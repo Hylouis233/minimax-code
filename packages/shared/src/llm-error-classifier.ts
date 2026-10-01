@@ -49,8 +49,7 @@ export const LLM_RETRY_REASONS = [
 export type LLMRetryReason = (typeof LLM_RETRY_REASONS)[number];
 
 export type LLMRetryDecision =
-  | { retryable: true; reason: LLMRetryReason }
-  | { retryable: false; reason: LLMMetricErrorKind };
+  { retryable: true; reason: LLMRetryReason } | { retryable: false; reason: LLMMetricErrorKind };
 
 export type LLMErrorSignal =
   | 'usage_limit'
@@ -148,7 +147,9 @@ export function normalizeLLMError(input: LLMErrorInput): NormalizedLLMError {
       signals.add('content_filter');
     }
 
-    const extracted = safeExtract(input.raw);
+    const extracted = safeExtract(
+      typeof input.raw === 'string' ? { message: input.raw } : input.raw,
+    );
     facts.httpStatus ??= validHttpStatus(input.statusCode) ?? extracted.httpStatus;
     facts.upstreamStatusCode ??= extracted.upstreamStatusCode;
     facts.providerMessageCode ??= extracted.providerMessageCode;
@@ -159,8 +160,16 @@ export function normalizeLLMError(input: LLMErrorInput): NormalizedLLMError {
     const visibleMessage = extracted.message ?? input.errorMessage;
     const legacy = extractLegacyMessageFacts(visibleMessage);
     facts.httpStatus ??= legacy.httpStatus;
-    facts.upstreamStatusCode ??= legacy.upstreamStatusCode;
-    facts.existingProtocolCode ??= legacy.existingProtocolCode;
+    facts.upstreamStatusCode = preferBusinessStatus(
+      facts.upstreamStatusCode,
+      legacy.upstreamStatusCode,
+    );
+    facts.providerMessageCode ??= legacy.providerMessageCode;
+    // A message-only wrapper must not replace a structured provider signal with
+    // its generic HTTP projection. Explicit wire errorCode still takes precedence.
+    if (facts.upstreamStatusCode === undefined && facts.providerMessageCode === undefined) {
+      facts.existingProtocolCode ??= legacy.existingProtocolCode;
+    }
     const message = legacy.message ?? visibleMessage;
     applyMessageSignals(message, facts, signals);
     applyNumericSignals(facts, signals);
@@ -178,10 +187,15 @@ export function toLLMMetricErrorKind(facts: LLMErrorFacts): LLMMetricErrorKind {
     if (facts.explicitAbort) return 'abort';
     if (facts.signals.has('credits_exhausted')) return 'credits_exhausted';
     if (facts.signals.has('usage_limit')) return 'usage_limit';
+    if (facts.signals.has('content_filter')) return 'content_filter';
     if (facts.signals.has('tpm_rate_limit')) return 'tpm_rate_limited';
+    const upstreamCode = mappedUpstreamCode(facts);
+    if (upstreamCode === LLM_ERROR_CODES.LLM_AUTH_ERROR) return 'auth';
+    if (upstreamCode === LLM_ERROR_CODES.LLM_RATE_LIMITED) return 'rate_limited';
+    if (upstreamCode === LLM_ERROR_CODES.LLM_UPSTREAM_ERROR) return 'server_error';
+    if (facts.existingProtocolCode === LLM_ERROR_CODES.SAFETY_SENSITIVE) return 'content_filter';
     if (facts.timeout && effectiveHttpStatus(facts) === 529) return 'overloaded';
     if (facts.timeout) return 'timeout';
-    if (facts.signals.has('content_filter')) return 'content_filter';
     if (facts.signals.has('empty_response')) return 'empty_response';
     if (facts.signals.has('length')) return 'length';
     switch (facts.existingProtocolCode) {
@@ -231,7 +245,8 @@ export function toLLMRetryDecision(normalized: NormalizedLLMError): LLMRetryDeci
     metricKind === 'abort' ||
     metricKind === 'usage_limit' ||
     metricKind === 'credits_exhausted' ||
-    metricKind === 'auth'
+    metricKind === 'auth' ||
+    metricKind === 'content_filter'
   ) {
     return { retryable: false, reason: metricKind };
   }
@@ -242,6 +257,13 @@ export function toLLMRetryDecision(normalized: NormalizedLLMError): LLMRetryDeci
     status === 403
   ) {
     return { retryable: false, reason: 'auth' };
+  }
+  const upstreamCode = mappedUpstreamCode(facts);
+  if (upstreamCode === LLM_ERROR_CODES.LLM_UPSTREAM_ERROR) {
+    return { retryable: false, reason: metricKind };
+  }
+  if (upstreamCode === LLM_ERROR_CODES.LLM_RATE_LIMITED) {
+    return { retryable: true, reason: 'rate_limited' };
   }
   if (facts.timeout) return { retryable: true, reason: 'timeout' };
   if (facts.signals.has('network')) return { retryable: true, reason: 'network' };
@@ -277,10 +299,14 @@ export function toLLMProtocolClassification(
       Object.values(LLM_ERROR_CODES).includes(facts.existingProtocolCode as LLMErrorStatusCode)
     ) {
       code = facts.existingProtocolCode;
+    } else if (facts.signals.has('content_filter')) {
+      code = LLM_ERROR_CODES.SAFETY_SENSITIVE;
     } else if (facts.signals.has('credits_exhausted')) {
       code = LLM_ERROR_CODES.LLM_CREDITS_EXHAUSTED;
     } else if (isLLMUsageLimitUpstreamStatusCode(facts.upstreamStatusCode)) {
       code = LLM_ERROR_CODES.USAGE_LIMIT_EXCEEDED;
+    } else if (mappedUpstreamCode(facts) !== undefined) {
+      code = mappedUpstreamCode(facts);
     } else if (httpStatus === 429 && facts.signals.has('tpm_rate_limit')) {
       code = LLM_ERROR_CODES.LLM_TPM_RATE_LIMITED;
     } else if (httpStatus === 529) {
@@ -310,6 +336,14 @@ interface SafeExtracted {
 }
 
 function safeExtract(raw: unknown): SafeExtracted {
+  try {
+    return extractSafeObject(raw);
+  } catch {
+    return {};
+  }
+}
+
+function extractSafeObject(raw: unknown): SafeExtracted {
   const out: SafeExtracted = {};
   const seen = new WeakSet<object>();
   const queue: Array<{ value: unknown; depth: number }> = [{ value: raw, depth: 0 }];
@@ -319,15 +353,6 @@ function safeExtract(raw: unknown): SafeExtracted {
     if (item.depth > 4 || typeof item.value !== 'object' || item.value === null) continue;
     if (seen.has(item.value)) continue;
     seen.add(item.value);
-    if (
-      item.value instanceof Error ||
-      (typeof DOMException !== 'undefined' && item.value instanceof DOMException)
-    ) {
-      const builtinError = item.value;
-      if (builtinError.name === 'AbortError') out.explicitAbort = true;
-      if (/TimeoutError/u.test(builtinError.name)) out.timeout = true;
-      if (!out.message && builtinError.message) out.message = sanitizeMessage(builtinError.message);
-    }
     let descriptors: PropertyDescriptorMap;
     try {
       descriptors = Object.getOwnPropertyDescriptors(item.value);
@@ -338,7 +363,21 @@ function safeExtract(raw: unknown): SafeExtracted {
       const descriptor = descriptors[key];
       return descriptor && 'value' in descriptor ? descriptor.value : undefined;
     };
-    const name = value('name');
+    // Error fields are own data properties. For DOMException, invoke only the
+    // built-in accessors rather than arbitrary getters supplied by a payload.
+    let name = value('name');
+    let builtinMessage: unknown;
+    if (typeof DOMException !== 'undefined' && item.value instanceof DOMException) {
+      try {
+        const prototype = DOMException.prototype;
+        name ??= Object.getOwnPropertyDescriptor(prototype, 'name')?.get?.call(item.value);
+        builtinMessage = Object.getOwnPropertyDescriptor(prototype, 'message')?.get?.call(
+          item.value,
+        );
+      } catch {
+        // Non-DOMException values fail the native brand check.
+      }
+    }
     const code = value('code');
     if (name === 'AbortError') out.explicitAbort = true;
     if (typeof name === 'string' && /TimeoutError/u.test(name)) out.timeout = true;
@@ -352,16 +391,25 @@ function safeExtract(raw: unknown): SafeExtracted {
       out.network = true;
     }
     const upstream = validInteger(value('status_code'));
-    out.upstreamStatusCode ??= upstream;
+    out.httpStatus ??= validHttpStatus(upstream);
+    out.upstreamStatusCode = preferBusinessStatus(out.upstreamStatusCode, upstream);
     const existing = validInteger(value('errorCode'));
-    out.existingProtocolCode ??= existing;
+    if (existing !== undefined && isLLMProtocolCode(existing))
+      out.existingProtocolCode ??= existing;
+    else out.providerMessageCode ??= existing;
     const providerCode = validInteger(value('code'));
-    if (providerCode !== undefined && providerCode < 10000)
+    if (providerCode !== undefined && isLLMProtocolCode(providerCode)) {
+      out.existingProtocolCode ??= providerCode;
+    } else {
       out.providerMessageCode ??= providerCode;
+    }
     const statusMessage = value('status_message') ?? value('status_msg');
-    const message = value('message');
+    const message = value('message') ?? builtinMessage;
     if (typeof statusMessage === 'string') out.message = sanitizeMessage(statusMessage);
     else if (!out.message && typeof message === 'string') out.message = sanitizeMessage(message);
+    const errorMessage = value('error');
+    if (!out.message && typeof errorMessage === 'string')
+      out.message = sanitizeMessage(errorMessage);
     const responseBody = value('responseBody');
     if (typeof responseBody === 'string' && responseBody.length <= 64_000) {
       try {
@@ -370,7 +418,7 @@ function safeExtract(raw: unknown): SafeExtracted {
         /* compatibility fallback */
       }
     }
-    for (const key of ['cause', 'error', 'data']) {
+    for (const key of ['base_resp', 'cause', 'error', 'data']) {
       queue.push({ value: value(key), depth: item.depth + 1 });
     }
   }
@@ -396,6 +444,7 @@ function sanitizeMessage(message: string): string {
 function extractLegacyMessageFacts(message: string | undefined): {
   httpStatus?: number;
   upstreamStatusCode?: number;
+  providerMessageCode?: number;
   existingProtocolCode?: number;
   message?: string;
 } {
@@ -407,8 +456,11 @@ function extractLegacyMessageFacts(message: string | undefined): {
   const httpStatus = validHttpStatus(statusCode);
   return {
     ...(httpStatus !== undefined ? { httpStatus } : {}),
-    ...(statusCode !== undefined && httpStatus === undefined
-      ? { upstreamStatusCode: statusCode }
+    ...(extracted.upstreamStatusCode !== undefined
+      ? { upstreamStatusCode: extracted.upstreamStatusCode }
+      : {}),
+    ...(extracted.providerMessageCode !== undefined
+      ? { providerMessageCode: extracted.providerMessageCode }
       : {}),
     ...(classified ? { existingProtocolCode: classified.status_code } : {}),
     ...(extracted.message ? { message: sanitizeMessage(extracted.message) } : {}),
@@ -417,13 +469,11 @@ function extractLegacyMessageFacts(message: string | undefined): {
 
 function applyNumericSignals(facts: LLMErrorFacts, signals: Set<LLMErrorSignal>): void {
   const httpStatus = effectiveHttpStatus(facts);
-  if (
-    facts.upstreamStatusCode === 1400010161 ||
-    facts.providerMessageCode === 1008 ||
-    httpStatus === 402
-  )
+  if (mappedUpstreamCode(facts) === LLM_ERROR_CODES.LLM_CREDITS_EXHAUSTED || httpStatus === 402)
     signals.add('credits_exhausted');
-  if (isLLMUsageLimitUpstreamStatusCode(facts.upstreamStatusCode)) signals.add('usage_limit');
+  if (mappedUpstreamCode(facts) === LLM_ERROR_CODES.USAGE_LIMIT_EXCEEDED)
+    signals.add('usage_limit');
+  if (mappedUpstreamCode(facts) === LLM_ERROR_CODES.SAFETY_SENSITIVE) signals.add('content_filter');
   if (
     httpStatus === 429 &&
     [2045, 2046, 2047, 1039, 1041].includes(facts.providerMessageCode ?? -1)
@@ -662,6 +712,8 @@ export const LLM_ERROR_STATUS_CODES = {
   LLM_MIGRATION_ERROR: 50114,
   /** daemon LLM_TPM_RATE_LIMITED — provider TPM/RPM short-term throttling */
   LLM_TPM_RATE_LIMITED: 50150,
+  /** Existing runtime SAFETY_SENSITIVE wire code — provider content rejection. */
+  SAFETY_SENSITIVE: 50201,
   /** LLM_CLUSTER_OVERLOADED — HTTP 529 */
   LLM_CLUSTER_OVERLOADED: 50151,
 } as const;
@@ -684,6 +736,16 @@ export function isLLMTpmRateLimitMessage(message: string | undefined): boolean {
  * source of daemon local-proxy-handler.ts::UPSTREAM_CODE_MAP.
  */
 export const UPSTREAM_STATUS_CODE_MAP: Record<number, LLMErrorStatusCode> = {
+  // MiniMax public base_resp codes: https://platform.minimax.cn/docs/api-reference/errorcode
+  1000: LLM_ERROR_CODES.LLM_UPSTREAM_ERROR,
+  1002: LLM_ERROR_CODES.LLM_RATE_LIMITED,
+  1004: LLM_ERROR_CODES.LLM_AUTH_ERROR,
+  1008: LLM_ERROR_CODES.LLM_CREDITS_EXHAUSTED,
+  1013: LLM_ERROR_CODES.LLM_UPSTREAM_ERROR,
+  1024: LLM_ERROR_CODES.LLM_UPSTREAM_ERROR,
+  1026: LLM_ERROR_CODES.SAFETY_SENSITIVE,
+  1027: LLM_ERROR_CODES.SAFETY_SENSITIVE,
+  1033: LLM_ERROR_CODES.LLM_UPSTREAM_ERROR,
   // MiniMax internal status: insufficient balance → 50110.
   1400010161: LLM_ERROR_CODES.LLM_CREDITS_EXHAUSTED,
   // MiniMax internal status: usage limit exceeded → 42212.
@@ -692,108 +754,65 @@ export const UPSTREAM_STATUS_CODE_MAP: Record<number, LLMErrorStatusCode> = {
   2067: LLM_ERROR_CODES.USAGE_LIMIT_EXCEEDED,
 };
 
-/**
- * Extract `{ status_code, errorCode, code, message }` signals from unknown raw values, supporting
- * nested envelopes such as `{error: {responseBody: '{"status_code":...}'}}` from Vercel AI SDK /
- * DOMException wrappers.
- *
- * Recursively unwrap three levels through err.responseBody (JSON string) → err.error (nested
- * object) → err.data → err.status.
- */
-export function tryExtractFromPayload(raw: unknown): {
+function isLLMProtocolCode(code: number): code is LLMErrorStatusCode {
+  return Object.values(LLM_ERROR_CODES).includes(code as LLMErrorStatusCode);
+}
+
+/** Preserve a nested business error over an outer HTTP-shaped or success wrapper. */
+function preferBusinessStatus(
+  current: number | undefined,
+  candidate: number | undefined,
+): number | undefined {
+  if (candidate === undefined) return current;
+  if (current === undefined) return candidate;
+  const candidateIsBusiness = candidate !== 0 && validHttpStatus(candidate) === undefined;
+  const currentIsWrapper = current === 0 || validHttpStatus(current) !== undefined;
+  const candidateIsKnown = UPSTREAM_STATUS_CODE_MAP[candidate] !== undefined;
+  const currentIsKnown = UPSTREAM_STATUS_CODE_MAP[current] !== undefined;
+  return candidateIsBusiness && (currentIsWrapper || (!currentIsKnown && candidateIsKnown))
+    ? candidate
+    : current;
+}
+
+function mappedUpstreamCode(
+  facts: Pick<LLMErrorFacts, 'upstreamStatusCode' | 'providerMessageCode'>,
+): LLMErrorStatusCode | undefined {
+  const code = facts.upstreamStatusCode ?? facts.providerMessageCode;
+  return code === undefined ? undefined : UPSTREAM_STATUS_CODE_MAP[code];
+}
+
+interface ExtractedLLMPayload {
+  /** Transport HTTP status only; provider status_code is kept separately. */
   statusCode?: number;
+  upstreamStatusCode?: number;
+  providerMessageCode?: number;
   errorCode?: number;
   message?: string;
-} {
-  if (typeof raw !== 'object' || raw === null) return {};
-  const obj = raw as Record<string, unknown>;
-  const out: { statusCode?: number; errorCode?: number; message?: string } = {};
+}
 
-  // ── pass 1: nested envelopes first ──────────────────────────────────────
-  // Business-level codes (inner upstream `status_code`) MUST take priority
-  // over transport-level codes (outer HTTP `statusCode`). AI SDK
-  // APICallError wraps upstream payload as `{statusCode: 500,
-  // responseBody: '{"status_code": 1400010161, ...}'}` — the inner 1400010161
-  // is the real cause (MiniMax credit exhausted → 50110), the outer 500 is
-  // just HTTP transport. We collect nested signals FIRST, then let outer
-  // fields fill in only what nested didn't provide.
+/** Bounded, no-getter extraction shared by legacy protocol and normalized paths. */
+export function tryExtractFromPayload(raw: unknown): ExtractedLLMPayload {
+  return extractPayload(raw, 0);
+}
 
-  let nested: { statusCode?: number; errorCode?: number; message?: string } = {};
-  if (typeof obj.responseBody === 'string') {
-    try {
-      const inner = JSON.parse(obj.responseBody) as Record<string, unknown>;
-      const innerExtract = tryExtractFromPayload(inner);
-      nested = { ...innerExtract };
-    } catch {
-      // ignore parse fail
-    }
+function extractPayload(raw: unknown, messageDepth: number): ExtractedLLMPayload {
+  try {
+    const extracted = safeExtract(raw);
+    const fromMessage =
+      messageDepth < 4 ? extractFromMessageString(extracted.message ?? '', messageDepth + 1) : {};
+    return {
+      statusCode: extracted.httpStatus ?? fromMessage.statusCode,
+      upstreamStatusCode: preferBusinessStatus(
+        extracted.upstreamStatusCode,
+        fromMessage.upstreamStatusCode,
+      ),
+      providerMessageCode: extracted.providerMessageCode ?? fromMessage.providerMessageCode,
+      errorCode: extracted.existingProtocolCode ?? fromMessage.errorCode,
+      message: fromMessage.message ?? extracted.message,
+    };
+  } catch {
+    return {};
   }
-  if (typeof obj.error === 'object' && obj.error !== null) {
-    const innerExtract = tryExtractFromPayload(obj.error);
-    nested.statusCode ??= innerExtract.statusCode;
-    nested.errorCode ??= innerExtract.errorCode;
-    nested.message ??= innerExtract.message;
-  }
-  if (typeof obj.data === 'object' && obj.data !== null) {
-    const innerExtract = tryExtractFromPayload(obj.data);
-    nested.statusCode ??= innerExtract.statusCode;
-    nested.errorCode ??= innerExtract.errorCode;
-    nested.message ??= innerExtract.message;
-  }
-  // `obj.cause` (Error chain root cause via `new Error('...', { cause: orig })`)
-  // — some SDK wrappers (Vercel AI / Vercel) re-throw the original
-  // provider Error as `.cause` while putting their own format string in
-  // `.message`. Recurse so the original typed signal isn't lost.
-  if (typeof obj.cause === 'object' && obj.cause !== null) {
-    const innerExtract = tryExtractFromPayload(obj.cause);
-    nested.statusCode ??= innerExtract.statusCode;
-    nested.errorCode ??= innerExtract.errorCode;
-    nested.message ??= innerExtract.message;
-  }
-  out.statusCode = nested.statusCode;
-  out.errorCode = nested.errorCode;
-  out.message = nested.message;
-
-  // ── pass 2: outer fields fill blanks ────────────────────────────────────
-  if (out.statusCode === undefined && typeof obj.status_code === 'number') {
-    out.statusCode = obj.status_code;
-  }
-  if (out.statusCode === undefined && typeof obj.statusCode === 'number') {
-    out.statusCode = obj.statusCode;
-  }
-  // Messages-compatible SDK `APIError` uses `.status` (number); other SDKs
-  // use `.statusCode`. Pick whichever appears.
-  if (out.statusCode === undefined && typeof obj.status === 'number') {
-    out.statusCode = obj.status;
-  }
-  if (out.errorCode === undefined && typeof obj.errorCode === 'number') {
-    out.errorCode = obj.errorCode;
-  }
-  if (out.errorCode === undefined && typeof obj.code === 'number') {
-    out.errorCode = obj.code;
-  }
-  if (!out.message && typeof obj.message === 'string') out.message = obj.message;
-  if (!out.message && typeof obj.status_message === 'string') out.message = obj.status_message;
-  if (!out.message && typeof obj.status_msg === 'string') out.message = obj.status_msg;
-  if (!out.message && typeof obj.error === 'string') out.message = obj.error;
-
-  // ── pass 3: message string fallback ──────────────────────────────────────
-  // Some SDKs throw APIError whose toString() is
-  // `[Error] <status> <json-body>`, Vercel / Vercel AI re-wrappers, etc.)
-  // collapse the typed fields into a plain text `message` string before
-  // throwing. Try to recover the signal from that string when typed fields
-  // didn't already cover it.
-  if (typeof obj.message === 'string') {
-    const fromMsg = extractFromMessageString(obj.message);
-    out.statusCode ??= fromMsg.statusCode;
-    out.errorCode ??= fromMsg.errorCode;
-    // Inner JSON payload may also carry a richer message (e.g. provider
-    // `error.message: "invalid api key"`); prefer it over the noisy raw
-    // outer string when available.
-    if (fromMsg.message) out.message = fromMsg.message;
-  }
-
-  return out;
 }
 
 // extractFromMessageString — best-effort parse of a raw error-message
@@ -814,12 +833,8 @@ export function tryExtractFromPayload(raw: unknown): {
 //     numeric content in JSON body doesn't trigger false positives.
 //   - message: the most specific human-readable message found in the
 //     embedded JSON (`error.message` → `message` → `error` as string).
-function extractFromMessageString(s: string): {
-  statusCode?: number;
-  errorCode?: number;
-  message?: string;
-} {
-  const out: { statusCode?: number; errorCode?: number; message?: string } = {};
+function extractFromMessageString(s: string, messageDepth: number): ExtractedLLMPayload {
+  const out: ExtractedLLMPayload = {};
   if (!s) return out;
 
   // 1. Find the embedded JSON body (first `{` ... last `}`).
@@ -830,8 +845,12 @@ function extractFromMessageString(s: string): {
     const jsonSlice = s.slice(firstBrace, lastBrace + 1);
     try {
       const parsed = JSON.parse(jsonSlice) as unknown;
-      const innerExtract = tryExtractFromPayload(parsed);
+      const innerExtract = extractPayload(parsed, messageDepth);
       if (innerExtract.statusCode !== undefined) out.statusCode = innerExtract.statusCode;
+      if (innerExtract.upstreamStatusCode !== undefined)
+        out.upstreamStatusCode = innerExtract.upstreamStatusCode;
+      if (innerExtract.providerMessageCode !== undefined)
+        out.providerMessageCode = innerExtract.providerMessageCode;
       if (innerExtract.errorCode !== undefined) out.errorCode = innerExtract.errorCode;
       if (innerExtract.message) out.message = innerExtract.message;
     } catch {
@@ -850,6 +869,10 @@ function extractFromMessageString(s: string): {
     }
   }
 
+  // A collapsed provider error may retain its business code after the HTTP
+  // status. Do not interpret arbitrary numbers elsewhere in prose as codes.
+  const suffix = prefix.match(/\b[45]\d{2}\s+\((\d{4,10})\)\s*$/u);
+  if (suffix) out.upstreamStatusCode ??= validInteger(Number(suffix[1]));
   return out;
 }
 
@@ -861,7 +884,8 @@ export function mapUpstreamHttpError(httpStatus: number): LLMErrorStatusCode | u
   if (httpStatus === 429) return LLM_ERROR_CODES.LLM_RATE_LIMITED;
   if (httpStatus === 529) return LLM_ERROR_CODES.LLM_CLUSTER_OVERLOADED;
   if (httpStatus === 401 || httpStatus === 403) return LLM_ERROR_CODES.LLM_AUTH_ERROR;
-  if (httpStatus >= 400) return LLM_ERROR_CODES.LLM_UPSTREAM_ERROR;
+  if (validHttpStatus(httpStatus) !== undefined && httpStatus >= 400)
+    return LLM_ERROR_CODES.LLM_UPSTREAM_ERROR;
   return undefined;
 }
 
@@ -903,10 +927,11 @@ export function classifyLLMErrorToCode(
       };
     }
   }
-  // 2. Match upstream status_code.
-  if (extracted.statusCode !== undefined && UPSTREAM_STATUS_CODE_MAP[extracted.statusCode]) {
+  // 2. Match provider business codes without treating them as HTTP statuses.
+  const upstreamCode = mappedUpstreamCode(extracted);
+  if (upstreamCode !== undefined) {
     return {
-      status_code: UPSTREAM_STATUS_CODE_MAP[extracted.statusCode]!,
+      status_code: upstreamCode,
       message: extracted.message ?? fallbackMessage(err),
     };
   }
@@ -918,12 +943,8 @@ export function classifyLLMErrorToCode(
   if (messageOnly) return messageOnly;
 
   const codeMessage = extracted.message ?? fallbackMessage(err);
-  const transportCode = extractErrorCode(err);
-  const httpStatus =
-    extracted.statusCode ??
-    (typeof (err as { statusCode?: unknown })?.statusCode === 'number'
-      ? (err as { statusCode: number }).statusCode
-      : undefined);
+  const transport = safeExtract(normalized);
+  const httpStatus = validHttpStatus(extracted.upstreamStatusCode) ?? extracted.statusCode;
 
   // 4. Provider TPM/rate-window fallback. These 429s are short-term request
   // throttles, not quota exhaustion, so they get their own product code.
@@ -943,14 +964,17 @@ export function classifyLLMErrorToCode(
   if (httpStatus !== undefined && (httpStatus < 500 || httpStatus === 529)) {
     const mapped = mapUpstreamHttpError(httpStatus);
     if (mapped !== undefined) {
-      return { status_code: mapped, message: extracted.message ?? fallbackMessage(err) };
+      return {
+        status_code: mapped,
+        message: extracted.message ?? fallbackMessage(err),
+      };
     }
   }
 
   // 6. LLM HTTP timeout fallback. A transport deadline does not prove that
   // the provider returned an explicit cluster-overload response.
   const timeoutMessage = codeMessage;
-  if (isLLMHttpTimeoutSignal(err, timeoutMessage)) {
+  if (transport.timeout || isLLMTransportTimeoutSignal(timeoutMessage)) {
     return {
       status_code: LLM_ERROR_CODES.LLM_UPSTREAM_ERROR,
       message: timeoutMessage,
@@ -961,40 +985,23 @@ export function classifyLLMErrorToCode(
   if (httpStatus !== undefined) {
     const mapped = mapUpstreamHttpError(httpStatus);
     if (mapped !== undefined) {
-      return { status_code: mapped, message: extracted.message ?? fallbackMessage(err) };
+      return {
+        status_code: mapped,
+        message: extracted.message ?? fallbackMessage(err),
+      };
     }
   }
 
   // 8. LLM transport network fallback. No dedicated daemon wire code exists for
   // network, so use the generic upstream code while preserving the raw detail.
   const networkMessage = codeMessage;
-  if (isLLMTransportNetworkSignal(networkMessage) || isLLMTransportNetworkCode(transportCode)) {
+  if (isLLMTransportNetworkSignal(networkMessage) || transport.network) {
     return {
       status_code: LLM_ERROR_CODES.LLM_UPSTREAM_ERROR,
       message: networkMessage,
     };
   }
   return null;
-}
-
-function isLLMHttpTimeoutSignal(err: unknown, message: string): boolean {
-  if (
-    /\b(timed?\s*out|timeout|ETIMEDOUT|ESOCKETTIMEDOUT|ECONNABORTED|UND_ERR_(?:CONNECT|HEADERS|BODY)_TIMEOUT)\b/i.test(
-      message,
-    )
-  ) {
-    return true;
-  }
-
-  if (typeof err !== 'object' || err === null) return false;
-  const candidate = err as { name?: unknown; code?: unknown };
-  return (
-    (typeof candidate.name === 'string' &&
-      /\b(?:TimeoutError|ConnectTimeoutError|HeadersTimeoutError|BodyTimeoutError)\b/i.test(
-        candidate.name,
-      )) ||
-    (typeof candidate.code === 'string' && isLLMTransportTimeoutCode(candidate.code))
-  );
 }
 
 function isLLMTransportTimeoutCode(code: string): boolean {
@@ -1013,10 +1020,6 @@ function isLLMTransportNetworkSignal(message: string): boolean {
     CHROMIUM_NETWORK_MESSAGE_RE.test(message) ||
     SAFE_TRANSPORT_NETWORK_MESSAGE_RE.test(message)
   );
-}
-
-function isLLMTransportNetworkCode(code: string | undefined): boolean {
-  return code !== undefined && SAFE_NETWORK_CODES.has(code) && !isLLMTransportTimeoutCode(code);
 }
 
 function classifyQuotaSignalFromMessage(
@@ -1050,7 +1053,6 @@ function classifyQuotaSignalFromMessage(
 }
 
 function fallbackMessage(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  if (typeof err === 'string') return err;
+  if (typeof err === 'string') return sanitizeMessage(err);
   return 'LLM call failed';
 }

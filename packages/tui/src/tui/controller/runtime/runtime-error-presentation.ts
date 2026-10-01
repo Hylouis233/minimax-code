@@ -58,6 +58,14 @@ export function resolveTuiRuntimeFailure(
   const retryable =
     (errorCode !== undefined && FORCE_RETRY_ERROR_CODES.has(errorCode)) ||
     metadata.retryable !== false;
+  // A structured provider rejection is authoritative even when its diagnostic
+  // text includes a rate-limit phrase or transport status from an outer wrapper.
+  if (errorCode === 50_201) {
+    return {
+      content: `The response was stopped by content safety checks.${diagnostics}${code}\nRevise the message before sending it again. Your prompt is preserved.`,
+      retryable: false,
+    };
+  }
   if (errorCode === 403) {
     return {
       content: `Access denied.${diagnostics}${code}\nCheck account and model permissions before sending again. Your prompt is preserved.`,
