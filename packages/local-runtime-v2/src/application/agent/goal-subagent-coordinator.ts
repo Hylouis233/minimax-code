@@ -16,6 +16,21 @@ import { renderGoalVerifierReminder } from './goal-verifier-reminder.js';
  */
 const GOAL_VERIFIER_DENIED_TOOLS = new Set(['web_fetch', 'web_search']);
 
+/**
+ * How many denied tool calls a child may spend recovering before the run is
+ * stopped as a capability violation.
+ *
+ * A single blocked call is a model mistake, not a defect: the blocked result
+ * goes back to the model, which still holds `read`, `grep` and `bash` and can
+ * reach the same evidence locally. Latching the run on the first attempt threw
+ * that recovery away and turned an ordinary detour into
+ * `paused(verifier_capability)`, so the ceiling has to leave room for the
+ * child to correct itself. Past this many attempts the child is not detouring,
+ * it is looping, and the existing `maxTurns`/`maxTokens` caps remain the outer
+ * bound on top of it.
+ */
+const MAX_DENIED_TOOL_RECOVERIES = 2;
+
 /** Structurally mirrors the v1 delegation runner's registry contract. */
 export interface GoalVerifierChildRunIssue {
   readonly code: 'route_unavailable' | 'capability_violation' | 'child_budget_exhausted';
@@ -39,6 +54,7 @@ export interface GoalVerifierChildRunState {
   childTurns: number;
   tokens: number;
   usageIncomplete: boolean;
+  deniedToolCalls: number;
   issue?: GoalVerifierChildRunIssue;
 }
 
@@ -69,6 +85,7 @@ export class GoalVerifierChildCoordinator {
       childTurns: 0,
       tokens: 0,
       usageIncomplete: false,
+      deniedToolCalls: 0,
     });
   }
 
@@ -160,11 +177,21 @@ export class GoalVerifierChildCoordinator {
     }
     const toolName = toolContext.toolCall.name;
     if (!GOAL_VERIFIER_DENIED_TOOLS.has(toolName)) return undefined;
-    const reason = `GOAL_VERIFIER_CAPABILITY_VIOLATION: readonly Goal verification blocked tool "${toolName}".`;
-    // Latched, not aborted here: the blocked result goes back to the model and
-    // the next `beforeLlm` stops the run on the latched issue.
-    this.latchIssue(state, { code: 'capability_violation', message: reason });
-    return { block: true, reason };
+    // The blocked result goes back to the model either way, so a bounded
+    // number of attempts is spent on recovery: the child still holds `read`,
+    // `grep` and `bash`, and the same evidence is reachable without a network
+    // tool. Only a child that keeps reaching for the denied tools after being
+    // told no is a real violation, and that is the case worth stopping for.
+    state.deniedToolCalls += 1;
+    if (state.deniedToolCalls > MAX_DENIED_TOOL_RECOVERIES) {
+      const reason = `GOAL_VERIFIER_CAPABILITY_VIOLATION: readonly Goal verification blocked tool "${toolName}" ${state.deniedToolCalls} times.`;
+      this.latchIssue(state, { code: 'capability_violation', message: reason });
+      return { block: true, reason };
+    }
+    return {
+      block: true,
+      reason: `This Goal verification is read-only and offline: "${toolName}" is unavailable. Verify from local evidence instead — read the files, search the tree, and inspect the working tree with git.`,
+    };
   }
 
   private latchIssue(state: GoalVerifierChildRunState, issue: GoalVerifierChildRunIssue): void {
@@ -231,8 +258,7 @@ export function createGoalVerifierChildExtension(
 
 function goalVerifierRunId(
   intent:
-    | { readonly kind?: string; readonly attributes?: Readonly<Record<string, string>> }
-    | undefined,
+    { readonly kind?: string; readonly attributes?: Readonly<Record<string, string>> } | undefined,
 ): string | undefined {
   if (
     intent?.kind !== 'goal-verifier' ||
