@@ -44,6 +44,7 @@ import {
   readUsageNumber,
 } from "./message-projection.js";
 import { projectMessageParts } from "./message-parts.js";
+import { hasWebuiNonTextActivity } from "./transcript-projection.js";
 
 // ── Field table documentation (readonly; pinned by tests) ────────────
 
@@ -428,9 +429,7 @@ export function projectLiveTurnView(
         ...(activityParts.length ? { activityParts } : {}),
       };
     });
-  const processSegments = projectedProcessSegments.some((segment) =>
-    segment.activityParts?.some((part) => part.type !== "text"),
-  )
+  const processSegments = hasWebuiNonTextActivity(projectedProcessSegments)
     ? projectedProcessSegments.filter((segment) => segment.activityParts?.length)
     : [];
   const view: WebuiLiveTurnView = {

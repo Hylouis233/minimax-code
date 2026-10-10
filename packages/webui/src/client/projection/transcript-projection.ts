@@ -135,6 +135,23 @@ export function projectWebuiQueryDurations(
   return out;
 }
 
+/**
+ * Whether any segment carries activity other than plain text.
+ *
+ * Both process-segment producers gate on this: a turn shows a process block
+ * only when something happened that is not prose. They each spelled the same
+ * `some((part) => part.type !== "text")` out; what they do once it is true
+ * differs — one keeps the segments as they are, the other drops the ones with
+ * no parts — so only the question is shared.
+ */
+export function hasWebuiNonTextActivity(
+  segments: readonly WebuiTranscriptProcessSegment[],
+): boolean {
+  return segments.some((segment) =>
+    segment.activityParts?.some((part) => part.type !== "text"),
+  );
+}
+
 /** Preserve the per-message activity segments that Desktop renders as rows. */
 export function projectWebuiProcessSegments(
   items: readonly WebuiTranscriptItem[],
@@ -187,9 +204,7 @@ export function projectWebuiProcessSegments(
   // Desktop treats earlier replies as archived process content while the
   // final reply remains outside the disclosure. Dropping text-only segments
   // here makes that boundary impossible to project in the renderer.
-  return segments.some((segment) => segment.activityParts?.some((part) => part.type !== "text"))
-    ? segments
-    : [];
+  return hasWebuiNonTextActivity(segments) ? segments : [];
 }
 
 /**

@@ -682,3 +682,55 @@ describe("groupWebuiTranscriptItems — persisted query duration", () => {
     expect(groups[0]?.totalRequestDurationMs).toBe(18_597);
   });
 });
+
+describe("the process-block gate", () => {
+  // Whether a turn shows its process disclosure at all. This predicate had no
+  // coverage: inverting it left all 2131 tests green, so it is pinned here.
+  // Only a part that is not plain text earns a block — a reply that is prose
+  // and nothing else renders as a reply, not as an archived process.
+  const textOnlyItem = () =>
+    projectWebuiMessage({
+      msgId: "history-text-only",
+      role: "assistant",
+      rawJson: JSON.stringify({
+        parts: [{ id: "answer", type: "text", content: "Final" }],
+      }),
+    });
+
+  const toolItem = () =>
+    projectWebuiMessage({
+      msgId: "history-tool",
+      role: "assistant",
+      rawJson: JSON.stringify({
+        parts: [
+          { id: "tool", type: "tool_call", tool_call: { name: "bash", status: "done" } },
+        ],
+      }),
+    });
+
+  it("keeps the segments when the activity is not all text", () => {
+    expect(projectWebuiProcessSegments(toolItem())).toHaveLength(1);
+  });
+
+  it("returns nothing when the activity is text only", () => {
+    expect(projectWebuiProcessSegments(textOnlyItem())).toEqual([]);
+  });
+
+  it("applies the same gate to the live turn view", () => {
+    const live = (parts: readonly Record<string, unknown>[]) =>
+      projectLiveTurnView(
+        [{ id: "live", answer: "Final", thinking: "", parts }],
+        { streaming: true },
+      );
+
+    expect(
+      live([{ id: "answer", type: "text", content: "Final" }])?.processSegments,
+    ).toBeUndefined();
+    expect(
+      live([
+        { id: "tool", type: "tool_call", tool_call: { name: "bash", status: "running" } },
+        { id: "answer", type: "text", content: "Final" },
+      ])?.processSegments?.[0]?.activityParts?.map((part) => part.type),
+    ).toEqual(["tool", "text"]);
+  });
+});
