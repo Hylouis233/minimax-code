@@ -3,10 +3,10 @@
 //
 // This is the boundary between the framework-free application layer and React.
 // The application object is created once by the composition root and provided
-// here; components read it and subscribe to its snapshot. They never receive a
-// store writer and never register a process-event callback — that is the
-// ticket's "components subscribe to application snapshots or selectors and
-// register no business event callback".
+// here; the bindings that need a part of it read it through the optional hook
+// below. Components never receive a store writer and never register a
+// process-event callback — that is the ticket's "components subscribe to
+// application snapshots or selectors and register no business event callback".
 
 import {
   createContext,
@@ -87,31 +87,6 @@ export function WebuiApplicationProvider({
   );
 }
 
-export function useWebuiApplication(): WebuiApplication {
-  const application = useContext(WebuiApplicationContext);
-  if (!application) {
-    throw new Error(
-      "useWebuiApplication must be used within a WebuiApplicationProvider",
-    );
-  }
-  return application;
-}
-
 export function useWebuiApplicationOptional(): WebuiApplication | undefined {
   return useContext(WebuiApplicationContext);
-}
-
-/**
- * Subscribe to the whole application snapshot. `subscribe` is the store's and
- * is stable across renders, and `getSnapshot` returns a cached object, so a
- * component re-renders exactly when the application state changes — and a
- * throwing consumer cannot unpack the subscription of its siblings.
- */
-export function useWebuiApplicationSnapshot(): WebuiApplicationState {
-  const application = useWebuiApplication();
-  return useSyncExternalStore(
-    application.subscribe,
-    application.getSnapshot,
-    application.getSnapshot,
-  );
 }

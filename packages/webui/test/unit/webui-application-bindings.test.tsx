@@ -16,10 +16,10 @@ import type { WebuiRuntimeEvent } from "../../src/shared/contracts/stream.js";
 import type { WebuiClientSessionResumer } from "../../src/client/contracts/execution-port.js";
 import {
   WebuiApplicationProvider,
-  useWebuiApplicationSnapshot,
+  useWebuiSessionStoreSnapshot,
 } from "../../src/client/bindings/application-context.js";
 import {
-  useWebuiSessionSending,
+  useWebuiSessionState,
   useWebuiSessionStream,
 } from "../../src/client/bindings/use-session-state.js";
 
@@ -46,8 +46,8 @@ function makeApplication() {
 }
 
 function Consumer({ sessionId }: { readonly sessionId: string }) {
-  const snapshot = useWebuiApplicationSnapshot();
-  const sending = useWebuiSessionSending(sessionId);
+  const snapshot = useWebuiSessionStoreSnapshot();
+  const sending = useWebuiSessionState(sessionId).sending;
   const stream = useWebuiSessionStream(sessionId);
   return (
     <span>

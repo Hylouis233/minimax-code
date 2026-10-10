@@ -21,7 +21,6 @@ import {
   selectWebuiSessionGoal,
   selectWebuiSessionPermissions,
   selectWebuiSessionQuestionnaire,
-  selectWebuiSessionSending,
   selectWebuiSessionStream,
 } from "../application/selectors.js";
 import type { WebuiGoal } from "../../shared/contracts/goal.js";
@@ -74,11 +73,6 @@ export function useWebuiSessionStream(
   const snapshot = useWebuiSessionStoreSnapshot();
   if (!sessionId) return initialWebuiApplicationSessionState.stream;
   return selectWebuiSessionStream(snapshot, sessionId);
-}
-
-export function useWebuiSessionSending(sessionId: string | undefined): boolean {
-  const snapshot = useWebuiSessionStoreSnapshot();
-  return sessionId ? selectWebuiSessionSending(snapshot, sessionId) : false;
 }
 
 /** The session's pending permissions, read through the selector. */
