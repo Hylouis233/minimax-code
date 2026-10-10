@@ -28,6 +28,7 @@ import type {
 } from "../contracts/stream-state.js";
 import type { WebuiStreamFrame } from "../../shared/contracts/stream.js";
 import type { WebuiAttachmentInput } from "../../shared/contracts/messages.js";
+import { isWebuiLeaseGenerationCurrent } from "./stream-lease.js";
 
 export interface WebuiStreamLoopDeps {
   readonly sendMessage?: WebuiClientMessageSender;
@@ -344,10 +345,11 @@ export function buildWebuiStreamLoopSink(
   // test is "am I still the newest claimer", not "do I still hold a lease".
   // Comparing against the lease instead would re-admit a superseded loop the
   // moment the newer turn's `[DONE]` cleared it.
-  const mine = (current: WebuiStreamState): boolean => {
-    if (generation === undefined) return current.subscription === undefined;
-    return current.lastClaimedGeneration === generation;
-  };
+  //
+  // The predicate is the lease mechanism's own (`mechanisms/stream-lease.ts`);
+  // this sink only binds it to the generation it claimed.
+  const mine = (current: WebuiStreamState): boolean =>
+    isWebuiLeaseGenerationCurrent(current, generation);
   return {
     /**
      * Claims once and only once. A second claim would mint a new generation and
