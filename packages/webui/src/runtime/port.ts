@@ -98,11 +98,6 @@ import type {
   WebuiUserProfileView,
 } from "../shared/contracts/personalization.js";
 
-export type {
-  WebuiPluginManagementAction,
-  WebuiPluginManagementRequest,
-} from "../shared/plugin-management.js";
-
 // Harness seam for the WebUI service.
 //
 // The service uses this port to reach the harness layer; the real
