@@ -289,7 +289,6 @@ export class WebuiService {
       cancelCodexOAuthLogin: (request) => this.port.cancelCodexOAuthLogin(request),
       refreshModels: () => this.port.refreshModels(),
       requestCompaction: (request) => this.port.requestCompaction(request),
-      invalidateAuth: () => this.port.invalidateAuth(),
     }, this.terminalManager);
     this.httpServer = createHttpListener(options.httpServerFactory);
     this.wsServer = new WebuiWebSocketServer({

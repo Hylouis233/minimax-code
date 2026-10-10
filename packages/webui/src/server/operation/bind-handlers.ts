@@ -206,7 +206,6 @@ export type WebuiOperationPort = Pick<
   | "cancelCodexOAuthLogin"
   | "refreshModels"
   | "requestCompaction"
-  | "invalidateAuth"
   | "getGlobalInstructions"
   | "setGlobalInstructions"
   | "getAgentMemory"

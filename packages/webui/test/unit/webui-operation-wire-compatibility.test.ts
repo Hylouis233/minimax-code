@@ -501,7 +501,16 @@ const TERMINAL_OPERATION_NAMES: readonly string[] = [
   "watchTerminal",
 ];
 
-/** Optional capabilities with a declared missing policy the wire must keep. */
+/**
+ * Optional capabilities with a declared missing policy the wire must keep.
+ *
+ * `signOut` used to be here, mapped to `signOutAccount`: the baseline fell back
+ * to `invalidateAuth` when that capability was absent. It is not optional any
+ * more — `WebuiHarnessPort` requires it and `WebuiService` forwards it
+ * unconditionally — so the absent host the baseline degraded for cannot be
+ * assembled, and the fallback went with it. Its non-callable case is a host
+ * shape that can still occur and is covered on its own below.
+ */
 const OPTIONAL_CAPABILITY_OPERATIONS: Readonly<Record<string, string>> = {
   listVisibleProjects: "listVisibleProjects",
   pluginManagement: "pluginManagement",
@@ -515,7 +524,6 @@ const OPTIONAL_CAPABILITY_OPERATIONS: Readonly<Record<string, string>> = {
   setUserProfile: "setUserProfile",
   getMemorySettings: "getMemorySettings",
   setMemorySettings: "setMemorySettings",
-  signOut: "signOutAccount",
 };
 
 describe("WebUI operation wire compatibility (baseline implementation vs typed bindings)", () => {
@@ -618,6 +626,17 @@ describe("WebUI operation wire compatibility (baseline implementation vs typed b
         { plan: { override: { [method]: 42 } } },
       );
     }
+  });
+
+  it("answers a non-callable signOutAccount through the dispatcher's failure path", async () => {
+    // `signOut` left the optional-capability matrix above when its absent case
+    // stopped being buildable; the non-callable override is still a real host
+    // shape, so it keeps the baseline's frame here.
+    await compareFrame(
+      "signOut with a non-callable signOutAccount",
+      requestFrame("signOut", VALID_BODIES.signOut),
+      { plan: { override: { signOutAccount: 42 } } },
+    );
   });
 
   it("hands each streaming capability the request signal and keeps the frames identical", async () => {
