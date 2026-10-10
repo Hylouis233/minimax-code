@@ -44,13 +44,33 @@ describe("WebUI command adapter", () => {
   });
 
   it("rejects malformed and unknown command request bodies", () => {
-    expect(runCommandOperation.validate(null)).toMatchObject({
+    // The message is pinned, not just the code: `invalid_body` is the answer to
+    // every rejected body, so a code-only assertion cannot tell a changed
+    // message — or a predicate that started rejecting something new — from the
+    // behaviour it was written against. AGENTS.md asks for this whenever a
+    // validator is touched, and `runCommand`'s was (the command list moved to
+    // `shared/contracts/commands.ts`).
+    assert.deepEqual(runCommandOperation.validate(null), {
       ok: false,
       code: "invalid_body",
+      message: "runCommand body must be an object",
     });
-    expect(
-      runCommandOperation.validate({ command: "not-a-command" }),
-    ).toMatchObject({ ok: false, code: "invalid_body" });
+    assert.deepEqual(runCommandOperation.validate({ command: "not-a-command" }), {
+      ok: false,
+      code: "invalid_body",
+      message: "runCommand command is invalid",
+    });
+    // Each optional field names itself, so the caller knows which one to fix.
+    for (const field of ["input", "sessionId", "agentName", "workspaceDir"]) {
+      assert.deepEqual(
+        runCommandOperation.validate({ command: "help", [field]: 42 }),
+        {
+          ok: false,
+          code: "invalid_body",
+          message: `${field} must be a string`,
+        },
+      );
+    }
   });
 
   it("validates and preserves the optional team-mode create field", () => {
