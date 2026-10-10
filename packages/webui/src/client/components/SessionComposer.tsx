@@ -1031,6 +1031,33 @@ export function WebuiComposer({
     return () => { cancelled = true; };
   }, [composerMenu, mentionRange !== undefined, pluginManagement]);
 
+  // The skills submenu and the slash palette render the same pool, so they read
+  // it through one loader. A second reader joins the request the first one
+  // started instead of fetching again and replacing the pool underneath it.
+  const [slashSkills, setSlashSkills] = useState<readonly WebuiSlashSkillSummary[]>(
+    [],
+  );
+  const slashSkillsRequestRef = useRef<
+    | {
+        readonly key: string;
+        readonly promise: Promise<readonly WebuiSlashSkillSummary[]>;
+      }
+    | undefined
+  >(undefined);
+  const readSlashSkills = useCallback((): Promise<
+    readonly WebuiSlashSkillSummary[]
+  > => {
+    if (!listSkills) return Promise.reject(new Error("技能目录暂不可用"));
+    const key = agentName ?? "";
+    if (slashSkillsRequestRef.current?.key !== key) {
+      slashSkillsRequestRef.current = {
+        key,
+        promise: listSkills({ agentName }).then((result) => result.skills),
+      };
+    }
+    return slashSkillsRequestRef.current.promise;
+  }, [listSkills, agentName]);
+
   useEffect(() => {
     if (composerMenu !== "skills") return;
     if (!listSkills) {
@@ -1040,12 +1067,12 @@ export function WebuiComposer({
     let cancelled = false;
     setSkillsMenuLoading(true);
     setSkillsMenuError(undefined);
-    listSkills({ agentName })
-      .then((result) => { if (!cancelled) setSlashSkills(result.skills); })
+    readSlashSkills()
+      .then((skills) => { if (!cancelled) setSlashSkills(skills); })
       .catch((error: unknown) => { if (!cancelled) setSkillsMenuError(error instanceof Error ? error.message : String(error)); })
       .finally(() => { if (!cancelled) setSkillsMenuLoading(false); });
     return () => { cancelled = true; };
-  }, [composerMenu, listSkills, agentName]);
+  }, [composerMenu, listSkills, readSlashSkills]);
 
   useEffect(() => {
     if (!mentionRange || !workspaceDir || !listWorkspaceFileTree) {
@@ -1254,32 +1281,29 @@ export function WebuiComposer({
   // functional even if the RPC is unavailable or rejects; once the live
   // registry returns, fetched entries replace the fixtures in the sectioning
   // pass.
-  const [slashSkills, setSlashSkills] = useState<readonly WebuiSlashSkillSummary[]>(
-    [],
-  );
   const slashSkillsLoadedRef = useRef(false);
   useEffect(() => {
     if (!listSkills) return;
     if (slashSkillsLoadedRef.current) return;
     let cancelled = false;
     slashSkillsLoadedRef.current = true;
-    listSkills({ agentName })
-      .then((result) => {
+    readSlashSkills()
+      .then((skills) => {
         if (cancelled) return;
-        setSlashSkills(result.skills);
+        setSlashSkills(skills);
       })
       .catch(() => {
-        // The popover keeps using the fixtures when the RPC rejects; nothing
-        // else to do here. The fetched-set flag stays true so we don't retry
-        // on every keystroke; the composer mounts once per session, not on
-        // every open.
+        // The popover keeps using the fixtures when the RPC rejects; the
+        // submenu reports the failure in its own state. Clearing the flag lets
+        // the next effect run retry; within one mount that means an
+        // `agentName` change, not every keystroke.
         if (cancelled) return;
         slashSkillsLoadedRef.current = false;
       });
     return () => {
       cancelled = true;
     };
-  }, [listSkills, agentName]);
+  }, [listSkills, readSlashSkills]);
   const slashSectioned = slashSkills.length
     ? sectionWebuiSlashPalette(
         WEBUI_BUILTIN_COMMANDS,
