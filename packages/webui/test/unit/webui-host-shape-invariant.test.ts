@@ -7,7 +7,7 @@
 // hooks the host exposed; tests could prove one shape, production could ship
 // another, and the wire protocol was a function of the host.
 //
-// This test pins three invariants that close that gap:
+// This file pins three of them and records where the fourth is enforced:
 //   1. The 18 operations that used to be gated are now in the registry on
 //      every build, regardless of which host fields the harness fills.
 //   2. The 6 terminal operations stay unregistered when the service is
@@ -20,10 +20,10 @@
 //      (one of the 18 that used to be gated) becomes a `harness_error`
 //      frame sourced from the handler's own thrown message — and crucially
 //      the dispatcher still looks the registry up FIRST.
-//      bridge comes up.
-//   3. (Compiler) `ScriptedHarnessPort` MUST satisfy `WebuiHarnessPort` —
-//      this file imports the fake type and the port type together so a
-//      missing port member breaks the test compile, not the runtime.
+//   4. (Compiler, enforced elsewhere) `ScriptedHarnessPort` MUST satisfy
+//      `WebuiHarnessPort`. That fake lives in `webui-service.test.ts`, which
+//      `tsconfig.test.json` compiles, so a missing port member breaks that
+//      program instead of failing at runtime. Nothing in this file imports it.
 
 import { describe, expect, it } from "vitest";
 import type { WebuiHarnessPort } from "../../src/runtime/port.js";

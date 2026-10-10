@@ -60,7 +60,6 @@ function cleanGraph(): Record<string, { bytesInOutput: number }> {
   return {
     "packages/webui/src/server/index.ts": { bytesInOutput: 120 },
     "packages/webui/src/client/main.tsx": { bytesInOutput: 6_000 },
-    "packages/webui/src/shared/placeholder.ts": { bytesInOutput: 60 },
     "node_modules/react/index.js": { bytesInOutput: 0 },
   };
 }
