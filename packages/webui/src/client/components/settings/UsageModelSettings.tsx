@@ -1,3 +1,4 @@
+import { formatWebuiCredits } from "../../value-readers.js";
 import { useEffect, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
 import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
@@ -260,7 +261,7 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
           <div className="flex w-full flex-col rounded-[16px] bg-bg_grouped_tertiary p-1">
             <div className="flex min-h-[64px] w-full items-center gap-6 overflow-hidden rounded-[12px] py-2 pl-3 pr-2"><div className="min-w-0"><span className="block text-[14px] leading-5">{quotaView.tokenPlanTier || (quotaView.hasTokenPlan ? "Token Plan" : "未订阅 Token Plan")}</span>{quotaView.tokenPlanExpiresAt ? <span className="mt-1 block text-[12px] leading-4 text-text_default_secondary">{new Date(quotaView.tokenPlanExpiresAt < 1e12 ? quotaView.tokenPlanExpiresAt * 1000 : quotaView.tokenPlanExpiresAt).toLocaleDateString("sv-SE").replaceAll("-", ".")}{quotaView.willRenewal ? " 自动续费" : ""}</span> : null}</div></div>
             <div className="h-[0.5px] bg-border_default" />
-            <div className="flex min-h-[64px] w-full items-center gap-6 overflow-hidden rounded-[12px] py-2 pl-3 pr-2"><div><span className="block text-[14px] leading-5">积分</span><span className="mt-1 block text-[12px] leading-4 text-text_default_secondary">剩余 {quotaView.purchasedCredits !== undefined && quotaView.freeCredits !== undefined ? `${formatCredits(quotaView.purchasedCredits)} + ${formatCredits(quotaView.freeCredits)}` : formatCredits(quotaView.creditBalance)}</span></div></div>
+            <div className="flex min-h-[64px] w-full items-center gap-6 overflow-hidden rounded-[12px] py-2 pl-3 pr-2"><div><span className="block text-[14px] leading-5">积分</span><span className="mt-1 block text-[12px] leading-4 text-text_default_secondary">剩余 {quotaView.purchasedCredits !== undefined && quotaView.freeCredits !== undefined ? `${formatWebuiCredits(quotaView.purchasedCredits)} + ${formatWebuiCredits(quotaView.freeCredits)}` : formatWebuiCredits(quotaView.creditBalance)}</span></div></div>
           </div>
         </section>
         {quotaData ? <section className="flex w-full flex-col gap-2" data-testid="settings-usage-limits"><h3 className="px-4 text-[14px] font-medium leading-5">用量</h3><div className="flex w-full flex-col rounded-[16px] bg-bg_grouped_tertiary p-1">{([["5 小时限额", quotaData.fiveHour], ["周限额", quotaData.weekly], ...(quotaData.video ? [["视频限额", quotaData.video] as const] : [])] as const).map(([label, window]) => { const value = record(window); const usedPercent = typeof value.usedPercent === "number" ? value.usedPercent : undefined; const usedCount = typeof value.usedCount === "number" ? value.usedCount : undefined; const totalCount = typeof value.totalCount === "number" ? value.totalCount : undefined; const percent = Math.round(usedPercent ?? (totalCount ? (usedCount ?? 0) / totalCount * 100 : 0)); const resetAtMs = typeof value.resetAtMs === "number" ? value.resetAtMs : undefined; const reset = resetLabel(resetAtMs); return <div key={label} className="flex min-h-[72px] flex-col justify-center gap-2 overflow-hidden rounded-[12px] py-2 pl-3 pr-2"><div className="flex items-center justify-between gap-3"><span className="text-[14px] font-normal leading-5 text-text_default_primary">{label}</span><span className="shrink-0 text-[13px] leading-5 text-text_default_secondary">{window.unlimited ? "无限制" : usedCount !== undefined ? `${usedCount}/${totalCount ?? 0}` : `${usedPercent ?? 0}% / 100%`}</span></div><div className="h-1 w-full overflow-hidden rounded-full bg-bg_interaction_tertiary_press"><div className="h-full rounded-full bg-text_default_primary" style={{ width: `${Math.max(0, Math.min(100, percent))}%` }} /></div>{reset ? <span className="text-[12px] font-normal leading-4 text-text_default_secondary">{reset}</span> : null}</div>; })}</div></section> : null}
@@ -344,12 +345,6 @@ export function DisabledBillingActions(): ReactElement {
   </div>;
 }
 
-
-function formatCredits(value: string | undefined): string {
-  if (value === undefined) return "—";
-  const numeric = Number(value.replace(/,/gu, ""));
-  return Number.isFinite(numeric) && value.trim() ? Math.trunc(numeric).toLocaleString("en-US") : value;
-}
 
 function InfoIcon(): ReactElement {
   return <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-icon_default_secondary"><circle cx="8" cy="8" r="6.25" stroke="currentColor" strokeWidth="1" /><path d="M8 7.25v3.5M8 5.25h.01" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg>;

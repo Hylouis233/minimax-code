@@ -1,3 +1,4 @@
+import { formatWebuiCredits } from "../value-readers.js";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
 import { WebuiIconBell, WebuiIconBrand, WebuiIconCommandUsage } from "../icons.js";
@@ -113,16 +114,6 @@ function accountString(account: AccountStatus | undefined, key: string): string 
     objectValue(account?.profile)?.[key],
   ];
   return candidates.find((value): value is string => typeof value === "string" && value.length > 0);
-}
-
-/** Mirrors the desktop's credit formatting: thousands separators, integer
- * rounding (the API reports `7726.2119999999995`, desktop shows `7,726`),
- * `—` when absent. */
-function formatCredits(value: string | undefined): string {
-  if (value === undefined) return "—";
-  const numeric = Number(value.replace(/,/gu, ""));
-  if (!Number.isFinite(numeric) || value.trim() === "") return value;
-  return numeric.toLocaleString("en-US", { maximumFractionDigits: 0 });
 }
 
 /**
@@ -669,7 +660,7 @@ function UsageReady({
       {showPlanRow || rows.length > 0 ? <div className="webui-user-menu-usage-hairline" /> : null}
       <div className="webui-user-menu-credits-row">
         <span>积分</span>
-        <span>{formatCredits(result.creditBalance)}</span>
+        <span>{formatWebuiCredits(result.creditBalance)}</span>
       </div>
     </div>
   );

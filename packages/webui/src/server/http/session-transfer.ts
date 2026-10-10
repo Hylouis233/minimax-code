@@ -10,6 +10,10 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { rejectHttp, respondJson } from "./responses.js";
 import type { WebuiHarnessPort } from "../../runtime/port.js";
 import type { WebuiSessionInfo } from "../../shared/contracts/session.js";
+import {
+  WEBUI_DEFAULT_IMPORT_AGENT,
+  webuiSessionTransferFileName,
+} from "../../shared/session-transfer-format.js";
 
 /**
  * The import body is a whole session and real ones run to tens of megabytes,
@@ -17,24 +21,6 @@ import type { WebuiSessionInfo } from "../../shared/contracts/session.js";
  * while still refusing a body that is not a session file.
  */
 const WEBUI_MAX_IMPORT_BYTES = 256 * 1024 * 1024;
-const WEBUI_DEFAULT_IMPORT_AGENT = "main";
-
-function webuiSessionTransferFileName(
-  sessionId: string,
-  session: { readonly title?: string; readonly agentName?: string },
-  exportedAt: string,
-): string {
-  const stamp = exportedAt.replace(/[-:]/gu, "").replace(/\..+$/u, "");
-  const raw = session.title?.trim() || session.agentName || sessionId;
-  const safe = raw
-    .replace(/[\\/:*?"<>|]/gu, "_")
-    .replace(/[\u0000-\u001F\u007F]/gu, " ")
-    .replace(/\s+/gu, " ")
-    .replace(/[. ]+$/u, "")
-    .trim()
-    .slice(0, 120);
-  return `${/[\p{L}\p{N}]/u.test(safe) ? safe : sessionId}-${stamp}.transfer.json`;
-}
 
 /**
  * `maxBytes` is a parameter rather than a constant so the cap can be tested

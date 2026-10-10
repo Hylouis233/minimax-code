@@ -731,7 +731,6 @@ describe("W0 · at-rules and animations W5/W6 must not remove", () => {
       "webui-panel-enter-right",
       "webui-popover-enter",
       "webui-settings-content-in",
-      "webui-settings-search-highlight",
       "webui-signin-claim-spin",
       "webui-user-menu-usage-pulse",
     ]);

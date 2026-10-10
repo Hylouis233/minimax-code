@@ -69,3 +69,19 @@ export function numberAmongKeys(
 export function formatWebuiError(value: unknown): string {
   return value instanceof Error ? value.message : String(value);
 }
+
+/**
+ * A credit balance, formatted the way the desktop formats it.
+ *
+ * Thousands separators, integer rounding — the API reports
+ * `7726.2119999999995` and the desktop shows `7,726` — and an em dash when the
+ * balance is absent. The rounding is the part that matters: a second copy in
+ * the settings panel truncated instead, so the same balance read one credit
+ * lower there.
+ */
+export function formatWebuiCredits(value: string | undefined): string {
+  if (value === undefined) return "—";
+  const numeric = Number(value.replace(/,/gu, ""));
+  if (!Number.isFinite(numeric) || value.trim() === "") return value;
+  return numeric.toLocaleString("en-US", { maximumFractionDigits: 0 });
+}

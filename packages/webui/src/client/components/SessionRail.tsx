@@ -47,7 +47,7 @@ import {
 } from "../rail-buckets.js";
 import { formatWebuiUnreadBadge } from "../projection/unread-badge.js";
 import type { WebuiClientSession, WebuiClientSessionPage, WebuiClientSessionTreePage, WebuiClientProject } from "../contracts/session-view.js";
-import { teamModeCopy, type TeamModeSessionChoices } from "../team-mode.js";
+import { teamModeCopy } from "../team-mode.js";
 
 const PROJECT_SESSION_BATCH_SIZE = 6;
 
@@ -1088,7 +1088,6 @@ export function WebuiSessionList({
   onLoadMore,
   selectedSessionId,
   error,
-  teamModeChoices,
   activity,
   now,
   pinnedSessions,
@@ -1103,7 +1102,6 @@ export function WebuiSessionList({
   readonly onLoadMore?: () => void;
   readonly selectedSessionId?: string;
   readonly error?: string;
-  readonly teamModeChoices?: TeamModeSessionChoices;
   readonly activity?: WebuiSessionActivityMap;
   /** Injected so the age labels re-render on a tick instead of on every event. */
   readonly now?: number;
@@ -1203,8 +1201,7 @@ export function WebuiSessionList({
                 <span className="w-0 flex-1 truncate text-sm">
                   {sessionLabel(session)}
                 </span>
-                {teamModeChoices?.[session.sessionId] === false ||
-                sessions.some(
+                {sessions.some(
                   (child) => child.parentSessionId === session.sessionId,
                 ) ? (
                   <span

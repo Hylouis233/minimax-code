@@ -675,8 +675,6 @@
   .webui-settings-content-header { margin: 0 0 var(--spacing_48); padding: 0 var(--spacing_20); }
   .webui-settings-sidebar, .webui-settings-content { scrollbar-width: none; }
   .webui-settings-sidebar::-webkit-scrollbar, .webui-settings-content::-webkit-scrollbar { display: none; }
-  .mavis-settings-search-highlight { animation: webui-settings-search-highlight 1400ms ease both; }
-  @keyframes webui-settings-search-highlight { 0% { background: var(--bg_interaction_tertiary_selected); } 100% { background: transparent; } }
   @keyframes webui-settings-content-in { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: translateX(0); } }
   @media (max-height: 680px) {
     .webui-settings-sidebar { padding-top: 16px; padding-bottom: var(--spacing_12); }

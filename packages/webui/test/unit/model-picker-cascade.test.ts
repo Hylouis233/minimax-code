@@ -78,6 +78,20 @@ describe("cascade — a model's own settings decide whether its row is worth des
     expect(modelHasSettings(entry({ contextWindowOptions: [] }))).toBe(false);
   });
 
+  it("describes a switchable model whose variant list never arrived", () => {
+    // The divergence this closes: `effortOptions` is empty but the runtime
+    // reported `thinkingConfig.mode === "switchable"`, so the composer's brain
+    // appeared while this row opened nothing. The question is
+    // `resolveEffortOptions`'s, not the raw field's — a model with a switch has
+    // something to configure even when the list did not reach the client.
+    const switchable = entry({
+      thinkingConfig: { mode: "switchable", default_value: "true" },
+      supportedVariants: ["thinking", ""],
+    });
+    expect(modelHasSettings(switchable)).toBe(true);
+    expect(rowHasFlyout(switchable)).toBe(true);
+  });
+
   it("has no model to describe as nothing to configure", () => {
     expect(modelHasSettings(undefined)).toBe(false);
     expect(rowHasFlyout(undefined)).toBe(false);

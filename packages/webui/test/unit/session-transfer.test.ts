@@ -8,7 +8,7 @@
 // what the browser should call the file.
 
 import { describe, expect, it } from "vitest";
-import { webuiSessionTransferFileName } from "../../src/runtime/session-transfer.js";
+import { webuiSessionTransferFileName } from "../../src/shared/session-transfer-format.js";
 
 const AT = "2026-10-03T04:42:59.970Z";
 // `:` and `-` are stripped; the `T` separator and the fractional part are

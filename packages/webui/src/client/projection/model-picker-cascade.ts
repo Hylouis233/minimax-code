@@ -29,6 +29,7 @@
  * returning constants: a function that ignores its argument and always says
  * "close" is a name the next reader will trust.
  */
+import { resolveEffortOptions } from "./thinking-control.js";
 import type { WebuiModelPickerEntry } from "../contracts/model-view.js";
 
 /** Which tier of the cascade is showing. */
@@ -47,7 +48,7 @@ export function modelHasSettings(
 ): boolean {
   if (!model) return false;
   return (
-    (model.effortOptions?.length ?? 0) > 0 ||
+    resolveEffortOptions(model).length > 0 ||
     (model.contextWindowOptions?.length ?? 0) > 0
   );
 }
