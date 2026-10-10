@@ -66,6 +66,24 @@ export interface WebuiTransportOptions {
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 
+/** A socket carrying one request, and the only way to settle it. */
+interface WebuiWireSession {
+  readonly close: () => void;
+}
+
+/**
+ * What a caller does with the frames of its own request. Everything but
+ * `frame` is optional, because the three operations below disagree about what a
+ * parse failure, a close or a socket error means — `watchTerminal` ignores all
+ * three, a unary request rejects on all three.
+ */
+interface WebuiWireHandlers {
+  readonly frame: (session: WebuiWireSession, frame: WireFrame) => void;
+  readonly invalidFrame?: (session: WebuiWireSession) => void;
+  readonly closed?: (session: WebuiWireSession) => void;
+  readonly failed?: (session: WebuiWireSession) => void;
+}
+
 function defaultWebSocket(): new (url: string) => WebuiSocket {
   return WebSocket as unknown as new (url: string) => WebuiSocket;
 }
@@ -87,63 +105,89 @@ export function createWebuiTransport({
   const websocketUrl = () =>
     `${baseWebsocketUrl.replace(/\/$/u, "")}/?token=${encodeURIComponent(token)}`;
 
+  /**
+   * One socket, one request frame, one requestId.
+   *
+   * Every operation below opens a socket, writes the same envelope once the
+   * socket opens, and then has to tell its own answer apart from whatever else
+   * arrives on that socket. That part is shared. What a frame *means* is not,
+   * so the handler decides: a unary response resolves, an `event` frame is
+   * forwarded until `[DONE]`, a terminal frame is forwarded until the caller
+   * stops. The session is passed back to each handler because settling means
+   * closing this socket, and a handler that reached for it by closure would be
+   * reading a `const` that does not exist yet when the socket opens
+   * synchronously.
+   */
+  function openWireSession(
+    operation: string,
+    body: unknown,
+    handlers: WebuiWireHandlers,
+  ): WebuiWireSession {
+    const ws = new webSocket(websocketUrl());
+    const requestId = crypto.randomUUID();
+    const session: WebuiWireSession = { close: () => ws.close() };
+    ws.addEventListener("open", () =>
+      ws.send(
+        JSON.stringify({
+          protocolVersion: 1,
+          kind: "request",
+          requestId,
+          operation,
+          body,
+        }),
+      ),
+    );
+    ws.addEventListener("message", (event) => {
+      let frame: WireFrame;
+      try {
+        frame = JSON.parse(String(event.data)) as WireFrame;
+      } catch {
+        handlers.invalidFrame?.(session);
+        return;
+      }
+      if (frame.requestId !== requestId) return;
+      handlers.frame(session, frame);
+    });
+    ws.addEventListener("close", () => handlers.closed?.(session));
+    ws.addEventListener("error", () => handlers.failed?.(session));
+    return session;
+  }
+
   function request<T>(operation: string, body: unknown): Promise<T> {
     return new Promise((resolve, reject) => {
-      const ws = new webSocket(websocketUrl());
-      const requestId = crypto.randomUUID();
       let settled = false;
       let timeout: ReturnType<typeof setTimeout>;
-      const fail = (error: Error) => {
+      const fail = (session: WebuiWireSession, error: Error) => {
         if (settled) return;
         settled = true;
         clearTimeout(timeout);
-        ws.close();
+        session.close();
         reject(error);
       };
+      const session = openWireSession(operation, body, {
+        frame: (session, frame) => {
+          if (frame.kind === "error") {
+            fail(session, new Error(frame.message ?? "WebUI request refused"));
+            return;
+          }
+          if (frame.kind !== "response") return;
+          settled = true;
+          clearTimeout(timeout);
+          session.close();
+          resolve(frame.body as T);
+        },
+        invalidFrame: (session) => fail(session, new Error("WebUI returned invalid JSON")),
+        closed: (session) =>
+          fail(session, new Error("WebUI connection closed before the response")),
+        failed: (session) => fail(session, new Error("WebUI connection failed")),
+      });
       timeout = setTimeout(
         () =>
           fail(
-            new Error(
-              `WebUI request timed out after ${requestTimeoutMs}ms (${operation})`,
-            ),
+            session,
+            new Error(`WebUI request timed out after ${requestTimeoutMs}ms (${operation})`),
           ),
         requestTimeoutMs,
-      );
-      ws.addEventListener("open", () =>
-        ws.send(
-          JSON.stringify({
-            protocolVersion: 1,
-            kind: "request",
-            requestId,
-            operation,
-            body,
-          }),
-        ),
-      );
-      ws.addEventListener("message", (event) => {
-        let frame: WireFrame;
-        try {
-          frame = JSON.parse(String(event.data)) as WireFrame;
-        } catch {
-          fail(new Error("WebUI returned invalid JSON"));
-          return;
-        }
-        if (frame.requestId !== requestId) return;
-        if (frame.kind === "error") {
-          fail(new Error(frame.message ?? "WebUI request refused"));
-          return;
-        }
-        if (frame.kind !== "response") return;
-        settled = true;
-        clearTimeout(timeout);
-        ws.close();
-        resolve(frame.body as T);
-      });
-      ws.addEventListener("close", () =>
-        fail(new Error("WebUI connection closed before the response")),
-      );
-      ws.addEventListener("error", () =>
-        fail(new Error("WebUI connection failed")),
       );
     });
   }
@@ -159,69 +203,53 @@ export function createWebuiTransport({
     onFrame: (frame: WebuiStreamFrame) => void,
   ): Promise<void> {
     return new Promise((resolve, reject) => {
-      const ws = new webSocket(websocketUrl());
-      const requestId = crypto.randomUUID();
       let settled = false;
-      const fail = (error: Error) => {
+      const fail = (session: WebuiWireSession, error: Error) => {
         if (settled) return;
         settled = true;
-        ws.close();
+        session.close();
         reject(error);
       };
-      ws.addEventListener("open", () =>
-        ws.send(
-          JSON.stringify({
-            protocolVersion: 1,
-            kind: "request",
-            requestId,
-            operation,
-            body,
-          }),
-        ),
-      );
-      ws.addEventListener("message", (event) => {
-        let frame: WireFrame;
-        try {
-          frame = JSON.parse(String(event.data)) as WireFrame;
-        } catch {
-          fail(new Error("WebUI returned invalid JSON"));
-          return;
-        }
-        if (frame.requestId !== requestId) return;
-        if (frame.kind === "error") {
-          fail(new Error(frame.message ?? `${operation} refused`));
-          return;
-        }
-        if (frame.kind !== "event") return;
-        const streamFrame = frame.body as WebuiStreamFrame;
-        onFrame(streamFrame);
-        if (streamFrame.dataJson === "[DONE]") {
-          settled = true;
-          ws.close();
-          resolve();
-        }
+      openWireSession(operation, body, {
+        frame: (session, frame) => {
+          if (frame.kind === "error") {
+            fail(session, new Error(frame.message ?? `${operation} refused`));
+            return;
+          }
+          if (frame.kind !== "event") return;
+          const streamFrame = frame.body as WebuiStreamFrame;
+          onFrame(streamFrame);
+          if (streamFrame.dataJson === "[DONE]") {
+            settled = true;
+            session.close();
+            resolve();
+          }
+        },
+        invalidFrame: (session) => fail(session, new Error("WebUI returned invalid JSON")),
+        closed: (session) => fail(session, new Error("WebUI connection closed before [DONE]")),
+        failed: (session) => fail(session, new Error("WebUI connection failed")),
       });
-      ws.addEventListener("close", () =>
-        fail(new Error("WebUI connection closed before [DONE]")),
-      );
-      ws.addEventListener("error", () =>
-        fail(new Error("WebUI connection failed")),
-      );
     });
   }
 
-  function watchTerminal(requestBody: { readonly terminalId: string }, onFrame: (frame: WebuiTerminalFrame) => void): () => void {
+  function watchTerminal(
+    requestBody: { readonly terminalId: string },
+    onFrame: (frame: WebuiTerminalFrame) => void,
+  ): () => void {
     let stopped = false;
-    const ws = new webSocket(websocketUrl());
-    const requestId = crypto.randomUUID();
-    ws.addEventListener("open", () => ws.send(JSON.stringify({ protocolVersion: 1, kind: "request", requestId, operation: "watchTerminal", body: requestBody })));
-    ws.addEventListener("message", (event) => {
-      if (stopped) return;
-      let frame: WireFrame;
-      try { frame = JSON.parse(String(event.data)) as WireFrame; } catch { return; }
-      if (frame.requestId === requestId && frame.kind === "event" && frame.body && typeof frame.body === "object") onFrame(frame.body as WebuiTerminalFrame);
+    const session = openWireSession("watchTerminal", requestBody, {
+      frame: (_session, frame) => {
+        // A stopped watch must not deliver, and `close()` is not a promise that
+        // the socket stops emitting: the caller's flag is what guarantees it.
+        if (stopped) return;
+        if (frame.kind !== "event" || !frame.body || typeof frame.body !== "object") return;
+        onFrame(frame.body as WebuiTerminalFrame);
+      },
     });
-    return () => { stopped = true; ws.close(); };
+    return () => {
+      stopped = true;
+      session.close();
+    };
   }
 
   return {

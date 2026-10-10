@@ -3949,6 +3949,7 @@
     "packages/webui/test/unit/webui-startup-fallback.test.tsx",
     "packages/webui/test/unit/webui-stream.test.ts",
     "packages/webui/test/unit/webui-transcript-widgets-integration.test.ts",
+    "packages/webui/test/unit/webui-transport-wire.test.ts",
     "packages/webui/test/unit/webui-usage-quota.test.ts",
     "packages/webui/test/unit/webui-w0-css-structure.test.ts",
     "packages/webui/test/unit/webui-w0-projections.test.ts",
