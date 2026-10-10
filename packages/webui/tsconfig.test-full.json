@@ -1,10 +1,10 @@
 // Full-coverage typecheck for the WebUI package.
 //
-// `tsconfig.test.json` names two of the 69 files in `test/unit/`, so neither
-// the unit tests nor the client components they render are held to `strict`
-// by anything that runs in CI. This program closes that gap: it is the same
-// typecheck the whole `test/unit/` tree and the client sources need, and it is
-// wired into CI next to the other `typecheck:*` scripts.
+// `tsconfig.test.json` names two of the 111 test files in `test/unit/`, so
+// neither the rest of the unit tests nor the client components they render are
+// held to `strict` by anything that runs in CI. This program closes that gap:
+// it is the same typecheck the whole `test/unit/` tree and the client sources
+// need, and it is wired into CI next to the other `typecheck:*` scripts.
 //
 // Three overrides relative to `tsconfig.test.json`, each for a specific error
 // class rather than for convenience:
