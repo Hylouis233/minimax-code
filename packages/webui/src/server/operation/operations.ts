@@ -1,17 +1,7 @@
-import { versionOperation, listSessionsOperation, listVisibleProjectsOperation, getSessionTreeOperation, createSessionOperation, getSessionOperation, getActiveTurnOperation, archiveSessionOperation, deleteSessionOperation, updateSessionOperation, getSessionForkOptionsOperation, forkSessionOperation } from "./session.js";
-import { listWorkspaceFileTreeOperation, browseWorkspaceDirsOperation, readWorkspaceFileOperation, getWorkspaceEnvironmentOperation, mutateWorkspaceGitOperation, getWorkspaceReviewSummaryOperation, listWorkspaceReviewFileDiffsOperation, getWorkspaceReviewFileContentOperation, searchWorkspaceReviewDiffsOperation, readCanvasOperation, applyCanvasOperation, readWorkspaceArchiveOperation, extractWorkspaceArchiveOperation, createTerminalOperation, listTerminalsOperation, writeTerminalOperation, resizeTerminalOperation, disposeTerminalOperation, watchTerminalOperation } from "./workspace.js";
-import { getMessagesOperation, getSessionDiffOperation, getTurnDiffOperation, revertTurnDiffOperation, reapplyTurnDiffOperation, getSessionRewindPreviewOperation, rewindSessionOperation, editSessionMessageOperation } from "./messages.js";
-import { isGoalEnabledOperation, getGoalOperation, createGoalOperation, patchGoalOperation, clearGoalOperation } from "./goal.js";
-import { sendMessageOperation, enqueueMessageOperation, resumeSessionOperation } from "./interaction.js";
-import { watchEventsOperation, listPendingPermissionsOperation, getPendingQuestionnaireOperation, replyPermissionOperation, replyQuestionnaireOperation, dismissQuestionnaireOperation } from "./questionnaire.js";
-import { abortSessionOperation, listQueueMessagesOperation, deleteQueueItemOperation, listModelsOperation, listSkillsOperation, selectModelOperation, getSessionUsageOperation } from "./queue.js";
-import { pluginManagementOperation } from "./plugin-management.js";
-import { getPermissionModeOperation, setPermissionModeOperation } from "./permission-mode.js";
-import { getGlobalInstructionsOperation, setGlobalInstructionsOperation } from "./personalization.js";
-import { getAgentMemoryOperation, setAgentMemoryOperation } from "./agent-memory.js";
-import { getUserProfileOperation, setUserProfileOperation } from "./user-profile.js";
-import { getMemorySettingsOperation, setMemorySettingsOperation } from "./memory-settings.js";
-import { listUserModelProvidersOperation, createUserModelProviderOperation, updateUserModelProviderOperation, deleteUserModelProviderOperation, testUserModelProviderOperation, testUserModelOperation, discoverUserModelsCandidateOperation, saveUserModelProviderCandidateOperation, listProviderPresetsOperation, getMiniMaxApiKeyStatusOperation, upsertMiniMaxApiKeyOperation, getCodexOAuthStatusOperation, getMiniMaxModelSourceOperation, setMiniMaxModelSourceOperation, testUserModelCandidateOperation, revealModelProviderApiKeyOperation, startCodexOAuthLoginOperation, cancelCodexOAuthLoginOperation, refreshModelsOperation, runCommandOperation } from "./provider.js";
+// The operation descriptors are re-exported from here so importers keep one
+// entry point. Nothing below references them by name: the registry is keyed by
+// the operation's string name and the handler maps are built in
+// `bind-handlers.ts` and `handlers/`.
 export { versionOperation, listSessionsOperation, listVisibleProjectsOperation, getSessionTreeOperation, createSessionOperation, getSessionOperation, getActiveTurnOperation, archiveSessionOperation, deleteSessionOperation, updateSessionOperation, getSessionForkOptionsOperation, forkSessionOperation } from "./session.js";
 export { listWorkspaceFileTreeOperation, browseWorkspaceDirsOperation, readWorkspaceFileOperation, getWorkspaceEnvironmentOperation, mutateWorkspaceGitOperation, getWorkspaceReviewSummaryOperation, listWorkspaceReviewFileDiffsOperation, getWorkspaceReviewFileContentOperation, searchWorkspaceReviewDiffsOperation, readCanvasOperation, applyCanvasOperation, readWorkspaceArchiveOperation, extractWorkspaceArchiveOperation, createTerminalOperation, listTerminalsOperation, writeTerminalOperation, resizeTerminalOperation, disposeTerminalOperation, watchTerminalOperation } from "./workspace.js";
 export { getMessagesOperation, getSessionDiffOperation, getTurnDiffOperation, revertTurnDiffOperation, reapplyTurnDiffOperation, getSessionRewindPreviewOperation, rewindSessionOperation, editSessionMessageOperation } from "./messages.js";
@@ -42,16 +32,6 @@ import type {
   WebuiOperationRegistration,
 } from "./operation-contract.js";
 import type { WebuiTerminalManager } from "../terminal.js";
-import {
-  getSigninPanelOperation,
-  claimSigninOperation,
-  signOutOperation,
-  beginAccountLoginOperation,
-  getAccountLoginStatusOperation,
-  cancelAccountLoginOperation,
-  getUsageQuotaOperation,
-  getAccountStatusOperation,
-} from "./account.js";
 export {
   getSigninPanelOperation,
   claimSigninOperation,
