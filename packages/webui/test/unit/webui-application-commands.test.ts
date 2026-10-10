@@ -117,6 +117,36 @@ describe("application-owned transcript history", () => {
     // An unknown session reads the shared empty page rather than throwing.
     expect(selectWebuiSessionTranscriptPage(store.getSnapshot(), undefined)).toEqual({});
   });
+
+  it("lets only the newest request for one session commit", async () => {
+    // The other side of the same fence: two loads for ONE session, the earlier
+    // one resolving last. The superseded page must not land. Pinned here
+    // because the request-ownership coordinator that used to carry its own copy
+    // of this rule had no production caller and was removed.
+    const pending: Array<(page: WebuiClientMessagePage) => void> = [];
+    const store = createWebuiSessionStore();
+    const owner = createWebuiTranscriptHistoryOwner({
+      store,
+      loadMessages: vi.fn(
+        (): Promise<WebuiClientMessagePage> =>
+          new Promise((resolve) => {
+            pending.push(resolve);
+          }),
+      ),
+    });
+    const older = owner.loadPage("A");
+    const newer = owner.loadPage("A");
+    expect(pending).toHaveLength(2);
+
+    pending[1]?.({ messages: [{ msgId: "newest" }] });
+    await expect(newer).resolves.toMatchObject({ status: "applied" });
+    pending[0]?.({ messages: [{ msgId: "superseded" }] });
+    await expect(older).resolves.toEqual({ status: "stale" });
+
+    expect(
+      store.readSession("A").transcript.page.messages?.map((message) => message.msgId),
+    ).toEqual(["newest"]);
+  });
 });
 
 describe("application-owned runtime facts", () => {
