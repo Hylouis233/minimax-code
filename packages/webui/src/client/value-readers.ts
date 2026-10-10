@@ -26,6 +26,40 @@ export function booleanValue(value: unknown): boolean | undefined {
 }
 
 /**
+ * The first of `keys` that holds a non-empty string.
+ *
+ * The message bodies name the same field differently depending on which
+ * producer wrote them (`msg_id` / `msgId` / `id`), so the projection files read
+ * a candidate list rather than one key. The rule — first non-empty wins, and an
+ * all-blank field counts as absent — was written out in three files under three
+ * signatures before this.
+ */
+export function stringAmongKeys(
+  value: Record<string, unknown> | undefined,
+  keys: readonly string[],
+): string | undefined {
+  if (!value) return undefined;
+  for (const key of keys) {
+    const candidate = value[key];
+    if (typeof candidate === "string" && candidate.trim()) return candidate;
+  }
+  return undefined;
+}
+
+/** The first of `keys` that holds a finite number. */
+export function numberAmongKeys(
+  value: Record<string, unknown> | undefined,
+  keys: readonly string[],
+): number | undefined {
+  if (!value) return undefined;
+  for (const key of keys) {
+    const candidate = value[key];
+    if (typeof candidate === "number" && Number.isFinite(candidate)) return candidate;
+  }
+  return undefined;
+}
+
+/**
  * Project an unknown error into a human-readable string for the user-facing
  * `refusal` field or for the `interactionError` banner. The original code
  * repeated `error instanceof Error ? error.message : String(error)` in 41

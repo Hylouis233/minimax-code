@@ -6,6 +6,10 @@
  * renderers all consume the same ordering and synthetic-message rules.
  */
 
+import {
+  recordValue,
+  stringAmongKeys,
+} from "../value-readers.js";
 import type {
   WebuiQuestionnaireResponseAnswer,
   WebuiQuestionnaireResponseSummary,
@@ -95,21 +99,15 @@ export interface WebuiTurnMessageGroup {
   readonly totalOutputTokens?: number;
 }
 
-function record(value: unknown): Record<string, unknown> | undefined {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
-}
-
+/**
+ * The file's call sites pass the candidate keys as rest arguments; the rule
+ * itself is `stringAmongKeys`, shared with the other projection files.
+ */
 function stringValue(
   value: Record<string, unknown> | undefined,
   ...keys: string[]
 ): string | undefined {
-  for (const key of keys) {
-    if (typeof value?.[key] === "string" && value[key].trim())
-      return value[key] as string;
-  }
-  return undefined;
+  return stringAmongKeys(value, keys);
 }
 
 function parseCommunicationInfos(value: unknown): readonly Record<string, unknown>[] {
@@ -122,7 +120,7 @@ function parseCommunicationInfos(value: unknown): readonly Record<string, unknow
   }
   if (Array.isArray(value))
     return value.flatMap((item) => parseCommunicationInfos(item));
-  const item = record(value);
+  const item = recordValue(value);
   if (!item) return [];
   const nested = item.events ?? item.infos ?? item.communicationInfos;
   if (nested !== undefined) return parseCommunicationInfos(nested);
@@ -130,13 +128,13 @@ function parseCommunicationInfos(value: unknown): readonly Record<string, unknow
 }
 
 function eventType(info: Record<string, unknown>): string | undefined {
-  const generic = record(info.generic);
+  const generic = recordValue(info.generic);
   return stringValue(info, "eventType", "event_type", "type") ??
     stringValue(generic, "eventType", "event_type", "type");
 }
 
 function eventData(info: Record<string, unknown>): Record<string, unknown> | undefined {
-  return record(info.data) ?? record(record(info.generic)?.data) ?? info;
+  return recordValue(info.data) ?? recordValue(recordValue(info.generic)?.data) ?? info;
 }
 
 function projectSyntheticParts(
@@ -193,7 +191,7 @@ function projectSyntheticParts(
           labels.push(entry);
           continue;
         }
-        const item = record(entry);
+        const item = recordValue(entry);
         if (!item) continue;
         const label =
           stringValue(item, "label", "value", "text", "optionLabel") ?? "";
@@ -228,7 +226,7 @@ function isTodoUpdatedEventMessage(message: WebuiMessageForParts): boolean {
   const content = message.msgContent?.trimStart();
   if (!content?.startsWith('{"eventType":')) return false;
   try {
-    const parsed = record(JSON.parse(content));
+    const parsed = recordValue(JSON.parse(content));
     return parsed?.eventType === "todo_updated";
   } catch {
     return false;
@@ -326,15 +324,15 @@ export function projectMessageParts(
         ordered.push(...assetProjection.parts);
       }
       else if (type === "tool_call") {
-        const call = record(raw.tool_call) ?? record(raw.toolCall);
+        const call = recordValue(raw.tool_call) ?? recordValue(raw.toolCall);
         if (call) ordered.push({ id, type: "tool_call", toolCall: call });
       } else if (type === "agent_joined") {
-        ordered.push({ id, type: "agent_joined", agent: record(raw.agent) ?? raw });
+        ordered.push({ id, type: "agent_joined", agent: recordValue(raw.agent) ?? raw });
       } else if (type === "delegation") {
-        const data = record(raw.message) ?? record(raw.delegation) ?? raw;
+        const data = recordValue(raw.message) ?? recordValue(raw.delegation) ?? raw;
         const delegations: Record<string, unknown>[] = Array.isArray(raw.delegations)
           ? raw.delegations.flatMap((value: unknown) => {
-              const entry = record(value);
+              const entry = recordValue(value);
               return entry ? [entry] : [];
             })
           : [data];

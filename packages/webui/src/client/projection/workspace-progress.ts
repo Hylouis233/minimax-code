@@ -1,3 +1,8 @@
+import {
+  numberAmongKeys,
+  recordValue,
+  stringAmongKeys,
+} from "../value-readers.js";
 import type { WebuiClientMessage } from "../contracts/message-view.js";
 import type {
   WebuiWorkspaceTodoStatus,
@@ -69,42 +74,11 @@ export function selectWebuiWorkspaceProgress(
   return { todos, subagents };
 }
 
-function record(value: unknown): Record<string, unknown> | undefined {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
-}
-
-function stringValue(
-  value: Record<string, unknown> | undefined,
-  keys: readonly string[],
-): string | undefined {
-  if (!value) return undefined;
-  for (const key of keys) {
-    const candidate = value[key];
-    if (typeof candidate === "string" && candidate.trim()) return candidate;
-  }
-  return undefined;
-}
-
-function numberValue(
-  value: Record<string, unknown> | undefined,
-  keys: readonly string[],
-): number | undefined {
-  if (!value) return undefined;
-  for (const key of keys) {
-    const candidate = value[key];
-    if (typeof candidate === "number" && Number.isFinite(candidate))
-      return candidate;
-  }
-  return undefined;
-}
-
 function normalizeTodos(value: unknown): WebuiWorkspaceTodo[] | undefined {
   if (!Array.isArray(value)) return undefined;
   return value.flatMap((candidate) => {
-    const todo = record(candidate);
-    const content = stringValue(todo, ["content"]);
+    const todo = recordValue(candidate);
+    const content = stringAmongKeys(todo, ["content"]);
     const status = todo?.status;
     if (
       !content ||
@@ -130,7 +104,7 @@ function normalizeTodos(value: unknown): WebuiWorkspaceTodo[] | undefined {
 export function webuiWorkspaceSubagentStatus(
   value: unknown,
 ): WebuiWorkspaceSubagentStatus {
-  const objectValue = record(value);
+  const objectValue = recordValue(value);
   if (objectValue) {
     return webuiWorkspaceSubagentStatus(
       objectValue.statusType ?? objectValue.status ?? objectValue.type,
@@ -152,7 +126,7 @@ export function webuiWorkspaceSubagentStatus(
 
 function eventStatus(value: Record<string, unknown>): WebuiWorkspaceSubagentStatus {
   return webuiWorkspaceSubagentStatus(
-    value.status ?? value.statusType ?? record(value.session_status)?.status,
+    value.status ?? value.statusType ?? recordValue(value.session_status)?.status,
   );
 }
 
@@ -170,14 +144,14 @@ function upsertSubagent(
 }
 
 function eventType(value: Record<string, unknown>): string | undefined {
-  const generic = record(value.generic);
-  return stringValue(generic, ["eventType", "event_type"])
-    ?? stringValue(value, ["eventType", "event_type", "type"]);
+  const generic = recordValue(value.generic);
+  return stringAmongKeys(generic, ["eventType", "event_type"])
+    ?? stringAmongKeys(value, ["eventType", "event_type", "type"]);
 }
 
 function eventData(value: Record<string, unknown>): Record<string, unknown> {
-  const generic = record(value.generic);
-  return record(generic?.data) ?? record(value.data) ?? value;
+  const generic = recordValue(value.generic);
+  return recordValue(generic?.data) ?? recordValue(value.data) ?? value;
 }
 
 function subagentFromEvent(
@@ -185,20 +159,20 @@ function subagentFromEvent(
   fallbackParentSessionId?: string,
 ): WebuiWorkspaceSubagent | undefined {
   const data = eventData(value);
-  const sessionId = stringValue(data, [
+  const sessionId = stringAmongKeys(data, [
     "sessionId",
     "session_id",
     "childSessionId",
     "child_session_id",
   ]);
-  const agentName = stringValue(data, [
+  const agentName = stringAmongKeys(data, [
     "agentName",
     "agent_name",
     "childAgentName",
     "child_agent_name",
   ]);
   if (!sessionId || !agentName) return undefined;
-  const parentSessionId = stringValue(data, [
+  const parentSessionId = stringAmongKeys(data, [
     "parentSessionId",
     "parent_session_id",
   ]) ?? fallbackParentSessionId;
@@ -206,13 +180,13 @@ function subagentFromEvent(
   return {
     sessionId,
     agentName,
-    ...(stringValue(data, ["title"]) ? { title: stringValue(data, ["title"]) } : {}),
+    ...(stringAmongKeys(data, ["title"]) ? { title: stringAmongKeys(data, ["title"]) } : {}),
     status,
-    ...(numberValue(data, ["createdAt", "created_at", "joinedAt", "joined_at"]) !== undefined
-      ? { createdAt: numberValue(data, ["createdAt", "created_at", "joinedAt", "joined_at"]) }
+    ...(numberAmongKeys(data, ["createdAt", "created_at", "joinedAt", "joined_at"]) !== undefined
+      ? { createdAt: numberAmongKeys(data, ["createdAt", "created_at", "joinedAt", "joined_at"]) }
       : {}),
-    ...(numberValue(data, ["updatedAt", "updated_at"]) !== undefined
-      ? { updatedAt: numberValue(data, ["updatedAt", "updated_at"]) }
+    ...(numberAmongKeys(data, ["updatedAt", "updated_at"]) !== undefined
+      ? { updatedAt: numberAmongKeys(data, ["updatedAt", "updated_at"]) }
       : {}),
     ...(parentSessionId ? { parentSessionId } : {}),
   };
@@ -289,7 +263,7 @@ export function reduceWebuiWorkspaceProgressEvent(
   }
   if (isEventTypeOf(type, SUBAGENT_STATUS_EVENT_TYPES)) {
     const data = eventData(value);
-    const childSessionId = stringValue(data, ["sessionId", "session_id"]);
+    const childSessionId = stringAmongKeys(data, ["sessionId", "session_id"]);
     if (!childSessionId) return state;
     const existing = state.subagents.find(
       (subagent) => subagent.sessionId === childSessionId,
@@ -306,7 +280,7 @@ export function reduceWebuiWorkspaceProgressEvent(
   }
   if (isEventTypeOf(type, SUBAGENT_REPORTED_EVENT_TYPES)) {
     const data = eventData(value);
-    const childSessionId = stringValue(data, ["sessionId", "session_id"]);
+    const childSessionId = stringAmongKeys(data, ["sessionId", "session_id"]);
     const existing = childSessionId
       ? state.subagents.find((subagent) => subagent.sessionId === childSessionId)
       : undefined;
@@ -327,7 +301,7 @@ export function reduceWebuiWorkspaceProgressEvent(
 function parseHistoryEvent(value: unknown): Record<string, unknown> | undefined {
   if (typeof value !== "string" || !value.trim()) return undefined;
   try {
-    return record(JSON.parse(value));
+    return recordValue(JSON.parse(value));
   } catch {
     return undefined;
   }
@@ -381,14 +355,14 @@ function applyTodoToolCalls(
   ];
   let next = state;
   for (const raw of calls) {
-    const call = record(raw);
+    const call = recordValue(raw);
     if (!call) continue;
     // History carries the normalised `{ name, arguments }`; the live wire frame
     // still nests them under `function`, so read both shapes.
-    const fn = record(call.function);
+    const fn = recordValue(call.function);
     const name = String(call.name ?? call.toolName ?? fn?.name ?? "").toLowerCase();
     if (name !== "todowrite" && name !== "todo_write") continue;
-    const input = record(call.input) ?? parseHistoryEvent(fn?.arguments) ?? parseHistoryEvent(call.arguments);
+    const input = recordValue(call.input) ?? parseHistoryEvent(fn?.arguments) ?? parseHistoryEvent(call.arguments);
     const todos = normalizeTodos(input?.todos);
     if (todos) next = { ...next, todos, hasTodoSnapshot: true };
   }

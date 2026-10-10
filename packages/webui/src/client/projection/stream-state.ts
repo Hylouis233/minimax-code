@@ -1,4 +1,5 @@
 import type { WebuiStreamFrame } from "../../shared/contracts/stream.js";
+import { recordValue } from "../value-readers.js";
 import {
   initialWebuiWorkspaceProgress,
   reduceWebuiWorkspaceProgressEvent,
@@ -207,19 +208,13 @@ export function isWebuiSubscriptionProbeCurrent(
  * Normalize both shapes so refresh recovery can recognize active sessions.
  */
 export function webuiSessionStatusType(value: unknown): string {
-  const status = record(value);
+  const status = recordValue(value);
   const raw = status?.statusType ?? status?.type ?? value;
   if (raw === 1 || raw === "1") return "started";
   if (raw === 0 || raw === "0") return "idle";
   if (raw === 2 || raw === "2") return "error";
   if (raw === 3 || raw === "3") return "aborted";
   return typeof raw === "string" ? raw.trim().toLowerCase() : "";
-}
-
-function record(value: unknown): Record<string, unknown> | undefined {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
 }
 
 function text(value: Record<string, unknown>, keys: readonly string[]): string {
@@ -244,7 +239,7 @@ function usageRecord(value: Record<string, unknown>): Record<string, unknown> | 
   // message itself. Accept any of the three layouts.
   const direct = value.usage ?? value.Usage;
   if (direct && typeof direct === "object" && !Array.isArray(direct)) return direct as Record<string, unknown>;
-  const data = record(value.data);
+  const data = recordValue(value.data);
   if (data) {
     const nested = data.usage ?? data.Usage;
     if (nested && typeof nested === "object" && !Array.isArray(nested)) return nested as Record<string, unknown>;
@@ -276,7 +271,7 @@ function upsertMessage(
   ]);
   const calls = toolCalls(value);
   const parts = Array.isArray(value.parts)
-    ? value.parts.filter((item): item is Record<string, unknown> => !!record(item))
+    ? value.parts.filter((item): item is Record<string, unknown> => !!recordValue(item))
     : undefined;
   const usage = usageRecord(value);
   const contextUsage = contextUsageRecord(value);
@@ -350,7 +345,7 @@ export function recogniseWebuiStreamPayload(
   } catch {
     return { kind: "generic_event" };
   }
-  const event = record(parsed);
+  const event = recordValue(parsed);
   if (!event) return { kind: "generic_event" };
   if (event.type === "resume_overflow") return { kind: "resume_overflow" };
   return { kind: "generic_event", event };
@@ -406,18 +401,18 @@ export function applyFrameData(
     return { ...next, phase: "streaming" };
   }
   if (type === 2 || type === "agent_message") {
-    const message = record(event.agent_message) ?? record(event.agentMessage);
+    const message = recordValue(event.agent_message) ?? recordValue(event.agentMessage);
     if (!message) return next;
     const nestedMessages = Array.isArray(message.messages) ? message.messages : undefined;
     const messages = nestedMessages
       ? nestedMessages.reduce(
           (all, item) =>
-            record(item) ? upsertMessage(all, record(item)!, false) : all,
+            recordValue(item) ? upsertMessage(all, recordValue(item)!, false) : all,
           next.messages,
         )
       : upsertMessage(next.messages, message, false);
     const contextUsage = nestedMessages
-      ? [...nestedMessages].reverse().map(record).find((item) => item ? contextUsageRecord(item) : undefined)
+      ? [...nestedMessages].reverse().map(recordValue).find((item) => item ? contextUsageRecord(item) : undefined)
       : contextUsageRecord(message);
     // Todo progress and subagent bookkeeping ride inside the message itself
     // rather than on the global bus, so the frame has to be unwrapped here or
@@ -431,7 +426,7 @@ export function applyFrameData(
     const workspaceProgress = nestedMessages
       ? nestedMessages.reduce(
           (progress, item) => {
-            const nested = record(item);
+            const nested = recordValue(item);
             return nested
               ? reduceWebuiWorkspaceProgressMessage(progress, nested)
               : progress;
@@ -449,7 +444,7 @@ export function applyFrameData(
   }
   if (type === 6 || type === "agent_message_chunk") {
     const message =
-      record(event.agent_message_chunk) ?? record(event.agentMessageChunk);
+      recordValue(event.agent_message_chunk) ?? recordValue(event.agentMessageChunk);
     return message
       ? {
           ...next,
@@ -459,7 +454,7 @@ export function applyFrameData(
       : next;
   }
   if (type === "session_status" || type === 3 || type === 4) {
-    const status = record(event.session_status);
+    const status = recordValue(event.session_status);
     return {
       ...next,
       phase: "streaming",
