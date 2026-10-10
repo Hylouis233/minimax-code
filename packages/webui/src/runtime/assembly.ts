@@ -42,7 +42,10 @@ import { createWebuiAuthSession } from "./auth-session.js";
 import { createWebuiRuntimeLifecycle } from "./lifecycle.js";
 import { createWebuiAccountLoginSession } from "./account-login.js";
 import { createHarnessPortFromHost } from "./harness/adapter.js";
-import type { WebuiRuntimeCliService } from "./harness/host-contract.js";
+import type {
+  WebuiRuntimeCliService,
+  WebuiRuntimeHostHandle,
+} from "./harness/host-contract.js";
 import type { WebuiHarnessPort } from "./port.js";
 import { configureWebuiRuntimeEnvironment } from "./runtime-environment.js";
 import { DailyCheckinClient } from "./check-in.js";
@@ -54,47 +57,40 @@ import {
 } from "./mcode-tools.js";
 
 /**
- * Minimal host contract the assembly needs from whatever factory
- * produces it. The shape matches what
- * `createLocalRuntimeHostV2` returns (its `apiHost.close()` plus
- * `dataDir`); `appVersion` is optional because the v2 host does not
- * echo the input option back.
+ * What the assembly guarantees about the host it hands back.
+ *
+ * The runtime factory produces the loose handle (`WebuiRuntimeHostHandle`); the
+ * assembly then enriches it with the credential-backed slots — quota, daily
+ * check-in, account login and the real sign-out — which is why those are
+ * required here and optional there. Everything else keeps the handle's own
+ * optionality, and the member types come from the handle instead of being
+ * restated: the two declarations had drifted apart, and the one member that
+ * existed only here (`requestCompaction`) was never assigned by anyone and read
+ * by no one — compaction is `cliService.requestCompaction`, resolved by the
+ * harness adapter.
+ *
+ * `appVersion` stays optional because the v2 host does not echo the input
+ * option back.
  */
-export interface WebuiAssembledHost {
-  readonly apiHost: { close(): Promise<void> };
-  readonly dataDir: string;
-  readonly appVersion?: string;
-  readonly invalidateAuth: () => void;
-  readonly getUsageQuota: (request?: {
-    readonly forceRefresh?: boolean;
-  }) => Promise<import("../shared/contracts/usage-quota.js").WebuiUsageQuotaResult>;
-  readonly getSigninPanel: () => Promise<import("../shared/contracts/account.js").WebuiSigninPanelView>;
-  readonly claimSignin: () => Promise<import("../shared/contracts/account.js").WebuiClaimSigninView>;
-  /**
-   * Account login (device authorization) over the same `MCodeOAuthCore` the
-   * quota lease reads, plus the sign-out that removes the credential. The
-   * core is assembly-owned (never produced by the runtime factory), so these
-   * are enrichment slots like `getUsageQuota`, not harness capabilities.
-   */
-  readonly beginAccountLogin: () => Promise<import("../shared/contracts/account.js").WebuiAccountLoginView>;
-  readonly getAccountLoginStatus: () => Promise<import("../shared/contracts/account.js").WebuiAccountLoginView>;
-  readonly cancelAccountLogin: () => Promise<void>;
-  readonly signOutAccount: () => Promise<{ readonly status: string; readonly generation: number }>;
-  /**
-   * Conversation compaction is opt-in on the live harness: `local-runtime-v2`
-   * exposes `CliService.requestCompaction?` and the WebUI host surface
-   * turns its absence into `runtime host does not expose requestCompaction`.
-   * Kept as a `?` here so a runtime that does not implement compaction
-   * still type-checks. Production hosts that do implement it will satisfy
-   * this slot and the service's `runCommand -> /compact` path will work.
-   */
-  requestCompaction?(request: {
-    readonly name: string;
-    readonly id: string;
-    readonly reason: "ui_request";
-    readonly customInstructions?: string;
-  }): Promise<Record<string, unknown>>;
-  readonly cliService?: WebuiRuntimeCliService;
+export interface WebuiAssembledHost extends WebuiRuntimeHostHandle {
+  // Each type is read back off the handle rather than restated: the two
+  // declarations drifted while both spelled the parameter lists out, and a
+  // second copy of a signature is a second thing to update.
+  readonly dataDir: NonNullable<WebuiRuntimeHostHandle["dataDir"]>;
+  readonly invalidateAuth: NonNullable<WebuiRuntimeHostHandle["invalidateAuth"]>;
+  readonly getUsageQuota: NonNullable<WebuiRuntimeHostHandle["getUsageQuota"]>;
+  readonly getSigninPanel: NonNullable<WebuiRuntimeHostHandle["getSigninPanel"]>;
+  readonly claimSignin: NonNullable<WebuiRuntimeHostHandle["claimSignin"]>;
+  readonly beginAccountLogin: NonNullable<
+    WebuiRuntimeHostHandle["beginAccountLogin"]
+  >;
+  readonly getAccountLoginStatus: NonNullable<
+    WebuiRuntimeHostHandle["getAccountLoginStatus"]
+  >;
+  readonly cancelAccountLogin: NonNullable<
+    WebuiRuntimeHostHandle["cancelAccountLogin"]
+  >;
+  readonly signOutAccount: NonNullable<WebuiRuntimeHostHandle["signOutAccount"]>;
 }
 
 // The browser provider types and the adoption rule live in
