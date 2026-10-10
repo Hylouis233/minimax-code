@@ -2,13 +2,15 @@ import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import {
   WEBUI_BUILTIN_COMMANDS,
-  WEBUI_RUN_COMMAND_NAMES,
   WEBUI_SKILL_FIXTURES,
+  type SlashCommandEntry,
+} from "../../src/client/slash-palette.js";
+import {
+  WEBUI_RUN_COMMAND_NAMES,
   classifyWebuiSlashCommand,
   isWebuiRunnableCommand,
   sectionWebuiSlashPalette,
-  type SlashCommandEntry,
-} from "../../src/client/slash-palette.js";
+} from "../../src/client/contracts/slash-command.js";
 import { resolveWebuiSubmissionIntent } from "../../src/client/projection/composer-state.js";
 
 /**

@@ -12,30 +12,10 @@
 import type { ReactElement } from "react";
 import {
   applyWebuiSlashLiteMode,
-  rankWebuiSlashPalette,
   sectionWebuiSlashPalette,
-  type SlashComposerMode,
   type SlashDirectAction,
-  type SlashPaletteSection,
   type SlashSendIntent,
   type WebuiSlashPaletteFields,
-} from "./contracts/slash-command.js";
-export {
-  applyWebuiSlashLiteMode,
-  rankWebuiSlashPalette,
-  sectionWebuiSlashPalette,
-  WEBUI_RUN_COMMAND_NAMES,
-  classifyWebuiSlashCommand,
-  isWebuiRunnableCommand,
-} from "./contracts/slash-command.js";
-export type {
-  SlashComposerMode,
-  SlashDirectAction,
-  SlashPaletteSection,
-  SlashSendIntent,
-  WebuiCommandClassification,
-  WebuiRunCommandName,
-  WebuiSlashCommandFields,
 } from "./contracts/slash-command.js";
 import {
   WebuiIconCommandCompact,

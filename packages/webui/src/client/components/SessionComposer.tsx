@@ -173,12 +173,12 @@ import {
   WEBUI_BUILTIN_COMMANDS,
   type SlashCommandEntry,
   type WebuiSlashSkillSummary,
-  type WebuiRunCommandName,
 } from "../slash-palette.js";
 import {
   isWebuiRunnableCommand,
   rankWebuiSlashPalette,
   sectionWebuiSlashPalette,
+  type WebuiRunCommandName,
 } from "../contracts/slash-command.js";
 
 const WEBUI_SLASH_FALLBACK_SECTIONED: SlashCommandEntry[] = await (async () => {
