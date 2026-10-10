@@ -66,6 +66,35 @@ import {
 
 const EMPTY_TRANSCRIPT_PAGE: WebuiClientMessagePage = {};
 
+const TRANSCRIPT_VIEWPORT_SELECTOR = '[data-webui-session-scroll="true"]';
+
+/**
+ * The scroll viewport that carries the transcript.
+ *
+ * It is an ancestor rather than the transcript element itself, and four places
+ * need it, so the selector lives here instead of being spelled out each time.
+ */
+function transcriptViewport(element: Element | null): HTMLElement | undefined {
+  return element?.closest<HTMLElement>(TRANSCRIPT_VIEWPORT_SELECTOR) ?? undefined;
+}
+
+/** Pin the viewport to the last message, when this follower is armed. */
+function pinTranscriptToBottom(viewport: HTMLElement, armed: boolean): void {
+  if (armed) viewport.scrollTop = webuiScrollBottomTop(viewport);
+}
+
+/**
+ * Watch the transcript's own height, so content that grows after the first paint
+ * (highlighting, images, tables) keeps being followed. Returns `undefined` where
+ * the environment has no `ResizeObserver`; the caller has nothing to disconnect.
+ */
+function observeTranscriptHeight(element: Element, onResize: () => void): (() => void) | undefined {
+  if (typeof ResizeObserver === "undefined") return undefined;
+  const observer = new ResizeObserver(onResize);
+  observer.observe(element);
+  return () => observer.disconnect();
+}
+
 /**
  * Historical questionnaire-response projection. Once the user submits a
  * questionnaire we render the question and the recorded answers inside the
@@ -394,9 +423,7 @@ export function WebuiSessionTranscript({
   useLayoutEffect(() => {
     if (!turnLive) return undefined;
     const transcript = transcriptRef.current;
-    const viewport = transcript?.closest<HTMLElement>(
-      '[data-webui-session-scroll="true"]',
-    );
+    const viewport = transcriptViewport(transcript);
     if (!transcript || !viewport) return undefined;
     if (
       previousTurnStateRef.current.sessionId !== sessionId ||
@@ -405,10 +432,7 @@ export function WebuiSessionTranscript({
       autoFollowRef.current = true;
       manualScrollIntentRef.current = false;
     }
-    const followBottom = () => {
-      if (autoFollowRef.current)
-        viewport.scrollTop = webuiScrollBottomTop(viewport);
-    };
+    const followBottom = () => pinTranscriptToBottom(viewport, autoFollowRef.current);
     const onScroll = () => {
       if (webuiScrollFollowsBottom(viewport)) {
         autoFollowRef.current = true;
@@ -420,22 +444,18 @@ export function WebuiSessionTranscript({
     const onWheel = () => { manualScrollIntentRef.current = true; };
     viewport.addEventListener("scroll", onScroll, { passive: true });
     viewport.addEventListener("wheel", onWheel, { passive: true });
-    const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(followBottom);
-    observer?.observe(transcript);
+    const stopObserving = observeTranscriptHeight(transcript, followBottom);
     followBottom();
     return () => {
-      observer?.disconnect();
+      stopObserving?.();
       viewport.removeEventListener("scroll", onScroll);
       viewport.removeEventListener("wheel", onWheel);
     };
   }, [sessionId, turnLive]);
   useLayoutEffect(() => {
     if (!turnLive) return;
-    const viewport = transcriptRef.current?.closest<HTMLElement>(
-      '[data-webui-session-scroll="true"]',
-    );
-    if (viewport && autoFollowRef.current)
-      viewport.scrollTop = webuiScrollBottomTop(viewport);
+    const viewport = transcriptViewport(transcriptRef.current);
+    if (viewport) pinTranscriptToBottom(viewport, autoFollowRef.current);
   }, [items, turnLive]);
   // 进入会话时落在最后一条消息上，和桌面端一致。上面那套跟随只在回合 live 时
   // 装配，所以非 live 的会话会保留上一个会话留下的 scrollTop（新挂载的视口就是 0，
@@ -451,26 +471,18 @@ export function WebuiSessionTranscript({
   }, [sessionId]);
   useLayoutEffect(() => {
     const transcript = transcriptRef.current;
-    const viewport = transcript?.closest<HTMLElement>(
-      '[data-webui-session-scroll="true"]',
-    );
+    const viewport = transcriptViewport(transcript);
     if (!transcript || !viewport) return undefined;
-    const followBottom = () => {
-      if (openScrollFollowRef.current)
-        viewport.scrollTop = webuiScrollBottomTop(viewport);
-    };
+    const followBottom = () => pinTranscriptToBottom(viewport, openScrollFollowRef.current);
     // 用户开始滚动即交还控制权。程序化设置 scrollTop 不产生 wheel/touchmove，
     // 所以跟随自己的写入不会把自己关掉。
     const releaseControl = () => { openScrollFollowRef.current = false; };
     viewport.addEventListener("wheel", releaseControl, { passive: true });
     viewport.addEventListener("touchmove", releaseControl, { passive: true });
-    const observer = typeof ResizeObserver === "undefined"
-      ? undefined
-      : new ResizeObserver(followBottom);
-    observer?.observe(transcript);
+    const stopObserving = observeTranscriptHeight(transcript, followBottom);
     followBottom();
     return () => {
-      observer?.disconnect();
+      stopObserving?.();
       viewport.removeEventListener("wheel", releaseControl);
       viewport.removeEventListener("touchmove", releaseControl);
     };
@@ -504,9 +516,7 @@ export function WebuiSessionTranscript({
         // 翻历史是用户主动往上走：交还控制权，否则更早消息并进来之后
         // 贴底跟随会把他从正在读的位置拽回末尾。
         openScrollFollowRef.current = false;
-        const viewport = transcriptRef.current?.closest<HTMLElement>(
-          '[data-webui-session-scroll="true"]',
-        );
+        const viewport = transcriptViewport(transcriptRef.current);
         const previousScrollTop = viewport?.scrollTop;
         void historyOwner?.loadOlder(sessionId, requestedCursor).then((outcome) => {
           requestAnimationFrame(() => {
