@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import type { WebuiClientSession } from "../contracts/session-view.js";
 import type { WebuiBrowserStorage } from "../infrastructure/storage.js";
 
 export const WEBUI_SESSION_OVERLAY_KEYS = {
@@ -66,25 +65,15 @@ export function writeProjectName(projectKey: string, name: string, storage: Webu
   return next;
 }
 
-const DESKTOP_ONLY_ENTRIES = ["Schedules", "Plugins / Skill marketplace", "Websites", "Remote control", "Maxclaw", "Maxhermes"];
-
-export function LeftRail({ sessions, activeSessionId, onSelect, onNew, children }: {
-  readonly sessions: readonly WebuiClientSession[];
-  readonly activeSessionId?: string;
-  readonly onSelect?: (id: string) => void;
-  readonly onNew?: () => void;
-  readonly children?: ReactNode;
-}) {
-  if (children)
-    return <div data-webui-component="left-rail" className="contents">{children}</div>;
-  return <div className="flex min-h-0 flex-1 flex-col gap-spacing_16">
-    <button className="webui-button-primary" onClick={onNew}>New session</button>
-    <nav className="grid gap-1" aria-label="Desktop navigation">
-      {DESKTOP_ONLY_ENTRIES.map((entry) => <button key={entry} type="button" disabled title="Desktop only" className="webui-nav-item cursor-not-allowed text-left text-text_default_tertiary opacity-60">{entry}<span className="sr-only">Desktop only</span></button>)}
-      <button type="button" className="webui-nav-item text-left">Local workspaces</button>
-    </nav>
-    <div className="min-h-0 flex-1 overflow-auto">
-      {sessions.map((session) => <button key={session.sessionId} className="webui-session-card" data-webui-session-active={session.sessionId === activeSessionId} onClick={() => onSelect?.(session.sessionId)}>{session.title ?? session.agentName}</button>)}
-    </div>
-  </div>;
+/**
+ * The rail's frame.
+ *
+ * The rail's contents are composed by the shell, so this owns the landmark and
+ * its data attribute and nothing else. It used to carry a second body — a "New
+ * session" button, a list of Desktop-only entries and a session list — that
+ * rendered only when no `children` were passed, and the one call site always
+ * passes them. The four props that fed it were passed by nobody who read them.
+ */
+export function LeftRail({ children }: { readonly children: ReactNode }) {
+  return <div data-webui-component="left-rail" className="contents">{children}</div>;
 }

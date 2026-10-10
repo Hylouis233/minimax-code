@@ -1167,11 +1167,7 @@ export function WebuiClientFoundationApp(
         <div className="contents">
           {/* -------------------------------------------------------------- rail */}
           <div className="relative h-full min-h-0 flex-shrink-0">
-            <LeftRail
-              sessions={page.sessions}
-              activeSessionId={selectedSessionId}
-              onNew={startNewTask}
-            >
+            <LeftRail>
             <aside
               aria-label="Primary navigation"
               data-webui-shell-region="rail"
@@ -1264,7 +1260,6 @@ export function WebuiClientFoundationApp(
                         selectedSessionId={selectedSessionId}
                         activity={sessionActivity}
                         now={activityNow}
-                        onProjectSelect={setNewTaskWorkspaceDir}
                         onCreateTaskInProject={(project) => startNewTask(project.workspaceDir)}
                         error={pageError}
                         pinnedSessions={pinnedSessions}

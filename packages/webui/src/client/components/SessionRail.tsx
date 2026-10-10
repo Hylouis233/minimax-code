@@ -1103,7 +1103,6 @@ export function WebuiSessionList({
   readonly loading: boolean;
   readonly onLoadMore?: () => void;
   readonly selectedSessionId?: string;
-  readonly onProjectSelect?: (workspaceDir?: string) => void;
   readonly error?: string;
   readonly teamModeChoices?: TeamModeSessionChoices;
   readonly activity?: WebuiSessionActivityMap;

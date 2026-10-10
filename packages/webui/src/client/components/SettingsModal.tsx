@@ -76,10 +76,6 @@ function Section({ title, testId, children }: { readonly title: string; readonly
  *  owners directly (plan §7.6; ticket #52) — but the name is kept exported for
  *  consumers that used to thread that prop through (`UserMenu`). It now names
  *  the settings owner's command surface. */
-export type WebuiSettingsModalCapabilities = NonNullable<
-  ReturnType<typeof useWebuiSettingsWorkflows>
->;
-
 interface SettingsModalProps {
   readonly open: boolean;
   readonly onClose: () => void;

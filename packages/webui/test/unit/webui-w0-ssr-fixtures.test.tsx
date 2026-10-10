@@ -20,6 +20,7 @@ import {
   WebuiFeedbackActions,
   WebuiMessageActionButton,
 } from "../../src/client/components/MessageActions.js";
+import { LeftRail } from "../../src/client/components/LeftRail.js";
 import { WebuiQuestionnaireResponse } from "../../src/client/components/SessionTranscript.js";
 import {
   mergeOlderTranscriptPage,
@@ -396,5 +397,28 @@ describe("WebUI transcript page merging", () => {
     ]);
     expect(result.state.page.hasMore).toBe(false);
     expect(result.state.page.nextCursor).toBeUndefined();
+  });
+});
+
+describe("W0 · SSR · LeftRail", () => {
+  // The frame's whole contract: the landmark and the `contents` display, with
+  // the rail's own markup passed through. It used to carry a second body that
+  // rendered only when no children were passed, and the one call site always
+  // passes them.
+  const markup = renderToStaticMarkup(
+    createElement(LeftRail, null, createElement("span", { "data-testid": "rail-child" })),
+  );
+
+  it("renders the rail landmark around its children", () => {
+    expect(markup).toContain('data-webui-component="left-rail"');
+    expect(markup).toContain('data-testid="rail-child"');
+  });
+
+  it("contributes no layout of its own", () => {
+    // `contents` is what lets the shell's own aside be the rail's box; a
+    // wrapper that generated a box would change the rail's geometry.
+    expect(markup).toContain('class="contents"');
+    expect(markup).not.toContain("webui-button-primary");
+    expect(markup).not.toContain("Desktop only");
   });
 });
