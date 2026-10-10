@@ -169,11 +169,20 @@ export const ALLOWED_EDGES = Object.freeze({
  * counted, but the CLI reports every violation that touches one of them so a
  * reviewer can see the provisional judgement instead of a silent pass.
  *
- * Each retained entry above records, in a comment on the entry itself, where
- * that file actually mixes. The judgement is **path-level** — a file is
- * ambiguous or it is not, and every violation touching one is surfaced. The
- * **symbol-level** ownership check §7.5 asks for does not exist yet: nothing
- * here can tell which of a mixed file's symbols owns a given edge.
+ * The list is currently **empty**: every file that was listed here has either
+ * been split or was re-read and found not to mix. The mechanism is kept — a
+ * future file can be listed again, and `collectProvisionalJudgements` plus the
+ * CLI's provisional section keep working for whoever adds it — but today no
+ * entry reports.
+ *
+ * Every removal below records, in a comment, where that file actually mixed (or
+ * why it never did). The judgement is **path-level** — a file is ambiguous or it
+ * is not, and every violation touching one is surfaced. The **symbol-level**
+ * ownership check §7.5 asks for still does not exist: nothing here can tell
+ * which of a mixed file's symbols owns a given edge. An empty list is not that
+ * capability having been built; it is there being nothing left to judge. If a
+ * genuinely two-layer file appears, add it here *and* implement symbol-level
+ * ownership — the list alone only surfaces the violation, it does not decide it.
  *
  * `client/projection/stream-state.ts` used to be listed here. It has since
  * become a pure `view` projection: `classifyLayers` gives it exactly `view`
@@ -204,28 +213,53 @@ export const ALLOWED_EDGES = Object.freeze({
  * that no longer sits at that path is deleted, so a re-created file at the old
  * path classifies as `unknown` and is reported instead of silently inheriting a
  * stale layer.
+ *
+ * `runtime/port.ts` used to be listed here. The entry claimed the module "pulls
+ * the shared plugin-management / canvas / model contract shapes into the same
+ * module", which is not what it does: every one of those shapes is imported
+ * with `import type` from `shared/`, and the DTOs already live in `shared/` —
+ * the port only *names* them. The only thing standing between the port and a
+ * single-layer judgement was a four-line `export type { ... } from
+ * "../shared/plugin-management.js"` forwarding shell, which was deleted; its one
+ * consumer (`runtime/harness/host-contract.ts`) now names the shared module in
+ * its inline type query. A type-only re-export is not a second layer either, so
+ * the entry asserted a mixture that did not exist.
+ *
+ * `client/slash-palette.ts` used to be listed here, and this one *was* a real
+ * mixture: the module re-exported the leaf `contracts/slash-command.js` symbols
+ * and imported React icon components in the same file, so it was simultaneously
+ * a contract barrel and a presentation module. The two forwarding `export { }`
+ * / `export type { }` blocks were deleted and every consumer now names
+ * `contracts/slash-command.js` directly — one module, one path, no barrel. What
+ * stays is presentation: `SlashCommandEntry`, the three display data pools
+ * (`WEBUI_BUILTIN_COMMANDS`, `WEBUI_PLUGIN_REGISTRY`, `WEBUI_SKILL_FIXTURES`),
+ * `slashSkillSummaryToEntry` and the icons.
+ *
+ * `server/envelope.ts` used to be listed here. The entry's stated worry was a
+ * "server-path module holding frame-validation behaviour that the runtime is
+ * meant to reach without depending on server code", but that is a forward-looking
+ * concern about an edge that does not exist: no module under `runtime/` imports
+ * `server/envelope.js` at all. The declarations (frame shape, protocol version,
+ * error codes) live in `shared/envelope.ts` and the only thing here is the
+ * `isWebuiFrame` validator, whose two importers are `server/index.ts` and
+ * `server/operation/operation-dispatch.ts`. Both are server-path, both are legal,
+ * so the path hides no edge.
+ *
+ * `server/service.ts` used to be listed here too. Re-read line by line, it holds
+ * only what plan §7.1 leaves it — HTTP/WS assembly plus `start`/`close` — plus
+ * composition-root work: it constructs the operation registry, projects the
+ * harness port's methods into it, injects `WebuiTerminalManager` and the HTTP
+ * listener / WebSocket server constructors, and shuts down in order. The
+ * network lifecycle itself already lives in `http-server.ts`,
+ * `websocket-server.ts`, `frame-handler.ts` and `access-policy.ts`. OAuth,
+ * broker and browser-provider work is *named* but never implemented here: the
+ * OAuth-shaped members (`getCodexOAuthStatus`, `startCodexOAuthLogin`,
+ * `cancelCodexOAuthLogin`, …) are one-line forwards into `this.port`, so no
+ * resource state machine is inlined. A composition root is the one place
+ * §7.5 explicitly permits, and it is classified `server` by path, so the entry
+ * asserted a mixture that the file does not have.
  */
-export const KNOWN_AMBIGUOUS_FILES = Object.freeze([
-  // Mixed where: the Node capability port. It declares the server-facing
-  // capability surface *and* pulls the shared plugin-management / canvas /
-  // model contract shapes into the same module, so a `runtime-port` label
-  // hides a real edge until the port and its DTOs are separated.
-  "runtime/port.ts",
-  // Mixed where: a barrel that re-exports the leaf slash-command contracts
-  // *and* imports React icon components, so the file is simultaneously a
-  // contract barrel and a presentation module.
-  "client/slash-palette.ts",
-  // Mixed where: the loopback HTTP/WebSocket entry point. It owns the
-  // transport server, the terminal manager and the runtime harness port
-  // wiring in one module, which is why the plan separates the runtime
-  // boundary from the server layer at all.
-  "server/service.ts",
-  // Mixed where: a server-path module holding frame-validation behaviour that
-  // the runtime is meant to reach without depending on server code. The
-  // declarations are shared; only the validator stayed here, so the path
-  // overstates the layer.
-  "server/envelope.ts",
-]);
+export const KNOWN_AMBIGUOUS_FILES = Object.freeze([]);
 
 /**
  * Baseline categories, each keyed to a migration stage from plan §7.7 (the
@@ -464,8 +498,8 @@ const BROWSER_LAYERS = new Set([
 ]);
 
 /** True when either endpoint of a pair is a known-ambiguous file. */
-export function touchesAmbiguousFile(from, to) {
-  return KNOWN_AMBIGUOUS_FILES.includes(from) || KNOWN_AMBIGUOUS_FILES.includes(to);
+export function touchesAmbiguousFile(from, to, ambiguousFiles = KNOWN_AMBIGUOUS_FILES) {
+  return ambiguousFiles.includes(from) || ambiguousFiles.includes(to);
 }
 
 /**
@@ -477,23 +511,28 @@ export function touchesAmbiguousFile(from, to) {
  * They therefore never feed the pass/fail condition — a reviewer reads them.
  * `violations` is the measured violation list (`result.direction`), so the
  * caller decides which subset to annotate.
+ *
+ * `ambiguousFiles` defaults to the real list and exists so the tests can drive
+ * this with a fixture list. The real list is empty today, and a test that only
+ * ever passed an empty list would pass even if the filter were deleted — the
+ * parameter is what keeps the mechanism covered, not a way to reconfigure it.
+ * Callers that omit it get exactly the shipped behaviour.
  */
-export function collectProvisionalJudgements(violations) {
+export function collectProvisionalJudgements(
+  violations,
+  ambiguousFiles = KNOWN_AMBIGUOUS_FILES,
+) {
   return violations
     .filter((violation) =>
-      touchesAmbiguousFile(violation.from, violation.to),
+      touchesAmbiguousFile(violation.from, violation.to, ambiguousFiles),
     )
     .map((violation) => ({
       from: violation.from,
       to: violation.to,
       category: violation.category,
       ambiguous: [
-        ...(KNOWN_AMBIGUOUS_FILES.includes(violation.from)
-          ? [violation.from]
-          : []),
-        ...(KNOWN_AMBIGUOUS_FILES.includes(violation.to)
-          ? [violation.to]
-          : []),
+        ...(ambiguousFiles.includes(violation.from) ? [violation.from] : []),
+        ...(ambiguousFiles.includes(violation.to) ? [violation.to] : []),
       ],
     }));
 }

@@ -147,37 +147,50 @@ describe("layer matrix", () => {
     expect(classifyLayers("shared/contracts/session.ts")).toEqual(["shared"]);
   });
 
-  it("records the known-ambiguous files from plan section 7.5", () => {
-    expect(KNOWN_AMBIGUOUS_FILES).toContain("runtime/port.ts");
-    expect(KNOWN_AMBIGUOUS_FILES).toContain("server/service.ts");
-    expect(KNOWN_AMBIGUOUS_FILES).toContain("server/envelope.ts");
-    expect(KNOWN_AMBIGUOUS_FILES).toContain("client/slash-palette.ts");
-    // `client/projection/stream-state.ts` was listed here while it still mixed
-    // responsibilities. It is now a pure `view` projection — `classifyLayers`
-    // gives it exactly `view` and no mechanism imports it — so listing it
-    // contradicted its own classification and the entry was removed.
+  it("keeps the plan section 7.5 mixed-file list empty", () => {
+    // The list is empty because each of the four entries was resolved, not
+    // because the check was relaxed: `runtime/port.ts` and `client/slash-palette.ts`
+    // lost their contract re-export shells, and `server/envelope.ts` /
+    // `server/service.ts` were re-read and hold a single layer. The reasoning is
+    // recorded on `KNOWN_AMBIGUOUS_FILES` in `scripts/lib/webui-dependency-rules.mjs`.
+    // The symbol-level ownership check §7.5 asks for is still not implemented —
+    // an empty list means nothing left to judge, not that judgement is automatic.
+    expect(KNOWN_AMBIGUOUS_FILES).toEqual([]);
+    // The four resolved entries must not come back: each is now judged by its
+    // path, and listing it again would assert a mixture that no longer exists.
+    expect(KNOWN_AMBIGUOUS_FILES).not.toContain("runtime/port.ts");
+    expect(KNOWN_AMBIGUOUS_FILES).not.toContain("client/slash-palette.ts");
+    expect(KNOWN_AMBIGUOUS_FILES).not.toContain("server/envelope.ts");
+    expect(KNOWN_AMBIGUOUS_FILES).not.toContain("server/service.ts");
+    // Entries removed earlier stay removed.
     expect(KNOWN_AMBIGUOUS_FILES).not.toContain(
       "client/projection/stream-state.ts",
     );
-    // `client/stream.ts` was split into the pure frame reducer in
-    // `client/projection/stream-state.ts` and the turn-coordinator commands;
-    // the original path no longer exists to be judged, so its entry is gone.
     expect(KNOWN_AMBIGUOUS_FILES).not.toContain("client/stream.ts");
-    // `client/contracts.ts` was split into leaf contracts in stage 1; the entry
-    // is gone because the file no longer exists to be judged.
     expect(KNOWN_AMBIGUOUS_FILES).not.toContain("client/contracts.ts");
-    // `client/session-runtime-store.ts` had no remaining importer and was
-    // deleted by the ticket-#45 slice; the entry is gone because the file no
-    // longer exists to be judged.
     expect(KNOWN_AMBIGUOUS_FILES).not.toContain(
       "client/session-runtime-store.ts",
     );
+  });
+
+  // Each resolved file is still classified, and still by a single layer — that
+  // is what makes an empty list truthful rather than merely empty. If one of
+  // these starts mixing again, its classification or this assertion is what
+  // should fail first.
+  it("classifies the files the empty list removed", () => {
+    expect(classifyLayers("runtime/port.ts")).toEqual(["runtime-port"]);
+    expect(classifyLayers("client/slash-palette.ts")).toEqual(["bindings"]);
+    expect(classifyLayers("server/envelope.ts")).toEqual(["server"]);
+    expect(classifyLayers("server/service.ts")).toEqual(["server"]);
   });
 
   // Every entry the list retains must still be a file the checker recognises
   // and classifies, and each must genuinely be path-ambiguous: if the matrix
   // gives it one clean layer, the entry is asserting a mixture that is gone.
   it("retains only files the matrix classifies", () => {
+    // Vacuously satisfied while the list is empty, and kept deliberately: the
+    // moment someone adds an entry, this is the loop that has to start holding
+    // it to the classifier.
     for (const file of KNOWN_AMBIGUOUS_FILES) {
       expect(classifyLayers(file).length).toBeGreaterThan(0);
     }
@@ -195,9 +208,20 @@ describe("provisional judgements for plan section 7.5 mixed files", () => {
     category: "unclassified",
   });
 
+  // The real `KNOWN_AMBIGUOUS_FILES` is empty, so these drive the collector with
+  // a fixture list. The paths are the ones the list used to hold — keeping them
+  // means these assertions still describe the real rule, and if the collector
+  // regressed they would still fail. The collector's default argument is what
+  // the CLI uses; "the empty real list reports nothing" is asserted separately
+  // in the block above.
+  const FIXTURE_AMBIGUOUS_FILES = ["runtime/port.ts", "server/envelope.ts"];
+
   it("reports a violation whose source is an ambiguous file", () => {
     expect(
-      collectProvisionalJudgements([violation("runtime/port.ts", "server/x.ts")]),
+      collectProvisionalJudgements(
+        [violation("runtime/port.ts", "server/x.ts")],
+        FIXTURE_AMBIGUOUS_FILES,
+      ),
     ).toEqual([
       {
         from: "runtime/port.ts",
@@ -210,7 +234,10 @@ describe("provisional judgements for plan section 7.5 mixed files", () => {
 
   it("reports a violation whose destination is an ambiguous file", () => {
     expect(
-      collectProvisionalJudgements([violation("server/x.ts", "server/envelope.ts")]),
+      collectProvisionalJudgements(
+        [violation("server/x.ts", "server/envelope.ts")],
+        FIXTURE_AMBIGUOUS_FILES,
+      ),
     ).toEqual([
       {
         from: "server/x.ts",
@@ -223,9 +250,10 @@ describe("provisional judgements for plan section 7.5 mixed files", () => {
 
   it("names both endpoints when the edge is ambiguous at both ends", () => {
     expect(
-      collectProvisionalJudgements([
-        violation("runtime/port.ts", "server/envelope.ts"),
-      ]),
+      collectProvisionalJudgements(
+        [violation("runtime/port.ts", "server/envelope.ts")],
+        FIXTURE_AMBIGUOUS_FILES,
+      ),
     ).toEqual([
       {
         from: "runtime/port.ts",
@@ -238,8 +266,25 @@ describe("provisional judgements for plan section 7.5 mixed files", () => {
 
   it("leaves a violation between two unambiguous files out", () => {
     expect(
-      collectProvisionalJudgements([violation("client/x.ts", "client/y.ts")]),
+      collectProvisionalJudgements(
+        [violation("client/x.ts", "client/y.ts")],
+        FIXTURE_AMBIGUOUS_FILES,
+      ),
     ).toEqual([]);
+  });
+
+  it("reports nothing for the real list, which is empty", () => {
+    // The collector's default argument is the shipped list. Today that list has
+    // no entries, so no violation can be provisional — asserted so the default
+    // wiring stays covered even though the fixtures above pass their own list.
+    expect(
+      collectProvisionalJudgements([
+        violation("runtime/port.ts", "server/envelope.ts"),
+      ]),
+    ).toEqual([]);
+    expect(touchesAmbiguousFile("runtime/port.ts", "server/envelope.ts")).toBe(
+      false,
+    );
   });
 
   it("does not report a violation merely because the removed file was ambiguous", () => {
@@ -247,6 +292,10 @@ describe("provisional judgements for plan section 7.5 mixed files", () => {
     // made every one of its edges look provisional. It is a plain `view` file
     // now, so its violations (if any) are ordinary judgements.
     expect(touchesAmbiguousFile("client/projection/stream-state.ts", "client/y.ts"))
+      .toBe(false);
+    // Same for the four entries resolved by this refactor: with the real list
+    // empty, none of them makes an edge provisional.
+    expect(touchesAmbiguousFile("client/slash-palette.ts", "server/service.ts"))
       .toBe(false);
   });
 
