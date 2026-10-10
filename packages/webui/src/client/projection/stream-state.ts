@@ -372,8 +372,6 @@ export function applyFrameData(
       ...next,
       actionDeltas: [...next.actionDeltas, ...frame.messageActionDeltas],
     };
-  if (frame.projection !== undefined)
-    next = { ...next, projection: frame.projection };
   const recognised = recogniseWebuiStreamPayload(frame.dataJson);
   if (recognised.kind === "empty") return next;
   if (recognised.kind === "done")

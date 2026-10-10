@@ -1,11 +1,9 @@
 // Dedicated handlers: the three data streams.
 //
 // `watchEvents`, `sendMessage` and `resumeSession` cannot be plain bindings:
-// each returns a `{ stream }` envelope, and send/resume wrap the harness
-// iterable through the session-stream projection. `watchEvents` is the one
-// stream that opts into the acknowledgement frame (declared on its descriptor).
+// each returns a `{ stream }` envelope. `watchEvents` is the one stream that
+// opts into the acknowledgement frame (declared on its descriptor).
 import type { WebuiOperationPort } from "../bind-handlers.js";
-import { projectSessionStream } from "../../projections/index.js";
 import { watchEventsOperation } from "../questionnaire.js";
 import { sendMessageOperation, resumeSessionOperation } from "../interaction.js";
 import type {
@@ -34,25 +32,15 @@ export function createStreamHandlerEntries(
   const sendMessage: DedicatedHandler<typeof sendMessageOperation> = async (
     context,
     body,
-  ) => {
-    const stream = await port.sendMessage(body, context.signal);
-    return {
-      stream: stream.ok
-        ? { ...stream, source: projectSessionStream(stream.source) }
-        : stream,
-    };
-  };
+  ) => ({
+    stream: await port.sendMessage(body, context.signal),
+  });
   const resumeSession: DedicatedHandler<typeof resumeSessionOperation> = async (
     context,
     body,
-  ) => {
-    const stream = await port.resumeSession(body, context.signal);
-    return {
-      stream: stream.ok
-        ? { ...stream, source: projectSessionStream(stream.source) }
-        : stream,
-    };
-  };
+  ) => ({
+    stream: await port.resumeSession(body, context.signal),
+  });
   return new Map([
     [watchEventsOperation.name, { operation: watchEventsOperation, handle: watchEvents as WebuiOperationHandler<unknown> }],
     [sendMessageOperation.name, { operation: sendMessageOperation, handle: sendMessage as WebuiOperationHandler<unknown> }],

@@ -120,8 +120,6 @@ export interface WebuiStreamState {
   readonly contextUsage?: Record<string, unknown>;
   /** The session-scoped Todo/Subagent projection fed by Desktop-compatible events. */
   readonly workspaceProgress: WebuiWorkspaceProgressState;
-  /** The server-owned projection snapshot carried by the current stream. */
-  readonly projection?: unknown;
   readonly status?: string;
   readonly refusal?: string;
   /**

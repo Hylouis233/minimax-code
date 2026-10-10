@@ -458,6 +458,18 @@ phase table at the end of this document reflects the corrected boundary.
 
 ### Step B3 — Event projections
 
+> **Later revision (2026-10-11).** The session-stream half of this step was
+> removed. `server/projections/permissions.ts`, `server/projections/compaction.ts`,
+> `reduceEvents` and the `projectSessionStream` wrap on the `sendMessage` /
+> `resumeSession` frames are gone: the wrap attached a per-session
+> permission/compaction snapshot to every stream frame, and no client module ever
+> read it — the browser builds the permission and questionnaire state the panels
+> render in `client/projection/effect-reducer.ts`. `projections/context-snapshot.ts`
+> and `projections/usage.ts` stay, because `getMessages` enriches its response
+> with them. The shared event corpus now has a client-side consumer test
+> (`test/unit/webui-event-corpus.test.ts`) in place of the removed projection's
+> coverage, and `test/unit/transport-frame.test.ts` was deleted with its subject.
+
 **Goal.** Mirror the runtime-event projections the TUI consumes, in
 particular the compaction projection, the permission / questionnaire
 projection and the usage projection, so the WebSocket event stream can

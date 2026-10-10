@@ -286,6 +286,65 @@ function assertFrameBytesEqual(
   }
 }
 
+/**
+ * Byte comparison for the two operations whose frames deliberately diverge from
+ * the frozen baseline by exactly one member.
+ *
+ * `legacy-protocol/README.md` forbids editing this directory when the wire
+ * contract is meant to change and says the divergence belongs in the suite's
+ * expectations instead. This is that record. The baseline still attaches a
+ * per-session `projection` snapshot to every `sendMessage` / `resumeSession`
+ * frame; the production frame type no longer declares the field and no client
+ * module ever read it, so production omits it.
+ *
+ * The comparison stays byte-exact: removing the member from the baseline's
+ * parsed value and re-serialising reproduces the production bytes, and any
+ * other difference — another member, another value, a reordered key — still
+ * fails. A baseline that stopped carrying the member fails the premise
+ * assertion instead of silently comparing two frames that were never checked.
+ */
+function assertFramesMatchBaselineWithoutProjection(
+  baseline: readonly string[],
+  production: readonly string[],
+  label: string,
+): void {
+  assert.equal(
+    baseline.length,
+    production.length,
+    `${label}: frame count diverged (baseline ${baseline.length}, production ${production.length})\nbaseline:\n${describeFrames(baseline)}\nproduction:\n${describeFrames(production)}`,
+  );
+  let strippedFrames = 0;
+  for (let index = 0; index < baseline.length; index += 1) {
+    const raw = baseline[index] ?? "";
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    // The dispatcher serialises a stream frame as the event's `body`, so the
+    // member the baseline appends sits one level down. Error frames carry no
+    // object body, and they are compared byte-for-byte like every other frame.
+    const body = parsed.body;
+    const carriesProjection =
+      body !== null &&
+      typeof body === "object" &&
+      !Array.isArray(body) &&
+      Object.hasOwn(body as Record<string, unknown>, "projection");
+    let expected = raw;
+    if (carriesProjection) {
+      const fields = { ...(body as Record<string, unknown>) };
+      delete fields.projection;
+      expected = JSON.stringify({ ...parsed, body: fields });
+      strippedFrames += 1;
+    }
+    const actual = production[index] ?? "";
+    assert.ok(
+      Buffer.from(expected, "utf8").equals(Buffer.from(actual, "utf8")),
+      `${label}: frame ${index} diverged beyond the removed projection member\nbaseline minus projection: ${expected}\nproduction:               ${actual}`,
+    );
+  }
+  assert.ok(
+    strippedFrames > 0,
+    `${label}: no baseline frame carried the projection member, so this expectation has stopped describing the divergence it exists for\nbaseline:\n${describeFrames(baseline)}`,
+  );
+}
+
 /** Run one frame through both sides and require identical bytes and calls. */
 async function compareFrame(
   label: string,
@@ -702,7 +761,11 @@ describe("WebUI operation wire compatibility (baseline implementation vs typed b
         requestFrame("sendMessage", VALID_BODIES.sendMessage),
         { plan: { stream: stream(newFinalized, fail) } },
       );
-      assertFrameBytesEqual(baseline.sent, production.sent, `sendMessage (fail=${fail})`);
+      assertFramesMatchBaselineWithoutProjection(
+        baseline.sent,
+        production.sent,
+        `sendMessage (fail=${fail})`,
+      );
     }
     expect(oldFinalized.count).toBe(2);
     expect(newFinalized.count).toBe(2);
@@ -730,7 +793,11 @@ describe("WebUI operation wire compatibility (baseline implementation vs typed b
     // the finalization count alone would not notice a side that emitted a
     // different number of frames (or the same frames in a different order)
     // before it closed the iterator.
-    assertFrameBytesEqual(baseline.sent, production.sent, "pending cancellation");
+    assertFramesMatchBaselineWithoutProjection(
+      baseline.sent,
+      production.sent,
+      "pending cancellation",
+    );
     expect(baseline.sent).toHaveLength(1);
     expect(oldFinalized.count).toBe(1);
     expect(newFinalized.count).toBe(1);
@@ -752,7 +819,11 @@ describe("WebUI operation wire compatibility (baseline implementation vs typed b
     };
     const baseline = await runClose("baseline");
     const production = await runClose("production");
-    assertFrameBytesEqual(baseline.sent, production.sent, "socket-close abort");
+    assertFramesMatchBaselineWithoutProjection(
+      baseline.sent,
+      production.sent,
+      "socket-close abort",
+    );
     expect(baseline.finalized).toBe(1);
     expect(production.finalized).toBe(1);
   });
