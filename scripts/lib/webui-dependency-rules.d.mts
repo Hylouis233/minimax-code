@@ -295,3 +295,31 @@ export function compareBaseline(
 export function toBaselineShape(
   violations: readonly DirectionViolation[],
 ): BaselineEntry[];
+
+/**
+ * The three members the collector reads. Deliberately narrower than
+ * {@link DirectionViolation}, which satisfies it structurally: the judgement
+ * only needs the endpoints and the category, so a caller that has no more than
+ * those can still ask for one.
+ */
+export interface ProvisionalJudgementSource {
+  readonly from: string;
+  readonly to: string;
+  readonly category: string;
+}
+
+/**
+ * One measured violation whose judgement rests on a provisional layer, i.e. a
+ * file listed in `KNOWN_AMBIGUOUS_FILES`. Reported, never enforced.
+ */
+export interface ProvisionalJudgement {
+  readonly from: string;
+  readonly to: string;
+  readonly category: string;
+  readonly ambiguous: readonly string[];
+}
+
+export function collectProvisionalJudgements(
+  violations: readonly ProvisionalJudgementSource[],
+  ambiguousFiles?: readonly string[],
+): ProvisionalJudgement[];
