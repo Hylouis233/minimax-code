@@ -18,6 +18,9 @@ import {
   unregisterWebuiEventWatcher,
 } from "./connection-health.js";
 import type { WebuiRuntimeEvent } from "../../shared/contracts/stream.js";
+import type { WebuiClientEventWatcher } from "../contracts/execution-port.js";
+
+export type { WebuiClientEventWatcher };
 
 declare const document: {
   readonly visibilityState: string;
@@ -29,7 +32,12 @@ declare const window: {
   removeEventListener(type: "online", listener: () => void): void;
 };
 
-type WireFrame = {
+/**
+ * One decoded frame off the socket, before it is classified as a response or
+ * an event. `transport.ts` decodes the same frames for the request/stream and
+ * terminal sockets and imports this shape rather than restating it.
+ */
+export type WireFrame = {
   readonly kind: string;
   readonly requestId: string;
   readonly body?: unknown;
@@ -47,10 +55,6 @@ export interface WebuiSocket {
 
 export type WebuiClientRuntimeEvent = WebuiRuntimeEvent;
 
-export type WebuiClientEventWatcher = (
-  onEvent: (event: WebuiClientRuntimeEvent) => void,
-  onReconnect?: () => void,
-) => () => void;
 
 /** Everything the channel needs from the transport that owns the socket factory. */
 export interface WebuiEventChannelOptions {

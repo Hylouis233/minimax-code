@@ -52,15 +52,9 @@ import {
   type WebuiClientEventWatcher,
   type WebuiClientRuntimeEvent,
   type WebuiSocket,
+  type WireFrame,
 } from "./event-channel.js";
 export type { WebuiClientEventWatcher, WebuiClientRuntimeEvent, WebuiSocket };
-
-type WireFrame = {
-  readonly kind: string;
-  readonly requestId: string;
-  readonly body?: unknown;
-  readonly message?: string;
-};
 
 export interface WebuiTransportOptions {
   readonly websocketUrl: string;

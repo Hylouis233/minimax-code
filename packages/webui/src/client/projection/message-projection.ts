@@ -22,6 +22,7 @@ import type {
   WebuiFileDiffInfoView,
   WebuiTurnDiffView,
 } from "../../shared/contracts/session.js";
+import type { WebuiUsageQuotaResult } from "../../shared/contracts/usage-quota.js";
 import {
   projectMessageParts,
   type WebuiMessageForParts,
@@ -503,30 +504,6 @@ export function readUsageNumber(
     if (typeof value === "number" && Number.isFinite(value)) return value;
   }
   return undefined;
-}
-
-/* Local types referenced by `deriveConversationUsageNotice`. */
-
-export interface WebuiUsageQuotaResult {
-  readonly signedIn?: boolean;
-  readonly quota?: {
-    readonly weekly: {
-      readonly unlimited?: boolean;
-      readonly usedPercent?: number;
-      readonly resetAtMs?: number | null;
-    };
-    readonly fiveHour: {
-      readonly unlimited?: boolean;
-      readonly usedPercent?: number;
-      readonly resetAtMs?: number | null;
-    };
-    readonly video?: {
-      readonly unlimited?: boolean;
-      readonly totalCount?: number;
-      readonly usedCount?: number;
-      readonly resetAtMs?: number | null;
-    };
-  };
 }
 
 export type ConversationUsageActionKind =

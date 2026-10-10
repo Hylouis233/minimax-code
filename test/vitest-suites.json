@@ -350,7 +350,8 @@
       "packages/webui/test/unit/interaction-coordinator.test.ts",
       "packages/webui/test/unit/stream-lease.test.ts",
       "packages/webui/test/integration/loopback-harness-path.test.ts",
-      "packages/webui/test/unit/overlay-geometry.test.ts"
+      "packages/webui/test/unit/overlay-geometry.test.ts",
+      "packages/webui/test/unit/conversation-usage-notice.test.ts"
     ]
   }
 }
