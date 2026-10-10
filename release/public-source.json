@@ -3810,6 +3810,7 @@
     "packages/webui/src/shared/session-transfer-format.ts",
     "packages/webui/tailwind.config.cjs",
     "packages/webui/test-results/.last-run.json",
+    "packages/webui/test/integration/loopback-harness-path.test.ts",
     "packages/webui/test/unit/account-login.test.ts",
     "packages/webui/test/unit/account-workflows.test.ts",
     "packages/webui/test/unit/activity-indicator.test.tsx",

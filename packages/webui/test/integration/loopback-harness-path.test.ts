@@ -1,0 +1,253 @@
+// The loopback → server → harness-port evidence the runtime layer plan asks
+// for, as one reproducible check instead of a one-off run recorded in an
+// issue comment (plan §6 acceptance level 4; §7.7 stage 6 "all required
+// verification done").
+//
+// Plan §6 asks for a real run covering authentication failure, shutdown and
+// reconnect, and says explicitly that fixtures do not substitute for it. What
+// this file does and does not establish is stated at the bottom, and the same
+// statement is carried in the plan; read it before treating a green run as
+// proof of the live-agent path.
+//
+// What is real here, end to end and in one process:
+//   * a real `WebuiService` binds a real loopback TCP port;
+//   * a real `ws` client connects, and is refused without a credential;
+//   * a request travels the real operation registry, the real dispatcher and
+//     the real frame envelope, and lands on the `WebuiHarnessPort` method the
+//     runtime adapter (`runtime/harness/adapter.ts`) also implements;
+//   * the `watchEvents` subscription opens and delivers a live event;
+//   * the client drops and reconnects against the same service;
+//   * after `close()`, the socket is closed by the server and a fresh
+//     connection is refused.
+//
+// What is NOT real, and is the boundary of this evidence: the leaf host behind
+// the harness port. `createHarnessPortFromHost` wraps a live CliService, and a
+// live CliSession is not deterministic to drive from a test. So the port here
+// is a scripted stand-in, exactly as ADR 0006 requires of every harness-side
+// test. That means this file proves the loopback, envelope, dispatch, stream
+// and shutdown path; it does **not** prove that a real agent process answers.
+// No test in this repository can, and the plan no longer implies one does.
+
+import { once } from "node:events";
+import { afterEach, describe, expect, it } from "vitest";
+import { WebSocket } from "ws";
+import type { RawData } from "ws";
+
+import { WebuiService } from "../../src/server/service.js";
+import type { WebuiHarnessPort } from "../../src/runtime/port.js";
+import type {
+  WebuiRuntimeEvent,
+  WebuiWatchEventsResult,
+} from "../../src/shared/contracts/stream.js";
+import type { WebuiSessionListResult } from "../../src/shared/contracts/session.js";
+
+interface TestPort extends WebuiHarnessPort {
+  /** Every harness method the run actually reached, in call order. */
+  readonly calls: string[];
+}
+
+function scriptedPort(): TestPort {
+  const calls: string[] = [];
+  const events: AsyncIterable<WebuiRuntimeEvent> = {
+    async *[Symbol.asyncIterator]() {
+      yield {
+        type: "session_changed",
+        payload: { sessionId: "s-loopback" },
+        timestamp: 1,
+        source: "loopback-integration",
+      } satisfies WebuiRuntimeEvent;
+      // Stay open: the iterator must not end, or the stream would close
+      // before the reconnect and shutdown steps can observe it.
+      await new Promise<void>(() => {});
+    },
+  };
+  const port = {
+    calls,
+    version: () => ({ version: "loopback-fixture", protocolVersion: 1 }),
+    listSessions: async (): Promise<WebuiSessionListResult> => {
+      calls.push("listSessions");
+      return {
+        sessions: [
+          {
+            sessionId: "s-loopback",
+            title: "loopback session",
+            status: "idle",
+            agentName: "main",
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        ],
+      } as unknown as WebuiSessionListResult;
+    },
+    watchEvents: (): AsyncIterable<WebuiRuntimeEvent> => {
+      calls.push("watchEvents");
+      return events;
+    },
+    close: async (): Promise<void> => {
+      calls.push("close");
+    },
+  } as unknown as TestPort;
+  return port;
+}
+
+interface Client {
+  readonly ws: WebSocket;
+  /** Resolves on a successful upgrade, rejects with the refusal otherwise. */
+  readonly upgrade: Promise<unknown>;
+  readonly closed: Promise<{ code: number }>;
+}
+
+function openClient(url: string): Client {
+  const ws = new WebSocket(url);
+  ws.on("error", () => undefined);
+  const upgrade = once(ws, "open");
+  const closed = new Promise<{ code: number }>((resolve) => {
+    ws.once("close", (code) => resolve({ code }));
+  });
+  return { ws, upgrade, closed };
+}
+
+/** Send one request frame and resolve with the next frame the server writes. */
+function once_(ws: WebSocket, request: unknown): Promise<Record<string, unknown>> {
+  return new Promise((resolve, reject) => {
+    const onMessage = (raw: RawData) => {
+      ws.off("message", onMessage);
+      try {
+        resolve(JSON.parse(raw.toString("utf8")) as Record<string, unknown>);
+      } catch (error) {
+        reject(error);
+      }
+    };
+    ws.on("message", onMessage);
+    ws.once("error", reject);
+    ws.send(JSON.stringify(request));
+  });
+}
+
+/**
+ * Wait for the next frame matching `predicate`. The events subscription
+ * answers its own request first (`{ stream: true }`) and only then emits
+ * event frames, so a stream assertion has to skip the acknowledgement.
+ */
+function awaitFrame(
+  ws: WebSocket,
+  predicate: (frame: Record<string, unknown>) => boolean,
+): Promise<Record<string, unknown>> {
+  return new Promise((resolve, reject) => {
+    const onMessage = (raw: RawData) => {
+      let frame: Record<string, unknown>;
+      try {
+        frame = JSON.parse(raw.toString("utf8")) as Record<string, unknown>;
+      } catch (error) {
+        ws.off("message", onMessage);
+        reject(error);
+        return;
+      }
+      if (!predicate(frame)) return;
+      ws.off("message", onMessage);
+      resolve(frame);
+    };
+    ws.on("message", onMessage);
+    ws.once("error", reject);
+  });
+}
+
+describe("loopback to harness-port evidence", () => {
+  let service: WebuiService | undefined;
+
+  afterEach(async () => {
+    await service?.close();
+    service = undefined;
+  });
+
+  it("covers authentication, dispatch, watchEvents, reconnect and shutdown", async () => {
+    const port = scriptedPort();
+    service = new WebuiService({
+      port,
+      // A fixed token keeps the URL readable and the refusal assertions
+      // independent of whatever the per-start generator produced.
+      credential: { token: "loopback-integration-token" },
+      webSocketHeartbeatIntervalMs: 30_000,
+    });
+    const info = await service.start();
+
+    // 1. A real loopback listener is bound, on an OS-assigned port.
+    expect(info.tcpPort).toBeGreaterThan(0);
+    const base = `ws://127.0.0.1:${info.tcpPort}`;
+    const url = `${base}/?token=${info.credential.token}`;
+
+    // 2. Authentication failure: the same listener refuses a client that
+    //    presents no credential, before any operation is dispatched.
+    const anonymous = openClient(base);
+    await expect(anonymous.upgrade).rejects.toThrow(/401/u);
+    expect((await anonymous.closed).code).not.toBe(1000);
+    expect(port.calls).not.toContain("listSessions");
+
+    // 3. An authenticated client connects and a request travels the real
+    //    registry and dispatcher to the harness port.
+    const first = openClient(url);
+    await first.upgrade;
+    const listed = await once_(first.ws, {
+      kind: "request",
+      protocolVersion: info.protocolVersion,
+      requestId: "r-list-1",
+      operation: "listSessions",
+      body: { name: "main", limit: 500 },
+    });
+    expect(listed.kind).toBe("response");
+    expect(port.calls).toContain("listSessions");
+
+    // 4. The events subscription opens and delivers a live event frame.
+    const watcher = new WebSocket(url);
+    watcher.on("error", () => undefined);
+    await once(watcher, "open");
+    const eventFrame = awaitFrame(
+      watcher,
+      (frame) => frame.kind === "event",
+    );
+    watcher.send(
+      JSON.stringify({
+        kind: "request",
+        protocolVersion: info.protocolVersion,
+        requestId: "r-watch-1",
+        operation: "watchEvents",
+        body: {},
+      }),
+    );
+    const frame = await eventFrame;
+    expect(frame.requestId).toBe("r-watch-1");
+    expect(port.calls).toContain("watchEvents");
+    expect(JSON.stringify(frame)).toContain("session_changed");
+
+    // 5. Reconnect: the client drops and a fresh socket dispatches again on
+    //    the same service, so the credential outlives one connection.
+    first.ws.close();
+    await first.closed;
+    const second = openClient(url);
+    await second.upgrade;
+    const listedAgain = await once_(second.ws, {
+      kind: "request",
+      protocolVersion: info.protocolVersion,
+      requestId: "r-list-2",
+      operation: "listSessions",
+      body: { name: "main", limit: 500 },
+    });
+    expect(listedAgain.requestId).toBe("r-list-2");
+
+    // 6. Shutdown: the server closes the live socket and stops accepting.
+    const shutdown = service.close();
+    const watcherClosed = once<number>(watcher, "close");
+    const secondClosed = once<number>(second.ws, "close");
+    await shutdown;
+    service = undefined;
+    expect(await watcherClosed).not.toBe(1000);
+    expect(await secondClosed).not.toBe(1000);
+
+    const afterShutdown = openClient(url);
+    await expect(afterShutdown.upgrade).rejects.toThrow();
+    // The port itself was closed, so a later reconnect cannot silently succeed.
+    const relisten = new WebSocket(base);
+    relisten.on("error", () => undefined);
+    await expect(once(relisten, "open")).rejects.toThrow();
+  });
+});

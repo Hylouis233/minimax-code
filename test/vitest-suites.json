@@ -348,7 +348,8 @@
       "packages/webui/test/unit/plugin-workflows.test.ts",
       "packages/webui/test/unit/webui-event-coordinator.test.ts",
       "packages/webui/test/unit/interaction-coordinator.test.ts",
-      "packages/webui/test/unit/stream-lease.test.ts"
+      "packages/webui/test/unit/stream-lease.test.ts",
+      "packages/webui/test/integration/loopback-harness-path.test.ts"
     ]
   }
 }
