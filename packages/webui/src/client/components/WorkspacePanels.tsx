@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
+import { basenamePath } from "../paths.js";
 import hljs from "highlight.js/lib/core";
 import bash from "highlight.js/lib/languages/bash";
 import c from "highlight.js/lib/languages/c";
@@ -584,7 +585,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     const input = terminal.onData((data) => { if (writeTerminal) void writeTerminal({ terminalId: String(active.terminalId), data }); });
     return () => { input.dispose(); observer.disconnect(); terminalStop.current?.(); terminalStop.current = undefined; terminal.dispose(); terminalInstance.current = undefined; };
   }, [activeTerminalId, terminals, watchTerminal, writeTerminal]);
-  const tabLabel = (item: WorkspacePanelTab): string => item.kind === "file-preview" ? item.path.split("/").at(-1) ?? item.path : item.kind === "review" && item.source === "turn" ? "Review" : ({ files: "查看文件", review: "变更", canvas: "画布", terminal: "终端" } as const)[item.kind];
+  const tabLabel = (item: WorkspacePanelTab): string => item.kind === "file-preview" ? basenamePath(item.path) : item.kind === "review" && item.source === "turn" ? "Review" : ({ files: "查看文件", review: "变更", canvas: "画布", terminal: "终端" } as const)[item.kind];
   const fileTabGlyph = (item: WorkspacePanelTab) => {
     if (item.kind === "files") return <WebuiIconFile className="webui-workspace-tab-file-icon" />;
     if (item.kind !== "file-preview") return null;
@@ -621,7 +622,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     </div>
     {hasFileWorkspace ? <div className="webui-workspace-file-toolbar">
       <div className="webui-workspace-file-breadcrumb" aria-label="文件路径">
-        {activeTab?.kind === "file-preview" ? activeTab.path.split("/").map((part, index) => <span key={`${part}-${index}`} className={index === activeTab.path.split("/").length - 1 ? "is-current" : ""}>{index ? <span aria-hidden="true">›</span> : null}{part}</span>) : <span className="is-current">{workspaceDir?.split(/[\\/]/u).filter(Boolean).at(-1) ?? "工作区"}</span>}
+        {activeTab?.kind === "file-preview" ? activeTab.path.split("/").map((part, index) => <span key={`${part}-${index}`} className={index === activeTab.path.split("/").length - 1 ? "is-current" : ""}>{index ? <span aria-hidden="true">›</span> : null}{part}</span>) : <span className="is-current">{basenamePath(workspaceDir ?? "") || "工作区"}</span>}
       </div>
       {activeTab?.kind === "file-preview" && /\.md$/iu.test(activeTab.path) ? <div className="webui-workspace-file-mode" role="group" aria-label="文件显示模式">
         <button type="button" aria-pressed={!fileCodeMode} onClick={() => setFileCodeMode(false)}>预览</button>

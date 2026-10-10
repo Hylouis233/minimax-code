@@ -3,6 +3,7 @@ import type { WebuiClientCreateSessionResult, WebuiClientSessionCreator } from "
 import type { WebuiGoal, WebuiGoalCreateRequest, WebuiGoalPatchRequest } from "../../shared/contracts/goal.js";
 import type { WebuiAttachmentInput } from "../../shared/contracts/messages.js";
 import { formatWebuiError } from "../value-readers.js";
+import { looksLikeAbsoluteWorkspacePath } from "../paths.js";
 import { queueWebuiTurn } from "./queue-command.js";
 import { ownsWebuiStreamGeneration, type WebuiStreamState } from "../projection/stream-state.js";
 import { runWebuiStreamLoop, type WebuiStreamLoopDeps, type WebuiStreamLoopSink } from "../mechanisms/stream-loop.js";
@@ -78,10 +79,6 @@ export interface WebuiGoalSubmitArgs {
   readonly createSession?: WebuiClientSessionCreator;
   readonly createSessionWorkspaceDir?: string;
   readonly teamModeOff?: boolean;
-}
-
-function looksLikeAbsoluteWorkspacePath(value: string): boolean {
-  return value.startsWith("/") || value.startsWith("\\\\") || /^[a-zA-Z]:[\\/]/.test(value);
 }
 
 function createSessionWorkspaceField(workspaceDir?: string): { readonly workspaceDir?: string } {

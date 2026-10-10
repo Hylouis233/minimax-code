@@ -26,6 +26,7 @@ import {
   type ReactElement,
 } from "react";
 import type { WebuiClientMessageEnqueuer, WebuiClientMessageSender, WebuiClientSessionResumer } from "../contracts/execution-port.js";
+import { looksLikeAbsoluteWorkspacePath } from "../paths.js";
 import type { WebuiClientMessageLoader } from "../contracts/message-view.js";
 import type { WebuiModelSelectionRequest } from "../contracts/model-view.js";
 import type { WebuiClientSessionCreator } from "../contracts/session-port.js";
@@ -142,7 +143,6 @@ import {
   resolveWebuiSubmissionIntent,
   resolveWebuiComposerEnterAction,
   isTurnLive,
-  looksLikeAbsoluteWorkspacePath,
 } from "../projection/composer-state.js";
 import {
   submitWebuiGoal,

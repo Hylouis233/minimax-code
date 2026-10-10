@@ -10,6 +10,7 @@ import {
   recordValue,
   stringAmongKeys,
 } from "../value-readers.js";
+import { basenamePath } from "../paths.js";
 import type {
   WebuiQuestionnaireResponseAnswer,
   WebuiQuestionnaireResponseSummary,
@@ -253,7 +254,7 @@ function projectDeliveredAssets(content: string, messageId: string): { content: 
       }
       const src = values.src?.trim();
       if (!src) continue;
-      const name = values.name?.trim() || values.caption?.trim() || src.split(/[\\/]/u).at(-1) || src;
+      const name = values.name?.trim() || values.caption?.trim() || basenamePath(src);
       assets.push({ src, name, ...(values.type ? { mediaType: values.type } : {}), ...(values.caption ? { caption: values.caption } : {}), ...(values.deleted === "true" ? { deleted: true } : {}) });
     }
     if (assets.length) parts.push({ id: `delivered-assets-${messageId}-${parts.length}`, type: "asset_list", assets });

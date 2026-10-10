@@ -31,6 +31,7 @@
 
 import { useEffect, useState, type ReactElement } from "react";
 import type { WebuiWorkspaceFileContent } from "../../shared/contracts/workspace.js";
+import { basenamePath } from "../paths.js";
 
 export type WorkspaceHtmlPreviewProps = {
   /** The file path the preview tab was opened with. */
@@ -135,7 +136,7 @@ export function hasRelativeDocumentReference(source: string): boolean {
  * point at, or the frame has not loaded (or failed to).
  */
 export function WorkspaceHtmlPreview({ path, fileUrl, content }: WorkspaceHtmlPreviewProps): ReactElement {
-  const fileName = path.split("/").at(-1) ?? path;
+  const fileName = basenamePath(path);
   const [frameState, setFrameState] = useState<WorkspaceHtmlFrameState>("loading");
 
   // A new URL is a new document: the previous file's outcome says nothing

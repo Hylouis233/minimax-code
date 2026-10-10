@@ -5,10 +5,6 @@ import type {
 import { classifyWebuiSlashCommand } from "../contracts/slash-command.js";
 import type { WebuiStreamState } from "./stream-state.js";
 
-export function looksLikeAbsoluteWorkspacePath(value: string): boolean {
-  return value.startsWith("/") || value.startsWith("\\\\") || /^[a-zA-Z]:[\\/]/.test(value);
-}
-
 export function isTurnLive(phase: WebuiStreamState["phase"] | undefined): boolean {
   return phase === "streaming" || phase === "waiting" || phase === "reconnecting";
 }

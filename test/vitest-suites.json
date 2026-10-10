@@ -352,7 +352,8 @@
       "packages/webui/test/integration/loopback-harness-path.test.ts",
       "packages/webui/test/unit/overlay-geometry.test.ts",
       "packages/webui/test/unit/conversation-usage-notice.test.ts",
-      "packages/webui/test/unit/first-party-signature.test.ts"
+      "packages/webui/test/unit/first-party-signature.test.ts",
+      "packages/webui/test/unit/paths.test.ts"
     ]
   }
 }

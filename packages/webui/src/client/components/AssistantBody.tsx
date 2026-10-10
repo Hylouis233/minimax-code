@@ -8,6 +8,7 @@
 
 import { useState, type ReactElement } from "react";
 import { WebuiMarkdown } from "../markdown.js";
+import { basenamePath } from "../paths.js";
 import { parseWebuiMessageFileReference, type WebuiMessageFileReference } from "../projection/message-file-reference.js";
 import { webuiActivitySummary } from "../projection/tool-projection.js";
 import { MessageAttachments, type MessageAttachment } from "./MessageAttachments.js";
@@ -124,7 +125,7 @@ function WebuiDeliveredAssets({ assets, workspaceDir, onOpenFile }: {
   if (assets.length === 0) return null;
   return <ul className="webui-delivered-assets" data-testid="delivered-assets-list">{assets.map((asset, index) => {
     const src = typeof asset.src === "string" ? asset.src : "";
-    const name = String(asset.name ?? src.split(/[\\/]/u).at(-1) ?? "文件");
+    const name = String(asset.name ?? (basenamePath(src) || "文件"));
     const caption = typeof asset.caption === "string" && asset.caption !== name ? asset.caption : undefined;
     const reference = src ? parseWebuiMessageFileReference(src, workspaceDir) : undefined;
     const extension = name.split(".").at(-1)?.toLowerCase();

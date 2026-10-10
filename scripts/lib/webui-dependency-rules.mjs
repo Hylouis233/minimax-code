@@ -327,6 +327,7 @@ const CLIENT_FILE_PROVENANCE = Object.freeze({
   "team-mode.ts": ["infrastructure"],
   "no-project.ts": ["infrastructure"],
   "value-readers.ts": ["contracts"],
+  "paths.ts": ["view"],
   "rail-buckets.ts": ["view"],
   "router.ts": ["view"],
   "slash-palette.ts": ["bindings"],

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type R
 import type { WebuiModelEntry } from "../../shared/contracts/models.js";
 import type { WebuiSessionListItem } from "../../shared/contracts/session.js";
 import type { WebuiVersionInfo } from "../../shared/contracts/version.js";
+import { basenamePath } from "../paths.js";
 import {
   initialWebuiReviewState,
   isWebuiReviewFiltering,
@@ -510,7 +511,7 @@ function ArchivedSessionsPage({ sessions, canDelete, canUnarchive, onDelete, onU
       <label className="webui-archived-search"><SearchIcon /><input aria-label="搜索已归档聊天" placeholder="搜索已归档聊天" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
     </div>
     {filtered.length ? <div className="webui-archived-groups">{[...grouped].map(([path, rows]) => <section className="webui-archived-project" key={path}>
-      <header className="webui-archived-project-heading"><span className="webui-archived-project-name"><FolderIcon />{path === "未关联项目" ? path : projectLabel(path)}</span><span>{rows.length} 个聊天</span></header>
+      <header className="webui-archived-project-heading"><span className="webui-archived-project-name"><FolderIcon />{path === "未关联项目" ? path : basenamePath(path)}</span><span>{rows.length} 个聊天</span></header>
       <div className="webui-archived-list">{rows.map((session) => <article className="webui-archived-row" key={session.sessionId}>
         <div className="webui-archived-row-copy"><div className="webui-archived-title" title={session.title || session.sessionId}>{session.title || session.sessionId}</div><time>{formatArchivedDate(session.updatedAt)}</time></div>
         <button type="button" className="webui-archived-icon-button" aria-label={`删除：${session.title || session.sessionId}`} title="删除" disabled={!canDelete} onClick={() => { if (window.confirm("确定删除这个已归档聊天吗？此操作无法撤销。")) void runDelete(session.sessionId); }}><TrashIcon /></button>
@@ -519,7 +520,6 @@ function ArchivedSessionsPage({ sessions, canDelete, canUnarchive, onDelete, onU
     </section>)}</div> : <p className="webui-archived-empty">{sessions.length ? "没有符合条件的聊天" : "暂无已归档聊天"}</p>}
   </div>;
 }
-function projectLabel(path: string): string { return path.split(/[\\/]/).filter(Boolean).at(-1) || path; }
 function formatArchivedDate(timestamp: number): string {
   if (!Number.isFinite(timestamp) || timestamp <= 0) return "";
   return new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(timestamp));

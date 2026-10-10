@@ -9,6 +9,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { ToggleSwitch } from "../ToggleSwitch.js";
+import { basenamePath } from "../../paths.js";
 import type { WebuiAgentMemoryView, WebuiGlobalInstructionsView, WebuiMemorySettingsView, WebuiUserProfileFields, WebuiUserProfileView } from "../../../shared/contracts/personalization.js";
 import {
   useWebuiSettingsWorkflows,
@@ -1069,7 +1070,7 @@ export function MemoryManagerDialog({
   const handoffSequence = useRef(0);
   const handoff = useCallback(() => {
     if (!onCreateInSession || draft === undefined || !filePath) return;
-    const fileName = filePath.split("/").pop() ?? "MEMORY.md";
+    const fileName = basenamePath(filePath) || "MEMORY.md";
     handoffSequence.current += 1;
     onCreateInSession({
       token: `${fileName}:${fileSize}:${handoffSequence.current}`,
