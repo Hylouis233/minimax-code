@@ -117,12 +117,14 @@ import { WebuiInteractionPanel } from "./InteractionPanel.js";
 import { WebuiQueuePanel } from "./QueuePanel.js";
 import {
   WebuiModelPicker,
-  resolveEffortOptions,
-  variantForEffort,
   type WebuiModelPickerDraft,
 } from "./ModelPicker.js";
 import { ThinkingTrigger } from "./ThinkingTrigger.js";
-import { chipLevelLabel } from "../projection/thinking-control.js";
+import {
+  chipLevelLabel,
+  resolveEffortOptions,
+  thinkingDraftPatch,
+} from "../projection/thinking-control.js";
 import {
   WebuiIconAttach,
   WebuiIconCheck,
@@ -2486,15 +2488,7 @@ export function WebuiComposer({
                       // Same three shapes of commit the cascade's fly-out
                       // reports, and for the same reason: which shape applies is
                       // a fact about the model contract, not the control.
-                      const variant = variantForEffort(model, option);
-                      void handleSelectModel(model, {
-                        ...(variant !== undefined ? { variant } : {}),
-                        ...(option === "default"
-                          ? { thinkingEffort: null }
-                          : option === "off" || option === "on"
-                            ? {}
-                            : { thinkingEffort: option }),
-                      });
+                      void handleSelectModel(model, thinkingDraftPatch(model, option));
                     }}
                   />
                   {sending ? (

@@ -11,7 +11,11 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { resolveEffortOptions } from "../../src/client/components/ModelPicker.js";
+import {
+  resolveEffortOptions,
+  thinkingDraftPatch,
+  variantForEffort,
+} from "../../src/client/projection/thinking-control.js";
 import type { WebuiModelPickerEntry } from "../../src/client/contracts/model-view.js";
 
 function entry(over: Partial<WebuiModelPickerEntry> = {}): WebuiModelPickerEntry {
@@ -115,5 +119,39 @@ describe("what the fly-out calls the thinking control", () => {
     // And no literal survives anywhere the control renders it.
     expect(FLYOUT_SOURCE).not.toContain('label="推理等级"');
     expect(FLYOUT_SOURCE).not.toContain('aria-label="推理等级"');
+  });
+});
+
+describe("what selecting an effort writes onto a draft", () => {
+  // The cascade's fly-out and the composer's trigger each spelled these three
+  // branches out; the copies were identical. The shapes are the contract's, not
+  // the control's, so they are pinned here once.
+  const LEVELS = entry({ effortOptions: ["default", "low", "high", "max"] });
+
+  it("carries a binary model's state in the wire variant", () => {
+    expect(thinkingDraftPatch(SWITCHABLE, "on")).toEqual({ variant: "thinking" });
+    expect(thinkingDraftPatch(SWITCHABLE, "off")).toEqual({ variant: "" });
+  });
+
+  it("carries a level in thinkingEffort, with no variant", () => {
+    expect(thinkingDraftPatch(LEVELS, "high")).toEqual({ thinkingEffort: "high" });
+    expect(variantForEffort(LEVELS, "high")).toBeUndefined();
+  });
+
+  it("asks for no override on `default`, which is not the same as off", () => {
+    // `null` means "the engine picks"; `variant: ""` means "off". Collapsing
+    // them would make the brain claim a state the user did not choose.
+    expect(thinkingDraftPatch(SWITCHABLE, "default")).toEqual({
+      thinkingEffort: null,
+    });
+    expect(thinkingDraftPatch(LEVELS, "default")).toEqual({
+      thinkingEffort: null,
+    });
+  });
+
+  it("writes nothing for a model whose options are empty", () => {
+    const none = entry();
+    expect(thinkingDraftPatch(none, "on")).toEqual({});
+    expect(thinkingDraftPatch(none, "off")).toEqual({});
   });
 });

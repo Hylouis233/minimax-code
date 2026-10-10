@@ -39,6 +39,10 @@ import type {
   WebuiModelProviderGroup,
 } from "../contracts/model-view.js";
 import { evaluateOutsideClose } from "../projection/outside-close.js";
+import {
+  resolveEffortOptions,
+  thinkingDraftPatch,
+} from "../projection/thinking-control.js";
 import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js";
 import {
   filterModelGroups,
@@ -231,31 +235,6 @@ function formatContextWindow(value: number): string {
   return String(value);
 }
 
-export function resolveEffortOptions(
-  model: WebuiModelPickerEntry,
-): readonly string[] {
-  const explicit = model.effortOptions ?? [];
-  if (explicit.length > 0) {
-    return explicit.includes("default") ? explicit : ["default", ...explicit];
-  }
-  // The runtime reports switchable thinking via `thinkingConfig.mode` +
-  // `supportedVariants`. Treat any model that supports both an empty and a
-  // non-empty variant as a binary "off / on" toggle so the picker still
-  // surfaces the control without the runtime having to fill `effortOptions`.
-  if (model.thinkingConfig?.mode === "switchable") {
-    const variants = model.supportedVariants ?? [];
-    const hasOff = variants.includes("") || variants.includes("none-thinking");
-    const hasOn = variants.some((variant) => variant && variant !== "none-thinking");
-    // `default_value` is the runtime's own statement that this model has a
-    // thinking switch, and it reaches the client on `thinkingConfig` even when
-    // the variant list does not. Trusting it means the brain icon does not
-    // depend on a second field arriving intact.
-    const declaredSwitch = model.thinkingConfig?.default_value !== undefined;
-    if ((hasOff && hasOn) || declaredSwitch) return ["off", "on"];
-  }
-  return [];
-}
-
 function resolveCurrentEffort(model: WebuiModelPickerEntry): string | undefined {
   const options = resolveEffortOptions(model);
   if (options.length === 0) return undefined;
@@ -269,21 +248,6 @@ function resolveCurrentEffort(model: WebuiModelPickerEntry): string | undefined 
       ? "on"
       : options[0]
     : options[0];
-}
-
-export function variantForEffort(
-  model: WebuiModelPickerEntry,
-  effort: string,
-): string | undefined {
-  const options = resolveEffortOptions(model);
-  if (options.length === 0) return undefined;
-  const thinkingOn = options.includes("on");
-  if (thinkingOn && (effort === "on" || effort === "off")) {
-    return effort === "on" ? "thinking" : "";
-  }
-  // Multi-level efforts (low/high/max, …) are not part of the wire variant;
-  // their value is carried by the thinking.effort selection instead.
-  return undefined;
 }
 
 /**
@@ -894,15 +858,9 @@ export function WebuiModelPicker({
    */
   const handleThinkingChange = (option: string) => {
     if (!focusedModel) return;
-    const variant = variantForEffort(focusedModel, option);
     const draft: WebuiModelPickerDraft = {
       ...focusedDraft,
-      ...(variant !== undefined ? { variant } : {}),
-      ...(option === "default"
-        ? { thinkingEffort: null }
-        : option === "off" || option === "on"
-          ? {}
-          : { thinkingEffort: option }),
+      ...thinkingDraftPatch(focusedModel, option),
     };
     setDrafts((current) => ({ ...current, [focusedKeyString]: draft }));
     onSettingChange(focusedModel, draft);
