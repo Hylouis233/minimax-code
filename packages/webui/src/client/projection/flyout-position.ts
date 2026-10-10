@@ -14,14 +14,22 @@
  * `overflow-y: auto`. That is why the anchor is a viewport-space rect rather
  * than an offset parent: an `absolute` fly-out inside the scrolling list would
  * be clipped by it, and the list is the one thing the fly-out has to escape.
+ *
+ * The rect shape and the clamp-into-the-viewport rule come from
+ * `overlay-geometry.ts`, which this module shares with the context-usage
+ * panel.
  */
 
-export interface FlyoutRect {
-  readonly left: number;
-  readonly top: number;
-  readonly width: number;
-  readonly height: number;
-}
+import {
+  overlayAxisStart,
+  type OverlayRect,
+} from "./overlay-geometry.js";
+
+/**
+ * The anchor rect this module places against. It is the shared viewport rect;
+ * the alias is kept because the picker names it in its own props.
+ */
+export type FlyoutRect = OverlayRect;
 
 export interface FlyoutPlacement {
   readonly left: number;
@@ -35,11 +43,6 @@ export const FLYOUT_VIEWPORT_MARGIN = 8;
 
 /** Space between the anchor row and the surface, in px. */
 export const FLYOUT_ANCHOR_GAP = 6;
-
-function clamp(value: number, min: number, max: number): number {
-  if (max < min) return min;
-  return Math.min(Math.max(value, min), max);
-}
 
 /**
  * Place a surface beside `anchor`, flipping and clamping into the viewport.
@@ -98,10 +101,10 @@ export function positionFlyout(args: {
 
   return {
     left: Math.round(
-      clamp(rawLeft, margin, Math.max(margin, viewport.width - surface.width - margin)),
+      overlayAxisStart(rawLeft, surface.width, viewport.width, margin),
     ),
     top: Math.round(
-      clamp(rawTop, margin, Math.max(margin, viewport.height - surface.height - margin)),
+      overlayAxisStart(rawTop, surface.height, viewport.height, margin),
     ),
     side,
   };

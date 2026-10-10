@@ -29,15 +29,22 @@
  * sibling gives: the panel grows by six breakdown rows when the disclosure is
  * opened, and a clamp computed against the closed height lets the last row fall
  * off screen.
+ *
+ * The rect shape and the clamp-into-the-viewport rule come from
+ * `overlay-geometry.ts`, which this module shares with the model fly-out.
  */
 
-/** A rectangle in viewport space, the same shape the fly-out anchor reports. */
-export interface PopoverAnchorRect {
-  readonly left: number;
-  readonly top: number;
-  readonly width: number;
-  readonly height: number;
-}
+import {
+  overlayAxisStart,
+  type OverlayRect,
+} from "./overlay-geometry.js";
+
+/**
+ * A rectangle in viewport space, the same shape the fly-out anchor reports.
+ * It is that shared rect; the alias is kept because the composer names it in
+ * its own props.
+ */
+export type PopoverAnchorRect = OverlayRect;
 
 export interface ContextUsagePlacement {
   readonly left: number;
@@ -58,11 +65,6 @@ export const CONTEXT_POPOVER_ANCHOR_GAP = 8;
  * later reads it as alignment.
  */
 export const CONTEXT_POPOVER_EDGE_OFFSET = 4;
-
-function clamp(value: number, min: number, max: number): number {
-  if (max < min) return min;
-  return Math.min(Math.max(value, min), max);
-}
 
 /**
  * Place the panel ABOVE the ring, right edges aligned, clamped into the viewport.
@@ -96,17 +98,19 @@ export function positionContextUsagePopover(args: {
 
   return {
     left: Math.round(
-      clamp(
+      overlayAxisStart(
         anchor.left + anchor.width + edgeOffset - surface.width,
+        surface.width,
+        viewport.width,
         margin,
-        Math.max(margin, viewport.width - surface.width - margin),
       ),
     ),
     top: Math.round(
-      clamp(
+      overlayAxisStart(
         anchor.top - gap - surface.height,
+        surface.height,
+        viewport.height,
         margin,
-        Math.max(margin, viewport.height - surface.height - margin),
       ),
     ),
   };
