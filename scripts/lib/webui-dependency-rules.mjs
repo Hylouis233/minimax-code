@@ -501,7 +501,7 @@ export function categoriseViolation(from, to, fromLayers, toLayers) {
  *   references: Array<{specifier: string, line: number, kind: string}>,
  *   nonLiteralDynamic: Array<{line: number}>,
  *   browserGlobalCandidates: Array<{name: string, line: number, position: number}>,
- *   callCandidates: Array<{line: number, position: number}>,
+ *   callCandidates: Array<{line: number, position: number, end: number}>,
  * }}
  */
 export function collectModuleReferences(fileName, sourceText) {
@@ -569,9 +569,17 @@ export function collectModuleReferences(fileName, sourceText) {
       // invoked through any of them: `port.m(...)`, `port["m"](...)` and a
       // binding or variable the caller took the method into (`const { m } = port`).
       // The program pass decides which ones actually name a capability method.
+      //
+      // The anchor is the node's whole span, not just its start. A capability
+      // call whose result is chained (`port.m().then(cb)`) and the call it is
+      // nested inside share a start offset — both begin at `port` — so a
+      // start-only anchor made the later lookup resolve both candidates to the
+      // outer chain and judge only `then`, leaving the capability call itself
+      // unjudged and recorded twice. The end offset distinguishes them.
       callCandidates.push({
         line: lineOf(node),
         position: node.getStart(sourceFile),
+        end: node.getEnd(),
       });
     }
     ts.forEachChild(node, visit);
@@ -1243,7 +1251,17 @@ function resolveAmbientFacts(sourceFiles, repositoryRoot, optionsFor, globalCand
           let match;
           const visit = (node) => {
             if (match) return;
-            if (node.getStart(sourceFile) === candidate.position && ts.isCallExpression(node)) {
+            // The span, not the start offset alone: a chained call
+            // (`port.m().then(cb)`) and the capability call nested inside it
+            // begin at the same character, so a start-only match resolved both
+            // candidates to the outer chain. Matching the end offset as well
+            // recovers exactly the node the collector saw, however deeply it is
+            // nested in a chain, an `await`, an optional call or an assignment.
+            if (
+              node.getStart(sourceFile) === candidate.position &&
+              node.getEnd() === candidate.end &&
+              ts.isCallExpression(node)
+            ) {
               match = node;
               return;
             }

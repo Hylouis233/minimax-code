@@ -958,6 +958,106 @@ describe("the capability-call rule", () => {
     });
   });
 
+  // A capability call must be judged by whether it is *invoked*, not by whether
+  // its result is awaited, chained or stored. When its result was consumed by a
+  // chain (`port.m().then(cb)`), the call and the chain that wraps it started at
+  // the same character; the resolving pass looked the candidate up by start
+  // offset alone, recovered the *outer* chain, and judged `then` instead of `m`.
+  // The capability call then went unjudged and was recorded twice. Each shape
+  // below is anchored on the call's whole span so the nested call is recovered
+  // whatever it is nested inside.
+  const chainedForms: ReadonlyArray<{ readonly label: string; readonly body: string }> = [
+    { label: "a .then chain", body: 'void port.sendMessage({}).then(() => {});' },
+    { label: "a .catch chain", body: 'void port.sendMessage({}).catch(() => {});' },
+    { label: "a .finally chain", body: 'void port.sendMessage({}).finally(() => {});' },
+    {
+      label: "an optional-call chain",
+      body: 'void port?.sendMessage({}).then(() => {});',
+    },
+    {
+      label: "an awaited capability call",
+      body: 'return port.sendMessage({}).then(() => {});',
+    },
+    {
+      label: "a capability call assigned to a variable",
+      body: 'const pending = port.sendMessage({});\n  void pending;',
+    },
+  ];
+
+  for (const form of chainedForms) {
+    it(`rejects a capability call whose result is consumed by ${form.label}`, () => {
+      const { result } = evaluateFixture({
+        "client/contracts/transport.ts": transportContract,
+        "client/components/Widget.tsx": caller(
+          "../contracts/transport.js",
+          "WebuiTransport",
+          form.body,
+        ),
+      });
+      expect(result.forbiddenCalls).toHaveLength(1);
+      expect(result.forbiddenCalls[0]).toMatchObject({
+        file: "client/components/Widget.tsx",
+        target: "WebuiTransport.sendMessage",
+      });
+      expect(result.pass).toBe(false);
+    });
+  }
+
+  it("rejects a chained capability call reached through a destructured binding", () => {
+    // The binding form and the chained form together: the collector records a
+    // bare-identifier callee, and the inner capability call is still nested in
+    // the chain that consumes its result.
+    const { result } = evaluateFixture({
+      "client/contracts/transport.ts": transportContract,
+      "client/components/Widget.tsx":
+        'import type { WebuiTransport } from "../contracts/transport.js";\n' +
+        'export function use(port: WebuiTransport): void {\n' +
+        "  const { sendMessage } = port;\n" +
+        "  void sendMessage({}).then(() => {});\n}\n",
+    });
+    expect(result.forbiddenCalls).toHaveLength(1);
+    expect(result.forbiddenCalls[0]).toMatchObject({
+      target: "WebuiTransport.sendMessage",
+    });
+    expect(result.pass).toBe(false);
+  });
+
+  it("judges a chained capability call once, not once per enclosing call", () => {
+    // The duplicate-candidate symptom of the same defect: the inner call and
+    // the chain that wraps it used to both resolve to the outer node, so the
+    // site was recorded twice.
+    const { graph } = evaluateFixture({
+      "client/contracts/transport.ts": transportContract,
+      "client/components/Widget.tsx": caller(
+        "../contracts/transport.js",
+        "WebuiTransport",
+        'void port.sendMessage({}).then(() => {});',
+      ),
+    });
+    expect(
+      graph.callSites.filter((site) => site.method === "sendMessage"),
+    ).toHaveLength(1);
+  });
+
+  it("keeps a chained call allowed in the bindings bridge and in the application", () => {
+    // The control for the shapes above: the *same* chained shape is legal where
+    // the capability is legitimately held, so the fixtures reject the chain
+    // rather than the chain-shaped syntax.
+    const { result } = evaluateFixture({
+      "client/contracts/transport.ts": transportContract,
+      "client/bindings/use-transport.ts":
+        'import type { WebuiTransport } from "../contracts/transport.js";\n' +
+        'export function use(port: WebuiTransport): void {\n' +
+        "  void port.sendMessage({}).then(() => {});\n}\n",
+      "client/application/send.ts":
+        'import type { WebuiTransport } from "../contracts/transport.js";\n' +
+        'export function use(port: WebuiTransport): void {\n' +
+        "  void port.sendMessage({}).then(() => {});\n}\n",
+    });
+    expect(result.forbiddenCalls).toHaveLength(0);
+    expect(result.pass).toBe(true);
+  });
+
   it("keeps a same-named local function and an indexed lookup out of the rule", () => {
     // Resolving identifier calls must not turn every call named like a
     // capability method into a violation: a local function has no capability

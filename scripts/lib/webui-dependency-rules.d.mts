@@ -76,10 +76,19 @@ export interface CollectedBrowserGlobalCandidate {
   readonly access: "base" | "member";
 }
 
-/** A call whose callee is a property access, anchored by its start offset. */
+/**
+ * A call whose callee is a property access, element access or identifier,
+ * anchored by the span of the call expression.
+ *
+ * Both offsets are needed: a capability call whose result is chained
+ * (`port.m().then(cb)`) and the call nested inside it share a start offset, so
+ * a start-only anchor made the resolving pass judge only the outer chain and
+ * leave the capability call unjudged.
+ */
 export interface CollectedCallCandidate {
   readonly line: number;
   readonly position: number;
+  readonly end: number;
 }
 
 /**
