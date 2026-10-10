@@ -483,10 +483,29 @@ const tailwindConfig = {
   // stylesheet even when a state-specific branch is not visible to Tailwind's
   // static class scan.
   safelist: [
+    // Component classes the shell composes from runtime state. Tailwind only
+    // sees the literal template head (`webui-tool-icon--${category}`), so every
+    // variant it can produce has to be named here or it is purged and the
+    // element silently loses its rule.
+    //
+    // `ThinkingTrigger.tsx` is the precedent: it hit this once and switched to
+    // a full-name map. The rest had not, so these eleven were missing from the
+    // compiled stylesheet while their rules sat in `shell.css`.
+    "webui-tool-icon--command",
+    "webui-tool-icon--file",
+    "webui-tool-icon--code",
+    "webui-tool-icon--web",
+    "webui-tool-icon--browser",
     // Review diff rows select these custom component classes from runtime
     // state, so Tailwind cannot discover them from a static class string.
     "webui-turn-review-line--addition",
     "webui-turn-review-line--deletion",
+    "webui-turn-review-line--hunk",
+    "webui-subagent-status--completed",
+    "webui-subagent-status--error",
+    "webui-user-menu-quota-row--first",
+    "webui-user-menu-quota-row--last",
+    "webui-user-menu-quota-row--solo",
     "bg-bg_default_primary",
     "bg-bg_default_secondary",
     "bg-bg_grouped_primary",
