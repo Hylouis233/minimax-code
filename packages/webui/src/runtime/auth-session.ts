@@ -91,7 +91,7 @@ export function createWebuiAuthSession(
     tokenProvider: async () => {
       try {
         const lease = await quotaOauthCore.getAccessToken({
-          requiredScopes: MCODE_OAUTH_SCOPES,
+          requiredScopes: [...MCODE_OAUTH_SCOPES],
           minValidityMs: 30_000,
         });
         return {
@@ -138,7 +138,7 @@ export function createWebuiAuthSession(
     }
     if (disposed || refreshVersion !== requestVersion) return;
     const lease = await quotaOauthCore.getAccessToken({
-      requiredScopes: MCODE_OAUTH_SCOPES,
+      requiredScopes: [...MCODE_OAUTH_SCOPES],
       minValidityMs: 60_000,
     });
     if (disposed || refreshVersion !== requestVersion) return;

@@ -1,3 +1,10 @@
+// Structural type shim for `@mavis/mcode-tools-host`: the workspace package
+// publishes `dist` types a source checkout does not build, so type-checking
+// needs local declarations for the subset the WebUI uses. See
+// `oauth-core.d.ts` in this directory for the full rationale.
+//
+// It lives beside its only consumer, `runtime/mcode-tools.ts`: plan §7.1 keeps
+// the server layer to network ingress and nothing else.
 declare module "@mavis/mcode-tools-host" {
   export interface McodeToolsAuthLeaseBroker {
     readonly endpoint: string;

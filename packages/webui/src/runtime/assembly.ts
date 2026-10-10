@@ -400,7 +400,7 @@ export async function createWebuiRuntimeHost(
     tokenProvider: async () => {
       try {
         const lease = await authSession.oauthCore.getAccessToken({
-          requiredScopes: MCODE_OAUTH_SCOPES,
+          requiredScopes: [...MCODE_OAUTH_SCOPES],
           minValidityMs: 30_000,
         });
         const realUserID = authSession.authContext.getter()?.realUserID?.trim();

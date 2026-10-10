@@ -6,6 +6,12 @@
 // server) and the workspace-sources esbuild plugin (bundle) — both map the
 // package export to `src/`.
 //
+// It sits here, beside its only consumers, because the runtime layer is the
+// whole consumer set: `auth-context.ts`, `auth-session.ts`, `assembly.ts`,
+// `account-login.ts` and `usage-quota.ts`. Plan §7.1 keeps the server layer to
+// network ingress and nothing else, so a shim no server module reads does not
+// belong under `server/`.
+//
 // Keep this file in sync with `packages/oauth-core/src/index.ts`; it is a
 // deliberate structural subset (ADR 0003 also keeps the WebUI off the
 // terminal client's wrapper `createMcodeSharedAuthSession` — the WebUI
@@ -80,7 +86,15 @@ declare module "@mavis/oauth-core" {
       readonly initialize?: () => unknown;
     });
     getAccessToken(options: {
-      readonly requiredScopes: typeof MCODE_OAUTH_SCOPES;
+      /**
+       * Mirrors `AccessTokenOptions.requiredScopes` in
+       * `packages/oauth-core/src/auth-core.ts:139`, which is a **mutable**
+       * `string[]`. This shim previously declared it as the readonly
+       * `MCODE_OAUTH_SCOPES` tuple, which accepted three call sites the real
+       * package rejects. Declaring it the way the package does is what makes
+       * this file a subset of the real surface rather than a substitute for it.
+       */
+      readonly requiredScopes: string[];
       readonly minValidityMs: number;
     }): Promise<MCodeAccessTokenLease>;
     handleUnauthorized(context: {
