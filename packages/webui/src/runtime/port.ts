@@ -282,11 +282,6 @@ export interface WebuiHarnessPort {
   cancelCodexOAuthLogin(request: { readonly loginId: string }): Promise<unknown>;
   refreshModels(): Promise<unknown>;
   /**
-   * Release anything the port owns. The service calls this after closing
-   * every transport-side resource so the harness can tear itself down in
-   * the order step 13 of the assembly checklist requires.
-   */
-  /**
    * Cloud account quota for the user-menu usage panel. Not a harness
    * capability — see `usage-quota.ts`; the assembly supplies the client
    * (so the method is unconditionally present on the port the service
@@ -320,7 +315,6 @@ export interface WebuiHarnessPort {
   getSigninPanel(): Promise<WebuiSigninPanelView>;
   claimSignin(): Promise<WebuiClaimSigninView>;
   /**
-/**
    * Account login over the device-authorization flow, and the sign-out that
    * actually removes the credential. See `account-login.ts` for why the
    * session lives server-side; supplied by the assembly alongside the host.
@@ -385,5 +379,10 @@ export interface WebuiHarnessPort {
    * `server` reach `runtime-port` only.
    */
   runCommand(request: WebuiRunCommandRequest): Promise<WebuiRunCommandResult>;
+  /**
+   * Release anything the port owns. The service calls this after closing
+   * every transport-side resource so the harness can tear itself down in
+   * the order step 13 of the assembly checklist requires.
+   */
   close(): Promise<void>;
 }

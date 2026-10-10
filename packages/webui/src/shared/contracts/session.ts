@@ -17,12 +17,12 @@
 // | `WebuiActiveTurnRequest` | Request naming the session whose active turn is probed. | Browser `client/infrastructure/transport.ts` (`getActiveTurn`). | `client/application/active-turn-probe.ts`; `client/contracts/execution-port.ts`; `client/components/SessionComposer.tsx`. |
 // | `WebuiSessionInfo` | The session identity/fields returned by lookup and mutations. | Runtime `getSession`/`updateSession`/`forkSession`/`createSession`. | `server/service.ts` (session-transfer route); `server/index.ts` (barrel). |
 // | `WebuiSessionLookupResult` | The `{ session }` envelope from a lookup. | Runtime `getSession`. | `client/contracts/session-port.ts`; `server/operation/session.ts`. |
-// | `WebuiUpdateSessionRequest` | Request to set a session title. | Browser `client/infrastructure/transport.ts` (`updateSession`). | `server/operation/provider.ts`; runtime `updateSession`. |
-// | `WebuiUpdateSessionResult` | The updated `{ session }`. | Runtime `updateSession`. | `server/operation/provider.ts`; `client/contracts/session-port.ts`. |
-// | `WebuiForkSessionRequest` | Request to fork a session. | Browser `client/infrastructure/transport.ts`; built in `client/projection/action-requests.ts` (`forkSession`). | `server/operation/provider.ts`; runtime `forkSession`. |
-// | `WebuiGetSessionForkOptionsRequest` | Request for fork options. | Browser `client/infrastructure/transport.ts`. | `server/operation/provider.ts`; runtime `getSessionForkOptions`. |
-// | `WebuiGetSessionForkOptionsResult` | Whether/where a session can be forked. | Runtime `getSessionForkOptions`. | `server/operation/provider.ts`; `client/contracts/session-port.ts`; `client/components/MessageItem.tsx`. |
-// | `WebuiForkSessionResult` | The forked session and its lineage ids. | Runtime `forkSession`. | `server/operation/provider.ts`; `client/contracts/session-port.ts`. |
+// | `WebuiUpdateSessionRequest` | Request to set a session title. | Browser `client/infrastructure/transport.ts` (`updateSession`). | `server/operation/session.ts`; runtime `updateSession`. |
+// | `WebuiUpdateSessionResult` | The updated `{ session }`. | Runtime `updateSession`. | `server/operation/session.ts`; `client/contracts/session-port.ts`. |
+// | `WebuiForkSessionRequest` | Request to fork a session. | Browser `client/infrastructure/transport.ts`; built in `client/projection/action-requests.ts` (`forkSession`). | `server/operation/session.ts`; runtime `forkSession`. |
+// | `WebuiGetSessionForkOptionsRequest` | Request for fork options. | Browser `client/infrastructure/transport.ts`. | `server/operation/session.ts`; runtime `getSessionForkOptions`. |
+// | `WebuiGetSessionForkOptionsResult` | Whether/where a session can be forked. | Runtime `getSessionForkOptions`. | `server/operation/session.ts`; `client/contracts/session-port.ts`; `client/components/MessageItem.tsx`. |
+// | `WebuiForkSessionResult` | The forked session and its lineage ids. | Runtime `forkSession`. | `server/operation/session.ts`; `client/contracts/session-port.ts`. |
 // | `WebuiCreateSessionRequest` | Request to create a session (name, workspace, teamModeOff). | Browser `client/infrastructure/transport.ts` (`createSession`). | runtime `createSession`; `server/operation/session.ts`; `server/service.ts`. |
 // | `WebuiSessionTransferFile` | A round-trippable session export (canonical + display layers). | Runtime `exportSessionTransfer` (`runtime/harness/sessions.ts`; CliService). | `runtime/port.ts` capability surface only; no src reader beyond it. |
 // | `WebuiImportSessionTransferRequest` | Request to import a session transfer into a target session. | HTTP route `server/service.ts` (session-transfer handler). | runtime `importSessionTransfer`; `runtime/port.ts`. |

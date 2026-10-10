@@ -2,6 +2,8 @@ import type { ClaimSigninData, SigninPanel } from "@mavis/shared/daily-signin";
 
 // The check-in wire types are the shared validators' own types — the same
 // `@mavis/shared/daily-signin` module the TUI and the desktop use (the webui
+// panel renders them directly, so there is no second shape to drift).
+//
 // Wire contract record (plan section 7.1 / 7.5): every exported
 // declaration below records its wire purpose, its producer and its
 // consumers, verified against the tree. Documentation only.
@@ -12,7 +14,6 @@ import type { ClaimSigninData, SigninPanel } from "@mavis/shared/daily-signin";
 // | `WebuiClaimSigninView` | The result of claiming today's check-in. | Runtime `claimSignin` (`runtime/harness/account.ts`; host `claimSignin`). | `client/contracts/account-port.ts`; `client/components/UserMenu.tsx`. |
 // | `WebuiAccountLoginPromptView` | The device-authorization prompt (code, verification URI, expiry) the login dialog shows. | Runtime `beginAccountLogin` / `getAccountLoginStatus` (`runtime/harness/account.ts`; host OAuth core). | unverified — nested in `WebuiAccountLoginView.prompt`; no direct importer. |
 // | `WebuiAccountLoginView` | One answer for both account questions: idle / pending(+prompt) / authenticated / error. | Runtime `beginAccountLogin` / `getAccountLoginStatus`. | `client/contracts/account-port.ts`; `client/components/AccountLoginDialog.tsx`; `server/operation/provider.ts` (response type). |
-// panel renders them directly, so there is no second shape to drift).
 export type WebuiSigninPanelView = SigninPanel;
 export type WebuiClaimSigninView = ClaimSigninData;
 
