@@ -13,7 +13,7 @@
  * `cli-auth` projection's harness bearer is rejected by the cloud endpoints
  * (probe-verified 2026-09-22).
  */
-import { createHash } from "node:crypto";
+import { webuiFirstPartySignatureHeaders } from "./signing.js";
 
 import {
   validateClaimSigninData,
@@ -67,10 +67,6 @@ function publicGatewayOrigin(input: {
   return PUBLIC_GATEWAY_ORIGINS[input.region][input.buildEnv];
 }
 
-function md5(value: string): string {
-  return createHash("md5").update(value).digest("hex");
-}
-
 /** Request builder copied from `createPublicGatewayRequest` (tui runtime). */
 function createPublicGatewayRequest(input: {
   readonly endpoint: string;
@@ -107,9 +103,6 @@ function createPublicGatewayRequest(input: {
   // `yy` / `x-timestamp` / `x-signature` are client attribution headers built
   // from two inline literals (wire-protocol constants shared across MiniMax
   // clients — not credentials; authorization is the Bearer token).
-  const signatureBody = input.body ?? "";
-  const yyBody = input.body ?? "{}";
-  const second = Math.floor(input.nowMs / 1_000);
   const pathWithSearch = `${url.pathname}${url.search}`;
   return {
     url,
@@ -119,11 +112,11 @@ function createPublicGatewayRequest(input: {
       "Content-Type": "application/json",
       "User-Agent": "MiniMaxCode",
       Authorization: `Bearer ${input.token}`,
-      yy: md5(
-        `${encodeURIComponent(pathWithSearch)}_${yyBody}${md5(String(input.nowMs))}ooui`,
-      ),
-      "x-timestamp": String(second),
-      "x-signature": md5(`${second}I*7Cf%WZ#S&%1RlZJ&C2${signatureBody}`),
+      ...webuiFirstPartySignatureHeaders({
+        pathWithSearch,
+        nowMs: input.nowMs,
+        ...(input.body === undefined ? {} : { body: input.body }),
+      }),
     },
   };
 }

@@ -19,13 +19,12 @@
 // Read `matrix-account-client.ts` when changing this file — the terminal
 // client is the reference implementation.
 //
-// Wire-protocol constants (`yy` / `x-timestamp` / `x-signature`, the inline
-// salt, `app_id` / `version_code`) tag a request as a first-party MiniMax
-// client. They are shared across all first-party clients and are not
-// credentials; authorization is the `Authorization: Bearer` header. Changing
-// either value requires a coordinated server-side rollout.
+// Wire-protocol constants (`app_id` / `version_code`) tag a request as a
+// first-party MiniMax client; the `yy` / `x-timestamp` / `x-signature` triple
+// they travel with is built by `./signing.js`, which the daily check-in client
+// shares.
 
-import { createHash } from "node:crypto";
+import { webuiFirstPartySignatureHeaders } from "./signing.js";
 
 import type {
   WebuiUsageQuotaResult,
@@ -439,7 +438,6 @@ export class UsageQuotaClient {
       timezoneOffsetSeconds: this.timezoneOffsetSeconds(),
     });
     const pathWithSearch = `${url.pathname}${url.search}`;
-    const second = Math.floor(requestTime / 1_000);
     const body = JSON.stringify(payload);
     const signal = AbortSignal.timeout(this.timeoutMs);
     const response = await this.fetchImpl(url, {
@@ -449,9 +447,7 @@ export class UsageQuotaClient {
         "Content-Type": "application/json",
         "User-Agent": "MiniMaxCode",
         Authorization: `Bearer ${token.accessToken}`,
-        yy: md5(`${encodeURIComponent(pathWithSearch)}_${body}${md5(String(requestTime))}ooui`),
-        "x-timestamp": String(second),
-        "x-signature": md5(`${second}I*7Cf%WZ#S&%1RlZJ&C2${body}`),
+        ...webuiFirstPartySignatureHeaders({ pathWithSearch, nowMs: requestTime, body }),
       },
       body,
       signal,
@@ -477,7 +473,6 @@ export class UsageQuotaClient {
       timezoneOffsetSeconds: this.timezoneOffsetSeconds(),
     });
     const pathWithSearch = `${url.pathname}${url.search}`;
-    const second = Math.floor(requestTime / 1_000);
     const signal = AbortSignal.timeout(this.timeoutMs);
     const response = await this.fetchImpl(url, {
       method: "GET",
@@ -486,9 +481,7 @@ export class UsageQuotaClient {
         "Content-Type": "application/json",
         "User-Agent": "MiniMaxCode",
         Authorization: `Bearer ${accessToken}`,
-        yy: md5(`${encodeURIComponent(pathWithSearch)}_{}${md5(String(requestTime))}ooui`),
-        "x-timestamp": String(second),
-        "x-signature": md5(`${second}I*7Cf%WZ#S&%1RlZJ&C2`),
+        ...webuiFirstPartySignatureHeaders({ pathWithSearch, nowMs: requestTime }),
       },
       signal,
     });
@@ -803,10 +796,6 @@ function finiteNumber(value: unknown): number | undefined {
 
 function normalizeCacheTtl(value: number | undefined, fallback: number): number {
   return value !== undefined && Number.isFinite(value) && value >= 0 ? value : fallback;
-}
-
-function md5(value: string): string {
-  return createHash("md5").update(value).digest("hex");
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
