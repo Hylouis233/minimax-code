@@ -638,7 +638,7 @@ export function WebuiComposer({
    *  session history by `deriveRecentWorkspaceDirs`; empty when the user has
    *  no project sessions yet. */
   readonly recentWorkspaceDirs?: readonly string[];
-  readonly runCommand?: (request: { readonly command: "help" | "new" | "compact" | "status" | "usage" | "model"; readonly input?: string; readonly sessionId?: string; readonly agentName?: string; readonly workspaceDir?: string; }) => Promise<Record<string, unknown>>;
+  readonly runCommand?: (request: { readonly command: WebuiRunCommandName; readonly input?: string; readonly sessionId?: string; readonly agentName?: string; readonly workspaceDir?: string; }) => Promise<Record<string, unknown>>;
   readonly sendMessage?: WebuiClientMessageSender;
   readonly enqueueMessage?: WebuiClientMessageEnqueuer;
   readonly resumeSession?: WebuiClientSessionResumer;

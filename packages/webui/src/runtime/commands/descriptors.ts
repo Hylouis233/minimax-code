@@ -1,3 +1,5 @@
+import type { WebuiRunCommandName } from "../../shared/contracts/commands.js";
+
 export interface WebuiCommandDescriptor {
   readonly name: string;
   readonly description: string;
@@ -10,5 +12,5 @@ export const WEBUI_COMMAND_DESCRIPTORS = {
   status: { name: "status", description: "Show account and model status" },
   usage: { name: "usage", description: "Show session usage" },
   model: { name: "model", description: "Choose a model" },
-} as const satisfies Record<string, WebuiCommandDescriptor>;
+} as const satisfies Record<WebuiRunCommandName, WebuiCommandDescriptor>;
 

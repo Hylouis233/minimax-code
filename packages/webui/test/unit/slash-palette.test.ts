@@ -7,6 +7,7 @@ import {
   WEBUI_PLUGIN_REGISTRY,
   WEBUI_SKILL_FIXTURES,
 } from "../../src/client/slash-palette.js";
+import { WEBUI_COMMAND_DESCRIPTORS } from "../../src/runtime/commands/descriptors.js";
 import {
   applyWebuiSlashLiteMode,
   isWebuiRunnableCommand,
@@ -226,12 +227,16 @@ describe("WebUI slash palette — runtime narrowing", () => {
     }
   });
 
-  it("WEBUI_RUN_COMMAND_NAMES matches the server-side validation list", () => {
-    // The harness port validation list lives in
-    // src/server/operation/provider.ts; keep the
-    // client literal union aligned so the narrowing never lies.
-    expect([...WEBUI_RUN_COMMAND_NAMES].sort()).toEqual(
-      ["compact", "help", "model", "new", "status", "usage"],
+  it("gives every accepted command a description for /help to render", () => {
+    // The names are one shared list now, and `runtime/commands/descriptors.ts`
+    // is typed `Record<WebuiRunCommandName, …>`, so the two sets cannot drift —
+    // a name with no descriptor is a compile error. What the type cannot say is
+    // that the descriptor is worth printing.
+    for (const name of WEBUI_RUN_COMMAND_NAMES) {
+      expect(WEBUI_COMMAND_DESCRIPTORS[name].description.trim()).not.toBe("");
+    }
+    expect(Object.keys(WEBUI_COMMAND_DESCRIPTORS).sort()).toEqual(
+      [...WEBUI_RUN_COMMAND_NAMES].sort(),
     );
   });
 });

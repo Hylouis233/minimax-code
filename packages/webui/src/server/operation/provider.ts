@@ -1,4 +1,8 @@
 import { WebuiErrorCode } from "../../shared/envelope.js";
+import {
+  WEBUI_RUN_COMMAND_NAMES,
+  type WebuiRunCommandName,
+} from "../../shared/contracts/commands.js";
 import { requireRecord } from "./operation-contract.js";
 import type { WebuiOperation, WebuiOperationValidation } from "./operation-contract.js";
 import { LIST_USER_MODEL_PROVIDERS_OPERATION_NAME, CREATE_USER_MODEL_PROVIDER_OPERATION_NAME, UPDATE_USER_MODEL_PROVIDER_OPERATION_NAME, DELETE_USER_MODEL_PROVIDER_OPERATION_NAME, TEST_USER_MODEL_PROVIDER_OPERATION_NAME, TEST_USER_MODEL_OPERATION_NAME, DISCOVER_USER_MODELS_CANDIDATE_OPERATION_NAME, SAVE_USER_MODEL_PROVIDER_CANDIDATE_OPERATION_NAME, LIST_PROVIDER_PRESETS_OPERATION_NAME, GET_MINIMAX_API_KEY_STATUS_OPERATION_NAME, UPSERT_MINIMAX_API_KEY_OPERATION_NAME, GET_CODEX_OAUTH_STATUS_OPERATION_NAME, GET_MINIMAX_MODEL_SOURCE_OPERATION_NAME, SET_MINIMAX_MODEL_SOURCE_OPERATION_NAME, TEST_USER_MODEL_CANDIDATE_OPERATION_NAME, REVEAL_MODEL_PROVIDER_API_KEY_OPERATION_NAME, START_CODEX_OAUTH_LOGIN_OPERATION_NAME, CANCEL_CODEX_OAUTH_LOGIN_OPERATION_NAME, REFRESH_MODELS_OPERATION_NAME, RUN_COMMAND_OPERATION_NAME, CANCEL_ACCOUNT_LOGIN_OPERATION_NAME } from "../../shared/operation-names.js";
@@ -41,8 +45,8 @@ export const runCommandOperation: WebuiOperation<
     if (body === null || typeof body !== "object" || Array.isArray(body))
       return { ok: false, code: WebuiErrorCode.invalidBody, message: "runCommand body must be an object" };
     const candidate = body as Record<string, unknown>;
-    const commands = ["help", "new", "compact", "status", "usage", "model"] as const;
-    if (!commands.includes(candidate.command as (typeof commands)[number]))
+    const commands = WEBUI_RUN_COMMAND_NAMES;
+    if (!commands.includes(candidate.command as WebuiRunCommandName))
       return { ok: false, code: WebuiErrorCode.invalidBody, message: "runCommand command is invalid" };
     for (const field of ["input", "sessionId", "agentName", "workspaceDir"] as const) {
       if (candidate[field] !== undefined && typeof candidate[field] !== "string")

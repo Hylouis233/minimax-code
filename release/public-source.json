@@ -3790,6 +3790,7 @@
     "packages/webui/src/server/websocket-server.ts",
     "packages/webui/src/shared/contracts/account.ts",
     "packages/webui/src/shared/contracts/canvas.ts",
+    "packages/webui/src/shared/contracts/commands.ts",
     "packages/webui/src/shared/contracts/goal.ts",
     "packages/webui/src/shared/contracts/interactions.ts",
     "packages/webui/src/shared/contracts/messages.ts",

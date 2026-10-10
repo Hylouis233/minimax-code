@@ -1,13 +1,13 @@
-export const WEBUI_RUN_COMMAND_NAMES = [
-  "help",
-  "new",
-  "compact",
-  "status",
-  "usage",
-  "model",
-] as const;
+// The list itself is a wire vocabulary, so it lives in `shared` where the
+// server's validator and the runtime's descriptors can reach it too. It is
+// imported for this file's own use and re-exported so the client's existing
+// import path keeps working.
+import {
+  WEBUI_RUN_COMMAND_NAMES,
+  type WebuiRunCommandName,
+} from "../../shared/contracts/commands.js";
 
-export type WebuiRunCommandName = (typeof WEBUI_RUN_COMMAND_NAMES)[number];
+export { WEBUI_RUN_COMMAND_NAMES, type WebuiRunCommandName };
 export type WebuiCommandClassification =
   | "runnable"
   | "inert-wired"
