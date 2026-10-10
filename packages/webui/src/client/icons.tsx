@@ -498,50 +498,6 @@ export function WebuiIconCommandPlan({ className }: WebuiIconProps): ReactElemen
   );
 }
 
-/** slash palette — desktop `fork` row leading glyph. */
-export function WebuiIconCommandFork({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <circle cx="5" cy="4" r="2.25" stroke="currentColor" strokeWidth="1.5" />
-      <circle cx="5" cy="16" r="2.25" stroke="currentColor" strokeWidth="1.5" />
-      <circle cx="15" cy="10" r="2.25" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M5 6.25V13.75" stroke="currentColor" strokeWidth="1.5" />
-      <path
-        d="M5 10C5 11.933 6.567 13.5 8.5 13.5H12.75"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-/** slash palette — desktop `memory` row leading glyph. */
-export function WebuiIconCommandMemory({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path
-        d="M10 2.5C6.41015 2.5 3.5 5.41015 3.5 9C3.5 11.1623 4.64045 13.0566 6.35714 14.1271C6.14027 14.9893 5.70609 15.7458 5.07584 16.2917C4.92993 16.4163 4.91625 16.6311 5.04552 16.7707C5.17479 16.9104 5.38951 16.9241 5.52921 16.7948C6.51996 15.8766 7.14611 14.741 7.39854 13.5614C8.19932 13.8385 9.06776 13.9954 9.99789 14C9.99964 14 9.99997 14 10 14C13.5898 14 16.5 11.0899 16.5 7.5C16.5 3.91015 13.5898 2.5 10 2.5Z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M8 7.5C8 9.16739 8.5 10.8333 9.75 11.25"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-      <path
-        d="M12.5 5C13.25 5.75 13.5 7 13.25 8"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
 // Skills section row leading glyphs. The WebUI ships these as fixtures that
 // mirror the desktop's slash-palette skill rows (mavis/ask-matt,
 // code-review, codebase-design, diagnosing-bugs). Each is inert today.

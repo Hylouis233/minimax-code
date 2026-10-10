@@ -155,12 +155,10 @@ export const DEFAULT_THINKING_PHRASE_START_DELAY_MAX_MS = 3000;
 export const DEFAULT_THINKING_PHRASE_ROTATION_INTERVAL_MS = 3500;
 
 export interface ThinkingPhraseRotationOptions {
-  phraseRootKey?: string;
   startDelayMinMs?: number;
   startDelayMaxMs?: number;
   rotationIntervalMs?: number;
   phrases?: ThinkingPhraseSet;
-  fallback?: string;
   random?: () => number;
 }
 
@@ -322,7 +320,6 @@ export function ActivityIndicator(props: ActivityIndicatorProps): React.JSX.Elem
 
   const rotated = useThinkingPhrase(showLabel && !label && !labelOverride, {
     ...(phrases ? { phrases } : {}),
-    fallback: phraseFallback,
   });
 
   useEffect(() => {

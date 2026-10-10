@@ -146,7 +146,7 @@ export function ConversationUsageBanner(props: ConversationUsageBannerProps): Re
   const labels: Record<ConversationUsageActionKind, string> = {
     buy_credits: buttonLabels?.buy_credits ?? DEFAULT_BUTTON_LABELS.buy_credits,
     subscribe_plan: buttonLabels?.subscribe_plan ?? DEFAULT_BUTTON_LABELS.subscribe_plan,
-    upgrade_plan: buttonLabels?.upgrade_plan ?? buttonLabels?.upgrade_plan ?? DEFAULT_BUTTON_LABELS.upgrade_plan,
+    upgrade_plan: buttonLabels?.upgrade_plan ?? DEFAULT_BUTTON_LABELS.upgrade_plan,
   };
 
   const composedMessage =

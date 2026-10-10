@@ -271,16 +271,6 @@ function resolveCurrentEffort(model: WebuiModelPickerEntry): string | undefined 
     : options[0];
 }
 
-function resolveThinkingMode(
-  model: WebuiModelPickerEntry,
-): "switchable" | "forced_on" | "forced_off" | undefined {
-  return model.thinkingConfig?.mode as
-    | "switchable"
-    | "forced_on"
-    | "forced_off"
-    | undefined;
-}
-
 export function variantForEffort(
   model: WebuiModelPickerEntry,
   effort: string,
