@@ -1,11 +1,7 @@
-// Unit tests for the application event coordinator and its single lease
-// implementation (ticket #45, slice B).
+// Unit tests for the application event coordinator (ticket #45, slice B).
 //
-// This slice builds `client/application/` but deliberately does NOT wire it into
-// the live process-event ingress — the atomic switch happens in a later
-// delivery unit. So every case here drives the new layer directly, through
-// `createWebuiApplication`, against a fake process-event channel. What it pins
-// is exactly the list the ticket names:
+// Every case drives the coordinator through `createWebuiApplication` against a
+// fake process-event channel. What it pins is exactly the list the ticket names:
 //
 //   * one channel per application instance, and repeated mount/unmount still
 //     yields one;
@@ -13,18 +9,20 @@
 //     does not tear down the shared channel;
 //   * the coordinator routes events to the retained activity/effect reducers and
 //     executes their effect commands against the store's writers;
-//   * a superseded generation's frames produce zero writes;
 //   * a late result for a previously selected session is discarded;
-//   * lease release on terminal, error and cancellation; resume overflow;
+//   * lease release on terminal, error and cancellation;
 //   * a late completion after disposal writes nothing.
-
+//
+// Stream frames are not part of this surface. They reach the store through the
+// stream sink (`client/mechanisms/stream-loop.ts`), which owns the lease fence;
+// `webui-shell.test.ts` covers the superseded-generation and resume-overflow
+// behaviour on that path.
 import { describe, expect, it, vi } from "vitest";
 
 import { createWebuiApplication } from "../../src/client/application/create-application.js";
 import { createWebuiEventEffectsRegistry } from "../../src/client/application/event-effects-registry.js";
 import { createWebuiComposerAttachStreamEffect } from "../../src/client/application/turn-commands.js";
 import type { WebuiProcessEventChannel } from "../../src/client/application/event-channel.js";
-import type { WebuiStreamFrame } from "../../src/shared/contracts/stream.js";
 import type { WebuiRuntimeEvent } from "../../src/shared/contracts/stream.js";
 import type { WebuiClientSessionResumer } from "../../src/client/contracts/execution-port.js";
 
@@ -83,14 +81,6 @@ function makeApplication(effects = {}) {
     turns: { resumeSession },
   });
   return { application, channels, opened: () => opened };
-}
-
-const frame = (dataJson: string): WebuiStreamFrame => ({ dataJson });
-
-function agentMessageFrame(text: string): WebuiStreamFrame {
-  return frame(
-    JSON.stringify({ type: 2, agent_message: { msg_id: "m1", msg_content: text } }),
-  );
 }
 
 describe("the application's single channel", () => {
@@ -164,30 +154,7 @@ describe("event routing to the retained reducers", () => {
   });
 });
 
-describe("the single lease and generation fencing", () => {
-  it("drops a superseded generation's frames with zero writes", () => {
-    const { application } = makeApplication();
-    const first = application.leases.claim("s1", "local-send");
-    const second = application.leases.claim("s1", "recovered", "t2");
-
-    const before = application.store.readSession("s1").stream;
-    application.events.handleStreamFrame({
-      sessionId: "s1",
-      generation: first,
-      frame: agentMessageFrame("stale"),
-    });
-    // Same object identity: the superseded attempt produced no write at all.
-    expect(application.store.readSession("s1").stream).toBe(before);
-    expect(application.store.readSession("s1").stream.messages).toHaveLength(0);
-
-    application.events.handleStreamFrame({
-      sessionId: "s1",
-      generation: second,
-      frame: agentMessageFrame("live"),
-    });
-    expect(application.store.readSession("s1").stream.messages).toHaveLength(1);
-  });
-
+describe("lease release", () => {
   it("releases the lease on terminal, error and cancellation", () => {
     const { application, channels } = makeApplication();
     for (const [type, expected] of [
@@ -206,24 +173,6 @@ describe("the single lease and generation fencing", () => {
     const generation = application.leases.claim("s1", "local-send");
     application.leases.release("s1", { generation });
     expect(application.store.readSession("s1").stream.subscription).toBeUndefined();
-  });
-
-  it("handles resume overflow by releasing the lease and marking a resync", () => {
-    const resumeOverflow = vi.fn();
-    const { application } = makeApplication({ resumeOverflow });
-    const generation = application.leases.claim("s1", "local-send");
-
-    application.events.handleStreamFrame({
-      sessionId: "s1",
-      generation,
-      frame: frame(JSON.stringify({ type: "resume_overflow" })),
-    });
-
-    const stream = application.store.readSession("s1").stream;
-    expect(stream.resumeRequired).toBe(true);
-    expect(stream.phase).toBe("reconnecting");
-    expect(stream.subscription).toBeUndefined();
-    expect(resumeOverflow).toHaveBeenCalledWith("s1");
   });
 });
 
@@ -296,16 +245,13 @@ describe("the turn coordinator's manual retry", () => {
 describe("late results and disposal", () => {
   it("writes nothing after disposal", () => {
     const { application } = makeApplication();
-    const generation = application.leases.claim("s1", "local-send");
     const before = application.store.readSession("s1").stream;
 
     application.dispose();
 
-    application.events.handleStreamFrame({
-      sessionId: "s1",
-      generation,
-      frame: agentMessageFrame("after dispose"),
-    });
+    application.events.handleEvent(
+      event("session.finish", { sessionId: "s1", turnId: "t1" }),
+    );
     application.store.updateSession("s1", (current) => ({
       ...current,
       sending: true,

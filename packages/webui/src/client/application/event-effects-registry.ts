@@ -82,8 +82,6 @@ export function createWebuiEventEffectsRegistry(): WebuiEventEffectsRegistry {
         perSession.get(sessionId)?.attachStream?.(sessionId, turnId, mode),
       setGoal: (sessionId: string, goal: WebuiGoal | undefined) =>
         perSession.get(sessionId)?.setGoal?.(sessionId, goal),
-      resumeOverflow: (sessionId) =>
-        perSession.get(sessionId)?.resumeOverflow?.(sessionId),
       // The channel was accepted; re-read authoritative state per session. Not
       // a barrier — a `session.start` can still slip past it — so each
       // session's own probe decides what to recover.

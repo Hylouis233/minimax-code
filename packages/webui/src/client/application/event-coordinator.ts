@@ -11,17 +11,15 @@
 //   * it runs the effect commands the effect reducer produces against the
 //     store's writers, so components no longer compute and apply business
 //     effects from a raw event callback;
-//   * it applies live stream frames through the single lease fence, so a
-//     superseded attempt's frames produce zero writes.
+//   * live stream frames do not come through here at all. They arrive at the
+//     stream sink (`client/mechanisms/stream-loop.ts`), which owns the single
+//     lease fence; this coordinator handles process events only.
 //
 // One channel, one coordinator: `attach` subscribes exactly once and `detach`
 // only removes that one listener. The channel's lifetime belongs to the
 // application, so unsubscribing never tears it down.
 
-import type {
-  WebuiRuntimeEvent,
-  WebuiStreamFrame,
-} from "../../shared/contracts/stream.js";
+import type { WebuiRuntimeEvent } from "../../shared/contracts/stream.js";
 import type { WebuiGoal } from "../../shared/contracts/goal.js";
 import {
   reduceWebuiEffect,
@@ -41,12 +39,7 @@ import type { WebuiStreamState } from "../projection/stream-state.js";
 // the id inside `goal` rather than at the top level. Reading the top level
 // only here dropped every such event before it could reach the reducer.
 import { eventSessionId } from "../projection/event-parsers.js";
-import {
-  recogniseWebuiStreamPayload,
-  reduceWebuiStreamFrame,
-} from "../projection/stream-state.js";
 import type { WebuiProcessEventChannel } from "./event-channel.js";
-import { releaseWebuiLease } from "../mechanisms/stream-lease.js";
 import type { WebuiSessionStore } from "./session-store.js";
 import type { WebuiStreamLeaseController } from "./stream-lease-controller.js";
 
@@ -114,18 +107,6 @@ export function createWebuiWatchEventCallback(
   };
 }
 
-/** A live stream frame addressed to one session and one attempt generation. */
-export interface WebuiEventStreamFrame {
-  readonly sessionId: string;
-  /**
-   * The generation the producing attempt claimed. Omitted for a caller that
-   * models no ownership; the fence then admits the frame only while no lease is
-   * held.
-   */
-  readonly generation?: number;
-  readonly frame: WebuiStreamFrame;
-}
-
 /** The parsed payload of a `workspace.git.changed` process event. */
 export interface WebuiWorkspaceGitChangedPayload {
   readonly workspace?: string;
@@ -151,7 +132,6 @@ export interface WebuiEventEffects {
     turnId: string | undefined,
     mode: "attach" | "recheck",
   ) => void;
-  readonly resumeOverflow?: (sessionId: string) => void;
   /**
    * The goal write path, routed to the session it names. Registered so the
    * goal-version guard (a late steering re-read must not clobber a newer goal
@@ -200,7 +180,6 @@ export interface WebuiEventCoordinator {
   /** Subscribe to the channel exactly once; returns a detach that removes it. */
   readonly attach: (channel: WebuiProcessEventChannel) => () => void;
   readonly handleEvent: (event: WebuiRuntimeEvent) => void;
-  readonly handleStreamFrame: (input: WebuiEventStreamFrame) => void;
   readonly detach: () => void;
   /** Whether the coordinator currently holds the channel subscription. */
   readonly isAttached: () => boolean;
@@ -291,33 +270,6 @@ export function createWebuiEventCoordinator(
     );
   };
 
-  const handleStreamFrame = (input: WebuiEventStreamFrame): void => {
-    if (store.isDisposed()) return;
-    // The single fence. A superseded attempt's generation is not current, so it
-    // returns the same state object and the store sees no change — zero writes.
-    if (!leases.isCurrent(input.sessionId, input.generation)) return;
-    const recognised = recogniseWebuiStreamPayload(input.frame.dataJson);
-    if (recognised.kind === "resume_overflow") {
-      // The server says our view is too far behind. Drop the lease with the
-      // turn it belonged to and mark the resync, then let the owned effect
-      // reload authoritative history and reopen a fresh subscription.
-      store.updateSession(input.sessionId, (current) => ({
-        ...current,
-        stream: releaseWebuiLease({
-          ...current.stream,
-          phase: "reconnecting",
-          resumeRequired: true,
-        }),
-      }));
-      effects.resumeOverflow?.(input.sessionId);
-      return;
-    }
-    store.updateSession(input.sessionId, (current) => ({
-      ...current,
-      stream: reduceWebuiStreamFrame(current.stream, input.frame),
-    }));
-  };
-
   const detach = (): void => {
     unsubscribe?.();
     unsubscribe = undefined;
@@ -334,7 +286,6 @@ export function createWebuiEventCoordinator(
       return off;
     },
     handleEvent,
-    handleStreamFrame,
     detach,
     isAttached: () => unsubscribe !== undefined,
   };
