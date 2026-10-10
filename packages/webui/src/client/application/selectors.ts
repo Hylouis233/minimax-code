@@ -45,13 +45,6 @@ export function selectWebuiSessionSending(
   return state.sessions.get(sessionId)?.sending ?? false;
 }
 
-export function selectWebuiSessionActivity(
-  state: WebuiApplicationState,
-  sessionId: string,
-): WebuiSessionActivity | undefined {
-  return state.activity[sessionId];
-}
-
 /**
  * The session's pending permissions, or the empty list when unknown. Reading a
  * slice through the snapshot (rather than through a store writer) is what lets

@@ -124,15 +124,6 @@ export function fenceWebuiLeaseStream(
   return isWebuiLeaseGenerationCurrent(state, generation) ? apply(state) : state;
 }
 
-/** Whether `generation` currently holds the lease (not merely newest). */
-export function isWebuiLeaseHeldBy(
-  state: WebuiStreamState,
-  generation: number | undefined,
-): boolean {
-  if (generation === undefined) return state.subscription === undefined;
-  return state.subscription?.generation === generation;
-}
-
 export function releaseWebuiSubscription(
   state: WebuiStreamState,
   scope?: WebuiSubscriptionReleaseScope,

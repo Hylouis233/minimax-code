@@ -16,10 +16,8 @@
 
 import { useMemo } from "react";
 
-import type { WebuiSessionActivity } from "../projection/session-activity.js";
 import {
   selectWebuiSession,
-  selectWebuiSessionActivity,
   selectWebuiSessionGoal,
   selectWebuiSessionPermissions,
   selectWebuiSessionQuestionnaire,
@@ -81,13 +79,6 @@ export function useWebuiSessionStream(
 export function useWebuiSessionSending(sessionId: string | undefined): boolean {
   const snapshot = useWebuiSessionStoreSnapshot();
   return sessionId ? selectWebuiSessionSending(snapshot, sessionId) : false;
-}
-
-export function useWebuiSessionActivity(
-  sessionId: string | undefined,
-): WebuiSessionActivity | undefined {
-  const snapshot = useWebuiSessionStoreSnapshot();
-  return sessionId ? selectWebuiSessionActivity(snapshot, sessionId) : undefined;
 }
 
 /** The session's pending permissions, read through the selector. */

@@ -19,11 +19,6 @@ import { validateAbsoluteDirectory, validateSessionIdBody } from "./common.js";
 import { VERSION_OPERATION_NAME, LIST_SESSIONS_OPERATION_NAME, LIST_VISIBLE_PROJECTS_OPERATION_NAME, GET_SESSION_TREE_OPERATION_NAME, CREATE_SESSION_OPERATION_NAME, GET_SESSION_OPERATION_NAME, GET_ACTIVE_TURN_OPERATION_NAME, ARCHIVE_SESSION_OPERATION_NAME, DELETE_SESSION_OPERATION_NAME, UPDATE_SESSION_OPERATION_NAME, GET_SESSION_FORK_OPTIONS_OPERATION_NAME, FORK_SESSION_OPERATION_NAME } from "../../shared/operation-names.js";
 type VersionRequestBody = undefined;
 
-interface VersionResponseBody {
-  readonly version: string;
-  readonly protocolVersion: number;
-}
-
 function validateVersionRequestBody(
   body: unknown,
 ): WebuiOperationValidation<VersionRequestBody> {

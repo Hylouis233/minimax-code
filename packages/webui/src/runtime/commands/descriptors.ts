@@ -12,5 +12,3 @@ export const WEBUI_COMMAND_DESCRIPTORS = {
   model: { name: "model", description: "Choose a model" },
 } as const satisfies Record<string, WebuiCommandDescriptor>;
 
-export type WebuiCommandName = keyof typeof WEBUI_COMMAND_DESCRIPTORS;
-

@@ -3,16 +3,14 @@
 // module (`stream-lease.ts`).
 //
 // This is the entry point plan §7.6 calls "turn coordinator claims and releases
-// through one entry": every claim, release and fence in the application goes
-// through here, and every one of them reads and writes the same store.
+// through one entry": every claim, release and currency check in the application
+// goes through here, and every one of them reads and writes the same store.
 
 import type { WebuiStreamState } from "../projection/stream-state.js";
 import type { WebuiSessionStore } from "./session-store.js";
 import {
   claimWebuiLease,
-  fenceWebuiLeaseStream,
   isWebuiLeaseGenerationCurrent,
-  isWebuiLeaseHeldBy,
   releaseWebuiLease,
 } from "../mechanisms/stream-lease.js";
 import type {
@@ -31,14 +29,6 @@ export interface WebuiStreamLeaseController {
   release: (sessionId: string, scope?: WebuiLeaseReleaseScope) => void;
   /** Whether `generation` is still the newest claimant for the session. */
   isCurrent: (sessionId: string, generation: number | undefined) => boolean;
-  /** Whether `generation` currently holds the lease (not merely newest). */
-  heldBy: (sessionId: string, generation: number | undefined) => boolean;
-  /** Apply a stream write only when `generation` is current. */
-  fence: (
-    sessionId: string,
-    generation: number | undefined,
-    apply: (current: WebuiStreamState) => WebuiStreamState,
-  ) => WebuiStreamState;
 }
 
 export function createWebuiStreamLeaseController(
@@ -67,14 +57,6 @@ export function createWebuiStreamLeaseController(
       isWebuiLeaseGenerationCurrent(
         store.readSession(sessionId).stream,
         generation,
-      ),
-    heldBy: (sessionId, generation) =>
-      isWebuiLeaseHeldBy(store.readSession(sessionId).stream, generation),
-    fence: (sessionId, generation, apply) =>
-      fenceWebuiLeaseStream(
-        store.readSession(sessionId).stream,
-        generation,
-        apply,
       ),
   };
 }
