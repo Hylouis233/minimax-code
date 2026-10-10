@@ -1,8 +1,8 @@
 // The pure history/context transforms the stream loop needs, bundled so a
 // caller can inject them instead of the mechanism importing `projection/`
-// directly (plan §7.2). `client/stream-loop.ts` is a mechanism and may not
-// reach into view/domain modules; the callers that already live below that
-// boundary — the composer, the recovery helper and the composer-state
+// directly (plan §7.2). `client/mechanisms/stream-loop.ts` is a mechanism and
+// may not reach into view/domain modules; the callers that already live below
+// that boundary — the composer, the recovery helper and the composer-state
 // orchestration — supply this bundle.
 //
 // The functions are the existing ones, re-used, not re-implemented: no second

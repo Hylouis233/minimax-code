@@ -36,11 +36,12 @@
 // `writeMemorySummary` — a textarea wired to the summary would reject exactly
 // the content the modal exists to show.
 //
-// The view types live in `src/client/contracts.ts`: this module imports
-// `node:fs` and the client tsconfig compiles with `"types": []`, so a
-// browser-side program has no node globals. `port.ts` sidesteps this by being
-// pure `import type` with no runtime import; anything that actually touches the
-// filesystem cannot live on the client side of the seam.
+// The view types live in `src/shared/contracts/personalization.ts`: this
+// module imports `node:fs` and the client tsconfig compiles with
+// `"types": []`, so a browser-side program has no node globals. `port.ts`
+// sidesteps this by being pure `import type` with no runtime import; anything
+// that actually touches the filesystem cannot live on the client side of the
+// seam.
 
 import { randomBytes } from "node:crypto";
 import { mkdir, open, readFile, rename, stat, unlink } from "node:fs/promises";

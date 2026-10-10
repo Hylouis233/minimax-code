@@ -11,7 +11,8 @@
 //
 // No React imports here — this is a pure type that lives in the contracts
 // layer so the props layer (app.tsx) and the transport implementation
-// (`client/transport.ts`) both import it without crossing boundaries.
+// (`client/infrastructure/transport.ts`) both import it without crossing
+// boundaries.
 
 import type { SessionPort } from "./session-port.js";
 import type { ExecutionPort } from "./execution-port.js";

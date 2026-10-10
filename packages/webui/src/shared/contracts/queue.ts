@@ -4,8 +4,8 @@
 //
 // | Declaration | Wire purpose | Producer | Consumers |
 // | --- | --- | --- | --- |
-// | `WebuiEnqueueMessageRequest` | Request to enqueue a message (id, content, model, attachments). | Browser `client/transport.ts` (`enqueueMessage`). | `client/contracts/execution-port.ts`; runtime `enqueueMessage`; `server/operation/interaction.ts`. |
-// | `WebuiEnqueueMessageResult` | The enqueue outcome (itemId, status, position). | Runtime `enqueueMessage` (`runtime/harness/execution.ts`; CliService). | `client/contracts/execution-port.ts`; `client/transport.ts`; `server/operation/interaction.ts`. |
+// | `WebuiEnqueueMessageRequest` | Request to enqueue a message (id, content, model, attachments). | Browser `client/infrastructure/transport.ts` (`enqueueMessage`). | `client/contracts/execution-port.ts`; runtime `enqueueMessage` (`runtime/port.ts`; `runtime/harness/host-contract.ts`); `server/operation/interaction.ts`. |
+// | `WebuiEnqueueMessageResult` | The enqueue outcome (itemId, status, position). | Runtime `enqueueMessage` (`runtime/harness/execution.ts`; CliService). | `client/contracts/execution-port.ts`; `client/infrastructure/transport.ts`; `runtime/harness/host-contract.ts`. |
 // | `WebuiQueueItem` | One queued message in a session's queue. | Runtime `listQueueMessages` (`runtime/harness/execution.ts`). | `client/contracts/execution-port.ts`; `client/components/SessionComposer.tsx`; `client/components/QueuePanel.tsx`; `server/operation/queue.ts`. |
 import type { WebuiAttachmentInput } from "./messages.js";
 
