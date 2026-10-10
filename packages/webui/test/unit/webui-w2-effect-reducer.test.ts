@@ -27,7 +27,7 @@ import {
 } from "../../src/client/projection/effect-reducer.js";
 import {
   applyWebuiEffectCommands,
-  createWebuiWatchEventCallback,
+  applyWebuiEventToSession,
   type WebuiEffectHandlers,
 } from "../../src/client/application/event-coordinator.js";
 import {
@@ -1068,15 +1068,7 @@ describe("D3 · watchEvents reduces each event against the latest stream", () =>
   it("keeps a spawned child available to the following completion event", () => {
     let store = makeState();
     const read = () => store;
-    const callback = createWebuiWatchEventCallback(
-      SESSION,
-      () => read().stream,
-      () => ({
-        permissions: read().permissions,
-        questionnaire: read().questionnaire,
-        goal: read().goal,
-      }),
-      {
+    const handlers: WebuiEffectHandlers = {
         refreshPending: () => undefined,
         refreshGoal: () => undefined,
         setSending: () => undefined,
@@ -1084,8 +1076,7 @@ describe("D3 · watchEvents reduces each event against the latest stream", () =>
         setPermissions: (patch) => { store = { ...store, permissions: patch(store.permissions) }; },
         setQuestionnaire: (patch) => { store = { ...store, questionnaire: patch(store.questionnaire) }; },
         setGoal: (goal) => { store = { ...store, goal }; },
-      },
-    );
+    };
 
     const spawned = event({
       type: "session.spawned",
@@ -1098,11 +1089,24 @@ describe("D3 · watchEvents reduces each event against the latest stream", () =>
       type: "session.finish",
       payload: { sessionId: SESSION, data: { sessionId: "child-1" } },
     });
-    callback(spawned);
+    const apply = (evt: WebuiRuntimeEvent) =>
+      applyWebuiEventToSession(
+        SESSION,
+        evt,
+        () => read().stream,
+        () => ({
+          permissions: read().permissions,
+          questionnaire: read().questionnaire,
+          goal: read().goal,
+        }),
+        handlers,
+      );
+
+    apply(spawned);
     expect(store.stream.workspaceProgress.subagents).toEqual([
       expect.objectContaining({ sessionId: "child-1", status: "running" }),
     ]);
-    callback(completed);
+    apply(completed);
     expect(store.stream.workspaceProgress.subagents).toEqual([
       expect.objectContaining({ sessionId: "child-1", status: "completed" }),
     ]);

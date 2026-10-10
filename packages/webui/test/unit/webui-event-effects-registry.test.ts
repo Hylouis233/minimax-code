@@ -51,8 +51,11 @@ describe("the per-session effects registry", () => {
     effects.channelReady?.();
     expect(a.channelReady).toHaveBeenCalledTimes(1);
 
+    // Unregistering A makes A's call inert — observed through the effect call
+    // itself rather than by reading the registry's map back.
     offA();
-    expect(registry.read("A")).toBeUndefined();
+    effects.refreshPending?.("A");
+    expect(a.refreshPending).toHaveBeenCalledTimes(1);
     // Re-registering a session and dropping the stale unregister leaves it in
     // place: the unregister removes only the exact set it registered.
     const first = { refreshPending: vi.fn() };
@@ -60,7 +63,9 @@ describe("the per-session effects registry", () => {
     const offFirst = registry.register("C", first);
     registry.register("C", second);
     offFirst();
-    expect(registry.read("C")).toBe(second);
+    effects.refreshPending?.("C");
+    expect(second.refreshPending).toHaveBeenCalledWith("C");
+    expect(first.refreshPending).not.toHaveBeenCalled();
   });
 });
 

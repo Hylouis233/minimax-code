@@ -91,20 +91,29 @@ export function applyWebuiEffectCommands(
   }
 }
 
-export function createWebuiWatchEventCallback(
+/**
+ * Reduce one process event against a session's latest state and run the
+ * commands it produces.
+ *
+ * This is the per-session half of `handleEvent`, extracted so the channel
+ * consumer and the tests drive the same function. It used to be a factory that
+ * returned the callback — with nobody calling it: `handleEvent` spelled the
+ * same four lines out inline, so the extraction existed twice and only the
+ * inline copy ran.
+ */
+export function applyWebuiEventToSession(
   sessionId: string,
+  event: WebuiRuntimeEvent,
   readStream: () => WebuiStreamState,
   readState: () => Omit<WebuiEffectState, "stream">,
   handlers: WebuiEffectHandlers,
-): (event: WebuiRuntimeEvent) => void {
-  return (event) => {
-    const commands = reduceWebuiEffect(
-      { ...readState(), stream: readStream() },
-      event,
-      sessionId,
-    ).commands;
-    applyWebuiEffectCommands(commands, handlers, readStream);
-  };
+): void {
+  const commands = reduceWebuiEffect(
+    { ...readState(), stream: readStream() },
+    event,
+    sessionId,
+  ).commands;
+  applyWebuiEffectCommands(commands, handlers, readStream);
 }
 
 /** The parsed payload of a `workspace.git.changed` process event. */
@@ -252,21 +261,21 @@ export function createWebuiEventCoordinator(
     const sessionId = eventSessionId(event);
     if (!sessionId) return;
     effects.invalidatePending?.(sessionId);
-    const current = store.readSession(sessionId);
-    const { commands } = reduceWebuiEffect(
-      {
-        stream: current.stream,
-        permissions: current.permissions,
-        questionnaire: current.questionnaire,
-        goal: current.goal,
-      },
-      event,
-      sessionId,
-    );
     // The effect executor is the existing one; it walks the command list in
     // order, and its `set-*` commands land on this coordinator's store writers.
-    applyWebuiEffectCommands(commands, handlersFor(sessionId), () =>
-      store.readSession(sessionId).stream,
+    applyWebuiEventToSession(
+      sessionId,
+      event,
+      () => store.readSession(sessionId).stream,
+      () => {
+        const current = store.readSession(sessionId);
+        return {
+          permissions: current.permissions,
+          questionnaire: current.questionnaire,
+          goal: current.goal,
+        };
+      },
+      handlersFor(sessionId),
     );
   };
 

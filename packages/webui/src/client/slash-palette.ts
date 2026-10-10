@@ -371,9 +371,9 @@ function iconForSkillName(name: string): WebuiIconComponent {
  * everything else. The order is preserved within each section.
  */
 /**
- * Composed API: section + lite-mode filter. Returns the static slice; skills
- * are awaited in `buildWebuiSlashPaletteAsync` below because the desktop's
- * skills come from a runtime IPC call.
+ * Composed API: section + lite-mode filter. Returns the static slice; the
+ * caller resolves the skills pool first (`resolveWebuiSlashSkills`), because
+ * the desktop's skills come from a runtime IPC call.
  */
 export function buildWebuiSlashPalette(options: {
   readonly skills?: readonly SlashCommandEntry[];
@@ -382,21 +382,6 @@ export function buildWebuiSlashPalette(options: {
   const skills = options.skills ?? [];
   const sectioned = sectionWebuiSlashPalette(WEBUI_BUILTIN_COMMANDS, skills);
   return applyWebuiSlashLiteMode(sectioned, !!options.lite);
-}
-
-/**
- * Async form: resolves the skills pool, then runs the sectioning pass. The
- * WebUI today calls this once per popover open (or once per session if the
- * popover persists across opens) so the resolver cost stays bounded.
- */
-export async function buildWebuiSlashPaletteAsync(options: {
-  readonly lite?: boolean;
-  readonly fetcher?: () => Promise<readonly WebuiSlashSkillSummary[]>;
-} = {}): Promise<SlashCommandEntry[]> {
-  const resolved = await resolveWebuiSlashSkills({
-    fetcher: options.fetcher,
-  });
-  return buildWebuiSlashPalette({ skills: resolved.skills, lite: options.lite });
 }
 
 /**

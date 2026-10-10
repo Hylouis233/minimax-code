@@ -36,15 +36,11 @@ export interface WebuiEventEffectsRegistry {
     sessionId: string,
     effects: WebuiEventEffects,
   ) => () => void;
-  /** The effect set currently registered for a session, if any. */
-  readonly read: (sessionId: string) => WebuiEventEffects | undefined;
   readonly answerQuestionnaire: (
     sessionId: string,
     request: WebuiQuestionnaireRequest,
     answers: readonly WebuiQuestionnaireAnswer[],
   ) => Promise<{ readonly ok: true } | { readonly ok: false; readonly error: string }>;
-  /** Drops every registration (application disposal). */
-  readonly clear: () => void;
   /**
    * One `WebuiEventEffects` the coordinator consumes: every per-session call is
    * routed to the session it names, and a channel-accepted signal fans out to
@@ -63,14 +59,12 @@ export function createWebuiEventEffectsRegistry(): WebuiEventEffectsRegistry {
         if (perSession.get(sessionId) === effects) perSession.delete(sessionId);
       };
     },
-    read: (sessionId) => perSession.get(sessionId),
     answerQuestionnaire: async (sessionId, request, answers) => {
       const answer = perSession.get(sessionId)?.answerQuestionnaire;
       return answer
         ? answer(request, answers)
         : { ok: false, error: "Questionnaire replies are unavailable" };
     },
-    clear: () => perSession.clear(),
     asWebuiEventEffects: () => ({
       invalidatePending: (sessionId) =>
         perSession.get(sessionId)?.invalidatePending?.(sessionId),
