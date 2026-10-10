@@ -1,3 +1,4 @@
+import { createWebuiMemoryStorage } from "./support/memory-storage.js";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
@@ -613,43 +614,30 @@ describe("unread counts", () => {
 });
 
 describe("unread storage", () => {
-  function fakeStorage(): Storage & { store: Map<string, string> } {
-    const store = new Map<string, string>();
-    return {
-      store,
-      getItem: (key: string) => store.get(key) ?? null,
-      setItem: (key: string, value: string) => void store.set(key, value),
-      removeItem: (key: string) => void store.delete(key),
-      clear: () => store.clear(),
-      key: () => null,
-      length: 0,
-    } as unknown as Storage & { store: Map<string, string> };
-  }
-
   it("round-trips counts", () => {
-    const storage = fakeStorage();
+    const storage = createWebuiMemoryStorage();
     writeWebuiUnreadCounts({ mvs_a: 2, mvs_b: 0 }, storage);
     expect(readWebuiUnreadCounts(storage)).toEqual({ mvs_a: 2 });
   });
 
   it("removes the key rather than storing an empty object", () => {
-    const storage = fakeStorage();
+    const storage = createWebuiMemoryStorage();
     writeWebuiUnreadCounts({ mvs_a: 1 }, storage);
-    expect(storage.store.size).toBe(1);
+    expect(storage.values.size).toBe(1);
     writeWebuiUnreadCounts({}, storage);
-    expect(storage.store.size).toBe(0);
+    expect(storage.values.size).toBe(0);
   });
 
   it("drops values that are not positive integers", () => {
     // `unread: NaN` would render a row claiming to be waiting on nothing, so a
     // stored float or string is dropped rather than coerced.
-    const storage = fakeStorage();
+    const storage = createWebuiMemoryStorage();
     storage.setItem(SESSION_UNREAD_STORAGE_KEY, JSON.stringify({ a: 1.5, b: "2", c: -1, d: 3, e: null }));
     expect(readWebuiUnreadCounts(storage)).toEqual({ d: 3 });
   });
 
   it("survives corrupt storage", () => {
-    const storage = fakeStorage();
+    const storage = createWebuiMemoryStorage();
     storage.setItem(SESSION_UNREAD_STORAGE_KEY, "{not json");
     expect(readWebuiUnreadCounts(storage)).toEqual({});
     storage.setItem(SESSION_UNREAD_STORAGE_KEY, "[1,2,3]");

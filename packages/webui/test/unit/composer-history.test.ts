@@ -1,3 +1,4 @@
+import { createWebuiMemoryStorage } from "./support/memory-storage.js";
 import { describe, expect, it } from "vitest";
 import {
   parseWebuiComposerPersisted,
@@ -109,21 +110,8 @@ describe("shouldRecallWebuiHistory", () => {
 });
 
 describe("persisted composer store", () => {
-  function memoryStorage(): Pick<Storage, "getItem" | "setItem"> & {
-    read(): string | null;
-  } {
-    let value: string | null = null;
-    return {
-      getItem: () => value,
-      setItem: (_key: string, next: string) => {
-        value = next;
-      },
-      read: () => value,
-    };
-  }
-
   it("round-trips drafts and history", () => {
-    const storage = memoryStorage();
+    const storage = createWebuiMemoryStorage();
     const state: WebuiComposerPersisted = {
       drafts: { home: "unsent", "s-1": "draft one" },
       history: { home: ["hello", "world"], "s-1": ["fix the bug"] },
@@ -133,7 +121,7 @@ describe("persisted composer store", () => {
   });
 
   it("returns empty state when nothing is stored or storage is unavailable", () => {
-    expect(parseWebuiComposerPersisted(memoryStorage().getItem("webui.composer.state.v1"))).toEqual({
+    expect(parseWebuiComposerPersisted(createWebuiMemoryStorage().getItem("webui.composer.state.v1"))).toEqual({
       drafts: {},
       history: {},
     });
@@ -144,7 +132,7 @@ describe("persisted composer store", () => {
   });
 
   it("tolerates corrupt payloads by falling back to empty state", () => {
-    const storage = memoryStorage();
+    const storage = createWebuiMemoryStorage();
     storage.setItem("webui.composer.state.v1", "{not json");
     expect(parseWebuiComposerPersisted(storage.getItem("webui.composer.state.v1"))).toEqual({
       drafts: {},
@@ -153,7 +141,7 @@ describe("persisted composer store", () => {
   });
 
   it("sanitizes non-object shapes inside a valid envelope", () => {
-    const storage = memoryStorage();
+    const storage = createWebuiMemoryStorage();
     storage.setItem(
       "webui.composer.state.v1",
       JSON.stringify({ drafts: "nope", history: [1, 2] }),
@@ -165,7 +153,7 @@ describe("persisted composer store", () => {
   });
 
   it("keeps only string values, trims keys, drops blanks", () => {
-    const storage = memoryStorage();
+    const storage = createWebuiMemoryStorage();
     storage.setItem(
       "webui.composer.state.v1",
       JSON.stringify({
@@ -237,7 +225,7 @@ describe("persisted composer store", () => {
   });
 
   it("keeps the active keys alive through a save's prune", () => {
-    const storage = memoryStorage();
+    const storage = createWebuiMemoryStorage();
     const drafts: Record<string, string> = {};
     const history: Record<string, string[]> = {};
     for (let i = 0; i < 60; i += 1) drafts[`s-${i}`] = "d";
@@ -276,13 +264,7 @@ describe("migrateWebuiHomeComposerState", () => {
 
 describe("composer persistence ownership", () => {
   it("persists through an injected infrastructure adapter", () => {
-    const values = new Map<string, string>();
-    const browser = {
-      getItem: (key: string) => values.get(key) ?? null,
-      setItem: (key: string, value: string) => { values.set(key, value); },
-      removeItem: (key: string) => { values.delete(key); },
-    } as Storage;
-    const adapter = createWebuiBrowserStorage(browser);
+    const adapter = createWebuiBrowserStorage(createWebuiMemoryStorage());
     const composer = createWebuiComposerStore({ storage: adapter });
     composer.setDraft("home", "draft");
     composer.recordInput("home", "sent");

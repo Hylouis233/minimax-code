@@ -1,3 +1,4 @@
+import { createWebuiMemoryStorage } from "./support/memory-storage.js";
 import { beforeEach, describe, expect, it } from "vitest";
 import { readSessionOverlay, toggleSessionOverlay } from "../../src/client/components/LeftRail.js";
 import {
@@ -9,20 +10,8 @@ import {
   readWebuiUnreadCounts,
 } from "../../src/client/infrastructure/storage.js";
 
-function createMemoryLocalStorage(): Storage {
-  const values = new Map<string, string>();
-  return {
-    get length() { return values.size; },
-    clear() { values.clear(); },
-    getItem(key) { return values.get(key) ?? null; },
-    key(index) { return [...values.keys()][index] ?? null; },
-    removeItem(key) { values.delete(key); },
-    setItem(key, value) { values.set(key, String(value)); },
-  };
-}
-
 beforeEach(() => {
-  globalThis.localStorage = createMemoryLocalStorage();
+  globalThis.localStorage = createWebuiMemoryStorage();
 });
 
 describe("team mode lock contract", () => {
@@ -79,7 +68,7 @@ describe("team mode lock contract", () => {
   });
 
   it("routes generic preferences through the injected storage adapter", () => {
-    const backing = createMemoryLocalStorage();
+    const backing = createWebuiMemoryStorage();
     const storage = createWebuiBrowserStorage(backing);
     storage.setItem("webui-theme", "dark");
     expect(storage.getItem("webui-theme")).toBe("dark");
@@ -129,7 +118,7 @@ describe("team mode lock contract", () => {
   });
 
   it("persists unread counts through the injected storage adapter", () => {
-    const backing = createMemoryLocalStorage();
+    const backing = createWebuiMemoryStorage();
     const storage = createWebuiBrowserStorage(backing);
     storage.writeUnreadCounts({ sessionA: 2, sessionB: 0 });
     expect(storage.readUnreadCounts()).toEqual({ sessionA: 2 });

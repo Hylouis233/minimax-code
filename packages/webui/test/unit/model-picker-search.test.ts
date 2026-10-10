@@ -11,6 +11,7 @@
 // menu starts closed and `renderToStaticMarkup` cannot open it, so the search
 // INPUT is pinned by the pure functions and by typecheck rather than by a
 // rendered assertion; that boundary is deliberate and is not covered elsewhere.
+import { createWebuiMemoryStorage } from "./support/memory-storage.js";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
@@ -351,13 +352,7 @@ describe("model picker favourites — persistence", () => {
   });
 
   it("normalizes favorite ids at the infrastructure storage boundary", () => {
-    const values = new Map<string, string>();
-    const browser = {
-      getItem: (key: string) => values.get(key) ?? null,
-      setItem: (key: string, value: string) => { values.set(key, value); },
-      removeItem: (key: string) => { values.delete(key); },
-    } as Storage;
-    const storage = createWebuiBrowserStorage(browser);
+    const storage = createWebuiBrowserStorage(createWebuiMemoryStorage());
     storage.writeFavoriteModels([" a ", "", "a", "b"], normalizeFavoriteModelIds);
     expect(storage.readFavoriteModels(normalizeFavoriteModelIds)).toEqual(["a", "b"]);
   });
