@@ -45,6 +45,14 @@ surface, and it is recorded in the suite's expectations instead.
 Blob id is `git rev-parse 89907fb3:<source path>` (first 12 digits), so any file
 here can be re-verified against the baseline rather than trusted.
 
+`Baseline source` is the path **at `89907fb3`**, not today's path, and several of
+them no longer exist: the refactor moved or deleted the live counterparts
+(`client/contracts.ts`, the `server/commands/` pair, `server/port.ts`, the two
+`server/projections/` files, …). That is expected — this table records where each
+frozen copy came from, and the frozen copy is the record of what the wire did.
+Read a missing path as "this file has since moved or gone", not as a broken
+entry, and do not repoint it: the blob id would stop resolving.
+
 | Frozen path | Baseline source | Blob |
 | --- | --- | --- |
 | `client/contracts.ts` | `packages/webui/src/client/contracts.ts` | `c7d88ad19dfb` |

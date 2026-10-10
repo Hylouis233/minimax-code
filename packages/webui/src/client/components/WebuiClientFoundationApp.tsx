@@ -3,12 +3,11 @@
 // `main.tsx` mounts.
 //
 // W3 tier 5 lift: this component (plus `useSelectedSessionId`,
-// `subscribeToSessionHash`, `WebuiClientFoundationAppProps`) was moved
-// verbatim out of `app.tsx`. The body is byte-identical to what used to
-// live there; the lift is move-only. `app.tsx` keeps a thin re-export
-// block so existing consumers (`webui-transcript-widgets-integration.test.ts`,
-// `main.tsx`'s default-import) keep their current import path during the
-// W3 wave.
+// `subscribeToSessionHash`, `WebuiClientFoundationAppProps`) was moved verbatim
+// into this file from the module that used to hold the shell — `app.tsx`, which
+// this file replaced. The body is byte-identical to what used to live there;
+// the lift was move-only, and `main.tsx` and
+// `webui-transcript-widgets-integration.test.ts` import from here.
 
 import {
   useCallback,

@@ -3,11 +3,10 @@
 // `groupWebuiSessionsByWorkspace`, `sortWebuiProjectSessionIds`,
 // `WebuiProjectGroup`).
 //
-// W3 tier 3 lift: this cluster (2 components + 4 helpers) was moved
-// verbatim out of `app.tsx`. The bodies are byte-identical to what used
-// to live there; the lift is move-only. `app.tsx` keeps a thin re-export
-// block so existing consumers (`webui-shell.test.ts`, importers via
-// `app.tsx`) keep their current import path during the W3 wave.
+// W3 tier 3 lift: this cluster (2 components + 4 helpers) was moved verbatim out
+// of the module that used to hold the shell — `app.tsx`, since replaced by
+// `WebuiClientFoundationApp.tsx`. The bodies are byte-identical to what used to
+// live there; the lift was move-only, and consumers import them from this file.
 
 import {
   useEffect,

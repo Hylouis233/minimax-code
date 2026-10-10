@@ -10,8 +10,8 @@
 /**
  * Hash helpers used by the shell. `main.tsx` also calls
  * `readSessionIdFromHash` for the SSR snapshot, so the symbol is re-exported
- * from `app.tsx` for back-compat (W2 moved it here from the original
- * `url.ts`; the Tier 5 move keeps it co-located with `WebuiClientFoundationApp`).
+ * from `WebuiClientFoundationApp.tsx` for back-compat (W2 moved it here from the
+ * original `url.ts`; the Tier 5 move kept it co-located with the shell).
  */
 export function readSessionIdFromHash(hash: string): string | undefined {
   const params = new URLSearchParams(
