@@ -62,8 +62,6 @@ function readEnvFlag(name: string): boolean {
 
 export interface WebuiServiceOptions {
   readonly port: WebuiHarnessPort;
-  /** Defaults to the protocol version the wire envelope ships. */
-  readonly protocolVersion?: number;
   /**
    * Loopback host the service binds to. The service refuses to start
    * when this is anything other than `127.0.0.1`, `localhost`, `::1` or
@@ -122,7 +120,6 @@ export class WebuiService {
   private readonly maxMessageBytes: number;
   private readonly webSocketHeartbeatIntervalMs: number;
   private readonly credential: WebuiCredential;
-  private readonly protocolVersion: number;
   private readonly dev: boolean;
   private readonly clientDirOverride: string | undefined;
   private readonly operations: ReadonlyMap<string, WebuiOperationRegistryEntry>;
@@ -146,7 +143,6 @@ export class WebuiService {
     this.webSocketHeartbeatIntervalMs =
       options.webSocketHeartbeatIntervalMs ?? WEBUI_WEBSOCKET_HEARTBEAT_INTERVAL_MS;
     this.credential = options.credential ?? createWebuiCredential();
-    this.protocolVersion = options.protocolVersion ?? WEBUI_PROTOCOL_VERSION;
     // The option is the source of truth for tests; the env var is the
     // convenience for the dev preview launcher. The option must win
     // when both are set so a test that pins `dev: false` cannot be
