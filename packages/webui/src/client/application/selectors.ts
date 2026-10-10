@@ -7,6 +7,7 @@
 // shape of the whole application state.
 
 import type { WebuiGoal } from "../../shared/contracts/goal.js";
+import type { WebuiClientMessagePage } from "../contracts/message-view.js";
 import type {
   WebuiPendingPermission,
   WebuiQuestionnaireRequest,
@@ -87,3 +88,22 @@ export function selectWebuiSelectedSessionId(
 ): string | undefined {
   return state.selectedSessionId;
 }
+
+/**
+ * The session's transcript page, or an empty page when the session is unknown.
+ *
+ * The transcript history owner (plan §7.1 `application/transcript-history.ts`)
+ * owns the `loadMessages` RPC and commits each answer here. A reader that needs
+ * the history — the shell's workspace-progress backfill, for one — projects this
+ * slice instead of fetching a second copy, so the RPC, its request fence and its
+ * error state stay with one owner.
+ */
+export function selectWebuiSessionTranscriptPage(
+  state: WebuiApplicationState,
+  sessionId: string | undefined,
+): WebuiClientMessagePage {
+  if (!sessionId) return emptyTranscriptPage;
+  return state.sessions.get(sessionId)?.transcript.page ?? emptyTranscriptPage;
+}
+
+const emptyTranscriptPage: WebuiClientMessagePage = {};

@@ -22,6 +22,7 @@
 // unit-tested against a scripted port.
 
 import type { SettingsPort } from "../contracts/settings-port.js";
+import type { WebuiVersionInfo } from "../../shared/contracts/version.js";
 import type { WebuiModelEntry } from "../../shared/contracts/models.js";
 import type {
   WebuiAgentMemoryView,
@@ -63,6 +64,7 @@ export type WebuiSettingsPortSlice = Pick<
   | "startCodexOAuthLogin"
   | "cancelCodexOAuthLogin"
   | "refreshModels"
+  | "version"
 >;
 
 export interface WebuiSettingsQueryState<T> {
@@ -88,6 +90,14 @@ export interface WebuiSettingsWorkflowsState {
   readonly apiKeyStatus: WebuiSettingsQueryState<Record<string, unknown>>;
   readonly codexOAuth: WebuiSettingsQueryState<Record<string, unknown>>;
   readonly modelSource: WebuiSettingsQueryState<WebuiModelSource>;
+  /**
+   * The runtime handshake fact (version, protocolVersion, dataDir).
+   *
+   * It is a `SettingsPort` method like any other, so it is read through this
+   * owner rather than invoked by a component: the shell and the surfaces it
+   * feeds read `runtimeVersion.value` from the snapshot.
+   */
+  readonly runtimeVersion: WebuiSettingsQueryState<WebuiVersionInfo>;
 }
 
 function idle<T>(): WebuiSettingsQueryState<T> {
@@ -107,6 +117,7 @@ export const initialWebuiSettingsWorkflowsState: WebuiSettingsWorkflowsState = {
   apiKeyStatus: idle(),
   codexOAuth: idle(),
   modelSource: idle(),
+  runtimeVersion: idle(),
 };
 
 function message(reason: unknown): string {
@@ -135,6 +146,13 @@ export interface WebuiSettingsWorkflows {
   readonly canStartCodexOAuth: boolean;
   readonly canReadModelSource: boolean;
   readonly canSetModelSource: boolean;
+  readonly canReadVersion: boolean;
+
+  /**
+   * Read the runtime handshake fact. A superseded answer is dropped, exactly
+   * like every other cached read here.
+   */
+  readonly loadVersion: () => Promise<void>;
 
   readonly loadInstructions: () => Promise<void>;
   /** Save; returns the runtime's answer and refreshes the cached read. */
@@ -237,7 +255,8 @@ export function createWebuiSettingsWorkflows(deps: {
     | "presets"
     | "apiKeyStatus"
     | "codexOAuth"
-    | "modelSource";
+    | "modelSource"
+    | "runtimeVersion";
 
   /** Store a query result under its field, keeping the state type honest. */
   const withQuery = <T>(
@@ -556,6 +575,15 @@ export function createWebuiSettingsWorkflows(deps: {
     return result;
   };
 
+  const loadVersion = async (): Promise<void> => {
+    const read = port.version;
+    if (!read) {
+      unavailable("runtimeVersion", "当前运行时不支持版本信息。");
+      return;
+    }
+    await readInto("runtimeVersion", "runtimeVersion", () => read());
+  };
+
   return {
     getSnapshot: () => state,
     subscribe: (listener) => {
@@ -582,6 +610,7 @@ export function createWebuiSettingsWorkflows(deps: {
     canStartCodexOAuth: port.startCodexOAuthLogin !== undefined,
     canReadModelSource: port.getMiniMaxModelSource !== undefined,
     canSetModelSource: port.setMiniMaxModelSource !== undefined,
+    canReadVersion: port.version !== undefined,
     loadInstructions,
     saveInstructions,
     loadProfile,
@@ -612,5 +641,6 @@ export function createWebuiSettingsWorkflows(deps: {
     loadModelSource,
     setModelSource,
     refreshModels,
+    loadVersion,
   };
 }

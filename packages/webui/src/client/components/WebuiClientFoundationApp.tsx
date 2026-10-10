@@ -78,6 +78,10 @@ import {
   WebuiIconSites,
 } from "../icons.js";
 import type { WebuiClientSession, WebuiClientSessionPage, WebuiClientProject } from "../contracts/session-view.js";
+import type {
+  WebuiClientMessage,
+  WebuiClientMessagePage,
+} from "../contracts/message-view.js";
 import type { WebuiTransport } from "../contracts/transport.js";
 import type { WebuiTodo } from "./WorkspacePanels.js";
 import type { WebuiUsageQuotaResult } from "../../shared/contracts/usage-quota.js";
@@ -99,7 +103,10 @@ import {
   selectWebuiCatalogTreePage,
 } from "../application/session-catalog.js";
 import { createWebuiSessionWorkflows } from "../application/session-workflows.js";
-import { selectWebuiSessionStream } from "../application/selectors.js";
+import {
+  selectWebuiSessionStream,
+  selectWebuiSessionTranscriptPage,
+} from "../application/selectors.js";
 import { WEBUI_HOME_SESSION_KEY } from "../application/state.js";
 import { createWebuiEventEffectsRegistry } from "../application/event-effects-registry.js";
 import { WebuiApplicationProvider } from "../bindings/application-context.js";
@@ -154,13 +161,14 @@ export interface WebuiClientFoundationAppProps {
   readonly version?: WebuiVersionInfo;
   readonly sessionPage?: WebuiClientSessionPage;
   /** Seed for the transcript so SSR / first paint can render messages before
-   * `loadMessages` resolves; production always re-fetches in the background
-   * so the prop only changes the initial paint, not the source of truth. */
-  readonly initialMessages?: import("../contracts/message-view.js").WebuiClientMessagePage;
+   * the transcript history owner's `loadMessages` resolves; production always
+   * re-fetches in the background so the prop only changes the initial paint,
+   * not the source of truth. */
+  readonly initialMessages?: WebuiClientMessagePage;
   /** Seed for the conversation usage banner so SSR / first paint can render
-   * it before `getUsageQuota` resolves; production always re-fetches in the
-   * background so the prop only changes the initial paint, not the source
-   * of truth.
+   * it before the account owner's `getUsageQuota` resolves; production always
+   * re-fetches in the background so the prop only changes the initial paint,
+   * not the source of truth.
    */
   readonly initialUsageQuota?: WebuiUsageQuotaResult;
   readonly locationHash?: string;
@@ -258,13 +266,9 @@ export function WebuiClientFoundationApp(
   // read directly off `transport` at the JSX consumption point — see the
   // 67-rebind classification table in the revision report.
   const loadMessages = transport?.loadMessages;
-  const getUsageQuota = transport?.getUsageQuota;
-  const getVersion = transport?.version;
   const getSessionForkOptions = transport?.getSessionForkOptions;
   const forkSession = transport?.forkSession;
 
-  const [runtimeVersion, setRuntimeVersion] = useState(version);
-  useEffect(() => { if (!runtimeVersion && getVersion) void getVersion().then(setRuntimeVersion); }, [getVersion, runtimeVersion]);
   // The one session catalog (plan §7.6 "Flat/tree queries"; ticket #49). The
   // shell subscribes to the store's catalog slice and resolves the flat and
   // tree pages from it; both views share one entity map, so a rename patches
@@ -341,10 +345,39 @@ export function WebuiClientFoundationApp(
     () => createWebuiSettingsWorkflows({ port: transport ?? {} }),
     [transport],
   );
+  // The runtime handshake fact is a `SettingsPort` method, so it is read through
+  // the settings owner like every other settings read rather than invoked here.
+  // The `version` seed prop still wins, so a server-rendered first paint is not
+  // replaced by a second identical fetch.
+  const settingsState = useSyncExternalStore(
+    settingsWorkflows.subscribe,
+    settingsWorkflows.getSnapshot,
+    settingsWorkflows.getSnapshot,
+  );
+  const runtimeVersion = version ?? settingsState.runtimeVersion.value;
+  useEffect(() => {
+    if (runtimeVersion || !settingsWorkflows.canReadVersion) return;
+    void settingsWorkflows.loadVersion();
+  }, [runtimeVersion, settingsWorkflows]);
   const pluginWorkflows = useMemo(
     () => createWebuiPluginWorkflows({ port: transport ?? {} }),
     [transport],
   );
+  // The usage quota is an `AccountPort` method, so it is read through the
+  // account owner that already caches it for the user menu and the settings
+  // dialog. The shell used to hold its own copy, fetched independently, with
+  // its own `cancelled` flag and its own error handling — so the banner and the
+  // menu could disagree about the same answer.
+  const accountState = useSyncExternalStore(
+    accountWorkflows.subscribe,
+    accountWorkflows.getSnapshot,
+    accountWorkflows.getSnapshot,
+  );
+  const usageQuota = accountState.usage.result ?? initialUsageQuota;
+  useEffect(() => {
+    if (!accountWorkflows.canReadUsage) return;
+    void accountWorkflows.loadUsage();
+  }, [accountWorkflows]);
   // Which surface the main column renders. Plugin management replaces the
   // conversation rather than floating above it, so the rail stays the only way
   // back out of it — every conversation navigation has to return here.
@@ -412,9 +445,6 @@ export function WebuiClientFoundationApp(
     useState<TeamModeSessionChoices>(browserStorage.readTeamModeSessionChoices);
   const pageError = catalog.flat.error;
   const setPageError = sessionWorkflows.setError;
-  const [usageQuota, setUsageQuota] = useState<WebuiUsageQuotaResult | undefined>(
-    () => initialUsageQuota,
-  );
   const [dismissedUsageNoticeKey, setDismissedUsageNoticeKey] = useState<
     string | undefined
   >();
@@ -447,8 +477,31 @@ export function WebuiClientFoundationApp(
         selectedSessionId ?? WEBUI_HOME_SESSION_KEY,
       ),
   );
-  const [historyProgress, setHistoryProgress] =
-    useState<WebuiWorkspaceProgressState>(initialWebuiWorkspaceProgress);
+  // The workspace-progress backfill, derived rather than fetched.
+  //
+  // The shell used to call `transport.loadMessages` itself and keep the answer
+  // in local state, with its own `cancelled` flag — a second reader of an RPC
+  // the transcript history owner (`application/transcript-history.ts`) already
+  // owns, fetches and commits into the session store. It now projects the
+  // owner's committed page, so the RPC, its request fence and its error state
+  // have one owner and one caller. `SessionTranscript` still drives the load
+  // when the transcript is mounted; when it is not, there is no history to
+  // project and the projection is the initial state.
+  const transcriptPage = useSyncExternalStore(
+    sessionStore.subscribe,
+    () => selectWebuiSessionTranscriptPage(sessionStore.getSnapshot(), selectedSessionId),
+    () => selectWebuiSessionTranscriptPage(sessionStore.getSnapshot(), selectedSessionId),
+  );
+  const historyProgress = useMemo<WebuiWorkspaceProgressState>(
+    () =>
+      selectedSessionId
+        ? projectWebuiWorkspaceHistory(
+            (transcriptPage.messages ?? []) as readonly WebuiClientMessage[],
+            selectedSessionId,
+          )
+        : initialWebuiWorkspaceProgress,
+    [selectedSessionId, transcriptPage.messages],
+  );
   // Sessions visible to lookups: roots from the flat page plus any child
   // sessions surfaced through the tree projection. Without the tree the
   // flat list is the only source, matching the original behaviour.
@@ -470,23 +523,6 @@ export function WebuiClientFoundationApp(
     flatSessionsWithChildren.find((session) => session.sessionId === selectedSessionId)
       ?.agentName ?? "main";
   useEffect(() => {
-    if (!selectedSessionId || !loadMessages) {
-      setHistoryProgress(initialWebuiWorkspaceProgress);
-      return;
-    }
-    let cancelled = false;
-    void loadMessages({ id: selectedSessionId }).then((result) => {
-      if (!cancelled)
-        setHistoryProgress(
-          projectWebuiWorkspaceHistory(
-            (result.messages ?? []) as unknown as readonly import("../contracts/message-view.js").WebuiClientMessage[],
-            selectedSessionId,
-          ),
-        );
-    }).catch(() => { if (!cancelled) setHistoryProgress(initialWebuiWorkspaceProgress); });
-    return () => { cancelled = true; };
-  }, [loadMessages, selectedSessionId]);
-  useEffect(() => {
     browserStorage.writeTeamModeOff(teamModeOff);
   }, [browserStorage, teamModeOff]);
   useEffect(() => {
@@ -501,27 +537,10 @@ export function WebuiClientFoundationApp(
     if (!sessionWorkflows.canLoadTree || sessionPage) return;
     void sessionWorkflows.loadTree();
   }, [sessionWorkflows, sessionPage]);
-  // Cloud usage quota for the conversation banner. The runtime exposes
-  // getUsageQuota when a bearer lease is available; we only fetch once per
-  // session switch so the banner reflects the user's current state without
-  // re-fetching on every render.
-  useEffect(() => {
-    if (!getUsageQuota) {
-      setUsageQuota(undefined);
-      return undefined;
-    }
-    let cancelled = false;
-    void getUsageQuota()
-      .then((next) => {
-        if (!cancelled) setUsageQuota(next);
-      })
-      .catch(() => {
-        if (!cancelled) setUsageQuota(undefined);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [getUsageQuota]);
+  // Cloud usage quota for the conversation banner comes from the account owner
+  // (`accountState.usage.result` above): it is loaded once there, on mount, and
+  // shared with the user menu and the settings dialog instead of being fetched
+  // a second time for the banner alone.
   const treeSubagents = useMemo<readonly WebuiWorkspaceSubagent[]>(() => {
     const node = treePage.sessions.find(
       (candidate) => candidate.session.sessionId === selectedSessionId,

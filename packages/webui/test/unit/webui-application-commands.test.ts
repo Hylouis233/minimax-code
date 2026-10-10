@@ -24,7 +24,12 @@ import {
 import { initialWebuiStreamState } from "../../src/client/projection/stream-state.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 import { createWebuiTranscriptHistoryOwner } from "../../src/client/application/transcript-history.js";
+import { selectWebuiSessionTranscriptPage } from "../../src/client/application/selectors.js";
+import { createWebuiAccountWorkflows } from "../../src/client/application/account-workflows.js";
+import { createWebuiSettingsWorkflows } from "../../src/client/application/settings-workflows.js";
 import type { WebuiClientMessagePage } from "../../src/client/contracts/message-view.js";
+import type { WebuiUsageQuotaResult } from "../../src/shared/contracts/usage-quota.js";
+import type { WebuiVersionInfo } from "../../src/shared/contracts/version.js";
 import type { WebuiSessionActivityMap } from "../../src/client/projection/session-activity.js";
 import type { WebuiActiveTurn } from "../../src/shared/contracts/session.js";
 import type { WebuiRuntimeEvent } from "../../src/shared/contracts/stream.js";
@@ -77,6 +82,98 @@ describe("application-owned transcript history", () => {
     expect(store.readSession("B").transcript.page.messages?.map((message) => message.msgId))
       .toEqual(["B-message"]);
     expect(store.readSession("A").transcript.page.messages).toBeUndefined();
+  });
+
+  // The shell's workspace-progress backfill reads this slice instead of
+  // fetching a second copy: the owner is the one reader of `loadMessages`, so
+  // a superseded request must not resurface through the projection either.
+  it("does not resurface a fenced response through the transcript-page selector", async () => {
+    let resolveA: (page: WebuiClientMessagePage) => void = () => {};
+    const store = createWebuiSessionStore();
+    const owner = createWebuiTranscriptHistoryOwner({
+      store,
+      loadMessages: vi.fn(
+        ({ id }: { readonly id: string; readonly before?: string }): Promise<WebuiClientMessagePage> =>
+          id === "A"
+            ? new Promise((resolve) => { resolveA = resolve; })
+            : Promise.resolve({ messages: [{ msgId: "B-message" }] }),
+      ),
+    });
+    const loadA = owner.loadPage("A");
+    await expect(owner.loadPage("B")).resolves.toMatchObject({ status: "applied" });
+    resolveA({ messages: [{ msgId: "A-late" }] });
+    await expect(loadA).resolves.toEqual({ status: "stale" });
+
+    // What the shell now reads: session B's committed page, and nothing at all
+    // for the session whose request was fenced.
+    expect(
+      selectWebuiSessionTranscriptPage(store.getSnapshot(), "B").messages?.map(
+        (message) => message.msgId,
+      ),
+    ).toEqual(["B-message"]);
+    expect(
+      selectWebuiSessionTranscriptPage(store.getSnapshot(), "A").messages,
+    ).toBeUndefined();
+    // An unknown session reads the shared empty page rather than throwing.
+    expect(selectWebuiSessionTranscriptPage(store.getSnapshot(), undefined)).toEqual({});
+  });
+});
+
+describe("application-owned runtime facts", () => {
+  it("reads the usage quota through the account owner, with a superseded answer dropped", async () => {
+    // The shell used to hold its own `usageQuota` state and call
+    // `transport.getUsageQuota` with its own `cancelled` flag, so the banner
+    // and the user menu could disagree about one answer.
+    const pending: Array<(result: WebuiUsageQuotaResult) => void> = [];
+    const getUsageQuota = vi.fn(
+      (): Promise<WebuiUsageQuotaResult> =>
+        new Promise((resolve) => { pending.push(resolve); }),
+    );
+    const workflows = createWebuiAccountWorkflows({ port: { getUsageQuota } });
+    expect(workflows.canReadUsage).toBe(true);
+
+    const first = workflows.loadUsage();
+    const second = workflows.loadUsage();
+    expect(getUsageQuota).toHaveBeenCalledTimes(2);
+    expect(workflows.getSnapshot().usage).toEqual({ status: "loading" });
+
+    // The superseded answer is dropped rather than applied over the newer one.
+    const superseded = pending[0];
+    const current = pending[1];
+    expect(superseded).toBeDefined();
+    expect(current).toBeDefined();
+    superseded?.({ signedIn: true });
+    await first;
+    expect(workflows.getSnapshot().usage).toEqual({ status: "loading" });
+
+    current?.({ signedIn: false });
+    await second;
+    expect(workflows.getSnapshot().usage).toEqual({
+      status: "ready",
+      result: { signedIn: false },
+    });
+  });
+
+  it("reads the runtime version through the settings owner", async () => {
+    const version: WebuiVersionInfo = { version: "0.6.3", protocolVersion: 3 };
+    const workflows = createWebuiSettingsWorkflows({
+      port: { version: vi.fn(async () => version) },
+    });
+    expect(workflows.canReadVersion).toBe(true);
+    expect(workflows.getSnapshot().runtimeVersion).toEqual({ status: "idle" });
+
+    await workflows.loadVersion();
+    expect(workflows.getSnapshot().runtimeVersion).toEqual({
+      status: "ready",
+      value: version,
+    });
+  });
+
+  it("reports an unwired version port rather than leaving the reader waiting", async () => {
+    const workflows = createWebuiSettingsWorkflows({ port: {} });
+    expect(workflows.canReadVersion).toBe(false);
+    await workflows.loadVersion();
+    expect(workflows.getSnapshot().runtimeVersion.status).toBe("error");
   });
 });
 
