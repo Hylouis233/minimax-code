@@ -4,7 +4,7 @@
 // bodies are unchanged, only the module boundary moved.
 import type { WebuiHarnessPort } from "../port.js";
 import type { WebuiRuntimeHostHandle } from "./host-contract.js";
-import { requireCliService } from "./requirements.js";
+import { requireCliService, requireHostSlot } from "./requirements.js";
 
 export function createExecutionAdapter(
   host: WebuiRuntimeHostHandle,
@@ -71,11 +71,11 @@ export function createExecutionAdapter(
       // be specific (the `/compact` slash command tells the user the host
       // does not support conversation compaction; folding the two errors
       // into one would only mention the CLI service).
-      if (!host.cliService)
-        throw new Error("runtime host does not expose the CLI service");
-      if (!host.cliService.requestCompaction)
-        throw new Error("runtime host does not expose requestCompaction");
-      return host.cliService.requestCompaction(request);
+      const cliService = requireCliService(host);
+      return requireHostSlot(
+        cliService.requestCompaction,
+        "requestCompaction",
+      ).call(cliService, request);
     },
   };
 }

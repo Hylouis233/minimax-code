@@ -3829,6 +3829,7 @@
     "packages/webui/test/unit/first-party-signature.test.ts",
     "packages/webui/test/unit/fork-session-operation.test.ts",
     "packages/webui/test/unit/global-instructions-operation.test.ts",
+    "packages/webui/test/unit/harness-host-slots.test.ts",
     "packages/webui/test/unit/interaction-coordinator.test.ts",
     "packages/webui/test/unit/legacy-protocol/README.md",
     "packages/webui/test/unit/legacy-protocol/client/contracts.ts",

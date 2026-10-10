@@ -13,7 +13,7 @@ import {
 } from "../workspace-archive.js";
 import type { WebuiHarnessPort } from "../port.js";
 import type { WebuiRuntimeHostHandle } from "./host-contract.js";
-import { requireCliService } from "./requirements.js";
+import { requireCliService, requireHostSlot } from "./requirements.js";
 import type {
   WebuiWorkspaceFile,
   WebuiWorkspaceFileContent,
@@ -32,7 +32,11 @@ export function createWorkspaceAdapter(
 ): Pick<WebuiHarnessPort, "listWorkspaceFileTree" | "readWorkspaceArchive" | "extractWorkspaceArchive" | "readWorkspaceFile" | "getWorkspaceEnvironment" | "mutateWorkspaceGit" | "getWorkspaceReviewSummary" | "listWorkspaceReviewFileDiffs" | "getWorkspaceReviewFileContent" | "searchWorkspaceReviewDiffs" | "readCanvas" | "applyCanvas"> {
   return {
     async listWorkspaceFileTree(request) {
-      const tree = await requireCliService(host).listWorkspaceFileTree!(request) as readonly WebuiWorkspaceFile[];
+      const cliService = requireCliService(host);
+      const tree = await requireHostSlot(
+        cliService.listWorkspaceFileTree,
+        "Workspace file listing",
+      ).call(cliService, request) as readonly WebuiWorkspaceFile[];
       // The runtime reports names and shape but no file facts, while the port
       // contract now promises `size` and `modifiedAt` for the panel's metadata
       // column. Statted here because this is the one place that sees both the
@@ -114,9 +118,11 @@ export function createWorkspaceAdapter(
 
     async getWorkspaceEnvironment(request) {
       const cliService = requireCliService(host);
-      if (!cliService.getWorkspaceGitEnvironment)
-        throw new Error("runtime host does not expose Workspace git state");
-      const { metadata, changes } = await cliService.getWorkspaceGitEnvironment(request.workspaceDir);
+      const getWorkspaceGitEnvironment = requireHostSlot(
+        cliService.getWorkspaceGitEnvironment,
+        "Workspace git state",
+      );
+      const { metadata, changes } = await getWorkspaceGitEnvironment.call(cliService, request.workspaceDir);
       return {
         isGitRepo: changes.isGitRepo === true || metadata.isGitRepo === true,
         ...(typeof metadata.branch === "string" ? { branch: metadata.branch } : {}),
@@ -134,41 +140,63 @@ export function createWorkspaceAdapter(
 
     async mutateWorkspaceGit(request) {
       const cliService = requireCliService(host);
-      if (!cliService.mutateWorkspaceGit)
-        throw new Error("runtime host does not expose Workspace git mutations");
-      return cliService.mutateWorkspaceGit(request);
+      const mutateWorkspaceGit = requireHostSlot(
+        cliService.mutateWorkspaceGit,
+        "Workspace git mutations",
+      );
+      return mutateWorkspaceGit.call(cliService, request);
     },
 
     async getWorkspaceReviewSummary(request) {
       const cliService = requireCliService(host);
-      if (!cliService.getWorkspaceReviewSummary) throw new Error("runtime host does not expose Workspace review summaries");
-      return cliService.getWorkspaceReviewSummary(request.workspaceDir) as Promise<WebuiWorkspaceReviewSummary>;
+      const getWorkspaceReviewSummary = requireHostSlot(
+        cliService.getWorkspaceReviewSummary,
+        "Workspace review summaries",
+      );
+      return getWorkspaceReviewSummary.call(cliService, request.workspaceDir) as Promise<WebuiWorkspaceReviewSummary>;
     },
 
     async listWorkspaceReviewFileDiffs(request) {
       const cliService = requireCliService(host);
-      if (!cliService.listWorkspaceReviewFileDiffs) throw new Error("runtime host does not expose Workspace review file diffs");
-      return cliService.listWorkspaceReviewFileDiffs({ ...request, fileIds: [...request.fileIds] }) as Promise<WebuiWorkspaceReviewDiffs>;
+      const listWorkspaceReviewFileDiffs = requireHostSlot(
+        cliService.listWorkspaceReviewFileDiffs,
+        "Workspace review file diffs",
+      );
+      return listWorkspaceReviewFileDiffs.call(cliService, { ...request, fileIds: [...request.fileIds] }) as Promise<WebuiWorkspaceReviewDiffs>;
     },
 
     async getWorkspaceReviewFileContent(request) {
       const cliService = requireCliService(host);
-      if (!cliService.getWorkspaceReviewFileContent) throw new Error("runtime host does not expose Workspace review file content");
-      return cliService.getWorkspaceReviewFileContent(request) as Promise<WebuiWorkspaceReviewFileContent>;
+      const getWorkspaceReviewFileContent = requireHostSlot(
+        cliService.getWorkspaceReviewFileContent,
+        "Workspace review file content",
+      );
+      return getWorkspaceReviewFileContent.call(cliService, request) as Promise<WebuiWorkspaceReviewFileContent>;
     },
 
     async searchWorkspaceReviewDiffs(request) {
       const cliService = requireCliService(host);
-      if (!cliService.searchWorkspaceReviewDiffs) throw new Error("runtime host does not expose Workspace review search");
-      return cliService.searchWorkspaceReviewDiffs(request) as Promise<WebuiWorkspaceReviewSearchResult>;
+      const searchWorkspaceReviewDiffs = requireHostSlot(
+        cliService.searchWorkspaceReviewDiffs,
+        "Workspace review search",
+      );
+      return searchWorkspaceReviewDiffs.call(cliService, request) as Promise<WebuiWorkspaceReviewSearchResult>;
     },
 
     async readCanvas(request) {
-      return requireCliService(host).readCanvas!(request) as Promise<WebuiCanvasDocument>;
+      const cliService = requireCliService(host);
+      return requireHostSlot(cliService.readCanvas, "canvas documents").call(
+        cliService,
+        request,
+      ) as Promise<WebuiCanvasDocument>;
     },
 
     async applyCanvas(request) {
-      return requireCliService(host).applyCanvas!(request as never) as Promise<{ readonly operationId: string; readonly document: WebuiCanvasDocument }>;
+      const cliService = requireCliService(host);
+      return requireHostSlot(cliService.applyCanvas, "canvas writes").call(
+        cliService,
+        request as never,
+      ) as Promise<{ readonly operationId: string; readonly document: WebuiCanvasDocument }>;
     },
   };
 }

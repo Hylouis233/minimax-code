@@ -4,7 +4,7 @@
 // bodies are unchanged, only the module boundary moved.
 import type { WebuiHarnessPort } from "../port.js";
 import type { WebuiRuntimeHostHandle } from "./host-contract.js";
-import { requireCliService } from "./requirements.js";
+import { requireCliService, requireHostSlot } from "./requirements.js";
 
 export function createSessionsAdapter(
   host: WebuiRuntimeHostHandle,
@@ -16,8 +16,11 @@ export function createSessionsAdapter(
 
     async listVisibleProjects(request) {
       const service = requireCliService(host);
-      if (!service.listVisibleProjects) throw new Error("runtime host does not expose project listing");
-      return service.listVisibleProjects(request.limit ?? 100);
+      const listVisibleProjects = requireHostSlot(
+        service.listVisibleProjects,
+        "project listing",
+      );
+      return listVisibleProjects.call(service, request.limit ?? 100);
     },
 
     async getSessionTree(request) {

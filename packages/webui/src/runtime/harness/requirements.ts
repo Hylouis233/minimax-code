@@ -13,16 +13,26 @@ import type { WebuiMemorySettingsView } from "../../shared/contracts/personaliza
  * helper so the failure message is the same as it was before the batch-C
  * seam work.
  */
+/**
+ * Resolve one optional host slot, or fail with the uniform message.
+ *
+ * The slot's name is the caller's, because the message has to say which
+ * capability is missing: `/compact` tells the user the host does not support
+ * compaction, not that its CLI service is absent. Every guard in this group
+ * used to spell the `if (!…) throw` out by hand, which is how three of them
+ * ended up as non-null assertions instead.
+ */
+export function requireHostSlot<T>(value: T | undefined, what: string): T {
+  if (!value) throw new Error(`runtime host does not expose ${what}`);
+  return value;
+}
+
 export function requireCliService(host: WebuiRuntimeHostHandle): WebuiRuntimeCliService {
-  if (!host.cliService)
-    throw new Error("runtime host does not expose the CLI service");
-  return host.cliService;
+  return requireHostSlot(host.cliService, "the CLI service");
 }
 
 export function requireDataDir(host: WebuiRuntimeHostHandle): string {
-  if (!host.dataDir)
-    throw new Error("runtime host does not expose a data directory");
-  return host.dataDir;
+  return requireHostSlot(host.dataDir, "a data directory");
 }
 
 /**

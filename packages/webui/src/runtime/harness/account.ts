@@ -6,53 +6,61 @@
 // capability group.
 import type { WebuiHarnessPort } from "../port.js";
 import type { WebuiRuntimeHostHandle } from "./host-contract.js";
-import { requireCliService } from "./requirements.js";
+import { requireCliService, requireHostSlot } from "./requirements.js";
 
 export function createAccountAdapter(
   host: WebuiRuntimeHostHandle,
 ): Pick<WebuiHarnessPort, "getUsageQuota" | "getSigninPanel" | "claimSignin" | "beginAccountLogin" | "getAccountLoginStatus" | "cancelAccountLogin" | "signOutAccount" | "getAccountStatus" | "getSessionUsage"> {
   return {
     async getUsageQuota(request) {
-      if (!host.getUsageQuota)
-        throw new Error("runtime host does not expose the usage quota client");
-      return host.getUsageQuota(request ?? {});
+      const getUsageQuota = requireHostSlot(
+        host.getUsageQuota,
+        "the usage quota client",
+      );
+      return getUsageQuota.call(host, request ?? {});
     },
 
     async getSigninPanel() {
-      if (!host.getSigninPanel)
-        throw new Error("runtime host does not expose the daily check-in client");
-      return host.getSigninPanel();
+      const getSigninPanel = requireHostSlot(
+        host.getSigninPanel,
+        "the daily check-in client",
+      );
+      return getSigninPanel.call(host);
     },
 
     async claimSignin() {
-      if (!host.claimSignin)
-        throw new Error("runtime host does not expose the daily check-in client");
-      return host.claimSignin();
+      const claimSignin = requireHostSlot(
+        host.claimSignin,
+        "the daily check-in client",
+      );
+      return claimSignin.call(host);
     },
 
     async beginAccountLogin() {
-      if (!host.beginAccountLogin)
-        throw new Error("runtime host does not expose account login");
-      return host.beginAccountLogin();
+      const beginAccountLogin = requireHostSlot(host.beginAccountLogin, "account login");
+      return beginAccountLogin.call(host);
     },
 
     async getAccountLoginStatus() {
-      if (!host.getAccountLoginStatus)
-        throw new Error("runtime host does not expose account login");
-      return host.getAccountLoginStatus();
+      const getAccountLoginStatus = requireHostSlot(
+        host.getAccountLoginStatus,
+        "account login",
+      );
+      return getAccountLoginStatus.call(host);
     },
 
     async cancelAccountLogin() {
-      if (!host.cancelAccountLogin)
-        throw new Error("runtime host does not expose account login");
-      await host.cancelAccountLogin();
+      const cancelAccountLogin = requireHostSlot(
+        host.cancelAccountLogin,
+        "account login",
+      );
+      await cancelAccountLogin.call(host);
       return { ok: true as const };
     },
 
     async signOutAccount() {
-      if (!host.signOutAccount)
-        throw new Error("runtime host does not expose account sign-out");
-      return host.signOutAccount();
+      const signOutAccount = requireHostSlot(host.signOutAccount, "account sign-out");
+      return signOutAccount.call(host);
     },
 
     async getAccountStatus(request) {
