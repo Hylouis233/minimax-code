@@ -22,10 +22,10 @@
 // pinned by reading the component, and the two render branches are pinned by
 // SSR. See 「marketplace page layout parity」 below.
 
+import { readWebuiSource, squashWhitespace } from "./support/source-text.js";
 import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { readFileSync } from "node:fs";
 import { PluginManagement } from "../../src/client/components/PluginManagement.js";
 const marketplace = (initialArea: "plugins" | "skills"): string =>
   renderToStaticMarkup(
@@ -34,17 +34,11 @@ const marketplace = (initialArea: "plugins" | "skills"): string =>
     }),
   );
 
-const component = readFileSync(
-  new URL("../../src/client/components/PluginManagement.tsx", import.meta.url),
-  "utf8",
-);
+const component = squashWhitespace(readWebuiSource("components/PluginManagement.tsx"));
 // The listing composition — the skill-hub paging and its unknowable total —
 // moved into the application plugin owner (ticket #52). The two assertions
 // below pin that behaviour where it now lives, with the same intent.
-const owner = readFileSync(
-  new URL("../../src/client/application/plugin-workflows.ts", import.meta.url),
-  "utf8",
-);
+const owner = squashWhitespace(readWebuiSource("application/plugin-workflows.ts"));
 
 describe("plugin marketplace catalogue", () => {
   it("offers 插件 and 技能 instead of 市场 and 个人", () => {
