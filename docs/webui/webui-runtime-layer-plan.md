@@ -310,6 +310,8 @@ The structure decisions above are not implementable without this section. It fix
 
 Every target path below is relative to `packages/webui/src/`. **Kept** means the file survives at the same path. **Moved** includes import fixups but no behaviour change. **Split from** requires the source to be reduced and callers rewired in the same step — never copied, leaving two implementations. No target file is merely renamed; the 868-line `client/contracts.ts` and the 905-line `server/host.ts` are dissolved, not relocated [E11, E16].
 
+The file names below record where each duty was planned to land; where the implementation settled on a different name for the same duty, the implemented name is the one in this table. Where a duty was not split out at all, it is listed under whichever surviving module absorbed it.
+
 | Layer | Target files | Provenance |
 | --- | --- | --- |
 | `runtime/` | `index.ts` | New: exports the runtime factory, capability interfaces and lifecycle handle only |
@@ -336,7 +338,7 @@ Every target path below is relative to `packages/webui/src/`. **Kept** means the
 | | `commands/descriptors.ts`, `commands/runner.ts` | Moved from `server/commands/`; the runner returns network-independent results |
 | `shared/` | `envelope.ts` | Split from `server/envelope.ts` — frame, protocol version, error codes; validator behaviour separates from constants |
 | | `operation-names.ts` | Moved from `server/operation/names.ts:70` |
-| | `contracts/*.ts` (17 files: session, messages, stream, goal, interactions, queue, workspace, review, canvas, models, providers, account, personalization, terminal, version) | Split from `server/port.ts` DTO declarations, per capability domain |
+| | `contracts/*.ts` (15 files: account, canvas, goal, interactions, messages, models, personalization, queue, review, session, stream, terminal, usage-quota, version, workspace) | Split from `server/port.ts` DTO declarations, per capability domain |
 | | `plugin-management.ts`, `session-transfer-format.ts` | Kept |
 | | `placeholder.ts` | **Deleted** — it has no consumer once real contracts exist |
 | `client/contracts/` | `session-port.ts`, `execution-port.ts`, `interaction-port.ts`, `workspace-port.ts`, `settings-port.ts`, `account-port.ts`, `plugin-port.ts`, `terminal-port.ts` | Split from `client/contracts.ts` — browser capability groups |
@@ -350,7 +352,7 @@ Every target path below is relative to `packages/webui/src/`. **Kept** means the
 | | `session-catalog.ts` | New: normalized entities plus flat/tree membership, cursor, loading and error state |
 | | `session-workflows.ts` | New: create/select/archive/fork/rename/import/export/delete with post-success catalog coordination |
 | | `interaction-coordinator.ts` | New: permission/questionnaire/goal refresh, replies, late-read protection |
-| | `workspace-queries.ts`, `request-ownership.ts`, `composer-store.ts`, `account-workflows.ts`, `settings-workflows.ts`, `plugin-workflows.ts`, `unread.ts` | New; `unread.ts` absorbs the ordering rules now spread across six component effects |
+| | `workspace-queries.ts`, `transcript-request-ownership.ts`, `composer-store.ts`, `account-workflows.ts`, `settings-workflows.ts`, `plugin-workflows.ts`, `unread.ts` | New; `unread.ts` absorbs the ordering rules now spread across six component effects. The request-ownership duty named `request-ownership.ts` here landed as `transcript-request-ownership.ts`: section 7.3 required the projection copy at `client/projection/transcript-request-ownership.ts` to move, not to be deleted |
 | `server/` | `service.ts` | Split from `server/service.ts:122,303,727` — retains HTTP/WS assembly and start/close; holds no OAuth, broker or browser provider |
 | | `http-server.ts` | Split from `service.ts:303,652,686` — HTTP listener lifecycle |
 | | `websocket-server.ts` | Split from `service.ts:305,727,774` — upgrade, socket set, heartbeat, connection close |
@@ -384,7 +386,7 @@ Every target path below is relative to `packages/webui/src/`. **Kept** means the
 | `client/mechanisms/stream-instrumentation.ts` | Moved from `stream-instrumentation.ts` | Stream metrics and diagnostics; changes no business state |
 | `client/bindings/application-context.tsx` | New | React application provider/context |
 | `client/bindings/use-session-state.ts` | Split from `session-runtime-store.ts:166` | React subscription to the session snapshot |
-| `client/bindings/use-query-state.ts` | New | React subscription to catalog, workspace, settings and plugin query snapshots |
+| `client/bindings/use-query-state.tsx` | New | React subscription to catalog, workspace, settings and plugin query snapshots |
 | `client/bindings/use-connection-health.ts` | Split from `connection-health.ts:87` | React subscription to the connection health snapshot |
 | `client/bindings/browser-effects.ts` | Split from `file-line-navigation.ts:7` and component DOM effects | Focus, scroll and browser interaction effects; issues no business RPC |
 | `client/bindings/navigation.ts` | Split from the shell's hash reading and listening | Browser navigation IO |
