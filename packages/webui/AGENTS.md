@@ -196,8 +196,8 @@ Edit in this order so each layer compiles against the previous one:
    calling the host handle.
 5. `shared/operation-names.ts` — the `*_OPERATION_NAME` constant.
 6. `server/operation/<domain>.ts` — the descriptor (validator + `WebuiOperation`).
-7. `server/operation/bind-handlers.ts` — the binding, or the dedicated handler for the thirteen operations that keep one.
-   so a missing handler is a compile error.
+7. `server/operation/bind-handlers.ts` — the binding, or the dedicated handler for the thirteen operations
+   that keep one. Every operation must be bound here, so a descriptor with no binding is a compile error.
 8. `server/operation/operations.ts` — the `registerOperation` call, in the position the order needs.
 9. `client/contracts/<capability>-port.ts` — the method on the right capability port (optional, like
    its neighbours); it reaches `WebuiTransport` through `client/contracts/transport.ts`.

@@ -68,9 +68,12 @@ export function createWebuiEventChannel({
   ): (() => void) => {
     // This socket is the page's only long-lived link while no turn runs, so
     // its health is the user's "am I still connected" signal between turns.
-    // Reported from inside the transport so every watcher — the shell's and
-    // any panel's — counts without each call site wiring callbacks; the
-    // store's ever-healthy rule keeps boot quiet.
+    // Reported from inside the transport so the watcher counts every
+    // subscription without each call site wiring callbacks; the store's
+    // ever-healthy rule keeps boot quiet. There is exactly one subscription
+    // per application instance now (plan §7.7 stage 4): the event
+    // coordinator owns the process-event ingress, and no panel subscribes
+    // to process events directly any more.
     const watcherToken = registerWebuiEventWatcher();
     let stopped = false;
     let socket: WebuiSocket | undefined;

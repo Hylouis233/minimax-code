@@ -1,5 +1,11 @@
 # WebUI client identity: a plan
 
+> **Status:** this file records the state at its own baseline. Paths cited below
+> (`src/server/port.ts`, `src/server/assembly.ts` and others) were relocated by
+> the migration in `docs/webui/webui-runtime-layer-plan.md` and have not been
+> back-filled line by line. The plan and its reasoning still stand; only the
+> paths are stale.
+
 How `packages/webui` gets a formal, testable client identity in the harness
 layer, and what it costs.
 

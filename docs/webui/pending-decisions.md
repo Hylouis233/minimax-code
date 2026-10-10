@@ -1,5 +1,11 @@
 # Pending decisions — WebUI H task (模型与用量)
 
+> **Status:** this file records the state at the H-task baseline. Paths cited
+> below (`server/port.ts`, `client/contracts.ts` and others) were relocated by
+> the migration in `docs/webui/webui-runtime-layer-plan.md` and have not been
+> back-filled line by line. The decisions and their reasoning still stand; only
+> the paths are stale.
+
 Open questions raised while porting roadmap task H from the other WebUI
 implementation onto this repository's `packages/webui`. Each one is a decision
 that was deliberately NOT made, with the reason it is still open and what a

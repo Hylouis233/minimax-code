@@ -1,5 +1,11 @@
 # WebUI TUI-Harness migration plan
 
+> **Status:** this file records the state at its own baseline. Paths cited below
+> (`src/server/port.ts`, `src/server/assembly.ts` and others) were relocated by
+> the migration in `docs/webui/webui-runtime-layer-plan.md` and have not been
+> back-filled line by line. The plan and its reasoning still stand; only the
+> paths are stale.
+
 Migration of `packages/webui/` to a TUI-driven backend over the desktop
 application's visual language. The WebUI is currently a half-finished client
 that uses a `runtimeOwnerKind: 'cli'` harness host; this plan changes it to use
