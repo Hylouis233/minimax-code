@@ -581,9 +581,12 @@ What v1 ships:
 
 - `WebuiCreateSessionRequest.teamModeOff?: boolean`, passed through to
   `createSession` (absent means unchanged).
-- The composer toggle chip next to the model selector, desktop tokens;
-  the persisted choice lives under the `mavis-team-mode` localStorage
-  key and is read on composer mount.
+- **No composer toggle chip.** This revision's list originally included one
+  "next to the model selector, desktop tokens"; the post-implementation
+  revision note at the end of this document removes it from v1, and the code
+  agrees — there is no chip, and nothing writes the choice. What survives is
+  the read side: the `mavis-team-mode` localStorage key is read on composer
+  mount, so a value written by an earlier build still applies.
 - The lock predicate `teamModeOff === false || getChildSessions(session.id).length > 0`,
   in product code (importable by tests), with the
   `home.agent_team_locked_tip` tooltip.
@@ -598,10 +601,12 @@ What v1 ships:
   `image: "onboard_v2_1_{cn,en}.png"`, and step 4 ("Ready" / "就绪")
   mentioning team assembly.
 
-Verification: the toggle is visible in the phase-5 screenshots next to
-the model selector; `team-mode.test.ts` imports the lock predicate
-from product code and drives it with fixture sessions; the
-`mavis-team-mode` key is written on toggle and read on mount.
+Verification: `team-mode.test.ts` imports the lock predicate from
+product code and drives it with fixture sessions, and the
+`mavis-team-mode` key is read on composer mount. It is **not** written:
+the write went with the toggle chip, which v1 does not ship (see the
+revision note at the end of this document). The phase-5 screenshots show
+no chip for the same reason.
 
 ### Visual reference provenance
 
