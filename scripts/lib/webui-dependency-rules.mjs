@@ -169,6 +169,20 @@ export const ALLOWED_EDGES = Object.freeze({
  * counted, but the CLI reports every violation that touches one of them so a
  * reviewer can see the provisional judgement instead of a silent pass.
  *
+ * Each retained entry above records, in a comment on the entry itself, where
+ * that file actually mixes. The judgement is **path-level** — a file is
+ * ambiguous or it is not, and every violation touching one is surfaced. The
+ * **symbol-level** ownership check §7.5 asks for does not exist yet: nothing
+ * here can tell which of a mixed file's symbols owns a given edge.
+ *
+ * `client/projection/stream-state.ts` used to be listed here. It has since
+ * become a pure `view` projection: `classifyLayers` gives it exactly `view`
+ * via `PROJECTION_SPLIT`, its only imports are shared contracts, the leaf
+ * `client/contracts/stream-state.ts` declarations and the `workspace-progress`
+ * projection, and no mechanism reaches into it any more. Listing it
+ * contradicted that classification, so the entry was removed rather than left
+ * asserting a mixture that no longer exists.
+ *
  * `client/contracts.ts` used to be listed here. The stage-1 contracts split
  * replaced it with leaf `client/contracts/*.ts` capability/view modules, so
  * the path no longer exists to be judged and the entry was removed rather than
@@ -192,10 +206,24 @@ export const ALLOWED_EDGES = Object.freeze({
  * stale layer.
  */
 export const KNOWN_AMBIGUOUS_FILES = Object.freeze([
+  // Mixed where: the Node capability port. It declares the server-facing
+  // capability surface *and* pulls the shared plugin-management / canvas /
+  // model contract shapes into the same module, so a `runtime-port` label
+  // hides a real edge until the port and its DTOs are separated.
   "runtime/port.ts",
-  "client/projection/stream-state.ts",
+  // Mixed where: a barrel that re-exports the leaf slash-command contracts
+  // *and* imports React icon components, so the file is simultaneously a
+  // contract barrel and a presentation module.
   "client/slash-palette.ts",
+  // Mixed where: the loopback HTTP/WebSocket entry point. It owns the
+  // transport server, the terminal manager and the runtime harness port
+  // wiring in one module, which is why the plan separates the runtime
+  // boundary from the server layer at all.
   "server/service.ts",
+  // Mixed where: a server-path module holding frame-validation behaviour that
+  // the runtime is meant to reach without depending on server code. The
+  // declarations are shared; only the validator stayed here, so the path
+  // overstates the layer.
   "server/envelope.ts",
 ]);
 
@@ -438,6 +466,36 @@ const BROWSER_LAYERS = new Set([
 /** True when either endpoint of a pair is a known-ambiguous file. */
 export function touchesAmbiguousFile(from, to) {
   return KNOWN_AMBIGUOUS_FILES.includes(from) || KNOWN_AMBIGUOUS_FILES.includes(to);
+}
+
+/**
+ * Every measured violation whose judgement rests on a provisional layer, i.e.
+ * one that touches a plan §7.5 mixed-responsibility file.
+ *
+ * These are reported, not enforced: the file's layer is an assumption until the
+ * file is split, so a violation touching one may or may not be a real defect.
+ * They therefore never feed the pass/fail condition — a reviewer reads them.
+ * `violations` is the measured violation list (`result.direction`), so the
+ * caller decides which subset to annotate.
+ */
+export function collectProvisionalJudgements(violations) {
+  return violations
+    .filter((violation) =>
+      touchesAmbiguousFile(violation.from, violation.to),
+    )
+    .map((violation) => ({
+      from: violation.from,
+      to: violation.to,
+      category: violation.category,
+      ambiguous: [
+        ...(KNOWN_AMBIGUOUS_FILES.includes(violation.from)
+          ? [violation.from]
+          : []),
+        ...(KNOWN_AMBIGUOUS_FILES.includes(violation.to)
+          ? [violation.to]
+          : []),
+      ],
+    }));
 }
 
 function allIn(values, set) {

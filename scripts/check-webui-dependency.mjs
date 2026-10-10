@@ -22,6 +22,7 @@ import { parseArgs } from "node:util";
 import { createRequire } from "node:module";
 import {
   buildDependencyGraph,
+  collectProvisionalJudgements,
   compareBaseline,
   evaluateGraph,
   pairKey,
@@ -137,6 +138,12 @@ const violatingPairs = new Set(
   result.direction.map((violation) => pairKey(violation.from, violation.to)),
 ).size;
 
+// Plan §7.5 mixed-responsibility files: reported for review, never enforced.
+// Their layer is an assumption until the file is split, so a violation that
+// touches one is not necessarily a defect — but it must not pass silently
+// either. Deliberately absent from `failed`.
+const provisionalJudgements = collectProvisionalJudgements(result.direction);
+
 const failed =
   newViolations.length > 0 ||
   staleEntries.length > 0 ||
@@ -169,6 +176,7 @@ const summary = {
   structuralExceptions: measuredStructural,
   newStructural,
   staleAllowances,
+  provisionalJudgements,
 };
 
 if (values.json) {
@@ -230,6 +238,16 @@ if (values.json) {
       );
     for (const entry of staleAllowances)
       lines.push(`  ${entry.kind}:${entry.file}:${entry.line}`);
+  }
+  if (provisionalJudgements.length) {
+    lines.push("");
+    lines.push(
+      `provisional judgements (${provisionalJudgements.length}) — plan §7.5 mixed-responsibility files, reported not enforced:`,
+    );
+    for (const entry of provisionalJudgements)
+      lines.push(
+        `  ${entry.from} -> ${entry.to}  [${entry.category}]  (ambiguous: ${entry.ambiguous.join(", ")})`,
+      );
   }
   lines.push("");
   lines.push(failed ? "WebUI internal dependency check FAILED." : "WebUI internal dependency check passed.");

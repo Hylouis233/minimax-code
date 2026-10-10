@@ -25,6 +25,7 @@ import {
   canonicalCycle,
   classifyLayers,
   collectModuleReferences,
+  collectProvisionalJudgements,
   compareBaseline,
   detectCycles,
   evaluateGraph,
@@ -32,6 +33,7 @@ import {
   normaliseSourcePath,
   pairKey,
   toBaselineShape,
+  touchesAmbiguousFile,
 } from "../../../../scripts/lib/webui-dependency-rules.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -146,7 +148,17 @@ describe("layer matrix", () => {
   });
 
   it("records the known-ambiguous files from plan section 7.5", () => {
-    expect(KNOWN_AMBIGUOUS_FILES).toContain("client/projection/stream-state.ts");
+    expect(KNOWN_AMBIGUOUS_FILES).toContain("runtime/port.ts");
+    expect(KNOWN_AMBIGUOUS_FILES).toContain("server/service.ts");
+    expect(KNOWN_AMBIGUOUS_FILES).toContain("server/envelope.ts");
+    expect(KNOWN_AMBIGUOUS_FILES).toContain("client/slash-palette.ts");
+    // `client/projection/stream-state.ts` was listed here while it still mixed
+    // responsibilities. It is now a pure `view` projection — `classifyLayers`
+    // gives it exactly `view` and no mechanism imports it — so listing it
+    // contradicted its own classification and the entry was removed.
+    expect(KNOWN_AMBIGUOUS_FILES).not.toContain(
+      "client/projection/stream-state.ts",
+    );
     // `client/stream.ts` was split into the pure frame reducer in
     // `client/projection/stream-state.ts` and the turn-coordinator commands;
     // the original path no longer exists to be judged, so its entry is gone.
@@ -160,6 +172,103 @@ describe("layer matrix", () => {
     expect(KNOWN_AMBIGUOUS_FILES).not.toContain(
       "client/session-runtime-store.ts",
     );
+  });
+
+  // Every entry the list retains must still be a file the checker recognises
+  // and classifies, and each must genuinely be path-ambiguous: if the matrix
+  // gives it one clean layer, the entry is asserting a mixture that is gone.
+  it("retains only files the matrix classifies", () => {
+    for (const file of KNOWN_AMBIGUOUS_FILES) {
+      expect(classifyLayers(file).length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("provisional judgements for plan section 7.5 mixed files", () => {
+  // A violation that touches a mixed-responsibility file may or may not be a
+  // real defect: the file's layer is an assumption until it is split. The list
+  // has to surface those judgements (plan §7.5 promises the CLI reports every
+  // violation touching one) without turning them into a new gate.
+  const violation = (from: string, to: string) => ({
+    from,
+    to,
+    category: "unclassified",
+  });
+
+  it("reports a violation whose source is an ambiguous file", () => {
+    expect(
+      collectProvisionalJudgements([violation("runtime/port.ts", "server/x.ts")]),
+    ).toEqual([
+      {
+        from: "runtime/port.ts",
+        to: "server/x.ts",
+        category: "unclassified",
+        ambiguous: ["runtime/port.ts"],
+      },
+    ]);
+  });
+
+  it("reports a violation whose destination is an ambiguous file", () => {
+    expect(
+      collectProvisionalJudgements([violation("server/x.ts", "server/envelope.ts")]),
+    ).toEqual([
+      {
+        from: "server/x.ts",
+        to: "server/envelope.ts",
+        category: "unclassified",
+        ambiguous: ["server/envelope.ts"],
+      },
+    ]);
+  });
+
+  it("names both endpoints when the edge is ambiguous at both ends", () => {
+    expect(
+      collectProvisionalJudgements([
+        violation("runtime/port.ts", "server/envelope.ts"),
+      ]),
+    ).toEqual([
+      {
+        from: "runtime/port.ts",
+        to: "server/envelope.ts",
+        category: "unclassified",
+        ambiguous: ["runtime/port.ts", "server/envelope.ts"],
+      },
+    ]);
+  });
+
+  it("leaves a violation between two unambiguous files out", () => {
+    expect(
+      collectProvisionalJudgements([violation("client/x.ts", "client/y.ts")]),
+    ).toEqual([]);
+  });
+
+  it("does not report a violation merely because the removed file was ambiguous", () => {
+    // The blind spot this fixes: the removed `stream-state.ts` entry would have
+    // made every one of its edges look provisional. It is a plain `view` file
+    // now, so its violations (if any) are ordinary judgements.
+    expect(touchesAmbiguousFile("client/projection/stream-state.ts", "client/y.ts"))
+      .toBe(false);
+  });
+
+  it("surfaces the judgement through the CLI without feeding the gate", () => {
+    // The real tree has no violation touching an ambiguous file, so the
+    // collector is exercised directly above. What has to hold here is the
+    // wiring: the CLI publishes the report, and its pass/fail condition never
+    // reads it — a mixed-file judgement is advisory and cannot fail CI.
+    const source = readFileSync(
+      path.join(repoRoot, "scripts/check-webui-dependency.mjs"),
+      "utf8",
+    );
+    expect(source).toContain("collectProvisionalJudgements(result.direction)");
+    // The summary is what `--json` emits, so the field is reachable there.
+    const summaryBlock = source.slice(source.indexOf("const summary = {"));
+    expect(summaryBlock).toContain("provisionalJudgements,");
+    // …and the gate is computed before it, from the enforced lists alone.
+    const failedBlock = source.slice(
+      source.indexOf("const failed ="),
+      source.indexOf("const summary = {"),
+    );
+    expect(failedBlock).not.toContain("provisionalJudgement");
   });
 });
 
