@@ -1806,9 +1806,6 @@ export function WebuiComposer({
     const intent = resolveWebuiSubmissionIntent({
       draft: messageDraft,
       commandMatch: command,
-      ...(commandInvocation?.[1] !== undefined
-        ? { commandInvocationName: commandInvocation[1] }
-        : {}),
       ...(commandInvocation?.[2] !== undefined
         ? { commandInvocationInput: commandInvocation[2] }
         : {}),

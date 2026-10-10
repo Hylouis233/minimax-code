@@ -193,7 +193,6 @@ describe("resolveWebuiSubmissionIntent — operational consequence: disabled / i
       const intent = resolveWebuiSubmissionIntent({
         draft: `/${entry.name} payload`,
         commandMatch: entry,
-        commandInvocationName: entry.name,
         commandInvocationInput: "payload",
         goalMode: false,
       });
@@ -224,7 +223,6 @@ describe("resolveWebuiSubmissionIntent — operational consequence: disabled / i
       const intent = resolveWebuiSubmissionIntent({
         draft: `/${entry.name} payload`,
         commandMatch: entry,
-        commandInvocationName: entry.name,
         commandInvocationInput: "payload",
         goalMode: false,
       });
@@ -276,7 +274,6 @@ describe("host `runCommand` stub counter — disabled entries trigger zero host 
     const intent = resolveWebuiSubmissionIntent({
       draft: `/${entry.name} payload`,
       commandMatch: entry,
-      commandInvocationName: entry.name,
       commandInvocationInput: "payload",
       goalMode: false,
     });

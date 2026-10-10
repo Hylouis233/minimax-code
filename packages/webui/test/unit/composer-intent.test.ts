@@ -85,7 +85,6 @@ const unknownCommand = commandEntry("totally-unknown", "outline only", true);
 const runCommandArgs = (overrides: {
   draft?: string;
   commandMatch?: SlashCommandEntry;
-  commandInvocationName?: string;
   commandInvocationInput?: string;
   goalMode?: boolean;
 }) =>
@@ -118,7 +117,6 @@ describe("resolveWebuiSubmissionIntent — path 1: activate-goal-mode", () => {
       runCommandArgs({
         draft: "/goal",
         commandMatch: goalCommand,
-        commandInvocationName: "goal",
         goalMode: false,
       }),
     );
@@ -130,7 +128,6 @@ describe("resolveWebuiSubmissionIntent — path 1: activate-goal-mode", () => {
       runCommandArgs({
         draft: "/goal",
         commandMatch: goalCommand,
-        commandInvocationName: "goal",
         goalMode: true,
       }),
     );
@@ -148,7 +145,6 @@ describe("resolveWebuiSubmissionIntent — path 1: activate-goal-mode", () => {
       runCommandArgs({
         draft: "/goal ship the release",
         commandMatch: goalCommand,
-        commandInvocationName: "goal",
         commandInvocationInput: "ship the release",
         goalMode: false,
       }),
@@ -166,7 +162,6 @@ describe("resolveWebuiSubmissionIntent — path 2: submit-goal", () => {
       runCommandArgs({
         draft: "/goal prepare onboarding doc",
         commandMatch: goalCommand,
-        commandInvocationName: "goal",
         commandInvocationInput: "prepare onboarding doc",
         goalMode: false,
       }),
@@ -226,7 +221,6 @@ describe("resolveWebuiSubmissionIntent — path 3: run-command", () => {
       runCommandArgs({
         draft: "/help",
         commandMatch: helpCommand,
-        commandInvocationName: "help",
       }),
     );
     expect(intent?.kind).toBe("run-command");
@@ -241,7 +235,6 @@ describe("resolveWebuiSubmissionIntent — path 3: run-command", () => {
       runCommandArgs({
         draft: "/help me",
         commandMatch: helpCommand,
-        commandInvocationName: "help",
         commandInvocationInput: "me",
       }),
     );
@@ -257,7 +250,6 @@ describe("resolveWebuiSubmissionIntent — path 3: run-command", () => {
       runCommandArgs({
         draft: "/compact",
         commandMatch: disabledCommand,
-        commandInvocationName: "compact",
       }),
     );
     expect(intent).toEqual({ kind: "submit-turn" });
@@ -268,7 +260,6 @@ describe("resolveWebuiSubmissionIntent — path 3: run-command", () => {
       runCommandArgs({
         draft: "/totally-unknown do thing",
         commandMatch: unknownCommand,
-        commandInvocationName: "totally-unknown",
         commandInvocationInput: "do thing",
       }),
     );
@@ -305,7 +296,6 @@ describe("resolveWebuiSubmissionIntent — dispatch order (rule 1 > 2 > 3 > 4)",
       runCommandArgs({
         draft: "/goal",
         commandMatch: goalCommand,
-        commandInvocationName: "goal",
         goalMode: false,
       }),
     );
@@ -320,7 +310,6 @@ describe("resolveWebuiSubmissionIntent — dispatch order (rule 1 > 2 > 3 > 4)",
       runCommandArgs({
         draft: "/goal ship the release",
         commandMatch: goalCommand,
-        commandInvocationName: "goal",
         commandInvocationInput: "ship the release",
       }),
     );
@@ -332,7 +321,6 @@ describe("resolveWebuiSubmissionIntent — dispatch order (rule 1 > 2 > 3 > 4)",
       runCommandArgs({
         draft: "/help",
         commandMatch: helpCommand,
-        commandInvocationName: "help",
       }),
     );
     expect(intent?.kind).toBe("run-command");
@@ -351,7 +339,6 @@ describe("resolveWebuiSubmissionIntent — no-op capability (resolver never sets
         args: runCommandArgs({
           draft: "/goal",
           commandMatch: goalCommand,
-          commandInvocationName: "goal",
         }),
         expected: { kind: "activate-goal-mode" },
       },
@@ -359,7 +346,6 @@ describe("resolveWebuiSubmissionIntent — no-op capability (resolver never sets
         args: runCommandArgs({
           draft: "/help",
           commandMatch: helpCommand,
-          commandInvocationName: "help",
         }),
         expected: { kind: "run-command", command: helpCommand },
       },
@@ -386,7 +372,6 @@ describe("resolveWebuiSubmissionIntent — disabled command inputs do not fill t
       runCommandArgs({
         draft: "/compact",
         commandMatch: disabledCommand,
-        commandInvocationName: "compact",
       }),
     );
     expect(intent).toEqual({ kind: "submit-turn" });
@@ -397,7 +382,6 @@ describe("resolveWebuiSubmissionIntent — disabled command inputs do not fill t
       runCommandArgs({
         draft: "/goal",
         commandMatch: goalCommand,
-        commandInvocationName: "goal",
         commandInvocationInput: "   ",
       }),
     );

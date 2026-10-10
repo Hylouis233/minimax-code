@@ -26,7 +26,6 @@ export type WebuiSubmissionIntent =
 export function resolveWebuiSubmissionIntent(args: {
   readonly draft: string;
   readonly commandMatch: WebuiSlashCommandFields | undefined;
-  readonly commandInvocationName?: string;
   readonly commandInvocationInput?: string;
   readonly goalMode: boolean;
   readonly planMode?: boolean;
