@@ -105,7 +105,7 @@ The registry is one module per concern. Add code in the layer it belongs to, not
 | `operation/<domain>.ts` | The operation descriptors (name + `validate`) grouped by domain: `session`, `workspace`, `messages`, `goal`, `interaction`, `questionnaire`, `queue`, `provider`, `plugin-management`, `permission-mode`, `personalization`, `agent-memory`, `user-profile`, `memory-settings`. |
 | `operation/bind-handlers.ts` | `WEBUI_OPERATION_BINDINGS` — the statically declared operation→capability mapping — plus `createBindingEntries` and `DEDICATED_OPERATION_NAMES` for the thirteen operations that keep a hand-written handler. It consumes the port from `runtime/port.ts`. |
 | `operation/operation-dispatch.ts` | `dispatchWebuiFrame` — one inbound frame → validate → look up → handle → response, stream, or error frame. |
-| `operation/operations.ts` | `createOperationRegistry` (the single `registerOperation` call site) and `registerOperation`. Re-exports the descriptors, so importers keep one entry point. The registry order is observable on the wire; preserve it when adding/removing operations. The set of operations it registers is contractually the same as `WebuiHarnessPort`'s — `bind-handlers.ts` derives its `Pick` from the port, so a port method added or removed must reach this file in the same change, and `test/unit/webui-host-shape-invariant.test.ts` (added in batch C) fails loudly if the two diverge. |
+| `operation/operations.ts` | `createOperationRegistry` (the single `registerOperation` call site) and `registerOperation`. Re-exports the descriptors, so importers keep one entry point. The registry order is observable on the wire; preserve it when adding/removing operations. The set of operations it registers is contractually the same as `WebuiHarnessPort`'s — `bind-handlers.ts` derives its `Pick` from the port, so a port method added or removed must reach this file in the same change. That agreement is enforced by the compiler rather than by an assertion: every port fake must implement every member (`FullPort` in `test/unit/webui-host-shape-invariant.test.ts`, `ScriptedHarnessPort` in `test/unit/webui-service.test.ts`), and the binding *count* is pinned separately (`createBindingEntries(port).size` in the host-shape suite). Drop a port member without dropping its binding, or add one without reaching this file, and `pnpm typecheck:webui-full` stops compiling. |
 
 ## How a request travels
 
@@ -212,6 +212,15 @@ Edit in this order so each layer compiles against the previous one:
     the dev launcher rebuilds the port from `createHarnessPortFromHost(assembled.host)` while unit
     tests use `assembled.harnessPort`, so enriching only the inner port keeps every gate green and
     breaks the live server with `runtime host does not expose the <method> client`.
+13. `test/unit/webui-operation-wire-compatibility.test.ts` — the roster counts. `BASELINE_OPERATION_NAMES`
+    comes from the frozen registry, but the numbers that pin it are expectations in this file:
+    `expect(BASELINE_OPERATION_NAMES).toHaveLength(99)`, its set size, and the production split
+    (`Object.keys(WEBUI_OPERATION_BINDINGS)` 86 + `DEDICATED_OPERATION_NAMES` 13 = 99). A new
+    operation breaks all of them, with messages that read as frozen-baseline drift rather than as
+    "you added an operation", so bump them in the same change — after checking that the roster really
+    grew. When the operation keeps a binding, bump `expect(createBindingEntries(port).size)` in
+    `test/unit/webui-host-shape-invariant.test.ts` too. Never edit the frozen registry itself; see
+    `test/unit/legacy-protocol/README.md`.
 
 ### Splitting or moving a module
 
