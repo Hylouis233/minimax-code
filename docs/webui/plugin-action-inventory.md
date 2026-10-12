@@ -1,8 +1,7 @@
 # Plugin action inventory — the 29 actions behind `plugin-port`
 
-**Status: produced, awaiting the operator's acceptance** — the same gate Phase 0's output is under.
-§5.6's `plugins` row makes this inventory a predecessor of the carve; #59 (A3) and #72 (B7) each name it
-as a Required one.
+**Status: accepted by the operator on 2026-10-12, together with Phase 0's output.** §5.6's `plugins` row
+makes this inventory a predecessor of the carve; #59 (A3) and #72 (B7) each name it as a Required one.
 
 ## What this owes, and who consumes it
 
@@ -158,9 +157,10 @@ Two consequences, neither of which this document applies to the plan file:
    carries **no client surface**. B7 must not build one, and no business declares a reader for it.
 2. `listSkills` is the member that carries `plugins`' published skill listing to the composer, which
    makes it **`plugins`' declaration**, not `settings`'. §15.1 table 2 gives `settings-port` two targets
-   (`models/provider-port.ts`, `settings/settings-port.ts`) and `listSkills` lands in neither. A3's
-   re-file needs a third target for the `settings-port` row, or the member that the composer actually
-   reads stays filed under the business that does not publish it.
+   (`models/provider-port.ts`, `settings/settings-port.ts`) and `listSkills` lands in neither.
+   **Decided 2026-10-12: the member files under `client/contracts/plugins/`**, so A3's `settings-port`
+   row gains a third target. §15.1's validity note carries the correction. The three cells' line budget
+   is re-derived at A3 — a line count there is a sizing estimate, not a source partition.
 
 ### 2. §9's port census counts a different unit than "member"
 
@@ -186,10 +186,11 @@ budget, not a member census.
 So A3's member-to-business split rests on §9's sentences plus the resulting file, and each split can be
 checked against the line budget above. The sentences settle most of it (`settings-port`: model and
 provider members → `models`; instructions, agent memory, user profile, memory settings → `settings`),
-and leave at least `listSkills` (Finding 1) and the model-source commands' status-versus-action boundary
+and leave the model-source commands' status-versus-action boundary
 (`getMiniMaxApiKeyStatus`/`getCodexOAuthStatus` per §5.6, against `upsertMiniMaxApiKey`,
 `startCodexOAuthLogin`, `cancelCodexOAuthLogin`, `refreshModels`) to be read off §5.6's `settings` and
-`models` rows at A3. Named here as the boundary of this document, not resolved by it.
+`models` rows at A3. (`listSkills`, which the rules left open too, is decided in Finding 1.) Named here
+as the boundary of this document, not resolved by it.
 
 ## Exit condition
 
@@ -202,5 +203,4 @@ not conflated with the port's member count.
 - **The two counts are separated**: 29 actions, 1 port member.
 - **The consumers are named**: #59, #72, C04, and the `plugin-port` row of §15.1 table 2.
 
-What this document does not grant itself is the acceptance that releases #59, which belongs to the
-operator and is asked for together with Phase 0's output.
+The acceptance that releases #59 was given by the operator on 2026-10-12, together with Phase 0's output.

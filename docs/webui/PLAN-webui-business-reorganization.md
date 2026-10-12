@@ -1500,6 +1500,12 @@ made against an earlier draft, all found by review rather than by reading the ga
 `sessions`; and the `stream-state`/`stream-recovery` pair belongs to **`turn`** — `projection/stream/` was
 never a business.
 
+**One row gains a target after the action inventory.** `listSkills` (`settings-port.ts:57`) is the member
+that carries the skill listing §4.2 and §4.8 publish to the composer's palette, and neither target above
+holds it. It files under `client/contracts/plugins/` (the operator's decision, 2026-10-12); the inventory
+that found it is `docs/webui/plugin-action-inventory.md`. The three cells' line budget is re-derived at
+A3, because a line count here is a sizing estimate, not a source partition.
+
 **What this table cannot prove.** It is a mapping, not a census. `PROJECTION_SPLIT` and
 `CLIENT_FILE_PROVENANCE` are tables of *mappings*, and a mapping outlives the file it described — two of
 `PROJECTION_SPLIT`'s four entries point at files that have already moved or never existed (§7.2), and two

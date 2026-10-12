@@ -1,8 +1,8 @@
 # Phase 0 — the substrate matrix
 
-**Status: output produced and complete; awaiting the operator's acceptance.**
+**Status: accepted by the operator on 2026-10-12. Phase 0 is closed and Phase 1 may start.**
 `PLAN-webui-business-reorganization.md` §8 Phase 0 requires this output to be accepted before
-Phase 1 begins (§14.1 item 4). Until then Phase 1 does not start.
+Phase 1 begins (§14.1 item 4); that acceptance was given, and `#57` is released by it.
 
 ## What Phase 0 owed
 
@@ -96,5 +96,5 @@ consumer list is complete."*
 
 - **All twelve rows are enumerated**, including `models`, which the source settles rather than a decision.
 - **The consumer list is complete**: twelve businesses, twelve values, five capabilities.
-- **The exit condition is therefore met.** What remains is §14.1 item 4 — the operator's acceptance of
-  this output — after which Phase 0 closes and Phase 1 (`#57`) can start.
+- **The exit condition is met.** §14.1 item 4 is discharged: the operator accepted this output on
+  2026-10-12, Phase 0 is closed, and Phase 1 (`#57`) may start.
