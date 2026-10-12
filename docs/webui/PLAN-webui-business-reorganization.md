@@ -22,7 +22,7 @@ design that only moves files and breaks up functions is a failure even with ever
 
 | Outcome | Measurement |
 | --- | --- |
-| 业务职责更集中 | the 88 pure business functions now living inside 20 component files are re-filed to the layer that owns them (§7.1); each business's row in §4 states one owner per concept |
+| 业务职责更集中 | the declarations living inside 20 component files are re-filed to the layer that owns them — a census of **81**, a work roster of **59** after Phase 3's claims (§7.1); each business's row in §4 states one owner per concept |
 | 模块边界更明确 | every business has a written eight-field contract (§4) and the unit is checked against four prohibitions (§5.1) that each name a concrete current violation |
 | 相关代码更容易定位 | one business name appears at every layer; `client/**/<business>/` is the complete answer to "where does this business live" (§6) |
 | 业务扩展落在清楚且有限的修改范围内 | the twelve extension scenarios of §10 are measured before and after; **S12 is the number that must move** |
@@ -89,7 +89,7 @@ port member census, cross-business import graph).
 | | |
 | --- | --- |
 | Largest single functions (AST, not file size) | `WebuiComposer` 2088 lines (`SessionComposer.tsx:565`, 75 hook calls in the declaration, the JSX return alone 717 lines); `PluginManagement` 1469; `WebuiClientFoundationApp` 1333 (81 hook calls, JSX return 422 lines); `WebuiProjectList` 786; `WebuiModelPicker` 628; `WebuiSessionTranscript` 598 |
-| Pure business functions living inside component files | **88, across 20 files**: `WorkspaceCanvas.tsx` 23, `SessionRail.tsx` 10, `DiffCard.tsx` 6 (including a state reducer), `LeftRail.tsx` 6 (browser storage IO), `ModelPicker.tsx` 5, `WorkspacePanels.tsx` 5, and 14 more files with 1–4 each |
+| Pure business functions living inside component files | **81 declarations across 20 files** — directly-exported, non-component function declarations, of which 59 remain to re-file once Phase 3's claims are subtracted (§7.1): `WorkspaceCanvas.tsx` 23, `SessionRail.tsx` 10, `DiffCard.tsx` 6 (including a state reducer), `LeftRail.tsx` 6 (browser storage IO), `ModelPicker.tsx` 5, `WorkspacePanels.tsx` 5, and 14 more files with 1–4 each |
 | Hooks in `client/components/` | 266 `useState`, **0 `useReducer`** |
 | Flat directories | `client/components/` 45 files, `client/projection/` 41, `client/application/` 27 |
 | The shell's relay | 47 distinct `transport?.X` forwarded as props; 54 cross-business import edges; `WebuiComposer` imports eight other businesses |
@@ -589,7 +589,7 @@ tells the executor which files each row moves.
 | Business | Owner module (target path) | May write | Publishes | Shared-rule home | Carve scope |
 | --- | --- | --- | --- | --- | --- |
 | `sessions` | `application/session-store.ts` (root, per §6.1's tree), `application/sessions/session-catalog.ts` | the session store (the single writable copy), the catalog read model, unread hydration ordering, and the per-session context-window consumption published for the composer's ring — **not** the rail's view state, and **not** the ring's `open`/`breakdownOpen`/`placement`, which are the component's view state | create / select / archive / fork / rename / import / export / delete, mark-read, `contextWindowUsage(sessionId)`, and `purge` as the published form of today's injected `purgeSlot` | **`unread.ts` — the already-correct shared rule (§5.1.4) and the template for the rest** | `purgeSlot` becomes a published command (no injected optional); `workspaceProjectName` leaves `SessionRail.tsx:144` for `workspace`; the two storage-key maps leave `LeftRail.tsx`; **`ContextUsageIndicator` leaves `SessionComposer.tsx` for `components/sessions/`, reads `account`'s quota and `models`' selection without writing either, and owns no state beyond its own view state — it is React/DOM presentation and MUST NOT be filed under `client/projection/`**; **`ArchivedSessionsPage` files under `components/sessions/`** (the second entry point §4.1 already names), and the archived state must **not** be added back into `session-workflows.ts`, which holds two machines |
-| `composer` | `application/composer/composer-store.ts`, `composer-workflows.ts` | draft text, input history, attachments and url references, mention/slash ranges, toolbar and queue state | `setDraft`, `recordComposerInput`, attachments, `chooseMention`, `chooseCommand`, the queue commands | — (its own) | **first carve.** The `sink` (`SessionComposer.tsx:750-769`) stops carrying four businesses' writers; the model, goal and interaction duties leave the composer |
+| `composer` | `application/composer/composer-store.ts`, `composer-workflows.ts` | draft text, input history, attachments and url references, mention/slash ranges, toolbar and queue state | `setDraft`, `recordComposerInput`, attachments, `chooseMention`, `chooseCommand`, the queue commands | — (its own) | The `sink` (`SessionComposer.tsx:750-769`) stops carrying four businesses' writers; the model, goal and interaction duties leave the composer |
 | `transcript` | `application/transcript/` (request ownership) + `projection/transcript/` | the transcript view model derived from the substrate | load a history page, load older, request a turn review (an invocation of `review`) | the **`review` state machine** — owner module `application/transcript/review-state.ts`, extracted from `DiffCard.tsx`'s reducer, with two readers (§10 S13). A capability's home is inside the business that presents it | `DiffCard.tsx`'s reducer and its five other pure functions leave the component file |
 | `workspace` | `application/workspace/workspace-queries.ts` + `projection/workspace/` | the file-tree query state and the git state. Panel open/expanded/active is the **component's** view state | `dispatchWorkspacePanel`, file read, git mutate (declared) | **the tab-kind enumeration — one registry, replacing the three sites at `workspace-panel-state.ts:3-9`, `WorkspacePanels.tsx:631`, `:655-657`** | the terminal *tab* stays; the terminal *process* does not (it is `workspace`'s capability, confirmed against Desktop in §14.4); **the coding and worktree settings pages are `workspace`' — `SettingsReviewPage` and `WebuiReviewPanel` file under `components/workspace/`, and their review commands are the `review` capability's, not `settings`'; `WebuiWorktreePanel` likewise** |
 | `interactions` | `application/interactions/interaction-coordinator.ts` | pending permission and questionnaire state, the replies, late-read protection | `replacePendingPermissions`, `removePendingPermission`, `applyQuestionnaire` | — (its own) | the coordinator loses the goal duty it absorbed as a third responsibility |
@@ -757,11 +757,13 @@ semantics in the client — the one part with generation fences, lease release a
 
 ---
 
-## 7. Responsibility re-filing: the 88 pure functions
+## 7. Responsibility re-filing: the 59-declaration work roster
 
 ### 7.1 The measured defect
 
-Twenty component files export **88 non-component functions**. The largest groups:
+Twenty component files export **81 directly-exported, non-component function declarations**. That is a
+**census**, not the work total: it includes the 21 declarations the Phase 3 tickets claim, so it cannot be
+Phase 4b's work. The largest groups:
 
 | File | Pure functions | Nature |
 | --- | ---: | --- |
@@ -776,6 +778,25 @@ Each is re-filed to the layer that owns it — `projection/<business>/` for a pu
 `application/<business>/` for a decision, `infrastructure/` for browser IO. **This is a filing fix:
 it creates no new owner**, and the row wording in §4.4 says so explicitly so the next reader does not
 create an owner per function.
+
+**The work roster is what remains after Phase B's claims.** A read-only AST probe returns 20 files / 81
+directly-exported, non-component function declarations; subtract what the carve tickets already carry and
+the re-filing has 59 declarations left.
+
+| | count | status |
+| --- | ---: | --- |
+| Declaration census | **81** | 20 files, directly-exported non-component function declarations |
+| Less B's claimed symbols | **−21** | `SessionRail` 9 + 1 (`workspaceProjectName`, which B3 sends to `projection/workspace/`), `LeftRail` 6, `ModelPicker` 5 — each with a named carrier and target |
+| Less B4's reducer | **−1** | `reduceWebuiDiffState`, claimed by B4 at `application/transcript/review-state.ts` — subtracted because a symbol claimed anywhere in Phase B is not Phase 4b's work |
+| **Work roster requiring re-filing** | **59** | across **12 destination directories** |
+| `initialWebuiDiffState` | 1 | a **state seed, not a function** — travels with its implementation |
+| Non-type export-list entries | 9 occurrences / **8 function names**, in 3 lists | **forwarded exports whose implementation is already outside `components/`** — recorded, not migrated |
+| Constants | — | travel with the implementation needing them |
+
+**Choosing a number between two measurements does not make it right.** An earlier draft of this section
+offered "20 files / 82 counting declarations only; 21 / 90 counting re-export lists; the plan says 20 / 88,
+inside the bracket" — **deleted**, because bracketing is not a determination. **`20 files` remains a
+population statement about the component tree, not a work count.**
 
 ### 7.2 Two files whose directory contradicts their layer
 
@@ -796,7 +817,9 @@ The `PROJECTION_SPLIT` entries for the other two names are dead, not live (§15.
 Order is derived from dependencies. The first belief this plan had to discard was "move the directories
 first": a responsibility change performed before the substrate is widened has to be re-import-repointed
 later, and the two diffs become impossible to review separately. The second was "start with the worst
-offender by size": the first business must be the one holding the most prohibition-1 violations.
+offender by size": the first business must be the one holding the most prohibition-1 violations. It
+survives only as a reason `composer` is carved early — the order below puts the two businesses whose
+published APIs `composer` consumes ahead of it.
 
 Every step ends with a tree where all applicable gates pass, and lands as one commit or a small ordered
 set whose message says whether it is a **move** or a **restructure**. There is no production feature
@@ -850,12 +873,17 @@ where behaviour will silently change.
 
 ### Phase 3 — Business boundaries, one business at a time
 
-Order: **`composer` → `sessions` → `interactions` → `goal` → `transcript` → `workspace` → `rail`
+Order: **`interactions` + `goal` → `composer` → `sessions` → `transcript` → `workspace` → `rail`
 (subsumed into `sessions`) → `models` → `plugins` → `settings` → `account` → `shell` last.**
 
-`composer` first because it holds a case of all four prohibitions and is the substrate's first
-consumer; `shell` last because it constructs the owners, and doing it early means re-wiring it
-repeatedly.
+**Run the interactions and goal boundary repair before the composer carve so composer can consume their
+published APIs without retaining their writers. The combined turn separates goal refresh/write/version-fence
+duties from pending interaction duties. This ordering does not reassign composer input-mode state or settings
+permission-mode state. Resolve the state/ref/effect disposition against §4/§5 and actual producers/consumers;
+declaration proximity is not ownership evidence.** `composer` holds a case of all four prohibitions and is the
+substrate's first consumer, which is why it is carved early — the order above puts the two businesses whose
+published APIs it consumes ahead of it; `shell` last because it constructs the owners, and doing it early
+means re-wiring it repeatedly.
 
 **What makes the boundary non-negotiable is a test that fails, not a table that is read.** A per-business
 plan-time table (`files today → target → duty change → acceptance → rollback`) **relocates** the boundary
@@ -908,6 +936,24 @@ specifiers inside `src/` and 410 inside `test/`. Then delete the gate's now-dead
 `application/` and the second does not exist, which is why deleting them is a separate clean-up rather
 than a consequence of the move) and update
 `packages/webui/AGENTS.md`, whose module role table names 40+ literal paths.
+
+### Phase 4b — §7.1's roster only
+
+The 59-declaration work roster leaves the component files for the layer that owns each
+(`projection/<business>/` for a pure derivation, `application/<business>/` for a decision,
+`infrastructure/` for browser IO). **This is a filing fix: it creates no new owner.** Batched by destination
+directory, after Phase 4, because §7.1's moves change a layer and cannot share a batch with Phase 4's
+classification-neutral moves. A batch that would need a baseline entry stops and reports it (§12.2).
+
+**§7.2 is not in Phase 4b.** `composer-history` and `effect-reducer` sit in `projection/`, the gate already
+classifies them `application`, and they are classification-neutral moves already present in §15.1's table.
+**They execute in the Phase 4 C instances owning `client/application/composer/` and
+`client/application/turn/`, and nowhere else.**
+
+**Why Phase 4 does not cover §7.1.** Phase 4 is the mechanical consequence of Phase 3: move the now-correct
+modules into `client/<layer>/<business>/`, pure moves plus import repointing. §7.1's declarations move **out
+of** `client/components/` — the presentation layer — into `projection/`, `application/` or `infrastructure/`,
+so they change layer and are not pure moves.
 
 ### Phase 5 — Finalize
 
@@ -1026,6 +1072,11 @@ reports "all invariants hold" cannot be read as "the boundaries are enforced".
 ### 12.2 Checking the layer direction and the runtime/application duties
 
 The duty table this section checks against is §5.5; the invariants are §5.4.
+
+**A carve may not add or widen a dependency baseline entry. Measure new findings against the pre-carve
+graph. Resolve an illegal edge by completing the scoped extraction/injection or by correcting the sequence;
+if resolution requires a scope or architecture change, stop the affected ticket and obtain an amended plan.
+A reported finding is not a passed acceptance criterion.**
 
 `pnpm check:webui-dependency` must report the **same verdict before and after** Phase 3–4 moves
 (`0 violations across 0 pairs`, `0 cycles`, `1 allowance`) because the carve is sub-directory-only.
@@ -1277,6 +1328,15 @@ cases, and §5.2 already quoted the purger comment correctly, so that draft cont
 ## 15. Appendix A — the business × layer mapping
 
 ### 15.1 The move table, regenerated
+
+**Counting rules that bind every figure in this plan.** Counts state their population, unit, baseline
+revision and measurement method. Line counts are sizing estimates, not a source partition. Import counts
+distinguish specifier occurrences from distinct importers. The §7 work roster counts declarations requiring
+re-filing; forwarded exports and already-filed implementations are recorded separately. Regenerate the
+affected figures using the chosen definitions; a count made with a different unit is not directly
+comparable. Two figures this rule was written for are §7.1's roster (a census of 81, a work roster of 59)
+and §9's port census, whose 216 reproduces only when nested request-shape fields are counted as members —
+see `docs/webui/plugin-action-inventory.md`, finding 2.
 
 **144 target rows are executable today and cover 127 of the 137 files that must be covered.** §15.4's ten contracts
 are undecided — each takes a `move`, `keep` or `delete` disposition — **so no final total exists yet**, and the
