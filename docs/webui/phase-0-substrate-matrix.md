@@ -1,6 +1,6 @@
 # Phase 0 — the substrate matrix
 
-**Status: output produced, one cell pending the operator's decision, not yet accepted.**
+**Status: output produced and complete; awaiting the operator's acceptance.**
 `PLAN-webui-business-reorganization.md` §8 Phase 0 requires this output to be accepted before
 Phase 1 begins (§14.1 item 4). Until then Phase 1 does not start.
 
@@ -43,7 +43,7 @@ Each value below was read from the source as it stands, not from §4's prose:
 | 4 | `workspace` | `read-model, in-flight-read` | **derived** — from the props the panels receive (above) |
 | 5 | `interactions` | `in-flight-read` | direct import; no intents — its four calls are stream-phase writers and the turn resumes through the substrate's own loop (§4.5) |
 | 6 | `goal` | `in-flight-read` | direct import; not intents — nothing in the goal path calls `attachTurn` or `sendTurn` (§4.6) |
-| 7 | `models` | **pending** | **the picker decision — see below** |
+| 7 | `models` | `none` | **derived** — the session-scoping lives in its own catalogue query, not in a substrate read (below) |
 | 8 | `plugins` | `none` | direct import (§4.8) |
 | 9 | `settings` | `read-model` | direct import, corrected from `none` (§4.9) |
 | 10 | `account` | `read-model` | direct import, corrected — the usage notice is session-scoped (§4.10) |
@@ -60,31 +60,41 @@ Derived from the table above, counting each capability's consumers:
 | `in-flight-read` | `sessions`, `composer`, `transcript`, `workspace`, `interactions`, `goal` | 6 |
 | `intents` | `sessions`, `composer` | 2 |
 | `self` | `turn` | 1 |
-| `none` | `plugins`, `shell` | 2 |
+| `none` | `plugins`, `shell`, `models` | 3 |
 
-**`models` is excluded from these counts until its cell is decided.** If it resolves to `none` the
-`none` row becomes 3 and no other row changes; if it resolves to `read-model` the `read-model` row
-becomes 7. **No other cell moves either way**, which is why the decision is separable.
+**All twelve businesses are counted.** The substrate's consumers are therefore: `read-model` 6,
+`in-flight-read` 6, `intents` 2, `self` 1, and `none` 3 — twelve businesses, twelve values.
 
-## The one pending cell
+## The `models` cell — derived, not decided
 
-**Does the `models` picker have to show the session's active model?**
+§5.6 named this as one of two cells §4 leaves open, on the ground that the picker's session-awareness
+would decide it. **The source settles it, so it is a derivation and not a decision.**
 
-- **Today: no.** `ModelPicker.tsx` has no `sessionId` and no session hook; it is selection-only.
-- **If no** → `models` `field 7` = `none`. The picker neither reads the substrate nor issues intents.
-- **If yes** → `models` `field 7` = `read-model`, and the picker gains a cross-business read of
-  `sessions`' active model that §4.7's *does not own* list does not currently declare. That read would
-  have to be declared there, and the picker would stop being purely selection-only.
+- The picker **already shows the session's current model**, and it does so without a substrate read.
+  `SessionComposer.tsx:1264` resolves it as `models.find((model) => model.selected)` and passes it to
+  the picker as `selected` (`:2460`); the chip is rendered inside the picker itself (`ModelPicker.tsx:925`).
+- The list is **session-scoped at its own owner**: `SessionComposer.tsx:1157` loads it with
+  `listModels?.({ sessionId })`, and `:867` clears it to `[]` when there is no session, with the comment
+  that the previous session's model state must not bleed into the composer.
+- So the picker consumes **no** substrate capability. Its session-awareness is a property of the
+  `models` catalogue query — which is `models`' own state — and not of a read of `sessions` or of the
+  substrate.
 
-§5.6 names this as one of the two cells §4 leaves open and that must be decided before its phase.
+**Derived: `models` `field 7` = `none`.** Two consequences worth stating:
+
+- §4.7's *does not own* list does **not** need a new cross-business read added for the picker: the
+  picker never reads `sessions`' active model, it reads its own catalogue.
+- The plan's open cell assumed the picker might need a session read. It does not. What the carve does
+  change is **where the list lives**: today the composer holds it as its own `useState`
+  (`SessionComposer.tsx:782`), and after the carve `models` owns the catalogue query while the picker
+  keeps receiving the list from its owner. The `field 7` value is `none` on both sides of that change.
 
 ## Exit condition
 
 §8 Phase 0's exit is *"every one of the twelve rows has an enumerated `field 7`, and the substrate's
 consumer list is complete."*
 
-- **Eleven of twelve rows are enumerated**; the twelfth is `models`, pending the decision above.
-- **The consumer list is complete for those eleven**, and the twelfth's two possible outcomes are both
-  stated, so the list closes the moment the cell is decided.
-- **The exit is therefore not met yet**, and this document is not accepted yet. Deciding `models`
-  completes the table; accepting this document closes Phase 0 and unblocks Phase 1.
+- **All twelve rows are enumerated**, including `models`, which the source settles rather than a decision.
+- **The consumer list is complete**: twelve businesses, twelve values, five capabilities.
+- **The exit condition is therefore met.** What remains is §14.1 item 4 — the operator's acceptance of
+  this output — after which Phase 0 closes and Phase 1 (`#57`) can start.
