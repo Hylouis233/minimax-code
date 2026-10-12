@@ -62,6 +62,7 @@ import {
 import {
   webuiScrollBottomTop,
   webuiScrollFollowsBottom,
+  webuiScrollIntent,
 } from "../projection/transcript-scroll.js";
 
 const EMPTY_TRANSCRIPT_PAGE: WebuiClientMessagePage = {};
@@ -421,13 +422,12 @@ export function WebuiSessionTranscript({
   const liveActivityAtTranscriptLevel =
     trailingLiveGroupId !== undefined && liveActivityGroupId === undefined;
   useLayoutEffect(() => {
-    if (!turnLive) return undefined;
     const transcript = transcriptRef.current;
     const viewport = transcriptViewport(transcript);
     if (!transcript || !viewport) return undefined;
     if (
       previousTurnStateRef.current.sessionId !== sessionId ||
-      !previousTurnStateRef.current.turnLive
+      (turnLive && !previousTurnStateRef.current.turnLive)
     ) {
       autoFollowRef.current = true;
       manualScrollIntentRef.current = false;
@@ -441,52 +441,53 @@ export function WebuiSessionTranscript({
         autoFollowRef.current = false;
       }
     };
-    const onWheel = () => { manualScrollIntentRef.current = true; };
+    const onIntent = (event: "wheel" | "touchmove", deltaY: number) => {
+      if (webuiScrollIntent({ event, deltaY, metrics: viewport }) === "ignore") return;
+      manualScrollIntentRef.current = true;
+    };
+    const onWheel = (event: WheelEvent) => { onIntent("wheel", event.deltaY); };
+    let lastTouchY: number | undefined;
+    const onTouchStart = (event: TouchEvent) => { lastTouchY = event.touches[0]?.clientY; };
+    const onTouchMove = (event: TouchEvent) => {
+      const y = event.touches[0]?.clientY;
+      if (lastTouchY === undefined || y === undefined) return;
+      const deltaY = lastTouchY - y;
+      lastTouchY = y;
+      onIntent("touchmove", deltaY);
+    };
     viewport.addEventListener("scroll", onScroll, { passive: true });
     viewport.addEventListener("wheel", onWheel, { passive: true });
+    viewport.addEventListener("touchstart", onTouchStart, { passive: true });
+    viewport.addEventListener("touchmove", onTouchMove, { passive: true });
     const stopObserving = observeTranscriptHeight(transcript, followBottom);
     followBottom();
     return () => {
       stopObserving?.();
       viewport.removeEventListener("scroll", onScroll);
       viewport.removeEventListener("wheel", onWheel);
+      viewport.removeEventListener("touchstart", onTouchStart);
+      viewport.removeEventListener("touchmove", onTouchMove);
     };
   }, [sessionId, turnLive]);
   useLayoutEffect(() => {
-    if (!turnLive) return;
     const viewport = transcriptViewport(transcriptRef.current);
     if (viewport) pinTranscriptToBottom(viewport, autoFollowRef.current);
   }, [items, turnLive]);
-  // 进入会话时落在最后一条消息上，和桌面端一致。上面那套跟随只在回合 live 时
-  // 装配，所以非 live 的会话会保留上一个会话留下的 scrollTop（新挂载的视口就是 0，
-  // 即顶部）。
+  // One follower for the whole transcript, not one per way of arriving at it.
   //
-  // 这里不能只跳一次：首屏消息落地后内容还会继续撑开高度（代码高亮、图片、
-  // markdown 表格），一次性跳转按当帧高度算出的"底部"会停在倒数几条消息上，实测
-  // 差出近一屏。所以进入会话期间用 ResizeObserver 持续贴底，直到用户自己滚动，
-  // 或者主动去翻更早的历史为止。骨架屏期间视口不足一屏，贴底等价于不动，无副作用。
-  const openScrollFollowRef = useRef(false);
-  useLayoutEffect(() => {
-    openScrollFollowRef.current = true;
-  }, [sessionId]);
-  useLayoutEffect(() => {
-    const transcript = transcriptRef.current;
-    const viewport = transcriptViewport(transcript);
-    if (!transcript || !viewport) return undefined;
-    const followBottom = () => pinTranscriptToBottom(viewport, openScrollFollowRef.current);
-    // 用户开始滚动即交还控制权。程序化设置 scrollTop 不产生 wheel/touchmove，
-    // 所以跟随自己的写入不会把自己关掉。
-    const releaseControl = () => { openScrollFollowRef.current = false; };
-    viewport.addEventListener("wheel", releaseControl, { passive: true });
-    viewport.addEventListener("touchmove", releaseControl, { passive: true });
-    const stopObserving = observeTranscriptHeight(transcript, followBottom);
-    followBottom();
-    return () => {
-      stopObserving?.();
-      viewport.removeEventListener("wheel", releaseControl);
-      viewport.removeEventListener("touchmove", releaseControl);
-    };
-  }, [sessionId]);
+  // Desktop's message viewport keeps a single policy, and this is it: auto-follow
+  // is armed on a session change and when a turn goes live; a gesture releases it
+  // only when the viewport can answer that gesture; and being back at the bottom
+  // re-arms it. A non-live session used to have a second follower that released
+  // on any wheel or touchmove wherever the viewport sat and then never re-armed,
+  // so content arriving after such a gesture stayed below the fold — and a wheel
+  // at the bottom, which Desktop records as `wheel-intent:ignored-boundary`, was
+  // enough to trigger it.
+  //
+  // Pinning cannot be a one-off either: after the first paint the content keeps
+  // growing (highlighting, images, markdown tables), and a single jump lands on
+  // the bottom of that frame's height, short of the real end by nearly a screen.
+  // The ResizeObserver inside the follower above is what keeps it pinned.
   const showEmptyState = !turnLive && !error && !loading && items.length === 0;
   // The right-rail navigator's tick list mirrors the assistant turns visible
   // on the page. A user turn isn't a tick — only the assistant block that
@@ -515,7 +516,7 @@ export function WebuiSessionTranscript({
         if (!requestedCursor) return;
         // 翻历史是用户主动往上走：交还控制权，否则更早消息并进来之后
         // 贴底跟随会把他从正在读的位置拽回末尾。
-        openScrollFollowRef.current = false;
+        autoFollowRef.current = false;
         const viewport = transcriptViewport(transcriptRef.current);
         const previousScrollTop = viewport?.scrollTop;
         void historyOwner?.loadOlder(sessionId, requestedCursor).then((outcome) => {
