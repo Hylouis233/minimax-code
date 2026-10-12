@@ -9,6 +9,10 @@
 // The values are recomputed here from the documented rule rather than copied
 // from a previous run: a hard-coded digest would pin today's md5 of today's
 // string and would still pass if the rule changed shape.
+//
+// The salt is the one value this file does restate, on purpose: it is a wire
+// constant a coordinated server rollout has to move, so an accidental edit to
+// it should go red here as well as in `signing.ts`. Everything else is derived.
 import { createHash } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
