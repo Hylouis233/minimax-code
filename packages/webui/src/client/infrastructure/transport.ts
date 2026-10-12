@@ -315,6 +315,7 @@ export function createWebuiTransport({
     createTerminal: (body) => request("createTerminal", body),
     listTerminals: () => request("listTerminals", {}),
     writeTerminal: (body) => request("writeTerminal", body),
+    resizeTerminal: (body) => request("resizeTerminal", body),
     disposeTerminal: (body) => request("disposeTerminal", body),
     watchTerminal,
     createSession: (body) => request("createSession", body),

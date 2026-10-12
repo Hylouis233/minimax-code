@@ -1530,7 +1530,7 @@ export function WebuiClientFoundationApp(
                 </aside>
               </div>
             ) : null}
-            {!homeMode && workspacePanel.open ? <WebuiWorkspacePanel state={workspacePanel} dispatch={dispatchWorkspacePanel} sessionId={selectedSessionId} workspaceDir={selectedSession?.workspaceDir} workspaceFileUrl={transport?.workspaceFileUrl} readWorkspaceArchive={transport?.readWorkspaceArchive} extractWorkspaceArchive={transport?.extractWorkspaceArchive} readCanvas={transport?.readCanvas} applyCanvas={transport?.applyCanvas} createTerminal={transport?.createTerminal} listTerminals={transport?.listTerminals} writeTerminal={transport?.writeTerminal} disposeTerminal={transport?.disposeTerminal} watchTerminal={transport?.watchTerminal} onClose={() => dispatchWorkspacePanel({ type: "close-panel" })} /> : null}
+            {!homeMode && workspacePanel.open ? <WebuiWorkspacePanel state={workspacePanel} dispatch={dispatchWorkspacePanel} sessionId={selectedSessionId} workspaceDir={selectedSession?.workspaceDir} workspaceFileUrl={transport?.workspaceFileUrl} readWorkspaceArchive={transport?.readWorkspaceArchive} extractWorkspaceArchive={transport?.extractWorkspaceArchive} readCanvas={transport?.readCanvas} applyCanvas={transport?.applyCanvas} createTerminal={transport?.createTerminal} listTerminals={transport?.listTerminals} writeTerminal={transport?.writeTerminal} resizeTerminal={transport?.resizeTerminal} disposeTerminal={transport?.disposeTerminal} watchTerminal={transport?.watchTerminal} onClose={() => dispatchWorkspacePanel({ type: "close-panel" })} /> : null}
             </>}
           </main>
         </div>

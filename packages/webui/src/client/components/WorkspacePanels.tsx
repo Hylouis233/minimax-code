@@ -40,6 +40,11 @@ import {
   type WebuiWorkspaceSubagent,
   type WebuiWorkspaceTodo,
 } from "../projection/workspace-progress.js";
+import {
+  TERMINAL_RESIZE_DEBOUNCE_MS,
+  terminalResizeRequest,
+} from "../projection/terminal-size.js";
+import type { WebuiTerminalSize } from "../contracts/terminal-port.js";
 import { WebuiIconAgent, WebuiIconCheck, WebuiIconChevronDown, WebuiIconClose, WebuiIconDiffFile, WebuiIconFile, WebuiIconFolder, WebuiIconRunLocation, WebuiIconSearch, WebuiIconSidebarToggle, WebuiIconWorkspaceCanvas, WebuiIconWorkspaceExpand, WebuiIconWorkspaceReview, WebuiIconWorkspaceTerminal } from "../icons.js";
 import { FileTree, filterWorkspaceFiles, findWorkspaceFile, getWorkspaceFileParentPaths, mergeWorkspaceFileChildren } from "./WorkspaceFileTree.js";
 import { WorkspaceMediaPreview, isMediaContent } from "./WorkspaceMediaPreview.js";
@@ -381,7 +386,7 @@ export function WebuiFilePreview({ tab, result, codeMode, workspaceFileUrl, read
   </div>;
 }
 
-export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, workspaceFileUrl, readWorkspaceArchive, extractWorkspaceArchive, readCanvas, applyCanvas, createTerminal, listTerminals, writeTerminal, disposeTerminal, watchTerminal, onClose }: {
+export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, workspaceFileUrl, readWorkspaceArchive, extractWorkspaceArchive, readCanvas, applyCanvas, createTerminal, listTerminals, writeTerminal, resizeTerminal, disposeTerminal, watchTerminal, onClose }: {
   readonly state: WorkspacePanelState;
   readonly dispatch: (command: WorkspacePanelCommand) => void;
   readonly sessionId?: string; readonly workspaceDir?: string;
@@ -396,6 +401,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   readonly createTerminal?: (request: { workspaceDir: string }) => Promise<{ terminalId: string; status: string }>;
   readonly listTerminals?: () => Promise<readonly Record<string, unknown>[]>;
   readonly writeTerminal?: (request: { terminalId: string; data: string }) => Promise<unknown>;
+  readonly resizeTerminal?: (request: WebuiTerminalSize) => Promise<unknown>;
   readonly disposeTerminal?: (request: { terminalId: string }) => Promise<unknown>;
   readonly watchTerminal?: (request: { terminalId: string }, onFrame: (frame: { terminalId: string; data: string; exited: boolean }) => void) => () => void;
   readonly onClose?: () => void;
@@ -427,6 +433,14 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   const terminalHost = useRef<HTMLDivElement>(null);
   const terminalInstance = useRef<Terminal>();
   const terminalStop = useRef<(() => void) | undefined>();
+  /**
+   * The size this pane last told the runtime, so an unchanged measurement is
+   * not sent twice. Deliberately NOT reset when the effect re-mounts the
+   * terminal: the entry carries its terminal id, and a different terminal
+   * cannot match it, so a fresh 80x24 pseudo-terminal still hears about the
+   * grid it was fitted to.
+   */
+  const reportedTerminalSize = useRef<WebuiTerminalSize>();
   const activeWorkspace = activeTab && "workspaceDir" in activeTab ? activeTab.workspaceDir : workspaceDir;
   const activeWorkspaceRef = useRef(activeWorkspace);
   activeWorkspaceRef.current = activeWorkspace;
@@ -571,6 +585,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   useEffect(() => {
     const active = terminals.find((candidate) => String(candidate.terminalId) === activeTerminalId) ?? terminals[0];
     if (!active || !terminalHost.current) return;
+    const terminalId = String(active.terminalId);
     const styles = getComputedStyle(terminalHost.current);
     const terminal = new Terminal({ cols: 80, rows: 24, convertEol: true, theme: { background: styles.getPropertyValue("--bg_default_secondary").trim(), foreground: styles.getPropertyValue("--terminal_foreground").trim(), cursor: styles.getPropertyValue("--terminal_cursor").trim() } });
     const fit = new FitAddon();
@@ -578,13 +593,33 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     terminal.open(terminalHost.current);
     fit.fit();
     terminalInstance.current = terminal;
-    terminalStop.current = watchTerminal?.({ terminalId: String(active.terminalId) }, (frame) => { terminal.write(frame.data); if (frame.exited) terminal.options.disableStdin = true; });
-    const onResize = () => { fit.fit(); };
+    terminalStop.current = watchTerminal?.({ terminalId }, (frame) => { terminal.write(frame.data); if (frame.exited) terminal.options.disableStdin = true; });
+    // The fit moves the browser's viewport; this is what tells the runtime. The
+    // size is read at send time, so a drag that ends in one place reports that
+    // place once instead of replaying every frame of the drag.
+    const reportTerminalSize = () => {
+      const request = terminalResizeRequest({ terminalId, cols: terminal.cols, rows: terminal.rows, reported: reportedTerminalSize.current });
+      if (!request) return;
+      reportedTerminalSize.current = request;
+      if (resizeTerminal) void resizeTerminal(request);
+    };
+    let resizeTimer: ReturnType<typeof setTimeout> | undefined;
+    const onResize = () => {
+      fit.fit();
+      if (!resizeTerminal) return;
+      if (resizeTimer !== undefined) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(reportTerminalSize, TERMINAL_RESIZE_DEBOUNCE_MS);
+    };
     const observer = new ResizeObserver(onResize);
     observer.observe(terminalHost.current);
-    const input = terminal.onData((data) => { if (writeTerminal) void writeTerminal({ terminalId: String(active.terminalId), data }); });
-    return () => { input.dispose(); observer.disconnect(); terminalStop.current?.(); terminalStop.current = undefined; terminal.dispose(); terminalInstance.current = undefined; };
-  }, [activeTerminalId, terminals, watchTerminal, writeTerminal]);
+    const input = terminal.onData((data) => { if (writeTerminal) void writeTerminal({ terminalId, data }); });
+    return () => { input.dispose(); observer.disconnect(); if (resizeTimer !== undefined) clearTimeout(resizeTimer); terminalStop.current?.(); terminalStop.current = undefined; terminal.dispose(); terminalInstance.current = undefined; };
+    // `resizeTerminal` takes its place beside its neighbours rather than being
+    // read through a ref: every port method here comes off the transport the
+    // entry builds once at module scope (`main.tsx`), so their identities do not
+    // change between renders and a panel drag cannot re-run this effect and
+    // rebuild a shell that is running.
+  }, [activeTerminalId, resizeTerminal, terminals, watchTerminal, writeTerminal]);
   const tabLabel = (item: WorkspacePanelTab): string => item.kind === "file-preview" ? basenamePath(item.path) : item.kind === "review" && item.source === "turn" ? "Review" : ({ files: "查看文件", review: "变更", canvas: "画布", terminal: "终端" } as const)[item.kind];
   const fileTabGlyph = (item: WorkspacePanelTab) => {
     if (item.kind === "files") return <WebuiIconFile className="webui-workspace-tab-file-icon" />;
