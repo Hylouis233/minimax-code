@@ -119,7 +119,7 @@ function highlightFileLine(line: string, language: string | undefined): string |
 }
 
 export type WebuiUnifiedDiffLine = {
-  readonly kind: "addition" | "context" | "deletion" | "hunk";
+  readonly kind: "addition" | "context" | "deletion" | "hunk" | "noNewline";
   readonly content: string;
   readonly oldLine?: number;
   readonly newLine?: number;
@@ -137,7 +137,15 @@ export function projectWebuiUnifiedDiffLines(diff: string): WebuiUnifiedDiffLine
       lines.push({ kind: "hunk", content: raw });
       continue;
     }
-    if (!raw || raw.startsWith("diff --git ") || raw.startsWith("index ") || raw.startsWith("--- ") || raw.startsWith("+++ ") || raw.startsWith("\\ No newline")) continue;
+    if (!raw || raw.startsWith("diff --git ") || raw.startsWith("index ") || raw.startsWith("--- ") || raw.startsWith("+++ ")) continue;
+    if (raw.startsWith("\\")) {
+      // "\ No newline at end of file" records a fact about the line before it
+      // and takes no number of its own. Desktop's renderer keeps it as its own
+      // row with no gutter numbers and neutral text, so it is carried through
+      // as a marker instead of dropped.
+      lines.push({ kind: "noNewline", content: raw });
+      continue;
+    }
     if (raw.startsWith("+")) {
       lines.push({ kind: "addition", ...(newLine === undefined ? {} : { newLine: newLine++ }), content: raw.slice(1) });
     } else if (raw.startsWith("-")) {
@@ -162,9 +170,9 @@ export function WebuiDiffFileSection({ file, selected, loading = false, error, o
       {file.deletions > 0 ? <span className="webui-diff-del">-{file.deletions}</span> : null}
     </summary>
     {loading ? <p className="webui-turn-review-unavailable" role="status">正在加载差异…</p> : error ? <p className="webui-turn-review-unavailable" role="alert">{error}</p> : lines.length ? <pre className="webui-file-code webui-turn-review-code"><code className={language ? `hljs language-${language}` : ""}>{lines.map((line, index) => {
-      const highlighted = line.kind === "hunk" ? undefined : highlightFileLine(line.content, language);
+      const highlighted = line.kind === "hunk" || line.kind === "noNewline" ? undefined : highlightFileLine(line.content, language);
       return <span className={`webui-turn-review-line webui-turn-review-line--${line.kind}`} key={`${index}-${line.kind}`}>
-        {line.kind === "hunk" ? <span className="webui-turn-review-hunk">{line.content}</span> : <>
+        {line.kind === "hunk" ? <span className="webui-turn-review-hunk">{line.content}</span> : line.kind === "noNewline" ? line.content : <>
           <span className="webui-turn-review-line-number">{line.oldLine ?? ""}</span>
           <span className="webui-turn-review-line-number">{line.newLine ?? ""}</span>
           <span className="webui-turn-review-marker">{line.kind === "addition" ? "+" : line.kind === "deletion" ? "−" : " "}</span>

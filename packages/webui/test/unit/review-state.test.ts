@@ -200,15 +200,24 @@ describe("unified diff projection and the line target it yields", () => {
     expect(marker?.kind).toBe("meta");
   });
 
-  it("treats content before the first hunk header as metadata, not as lines", () => {
+  it("folds the file's own header lines into the file heading, not into rows", () => {
+    // `diff --git` / `index` / `---` / `+++` are file metadata: Desktop's diff
+    // view parses them into the header it already draws above the patch — path,
+    // status, +N/−M — and never renders them as rows of the diff. This list
+    // sits under the same heading, so it drops them, and drops them before the
+    // numbering path so a jump can never point at one.
     const lines = projectWebuiReviewLines(diff);
+    expect(lines.some((line) => line.kind === "meta")).toBe(false);
+    expect(lines[0]).toEqual({ kind: "hunk", text: "@@ -10,4 +10,5 @@ export function thing() {" });
+  });
+
+  it("treats content before the first hunk header as metadata, not as lines", () => {
+    // A patch carrying prose or an unrecognised header before its first hunk
+    // has no side to number. Numbering it would point the editor at the wrong
+    // place, so it is read as a meta row and yields no target.
+    const lines = projectWebuiReviewLines(["this is not a diff", "@@ -1,1 +1,1 @@", " keep"].join("\n"));
     const meta = lines.filter((line) => line.kind === "meta");
-    expect(meta.map((line) => line.text)).toEqual([
-      "diff --git a/src/one.ts b/src/one.ts",
-      "index 123..456 100644",
-      "--- a/src/one.ts",
-      "+++ b/src/one.ts",
-    ]);
+    expect(meta.map((line) => line.text)).toEqual(["this is not a diff"]);
     expect(meta.every((line) => webuiReviewLineTarget(line) === undefined)).toBe(true);
   });
 

@@ -136,6 +136,10 @@
   .webui-turn-review-line--addition { background: var(--bg_status_positive); color: #17251d; }
   .webui-turn-review-line--deletion { background: var(--bg_status_error); color: #302022; }
   .webui-turn-review-line--hunk { background: var(--bg_grouped_secondary); color: var(--text_default_tertiary); }
+  /* The no-newline marker: Desktop renders it as its own row with no gutter
+     numbers and neutral text, because it records a fact about the line above
+     rather than being a line of the file. */
+  .webui-turn-review-line--noNewline { grid-column: 1 / -1; padding: 1px var(--spacing_12); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--text_default_tertiary); }
   .webui-turn-review-line-number { border-right: 1px solid var(--border_light); padding: 0 8px 0 4px; color: var(--text_default_tertiary); text-align: right; user-select: none; }
   .webui-turn-review-line--addition .webui-turn-review-line-number { color: var(--text_status_success); }
   .webui-turn-review-line--deletion .webui-turn-review-line-number { color: var(--text_status_error); }

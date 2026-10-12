@@ -193,6 +193,24 @@ describe("turn review unified diff projection", () => {
     ]);
   });
 
+  it("keeps the no-newline marker as its own row, the way Desktop renders it", () => {
+    // pierre — the diff component Desktop renders with — keeps this marker in
+    // the hunk's line list and draws it as a row with no gutter numbers. The
+    // projection dropping it made a patch whose last line has no newline look
+    // identical to one whose last line does.
+    expect(projectWebuiUnifiedDiffLines([
+      "@@ -1,1 +1,1 @@",
+      "-return false;",
+      "\\ No newline at end of file",
+      "+return true;",
+    ].join("\n"))).toEqual([
+      { kind: "hunk", content: "@@ -1,1 +1,1 @@" },
+      { kind: "deletion", oldLine: 1, content: "return false;" },
+      { kind: "noNewline", content: "\\ No newline at end of file" },
+      { kind: "addition", newLine: 1, content: "return true;" },
+    ]);
+  });
+
   it("renders workspace review additions and deletions using the shared highlighted diff rows", () => {
     const markup = renderToStaticMarkup(createElement(WebuiDiffFileSection, {
       file: { file: "src/example.ts", additions: 1, deletions: 1, diff: "@@ -1 +1 @@\n-return false;\n+return true;" },

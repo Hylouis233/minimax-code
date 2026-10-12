@@ -222,7 +222,9 @@ export function projectWebuiReviewLines(unifiedDiff: string): readonly WebuiRevi
       continue;
     }
     if (raw.startsWith("diff ") || raw.startsWith("index ") || raw.startsWith("--- ") || raw.startsWith("+++ ")) {
-      projected.push({ kind: "meta", text: raw });
+      // File metadata. Desktop's diff view parses these into the file header it
+      // already draws — path, status, +N/−M — and never renders them as rows, so
+      // neither does this list. They stay out of the line numbering path too.
       continue;
     }
     if (!inHunk) {

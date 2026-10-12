@@ -501,6 +501,7 @@ const tailwindConfig = {
     "webui-turn-review-line--addition",
     "webui-turn-review-line--deletion",
     "webui-turn-review-line--hunk",
+    "webui-turn-review-line--noNewline",
     "webui-subagent-status--completed",
     "webui-subagent-status--error",
     "webui-user-menu-quota-row--first",
