@@ -23,6 +23,17 @@ export interface WebuiModelEntry {
   readonly selected?: boolean;
   readonly enabled?: boolean;
   readonly variant?: string;
+  /**
+   * The variants this model reports: `""` for thinking off, `thinking` for on,
+   * a level name for a depth scale. `listModels` fills it with
+   * `normalizeSupportedVariants`; the client's `resolveEffortOptions` reads it
+   * to decide whether a `switchable` model gets an on/off control.
+   *
+   * The runtime has always sent it; the port just never declared it, so the
+   * client's read sat on the index signature like a condition only the client
+   * believed in.
+   */
+  readonly supportedVariants?: readonly string[];
   readonly effortOptions?: readonly string[];
   readonly defaultEffort?: string;
   readonly contextWindowOptions?: readonly number[];

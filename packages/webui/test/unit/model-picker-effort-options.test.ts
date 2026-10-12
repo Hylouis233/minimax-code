@@ -17,6 +17,7 @@ import {
   variantForEffort,
 } from "../../src/client/projection/thinking-control.js";
 import type { WebuiModelPickerEntry } from "../../src/client/contracts/model-view.js";
+import type { WebuiModelEntry } from "../../src/shared/contracts/models.js";
 
 function entry(over: Partial<WebuiModelPickerEntry> = {}): WebuiModelPickerEntry {
   return { providerId: "minimax_api", modelId: "MiniMax-M3", ...over };
@@ -153,5 +154,25 @@ describe("what selecting an effort writes onto a draft", () => {
     const none = entry();
     expect(thinkingDraftPatch(none, "on")).toEqual({});
     expect(thinkingDraftPatch(none, "off")).toEqual({});
+  });
+});
+
+describe("the wire DTO the runtime sends", () => {
+  it("declares the variant list the picker reads", () => {
+    // Typed as the wire DTO, not as the picker's view type: if
+    // `WebuiModelEntry` stopped declaring `supportedVariants`, the read below
+    // would fall back to the index signature's `unknown` and this file would
+    // not compile. That is how the field went missing from the contract while
+    // the client kept reading it — nothing failed, because an index signature
+    // accepts whatever the runtime sends.
+    const model: WebuiModelEntry = {
+      providerId: "minimax_api",
+      modelId: "MiniMax-M3",
+      thinkingConfig: { mode: "switchable", default_value: "true" },
+      supportedVariants: ["thinking", ""],
+    };
+    const declared: readonly string[] = model.supportedVariants ?? [];
+    expect(declared).toEqual(["thinking", ""]);
+    expect(resolveEffortOptions(model)).toEqual(["off", "on"]);
   });
 });
