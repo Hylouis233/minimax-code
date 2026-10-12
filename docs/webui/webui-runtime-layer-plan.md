@@ -342,7 +342,7 @@ The file names below record where each duty was planned to land; where the imple
 | | `commands/descriptors.ts`, `commands/runner.ts` | Moved from `server/commands/`; the runner returns network-independent results |
 | `shared/` | `envelope.ts` | Split from `server/envelope.ts` — frame, protocol version, error codes; validator behaviour separates from constants |
 | | `operation-names.ts` | Moved from `server/operation/names.ts:70` |
-| | `contracts/*.ts` (15 files: account, canvas, goal, interactions, messages, models, personalization, queue, review, session, stream, terminal, usage-quota, version, workspace) | Split from `server/port.ts` DTO declarations, per capability domain |
+| | `contracts/*.ts` (16 files: account, canvas, commands, goal, interactions, messages, models, personalization, queue, review, session, stream, terminal, usage-quota, version, workspace) | Split from `server/port.ts` DTO declarations, per capability domain |
 | | `plugin-management.ts`, `session-transfer-format.ts` | Kept |
 | | `placeholder.ts` | **Deleted** — it has no consumer once real contracts exist |
 | `client/contracts/` | `session-port.ts`, `execution-port.ts`, `interaction-port.ts`, `workspace-port.ts`, `settings-port.ts`, `account-port.ts`, `plugin-port.ts`, `terminal-port.ts` | Split from `client/contracts.ts` — browser capability groups |
