@@ -72,6 +72,22 @@ const BUSINESSES = [
     // (§5.6); the fact that one module declares both views is not ownership.
     declarations: [
       { module: "application/session-commands.ts", name: "WebuiInteractionCommands" },
+      // §5.6: the carve's owner publishes the permission reply and the
+      // answer/dismiss commands. Added by ticket #66, which split the two duties
+      // out of the composer and gave each business its own owner.
+      {
+        module: "application/interaction-coordinator.ts",
+        name: "WebuiInteractionCoordinator",
+      },
+    ],
+  },
+  {
+    business: "goal",
+    // §4 criterion C: `goal` owns state, has its own lifecycle events and
+    // publishes commands, while no component ever names it. §5.6 gives the carve
+    // the refresh, the write commands and the versioned apply. Added by ticket #66.
+    declarations: [
+      { module: "application/goal-coordinator.ts", name: "WebuiGoalCoordinator" },
     ],
   },
 ];

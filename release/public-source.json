@@ -3845,6 +3845,7 @@
     "packages/webui/test/unit/fork-session-operation.test.ts",
     "packages/webui/test/unit/global-instructions-operation.test.ts",
     "packages/webui/test/unit/goal-coordinator.test.ts",
+    "packages/webui/test/unit/goal-interaction-prohibitions.test.ts",
     "packages/webui/test/unit/harness-host-slots.test.ts",
     "packages/webui/test/unit/interaction-coordinator.test.ts",
     "packages/webui/test/unit/legacy-protocol/README.md",

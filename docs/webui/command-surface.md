@@ -12,10 +12,22 @@ yet, not that it publishes nothing.
 
 | Business | Declaration | Member | Declared in |
 | --- | --- | --- | --- |
+| goal | `WebuiGoalCoordinator` | `applyGoal` | `application/goal-coordinator.ts` |
+| goal | `WebuiGoalCoordinator` | `clearGoal` | `application/goal-coordinator.ts` |
+| goal | `WebuiGoalCoordinator` | `createGoal` | `application/goal-coordinator.ts` |
+| goal | `WebuiGoalCoordinator` | `goalVersion` | `application/goal-coordinator.ts` |
+| goal | `WebuiGoalCoordinator` | `isGoalEnabled` | `application/goal-coordinator.ts` |
+| goal | `WebuiGoalCoordinator` | `patchGoal` | `application/goal-coordinator.ts` |
+| goal | `WebuiGoalCoordinator` | `refreshGoal` | `application/goal-coordinator.ts` |
 | interactions | `WebuiInteractionCommands` | `applyGoal` | `application/session-commands.ts` |
 | interactions | `WebuiInteractionCommands` | `applyQuestionnaire` | `application/session-commands.ts` |
 | interactions | `WebuiInteractionCommands` | `removePendingPermission` | `application/session-commands.ts` |
 | interactions | `WebuiInteractionCommands` | `replacePendingPermissions` | `application/session-commands.ts` |
+| interactions | `WebuiInteractionCoordinator` | `answerQuestionnaire` | `application/interaction-coordinator.ts` |
+| interactions | `WebuiInteractionCoordinator` | `dismissQuestionnaire` | `application/interaction-coordinator.ts` |
+| interactions | `WebuiInteractionCoordinator` | `invalidatePendingReads` | `application/interaction-coordinator.ts` |
+| interactions | `WebuiInteractionCoordinator` | `refresh` | `application/interaction-coordinator.ts` |
+| interactions | `WebuiInteractionCoordinator` | `replyPermission` | `application/interaction-coordinator.ts` |
 | turn | `WebuiStreamPhaseCommands` | `awaitInteraction` | `application/session-commands.ts` |
 | turn | `WebuiStreamPhaseCommands` | `endStreaming` | `application/session-commands.ts` |
 | turn | `WebuiStreamPhaseCommands` | `markStreamPhase` | `application/session-commands.ts` |
