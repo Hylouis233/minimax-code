@@ -15,6 +15,7 @@ import { TurnNavigator, type TurnSummary } from "./TurnNavigator.js";
 import { MessageItem } from "./MessageItem.js";
 import { formatWebuiMessageTimestamp } from "./MessageActions.js";
 import type { WebuiMessageActionCapabilities } from "../contracts/transcript/transcript-view.js";
+import { useWebuiPortSlice } from "../bindings/port-slices-context.js";
 import { useWebuiSessionQuestionnaire, useWebuiSessionState, useWebuiSessionStream, useWebuiTranscriptHistoryOwner } from "../bindings/use-session-state.js";
 import { isTurnLive } from "../projection/composer-state.js";
 import {
@@ -31,17 +32,6 @@ import type { WebuiQuestionnaireRequest } from "../../shared/contracts/interacti
 /** Capability subset the transcript passes through to each message item.
  *  Single source of truth lives in `WebuiTransport`; this alias keeps the
  *  prop block free of per-key `WebuiTransport["x"]` redeclarations. */
-type WebuiSessionTranscriptCapabilities = Pick<
-  WebuiTransport,
-  | "getTurnDiff"
-  | "revertTurnDiff"
-  | "reapplyTurnDiff"
-  | "getSessionForkOptions"
-  | "forkSession"
-  | "getSessionRewindPreview"
-  | "rewindSession"
-  | "editSessionMessage"
->;
 import type { WebuiTurnDiffView } from "../../shared/contracts/session.js";
 import type { WebuiQuestionnaireResponseSummary } from "../contracts/transcript/transcript-view.js";
 import type { WebuiMessageFileReference } from "../projection/message-file-reference.js";
@@ -110,6 +100,7 @@ export function WebuiQuestionnaireResponse({
   readonly summary: WebuiQuestionnaireResponseSummary;
   readonly timestamp?: number;
 }): ReactElement {
+
   const { requestId, answers } = summary;
   return (
     <article
@@ -217,14 +208,6 @@ export function WebuiQuestionnaireResponse({
 export function WebuiSessionTranscript({
   sessionId,
   initialMessages,
-  getTurnDiff,
-  revertTurnDiff,
-  reapplyTurnDiff,
-  getSessionForkOptions,
-  forkSession,
-  getSessionRewindPreview,
-  rewindSession,
-  editSessionMessage,
   answerPlanBuild,
   workspaceDir,
   onOpenFile,
@@ -238,7 +221,23 @@ export function WebuiSessionTranscript({
   readonly onOpenTurnReview?: (command: Extract<WorkspacePanelCommand, { type: "open-turn-review" }>) => void;
   readonly onOpenPlanFile?: (input: { readonly sessionId: string; readonly path: string; readonly content: string }) => void;
   readonly answerPlanBuild?: (request: WebuiQuestionnaireRequest) => Promise<void>;
-} & WebuiSessionTranscriptCapabilities): ReactElement {
+}): ReactElement {
+
+  // The transcript and session capabilities (plan §8 Phase 2, A4-s3): this pane
+  // reads the two slices it belongs to instead of receiving the members as props.
+  // An unwired member is `undefined` — the same value the optional prop carried —
+  // and a host with no provider renders the shape it already renders with
+  // nothing wired (SSR, tests).
+  const transcriptPort = useWebuiPortSlice("transcript");
+  const sessionsPort = useWebuiPortSlice("sessions");
+  const getTurnDiff = transcriptPort?.getTurnDiff;
+  const revertTurnDiff = transcriptPort?.revertTurnDiff;
+  const reapplyTurnDiff = transcriptPort?.reapplyTurnDiff;
+  const getSessionRewindPreview = transcriptPort?.getSessionRewindPreview;
+  const rewindSession = transcriptPort?.rewindSession;
+  const editSessionMessage = transcriptPort?.editSessionMessage;
+  const getSessionForkOptions = sessionsPort?.getSessionForkOptions;
+  const forkSession = sessionsPort?.forkSession;
   const historyOwner = useWebuiTranscriptHistoryOwner();
   const transcriptState = useWebuiSessionState(sessionId).transcript;
   const hasCanonicalPage = transcriptState.page.messages !== undefined;

@@ -3945,6 +3945,7 @@
     "packages/webui/test/unit/webui-auth-context.test.ts",
     "packages/webui/test/unit/webui-boundary-check.test.ts",
     "packages/webui/test/unit/webui-candidate-wire-compatibility.test.ts",
+    "packages/webui/test/unit/webui-capability-seam.test.tsx",
     "packages/webui/test/unit/webui-checkin.test.ts",
     "packages/webui/test/unit/webui-dependency-check.test.ts",
     "packages/webui/test/unit/webui-design-tokens.test.ts",

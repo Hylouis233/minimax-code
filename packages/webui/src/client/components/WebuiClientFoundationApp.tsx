@@ -256,8 +256,6 @@ export function WebuiClientFoundationApp(
   const sessionsPort = portSlices.sessions;
   const transcriptPort = portSlices.transcript;
   const composerPort = portSlices.composer;
-  const goalPort = portSlices.goal;
-  const interactionsPort = portSlices.interactions;
   // The one application session store for this mount (plan §7.6; ticket #45).
   // A caller (tests, SSR) may inject one; production omits the prop and the
   // shell creates exactly one. The shell provides this exact object through
@@ -296,8 +294,6 @@ export function WebuiClientFoundationApp(
   // read directly off `transport` at the JSX consumption point — see the
   // 67-rebind classification table in the revision report.
   const loadMessages = transcriptPort.loadMessages;
-  const getSessionForkOptions = sessionsPort.getSessionForkOptions;
-  const forkSession = sessionsPort.forkSession;
 
   // The one session catalog (plan §7.6 "Flat/tree queries"; ticket #49). The
   // shell subscribes to the store's catalog slice and resolves the flat and
@@ -1492,7 +1488,6 @@ export function WebuiClientFoundationApp(
                     sessionLayout={!homeMode}
                     usageQuota={usageQuota}
                     agentName={selectedAgentName}
-                    createSession={sessionWorkflows.createSession}
                     createSessionWorkspaceDir={newTaskWorkspaceDir}
                     onWorkspaceChange={handleWorkspaceChange}
                     workspaceMenuOpen={workspaceMenuOpen}
@@ -1500,29 +1495,7 @@ export function WebuiClientFoundationApp(
                     recentWorkspaceDirs={recentWorkspaceDirs}
                     runCommand={commandWorkflows.canRunCommand ? commandWorkflows.runCommand : undefined}
                     sendMessage={transport?.sendMessage}
-                    enqueueMessage={composerPort.enqueueMessage}
-                    loadMessages={loadMessages}
-                    getTurnDiff={transcriptPort.getTurnDiff}
-                    revertTurnDiff={transcriptPort.revertTurnDiff}
-                    reapplyTurnDiff={transcriptPort.reapplyTurnDiff}
-                    getSessionForkOptions={getSessionForkOptions}
-                    forkSession={forkSession}
-                    getSessionRewindPreview={transcriptPort.getSessionRewindPreview}
-                    rewindSession={transcriptPort.rewindSession}
-                    editSessionMessage={transcriptPort.editSessionMessage}
-                    getGoal={goalPort.getGoal}
                     getActiveTurn={transport?.getActiveTurn}
-                    createGoal={goalPort.createGoal}
-                    patchGoal={goalPort.patchGoal}
-                    clearGoal={goalPort.clearGoal}
-                    isGoalEnabled={goalPort.isGoalEnabled}
-                    listPendingPermissions={interactionsPort.listPendingPermissions}
-                    getPendingQuestionnaire={interactionsPort.getPendingQuestionnaire}
-                    replyPermission={interactionsPort.replyPermission}
-                    replyQuestionnaire={interactionsPort.replyQuestionnaire}
-                    dismissQuestionnaire={interactionsPort.dismissQuestionnaire}
-                    listQueueMessages={composerPort.listQueueMessages}
-                    deleteQueueItem={composerPort.deleteQueueItem}
                     listModels={transport?.listModels}
                     listSkills={transport?.listSkills}
                     listWorkspaceFileTree={transport?.listWorkspaceFileTree}
@@ -1555,14 +1528,6 @@ export function WebuiClientFoundationApp(
                         onOpenFile={({ sessionId, workspaceDir, reference }) => dispatchWorkspacePanel({ type: "open-file", sessionId, workspaceDir, path: reference.path, ...(reference.lineStart !== undefined ? { lineStart: reference.lineStart } : {}), ...(reference.lineEnd !== undefined ? { lineEnd: reference.lineEnd } : {}) })}
                         onOpenTurnReview={(command) => dispatchWorkspacePanel(command)}
                         {...(initialMessages ? { initialMessages } : {})}
-                        getTurnDiff={transcriptPort.getTurnDiff}
-                        revertTurnDiff={transcriptPort.revertTurnDiff}
-                        reapplyTurnDiff={transcriptPort.reapplyTurnDiff}
-                        getSessionForkOptions={getSessionForkOptions}
-                        forkSession={forkSession}
-                        getSessionRewindPreview={transcriptPort.getSessionRewindPreview}
-                        rewindSession={transcriptPort.rewindSession}
-                        editSessionMessage={transcriptPort.editSessionMessage}
                         answerPlanBuild={planReviewWorkflow.answerPlanBuild}
                         onOpenPlanFile={({ sessionId: planSessionId, path, content }) => dispatchWorkspacePanel({ type: "open-plan-file", sessionId: planSessionId, workspaceDir: selectedSession?.workspaceDir ?? "", path, content })}
                       />
