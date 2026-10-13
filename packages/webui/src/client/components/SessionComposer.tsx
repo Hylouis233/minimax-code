@@ -38,7 +38,7 @@ import { projectWebuiMessageToStreamMessage, readUsageNumber } from "../projecti
 import { createWebuiGoalCoordinator } from "../application/goal-coordinator.js";
 import {
   createWebuiInteractionCoordinator,
-} from "../application/interaction-coordinator.js";
+} from "../application/interactions/interaction-coordinator.js";
 import { latestContextUsage, readContextUsageSnapshot } from "../projection/context-usage.js";
 import {
   contextUsagePopoverStyle,

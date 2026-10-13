@@ -13,7 +13,7 @@ import {
   createWebuiInteractionCoordinator,
   createWebuiPlanReviewWorkflow,
   type WebuiInteractionSink,
-} from "../../src/client/application/interaction-coordinator.js";
+} from "../../src/client/application/interactions/interaction-coordinator.js";
 import { webuiAnswersEndTurn } from "../../src/client/projection/questionnaire-state.js";
 import type { WebuiPendingPermission, WebuiQuestionnaireRequest } from "../../src/shared/contracts/interactions.js";
 

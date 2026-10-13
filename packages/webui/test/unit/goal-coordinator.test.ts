@@ -19,7 +19,7 @@ import {
   createWebuiGoalCoordinator,
   type WebuiGoalSink,
 } from "../../src/client/application/goal-coordinator.js";
-import { createWebuiInteractionCoordinator } from "../../src/client/application/interaction-coordinator.js";
+import { createWebuiInteractionCoordinator } from "../../src/client/application/interactions/interaction-coordinator.js";
 
 function goalSink(): WebuiGoalSink & Record<string, unknown> {
   return { applyGoal: vi.fn(), afterGoalReRead: vi.fn() } as never;

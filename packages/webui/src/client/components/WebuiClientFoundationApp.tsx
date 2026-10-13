@@ -144,7 +144,7 @@ import {
   webuiWorkspaceSubagentStatus,
 } from "../projection/workspace-progress.js";
 import { createWebuiApplication, type WebuiApplication } from "../application/create-application.js";
-import { createWebuiPlanReviewWorkflow } from "../application/interaction-coordinator.js";
+import { createWebuiPlanReviewWorkflow } from "../application/interactions/interaction-coordinator.js";
 import type { WebuiEventEffects } from "../application/event-coordinator.js";
 import { createWebuiOpenEventChannel } from "../bindings/event-channel-adapter.js";
 import type { WebuiWorkspaceGitChangedSignal } from "../projection/workspace-panel-state.js";

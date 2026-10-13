@@ -13,7 +13,7 @@
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
 
-import type { WebuiInteractionSink } from "../../src/client/application/interaction-coordinator.js";
+import type { WebuiInteractionSink } from "../../src/client/application/interactions/interaction-coordinator.js";
 import type { WebuiGoalSink } from "../../src/client/application/goal-coordinator.js";
 import { createWebuiVersionCells } from "../../src/client/application/version-cell.js";
 
