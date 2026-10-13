@@ -31,42 +31,42 @@ import {
   type ReactElement,
 } from "react";
 
-import { WebuiIconChevronDown } from "../icons.js";
-import { ToggleSwitch } from "./ToggleSwitch.js";
+import { WebuiIconChevronDown } from "../../icons.js";
+import { ToggleSwitch } from "../ToggleSwitch.js";
 import type {
   WebuiModelPickerDraft,
   WebuiModelPickerEntry,
   WebuiModelProviderGroup,
-} from "../contracts/models/model-view.js";
-import { evaluateOutsideClose } from "../projection/outside-close.js";
+} from "../../contracts/models/model-view.js";
+import { evaluateOutsideClose } from "../../projection/outside-close.js";
 import {
   resolveEffortOptions,
   thinkingDraftPatch,
-} from "../projection/thinking-control.js";
-import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js";
+} from "../../projection/thinking-control.js";
+import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
 import {
   filterModelGroups,
   isSearchEmpty,
-} from "../projection/model-picker-search.js";
+} from "../../projection/model-picker-search.js";
 import {
   orderModelGroups,
   toggleFavoriteId,
-} from "../projection/model-favorites.js";
+} from "../../projection/model-favorites.js";
 import {
   isPreview,
   rowHasFlyout,
   type CascadeTier,
-} from "../projection/model-picker-cascade.js";
+} from "../../projection/model-picker-cascade.js";
 import {
   MODEL_FLYOUT_HOVER_DELAY_MS,
   hoverArrival,
-} from "../projection/model-picker-hover.js";
+} from "../../projection/model-picker-hover.js";
 import {
   ModelSettingsFlyout,
   type ModelSettingsFlyoutProps,
   type FlyoutAnchor,
 } from "./ModelSettingsFlyout.js";
-import type { FlyoutRect } from "../projection/flyout-position.js";
+import type { FlyoutRect } from "../../projection/flyout-position.js";
 
 // Re-export so existing importers keep their import path stable.
 export type {

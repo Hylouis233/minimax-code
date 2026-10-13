@@ -10,7 +10,7 @@ import {
   rowIdOf,
   WebuiModelMenuList,
   WebuiModelPicker,
-} from "../../src/client/components/ModelPicker.js";
+} from "../../src/client/components/models/ModelPicker.js";
 import type { WebuiModelPickerEntry } from "../../src/client/contracts/models/model-view.js";
 
 function entry(

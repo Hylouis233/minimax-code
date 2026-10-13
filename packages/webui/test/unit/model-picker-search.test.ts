@@ -20,7 +20,7 @@ import {
   groupModelsByProvider,
   modelKey,
   WebuiModelMenuList,
-} from "../../src/client/components/ModelPicker.js";
+} from "../../src/client/components/models/ModelPicker.js";
 import {
   filterModelGroups,
   fuzzyMatches,

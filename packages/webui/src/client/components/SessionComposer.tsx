@@ -126,7 +126,7 @@ import { WebuiQueuePanel } from "./QueuePanel.js";
 import {
   WebuiModelPicker,
   type WebuiModelPickerDraft,
-} from "./ModelPicker.js";
+} from "./models/ModelPicker.js";
 import { ThinkingTrigger } from "./composer/ThinkingTrigger.js";
 import {
   chipLevelLabel,
