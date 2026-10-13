@@ -1575,14 +1575,25 @@ const FORBIDDEN_RECEIVER_INTERFACES = new Map([
   // [declaredReceiverName, forbiddenMethodNames]
   ["WebuiSessionStore", new Set(["createSessionWriter", "createInteractionWriter"])],
   ["WebuiTransport", null], // any method call is a business RPC; null = wildcard
+  // The capability ports. The names are the ones the port re-file produced
+  // (plan §9, ticket #59): `ExecutionPort` no longer exists, and the interfaces
+  // it and `settings-port`/`session-port`/`interaction-port` were split into
+  // each carry their own members now. A name missing here is silent lost
+  // coverage — the rule falls through to the receiver-type lookup, which has no
+  // entry for a slice alias — so the list has to track the declarations.
   ["SessionPort", null],
-  ["ExecutionPort", null],
+  ["TranscriptPort", null],
+  ["TurnExecutionPort", null],
+  ["ComposerPort", null],
+  ["ShellEventPort", null],
   ["InteractionPort", null],
+  ["GoalPort", null],
   ["WorkspacePort", null],
+  ["TerminalPort", null],
   ["SettingsPort", null],
+  ["ModelsPort", null],
   ["AccountPort", null],
   ["PluginPort", null],
-  ["TerminalPort", null],
 ]);
 
 // Layers that must *not* invoke a writer-factory or a business-RPC method.

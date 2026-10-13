@@ -1164,6 +1164,56 @@ resolver produces unbounded false positives, stop and report rather than shippin
 trusted, and never widen a baseline to reach green. This spike is separable: dropping it leaves every
 other phase intact and weakens only the *verification* of Phase 3.
 
+**Spike outcome — run 2026-10-13 against the delivered seam (ticket #65). The extension is validated and
+prepared, not landed, and the nine findings it produces are filed on the carves that own them.**
+
+Measured on `webui` at the commit that closed A3, four configurations, same program build each time.
+The probe lives outside the repository (`minimax-code-webui-work/w3-spike-12.7/probe.mjs`) and drives
+`buildDependencyGraph`/`evaluateGraph` directly:
+
+| configuration | resolved call sites | under `client/components/` | `forbiddenCalls` |
+| --- | ---: | ---: | ---: |
+| A — as shipped | 3802 | 1440 | 0 |
+| B — resolver extended to function-parameter destructuring | 3996 | 1633 | 2 |
+| C — B + the policy map updated to the re-filed interfaces | 3996 | 1633 | 9 |
+| D — policy map updated, resolver unextended (what a commit can ship today) | 3802 | 1440 | 0 |
+
+**The stop condition is not met.** The extension resolves 194 more sites and produces 9 findings, not an
+unbounded set; every one of the nine is a verified true positive — a `Pick<WebuiTransport, …>` capability
+slice invoked from a presentation component, which is prohibition 1 in its literal form:
+
+| file:line | method | owning carve |
+| --- | --- | --- |
+| `GoalBanner.tsx:143`, `:152` | `patchGoal`, `clearGoal` | `interactions` + `goal` (B1) |
+| `DiffCard.tsx:213` | `getTurnDiff` | `transcript` (B4) |
+| `MessageItem.tsx:146`, `:154`, `:164` | `getSessionRewindPreview`, `rewindSession`, `editSessionMessage` | `transcript` (B4) |
+| `MessageItem.tsx:172`, `:181` | `forkSession`, `getSessionForkOptions` | `transcript` (B4) |
+| `SessionComposer.tsx:850` | `loadMessages` | `transcript` (B4) / `composer` (B2), whichever lands first |
+
+**Why it is not landed here.** Landing B or C turns the gate red with those nine, and this plan forbids
+widening a baseline to reach green and treats a reported finding as a stopping result — so the extension
+lands *with* the carve that removes its findings, per business, not before. The extension itself is one
+branch in `destructuredMemberPath` (`if (ts.isParameter(outer)) return { keys, source: outer };`) plus the
+resolver's existing `propertyAlongPath`, which already does the right thing with a parameter — it reads the
+parameter's *declared type*, so a capability reached through a prop bag typed as a port is resolved, and an
+untyped parameter yields no site rather than a false one.
+
+**A second finding, and the reason C differs from B: the A3 port re-file silently dropped coverage.** The
+call rule keys first on the interface a method was declared in
+(`FORBIDDEN_RECEIVER_INTERFACES`), and that map still named `ExecutionPort` — destroyed by the re-file —
+while the six interfaces the re-file produced (`TranscriptPort`, `TurnExecutionPort`, `ComposerPort`,
+`ShellEventPort`, `ModelsPort`, `GoalPort`) were absent. Seven of the nine findings reach the rule only
+after the map is corrected; with the map as shipped, sites declared on the new interfaces fall through to
+the receiver-type lookup and are never judged. **A rename cannot turn a gate red, which is why this went
+unnoticed** — the map was corrected in the same commit as this record (`FORBIDDEN_RECEIVER_INTERFACES` now
+names the thirteen interfaces the re-file produces and no longer names `ExecutionPort`), and that
+correction is inert on today's tree: configuration D measures 0, because every site on a new interface
+sits in `client/application/`, where capability calls are legitimate.
+
+**What remains a reading, not a measurement.** Whether each of the nine is resolved the right way *in its
+business's terms* — a published command invoked by the owner, or the component handing the intent up — is
+the carve's judgement, not the rule's. The rule can only say that a presentation component invoked it.
+
 ---
 
 ## 13. How this design was reached
