@@ -3,7 +3,7 @@
 // Projection outputs and loader inputs the components consume. Split from the
 // former `client/contracts.ts`; nothing here crosses the process boundary.
 
-import type { WebuiFileDiffInfoView } from "../../../shared/contracts/session.js";
+import type { WebuiFileDiffInfoView } from "../../../../shared/contracts/session.js";
 
 /* Attachment shape — used by the components layer, declared here so the
  * projection layer can return an `attachments` array without importing the

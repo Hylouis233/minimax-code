@@ -14,14 +14,14 @@ import { ActivityIndicator, MessageAfterQueryStreamingPlaceholder, MessagePassiv
 import { TurnNavigator, type TurnSummary } from "./TurnNavigator.js";
 import { MessageItem } from "./MessageItem.js";
 import { formatWebuiMessageTimestamp } from "../../projection/transcript/message-timestamp.js";
-import type { WebuiMessageActionCapabilities } from "../../contracts/transcript/transcript-view.js";
+import type { WebuiMessageActionCapabilities } from "../../features/transcript/contracts/transcript-view.js";
 import { useWebuiSessionQuestionnaire, useWebuiSessionState, useWebuiSessionStream, useWebuiTranscriptHistoryOwner } from "../../bindings/use-session-state.js";
 import { isTurnLive } from "../../projection/turn/stream-state.js";
 import { isWebuiPlanReviewRequest } from "../../projection/interactions/plan-mode.js";
 import { WebuiTranscriptPlanDelivery } from "./PlanDelivery.js";
 import { WebuiQuestionnaireResponse } from "./QuestionnaireResponse.js";
-import type { WebuiClientMessagePage } from "../../contracts/transcript/message-view.js";
-import type { WebuiTranscriptItem } from "../../contracts/transcript/transcript-view.js";
+import type { WebuiClientMessagePage } from "../../features/transcript/contracts/message-view.js";
+import type { WebuiTranscriptItem } from "../../features/transcript/contracts/transcript-view.js";
 import type { WebuiTransport } from "../../contracts/transport.js";
 import type { WebuiQuestionnaireRequest } from "../../../shared/contracts/interactions.js";
 
@@ -40,7 +40,7 @@ type WebuiSessionTranscriptCapabilities = Pick<
   | "editSessionMessage"
 >;
 import type { WebuiTurnDiffView } from "../../../shared/contracts/session.js";
-import type { WebuiQuestionnaireResponseSummary } from "../../contracts/transcript/transcript-view.js";
+import type { WebuiQuestionnaireResponseSummary } from "../../features/transcript/contracts/transcript-view.js";
 import type { WebuiMessageFileReference } from "../../projection/transcript/message-file-reference.js";
 import type { WorkspacePanelCommand } from "../../projection/workspace/workspace-panel-state.js";
 import {

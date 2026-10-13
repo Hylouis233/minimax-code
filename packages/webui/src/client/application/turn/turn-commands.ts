@@ -19,7 +19,7 @@
 
 import type {WebuiClientMessageEnqueuer} from "../../contracts/composer/command-port.js";
 import type {WebuiClientSessionResumer} from "../../contracts/turn/execution-port.js";
-import type { WebuiClientMessageLoader } from "../../contracts/transcript/message-view.js";
+import type { WebuiClientMessageLoader } from "../../features/transcript/contracts/message-view.js";
 import type { WebuiClientSessionCreator } from "../../contracts/sessions/session-port.js";
 import type { WebuiAttachmentInput } from "../../../shared/contracts/messages.js";
 import type { WebuiTurnCommandWriter } from "../sessions/session-commands.js";

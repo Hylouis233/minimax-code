@@ -23,7 +23,7 @@ import type { WebuiSessionCatalogState } from "./sessions/session-catalog.js";
 import { initialWebuiSessionCatalogState } from "./sessions/session-catalog.js";
 import { initialWebuiStreamState } from "../projection/turn/stream-state.js";
 import type { WebuiStreamState } from "../projection/turn/stream-state.js";
-import type { WebuiClientMessagePage } from "../contracts/transcript/message-view.js";
+import type { WebuiClientMessagePage } from "../features/transcript/contracts/message-view.js";
 
 export interface WebuiApplicationTranscriptState {
   readonly generation: number;

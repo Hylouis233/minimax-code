@@ -19,7 +19,7 @@ import type {
   WebuiRevertTurnDiffRequest,
   WebuiRevertTurnDiffResult,
 } from "../../../shared/contracts/session.js";
-import type { WebuiDiffState, WebuiDiffStateAction } from "../../contracts/transcript/review-view.js";
+import type { WebuiDiffState, WebuiDiffStateAction } from "../../features/transcript/contracts/review-view.js";
 
 export interface WebuiReviewFile {
   readonly fileId: string;

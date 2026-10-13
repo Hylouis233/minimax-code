@@ -26,7 +26,7 @@ import {
 import type {WebuiClientMessageEnqueuer} from "../../contracts/composer/command-port.js";
 import type {WebuiClientMessageSender} from "../../contracts/turn/execution-port.js";
 import { WebuiWorkspaceDirectoryBrowser } from "../workspace/WebuiWorkspaceDirectoryBrowser.js";
-import type { WebuiClientMessageLoader } from "../../contracts/transcript/message-view.js";
+import type { WebuiClientMessageLoader } from "../../features/transcript/contracts/message-view.js";
 import type { WebuiModelSelectionRequest } from "../../contracts/models/model-view.js";
 import type { WebuiClientSessionCreator } from "../../contracts/sessions/session-port.js";
 import type { WebuiClientSessionPage, WebuiClientSession } from "../../contracts/sessions/session-view.js";

@@ -141,6 +141,34 @@ describe("layer matrix", () => {
     ]);
   });
 
+  it("classifies the business-first homes by the layers their files carry", () => {
+    // The target homes (plan §5.1) carry the same layers as the technical homes
+    // the files come from, so a direction rule is not re-spelled when a file
+    // moves. Without these mappings a moved path would classify `unknown`, which
+    // is reported rather than constrained: the gate would look green while
+    // enforcing less than it did before the move. These assertions fail if the
+    // mapping is dropped.
+    expect(classifyLayers("client/features/transcript/contracts/message-view.ts")).toEqual([
+      "contracts",
+    ]);
+    expect(classifyLayers("client/features/transcript/projection/message-projection.ts")).toEqual([
+      "view",
+    ]);
+    expect(classifyLayers("client/features/transcript/application/history.ts")).toEqual([
+      "application",
+    ]);
+    expect(classifyLayers("client/features/transcript/bindings/session.ts")).toEqual(["bindings"]);
+    expect(classifyLayers("client/features/transcript/ui/SessionTranscript.tsx")).toEqual([
+      "bindings",
+    ]);
+    // The conversation substrate takes the layer the mechanisms home carries.
+    expect(classifyLayers("client/conversation/transcript-history.ts")).toEqual(["mechanisms"]);
+    expect(classifyLayers("client/platform/transport.ts")).toEqual(["infrastructure"]);
+    expect(classifyLayers("client/ui/markdown.tsx")).toEqual(["bindings"]);
+    // A feature path with no role directory is not silently given one.
+    expect(classifyLayers("client/features/transcript/whatever.ts")).toEqual(["unknown"]);
+  });
+
   it("classifies the two client-root files by path rule alone", () => {
     // These are the only two files plan §6.1 keeps at the client root. Their
     // `root` layer used to come from `CLIENT_FILE_PROVENANCE`, which C-fin

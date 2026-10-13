@@ -20,7 +20,7 @@ import {
   webuiWorkspaceSubagentStatus,
   type WebuiWorkspaceProgressState,
 } from "../../src/client/projection/workspace/workspace-progress.js";
-import type { WebuiClientMessage } from "../../src/client/contracts/transcript/message-view.js";
+import type { WebuiClientMessage } from "../../src/client/features/transcript/contracts/message-view.js";
 
 function message(value: Record<string, unknown>): WebuiClientMessage {
   return value as unknown as WebuiClientMessage;

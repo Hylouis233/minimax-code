@@ -6,7 +6,7 @@
 // record moved here from `projection/transcript/message-parts.ts` so this leaf contract
 // no longer reaches into projection implementation.
 
-import type { WebuiTurnDiffView } from "../../../shared/contracts/session.js";
+import type { WebuiTurnDiffView } from "../../../../shared/contracts/session.js";
 import type { WebuiMessageAttachment } from "./message-view.js";
 
 /**

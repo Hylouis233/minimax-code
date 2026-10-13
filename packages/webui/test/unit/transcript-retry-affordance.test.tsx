@@ -25,7 +25,7 @@ import { createWebuiSessionStore } from "../../src/client/application/session-st
 import { WebuiApplicationProvider } from "../../src/client/bindings/application-context.js";
 import { createWebuiApplicationFixture } from "../support/application-fixture.js";
 import { projectMessageParts } from "../../src/client/projection/transcript/message-parts.js";
-import type { WebuiClientMessage } from "../../src/client/contracts/transcript/message-view.js";
+import type { WebuiClientMessage } from "../../src/client/features/transcript/contracts/message-view.js";
 
 /** Captures the retry control's click handler out of a static render. */
 function renderWithRetryCapture(props: {

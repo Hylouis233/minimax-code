@@ -13,7 +13,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { WebuiClientFoundationApp } from "../../src/client/components/shell/WebuiClientFoundationApp.js";
 import { shellElement } from "../support/shell-fixture.js";
-import type { WebuiClientMessage, WebuiClientMessagePage } from "../../src/client/contracts/transcript/message-view.js";
+import type { WebuiClientMessage, WebuiClientMessagePage } from "../../src/client/features/transcript/contracts/message-view.js";
 
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 import type { WebuiUsageQuotaResult } from "../../src/shared/contracts/usage-quota.js";

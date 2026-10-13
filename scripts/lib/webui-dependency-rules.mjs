@@ -396,6 +396,34 @@ export function classifyLayers(relative) {
   if (normalized === "client/global.d.ts") return ["root"];
 
   // Target layout (post-migration, and the layout fixtures use).
+  //
+  // The business-first homes (plan §5.1) carry the same layers their current
+  // technical homes do, so a file keeps its layer when it moves and a direction
+  // rule is not re-spelled. Without these the moved paths would classify
+  // `unknown`, which reports rather than constrains — the gate would look green
+  // while enforcing less than it did before the move.
+  if (normalized.startsWith("client/features/")) {
+    const [business, ...tail] = normalized.slice("client/features/".length).split("/");
+    if (!business) return ["unknown"];
+    const role = tail[0];
+    if (role === "contracts") return ["contracts"];
+    if (role === "projection") {
+      const b = basenameWithoutExtension(normalized);
+      return PROJECTION_DOMAIN.has(b) ? ["domain"] : ["view"];
+    }
+    if (role === "application") return ["application"];
+    if (role === "bindings" || role === "ui") return ["bindings"];
+    // A file at the feature root is its published surface; if it sits there it
+    // declares something. Report anything deeper that has no role directory.
+    return ["unknown"];
+  }
+  // Conversation substrate (plan §5.1) — the home of turn/history/stream
+  // lifecycle, and the target for `client/mechanisms/` plus the history rules
+  // that currently sit under `client/application/`.
+  if (normalized.startsWith("client/conversation/")) return ["mechanisms"];
+  if (normalized.startsWith("client/platform/")) return ["infrastructure"];
+  if (normalized.startsWith("client/ui/")) return ["bindings"];
+  if (normalized.startsWith("client/shell/")) return ["bindings"];
   if (normalized.startsWith("client/components/")) return ["bindings"];
   if (normalized.startsWith("client/bindings/")) return ["bindings"];
   if (normalized.startsWith("client/application/")) return ["application"];

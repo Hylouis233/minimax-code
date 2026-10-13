@@ -3,7 +3,7 @@ import {
   recordValue,
   stringAmongKeys,
 } from "../../contracts/value-readers.js";
-import type { WebuiClientMessage } from "../../contracts/transcript/message-view.js";
+import type { WebuiClientMessage } from "../../features/transcript/contracts/message-view.js";
 import type {
   WebuiWorkspaceTodoStatus,
   WebuiWorkspaceTodo,

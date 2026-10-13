@@ -8,8 +8,8 @@
 //
 // Every method stays optional — `undefined` means "the operation is not wired".
 
-import type { WebuiClientMessageLoader } from ".././transcript/message-view.js";
-import type { WebuiEditSessionMessageRequest, WebuiEditSessionMessageResult, WebuiGetSessionDiffRequest, WebuiGetSessionDiffResult, WebuiGetSessionRewindPreviewRequest, WebuiGetSessionRewindPreviewResult, WebuiGetTurnDiffRequest, WebuiGetTurnDiffResult, WebuiReapplyTurnDiffRequest, WebuiReapplyTurnDiffResult, WebuiRevertTurnDiffRequest, WebuiRevertTurnDiffResult, WebuiRewindSessionRequest, WebuiRewindSessionResult } from "../../../shared/contracts/session.js";
+import type { WebuiClientMessageLoader } from "./message-view.js";
+import type { WebuiEditSessionMessageRequest, WebuiEditSessionMessageResult, WebuiGetSessionDiffRequest, WebuiGetSessionDiffResult, WebuiGetSessionRewindPreviewRequest, WebuiGetSessionRewindPreviewResult, WebuiGetTurnDiffRequest, WebuiGetTurnDiffResult, WebuiReapplyTurnDiffRequest, WebuiReapplyTurnDiffResult, WebuiRevertTurnDiffRequest, WebuiRevertTurnDiffResult, WebuiRewindSessionRequest, WebuiRewindSessionResult } from "../../../../shared/contracts/session.js";
 
 export interface TranscriptPort {
   readonly loadMessages?: WebuiClientMessageLoader;

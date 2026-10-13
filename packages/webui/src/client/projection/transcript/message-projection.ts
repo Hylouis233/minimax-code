@@ -15,8 +15,8 @@ import {
   recordValue,
   stringValue,
 } from "../../contracts/value-readers.js";
-import type { WebuiClientMessage, WebuiMessageAttachment } from "../../contracts/transcript/message-view.js";
-import type { WebuiTranscriptItem } from "../../contracts/transcript/transcript-view.js";
+import type { WebuiClientMessage, WebuiMessageAttachment } from "../../features/transcript/contracts/message-view.js";
+import type { WebuiTranscriptItem } from "../../features/transcript/contracts/transcript-view.js";
 import type { WebuiStreamMessage } from "../turn/stream-state.js";
 import type {
   WebuiFileDiffInfoView,

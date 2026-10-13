@@ -20,7 +20,7 @@
 // retry cannot strand a "thinking" indicator or let a superseded attempt write.
 
 import type {WebuiClientSessionResumer} from "../../contracts/turn/execution-port.js";
-import type { WebuiClientMessageLoader } from "../../contracts/transcript/message-view.js";
+import type { WebuiClientMessageLoader } from "../../features/transcript/contracts/message-view.js";
 import { streamRecoveryProjection } from "../../projection/turn/stream-recovery.js";
 import type { WebuiStreamState } from "../../projection/turn/stream-state.js";
 import { reduceWebuiStreamFrame } from "../../projection/turn/stream-state.js";

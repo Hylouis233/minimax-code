@@ -22,7 +22,7 @@
 
 import type { ComposerPort } from "../../contracts/composer/command-port.js";
 import type { TurnExecutionPort } from "../../contracts/turn/execution-port.js";
-import type { WebuiClientMessageLoader } from "../../contracts/transcript/message-view.js";
+import type { WebuiClientMessageLoader } from "../../features/transcript/contracts/message-view.js";
 import type { WebuiClientSessionCreator } from "../../contracts/sessions/session-port.js";
 
 /** The capabilities a turn is run with, published as one object. */

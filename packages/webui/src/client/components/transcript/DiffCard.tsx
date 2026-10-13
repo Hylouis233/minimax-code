@@ -14,7 +14,7 @@ import type {
   WebuiGetTurnDiffRequest,
   WebuiTurnDiffView,
 } from "../../../shared/contracts/session.js";
-import type { WebuiDiffState } from "../../contracts/transcript/review-view.js";
+import type { WebuiDiffState } from "../../features/transcript/contracts/review-view.js";
 import {
   buildWebuiDiffMutationRequest,
   confirmWebuiDiffMutation,

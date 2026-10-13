@@ -7,7 +7,7 @@
 
 import type { ReactElement } from "react";
 
-import type { WebuiQuestionnaireResponseSummary } from "../../contracts/transcript/transcript-view.js";
+import type { WebuiQuestionnaireResponseSummary } from "../../features/transcript/contracts/transcript-view.js";
 import { formatWebuiMessageTimestamp } from "../../projection/transcript/message-timestamp.js";
 
 /**

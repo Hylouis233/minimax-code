@@ -23,7 +23,7 @@ import type { GoalPort } from "./goal/goal-port.js";
 import type { WorkspacePort } from "./workspace/workspace-port.js";
 import type { SettingsPort } from "./settings/settings-port.js";
 import type { ModelsPort } from "./models/provider-port.js";
-import type { TranscriptPort } from "./transcript/session-read-port.js";
+import type { TranscriptPort } from "../features/transcript/contracts/session-read-port.js";
 import type { AccountPort } from "./account/account-port.js";
 import type { PluginPort } from "./plugins/plugin-port.js";
 import type { TerminalPort } from "./workspace/terminal-port.js";

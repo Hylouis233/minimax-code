@@ -24,7 +24,7 @@
 import type {
   WebuiClientMessageLoader,
   WebuiClientMessagePage,
-} from "../../contracts/transcript/message-view.js";
+} from "../../features/transcript/contracts/message-view.js";
 import {
   createWebuiKeyedResource,
   createWebuiSelectedSlot,

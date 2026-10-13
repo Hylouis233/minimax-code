@@ -37,7 +37,7 @@ import {
   WebuiIconMessageRewind,
 } from "../shell/icons.js";
 import type { WebuiGetSessionRewindPreviewResult } from "../../../shared/contracts/session.js";
-import type { WebuiMessageActionCapabilities } from "../../contracts/transcript/transcript-view.js";
+import type { WebuiMessageActionCapabilities } from "../../features/transcript/contracts/transcript-view.js";
 import { formatWebuiMessageTimestamp } from "../../projection/transcript/message-timestamp.js";
 import { toggleWebuiFeedback, copyWebuiMessageText, scheduleWebuiCopiedReset } from "../../application/transcript/message-feedback.js";
 import type { WebuiCopyDependencies } from "../../application/transcript/message-feedback.js";

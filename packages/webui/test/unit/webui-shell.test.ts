@@ -60,8 +60,8 @@ import {
 import { shellElement } from "../support/shell-fixture.js";
 import type {WebuiClientMessageEnqueuer} from "../../src/client/contracts/composer/command-port.js";
 import type {WebuiClientMessageSender, WebuiClientSessionResumer} from "../../src/client/contracts/turn/execution-port.js";
-import type { WebuiClientMessageLoader } from "../../src/client/contracts/transcript/message-view.js";
-import type { WebuiTranscriptItem } from "../../src/client/contracts/transcript/transcript-view.js";
+import type { WebuiClientMessageLoader } from "../../src/client/features/transcript/contracts/message-view.js";
+import type { WebuiTranscriptItem } from "../../src/client/features/transcript/contracts/transcript-view.js";
 import {
   buildWebuiModelSelectionRequest,
   webuiModelOptionValue,

@@ -80,7 +80,7 @@ import type { WebuiClientSession, WebuiClientSessionPage, WebuiClientProject } f
 import type {
   WebuiClientMessage,
   WebuiClientMessagePage,
-} from "../../contracts/transcript/message-view.js";
+} from "../../features/transcript/contracts/message-view.js";
 import type { WebuiTransport } from "../../contracts/transport.js";
 import type { WebuiTodo } from "../../projection/workspace/panel-projection.js";
 import type { WebuiUsageQuotaResult } from "../../../shared/contracts/usage-quota.js";

@@ -18,7 +18,7 @@
 // - `trailingLiveGroupId` decides which group owns the live activity row, so the
 //   `推理中…` indicator renders exactly once and always trails the transcript.
 
-import type { WebuiClientMessagePage } from "../../contracts/transcript/message-view.js";
+import type { WebuiClientMessagePage } from "../../features/transcript/contracts/message-view.js";
 import { isTurnLive } from "../turn/stream-state.js";
 import { projectWebuiTranscriptMessage } from "./message-projection.js";
 import {

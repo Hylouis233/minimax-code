@@ -17,7 +17,7 @@ import type {WebuiClientMessageSender, WebuiClientSessionResumer} from "../contr
 import type {
   WebuiClientMessage,
   WebuiClientMessageLoader,
-} from "../contracts/transcript/message-view.js";
+} from "../features/transcript/contracts/message-view.js";
 
 import type {
   WebuiStreamMessage,
