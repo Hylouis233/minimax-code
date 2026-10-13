@@ -21,6 +21,7 @@ import {
 } from "../../src/client/application/sessions/session-catalog.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 import { createWebuiSessionWorkflows } from "../../src/client/application/sessions/session-workflows.js";
+import { createWebuiSessionScopeManager } from "../../src/client/application/sessions/session-scope.js";
 import { selectWebuiWorkspaceProgress } from "../../src/client/projection/workspace/workspace-progress.js";
 import type { WebuiClientSession } from "../../src/client/contracts/sessions/session-view.js";
 
@@ -323,5 +324,77 @@ describe("the tree ingest reads a node's children defensively", () => {
     const catalog = reduceWebuiCatalogTreeLoaded(initialWebuiSessionCatalogState, page);
     const resolved = selectWebuiCatalogTreePage(catalog);
     expect(resolved.sessions[0]?.childSessions.map((child) => child.sessionId)).toEqual(["A1", "A2"]);
+  });
+});
+
+// A delete is an accepted mutation, so it holds a settlement lease until its
+// outcome and invalidation are committed, and revokes the deleted session's
+// remaining interests at the commit point (T04; plan §4.3).
+describe("the session scope across a delete", () => {
+  function deletingWorkflows(deleteSession: () => Promise<{ success?: boolean }>) {
+    const store = createWebuiSessionStore({
+      catalog: createWebuiSessionCatalogFromPage({
+        sessions: [session({ sessionId: "a" })],
+        hasMore: false,
+      }),
+    });
+    const scope = createWebuiSessionScopeManager();
+    const workflows = createWebuiSessionWorkflows({
+      store,
+      composer: purger(),
+      scope,
+      port: {
+        deleteSession,
+        loadSessions: async () => ({ sessions: [], hasMore: false }),
+        loadSessionTree: async () => ({ sessions: [], hasMore: false }),
+      } as unknown as Parameters<typeof createWebuiSessionWorkflows>[0]["port"],
+    });
+    return { store, scope, workflows };
+  }
+
+  it("holds a settlement lease while the delete is in flight, and drops it at the commit", async () => {
+    let commit!: () => void;
+    const pending = new Promise<{ success?: boolean }>((resolve) => {
+      commit = () => resolve({ success: true });
+    });
+    const { scope, workflows } = deletingWorkflows(() => pending);
+
+    const removal = workflows.remove("a");
+    await Promise.resolve();
+
+    // Nothing may evict the session while the mutation it owes is in flight.
+    expect(scope.kinds("a")).toEqual(["settlement"]);
+    expect(scope.mayEvict("a")).toBe(false);
+
+    commit();
+    await removal;
+    expect(scope.isInterested("a")).toBe(false);
+  });
+
+  it("revokes every browser interest in the deleted session", async () => {
+    const { scope, workflows } = deletingWorkflows(async () => ({ success: true }));
+    // A stream attempt on the session being deleted: it can no longer commit, so
+    // its lease must not keep the session interesting.
+    scope.acquire("a", "delivery", "attempt-1");
+    scope.acquire("a", "secondary", "workspace-tab-1");
+
+    await workflows.remove("a");
+
+    expect(scope.isInterested("a")).toBe(false);
+    expect(scope.interested()).toEqual([]);
+  });
+
+  it("releases the lease and keeps the session when the delete fails", async () => {
+    const { scope, workflows } = deletingWorkflows(async () => {
+      throw new Error("delete refused");
+    });
+    scope.acquire("a", "delivery", "attempt-1");
+
+    await expect(workflows.remove("a")).rejects.toThrow("delete refused");
+
+    // The failure is recorded, the settlement lease is gone, and what the
+    // session owed before the attempt is untouched.
+    expect(scope.kinds("a")).toEqual(["delivery"]);
+    expect(scope.isInterested("a")).toBe(true);
   });
 });

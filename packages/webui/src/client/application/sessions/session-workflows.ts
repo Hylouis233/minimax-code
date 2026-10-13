@@ -15,6 +15,7 @@
 
 import type { SessionPort, WebuiClientSessionCreator } from "../../contracts/sessions/session-port.js";
 import type { WebuiComposerStore } from "../composer/composer-store.js";
+import type { WebuiSessionScopeManager } from "./session-scope.js";
 import type {
   WebuiClientProject,
   WebuiClientSessionPage,
@@ -179,6 +180,13 @@ export function createWebuiSessionWorkflows(deps: {
    * configuration of this module, so the delete **cannot compile** without it.
    */
   readonly composer: Pick<WebuiComposerStore, "purgeSlot">;
+  /**
+   * The session scope (plan §4.3). A delete is an accepted mutation, so it holds
+   * a **settlement** lease until its outcome and the invalidation it owes are
+   * committed — or until the failure is recorded — and it revokes the deleted
+   * session's remaining browser interests at the commit point.
+   */
+  readonly scope?: WebuiSessionScopeManager;
   readonly port: QueryPort & MutationPort;
   /** Injected browser IO; absent means the import operation is not wired. */
   readonly importSession?: WebuiSessionImporter;
@@ -373,7 +381,16 @@ export function createWebuiSessionWorkflows(deps: {
     },
     remove: async (sessionId) => {
       if (!port.deleteSession) return;
-      await port.deleteSession({ id: sessionId });
+      // The settlement lease outlives the view that asked for the delete: the
+      // session cannot be evicted while the mutation it owes is in flight.
+      const settle = deps.scope?.acquire(sessionId, "settlement", `delete:${sessionId}`);
+      try {
+        await port.deleteSession({ id: sessionId });
+      } catch (error) {
+        // A failed delete retains state, and retains nothing of the lease.
+        settle?.();
+        throw error;
+      }
       // The delete has committed, so every slice that could still describe a
       // live session goes: the session fence first (so a stream frame or event
       // that arrives from here on writes nothing), then the application-store
@@ -383,10 +400,14 @@ export function createWebuiSessionWorkflows(deps: {
       removedSessionIds.add(sessionId);
       store.purgeSession(sessionId);
       composer.purgeSlot(sessionId);
+      // Every browser interest in the deleted session goes with it, including a
+      // delivery lease on a stream that can no longer commit.
+      deps.scope?.purge(sessionId);
       commitCatalog((current) => removeWebuiCatalogSessions(current, [sessionId]));
       dropRemovedArchivedRows();
       await refresh();
       if (archived.status !== "idle") await loadArchived();
+      settle?.();
     },
     getArchivedSnapshot: () => archived,
     subscribeArchived: (listener) => {
@@ -399,12 +420,19 @@ export function createWebuiSessionWorkflows(deps: {
     loadArchived,
     removeArchived: async (sessionId) => {
       if (!port.deleteSession) return;
-      await port.deleteSession({ id: sessionId });
+      const settle = deps.scope?.acquire(sessionId, "settlement", `delete:${sessionId}`);
+      try {
+        await port.deleteSession({ id: sessionId });
+      } catch (error) {
+        settle?.();
+        throw error;
+      }
       // Deleting from the archived page removes the same session the rail
       // could still be showing, so it takes the same teardown as `remove`.
       removedSessionIds.add(sessionId);
       store.purgeSession(sessionId);
       composer.purgeSlot(sessionId);
+      deps.scope?.purge(sessionId);
       commitCatalog((current) => removeWebuiCatalogSessions(current, [sessionId]));
       dropRemovedArchivedRows();
       await loadArchived();

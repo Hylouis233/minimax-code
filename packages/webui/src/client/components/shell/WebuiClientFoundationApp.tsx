@@ -327,6 +327,9 @@ export function WebuiClientFoundationApp(
         composer: composerStore,
         port: sessionsPort,
         importSession: importWebuiSessionFile,
+        // A delete is an accepted mutation: it holds a settlement lease and
+        // revokes the deleted session's interests (plan §4.3).
+        scope: application.sessionScope,
       }),
     [sessionStore, composerStore, sessionsPort],
   );
