@@ -32,10 +32,10 @@ import {
   PersonalizationSettings,
   formatMemoryTimestamp,
   isMemorySaveable,
-  isProfileSaveable,
 } from "../../src/client/components/settings/PersonalizationSettings.js";
 import { PERSONALIZATION_SECTION_HINTS } from "../../src/client/components/settings/settings-atoms.js";
 import { resolveEditorSeed } from "../../src/client/components/settings/GlobalInstructionsSection.js";
+import { isProfileSaveable } from "../../src/client/components/settings/UserProfileSection.js";
 
 import { useMemo } from "react";
 import { createWebuiSettingsWorkflows } from "../../src/client/application/settings-workflows.js";

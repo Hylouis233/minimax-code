@@ -3647,6 +3647,7 @@
     "packages/webui/src/client/components/settings/GlobalInstructionsSection.tsx",
     "packages/webui/src/client/components/settings/PersonalizationSettings.tsx",
     "packages/webui/src/client/components/settings/UsageModelSettings.tsx",
+    "packages/webui/src/client/components/settings/UserProfileSection.tsx",
     "packages/webui/src/client/components/settings/settings-atoms.tsx",
     "packages/webui/src/client/components/workspace/ReviewSettingsPage.tsx",
     "packages/webui/src/client/contracts/account/account-port.ts",
