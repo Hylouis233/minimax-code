@@ -25,7 +25,7 @@ import {
   WebuiContextMenu,
   placeWebuiContextMenu,
 } from "../../src/client/components/ContextMenu.js";
-import { WebuiInteractionPanel } from "../../src/client/components/InteractionPanel.js";
+import { WebuiInteractionPanel } from "../../src/client/components/interactions/InteractionPanel.js";
 import {
   WebuiProjectList,
   WebuiSessionList,

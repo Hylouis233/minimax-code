@@ -22,7 +22,7 @@ import {
   webuiPlanMarkdown,
   webuiPlanPath,
 } from "../projection/plan-mode.js";
-import { WebuiPlanDeliveryCard } from "./PlanModeCards.js";
+import { WebuiPlanDeliveryCard } from "./interactions/PlanModeCards.js";
 import type { WebuiClientMessagePage } from "../contracts/transcript/message-view.js";
 import type { WebuiTranscriptItem } from "../contracts/transcript/transcript-view.js";
 import type { WebuiTransport } from "../contracts/transport.js";

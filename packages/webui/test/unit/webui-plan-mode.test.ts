@@ -38,8 +38,8 @@ import {
   WebuiPlanEnterConfirmation,
   WebuiPlanReviewDecision,
   WebuiPlanSurface,
-} from "../../src/client/components/PlanModeCards.js";
-import { WebuiInteractionPanel } from "../../src/client/components/InteractionPanel.js";
+} from "../../src/client/components/interactions/PlanModeCards.js";
+import { WebuiInteractionPanel } from "../../src/client/components/interactions/InteractionPanel.js";
 import type {
   WebuiQuestionnaireRequest,
   WebuiQuestionnaireStep,

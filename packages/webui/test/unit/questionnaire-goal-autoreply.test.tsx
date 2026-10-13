@@ -32,7 +32,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { WebuiInteractionPanel } from "../../src/client/components/InteractionPanel.js";
+import { WebuiInteractionPanel } from "../../src/client/components/interactions/InteractionPanel.js";
 import type { WebuiQuestionnaireRequest } from "../../src/shared/contracts/interactions.js";
 
 function request(over: Partial<WebuiQuestionnaireRequest> = {}): WebuiQuestionnaireRequest {

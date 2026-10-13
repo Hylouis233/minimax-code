@@ -30,17 +30,17 @@ import {
   webuiPlanReviewDescription,
   webuiPlanSummary,
   webuiPlanTitle,
-} from "../projection/plan-mode.js";
-import { WebuiMarkdown } from "../markdown.js";
+} from "../../projection/plan-mode.js";
+import { WebuiMarkdown } from "../../markdown.js";
 import {
   WebuiIconClose,
   WebuiIconCommandPlan,
   WebuiIconMessageEdit,
-} from "../icons.js";
+} from "../../icons.js";
 import type {
   WebuiQuestionnaireAnswer,
   WebuiQuestionnaireRequest,
-} from "../../shared/contracts/interactions.js";
+} from "../../../shared/contracts/interactions.js";
 
 /** Eye glyph for 预览. The desktop ships this one inside a per-chunk icon
  *  module whose path data is not addressable offline; this is an equivalent
