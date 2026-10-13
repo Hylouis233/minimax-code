@@ -44,7 +44,20 @@ export interface WebuiTranscriptPageHandle {
 export interface WebuiTranscriptHistoryOwner {
   readonly selectSession: (sessionId: string | undefined) => void;
   readonly seed: (sessionId: string, page: WebuiClientMessagePage) => void;
+  /**
+   * Reads the head page, joining a read already in flight for that key.
+   *
+   * Opening a session view is the caller: two readers wanting the same page at
+   * once (the transcript and a context inspection) share one request rather than
+   * one superseding the other.
+   */
   readonly loadPage: (sessionId: string) => Promise<WebuiTranscriptLoadOutcome>;
+  /**
+   * Reads the head page as it is NOW: freshness advances first, so an answer
+   * already in flight cannot land. A turn settling is the caller — the page it
+   * held was written before the turn's messages were persisted.
+   */
+  readonly refreshPage: (sessionId: string) => Promise<WebuiTranscriptLoadOutcome>;
   readonly loadOlder: (
     sessionId: string,
     cursor: string,
@@ -108,87 +121,102 @@ export function createWebuiTranscriptHistoryOwner(deps: {
     );
   };
 
+  /**
+   * One page read for one key.
+   *
+   * `join` goes through the resource's own read, so two readers asking for the
+   * same key share one request — the context inspection and the transcript do
+   * exactly that when a session view opens. `fresh` advances the key's freshness
+   * first, which is what a caller wants when the answer may have changed under it
+   * (a turn just settled, a mutation landed): the read already in flight can no
+   * longer commit and a new one starts.
+   */
   const load = async (
     sessionId: string,
-    cursor?: string,
+    cursor: string | undefined,
+    mode: "join" | "fresh",
   ): Promise<WebuiTranscriptLoadOutcome> => {
     if (!deps.loadMessages) return { status: "failed" };
     if (presentation.identity() !== sessionId) selectSession(sessionId);
     const key = keyOf(sessionId, cursor);
-    // A newer request for THIS key supersedes the one before it. A request for
-    // another session, or for another anchor of the same session, keeps its own
-    // generation and is unaffected. Freshness advances before the read, so the
-    // answer already in flight for the previous revision can no longer commit.
-    pages.invalidate(key);
-    const token = pages.capture(key);
+    if (mode === "fresh") pages.invalidate(key);
     // Captured before the read: refused if the presentation has moved on.
     const presentationToken = presentation.capture();
     deps.store.updateSession(sessionId, (state) => ({
       ...state,
       transcript: { ...state.transcript, loading: true, error: undefined },
     }));
-    const handle: WebuiTranscriptPageHandle = {
-      sessionId,
-      ...(cursor ? { cursor } : {}),
-      token,
-    };
-    try {
-      const page = await deps.loadMessages({
+    const loadMessages = deps.loadMessages;
+    // What THIS read produced. A joining read produces nothing (its fetch is
+    // never called), and a read the resource refused produces nothing either —
+    // both are told apart below by whether the entry carries this exact answer.
+    let own: { readonly value?: WebuiClientMessagePage } = {};
+    await pages.load(key, async () => {
+      const value = await loadMessages({
         id: sessionId,
         ...(cursor ? { before: cursor } : {}),
       });
-      if (!pages.commit(token, { status: "ready", value: page })) {
-        return { status: "stale" };
-      }
-      // The presentation fence: a page that arrived for a session the view has
-      // left is not written, so the store never gains a page nothing presented.
-      if (
-        !presentation.commit(presentationToken, {
-          status: "ready",
-          value: { sessionId },
-        })
-      ) {
-        return { status: "stale" };
-      }
-      deps.store.updateSession(sessionId, (state) => {
-        const current = state.transcript;
-        const olderResult = cursor
-          ? mergeOlderTranscriptPage(
-              {
-                ownerSessionId: sessionId,
-                generation: current.generation,
-                page: current.page,
-                loading: false,
-              },
-              page,
-              cursor,
-            )
-          : undefined;
-        return {
+      own = { value };
+      return value;
+    });
+    const entry = pages.read(key);
+    // Not holding a ready answer: either this read was superseded (by a newer
+    // request for the same key, or by an invalidation) or it failed.
+    if (!entry || entry.status !== "ready" || (own.value && entry.value !== own.value)) {
+      // A superseded failure reports nothing: it belongs to a read nobody is
+      // waiting for any more.
+      if (entry?.status === "error" && own.value === undefined) {
+        const failure = entry.error;
+        deps.store.updateSession(sessionId, (state) => ({
           ...state,
-          transcript: {
-            ...state.transcript,
-            page: olderResult?.state.page ?? page,
-            loading: false,
-            ...(olderResult?.error ? { error: olderResult.error } : {}),
-          },
-        };
-      });
-      return { status: "applied", page: handle };
-    } catch (reason) {
-      // A superseded request reports nothing: its failure belongs to a read
-      // nobody is waiting for any more.
-      if (!pages.commit(token, { status: "error" })) return { status: "stale" };
-      deps.store.updateSession(sessionId, (state) => ({
+          transcript: { ...state.transcript, error: failure, loading: false },
+        }));
+        return { status: "failed" };
+      }
+      return { status: "stale" };
+    }
+    const page = entry.value;
+    // `WebuiResourceState.value` is optional even for a ready entry, so the page
+    // is asserted once here rather than at each use.
+    if (!page) return { status: "stale" };
+    // The presentation fence: a page that arrived for a session the view has
+    // left is not written, so the store never gains a page nothing presented.
+    if (
+      !presentation.commit(presentationToken, {
+        status: "ready",
+        value: { sessionId },
+      })
+    ) {
+      return { status: "stale" };
+    }
+    deps.store.updateSession(sessionId, (state) => {
+      const current = state.transcript;
+      const olderResult = cursor
+        ? mergeOlderTranscriptPage(
+            {
+              ownerSessionId: sessionId,
+              generation: current.generation,
+              page: current.page,
+              loading: false,
+            },
+            page,
+            cursor,
+          )
+        : undefined;
+      return {
         ...state,
         transcript: {
           ...state.transcript,
-          error: reason instanceof Error ? reason.message : String(reason),
+          page: olderResult?.state.page ?? page,
           loading: false,
+          ...(olderResult?.error ? { error: olderResult.error } : {}),
         },
-      }));
-      return { status: "failed" };
-    }
+      };
+    });
+    return {
+      status: "applied",
+      page: { sessionId, ...(cursor ? { cursor } : {}), token: pages.capture(key) },
+    };
   };
 
   const ensurePage = async (
@@ -208,8 +236,9 @@ export function createWebuiTranscriptHistoryOwner(deps: {
     selectSession,
     seed,
     ensurePage,
-    loadPage: (sessionId) => load(sessionId),
-    loadOlder: (sessionId, cursor) => load(sessionId, cursor),
+    loadPage: (sessionId) => load(sessionId, undefined, "join"),
+    refreshPage: (sessionId) => load(sessionId, undefined, "fresh"),
+    loadOlder: (sessionId, cursor) => load(sessionId, cursor, "fresh"),
     isCurrentPage: (handle) =>
       !pages.isDisposed() &&
       handle.token.incarnation === incarnation &&

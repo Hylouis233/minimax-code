@@ -135,7 +135,7 @@ describe("application-owned transcript history", () => {
       ),
     });
     const older = owner.loadPage("A");
-    const newer = owner.loadPage("A");
+    const newer = owner.refreshPage("A");
     expect(pending).toHaveLength(2);
 
     pending[1]?.({ messages: [{ msgId: "newest" }] });

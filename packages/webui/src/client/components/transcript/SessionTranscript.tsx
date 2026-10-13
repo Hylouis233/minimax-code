@@ -132,7 +132,9 @@ export function WebuiSessionTranscript({
     previousTurnStateRef.current = { sessionId, turnLive };
     // 加载历史页只处理会话内的 live → idle 转换；切换会话由首屏请求负责。
     if (previous.sessionId !== sessionId || !previous.turnLive || turnLive) return undefined;
-    void historyOwner?.loadPage(sessionId);
+    // A settled turn has persisted messages the page we hold predates: this read
+    // is the one that must not join an answer already in flight.
+    void historyOwner?.refreshPage(sessionId);
     return undefined;
   }, [historyOwner, sessionId, turnLive]);
   // One view model, derived in one place (`projection/transcript/

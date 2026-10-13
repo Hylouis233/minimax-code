@@ -43,7 +43,11 @@ describe("a late page after a session switch is discarded", () => {
     expect(store.readSession("B").transcript.page.messages?.map((m) => m.msgId)).toEqual(["B-1"]);
   });
 
-  it("discards an older response that loses to a newer request for the same session", async () => {
+  it("discards an older response that a refresh superseded", async () => {
+    // A plain second `loadPage` JOINS the read in flight (one request, one
+    // answer); what supersedes is a refresh, which is what a caller asks for when
+    // the answer may have moved under it. Both halves are pinned here: this case
+    // for the supersede, the next one for the join.
     const releases: Array<(page: WebuiClientMessagePage) => void> = [];
     const store = createWebuiSessionStore();
     const owner = createWebuiTranscriptHistoryOwner({
@@ -51,7 +55,7 @@ describe("a late page after a session switch is discarded", () => {
       loadMessages: () => new Promise<WebuiClientMessagePage>((resolve) => releases.push(resolve)),
     });
     const first = owner.loadPage("S");
-    const second = owner.loadPage("S");
+    const second = owner.refreshPage("S");
     releases[1]!(page("newer"));
     await expect(second).resolves.toMatchObject({ status: "applied" });
     releases[0]!(page("older"));
@@ -98,7 +102,7 @@ describe("a late page after a session switch is discarded", () => {
       loadMessages: () => new Promise<WebuiClientMessagePage>((resolve) => releases.push(resolve)),
     });
     const first = owner.loadPage("S");
-    const second = owner.loadPage("S");
+    const second = owner.refreshPage("S");
     releases[1]!(page("newer"));
     const applied = await second;
     releases[0]!(page("older"));
@@ -161,11 +165,28 @@ describe("a context-only inspection reuses the history answer", () => {
     expect(loads).toEqual(["S"]);
   });
 
-  // A true join — two readers, one request — is NOT asserted yet, and this is the
-  // finding rather than an omission: `loadPage` invalidates the key before it
-  // reads, so when the transcript's own read follows the inspection's, it
-  // supersedes it instead of joining it (the inspection's answer is refused, one
-  // request each). Making the join real needs `loadPage` to read and a separate
-  // `refresh` for the callers that want fresh data (the mount, the live-to-idle
-  // handoff), which is the next slice on this ticket.
+  it("joins one read when two readers need the same page at once", async () => {
+    // The transcript opening a session and a context inspection asking for the
+    // same page are two readers of one key. They share the request in flight
+    // rather than one of them superseding the other (plan §4.5: a call whose key,
+    // freshness revision and owner incarnation all match joins that request).
+    const loads: string[] = [];
+    const releases: Array<(page: WebuiClientMessagePage) => void> = [];
+    const store = createWebuiSessionStore();
+    const owner = createWebuiTranscriptHistoryOwner({
+      store,
+      loadMessages: ({ id }) => {
+        loads.push(id);
+        return new Promise<WebuiClientMessagePage>((resolve) => releases.push(resolve));
+      },
+    });
+    const inspection = owner.ensurePage("S");
+    const transcript = owner.loadPage("S");
+    expect(loads).toEqual(["S"]);
+    releases[0]!(page("S-1"));
+    await expect(inspection).resolves.toMatchObject({ messages: [{ msgId: "S-1" }] });
+    await expect(transcript).resolves.toMatchObject({ status: "applied" });
+    expect(loads).toEqual(["S"]);
+    expect(store.readSession("S").transcript.page.messages?.map((m) => m.msgId)).toEqual(["S-1"]);
+  });
 });
