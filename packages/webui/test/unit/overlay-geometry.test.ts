@@ -17,7 +17,7 @@ import {
   overlayAxisStart,
 } from "../../src/client/projection/common/overlay-geometry.js";
 import { positionFlyout } from "../../src/client/projection/common/flyout-position.js";
-import { positionContextUsagePopover } from "../../src/client/projection/context-usage-popover.js";
+import { positionContextUsagePopover } from "../../src/client/projection/composer/context-usage-popover.js";
 
 const MARGIN = 8;
 

@@ -18,7 +18,7 @@ import {
   drawableBreakdownRows,
   formatPercent,
   UNREPORTED_SHADE,
-} from "../../src/client/projection/context-breakdown.js";
+} from "../../src/client/projection/composer/context-breakdown.js";
 
 const ALL_KINDS = CONTEXT_BREAKDOWN_CATEGORIES.map((category) => category.kind);
 

@@ -8,13 +8,13 @@
 import type { WebuiModelEntry } from "../../../shared/contracts/models.js";
 import type { WebuiUsageQuotaResult } from "../../../shared/contracts/usage-quota.js";
 import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
-import { breakdownSegmentPercent, breakdownShareLabel, breakdownSwatchStyle, contextBreakdownRows, drawableBreakdownRows } from "../../projection/context-breakdown.js";
+import { breakdownSegmentPercent, breakdownShareLabel, breakdownSwatchStyle, contextBreakdownRows, drawableBreakdownRows } from "../../projection/composer/context-breakdown.js";
 import {
   contextUsagePopoverStyle,
   positionContextUsagePopover,
   sameContextUsagePlacement,
   type ContextUsagePlacement,
-} from "../../projection/context-usage-popover.js";
+} from "../../projection/composer/context-usage-popover.js";
 import { readUsageNumber } from "../../projection/message-projection.js";
 import { isTokenPlanModel } from "../../projection/token-plan-model.js";
 import { formatUsageResetLabel } from "../account/UserMenuUsage.js";

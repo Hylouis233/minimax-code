@@ -39,26 +39,26 @@ import { createWebuiGoalCoordinator } from "../application/goal-coordinator.js";
 import {
   createWebuiInteractionCoordinator,
 } from "../application/interactions/interaction-coordinator.js";
-import { latestContextUsage, readContextUsageSnapshot } from "../projection/context-usage.js";
+import { latestContextUsage, readContextUsageSnapshot } from "../projection/composer/context-usage.js";
 import {
   contextUsagePopoverStyle,
   positionContextUsagePopover,
   sameContextUsagePlacement,
   type ContextUsagePlacement,
-} from "../projection/context-usage-popover.js";
+} from "../projection/composer/context-usage-popover.js";
 import {
   breakdownSegmentPercent,
   breakdownShareLabel,
   breakdownSwatchStyle,
   contextBreakdownRows,
   drawableBreakdownRows,
-} from "../projection/context-breakdown.js";
+} from "../projection/composer/context-breakdown.js";
 import { isTokenPlanModel } from "../projection/token-plan-model.js";
-import type { WebuiRecordedTurn } from "../projection/composer-state.js";
+import type { WebuiRecordedTurn } from "../projection/composer/composer-state.js";
 import type {
   WebuiComposerAttachment,
   WebuiComposerUrlReference,
-} from "../projection/composer-interactions.js";
+} from "../projection/composer/composer-interactions.js";
 import {
   createWebuiComposerAttachStreamEffect,
   recheckWebuiSubscription,
@@ -153,7 +153,7 @@ import {
   resolveWebuiSubmissionIntent,
   resolveWebuiComposerEnterAction,
   isTurnLive,
-} from "../projection/composer-state.js";
+} from "../projection/composer/composer-state.js";
 import {
   submitWebuiGoal,
 } from "../application/composer/composer-workflows.js";
@@ -170,7 +170,7 @@ import {
   replaceWebuiSlashToken,
   webuiAttachmentLimitError,
   webuiTextAttachmentDataUrl,
-} from "../projection/composer-interactions.js";
+} from "../projection/composer/composer-interactions.js";
 import {
   shouldRecallWebuiHistory,
   startWebuiHistoryBrowse,

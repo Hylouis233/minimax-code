@@ -11,7 +11,7 @@ import {
   isWebuiRunnableCommand,
   sectionWebuiSlashPalette,
 } from "../../src/client/contracts/composer/slash-command.js";
-import { resolveWebuiSubmissionIntent } from "../../src/client/projection/composer-state.js";
+import { resolveWebuiSubmissionIntent } from "../../src/client/projection/composer/composer-state.js";
 
 /**
  * Pure tests for the slash palette decision layer.

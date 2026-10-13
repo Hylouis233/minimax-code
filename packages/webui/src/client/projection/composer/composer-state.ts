@@ -1,9 +1,9 @@
 import type {
   WebuiRunCommandName,
   WebuiSlashCommandFields,
-} from "../contracts/composer/slash-command.js";
-import { classifyWebuiSlashCommand } from "../contracts/composer/slash-command.js";
-import type { WebuiStreamState } from "./stream-state.js";
+} from "../../contracts/composer/slash-command.js";
+import { classifyWebuiSlashCommand } from "../../contracts/composer/slash-command.js";
+import type { WebuiStreamState } from "../stream-state.js";
 
 export function isTurnLive(phase: WebuiStreamState["phase"] | undefined): boolean {
   return phase === "streaming" || phase === "waiting" || phase === "reconnecting";

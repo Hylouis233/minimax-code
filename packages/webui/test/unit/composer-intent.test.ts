@@ -6,7 +6,7 @@ import {
   resolveWebuiComposerEnterAction,
   resolveWebuiSubmissionIntent,
   type WebuiSubmissionIntent,
-} from "../../src/client/projection/composer-state.js";
+} from "../../src/client/projection/composer/composer-state.js";
 import type { SlashCommandEntry } from "../../src/client/components/composer/slash-palette.js";
 import {
   findWebuiMentionRange,
@@ -16,7 +16,7 @@ import {
   replaceWebuiSlashToken,
   webuiAttachmentLimitError,
   webuiTextAttachmentDataUrl,
-} from "../../src/client/projection/composer-interactions.js";
+} from "../../src/client/projection/composer/composer-interactions.js";
 import { sendMessageOperation, enqueueMessageOperation } from "../../src/server/operation/operations.js";
 import { setPermissionModeOperation } from "../../src/server/operation/permission-mode.js";
 
