@@ -1056,7 +1056,9 @@
       "25da9c23",
       "519dc358",
       "a521a39a",
-      "688f0fa3"
+      "688f0fa3",
+      "2a8c7fcf",
+      "f8023447"
     ],
     "published": false,
     "tickets": {
@@ -1064,7 +1066,7 @@
       "T02": "implemented locally, acceptance evidence recorded on #128",
       "T03": "implemented locally, acceptance evidence recorded on #129",
       "T04": "implemented locally, acceptance evidence recorded on #130",
-      "T05": "in progress locally: permanent-domain-event-routing, goal-session-owner and interaction-session-owner landed; the effects-registry removal is attempted and reverted (see below); retained-goal-view-reconciliation remains"
+      "T05": "implemented locally except one evidence item: permanent-domain-event-routing, goal-session-owner and interaction-session-owner are delivered; retained-goal-view-reconciliation's correction (C4) is in source and unit-verified, its browser regression case is not delivered"
     },
     "frontier": [
       "T05 (in progress)",
@@ -1073,7 +1075,8 @@
       "T17"
     ],
     "notes": [
-      "T05 effects-registry removal: an attempt (routes-only coordinator, no WebuiEventEffects, no setEventEffects, no registry) is saved outside the repository at minimax-code-webui-work/w0-baseline/t05-registry-removal-attempt.patch. It is reverted because the built-client browser suite's error-boundary retry case (settings-account-tab.spec.mjs:303) stops recovering the composer after the retry: the rail and transcript come back and the composer does not render. The rest of that patch's checks were green (154 unit files, boundary 294 inputs, commands current), so the regression is local to the composer/shell remount path."
+      "T05 C4 browser evidence: the composer no longer clears the canonical goal when a session switch resets the goal presentation (a521a39a). The unit-level retained-truth cases pass. A browser regression case was written twice and withdrawn: the switch it drives lands on a session the goal-retention fixture does not carry in its rail (the page snapshot shows a different session), so the case asserted nothing about the switch. It needs a fixture whose second session exists in the tree; the withdrawn case is not kept in the repository.",
+      "T05 effects-registry removal landed as 2a8c7fcf after the earlier revert: the browser failure that blocked it was a legitimate behaviour change (an accepted channel now reconciles the session's goal per §4.3, so a session with an active goal reopens the composer in goal mode), not a regression. The retry case now asserts the composer is present and usable."
     ]
   },
   "publicationVerification": {
