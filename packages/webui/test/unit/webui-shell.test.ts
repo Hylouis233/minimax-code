@@ -35,7 +35,7 @@ import {
   sortWebuiProjectSessionIds,
 } from "../../src/client/components/SessionRail.js";
 import { WebuiSessionTranscript as BaseWebuiSessionTranscript } from "../../src/client/components/SessionTranscript.js";
-import { WebuiWorkspaceDirectoryBrowser } from "../../src/client/components/SessionComposer.js";
+import { WebuiWorkspaceDirectoryBrowser } from "../../src/client/components/workspace/WebuiWorkspaceDirectoryBrowser.js";
 import {
   WebuiIconContextArchive,
   WebuiIconContextCopy,

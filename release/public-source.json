@@ -3654,6 +3654,7 @@
     "packages/webui/src/client/components/settings/UserProfileSection.tsx",
     "packages/webui/src/client/components/settings/settings-atoms.tsx",
     "packages/webui/src/client/components/workspace/ReviewSettingsPage.tsx",
+    "packages/webui/src/client/components/workspace/WebuiWorkspaceDirectoryBrowser.tsx",
     "packages/webui/src/client/contracts/account/account-port.ts",
     "packages/webui/src/client/contracts/composer/command-port.ts",
     "packages/webui/src/client/contracts/composer/slash-command.ts",
