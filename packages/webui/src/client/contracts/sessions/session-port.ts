@@ -4,7 +4,7 @@
 // and the per-session usage read, with the loader/creator types those members
 // take. §9 halves `session-port` between `sessions` and `transcript`; the session
 // records themselves are this file's, and the message half is
-// `transcript/transcript-port.ts`.
+// `transcript/session-read-port.ts`.
 //
 // Every method stays optional — `undefined` means "the operation is not wired".
 

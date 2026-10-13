@@ -21,7 +21,7 @@
 //
 // Framework-free: no React, no DOM, no storage.
 
-import type { ModelsPort } from "../contracts/models/models-port.js";
+import type { ModelsPort } from "../contracts/models/provider-port.js";
 import type { WebuiModelEntry } from "../../shared/contracts/models.js";
 import {
   createWebuiQueryStore,

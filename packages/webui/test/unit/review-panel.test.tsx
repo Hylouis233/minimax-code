@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { WebuiReviewPanel, WebuiReviewWorkspacePicker } from "../../src/client/components/workspace/SettingsReviewPage.js";
+import { WebuiReviewPanel, WebuiReviewWorkspacePicker } from "../../src/client/components/workspace/ReviewSettingsPage.js";
 import {
   initialWebuiReviewState,
   reduceWebuiReviewState,
@@ -273,7 +273,7 @@ describe("choosing a workspace to review", () => {
  * from a click handler, so no `renderToStaticMarkup` call can ever reach the
  * `coding` or `worktree` branch — the panels are asserted directly above and
  * the wiring between the tab and the panel is not. Negative injection proved
- * the gap is real: replacing `{active === "coding" ? <SettingsReviewPage`
+ * the gap is real: replacing `{active === "coding" ? <ReviewSettingsPage`
  * with `{false ? ...` left the whole suite green, and the same held for the
  * worktree tab.
  *
@@ -291,7 +291,7 @@ describe("tab-to-page wiring", () => {
   );
 
   it("routes the coding tab to the review page", () => {
-    expect(source).toContain('{active === "coding" ? <SettingsReviewPage');
+    expect(source).toContain('{active === "coding" ? <ReviewSettingsPage');
   });
 
   it("routes the worktree tab to the worktree page", () => {
@@ -318,11 +318,11 @@ describe("the chosen workspace reaches the review load", () => {
    * ticket #70), so the slice reads it directly and stops at the picker — the
    * page's own call is what these assertions are about. */
   const source = readFileSync(
-    fileURLToPath(new URL("../../src/client/components/workspace/SettingsReviewPage.tsx", import.meta.url)),
+    fileURLToPath(new URL("../../src/client/components/workspace/ReviewSettingsPage.tsx", import.meta.url)),
     "utf8",
   );
   const page = source.slice(
-    source.indexOf("export function SettingsReviewPage"),
+    source.indexOf("export function ReviewSettingsPage"),
     source.indexOf("export function WebuiReviewWorkspacePicker"),
   );
 

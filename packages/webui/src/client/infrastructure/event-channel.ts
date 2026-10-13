@@ -18,7 +18,7 @@ import {
   unregisterWebuiEventWatcher,
 } from "./connection-health.js";
 import type { WebuiRuntimeEvent } from "../../shared/contracts/stream.js";
-import type {WebuiClientEventWatcher} from "../contracts/shell/event-port.js";
+import type {WebuiClientEventWatcher} from "../contracts/shell/watch-port.js";
 
 export type { WebuiClientEventWatcher };
 

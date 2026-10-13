@@ -20,7 +20,7 @@ import { createWebuiApplication } from "../../src/client/application/create-appl
 import { createWebuiEventEffectsRegistry } from "../../src/client/application/event-effects-registry.js";
 import type { WebuiProcessEventChannel } from "../../src/client/application/event-channel.js";
 import { createWebuiOpenEventChannel } from "../../src/client/bindings/event-channel-adapter.js";
-import type {WebuiClientEventWatcher} from "../../src/client/contracts/shell/event-port.js";
+import type {WebuiClientEventWatcher} from "../../src/client/contracts/shell/watch-port.js";
 import type {WebuiClientSessionResumer} from "../../src/client/contracts/turn/execution-port.js";
 import type { WebuiRuntimeEvent } from "../../src/shared/contracts/stream.js";
 

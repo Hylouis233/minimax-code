@@ -79,7 +79,7 @@ describe("the two readers share it", () => {
       .sort();
     expect(readers).toEqual([
       "components/DiffCard.tsx",
-      "components/workspace/SettingsReviewPage.tsx",
+      "components/workspace/ReviewSettingsPage.tsx",
     ]);
   });
 

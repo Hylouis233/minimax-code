@@ -1,5 +1,5 @@
 // The review page under `workspace` (plan §5.6's `workspace` row: "the coding and
-// worktree settings pages are `workspace`' — `SettingsReviewPage` and
+// worktree settings pages are `workspace`' — `ReviewSettingsPage` and
 // `WebuiReviewPanel` file under `components/workspace/`, and their review commands
 // are the `review` capability's, not `settings`'"; ticket #70).
 //
@@ -48,7 +48,7 @@ type WebuiReviewStateAction = Parameters<typeof reduceWebuiReviewState>[1];
  * decision that does not need the network still lives in `review-state.ts` so
  * it can be tested without a DOM — this component is the thin shell that
  * renders what the owner answered. */
-export function SettingsReviewPage({ workspaceDir, onOpenFileLine }: {
+export function ReviewSettingsPage({ workspaceDir, onOpenFileLine }: {
   readonly workspaceDir?: string;
   readonly onOpenFileLine?: (path: string, line: number) => void;
 }): ReactElement {

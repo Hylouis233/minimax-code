@@ -26,7 +26,7 @@ import {
   type FormEvent,
   type ReactElement,
 } from "react";
-import type {WebuiClientMessageEnqueuer} from "../contracts/composer/composer-port.js";
+import type {WebuiClientMessageEnqueuer} from "../contracts/composer/command-port.js";
 import type {WebuiClientMessageSender} from "../contracts/turn/execution-port.js";
 import { looksLikeAbsoluteWorkspacePath } from "../paths.js";
 import type { WebuiClientMessageLoader } from "../contracts/transcript/message-view.js";

@@ -9,7 +9,7 @@
 //
 // The provider half of the former `settings-port.ts` — the model list and selection
 // and the whole provider CRUD, `upsertMiniMaxApiKey` included — is
-// `models/models-port.ts`: §5.6 states the provider CRUD "is this row's duty, not
+// `models/provider-port.ts`: §5.6 states the provider CRUD "is this row's duty, not
 // `settings`'".
 //
 // Every method stays optional — `undefined` means "the operation is not wired".

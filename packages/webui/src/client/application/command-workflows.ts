@@ -11,7 +11,7 @@
 // to remove the direct transport edge from the presentation layer, so the one
 // place a command reaches the wire is the application.
 
-import type { ComposerPort } from "../contracts/composer/composer-port.js";
+import type { ComposerPort } from "../contracts/composer/command-port.js";
 
 type CommandPort = Pick<ComposerPort, "runCommand">;
 
