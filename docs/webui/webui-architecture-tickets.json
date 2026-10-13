@@ -1083,7 +1083,8 @@
       "7803d467",
       "9fba8e90",
       "2092c050",
-      "d6886487"
+      "d6886487",
+      "78f85092"
     ],
     "published": false,
     "tickets": {
@@ -1096,17 +1097,19 @@
       "T10": "closed 2026-10-14 (issue #136, comment 6156644369): both review families have their own owners and both consumers are browser-verified",
       "T14": "closed 2026-10-14 (issue #140, comment 6156919983): the host assembles the registry and the terminal-process port; the service binds what it was handed",
       "T07": "closed 2026-10-14 (issue #133, comment 6157401861): one Sessions owner holds the catalogue, the rail overlays and the lifecycle commands, with the delete failure/interest evidence and the rail/archive/import/export browser entry paths",
-      "T09": "closed 2026-10-14 (issue #135, comment 6157618298): one Account owner holds the status/login/check-in/quota lifetime, the credential reads left Settings, and its timers end with its disposal"
+      "T09": "closed 2026-10-14 (issue #135, comment 6157618298): one Account owner holds the status/login/check-in/quota lifetime, the credential reads left Settings, and its timers end with its disposal",
+      "T11": "in progress: the panel no longer crashes on an unexpected runtime answer; the mixed workspace owner still needs its files/tree/content and environment identities extracted"
     },
     "frontier": [
       "T08",
+      "T11",
       "T12",
       "T17"
     ],
     "notes": [
-      "T09 closed 2026-10-14 (d9b87ff4, d6886487). The account files took their business-first homes; getMiniMaxApiKeyStatus/getCodexOAuthStatus moved from settings-workflows to the Account owner (no copy left behind); the OAuth status poll is the owner's with interest-based acquire/release; dispose() stops both timers and every commit site drops a late answer.",
-      "T09's evidence split: owner behaviour through public seams in account-workflows.test.ts (pending login, slow first reply, cancel, switch-account sign-out-first, superseded read, disposal x3, sign-out failure) and the visible paths in the built client in account-login.spec.mjs. Live cloud acceptance stays separately labelled; the runtime-side quota adapter is T17's.",
-      "T12 (settings composition) is now unblocked: its blockers T03, T07 and T09 are all closed."
+      "T11 started (78f85092) with the robustness gap T10 handed over: the file side panel crashed the whole UI into its error boundary when the tree or the terminal list answered something other than what it renders. The tree loader now treats a non-tree answer as an error state, the panel normalises what it filters and what it lists, and workspace-panel-robustness.spec.mjs drives the scenario that crashed (the panel opens, no error boundary, the transcript stays mounted, the tree reports the answer).",
+      "T11's remaining acceptance: extract the files/tree/content and environment identities from the mixed query owner (592 lines) and compose T10's review APIs rather than reimplementing review policy; workspace Git events invalidating the matched owners directly; panel/tab state ownership with interest release on close; canvas/archive/preview/directory-browser outcome and freshness ownership; moving the workspace contracts/projections/bindings/UI to features/workspace; and the stale/supersession/burst/HTTP-range/browser evidence.",
+      "Frontier corrected: T11 was missing from the recorded list (its blockers T04 and T10 are both closed)."
     ]
   },
   "publicationVerification": {
