@@ -387,7 +387,8 @@
       "packages/webui/test/unit/webui-identity-epoch-wiring.test.ts",
       "packages/webui/test/unit/request-freshness.test.ts",
       "packages/webui/test/unit/conversation-turn-commands.test.ts",
-      "packages/webui/test/unit/session-scope.test.ts"
+      "packages/webui/test/unit/session-scope.test.ts",
+      "packages/webui/test/unit/home-adoption-transaction.test.ts"
     ]
   }
 }

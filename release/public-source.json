@@ -3903,6 +3903,7 @@
     "packages/webui/test/unit/goal-coordinator.test.ts",
     "packages/webui/test/unit/goal-interaction-prohibitions.test.ts",
     "packages/webui/test/unit/harness-host-slots.test.ts",
+    "packages/webui/test/unit/home-adoption-transaction.test.ts",
     "packages/webui/test/unit/interaction-coordinator.test.ts",
     "packages/webui/test/unit/legacy-protocol/README.md",
     "packages/webui/test/unit/legacy-protocol/client/contracts.ts",
