@@ -39,39 +39,8 @@ import {
 import type { WebuiGetSessionRewindPreviewResult } from "../../../shared/contracts/session.js";
 import type { WebuiMessageActionCapabilities } from "../../contracts/transcript/transcript-view.js";
 import { formatWebuiMessageTimestamp } from "../../projection/transcript/message-timestamp.js";
-
-export function toggleWebuiFeedback(
-  value: "like" | "dislike" | undefined,
-  next: "like" | "dislike",
-): "like" | "dislike" {
-  return value === next ? (next === "like" ? "dislike" : "like") : next;
-}
-
-export interface WebuiCopyDependencies {
-  readonly clipboard?: { readonly writeText: (value: string) => Promise<void> };
-  readonly fallback?: () => void;
-}
-
-export async function copyWebuiMessageText(
-  value: string,
-  dependencies: WebuiCopyDependencies,
-): Promise<boolean> {
-  try {
-    if (dependencies.clipboard) await dependencies.clipboard.writeText(value);
-    else if (dependencies.fallback) dependencies.fallback();
-    else return false;
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export function scheduleWebuiCopiedReset(
-  setCopied: (value: boolean) => void,
-  schedule: (callback: () => void, delayMs: number) => unknown,
-): void {
-  schedule(() => setCopied(false), 1_200);
-}
+import { toggleWebuiFeedback, copyWebuiMessageText, scheduleWebuiCopiedReset } from "../../application/transcript/message-feedback.js";
+import type { WebuiCopyDependencies } from "../../application/transcript/message-feedback.js";
 
 export function WebuiMessageActionButton({
   testId,

@@ -17,10 +17,8 @@ import {
   WebuiFeedbackActions,
   WebuiMessageActions,
   WebuiRewindDialog,
-  copyWebuiMessageText,
-  scheduleWebuiCopiedReset,
-  toggleWebuiFeedback,
 } from "../../src/client/components/transcript/MessageActions.js";
+import { copyWebuiMessageText, scheduleWebuiCopiedReset, toggleWebuiFeedback } from "../../src/client/application/transcript/message-feedback.js";
 import { MessageItem } from "../../src/client/components/transcript/MessageItem.js";
 import { PluginCatalogue } from "../../src/client/components/plugins/PluginCatalogue.js";
 import {
