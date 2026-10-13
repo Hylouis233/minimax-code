@@ -31,6 +31,7 @@ import {
   removeWebuiCatalogSessions,
 } from "../../src/client/features/sessions/application/session-catalog.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
+import { createWebuiSessionScopeManager } from "../../src/client/conversation/session-scope.js";
 import {
   createWebuiSessionWorkflows,
 } from "../../src/client/features/sessions/application/session-workflows.js";
@@ -292,6 +293,82 @@ describe("R7 · the delete workflow teardown", () => {
     expect(composer.readHistory("a")).toEqual([]);
     expect(snapshot.catalog.entities.has("a")).toBe(false);
     expect(snapshot.catalog.flat.ids).toEqual(["b"]);
+  });
+
+  it("keeps every slice when the delete fails, and holds no lease afterwards", async () => {
+    const store = createWebuiSessionStore({
+      catalog: createWebuiSessionCatalogFromPage(page("a", "b")),
+    });
+    store.updateSession("a", (current) => ({ ...current, sending: true }));
+    store.updateActivity((current): WebuiSessionActivityMap => ({
+      ...current,
+      a: { lastActivityAt: 3, unread: 1 },
+    }));
+    const composer = createWebuiComposerStore({
+      initial: { drafts: { a: "half-written" }, history: { a: ["earlier"] } },
+    });
+    const scope = createWebuiSessionScopeManager();
+    scope.select("a");
+    scope.acquire("a", "delivery", "stream");
+    const workflows = createWebuiSessionWorkflows({
+      store,
+      composer,
+      scope,
+      port: {
+        deleteSession: async () => {
+          throw new Error("delete refused");
+        },
+        loadSessions: async () => page("b"),
+        loadSessionTree: async () => ({ sessions: [], hasMore: false }),
+      } as unknown as Parameters<typeof createWebuiSessionWorkflows>[0]["port"],
+    });
+
+    await expect(workflows.remove("a")).rejects.toThrow("delete refused");
+
+    // Nothing was purged: a refused delete leaves the session exactly as it was.
+    const snapshot = store.getSnapshot();
+    expect(snapshot.sessions.get("a")?.sending).toBe(true);
+    expect(snapshot.activity.a).toEqual({ lastActivityAt: 3, unread: 1 });
+    expect(composer.readDraft("a")).toBe("half-written");
+    expect(composer.readHistory("a")).toEqual(["earlier"]);
+    expect(snapshot.catalog.entities.has("a")).toBe(true);
+    expect(snapshot.catalog.flat.ids).toEqual(["a", "b"]);
+    // The settlement lease went with the failure; the selection and the delivery
+    // lease were never the delete's to take.
+    expect(scope.kinds("a")).toEqual(
+      expect.arrayContaining(["selected-view", "delivery"]),
+    );
+    expect(scope.kinds("a")).not.toContain("settlement");
+  });
+
+  it("revokes every interest in the session it deletes", async () => {
+    const store = createWebuiSessionStore({
+      catalog: createWebuiSessionCatalogFromPage(page("a", "b")),
+    });
+    const composer = createWebuiComposerStore({ initial: { drafts: {}, history: {} } });
+    const scope = createWebuiSessionScopeManager();
+    scope.select("a");
+    scope.acquire("a", "secondary", "workspace-tab");
+    scope.acquire("a", "delivery", "stream");
+    const workflows = createWebuiSessionWorkflows({
+      store,
+      composer,
+      scope,
+      port: {
+        deleteSession: async () => ({ success: true }),
+        loadSessions: async () => page("b"),
+        loadSessionTree: async () => ({ sessions: [], hasMore: false }),
+      } as unknown as Parameters<typeof createWebuiSessionWorkflows>[0]["port"],
+    });
+
+    await workflows.remove("a");
+
+    // The deleted session is no longer interesting to anyone, so nothing can
+    // recreate an owner over work the delete already settled.
+    expect(scope.isInterested("a")).toBe(false);
+    expect(scope.kinds("a")).toEqual([]);
+    expect(scope.mayEvict("a")).toBe(true);
+    expect(scope.selected()).toBeUndefined();
   });
 
   it("keeps a deleted session out of a load that lands after the delete", async () => {

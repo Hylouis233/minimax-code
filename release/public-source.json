@@ -4168,6 +4168,7 @@
     "test/webui-browser/harness.mjs",
     "test/webui-browser/plugin-mcp-status.spec.mjs",
     "test/webui-browser/questionnaire.spec.mjs",
+    "test/webui-browser/rail-archive.spec.mjs",
     "test/webui-browser/rail-context-menu.spec.mjs",
     "test/webui-browser/rail-pin.spec.mjs",
     "test/webui-browser/rail-search.spec.mjs",

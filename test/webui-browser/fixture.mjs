@@ -84,6 +84,10 @@ export function installFixtureTransport() {
   // in but quota-less, not as signed out).
   let usageQuotaResult = {};
   let activeTurn;
+  // Archived session ids. `archiveSession` is one operation for both directions
+  // (`{id}` archives, `{id, archived: false}` takes it back), and the archived
+  // page is the same `listSessions` call with `onlyArchived`.
+  let archivedIds = [];
   // The review families' answers. T10's consumers read them: the transcript's diff
   // card asks for a turn's diff and can revert it, and the workspace review panel
   // asks for the working tree's summary.
@@ -107,7 +111,27 @@ export function installFixtureTransport() {
   const clone = (value) => JSON.parse(JSON.stringify(value));
   const matches = (body, condition) => Object.entries(condition).every(([key, value]) => body?.[key] === value);
   const responseFor = (operation, body) => {
-    if (operation === "listSessions") return { sessions, hasMore: false };
+    if (operation === "listSessions") {
+      if (body?.onlyArchived) {
+        return {
+          sessions: sessions.filter((item) => archivedIds.includes(item.sessionId)),
+          hasMore: false,
+        };
+      }
+      if (body?.includeArchived) return { sessions, hasMore: false };
+      return {
+        sessions: sessions.filter((item) => !archivedIds.includes(item.sessionId)),
+        hasMore: false,
+      };
+    }
+    if (operation === "archiveSession") {
+      const id = String(body?.id ?? "");
+      archivedIds =
+        body?.archived === false
+          ? archivedIds.filter((candidate) => candidate !== id)
+          : [...new Set([...archivedIds, id])];
+      return { success: true };
+    }
     if (operation === "getSessionTree") return clone(tree);
     if (operation === "listVisibleProjects") return projects;
     if (operation === "getMessages") {
@@ -287,6 +311,9 @@ export function installFixtureTransport() {
     // blocking — the transcript's own request is the second of the three.
     delayEvery(operation, condition) { held.push({ operation, condition }); },
     setPage(sessionId, page) { pages[sessionId] = clone(page); },
+    /** Which sessions the fixture currently holds as archived. */
+    setArchived(ids) { archivedIds = [...ids]; },
+    archived() { return [...archivedIds]; },
     /** What the runtime answers for a turn's diff, and what a revert returns. */
     setTurnDiff(next) { turnDiff = clone(next); },
     // The tree projection the rail and the composer both read. Mutable for the
