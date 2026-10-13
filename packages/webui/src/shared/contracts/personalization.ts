@@ -7,7 +7,7 @@
 // the same shapes; a Node program compiling with `"types": []` cannot host the
 // declarations itself.
 //
-// Split out of `client/contracts/settings-port.ts` during the Node runtime
+// Split out of `client/contracts/settings/settings-port.ts` during the Node runtime
 // extraction (plan section 7.1: profile-files' client-contract import is
 // rewired to shared personalization DTOs). `settings-port.ts` re-exports these
 // names for the harness host and the capability port, whose references move
@@ -19,11 +19,11 @@
 //
 // | Declaration | Wire purpose | Producer | Consumers |
 // | --- | --- | --- | --- |
-// | `WebuiGlobalInstructionsView` | Profile-wide `AGENTS.md` content/exists/path/maxBytes. | Runtime `getGlobalInstructions` (`runtime/harness/settings.ts`; `runtime/profile-files.ts` `readGlobalInstructions`). | `client/contracts/settings-port.ts`; `client/components/settings/PersonalizationSettings.tsx`. |
-// | `WebuiAgentMemoryView` | Per-agent main memory summary/content. | Runtime `getAgentMemory` (`runtime/harness/settings.ts`; `runtime/profile-files.ts` `readAgentMemory`). | `client/contracts/settings-port.ts`; `client/components/settings/PersonalizationSettings.tsx`. |
-// | `WebuiUserProfileFields` | The three 关于你 fields (nickname/occupation/moreAbout). | Runtime `runtime/profile-files.ts` `parseUserProfileRegion`/`writeUserProfile`; also the browser form. | `client/contracts/settings-port.ts` (via `WebuiUserProfileView`); `client/components/settings/PersonalizationSettings.tsx`. |
-// | `WebuiUserProfileView` | The 关于你 region of `user.md` (three fields plus exists/malformed/path/caps). | Runtime `getUserProfile` (`runtime/harness/settings.ts`; `runtime/profile-files.ts` `readUserProfile`). | `client/contracts/settings-port.ts`; `client/components/settings/PersonalizationSettings.tsx`. |
-// | `WebuiMemorySettingsView` | The two long-term-memory switches (enabled/proactive). | Runtime `getMemorySettings` (`runtime/harness/settings.ts`). | `client/contracts/settings-port.ts`; `client/components/settings/PersonalizationSettings.tsx`; `runtime/harness/requirements.ts`. |
+// | `WebuiGlobalInstructionsView` | Profile-wide `AGENTS.md` content/exists/path/maxBytes. | Runtime `getGlobalInstructions` (`runtime/harness/settings.ts`; `runtime/profile-files.ts` `readGlobalInstructions`). | `client/contracts/settings/settings-port.ts`; `client/components/settings/PersonalizationSettings.tsx`. |
+// | `WebuiAgentMemoryView` | Per-agent main memory summary/content. | Runtime `getAgentMemory` (`runtime/harness/settings.ts`; `runtime/profile-files.ts` `readAgentMemory`). | `client/contracts/settings/settings-port.ts`; `client/components/settings/PersonalizationSettings.tsx`. |
+// | `WebuiUserProfileFields` | The three 关于你 fields (nickname/occupation/moreAbout). | Runtime `runtime/profile-files.ts` `parseUserProfileRegion`/`writeUserProfile`; also the browser form. | `client/contracts/settings/settings-port.ts` (via `WebuiUserProfileView`); `client/components/settings/PersonalizationSettings.tsx`. |
+// | `WebuiUserProfileView` | The 关于你 region of `user.md` (three fields plus exists/malformed/path/caps). | Runtime `getUserProfile` (`runtime/harness/settings.ts`; `runtime/profile-files.ts` `readUserProfile`). | `client/contracts/settings/settings-port.ts`; `client/components/settings/PersonalizationSettings.tsx`. |
+// | `WebuiMemorySettingsView` | The two long-term-memory switches (enabled/proactive). | Runtime `getMemorySettings` (`runtime/harness/settings.ts`). | `client/contracts/settings/settings-port.ts`; `client/components/settings/PersonalizationSettings.tsx`; `runtime/harness/requirements.ts`. |
 
 /**
  * Profile-wide `AGENTS.md`.

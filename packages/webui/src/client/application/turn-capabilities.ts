@@ -20,22 +20,23 @@
 // members rather than by assigning `undefined` to them: the two are the same
 // to every reader, and dropping them keeps a structural comparison honest.
 
-import type { ExecutionPort } from "../contracts/execution-port.js";
+import type { ComposerPort } from "../contracts/composer/composer-port.js";
+import type { TurnExecutionPort } from "../contracts/turn/execution-port.js";
 import type { WebuiClientMessageLoader } from "../contracts/transcript/message-view.js";
-import type { WebuiClientSessionCreator } from "../contracts/session-port.js";
+import type { WebuiClientSessionCreator } from "../contracts/sessions/session-port.js";
 
 /** The capabilities a turn is run with, published as one object. */
 export interface WebuiTurnCapabilitySlice {
   /** **send** — open a turn with a message. */
-  readonly send?: ExecutionPort["sendMessage"];
+  readonly send?: TurnExecutionPort["sendMessage"];
   /** **resume** — anchor on a turn already running (or restart one). */
-  readonly resume?: ExecutionPort["resumeSession"];
+  readonly resume?: TurnExecutionPort["resumeSession"];
   /** **load** — read authoritative history for the anchor and the resync. */
   readonly load?: WebuiClientMessageLoader;
   /** **stop** — abort the running turn. */
-  readonly stop?: ExecutionPort["abortSession"];
+  readonly stop?: TurnExecutionPort["abortSession"];
   /** The queue's write; a send while a turn is in flight enqueues instead. */
-  readonly enqueue?: ExecutionPort["enqueueMessage"];
+  readonly enqueue?: ComposerPort["enqueueMessage"];
   /** Create the session a first message needs before that message is sent. */
   createSession?: WebuiClientSessionCreator;
 }
@@ -46,11 +47,11 @@ export interface WebuiTurnCapabilitySlice {
  * naming six of its members at the call site.
  */
 export interface WebuiTurnCapabilityPort {
-  readonly sendMessage?: ExecutionPort["sendMessage"];
-  readonly resumeSession?: ExecutionPort["resumeSession"];
+  readonly sendMessage?: TurnExecutionPort["sendMessage"];
+  readonly resumeSession?: TurnExecutionPort["resumeSession"];
   readonly loadMessages?: WebuiClientMessageLoader;
-  readonly abortSession?: ExecutionPort["abortSession"];
-  readonly enqueueMessage?: ExecutionPort["enqueueMessage"];
+  readonly abortSession?: TurnExecutionPort["abortSession"];
+  readonly enqueueMessage?: ComposerPort["enqueueMessage"];
   readonly createSession?: WebuiClientSessionCreator;
 }
 

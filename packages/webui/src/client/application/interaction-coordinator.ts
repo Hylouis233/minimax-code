@@ -22,7 +22,8 @@
 // session, so a re-read cannot land in the wrong one by construction rather than
 // by a guard.
 
-import type { InteractionPort } from "../contracts/interaction-port.js";
+import type { GoalPort } from "../contracts/goal/goal-port.js";
+import type { InteractionPort } from "../contracts/interactions/interaction-port.js";
 import type { WebuiGoal } from "../../shared/contracts/goal.js";
 import type {
   WebuiInteractionReplyResult,
@@ -37,11 +38,16 @@ export type WebuiInteractionPortSlice = Pick<
   InteractionPort,
   | "listPendingPermissions"
   | "getPendingQuestionnaire"
-  | "getGoal"
   | "replyPermission"
   | "replyQuestionnaire"
   | "dismissQuestionnaire"
->;
+> &
+  // `getGoal` stays on this slice because the coordinator still drives the
+  // goal refresh while the goal carve has not happened (plan §5.6: the
+  // coordinator "loses the goal duty it absorbed as a third responsibility" at
+  // the `interactions` carve). The declaration re-file puts it on the port that
+  // owns it, so the duty can leave without moving a type.
+  Pick<GoalPort, "getGoal">;
 
 /** The store writes and stream-phase transitions a flow drives. */
 export interface WebuiInteractionSink {

@@ -13,7 +13,7 @@
 // latter can call in without forming a cycle): the only collaborator is the
 // error formatter.
 
-import type { WebuiClientMessageEnqueuer } from "../contracts/execution-port.js";
+import type {WebuiClientMessageEnqueuer} from "../contracts/composer/composer-port.js";
 import type { WebuiAttachmentInput } from "../../shared/contracts/messages.js";
 import { formatWebuiError } from "../value-readers.js";
 

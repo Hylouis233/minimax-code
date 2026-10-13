@@ -13,7 +13,7 @@
 // This module is framework-free — no React, no DOM, no storage — so it can be
 // unit-tested against a scripted port.
 
-import type { SessionPort, WebuiClientSessionCreator } from "../contracts/session-port.js";
+import type { SessionPort, WebuiClientSessionCreator } from "../contracts/sessions/session-port.js";
 import type {
   WebuiClientProject,
   WebuiClientSessionPage,

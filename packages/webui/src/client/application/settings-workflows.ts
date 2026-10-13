@@ -21,7 +21,8 @@
 // This module is framework-free — no React, no DOM, no storage — so it can be
 // unit-tested against a scripted port.
 
-import type { SettingsPort } from "../contracts/settings-port.js";
+import type { ModelsPort } from "../contracts/models/models-port.js";
+import type { SettingsPort } from "../contracts/settings/settings-port.js";
 import type { WebuiVersionInfo } from "../../shared/contracts/version.js";
 import type { WebuiModelEntry } from "../../shared/contracts/models.js";
 import type {
@@ -32,7 +33,14 @@ import type {
   WebuiUserProfileView,
 } from "../../shared/contracts/personalization.js";
 
-/** The transport methods this owner drives. Absent means "not wired". */
+/**
+ * The settings-and-models slice this workflow drives. The port re-file (plan §9,
+ * ticket #59) split the former `SettingsPort` in two, so the slice is now an
+ * intersection: the settings half comes from `settings/settings-port.js` and the
+ * provider half from `models/models-port.js`. The intersection preserves exactly
+ * the surface this workflow consumed, with each member resolved against the port
+ * that now owns it.
+ */
 export type WebuiSettingsPortSlice = Pick<
   SettingsPort,
   | "getGlobalInstructions"
@@ -43,29 +51,32 @@ export type WebuiSettingsPortSlice = Pick<
   | "setAgentMemory"
   | "getMemorySettings"
   | "setMemorySettings"
-  | "listModels"
-  | "selectModel"
-  | "listUserModelProviders"
-  | "createUserModelProvider"
-  | "updateUserModelProvider"
-  | "deleteUserModelProvider"
-  | "testUserModelProvider"
-  | "testUserModel"
-  | "discoverUserModelsCandidate"
-  | "saveUserModelProviderCandidate"
-  | "listProviderPresets"
   | "getMiniMaxApiKeyStatus"
-  | "upsertMiniMaxApiKey"
   | "getCodexOAuthStatus"
   | "getMiniMaxModelSource"
   | "setMiniMaxModelSource"
-  | "testUserModelCandidate"
-  | "revealModelProviderApiKey"
   | "startCodexOAuthLogin"
   | "cancelCodexOAuthLogin"
-  | "refreshModels"
   | "version"
->;
+> &
+  Pick<
+    ModelsPort,
+    | "listModels"
+    | "selectModel"
+    | "listUserModelProviders"
+    | "createUserModelProvider"
+    | "updateUserModelProvider"
+    | "deleteUserModelProvider"
+    | "testUserModelProvider"
+    | "testUserModel"
+    | "discoverUserModelsCandidate"
+    | "saveUserModelProviderCandidate"
+    | "listProviderPresets"
+    | "upsertMiniMaxApiKey"
+    | "testUserModelCandidate"
+    | "revealModelProviderApiKey"
+    | "refreshModels"
+  >;
 
 export interface WebuiSettingsQueryState<T> {
   readonly status: "idle" | "loading" | "ready" | "error";

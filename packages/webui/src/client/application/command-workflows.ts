@@ -11,15 +11,15 @@
 // to remove the direct transport edge from the presentation layer, so the one
 // place a command reaches the wire is the application.
 
-import type { ExecutionPort } from "../contracts/execution-port.js";
+import type { ComposerPort } from "../contracts/composer/composer-port.js";
 
-type CommandPort = Pick<ExecutionPort, "runCommand">;
+type CommandPort = Pick<ComposerPort, "runCommand">;
 
 export type WebuiRunCommandRequest = Parameters<
-  NonNullable<ExecutionPort["runCommand"]>
+  NonNullable<ComposerPort["runCommand"]>
 >[0];
 export type WebuiRunCommandResult = Awaited<
-  ReturnType<NonNullable<ExecutionPort["runCommand"]>>
+  ReturnType<NonNullable<ComposerPort["runCommand"]>>
 >;
 
 export interface WebuiCommandWorkflows {

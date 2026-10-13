@@ -24,7 +24,7 @@ import { createWebuiEventEffectsRegistry } from "../../src/client/application/ev
 import { createWebuiComposerAttachStreamEffect } from "../../src/client/application/turn-commands.js";
 import type { WebuiProcessEventChannel } from "../../src/client/application/event-channel.js";
 import type { WebuiRuntimeEvent } from "../../src/shared/contracts/stream.js";
-import type { WebuiClientSessionResumer } from "../../src/client/contracts/execution-port.js";
+import type {WebuiClientSessionResumer} from "../../src/client/contracts/turn/execution-port.js";
 
 function event(type: string, payload: Record<string, unknown>): WebuiRuntimeEvent {
   return { type, payload, timestamp: 1, source: "test" };

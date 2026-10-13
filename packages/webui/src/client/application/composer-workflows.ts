@@ -1,5 +1,5 @@
-import type { WebuiClientMessageEnqueuer } from "../contracts/execution-port.js";
-import type { WebuiClientCreateSessionResult, WebuiClientSessionCreator } from "../contracts/session-port.js";
+import type {WebuiClientMessageEnqueuer} from "../contracts/composer/composer-port.js";
+import type { WebuiClientCreateSessionResult, WebuiClientSessionCreator } from "../contracts/sessions/session-port.js";
 import type { WebuiGoal, WebuiGoalCreateRequest, WebuiGoalPatchRequest } from "../../shared/contracts/goal.js";
 import type { WebuiAttachmentInput } from "../../shared/contracts/messages.js";
 import { formatWebuiError } from "../value-readers.js";

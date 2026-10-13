@@ -1,19 +1,21 @@
-// Settings capability port.
+// Settings capability port (plan §9; ticket #59).
 //
-// Models, providers, skills, permission mode, instructions, memory and the
-// user profile. Split from the monolithic `WebuiTransport` in the former
-// `client/contracts.ts`; `transport.ts` composes it. Every method stays
-// optional — `undefined` means "the operation is not wired".
+// Instructions, agent memory, the user profile, the memory switches, permission
+// mode, the api-key *status*, the Codex OAuth status, the model source and the
+// runtime version. §9 sends "instructions, agent memory, user profile, memory
+// settings" here; §5.6 names the rest of these explicitly ("api-key status, model
+// source and Codex OAuth status are `settings`'", "permission mode stays in
+// `settings`"), and `version` is read by this business's own workflow.
+//
+// The provider half of the former `settings-port.ts` — the model list and selection
+// and the whole provider CRUD, `upsertMiniMaxApiKey` included — is
+// `models/models-port.ts`: §5.6 states the provider CRUD "is this row's duty, not
+// `settings`'".
+//
+// Every method stays optional — `undefined` means "the operation is not wired".
 
-import type { WebuiModelEntry } from "../../shared/contracts/models.js";
-import type { WebuiVersionInfo } from "../../shared/contracts/version.js";
-import type { WebuiModelSelectionRequest } from "./models/model-view.js";
-import type {
-  WebuiAgentMemoryView,
-  WebuiGlobalInstructionsView,
-  WebuiMemorySettingsView,
-  WebuiUserProfileView,
-} from "../../shared/contracts/personalization.js";
+import type { WebuiVersionInfo } from "../../../shared/contracts/version.js";
+import type { WebuiAgentMemoryView, WebuiGlobalInstructionsView, WebuiMemorySettingsView, WebuiUserProfileView } from "../../../shared/contracts/personalization.js";
 
 export interface SettingsPort {
   readonly version?: () => Promise<WebuiVersionInfo>;
@@ -51,43 +53,10 @@ export interface SettingsPort {
     readonly enabled?: boolean;
     readonly proactive?: boolean;
   }) => Promise<WebuiMemorySettingsView>;
-  readonly listModels?: (request?: {
-    readonly sessionId?: string;
-  }) => Promise<readonly WebuiModelEntry[]>;
-  readonly selectModel?: (
-    request: WebuiModelSelectionRequest,
-  ) => Promise<{ readonly success?: boolean }>;
-  readonly listUserModelProviders?: () => Promise<readonly Record<string, unknown>[]>;
-  readonly createUserModelProvider?: (
-    request: Record<string, unknown>,
-  ) => Promise<unknown>;
-  readonly updateUserModelProvider?: (
-    request: Record<string, unknown>,
-  ) => Promise<unknown>;
-  readonly deleteUserModelProvider?: (providerId: string) => Promise<unknown>;
-  readonly testUserModelProvider?: (request: { readonly providerId: string; readonly apiKey?: string }) => Promise<unknown>;
-  readonly testUserModel?: (request: {
-    readonly providerId: string;
-    readonly modelId: string;
-  }) => Promise<unknown>;
-  readonly discoverUserModelsCandidate?: (
-    request: Record<string, unknown>,
-  ) => Promise<unknown>;
-  readonly saveUserModelProviderCandidate?: (
-    request: Record<string, unknown>,
-  ) => Promise<unknown>;
-  readonly listProviderPresets?: () => Promise<readonly Record<string, unknown>[]>;
   readonly getMiniMaxApiKeyStatus?: () => Promise<Record<string, unknown>>;
-  readonly upsertMiniMaxApiKey?: (request: {
-    readonly apiKey: string;
-    readonly saveAndUse?: boolean;
-  }) => Promise<unknown>;
   readonly getCodexOAuthStatus?: () => Promise<Record<string, unknown>>;
   readonly getMiniMaxModelSource?: () => Promise<"token_plan" | "minimax_api_key">;
   readonly setMiniMaxModelSource?: (source: "token_plan" | "minimax_api_key") => Promise<"token_plan" | "minimax_api_key">;
-  readonly testUserModelCandidate?: (request: { readonly candidate: Record<string, unknown>; readonly modelId: string }) => Promise<unknown>;
-  readonly revealModelProviderApiKey?: (request: { readonly providerId: string }) => Promise<string>;
   readonly startCodexOAuthLogin?: (request?: Record<string, unknown>) => Promise<unknown>;
   readonly cancelCodexOAuthLogin?: (request: { readonly loginId: string }) => Promise<unknown>;
-  readonly refreshModels?: () => Promise<unknown>;
 }

@@ -5,11 +5,11 @@
 // | Declaration | Wire purpose | Producer | Consumers |
 // | --- | --- | --- | --- |
 // | `WebuiWorkspaceReviewFile` | One changed file in a review summary. | Runtime `getWorkspaceReviewSummary` (`runtime/harness/workspace.ts`; CliService). | unverified — nested in `WebuiWorkspaceReviewSummary.files`; no direct importer. |
-// | `WebuiWorkspaceReviewSummary` | A working-tree review snapshot (files plus totals). | Runtime `getWorkspaceReviewSummary`. | `client/contracts/workspace-port.ts`; `client/components/WorkspacePanels.tsx`; `server/operation/workspace.ts`. |
+// | `WebuiWorkspaceReviewSummary` | A working-tree review snapshot (files plus totals). | Runtime `getWorkspaceReviewSummary`. | `client/contracts/workspace/workspace-port.ts`; `client/components/WorkspacePanels.tsx`; `server/operation/workspace.ts`. |
 // | `WebuiWorkspaceReviewFileDiff` | One file's diff/error inside a review-diffs result. | Runtime `listWorkspaceReviewFileDiffs` (`runtime/harness/workspace.ts`). | `client/components/SettingsModal.tsx`. |
-// | `WebuiWorkspaceReviewDiffs` | A batch of per-file review diffs for one snapshot. | Runtime `listWorkspaceReviewFileDiffs`. | `client/contracts/workspace-port.ts`; `client/components/WorkspacePanels.tsx`. |
-// | `WebuiWorkspaceReviewFileContent` | One file's old/new content for review. | Runtime `getWorkspaceReviewFileContent` (`runtime/harness/workspace.ts`). | `client/contracts/workspace-port.ts`. |
-// | `WebuiWorkspaceReviewSearchResult` | Paginated in-diff search results for a review snapshot. | Runtime `searchWorkspaceReviewDiffs` (`runtime/harness/workspace.ts`). | `client/contracts/workspace-port.ts`; `client/components/WorkspacePanels.tsx`. |
+// | `WebuiWorkspaceReviewDiffs` | A batch of per-file review diffs for one snapshot. | Runtime `listWorkspaceReviewFileDiffs`. | `client/contracts/workspace/workspace-port.ts`; `client/components/WorkspacePanels.tsx`. |
+// | `WebuiWorkspaceReviewFileContent` | One file's old/new content for review. | Runtime `getWorkspaceReviewFileContent` (`runtime/harness/workspace.ts`). | `client/contracts/workspace/workspace-port.ts`. |
+// | `WebuiWorkspaceReviewSearchResult` | Paginated in-diff search results for a review snapshot. | Runtime `searchWorkspaceReviewDiffs` (`runtime/harness/workspace.ts`). | `client/contracts/workspace/workspace-port.ts`; `client/components/WorkspacePanels.tsx`. |
 export interface WebuiWorkspaceReviewFile {
   readonly fileId: string; readonly path: string; readonly originalPath?: string;
   readonly status: string; readonly type?: "text" | "binary";

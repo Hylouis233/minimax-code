@@ -38,7 +38,7 @@ import {
   type WebuiStreamLoopSink,
 } from "../../src/client/mechanisms/stream-loop.js";
 import { streamRecoveryProjection } from "../../src/client/projection/stream-recovery.js";
-import type { WebuiClientMessageSender } from "../../src/client/contracts/execution-port.js";
+import type {WebuiClientMessageSender} from "../../src/client/contracts/turn/execution-port.js";
 import type { WebuiStreamFrame } from "../../src/shared/contracts/stream.js";
 import { streamStateBundle } from "../../src/client/application/stream-state-bundle.js";
 import { createWebuiStreamPhaseCommands } from "../../src/client/application/session-commands.js";

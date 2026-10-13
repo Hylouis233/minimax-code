@@ -28,7 +28,7 @@
 // This module is framework-free — no React, no DOM, no storage — so it can be
 // unit-tested against a scripted port.
 
-import type { WorkspacePort } from "../contracts/workspace-port.js";
+import type { WorkspacePort } from "../contracts/workspace/workspace-port.js";
 import type {
   WebuiWorkspaceEnvironment,
   WebuiWorkspaceFile,

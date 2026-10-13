@@ -4,7 +4,7 @@
 //
 // | Declaration | Wire purpose | Producer | Consumers |
 // | --- | --- | --- | --- |
-// | `WebuiModelEntry` | One model available to the composer/settings. | Runtime `listModels` (`runtime/harness/models-plugins.ts`; CliService). | `client/contracts/settings-port.ts`; `client/projection/action-requests.ts`; `client/components/SessionComposer.tsx`; `client/components/SettingsModal.tsx`; `runtime/commands/runner.ts`. |
+// | `WebuiModelEntry` | One model available to the composer/settings. | Runtime `listModels` (`runtime/harness/models-plugins.ts`; CliService). | `client/contracts/settings/settings-port.ts`; `client/projection/action-requests.ts`; `client/components/SessionComposer.tsx`; `client/components/SettingsModal.tsx`; `runtime/commands/runner.ts`. |
 // | `WebuiSkillEntry` | A slash-palette skill (name/displayName/description). | Runtime `listSkills` (`runtime/harness/models-plugins.ts`, maps the harness `SkillInfo` subset). | `client/slash-palette.ts` (structural read); `server/operation/queue.ts` (`listSkills` response). |
 export interface WebuiModelEntry {
   readonly providerId: string;

@@ -19,7 +19,7 @@
 // fences its own writes and releases on terminal, error or cancellation, so the
 // retry cannot strand a "thinking" indicator or let a superseded attempt write.
 
-import type { WebuiClientSessionResumer } from "../contracts/execution-port.js";
+import type {WebuiClientSessionResumer} from "../contracts/turn/execution-port.js";
 import type { WebuiClientMessageLoader } from "../contracts/transcript/message-view.js";
 import { streamRecoveryProjection } from "../projection/stream-recovery.js";
 import type { WebuiStreamState } from "../projection/stream-state.js";
