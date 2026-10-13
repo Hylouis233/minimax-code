@@ -1047,13 +1047,15 @@
       "c5858a3f",
       "7b359694",
       "4afa78a7",
-      "5f7418aa"
+      "5f7418aa",
+      "db2a5739"
     ],
     "published": false,
     "tickets": {
       "T01": "implemented locally, acceptance evidence recorded on #127",
       "T02": "implemented locally, acceptance evidence recorded on #128",
-      "T03": "implemented locally, acceptance evidence recorded on #129"
+      "T03": "implemented locally, acceptance evidence recorded on #129",
+      "T04": "in progress locally: conversation-turn-commands landed; session-interest-lease-manager, home-adoption-transaction and delivery-disposer-registry remain"
     },
     "frontier": [
       "T04",
