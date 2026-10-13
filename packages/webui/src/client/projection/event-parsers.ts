@@ -4,6 +4,7 @@ import type {
   WebuiPendingPermission,
   WebuiQuestionnaireRequest,
 } from "../../shared/contracts/interactions.js";
+import { isWebuiGoalEventKind } from "./event-kinds.js";
 import type { WebuiRuntimeEvent } from "../../shared/contracts/stream.js";
 
 /**
@@ -30,7 +31,9 @@ export function eventSessionId(event: WebuiRuntimeEvent): string | undefined {
 }
 
 function nestedGoalSessionId(event: WebuiRuntimeEvent): string | undefined {
-  if (!event.type.startsWith("thread_goal.")) return undefined;
+  // The family check comes from the kind registry (§15.4 S9), not from a literal
+  // prefix here: this was one of the three sites that each knew the goal verbs.
+  if (!isWebuiGoalEventKind(event.type)) return undefined;
   const goal = event.payload.goal;
   if (!goal || typeof goal !== "object" || Array.isArray(goal)) return undefined;
   const value = (goal as Record<string, unknown>).sessionId;
