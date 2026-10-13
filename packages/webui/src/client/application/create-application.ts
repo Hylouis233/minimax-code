@@ -39,6 +39,15 @@ import {
   type WebuiGoalSessionOwners,
 } from "./goal/goal-session-owners.js";
 import type { WebuiGoalPortSlice } from "./goal/goal-coordinator.js";
+import {
+  createWebuiInteractionSessionOwners,
+  type WebuiInteractionSessionOwners,
+} from "./interactions/interaction-session-owners.js";
+import type { WebuiInteractionPortSlice } from "./interactions/interaction-coordinator.js";
+import {
+  selectWebuiCatalogFlatPage,
+  selectWebuiCatalogTreePage,
+} from "./sessions/session-catalog.js";
 import type { WebuiApplicationState } from "./state.js";
 import { WEBUI_HOME_SESSION_KEY } from "./state.js";
 import {
@@ -113,6 +122,16 @@ export interface WebuiApplicationDeps {
    * wired, which is the state the owner's own absent-capability handling covers.
    */
   readonly goalPort?: WebuiGoalPortSlice;
+  /**
+   * The interaction capability, so the application owns the permission and
+   * questionnaire owner rather than the view that happens to be mounted (T05).
+   */
+  readonly interactionsPort?: WebuiInteractionPortSlice;
+  /**
+   * The fallback requester name for a session. Defaults to the catalogue's own
+   * answer for that session, which is where the shell reads it too.
+   */
+  readonly readAgentName?: (sessionId: string) => string;
 }
 
 export type WebuiApplicationLifecycleState = "constructed" | "started" | "disposed";
@@ -161,6 +180,12 @@ export interface WebuiApplication {
    * whether or not a view is mounted, and each session has its own fence.
    */
   readonly goals: WebuiGoalSessionOwners;
+  /**
+   * The interaction owners, one per session (T05). An event route re-reads and
+   * fences through them, and a transcript submits its reply to them, whether or
+   * not the composer is mounted on that session.
+   */
+  readonly interactions: WebuiInteractionSessionOwners;
   /**
    * The client deliveries this application can actually close (plan §4.3).
    * Disposal closes them; it never aborts a host turn.
@@ -277,6 +302,26 @@ export function createWebuiApplication(
     ...(deps.goalPort ? { port: deps.goalPort } : {}),
   });
   /**
+   * The agent a session belongs to, read from the catalogue the rail renders —
+   * the same source the shell uses for the composer's fallback requester name.
+   */
+  const catalogueAgentName = (sessionId: string): string => {
+    const catalog = store.getSnapshot().catalog;
+    const flat = selectWebuiCatalogFlatPage(catalog).sessions.find(
+      (session) => session.sessionId === sessionId,
+    );
+    if (flat) return flat.agentName;
+    for (const node of selectWebuiCatalogTreePage(catalog).sessions) {
+      if (node.session.sessionId === sessionId) return node.session.agentName;
+    }
+    return "main";
+  };
+  const interactions = createWebuiInteractionSessionOwners({
+    store,
+    ...(deps.interactionsPort ? { port: deps.interactionsPort } : {}),
+    readAgentName: deps.readAgentName ?? catalogueAgentName,
+  });
+  /**
    * The one selection command. Selecting activates the new session's scope and
    * releases the previous selection's lease — and only that lease, so an
    * accepted delivery or an outstanding settlement survives the navigation.
@@ -324,6 +369,15 @@ export function createWebuiApplication(
     routes: {
       setGoal: (sessionId, goal) => goals.owner(sessionId).applyGoal(goal),
       refreshGoal: (sessionId) => goals.owner(sessionId).refreshGoal(),
+      // Fencing is local and cheap, so it happens for any named session. The
+      // READ only runs for a session something still needs (plan §4.3: an
+      // uninterested session retains its dirty marker and reconciles when
+      // interest arrives, rather than fanning out a background fetch).
+      invalidatePending: (sessionId) => interactions.owner(sessionId).invalidatePendingReads(),
+      refreshPending: (sessionId) => {
+        if (!sessionScope.isInterested(sessionId)) return;
+        return interactions.owner(sessionId).refresh();
+      },
     },
     effects: eventEffects.slot,
   });
@@ -375,6 +429,7 @@ export function createWebuiApplication(
     sessionScope,
     deliveries,
     goals,
+    interactions,
     events,
     turns,
     turnCapabilities,
@@ -417,6 +472,7 @@ export function createWebuiApplication(
       deliveries.closeAll();
       sessionScope.dispose();
       goals.dispose();
+      interactions.dispose();
       store.dispose();
       channel?.close?.();
       channel = undefined;

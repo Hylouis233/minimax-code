@@ -33,6 +33,8 @@ function coordinator() {
     routes: {
       setGoal: (sessionId, goal) => goals.owner(sessionId).applyGoal(goal),
       refreshGoal: (sessionId) => goals.owner(sessionId).refreshGoal(),
+      invalidatePending: () => undefined,
+      refreshPending: () => undefined,
     },
   });
   return { store, events, goals };

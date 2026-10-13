@@ -100,6 +100,7 @@ function WebuiClientRoot({
         // The goal capability: the application owns the goal owner, so an event
         // route commits for any session, mounted or not (T05).
         goalPort: slices.goal,
+        interactionsPort: slices.interactions,
         // The same storage adapter the shell used to inject by hand, so the
         // production boot persists and restores unread counts exactly as the
         // fixture assembly always did (plan §4.1; correction C1).

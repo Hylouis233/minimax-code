@@ -180,6 +180,13 @@ export interface WebuiDomainEventRoutes {
   readonly setGoal: (sessionId: string, goal: WebuiGoal | undefined) => void;
   /** The steering re-read for one session, through that session's owner. */
   readonly refreshGoal: (sessionId: string) => void | Promise<unknown>;
+  /**
+   * Fence this session's pending-interaction projection: an event changed what a
+   * read in flight would answer with.
+   */
+  readonly invalidatePending: (sessionId: string) => void;
+  /** The authoritative permission/questionnaire re-read for one session. */
+  readonly refreshPending: (sessionId: string) => void | Promise<unknown>;
 }
 
 export interface WebuiEventCoordinatorDeps {
@@ -226,7 +233,7 @@ export function createWebuiEventCoordinator(
   let unsubscribe: (() => void) | undefined;
 
   const handlersFor = (sessionId: string): WebuiEffectHandlers => ({
-    refreshPending: () => effects.refreshPending?.(sessionId),
+    refreshPending: () => deps.routes.refreshPending(sessionId),
     // The route, never the replaceable set: a mounted view cannot take the goal
     // read away from the owner that fences it.
     refreshGoal: () => deps.routes.refreshGoal(sessionId),
@@ -284,7 +291,7 @@ export function createWebuiEventCoordinator(
     }
     const sessionId = eventSessionId(event);
     if (!sessionId) return;
-    effects.invalidatePending?.(sessionId);
+    deps.routes.invalidatePending(sessionId);
     // The effect executor is the existing one; it walks the command list in
     // order, and its `set-*` commands land on this coordinator's store writers.
     applyWebuiEventToSession(

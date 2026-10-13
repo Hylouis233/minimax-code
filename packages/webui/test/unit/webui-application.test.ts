@@ -338,16 +338,25 @@ describe("stage 4 — the four call sites' handling through the coordinator", ()
       setGoal,
     });
     const fake = makeChannel();
+    const listPendingPermissions = vi.fn(async () => ({ requests: [] }));
     const probeApp = createWebuiApplication({
       openEventChannel: () => fake.channel,
       effects: registry.asWebuiEventEffects(),
+      interactionsPort: { listPendingPermissions } as never,
       turns: { resumeSession: (async () => {}) as unknown as WebuiClientSessionResumer },
     });
-    probeApp.start();
+    // The read runs for an interested session (plan §4.3): the selection is what
+    // makes this session one.
+    probeApp.start({ initialSessionId: "s1" });
 
     fake.emit(event("session.queue.updated", { sessionId: "s1" }));
-    expect(invalidatePending).toHaveBeenCalledWith("s1");
-    expect(refreshPending).toHaveBeenCalledWith("s1");
+    // The pending fence and re-read are the application's routes through the
+    // session's interaction owner (T05), so the registered hooks are not
+    // consulted; the owner really re-reads through the port.
+    expect(invalidatePending).not.toHaveBeenCalled();
+    expect(refreshPending).not.toHaveBeenCalled();
+    expect(listPendingPermissions).toHaveBeenCalledTimes(1);
+    expect(probeApp.store.readSession("s1").permissions).toEqual([]);
 
     fake.emit(
       event("thread_goal.objective_updated_steering", {

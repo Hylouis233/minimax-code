@@ -56,7 +56,6 @@ import type {
 } from "../../projection/composer/composer-interactions.js";
 import { createWebuiComposerAttachStreamEffect } from "../../application/turn/turn-commands.js";
 import {
-  useWebuiInteractionCommands,
   useWebuiSessionCommands,
   useWebuiSessionGoal,
   useWebuiSessionPermissions,
@@ -67,11 +66,14 @@ import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities
 import { ContextUsageIndicator } from "../sessions/ContextUsageIndicator.js";
 import { useWebuiPortSlice } from "../../bindings/port-slices-context.js";
 import { useWebuiEventEffectsRegistry } from "../../bindings/event-effects-context.js";
-import { useWebuiVersionCells } from "../../bindings/version-cells.js";
 import {
   useWebuiGoalOwner,
   useWebuiGoalReaction,
 } from "../../bindings/goal-owner.js";
+import {
+  useWebuiInteractionAgentNameReader,
+  useWebuiInteractionOwner,
+} from "../../bindings/interaction-owner.js";
 import { useWebuiComposerStore } from "../../bindings/composer-store.js";
 import { webuiSessionStatusType } from "../../projection/turn/stream-state.js";
 
@@ -478,7 +480,6 @@ export function WebuiComposer({
   const permissions = useWebuiSessionPermissions(sessionId);
   const questionnaire = useWebuiSessionQuestionnaire(sessionId);
   const goal = useWebuiSessionGoal(sessionId);
-  const interactionCommands = useWebuiInteractionCommands(sessionId);
   // The interaction flows (plan §7.1 `client/application/interactions/interaction-coordinator.ts`).
   // The policy — what counts as an accepted reply, what state transition follows
   // it, which permissions a re-read keeps — lives there. This component supplies
@@ -492,29 +493,19 @@ export function WebuiComposer({
   // an in-flight read resurrect the state it was meant to replace. The policy is
   // each coordinator's; the cell has to outlive a render, which is why the
   // application creates it — a counter inside a per-render coordinator would
-  // reset and silently disable the guard it protects.
-  const versionCells = useWebuiVersionCells();
-  const pendingVersionRef = versionCells.pending;
+  // reset and silently disable the guard it protects. Both fences are the
+  // owners' now (T05), so this component reads neither.
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
-  const interactionCoordinator = createWebuiInteractionCoordinator({
-    port: { ...interactionsPort },
-    sink: {
-      replacePendingPermissions: interactionCommands.replacePendingPermissions,
-      removePendingPermission: interactionCommands.removePendingPermission,
-      applyQuestionnaire: interactionCommands.applyQuestionnaire,
-    },
-    // turn's published stream-phase commands (plan §8 Phase 3 B1; §5.1
-    // prohibition 1). The four transitions used to be handed in as sink
-    // callbacks, which is the "injected optional object" shape §5.2 calls the
-    // violation; an owner may invoke another business's published command, and
-    // the outcome→transition policy now lives with the flow that owns it rather
-    // than in this wiring.
-    streams: phase,
-    sessionId,
-    agentName,
-    pendingVersionRef,
-  });
+  // The interaction owner is the application's, keyed by session (T05): this
+  // component reads the one for the session it is showing instead of
+  // constructing one, so an event re-reads and a reply commits whether or not
+  // this view is mounted, and each session has its own fence.
+  const interactionCoordinator = useWebuiInteractionOwner(sessionId);
+  // The fallback requester name is this surface's prop — the session list's
+  // answer for the session it is showing — so it is installed as the owners'
+  // reader rather than re-derived from a second source (T05).
+  useWebuiInteractionAgentNameReader(agentName);
   // The goal owner is the application's, keyed by session (T05): this component
   // reads the one for the session it is showing instead of constructing one, so a
   // goal event commits whether or not this view is mounted and each session has
@@ -748,9 +739,9 @@ export function WebuiComposer({
     // coordinator. The coordinator runs them for events addressed to this
     // session, so the composer holds no channel and no raw event callback.
     const unregisterEffects = effectsRegistry?.register(sessionId, {
-      answerQuestionnaire: (request, answers) => interactionCoordinator.answerQuestionnaire(request, answers),
-      invalidatePending: () => interactionCoordinator.invalidatePendingReads(),
-      refreshPending: () => refreshPending(),
+      // The pending re-read, its fence and the questionnaire reply are the
+      // application's routes through the session's interaction owner (T05); this
+      // view registers only its own stream-attach and reconnect reactions.
       // The goal read and write are not registered here any more: they are the
       // application's permanent route through the session's owner (T05), so a
       // goal event commits for any session, mounted or not, and this view cannot
@@ -984,9 +975,13 @@ export function WebuiComposer({
     answers: readonly WebuiQuestionnaireAnswer[],
   ) => {
     setInteractionError(undefined);
+    // The composer knows the session's agent (it is a prop from the session
+    // list), so it names the requester itself rather than relying on the owner's
+    // fallback reader.
     const outcome = await interactionCoordinator.answerQuestionnaire(
       request,
       answers,
+      agentName,
     );
     if (!outcome.ok) setInteractionError(outcome.error);
   };

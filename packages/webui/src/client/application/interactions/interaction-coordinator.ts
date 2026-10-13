@@ -82,6 +82,12 @@ export interface WebuiInteractionCoordinator {
   readonly answerQuestionnaire: (
     request: WebuiQuestionnaireRequest,
     answers: readonly WebuiQuestionnaireAnswer[],
+    /**
+     * The requester name this call composes with, when the surface making the
+     * call knows it (the composer does: the session list is its prop). Falls
+     * back to the owner's reader, then to the request's own requester.
+     */
+    requesterName?: string,
   ) => Promise<WebuiInteractionOutcome>;
   readonly dismissQuestionnaire: (
     request: WebuiQuestionnaireRequest,
@@ -109,8 +115,12 @@ export interface WebuiInteractionCoordinatorOptions {
   readonly pendingVersionRef: WebuiVersionCell;
   /** The session these flows belong to. Absent means nothing to refresh. */
   readonly sessionId?: string;
-  /** Fallback requester name when the request carries none. */
-  readonly agentName: string;
+  /**
+   * Fallback requester name when the request carries none. A reader rather than
+   * a fixed string: the session's agent is a property of the runtime's session
+   * list, which is loaded after the owner exists (T05).
+   */
+  readonly agentName: string | (() => string);
 }
 
 /** Application-owned plan-review reply; the transcript submits this intent. */
@@ -149,6 +159,7 @@ export function createWebuiInteractionCoordinator({
     replyQuestionnaire,
     dismissQuestionnaire,
   } = port;
+  const agent = (): string => (typeof agentName === "function" ? agentName() : agentName);
   const invalidatePendingReads = (): void => {
     pendingVersionRef.current += 1;
   };
@@ -164,7 +175,7 @@ export function createWebuiInteractionCoordinator({
       try {
         const [permissionResult, questionnaireResult] = await Promise.all([
           listPendingPermissions?.(),
-          getPendingQuestionnaire?.({ name: agentName, sessionId }),
+          getPendingQuestionnaire?.({ name: agent(), sessionId }),
         ]);
         const sessionPermissions = (permissionResult?.requests ?? []).filter(
           (permission) => permission.sessionId === sessionId,
@@ -206,13 +217,13 @@ export function createWebuiInteractionCoordinator({
       }
     },
 
-    answerQuestionnaire: async (request, answers) => {
+    answerQuestionnaire: async (request, answers, requesterName) => {
       if (!replyQuestionnaire)
         return { ok: false, error: "Questionnaire replies are unavailable" };
       invalidatePendingReads();
       try {
         const result = await replyQuestionnaire({
-          name: request.requester?.agentName ?? agentName,
+          name: request.requester?.agentName ?? requesterName ?? agent(),
           requestId: request.id,
           schemaVersion: request.schemaVersion,
           answers,
@@ -239,7 +250,7 @@ export function createWebuiInteractionCoordinator({
       invalidatePendingReads();
       try {
         const result = await dismissQuestionnaire({
-          name: request.requester?.agentName ?? agentName,
+          name: request.requester?.agentName ?? agent(),
           requestId: request.id,
         });
         if (result.ok !== true)

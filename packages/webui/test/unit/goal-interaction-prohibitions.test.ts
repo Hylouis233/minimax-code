@@ -106,8 +106,16 @@ describe("prohibition 2 — a rule may not be filed under a module that does not
     // render, so the application creates the instance and the business reads the
     // one it is handed.
     const composer = flat(read("components/composer/WebuiComposer.tsx"));
-    expect(composer).toContain("useWebuiVersionCells()");
+    // T05 moved both fences into the session-keyed owners: the component reads
+    // neither cell and holds no counter of its own.
+    expect(composer).not.toContain("useWebuiVersionCells()");
     expect(composer).not.toMatch(/useRef\(0\)/u);
+    expect(flat(read("application/goal/goal-session-owners.ts"))).toContain(
+      "const goalVersionRef: WebuiVersionCell = { current: 0 };",
+    );
+    expect(flat(read("application/interactions/interaction-session-owners.ts"))).toContain(
+      "const pendingVersionRef: WebuiVersionCell = { current: 0 };",
+    );
     expect(flat(read("application/create-application.ts"))).toContain(
       "const versionCells = createWebuiVersionCells();",
     );

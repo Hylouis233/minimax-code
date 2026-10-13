@@ -109,15 +109,25 @@ describe("the coordinator runs the registered effect handlers", () => {
     });
 
     const fake = makeChannel();
+    const listPendingPermissions = vi.fn(async () => ({ requests: [] }));
     const probeApp = createWebuiApplication({
       openEventChannel: () => fake.channel,
       effects: registry.asWebuiEventEffects(),
+      interactionsPort: { listPendingPermissions } as never,
       turns: { resumeSession },
     });
-    probeApp.start();
+    // The read runs for an interested session (plan §4.3): the selection is what
+    // makes this session one.
+    probeApp.start({ initialSessionId: "s1" });
 
     fake.emit(event("session.queue.updated", { sessionId: "s1" }));
-    expect(refreshPending).toHaveBeenCalledWith("s1");
+    // The pending re-read is the application route's too (T05): the registered
+    // hook is not consulted, and the session's interaction owner does the read.
+    expect(refreshPending).not.toHaveBeenCalled();
+    // The owner really re-read and committed: the session's pending snapshot was
+    // replaced through the store, and the permission read was issued.
+    expect(listPendingPermissions).toHaveBeenCalledTimes(1);
+    expect(probeApp.store.readSession("s1").permissions).toEqual([]);
 
     // The goal re-read is the application route's, not a registered effect: a
     // mounted view cannot take the goal read away from the owner that fences it
@@ -151,16 +161,21 @@ describe("the bindings-layer transport event-channel adapter", () => {
       };
     };
 
+    const listPendingPermissions = vi.fn(async () => ({ requests: [] }));
     const probeApp = createWebuiApplication({
       openEventChannel: createWebuiOpenEventChannel(watcher),
       effects: registry.asWebuiEventEffects(),
+      interactionsPort: { listPendingPermissions } as never,
       turns: { resumeSession },
     });
     probeApp.start();
 
     // A frame off the transport reaches the coordinator through the adapter…
     onEvent?.(event("session.queue.updated", { sessionId: "s1" }));
-    expect(refreshPending).toHaveBeenCalledWith("s1");
+    // …and the pending re-read is the application route's (T05), committed
+    // through the session's interaction owner.
+    expect(refreshPending).not.toHaveBeenCalled();
+    expect(probeApp.store.readSession("s1").permissions).toEqual([]);
 
     // …and the watcher's acceptance signal reaches the registered session.
     onReady?.();

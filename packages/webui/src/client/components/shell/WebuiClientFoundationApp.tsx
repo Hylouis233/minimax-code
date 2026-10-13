@@ -440,14 +440,23 @@ export function WebuiClientFoundationApp(
   );
   const [selectedSessionId, setSelectedSessionId] =
     useSelectedSessionId(locationHash);
+  // The plan-review reply needs the session's agent name, which is derived from
+  // the session list further down; the ref carries it to the call.
+  const agentNameRef = useRef<string | undefined>(undefined);
   const planReviewWorkflow = useMemo(
-    () => createWebuiPlanReviewWorkflow({
-      answerQuestionnaire: (request, answers) =>
-        selectedSessionId
-          ? eventEffectsRegistry.answerQuestionnaire(selectedSessionId, request, answers)
-          : Promise.resolve({ ok: false, error: "Questionnaire replies are unavailable" }),
-    }),
-    [eventEffectsRegistry, selectedSessionId],
+    () =>
+      createWebuiPlanReviewWorkflow({
+        // The reply goes to the session's interaction owner, not through a
+        // registry lookup that only works while the composer is mounted there
+        // (T05).
+        answerQuestionnaire: (request, answers) =>
+          selectedSessionId
+            ? application.interactions
+                .owner(selectedSessionId)
+                .answerQuestionnaire(request, answers, agentNameRef.current)
+            : Promise.resolve({ ok: false, error: "Questionnaire replies are unavailable" }),
+      }),
+    [application, selectedSessionId],
   );
   // Rail session links are plain `#session=<id>` anchors, so the navigation runs
   // through the hash subscription inside `useSelectedSessionId` rather than
@@ -568,6 +577,17 @@ export function WebuiClientFoundationApp(
   const selectedAgentName =
     flatSessionsWithChildren.find((session) => session.sessionId === selectedSessionId)
       ?.agentName ?? "main";
+  /**
+   * The interaction owners compose their fallback requester name from the same
+   * session list this surface renders (T05). The list loads after the
+   * application exists, so the reader is installed rather than passed.
+   */
+  const selectedAgentNameRef = useRef(selectedAgentName);
+  selectedAgentNameRef.current = selectedAgentName;
+  agentNameRef.current = selectedAgentName;
+  useEffect(() => {
+    application.interactions.setAgentNameReader(() => selectedAgentNameRef.current);
+  }, [application]);
   useEffect(() => {
     browserStorage.writeTeamModeOff(teamModeOff);
   }, [browserStorage, teamModeOff]);
