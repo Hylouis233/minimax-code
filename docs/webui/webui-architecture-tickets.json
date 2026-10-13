@@ -7,8 +7,12 @@
   "specification": "docs/webui/SPEC-webui-architecture-redesign.md",
   "triageLabel": "ready-for-agent",
   "countingRule": "21 implementation tickets T01-T21, excluding the parent specification issue; each produced target has exactly one carrier; consumer integrations are not second producers",
-  "parentIssue": null,
-  "authorityCommit": null,
+  "parentIssue": {
+    "number": 126,
+    "id": 5831843043,
+    "url": "https://github.com/mcode-webui/minimax-code/issues/126"
+  },
+  "authorityCommit": "486dc644838f403a1956786d1e821a5039702bcc",
   "tickets": [
     {
       "id": "T01",
@@ -46,7 +50,11 @@
       ],
       "verification": "Existing dependency-rule/tool tests plus public application/stream/protocol/browser baseline scenarios; deliberately illegal fixtures prove the role check can fail.",
       "nonGoals": "No feature refactor, product behavior redesign, frozen-oracle edit or suppression of an existing failing gate.",
-      "issue": null
+      "issue": {
+        "number": 127,
+        "id": 5831845378,
+        "url": "https://github.com/mcode-webui/minimax-code/issues/127"
+      }
     },
     {
       "id": "T02",
@@ -84,7 +92,11 @@
       ],
       "verification": "Public assembled lifecycle with injected storage/channel plus built-client boot/remount and real loopback startup/shutdown.",
       "nonGoals": "Does not install T05 domain policy or redefine Composer resets.",
-      "issue": null
+      "issue": {
+        "number": 128,
+        "id": 5831848246,
+        "url": "https://github.com/mcode-webui/minimax-code/issues/128"
+      }
     },
     {
       "id": "T03",
@@ -125,7 +137,11 @@
       ],
       "verification": "Assembled Models commands/read models with adversarial capabilities plus model keyboard/focus/provider browser scenarios.",
       "nonGoals": "The common primitive owns mechanics only; no global business cache or duplicate Composer model owner remains in the final programme.",
-      "issue": null
+      "issue": {
+        "number": 129,
+        "id": 5831882634,
+        "url": "https://github.com/mcode-webui/minimax-code/issues/129"
+      }
     },
     {
       "id": "T04",
@@ -167,7 +183,11 @@
       ],
       "verification": "Assembled conversation command/stream traces, existing lease/recovery tests and real loopback send/resume/detach/stop paths.",
       "nonGoals": "No goal/provider/workspace policy in conversation and no all-session automatic attachment.",
-      "issue": null
+      "issue": {
+        "number": 130,
+        "id": 5831889015,
+        "url": "https://github.com/mcode-webui/minimax-code/issues/130"
+      }
     },
     {
       "id": "T05",
@@ -215,7 +235,11 @@
       ],
       "verification": "Assembled installed event ingress and goal/interaction commands; real loopback emitter/reconnect paths and goal/questionnaire browser behavior.",
       "nonGoals": "No generic internal event bus, background fetch fan-out or new interaction UX.",
-      "issue": null
+      "issue": {
+        "number": 131,
+        "id": 5831925062,
+        "url": "https://github.com/mcode-webui/minimax-code/issues/131"
+      }
     },
     {
       "id": "T06",
@@ -260,7 +284,11 @@
       ],
       "verification": "Assembled history/transcript outcomes plus frozen message/turn fixtures and built-browser scrolling/live handoff.",
       "nonGoals": "Turn/workspace review query ownership is produced by T10, not copied here.",
-      "issue": null
+      "issue": {
+        "number": 132,
+        "id": 5831934513,
+        "url": "https://github.com/mcode-webui/minimax-code/issues/132"
+      }
     },
     {
       "id": "T07",
@@ -304,7 +332,11 @@
       ],
       "verification": "Assembled Sessions commands/read models, transfer loopback integration and rail browser menu/search/overlay scenarios.",
       "nonGoals": "No second catalogue/session store, product reclassification of projects or hidden default workspace changes.",
-      "issue": null
+      "issue": {
+        "number": 133,
+        "id": 5831943172,
+        "url": "https://github.com/mcode-webui/minimax-code/issues/133"
+      }
     },
     {
       "id": "T08",
@@ -344,7 +376,11 @@
       ],
       "verification": "Assembled Plugins commands with actual internal adapters, server validator/wire compatibility and catalogue/MCP/browser consumers.",
       "nonGoals": "No new plugin action, service, unrestricted dispatch or copied Composer catalogue query.",
-      "issue": null
+      "issue": {
+        "number": 134,
+        "id": 5831953261,
+        "url": "https://github.com/mcode-webui/minimax-code/issues/134"
+      }
     },
     {
       "id": "T09",
@@ -382,7 +418,11 @@
       ],
       "verification": "Assembled Account capability/storage/timer traces and browser account/login/status scenarios; real cloud acceptance separately labeled.",
       "nonGoals": "Runtime quota adapter/projection extraction is produced by T17; no new credential behavior.",
-      "issue": null
+      "issue": {
+        "number": 135,
+        "id": 5831957489,
+        "url": "https://github.com/mcode-webui/minimax-code/issues/135"
+      }
     },
     {
       "id": "T10",
@@ -423,7 +463,11 @@
       ],
       "verification": "Assembled Review read/command traces, loopback mutation/snapshot paths and transcript/workspace review browser consumers.",
       "nonGoals": "No file/environment cache takeover, universal review snapshot or new Git mutation semantics.",
-      "issue": null
+      "issue": {
+        "number": 136,
+        "id": 5831962279,
+        "url": "https://github.com/mcode-webui/minimax-code/issues/136"
+      }
     },
     {
       "id": "T11",
@@ -465,7 +509,11 @@
       ],
       "verification": "Assembled workspace commands/query snapshots, HTTP range/content/path integration and panel/canvas/preview browser behavior.",
       "nonGoals": "T15 produces terminal ownership and T16 produces archive parser policy; this ticket only composes their existing/adopted public capabilities.",
-      "issue": null
+      "issue": {
+        "number": 137,
+        "id": 5831969428,
+        "url": "https://github.com/mcode-webui/minimax-code/issues/137"
+      }
     },
     {
       "id": "T12",
@@ -504,7 +552,11 @@
       ],
       "verification": "Assembled Settings commands with actual peer public APIs, loopback personalization/profile paths and settings browser scenarios.",
       "nonGoals": "No duplicate models/account/archive owner, new preference or changed credential persistence.",
-      "issue": null
+      "issue": {
+        "number": 138,
+        "id": 5831976194,
+        "url": "https://github.com/mcode-webui/minimax-code/issues/138"
+      }
     },
     {
       "id": "T13",
@@ -556,7 +608,11 @@
       ],
       "verification": "Assembled Composer intents/outcomes and actual owner collaborations plus composer keyboard/menu/attachment/queue/goal browser scenarios.",
       "nonGoals": "No new Composer reset UX, background attachment policy or peer owner recreation.",
-      "issue": null
+      "issue": {
+        "number": 139,
+        "id": 5831984107,
+        "url": "https://github.com/mcode-webui/minimax-code/issues/139"
+      }
     },
     {
       "id": "T14",
@@ -596,7 +652,11 @@
       ],
       "verification": "Frozen wire and host-shape invariants plus real loopback request/stream/terminal lifecycle paths.",
       "nonGoals": "No public operation change, validator tightening, protocol topology change or removal of host adaptation.",
-      "issue": null
+      "issue": {
+        "number": 140,
+        "id": 5832001525,
+        "url": "https://github.com/mcode-webui/minimax-code/issues/140"
+      }
     },
     {
       "id": "T15",
@@ -636,7 +696,11 @@
       ],
       "verification": "Application terminal commands and loopback iterator cancellation plus real native PTY and xterm attachment behavior; fixtures and native evidence remain distinct.",
       "nonGoals": "No terminal protocol redesign, new process scope or kill-on-unmount behavior.",
-      "issue": null
+      "issue": {
+        "number": 141,
+        "id": 5832006645,
+        "url": "https://github.com/mcode-webui/minimax-code/issues/141"
+      }
     },
     {
       "id": "T16",
@@ -674,7 +738,11 @@
       ],
       "verification": "Actual chosen parser with filesystem conformance/security corpus, runtime archive workflows and loopback/browser archive consumer behavior.",
       "nonGoals": "No new archive feature or relaxed limits; parser selection is this ticket's executable work, not an unresolved operator question.",
-      "issue": null
+      "issue": {
+        "number": 142,
+        "id": 5832012945,
+        "url": "https://github.com/mcode-webui/minimax-code/issues/142"
+      }
     },
     {
       "id": "T17",
@@ -708,7 +776,11 @@
       ],
       "verification": "Runtime quota public outcomes with controlled real adapter/clock traces; optional live endpoint acceptance clearly separated.",
       "nonGoals": "No TTL/degradation/product pricing change, browser token persistence or generic global cache.",
-      "issue": null
+      "issue": {
+        "number": 143,
+        "id": 5832020613,
+        "url": "https://github.com/mcode-webui/minimax-code/issues/143"
+      }
     },
     {
       "id": "T18",
@@ -753,7 +825,11 @@
       ],
       "verification": "Expand-migrate-contract wide-refactor batch with moved-body equivalence, dependency/build checks and existing wire/storage/UI consumer scenarios.",
       "nonGoals": "No second ownership migration for businesses, new generic bus/cache or changed socket topology.",
-      "issue": null
+      "issue": {
+        "number": 144,
+        "id": 5832025763,
+        "url": "https://github.com/mcode-webui/minimax-code/issues/144"
+      }
     },
     {
       "id": "T19",
@@ -800,7 +876,11 @@
       ],
       "verification": "Assembled public application plus built browser screen/navigation behavior and sensitive source call/import checks.",
       "nonGoals": "Does not recreate owners already delivered by prior tickets or redesign screens.",
-      "issue": null
+      "issue": {
+        "number": 145,
+        "id": 5832037713,
+        "url": "https://github.com/mcode-webui/minimax-code/issues/145"
+      }
     },
     {
       "id": "T20",
@@ -835,7 +915,11 @@
       ],
       "verification": "Built effective-style comparisons and real browser screenshots/geometry/interactions at pinned viewport/theme scenarios.",
       "nonGoals": "No visual redesign, new tokens/theme or numerical stylesheet line target.",
-      "issue": null
+      "issue": {
+        "number": 146,
+        "id": 5832055158,
+        "url": "https://github.com/mcode-webui/minimax-code/issues/146"
+      }
     },
     {
       "id": "T21",
@@ -900,7 +984,11 @@
       ],
       "verification": "Full declared integration verification and coverage/population audit; a green narrow gate cannot substitute for the complete acceptance scope.",
       "nonGoals": "No new eviction/flow-control/protocol design, reopened product scope or hidden implementation waiver.",
-      "issue": null
+      "issue": {
+        "number": 147,
+        "id": 5832059059,
+        "url": "https://github.com/mcode-webui/minimax-code/issues/147"
+      }
     }
   ],
   "largeFileCarriers": {
@@ -942,5 +1030,23 @@
       "T17"
     ]
   },
-  "partitionRule": "The mixed workspace query file has two disjoint produced responsibilities: T10 produces review queries, T11 produces files/environment queries. Large-file carrier describes completion of its responsibility cut, not exclusive edits; all producing targets above remain unique. T19 consumes factories/state moved by prior business tickets rather than producing them again. T18 moves only the platform/generic UI residual population."
+  "partitionRule": "The mixed workspace query file has two disjoint produced responsibilities: T10 produces review queries, T11 produces files/environment queries. Large-file carrier describes completion of its responsibility cut, not exclusive edits; all producing targets above remain unique. T19 consumes factories/state moved by prior business tickets rather than producing them again. T18 moves only the platform/generic UI residual population.",
+  "publicationVerification": {
+    "status": "PASS",
+    "date": "2026-10-13",
+    "parentSpecCount": 1,
+    "implementationTicketCount": 21,
+    "nativeBlockingEdgeCount": 70,
+    "initialFrontier": [
+      "T01"
+    ],
+    "checks": [
+      "exact non-empty issue bodies",
+      "ready-for-agent labels",
+      "21 ordered native child issues",
+      "70 exact native blocking edges",
+      "distinct titles and contiguous T01-T21 ordinals",
+      "immutable pushed authority snapshot"
+    ]
+  }
 }

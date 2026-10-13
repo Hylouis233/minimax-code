@@ -1,6 +1,6 @@
 # Plan — WebUI architecture and business module redesign
 
-Status: accepted architecture; specification and development decomposition in preparation. The operator explicitly instructed advancing this Plan to ready-for-development on 2026-10-13. This preparation session does not implement business code or dispatch implementation agents.
+Status: ready for development. The architecture decisions, specification, target partition and dependency-ordered tracker tickets are published and verified. The operator explicitly instructed this preparation on 2026-10-13. No business implementation or implementation-agent dispatch occurred during preparation.
 
 Date: 2026-10-13. Source baseline: `5d89bff9c2e25fb79e1278ec276d1fbf17c0882f`, originally on `webui`, with a clean tracked working tree. The proposal is delivered on `docs/webui-architecture-plan`.
 
@@ -441,7 +441,7 @@ Where the current implementation contradicts an intended invariant (for example 
 
 ## 9. Implementation planning inputs and dependency order
 
-These are dependency-driven work packages for a later implementation plan. They are not authorized coding tasks. The destination is complete; staging controls compatibility, not design ambition.
+These are dependency-driven work packages. The development board partitions them into executable tickets with explicit acceptance criteria and blockers; work packages are not ten indivisible coding tasks. The preparation session publishes this authority but starts no implementation. The destination is complete; staging controls compatibility, not design ambition.
 
 | Work package | Scope / dependencies | Verifiable exit criterion |
 | --- | --- | --- |
@@ -498,6 +498,14 @@ The [decision record](webui-architecture-decisions.md) preserves D1–D12, R1/R2
 T01 is the initial execution frontier. T05 transfers domain-event authority atomically, never through dual production writers; T18 is the remaining platform/generic UI mechanical migration batch; T21 contracts only after every producing ticket completes. Each ticket has readable Source sections, acceptance criteria, verification boundaries and native blockers. Readiness is checked by tracker read-back, not inferred from successful create calls. Publication completion and immutable authority receipt are recorded in the board; this preparation is not product implementation acceptance.
 
 T02 produces the opaque credential/config epoch context and assembles existing real owners with narrow reconciliation commands before permanent routing. T05 uses these real paths while later carriers replace owner implementations; no placeholder route may silently drop work. Settings owns permission-preference commands and runtime-version reads (T12), Account owns credential/API-key/OAuth status (T09), and Composer (T13) consumes those published APIs. T14 establishes the terminal-process port while simplifying operation bindings; T15 then relocates the real terminal implementation behind that same port. These assignments remove ghost inputs and unnecessary terminal-relocation blockers.
+
+### 10.3 Verified development-ready receipt
+
+Preparation published [Spec #126](https://github.com/mcode-webui/minimax-code/issues/126) and its **21 native child tickets #127–#147**, with contiguous board ordinals T01–T21. Full tracker read-back verified exact non-empty bodies, distinct titles, `ready-for-agent` labels, ordered parent-child relationships and **70 native blocking edges** matching the manifest. The immutable decision/specification authority snapshot is `486dc644838f403a1956786d1e821a5039702bcc`, pushed on `docs/webui-architecture-plan`; the board carries the individual issue links and publication metadata.
+
+The initial execution frontier is [T01 / #127](https://github.com/mcode-webui/minimax-code/issues/127). All implementation tickets remain open and unassigned; publication did not execute them. T01's established source/tooling repair is an implementation prerequisite, not an unanswered operator decision. The accepted correction ledger and tests distinguish structural equivalence from established invariant corrections. Parser conformance/selection is assigned to T16; transport topology, new eviction semantics and new product capabilities remain outside scope.
+
+Preparation verification: local decision/Spec/target/dependency/large-file coverage parsing passed; `check:source` passed with 5,032 inventory paths; `check:tsconfig` and current business-navigation checks passed; release-tool tests passed 54 with one platform skip; current source dependency check passed at 303 files / 1,099 references. `check:webui-commands` still fails on the pre-existing stale source path and is explicitly assigned to T01. No full product verifier, browser/live-runtime, cloud, PTY or performance acceptance is claimed by document/issue preparation. Only authority documents and their generated inventory/receipts changed; no product code or historical execution evidence was rewritten.
 
 ### 10.1 Plan-delivery verification
 
