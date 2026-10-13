@@ -28,7 +28,7 @@ import {
   submitWebuiComposerTurn,
   type WebuiComposerSubmitHandlers,
   type WebuiComposerTurnCallbacks,
-} from "./composer-workflows.js";
+} from "./composer/composer-workflows.js";
 import { isWebuiSubscriptionProbeCurrent, ownsWebuiStreamGeneration, resolveWebuiSubscriptionRecheck, type WebuiStreamState } from "../projection/stream-state.js";
 import { streamRecoveryProjection } from "../projection/stream-recovery.js";
 import {

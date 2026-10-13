@@ -34,7 +34,7 @@ import type { WebuiSessionActivityMap } from "../../src/client/projection/sessio
 import type { WebuiActiveTurn } from "../../src/shared/contracts/session.js";
 import type { WebuiRuntimeEvent } from "../../src/shared/contracts/stream.js";
 import type { WebuiStreamLoopSink } from "../../src/client/mechanisms/stream-loop.js";
-import type { WebuiComposerSubmitHandlers } from "../../src/client/application/composer-workflows.js";
+import type { WebuiComposerSubmitHandlers } from "../../src/client/application/composer/composer-workflows.js";
 
 const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 

@@ -1,14 +1,14 @@
-import type {WebuiClientMessageEnqueuer} from "../contracts/composer/command-port.js";
-import type { WebuiClientCreateSessionResult, WebuiClientSessionCreator } from "../contracts/sessions/session-port.js";
-import type { WebuiGoal, WebuiGoalCreateRequest, WebuiGoalPatchRequest } from "../../shared/contracts/goal.js";
-import type { WebuiAttachmentInput } from "../../shared/contracts/messages.js";
-import { formatWebuiError } from "../value-readers.js";
-import { looksLikeAbsoluteWorkspacePath } from "../paths.js";
-import { queueWebuiTurn } from "./queue-command.js";
-import { ownsWebuiStreamGeneration, type WebuiStreamState } from "../projection/stream-state.js";
-import { runWebuiStreamLoop, type WebuiStreamLoopDeps, type WebuiStreamLoopSink } from "../mechanisms/stream-loop.js";
-import { streamRecoveryProjection } from "../projection/stream-recovery.js";
-import { streamStateBundle } from "./stream-state-bundle.js";
+import type {WebuiClientMessageEnqueuer} from "../../contracts/composer/command-port.js";
+import type { WebuiClientCreateSessionResult, WebuiClientSessionCreator } from "../../contracts/sessions/session-port.js";
+import type { WebuiGoal, WebuiGoalCreateRequest, WebuiGoalPatchRequest } from "../../../shared/contracts/goal.js";
+import type { WebuiAttachmentInput } from "../../../shared/contracts/messages.js";
+import { formatWebuiError } from "../../value-readers.js";
+import { looksLikeAbsoluteWorkspacePath } from "../../paths.js";
+import { queueWebuiTurn } from "../queue-command.js";
+import { ownsWebuiStreamGeneration, type WebuiStreamState } from "../../projection/stream-state.js";
+import { runWebuiStreamLoop, type WebuiStreamLoopDeps, type WebuiStreamLoopSink } from "../../mechanisms/stream-loop.js";
+import { streamRecoveryProjection } from "../../projection/stream-recovery.js";
+import { streamStateBundle } from "../stream-state-bundle.js";
 
 export interface WebuiComposerSubmitArgs {
   readonly sessionId?: string;

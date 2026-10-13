@@ -14,7 +14,7 @@
 // unit-tested against a scripted port.
 
 import type { SessionPort, WebuiClientSessionCreator } from "../contracts/sessions/session-port.js";
-import type { WebuiComposerStore } from "./composer-store.js";
+import type { WebuiComposerStore } from "./composer/composer-store.js";
 import type {
   WebuiClientProject,
   WebuiClientSessionPage,

@@ -19,7 +19,7 @@ import {
   type ReactElement,
 } from "react";
 import { ArchonShell } from "./ArchonShell.js";
-import { WEBUI_COMPOSER_HOME_KEY } from "../projection/composer-history.js";
+import { WEBUI_COMPOSER_HOME_KEY } from "../application/composer/composer-history.js";
 import { Composer } from "./Composer.js";
 import { GreetingSkeleton } from "./TranscriptSkeletons.js";
 import { LeftRail } from "./LeftRail.js";
@@ -90,8 +90,8 @@ import type {
   WebuiWorkspaceSubagent,
 } from "../projection/workspace-progress.js";
 import type { WebuiProjectGroup } from "./SessionRail.js";
-import { createWebuiCommandWorkflows } from "../application/command-workflows.js";
-import { createWebuiComposerStore } from "../application/composer-store.js";
+import { createWebuiCommandWorkflows } from "../application/composer/command-workflows.js";
+import { createWebuiComposerStore } from "../application/composer/composer-store.js";
 import {
   createWebuiSessionStore,
   type WebuiSessionStore,

@@ -156,7 +156,7 @@ import {
 } from "../projection/composer-state.js";
 import {
   submitWebuiGoal,
-} from "../application/composer-workflows.js";
+} from "../application/composer/composer-workflows.js";
 import { evaluateComposerDismiss, evaluateOutsideClose } from "../projection/outside-close.js";
 import {
   buildWebuiModelSelectionRequest,
@@ -176,7 +176,7 @@ import {
   startWebuiHistoryBrowse,
   stepWebuiHistoryBrowse,
   type WebuiHistoryBrowse,
-} from "../projection/composer-history.js";
+} from "../application/composer/composer-history.js";
 import {
   slashSkillSummaryToEntry,
   WEBUI_BUILTIN_COMMANDS,

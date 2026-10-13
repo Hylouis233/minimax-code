@@ -40,7 +40,7 @@ import {
 import {
   createWebuiComposerStore,
   type WebuiComposerStore,
-} from "./composer-store.js";
+} from "./composer/composer-store.js";
 import {
   createWebuiVersionCells,
   type WebuiVersionCells,
