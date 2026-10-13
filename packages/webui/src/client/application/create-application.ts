@@ -16,8 +16,8 @@
 
 import {
   createWebuiEventCoordinator,
+  type WebuiWorkspaceGitChangedPayload,
   type WebuiEventCoordinator,
-  type WebuiEventEffects,
 } from "./turn/event-coordinator.js";
 import type { WebuiOpenEventChannel, WebuiProcessEventChannel } from "./turn/event-channel.js";
 import { createWebuiSessionStore } from "./session-store.js";
@@ -34,6 +34,10 @@ import {
   createWebuiDeliveryDisposers,
   type WebuiDeliveryDisposers,
 } from "./turn/delivery-disposers.js";
+import {
+  createWebuiConversationTurnCommands,
+  type WebuiConversationTurnCommands,
+} from "./turn/turn-commands.js";
 import {
   createWebuiGoalSessionOwners,
   type WebuiGoalSessionOwners,
@@ -91,7 +95,7 @@ export interface WebuiApplicationDeps {
   readonly store?: WebuiSessionStore;
   /** The session the UI currently has selected; default reads the store. */
   readonly readActiveSessionId?: () => string | undefined;
-  readonly effects?: WebuiEventEffects;
+
   /** Transport-facing dependencies of the turn coordinator. */
   readonly turns: Omit<WebuiTurnCoordinatorDeps, "store" | "leases">;
   /**
@@ -237,55 +241,24 @@ export interface WebuiApplication {
    */
   readonly adoptHomeSession: (sessionId: string) => void;
   /**
-   * Replace the effects the event coordinator runs.
+   * Subscribe to a domain event that carries no session id (a workspace-git
+   * change). A reaction, not a route: it runs after the coordinator has routed
+   * the event to the owners, and it cannot displace anything (plan §4.4).
    *
-   * The coordinator reads its effects through a slot rather than a value, so the
-   * application can be constructed before the effects exist — the composition
-   * root builds the application and provides it, and the subtree below it
-   * registers the per-session handlers and its own view reactions once it is
-   * mounted. Registration **replaces** the whole set and returns a detach that
-   * restores the set in force before the call, so a remount is symmetric.
-   *
-   * Members the set does not carry are removed rather than forwarded as
-   * no-ops: the coordinator branches on their presence (`if (effects.setGoal)`
-   * chooses between the registered write path and its own store write), so an
-   * always-present forwarder would silently take the registered branch.
+   * Temporary adapter: the workspace business owns this invalidation once its
+   * query owner exists (T11); until then the surface that holds the affected
+   * views subscribes here.
    */
-  readonly setEventEffects: (effects: WebuiEventEffects) => () => void;
+  readonly onWorkspaceGitChanged: (
+    listener: (payload: WebuiWorkspaceGitChangedPayload) => void,
+  ) => () => void;
+  /**
+   * Subscribe to the channel-accepted signal. A reaction, not a route: the
+   * application's own reconciliation runs first, then listeners are told.
+   */
+  readonly onChannelReady: (listener: () => void) => () => void;
   /** Tear down: detach the coordinator, dispose the store, close the channel. */
   readonly dispose: () => void;
-}
-
-/**
- * The effects slot the coordinator reads.
- *
- * The coordinator captures the object **once** and closes over it, so the slot's
- * identity is what stays stable while its members change: registering rewrites
- * the keys in place. Members the registration does not carry are deleted rather
- * than left as permanent forwarders, because the coordinator branches on their
- * presence — `if (effects.setGoal)` at `event-coordinator.ts` chooses between the
- * registered goal write path and its own store write, and a forwarder that is
- * always defined would take the registered branch on a host that registered
- * nothing.
- */
-function createEventEffectsSlot(initial: WebuiEventEffects): {
-  readonly slot: WebuiEventEffects;
-  readonly snapshot: () => WebuiEventEffects;
-  readonly replace: (next: WebuiEventEffects) => void;
-} {
-  const slot: Record<string, unknown> = {};
-  const replace = (next: WebuiEventEffects): void => {
-    for (const key of Object.keys(slot)) delete slot[key];
-    for (const [key, value] of Object.entries(next)) {
-      if (value !== undefined) slot[key] = value;
-    }
-  };
-  replace(initial);
-  return {
-    slot: slot as WebuiEventEffects,
-    snapshot: () => ({ ...(slot as WebuiEventEffects) }),
-    replace,
-  };
 }
 
 export function createWebuiApplication(
@@ -358,28 +331,76 @@ export function createWebuiApplication(
   // registration (the subtree that owns the effects) replaces it in place. The
   // coordinator holds the slot object, not a copy of its members, so a
   // registration made after construction is what the next event sees.
-  const eventEffects = createEventEffectsSlot(deps.effects ?? {});
+  /**
+   * The reactions a surface subscribes to for the two signals that carry no
+   * session id of their own. They run after the owners have been routed to, and
+   * they cannot replace a route (plan §4.4).
+   */
+  const workspaceGitListeners = new Set<(payload: WebuiWorkspaceGitChangedPayload) => void>();
+  const channelReadyListeners = new Set<() => void>();
+  const notify = <T>(listeners: Set<(value: T) => void>, value: T): void => {
+    for (const listener of [...listeners]) listener(value);
+  };
+  /**
+   * The conversation command set for one session, built on demand: the attach
+   * and recheck routes are the application's, so a `session.start` is followed
+   * whether or not a composer is mounted (T05).
+   */
+  const turnCommands = new Map<string, WebuiConversationTurnCommands>();
+  /**
+   * The one reconciliation entry point (plan §4.4): the same owner routes the
+   * event path uses, so selection and reconnect do not run a second one.
+   */
+  const reconcileSession = (sessionId: string): void => {
+    if (lifecycleState() === "disposed") return;
+    interactions.owner(sessionId).invalidatePendingReads();
+    void interactions.owner(sessionId).refresh();
+    void goals.owner(sessionId).refreshGoal();
+  };
+  const turnCommandsFor = (sessionId: string): WebuiConversationTurnCommands => {
+    const existing = turnCommands.get(sessionId);
+    if (existing) return existing;
+    const commands = createWebuiConversationTurnCommands({
+      store,
+      sessionId,
+      ...(deps.turnCapabilities ? { capabilities: turnCapabilities } : {}),
+      deliveries,
+      scope: sessionScope,
+    });
+    turnCommands.set(sessionId, commands);
+    return commands;
+  };
   const events = createWebuiEventCoordinator({
     store,
     leases,
     readActiveSessionId,
     unread,
-    // The permanent routes, installed here — before `start` opens ingress — and
-    // outside the replaceable effect set, so no view can displace them.
+    // The permanent routes, installed here — before `start` opens ingress —
+    // and outside anything a view can replace, so no surface can displace them.
     routes: {
       setGoal: (sessionId, goal) => goals.owner(sessionId).applyGoal(goal),
       refreshGoal: (sessionId) => goals.owner(sessionId).refreshGoal(),
-      // Fencing is local and cheap, so it happens for any named session. The
-      // READ only runs for a session something still needs (plan §4.3: an
-      // uninterested session retains its dirty marker and reconciles when
-      // interest arrives, rather than fanning out a background fetch).
       invalidatePending: (sessionId) => interactions.owner(sessionId).invalidatePendingReads(),
       refreshPending: (sessionId) => {
         if (!sessionScope.isInterested(sessionId)) return;
         return interactions.owner(sessionId).refresh();
       },
+      attachStream: (sessionId, turnId, mode) => {
+        const commands = turnCommandsFor(sessionId);
+        if (mode === "recheck") commands.recheck(turnId);
+        else commands.attach(turnId);
+      },
+      // The application's own reconciliation first, then the surfaces that
+      // subscribed: a reconnect is a possible observation gap, not a barrier.
+      channelReady: () => {
+        for (const sessionId of sessionScope.interested()) {
+          reconcileSession(sessionId);
+          turnCommandsFor(sessionId).recover();
+        }
+        notify(channelReadyListeners, undefined);
+      },
+      workspaceGitChanged: (payload) => notify(workspaceGitListeners, payload),
     },
-    effects: eventEffects.slot,
   });
   const turns = createWebuiTurnCoordinator({
     store,
@@ -400,6 +421,8 @@ export function createWebuiApplication(
   // one channel and attaches the coordinator to it; `dispose` detaches, disposes
   // the store that fences late commits, and closes the channel.
   let lifecycle: WebuiApplicationLifecycleState = "constructed";
+  /** Read by helpers defined above the lifecycle block. */
+  const lifecycleState = (): WebuiApplicationLifecycleState => lifecycle;
   let channel: WebuiProcessEventChannel | undefined;
   let detach: (() => void) | undefined;
 
@@ -444,9 +467,7 @@ export function createWebuiApplication(
       if (lifecycle === "disposed") return;
       const target = sessionId ?? readActiveSessionId();
       if (!target) return;
-      eventEffects.slot.invalidatePending?.(target);
-      eventEffects.slot.refreshPending?.(target);
-      eventEffects.slot.refreshGoal?.(target);
+      reconcileSession(target);
     },
     adoptHomeSession: (sessionId) => {
       // One committed transition: the home turn's live record moves onto the
@@ -457,10 +478,13 @@ export function createWebuiApplication(
       composer.adoptHome(sessionId);
       selectSession(sessionId);
     },
-    setEventEffects: (next) => {
-      const previous = eventEffects.snapshot();
-      eventEffects.replace(next);
-      return () => eventEffects.replace(previous);
+    onWorkspaceGitChanged: (listener) => {
+      workspaceGitListeners.add(listener);
+      return () => workspaceGitListeners.delete(listener);
+    },
+    onChannelReady: (listener) => {
+      channelReadyListeners.add(listener);
+      return () => channelReadyListeners.delete(listener);
     },
     dispose: () => {
       if (lifecycle === "disposed") return;
@@ -473,6 +497,9 @@ export function createWebuiApplication(
       sessionScope.dispose();
       goals.dispose();
       interactions.dispose();
+      workspaceGitListeners.clear();
+      channelReadyListeners.clear();
+      turnCommands.clear();
       store.dispose();
       channel?.close?.();
       channel = undefined;

@@ -42,7 +42,6 @@ import {
   type WebuiActiveTurnProbeFn,
 } from "./active-turn-probe.js";
 import { streamStateBundle } from "./stream-state-bundle.js";
-import type { WebuiEventEffects } from "./event-coordinator.js";
 import type { WebuiSessionStore } from "../session-store.js";
 import { WEBUI_HOME_SESSION_KEY } from "../state.js";
 import {
@@ -54,20 +53,6 @@ import type { WebuiTurnCapabilitySlice } from "./turn-capabilities.js";
 import type { WebuiDeliveryDisposers } from "./delivery-disposers.js";
 import type { WebuiSessionScopeManager } from "../sessions/session-scope.js";
 import { stopWebuiTurn } from "./turn-coordinator.js";
-
-/** Adapts the application's session-aware event call to the composer commands. */
-export function createWebuiComposerAttachStreamEffect(
-  attachToTurn: (turnId: string | undefined) => void,
-  recheckSubscription: (turnId: string | undefined) => void,
-): NonNullable<WebuiEventEffects["attachStream"]> {
-  return (_sessionId, turnId, mode) => {
-    if (mode === "recheck") {
-      recheckSubscription(turnId);
-      return;
-    }
-    attachToTurn(turnId);
-  };
-}
 
 export interface WebuiAttachTurnDeps {
   readonly sessionId: string | undefined;

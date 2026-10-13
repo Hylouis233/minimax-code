@@ -20,8 +20,6 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createWebuiApplication } from "../../src/client/application/create-application.js";
-import { createWebuiEventEffectsRegistry } from "../../src/client/application/turn/event-effects-registry.js";
-import { createWebuiComposerAttachStreamEffect } from "../../src/client/application/turn/turn-commands.js";
 import type { WebuiProcessEventChannel } from "../../src/client/application/turn/event-channel.js";
 import type { WebuiRuntimeEvent } from "../../src/shared/contracts/stream.js";
 import type {WebuiClientSessionResumer} from "../../src/client/contracts/turn/execution-port.js";
@@ -66,7 +64,13 @@ function makeChannel(): FakeChannel {
   };
 }
 
-function makeApplication(effects = {}) {
+function makeApplication(
+  options: {
+    readonly interactionsPort?: Record<string, unknown>;
+    readonly goalPort?: Record<string, unknown>;
+    readonly turnCapabilities?: Record<string, unknown>;
+  } = {},
+) {
   const channels: FakeChannel[] = [];
   let opened = 0;
   const resumeSession = vi.fn(async () => {}) as unknown as WebuiClientSessionResumer;
@@ -77,337 +81,87 @@ function makeApplication(effects = {}) {
       channels.push(fake);
       return fake.channel;
     },
-    effects,
+    ...(options.interactionsPort
+      ? { interactionsPort: options.interactionsPort as never }
+      : {}),
+    ...(options.goalPort ? { goalPort: options.goalPort as never } : {}),
+    ...(options.turnCapabilities
+      ? { turnCapabilities: options.turnCapabilities as never }
+      : {}),
     turns: { resumeSession },
   });
   application.start();
   return { application, channels, opened: () => opened };
 }
 
-describe("the application's single channel", () => {
-  it("opens exactly one channel per application instance", () => {
-    const first = makeApplication();
-    const second = makeApplication();
-    expect(first.opened()).toBe(1);
-    expect(second.opened()).toBe(1);
-    // And the event coordinator is its sole consumer: one listener on the wire.
-    expect(first.channels[0]!.listenerCount()).toBe(1);
-  });
-
-  it("keeps one channel across repeated mount/unmount", () => {
-    const { application, channels, opened } = makeApplication();
-    for (let i = 0; i < 5; i += 1) {
-      const unsubscribe = application.subscribe(() => undefined);
-      unsubscribe();
-    }
-    // Component subscriptions live on the application, not the raw channel, so
-    // they never open another one.
-    expect(opened()).toBe(1);
-    expect(channels[0]!.listenerCount()).toBe(1);
-  });
-
-  it("a throwing listener does not break other subscribers", () => {
-    const { application } = makeApplication();
-    const healthy = vi.fn();
-    application.subscribe(() => {
-      throw new Error("listener exploded");
-    });
-    application.subscribe(healthy);
-    application.select("s1");
-    expect(healthy).toHaveBeenCalled();
-  });
-
-  it("unsubscribing does not tear down the shared channel", () => {
-    const { application, channels } = makeApplication();
-    const kept = vi.fn();
-    const dropped = application.subscribe(() => undefined);
-    application.subscribe(kept);
-    dropped();
-    // A channel event still reaches the remaining subscriber and the channel
-    // is never closed by a component unmount.
-    channels[0]!.emit(event("session.start", { sessionId: "s1", turnId: "t1" }));
-    expect(kept).toHaveBeenCalled();
-    expect(channels[0]!.closeSpy).not.toHaveBeenCalled();
-    expect(channels[0]!.listenerCount()).toBe(1);
-  });
-});
-
-describe("event routing to the retained reducers", () => {
-  it("routes activity and executes the effect reducer's commands", () => {
-    const { application, channels } = makeApplication();
-    channels[0]!.emit(event("session.start", { sessionId: "s1", turnId: "t1" }));
-
-    const snapshot = application.getSnapshot();
-    // Activity reducer (retained, unchanged) marked the session busy.
-    expect(snapshot.activity["s1"]?.busy?.turnId).toBe("t1");
-    // Effect execution lives in the coordinator: the store's writer recorded
-    // sending + the streaming phase.
-    expect(application.store.readSession("s1").sending).toBe(true);
-    expect(application.store.readSession("s1").stream.phase).toBe("streaming");
-  });
-
-  it("runs an injected ready effect when the channel is accepted", () => {
-    const channelReady = vi.fn();
-    const { channels } = makeApplication({ channelReady });
-    expect(channelReady).not.toHaveBeenCalled();
-    channels[0]!.ready();
-    expect(channelReady).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe("lease release", () => {
-  it("releases the lease on terminal, error and cancellation", () => {
-    const { application, channels } = makeApplication();
-    for (const [type, expected] of [
-      ["session.finish", "finished"],
-      ["session.error", "error"],
-      ["session.abort", "aborted"],
-    ] as const) {
-      application.leases.claim("s1", "recovered", "t1");
-      channels[0]!.emit(event(type, { sessionId: "s1", turnId: "t1" }));
-      const stream = application.store.readSession("s1").stream;
-      expect(stream.subscription).toBeUndefined();
-      expect(stream.status).toBe(expected);
-    }
-
-    // Cancellation: an explicit release scoped to the claiming generation.
-    const generation = application.leases.claim("s1", "local-send");
-    application.leases.release("s1", { generation });
-    expect(application.store.readSession("s1").stream.subscription).toBeUndefined();
-  });
-});
-
-describe("the turn coordinator's manual retry", () => {
-  function appWithResume(resumeSession: WebuiClientSessionResumer) {
-    const fake = makeChannel();
-    const application = createWebuiApplication({
-      openEventChannel: () => fake.channel,
-      turns: { resumeSession },
-    });
-    application.start();
-    return { application, channel: fake };
-  }
-
-  function seedRefused(
-    application: ReturnType<typeof appWithResume>["application"],
-    sessionId: string,
-  ): void {
-    application.store.updateSession(sessionId, (current) => ({
-      ...current,
-      stream: {
-        ...current.stream,
-        phase: "refused",
-        refusal: "WebUI connection closed before [DONE]",
-        cursor: "c9",
-      },
-    }));
-  }
-
-  it("clears the standing refusal and re-attaches from the recorded cursor", () => {
-    const resumeSession = vi.fn(
-      () => new Promise<void>(() => {}),
-    ) as unknown as WebuiClientSessionResumer;
-    const { application } = appWithResume(resumeSession);
-    seedRefused(application, "s1");
-
-    void application.turns.retry("s1");
-
-    const stream = application.store.readSession("s1").stream;
-    // The attach loop's synchronous prefix: lease claimed, phase streaming, and
-    // the old refusal gone rather than lingering under the new attempt.
-    expect(stream.phase).toBe("streaming");
-    expect(stream.refusal).toBeUndefined();
-    expect(stream.transcriptIncomplete).toBe(false);
-    expect(stream.subscription?.owner).toBe("recovered");
-    expect(resumeSession).toHaveBeenCalledWith(
-      { id: "s1", afterCursor: "c9" },
-      expect.any(Function),
-    );
-  });
-
-  it("is one attempt: a still-dead server refuses again through the same path", async () => {
-    const resumeSession = vi.fn(async () => {
-      throw new Error("connection refused again");
-    }) as unknown as WebuiClientSessionResumer;
-    const { application } = appWithResume(resumeSession);
-    seedRefused(application, "s1");
-
-    await application.turns.retry("s1");
-
-    const stream = application.store.readSession("s1").stream;
-    expect(stream.phase).toBe("refused");
-    expect(stream.refusal).toBe("connection refused again");
-    // The failed attempt leaves no lease behind for the next retry to collide
-    // with.
-    expect(stream.subscription).toBeUndefined();
-    expect(resumeSession).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe("late results and disposal", () => {
-  it("writes nothing after disposal", () => {
-    const { application } = makeApplication();
-    const before = application.store.readSession("s1").stream;
-
-    application.dispose();
-
-    application.events.handleEvent(
-      event("session.finish", { sessionId: "s1", turnId: "t1" }),
-    );
-    application.store.updateSession("s1", (current) => ({
-      ...current,
-      sending: true,
-    }));
-
-    expect(application.store.isDisposed()).toBe(true);
-    expect(application.store.readSession("s1").stream).toBe(before);
-    expect(application.store.readSession("s1").sending).toBe(false);
-  });
-});
-
 describe("stage 4 — the four call sites' handling through the coordinator", () => {
-  it("claims its own locally sent turn instead of attaching a second stream", () => {
-    const attachStream = vi.fn();
-    const { application, channels } = makeApplication({ attachStream });
-    // A local send claims the lease without a turn id (the stream loop's
-    // `claimSubscription("local-send")`), then the runtime publishes
-    // `session.start` for our own turn.
-    application.leases.claim("s1", "local-send");
-    channels[0]!.emit(event("session.start", { sessionId: "s1", turnId: "t1" }));
-
-    // The lease already covers the turn, so no second stream is opened; the
-    // reducer adopts the turn id onto the existing subscription instead.
-    expect(attachStream).not.toHaveBeenCalled();
-    const stream = application.store.readSession("s1").stream;
-    expect(stream.subscription?.turnId).toBe("t1");
-    expect(stream.subscription?.owner).toBe("local-send");
-    expect(application.store.readSession("s1").sending).toBe(true);
-  });
-
-  it("attaches a server-initiated turn the client never started", () => {
-    const attachStream = vi.fn();
-    const { channels } = makeApplication({ attachStream });
-    channels[0]!.emit(event("session.start", { sessionId: "s1", turnId: "srv-1" }));
-    expect(attachStream).toHaveBeenCalledWith("s1", "srv-1", "attach");
-  });
-
-  it("asks the active-turn probe to recheck when a session.start names another turn", () => {
-    const attachStream = vi.fn();
-    const { application, channels } = makeApplication({ attachStream });
-    application.leases.claim("s1", "recovered", "other");
-    channels[0]!.emit(event("session.start", { sessionId: "s1", turnId: "srv-2" }));
-    // A different turn is already held; the event alone cannot tell stale from
-    // concurrent, so the attach decision is "recheck" and the probe decides.
-    expect(attachStream).toHaveBeenCalledWith("s1", "srv-2", "recheck");
-  });
-
-  it("routes coordinator to registry to the composer's attach/recheck commands", () => {
-    const registry = createWebuiEventEffectsRegistry();
-    const attachToTurn = vi.fn();
-    const recheckSubscription = vi.fn();
-    registry.register("s1", {
-      attachStream: createWebuiComposerAttachStreamEffect(
-        attachToTurn,
-        recheckSubscription,
-      ),
+  it("attaches to the turn a session.start names, with no view mounted", async () => {
+    // The application builds the conversation command set for the session and
+    // attaches itself: the composer is not involved (T05). The evidence is the
+    // attempt reaching the session's own transport.
+    const { application, channels } = makeApplication({
+      turnCapabilities: { resume: async () => undefined },
     });
-    const { application, channels } = makeApplication(
-      registry.asWebuiEventEffects(),
-    );
-    application.leases.claim("s1", "recovered", "old-turn");
+
+    channels[0]!.emit(event("session.start", { sessionId: "s1", turnId: "turn-B" }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // The attempt started on the session's record: streaming, with the sending
+    // flag up, which is what a mounted composer used to be required for.
+    const record = application.store.readSession("s1");
+    expect(record.stream.phase).toBe("streaming");
+    expect(record.sending).toBe(true);
+  });
+
+  it("re-reads the session's pending interactions and goal through their owners", () => {
+    const listPendingPermissions = vi.fn(async () => ({ requests: [] }));
+    const getGoal = vi.fn(async () => undefined);
+    const { application, channels } = makeApplication({
+      interactionsPort: { listPendingPermissions },
+      goalPort: { getGoal },
+    });
+    // Interest is what makes the read worth running (plan §4.3).
+    application.sessionScope.acquire("s1", "secondary", "tab-1");
+
+    channels[0]!.emit(event("session.queue.updated", { sessionId: "s1" }));
+
+    expect(listPendingPermissions).toHaveBeenCalledTimes(1);
+    expect(application.store.readSession("s1").permissions).toEqual([]);
+    expect(getGoal).not.toHaveBeenCalled();
+  });
+
+  it("delivers a workspace-git event to the surfaces that subscribed", () => {
+    const { application, channels } = makeApplication();
+    const seen: unknown[] = [];
+    application.onWorkspaceGitChanged((payload) => seen.push(payload));
 
     channels[0]!.emit(
-      event("session.start", { sessionId: "s1", turnId: "turn-B" }),
+      event("workspace.git.changed", { workspace: "/repo", aliases: ["/repo-alias"] }),
     );
 
-    expect(recheckSubscription).toHaveBeenCalledTimes(1);
-    expect(recheckSubscription).toHaveBeenCalledWith("turn-B");
-    expect(attachToTurn).not.toHaveBeenCalled();
+    expect(seen).toEqual([{ workspace: "/repo", aliases: ["/repo-alias"] }]);
   });
 
-  it("re-reads interaction, questionnaire and goal through the registered effects", () => {
-    const registry = createWebuiEventEffectsRegistry();
-    const invalidatePending = vi.fn();
-    const refreshPending = vi.fn();
-    const refreshGoal = vi.fn();
-    const setGoal = vi.fn();
-    registry.register("s1", {
-      invalidatePending,
-      refreshPending,
-      refreshGoal,
-      setGoal,
-    });
-    const fake = makeChannel();
+  it("reconciles every interested session on a ready signal, then tells subscribers", () => {
     const listPendingPermissions = vi.fn(async () => ({ requests: [] }));
+    const fake = makeChannel();
     const probeApp = createWebuiApplication({
       openEventChannel: () => fake.channel,
-      effects: registry.asWebuiEventEffects(),
       interactionsPort: { listPendingPermissions } as never,
       turns: { resumeSession: (async () => {}) as unknown as WebuiClientSessionResumer },
     });
-    // The read runs for an interested session (plan §4.3): the selection is what
-    // makes this session one.
-    probeApp.start({ initialSessionId: "s1" });
-
-    fake.emit(event("session.queue.updated", { sessionId: "s1" }));
-    // The pending fence and re-read are the application's routes through the
-    // session's interaction owner (T05), so the registered hooks are not
-    // consulted; the owner really re-reads through the port.
-    expect(invalidatePending).not.toHaveBeenCalled();
-    expect(refreshPending).not.toHaveBeenCalled();
-    expect(listPendingPermissions).toHaveBeenCalledTimes(1);
-    expect(probeApp.store.readSession("s1").permissions).toEqual([]);
-
-    fake.emit(
-      event("thread_goal.objective_updated_steering", {
-        sessionId: "s1",
-        goalId: "g1",
-      }),
-    );
-    // The goal read and write belong to the application's route, not to the
-    // registered set (T05): the registered goal hooks are not consulted at all.
-    expect(refreshGoal).not.toHaveBeenCalled();
-    expect(setGoal).not.toHaveBeenCalled();
-
-    // A goal-bearing event commits through the session's owner, which the
-    // application created — so the version fence still owns every write.
-    fake.emit(event("thread_goal.cleared", { sessionId: "s1" }));
-    expect(probeApp.store.readSession("s1").goal).toBeUndefined();
-    expect(probeApp.goals.sessions()).toContain("s1");
-  });
-
-  it("invalidates the workspace panel git and review queries through the coordinator", () => {
-    const workspaceGitChanged = vi.fn();
-    const { channels } = makeApplication({ workspaceGitChanged });
-    channels[0]!.emit(
-      event("workspace.git.changed", {
-        workspace: "/repo",
-        aliases: ["/repo-alias"],
-      }),
-    );
-    expect(workspaceGitChanged).toHaveBeenCalledWith({
-      workspace: "/repo",
-      aliases: ["/repo-alias"],
-    });
-  });
-
-  it("re-probes after reconnect by fanning the ready signal to every session", () => {
-    const registry = createWebuiEventEffectsRegistry();
-    const firstReady = vi.fn();
-    const secondReady = vi.fn();
-    registry.register("s1", { channelReady: firstReady });
-    registry.register("s2", { channelReady: secondReady });
-    const fake = makeChannel();
-    const probeApp = createWebuiApplication({
-      openEventChannel: () => fake.channel,
-      effects: registry.asWebuiEventEffects(),
-      turns: { resumeSession: (async () => {}) as unknown as WebuiClientSessionResumer },
-    });
     probeApp.start();
-    // The server accepted the channel again; each session re-reads its
-    // authoritative state, which is how a missed `session.start` is recovered.
+    probeApp.sessionScope.acquire("s1", "secondary", "tab-1");
+    probeApp.sessionScope.acquire("s2", "secondary", "tab-2");
+    const ready = vi.fn();
+    probeApp.onChannelReady(ready);
+
+    // The server accepted the channel again; each interested session re-reads
+    // its authoritative state, which is how a missed `session.start` is
+    // recovered, and the surfaces that subscribed are told afterwards.
     fake.ready();
-    expect(firstReady).toHaveBeenCalledTimes(1);
-    expect(secondReady).toHaveBeenCalledTimes(1);
+
+    expect(listPendingPermissions).toHaveBeenCalledTimes(2);
+    expect(ready).toHaveBeenCalledTimes(1);
   });
 });

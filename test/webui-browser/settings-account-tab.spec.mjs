@@ -317,7 +317,12 @@ test("retry after a render error brings the app back", async ({ page }) => {
   await expect(page.locator('[data-testid="webui-error-boundary"]')).toHaveCount(0);
   await expect(page.locator('[data-webui-session-link="A"]')).toBeVisible();
   await expect(page.locator('[data-webui-session-link="B"]')).toBeVisible();
-  await expect(page.getByPlaceholder("输入消息…（输入 / 唤起命令）")).toBeVisible();
+  // The composer is back and usable. Its input MODE is not asserted here: the
+  // recovered app reconciles the session's goal on the accepted channel (plan
+  // §4.3), so a session with an active goal legitimately opens in goal mode —
+  // which is what this spec's fixture holds. What this case is about is that the
+  // composer exists again at all.
+  await expect(page.locator("textarea").first()).toBeVisible();
   await expect(page.getByText("History A synthetic")).toBeVisible();
 
   // And the recovered app is not a frozen snapshot of the failed render: the

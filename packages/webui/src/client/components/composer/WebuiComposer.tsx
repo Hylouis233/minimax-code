@@ -54,7 +54,6 @@ import type {
   WebuiComposerAttachment,
   WebuiComposerUrlReference,
 } from "../../projection/composer/composer-interactions.js";
-import { createWebuiComposerAttachStreamEffect } from "../../application/turn/turn-commands.js";
 import {
   useWebuiSessionCommands,
   useWebuiSessionGoal,
@@ -65,7 +64,6 @@ import {
 import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
 import { ContextUsageIndicator } from "../sessions/ContextUsageIndicator.js";
 import { useWebuiPortSlice } from "../../bindings/port-slices-context.js";
-import { useWebuiEventEffectsRegistry } from "../../bindings/event-effects-context.js";
 import {
   useWebuiGoalOwner,
   useWebuiGoalReaction,
@@ -472,7 +470,6 @@ export function WebuiComposer({
   // event coordinator — the sole consumer of the process-event channel — runs
   // them for events addressed to this session; it holds no channel and
   // registers nothing when no provider is mounted (SSR, tests).
-  const effectsRegistry = useWebuiEventEffectsRegistry();
   // The interaction slices live on the one application store, read here through
   // selectors and kept nowhere else (plan §7.6; ticket #45). The commands write
   // through the store's interaction writer; the composer holds no store writer
@@ -735,33 +732,13 @@ export function WebuiComposer({
     // consumer, reduces each event, and runs this session's registered effects
     // below (ticket #45, the atomic ingress flip).
     recoverMissedTurn();
-    // Register this session's effect handlers for the application event
-    // coordinator. The coordinator runs them for events addressed to this
-    // session, so the composer holds no channel and no raw event callback.
-    const unregisterEffects = effectsRegistry?.register(sessionId, {
-      // The pending re-read, its fence and the questionnaire reply are the
-      // application's routes through the session's interaction owner (T05); this
-      // view registers only its own stream-attach and reconnect reactions.
-      // The goal read and write are not registered here any more: they are the
-      // application's permanent route through the session's owner (T05), so a
-      // goal event commits for any session, mounted or not, and this view cannot
-      // displace that route by registering its own.
-      attachStream: createWebuiComposerAttachStreamEffect(
-        attachToTurn,
-        recheckSubscription,
-      ),
-      channelReady: () => {
-        void refreshPending().catch(() => undefined);
-        recoverMissedTurn();
-      },
-    });
+    // Nothing is registered here any more: the application's permanent routes
+    // own every domain fact (T05), so this view holds no effect set to install.
     return () => {
       cancelled = true;
-      unregisterEffects?.();
     };
   }, [
     agentName,
-    effectsRegistry,
     getActiveTurn,
     // These two come from the interactions slice now (the coordinator reads it);
     // the members are stable for the mount, so the registration does not churn.

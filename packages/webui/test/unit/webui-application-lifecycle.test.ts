@@ -75,6 +75,8 @@ function makeApplication(options: {
     readonly write: (counts: Readonly<Record<string, number>>) => void;
   };
   readonly turnCapabilities?: Record<string, unknown>;
+  readonly interactionsPort?: Record<string, unknown>;
+  readonly goalPort?: Record<string, unknown>;
 } = {}) {
   const opened: ReturnType<typeof scriptedChannel>[] = options.channels ?? [];
   const application = createWebuiApplication({
@@ -87,6 +89,10 @@ function makeApplication(options: {
     ...(options.turnCapabilities
       ? { turnCapabilities: options.turnCapabilities as never }
       : {}),
+    ...(options.interactionsPort
+      ? { interactionsPort: options.interactionsPort as never }
+      : {}),
+    ...(options.goalPort ? { goalPort: options.goalPort as never } : {}),
     turns: { resumeSession: (async () => {}) as unknown as WebuiClientSessionResumer },
   });
   return { application, opened };
@@ -339,54 +345,59 @@ describe("the identity epoch context", () => {
 // of each surface probing on its own, and the re-reads are the ones the
 // installed routes own — asserted through the routes themselves, not a copy.
 describe("the reconciliation entry point", () => {
-  it("runs the installed session's authoritative re-reads", () => {
-    const refreshPending = vi.fn();
-    const refreshGoal = vi.fn();
-    const invalidatePending = vi.fn();
-    const { application } = makeApplication();
-    application.setEventEffects({
-      invalidatePending,
-      refreshPending,
-      refreshGoal,
+  it("runs the reconciled session's authoritative re-reads through their owners", () => {
+    const listPendingPermissions = vi.fn(async () => ({ requests: [] }));
+    const getGoal = vi.fn(async () => undefined);
+    const { application } = makeApplication({
+      interactionsPort: { listPendingPermissions },
+      goalPort: { getGoal },
     });
 
     application.reconcile(SESSION);
 
-    expect(invalidatePending).toHaveBeenCalledWith(SESSION);
-    expect(refreshPending).toHaveBeenCalledWith(SESSION);
-    expect(refreshGoal).toHaveBeenCalledWith(SESSION);
+    // One entry point, and it is the owner routes the event path uses: the
+    // pending snapshot is really re-read and the goal is really re-read.
+    expect(listPendingPermissions).toHaveBeenCalledTimes(1);
+    expect(getGoal).toHaveBeenCalledWith({ sessionId: SESSION });
     application.dispose();
   });
 
   it("defaults to the application's own selection", () => {
-    const refreshPending = vi.fn();
-    const { application } = makeApplication();
-    application.setEventEffects({ refreshPending });
+    const listPendingPermissions = vi.fn(async () => ({ requests: [] }));
+    const { application } = makeApplication({
+      interactionsPort: { listPendingPermissions },
+    });
     application.start({ initialSessionId: SESSION });
 
     application.reconcile();
 
-    expect(refreshPending).toHaveBeenCalledWith(SESSION);
+    expect(listPendingPermissions).toHaveBeenCalledTimes(1);
     application.dispose();
   });
 
   it("does nothing when there is no session to reconcile", () => {
-    const refreshPending = vi.fn();
-    const { application } = makeApplication();
-    application.setEventEffects({ refreshPending });
+    const listPendingPermissions = vi.fn(async () => ({ requests: [] }));
+    const { application } = makeApplication({
+      interactionsPort: { listPendingPermissions },
+    });
     application.start();
+
     application.reconcile();
-    expect(refreshPending).not.toHaveBeenCalled();
+
+    expect(listPendingPermissions).not.toHaveBeenCalled();
     application.dispose();
   });
 
   it("stops reconciling after disposal", () => {
-    const refreshPending = vi.fn();
-    const { application } = makeApplication();
-    application.setEventEffects({ refreshPending });
+    const listPendingPermissions = vi.fn(async () => ({ requests: [] }));
+    const { application } = makeApplication({
+      interactionsPort: { listPendingPermissions },
+    });
     application.start({ initialSessionId: SESSION });
     application.dispose();
+
     application.reconcile(SESSION);
-    expect(refreshPending).not.toHaveBeenCalled();
+
+    expect(listPendingPermissions).not.toHaveBeenCalled();
   });
 });

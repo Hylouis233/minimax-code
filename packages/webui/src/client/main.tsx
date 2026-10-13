@@ -21,11 +21,9 @@ import {
 } from "./infrastructure/storage.js";
 import { createWebuiApplication } from "./application/create-application.js";
 import { createWebuiComposerStore } from "./application/composer/composer-store.js";
-import { createWebuiEventEffectsRegistry } from "./application/turn/event-effects-registry.js";
 import { createWebuiPortSlices } from "./application/port-slices.js";
 import { createWebuiOpenEventChannel } from "./bindings/event-channel-adapter.js";
 import { WebuiApplicationProvider } from "./bindings/application-context.js";
-import { WebuiEventEffectsRegistryProvider } from "./bindings/event-effects-context.js";
 import { WebuiPortSlicesProvider } from "./bindings/port-slices-context.js";
 
 declare const document: {
@@ -71,10 +69,6 @@ function WebuiClientRoot({
   /** The session the initial route names, parsed from the hash by the entry. */
   readonly initialSessionId?: string;
 }): JSX.Element {
-  const effectsRegistry = React.useMemo(
-    () => createWebuiEventEffectsRegistry(),
-    [],
-  );
   const slices = React.useMemo(
     () => createWebuiPortSlices(transport),
     [transport],
@@ -93,10 +87,6 @@ function WebuiClientRoot({
         openEventChannel: transport.watchEvents
           ? createWebuiOpenEventChannel(transport.watchEvents)
           : () => ({ subscribe: () => () => undefined }),
-        // The registry is the initial registration. The shell below composes its
-        // own view reactions on top and registers them through
-        // `setEventEffects`, because it renders after this instance exists.
-        effects: effectsRegistry.asWebuiEventEffects(),
         // The goal capability: the application owns the goal owner, so an event
         // route commits for any session, mounted or not (T05).
         goalPort: slices.goal,
@@ -120,7 +110,7 @@ function WebuiClientRoot({
           : {}),
         composer,
       }),
-    [composer, effectsRegistry, transport, storage],
+    [composer, transport, storage],
   );
   // One lifecycle per mount: start once, dispose only when this instance is
   // replaced or the root unmounts. The initial route is read through a ref
@@ -133,7 +123,7 @@ function WebuiClientRoot({
   }, [application]);
 
   return (
-    <WebuiEventEffectsRegistryProvider registry={effectsRegistry}>
+
       <WebuiApplicationProvider application={application}>
         <WebuiPortSlicesProvider slices={slices}>
           <WebuiClientFoundationApp
@@ -144,7 +134,7 @@ function WebuiClientRoot({
           />
         </WebuiPortSlicesProvider>
       </WebuiApplicationProvider>
-    </WebuiEventEffectsRegistryProvider>
+
   );
 }
 

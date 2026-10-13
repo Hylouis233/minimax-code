@@ -123,56 +123,18 @@ export interface WebuiWorkspaceGitChangedPayload {
 }
 
 /**
- * The side effects the coordinator is permitted to kick off. They are injected
- * because the coordinator owns *when* an effect runs, not *how*: the transport
- * calls behind them live in the turn coordinator or the infrastructure layer.
- */
-export interface WebuiEventEffects {
-  readonly answerQuestionnaire?: (
-    request: WebuiQuestionnaireRequest,
-    answers: readonly WebuiQuestionnaireAnswer[],
-  ) => Promise<{ readonly ok: true } | { readonly ok: false; readonly error: string }>;
-  /** A session event may invalidate an in-flight pending-interaction snapshot. */
-  readonly invalidatePending?: (sessionId: string) => void;
-  readonly refreshPending?: (sessionId: string) => void | Promise<unknown>;
-  readonly refreshGoal?: (sessionId: string) => void | Promise<unknown>;
-  readonly attachStream?: (
-    sessionId: string,
-    turnId: string | undefined,
-    mode: "attach" | "recheck",
-  ) => void;
-  /**
-   * The goal write path, routed to the session it names. Registered so the
-   * goal-version guard (a late steering re-read must not clobber a newer goal
-   * an event just applied) stays on the one writer that owns it. Absent, the
-   * coordinator writes the store directly.
-   */
-  readonly setGoal?: (sessionId: string, goal: WebuiGoal | undefined) => void;
-  /**
-   * A `workspace.git.changed` event arrived. It carries no session id, so it is
-   * delivered to this application-wide hook rather than a per-session effect;
-   * the owner invalidates the workspace git and review queries.
-   */
-  readonly workspaceGitChanged?: (
-    payload: WebuiWorkspaceGitChangedPayload,
-  ) => void;
-  /** The channel was accepted; re-read authoritative state. Not a barrier. */
-  readonly channelReady?: () => void;
-}
-
-/**
  * The permanent domain routes (T05's `permanent-domain-event-routing`).
  *
- * These are installed by the application assembly **before** ingress opens, and
- * they are not part of the replaceable effect set: a view reaction may subscribe
- * after a commit, but it cannot displace the route that owns the commit. The
- * distinction is the correction the T01 ledger's C2 records — an event set
- * registered by a subtree supplied its own goal handler for the session it was
- * mounted on, and a goal event for any other session was dropped, because the
- * handler's presence suppressed the coordinator's own write and then found no
- * registration to route to.
+ * They are installed by the application assembly **before** ingress opens, and
+ * there is no replaceable effect set: a view reaction may subscribe after a
+ * commit, but it cannot displace the route that owns the commit. The distinction
+ * is the correction the T01 ledger's C2 records — an event set registered by a
+ * subtree supplied its own goal handler for the session it was mounted on, and a
+ * goal event for any other session was dropped, because the handler's presence
+ * suppressed the coordinator's own write and then found no registration to route
+ * to.
  *
- * They are required, not optional: a missing route would be a silent drop, and
+ * Every member is required: a missing route would be a silent drop, and
  * `createWebuiApplication` always installs them.
  */
 export interface WebuiDomainEventRoutes {
@@ -180,13 +142,27 @@ export interface WebuiDomainEventRoutes {
   readonly setGoal: (sessionId: string, goal: WebuiGoal | undefined) => void;
   /** The steering re-read for one session, through that session's owner. */
   readonly refreshGoal: (sessionId: string) => void | Promise<unknown>;
-  /**
-   * Fence this session's pending-interaction projection: an event changed what a
-   * read in flight would answer with.
-   */
+  /** Fence this session's pending-interaction projection. */
   readonly invalidatePending: (sessionId: string) => void;
   /** The authoritative permission/questionnaire re-read for one session. */
   readonly refreshPending: (sessionId: string) => void | Promise<unknown>;
+  /** Attach to, or recheck, the turn a `session.start` names. */
+  readonly attachStream: (
+    sessionId: string,
+    turnId: string | undefined,
+    mode: "attach" | "recheck",
+  ) => void;
+  /**
+   * The channel was accepted: a possible observation gap. Not a barrier — a
+   * `session.start` can still slip past it — so reconciliation decides what to
+   * re-read.
+   */
+  readonly channelReady: () => void;
+  /**
+   * A `workspace.git.changed` event, which carries no session id. The owner
+   * invalidates the workspace git and review queries it affects.
+   */
+  readonly workspaceGitChanged: (payload: WebuiWorkspaceGitChangedPayload) => void;
 }
 
 export interface WebuiEventCoordinatorDeps {
@@ -202,7 +178,6 @@ export interface WebuiEventCoordinatorDeps {
    * implementation of the activity write path.
    */
   readonly unread: WebuiActivityIngress;
-  readonly effects?: WebuiEventEffects;
 }
 
 /**
@@ -229,7 +204,6 @@ export function createWebuiEventCoordinator(
   deps: WebuiEventCoordinatorDeps,
 ): WebuiEventCoordinator {
   const { store, leases, readActiveSessionId, unread } = deps;
-  const effects = deps.effects ?? {};
   let unsubscribe: (() => void) | undefined;
 
   const handlersFor = (sessionId: string): WebuiEffectHandlers => ({
@@ -259,8 +233,7 @@ export function createWebuiEventCoordinator(
       // sees it and a late re-read cannot resurrect what it replaced.
       deps.routes.setGoal(sessionId, goal);
     },
-    attachStream: (turnId, mode) =>
-      effects.attachStream?.(sessionId, turnId, mode),
+    attachStream: (turnId, mode) => deps.routes.attachStream(sessionId, turnId, mode),
   });
 
   const handleEvent = (event: WebuiRuntimeEvent): void => {
@@ -277,7 +250,7 @@ export function createWebuiEventCoordinator(
     if (event.type === "workspace.git.changed") {
       const rawWorkspace = event.payload.workspace;
       const rawAliases = event.payload.aliases;
-      effects.workspaceGitChanged?.({
+      deps.routes.workspaceGitChanged({
         ...(typeof rawWorkspace === "string" ? { workspace: rawWorkspace } : {}),
         ...(Array.isArray(rawAliases)
           ? {
@@ -320,7 +293,7 @@ export function createWebuiEventCoordinator(
       if (unsubscribe) return unsubscribe;
       const off = channel.subscribe(
         (event) => handleEvent(event),
-        () => effects.channelReady?.(),
+        () => deps.routes.channelReady(),
       );
       unsubscribe = off;
       return off;

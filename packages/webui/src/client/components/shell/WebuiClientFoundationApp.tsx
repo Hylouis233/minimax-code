@@ -101,7 +101,6 @@ import {
   selectWebuiSessionTranscriptPage,
 } from "../../application/selectors.js";
 import { WEBUI_HOME_SESSION_KEY } from "../../application/state.js";
-import { createWebuiEventEffectsRegistry } from "../../application/turn/event-effects-registry.js";
 import {
   WebuiPortSlicesProvider,
   useWebuiPortSlicesOptional,
@@ -109,10 +108,6 @@ import {
 import { createWebuiPortSlices } from "../../application/port-slices.js";
 import { WebuiApplicationProvider } from "../../bindings/application-context.js";
 import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
-import {
-  WebuiEventEffectsRegistryProvider,
-  useWebuiEventEffectsRegistry,
-} from "../../bindings/event-effects-context.js";
 import { useWebuiApplicationOptional } from "../../bindings/application-context.js";
 import {
   WebuiAccountWorkflowsProvider,
@@ -139,7 +134,6 @@ import {
 } from "../../projection/workspace/workspace-progress.js";
 import type { WebuiApplication } from "../../application/create-application.js";
 import { createWebuiPlanReviewWorkflow } from "../../application/interactions/interaction-coordinator.js";
-import type { WebuiEventEffects } from "../../application/turn/event-coordinator.js";
 import type { WebuiWorkspaceGitChangedSignal } from "../../projection/workspace/workspace-panel-state.js";
 import { ConnectionStatus } from "./ConnectionStatus.js";
 import { deriveConversationUsageNotice } from "../../projection/transcript/message-projection.js";
@@ -283,11 +277,6 @@ export function WebuiClientFoundationApp(
   // provides it; the composer registers its session's effect handlers here and
   // `asWebuiEventEffects()` is what the application coordinator consumes over
   // the single process-event channel.
-  const providedRegistry = useWebuiEventEffectsRegistry();
-  const eventEffectsRegistry = useMemo(
-    () => providedRegistry ?? createWebuiEventEffectsRegistry(),
-    [providedRegistry],
-  );
   // Each method comes from `transport`. Re-binding to the same local
   // name as before keeps the rest of the function body identical.
   // Local rebinds: each name below is consumed by a shell-side effect or
@@ -1013,31 +1002,29 @@ export function WebuiClientFoundationApp(
   // git/review queries through the same coordinator.
   const [workspaceGitChanged, setWorkspaceGitChanged] =
     useState<WebuiWorkspaceGitChangedSignal>();
-  const applicationEffects = useMemo<WebuiEventEffects>(
-    () => ({
-      ...eventEffectsRegistry.asWebuiEventEffects(),
-      workspaceGitChanged: (payload) =>
+  /**
+   * The shell's two reactions, subscribed rather than installed as a replaceable
+   * set (T05): they run after the application's own routes have run, and they
+   * cannot displace one. Temporary adapters until the workspace business owns
+   * its invalidation (T11) and the reconnect reconciliation (T12).
+   */
+  useEffect(
+    () =>
+      application.onWorkspaceGitChanged((payload) =>
         setWorkspaceGitChanged((previous) => ({
           revision: (previous?.revision ?? 0) + 1,
           ...payload,
         })),
-      channelReady: () => {
-        eventEffectsRegistry.asWebuiEventEffects().channelReady?.();
+      ),
+    [application],
+  );
+  useEffect(
+    () =>
+      application.onChannelReady(() => {
         setActivityNow(Date.now());
         setActivityProbeNonce((nonce) => nonce + 1);
-      },
-    }),
-    [eventEffectsRegistry],
-  );
-
-  // The shell registers its own view reactions instead of handing them to the
-  // constructor: the application is assembled and owned outside this component,
-  // so `setEventEffects` is how the shell's `channelReady` / workspace-git
-  // reactions join the per-session registry (`ticket #61`). Detaching on unmount
-  // is what a remount of the shell undoes.
-  useEffect(
-    () => application.setEventEffects(applicationEffects),
-    [application, applicationEffects],
+      }),
+    [application],
   );
   // The shell never disposes the application: its lifetime belongs to the
   // composition root that built it (plan §4.1).
@@ -1151,7 +1138,7 @@ export function WebuiClientFoundationApp(
   const progressPanelContent = <WebuiProgressOverviewPanel workspaceDir={selectedSession?.workspaceDir} isDefaultWorkspace={selectedSession?.isDefaultWorkspace} todos={progressTodos} subagents={progressSubagents} showProgress={!homeMode} showEmptyProgress={true} environmentCollapsed={workspaceEnvironmentCollapsed} progressCollapsed={workspaceProgressCollapsed} subagentsCollapsed={workspaceSubagentsCollapsed} onToggleEnvironment={() => setWorkspaceEnvironmentCollapsed((value) => !value)} onToggleProgress={() => setWorkspaceProgressCollapsed((value) => !value)} onToggleSubagents={() => setWorkspaceSubagentsCollapsed((value) => !value)} onMemberClick={handleWorkspaceSubagentClick} onOpenChanges={() => selectedSession?.workspaceDir && selectedSessionId ? dispatchWorkspacePanel({ type: "open-workspace-review", sessionId: selectedSessionId, workspaceDir: selectedSession.workspaceDir }) : undefined} onOpenTerminal={() => dispatchWorkspacePanel({ type: "open-tab", kind: "terminal", workspaceDir: selectedSession?.workspaceDir })} />;
 
   return (
-    <WebuiEventEffectsRegistryProvider registry={eventEffectsRegistry}>
+    <>
       {/* The slices are provided, not only read (plan §8 Phase 2). A consumer
         * below reads its business's slice from this context; production mounts
         * the composition root's instances (A4-s2) and this re-provides the same
@@ -1568,7 +1555,7 @@ export function WebuiClientFoundationApp(
     </WebuiAccountWorkflowsProvider>
     </WebuiWorkspaceQueriesProvider>
       </WebuiPortSlicesProvider>
-    </WebuiEventEffectsRegistryProvider>
+    </>
   );
 }
 
