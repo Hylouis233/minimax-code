@@ -5,7 +5,7 @@
 // | Declaration | Wire purpose | Producer | Consumers |
 // | --- | --- | --- | --- |
 // | `WebuiSessionListRequest` | Session list query (name, paging, filters). | Browser `client/infrastructure/transport.ts` (`listSessions`). | runtime `listSessions`; `server/operation/session.ts`. |
-// | `WebuiSessionListItem` | One session in a list/tree page. | Runtime `listSessions`/`getSessionTree` (`runtime/harness/sessions.ts`; CliService). | `client/components/SettingsModal.tsx`; `server/index.ts` (barrel). |
+// | `WebuiSessionListItem` | One session in a list/tree page. | Runtime `listSessions`/`getSessionTree` (`runtime/harness/sessions.ts`; CliService). | `client/components/settings/SettingsModal.tsx`; `server/index.ts` (barrel). |
 // | `WebuiSessionPage` | A page of session-list results. | Runtime `listSessions`. | `client/contracts/sessions/session-port.ts`; `server/operation/session.ts`. |
 // | `WebuiProjectRecord` | One visible project (rail grouping). | Runtime `listVisibleProjects` (`runtime/harness/sessions.ts`). | `client/contracts/sessions/session-view.ts` (`WebuiClientProject`); `server/operation/session.ts`. |
 // | `WebuiSessionTreeRequest` | Session tree query (name, paging, filters). | Browser `client/infrastructure/transport.ts` (`getSessionTree`). | runtime `getSessionTree`; `server/operation/session.ts`. |
@@ -13,8 +13,8 @@
 // | `WebuiSessionTreePage` | A page of session-tree results. | Runtime `getSessionTree`. | `client/contracts/sessions/session-port.ts`; `server/operation/session.ts`. |
 // | `WebuiSessionLookupRequest` | Request to look up one session by id. | Browser `client/infrastructure/transport.ts` (`getSession`). | `server/operation/common.ts`; runtime `getSession`. |
 // | `WebuiActiveTurn` | Authoritative active-turn probe (turnId, busyReason, locallyOwned). | Runtime `getActiveTurn` (`runtime/harness/execution.ts`; CliService). | `client/projection/sessions/session-activity.ts`. |
-// | `WebuiActiveTurnResult` | The active turn, or undefined when idle. | Runtime `getActiveTurn`. | `client/contracts/turn/execution-port.ts`; `client/components/SessionComposer.tsx`. |
-// | `WebuiActiveTurnRequest` | Request naming the session whose active turn is probed. | Browser `client/infrastructure/transport.ts` (`getActiveTurn`). | `client/application/turn/active-turn-probe.ts`; `client/contracts/turn/execution-port.ts`; `client/components/SessionComposer.tsx`. |
+// | `WebuiActiveTurnResult` | The active turn, or undefined when idle. | Runtime `getActiveTurn`. | `client/contracts/turn/execution-port.ts`; `client/components/composer/WebuiComposer.tsx`. |
+// | `WebuiActiveTurnRequest` | Request naming the session whose active turn is probed. | Browser `client/infrastructure/transport.ts` (`getActiveTurn`). | `client/application/turn/active-turn-probe.ts`; `client/contracts/turn/execution-port.ts`; `client/components/composer/WebuiComposer.tsx`. |
 // | `WebuiSessionInfo` | The session identity/fields returned by lookup and mutations. | Runtime `getSession`/`updateSession`/`forkSession`/`createSession`. | `server/service.ts` (session-transfer route); `server/index.ts` (barrel). |
 // | `WebuiSessionLookupResult` | The `{ session }` envelope from a lookup. | Runtime `getSession`. | `client/contracts/sessions/session-port.ts`; `server/operation/session.ts`. |
 // | `WebuiUpdateSessionRequest` | Request to set a session title. | Browser `client/infrastructure/transport.ts` (`updateSession`). | `server/operation/session.ts`; runtime `updateSession`. |

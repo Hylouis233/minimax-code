@@ -21,7 +21,7 @@ import {
   webuiRailMenuFor,
   webuiRailMenuKeys,
   type WebuiRailMenuState,
-} from "../../src/client/projection/rail-menu.js";
+} from "../../src/client/projection/sessions/rail-menu.js";
 
 const RAIL = new URL("../../src/client/components/sessions/SessionRail.tsx", import.meta.url);
 const rail = readFileSync(RAIL, "utf8");

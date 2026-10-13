@@ -1,7 +1,7 @@
 // Browser transport — the single bag of methods the foundation app and the
 // composer consume.
 //
-// Composed from the eight capability ports, one per capability group. It
+// Composed from the thirteen business capability ports. It
 // declares no method of its own: every operation lives in exactly one port and
 // this type only joins them. Every method stays optional — `undefined` means
 // "the operation is not wired" (the panel renders the affected area

@@ -23,7 +23,7 @@ import {
   isWebuiGoalEventKind,
   isWebuiInteractionEventKind,
   resolveWebuiEventKind,
-} from "../../src/client/projection/event-kinds.js";
+} from "../../src/client/projection/common/event-kinds.js";
 import {
   readWebuiSource,
   squashWhitespace,

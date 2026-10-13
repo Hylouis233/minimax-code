@@ -18,15 +18,15 @@
 // write bumps, what a late answer does — lives here; the transport call and the
 // store write arrive through the port and the sink.
 
-import type { GoalPort } from "../contracts/goal/goal-port.js";
+import type { GoalPort } from "../../contracts/goal/goal-port.js";
 import type {
   WebuiGoal,
   WebuiGoalCreateRequest,
   WebuiGoalEnabledResult,
   WebuiGoalPatchRequest,
   WebuiGoalSessionRequest,
-} from "../../shared/contracts/goal.js";
-import type { WebuiVersionCell } from "./version-cell.js";
+} from "../../../shared/contracts/goal.js";
+import type { WebuiVersionCell } from "../version-cell.js";
 
 /** The goal capability this owner drives. Absent means the operation is unwired. */
 export type WebuiGoalPortSlice = Pick<

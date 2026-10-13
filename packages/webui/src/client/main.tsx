@@ -20,6 +20,7 @@ import {
   getWebuiBrowserStorage,
 } from "./infrastructure/storage.js";
 import { createWebuiApplication } from "./application/create-application.js";
+import { createWebuiComposerStore } from "./application/composer/composer-store.js";
 import { createWebuiEventEffectsRegistry } from "./application/turn/event-effects-registry.js";
 import { createWebuiPortSlices } from "./application/port-slices.js";
 import { createWebuiOpenEventChannel } from "./bindings/event-channel-adapter.js";
@@ -61,9 +62,11 @@ const config = (
 function WebuiClientRoot({
   transport,
   dataDir,
+  storage,
 }: {
   readonly transport: ReturnType<typeof createWebuiTransport>;
   readonly dataDir?: string;
+  readonly storage: ReturnType<typeof createWebuiBrowserStorage>;
 }): JSX.Element {
   const effectsRegistry = React.useMemo(
     () => createWebuiEventEffectsRegistry(),
@@ -72,6 +75,10 @@ function WebuiClientRoot({
   const slices = React.useMemo(
     () => createWebuiPortSlices(transport),
     [transport],
+  );
+  const composer = React.useMemo(
+    () => createWebuiComposerStore({ storage }),
+    [storage],
   );
   const application = React.useMemo(
     () =>
@@ -95,8 +102,9 @@ function WebuiClientRoot({
         ...(transport.loadMessages
           ? { loadMessages: transport.loadMessages }
           : {}),
+        composer,
       }),
-    [effectsRegistry, transport],
+    [composer, effectsRegistry, transport],
   );
   React.useEffect(() => () => application.dispose(), [application]);
 
@@ -157,7 +165,7 @@ const browserCapabilities = {
 // The transport is the module-scope instance; the application, its store and
 // the port slices are built by the root below, once per mount, and provided to
 // the shell (plan §8 Phase 2, A4-s2).
-const app = <WebuiClientRoot transport={transport} dataDir={runtimeConfig.dataDir} />;
+const app = <WebuiClientRoot transport={transport} dataDir={runtimeConfig.dataDir} storage={browserCapabilities.storage} />;
 const currentRoute = route(location.pathname);
 root.render(
   // The boundary wraps the app, not the 404: a 404 is a legitimate render and

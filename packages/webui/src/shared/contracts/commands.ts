@@ -4,8 +4,8 @@
 //
 // | Declaration | Wire purpose | Producer | Consumers |
 // | --- | --- | --- | --- |
-// | `WEBUI_RUN_COMMAND_NAMES` | The command vocabulary `runCommand` accepts, in `/help` order. | Shared literal. | `runtime/commands/descriptors.ts` (the descriptor set must match it), `server/operation/provider.ts` (body validation), `client/contracts/composer/slash-command.ts` (re-exported for the palette), `client/components/SessionComposer.tsx` (the prop's union). |
-// | `WebuiRunCommandName` | One accepted command name. | Derived from the list. | `client/contracts/composer/slash-command.ts`, `client/projection/composer/composer-state.ts`, `client/components/SessionComposer.tsx`. |
+// | `WEBUI_RUN_COMMAND_NAMES` | The command vocabulary `runCommand` accepts, in `/help` order. | Shared literal. | `runtime/commands/descriptors.ts` (the descriptor set must match it), `server/operation/provider.ts` (body validation), `client/contracts/composer/slash-command.ts` (re-exported for the palette), `client/components/composer/WebuiComposer.tsx` (the prop's union). |
+// | `WebuiRunCommandName` | One accepted command name. | Derived from the list. | `client/contracts/composer/slash-command.ts`, `client/projection/composer/composer-state.ts`, `client/components/composer/WebuiComposer.tsx`. |
 //
 // This list lives in `shared` because all three sides need it and `shared` is
 // the only layer they may all reach: `server` may import `shared` and

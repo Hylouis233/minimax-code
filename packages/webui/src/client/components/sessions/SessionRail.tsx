@@ -39,7 +39,7 @@ import {
   webuiRailMenuFor,
   type WebuiRailMenuEntry,
   type WebuiRailMenuSubject,
-} from "../../projection/rail-menu.js";
+} from "../../projection/sessions/rail-menu.js";
 import { RailRow } from "./RailRow.js";
 import {
   formatWebuiSessionAge,
@@ -54,7 +54,7 @@ import {
 import { formatWebuiUnreadBadge } from "../../projection/common/unread-badge.js";
 import type { WebuiClientSession, WebuiClientSessionPage, WebuiClientSessionTreePage, WebuiClientProject } from "../../contracts/sessions/session-view.js";
 import { teamModeCopy } from "../../infrastructure/team-mode.js";
-import { workspaceProjectName } from "../../projection/workspace-name.js";
+import { workspaceProjectName } from "../../projection/workspace/workspace-name.js";
 
 const PROJECT_SESSION_BATCH_SIZE = 6;
 

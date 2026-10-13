@@ -9,7 +9,7 @@ import type {
   WebuiGoalPatchRequest,
   WebuiGoalStatus,
 } from "../../../shared/contracts/goal.js";
-import { WEBUI_GOAL_OBJECTIVE_EVENT_TYPES } from "../event-kinds.js";
+import { WEBUI_GOAL_OBJECTIVE_EVENT_TYPES } from "../common/event-kinds.js";
 
 /**
  * Build a synthetic transcript message for one of the

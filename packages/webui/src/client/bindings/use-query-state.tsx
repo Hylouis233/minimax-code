@@ -36,7 +36,7 @@ import {
   initialWebuiModelsWorkflowsState,
   type WebuiModelsWorkflows,
   type WebuiModelsWorkflowsState,
-} from "../application/models-workflows.js";
+} from "../application/models/models-workflows.js";
 import {
   initialWebuiPluginWorkflowsState,
   type WebuiPluginWorkflows,

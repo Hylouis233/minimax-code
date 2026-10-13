@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
 
 import type { WebuiInteractionSink } from "../../src/client/application/interactions/interaction-coordinator.js";
-import type { WebuiGoalSink } from "../../src/client/application/goal-coordinator.js";
+import type { WebuiGoalSink } from "../../src/client/application/goal/goal-coordinator.js";
 import { createWebuiVersionCells } from "../../src/client/application/version-cell.js";
 
 const CLIENT_ROOT = new URL("../../src/client/", import.meta.url);
@@ -94,7 +94,7 @@ describe("prohibition 2 — a rule may not be filed under a module that does not
   it("interactions: the answers→phase rule lives with the flow that knows the outcome", () => {
     // The composer's wiring computed this; the transition's policy is the
     // interaction flow's, so both moved into the owner in this carve.
-    const composer = flat(read("components/SessionComposer.tsx"));
+    const composer = flat(read("components/composer/WebuiComposer.tsx"));
     expect(composer).not.toContain("webuiAnswersEndTurn");
     expect(flat(read("application/interactions/interaction-coordinator.ts"))).toContain(
       "webuiAnswersEndTurn(answers)",
@@ -105,7 +105,7 @@ describe("prohibition 2 — a rule may not be filed under a module that does not
     // §4.2 field 6: the composer owns neither fence. The cell has to outlive a
     // render, so the application creates the instance and the business reads the
     // one it is handed.
-    const composer = flat(read("components/SessionComposer.tsx"));
+    const composer = flat(read("components/composer/WebuiComposer.tsx"));
     expect(composer).toContain("useWebuiVersionCells()");
     expect(composer).not.toMatch(/useRef\(0\)/u);
     expect(flat(read("application/create-application.ts"))).toContain(
@@ -122,11 +122,11 @@ describe("prohibition 2 — a rule may not be filed under a module that does not
     // The composer used to keep a second copy of the capture/compare guard while
     // the owner held the same logic. Neither the fence nor the read may be filed
     // in a component again.
-    const composer = flat(read("components/SessionComposer.tsx"));
+    const composer = flat(read("components/composer/WebuiComposer.tsx"));
     expect(composer).not.toContain("goalVersionRef.current ==");
     expect(composer).not.toContain("goalVersionRef.current +=");
     expect(composer).not.toContain("getGoal({ sessionId })");
-    expect(flat(read("application/goal-coordinator.ts"))).toContain(
+    expect(flat(read("application/goal/goal-coordinator.ts"))).toContain(
       "goalVersionRef.current !== versionAtRequest",
     );
   });
@@ -150,7 +150,7 @@ describe("prohibition 3 — the set of valid values is enumerated in exactly one
 
   it("goal: no module but the registry and the reducer names a goal kind", () => {
     const naming = clientModules().filter((file) => {
-      if (file === "projection/event-kinds.ts") return false;
+      if (file === "projection/common/event-kinds.ts") return false;
       if (file === "application/turn/effect-reducer.ts") return false; // §10 S9 keeps the reducer's switch
       if (file === MESSAGE_BLOCK_KINDS) return false; // message-block kinds, not event kinds
       return literal.test(flat(read(file)));
@@ -164,7 +164,7 @@ describe("prohibition 3 — the set of valid values is enumerated in exactly one
     // should say which business it broke.
     const naming = clientModules().filter(
       (file) =>
-        file !== "projection/event-kinds.ts" &&
+        file !== "projection/common/event-kinds.ts" &&
         file !== "application/turn/effect-reducer.ts" &&
         file !== MESSAGE_BLOCK_KINDS &&
         /"(?:permission|questionnaire)\.[a-z_.]+"/u.test(flat(read(file))),
@@ -190,11 +190,11 @@ describe("prohibition 4 — a rule shared across businesses gets one owner every
     expect(declaring).toEqual(["application/version-cell.ts"]);
     // Read as a type by both fences, one cell each — the independence the two
     // coordinators assert in their own suites. Phase 4 filed the interaction
-    // coordinator under `application/interactions/` while `goal-coordinator.ts`
-    // stayed at the `application/` floor, so the two fences reach the same cell
-    // from one level apart.
+    // coordinator under `application/interactions/` and the goal coordinator
+    // under `application/goal/`, so both owners reach the shared cell by their
+    // business-relative path.
     for (const [file, specifier] of [
-      ["application/goal-coordinator.ts", './version-cell.js'],
+      ["application/goal/goal-coordinator.ts", '../version-cell.js'],
       ["application/interactions/interaction-coordinator.ts", '../version-cell.js'],
     ]) {
       expect(read(file)).toContain(`from "${specifier}"`);

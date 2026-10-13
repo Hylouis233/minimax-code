@@ -57,7 +57,7 @@ import {
 } from "../../projection/shell/shell-surface.js";
 import { ConversationUsageBanner } from "../account/ConversationUsageBanner.js";
 import { PluginCatalogue } from "../plugins/PluginCatalogue.js";
-import { WebuiComposer } from "../SessionComposer.js";
+import { WebuiComposer } from "../composer/WebuiComposer.js";
 import { WebuiSessionTranscript } from "../transcript/SessionTranscript.js";
 import {
   WebuiProjectList,
@@ -130,7 +130,7 @@ import {
 } from "../../bindings/use-query-state.js";
 import { createWebuiWorkspaceQueries } from "../../application/workspace/workspace-queries.js";
 import { createWebuiAccountWorkflows } from "../../application/account/account-workflows.js";
-import { createWebuiModelsWorkflows } from "../../application/models-workflows.js";
+import { createWebuiModelsWorkflows } from "../../application/models/models-workflows.js";
 import { createWebuiSettingsWorkflows } from "../../application/settings/settings-workflows.js";
 import { createWebuiPluginWorkflows } from "../../application/plugins/plugin-workflows.js";
 import { webuiActiveTurnProbeFor } from "../../application/turn/active-turn-probe.js";

@@ -52,8 +52,8 @@ import {
 import type {
   WebuiTurnCapabilityPort,
   WebuiTurnCapabilitySlice,
-} from "./turn-capabilities.js";
-import { createWebuiTurnCapabilitySlice } from "./turn-capabilities.js";
+} from "./turn/turn-capabilities.js";
+import { createWebuiTurnCapabilitySlice } from "./turn/turn-capabilities.js";
 import type { WebuiClientMessageLoader } from "../contracts/transcript/message-view.js";
 
 export interface WebuiApplicationDeps {

@@ -10,6 +10,12 @@ The classification test is the plan's own, from §5.6: **the line is survival, n
 widget.** Draft text survives a session switch and a silent home→session creation, so it
 is application state; an open menu does not, so it is view state.
 
+This is a Phase 3 B2 snapshot. Its source paths, state line numbers, and effect counts refer to the
+pre-Phase-4/4b tree; the component now lives at
+`packages/webui/src/client/components/composer/WebuiComposer.tsx`, with the composer owner under
+`client/application/composer/`. The historical command paths below are intentionally retained as
+provenance, not as current-tree navigation instructions.
+
 Re-derive the inventory (the numbers below are from this commit):
 
 ```sh

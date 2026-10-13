@@ -15,7 +15,7 @@ import { useCallback, useEffect, useRef, useState, type ReactElement } from "rea
 import { createPortal } from "react-dom";
 import { WebuiIconBell, WebuiIconBrand, WebuiIconCommandUsage } from "../shell/icons.js";
 import { SigninClaimResult } from "@mavis/shared/daily-signin";
-import { SettingsModal } from "../SettingsModal.js";
+import { SettingsModal } from "../settings/SettingsModal.js";
 import { AccountLoginDialog } from "./AccountLoginDialog.js";
 import type { MemoryHandoff } from "../settings/MemoryManagerDialog.js";
 import type { WebuiVersionInfo } from "../../../shared/contracts/version.js";

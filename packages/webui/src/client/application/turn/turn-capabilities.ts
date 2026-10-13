@@ -20,10 +20,10 @@
 // members rather than by assigning `undefined` to them: the two are the same
 // to every reader, and dropping them keeps a structural comparison honest.
 
-import type { ComposerPort } from "../contracts/composer/command-port.js";
-import type { TurnExecutionPort } from "../contracts/turn/execution-port.js";
-import type { WebuiClientMessageLoader } from "../contracts/transcript/message-view.js";
-import type { WebuiClientSessionCreator } from "../contracts/sessions/session-port.js";
+import type { ComposerPort } from "../../contracts/composer/command-port.js";
+import type { TurnExecutionPort } from "../../contracts/turn/execution-port.js";
+import type { WebuiClientMessageLoader } from "../../contracts/transcript/message-view.js";
+import type { WebuiClientSessionCreator } from "../../contracts/sessions/session-port.js";
 
 /** The capabilities a turn is run with, published as one object. */
 export interface WebuiTurnCapabilitySlice {

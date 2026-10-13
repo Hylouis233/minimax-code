@@ -29,6 +29,8 @@
     "check:webui-boundary": "node scripts/check-webui-boundary.mjs",
     "check:webui-commands": "node scripts/webui-command-surface.mjs",
     "gen:webui-commands": "node scripts/webui-command-surface.mjs --write",
+    "gen:webui-business-navigation": "node scripts/webui-business-navigation.mjs --write",
+    "check:webui-business-navigation": "node scripts/webui-business-navigation.mjs",
     "check:webui-dependency": "node scripts/check-webui-dependency.mjs",
     "test:webui": "node scripts/run-vitest-suite.mjs webui",
     "test:webui-browser": "playwright install chromium && playwright test",

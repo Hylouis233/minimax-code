@@ -4,7 +4,7 @@ import type {
   WebuiPendingPermission,
   WebuiQuestionnaireRequest,
 } from "../../../shared/contracts/interactions.js";
-import { isWebuiGoalEventKind } from "../event-kinds.js";
+import { isWebuiGoalEventKind } from "../common/event-kinds.js";
 import type { WebuiRuntimeEvent } from "../../../shared/contracts/stream.js";
 
 /**

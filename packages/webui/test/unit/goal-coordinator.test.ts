@@ -18,7 +18,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createWebuiGoalCoordinator,
   type WebuiGoalSink,
-} from "../../src/client/application/goal-coordinator.js";
+} from "../../src/client/application/goal/goal-coordinator.js";
 import { createWebuiInteractionCoordinator } from "../../src/client/application/interactions/interaction-coordinator.js";
 
 function goalSink(): WebuiGoalSink & Record<string, unknown> {

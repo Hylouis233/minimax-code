@@ -21,13 +21,13 @@
 //
 // Framework-free: no React, no DOM, no storage.
 
-import type { ModelsPort } from "../contracts/models/provider-port.js";
-import type { WebuiModelEntry } from "../../shared/contracts/models.js";
+import type { ModelsPort } from "../../contracts/models/provider-port.js";
+import type { WebuiModelEntry } from "../../../shared/contracts/models.js";
 import {
   createWebuiQueryStore,
   idleWebuiQueryState,
   type WebuiQueryState,
-} from "./query-store.js";
+} from "../query-store.js";
 
 /** The provider half of the port re-file (plan §9, ticket #59). */
 export type WebuiModelsPortSlice = Pick<

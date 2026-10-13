@@ -4,7 +4,7 @@ import path from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { WebuiQueuePanel } from "../../src/client/components/QueuePanel.js";
+import { WebuiQueuePanel } from "../../src/client/components/composer/QueuePanel.js";
 import type { WebuiQueueItem } from "../../src/shared/contracts/queue.js";
 
 function item(over: Partial<WebuiQueueItem> = {}): WebuiQueueItem {
@@ -153,7 +153,8 @@ describe("the composer wiring", () => {
       "src",
       "client",
       "components",
-      "SessionComposer.tsx",
+      "composer",
+      "WebuiComposer.tsx",
     ),
     "utf8",
   ).replace(/\/\*[\s\S]*?\*\//gu, "");

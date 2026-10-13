@@ -112,6 +112,11 @@ test("drafts are per session and survive a switch and a reload", async ({ page }
   await input.fill("draft for B");
   await switchSession(page, "A");
   await expect(input).toHaveValue("draft for A");
+  const persistedBeforeReload = await page.evaluate(() =>
+    window.localStorage.getItem("webui.composer.state.v1"),
+  );
+  expect(persistedBeforeReload).toContain("draft for A");
+  expect(persistedBeforeReload).toContain("draft for B");
 
   await page.reload();
   await expect(page.locator("#webui-root")).toBeVisible();

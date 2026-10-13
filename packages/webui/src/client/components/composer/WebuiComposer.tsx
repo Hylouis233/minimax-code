@@ -2,11 +2,8 @@
 // permission/questionnaire panels, goal banner, and submit
 // pipeline.
 //
-// W3 tier 4 lift: this component was moved verbatim out of `app.tsx`. The
-// body is byte-identical to what used to live there; the lift is move-only.
-// `app.tsx` does NOT re-export `WebuiComposer` because only the shell
-// (Tier 5) uses it — the call site stays in `app.tsx` and reaches the new
-// module via a local `import { WebuiComposer } from "./components/SessionComposer.js";`.
+// The shell imports `WebuiComposer` from this business module directly; there
+// is no central component re-export layer.
 //
 // The component reads the stream/sending slices through the application
 // bindings (`useWebuiSessionState` / `useWebuiSessionCommands`), which subscribe
@@ -26,44 +23,44 @@ import {
   type FormEvent,
   type ReactElement,
 } from "react";
-import type {WebuiClientMessageEnqueuer} from "../contracts/composer/command-port.js";
-import type {WebuiClientMessageSender} from "../contracts/turn/execution-port.js";
-import { WebuiWorkspaceDirectoryBrowser } from "./workspace/WebuiWorkspaceDirectoryBrowser.js";
-import type { WebuiClientMessageLoader } from "../contracts/transcript/message-view.js";
-import type { WebuiModelSelectionRequest } from "../contracts/models/model-view.js";
-import type { WebuiClientSessionCreator } from "../contracts/sessions/session-port.js";
-import type { WebuiClientSessionPage, WebuiClientSession } from "../contracts/sessions/session-view.js";
-import type { WebuiTransport } from "../contracts/transport.js";
-import { projectWebuiMessageToStreamMessage, readUsageNumber } from "../projection/transcript/message-projection.js";
-import { createWebuiGoalCoordinator } from "../application/goal-coordinator.js";
+import type {WebuiClientMessageEnqueuer} from "../../contracts/composer/command-port.js";
+import type {WebuiClientMessageSender} from "../../contracts/turn/execution-port.js";
+import { WebuiWorkspaceDirectoryBrowser } from "../workspace/WebuiWorkspaceDirectoryBrowser.js";
+import type { WebuiClientMessageLoader } from "../../contracts/transcript/message-view.js";
+import type { WebuiModelSelectionRequest } from "../../contracts/models/model-view.js";
+import type { WebuiClientSessionCreator } from "../../contracts/sessions/session-port.js";
+import type { WebuiClientSessionPage, WebuiClientSession } from "../../contracts/sessions/session-view.js";
+import type { WebuiTransport } from "../../contracts/transport.js";
+import { projectWebuiMessageToStreamMessage, readUsageNumber } from "../../projection/transcript/message-projection.js";
+import { createWebuiGoalCoordinator } from "../../application/goal/goal-coordinator.js";
 import {
   createWebuiInteractionCoordinator,
-} from "../application/interactions/interaction-coordinator.js";
-import { latestContextUsage, readContextUsageSnapshot } from "../projection/composer/context-usage.js";
+} from "../../application/interactions/interaction-coordinator.js";
+import { latestContextUsage, readContextUsageSnapshot } from "../../projection/composer/context-usage.js";
 import {
   contextUsagePopoverStyle,
   positionContextUsagePopover,
   sameContextUsagePlacement,
   type ContextUsagePlacement,
-} from "../projection/composer/context-usage-popover.js";
+} from "../../projection/composer/context-usage-popover.js";
 import {
   breakdownSegmentPercent,
   breakdownShareLabel,
   breakdownSwatchStyle,
   contextBreakdownRows,
   drawableBreakdownRows,
-} from "../projection/composer/context-breakdown.js";
-import { isTokenPlanModel } from "../projection/models/token-plan-model.js";
+} from "../../projection/composer/context-breakdown.js";
+import { isTokenPlanModel } from "../../projection/models/token-plan-model.js";
 import type {
   WebuiComposerAttachment,
   WebuiComposerUrlReference,
-} from "../projection/composer/composer-interactions.js";
+} from "../../projection/composer/composer-interactions.js";
 import {
   createWebuiComposerAttachStreamEffect,
   recheckWebuiSubscription,
   recoverMissedWebuiTurn,
-} from "../application/turn/turn-commands.js";
-import { webuiActiveTurnProbeFor } from "../application/turn/active-turn-probe.js";
+} from "../../application/turn/turn-commands.js";
+import { webuiActiveTurnProbeFor } from "../../application/turn/active-turn-probe.js";
 import {
   useWebuiInteractionCommands,
   useWebuiSessionCommands,
@@ -71,14 +68,14 @@ import {
   useWebuiSessionPermissions,
   useWebuiSessionQuestionnaire,
   useWebuiSessionState,
-} from "../bindings/use-session-state.js";
-import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js";
-import { ContextUsageIndicator } from "./sessions/ContextUsageIndicator.js";
-import { useWebuiPortSlice } from "../bindings/port-slices-context.js";
-import { useWebuiEventEffectsRegistry } from "../bindings/event-effects-context.js";
-import { useWebuiVersionCells } from "../bindings/version-cells.js";
-import { useWebuiComposerStore } from "../bindings/composer-store.js";
-import { webuiSessionStatusType } from "../projection/turn/stream-state.js";
+} from "../../bindings/use-session-state.js";
+import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
+import { ContextUsageIndicator } from "../sessions/ContextUsageIndicator.js";
+import { useWebuiPortSlice } from "../../bindings/port-slices-context.js";
+import { useWebuiEventEffectsRegistry } from "../../bindings/event-effects-context.js";
+import { useWebuiVersionCells } from "../../bindings/version-cells.js";
+import { useWebuiComposerStore } from "../../bindings/composer-store.js";
+import { webuiSessionStatusType } from "../../projection/turn/stream-state.js";
 
 /** Capability subset the session composer consumes. Single source of truth
  *  lives in `WebuiTransport`; this alias keeps the prop block free of
@@ -100,38 +97,38 @@ import type {
   WebuiGoalCreateRequest,
   WebuiGoalEnabledResult,
   WebuiGoalSessionRequest,
-} from "../../shared/contracts/goal.js";
+} from "../../../shared/contracts/goal.js";
 import type {
   WebuiActiveTurnRequest,
   WebuiActiveTurnResult,
-} from "../../shared/contracts/session.js";
+} from "../../../shared/contracts/session.js";
 import type {
   WebuiInteractionReplyResult,
   WebuiPendingPermission,
   WebuiQuestionnaireAnswer,
   WebuiQuestionnaireRequest,
-} from "../../shared/contracts/interactions.js";
-import type { WebuiModelEntry } from "../../shared/contracts/models.js";
-import type { WebuiQueueItem } from "../../shared/contracts/queue.js";
+} from "../../../shared/contracts/interactions.js";
+import type { WebuiModelEntry } from "../../../shared/contracts/models.js";
+import type { WebuiQueueItem } from "../../../shared/contracts/queue.js";
 import type {
   WebuiWorkspaceDirectoryListing,
   WebuiWorkspaceFile,
-} from "../../shared/contracts/workspace.js";
-import type { WebuiUsageQuotaResult } from "../../shared/contracts/usage-quota.js";
-import { formatUsageResetLabel } from "../projection/account/usage.js";
-import { WebuiGoalBanner } from "./goal/GoalBanner.js";
-import { WebuiInteractionPanel } from "./interactions/InteractionPanel.js";
+} from "../../../shared/contracts/workspace.js";
+import type { WebuiUsageQuotaResult } from "../../../shared/contracts/usage-quota.js";
+import { formatUsageResetLabel } from "../../projection/account/usage.js";
+import { WebuiGoalBanner } from "../goal/GoalBanner.js";
+import { WebuiInteractionPanel } from "../interactions/InteractionPanel.js";
 import { WebuiQueuePanel } from "./QueuePanel.js";
 import {
   WebuiModelPicker,
   type WebuiModelPickerDraft,
-} from "./models/ModelPicker.js";
-import { ThinkingTrigger } from "./composer/ThinkingTrigger.js";
+} from "../models/ModelPicker.js";
+import { ThinkingTrigger } from "./ThinkingTrigger.js";
 import {
   chipLevelLabel,
   resolveEffortOptions,
   thinkingDraftPatch,
-} from "../projection/models/thinking-control.js";
+} from "../../projection/models/thinking-control.js";
 import {
   WebuiIconAttach,
   WebuiIconCheck,
@@ -146,21 +143,21 @@ import {
   WebuiIconSend,
   WebuiIconSkillGeneric,
   type WebuiIconProps,
-} from "./shell/icons.js";
-import { OutputError } from "./transcript/OutputError.js";
+} from "../shell/icons.js";
+import { OutputError } from "../transcript/OutputError.js";
 import {
   resolveWebuiSubmissionIntent,
   resolveWebuiComposerEnterAction,
   isTurnLive,
-} from "../projection/composer/composer-state.js";
+} from "../../projection/composer/composer-state.js";
 import {
   submitWebuiGoal,
-} from "../application/composer/composer-workflows.js";
-import { evaluateComposerDismiss, evaluateOutsideClose } from "../projection/common/outside-close.js";
+} from "../../application/composer/composer-workflows.js";
+import { evaluateComposerDismiss, evaluateOutsideClose } from "../../projection/common/outside-close.js";
 import {
   buildWebuiModelSelectionRequest,
-} from "../projection/sessions/action-requests.js";
-import { workspaceProjectName } from "../projection/workspace-name.js";
+} from "../../projection/sessions/action-requests.js";
+import { workspaceProjectName } from "../../projection/workspace/workspace-name.js";
 import {
   findWebuiMentionRange,
   findWebuiSlashRange,
@@ -169,29 +166,29 @@ import {
   replaceWebuiSlashToken,
   webuiAttachmentLimitError,
   webuiTextAttachmentDataUrl,
-} from "../projection/composer/composer-interactions.js";
+} from "../../projection/composer/composer-interactions.js";
 import {
   shouldRecallWebuiHistory,
   startWebuiHistoryBrowse,
   stepWebuiHistoryBrowse,
   type WebuiHistoryBrowse,
-} from "../application/composer/composer-history.js";
+} from "../../application/composer/composer-history.js";
 import {
   slashSkillSummaryToEntry,
   WEBUI_BUILTIN_COMMANDS,
   type SlashCommandEntry,
   type WebuiSlashSkillSummary,
-} from "./composer/slash-palette.js";
+} from "./slash-palette.js";
 import {
   isWebuiRunnableCommand,
   rankWebuiSlashPalette,
   sectionWebuiSlashPalette,
   type WebuiRunCommandName,
-} from "../contracts/composer/slash-command.js";
-import { planWebuiRetryResend, resendRecordedWebuiTurn } from "../application/composer/turn-retry.js";
+} from "../../contracts/composer/slash-command.js";
+import { planWebuiRetryResend, resendRecordedWebuiTurn } from "../../application/composer/turn-retry.js";
 
 const WEBUI_SLASH_FALLBACK_SECTIONED: SlashCommandEntry[] = await (async () => {
-  const { resolveWebuiSlashSkills } = await import("./composer/slash-palette.js");
+  const { resolveWebuiSlashSkills } = await import("./slash-palette.js");
   const resolved = await resolveWebuiSlashSkills();
   return sectionWebuiSlashPalette(WEBUI_BUILTIN_COMMANDS, resolved.skills);
 })();

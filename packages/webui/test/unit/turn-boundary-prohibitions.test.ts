@@ -39,7 +39,7 @@ function read(relativePath: string): string {
 
 /** The modules `turn` owns: its capability slice, commands, loop and lease. */
 const TURN_MODULES = [
-  "application/turn-capabilities.ts",
+  "application/turn/turn-capabilities.ts",
   "application/turn/turn-commands.ts",
   "application/turn/turn-coordinator.ts",
   "application/sessions/session-commands.ts",

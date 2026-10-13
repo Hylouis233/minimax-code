@@ -90,7 +90,7 @@ describe("each action's business is the one the inventory records", () => {
       "contracts/plugins/plugin-port.ts", // the declaration
       "infrastructure/transport.ts", // the wire
       "components/shell/WebuiClientFoundationApp.tsx", // the composition root that builds the slice
-      "components/SessionComposer.tsx", // the declared reader of `listInstalledPlugins` (§4.2, §4.8)
+      "components/composer/WebuiComposer.tsx", // the declared reader of `listInstalledPlugins` (§4.2, §4.8)
     ];
     const reach = [..."application contracts infrastructure components bindings projection".split(" ")]
       .flatMap((layer) => {
@@ -106,7 +106,7 @@ describe("each action's business is the one the inventory records", () => {
   });
 
   it("keeps the composer's read of listInstalledPlugins as the inventory declares it", () => {
-    const composer = read(new URL("components/SessionComposer.tsx", CLIENT));
+    const composer = read(new URL("components/composer/WebuiComposer.tsx", CLIENT));
     expect(composer).toContain("listInstalledPlugins");
   });
 });

@@ -62,7 +62,7 @@ import type { WorkspacePort } from "../contracts/workspace/workspace-port.js";
 import {
   createWebuiTurnCapabilitySlice,
   type WebuiTurnCapabilitySlice,
-} from "./turn-capabilities.js";
+} from "./turn/turn-capabilities.js";
 
 /**
  * The port object the slices are cut from. `WebuiTransport` satisfies it

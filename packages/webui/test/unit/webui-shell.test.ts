@@ -1252,7 +1252,7 @@ describe("WebUI shell — desktop anatomy", () => {
 
   it("does not render a usage summary in the session composer", () => {
     const source = readFileSync(
-      new URL("../../src/client/components/SessionComposer.tsx", import.meta.url),
+      new URL("../../src/client/components/composer/WebuiComposer.tsx", import.meta.url),
       "utf8",
     );
     expect(source).not.toContain('data-webui-session-usage="true"');
@@ -1327,7 +1327,7 @@ describe("WebUI rail row click wiring", () => {
 
 // Behaviour-level coverage of the composer's send/resume loop. The test
 // drives the same `runWebuiStreamLoop` the composer in
-// `components/SessionComposer.tsx` calls
+// `components/composer/WebuiComposer.tsx` calls
 // from its submit handler, with a WebSocket double (the mocked
 // `sendMessage` / `resumeSession` close over the `onFrame` callback the
 // transport would otherwise hand to a real socket). The assertions
@@ -1794,7 +1794,7 @@ describe("WebUI composer sink binding", () => {
 // Coverage of the production app-to-helper seam. The earlier binding
 // tests exercised `buildWebuiStreamLoopSink` and the loop that uses
 // it; they did not exercise the React composer's submit handler at
-// `components/SessionComposer.tsx:723-788` (the seam where the component
+// `components/composer/WebuiComposer.tsx:723-788` (the seam where the component
 // assembles its
 // handlers and hands them to `submitWebuiComposerTurn`). The new
 // shape: `submitWebuiComposerTurn` is the extracted form-submit body

@@ -4,14 +4,20 @@
 required every ticket closed. **§14 is the decision record**: it holds the six decisions this plan
 needed, each with how it landed, and nothing in this document is still open.
 
-**Programme position, at 2026-10-13**
+**Final programme position, at 2026-10-13**
 
 | | |
 | --- | --- |
-| Phase 0 — the substrate matrix | **closed** 2026-10-12: `phase-0-substrate-matrix.md` accepted; §14.1 item 4 discharged |
-| Phase 1 — the substrate and the seam | **in progress**: `#57` closed (turn intents and the command surface), `#58` closed (the writer commands regrouped), `#59` in progress (the 18-file contract re-file) |
-| Phases 2–5 | not started; the board carries their tickets and §8 defines them |
-| Last delivered revision | `webui @ 988712ac` |
+| Phase 0 — the substrate matrix | **complete** 2026-10-12: `phase-0-substrate-matrix.md` accepted; §14.1 item 4 discharged |
+| Phase 1 — the substrate and the seam | **complete**: turn intents, writer command groups, and the 18-file browser-contract re-file are in the delivered tree |
+| Phase 2 — stop forwarding the composed transport | **complete**: the shell no longer forwards the generic composed value to business components; the composition-root interface remains, and optional capabilities remain represented in business slices |
+| Phase 3 — business boundaries | **complete**: the twelve business contracts, per-business checks, and all §16.10 `execute` outcomes are represented in the tree |
+| Phase 4 — directory grouping | **complete**: the final pass moved the three omitted presentation modules and six §15.1 owner/projection modules into their recorded homes |
+| Phase 4b — declaration re-filing | **complete**: all 59 roster declarations have been filed by their owner layer |
+| Phase 5 — finalize | **complete after E2 reconciliation**: ADR 0015, the generated business navigation table, the final extension re-measurement, and the external wrap-up are present; `pnpm check:webui-business-navigation` checks the generated table against the delivered tree and §5.6 contract |
+| Execution boundary | **No issue was opened**; work was performed directly on `webui` as the operator directed. No PR or commit is part of this plan's completion claim. |
+| Verification base | `webui @ 6a455a2419923550ff6a6b6f8afdb42a7652f66f` plus the final working-tree changes described below |
+| Final verification | `build:webui`, `typecheck:webui`, `test:webui` (144 files / 2,337 tests), `check:webui-boundary`, `check:webui-dependency`, `check:source`, and `git diff --check` pass; browser suite is 96/97 with the same explicitly waived baseline failure reproduced at `07fd8885d6c9819e45cd3c9905eb4bff275ca278` |
 
 The revision in the table below is the **design baseline** this plan was written against. It is the
 comparison point and is not advanced by execution; delivered revisions are the position table above
@@ -54,7 +60,7 @@ design that only moves files and breaks up functions is a failure even with ever
 `packages/webui/src` structurally (AST inventory, per-file export map, per-declaration hook census,
 port member census, cross-business import graph).
 
-### 1.2 Verified first-hand in this round
+### 1.2 Verified first-hand at the design baseline
 
 - git branch, HEAD, clean tree;
 - 255 source files / 56 016 lines; per-directory census; the largest declarations (§2.2);
@@ -814,7 +820,7 @@ the re-filing has 59 declarations left.
 | --- | ---: | --- |
 | Declaration census | **81** | 20 files, directly-exported non-component function declarations |
 | Less B's claimed symbols | **−21** | `SessionRail` 9 + 1 (`workspaceProjectName`, which B3 sends to `projection/workspace/`), `LeftRail` 6, `ModelPicker` 5 — each with a named carrier and target |
-| Less B4's reducer | **−1** | `reduceWebuiDiffState`, claimed by B4 at `application/transcript/review-state.ts` — subtracted because a symbol claimed anywhere in Phase B is not Phase 4b's work |
+| Less B4's reducer | **−1** | `reduceWebuiDiffState`, initially claimed at `application/transcript/review-state.ts`; delivered at `projection/transcript/review-state.ts` because it is a pure state transition — subtracted because a symbol claimed anywhere in Phase B is not Phase 4b's work |
 | **Work roster requiring re-filing** | **59** | across **12 destination directories** |
 | `initialWebuiDiffState` | 1 | a **state seed, not a function** — travels with its implementation |
 | Non-type export-list entries | 9 occurrences / **8 function names**, in 3 lists | **forwarded exports whose implementation is already outside `components/`** — recorded, not migrated |
@@ -883,18 +889,21 @@ is written for the substrate.
 *Rollback:* per step. Step 1 alone is independently shippable and independently valuable — it removes
 the first true prohibition-1 violation.
 
-### Phase 2 — Stop publishing the composed transport
+### Phase 2 — Stop forwarding the composed transport
 
-`transport.ts` becomes an internal of the composition root; each business receives **its own port
-slice** constructed at `create-application.ts` and delivered through its own context instead of 47
-props from the shell. **A directory re-file does not narrow the seam — only narrowing the seam does.**
+`client/contracts/transport.ts` remains the composed type used by the composition root and leaf prop
+types. The composition root constructs the transport and cuts it into each business's **own port slice**
+at `create-application.ts`, delivered through its own context instead of forwarding generic transport
+members from the shell. **A directory re-file does not narrow the seam — only narrowing the seam does.**
 Do not read "the gate stays green" as "the seam is closed"; these are different claims and the second
 becomes true only here.
 
 *Exit:* the shell forwards zero transport members; `Partial` optionality is preserved in exactly the
 same places (`sendMessage?`, `resumeSession?`, `watchEvents?` today, with
-`WebuiClientFoundationApp.tsx:157`'s `transport?` prop and the "not wired" mode intact); the browser
-suite passes.
+`WebuiClientFoundationApp.tsx:157`'s `transport?` prop and the "not wired" mode intact). The browser
+suite records 96 passing tests and one failure at `composer.spec.mjs:104`; the same failure was reproduced
+at the documented Phase 4b base and explicitly waived as unrelated to that batch. The final verification
+note records both runs and the evidence path.
 
 *Rollback:* per business slice. **This is the highest-risk step in the programme** — the optionality is
 where behaviour will silently change.
@@ -985,18 +994,42 @@ so they change layer and are not pure moves.
 
 ### Phase 5 — Finalize
 
-ADR 0015 (§11), the completed contract table, the re-measured extension table (§10), and the wrap-up
-record outside the repository.
+1. **E1 — Record the decision and finish the contracts.** Write ADR 0015 under `docs/adr/`, keep
+   ADR 0014 unchanged, and verify all twelve §4 rows against the eight fields in §5.6 and the final
+   source paths. The ADR fixes the business axis and its invariants; it does not replace this
+   implementation plan.
+2. **E2 — Publish navigation from the delivered tree.** Generate the business × layer index in
+   `packages/webui/AGENTS.md` with `scripts/webui-business-navigation.mjs`. The generator discovers
+   business directories and the `sessions` / `shell` root entry modules from `packages/webui/src/client/`;
+   its published-command and substrate columns are the approved §5.6 contract. It includes `turn` with
+   no presentation module and lists shared application roots as shared modules rather than businesses.
+   `pnpm check:webui-business-navigation` must reproduce the checked-in block; the generator and its
+   output are committed together.
+3. **E3 — Re-measure and reconcile.** Re-read the twelve extension scenarios in §10 against the
+   final source tree and record the actual changed-file set each scenario requires. Recompute the
+   §15.1 target and source totals from the final destinations and dispositions; do not carry forward
+   design-baseline line counts. Record the verification scope and remaining live-runtime limits in
+   an external wrap-up note.
+
+**Exit:** ADR 0015 exists; every business row resolves to its actual owner and path; the generated
+navigation table names only existing directories and matches §5.6; §10 identifies observed final
+change surfaces and keeps the protocol-cost control rows explicit; §15.1's targets and totals agree
+with the working tree; the wrap-up note records actual commands and outcomes. The exit checks were
+reconciled on 2026-10-13 after finding that E2's table had no reproducible generator and omitted its
+published-command contract column. The final evidence is in
+`/home/fectivnfy/my_data/project/my_project/minimax-code-webui-work/phase5/phase5-wrap-up-20261013.md`.
 
 ---
 
 ## 9. The port re-file (S12 — the number that must move)
 
-`client/contracts/` holds 8 ports and 216 members, and their cut is **not** the business cut:
-`execution-port` (37) maps to `composer` **and** `turn` **and** `shell`; `session-port` (43) maps to
-`sessions` **and** `transcript`; `settings-port` (53) maps to `models` **and** `settings`;
-`terminal-port` (15) maps to the `terminal` capability inside `workspace`; `interaction-port` (24) maps
-to `interactions` and `goal`.
+`client/contracts/` now has 13 business port files and 100 top-level capability members. This final count
+uses direct `readonly` members on each port interface; it does not count nested request-shape fields. The
+older baseline count of 216 included nested request-shape fields across eight ports and is not comparable.
+The final per-file census is: `account` 8, `composer` 4, `goal` 5, `interactions` 5, `models` 15,
+`plugins` 2, `sessions` 11, `settings` 17, `shell` 1, `transcript` 8, `turn` 4, and `workspace` 20
+(including the terminal capability's 6). The member names are unique across the 13 files. `plugin-port`
+has two top-level members, one of which (`pluginManagement`) carries 29 actions.
 
 Both halves of the fix are required, and the second is the load-bearing one:
 
@@ -1007,8 +1040,9 @@ Both halves of the fix are required, and the second is the load-bearing one:
    memory, user profile, memory settings → `settings`); `execution-port` splits three ways
    (`sendMessage`/`resumeSession` → the substrate, `runCommand` → `composer`, `watchEvents` →
    `shell`/`turn`); `session-port` splits between `sessions` and `transcript`.
-2. **Stop publishing the composed transport.** A directory re-file cannot narrow the seam while the
-   shell still holds 47 values from one composed object.
+2. **Stop passing the composed transport as a business capability.** The final tree keeps
+   `client/contracts/transport.ts` as the composition-root interface, but the application cuts it into
+   named business slices. Leaf components receive the specific optional capability props they use.
 
 **Count the port's actions, not its members.** `plugin-port` has one member and 29 actions; the
 opposite error is `settings-port`'s 53 members for seven duties. The re-file must be driven by the
@@ -1026,19 +1060,19 @@ violated *through the seam* rather than around it.
 
 | # | Extension | Today | Target |
 | --- | --- | --- | --- |
-| S1 | rail context-menu item on an existing capability | 4 files / 1 dir / rule in two builders and two render branches | 2 files / 1 dir |
+| S1 | rail context-menu item on an existing capability | 4 files across `projection/` and `components/`; rules were duplicated across builders and render branches | `projection/sessions/rail-menu.ts` + `components/sessions/SessionRail.tsx` (2 files across the two owning layers) |
 | S2 | permission prompt gains a field (with protocol) | 4+ files / 4 dirs | **unchanged** — inherent protocol cost; kept as the control row that calibrates what the carve cannot touch |
-| S3 | change the reconnect recovery policy | 8 files / 4 dirs, policy scattered across 2 layers and 2 components | `turn` + `sessions` + one wiring file |
-| S4 | new right-column tab kind | 3 files / kinds enumerated in **3** places | 1 registry + the host's render branch |
-| S5 | new composer toolbar control | 2 files, one a 2088-line function | 1 bounded file |
-| S6 | a second business shows the same session | no seam; `ArchonShell` is 14 lines and its rail branch was removed | the new business consumes `sessions`' read model and the substrate with **zero imports from `components/`** |
-| S7 | new wire operation end to end | 13 steps (`packages/webui/AGENTS.md`) | unchanged — protocol cost, a control row |
-| S8 | a business is added to the client | no template; `goal` had to be spread by hand across 47 files in 12 directories | one directory per layer + one port entry + one registration |
-| S9 | new stream frame / tool-result kind | 7 files / 4 dirs / 3 layers; kinds enumerated in the parser, the reducer and the renderer | parse + render keyed by one kind registry; the reducer untouched for a purely presentational kind |
-| S10 | goal status gains a value | 47 files across 12 dirs; `interaction-coordinator.ts` absorbs goal as a third duty | `goal`'s own business; the coordinator loses the duty; the fence has one home |
+| S3 | change the reconnect recovery policy | design-baseline count: 8 files / 4 dirs | final decision/transition: `application/turn/turn-commands.ts`, `application/turn/active-turn-probe.ts`, `application/turn/event-effects-registry.ts`, `application/turn/effect-reducer.ts`, `projection/turn/stream-state.ts`; session activity remains in `projection/sessions/session-activity.ts`; event subscription is coordinated by `application/turn/event-channel.ts`; composition wiring stays at the shell/application boundary |
+| S4 | new right-column tab kind | baseline had kinds enumerated in 3 places | final discriminant and shape registry: `projection/workspace/workspace-panel-state.ts`; host rendering: `components/workspace/WorkspacePanels.tsx` |
+| S5 | new composer toolbar control | baseline: 2 files, one a 2088-line function | presentation host `components/composer/WebuiComposer.tsx` (2460 lines); extension placement must be rechecked against the target component split, so the file-count reduction is not claimed |
+| S6 | a second business shows the same session | no independent consumer was added by this reorganization; the scenario remains a design acceptance constraint | the new business should consume `sessions`' read model and the turn substrate with zero imports from `components/`; this is architectural guidance, not a measured before/after result |
+| S7 | new wire operation end to end | 13-step baseline in `packages/webui/AGENTS.md` | unchanged — protocol cost, retained as a control row; this filing work did not add a wire operation |
+| S8 | a business is added to the client | design baseline: no navigation guide; `goal` had to be spread by hand across 47 files in 12 directories | `packages/webui/AGENTS.md` now provides the business × layer index; port and registration work remains governed by the existing application assembly contracts |
+| S9 | new stream frame / tool-result kind | baseline: 7 files / 4 dirs / 3 layers | `projection/common/event-kinds.ts` centralizes goal/interaction event classification; parser and render consumers use it, while stateful event effects remain in `application/turn/effect-reducer.ts` |
+| S10 | goal status gains a value | baseline: 47 files across 12 dirs; goal shared interaction coordination | goal state projects in `projection/goal/goal-state.ts`; orchestration lives in `application/goal/goal-coordinator.ts`; shared event classification is in `projection/common/event-kinds.ts` |
 | S11 | = S8, stated as the on-boarding cost | — | — |
-| **S12** | **a capability port gains a member** | **216 members in 8 ports, one holding 53 unrelated duties; a new account-ish feature lands in `settings-port`** | **re-filed along the business axis; each member has one home** |
-| S13 | review/diff rendered in a second place | the reducer is filed in the transcript's component | one owner (`review`'s reducer module) and two readers |
+| **S12** | **a capability port gains a member** | design baseline: 216 nested-inclusive members in 8 ports | final: 100 direct top-level members in 13 business port files, with unique member names; `pluginManagement` separately retains its 29-action inventory |
+| S13 | review/diff rendered in a second place | baseline draft placed reducer in a transcript component | one pure owner, `projection/transcript/review-state.ts`, consumed by `components/transcript/DiffCard.tsx` and `components/workspace/ReviewSettingsPage.tsx` |
 
 **The re-measurement is an acceptance condition, not a report.** A design that moves no row is not an
 improvement, and neither is a table whose numbers improve while the mechanism does not. Two rows are
@@ -1325,11 +1359,11 @@ operator ruling, and it is stated that way rather than being dressed up as one.
 - *Formal record:* ADR 0015 (§11), written in Phase 5. The ADR restates this decision; it does not
   reopen it.
 
-**2. Phase 2 — stop publishing the composed transport — is in the first delivery. IN.**
+**2. Phase 2 — stop forwarding the composed transport — is in the first delivery. IN.**
 
 - *How it landed:* the operator's authorization. Phase 2 is in §8's staging and carries its own board
   milestone.
-- *Why it is not optional:* it is the only step that makes prohibition 1 real at the seam. §8 says so
+- *Why it is not optional:* it is the step that makes prohibition 1 real at the seam. §8 says so
   in one line: "a directory re-file does not narrow the seam, only narrowing the seam does." Deferred,
   the delivery could not be called the completed business-boundary reorganization (item 6).
 
@@ -1492,160 +1526,149 @@ comparable. Two figures this rule was written for are §7.1's roster (a census o
 and §9's port census, whose 216 reproduces only when nested request-shape fields are counted as members —
 see `docs/webui/plugin-action-inventory.md`, finding 2.
 
-**144 target rows, covering 127 of the 137 files that must be covered.** §15.4's ten contracts **are now
-resolved**, which is the boundary this opening paragraph used to point at: seven take `move` with a named
-target, two take `delete` (authorized by the operator on 2026-10-13 and executed by `#59`), and `transport.ts`
-takes whichever of `delete` or `keep` Phase 2 records. **The executable rows are recomputed at `#122` (E3),
-never adjusted**, and the tables below are complete only up to the pre-resolution figure of 144.
+**Final move-table count: 155 printed target rows, representing 151 unique destinations from 134 moved source files.**
+The seven `move` and two `delete` dispositions in §15.4 are executed; `transport.ts` is retained as the composition-root type contract. The
+count includes split-component outputs and the six relocated modules plus shared glyph extraction listed in
+the supplemental Phase 3 table. Four split-component targets repeat the retained target row (`PluginCatalogue`,
+`WebuiComposer`, `SettingsModal`, and `UserMenu`); after those four are deduplicated there are 151 unique
+destinations. The supplemental table is an audit view of rows already counted here, not an additional set of
+destinations. These are current-tree counts, not the pre-disposition estimate.
 
-The `lines` column is each target's size today, for review sizing only. **The target rows are a size estimate and do
-not constitute a complete partition of a source file:** where one source carries several rows, the rows sum to less
-than the source's total, and the difference is **unallocated**. The measured differences for the seven sources above
-are `374` (`SessionComposer.tsx`), `125` (`PluginManagement.tsx`), `168` (`SettingsModal.tsx`), `42` (`UserMenu.tsx`),
-`261` (`PersonalizationSettings.tsx`), `≈0` (`UsageModelSettings.tsx`) and `0` (`QueuePanel.tsx`). **They may
-contain imports and types, helpers that have a clear business owner, retained business presentation, and counting
-error** — `SettingsModal`'s residual holds `SettingsWorktreePage`, `WebuiWorktreePanel` and `ArchivedSessionsPage`
-(`:422`, `:444`, `:489`), which carry real query, render and error behaviour, and `SessionComposer`'s holds
-`planWebuiRetryResend` and `resendRecordedWebuiTurn` (`:523`, `:549`), which are `composer`'s retry logic. **Actual
-migration allocates each piece by the contracts of §4/§5 and verifies it; nothing here assigns a residual to the
-retained module.** Every target is `client/<layer>/<business>/`, using the twelve businesses of §4.
+The `lines` column is each target's size in the verified final tree, for review sizing only. Split modules have
+multiple rows, and their row sizes do not claim to partition every source line. The six relocation rows and
+the shared glyph extraction are recorded in the supplemental table below. Every target is under a business directory from §4 or one of the two deliberate shared
+homes, `projection/common/` and `components/shared/`.
 
 **This is a `client/**` list, not a package inventory.** `server/`, `runtime/` and `shared/` appear nowhere in
 it: §5.5's duty table governs them and this programme does not move them.
 
-**The arithmetic a reviewer runs.** `163` files under `client/` − `26` that §6.1 names unchanged = `137` files that
-must be covered; §15.4 holds ten back, leaving `127`. Across the four tables below: `112` unsplit + `11` from the
-four splitting component files + `8` from the three previously-unrowed files + `13` contract rows from the eight
-ports = **`144` executable rows**. **The tables print `148` data rows because table 1 still shows the four source
-rows whose targets moved into table 3: those four are consumed, not additional, and `148 − 4 = 144`.**
-
-**The total is `144` executable rows today, and it is recomputed from the dispositions, never adjusted.** The
-ten contracts of §15.4 are now resolved — seven `move` to named targets, two `delete` — so the boundary this
-paragraph used to point at is closed: those nine rows exist where they did not before, `127` moves with the two
-deletions, and `#122` (E3) re-derives every affected figure. No other total is stated.
-
-**The check a reviewer runs.** The four tables print `148` data rows, `144` of which are executable, and they carry
-`127` distinct source files. Any other printed row count, or a source count other than `127`, is a defect in this
-section.
+**The arithmetic a reviewer runs.** Count each mapping row's destination in §15.1, including split-component
+outputs and port re-files; normalize destinations beginning `components/` by prefixing `client/`. This yields
+155 printed destination rows and 151 unique destinations; four retained-target rows repeat in the split table.
+Carry quoted source cells (`"`) forward and count distinct source paths from the source/destination mapping rows:
+134 source files move, two held placeholders are deleted, and the retained `transport.ts` is one additional
+disposition. Together these are the 137 files previously in the move-or-hold population.
+The supplemental Phase 3 table records seven of those destinations with their source and rationale and does not
+add to the total. The `lines` values were regenerated from the final files under `packages/webui/src/client/`.
 
 | from | to | lines |
 | --- | --- | ---: |
 | `client/ConnectionStatus.tsx` | `client/components/shell/ConnectionStatus.tsx` | 152 |
-| `client/application/account-workflows.ts` | `client/application/account/account-workflows.ts` | 439 |
-| `client/application/active-turn-probe.ts` | `client/application/turn/active-turn-probe.ts` | 69 |
-| `client/application/command-workflows.ts` | `client/application/composer/command-workflows.ts` | 44 |
-| `client/application/composer-store.ts` | `client/application/composer/composer-store.ts` | 144 |
-| `client/application/composer-workflows.ts` | `client/application/composer/composer-workflows.ts` | 179 |
-| `client/application/event-channel.ts` | `client/application/turn/event-channel.ts` | 36 |
-| `client/application/event-coordinator.ts` | `client/application/turn/event-coordinator.ts` | 302 |
-| `client/application/event-effects-registry.ts` | `client/application/turn/event-effects-registry.ts` | 88 |
-| `client/application/interaction-coordinator.ts` | `client/application/interactions/interaction-coordinator.ts` | 313 |
-| `client/application/plugin-workflows.ts` | `client/application/plugins/plugin-workflows.ts` | 458 |
-| `client/application/queue-command.ts` | `client/application/turn/queue-command.ts` | 54 |
-| `client/application/session-catalog.ts` | `client/application/sessions/session-catalog.ts` | 324 |
-| `client/application/session-commands.ts` | `client/application/sessions/session-commands.ts` | 226 |
-| `client/application/session-workflows.ts` | `client/application/sessions/session-workflows.ts` | 455 |
-| `client/application/settings-workflows.ts` | `client/application/settings/settings-workflows.ts` | 647 |
+| `client/application/account-workflows.ts` | `client/application/account/account-workflows.ts` | 438 |
+| `client/application/active-turn-probe.ts` | `client/application/turn/active-turn-probe.ts` | 68 |
+| `client/application/command-workflows.ts` | `client/application/composer/command-workflows.ts` | 43 |
+| `client/application/composer-store.ts` | `client/application/composer/composer-store.ts` | 351 |
+| `client/application/composer-workflows.ts` | `client/application/composer/composer-workflows.ts` | 178 |
+| `client/application/event-channel.ts` | `client/application/turn/event-channel.ts` | 35 |
+| `client/application/event-coordinator.ts` | `client/application/turn/event-coordinator.ts` | 301 |
+| `client/application/event-effects-registry.ts` | `client/application/turn/event-effects-registry.ts` | 87 |
+| `client/application/interaction-coordinator.ts` | `client/application/interactions/interaction-coordinator.ts` | 257 |
+| `client/application/plugin-workflows.ts` | `client/application/plugins/plugin-workflows.ts` | 457 |
+| `client/application/queue-command.ts` | `client/application/turn/queue-command.ts` | 53 |
+| `client/application/session-catalog.ts` | `client/application/sessions/session-catalog.ts` | 323 |
+| `client/application/session-commands.ts` | `client/application/sessions/session-commands.ts` | 261 |
+| `client/application/session-workflows.ts` | `client/application/sessions/session-workflows.ts` | 451 |
+| `client/application/settings-workflows.ts` | `client/application/settings/settings-workflows.ts` | 333 |
 | `client/application/stream-lease-controller.ts` | `client/application/turn/stream-lease-controller.ts` | 62 |
-| `client/application/stream-state-bundle.ts` | `client/application/turn/stream-state-bundle.ts` | 28 |
-| `client/application/transcript-history.ts` | `client/application/transcript/transcript-history.ts` | 126 |
-| `client/application/transcript-request-ownership.ts` | `client/application/transcript/transcript-request-ownership.ts` | 69 |
-| `client/application/turn-commands.ts` | `client/application/turn/turn-commands.ts` | 268 |
-| `client/application/turn-coordinator.ts` | `client/application/turn/turn-coordinator.ts` | 165 |
-| `client/application/unread.ts` | `client/application/sessions/unread.ts` | 199 |
-| `client/application/workspace-queries.ts` | `client/application/workspace/workspace-queries.ts` | 829 |
-| `client/components/AccountLoginDialog.tsx` | `client/components/account/AccountLoginDialog.tsx` | 262 |
-| `client/components/ActivityIndicator.tsx` | `client/components/transcript/ActivityIndicator.tsx` | 437 |
-| `client/components/ArchonPage.tsx` | `client/components/shell/ArchonPage.tsx` | 6 |
-| `client/components/ArchonShell.tsx` | `client/components/shell/ArchonShell.tsx` | 15 |
-| `client/components/AssistantBody.tsx` | `client/components/transcript/AssistantBody.tsx` | 371 |
-| `client/components/Composer.tsx` | `client/components/composer/Composer.tsx` | 15 |
-| `client/components/ContextMenu.tsx` | `client/components/shared/ContextMenu.tsx` | 176 |
+| `client/application/stream-state-bundle.ts` | `client/application/turn/stream-state-bundle.ts` | 27 |
+| `client/application/transcript-history.ts` | `client/application/transcript/transcript-history.ts` | 125 |
+| `client/application/transcript-request-ownership.ts` | `client/application/transcript/transcript-request-ownership.ts` | 68 |
+| `client/application/turn-commands.ts` | `client/application/turn/turn-commands.ts` | 265 |
+| `client/application/turn-coordinator.ts` | `client/application/turn/turn-coordinator.ts` | 164 |
+| `client/application/unread.ts` | `client/application/sessions/unread.ts` | 198 |
+| `client/application/workspace-queries.ts` | `client/application/workspace/workspace-queries.ts` | 828 |
+| `client/components/AccountLoginDialog.tsx` | `client/components/account/AccountLoginDialog.tsx` | 223 |
+| `client/components/ActivityIndicator.tsx` | `client/components/transcript/ActivityIndicator.tsx` | 369 |
+| `client/components/ArchonPage.tsx` | `client/components/shell/ArchonPage.tsx` | 5 |
+| `client/components/ArchonShell.tsx` | `client/components/shell/ArchonShell.tsx` | 14 |
+| `client/components/AssistantBody.tsx` | `client/components/transcript/AssistantBody.tsx` | 370 |
+| `client/components/Composer.tsx` | `client/components/composer/Composer.tsx` | 14 |
+| `client/components/ContextMenu.tsx` | `client/components/shared/ContextMenu.tsx` | 152 |
 | `client/components/ConversationUsageBanner.tsx` | `client/components/account/ConversationUsageBanner.tsx` | 248 |
-| `client/components/DiffCard.tsx` | `client/components/transcript/DiffCard.tsx` | 353 |
-| `client/components/GoalBanner.tsx` | `client/components/goal/GoalBanner.tsx` | 206 |
-| `client/components/InteractionPanel.tsx` | `client/components/interactions/InteractionPanel.tsx` | 469 |
-| `client/components/LeftRail.tsx` | `client/components/sessions/LeftRail.tsx` | 80 |
-| `client/components/MessageActions.tsx` | `client/components/transcript/MessageActions.tsx` | 277 |
+| `client/components/DiffCard.tsx` | `client/components/transcript/DiffCard.tsx` | 217 |
+| `client/components/GoalBanner.tsx` | `client/components/goal/GoalBanner.tsx` | 205 |
+| `client/components/InteractionPanel.tsx` | `client/components/interactions/InteractionPanel.tsx` | 468 |
+| `client/components/LeftRail.tsx` | `client/components/sessions/LeftRail.tsx` | 14 |
+| `client/components/MessageActions.tsx` | `client/components/transcript/MessageActions.tsx` | 237 |
 | `client/components/MessageAttachments.tsx` | `client/components/transcript/MessageAttachments.tsx` | 238 |
-| `client/components/MessageItem.tsx` | `client/components/transcript/MessageItem.tsx` | 307 |
-| `client/components/ModelPicker.tsx` | `client/components/models/ModelPicker.tsx` | 1036 |
-| `client/components/ModelSettingsFlyout.tsx` | `client/components/models/ModelSettingsFlyout.tsx` | 424 |
-| `client/components/NotFound.tsx` | `client/components/shell/NotFound.tsx` | 3 |
+| `client/components/MessageItem.tsx` | `client/components/transcript/MessageItem.tsx` | 306 |
+| `client/components/ModelPicker.tsx` | `client/components/models/ModelPicker.tsx` | 1126 |
+| `client/components/ModelSettingsFlyout.tsx` | `client/components/models/ModelSettingsFlyout.tsx` | 423 |
+| `client/components/NotFound.tsx` | `client/components/shell/NotFound.tsx` | 2 |
 | `client/components/OutputError.tsx` | `client/components/transcript/OutputError.tsx` | 214 |
-| `client/components/PlanModeCards.tsx` | `client/components/interactions/PlanModeCards.tsx` | 389 |
-| `client/components/PluginManagement.tsx` | `client/components/plugins/PluginManagement.tsx` | 1595 |
-| `client/components/RailRow.tsx` | `client/components/sessions/RailRow.tsx` | 50 |
-| `client/components/SessionComposer.tsx` | `client/components/composer/SessionComposer.tsx` | 2977 |
-| `client/components/SessionRail.tsx` | `client/components/sessions/SessionRail.tsx` | 1250 |
-| `client/components/SessionTranscript.tsx` | `client/components/transcript/SessionTranscript.tsx` | 815 |
-| `client/components/SettingsModal.tsx` | `client/components/settings/SettingsModal.tsx` | 526 |
-| `client/components/StartupFallback.tsx` | `client/components/shell/StartupFallback.tsx` | 61 |
-| `client/components/ThinkingTrigger.tsx` | `client/components/composer/ThinkingTrigger.tsx` | 187 |
-| `client/components/ToggleSwitch.tsx` | `client/components/shared/ToggleSwitch.tsx` | 39 |
-| `client/components/Transcript.tsx` | `client/components/transcript/Transcript.tsx` | 14 |
-| `client/components/TranscriptPrimitives.tsx` | `client/components/transcript/TranscriptPrimitives.tsx` | 610 |
+| `client/components/PlanModeCards.tsx` | `client/components/interactions/PlanModeCards.tsx` | 388 |
+| `client/components/PluginManagement.tsx` | `client/components/plugins/PluginCatalogue.tsx` | 1208 |
+| `client/components/RailRow.tsx` | `client/components/sessions/RailRow.tsx` | 49 |
+| `client/components/SessionComposer.tsx` | `client/components/composer/WebuiComposer.tsx` | 2460 |
+| `client/components/SessionRail.tsx` | `client/components/sessions/SessionRail.tsx` | 1342 |
+| `client/components/SessionTranscript.tsx` | `client/components/transcript/SessionTranscript.tsx` | 814 |
+| `client/components/SettingsModal.tsx` | `client/components/settings/SettingsModal.tsx` | 232 |
+| `client/components/StartupFallback.tsx` | `client/components/shell/StartupFallback.tsx` | 60 |
+| `client/components/ThinkingTrigger.tsx` | `client/components/composer/ThinkingTrigger.tsx` | 186 |
+| `client/components/ToggleSwitch.tsx` | `client/components/shared/ToggleSwitch.tsx` | 38 |
+| `client/components/Transcript.tsx` | `client/components/transcript/Transcript.tsx` | 13 |
+| `client/components/TranscriptPrimitives.tsx` | `client/components/transcript/TranscriptPrimitives.tsx` | 609 |
 | `client/components/TranscriptSkeletons.tsx` | `client/components/transcript/TranscriptSkeletons.tsx` | 118 |
-| `client/components/TurnNavigator.tsx` | `client/components/transcript/TurnNavigator.tsx` | 278 |
-| `client/components/UserMenu.tsx` | `client/components/account/UserMenu.tsx` | 888 |
-| `client/components/WebuiClientFoundationApp.tsx` | `client/components/shell/WebuiClientFoundationApp.tsx` | 1551 |
-| `client/components/WebuiErrorBoundary.tsx` | `client/components/shell/WebuiErrorBoundary.tsx` | 142 |
-| `client/components/WorkspaceArchiveView.tsx` | `client/components/workspace/WorkspaceArchiveView.tsx` | 291 |
-| `client/components/WorkspaceCanvas.tsx` | `client/components/workspace/WorkspaceCanvas.tsx` | 739 |
-| `client/components/WorkspaceFileTree.tsx` | `client/components/workspace/WorkspaceFileTree.tsx` | 101 |
-| `client/components/WorkspaceHtmlPreview.tsx` | `client/components/workspace/WorkspaceHtmlPreview.tsx` | 192 |
-| `client/components/WorkspaceMediaPreview.tsx` | `client/components/workspace/WorkspaceMediaPreview.tsx` | 212 |
-| `client/components/WorkspacePanels.tsx` | `client/components/workspace/WorkspacePanels.tsx` | 713 |
-| `client/icons.tsx` | `client/components/shell/icons.tsx` | 679 |
-| `client/markdown.tsx` | `client/components/transcript/markdown.tsx` | 381 |
-| `client/no-project.ts` | `client/infrastructure/no-project.ts` | 19 |
-| `client/paths.ts` | `client/projection/common/paths.ts` | 35 |
-| `client/projection/action-requests.ts` | `client/projection/sessions/action-requests.ts` | 136 |
-| `client/projection/composer-history.ts` | `client/application/composer/composer-history.ts` | 271 |
-| `client/projection/composer-interactions.ts` | `client/projection/composer/composer-interactions.ts` | 127 |
-| `client/projection/composer-state.ts` | `client/projection/composer/composer-state.ts` | 98 |
-| `client/projection/context-breakdown.ts` | `client/projection/composer/context-breakdown.ts` | 202 |
-| `client/projection/context-usage-popover.ts` | `client/projection/composer/context-usage-popover.ts` | 154 |
-| `client/projection/context-usage.ts` | `client/projection/composer/context-usage.ts` | 30 |
-| `client/projection/effect-reducer.ts` | `client/application/turn/effect-reducer.ts` | 466 |
-| `client/projection/event-parsers.ts` | `client/projection/interactions/event-parsers.ts` | 115 |
-| `client/projection/flyout-position.ts` | `client/projection/common/flyout-position.ts` | 129 |
-| `client/projection/goal-state.ts` | `client/projection/goal/goal-state.ts` | 110 |
-| `client/projection/message-file-reference.ts` | `client/projection/transcript/message-file-reference.ts` | 38 |
-| `client/projection/message-parts.ts` | `client/projection/transcript/message-parts.ts` | 666 |
-| `client/projection/message-projection.ts` | `client/projection/transcript/message-projection.ts` | 521 |
-| `client/projection/model-favorites.ts` | `client/projection/models/model-favorites.ts` | 165 |
-| `client/projection/model-picker-cascade.ts` | `client/projection/models/model-picker-cascade.ts` | 122 |
-| `client/projection/model-picker-hover.ts` | `client/projection/models/model-picker-hover.ts` | 99 |
-| `client/projection/model-picker-search.ts` | `client/projection/models/model-picker-search.ts` | 133 |
-| `client/projection/model-reorder.ts` | `client/projection/models/model-reorder.ts` | 11 |
+| `client/components/TurnNavigator.tsx` | `client/components/transcript/TurnNavigator.tsx` | 277 |
+| `client/components/UserMenu.tsx` | `client/components/account/UserMenu.tsx` | 271 |
+| `client/components/WebuiClientFoundationApp.tsx` | `client/components/shell/WebuiClientFoundationApp.tsx` | 1644 |
+| `client/components/WebuiErrorBoundary.tsx` | `client/components/shell/WebuiErrorBoundary.tsx` | 130 |
+| `client/components/WorkspaceArchiveView.tsx` | `client/components/workspace/WorkspaceArchiveView.tsx` | 257 |
+| `client/components/WorkspaceCanvas.tsx` | `client/components/workspace/WorkspaceCanvas.tsx` | 388 |
+| `client/components/WorkspaceFileTree.tsx` | `client/components/workspace/WorkspaceFileTree.tsx` | 59 |
+| `client/components/WorkspaceHtmlPreview.tsx` | `client/components/workspace/WorkspaceHtmlPreview.tsx` | 139 |
+| `client/components/WorkspaceMediaPreview.tsx` | `client/components/workspace/WorkspaceMediaPreview.tsx` | 162 |
+| `client/components/WorkspacePanels.tsx` | `client/components/workspace/WorkspacePanels.tsx` | 666 |
+| `client/icons.tsx` | `client/components/shell/icons.tsx` | 678 |
+| `client/markdown.tsx` | `client/components/transcript/markdown.tsx` | 380 |
+| `client/no-project.ts` | `client/infrastructure/no-project.ts` | 18 |
+| `client/paths.ts` | `client/projection/common/paths.ts` | 34 |
+| `client/projection/action-requests.ts` | `client/projection/sessions/action-requests.ts` | 135 |
+| `client/projection/composer-history.ts` | `client/application/composer/composer-history.ts` | 270 |
+| `client/projection/composer-interactions.ts` | `client/projection/composer/composer-interactions.ts` | 146 |
+| `client/projection/composer-state.ts` | `client/projection/composer/composer-state.ts` | 108 |
+| `client/projection/context-breakdown.ts` | `client/projection/composer/context-breakdown.ts` | 201 |
+| `client/projection/context-usage-popover.ts` | `client/projection/composer/context-usage-popover.ts` | 153 |
+| `client/projection/context-usage.ts` | `client/projection/composer/context-usage.ts` | 29 |
+| `client/projection/effect-reducer.ts` | `client/application/turn/effect-reducer.ts` | 465 |
+| `client/projection/event-parsers.ts` | `client/projection/interactions/event-parsers.ts` | 117 |
+| `client/projection/flyout-position.ts` | `client/projection/common/flyout-position.ts` | 128 |
+| `client/projection/goal-state.ts` | `client/projection/goal/goal-state.ts` | 108 |
+| `client/projection/message-file-reference.ts` | `client/projection/transcript/message-file-reference.ts` | 37 |
+| `client/projection/message-parts.ts` | `client/projection/transcript/message-parts.ts` | 665 |
+| `client/projection/message-projection.ts` | `client/projection/transcript/message-projection.ts` | 520 |
+| `client/projection/model-favorites.ts` | `client/projection/models/model-favorites.ts` | 164 |
+| `client/projection/model-picker-cascade.ts` | `client/projection/models/model-picker-cascade.ts` | 121 |
+| `client/projection/model-picker-hover.ts` | `client/projection/models/model-picker-hover.ts` | 98 |
+| `client/projection/model-picker-search.ts` | `client/projection/models/model-picker-search.ts` | 132 |
+| `client/projection/model-reorder.ts` | `client/projection/models/model-reorder.ts` | 10 |
 | `client/projection/outside-close.ts` | `client/projection/common/outside-close.ts` | 266 |
-| `client/projection/overlay-geometry.ts` | `client/projection/common/overlay-geometry.ts` | 57 |
-| `client/projection/plan-mode.ts` | `client/projection/interactions/plan-mode.ts` | 286 |
+| `client/projection/overlay-geometry.ts` | `client/projection/common/overlay-geometry.ts` | 56 |
+| `client/projection/plan-mode.ts` | `client/projection/interactions/plan-mode.ts` | 285 |
 | `client/projection/questionnaire-state.ts` | `client/projection/interactions/questionnaire-state.ts` | 113 |
-| `client/projection/review-state.ts` | `client/projection/transcript/review-state.ts` | 276 |
-| `client/projection/session-activity.ts` | `client/projection/sessions/session-activity.ts` | 325 |
-| `client/projection/shell-surface.ts` | `client/projection/shell/shell-surface.ts` | 66 |
-| `client/projection/stream-recovery.ts` | `client/projection/turn/stream-recovery.ts` | 24 |
+| `client/projection/review-state.ts` | `client/projection/transcript/review-state.ts` | 434 |
+| `client/projection/session-activity.ts` | `client/projection/sessions/session-activity.ts` | 324 |
+| `client/projection/shell-surface.ts` | `client/projection/shell/shell-surface.ts` | 65 |
+| `client/projection/stream-recovery.ts` | `client/projection/turn/stream-recovery.ts` | 23 |
 | `client/projection/stream-state.ts` | `client/projection/turn/stream-state.ts` | 540 |
-| `client/projection/terminal-size.ts` | `client/projection/workspace/terminal-size.ts` | 76 |
-| `client/projection/thinking-control.ts` | `client/projection/models/thinking-control.ts` | 255 |
-| `client/projection/token-plan-model.ts` | `client/projection/models/token-plan-model.ts` | 68 |
-| `client/projection/tool-projection.ts` | `client/projection/transcript/tool-projection.ts` | 298 |
-| `client/projection/transcript-projection.ts` | `client/projection/transcript/transcript-projection.ts` | 335 |
-| `client/projection/transcript-scroll.ts` | `client/projection/common/transcript-scroll.ts` | 61 |
-| `client/projection/transcript-shape.ts` | `client/projection/transcript/transcript-shape.ts` | 480 |
-| `client/projection/unread-badge.ts` | `client/projection/common/unread-badge.ts` | 15 |
-| `client/projection/usage-settings.ts` | `client/projection/models/usage-settings.ts` | 70 |
-| `client/projection/workspace-file-tree.ts` | `client/projection/workspace/workspace-file-tree.ts` | 58 |
-| `client/projection/workspace-panel-state.ts` | `client/projection/workspace/workspace-panel-state.ts` | 187 |
-| `client/projection/workspace-progress.ts` | `client/projection/workspace/workspace-progress.ts` | 408 |
-| `client/projection/worktree-state.ts` | `client/projection/sessions/worktree-state.ts` | 129 |
-| `client/rail-buckets.ts` | `client/projection/sessions/rail-buckets.ts` | 152 |
-| `client/router.ts` | `client/projection/common/router.ts` | 7 |
-| `client/slash-palette.ts` | `client/components/composer/slash-palette.ts` | 418 |
-| `client/team-mode.ts` | `client/infrastructure/team-mode.ts` | 66 |
-| `client/value-readers.ts` | `client/contracts/value-readers.ts` | 88 |
+| `client/projection/terminal-size.ts` | `client/projection/workspace/terminal-size.ts` | 75 |
+| `client/projection/thinking-control.ts` | `client/projection/models/thinking-control.ts` | 254 |
+| `client/projection/token-plan-model.ts` | `client/projection/models/token-plan-model.ts` | 67 |
+| `client/projection/tool-projection.ts` | `client/projection/transcript/tool-projection.ts` | 297 |
+| `client/projection/transcript-projection.ts` | `client/projection/transcript/transcript-projection.ts` | 334 |
+| `client/projection/transcript-scroll.ts` | `client/projection/common/transcript-scroll.ts` | 60 |
+| `client/projection/transcript-shape.ts` | `client/projection/transcript/transcript-shape.ts` | 479 |
+| `client/projection/unread-badge.ts` | `client/projection/common/unread-badge.ts` | 14 |
+| `client/projection/usage-settings.ts` | `client/projection/models/usage-settings.ts` | 69 |
+| `client/projection/workspace-file-tree.ts` | `client/projection/workspace/workspace-file-tree.ts` | 110 |
+| `client/projection/workspace-panel-state.ts` | `client/projection/workspace/workspace-panel-state.ts` | 319 |
+| `client/projection/workspace-progress.ts` | `client/projection/workspace/workspace-progress.ts` | 407 |
+| `client/projection/worktree-state.ts` | `client/projection/sessions/worktree-state.ts` | 128 |
+| `client/rail-buckets.ts` | `client/projection/sessions/rail-buckets.ts` | 151 |
+| `client/router.ts` | `client/projection/common/router.ts` | 6 |
+| `client/slash-palette.ts` | `client/components/composer/slash-palette.ts` | 417 |
+| `client/team-mode.ts` | `client/infrastructure/team-mode.ts` | 65 |
+| `client/value-readers.ts` | `client/contracts/value-readers.ts` | 101 |
 
 **Rows this table is missing, and rows it must replace.** The 116 rows above are not the whole set.
 
@@ -1657,13 +1680,13 @@ states and its own save and delete-confirm, so it is a target in its own right, 
 | from | to | lines |
 | --- | --- | ---: |
 | `client/components/QueuePanel.tsx` | `client/components/composer/QueuePanel.tsx` | 81 |
-| `client/components/settings/PersonalizationSettings.tsx` | `client/components/settings/PersonalizationSettings.tsx` (thin page) | ~91 |
-| " | `client/components/settings/GlobalInstructionsSection.tsx` | ~162 |
-| " | `client/components/settings/UserProfileSection.tsx` | ~197 |
-| " | `client/components/settings/MemorySection.tsx` | ~228 |
-| " | `client/components/settings/MemoryManagerDialog.tsx` | 427 |
-| `client/components/settings/UsageModelSettings.tsx` | `client/components/models/ProviderFormPanel.tsx` | ~190 |
-| " | `client/components/settings/UsageModelSettings.tsx` (parent — the shared lifecycle block) | retained |
+| `client/components/settings/PersonalizationSettings.tsx` | `client/components/settings/PersonalizationSettings.tsx` (thin page) | 144 |
+| " | `client/components/settings/GlobalInstructionsSection.tsx` | 203 |
+| " | `client/components/settings/UserProfileSection.tsx` | 265 |
+| " | `client/components/settings/MemorySection.tsx` | 211 |
+| " | `client/components/settings/MemoryManagerDialog.tsx` | 534 |
+| `client/components/settings/UsageModelSettings.tsx` | `client/components/models/ProviderFormPanel.tsx` | 243 |
+| " | `client/components/settings/UsageModelSettings.tsx` (parent — the shared lifecycle block) | 258 |
 
 The `UsageModelSettings` targets follow §5.6's backfill: quota is `account`'s and provider CRUD is `models`',
 so the form's commands leave for `models` before the surfaces separate.
@@ -1674,17 +1697,17 @@ appeared in an earlier draft are **removed**: `DesktopSettingsPage` is `withdraw
 
 | replaces | with | lines |
 | --- | --- | ---: |
-| `SessionComposer.tsx` -> `components/composer/SessionComposer.tsx` | `components/composer/WebuiComposer.tsx` | 2088 |
-| " | `components/workspace/WebuiWorkspaceDirectoryBrowser.tsx` | 196 |
-| " | `components/sessions/ContextUsageIndicator.tsx` | 318 |
-| `PluginManagement.tsx` -> `components/plugins/PluginManagement.tsx` | `components/plugins/PluginCatalogue.tsx` | ~1059 |
-| " | `components/plugins/PluginItemDialog.tsx` | 305 |
-| " | `components/plugins/PluginImportDialog.tsx` | 105 |
-| `SettingsModal.tsx` -> `components/settings/SettingsModal.tsx` | `components/settings/SettingsModal.tsx` (shell + primitives) | ~81 |
-| " | `components/workspace/ReviewSettingsPage.tsx` | 276 |
-| `UserMenu.tsx` -> `components/account/UserMenu.tsx` | `components/account/UserMenu.tsx` (shell) | ~209 |
-| " | `components/account/UserMenuSignin.tsx` | 420 |
-| " | `components/account/UserMenuUsage.tsx` | 216 |
+| `SessionComposer.tsx` -> `components/composer/WebuiComposer.tsx` | `components/composer/WebuiComposer.tsx` | 2460 |
+| " | `components/workspace/WebuiWorkspaceDirectoryBrowser.tsx` | 182 |
+| " | `components/sessions/ContextUsageIndicator.tsx` | 343 |
+| `PluginManagement.tsx` -> `components/plugins/PluginCatalogue.tsx` | `components/plugins/PluginCatalogue.tsx` | 1208 |
+| " | `components/plugins/PluginItemDialog.tsx` | 370 |
+| " | `components/plugins/PluginImportDialog.tsx` | 138 |
+| `SettingsModal.tsx` -> `components/settings/SettingsModal.tsx` | `components/settings/SettingsModal.tsx` (shell + primitives) | 232 |
+| " | `components/workspace/ReviewSettingsPage.tsx` | 317 |
+| `UserMenu.tsx` -> `components/account/UserMenu.tsx` | `components/account/UserMenu.tsx` (shell) | 271 |
+| " | `components/account/UserMenuSignin.tsx` | 401 |
+| " | `components/account/UserMenuUsage.tsx` | 217 |
 
 **No new row:** `SessionRail.tsx`, `ModelPicker.tsx`, `GoalBanner.tsx` and `MessageItem.tsx` keep their existing
 rows — their cuts stay inside files already tabulated.
@@ -1693,17 +1716,17 @@ Every one follows from §9's own enumeration, quoted here so each row carries it
 
 | from | to | lines | §9's sentence |
 |---|---|---:|---|
-| `client/contracts/execution-port.ts` | `client/contracts/turn/execution-port.ts` | ~60 | "…`execution-port` splits three ways (`sendMessage`/`resumeSession` → the substrate, `runCommand` → `composer`, `watchEvents` → `shell`/`turn`)" |
-| " | `client/contracts/composer/command-port.ts` | ~10 | same |
-| " | `client/contracts/shell/watch-port.ts` | ~24 | same |
-| `client/contracts/settings-port.ts` | `client/contracts/models/provider-port.ts` | ~55 | "`settings-port`'s 53 members divide mechanically (models + providers → `models`; …)" |
-| " | `client/contracts/settings/settings-port.ts` | ~47 | same |
-| `client/contracts/session-port.ts` | `client/contracts/sessions/session-port.ts` | ~80 | "`session-port` splits between `sessions` and `transcript`" |
-| " | `client/contracts/transcript/session-read-port.ts` | ~31 | same |
-| `client/contracts/interaction-port.ts` | `client/contracts/interactions/interaction-port.ts` | ~44 | "`interaction-port` (24) maps to `interactions` and `goal`" |
-| " | `client/contracts/goal/goal-port.ts` | ~10 | same |
+| `client/contracts/execution-port.ts` | `client/contracts/turn/execution-port.ts` | 57 | "…`execution-port` splits three ways (`sendMessage`/`resumeSession` → the substrate, `runCommand` → `composer`, `watchEvents` → `shell`/`turn`)" |
+| " | `client/contracts/composer/command-port.ts` | 41 | same |
+| " | `client/contracts/shell/watch-port.ts` | 29 | same |
+| `client/contracts/settings-port.ts` | `client/contracts/models/provider-port.ts` | 47 | "`settings-port`'s 53 members divide mechanically (models + providers → `models`; …)" |
+| " | `client/contracts/settings/settings-port.ts` | 62 | same |
+| `client/contracts/session-port.ts` | `client/contracts/sessions/session-port.ts` | 66 | "`session-port` splits between `sessions` and `transcript`" |
+| " | `client/contracts/transcript/session-read-port.ts` | 37 | same |
+| `client/contracts/interaction-port.ts` | `client/contracts/interactions/interaction-port.ts` | 34 | "`interaction-port` (24) maps to `interactions` and `goal`" |
+| " | `client/contracts/goal/goal-port.ts` | 22 | same |
 | `client/contracts/account-port.ts` | `client/contracts/account/account-port.ts` | 30 | §9's port enumeration |
-| `client/contracts/plugin-port.ts` | `client/contracts/plugins/plugin-port.ts` | 11 | same |
+| `client/contracts/plugin-port.ts` | `client/contracts/plugins/plugin-port.ts` | 31 | same |
 | `client/contracts/terminal-port.ts` | `client/contracts/workspace/terminal-port.ts` | 47 | "`terminal-port`'s 15 members remain the capability record criterion C produced" — a capability inside `workspace` |
 | `client/contracts/workspace-port.ts` | `client/contracts/workspace/workspace-port.ts` | 82 | §9's port enumeration |
 
@@ -1722,13 +1745,11 @@ holds it. It files under `client/contracts/plugins/` (the operator's decision, 2
 that found it is `docs/webui/plugin-action-inventory.md`. The three cells' line budget is re-derived at
 A3, because a line count here is a sizing estimate, not a source partition.
 
-**Phase 3's own modules — the rows the carves create (added 2026-10-13; not folded into the counts above).**
+**Phase 3's own modules — supplemental path records (added 2026-10-13).**
 Phase 3 *creates* modules as well as moving them: a carve that separates a duty has to leave the separated code
-somewhere, and §6.1's tree is what names that somewhere. The rows below are the modules Phase 3 has created so
-far, each with the target §6.1's tree and §5.6's owner rows give it. **They are additions, not a correction: the
-arithmetic above (`148` printed, `144` executable, `127` sources) counts the pre-Phase-3 tree, and `#122` (E3)
-re-derives every affected figure** — a reader checking that arithmetic against this table finds it still holds
-for the rows above this paragraph.
+somewhere, and §6.1's tree is what names that somewhere. The rows below record the six relocated modules and
+shared glyph extraction, plus `ReviewSettingsPage` already listed in the split-component table. These rows
+explain destinations already included in the 155-row, 155-target count above; they are not additional targets.
 
 | from | to | lines | created by |
 | --- | --- | ---: | --- |
@@ -1739,9 +1760,7 @@ for the rows above this paragraph.
 | `client/projection/rail-menu.ts` | `client/projection/sessions/rail-menu.ts` | 119 | B3's S1 — the rail is a place the user works and the menu is the rail's rule (§4.1) |
 | `client/projection/workspace-name.ts` | `client/projection/workspace/workspace-name.ts` | 23 | B3, moving the rule off `SessionRail.tsx` (§5.6 `workspace`) |
 | `client/components/workspace/ReviewSettingsPage.tsx` | *(at its target)* | 317 | §16.10 `execute`. Created as `SettingsReviewPage.tsx` and renamed to this row's basename on 2026-10-13, so the tree matches §15.1 and §16.10 |
-| `client/components/settings/settings-glyphs.tsx` | `client/components/shared/settings-glyphs.tsx` | 31 | extracted so the review page and the settings pages share one glyph module instead of two copies; no business owns it, so `components/shared/`, §6.1's non-business home |
-
-**Three Phase 3 modules need no row.** `client/application/query-store.ts` (115 lines — the cached-read fence
+| `client/components/settings/settings-atoms.tsx` | `client/components/shared/settings-glyphs.tsx` | 9 | extracted the shared `SearchIcon` and `FolderIcon` presentation helpers so settings and review pages use one glyph module; the source module remains for settings-specific atoms; no business owns the shared presentation, so `components/shared/`, §6.1's non-business home |**Three Phase 3 modules need no row.** `client/application/query-store.ts` (115 lines — the cached-read fence |
 §16.3 requires to exist once), `client/application/version-cell.ts` (42 — one version cell per fence) and
 `client/application/port-slices.ts` (296 — the per-business slice constructor) are **root-shared application
 modules**, which §6.1's tree provides for beside `create-application.ts`, `state.ts`, `session-store.ts` and
@@ -1758,9 +1777,7 @@ unlike a rename inside `client/projection/` — it cannot change a module's clas
 `CLIENT_FILE_PROVENANCE` are tables of *mappings*, and a mapping outlives the file it described — two of
 `PROJECTION_SPLIT`'s four entries point at files that have already moved or never existed (§7.2), and two
 rows of an earlier draft of this table were exactly that error. Read this as the move list for Phase 4 and
-re-check each source against the tree at the time of the move.
-
-### 15.2 What each business owns across the layer boundaries
+re-check each source against the tree at the time of the move.### 15.2 What each business owns across the layer boundaries
 
 `client/contracts/` is re-filed per §9. The cross-process layers are named here so a reader can see that the
 carve stops at the client's own boundary, and `shared/contracts/` holds its 16 DTOs:
@@ -1814,7 +1831,7 @@ and the honest floor for it. The list is what §12.5 leaves abstract.
 | --- | --- | --- | --- |
 | The generation fence | `test/unit/stream-lease.test.ts` plus `ownsWebuiStreamGeneration` (`application/turn-commands.ts:101`) | machine | 1 |
 | Request attribution | `application/transcript-request-ownership.ts`, asserted through `test/unit/transcript-shape.test.ts` and `test/unit/webui-application-commands.test.ts` — **there is no test file named after that module**, so its coverage is indirect and must be read rather than assumed | machine + reading | 3 (`transcript`) |
-| **Absent optional capability** | `turn-commands.ts:86` guards this path and **no registered test covers it**. This is the highest-value new test in the programme, and it is Phase 1 step 1's third exit condition | **new test required** | 1 |
+| **Absent optional capability** | `application/turn/turn-commands.ts` guards the path; registered `test/unit/turn-substrate-fences.test.ts:212` asserts the absent-capability exit releases the raw sink exactly once | machine + reading | 1 |
 | Mount and release | `test/unit/webui-shell.test.ts`, `test/unit/connection-health.test.ts` for construction; "exactly one channel per mount" is not machine-checkable today | machine + reading | 2 |
 | Refresh | `test/unit/session-stream-retry.test.ts` | machine | 2 |
 | Reconnect | `test/unit/session-stream-retry.test.ts` | machine | 2 |
@@ -1839,21 +1856,20 @@ says so, and nothing later may imply otherwise.
 | `message-view.ts` | 89 | **move** | `client/contracts/transcript/message-view.ts` | declares the message entity, page and loader — §9's "session-port's message half", which §15.2 assigns to `transcript` |
 | `model-view.ts` | 85 | **move** | `client/contracts/models/model-view.ts` | declares the picker's shapes; every importer is on the `models` surface |
 | `session-view.ts` | 39 | **move** | `client/contracts/sessions/session-view.ts` | declares `WebuiClientSession`, `WebuiClientProject`, `WebuiClientSessionTreeNode` — §9's "session-port's session half" |
-| `review-view.ts` | 34 | **move** | `client/contracts/transcript/review-view.ts` | declares `WebuiDiffState` and `WebuiDiffStateAction`, the state and action types of `reduceWebuiDiffState`; §5.6 files that reducer under `application/transcript/review-state.ts`, so the types travel to the same business. This section's warning about the `review` collision is answered by §5.6's single owner: `workspace` presents review surfaces and commands the `review` capability, it does not own the state machine |
-| `transport.ts` | 34 | **delete or keep — decided by Phase 2** | — | it declares `WebuiTransport` itself. Phase 2 records whether that interface is still published once the shell stops forwarding 47 members: `delete` if it is not, `keep` at `client/contracts/` if the phase decides it survives — in which case it needs no row. `#61` (A4-s2) records the decision; `#64` (A4-s5) executes it |
+| `review-view.ts` | 34 | **move** | `client/contracts/transcript/review-view.ts` | declares `WebuiDiffState` and `WebuiDiffStateAction`, the state and action types of `reduceWebuiDiffState`; the reducer is currently `projection/transcript/review-state.ts`, and the types remain with that transcript-owned state machine. `workspace` presents review surfaces and commands the `review` capability, but does not own this state machine |
+| `transport.ts` | 34 | **keep** | `client/contracts/transport.ts` | declares the composed `WebuiTransport` type used at the composition root and by application slice construction. Phase 2 removed generic transport forwarding to business components; it did not remove this composition-root type contract |
 | `workspace-view.ts` | 9 | **delete** | — | **zero declarations, zero importers.** It holds a comment only: the runtime-layer plan reserved it as a target-layout placeholder, and the comment records that every workspace and review view moved to `shared/contracts/`, so no browser-local workspace type remains |
 | `execution-state.ts` | 9 | **delete** | — | same shape: **zero declarations, zero importers**, and the comment states the active-turn trio is a shared wire DTO with no browser-local copy left to declare |
 
-**Seven `move`, one Phase 2 decision, two `delete` — and both deletions are authorized.** The operator
-authorized deleting the two zero-declaration files on 2026-10-13. They are `delete` rather than `keep` for the
+**Seven `move`, one `keep`, and two `delete`.** The two zero-declaration files were deleted on 2026-10-13. They are `delete` rather than `keep` for the
 reason this section itself gives: a `keep` means the file stays in the delivered tree and the layout claims a
 home it does not fill, and the new `client/contracts/<business>/` tree is the declared home for a future
 browser-local view, so the placeholder has nothing left to stand for. Both were verified to have no importer
 in `src/client` or `test`; the only textual matches are a CSS class and a component's own class string.
-**Nothing here is carried by presumption:** the seven moves and the two deletions are `#59`'s (A3) delivery,
-in progress at this revision, and `#122` (E3) re-derives §15.1's row counts afterwards rather than adjusting them.
+**All ten dispositions are represented in the current tree:** seven moves, one retained composition-root
+contract, and two deleted placeholders. The generated source inventory is regenerated with the final file set.
 
-**Entry conditions common to all ten.** (a) §9's amendment enumerates the non-port contracts and assigns each a business **or** records a `keep` — **met** by `contract-re-file-inventory.md`, which is why §9's re-file is stated over 18 files and not 8. (b) §15.1's `lines` column is regenerated at `#122` (E3). (c) `release/public-source.json` is regenerated in each change that acts on a disposition (§12.6) — done for `#59`'s moves and deletions. **A `delete` disposition removes a row and a file; the arithmetic in §15.1's opening must be recomputed, not adjusted.**
+**Entry conditions common to all ten.** (a) Each disposition is recorded here and in `contract-re-file-inventory.md`. (b) §15.1 line counts and destination totals are regenerated against the final tree. (c) `release/public-source.json` is regenerated for the final file set. A `delete` disposition removes a row and a file.
 
 ---
 
