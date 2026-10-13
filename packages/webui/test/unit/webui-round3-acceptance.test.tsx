@@ -9,7 +9,7 @@ import {
   reduceWebuiDiffState,
 } from "../../src/client/projection/review-state.js";
 import { WebuiDiffCard } from "../../src/client/components/DiffCard.js";
-import { WebuiGoalBanner } from "../../src/client/components/GoalBanner.js";
+import { WebuiGoalBanner } from "../../src/client/components/goal/GoalBanner.js";
 import { WebuiInteractionPanel } from "../../src/client/components/InteractionPanel.js";
 import { chunkWebuiWorkspaceReviewFileIds, projectWebuiUnifiedDiffLines, WebuiDiffFileSection } from "../../src/client/components/WorkspacePanels.js";
 import {

@@ -120,7 +120,7 @@ import type {
 } from "../../shared/contracts/workspace.js";
 import type { WebuiUsageQuotaResult } from "../../shared/contracts/usage-quota.js";
 import { formatUsageResetLabel } from "./account/UserMenuUsage.js";
-import { WebuiGoalBanner } from "./GoalBanner.js";
+import { WebuiGoalBanner } from "./goal/GoalBanner.js";
 import { WebuiInteractionPanel } from "./InteractionPanel.js";
 import { WebuiQueuePanel } from "./QueuePanel.js";
 import {

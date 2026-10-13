@@ -6,17 +6,17 @@
 
 import { useEffect, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
-import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js";
+import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
 import {
   formatWebuiGoalDuration,
   WEBUI_GOAL_STATUS_COPY,
   WEBUI_GOAL_WAIT_COPY,
-} from "../projection/goal-state.js";
+} from "../../projection/goal-state.js";
 import type {
   WebuiGoal,
   WebuiGoalStatus,
-} from "../../shared/contracts/goal.js";
-import type { WebuiTransport } from "../contracts/transport.js";
+} from "../../../shared/contracts/goal.js";
+import type { WebuiTransport } from "../../contracts/transport.js";
 
 /** Capability subset the goal banner consumes. Single source of truth lives
  *  in `WebuiTransport`; this alias keeps the prop block free of per-key
@@ -27,7 +27,7 @@ import {
   WebuiIconClose,
   WebuiIconContextRename,
   WebuiIconContextTrash,
-} from "../icons.js";
+} from "../../icons.js";
 
 function GoalPauseIcon(): ReactElement {
   return <svg viewBox="0 0 20 20" width="18" height="18" fill="none" aria-hidden="true"><path d="M6 4.5v11M14 4.5v11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>;
