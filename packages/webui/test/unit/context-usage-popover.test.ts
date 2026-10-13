@@ -169,7 +169,7 @@ describe("context-usage panel — placed from the ring, not from CSS offsets", (
 describe("context-usage panel — the shape the source has to keep", () => {
   const css = readClient("styles/shell.css");
   // The panel moved to its own module (ticket #77); the composer keeps the call site.
-  const indicator = readClient("components/sessions/ContextUsageIndicator.tsx");
+  const indicator = readClient("features/sessions/ui/ContextUsageIndicator.tsx");
   // The panel's OWN declaration block and nothing after it. Slicing to the end of
   // the sheet would match every later rule, including rules that have nothing to
   // do with this panel — which is how a tripwire starts passing for the wrong

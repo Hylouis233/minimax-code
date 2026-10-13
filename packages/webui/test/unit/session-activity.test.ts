@@ -20,7 +20,7 @@ import {
 import {
   WebuiProjectList,
   WebuiSessionList,
-} from "../../src/client/components/sessions/SessionRail.js";
+} from "../../src/client/features/sessions/ui/SessionRail.js";
 import { WebuiClientFoundationApp } from "../../src/client/components/shell/WebuiClientFoundationApp.js";
 import { shellElement } from "../support/shell-fixture.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";

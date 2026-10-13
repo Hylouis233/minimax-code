@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const RELATIVE = "src/client/components/sessions/ContextUsageIndicator.tsx";
+const RELATIVE = "src/client/features/sessions/ui/ContextUsageIndicator.tsx";
 const source = readFileSync(fileURLToPath(new URL("../../" + RELATIVE, import.meta.url)), "utf8");
 
 describe("the indicator keeps its four pieces of state", () => {
@@ -54,7 +54,7 @@ describe("the indicator reads and writes nothing it does not own", () => {
 
   it("is a component, not a projection", () => {
     // §6.1: a module's edges resolve by basename, so the home is part of the contract.
-    expect(RELATIVE).toContain("src/client/components/sessions/");
+    expect(RELATIVE).toContain("src/client/features/sessions/ui/");
     expect(RELATIVE).not.toContain("src/client/projection/");
   });
 });

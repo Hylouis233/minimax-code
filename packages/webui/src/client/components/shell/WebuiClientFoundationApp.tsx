@@ -22,7 +22,7 @@ import { ArchonShell } from "./ArchonShell.js";
 import { WEBUI_COMPOSER_HOME_KEY } from "../../application/composer/composer-history.js";
 import { Composer } from "../composer/Composer.js";
 import { GreetingSkeleton } from "../../features/transcript/ui/TranscriptSkeletons.js";
-import { LeftRail } from "../sessions/LeftRail.js";
+import { LeftRail } from "../../features/sessions/ui/LeftRail.js";
 import {
   readProjectNames,
   readProjectPins,
@@ -64,8 +64,8 @@ import {
   filterWebuiSessionsByQuery,
   sessionHash,
   sessionLabel,
-} from "../sessions/SessionRail.js";
-import { RailRow } from "../sessions/RailRow.js";
+} from "../../features/sessions/ui/SessionRail.js";
+import { RailRow } from "../../features/sessions/ui/RailRow.js";
 import {
   WebuiIconBrand,
   WebuiIconContextExport,
@@ -89,7 +89,7 @@ import type {
   WebuiWorkspaceProgressState,
   WebuiWorkspaceSubagent,
 } from "../../projection/workspace/workspace-progress.js";
-import type { WebuiProjectGroup } from "../sessions/SessionRail.js";
+import type { WebuiProjectGroup } from "../../features/sessions/ui/SessionRail.js";
 import { createWebuiCommandWorkflows } from "../../application/composer/command-workflows.js";
 import {
   selectWebuiCatalogFlatPage,
@@ -155,6 +155,8 @@ export interface WebuiClientFoundationAppProps {
   // `WebuiTransport`). Optional semantics preserved: `transport.X` is
   // `undefined` exactly when the underlying operation is not wired.
   readonly label: string;
+  /** The Agent Team badge's tooltip, resolved by the composition root. */
+  readonly teamModeLabel?: string;
   readonly version?: WebuiVersionInfo;
   readonly sessionPage?: WebuiClientSessionPage;
   /** Seed for the transcript so SSR / first paint can render messages before
@@ -1283,6 +1285,7 @@ export function WebuiClientFoundationApp(
                       </div>
 
                       <WebuiProjectList
+                      teamModeLabel={props.teamModeLabel}
                         page={railPage}
                         treePage={railTreePage}
                         projectRecords={projectRecords}

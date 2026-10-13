@@ -30,6 +30,36 @@
       "from": "client/features/sessions/application/session-workflows.ts",
       "to": "client/application/composer/composer-store.ts",
       "reason": "Archiving or deleting a session clears that session's Composer draft, so the workflow calls the composer store's own clear. Both sat in the application layer before the sessions owner moved; the entry goes when composer publishes a public clear command (T13 owns that surface)."
+    },
+    {
+      "from": "client/features/sessions/ui/ContextUsageIndicator.tsx",
+      "to": "client/projection/composer/context-breakdown.ts",
+      "reason": "The rail's context chip renders the Composer's context breakdown. It is a Sessions rail overlay reading another business's projection; the entry goes when the Composer publishes that read as a public contract (T13 owns the composer surface)."
+    },
+    {
+      "from": "client/features/sessions/ui/ContextUsageIndicator.tsx",
+      "to": "client/projection/composer/context-usage-popover.ts",
+      "reason": "The chip's popover is the Composer's context-usage projection. Reviewed peer edge until the Composer publishes it."
+    },
+    {
+      "from": "client/features/sessions/ui/ContextUsageIndicator.tsx",
+      "to": "client/features/transcript/projection/message-projection.ts",
+      "reason": "The chip counts the current session's messages, which the Transcript projects. Reviewed peer edge until the Transcript publishes that read."
+    },
+    {
+      "from": "client/features/sessions/ui/ContextUsageIndicator.tsx",
+      "to": "client/projection/models/token-plan-model.ts",
+      "reason": "The chip shows the token plan, which Models owns. Reviewed peer edge until Models publishes the plan read."
+    },
+    {
+      "from": "client/features/sessions/ui/ContextUsageIndicator.tsx",
+      "to": "client/projection/account/usage.ts",
+      "reason": "The chip shows account usage, which Account owns. Reviewed peer edge until Account publishes the usage read (T09 owns the account lifetime)."
+    },
+    {
+      "from": "client/features/sessions/ui/SessionRail.tsx",
+      "to": "client/projection/workspace/workspace-name.ts",
+      "reason": "The rail labels a project by its workspace name, which the Workspace business derives. Reviewed peer edge until Workspace publishes the name projection."
     }
   ]
 }

@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { WebuiIconContextPin } from "../../src/client/components/shell/icons.js";
-import { WebuiProjectList } from "../../src/client/components/sessions/SessionRail.js";
+import { WebuiProjectList } from "../../src/client/features/sessions/ui/SessionRail.js";
 import type { WebuiClientProject, WebuiClientSession, WebuiClientSessionPage } from "../../src/client/contracts/sessions/session-view.js";
 
 /**
@@ -283,7 +283,7 @@ describe("the persistent pin marker", () => {
     // prop list, so this can fail: revert the child call site to the
     // three-prop form and the flag is outside the window.
     const source = readFileSync(
-      new URL("../../src/client/components/sessions/SessionRail.tsx", import.meta.url),
+      new URL("../../src/client/features/sessions/ui/SessionRail.tsx", import.meta.url),
       "utf8",
     );
     const anchor = source.indexOf("session={child}");

@@ -33,7 +33,7 @@ import {
   resolveDefaultExpandedProjectKey,
   sessionHash,
   sortWebuiProjectSessionIds,
-} from "../../src/client/components/sessions/SessionRail.js";
+} from "../../src/client/features/sessions/ui/SessionRail.js";
 import { WebuiSessionTranscript as BaseWebuiSessionTranscript } from "../../src/client/features/transcript/ui/SessionTranscript.js";
 import { WebuiWorkspaceDirectoryBrowser } from "../../src/client/components/workspace/WebuiWorkspaceDirectoryBrowser.js";
 import {
@@ -1317,7 +1317,7 @@ describe("WebUI shell — theme switching", () => {
 describe("WebUI rail row click wiring", () => {
   it("does not pass React's click event to a no-argument selection callback", () => {
     const source = readFileSync(
-      new URL("../../src/client/components/sessions/RailRow.tsx", import.meta.url),
+      new URL("../../src/client/features/sessions/ui/RailRow.tsx", import.meta.url),
       "utf8",
     );
 

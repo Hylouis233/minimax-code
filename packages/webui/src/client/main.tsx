@@ -1,7 +1,10 @@
 import * as React from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { WebuiClientFoundationApp } from "./components/shell/WebuiClientFoundationApp.js";
-export { WebuiSessionList } from "./components/sessions/SessionRail.js";
+// The composition root may read the platform layer; the shell and the rail may
+// not (plan §5.3), so the label is resolved here and injected.
+import { teamModeCopy } from "./infrastructure/team-mode.js";
+export { WebuiSessionList } from "./features/sessions/ui/SessionRail.js";
 export { WebuiSessionTranscript } from "./features/transcript/ui/SessionTranscript.js";
 export {
   WebuiClientFoundationApp,
@@ -135,6 +138,7 @@ function WebuiClientRoot({
       <WebuiApplicationProvider application={application}>
         <WebuiPortSlicesProvider slices={slices}>
           <WebuiClientFoundationApp
+          teamModeLabel={teamModeCopy().label}
             label="webui-foundation"
             hostLabel={location.host}
             dataDir={dataDir}

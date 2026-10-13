@@ -9,7 +9,7 @@ import {
   type WebuiRailView,
 } from "../../src/client/features/sessions/projection/rail-buckets.js";
 import { WebuiIconSessionStar } from "../../src/client/components/shell/icons.js";
-import { WebuiProjectList } from "../../src/client/components/sessions/SessionRail.js";
+import { WebuiProjectList } from "../../src/client/features/sessions/ui/SessionRail.js";
 import type { WebuiSessionActivityMap } from "../../src/client/features/sessions/projection/session-activity.js";
 import type { WebuiClientProject, WebuiClientSession } from "../../src/client/contracts/sessions/session-view.js";
 
@@ -394,7 +394,7 @@ describe("the star on a rail row", () => {
     // only from internal `useState` that no prop seeds, and this suite has no
     // DOM to click the disclosure with. The browser spec covers the real thing.
     const source = readFileSync(
-      new URL("../../src/client/components/sessions/SessionRail.tsx", import.meta.url),
+      new URL("../../src/client/features/sessions/ui/SessionRail.tsx", import.meta.url),
       "utf8",
     );
     const anchor = source.indexOf("session={child}");

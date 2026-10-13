@@ -33,28 +33,27 @@ import {
   WebuiIconSessionStarMark,
   WebuiIconSessionDisclosure,
   WebuiIconAgent,
-} from "../shell/icons.js";
-import { WebuiContextMenu, type WebuiContextMenuItem } from "../shared/ContextMenu.js";
+} from "../../../components/shell/icons.js";
+import { WebuiContextMenu, type WebuiContextMenuItem } from "../../../components/shared/ContextMenu.js";
 import {
   webuiRailMenuFor,
   type WebuiRailMenuEntry,
   type WebuiRailMenuSubject,
-} from "../../features/sessions/projection/rail-menu.js";
+} from "../projection/rail-menu.js";
 import { RailRow } from "./RailRow.js";
 import {
   formatWebuiSessionAge,
   type WebuiSessionActivityMap,
-} from "../../features/sessions/projection/session-activity.js";
+} from "../projection/session-activity.js";
 import {
   filterWebuiRailViewSessions,
   selectWebuiRailViewTabs,
   type WebuiRailView,
   type WebuiRailViewTab,
-} from "../../features/sessions/projection/rail-buckets.js";
-import { formatWebuiUnreadBadge } from "../../projection/common/unread-badge.js";
-import type { WebuiClientSession, WebuiClientSessionPage, WebuiClientSessionTreePage, WebuiClientProject } from "../../contracts/sessions/session-view.js";
-import { teamModeCopy } from "../../infrastructure/team-mode.js";
-import { workspaceProjectName } from "../../projection/workspace/workspace-name.js";
+} from "../projection/rail-buckets.js";
+import { formatWebuiUnreadBadge } from "../../../projection/common/unread-badge.js";
+import type { WebuiClientSession, WebuiClientSessionPage, WebuiClientSessionTreePage, WebuiClientProject } from "../../../contracts/sessions/session-view.js";
+import { workspaceProjectName } from "../../../projection/workspace/workspace-name.js";
 
 const PROJECT_SESSION_BATCH_SIZE = 6;
 
@@ -554,6 +553,7 @@ export function WebuiProjectList({
   starredSessions,
   pinnedProjects,
   projectNames,
+  teamModeLabel,
   onRenameProject,
   onToggleProjectPin,
   onArchiveProject,
@@ -602,6 +602,13 @@ export function WebuiProjectList({
   /** Which slice of the list to show. Falls back to internal state. */
   readonly view?: WebuiRailView;
   readonly onViewChange?: (view: WebuiRailView) => void;
+  /**
+   * The Agent Team badge's tooltip, injected by the composition root. A view may
+   * not read the platform adapter that holds the team-mode choice (plan §5.3), so
+   * whoever renders the rail passes the label in.
+   */
+  readonly teamModeLabel?: string;
+
 }): ReactElement {
   // Build a lookup from parent session id to its child sessions. When
   // `treePage` is provided, this lets the rail render child sessions under
@@ -918,6 +925,7 @@ export function WebuiProjectList({
           emptyLabel={activeTab?.emptyLabel}
           preserveOrder
           onSessionContextMenu={openSessionMenu}
+          teamModeLabel={teamModeLabel}
         />
         {/* The menu render exists in BOTH return branches on purpose. The flat
          * views open the same `contextMenu` state the projects view does, but
@@ -1189,6 +1197,7 @@ export function WebuiSessionList({
   emptyLabel,
   preserveOrder,
   onSessionContextMenu,
+  teamModeLabel,
 }: {
   readonly page: WebuiClientSessionPage;
   readonly loading: boolean;
@@ -1224,6 +1233,13 @@ export function WebuiSessionList({
    * would be undone by the default sort below.
    */
   readonly preserveOrder?: boolean;
+  /**
+   * The Agent Team badge's tooltip, injected by the composition root. A view may
+   * not read the platform adapter that holds the team-mode choice (plan §5.3), so
+   * whoever renders the rail passes the label in.
+   */
+  readonly teamModeLabel?: string;
+
   /**
    * Opens the session context menu on a right-click. The flat views (收藏 /
    * 运行中 / 未读) list the same root sessions the projects view groups under
@@ -1300,7 +1316,7 @@ export function WebuiSessionList({
                   <span
                     className="webui-pill flex-shrink-0 bg-bg_interaction_primary_default text-text_default_primary text-[11px]"
                     data-webui-team-badge="true"
-                    title={teamModeCopy().label}
+                    title={teamModeLabel}
                   >
                     Agent Team
                   </span>

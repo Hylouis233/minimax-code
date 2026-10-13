@@ -32,7 +32,7 @@ import {
 const here = path.dirname(fileURLToPath(import.meta.url));
 const indicatorPath = path.resolve(
   here,
-  "../../src/client/components/sessions/ContextUsageIndicator.tsx",
+  "../../src/client/features/sessions/ui/ContextUsageIndicator.tsx",
 );
 const composerPath = path.resolve(here, "../../src/client/components/composer/WebuiComposer.tsx");
 
