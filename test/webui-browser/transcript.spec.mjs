@@ -171,23 +171,31 @@ test("a session switch reads the page once per need, not once per reader", async
   // The composer used to load the page itself, only to read `contextSnapshot`
   // from it: with the transcript's own read and the workspace history progress
   // read, a switch cost three `getMessages` for one session. Context inspection
-  // now joins the transcript history owner's keyed read (plan §4.5), so the
-  // composer's page read is gone.
+  // now joins the transcript history owner's keyed read (plan §4.5).
+  //
+  // The count is settled before it is asserted: a poll for "at most two" is
+  // satisfied by zero reads, which is how an earlier version of this case passed
+  // with the composer's read still in place. What this case holds is the settled
+  // count — a switch reads the page twice, and a third reader would fail it. That
+  // the composer's own read is gone is proven at the unit seam instead
+  // (`transcript-fences.test.ts`: the inspection answers from the cached page and
+  // reads nothing), because in this fixture the composer's read never fires.
   await configureFixture(page, () => undefined);
   await openApp(page);
 
   await switchSession(page, "B");
   await expect(page.getByText("History B synthetic")).toBeVisible();
-  await expect.poll(() => page.evaluate(() =>
-    window.__fixture.requests.filter(
-      (request) => request.operation === "getMessages" && request.body?.id === "B",
-    ).length,
-  )).toBeLessThanOrEqual(2);
 
-  const reads = await page.evaluate(() =>
-    window.__fixture.requests
-      .filter((request) => request.operation === "getMessages" && request.body?.id === "B")
-      .length,
-  );
-  expect(reads).toBeGreaterThan(0);
+  const reads = () =>
+    page.evaluate(() =>
+      window.__fixture.requests.filter(
+        (request) => request.operation === "getMessages" && request.body?.id === "B",
+      ).length,
+    );
+  // The two readers that legitimately need a page: the transcript and the
+  // workspace history progress.
+  await expect.poll(reads).toBe(2);
+  // Settled: nothing else may read the same page afterwards.
+  await page.waitForTimeout(400);
+  expect(await reads()).toBe(2);
 });

@@ -139,3 +139,33 @@ describe("live-to-history handover renders a completed turn once", () => {
     ]);
   });
 });
+
+describe("a context-only inspection reuses the history answer", () => {
+  it("returns the cached page without reading again", async () => {
+    const loads: string[] = [];
+    const store = createWebuiSessionStore();
+    const owner = createWebuiTranscriptHistoryOwner({
+      store,
+      loadMessages: ({ id }) => {
+        loads.push(id);
+        return Promise.resolve(page("S-1"));
+      },
+    });
+    await owner.loadPage("S");
+    expect(loads).toEqual(["S"]);
+    // The composer's context inspection asks for the same page; the owner answers
+    // from its resource, so the switch costs nothing extra (plan §4.5).
+    await expect(owner.ensurePage("S")).resolves.toMatchObject({
+      messages: [{ msgId: "S-1" }],
+    });
+    expect(loads).toEqual(["S"]);
+  });
+
+  // A true join — two readers, one request — is NOT asserted yet, and this is the
+  // finding rather than an omission: `loadPage` invalidates the key before it
+  // reads, so when the transcript's own read follows the inspection's, it
+  // supersedes it instead of joining it (the inspection's answer is refused, one
+  // request each). Making the join real needs `loadPage` to read and a separate
+  // `refresh` for the callers that want fresh data (the mount, the live-to-idle
+  // handoff), which is the next slice on this ticket.
+});
