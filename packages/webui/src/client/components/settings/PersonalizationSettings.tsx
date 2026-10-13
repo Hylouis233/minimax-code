@@ -16,6 +16,8 @@ import {
   useWebuiSettingsWorkflowsState,
 } from "../../bindings/use-query-state.js";
 import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
+import { PERSONALIZATION_SECTION_HINTS, SectionHeader } from "./settings-atoms.js";
+import { GlobalInstructionsSection } from "./GlobalInstructionsSection.js";
 
 /**
  * Personalization panel — the three blocks the desktop surface ships:
@@ -35,19 +37,6 @@ import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities
  * `custom-instructions` tab definition in `SettingsModal.tsx`, which the earlier
  * PR removed.
  */
-
-const INSTRUCTIONS_PLACEHOLDER = [
-  "# Agents 全局设定",
-  "",
-  "## 技术背景",
-  "",
-  "| 维度 | 内容 |",
-  "| --- | --- |",
-  "| 语言 | TypeScript / Rust / Go |",
-  "| 偏好 | 清晰简洁，遵循设计模式 |",
-  "",
-  "留空保存会删除该文件。",
-].join("\n");
 
 const PROFILE_PLACEHOLDER = "告诉 Agent 你的背景和长期偏好……";
 
@@ -101,20 +90,6 @@ export function isProfileSaveable(
 }
 
 /**
- * The three section bubbles, copied from the desktop word for word.
- *
- * Exported because the test asserts the exact strings: a tooltip is copy the
- * user reads, and a paraphrase that reads fine still means the WebUI and the
- * desktop stop saying the same thing about the same control.
- */
-export const PERSONALIZATION_SECTION_HINTS = {
-  globalInstructions:
-    "定义 Agent 应该如何工作、回答和执行任务，为此设备上的所有 Agent 提供额外指令和上下文。",
-  userProfile: "告诉 Agent 你的背景和长期偏好。",
-  memory: "设置在此电脑上如何收集、保留和整合本地记忆。",
-} as const;
-
-/**
  * The delete confirmation's copy, copied from the desktop word for word.
  *
  * The half-width `?` is the desktop's, not a typo to tidy up: a full-width
@@ -129,59 +104,6 @@ export const MEMORY_DELETE_CONFIRM = {
   cancel: "取消",
   confirm: "删除",
 } as const;
-
-/**
- * The section title's help affordance.
- *
- * A real bubble rather than a native `title`, because the desktop hangs a dark
- * bubble with an arrow above the glyph and a `title` cannot match it: the
- * browser draws its own surface, delays it about a second, and paints no
- * arrow. The shape itself is not new — `.webui-signin-credits-tooltip` and
- * `.webui-context-usage-label` already carry it, and this is the third call
- * site against the same object rather than a third design.
- *
- * Two decisions worth stating. It is a real `button`, not the `role="img"`
- * span it replaces, so the affordance is reachable by keyboard; the bubble is
- * `aria-hidden` because `aria-label` already reads as the control's name and
- * a `role="tooltip"` nothing references would be a second, dangling
- * announcement of the same sentence.
- */
-function InfoHint({ text, testId }: { readonly text: string; readonly testId: string }): ReactElement {
-  return (
-    <span className="webui-settings-info-hint-anchor">
-      <button type="button" data-testid={testId} className="webui-settings-info-hint" aria-label={text}>
-        i
-      </button>
-      <span aria-hidden="true" className="webui-settings-info-hint-bubble">
-        {text}
-      </span>
-    </span>
-  );
-}
-
-function SectionHeader({
-  title,
-  hintTestId,
-  hint,
-  children,
-}: {
-  readonly title: string;
-  readonly hint: string;
-  readonly hintTestId: string;
-  readonly children?: ReactNode;
-}): ReactElement {
-  return (
-    <div className="webui-personalization-header">
-      {/* Title and hint travel together: the header is `space-between`, so
-          three loose children would push the action button into the middle. */}
-      <div className="webui-personalization-title">
-        <h3>{title}</h3>
-        <InfoHint text={hint} testId={hintTestId} />
-      </div>
-      {children}
-    </div>
-  );
-}
 
 /** One switch row inside the 记忆 card. Mirrors the desktop's row grammar. */
 function MemoryRow({
@@ -204,44 +126,6 @@ function MemoryRow({
       <div className="webui-generic-row-control">{children}</div>
     </div>
   );
-}
-
-/**
- * Pre-migration storage key from the pre-AGENTS.md prototype. If it holds
- * text, that text is user-authored and would be lost on upgrade, so it is
- * seeded into the editor once. The flag is written only after a successful
- * server read so a failed load retries the migration instead of burning it.
- */
-const LEGACY_STORAGE_KEY = "webui-custom-instructions";
-const MIGRATION_FLAG_KEY = "webui-custom-instructions-migrated";
-
-function readLegacyDraft(storage: ReturnType<typeof useWebuiBrowserCapabilities>["storage"]): string {
-  return storage.getItem(LEGACY_STORAGE_KEY) ?? "";
-}
-
-function markMigrationDone(storage: ReturnType<typeof useWebuiBrowserCapabilities>["storage"]): void {
-  storage.setItem(MIGRATION_FLAG_KEY, "1");
-  storage.removeItem(LEGACY_STORAGE_KEY);
-}
-
-/**
- * What the editor should open with.
- *
- * The live profile file always wins: a non-empty `AGENTS.md` is what the next
- * turn will read, and seeding a stale browser-local draft over it would
- * resurrect text the user has already replaced on disk. The legacy draft is
- * only adopted when there is no file to conflict with, and only once — after
- * that the flag is set and the draft is dropped.
- */
-export function resolveEditorSeed(input: {
-  readonly exists: boolean;
-  readonly content: string;
-  readonly legacyDraft: string;
-  readonly migrationDone: boolean;
-}): string {
-  if (input.exists) return input.content;
-  if (input.migrationDone) return "";
-  return input.legacyDraft.trim() ? input.legacyDraft : "";
 }
 
 export interface PersonalizationSettingsProps {
@@ -346,146 +230,7 @@ export function PersonalizationSettings({ onCreateInSession }: PersonalizationSe
   );
 }
 
-interface GlobalInstructionsSectionProps {
-  readonly getGlobalInstructions?: () => Promise<WebuiGlobalInstructionsView>;
-  readonly setGlobalInstructions?: (request: { readonly content: string }) => Promise<WebuiGlobalInstructionsView>;
-}
-
-function GlobalInstructionsSection({
-  getGlobalInstructions,
-  setGlobalInstructions,
-}: GlobalInstructionsSectionProps): ReactElement {
-  const { storage } = useWebuiBrowserCapabilities();
-  const [draft, setDraft] = useState("");
-  const [loaded, setLoaded] = useState<string>();
-  const [maxBytes, setMaxBytes] = useState(32 * 1024);
-  const [filePath, setFilePath] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string>();
-
-  useEffect(() => {
-    if (!getGlobalInstructions) return;
-    let cancelled = false;
-    void getGlobalInstructions()
-      .then((value) => {
-        if (cancelled || !value) return;
-        setLoaded(value.content);
-        setMaxBytes(value.maxBytes);
-        setFilePath(value.path);
-        setDraft(
-          resolveEditorSeed({
-            exists: value.exists,
-            content: value.content,
-            legacyDraft: readLegacyDraft(storage),
-            migrationDone: storage.getItem(MIGRATION_FLAG_KEY) === "1",
-          }),
-        );
-        // A live profile file retires the legacy draft immediately: the user
-        // already has content there, so keeping a browser-local copy around
-        // only creates a second source that can drift.
-        if (value.exists) markMigrationDone(storage);
-      })
-      .catch((cause: unknown) => {
-        if (cancelled) return;
-        setError(cause instanceof Error ? cause.message : String(cause));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [getGlobalInstructions]);
-
-  const byteLength = useMemo(() => new TextEncoder().encode(draft).length, [draft]);
-  const overLimit = byteLength > maxBytes;
-  const dirty = loaded !== undefined && draft !== loaded;
-
-  const save = useCallback(async () => {
-    if (!setGlobalInstructions || saving || overLimit) return;
-    setSaving(true);
-    setError(undefined);
-    try {
-      const next = await setGlobalInstructions({ content: draft });
-      if (next) {
-        setLoaded(next.content);
-        setMaxBytes(next.maxBytes);
-        setFilePath(next.path);
-      }
-      markMigrationDone(storage);
-      setSaved(true);
-    } catch (cause: unknown) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setSaving(false);
-    }
-  }, [draft, overLimit, saving, setGlobalInstructions, storage]);
-
-  return (
-    <section
-      data-testid="global-instructions-section"
-      className="webui-generic-section"
-    >
-      <SectionHeader
-        title="自定义指令"
-        hint={PERSONALIZATION_SECTION_HINTS.globalInstructions}
-        hintTestId="global-instructions-hint"
-      >
-        <button
-          type="button"
-          data-testid="global-instructions-save"
-          className="webui-mavis-button webui-mavis-button-black webui-section-save-button"
-          disabled={!dirty || saving || overLimit || !setGlobalInstructions}
-          onClick={() => void save()}
-        >
-          保存
-        </button>
-      </SectionHeader>
-      <div className="webui-generic-card">
-        <textarea
-          data-testid="global-instructions-textarea"
-          className="webui-personalization-textarea"
-          value={draft}
-          spellCheck={false}
-          placeholder={INSTRUCTIONS_PLACEHOLDER}
-          onChange={(event) => {
-            setDraft(event.target.value);
-            setSaved(false);
-          }}
-        />
-        <div className="webui-personalization-meta">
-          <span data-testid="global-instructions-path">{filePath}</span>
-          <span
-            data-testid="global-instructions-size"
-            className={overLimit ? "is-over-limit" : undefined}
-          >
-            {byteLength} / {maxBytes} 字节
-          </span>
-        </div>
-        {overLimit ? (
-          <p role="alert" data-testid="global-instructions-over-limit" className="webui-settings-error">
-            内容超出 {maxBytes} 字节上限，请精简后再保存。
-          </p>
-        ) : null}
-        {error ? (
-          <p role="alert" data-testid="global-instructions-error" className="webui-settings-error">
-            {error}
-          </p>
-        ) : null}
-        {saved && !dirty ? (
-          <p data-testid="global-instructions-saved" className="webui-personalization-saved">
-            已保存
-          </p>
-        ) : null}
-        {!setGlobalInstructions ? (
-          <p data-testid="global-instructions-unavailable" className="webui-settings-error">
-            当前运行时不支持自定义指令读写。
-          </p>
-        ) : null}
-      </div>
-    </section>
-  );
-}
-
-export interface UserProfileSectionProps {
+interface UserProfileSectionProps {
   readonly getUserProfile?: () => Promise<WebuiUserProfileView>;
   readonly setUserProfile?: (request: {
     readonly nickname: string;

@@ -35,7 +35,7 @@ import {
 import { selectWebuiCatalogFlatPage } from "../../application/session-catalog.js";
 import { useWebuiSessionStoreContext } from "../../bindings/application-context.js";
 import { useWebuiWorkspaceQueries } from "../../bindings/use-query-state.js";
-import { FolderIcon, SearchIcon } from "../settings/settings-glyphs.js";
+import { FolderIcon, SearchIcon } from "../settings/settings-atoms.js";
 
 type WebuiReviewStateAction = Parameters<typeof reduceWebuiReviewState>[1];
 

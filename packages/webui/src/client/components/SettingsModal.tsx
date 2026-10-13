@@ -10,7 +10,7 @@ import {
   type WebuiWorktreeWorkspace,
 } from "../projection/worktree-state.js";
 import { ToggleSwitch as Switch } from "./ToggleSwitch.js";
-import { FolderIcon, SearchIcon } from "./settings/settings-glyphs.js";
+import { FolderIcon, SearchIcon } from "./settings/settings-atoms.js";
 import { ReviewSettingsPage } from "./workspace/ReviewSettingsPage.js";
 import { UsageModelSettings } from "./settings/UsageModelSettings.js";
 import { PersonalizationSettings, type MemoryHandoff } from "./settings/PersonalizationSettings.js";

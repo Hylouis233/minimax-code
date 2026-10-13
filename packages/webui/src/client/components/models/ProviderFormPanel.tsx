@@ -26,7 +26,7 @@ import { reorderModelIds } from "../../projection/model-reorder.js";
 import { projectProviderHeaders, type ProviderHeaderDraft } from "../../projection/usage-settings.js";
 import { recordOf, textOf } from "../../value-readers.js";
 import { ToggleSwitch } from "../ToggleSwitch.js";
-import { CloseIcon, IconButton, RefreshIcon } from "../settings/settings-glyphs.js";
+import { CloseIcon, IconButton, RefreshIcon } from "../settings/settings-atoms.js";
 
 /**
  * The provider commands this panel invokes. §5.6 files them under `models` rather than

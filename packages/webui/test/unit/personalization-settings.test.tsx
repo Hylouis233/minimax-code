@@ -28,14 +28,14 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   MEMORY_DELETE_CONFIRM,
   MEMORY_HANDOFF_PROMPT,
-  PERSONALIZATION_SECTION_HINTS,
   MemoryManagerDialog,
   PersonalizationSettings,
   formatMemoryTimestamp,
   isMemorySaveable,
   isProfileSaveable,
-  resolveEditorSeed,
 } from "../../src/client/components/settings/PersonalizationSettings.js";
+import { PERSONALIZATION_SECTION_HINTS } from "../../src/client/components/settings/settings-atoms.js";
+import { resolveEditorSeed } from "../../src/client/components/settings/GlobalInstructionsSection.js";
 
 import { useMemo } from "react";
 import { createWebuiSettingsWorkflows } from "../../src/client/application/settings-workflows.js";

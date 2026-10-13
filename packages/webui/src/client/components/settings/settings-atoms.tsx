@@ -1,5 +1,11 @@
-// Small presentation atoms the settings surfaces share: two stroke glyphs, an icon button and
-// the close/refresh glyphs it and the provider form both use.
+// Small presentation atoms the settings surfaces share: two stroke glyphs, an icon button, the
+// close/refresh glyphs it and the provider form both use, and the section header three of the
+// personalization editors hang their titles and hints on.
+//
+// The header is here rather than in `PersonalizationSettings.tsx` because that file *composes* those
+// editors (ticket #73): a child importing the header back from its parent would be a cycle, and
+// §5.1's second prohibition wants a shared rule under a module that owns the concept — a
+// settings-surface atom belongs with the other settings-surface atoms.
 //
 // They were declared inside `SettingsModal.tsx`; the review page moved to
 // `components/workspace/` (plan §5.6's `workspace` row) and needs the same two,
@@ -28,4 +34,71 @@ export function CloseIcon(): ReactElement {
 
 export function RefreshIcon(): ReactElement {
   return <path d="M17.1134 2.28793C17.4446 2.28807 17.714 2.55625 17.714 2.88754V6.83871C17.7139 6.90647 17.6986 6.97031 17.6778 7.0311C17.6737 7.04327 17.672 7.05627 17.6671 7.06821C17.6211 7.17887 17.543 7.2721 17.4444 7.33774C17.4279 7.34876 17.41 7.35685 17.3927 7.36606C17.3761 7.37488 17.3603 7.38516 17.3429 7.39243C17.3232 7.40058 17.3025 7.405 17.2823 7.41098C17.2645 7.41626 17.2471 7.42299 17.2286 7.42661C17.1905 7.43409 17.152 7.43925 17.1134 7.4393H13.1622C12.8309 7.4393 12.5627 7.17002 12.5626 6.83871C12.5627 6.50747 12.8309 6.23911 13.1622 6.23911H15.6641L14.9024 5.47739V5.47641C13.5816 4.21108 11.8278 3.48724 10.0001 3.48715C8.71218 3.48721 7.4528 3.86932 6.38192 4.58481C5.311 5.30039 4.47641 6.31773 3.98348 7.50766C3.49059 8.69761 3.36214 10.0071 3.61337 11.2704C3.86468 12.5336 4.48483 13.6946 5.39559 14.6053C6.30627 15.5158 7.46655 16.1363 8.72958 16.3875C9.99263 16.6387 11.3025 16.5101 12.4923 16.0174C13.6822 15.5245 14.6996 14.6889 15.4151 13.618C16.1306 12.5471 16.5128 11.2878 16.5128 9.99985C16.5129 9.66861 16.7821 9.40024 17.1134 9.40024C17.4443 9.40061 17.7128 9.66885 17.713 9.99985C17.7129 11.5252 17.2606 13.0167 16.4132 14.285C15.5658 15.5532 14.3613 16.5421 12.9522 17.1258C11.5432 17.7095 9.99206 17.8617 8.49618 17.5643C7.00027 17.2667 5.62552 16.5323 4.54696 15.4539C3.46838 14.3754 2.73325 13.0008 2.43563 11.5047C2.13807 10.0087 2.29135 8.45793 2.87508 7.04868C3.45884 5.63941 4.44759 4.4352 5.71591 3.58774C6.9841 2.74043 8.47489 2.28799 10.0001 2.28793C12.1508 2.28802 14.2035 3.14088 15.7423 4.61996L16.5138 5.39145V2.88754C16.5138 2.55626 16.7821 2.28808 17.1134 2.28793Z" fill="currentColor" />;
+}
+
+/**
+ * The three section bubbles, copied from the desktop word for word.
+ *
+ * Exported because the test asserts the exact strings: a tooltip is copy the
+ * user reads, and a paraphrase that reads fine still means the WebUI and the
+ * desktop stop saying the same thing about the same control.
+ */
+export const PERSONALIZATION_SECTION_HINTS = {
+  globalInstructions:
+    "定义 Agent 应该如何工作、回答和执行任务，为此设备上的所有 Agent 提供额外指令和上下文。",
+  userProfile: "告诉 Agent 你的背景和长期偏好。",
+  memory: "设置在此电脑上如何收集、保留和整合本地记忆。",
+} as const;
+
+/**
+ * The section title's help affordance.
+ *
+ * A real bubble rather than a native `title`, because the desktop hangs a dark
+ * bubble with an arrow above the glyph and a `title` cannot match it: the
+ * browser draws its own surface, delays it about a second, and paints no
+ * arrow. The shape itself is not new — `.webui-signin-credits-tooltip` and
+ * `.webui-context-usage-label` already carry it, and this is the third call
+ * site against the same object rather than a third design.
+ *
+ * Two decisions worth stating. It is a real `button`, not the `role="img"`
+ * span it replaces, so the affordance is reachable by keyboard; the bubble is
+ * `aria-hidden` because `aria-label` already reads as the control's name and
+ * a `role="tooltip"` nothing references would be a second, dangling
+ * announcement of the same sentence.
+ */
+export function InfoHint({ text, testId }: { readonly text: string; readonly testId: string }): ReactElement {
+  return (
+    <span className="webui-settings-info-hint-anchor">
+      <button type="button" data-testid={testId} className="webui-settings-info-hint" aria-label={text}>
+        i
+      </button>
+      <span aria-hidden="true" className="webui-settings-info-hint-bubble">
+        {text}
+      </span>
+    </span>
+  );
+}
+
+export function SectionHeader({
+  title,
+  hintTestId,
+  hint,
+  children,
+}: {
+  readonly title: string;
+  readonly hint: string;
+  readonly hintTestId: string;
+  readonly children?: ReactNode;
+}): ReactElement {
+  return (
+    <div className="webui-personalization-header">
+      {/* Title and hint travel together: the header is `space-between`, so
+          three loose children would push the action button into the middle. */}
+      <div className="webui-personalization-title">
+        <h3>{title}</h3>
+        <InfoHint text={hint} testId={hintTestId} />
+      </div>
+      {children}
+    </div>
+  );
 }
