@@ -45,7 +45,12 @@ export interface WebuiEventKindEntry {
 
 /** The goal family: `thread_goal.<verb>`. */
 export const WEBUI_GOAL_EVENT_KINDS = [
-  { kind: "goal.updated", family: "goal", match: { type: "thread_goal.updated" } },
+  {
+    kind: "goal.updated",
+    family: "goal",
+    match: { type: "thread_goal.updated" },
+    carriesObjective: true,
+  },
   {
     kind: "goal.objective-updated",
     family: "goal",
@@ -58,11 +63,15 @@ export const WEBUI_GOAL_EVENT_KINDS = [
     match: { type: "thread_goal.objective_steering" },
     carriesObjective: true,
   },
+  // The reducer knows this kind, and `projectWebuiThreadGoalMessage` deliberately
+  // does **not** project a goal message from it: the pre-registry code listed
+  // exactly `objective_updated`, `objective_steering` and `updated`, and this
+  // registry reproduces that set rather than a plausible-looking one. `carriesObjective`
+  // therefore means "projects the goal message", not "mentions an objective".
   {
     kind: "goal.objective-updated-steering",
     family: "goal",
     match: { type: "thread_goal.objective_updated_steering" },
-    carriesObjective: true,
   },
   { kind: "goal.cleared", family: "goal", match: { type: "thread_goal.cleared" } },
   // A safety net for a verb of the same family this table has not learned yet:

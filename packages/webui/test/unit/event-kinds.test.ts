@@ -58,8 +58,14 @@ describe("the registry answers for the kinds it owns", () => {
     expect([...WEBUI_GOAL_OBJECTIVE_EVENT_TYPES].sort()).toEqual([
       "thread_goal.objective_steering",
       "thread_goal.objective_updated",
-      "thread_goal.objective_updated_steering",
+      "thread_goal.updated",
     ]);
+    // The exclusion is part of the contract. `thread_goal.updated` was in the
+    // pre-registry list and `thread_goal.objective_updated_steering` was not, so
+    // the derived list reproduces behaviour rather than a plausible superset.
+    expect(WEBUI_GOAL_OBJECTIVE_EVENT_TYPES).not.toContain(
+      "thread_goal.objective_updated_steering",
+    );
     // Derived, not declared: every entry it reports is one the table marks.
     for (const type of WEBUI_GOAL_OBJECTIVE_EVENT_TYPES) {
       expect(resolveWebuiEventKind(type)?.family).toBe("goal");
