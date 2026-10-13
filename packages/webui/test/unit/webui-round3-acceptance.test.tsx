@@ -27,7 +27,7 @@ import {
   buildWebuiForkRequest,
   buildWebuiMessageForkRequest,
   buildWebuiRewindRequest,
-} from "../../src/client/projection/action-requests.js";
+} from "../../src/client/projection/sessions/action-requests.js";
 import {
   buildWebuiGoalEditPatch,
   buildWebuiGoalStatusPatch,

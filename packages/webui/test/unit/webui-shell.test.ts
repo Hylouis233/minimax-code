@@ -64,7 +64,7 @@ import type { WebuiTranscriptItem } from "../../src/client/contracts/transcript/
 import {
   buildWebuiModelSelectionRequest,
   webuiModelOptionValue,
-} from "../../src/client/projection/action-requests.js";
+} from "../../src/client/projection/sessions/action-requests.js";
 import { looksLikeAbsoluteWorkspacePath } from "../../src/client/projection/common/paths.js";
 import {
   buildWebuiComposerHandlers,

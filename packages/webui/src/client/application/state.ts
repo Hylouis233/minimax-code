@@ -17,8 +17,8 @@ import type {
   WebuiPendingPermission,
   WebuiQuestionnaireRequest,
 } from "../../shared/contracts/interactions.js";
-import type { WebuiSessionActivityMap } from "../projection/session-activity.js";
-import { initialWebuiSessionActivity } from "../projection/session-activity.js";
+import type { WebuiSessionActivityMap } from "../projection/sessions/session-activity.js";
+import { initialWebuiSessionActivity } from "../projection/sessions/session-activity.js";
 import type { WebuiSessionCatalogState } from "./sessions/session-catalog.js";
 import { initialWebuiSessionCatalogState } from "./sessions/session-catalog.js";
 import { initialWebuiStreamState } from "../projection/stream-state.js";

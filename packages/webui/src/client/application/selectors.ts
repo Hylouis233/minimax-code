@@ -12,7 +12,7 @@ import type {
   WebuiPendingPermission,
   WebuiQuestionnaireRequest,
 } from "../../shared/contracts/interactions.js";
-import type { WebuiSessionActivity } from "../projection/session-activity.js";
+import type { WebuiSessionActivity } from "../projection/sessions/session-activity.js";
 import type { WebuiStreamState } from "../projection/stream-state.js";
 import { initialWebuiApplicationSessionState } from "./state.js";
 import type {

@@ -8,7 +8,7 @@ import {
   selectWebuiWorktreeWorkspaces,
   type WebuiWorktreeSourceSession,
   type WebuiWorktreeWorkspace,
-} from "../projection/worktree-state.js";
+} from "../projection/sessions/worktree-state.js";
 import { ToggleSwitch as Switch } from "./shared/ToggleSwitch.js";
 import { FolderIcon, SearchIcon } from "./settings/settings-atoms.js";
 import { ReviewSettingsPage } from "./workspace/ReviewSettingsPage.js";

@@ -7,10 +7,10 @@ import {
   filterWebuiRailViewSessions,
   selectWebuiRailViewTabs,
   type WebuiRailView,
-} from "../../src/client/rail-buckets.js";
+} from "../../src/client/projection/sessions/rail-buckets.js";
 import { WebuiIconSessionStar } from "../../src/client/components/shell/icons.js";
 import { WebuiProjectList } from "../../src/client/components/sessions/SessionRail.js";
-import type { WebuiSessionActivityMap } from "../../src/client/projection/session-activity.js";
+import type { WebuiSessionActivityMap } from "../../src/client/projection/sessions/session-activity.js";
 import type { WebuiClientProject, WebuiClientSession } from "../../src/client/contracts/sessions/session-view.js";
 
 /**

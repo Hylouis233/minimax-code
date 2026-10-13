@@ -44,13 +44,13 @@ import { RailRow } from "./RailRow.js";
 import {
   formatWebuiSessionAge,
   type WebuiSessionActivityMap,
-} from "../../projection/session-activity.js";
+} from "../../projection/sessions/session-activity.js";
 import {
   filterWebuiRailViewSessions,
   selectWebuiRailViewTabs,
   type WebuiRailView,
   type WebuiRailViewTab,
-} from "../../rail-buckets.js";
+} from "../../projection/sessions/rail-buckets.js";
 import { formatWebuiUnreadBadge } from "../../projection/common/unread-badge.js";
 import type { WebuiClientSession, WebuiClientSessionPage, WebuiClientSessionTreePage, WebuiClientProject } from "../../contracts/sessions/session-view.js";
 import { teamModeCopy } from "../../infrastructure/team-mode.js";

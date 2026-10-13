@@ -12,7 +12,7 @@ import {
   isWebuiReviewFiltering,
   type WebuiReviewFile,
 } from "../../src/client/projection/review-state.js";
-import { groupWebuiWorktreeWorkspaces } from "../../src/client/projection/worktree-state.js";
+import { groupWebuiWorktreeWorkspaces } from "../../src/client/projection/sessions/worktree-state.js";
 
 /* Why this file asserts on markup rather than on clicks:
  *

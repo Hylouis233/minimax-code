@@ -16,7 +16,7 @@ import {
   reduceWebuiSessionActivity,
   seedWebuiSessionActivity,
   type WebuiSessionActivityMap,
-} from "../../src/client/projection/session-activity.js";
+} from "../../src/client/projection/sessions/session-activity.js";
 import {
   WebuiProjectList,
   WebuiSessionList,

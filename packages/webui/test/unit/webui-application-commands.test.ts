@@ -30,7 +30,7 @@ import { createWebuiSettingsWorkflows } from "../../src/client/application/setti
 import type { WebuiClientMessagePage } from "../../src/client/contracts/transcript/message-view.js";
 import type { WebuiUsageQuotaResult } from "../../src/shared/contracts/usage-quota.js";
 import type { WebuiVersionInfo } from "../../src/shared/contracts/version.js";
-import type { WebuiSessionActivityMap } from "../../src/client/projection/session-activity.js";
+import type { WebuiSessionActivityMap } from "../../src/client/projection/sessions/session-activity.js";
 import type { WebuiActiveTurn } from "../../src/shared/contracts/session.js";
 import type { WebuiRuntimeEvent } from "../../src/shared/contracts/stream.js";
 import type { WebuiStreamLoopSink } from "../../src/client/mechanisms/stream-loop.js";

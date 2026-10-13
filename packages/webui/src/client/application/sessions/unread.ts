@@ -43,7 +43,7 @@ import {
   reduceWebuiSessionActivity,
   seedWebuiSessionActivity,
   type WebuiSessionActivityMap,
-} from "../../projection/session-activity.js";
+} from "../../projection/sessions/session-activity.js";
 import type { WebuiActiveTurnProbe } from "../turn/active-turn-probe.js";
 
 /**

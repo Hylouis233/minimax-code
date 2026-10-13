@@ -31,7 +31,7 @@ import {
   groupWebuiWorktreeWorkspaces,
   type WebuiWorktreeSourceSession,
   type WebuiWorktreeWorkspace,
-} from "../../projection/worktree-state.js";
+} from "../../projection/sessions/worktree-state.js";
 import { selectWebuiCatalogFlatPage } from "../../application/sessions/session-catalog.js";
 import { useWebuiSessionStoreContext } from "../../bindings/application-context.js";
 import { useWebuiWorkspaceQueries } from "../../bindings/use-query-state.js";

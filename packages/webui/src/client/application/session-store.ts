@@ -24,8 +24,8 @@
 import type {
   WebuiSessionActivity,
   WebuiSessionActivityMap,
-} from "../projection/session-activity.js";
-import { initialWebuiSessionActivity } from "../projection/session-activity.js";
+} from "../projection/sessions/session-activity.js";
+import { initialWebuiSessionActivity } from "../projection/sessions/session-activity.js";
 import type { WebuiSessionCatalogState } from "./sessions/session-catalog.js";
 import { initialWebuiSessionCatalogState } from "./sessions/session-catalog.js";
 import type { WebuiStreamState } from "../projection/stream-state.js";

@@ -52,7 +52,7 @@ import {
   buildWebuiMessageForkRequest,
   buildWebuiRewindRequest,
   webuiClientRequestId,
-} from "../../projection/action-requests.js";
+} from "../../projection/sessions/action-requests.js";
 
 /**
  * The single message renderer shared by persisted history and the live turn.
