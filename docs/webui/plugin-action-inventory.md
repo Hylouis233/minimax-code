@@ -10,8 +10,8 @@ driven by the action inventory, not the member count**, or `plugins` is carved a
 small."*
 
 §5.6's `plugins` row: *"**the action inventory must be enumerated first** — 29 actions behind one port
-member (§15.3), or this carve under-scopes by an order of magnitude"*. §14.3 lists it as a known gap the
-plan does not close; this document closes it.
+member (§15.3), or this carve under-scopes by an order of magnitude"*. §14.3 carried it as a gap; this
+document closes it, and §14.3 now records that closure.
 
 | consumer | what it needs from here |
 | --- | --- |
@@ -174,7 +174,10 @@ Two consequences, neither of which this document applies to the plan file:
 The plan's per-port figures (53, 43, 37, 33, 24, 15, 10, 1) reproduce exactly under the **first** rule,
 so they are name occurrences, not interface members. Under the second rule the same eight files hold
 108. Recorded because E3 re-measures this figure: a re-measurement in the other unit would read as a
-halving that never happened. Which unit S12 moves is not settled here.
+halving that never happened. **The unit is settled: S12 moves in the plan's unit — name occurrences, 216
+in 8 ports — because §15.1's counting rules bind every figure in the plan and state that a count made with
+a different unit is not directly comparable, so a before/after pair exists in one unit only.** The 108
+interface-member figure stays as a second measurement of the same eight files, not as S12's denominator.
 
 ### 3. What §15.1 table 2 gives A3, and what it does not
 

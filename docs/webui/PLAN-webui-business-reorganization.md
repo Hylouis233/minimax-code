@@ -1,7 +1,21 @@
 # Plan — WebUI business reorganization
 
-**Status:** proposal for approval. Nothing in this document has been executed. No source file, test,
-gate script, roadmap line or issue was changed by the session that wrote it.
+**Status: approved, and in execution.** The operator authorized the whole programme on 2026-10-13 and
+required every ticket closed. **§14 is the decision record**: it holds the six decisions this plan
+needed, each with how it landed, and nothing in this document is still open.
+
+**Programme position, at 2026-10-13**
+
+| | |
+| --- | --- |
+| Phase 0 — the substrate matrix | **closed** 2026-10-12: `phase-0-substrate-matrix.md` accepted; §14.1 item 4 discharged |
+| Phase 1 — the substrate and the seam | **in progress**: `#57` closed (turn intents and the command surface), `#58` closed (the writer commands regrouped), `#59` in progress (the 18-file contract re-file) |
+| Phases 2–5 | not started; the board carries their tickets and §8 defines them |
+| Last delivered revision | `webui @ 988712ac` |
+
+The revision in the table below is the **design baseline** this plan was written against. It is the
+comparison point and is not advanced by execution; delivered revisions are the position table above
+and the board.
 
 **Baseline**
 
@@ -73,10 +87,12 @@ port member census, cross-business import graph).
   `sessions`, `workspace`, `interactions`, `models`, `plugins`, `settings` and `account` import **no**
   substrate hook at all, because the shell hands them the values as props. Five plus seven is the twelve
   of §4; an earlier draft of this paragraph said "the other eight" and listed seven, omitting `goal`.
-  §4 marks the three of those that the props still cannot decide — `sessions`, `workspace`, `models` —
-  `[to derive]`, records the other four (`interactions`, `plugins`, `settings`, `account`) as `[verified]`
-  or `[verified — corrected]`, and §8 step 0 makes the remaining derivation an explicit obligation with a
-  stated method. This is a known gap in this document, not an oversight discovered later.
+  §4 marked the three of those the props could not then decide — `sessions`, `workspace`, `models` —
+  `[to derive]`, recorded the other four (`interactions`, `plugins`, `settings`, `account`) as `[verified]`
+  or `[verified — corrected]`, and §8 step 0 made the remaining derivation an explicit obligation with a
+  stated method. **That derivation was carried out in Phase 0 and its output was accepted on
+  2026-10-12**, so all twelve rows now carry a value; the ledger is `phase-0-substrate-matrix.md` and
+  §4's legend records the retired marker.
 - The handoff document's commit statistics and the §5 comparison experiments of the migration plan
   were **not** re-run.
 
@@ -176,8 +192,12 @@ how it is reached:
   the props it receives decide the answer (§1.3).
 - **[verified — corrected]** — the same, for a value this plan changed during review.
 - **[corrected]** — the same, where the plan replaced a value rather than adjusting one.
-- **[to derive]** — neither a direct import nor the props decide it today, so Phase 0 derives it
-  (`sessions`, `workspace`, `models`).
+- **[to derive]** — retired. It marked a value that neither a direct import nor the props decided at the
+  time. Phase 0 derived the three rows that carried it (`sessions`, `workspace`, `models`) from the props
+  each business receives, and its output was accepted on 2026-10-12. Every row below now carries
+  `[verified]`, `[verified — corrected]`, `[corrected]` or `[derived]`.
+- **[derived]** — settled in Phase 0 the same way, from the props rather than from imports
+  (`phase-0-substrate-matrix.md`).
 
 An earlier draft defined `[verified]` as requiring a direct import, which contradicted §1.3's own allowance
 for settling a value from props; it also left `[corrected]` undefined.
@@ -203,8 +223,9 @@ for settling a value from props; it also left `[corrected]` undefined.
 6. **Does not own** `workspaceProjectName` (→ `workspace`; filed here today at `SessionRail.tsx:144`
    and imported across businesses by `SessionComposer.tsx:156`); the composer's draft state (→
    `composer`); the transcript.
-7. **[to derive]** — the rail receives everything by prop today; it is the substrate's primary
-   consumer and must end at `read-model, in-flight-read, intents`.
+7. **[derived: `read-model, in-flight-read, intents`]** — the rail receives everything by prop today,
+   which is why the cell could not be read from imports; Phase 0 read the props themselves
+   (`SessionRail.tsx:215`, `:1085`) and settled it. The rail is the substrate's primary consumer.
 8. **Failure & recovery.** The reconnect recovery policy — 7 files across 5 layers today — collapses
    here: on a missed `session.start`, probe the server, fence on `ownsWebuiStreamGeneration`, guard
    with `if (existing.subscription) return`, and never set sending when the capability is absent. The
@@ -276,8 +297,9 @@ for settling a value from props; it also left `[corrected]` undefined.
 6. **Does not own** the `review` state machine (→ `review`'s owner module); the terminal process
    (→ `terminal` capability); and the 23 pure canvas functions move out of `WorkspaceCanvas.tsx` into
    this business's projection — **a filing fix, not a new owner per function**.
-7. **[to derive]** — `WorkspacePanels` receives 11 capability props today; expected
-   `read-model, in-flight-read`.
+7. **[derived: `read-model, in-flight-read`]** — `WorkspacePanels` receives 11 capability props today;
+   Phase 0 read them (`WorkspacePanels.tsx:275`) and found zero substrate turn intents reaching this
+   business (`attachTurn`, `sendTurn`, `resumeSession`, `loadMessages`: 0 occurrences).
 8. **Failure & recovery.** A failed file read renders an error row, not an empty panel; **tab content
    re-keys on session change while the tab set persists**; the canvas preview rolls back on a failed
    apply.
@@ -333,9 +355,12 @@ for settling a value from props; it also left `[corrected]` undefined.
    per-session usage (→ `sessions`); **the model chip** — the user-visible chip belongs to whichever
    business renders it, and declaring this is what stops the chip becoming an undeclared cross-business
    write.
-7. **[to derive]** — `ModelPicker.tsx` contains no `sessionId` and no session hook today, so the
-   picker is selection-only and `none` is the likely value; the value depends on whether the picker
-   must show the session's active model.
+7. **[derived: `none`]** — the picker contains no `sessionId` and no session hook, and the open half
+   of the question was whether it must show the session's active model. **The source settles it, so it
+   is a derivation and not a decision**: the picker already shows that model, resolved from `models`'
+   own catalogue query (`SessionComposer.tsx:1264` reads `models.find((model) => model.selected)` and
+   passes it as `selected`; `:1157` loads the list with `listModels?.({ sessionId })`), so the carve
+   adds no cross-business read. See `phase-0-substrate-matrix.md`, "The `models` cell".
 8. **Failure & recovery.** A failed selection must not leave the chip committed (a chip write, and
    therefore declared); a failed provider test preserves the draft; the hover timing must not commit a
    thinking choice on a fly-by (`model-picker-hover.ts`).
@@ -610,9 +635,11 @@ state as a business's write permission would have made this carve look like a UI
 every draft as component-local would make it look like a state migration in the other direction. The line is
 survival, not the widget.
 
-**Where this table leaves a decision open, it says so rather than implying one.** Two cells are not settled by
-§4 and must be decided before their phase: `plugins`' action inventory (§15.3), and whether `models`' picker
-must show the session's active model, which decides `models`' field 7 (§14.3).
+**Where this table once left a decision open, each is now closed.** Two cells were not settled by §4, and
+neither is carried as an open item: `plugins`' action inventory (§15.3) is enumerated in
+`plugin-action-inventory.md`, accepted by the operator on 2026-10-12; and whether `models`' picker must show
+the session's active model was settled **by the source rather than by a decision**, because the picker
+already shows it from `models`' own catalogue query, so `models`' `field 7` is `none` (§4.7.7, §14.3).
 
 ---
 
@@ -711,7 +738,7 @@ favour business-first — a composer change lands in one directory instead of th
 more than it shows.** `application/session-catalog.ts:15-17` and `application/unread.ts:1-24` both declare the
 rail as their consumer while living outside any rail directory. That establishes **coupling, not a
 refutation**: under a business-first tree those modules would sit under `sessions` alongside the rail, so the
-open question would be whether `sessions` owns the rail's presentation duties — which criterion C answers
+question would then be whether `sessions` owns the rail's presentation duties — which criterion C answers
 *no*, since the rail is a place the user works and the catalog is a query. An earlier draft presented this as
 decisively disqualifying business-first; it does not, and the review was right to say so. The reasons the
 plan actually rests on are the two below: the layer staying readable from the path, and the presentation rule
@@ -831,7 +858,8 @@ Re-derive `field 7` for the three rows marked **[to derive]** — `sessions` (§
 rather than from its own imports — because today's imports do not show it (§1.3). Output: the completed
 eight-field table, committed to the design docs, and the enumeration of the substrate's consumers.
 *Exit:* every one of the twelve rows has an enumerated `field 7`, and the substrate's consumer list is
-complete. *Rollback:* none needed.
+complete. *Rollback:* none needed. **Done:** the output is `phase-0-substrate-matrix.md`, accepted by the
+operator on 2026-10-12; the three derived values and the discharged decision are recorded in §14.1 item 4.
 
 ### Phase 1 — Substrate repair
 
@@ -1144,10 +1172,13 @@ other phase intact and weakens only the *verification* of Phase 3.
 separate Lead profile (codex `gpt-6.1-sol`, read-only; brief `review-lead-01-plan-direction.md`, answer in
 `lead-review-01.log`). Its verdict — **the direction is right, the plan is not yet approvable** — produced
 eight findings. Its re-review of the first revision scored them **two closed, four partly closed, one
-open, and one open with the scope disclosed**, and found four problems the revision itself introduced. The
-open items are recorded in §14.1 and §14.3 rather than smoothed over here: the plan-time boundary contract
-(§5.6) is the one that decides whether the direction can be approved, and the review's own words for it are
-that the revision "handed the gap to writing tests and generating an export list" instead of closing it. Then six grilling rounds against a second agent
+open, and one open with the scope disclosed**, and found four problems the revision itself introduced. Those
+open items were recorded rather than smoothed over, and both are closed now: §14.1 carries the six settled
+decisions and §14.3 records the closure of the three gaps. The plan-time boundary contract (§5.6) was the one
+deciding whether the direction could be approved, and the review's own words for it were
+that the revision "handed the gap to writing tests and generating an export list" instead of closing it; §8
+Phase 3 now makes those two the unit of the work, which is why §5.6's table is read against a failing test
+rather than against prose. Then six grilling rounds against a second agent
 (MiniMax `M3.1-Flash-Preview`, read-only, one persistent session).
 
 **The specified model is not available, and this is the declaration the request asks for.** The request
@@ -1212,38 +1243,90 @@ briefs: `~/my_data/project/my_project/minimax-code-webui-work/w2-business-reorg/
 axis (§2.3); the substrate's status as a business rather than an unnamed floor (§3); and the refusal to
 let "the gate stays green" stand for structural enforcement (§12.1).
 
-**Unresolved when this document was written, and handed to the implementer:** `field 7` for the **three**
-rows marked **[to derive]** — `sessions`, `workspace`, `models` (§1.3, §4.1, §4.4, §4.7, Phase 0), and the
-the six decisions listed in §14.1.
+**Unresolved when this document was written, and since settled:** `field 7` for the three rows §4
+marked **[to derive]** — `sessions`, `workspace`, `models` (§1.3, §4.1, §4.4, §4.7) — was derived in
+Phase 0 and accepted on 2026-10-12; the six decisions listed in §14.1 were settled by the operator's
+authorization of 2026-10-13 and are recorded there. **§14 is the record, and nothing in §13 is still
+open.**
 
 ---
 
-## 14. Decisions that are the user's, and out-of-scope items
+## 14. The decision record, and out-of-scope items
 
-### 14.1 Decisions this plan needs from the user
+### 14.1 The six decisions this plan needed, as settled
 
-1. **Whether to adopt the business axis at all**, and with it the twelve-business list of §4 (including
-   `goal` as a business rather than part of `interactions`, and `turn` as a business that appears nowhere).
-2. **Whether Phase 2 (stop publishing the composed transport) is in the first delivery.** It is the
-   highest-risk step and the only one that makes prohibition 1 real at the seam; a plan without it can
-   still deliver §4's contracts and §6's layout, and would be honest about the seam staying open.
-3. **Whether the call-rule spike (§12.7) is in scope now.** Separable; it is the difference between
-   prohibition 1 being reviewed and being measured.
-4. **`field 7` for the three rows marked to derive** (`sessions`, `workspace`, `models`) — not a design decision, but Phase 0's output must
-   be accepted before Phase 1, because it is the substrate's consumer list.
-5. **The layout axis is a trade-off this plan makes, not a derivation** (§6.1): the seven top-level
-   `client/*` names are kept so the layer stays readable from the path and the dependency rules keep one
-   meaning, at the cost of one extra path segment per business module. A business-first top-level layout is
-   *affordable* — the classifier repair is small — and would narrow the typical change scope. It is not
-   chosen for the two reasons §6.1 states: the layer stays readable from the path, and the presentation
-   rule's coverage does not have to be re-proved. The catalog/unread modules that name the rail as their
-   consumer are **not** a third reason — earlier drafts of this item and of §6.1 read them as proof that
-   business-first forces mixed duties, which the source does not show.
-6. **Whether the prohibition tests of Phase 3 are written at all.** They are the machine half of §12.1's
-   three-layer split; the dependency checker holds no business-boundary rule either way. Skipping them is a
-   choice, and a green gate would then be read as coverage it does not provide. §14.1.2 and §10 are
-   connected: if Phase 2 is deferred, the delivery cannot be called the completed business-boundary
-   reorganization.
+This section was a question list. Each item now carries its **decision**, how it landed, and what
+delivers it. Nothing here is open. One item is marked as a decision *this plan* made rather than an
+operator ruling, and it is stated that way rather than being dressed up as one.
+
+**1. Adopt the business axis, and with it §4's twelve-business list — ADOPTED.**
+
+- *How it landed:* the operator authorized the whole programme on 2026-10-13, which settles the axis
+  and the list together. The board is built from §4: one Phase 3 carve ticket per business, the Phase 4
+  and Phase 4b batches per layer, and Phase 1 already publishes `turn` as a business.
+- *Three judgements that travel with it:* `goal` is a business rather than part of `interactions`;
+  `turn` is a business that appears nowhere (it stands on criterion C, and §12.1 records that its
+  boundary is carried by tests rather than by a carve); and `terminal` is a **capability**, not a
+  business, so the list stays at twelve — §14.4 carries the Desktop evidence that a terminal is bound
+  to a `sessionId` and destroyed with it.
+- *One vocabulary correction accepted with it:* `rail` is WebUI-local. Desktop's surface is `Sidebar*`
+  throughout, so the two products are not assumed to share a vocabulary and the business name stays
+  `sessions` (§14.4).
+- *Formal record:* ADR 0015 (§11), written in Phase 5. The ADR restates this decision; it does not
+  reopen it.
+
+**2. Phase 2 — stop publishing the composed transport — is in the first delivery. IN.**
+
+- *How it landed:* the operator's authorization. Phase 2 is in §8's staging and carries its own board
+  milestone.
+- *Why it is not optional:* it is the only step that makes prohibition 1 real at the seam. §8 says so
+  in one line: "a directory re-file does not narrow the seam, only narrowing the seam does." Deferred,
+  the delivery could not be called the completed business-boundary reorganization (item 6).
+
+**3. The call-rule spike (§12.7) is in scope now. IN.**
+
+- *How it landed:* the operator's authorization; it is a Phase 1 deliverable and it is what makes
+  prohibition 1 measurable rather than merely reviewed.
+- *The stop rule still binds the implementer:* if the extended resolver produces unbounded false
+  positives, the spike reports and stops rather than shipping an untrustworthy rule, and the frozen
+  baseline is never widened (§12.2, §12.7). A spike that stops leaves this item delivered as a
+  measurement, not as a rule.
+
+**4. `field 7` for the three rows marked to derive — DISCHARGED 2026-10-12.**
+
+- *How it landed:* Phase 0's output was accepted by the operator on 2026-10-12.
+  `phase-0-substrate-matrix.md` opens with that acceptance and closes with "§14.1 item 4 is discharged:
+  the operator accepted this output on 2026-10-12, Phase 0 is closed, and Phase 1 (`#57`) may start."
+- *The values:* `sessions` → `read-model, in-flight-read, intents`; `workspace` →
+  `read-model, in-flight-read`; `models` → `none`. §4.1.7, §4.4.7 and §4.7.7 now carry them, and §4's
+  legend records `[to derive]` as retired.
+- *Delivered by:* `#57`, which the acceptance released.
+
+**5. The layout axis — a decision THIS PLAN makes, not an operator question: layer-first.**
+
+- *The decision:* the seven top-level `client/*` names are kept, so the layer stays readable from the
+  path and the dependency rules keep one meaning, at the cost of one extra path segment per business
+  module (§6.1).
+- *Why it was listed here and is still not an operator question:* §6.1 makes the trade-off explicitly,
+  and an earlier form of this item presented the trade-off as if it were open. A business-first
+  top-level layout is *affordable* — the classifier repair is small — and would narrow the typical
+  change scope. It is not chosen for the two reasons §6.1 states: the layer stays readable from the
+  path, and the presentation rule's coverage does not have to be re-proved. The catalog/unread modules
+  that name the rail as their consumer are **not** a third reason — earlier drafts read them as proof
+  that business-first forces mixed duties, which the source does not show.
+- *Delivered by:* §15.1's move table, executed across Phase 4's batches.
+
+**6. Phase 3's prohibition tests are written. WRITTEN, and required.**
+
+- *How it landed:* the operator's authorization. Each Phase 3 carve delivers its business's four
+  prohibition tests as the unit of its work (§8 Phase 3), and the generated command surface of §8
+  Phase 3 makes each business's published commands an output rather than a claim.
+- *Why it is not optional:* they are the machine half of §12.1's three-layer split. The dependency
+  checker holds no business-boundary rule either way, so a green gate must not be read as coverage it
+  does not provide.
+- *Delivered by:* `#57`, which carries the `turn` business's four (and the command-surface generator
+  itself); then the Phase 3 carve ticket of each business. `turn` has no carve ticket, which is why its
+  tests land in Phase 1.
 
 ### 14.2 Out of scope, stated as a change-type test
 
@@ -1266,16 +1349,35 @@ Unchanged in substance and still out of scope: a second view of the same session
 substrate must not block it — S6 — but building it is a product decision); `docs/webui/pending-decisions.md`
 items; the stacked-generation CSS; a new workspace package or a change to publication boundaries;
 `packages/tui` (ADR 0003: read as specification, never imported); extending `tsconfig.test.json` to the whole
-webui test tree; any PR, push, roadmap baseline edit, group message or issue; and the two business
-differences recorded in §14.4.
+webui test tree; and the two business differences recorded in §14.4.
 
-### 14.3 Known gaps this plan does not close
+**The repository-facing clause an earlier form of this section carried, and what supersedes it.** It listed
+"any PR, push, roadmap baseline edit, group message or issue" as out of scope. That was written for a design
+round which was not authorized to change anything, and it is now **superseded for the part the operator's
+instruction of 2026-10-13 requires**: that instruction is to execute the programme to completion with **every
+ticket closed**, and a closed ticket on this fork means the evidence its comment cites exists on the remote.
 
-- `field 7` derivation for the three rows still marked `[to derive]` — `sessions`, `workspace`, `models` (§1.3, §4.1, §4.4, §4.7).
-- Whether the `models` picker must show the session's active model, which decides `models`' `field 7`
-  and whether the chip is a declared write (§4.7).
-- The action-level inventory of `plugin-port` (29 union values behind one member) — the re-file needs it
-  enumerated rather than counted (§4.8, §9).
+- **In scope and required:** commits on the `webui` feature branch; pushing that branch to
+  `origin` (`mcode-webui/minimax-code`, per `AGENTS.md`); opening, commenting on and closing the board's
+  issues, each closure carrying its per-criterion evidence; and the `release/public-source.json`
+  regeneration every such change needs (§12.6).
+- **Still out of scope:** a pull request against the default branch; any edit to the roadmap's baseline
+  line; group messages; and merging the feature branch. None of the four is needed to close a ticket, and
+  `CONTRIBUTING.md` keeps its own requirements for contribution time.
+
+### 14.3 The three gaps this section carried, now closed
+
+All three were closed before Phase 1 ran. None is carried as an open item.
+
+| gap | closed by |
+| --- | --- |
+| `field 7` derivation for the three rows marked `[to derive]` — `sessions`, `workspace`, `models` (§1.3, §4.1, §4.4, §4.7) | **Phase 0's derivation, accepted by the operator on 2026-10-12** (`phase-0-substrate-matrix.md`). Values: `sessions` → `read-model, in-flight-read, intents`; `workspace` → `read-model, in-flight-read`; `models` → `none`. §4.1.7, §4.4.7 and §4.7.7 carry them. |
+| Whether the `models` picker must show the session's active model, which decides `models`' `field 7` and whether the chip is a declared write (§4.7) | **The source settles it, so it was a derivation and not a decision.** The picker already shows that model, and does so without a substrate read: `SessionComposer.tsx:1264` resolves it as `models.find((model) => model.selected)` and passes it as `selected`, and `:1157` loads the list with `listModels?.({ sessionId })`, so the session-awareness is a property of `models`' own catalogue query. `field 7` is `none` on both sides of the carve, and the carve adds no cross-business read. |
+| The action-level inventory of `plugin-port` (29 union values behind one member) — the re-file needs it enumerated rather than counted (§4.8, §9) | **`plugin-action-inventory.md`, accepted by the operator on 2026-10-12** together with Phase 0's output. It enumerates the 29 actions and is the inventory §9's re-file is driven by; `#59` (A3) and the `plugins` carve each name it as a Required predecessor. |
+
+**What this section does not claim:** that the programme has no unknowns left. §14.4's two Desktop business
+differences and §14.5's two behaviour changes stay deliberately outside it — out of scope by decision, not
+open by omission.
 
 ### 14.4 The Desktop reconciliation, and the business differences it records
 
@@ -1338,10 +1440,11 @@ comparable. Two figures this rule was written for are §7.1's roster (a census o
 and §9's port census, whose 216 reproduces only when nested request-shape fields are counted as members —
 see `docs/webui/plugin-action-inventory.md`, finding 2.
 
-**144 target rows are executable today and cover 127 of the 137 files that must be covered.** §15.4's ten contracts
-are undecided — each takes a `move`, `keep` or `delete` disposition — **so no final total exists yet**, and the
-tables below are complete only up to that boundary. The executable rows are **recomputed, never adjusted**, when
-§15.4 resolves.
+**144 target rows, covering 127 of the 137 files that must be covered.** §15.4's ten contracts **are now
+resolved**, which is the boundary this opening paragraph used to point at: seven take `move` with a named
+target, two take `delete` (authorized by the operator on 2026-10-13 and executed by `#59`), and `transport.ts`
+takes whichever of `delete` or `keep` Phase 2 records. **The executable rows are recomputed at `#122` (E3),
+never adjusted**, and the tables below are complete only up to the pre-resolution figure of 144.
 
 The `lines` column is each target's size today, for review sizing only. **The target rows are a size estimate and do
 not constitute a complete partition of a source file:** where one source carries several rows, the rows sum to less
@@ -1364,9 +1467,10 @@ four splitting component files + `8` from the three previously-unrowed files + `
 ports = **`144` executable rows**. **The tables print `148` data rows because table 1 still shows the four source
 rows whose targets moved into table 3: those four are consumed, not additional, and `148 − 4 = 144`.**
 
-**No total beyond `144` is stated anywhere**, because §15.4 has no fixed outcome: a `keep` yields no row, a `delete`
-yields no row and one fewer file, and `127` moves with it. The executable total is **recomputed from the
-dispositions, never adjusted**.
+**The total is `144` executable rows today, and it is recomputed from the dispositions, never adjusted.** The
+ten contracts of §15.4 are now resolved — seven `move` to named targets, two `delete` — so the boundary this
+paragraph used to point at is closed: those nine rows exist where they did not before, `127` moves with the two
+deletions, and `#122` (E3) re-derives every affected figure. No other total is stated.
 
 **The check a reviewer runs.** The four tables print `148` data rows, `144` of which are executable, and they carry
 `127` distinct source files. Any other printed row count, or a source count other than `127`, is a defect in this
@@ -1639,24 +1743,33 @@ needs a built client (`§12.5`'s row for `pnpm test:webui-browser`). This paragr
 says so, and nothing later may imply otherwise.
 
 
-### 15.4 The ten held contracts — disposition, not presumption
+### 15.4 The ten held contracts — the dispositions, decided
 
-**Each of the ten receives exactly one disposition: `move`, `keep`, or `delete`. §15.1 does not presume they move.**
+**Each of the ten carries exactly one disposition: `move`, `keep` or `delete`. §15.1 does not presume they move.** The dispositions below are **decided, not proposed.** The enumeration is `contract-re-file-inventory.md`, produced at `876a48e6`, and it is what `#59` (A3) executes.
 
-| file | line | disposition | entry condition |
-| --- | ---: | --- | --- |
-| `transport.ts` | 34 | **delete or keep — not yet decidable** | **Blocked on Phase 2.** §9's second half is "stop publishing the composed transport"; the file declares `interface WebuiTransport`. **Entry condition:** Phase 2 records whether that interface is still published after the shell stops forwarding 47 members. `delete` if it is not; `keep` at `contracts/` if the phase decides it survives unchanged — **in which case it needs no row.** |
-| `stream-state.ts` | 182 | **move — target undecided** | §9's amendment must name it. **Not** the `projection/stream-state.ts` pair §15.3 assigns to `turn`; this is the contracts file of the same name and it has no stated home. |
-| `slash-command.ts` | 111 | **move — target undecided** | §9's amendment. |
-| `transcript-view.ts` | 105 | **move — target undecided** | §9's amendment. |
-| `message-view.ts` | 89 | **move — target undecided** | §9's amendment. |
-| `model-view.ts` | 85 | **move — target undecided** | §9's amendment. |
-| `session-view.ts` | 39 | **move — target undecided** | §9's amendment. |
-| `review-view.ts` | 34 | **move — target undecided** | §9's amendment, and it depends on §4.3's `review` capability having one owner — the same collision §16 records between §5.6's `transcript` and `workspace` rows. |
-| `workspace-view.ts` | 9 | **move or keep — 9 lines** | §9's amendment. At 9 lines a `keep` is a defensible disposition and the row count must reflect whichever is chosen. |
-| `execution-state.ts` | 9 | **move or keep — 9 lines** | §9's amendment. Same9-line question. |
+| file | line | disposition | target | why |
+| --- | ---: | --- | --- | --- |
+| `stream-state.ts` | 182 | **move** | `client/contracts/turn/stream-state.ts` | declares `WebuiStreamState`, `WebuiStreamSubscription`, `WebuiStreamMessage`; its importers are `mechanisms/stream-loop.ts`, `mechanisms/stream-lease.ts` and `projection/stream-state.ts`, all `turn`'s. **Not** the same-named file under `projection/` that §15.3 assigns to `turn` |
+| `slash-command.ts` | 111 | **move** | `client/contracts/composer/slash-command.ts` | declares the palette's vocabulary (`SlashComposerMode`, `SlashPaletteSection`, `classifyWebuiSlashCommand`); importers are `projection/composer-state.ts`, `slash-palette.ts`, `SessionComposer.tsx` |
+| `transcript-view.ts` | 105 | **move** | `client/contracts/transcript/transcript-view.ts` | declares the transcript's render shapes (`WebuiTranscriptItem`, `WebuiTranscriptProcessSegment`); importers are `projection/transcript-*` and `components/transcript/*` |
+| `message-view.ts` | 89 | **move** | `client/contracts/transcript/message-view.ts` | declares the message entity, page and loader — §9's "session-port's message half", which §15.2 assigns to `transcript` |
+| `model-view.ts` | 85 | **move** | `client/contracts/models/model-view.ts` | declares the picker's shapes; every importer is on the `models` surface |
+| `session-view.ts` | 39 | **move** | `client/contracts/sessions/session-view.ts` | declares `WebuiClientSession`, `WebuiClientProject`, `WebuiClientSessionTreeNode` — §9's "session-port's session half" |
+| `review-view.ts` | 34 | **move** | `client/contracts/transcript/review-view.ts` | declares `WebuiDiffState` and `WebuiDiffStateAction`, the state and action types of `reduceWebuiDiffState`; §5.6 files that reducer under `application/transcript/review-state.ts`, so the types travel to the same business. This section's warning about the `review` collision is answered by §5.6's single owner: `workspace` presents review surfaces and commands the `review` capability, it does not own the state machine |
+| `transport.ts` | 34 | **delete or keep — decided by Phase 2** | — | it declares `WebuiTransport` itself. Phase 2 records whether that interface is still published once the shell stops forwarding 47 members: `delete` if it is not, `keep` at `client/contracts/` if the phase decides it survives — in which case it needs no row. `#61` (A4-s2) records the decision; `#64` (A4-s5) executes it |
+| `workspace-view.ts` | 9 | **delete** | — | **zero declarations, zero importers.** It holds a comment only: the runtime-layer plan reserved it as a target-layout placeholder, and the comment records that every workspace and review view moved to `shared/contracts/`, so no browser-local workspace type remains |
+| `execution-state.ts` | 9 | **delete** | — | same shape: **zero declarations, zero importers**, and the comment states the active-turn trio is a shared wire DTO with no browser-local copy left to declare |
 
-**Entry conditions common to all ten.** (a) §9's amendment enumerates the non-port contracts and assigns each a business **or** records a `keep`. (b) §15.1's `lines` column is regenerated. (c) `release/public-source.json` is regenerated for every added, moved or deleted file. **A `delete` disposition removes a row and a file; the arithmetic in §15.1's opening must be recomputed, not adjusted.**
+**Seven `move`, one Phase 2 decision, two `delete` — and both deletions are authorized.** The operator
+authorized deleting the two zero-declaration files on 2026-10-13. They are `delete` rather than `keep` for the
+reason this section itself gives: a `keep` means the file stays in the delivered tree and the layout claims a
+home it does not fill, and the new `client/contracts/<business>/` tree is the declared home for a future
+browser-local view, so the placeholder has nothing left to stand for. Both were verified to have no importer
+in `src/client` or `test`; the only textual matches are a CSS class and a component's own class string.
+**Nothing here is carried by presumption:** the seven moves and the two deletions are `#59`'s (A3) delivery,
+in progress at this revision, and `#122` (E3) re-derives §15.1's row counts afterwards rather than adjusting them.
+
+**Entry conditions common to all ten.** (a) §9's amendment enumerates the non-port contracts and assigns each a business **or** records a `keep` — **met** by `contract-re-file-inventory.md`, which is why §9's re-file is stated over 18 files and not 8. (b) §15.1's `lines` column is regenerated at `#122` (E3). (c) `release/public-source.json` is regenerated in each change that acts on a disposition (§12.6) — done for `#59`'s moves and deletions. **A `delete` disposition removes a row and a file; the arithmetic in §15.1's opening must be recomputed, not adjusted.**
 
 ---
 

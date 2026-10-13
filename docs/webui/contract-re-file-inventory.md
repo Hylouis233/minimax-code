@@ -1,8 +1,9 @@
 # The ten held contracts — dispositions
 
-**Status: produced; the seven `move` dispositions are decided here, and the two `delete` proposals
-below need the operator's word** because they remove files. `transport.ts` stays undecided until
-Phase 2 records whether the composed interface is still published.
+**Status: decided, and executed by #59 (A3).** The seven `move` dispositions are decided here. **The
+operator authorized the two `delete`s on 2026-10-13**, so all ten now carry a disposition that is either
+decided or mechanically owned: `transport.ts` stays undecided until Phase 2 records whether the composed
+interface is still published, which is that row's design rather than a gap in this document.
 
 §15.4 requires exactly one disposition each — `move`, `keep` or `delete` — and states the common entry
 condition: *"(a) §9's amendment enumerates the non-port contracts and assigns each a business or records
@@ -38,11 +39,11 @@ Line counts and declaration counts are measured, not quoted: `wc -l` and `grep -
 | `session-view.ts` | 39 | 5 | **move** | `client/contracts/sessions/session-view.ts` | declares `WebuiClientSession`, `WebuiClientProject`, `WebuiClientSessionTreeNode` — §9's "session-port's session half" |
 | `review-view.ts` | 34 | 2 | **move** | `client/contracts/transcript/review-view.ts` | declares `WebuiDiffState` and `WebuiDiffStateAction`, the state and action types of `reduceWebuiDiffState`. §5.6 files that reducer under `application/transcript/review-state.ts` (§7-stage B4), so the types travel to the same business. §15.4's warning about the `review` collision is answered by §5.6's single owner: `workspace` presents review surfaces and commands the `review` capability, it does not own the state machine |
 | `transport.ts` | 34 | 1 | **undecided — blocked on Phase 2** | decide at A4-s2, execute at A4-s5 | it declares `WebuiTransport` itself. Phase 2 records whether that interface is still published once the shell stops forwarding 47 members: `delete` if it is not, `keep` at `client/contracts/` if the phase decides it survives — in which case it needs no row |
-| `workspace-view.ts` | 9 | **0** | **delete — proposed** | — | **zero declarations and zero importers.** It holds a comment only: the runtime-layer plan reserved it as a target-layout placeholder, and the comment records that every workspace and review view moved to `shared/contracts/`, so no browser-local workspace type remains |
-| `execution-state.ts` | 9 | **0** | **delete — proposed** | — | same shape: **zero declarations, zero importers**, and the comment states the active-turn trio is a shared wire DTO with no browser-local copy left to declare |
+| `workspace-view.ts` | 9 | **0** | **delete — authorized 2026-10-13** | — | **zero declarations and zero importers.** It holds a comment only: the runtime-layer plan reserved it as a target-layout placeholder, and the comment records that every workspace and review view moved to `shared/contracts/`, so no browser-local workspace type remains |
+| `execution-state.ts` | 9 | **0** | **delete — authorized 2026-10-13** | — | same shape: **zero declarations, zero importers**, and the comment states the active-turn trio is a shared wire DTO with no browser-local copy left to declare |
 
-**Seven `move`, one undecided, two proposed `delete`.** The two zero-declaration files are
-`delete` proposals rather than `keep` for the reason §15.4 itself gives: a `keep` means the file stays
+**Seven `move`, one Phase 2 decision, two `delete`.** The two zero-declaration files are
+`delete` rather than `keep` for the reason §15.4 itself gives: a `keep` means the file stays
 in the delivered tree and the layout claims a home it does not fill. The new
 `client/contracts/<business>/` tree is the declared home for a future browser-local view, so the
 placeholder has nothing left to stand for. Both were verified to have no importer in `src/client` or
@@ -59,10 +60,12 @@ placeholder has nothing left to stand for. Both were verified to have no importe
 | **#122 (E3)** | S12 re-measured by declaration. Row counts re-derived once the dispositions land — §15.1's opening arithmetic (144 rows / 127 of 137 files) is the *pre*-disposition figure and is recomputed, never adjusted. |
 
 **A `delete` removes a file and a source-inventory entry**, so `release/public-source.json` is
-regenerated in the same change that acts on the proposal. Nothing in this document touches the tree.
+regenerated in the same change that acts on it. `#59` does so for the seven `move`s and the two
+authorized deletions; nothing in this document touched the tree by itself.
 
 ## Exit condition
 
-§15.4's entry condition (a) is met when each of the ten carries exactly one disposition — seven do here,
-one is blocked on a phase that owns its input, and two are proposed with the reason stated. §15.4's (b)
-and (c) belong to the tickets above, which is where the regenerated figures become reviewable.
+§15.4's entry condition (a) is met: each of the ten carries exactly one disposition — seven decided and
+executed here, one owned by a phase that carries its input, and two authorized by the operator and
+executed by `#59`. §15.4's (b) and (c) belong to the tickets above, which is where the regenerated
+figures become reviewable.
