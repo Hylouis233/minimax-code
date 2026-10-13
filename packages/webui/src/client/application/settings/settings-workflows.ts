@@ -28,16 +28,16 @@ import {
   createWebuiQueryStore,
   idleWebuiQueryState,
   type WebuiQueryState,
-} from "./query-store.js";
-import type { SettingsPort } from "../contracts/settings/settings-port.js";
-import type { WebuiVersionInfo } from "../../shared/contracts/version.js";
+} from "../query-store.js";
+import type { SettingsPort } from "../../contracts/settings/settings-port.js";
+import type { WebuiVersionInfo } from "../../../shared/contracts/version.js";
 import type {
   WebuiAgentMemoryView,
   WebuiGlobalInstructionsView,
   WebuiMemorySettingsView,
   WebuiUserProfileFields,
   WebuiUserProfileView,
-} from "../../shared/contracts/personalization.js";
+} from "../../../shared/contracts/personalization.js";
 
 /**
  * The settings half of the port re-file (plan §9, ticket #59). The provider half

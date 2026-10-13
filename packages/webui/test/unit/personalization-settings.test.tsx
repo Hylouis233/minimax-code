@@ -40,7 +40,7 @@ import { resolveEditorSeed } from "../../src/client/components/settings/GlobalIn
 import { isProfileSaveable } from "../../src/client/components/settings/UserProfileSection.js";
 
 import { useMemo } from "react";
-import { createWebuiSettingsWorkflows } from "../../src/client/application/settings-workflows.js";
+import { createWebuiSettingsWorkflows } from "../../src/client/application/settings/settings-workflows.js";
 import { WebuiSettingsWorkflowsProvider } from "../../src/client/bindings/use-query-state.js";
 
 type PanelCaps = {
