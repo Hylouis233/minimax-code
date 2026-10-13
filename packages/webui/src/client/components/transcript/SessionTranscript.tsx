@@ -8,7 +8,7 @@
 // existing consumers (`webui-shell.test.ts`, importers via `app.tsx`)
 // keep their current import path during the W3 wave.
 
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, type ReactElement } from "react";
 import { ChatSkeleton } from "./TranscriptSkeletons.js";
 import { ActivityIndicator, MessageAfterQueryStreamingPlaceholder, MessagePassiveLoadingPlaceholder } from "./ActivityIndicator.js";
 import { TurnNavigator, type TurnSummary } from "./TurnNavigator.js";
@@ -17,12 +17,9 @@ import { formatWebuiMessageTimestamp } from "../../projection/transcript/message
 import type { WebuiMessageActionCapabilities } from "../../contracts/transcript/transcript-view.js";
 import { useWebuiSessionQuestionnaire, useWebuiSessionState, useWebuiSessionStream, useWebuiTranscriptHistoryOwner } from "../../bindings/use-session-state.js";
 import { isTurnLive } from "../../projection/turn/stream-state.js";
-import {
-  isWebuiPlanReviewRequest,
-  webuiPlanMarkdown,
-  webuiPlanPath,
-} from "../../projection/interactions/plan-mode.js";
-import { WebuiPlanDeliveryCard } from "../interactions/PlanModeCards.js";
+import { isWebuiPlanReviewRequest } from "../../projection/interactions/plan-mode.js";
+import { WebuiTranscriptPlanDelivery } from "./PlanDelivery.js";
+import { WebuiQuestionnaireResponse } from "./QuestionnaireResponse.js";
 import type { WebuiClientMessagePage } from "../../contracts/transcript/message-view.js";
 import type { WebuiTranscriptItem } from "../../contracts/transcript/transcript-view.js";
 import type { WebuiTransport } from "../../contracts/transport.js";
@@ -66,124 +63,6 @@ import {
 } from "../../bindings/use-transcript-scroll.js";
 
 const EMPTY_TRANSCRIPT_PAGE: WebuiClientMessagePage = {};
-
-/**
- * Historical questionnaire-response projection. Once the user submits a
- * questionnaire we render the question and the recorded answers inside the
- * conversation so a rewinded session still remembers what the user picked.
- */
-export function WebuiQuestionnaireResponse({
-  messageId,
-  summary,
-  timestamp,
-}: {
-  readonly messageId: string;
-  readonly summary: WebuiQuestionnaireResponseSummary;
-  readonly timestamp?: number;
-}): ReactElement {
-  const { requestId, answers } = summary;
-  return (
-    <article
-      className="webui-questionnaire-history flex w-full max-w-[80%] min-w-0 flex-col gap-3 rounded-2xl border-[0.5px] border-border_default bg-bg_grouped_secondary_elevated p-4 text-text_default_primary"
-      data-webui-questionnaire-history="true"
-      data-message-id={messageId}
-      data-webui-questionnaire-request={requestId}
-      data-testid={`questionnaire-history-${requestId}`}
-    >
-      <header className="flex min-w-0 items-center justify-between gap-3">
-        <span
-          className="text-size_14 font-medium leading-line_height_20 text-text_default_primary"
-          data-testid="questionnaire-history-label"
-        >
-          问卷回答
-        </span>
-        {typeof timestamp === "number" ? (
-          <time
-            className="shrink-0 text-size_12 leading-line_height_16 text-text_default_tertiary"
-            dateTime={new Date(timestamp).toISOString()}
-            data-testid="questionnaire-history-timestamp"
-          >
-            {formatWebuiMessageTimestamp(timestamp)}
-          </time>
-        ) : null}
-      </header>
-      <ul
-        className="webui-questionnaire-history-answers flex min-w-0 flex-col gap-3"
-        data-testid="questionnaire-history-answers"
-      >
-        {answers.map((answer, index) => (
-          <li
-            key={`${requestId}-${index}`}
-            className="webui-questionnaire-history-answer flex min-w-0 flex-col gap-1.5 text-size_14 leading-line_height_20"
-            data-testid={`questionnaire-history-answer-${index}`}
-          >
-            <strong
-              className="text-text_default_primary"
-              data-testid={`questionnaire-history-answer-${index}-question`}
-            >
-              {answer.question}
-            </strong>
-            <ul className="flex min-w-0 flex-wrap gap-2">
-              {answer.labels.map((label, labelIndex) => (
-                <li
-                  key={`${requestId}-${index}-${labelIndex}`}
-                  className="webui-questionnaire-history-label max-w-full rounded-lg bg-bg_grouped_tertiary px-3 py-1.5 text-text_default_secondary [overflow-wrap:anywhere]"
-                  data-testid={`questionnaire-history-answer-${index}-label-${labelIndex}`}
-                >
-                  <span>{label}</span>
-                </li>
-              ))}
-            </ul>
-          </li>
-        ))}
-      </ul>
-      <details className="webui-questionnaire-history-details border-t-[0.5px] border-border_default pt-2">
-        <summary className="w-fit cursor-pointer text-size_12 leading-line_height_16 text-text_default_tertiary hover:text-text_default_secondary">
-          查看回答信息
-        </summary>
-        <dl
-          className="webui-questionnaire-history-meta mt-2 grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-size_12 leading-line_height_16 text-text_default_tertiary"
-          data-testid="questionnaire-history-meta"
-        >
-          <div className="contents" data-testid="questionnaire-history-meta-requestId">
-            <dt>requestId</dt>
-            <dd className="min-w-0 break-all font-mono">{requestId || "(未提供)"}</dd>
-          </div>
-          {summary.schemaVersion ? (
-            <div className="contents" data-testid="questionnaire-history-meta-schema">
-              <dt>schemaVersion</dt>
-              <dd className="font-mono">{summary.schemaVersion}</dd>
-            </div>
-          ) : null}
-          {summary.submittedAt ? (
-            <div className="contents" data-testid="questionnaire-history-meta-submitted">
-              <dt>submittedAt</dt>
-              <dd className="min-w-0 break-all font-mono">{summary.submittedAt}</dd>
-            </div>
-          ) : null}
-          {summary.mode ? (
-            <div className="contents" data-testid="questionnaire-history-meta-mode">
-              <dt>mode</dt>
-              <dd className="break-all font-mono">{summary.mode}</dd>
-            </div>
-          ) : null}
-          {summary.source ? (
-            <div className="contents" data-testid="questionnaire-history-meta-source">
-              <dt>source</dt>
-              <dd className="break-all font-mono">{summary.source}</dd>
-            </div>
-          ) : null}
-          {summary.featureKey ? (
-            <div className="contents" data-testid="questionnaire-history-meta-feature-key">
-              <dt>featureKey</dt>
-              <dd className="break-all font-mono">{summary.featureKey}</dd>
-            </div>
-          ) : null}
-        </dl>
-      </details>
-    </article>
-  );
-}
 
 export function WebuiSessionTranscript({
   sessionId,
@@ -236,30 +115,9 @@ export function WebuiSessionTranscript({
   const planReview = isWebuiPlanReviewRequest(pendingQuestionnaire)
     ? pendingQuestionnaire
     : undefined;
-  const [planSubmitting, setPlanSubmitting] = useState(false);
-  const [planError, setPlanError] = useState<string | undefined>(undefined);
+  // The card is a MESSAGE in the transcript, not a floating card: it anchors to
+  // the turn that wrote the plan.
   const planAnchorMessageId = planReview?.tool?.messageId;
-  const submitPlanBuild = useCallback(() => {
-    if (!planReview || !answerPlanBuild) return;
-    setPlanError(undefined);
-    setPlanSubmitting(true);
-    void answerPlanBuild(planReview)
-      .catch((error: unknown) => {
-        setPlanError(error instanceof Error ? error.message : String(error));
-      })
-      .finally(() => setPlanSubmitting(false));
-  }, [answerPlanBuild, planReview]);
-  // 预览 opens the whole plan file in the workspace panel, the way the desktop
-  // hands the markdown to its file viewer. The file lives outside the workspace
-  // root, so the content travels with the command instead of being read back.
-  const openPlanFile = useCallback(
-    (request: WebuiQuestionnaireRequest) => {
-      const path = webuiPlanPath(request);
-      if (!path || !onOpenPlanFile) return;
-      onOpenPlanFile({ sessionId, path, content: webuiPlanMarkdown(request) });
-    },
-    [onOpenPlanFile, sessionId],
-  );
   // History and stream frames feed one transcript projection. The live
   // records update the same message identities in this list while history
   // supplies the persisted fields and older messages.
@@ -585,11 +443,11 @@ export function WebuiSessionTranscript({
                   data-testid="plan-inline-anchor"
                 >
                   {planReview ? (
-                    <WebuiPlanDeliveryCard
+                    <WebuiTranscriptPlanDelivery
+                      sessionId={sessionId}
                       request={planReview}
-                      onBuild={submitPlanBuild}
-                      onViewPlan={() => openPlanFile(planReview)}
-                      chrome={{ busy: planSubmitting, error: planError }}
+                      answerPlanBuild={answerPlanBuild}
+                      onOpenPlanFile={onOpenPlanFile}
                     />
                   ) : null}
                 </div>

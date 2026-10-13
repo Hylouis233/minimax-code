@@ -21,7 +21,7 @@ import {
   WebuiMessageActionButton,
 } from "../../src/client/components/transcript/MessageActions.js";
 import { LeftRail } from "../../src/client/components/sessions/LeftRail.js";
-import { WebuiQuestionnaireResponse } from "../../src/client/components/transcript/SessionTranscript.js";
+import { WebuiQuestionnaireResponse } from "../../src/client/components/transcript/QuestionnaireResponse.js";
 import {
   mergeOlderTranscriptPage,
   type WebuiOwnedTranscriptState,

@@ -3668,6 +3668,8 @@
     "packages/webui/src/client/components/transcript/MessageAttachments.tsx",
     "packages/webui/src/client/components/transcript/MessageItem.tsx",
     "packages/webui/src/client/components/transcript/OutputError.tsx",
+    "packages/webui/src/client/components/transcript/PlanDelivery.tsx",
+    "packages/webui/src/client/components/transcript/QuestionnaireResponse.tsx",
     "packages/webui/src/client/components/transcript/SessionTranscript.tsx",
     "packages/webui/src/client/components/transcript/Transcript.tsx",
     "packages/webui/src/client/components/transcript/TranscriptPrimitives.tsx",
