@@ -22,6 +22,10 @@
 // Framework-free: no React, no DOM, no storage.
 
 import type { WebuiIdentityEpochs } from "../identity-epochs.js";
+import {
+  createWebuiKeyedResource,
+  type WebuiResourceKey,
+} from "../request-freshness.js";
 import type { ModelsPort } from "../../contracts/models/provider-port.js";
 import type { WebuiModelEntry } from "../../../shared/contracts/models.js";
 import {
@@ -117,6 +121,12 @@ export interface WebuiModelsWorkflows {
     readonly saveAndUse?: boolean;
   }) => Promise<unknown>;
   readonly refreshModels: () => Promise<unknown>;
+  /**
+   * Fences the owner: every keyed resource stops committing and stops
+   * scheduling. A remount builds a fresh owner rather than reactivating
+   * this one.
+   */
+  readonly dispose: () => void;
 }
 
 export function createWebuiModelsWorkflows(deps: {
@@ -138,11 +148,88 @@ export function createWebuiModelsWorkflows(deps: {
     deps.identityEpochs?.advance("credentials");
     deps.identityEpochs?.advance("configuration");
   };
-  const { getSnapshot, subscribe, set, readInto, unavailable } =
-    createWebuiQueryStore(initialWebuiModelsWorkflowsState);
+  // The keyed resources (§4.5; T03). Identity is storage identity: each answer
+  // lives under a key that carries every response-affecting input, so a late
+  // answer for one context lands in *its own* entry instead of overwriting the
+  // context the user is looking at — the defect the old destination field had.
+  //
+  //   * the catalogue is keyed by the session/agent context it was asked for and
+  //     by the opaque credential/config generations it was computed under;
+  //   * the provider list is keyed by the configuration generation;
+  //   * the presets are global, so their key is empty.
+  const catalogue = createWebuiKeyedResource<readonly WebuiModelEntry[]>();
+  const providerList = createWebuiKeyedResource<readonly Record<string, unknown>[]>();
+  const presetList = createWebuiKeyedResource<readonly Record<string, unknown>[]>();
+  const PRESETS_KEY: WebuiResourceKey = {};
+  // Which catalogue key the snapshot shows. Switching it is not a re-key of the
+  // stored answers: they stay under the keys they were read for.
+  let shownCatalogueKey: WebuiResourceKey = {};
+
+  const providerKey = (): WebuiResourceKey => ({
+    configuration: deps.identityEpochs?.configuration().token ?? null,
+  });
+  const catalogueKeyFor = (sessionId?: string): WebuiResourceKey => ({
+    sessionId: sessionId ?? null,
+    credentials: deps.identityEpochs?.credentials().token ?? null,
+    configuration: deps.identityEpochs?.configuration().token ?? null,
+  });
+
+  // The owner's own snapshot: the projection below writes it, the React binding
+  // subscribes to it. It holds no answer of its own — the keyed resources do.
+  let state: WebuiModelsWorkflowsState = initialWebuiModelsWorkflowsState;
+  const listeners = new Set<() => void>();
+  const getSnapshot = (): WebuiModelsWorkflowsState => state;
+  const subscribe = (listener: () => void): (() => void) => {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+  };
+  const set = (
+    update: (current: WebuiModelsWorkflowsState) => WebuiModelsWorkflowsState,
+  ): void => {
+    const next = update(state);
+    if (next === state) return;
+    state = next;
+    for (const listener of [...listeners]) listener();
+  };
 
   const markModels = (): void => {
     set((current) => ({ ...current, modelsRevision: current.modelsRevision + 1 }));
+  };
+
+  /**
+   * Retires the catalogue answer the owner is showing. A provider or credential
+   * write changes what the catalogue means, so a read that started before it must
+   * not land as current — the freshness revision moves first, and the next read
+   * is scheduled under the new generation's key.
+   */
+  const invalidateCatalogue = (): void => {
+    catalogue.invalidate(shownCatalogueKey);
+  };
+
+  /**
+   * The snapshot is a projection of the keyed entries, not a second store: it
+   * shows the entry for the key that is currently selected and the entries for
+   * the provider and preset keys. A commit for another key changes that key's
+   * entry and leaves this projection alone.
+   */
+  const project = (): void => {
+    set((current) => ({
+      ...current,
+      models: catalogue.read(shownCatalogueKey) ?? idleWebuiQueryState(),
+      providers: providerList.read(providerKey()) ?? idleWebuiQueryState(),
+      presets: presetList.read(PRESETS_KEY) ?? idleWebuiQueryState(),
+    }));
+  };
+  catalogue.subscribe(project);
+  providerList.subscribe(project);
+  presetList.subscribe(project);
+
+  /** A capability the runtime does not expose is reported, never a success. */
+  const unavailable = (
+    field: "models" | "providers" | "presets",
+    error: string,
+  ): void => {
+    set((current) => ({ ...current, [field]: { status: "error", error } }));
   };
 
   const loadModels = async (sessionId?: string): Promise<void> => {
@@ -150,7 +237,10 @@ export function createWebuiModelsWorkflows(deps: {
       unavailable("models", "当前运行时不支持模型列表。");
       return;
     }
-    await readInto("models", "models", () => port.listModels!(sessionId ? { sessionId } : undefined));
+    shownCatalogueKey = catalogueKeyFor(sessionId);
+    await catalogue.load(shownCatalogueKey, () =>
+      port.listModels!(sessionId ? { sessionId } : undefined),
+    );
   };
 
   const selectModel = async (request: {
@@ -172,12 +262,13 @@ export function createWebuiModelsWorkflows(deps: {
       unavailable("providers", "当前运行时不支持自定义提供商。");
       return;
     }
-    await readInto("providers", "providers", () => port.listUserModelProviders!());
+    await providerList.load(providerKey(), () => port.listUserModelProviders!());
   };
 
   /** A provider mutation refreshes the provider list and marks models stale. */
   const afterProviderMutation = async (): Promise<void> => {
     markModels();
+    invalidateCatalogue();
     // The write landed, so answers computed under the previous configuration are
     // no longer current. Advancing after the mutation — never before — is what
     // keeps a failed write from retiring answers that are still true.
@@ -189,18 +280,16 @@ export function createWebuiModelsWorkflows(deps: {
     providerId: string,
     models: readonly Record<string, unknown>[],
   ): void => {
-    set((current) => {
-      const providers = current.providers.value;
-      if (!providers) return current;
-      return {
-        ...current,
-        providers: {
-          status: "ready",
-          value: providers.map((provider) =>
-            provider.providerId === providerId ? { ...provider, models } : provider,
-          ),
-        },
-      };
+    const entry = providerList.read(providerKey());
+    const providers = entry?.value;
+    if (!providers) return;
+    // The optimistic patch goes through the resource, so the reload that follows
+    // is the truth and the patched value never becomes a second source.
+    providerList.commit(providerList.capture(providerKey()), {
+      status: "ready",
+      value: providers.map((provider: Record<string, unknown>) =>
+        provider.providerId === providerId ? { ...provider, models } : provider,
+      ),
     });
   };
 
@@ -277,7 +366,7 @@ export function createWebuiModelsWorkflows(deps: {
       unavailable("presets", "当前运行时不支持提供商预设。");
       return;
     }
-    await readInto("presets", "presets", () => port.listProviderPresets!());
+    await presetList.load(PRESETS_KEY, () => port.listProviderPresets!());
   };
 
   const upsertApiKey = async (body: {
@@ -287,6 +376,7 @@ export function createWebuiModelsWorkflows(deps: {
     if (!port.upsertMiniMaxApiKey) throw new Error("当前运行时不支持保存 API key。");
     const result = await port.upsertMiniMaxApiKey(body);
     markModels();
+    invalidateCatalogue();
     // A credential write retires both generations: the credential changed, and
     // the catalogue it unlocks may have too.
     afterCredentialWrite();
@@ -327,5 +417,10 @@ export function createWebuiModelsWorkflows(deps: {
     loadPresets,
     upsertApiKey,
     refreshModels,
+    dispose: () => {
+      catalogue.dispose();
+      providerList.dispose();
+      presetList.dispose();
+    },
   };
 }

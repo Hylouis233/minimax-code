@@ -116,3 +116,74 @@ describe("writing a provider key", () => {
     expect(workflows).not.toHaveProperty("loadApiKeyStatus");
   });
 });
+
+// The keyed resources behind the owner (T03; plan §4.5, §3 P3).
+//
+// These are the ticket's criterion-6 claims asserted through the owner's own
+// public commands: keyed independence, freshness coverage across a write, and a
+// disposed owner accepting nothing. The adversarial part is the scheduling —
+// two reads in flight, resolved out of order — because that is the shape the old
+// destination field failed.
+describe("the catalogue is keyed, not one destination", () => {
+  const model = (modelId: string) => ({ modelId });
+
+  it("keeps a late answer for another session out of the shown catalogue", async () => {
+    let resolveA!: (value: readonly Record<string, unknown>[]) => void;
+    const slowA = new Promise<readonly Record<string, unknown>[]>((resolve) => {
+      resolveA = resolve;
+    });
+    const workflows = build({
+      listModels: async (request) =>
+        request?.sessionId === "A" ? slowA : [model("b")],
+    });
+
+    const pendingA = workflows.loadModels("A");
+    await workflows.loadModels("B");
+    expect(workflows.getSnapshot().models.value).toEqual([model("b")]);
+
+    resolveA([model("a")]);
+    await pendingA;
+
+    // A's answer landed in A's own entry: the shown catalogue is still B's, which
+    // is the invariant the old seam could not state.
+    expect(workflows.getSnapshot().models.value).toEqual([model("b")]);
+  });
+
+  it("refuses a catalogue answer that was in flight when a provider write retired it", async () => {
+    let resolveRead!: (value: readonly Record<string, unknown>[]) => void;
+    const slow = new Promise<readonly Record<string, unknown>[]>((resolve) => {
+      resolveRead = resolve;
+    });
+    const workflows = build({
+      listModels: () => slow,
+      listUserModelProviders: async () => [],
+      createUserModelProvider: async () => ({ ok: true }),
+    });
+
+    const pending = workflows.loadModels();
+    expect(workflows.getSnapshot().models.status).toBe("loading");
+
+    await workflows.createProvider({ providerId: "b" });
+    resolveRead([model("stale")]);
+    await pending;
+
+    // The write advanced the configuration generation and retired the answer, so
+    // the pre-write read never becomes the current catalogue.
+    expect(workflows.getSnapshot().models.value).toBeUndefined();
+  });
+
+  it("accepts nothing after disposal", async () => {
+    let resolveRead!: (value: readonly Record<string, unknown>[]) => void;
+    const slow = new Promise<readonly Record<string, unknown>[]>((resolve) => {
+      resolveRead = resolve;
+    });
+    const workflows = build({ listModels: () => slow });
+
+    const pending = workflows.loadModels();
+    workflows.dispose();
+    resolveRead([model("late")]);
+    await pending;
+
+    expect(workflows.getSnapshot().models.value).toBeUndefined();
+  });
+});
