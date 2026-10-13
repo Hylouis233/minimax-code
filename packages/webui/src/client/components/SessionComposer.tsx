@@ -54,6 +54,7 @@ import {
   drawableBreakdownRows,
 } from "../projection/context-breakdown.js";
 import { isTokenPlanModel } from "../projection/token-plan-model.js";
+import type { WebuiRecordedTurn } from "../projection/composer-state.js";
 import type {
   WebuiComposerAttachment,
   WebuiComposerUrlReference,
@@ -492,12 +493,6 @@ export type WebuiRetryResendPlan =
       readonly reason: "no-refusal" | "no-recorded-input";
     };
 
-/** The input of the last turn a composer submitted, and the session it was in. */
-export interface WebuiRecordedTurn {
-  readonly session: string | undefined;
-  readonly message: string;
-}
-
 /**
  * Decide what a retry on a failed turn does.
  *
@@ -770,8 +765,30 @@ export function WebuiComposer({
   });
   const applyGoal = goalCoordinator.applyGoal;
   const [goalEnabled, setGoalEnabled] = useState(true);
-  const [goalMode, setGoalMode] = useState(false);
-  const [planMode, setPlanMode] = useState(false);
+  // The composer's owner, read once for everything this component keeps in it
+  // (§4.2 field 1: the input modes, the retry record, the queue; §5.6's may-write
+  // cell for the staging). One store, one subscription.
+  const composerStore = useWebuiComposerStore();
+  const composerSnapshot = useSyncExternalStore(
+    composerStore.subscribe,
+    composerStore.getSnapshot,
+    composerStore.getSnapshot,
+  );
+  // The input modes are the composer's own state (§4.2 field 1), kept by its owner.
+  const goalMode = composerSnapshot.modes.goal;
+  const planMode = composerSnapshot.modes.plan;
+  const setGoalMode = useCallback(
+    (next: boolean) => {
+      composerStore.setModes({ goal: next });
+    },
+    [composerStore],
+  );
+  const setPlanMode = useCallback(
+    (next: boolean) => {
+      composerStore.setModes({ plan: next });
+    },
+    [composerStore],
+  );
   const [goalSubmitting, setGoalSubmitting] = useState(false);
   const [interactionError, setInteractionError] = useState<string>();
   // The queue mirror is the composer's own state, and its owner is the composer
@@ -779,12 +796,6 @@ export function WebuiComposer({
   // component-local today)"; §5.6's composer row names the owner module). It is
   // live state: not persisted, and not per-slot, because unlike the draft it does
   // not survive a session switch.
-  const composerStore = useWebuiComposerStore();
-  const composerSnapshot = useSyncExternalStore(
-    composerStore.subscribe,
-    composerStore.getSnapshot,
-    composerStore.getSnapshot,
-  );
   const queueState = composerSnapshot.queue;
   const queueItems = queueState.items;
   const queuePaused = queueState.paused;
@@ -1797,16 +1808,12 @@ export function WebuiComposer({
     });
   };
   // The input of the last turn this composer submitted, kept locally so retry
-  // can re-send it without asking the server what was asked. Two holders, one
-  // value, as the slash-range ref above also does: the ref is what the retry
-  // handler reads (always current, even before the re-render lands), and the
-  // state is what makes the affordance appear at all.
-  const recordedTurnRef = useRef<WebuiRecordedTurn>();
-  const [recordedTurn, setRecordedTurn] = useState<WebuiRecordedTurn>();
+  // can re-send it without asking the server what was asked. One holder: the
+  // owner's, which the handler reads synchronously and the render subscribes to,
+  // so there is no second copy to fall out of step.
+  const recordedTurn = composerSnapshot.retry;
   const recordSubmittedTurn = (message: string) => {
-    const record: WebuiRecordedTurn = { session: sessionId, message };
-    recordedTurnRef.current = record;
-    setRecordedTurn(record);
+    composerStore.setRetry({ session: sessionId, message });
   };
   const retryPlan = planWebuiRetryResend({
     refusal: stream.refusal,
@@ -1817,7 +1824,9 @@ export function WebuiComposer({
   const handleRetryResend = () => {
     resendRecordedWebuiTurn({
       refusal: stream.refusal,
-      recordedTurn: recordedTurnRef.current,
+      // Read from the owner: the handler needs the value current *now*, not the
+      // one the render that installed it saw.
+      recordedTurn: composerStore.readRetry(),
       session: sessionId,
       sendTurn,
     });

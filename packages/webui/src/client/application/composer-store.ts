@@ -29,6 +29,7 @@ import type {
   WebuiComposerAttachment,
   WebuiComposerUrlReference,
 } from "../projection/composer-interactions.js";
+import type { WebuiRecordedTurn } from "../projection/composer-state.js";
 
 export interface WebuiComposerPersistence {
   readonly loadComposer: <T>(parse: (raw: string | null | undefined) => T) => T;
@@ -70,6 +71,21 @@ export interface WebuiComposerStagingState {
   readonly seedToken?: string;
 }
 
+/**
+ * The composer's input modes (§4.2 field 1 lists them with the owned state; §5.6's
+ * may-write cell calls the pair "toolbar state"). Live, like the queue and the
+ * staging.
+ */
+export interface WebuiComposerModes {
+  readonly goal: boolean;
+  readonly plan: boolean;
+}
+
+export const WEBUI_COMPOSER_EMPTY_MODES: WebuiComposerModes = {
+  goal: false,
+  plan: false,
+};
+
 export const WEBUI_COMPOSER_EMPTY_STAGING: WebuiComposerStagingState = {
   attachments: [],
   urlReferences: [],
@@ -84,6 +100,12 @@ export const WEBUI_COMPOSER_EMPTY_STAGING: WebuiComposerStagingState = {
 export interface WebuiComposerSnapshot extends WebuiComposerPersisted {
   readonly queue: WebuiComposerQueueState;
   readonly staging: WebuiComposerStagingState;
+  readonly modes: WebuiComposerModes;
+  /**
+   * The last submitted turn, so the retry affordance can re-send it without
+   * asking the server what was asked (§4.2 field 1: the retry record).
+   */
+  readonly retry: WebuiRecordedTurn | undefined;
 }
 
 export interface WebuiComposerStore {
@@ -120,6 +142,20 @@ export interface WebuiComposerStore {
   readonly readQueue: () => WebuiComposerQueueState;
   /** The staged attachments and url references. */
   readonly readStaging: () => WebuiComposerStagingState;
+  /** The input modes. */
+  readonly readModes: () => WebuiComposerModes;
+  readonly setModes: (
+    next:
+      | Partial<WebuiComposerModes>
+      | ((current: WebuiComposerModes) => Partial<WebuiComposerModes>),
+  ) => void;
+  /**
+   * The retry record. Read it from here rather than from a second holder: the
+   * retry handler needs the value that is current *now*, not the one the last
+   * render saw, and this returns it synchronously.
+   */
+  readonly readRetry: () => WebuiRecordedTurn | undefined;
+  readonly setRetry: (next: WebuiRecordedTurn | undefined) => void;
   /**
    * Replace part of the staging. A function receives the current state, so a
    * caller that removes one attachment hands back the array it received.
@@ -150,9 +186,11 @@ export function createWebuiComposerStore(options?: {
   let state = options?.initial ?? options?.storage?.loadComposer(parseWebuiComposerPersisted) ?? { drafts: {}, history: {} };
   let queue = WEBUI_COMPOSER_EMPTY_QUEUE;
   let staging = WEBUI_COMPOSER_EMPTY_STAGING;
+  let modes = WEBUI_COMPOSER_EMPTY_MODES;
+  let retry: WebuiRecordedTurn | undefined;
   // One stable object per change: a fresh snapshot on *every* `getSnapshot()` call
   // would make `useSyncExternalStore` re-render forever.
-  let snapshot: WebuiComposerSnapshot = { ...state, queue, staging };
+  let snapshot: WebuiComposerSnapshot = { ...state, queue, staging, modes, retry };
   const listeners = new Set<() => void>();
 
   const notify = (): void => {
@@ -177,7 +215,7 @@ export function createWebuiComposerStore(options?: {
     const next = update(state);
     if (next === state) return;
     state = next;
-    snapshot = { ...state, queue, staging };
+    snapshot = { ...state, queue, staging, modes, retry };
     options?.storage?.saveComposer(state, serializeWebuiComposerPersisted, keepKeys);
     notify();
   };
@@ -221,7 +259,7 @@ export function createWebuiComposerStore(options?: {
       // an unchanged result must not notify.
       if (items === queue.items && paused === queue.paused) return;
       queue = { items, paused };
-      snapshot = { ...state, queue, staging };
+      snapshot = { ...state, queue, staging, modes, retry };
       notify();
     },
     readStaging: () => snapshot.staging,
@@ -239,7 +277,25 @@ export function createWebuiComposerStore(options?: {
       )
         return;
       staging = { attachments, urlReferences, busy, ...(seedToken === undefined ? {} : { seedToken }) };
-      snapshot = { ...state, queue, staging };
+      snapshot = { ...state, queue, staging, modes, retry };
+      notify();
+    },
+    readModes: () => snapshot.modes,
+    setModes: (next) => {
+      const patch = typeof next === "function" ? next(modes) : next;
+      const goal = patch.goal ?? modes.goal;
+      const plan = patch.plan ?? modes.plan;
+      if (goal === modes.goal && plan === modes.plan) return;
+      modes = { goal, plan };
+      snapshot = { ...state, queue, staging, modes, retry };
+      notify();
+    },
+    readRetry: () => snapshot.retry,
+    setRetry: (next) => {
+      if (next === retry) return;
+      if (next && retry && next.session === retry.session && next.message === retry.message) return;
+      retry = next;
+      snapshot = { ...state, queue, staging, modes, retry };
       notify();
     },
     purgeSlot: (key) => {

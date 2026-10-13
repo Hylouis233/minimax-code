@@ -48,10 +48,14 @@ reproduces exactly that. Keying it by session would be the behaviour change here
 drop the current list on the way out and show a different one on the way back.
 `composer-history.test.ts` asserts the half that matters (`does not persist the live state`,
 and the snapshot the live state rides).
-| `recordedTurn` `:1757` | component-local `useState` | composer state (§4.2 field 1: the retry record) | `composer-store.ts` |
-| `recordedTurnRef` `:1756` | component-local `useRef` | composer state (its guard) | `composer-store.ts` |
-| `planMode` `:777` | component-local `useState` | composer state (§4.2 field 1: input mode flags) | `composer-store.ts` |
-| `goalMode` `:776` | component-local `useState` | composer state (§4.2 field 1: input mode flags) | `composer-store.ts` |
+| `recordedTurn` `:1757` | **resolved** — `composerSnapshot.retry` | composer state (§4.2 field 1: the retry record) | `composer-store.ts`: `readRetry()` / `setRetry()` |
+| `recordedTurnRef` `:1756` | **gone** — the second holder was the problem, not the solution | composer state (its guard) | `readRetry()` returns the current value synchronously, so the ref that existed to beat the render no longer has a job |
+| `planMode` `:777` | **resolved** — `composerSnapshot.modes.plan` | composer state (§4.2 field 1: input mode flags) | `composer-store.ts`: `readModes()` / `setModes()` |
+| `goalMode` `:776` | **resolved** — `composerSnapshot.modes.goal` | composer state (§4.2 field 1: input mode flags) | same |
+
+The retry record's type moved with it: `WebuiRecordedTurn` was exported from the component
+and is now in `projection/composer-state.ts` (no other module imported it, so nothing needed
+repointing).
 
 ## 2. Foreign state in a temporary home — the two fence cells (resolved)
 
@@ -135,10 +139,10 @@ this file must stop holding. `open` `:2647`, `hovered` `:2648`, `breakdownOpen` 
 ticket is not blocked.
 
 **Not yet in its final home** (this carve's work, in the order the code allows):
-1. §1 — thirteen elements move into `composer-store.ts`. **Six done** (the queue — §4.2's
-   two named rows — and the attachment staging, four rows); seven left: `mentionRange`,
-   `slashDraftRef`, `slashRangeRef`, `recordedTurn`, `recordedTurnRef`, `planMode`,
-   `goalMode`.
+1. §1 — thirteen elements move into `composer-store.ts`. **Ten done** (the queue — §4.2's
+   two named rows — the attachment staging, the two input modes and the retry record, whose
+   ref is gone rather than moved); three left, all in the next group: `mentionRange`,
+   `slashDraftRef`, `slashRangeRef`.
 2. §2 — **done** (the two cells above).
 3. §4 — the caches whose owner module does not exist yet lose their local copy in that
    owner's carve; until then the ledger records the API each one resolves against, and the

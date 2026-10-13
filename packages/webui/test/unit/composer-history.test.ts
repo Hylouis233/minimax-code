@@ -276,6 +276,8 @@ describe("composer persistence ownership", () => {
       // because nothing persisted them.
       queue: { items: [], paused: false },
       staging: { attachments: [], urlReferences: [], busy: false },
+      modes: { goal: false, plan: false },
+      retry: undefined,
     });
   });
 
@@ -292,10 +294,14 @@ describe("composer persistence ownership", () => {
       urlReferences: [{ id: "u1", url: "https://x.test" }],
       busy: true,
     });
+    composer.setModes({ goal: true, plan: true });
+    composer.setRetry({ session: "s1", message: "sent" });
     expect(composer.readQueue().paused).toBe(true);
     expect(composer.readStaging().busy).toBe(true);
+    expect(composer.readModes()).toEqual({ goal: true, plan: true });
+    expect(composer.readRetry()).toEqual({ session: "s1", message: "sent" });
     const stored = memory.getItem("webui.composer.state.v1") ?? "";
-    for (const token of ["q1", "queue", "a1", "staging", "x.png"]) {
+    for (const token of ["q1", "queue", "a1", "staging", "x.png", "retry", "modes", "sent"]) {
       expect(stored).not.toContain(token);
     }
     expect(stored).toContain("draft");
