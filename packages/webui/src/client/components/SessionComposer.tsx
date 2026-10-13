@@ -127,7 +127,7 @@ import {
   WebuiModelPicker,
   type WebuiModelPickerDraft,
 } from "./ModelPicker.js";
-import { ThinkingTrigger } from "./ThinkingTrigger.js";
+import { ThinkingTrigger } from "./composer/ThinkingTrigger.js";
 import {
   chipLevelLabel,
   resolveEffortOptions,
@@ -182,7 +182,7 @@ import {
   WEBUI_BUILTIN_COMMANDS,
   type SlashCommandEntry,
   type WebuiSlashSkillSummary,
-} from "../slash-palette.js";
+} from "./composer/slash-palette.js";
 import {
   isWebuiRunnableCommand,
   rankWebuiSlashPalette,
@@ -191,7 +191,7 @@ import {
 } from "../contracts/composer/slash-command.js";
 
 const WEBUI_SLASH_FALLBACK_SECTIONED: SlashCommandEntry[] = await (async () => {
-  const { resolveWebuiSlashSkills } = await import("../slash-palette.js");
+  const { resolveWebuiSlashSkills } = await import("./composer/slash-palette.js");
   const resolved = await resolveWebuiSlashSkills();
   return sectionWebuiSlashPalette(WEBUI_BUILTIN_COMMANDS, resolved.skills);
 })();

@@ -6,7 +6,7 @@ import {
   WEBUI_BUILTIN_COMMANDS,
   WEBUI_PLUGIN_REGISTRY,
   WEBUI_SKILL_FIXTURES,
-} from "../../src/client/slash-palette.js";
+} from "../../src/client/components/composer/slash-palette.js";
 import { WEBUI_COMMAND_DESCRIPTORS } from "../../src/runtime/commands/descriptors.js";
 import {
   applyWebuiSlashLiteMode,

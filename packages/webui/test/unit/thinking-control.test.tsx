@@ -21,7 +21,7 @@ import {
   resolveThinkingVerdict,
   thinkingControlShape,
 } from "../../src/client/projection/thinking-control.js";
-import { ThinkingTrigger } from "../../src/client/components/ThinkingTrigger.js";
+import { ThinkingTrigger } from "../../src/client/components/composer/ThinkingTrigger.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const componentPath = path.resolve(

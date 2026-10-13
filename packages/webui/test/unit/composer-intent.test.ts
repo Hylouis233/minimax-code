@@ -7,7 +7,7 @@ import {
   resolveWebuiSubmissionIntent,
   type WebuiSubmissionIntent,
 } from "../../src/client/projection/composer-state.js";
-import type { SlashCommandEntry } from "../../src/client/slash-palette.js";
+import type { SlashCommandEntry } from "../../src/client/components/composer/slash-palette.js";
 import {
   findWebuiMentionRange,
   findWebuiSlashRange,

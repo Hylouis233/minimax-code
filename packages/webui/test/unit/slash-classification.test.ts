@@ -4,7 +4,7 @@ import {
   WEBUI_BUILTIN_COMMANDS,
   WEBUI_SKILL_FIXTURES,
   type SlashCommandEntry,
-} from "../../src/client/slash-palette.js";
+} from "../../src/client/components/composer/slash-palette.js";
 import {
   WEBUI_RUN_COMMAND_NAMES,
   classifyWebuiSlashCommand,

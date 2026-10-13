@@ -16,7 +16,7 @@ import {
   type SlashDirectAction,
   type SlashSendIntent,
   type WebuiSlashPaletteFields,
-} from "./contracts/composer/slash-command.js";
+} from "../../contracts/composer/slash-command.js";
 import {
   WebuiIconCommandCompact,
   WebuiIconCommandGoal,
@@ -27,7 +27,7 @@ import {
   WebuiIconSkillCodeReview,
   WebuiIconSkillDiagnosingBugs,
   WebuiIconSkillGeneric,
-} from "./icons.js";
+} from "../../icons.js";
 
 /**
  * Three states a slash command can be in at runtime. Distinct from the
