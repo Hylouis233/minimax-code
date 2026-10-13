@@ -38,6 +38,7 @@ import {
 } from "../shell/icons.js";
 import type { WebuiGetSessionRewindPreviewResult } from "../../../shared/contracts/session.js";
 import type { WebuiMessageActionCapabilities } from "../../contracts/transcript/transcript-view.js";
+import { formatWebuiMessageTimestamp } from "../../projection/transcript/message-timestamp.js";
 
 export function toggleWebuiFeedback(
   value: "like" | "dislike" | undefined,
@@ -70,15 +71,6 @@ export function scheduleWebuiCopiedReset(
   schedule: (callback: () => void, delayMs: number) => unknown,
 ): void {
   schedule(() => setCopied(false), 1_200);
-}
-
-/** Desktop timestamp format for the action row: `9月22日, 22:37`. */
-export function formatWebuiMessageTimestamp(value?: number): string | undefined {
-  if (value === undefined || !Number.isFinite(value)) return undefined;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return undefined;
-  const pad = (input: number) => String(input).padStart(2, "0");
-  return `${date.getMonth() + 1}月${date.getDate()}日, ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 export function WebuiMessageActionButton({

@@ -13,7 +13,7 @@ import { ChatSkeleton } from "./TranscriptSkeletons.js";
 import { ActivityIndicator, MessageAfterQueryStreamingPlaceholder, MessagePassiveLoadingPlaceholder } from "./ActivityIndicator.js";
 import { TurnNavigator, type TurnSummary } from "./TurnNavigator.js";
 import { MessageItem } from "./MessageItem.js";
-import { formatWebuiMessageTimestamp } from "./MessageActions.js";
+import { formatWebuiMessageTimestamp } from "../../projection/transcript/message-timestamp.js";
 import type { WebuiMessageActionCapabilities } from "../../contracts/transcript/transcript-view.js";
 import { useWebuiSessionQuestionnaire, useWebuiSessionState, useWebuiSessionStream, useWebuiTranscriptHistoryOwner } from "../../bindings/use-session-state.js";
 import { isTurnLive } from "../../projection/composer/composer-state.js";
