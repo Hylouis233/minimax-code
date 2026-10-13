@@ -1353,17 +1353,19 @@ webui test tree; and the two business differences recorded in §14.4.
 
 **The repository-facing clause an earlier form of this section carried, and what supersedes it.** It listed
 "any PR, push, roadmap baseline edit, group message or issue" as out of scope. That was written for a design
-round which was not authorized to change anything, and it is now **superseded for the part the operator's
-instruction of 2026-10-13 requires**: that instruction is to execute the programme to completion with **every
-ticket closed**, and a closed ticket on this fork means the evidence its comment cites exists on the remote.
+round which was not authorized to change anything. **The operator superseded it explicitly on 2026-10-13**,
+having been asked the question directly: closing a ticket is a remote write, so that clause and the
+instruction to close every ticket could not both hold.
 
-- **In scope and required:** commits on the `webui` feature branch; pushing that branch to
-  `origin` (`mcode-webui/minimax-code`, per `AGENTS.md`); opening, commenting on and closing the board's
-  issues, each closure carrying its per-criterion evidence; and the `release/public-source.json`
-  regeneration every such change needs (§12.6).
-- **Still out of scope:** a pull request against the default branch; any edit to the roadmap's baseline
-  line; group messages; and merging the feature branch. None of the four is needed to close a ticket, and
-  `CONTRIBUTING.md` keeps its own requirements for contribution time.
+- **Authorized by the operator on 2026-10-13:** commits on the `webui` feature branch; pushing that branch to
+  `origin` (`mcode-webui/minimax-code`, the working remote — **never `upstream`, never the default branch**);
+  and `gh` writes against that remote, i.e. commenting on and closing the board's issues, each closure
+  carrying its per-criterion evidence. Plus the `release/public-source.json` regeneration every such change
+  needs (§12.6).
+- **Not authorized, and out of scope:** a pull request against the default branch — the operator's word was
+  that it is not needed to close a ticket, and it stays a Phase 5 question; any edit to the roadmap's baseline
+  line; group messages; and merging the feature branch. `CONTRIBUTING.md` keeps its own requirements for
+  contribution time.
 
 ### 14.3 The three gaps this section carried, now closed
 
