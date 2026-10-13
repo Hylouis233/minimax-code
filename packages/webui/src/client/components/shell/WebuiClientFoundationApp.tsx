@@ -363,6 +363,9 @@ export function WebuiClientFoundationApp(
     }),
     [accountPort],
   );
+  // The account owner runs timers (the login poll and the OAuth status poll), so
+  // its mount owns their end (T09).
+  useEffect(() => () => accountWorkflows.dispose(), [accountWorkflows]);
   const settingsWorkflows = useMemo(
     () => createWebuiSettingsWorkflows({
       port: settingsPort,

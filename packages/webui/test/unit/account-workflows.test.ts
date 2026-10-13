@@ -203,3 +203,67 @@ describe("the account answer has one owner", () => {
     expect(workflows.getSnapshot().account.status).toBe("idle");
   });
 });
+
+describe("the owner's disposal", () => {
+  it("stops every timer it runs", async () => {
+    vi.useFakeTimers();
+    const loginStatus = vi.fn(async (): Promise<WebuiAccountLoginView> => pending);
+    const codexStatus = vi.fn(async () => ({ state: "pending" }));
+    const workflows = createWebuiAccountWorkflows({
+      port: {
+        beginAccountLogin: async () => pending,
+        getAccountLoginStatus: loginStatus,
+        getCodexOAuthStatus: codexStatus,
+      },
+    });
+
+    await workflows.beginLogin();
+    const release = workflows.acquireCodexOAuthPolling();
+    await vi.advanceTimersByTimeAsync(2_000);
+    const loginCalls = loginStatus.mock.calls.length;
+    const codexCalls = codexStatus.mock.calls.length;
+    expect(loginCalls).toBeGreaterThan(0);
+    expect(codexCalls).toBeGreaterThan(0);
+
+    workflows.dispose();
+    // The release the surface still holds must not restart anything either.
+    release();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(loginStatus.mock.calls.length).toBe(loginCalls);
+    expect(codexStatus.mock.calls.length).toBe(codexCalls);
+  });
+
+  it("drops an answer that lands after disposal", async () => {
+    let resolveAccount: ((value: Record<string, unknown>) => void) | undefined;
+    const workflows = createWebuiAccountWorkflows({
+      port: {
+        getAccountStatus: () =>
+          new Promise<Record<string, unknown>>((resolve) => {
+            resolveAccount = resolve;
+          }),
+      },
+    });
+
+    const read = workflows.loadAccount();
+    workflows.dispose();
+    resolveAccount?.({ signedIn: true, accountId: "late" });
+    await read;
+
+    // A disposed owner commits nothing, so a late answer cannot resurrect state.
+    expect(workflows.getSnapshot().account.status).toBe("loading");
+  });
+
+  it("refuses a poll interest once disposed", async () => {
+    vi.useFakeTimers();
+    const codexStatus = vi.fn(async () => ({ state: "pending" }));
+    const workflows = createWebuiAccountWorkflows({
+      port: { getCodexOAuthStatus: codexStatus },
+    });
+
+    workflows.dispose();
+    const release = workflows.acquireCodexOAuthPolling();
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(codexStatus).not.toHaveBeenCalled();
+    release();
+  });
+});

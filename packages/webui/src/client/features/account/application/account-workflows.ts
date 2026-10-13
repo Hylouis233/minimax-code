@@ -190,6 +190,13 @@ export interface WebuiAccountWorkflows {
    */
   readonly acquireCodexOAuthPolling: () => () => void;
 
+  /**
+   * Terminal teardown: every timer this owner runs stops and a late answer can no
+   * longer commit. The application is replaced per mount, so an owner that kept
+   * polling after its mount went away would be a leak (T09; plan §4.1).
+   */
+  readonly dispose: () => void;
+
   /** Sign out, then refresh the account and usage answers. */
   readonly signOutAccount: () => Promise<void>;
   /** Clear the recorded sign-out error once the surface is dismissed. */
@@ -225,6 +232,7 @@ export function createWebuiAccountWorkflows(deps: {
       value?.plan ?? null,
     ]);
   let lastCredentialFingerprint: string | undefined;
+  let disposed = false;
   let state = initialWebuiAccountWorkflowsState;
   const listeners = new Set<() => void>();
   const versions = new Map<string, number>();
@@ -261,6 +269,7 @@ export function createWebuiAccountWorkflows(deps: {
       }));
       return;
     }
+    if (disposed) return;
     const version = bump(key);
     set((current) => ({
       ...current,
@@ -268,10 +277,10 @@ export function createWebuiAccountWorkflows(deps: {
     }));
     try {
       const value = await read();
-      if (!isCurrent(key, version)) return;
+      if (disposed || !isCurrent(key, version)) return;
       set((current) => ({ ...current, [key]: { status: "ready", value } }));
     } catch (error) {
-      if (!isCurrent(key, version)) return;
+      if (disposed || !isCurrent(key, version)) return;
       set((current) => ({
         ...current,
         [key]: { status: "error", error: message(error) },
@@ -292,6 +301,7 @@ export function createWebuiAccountWorkflows(deps: {
   let loginTimer: ReturnType<typeof setInterval> | undefined;
 
   const acquireCodexOAuthPolling = (): (() => void) => {
+    if (disposed) return () => undefined;
     codexPollHolders += 1;
     if (codexPollTimer === undefined && port.getCodexOAuthStatus) {
       void loadCredentialStatus(
@@ -311,6 +321,15 @@ export function createWebuiAccountWorkflows(deps: {
       codexPollHolders = Math.max(0, codexPollHolders - 1);
       if (codexPollHolders === 0) stopCodexPolling();
     };
+  };
+
+  const dispose = (): void => {
+    if (disposed) return;
+    disposed = true;
+    stopLoginPolling();
+    stopCodexPolling();
+    codexPollHolders = 0;
+    listeners.clear();
   };
 
   const stopLoginPolling = (): void => {
@@ -436,7 +455,7 @@ export function createWebuiAccountWorkflows(deps: {
     set((current) => ({ ...current, account: { ...current.account, status: "loading" } }));
     try {
       const value = await read(sessionId ? { sessionId } : undefined);
-      if (!isCurrent(key, version)) return;
+      if (disposed || !isCurrent(key, version)) return;
       set((current) => ({ ...current, account: { status: "ready", value } }));
       // Authoritative reconciliation: the runtime is the credential authority,
       // so an answer that reports a *different* identity advances the epoch. The
@@ -447,7 +466,7 @@ export function createWebuiAccountWorkflows(deps: {
       }
       lastCredentialFingerprint = fingerprint;
     } catch (reason) {
-      if (!isCurrent(key, version)) return;
+      if (disposed || !isCurrent(key, version)) return;
       set((current) => ({
         ...current,
         account: { ...current.account, status: "error", error: message(reason) },
@@ -466,10 +485,10 @@ export function createWebuiAccountWorkflows(deps: {
     set((current) => ({ ...current, usage: { ...current.usage, status: "loading" } }));
     try {
       const result = await read(forceRefresh ? { forceRefresh: true } : undefined);
-      if (!isCurrent(key, version)) return;
+      if (disposed || !isCurrent(key, version)) return;
       set((current) => ({ ...current, usage: { status: "ready", result } }));
     } catch (reason) {
-      if (!isCurrent(key, version)) return;
+      if (disposed || !isCurrent(key, version)) return;
       set((current) => ({ ...current, usage: { status: "error", error: message(reason) } }));
     }
   };
@@ -488,13 +507,13 @@ export function createWebuiAccountWorkflows(deps: {
     set((current) => ({ ...current, signin: { ...current.signin, loading: true, error: undefined } }));
     try {
       const panel = await read();
-      if (!isCurrent(key, version)) return;
+      if (disposed || !isCurrent(key, version)) return;
       set((current) => ({
         ...current,
         signin: { ...current.signin, loading: false, panel, error: undefined },
       }));
     } catch (reason) {
-      if (!isCurrent(key, version)) return;
+      if (disposed || !isCurrent(key, version)) return;
       set((current) => ({
         ...current,
         signin: { ...current.signin, loading: false, error: message(reason) },
@@ -585,6 +604,7 @@ export function createWebuiAccountWorkflows(deps: {
         "当前运行时不支持 Codex 登录状态。",
       ),
     acquireCodexOAuthPolling,
+    dispose,
     loadAccount,
     loadUsage,
     loadSigninPanel,
