@@ -1081,7 +1081,8 @@
       "39fc07f6",
       "3c454bc8",
       "7803d467",
-      "9fba8e90"
+      "9fba8e90",
+      "2092c050"
     ],
     "published": false,
     "tickets": {
@@ -1093,17 +1094,17 @@
       "T06": "closed 2026-10-14, acceptance evidence recorded on #132",
       "T10": "closed 2026-10-14 (issue #136, comment 6156644369): both review families have their own owners and both consumers are browser-verified",
       "T14": "closed 2026-10-14 (issue #140, comment 6156919983): the host assembles the registry and the terminal-process port; the service binds what it was handed",
-      "T07": "in progress: acceptance 1, 2 (with one recorded peer edge), 3, 4 and 5 are delivered and verified; acceptance 6 is delivered for the rail and the archived surface, and the import/export browser entries are the last item"
+      "T07": "closed 2026-10-14 (issue #133, comment 6157401861): one Sessions owner holds the catalogue, the rail overlays and the lifecycle commands, with the delete failure/interest evidence and the rail/archive/import/export browser entry paths"
     },
     "frontier": [
-      "T07",
       "T08",
       "T09",
       "T17"
     ],
     "notes": [
-      "T07 slice 3 (9fba8e90): the delete teardown's failure half is pinned (a refused delete purges nothing, keeps the selection and delivery leases, and drops the settlement lease it took) and so is the interest revocation on a successful delete; the archived entry surface now has a built-client case (rail menu archives -> archived settings page reads it through the same owner -> 取消归档 takes it back with {id, archived:false}).",
-      "T07's last item: the import/export browser entry paths. Both are HTTP (POST /session-import, GET /session-transfer), and the browser harness answers only the WebSocket: it has no HTTP server, so a browser case needs the harness to serve or intercept those two routes. The routes themselves are already covered over a real WebuiService and loopback HTTP (session-transfer-route.test.ts) and so are the client adapters (session-transfer-download.test.ts); what is missing is only the rail's button + file-picker entry, so the browser case can stub the network and say so."
+      "T07 closed 2026-10-14 (3c454bc8, 7803d467, 9fba8e90, 2092c050). The sessions owner's files and rail UI took their business-first homes, the rail's platform read is injected, the delete failure/interest behaviour is pinned, and the rail/archive/import/export browser entry paths are covered.",
+      "T07 kept two things where they were and said why: session-store.ts stays in the application layer (it owns application/state.ts, and conversation may not reach the assembly state container) and bindings/use-session-state.ts stays a shared binding. The cross-business edges the moves surfaced are recorded as reviewed peer entries naming the ticket that retires each.",
+      "T07's transfer browser case intercepts the two HTTP routes and says so in its header: the browser harness serves no HTTP, so it proves the entry path while the routes stay covered over a real WebuiService and loopback HTTP (session-transfer-route.test.ts)."
     ]
   },
   "publicationVerification": {
