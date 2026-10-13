@@ -74,9 +74,8 @@ vi.mock("react/jsx-runtime", async (importOriginal) => {
 
 import {
   WebuiComposer,
-  planWebuiRetryResend,
-  resendRecordedWebuiTurn,
 } from "../../src/client/components/SessionComposer.js";
+import { planWebuiRetryResend, resendRecordedWebuiTurn } from "../../src/client/application/composer/turn-retry.js";
 import { OutputError } from "../../src/client/components/transcript/OutputError.js";
 import {
   buildWebuiComposerHandlers,
