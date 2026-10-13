@@ -69,11 +69,18 @@ describe("the diff machine has one owner", () => {
 });
 
 describe("the two readers share it", () => {
-  it("is read by the transcript's card and by the review page", () => {
-    const readers = ["components/DiffCard.tsx", "components/SettingsModal.tsx"].filter((file) =>
-      read(file).includes('"../projection/review-state.js"'),
-    );
-    expect(readers).toEqual(["components/DiffCard.tsx", "components/SettingsModal.tsx"]);
+  it("is read by the transcript's card and by the review page, and by nothing else", () => {
+    // Scanned rather than listed: the review page moved to
+    // `components/workspace/` in ticket #70, so a hardcoded path went stale
+    // while the acceptance ("one owner, two readers") still held. Scanning the
+    // tree makes a third reader fail here and a relocation a no-op.
+    const readers = modulesUnder("components/")
+      .filter((file) => read(file).includes("/projection/review-state.js"))
+      .sort();
+    expect(readers).toEqual([
+      "components/DiffCard.tsx",
+      "components/workspace/SettingsReviewPage.tsx",
+    ]);
   });
 
   it("still decides the same things the card used to decide itself", () => {
