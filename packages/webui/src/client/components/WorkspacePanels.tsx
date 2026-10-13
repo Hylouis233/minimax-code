@@ -33,7 +33,16 @@ import type {
   WebuiWorkspaceReviewSearchResult,
   WebuiWorkspaceReviewSummary,
 } from "../../shared/contracts/review.js";
-import type { WorkspacePanelCommand, WorkspacePanelState, WorkspacePanelTab } from "../projection/workspace-panel-state.js";
+import type {
+  WebuiWorkspaceTabKind,
+  WorkspacePanelCommand,
+  WorkspacePanelState,
+  WorkspacePanelTab,
+} from "../projection/workspace-panel-state.js";
+import {
+  webuiWorkspaceAddMenu,
+  webuiWorkspaceTabLabel,
+} from "../projection/workspace-panel-state.js";
 import { focusWebuiFileLine, webuiFileLineTargetId } from "../bindings/browser-effects.js";
 import {
   projectWebuiWorkspaceHistory,
@@ -628,7 +637,25 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     // change between renders and a panel drag cannot re-run this effect and
     // rebuild a shell that is running.
   }, [activeTerminalId, resizeTerminal, terminals, watchTerminal, writeTerminal]);
-  const tabLabel = (item: WorkspacePanelTab): string => item.kind === "file-preview" ? basenamePath(item.path) : item.kind === "review" && item.source === "turn" ? "Review" : ({ files: "查看文件", review: "变更", canvas: "画布", terminal: "终端" } as const)[item.kind];
+  // The label rule lives in the registry (plan §4.4, §10 S4); the icon below is the
+  // host render branch the registry is allowed to have.
+  const tabLabel = (item: WorkspacePanelTab): string => webuiWorkspaceTabLabel(item);
+  // The registry carries the kinds, their words and how each opens; the glyphs are
+  // this file's, which is the host render branch §10 S4 allows.
+  const addMenuGlyph = (kind: WebuiWorkspaceTabKind) => {
+    switch (kind) {
+      case "review":
+        return <WebuiIconWorkspaceReview className="size-[18px] shrink-0" />;
+      case "terminal":
+        return <WebuiIconWorkspaceTerminal className="size-[18px] shrink-0" />;
+      case "canvas":
+        return <WebuiIconWorkspaceCanvas className="size-[18px] shrink-0" />;
+      case "files":
+        return <WebuiIconFile className="size-[18px] shrink-0" />;
+      default:
+        return null;
+    }
+  };
   const fileTabGlyph = (item: WorkspacePanelTab) => {
     if (item.kind === "files") return <WebuiIconFile className="webui-workspace-tab-file-icon" />;
     if (item.kind !== "file-preview") return null;
@@ -651,10 +678,11 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
         <div className="webui-workspace-add-anchor">
           <button type="button" className="webui-workspace-add-trigger" aria-label="添加标签" aria-haspopup="menu" aria-expanded={state.addMenuOpen} onClick={() => dispatch({ type: "toggle-add-menu" })}>+</button>
           {state.addMenuOpen ? <div className="webui-workspace-add-menu" role="menu" aria-label="添加工作区标签">
-            {sessionId && workspaceDir ? <button type="button" role="menuitem" onClick={() => dispatch({ type: "open-workspace-review", sessionId, workspaceDir })}><WebuiIconWorkspaceReview className="size-[18px] shrink-0" /><span>审查</span></button> : null}
-            <button type="button" role="menuitem" onClick={() => dispatch({ type: "open-tab", kind: "terminal", sessionId, workspaceDir })}><WebuiIconWorkspaceTerminal className="size-[18px] shrink-0" /><span>终端</span></button>
-            <button type="button" role="menuitem" onClick={() => dispatch({ type: "open-tab", kind: "canvas", sessionId, workspaceDir })}><WebuiIconWorkspaceCanvas className="size-[18px] shrink-0" /><span>画布</span></button>
-            <button type="button" role="menuitem" onClick={() => dispatch({ type: "open-tab", kind: "files", sessionId, workspaceDir })}><WebuiIconFile className="size-[18px] shrink-0" /><span>查看文件</span></button>
+            {webuiWorkspaceAddMenu().map((entry) => entry.opens.type === "open-workspace-review"
+              ? (sessionId && workspaceDir
+                  ? <button key={entry.kind} type="button" role="menuitem" onClick={() => dispatch({ type: "open-workspace-review", sessionId, workspaceDir })}>{addMenuGlyph(entry.kind)}<span>{entry.label}</span></button>
+                  : null)
+              : <button key={entry.kind} type="button" role="menuitem" onClick={() => dispatch({ type: "open-tab", kind: entry.opens.kind, sessionId, workspaceDir })}>{addMenuGlyph(entry.kind)}<span>{entry.label}</span></button>)}
           </div> : null}
         </div>
       </div>

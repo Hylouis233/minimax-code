@@ -1,12 +1,145 @@
 import type { WebuiTurnDiffView } from "../../shared/contracts/session.js";
+import { basenamePath } from "../paths.js";
 
-export type WorkspacePanelTab =
-  { readonly id: string; readonly kind: "files"; readonly sessionId?: string; readonly workspaceDir?: string }
-  | { readonly id: string; readonly kind: "file-preview"; readonly sessionId: string; readonly workspaceDir: string; readonly path: string; readonly lineStart?: number; readonly lineEnd?: number; readonly content?: string }
-  | { readonly id: string; readonly kind: "review"; readonly sessionId: string; readonly workspaceDir: string; readonly source: "workspace"; readonly selectedPath?: string; readonly reviewSnapshotId?: string }
-  | { readonly id: string; readonly kind: "review"; readonly sessionId: string; readonly workspaceDir: string; readonly source: "turn"; readonly messageId: string; readonly assistantMessageId?: string; readonly turnId?: string; readonly changeSetId?: string; readonly files: WebuiTurnDiffView["fileChanges"]; readonly selectedPath?: string }
-  | { readonly id: string; readonly kind: "canvas"; readonly sessionId?: string }
-  | { readonly id: string; readonly kind: "terminal"; readonly workspaceDir?: string };
+// ---------------------------------------------------------------------------
+// The tab-kind registry (plan §4.4: "the single tab-kind registry"; §5.6's
+// `workspace` row; §10 S4). The kinds used to be enumerated in three places — the
+// union here, the label map and the add menu in `WorkspacePanels.tsx` — so adding
+// a kind meant finding all three, and the type system caught only two of them
+// (§5.1.3's recorded violation). They are declared once, below, and everything
+// else derives: the union from the shapes' keys, the tab's label from the table,
+// and the add menu from the table plus its order.
+//
+// §10 S4 permits the registry to carry a host render branch, which is why the
+// *icons* and the dispatch calls stay in the component: this module has no React
+// and no dispatcher. What it owns is the closed set and the words.
+// ---------------------------------------------------------------------------
+
+/**
+ * One kind's tab shape. The keys are the closed set — a new kind is a new key
+ * here, and nothing else spells the set out.
+ *
+ * `review` has two variants because one tab serves both the workspace's change
+ * set and a turn's; the discriminant is `source`, not `kind`.
+ */
+export interface WebuiWorkspaceTabShapes {
+  readonly files: {
+    readonly sessionId?: string;
+    readonly workspaceDir?: string;
+  };
+  readonly "file-preview": {
+    readonly sessionId: string;
+    readonly workspaceDir: string;
+    readonly path: string;
+    readonly lineStart?: number;
+    readonly lineEnd?: number;
+    readonly content?: string;
+  };
+  readonly review:
+    | {
+        readonly sessionId: string;
+        readonly workspaceDir: string;
+        readonly source: "workspace";
+        readonly selectedPath?: string;
+        readonly reviewSnapshotId?: string;
+      }
+    | {
+        readonly sessionId: string;
+        readonly workspaceDir: string;
+        readonly source: "turn";
+        readonly messageId: string;
+        readonly assistantMessageId?: string;
+        readonly turnId?: string;
+        readonly changeSetId?: string;
+        readonly files: WebuiTurnDiffView["fileChanges"];
+        readonly selectedPath?: string;
+      };
+  readonly canvas: {
+    readonly sessionId?: string;
+  };
+  readonly terminal: {
+    readonly workspaceDir?: string;
+  };
+}
+
+export type WebuiWorkspaceTabKind = keyof WebuiWorkspaceTabShapes;
+
+/** Every tab, derived: one member per declared kind, each carrying `kind` and its shape. */
+export type WorkspacePanelTab = {
+  [K in WebuiWorkspaceTabKind]: { readonly id: string; readonly kind: K } &
+    WebuiWorkspaceTabShapes[K];
+}[WebuiWorkspaceTabKind];
+
+/**
+ * The kinds an `open-tab` command may name: exactly those whose add-menu entry is
+ * an `open-tab`. Derived, so a kind that gains or loses a menu entry moves this
+ * union with it.
+ */
+export type WebuiWorkspaceMenuTabKind = Extract<
+  WebuiWorkspaceAddMenuOpen,
+  { readonly type: "open-tab" }
+>["kind"];
+
+/** How an add-menu entry opens its tab. Data, so the component only dispatches it. */
+export type WebuiWorkspaceAddMenuOpen =
+  | { readonly type: "open-workspace-review" }
+  | { readonly type: "open-tab"; readonly kind: "files" | "canvas" | "terminal" };
+
+export interface WebuiWorkspaceTabKindEntry {
+  /** The tab's label, and the add-menu entry's when it has one. */
+  readonly label: string;
+  /**
+   * The add-menu entry, or `null` for a kind opened only by an instance — a file
+   * preview is opened by a path from the tree, never by the menu.
+   */
+  readonly addMenu: WebuiWorkspaceAddMenuOpen | null;
+}
+
+export const WEBUI_WORKSPACE_TAB_KINDS: Readonly<
+  Record<WebuiWorkspaceTabKind, WebuiWorkspaceTabKindEntry>
+> = {
+  files: { label: "查看文件", addMenu: { type: "open-tab", kind: "files" } },
+  "file-preview": { label: "文件", addMenu: null },
+  review: { label: "变更", addMenu: { type: "open-workspace-review" } },
+  canvas: { label: "画布", addMenu: { type: "open-tab", kind: "canvas" } },
+  terminal: { label: "终端", addMenu: { type: "open-tab", kind: "terminal" } },
+};
+
+/**
+ * The add menu's order. It is not the table's: 审查 leads and 查看文件 trails the
+ * kinds that open a process, which is the order Desktop's menu has.
+ */
+export const WEBUI_WORKSPACE_ADD_MENU_ORDER: readonly WebuiWorkspaceTabKind[] = [
+  "review",
+  "terminal",
+  "canvas",
+  "files",
+];
+
+export interface WebuiWorkspaceAddMenuEntry {
+  readonly kind: WebuiWorkspaceTabKind;
+  readonly label: string;
+  readonly opens: WebuiWorkspaceAddMenuOpen;
+}
+
+/** The add menu, derived from the table — entries and order both live there. */
+export function webuiWorkspaceAddMenu(): readonly WebuiWorkspaceAddMenuEntry[] {
+  return WEBUI_WORKSPACE_ADD_MENU_ORDER.flatMap((kind) => {
+    const entry = WEBUI_WORKSPACE_TAB_KINDS[kind];
+    return entry.addMenu ? [{ kind, label: entry.label, opens: entry.addMenu }] : [];
+  });
+}
+
+/**
+ * A tab's label, by one rule instead of two copies: a file preview shows its
+ * file, a turn's review says "Review" (it is not the workspace's change set), and
+ * every other kind shows the registry's word.
+ */
+export function webuiWorkspaceTabLabel(tab: WorkspacePanelTab): string {
+  if (tab.kind === "file-preview") return basenamePath(tab.path);
+  if (tab.kind === "review" && tab.source === "turn") return "Review";
+  return WEBUI_WORKSPACE_TAB_KINDS[tab.kind].label;
+}
 
 export interface WorkspacePanelState {
   readonly open: boolean;
@@ -90,7 +223,7 @@ export type WorkspacePanelCommand =
   | { readonly type: "open-workspace-review"; readonly sessionId: string; readonly workspaceDir: string; readonly selectedPath?: string }
   | { readonly type: "open-turn-review"; readonly sessionId: string; readonly workspaceDir: string; readonly messageId: string; readonly assistantMessageId?: string; readonly turnId?: string; readonly changeSetId?: string; readonly files: WebuiTurnDiffView["fileChanges"]; readonly selectedPath?: string }
   | { readonly type: "open-primary-view"; readonly kind: "files"; readonly sessionId?: string; readonly workspaceDir?: string }
-  | { readonly type: "open-tab"; readonly kind: "files" | "canvas" | "terminal"; readonly sessionId?: string; readonly workspaceDir?: string }
+  | { readonly type: "open-tab"; readonly kind: WebuiWorkspaceMenuTabKind; readonly sessionId?: string; readonly workspaceDir?: string }
   | { readonly type: "select-tab"; readonly tabId: string }
   | { readonly type: "select-review-file"; readonly tabId: string; readonly path: string }
   | { readonly type: "set-review-snapshot"; readonly tabId: string; readonly reviewSnapshotId: string }
