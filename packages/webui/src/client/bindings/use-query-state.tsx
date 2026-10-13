@@ -33,6 +33,11 @@ import {
   type WebuiSettingsWorkflowsState,
 } from "../application/settings-workflows.js";
 import {
+  initialWebuiModelsWorkflowsState,
+  type WebuiModelsWorkflows,
+  type WebuiModelsWorkflowsState,
+} from "../application/models-workflows.js";
+import {
   initialWebuiPluginWorkflowsState,
   type WebuiPluginWorkflows,
   type WebuiPluginWorkflowsState,
@@ -165,6 +170,44 @@ export function useWebuiSettingsWorkflowsState(): WebuiSettingsWorkflowsState {
 
 function settingsInitialSnapshot(): WebuiSettingsWorkflowsState {
   return initialWebuiSettingsWorkflowsState;
+}
+
+// `models` is its own owner (plan §5.6): the catalogue, the selection and the
+// provider list have their own snapshot and their own commands, so a surface
+// that only needs models does not subscribe to the settings snapshot.
+const WebuiModelsWorkflowsContext = createContext<WebuiModelsWorkflows | undefined>(
+  undefined,
+);
+
+export function WebuiModelsWorkflowsProvider({
+  workflows,
+  children,
+}: {
+  readonly workflows: WebuiModelsWorkflows;
+  readonly children: ReactNode;
+}): JSX.Element {
+  return (
+    <WebuiModelsWorkflowsContext.Provider value={workflows}>
+      {children}
+    </WebuiModelsWorkflowsContext.Provider>
+  );
+}
+
+export function useWebuiModelsWorkflows(): WebuiModelsWorkflows | undefined {
+  return useContext(WebuiModelsWorkflowsContext);
+}
+
+export function useWebuiModelsWorkflowsState(): WebuiModelsWorkflowsState {
+  const workflows = useContext(WebuiModelsWorkflowsContext);
+  return useSyncExternalStore(
+    workflows ? workflows.subscribe : noopSubscribe,
+    workflows ? workflows.getSnapshot : modelsInitialSnapshot,
+    workflows ? workflows.getSnapshot : modelsInitialSnapshot,
+  );
+}
+
+function modelsInitialSnapshot(): WebuiModelsWorkflowsState {
+  return initialWebuiModelsWorkflowsState;
 }
 
 const WebuiPluginWorkflowsContext = createContext<WebuiPluginWorkflows | undefined>(

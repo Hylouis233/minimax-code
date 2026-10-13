@@ -124,11 +124,13 @@ import {
   WebuiAccountWorkflowsProvider,
   WebuiPluginWorkflowsProvider,
   WebuiSessionWorkflowsProvider,
+  WebuiModelsWorkflowsProvider,
   WebuiSettingsWorkflowsProvider,
   WebuiWorkspaceQueriesProvider,
 } from "../bindings/use-query-state.js";
 import { createWebuiWorkspaceQueries } from "../application/workspace-queries.js";
 import { createWebuiAccountWorkflows } from "../application/account-workflows.js";
+import { createWebuiModelsWorkflows } from "../application/models-workflows.js";
 import { createWebuiSettingsWorkflows } from "../application/settings-workflows.js";
 import { createWebuiPluginWorkflows } from "../application/plugin-workflows.js";
 import { webuiActiveTurnProbeFor } from "../application/active-turn-probe.js";
@@ -384,6 +386,17 @@ export function WebuiClientFoundationApp(
   const settingsWorkflows = useMemo(
     () => createWebuiSettingsWorkflows({ port: settingsPort }),
     [settingsPort],
+  );
+  // `models` owns the catalogue, the selection and the provider list (plan §5.6),
+  // so it is its own owner with its own snapshot. The one call that crosses the
+  // boundary is `upsertApiKey`'s: it refreshes `settings`' api-key *status* read
+  // through that owner's published command rather than copying the read.
+  const modelsWorkflows = useMemo(
+    () => createWebuiModelsWorkflows({
+      port: modelsPort,
+      refreshApiKeyStatus: () => settingsWorkflows.loadApiKeyStatus(),
+    }),
+    [modelsPort, settingsWorkflows],
   );
   // The runtime handshake fact is a `SettingsPort` method, so it is read through
   // the settings owner like every other settings read rather than invoked here.
@@ -1217,6 +1230,7 @@ export function WebuiClientFoundationApp(
       <WebuiPortSlicesProvider slices={portSlices}>
     <WebuiWorkspaceQueriesProvider queries={workspaceQueries}>
     <WebuiAccountWorkflowsProvider workflows={accountWorkflows}>
+    <WebuiModelsWorkflowsProvider workflows={modelsWorkflows}>
     <WebuiSettingsWorkflowsProvider workflows={settingsWorkflows}>
     <WebuiPluginWorkflowsProvider workflows={pluginWorkflows}>
     <WebuiSessionWorkflowsProvider workflows={sessionWorkflows}>
@@ -1619,6 +1633,7 @@ export function WebuiClientFoundationApp(
     </WebuiSessionWorkflowsProvider>
     </WebuiPluginWorkflowsProvider>
     </WebuiSettingsWorkflowsProvider>
+    </WebuiModelsWorkflowsProvider>
     </WebuiAccountWorkflowsProvider>
     </WebuiWorkspaceQueriesProvider>
       </WebuiPortSlicesProvider>

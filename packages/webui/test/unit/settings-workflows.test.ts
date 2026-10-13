@@ -1,9 +1,12 @@
 // Unit tests for the settings workflow owner (ticket #52).
 //
 // The owner is framework-free, so these run the real decision logic the
-// settings dialog and the usage page delegate to: that a superseded read is
-// dropped rather than applied over a newer one, and that a successful write
-// invalidates exactly the caches it affects.
+// settings dialog delegates to: that a superseded read is dropped rather than
+// applied over a newer one, and that a successful write invalidates exactly the
+// caches it affects.
+//
+// The catalogue, the selection and the provider list are `models`' owner since
+// the §5.6 carve, so their cases live in `models-workflows.test.ts`.
 
 import { describe, expect, it } from "vitest";
 
@@ -77,39 +80,6 @@ describe("a settings write invalidates exactly what it affects", () => {
     expect(workflows.getSnapshot().revision).toBe(before + 1);
   });
 
-  it("re-reads the provider list and marks models stale after a provider change", async () => {
-    let providers: readonly Record<string, unknown>[] = [{ providerId: "a" }];
-    const workflows = createWebuiSettingsWorkflows({
-      port: {
-        listUserModelProviders: async () => providers,
-        createUserModelProvider: async () => {
-          providers = [...providers, { providerId: "b" }];
-          return { ok: true };
-        },
-      },
-    });
-
-    await workflows.loadProviders();
-    expect(workflows.getSnapshot().providers.value).toHaveLength(1);
-    const modelsBefore = workflows.getSnapshot().modelsRevision;
-
-    await workflows.createProvider({ providerId: "b" });
-    expect(workflows.getSnapshot().providers.value).toHaveLength(2);
-    expect(workflows.getSnapshot().modelsRevision).toBe(modelsBefore + 1);
-  });
-
-  it("marks models stale when the model source changes", async () => {
-    const workflows = createWebuiSettingsWorkflows({
-      port: {
-        setMiniMaxModelSource: async (source) => source,
-      },
-    });
-    const before = workflows.getSnapshot().modelsRevision;
-    await workflows.setModelSource("minimax_api_key");
-    expect(workflows.getSnapshot().modelSource.value).toBe("minimax_api_key");
-    expect(workflows.getSnapshot().modelsRevision).toBe(before + 1);
-  });
-
   it("surfaces a write against an unwired capability as an error", async () => {
     const workflows = createWebuiSettingsWorkflows({ port: {} });
     await expect(workflows.saveInstructions("x")).rejects.toThrow(
@@ -118,43 +88,3 @@ describe("a settings write invalidates exactly what it affects", () => {
   });
 });
 
-describe("an optimistic provider patch stays the owner's", () => {
-  it("shows the patched models at once and the reload is the truth", async () => {
-    let providers: readonly Record<string, unknown>[] = [
-      { providerId: "a", models: [{ modelId: "m1", enabled: true }] },
-    ];
-    const workflows = createWebuiSettingsWorkflows({
-      port: {
-        listUserModelProviders: async () => providers,
-        updateUserModelProvider: async (body) => {
-          providers = [{ providerId: "a", models: body.models as readonly Record<string, unknown>[] }];
-          return { ok: true };
-        },
-      },
-    });
-
-    await workflows.loadProviders();
-    workflows.patchProviderModels("a", [{ modelId: "m1", enabled: false }]);
-    expect(
-      (workflows.getSnapshot().providers.value?.[0]?.models as readonly Record<string, unknown>[])[0]?.enabled,
-    ).toBe(false);
-  });
-
-  it("reloads the truth when the write fails", async () => {
-    const workflows = createWebuiSettingsWorkflows({
-      port: {
-        listUserModelProviders: async () => [
-          { providerId: "a", models: [{ modelId: "m1", enabled: true }] },
-        ],
-        updateUserModelProvider: async () => Promise.reject(new Error("nope")),
-      },
-    });
-
-    await workflows.loadProviders();
-    workflows.patchProviderModels("a", [{ modelId: "m1", enabled: false }]);
-    await expect(workflows.updateProvider({ providerId: "a" })).rejects.toThrow("nope");
-    expect(
-      (workflows.getSnapshot().providers.value?.[0]?.models as readonly Record<string, unknown>[])[0]?.enabled,
-    ).toBe(true);
-  });
-});

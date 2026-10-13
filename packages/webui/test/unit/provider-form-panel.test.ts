@@ -33,7 +33,7 @@ describe("the parent keeps the lifetime", () => {
     const effect = between(parent, "useEffect(() => {", "}, [sessionId]);");
     expect(effect).toContain("account?.loadUsage()");
     expect(effect).toContain("settings?.loadApiKeyStatus()");
-    expect(effect).toContain("settings?.loadProviders()");
+    expect(effect).toContain("models?.loadProviders()");
     expect(effect).toContain("settings?.loadModelSource()");
     expect(effect).toContain("settings?.loadCodexOAuthStatus()");
     expect(parent).toContain("}, [sessionId]);");

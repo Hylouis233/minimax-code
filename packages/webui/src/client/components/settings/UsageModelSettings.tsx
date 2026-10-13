@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactElement } from "react";
 import { formatWebuiCredits, recordOf, textOf } from "../../value-readers.js";
-import { useWebuiAccountWorkflows, useWebuiAccountWorkflowsState, useWebuiSettingsWorkflows, useWebuiSettingsWorkflowsState } from "../../bindings/use-query-state.js";
+import { useWebuiAccountWorkflows, useWebuiAccountWorkflowsState, useWebuiModelsWorkflows, useWebuiModelsWorkflowsState, useWebuiSettingsWorkflows, useWebuiSettingsWorkflowsState } from "../../bindings/use-query-state.js";
 import { ToggleSwitch } from "../ToggleSwitch.js";
 import { formatResetLabel, getActiveSourceBadge, type ProviderHeaderDraft } from "../../projection/usage-settings.js";
 import { IconButton, RefreshIcon } from "./settings-glyphs.js";
@@ -10,7 +10,7 @@ type Props = {
   readonly sessionId?: string;
 };
 
-/** The provider form's commands when the owner is not wired yet. It disables what `settings?.` used
+/** The provider form's commands when the owner is not wired yet. It disables what `models?.` used
  * to make unavailable and does nothing where `settings?.X()` used to call nothing, so the panel's
  * own code needs no optional-chaining of its own. */
 const NO_PROVIDER_COMMANDS: WebuiProviderFormCommands = {
@@ -40,6 +40,10 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
   // to survive it (§5.7 LC-4).
   const settings = useWebuiSettingsWorkflows();
   const settingsState = useWebuiSettingsWorkflowsState();
+  // The provider form and the model list are `models`' (plan §5.6, §5.7): its commands
+  // and its snapshot come from that owner, not from the settings one.
+  const models = useWebuiModelsWorkflows();
+  const modelsState = useWebuiModelsWorkflowsState();
   const account = useWebuiAccountWorkflows();
   const accountState = useWebuiAccountWorkflowsState();
   const [sourceTab, setSourceTab] = useState<"token-plan" | "minimax-api" | "custom">("token-plan");
@@ -69,19 +73,19 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
   const apiStatus = settingsState.apiKeyStatus.value;
   const apiLoading = settingsState.apiKeyStatus.status === "idle" || settingsState.apiKeyStatus.status === "loading";
   const apiError = settingsState.apiKeyStatus.status === "error" ? settingsState.apiKeyStatus.error : undefined;
-  const providers = settingsState.providers.value ?? [];
-  const providerLoading = settingsState.providers.status === "idle" || settingsState.providers.status === "loading";
-  const providerError = providerActionError ?? (settingsState.providers.status === "error" ? settingsState.providers.error : undefined);
-  const presets = settingsState.presets.value ?? [];
+  const providers = modelsState.providers.value ?? [];
+  const providerLoading = modelsState.providers.status === "idle" || modelsState.providers.status === "loading";
+  const providerError = providerActionError ?? (modelsState.providers.status === "error" ? modelsState.providers.error : undefined);
+  const presets = modelsState.presets.value ?? [];
   const oauth = settingsState.codexOAuth.value;
   const activeSource = settingsState.modelSource.value;
   const sourceLoaded = settingsState.modelSource.status === "ready";
 
   const loadQuota = () => { void account?.loadUsage(); };
   const loadApiStatus = () => { void settings?.loadApiKeyStatus(); };
-  const loadProviders = () => { setProviderActionError(undefined); void settings?.loadProviders(); };
+  const loadProviders = () => { setProviderActionError(undefined); void models?.loadProviders(); };
   useEffect(() => {
-    void account?.loadUsage(); void settings?.loadApiKeyStatus(); void settings?.loadProviders();
+    void account?.loadUsage(); void settings?.loadApiKeyStatus(); void models?.loadProviders();
     void settings?.loadModelSource(); void settings?.loadCodexOAuthStatus();
   // Owner objects are stable; the initial loads are keyed on the session as before.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -104,18 +108,18 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
     catch (error) { setKeyResult(error instanceof Error ? error.message : String(error)); }
   };
   const testKey = async () => {
-    if ((!apiKey.trim() && !apiValid) || !settings) return;
+    if ((!apiKey.trim() && !apiValid) || !models) return;
     setTestingKey(true); setKeyResult(undefined);
     try {
-      const result = recordOf(await settings.testProvider({ providerId: "minimax_api", ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}) }));
+      const result = recordOf(await models.testProvider({ providerId: "minimax_api", ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}) }));
       setKeyResult(result.success === true ? "连接成功" : textOf(recordOf(result.status).lastErrorMessage) || "连接失败");
     } catch (error) { setKeyResult(error instanceof Error ? error.message : String(error)); }
     finally { setTestingKey(false); }
   };
   const saveKey = async () => {
-    if (!apiKey.trim() || !settings) return;
+    if (!apiKey.trim() || !models) return;
     setSavingKey(true); setKeyResult(undefined);
-    try { await settings.upsertApiKey({ apiKey: apiKey.trim(), saveAndUse: true }); void settings.loadModelSource(); }
+    try { await models.upsertApiKey({ apiKey: apiKey.trim(), saveAndUse: true }); void settings?.loadModelSource(); }
     catch (error) { setKeyResult(error instanceof Error ? error.message : String(error)); }
     finally { setSavingKey(false); }
   };
@@ -189,7 +193,7 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
         <ProviderFormPanel
           providers={providers}
           presets={presets}
-          commands={settings ?? NO_PROVIDER_COMMANDS}
+          commands={models ?? NO_PROVIDER_COMMANDS}
           setProviderActionError={setProviderActionError}
           draftName={draftName}
           setDraftName={setDraftName}
@@ -210,7 +214,7 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
           providerPendingDelete={providerPendingDelete}
           setProviderPendingDelete={setProviderPendingDelete}
         />
-        {oauthError ? <p role="alert">{oauthError}</p> : oauth?.state === "connected" ? <div className="flex items-center gap-3"><span>Codex OAuth 已连接</span><button type="button" disabled={!settings?.canManageProviders} onClick={() => void settings?.refreshModels?.()}>获取模型列表</button></div> : <div className="flex items-center gap-2"><button type="button" disabled={!settings?.canStartCodexOAuth || Boolean(oauthLoginId)} onClick={() => void beginCodexLogin()}>{oauthLoginId ? "正在连接 Codex OAuth" : "连接 Codex OAuth"}</button>{oauthLoginId ? <button type="button" disabled={!settings?.canStartCodexOAuth} onClick={() => void cancelCodexLogin()}>取消</button> : null}</div>}
+        {oauthError ? <p role="alert">{oauthError}</p> : oauth?.state === "connected" ? <div className="flex items-center gap-3"><span>Codex OAuth 已连接</span><button type="button" disabled={!models?.canManageProviders} onClick={() => void models?.refreshModels?.()}>获取模型列表</button></div> : <div className="flex items-center gap-2"><button type="button" disabled={!settings?.canStartCodexOAuth || Boolean(oauthLoginId)} onClick={() => void beginCodexLogin()}>{oauthLoginId ? "正在连接 Codex OAuth" : "连接 Codex OAuth"}</button>{oauthLoginId ? <button type="button" disabled={!settings?.canStartCodexOAuth} onClick={() => void cancelCodexLogin()}>取消</button> : null}</div>}
       </>}
     </section> : null}
   </div>;
