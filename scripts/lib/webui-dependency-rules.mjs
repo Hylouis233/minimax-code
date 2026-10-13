@@ -336,7 +336,7 @@ export const CATEGORIES = Object.freeze({
 // classification" table. Files not listed here are pure view projections.
 // `session-activity` is the relocated pure activity rules (plan §7.3, ticket
 // #49): it moved from `client/session-activity.ts` (classified `domain`) to
-// `client/projection/sessions/session-activity.ts`, keeping that layer.
+// `client/features/sessions/projection/session-activity.ts`, keeping that layer.
 const PROJECTION_DOMAIN = new Set([
   "action-requests",
   "context-usage",
@@ -1777,7 +1777,7 @@ const FORBIDDEN_RECEIVER_INTERFACES = new Map([
 // Layers that must *not* invoke a writer-factory or a business-RPC method.
 // The `bindings` layer is intentionally absent: it is the legitimate bridge
 // that turns a writer into a command surface (plan §7.2
-// `client/bindings/use-session-state.ts`). Lower-level layers
+// `client/features/sessions/bindings/use-session-state.ts`). Lower-level layers
 // (view/domain/contracts/shared/mechanisms) do not own capability
 // interactions, so a writer or RPC call there is treated as a sign the
 // application contract has slipped.

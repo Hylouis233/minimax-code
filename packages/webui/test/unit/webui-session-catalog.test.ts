@@ -18,10 +18,10 @@ import {
   removeWebuiCatalogEntities,
   selectWebuiCatalogFlatPage,
   selectWebuiCatalogTreePage,
-} from "../../src/client/application/sessions/session-catalog.js";
+} from "../../src/client/features/sessions/application/session-catalog.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
-import { createWebuiSessionWorkflows } from "../../src/client/application/sessions/session-workflows.js";
-import { createWebuiSessionScopeManager } from "../../src/client/application/sessions/session-scope.js";
+import { createWebuiSessionWorkflows } from "../../src/client/features/sessions/application/session-workflows.js";
+import { createWebuiSessionScopeManager } from "../../src/client/conversation/session-scope.js";
 import { selectWebuiWorkspaceProgress } from "../../src/client/projection/workspace/workspace-progress.js";
 import type { WebuiClientSession } from "../../src/client/contracts/sessions/session-view.js";
 

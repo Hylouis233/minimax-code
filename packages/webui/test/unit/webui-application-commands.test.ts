@@ -14,7 +14,7 @@ import { createWebuiActiveTurnProbe, webuiActiveTurnProbeFor } from "../../src/c
 import {
   createWebuiUnreadController,
   type WebuiUnreadStore,
-} from "../../src/client/application/sessions/unread.js";
+} from "../../src/client/features/sessions/application/unread.js";
 import { queueWebuiTurn } from "../../src/client/application/turn/queue-command.js";
 import {
   recoverMissedWebuiTurn,
@@ -33,7 +33,7 @@ import { createWebuiSettingsWorkflows } from "../../src/client/application/setti
 import type { WebuiClientMessagePage } from "../../src/client/features/transcript/contracts/message-view.js";
 import type { WebuiUsageQuotaResult } from "../../src/shared/contracts/usage-quota.js";
 import type { WebuiVersionInfo } from "../../src/shared/contracts/version.js";
-import type { WebuiSessionActivityMap } from "../../src/client/projection/sessions/session-activity.js";
+import type { WebuiSessionActivityMap } from "../../src/client/features/sessions/projection/session-activity.js";
 import type { WebuiActiveTurn } from "../../src/shared/contracts/session.js";
 import type { WebuiRuntimeEvent } from "../../src/shared/contracts/stream.js";
 import type { WebuiStreamLoopSink } from "../../src/client/mechanisms/stream-loop.js";

@@ -65,7 +65,7 @@ import type { WebuiTranscriptItem } from "../../src/client/features/transcript/c
 import {
   buildWebuiModelSelectionRequest,
   webuiModelOptionValue,
-} from "../../src/client/projection/sessions/action-requests.js";
+} from "../../src/client/features/sessions/projection/action-requests.js";
 import { looksLikeAbsoluteWorkspacePath } from "../../src/client/projection/common/paths.js";
 import {
   buildWebuiComposerHandlers,
@@ -74,7 +74,7 @@ import {
   submitWebuiComposerTurn,
   type WebuiComposerSubmitHandlers,
 } from "../../src/client/application/composer/composer-workflows.js";
-import { createWebuiTurnLifecycleCommands } from "../../src/client/application/sessions/session-commands.js";
+import { createWebuiTurnLifecycleCommands } from "../../src/client/features/sessions/application/session-commands.js";
 import { projectWebuiMessage } from "../../src/client/features/transcript/projection/message-projection.js";
 import { projectLiveTurnView } from "../../src/client/features/transcript/projection/transcript-shape.js";
 import { buildWebuiQuestionnaireAnswers } from "../../src/client/projection/interactions/questionnaire-state.js";

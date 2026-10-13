@@ -23,7 +23,7 @@ import type { WebuiSessionStore } from "../session-store.js";
 import {
   createWebuiInteractionCommands,
   createWebuiStreamPhaseCommands,
-} from "../sessions/session-commands.js";
+} from "../../features/sessions/application/session-commands.js";
 import {
   createWebuiInteractionCoordinator,
   type WebuiInteractionCoordinator,

@@ -12,7 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createWebuiConversationTurnCommands } from "../../src/client/application/turn/turn-commands.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
-import { createWebuiSessionScopeManager } from "../../src/client/application/sessions/session-scope.js";
+import { createWebuiSessionScopeManager } from "../../src/client/conversation/session-scope.js";
 import { createWebuiDeliveryDisposers } from "../../src/client/application/turn/delivery-disposers.js";
 import { WEBUI_HOME_SESSION_KEY } from "../../src/client/application/state.js";
 

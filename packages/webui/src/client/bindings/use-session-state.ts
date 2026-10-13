@@ -51,7 +51,7 @@ import {
   type WebuiInteractionCommands,
   type WebuiStreamPhaseCommands,
   type WebuiTurnLifecycleCommands,
-} from "../application/sessions/session-commands.js";
+} from "../features/sessions/application/session-commands.js";
 import { createWebuiConversationTurnCommands } from "../application/turn/turn-commands.js";
 import {
   useWebuiApplicationOptional,

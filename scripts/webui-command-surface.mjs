@@ -59,9 +59,9 @@ const BUSINESSES = [
     // the groups themselves are the two interfaces `session-commands.ts` draws.
     declarations: [
       { module: "application/turn/turn-capabilities.ts", name: "WebuiTurnCapabilitySlice" },
-      { module: "application/sessions/session-commands.ts", name: "WebuiStreamPhaseCommands" },
-      { module: "application/sessions/session-commands.ts", name: "WebuiTurnLifecycleCommands" },
-      { module: "application/sessions/session-commands.ts", name: "WebuiTurnCommandWriter" },
+      { module: "features/sessions/application/session-commands.ts", name: "WebuiStreamPhaseCommands" },
+      { module: "features/sessions/application/session-commands.ts", name: "WebuiTurnLifecycleCommands" },
+      { module: "features/sessions/application/session-commands.ts", name: "WebuiTurnCommandWriter" },
       { module: "application/turn/turn-coordinator.ts", name: "WebuiTurnCoordinator" },
     ],
   },
@@ -71,7 +71,7 @@ const BUSINESSES = [
     // than under `turn` because the state it writes is `interactions`' own
     // (§5.6); the fact that one module declares both views is not ownership.
     declarations: [
-      { module: "application/sessions/session-commands.ts", name: "WebuiInteractionCommands" },
+      { module: "features/sessions/application/session-commands.ts", name: "WebuiInteractionCommands" },
       // §5.6: the carve's owner publishes the permission reply and the
       // answer/dismiss commands. Added by ticket #66, which split the two duties
       // out of the composer and gave each business its own owner.

@@ -39,18 +39,18 @@ import {
   webuiRailMenuFor,
   type WebuiRailMenuEntry,
   type WebuiRailMenuSubject,
-} from "../../projection/sessions/rail-menu.js";
+} from "../../features/sessions/projection/rail-menu.js";
 import { RailRow } from "./RailRow.js";
 import {
   formatWebuiSessionAge,
   type WebuiSessionActivityMap,
-} from "../../projection/sessions/session-activity.js";
+} from "../../features/sessions/projection/session-activity.js";
 import {
   filterWebuiRailViewSessions,
   selectWebuiRailViewTabs,
   type WebuiRailView,
   type WebuiRailViewTab,
-} from "../../projection/sessions/rail-buckets.js";
+} from "../../features/sessions/projection/rail-buckets.js";
 import { formatWebuiUnreadBadge } from "../../projection/common/unread-badge.js";
 import type { WebuiClientSession, WebuiClientSessionPage, WebuiClientSessionTreePage, WebuiClientProject } from "../../contracts/sessions/session-view.js";
 import { teamModeCopy } from "../../infrastructure/team-mode.js";

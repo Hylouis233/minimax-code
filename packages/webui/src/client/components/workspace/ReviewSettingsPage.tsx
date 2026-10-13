@@ -31,8 +31,8 @@ import {
   groupWebuiWorktreeWorkspaces,
   type WebuiWorktreeSourceSession,
   type WebuiWorktreeWorkspace,
-} from "../../projection/sessions/worktree-state.js";
-import { selectWebuiCatalogFlatPage } from "../../application/sessions/session-catalog.js";
+} from "../../features/sessions/projection/worktree-state.js";
+import { selectWebuiCatalogFlatPage } from "../../features/sessions/application/session-catalog.js";
 import { useWebuiSessionStoreContext } from "../../bindings/application-context.js";
 import { useWebuiWorkspaceQueries } from "../../bindings/use-query-state.js";
 import { FolderIcon, SearchIcon } from "../shared/settings-glyphs.js";

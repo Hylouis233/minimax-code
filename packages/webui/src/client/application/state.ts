@@ -17,10 +17,10 @@ import type {
   WebuiPendingPermission,
   WebuiQuestionnaireRequest,
 } from "../../shared/contracts/interactions.js";
-import type { WebuiSessionActivityMap } from "../projection/sessions/session-activity.js";
-import { initialWebuiSessionActivity } from "../projection/sessions/session-activity.js";
-import type { WebuiSessionCatalogState } from "./sessions/session-catalog.js";
-import { initialWebuiSessionCatalogState } from "./sessions/session-catalog.js";
+import type { WebuiSessionActivityMap } from "../features/sessions/projection/session-activity.js";
+import { initialWebuiSessionActivity } from "../features/sessions/projection/session-activity.js";
+import type { WebuiSessionCatalogState } from "../features/sessions/application/session-catalog.js";
+import { initialWebuiSessionCatalogState } from "../features/sessions/application/session-catalog.js";
 import { initialWebuiStreamState } from "../projection/turn/stream-state.js";
 import type { WebuiStreamState } from "../projection/turn/stream-state.js";
 import type { WebuiClientMessagePage } from "../features/transcript/contracts/message-view.js";

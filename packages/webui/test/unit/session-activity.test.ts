@@ -16,7 +16,7 @@ import {
   reduceWebuiSessionActivity,
   seedWebuiSessionActivity,
   type WebuiSessionActivityMap,
-} from "../../src/client/projection/sessions/session-activity.js";
+} from "../../src/client/features/sessions/projection/session-activity.js";
 import {
   WebuiProjectList,
   WebuiSessionList,
@@ -24,7 +24,7 @@ import {
 import { WebuiClientFoundationApp } from "../../src/client/components/shell/WebuiClientFoundationApp.js";
 import { shellElement } from "../support/shell-fixture.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
-import { createWebuiSessionCatalogFromPage } from "../../src/client/application/sessions/session-catalog.js";
+import { createWebuiSessionCatalogFromPage } from "../../src/client/features/sessions/application/session-catalog.js";
 import { formatWebuiUnreadBadge } from "../../src/client/projection/common/unread-badge.js";
 import {
   readWebuiUnreadCounts,
@@ -774,8 +774,9 @@ describe("host wiring", () => {
         "..",
         "src",
         "client",
-        "application",
+        "features",
         "sessions",
+        "application",
         "unread.ts",
       ),
       "utf8",

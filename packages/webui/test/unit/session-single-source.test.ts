@@ -12,7 +12,6 @@
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
 
-const APP_ROOT = new URL("../../src/client/application/", import.meta.url);
 const CLIENT_ROOT = new URL("../../src/client/", import.meta.url);
 
 const read = (relative: string): string =>
@@ -20,42 +19,48 @@ const read = (relative: string): string =>
 const flat = (text: string): string => text.replace(/\s+/gu, " ");
 
 /**
- * Every `client/application/**` module, as a path relative to that directory.
+ * Every `client/**` module, as a path relative to `client/`.
  *
- * Recursive on purpose. Phase 4 filed each business under `application/<business>/`,
- * and a flat `readdirSync` would have stopped seeing `sessions/unread.ts` — the
- * assertion below would then have passed *because it could no longer find the
- * second constructor*, which is the exact failure this suite exists to catch.
+ * Recursive on purpose, and rooted at the whole client rather than one layer: the
+ * unread controller now lives in `features/sessions/application/unread.ts`, so a
+ * walker that only saw `application/**` would pass *because it could no longer
+ * find* the second constructor — the exact failure this suite exists to catch.
  */
 const appModules = (): string[] => {
   const out: string[] = [];
-  const walk = (dir: URL, prefix: string): void => {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+  const walk = (dir: string, prefix: string): void => {
+    for (const entry of readdirSync(new URL(dir, CLIENT_ROOT), {
+      withFileTypes: true,
+    })) {
       const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
-      if (entry.isDirectory()) walk(new URL(`${relative}/`, dir), relative);
+      if (entry.isDirectory()) walk(`${dir}${entry.name}/`, relative);
       else if (entry.name.endsWith(".ts")) out.push(relative);
     }
   };
-  walk(APP_ROOT, "");
+  walk("", "");
   return out;
 };
 
 describe("the session state source is single", () => {
   it("holds the session map in exactly one module", () => {
     const holders = appModules().filter((name) =>
-      /new Map<string, WebuiApplicationSessionState>/.test(read(`application/${name}`)),
+      /new Map<string, WebuiApplicationSessionState>/.test(read(name)),
     );
-    expect(holders).toEqual(["session-store.ts"]);
+    expect(holders).toEqual(["application/session-store.ts"]);
   });
 
   it("constructs the unread controller in exactly one module", () => {
     const callers = appModules().filter((name) =>
-      read(`application/${name}`).includes("createWebuiUnreadController("),
+      read(name).includes("createWebuiUnreadController("),
     );
     // The module that defines it, plus the composition root that creates it.
-    // Both paths are relative to `client/application/`, so the owner's business
-    // directory is part of the expected value.
-    expect(callers.sort()).toEqual(["create-application.ts", "sessions/unread.ts"]);
+    // Paths are relative to `client/`, so each owner's home is part of the
+    // expected value: the store stays in the application layer (it owns the
+    // state container), while the unread controller belongs to Sessions.
+    expect(callers.sort()).toEqual([
+      "application/create-application.ts",
+      "features/sessions/application/unread.ts",
+    ]);
   });
 
   it("derives the shell's page from the catalog instead of holding sessions", () => {

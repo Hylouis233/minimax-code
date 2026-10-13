@@ -7,7 +7,7 @@ import {
   groupWebuiWorktreeWorkspaces,
   selectWebuiWorktreeWorkspaces,
   type WebuiWorktreeSourceSession,
-} from "../../src/client/projection/sessions/worktree-state.js";
+} from "../../src/client/features/sessions/projection/worktree-state.js";
 
 /* `renderToStaticMarkup` runs the first render and never runs effects, so the
  * fetching half of this page cannot be asserted here. What this file proves is

@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { createWebuiSessionScopeManager } from "../../src/client/application/sessions/session-scope.js";
+import { createWebuiSessionScopeManager } from "../../src/client/conversation/session-scope.js";
 import { createWebuiApplication } from "../../src/client/application/create-application.js";
 import type { WebuiClientSessionResumer } from "../../src/client/contracts/turn/execution-port.js";
 

@@ -46,7 +46,7 @@ import {
   initialWebuiArchivedSessionsState,
   type WebuiArchivedSessionsState,
   type WebuiSessionWorkflows,
-} from "../application/sessions/session-workflows.js";
+} from "../features/sessions/application/session-workflows.js";
 
 const WebuiWorkspaceQueriesContext = createContext<WebuiWorkspaceQueries | undefined>(
   undefined,

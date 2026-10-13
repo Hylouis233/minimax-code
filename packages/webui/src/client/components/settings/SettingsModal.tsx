@@ -8,7 +8,7 @@ import {
   selectWebuiWorktreeWorkspaces,
   type WebuiWorktreeSourceSession,
   type WebuiWorktreeWorkspace,
-} from "../../projection/sessions/worktree-state.js";
+} from "../../features/sessions/projection/worktree-state.js";
 import { ToggleSwitch as Switch } from "../shared/ToggleSwitch.js";
 import { FolderIcon, SearchIcon } from "../shared/settings-glyphs.js";
 import { ReviewSettingsPage } from "../workspace/ReviewSettingsPage.js";
@@ -27,7 +27,7 @@ import {
 } from "../../bindings/use-query-state.js";
 import { useWebuiSessionStoreContext } from "../../bindings/application-context.js";
 import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
-import { selectWebuiCatalogFlatPage } from "../../application/sessions/session-catalog.js";
+import { selectWebuiCatalogFlatPage } from "../../features/sessions/application/session-catalog.js";
 import { DESKTOP_SETTINGS_TABS, resolveThemePreference, filterSettingsTabs } from "../../projection/settings/settings-view.js";
 import type { SettingsTabKey } from "../../projection/settings/settings-view.js";
 export const SETTINGS_GROUPS = [{ key: "preferences", label: "偏好" }, { key: "management", label: "管理" }, { key: "coding", label: "编码" }, { key: "archived", label: "归档" }] as const;

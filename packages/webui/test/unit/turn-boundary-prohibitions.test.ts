@@ -42,7 +42,7 @@ const TURN_MODULES = [
   "application/turn/turn-capabilities.ts",
   "application/turn/turn-commands.ts",
   "application/turn/turn-coordinator.ts",
-  "application/sessions/session-commands.ts",
+  "features/sessions/application/session-commands.ts",
   "application/turn/stream-state-bundle.ts",
   "application/turn/stream-lease-controller.ts",
   "mechanisms/stream-loop.ts",
@@ -89,7 +89,7 @@ describe("prohibition 1 — turn holds no writer for another business's state", 
     // `setGoal` as *parameter types* of the interaction command factory. The
     // writer behind them belongs to `interactions`; this module must not be able
     // to reach it.
-    const source = read("application/sessions/session-commands.ts");
+    const source = read("features/sessions/application/session-commands.ts");
     expect(source).not.toMatch(/from "\.\.?\/[^"]*session-store\.js"/u);
     expect(source).not.toMatch(/createInteractionWriter/u);
     expect(source).not.toMatch(/updateSession\(/u);
@@ -136,7 +136,7 @@ describe("prohibition 3 — the stream-phase value set is enumerated exactly onc
   });
 
   it("derives the phase type from the union instead of re-listing it", () => {
-    expect(read("application/sessions/session-commands.ts")).toContain(
+    expect(read("features/sessions/application/session-commands.ts")).toContain(
       'WebuiStreamState["phase"]',
     );
   });

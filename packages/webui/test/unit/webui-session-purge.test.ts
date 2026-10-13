@@ -29,17 +29,17 @@ import {
   reduceWebuiCatalogFlatLoaded,
   selectWebuiCatalogFlatPage,
   removeWebuiCatalogSessions,
-} from "../../src/client/application/sessions/session-catalog.js";
+} from "../../src/client/features/sessions/application/session-catalog.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 import {
   createWebuiSessionWorkflows,
-} from "../../src/client/application/sessions/session-workflows.js";
+} from "../../src/client/features/sessions/application/session-workflows.js";
 import { createWebuiComposerStore } from "../../src/client/application/composer/composer-store.js";
 import {
   createWebuiInteractionCommands,
   createWebuiTurnLifecycleCommands,
   createWebuiTurnCommands,
-} from "../../src/client/application/sessions/session-commands.js";
+} from "../../src/client/features/sessions/application/session-commands.js";
 import { WEBUI_HOME_SESSION_KEY } from "../../src/client/application/state.js";
 import {
   initialWebuiStreamState,
@@ -48,7 +48,7 @@ import {
 import type { WebuiStreamLoopExtra } from "../../src/client/mechanisms/stream-loop.js";
 import { buildWebuiStreamLoopSink } from "../../src/client/mechanisms/stream-loop.js";
 import { streamStateBundle } from "../../src/client/application/turn/stream-state-bundle.js";
-import type { WebuiSessionActivityMap } from "../../src/client/projection/sessions/session-activity.js";
+import type { WebuiSessionActivityMap } from "../../src/client/features/sessions/projection/session-activity.js";
 import type { WebuiClientSession } from "../../src/client/contracts/sessions/session-view.js";
 import type { WebuiSessionListItem } from "../../src/shared/contracts/session.js";
 import type { WebuiStreamFrame } from "../../src/shared/contracts/stream.js";

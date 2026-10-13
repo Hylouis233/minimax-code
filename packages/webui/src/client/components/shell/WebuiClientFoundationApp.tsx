@@ -94,8 +94,8 @@ import { createWebuiCommandWorkflows } from "../../application/composer/command-
 import {
   selectWebuiCatalogFlatPage,
   selectWebuiCatalogTreePage,
-} from "../../application/sessions/session-catalog.js";
-import { createWebuiSessionWorkflows } from "../../application/sessions/session-workflows.js";
+} from "../../features/sessions/application/session-catalog.js";
+import { createWebuiSessionWorkflows } from "../../features/sessions/application/session-workflows.js";
 import {
   selectWebuiSessionStream,
   selectWebuiSessionTranscriptPage,

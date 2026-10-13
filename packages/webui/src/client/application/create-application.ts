@@ -29,7 +29,7 @@ import {
 import {
   createWebuiSessionScopeManager,
   type WebuiSessionScopeManager,
-} from "./sessions/session-scope.js";
+} from "../conversation/session-scope.js";
 import {
   createWebuiDeliveryDisposers,
   type WebuiDeliveryDisposers,
@@ -51,7 +51,7 @@ import type { WebuiInteractionPortSlice } from "./interactions/interaction-coord
 import {
   selectWebuiCatalogFlatPage,
   selectWebuiCatalogTreePage,
-} from "./sessions/session-catalog.js";
+} from "../features/sessions/application/session-catalog.js";
 import type { WebuiApplicationState } from "./state.js";
 import { WEBUI_HOME_SESSION_KEY } from "./state.js";
 import {
@@ -62,7 +62,7 @@ import type { WebuiTurnCoordinatorDeps } from "./turn/turn-coordinator.js";
 import {
   createWebuiUnreadController,
   type WebuiUnreadController,
-} from "./sessions/unread.js";
+} from "../features/sessions/application/unread.js";
 import {
   createWebuiComposerStore,
   type WebuiComposerStore,

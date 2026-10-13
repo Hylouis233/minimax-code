@@ -34,7 +34,7 @@ import type {
 } from "../../../shared/contracts/interactions.js";
 import { buildWebuiPlanApproveAnswers } from "../../projection/interactions/plan-mode.js";
 import { webuiAnswersEndTurn } from "../../projection/interactions/questionnaire-state.js";
-import type { WebuiStreamPhaseCommands } from "../sessions/session-commands.js";
+import type { WebuiStreamPhaseCommands } from "../../features/sessions/application/session-commands.js";
 import type { WebuiVersionCell } from "../version-cell.js";
 
 /** The transport methods this owner drives. Absent means "not wired". */
