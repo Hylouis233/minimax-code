@@ -41,10 +41,11 @@ import {
   createWebuiComposerStore,
   type WebuiComposerStore,
 } from "./composer/composer-store.js";
+import { createWebuiVersionCells, type WebuiVersionCells } from "./version-cell.js";
 import {
-  createWebuiVersionCells,
-  type WebuiVersionCells,
-} from "./version-cell.js";
+  createWebuiIdentityEpochs,
+  type WebuiIdentityEpochs,
+} from "./identity-epochs.js";
 import {
   createWebuiTranscriptHistoryOwner,
   type WebuiTranscriptHistoryOwner,
@@ -146,6 +147,13 @@ export interface WebuiApplication {
    */
   readonly versionCells: WebuiVersionCells;
   /**
+   * The opaque credential/config generation context (§4.5; T02). Owners put a
+   * token in a resource key and compare with `isCurrent`; the business that owns
+   * a write advances the epoch it invalidates. Tokens are instance-scoped and
+   * carry no credential value.
+   */
+  readonly identityEpochs: WebuiIdentityEpochs;
+  /**
    * Commit home→session adoption as one transition: carry the home turn's live
    * record onto the created session, move the home composer slot onto it and
    * select it. Both store writes are no-notify; the caller writes the hash and
@@ -229,6 +237,10 @@ export function createWebuiApplication(
   // fence `goal`'s state and interactions' late-read protection `interactions'`,
   // so the component must not be the thing that declares them.
   const versionCells = createWebuiVersionCells();
+  // The opaque identity/freshness context (§4.5). Created once per instance so a
+  // remount gets fresh tokens, and published because every owner that keys a
+  // resource by credential/config generation reads it.
+  const identityEpochs = createWebuiIdentityEpochs();
   // The effects slot: the initial set is the composition root's, and a later
   // registration (the subtree that owns the effects) replaces it in place. The
   // coordinator holds the slot object, not a copy of its members, so a
@@ -293,6 +305,7 @@ export function createWebuiApplication(
     unread,
     composer,
     versionCells,
+    identityEpochs,
     adoptHomeSession: (sessionId) => {
       // One committed transition: the home turn's live record moves onto the
       // created session, the composer's home slot moves onto it, and the

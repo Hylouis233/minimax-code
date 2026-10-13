@@ -3481,6 +3481,7 @@
     "packages/webui/src/client/application/composer/turn-retry.ts",
     "packages/webui/src/client/application/create-application.ts",
     "packages/webui/src/client/application/goal/goal-coordinator.ts",
+    "packages/webui/src/client/application/identity-epochs.ts",
     "packages/webui/src/client/application/interactions/interaction-coordinator.ts",
     "packages/webui/src/client/application/models/models-workflows.ts",
     "packages/webui/src/client/application/plugins/plugin-workflows.ts",

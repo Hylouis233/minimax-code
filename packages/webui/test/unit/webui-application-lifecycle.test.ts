@@ -13,6 +13,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createWebuiApplication } from "../../src/client/application/create-application.js";
+import { createWebuiIdentityEpochs } from "../../src/client/application/identity-epochs.js";
 import type { WebuiProcessEventChannel } from "../../src/client/application/turn/event-channel.js";
 import type { WebuiRuntimeEvent } from "../../src/shared/contracts/stream.js";
 import type { WebuiClientSessionResumer } from "../../src/client/contracts/turn/execution-port.js";
@@ -257,5 +258,78 @@ describe("the entry's boot shape", () => {
     application.start();
     application.dispose();
     expect(openEventChannel).toHaveBeenCalledTimes(1);
+  });
+});
+
+// The opaque identity/freshness context (T02's `opaque-identity-freshness-context`).
+// §4.5 puts credential and configuration generations in the resource key; these
+// cases pin the three properties a key can rely on — the token is opaque, it
+// belongs to one instance, and a generation only ever moves forward.
+describe("the identity epoch context", () => {
+  it("hands out opaque tokens that carry no credential", () => {
+    const epochs = createWebuiIdentityEpochs();
+    const credentials = epochs.credentials();
+    // The token is a counter string, and the *shape* is what makes it safe to
+    // key a resource with: no value is passed in, so none can leak out.
+    expect(credentials.token).toMatch(/^app\d+\.credentials\.\d+$/u);
+    expect(epochs.read("credentials")).toEqual(credentials);
+  });
+
+  it("advances one generation at a time and reports it as stale afterwards", () => {
+    const epochs = createWebuiIdentityEpochs();
+    const captured = epochs.credentials();
+    expect(epochs.isCurrent(captured)).toBe(true);
+
+    const advanced = epochs.advance("credentials");
+    expect(advanced.generation).toBe(captured.generation + 1);
+    // The captured token is no longer current, which is the whole point: an
+    // answer that started before the write cannot commit after it.
+    expect(epochs.isCurrent(captured)).toBe(false);
+    expect(epochs.isCurrent(advanced)).toBe(true);
+    // A different key is untouched: a credential write does not retire
+    // configuration answers.
+    expect(epochs.configuration().generation).toBe(0);
+  });
+
+  it("never lets a generation move backwards", () => {
+    const epochs = createWebuiIdentityEpochs();
+    epochs.advance("configuration");
+    const first = epochs.configuration();
+    epochs.advance("configuration");
+    const second = epochs.configuration();
+    expect(second.generation).toBeGreaterThan(first.generation);
+    expect(epochs.isCurrent(first)).toBe(false);
+    expect(epochs.isCurrent(second)).toBe(true);
+  });
+
+  it("notifies subscribers with the epoch that moved", () => {
+    const epochs = createWebuiIdentityEpochs();
+    const seen: string[] = [];
+    const detach = epochs.subscribe((epoch) => seen.push(epoch.key));
+    epochs.advance("credentials");
+    epochs.advance("configuration");
+    detach();
+    epochs.advance("application");
+    expect(seen).toEqual(["credentials", "configuration"]);
+  });
+
+  it("gives a fresh assembly fresh tokens, so an old capture is never current", () => {
+    const first = createWebuiIdentityEpochs();
+    const captured = first.credentials();
+    const second = createWebuiIdentityEpochs();
+    // Same generation, different instance: the token differs, so the previous
+    // instance's answer is rejected rather than accepted on a generation match.
+    expect(second.credentials().generation).toBe(captured.generation);
+    expect(second.credentials().token).not.toBe(captured.token);
+    expect(second.isCurrent(captured)).toBe(false);
+  });
+
+  it("publishes the context on the assembled application", () => {
+    const { application } = makeApplication();
+    const captured = application.identityEpochs.credentials();
+    expect(application.identityEpochs.isCurrent(captured)).toBe(true);
+    application.identityEpochs.advance("credentials");
+    expect(application.identityEpochs.isCurrent(captured)).toBe(false);
+    application.dispose();
   });
 });
