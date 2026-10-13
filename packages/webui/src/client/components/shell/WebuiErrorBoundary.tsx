@@ -1,16 +1,5 @@
 import { Component, type ErrorInfo, type ReactElement, type ReactNode } from "react";
-
-/**
- * Normalises whatever a render threw. A component may throw a string or a
- * plain object, and the fallback must not itself throw while reporting the
- * failure — so the conversion happens once, here, instead of at each use site.
- * `String` is total for every value, which is what keeps the reporting path
- * free of a second failure.
- */
-export function describeWebuiBoundaryError(error: unknown): Error {
-  if (error instanceof Error) return error;
-  return new Error(String(error));
-}
+import { describeWebuiBoundaryError } from "../../application/shell/boundary-error.js";
 
 /** Why the boundary holds the `Error` rather than a boolean: the fallback shows
  *  its message, and the same value is what reaches the console. A boolean would

@@ -2,10 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
-  describeWebuiBoundaryError,
   WebuiErrorBoundary,
   WebuiErrorBoundaryFallback,
 } from "../../src/client/components/shell/WebuiErrorBoundary.js";
+import { describeWebuiBoundaryError } from "../../src/client/application/shell/boundary-error.js";
 
 /**
  * The webui suite runs in the `node` environment with no DOM, and React does
