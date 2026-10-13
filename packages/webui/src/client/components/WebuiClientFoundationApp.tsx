@@ -108,6 +108,8 @@ import {
 } from "../application/selectors.js";
 import { WEBUI_HOME_SESSION_KEY } from "../application/state.js";
 import { createWebuiEventEffectsRegistry } from "../application/event-effects-registry.js";
+import { useWebuiPortSlicesOptional } from "../bindings/port-slices-context.js";
+import { createWebuiPortSlices } from "../application/port-slices.js";
 import { WebuiApplicationProvider } from "../bindings/application-context.js";
 import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js";
 import {
@@ -240,6 +242,22 @@ export function WebuiClientFoundationApp(
     transport,
     sessionStore: providedSessionStore,
   } = props;
+  // The per-business port slices (plan §8 Phase 2, A4-s3). A business reads its
+  // own slice instead of reaching into the composed transport, so what it *can*
+  // reach is decided here rather than by convention. When the composition root
+  // provides them the shell uses those instances; otherwise it cuts its own from
+  // the transport prop, so the prop-driven hosts (SSR, unit tests) get the same
+  // narrowed shape instead of a fallback to the whole transport.
+  const providedSlices = useWebuiPortSlicesOptional();
+  const portSlices = useMemo(
+    () => providedSlices ?? createWebuiPortSlices(transport ?? {}),
+    [providedSlices, transport],
+  );
+  const sessionsPort = portSlices.sessions;
+  const transcriptPort = portSlices.transcript;
+  const composerPort = portSlices.composer;
+  const goalPort = portSlices.goal;
+  const interactionsPort = portSlices.interactions;
   // The one application session store for this mount (plan §7.6; ticket #45).
   // A caller (tests, SSR) may inject one; production omits the prop and the
   // shell creates exactly one. The shell provides this exact object through
@@ -277,9 +295,9 @@ export function WebuiClientFoundationApp(
   // a pure conduit. Everything else that used to be rebound here is now
   // read directly off `transport` at the JSX consumption point — see the
   // 67-rebind classification table in the revision report.
-  const loadMessages = transport?.loadMessages;
-  const getSessionForkOptions = transport?.getSessionForkOptions;
-  const forkSession = transport?.forkSession;
+  const loadMessages = transcriptPort.loadMessages;
+  const getSessionForkOptions = sessionsPort.getSessionForkOptions;
+  const forkSession = sessionsPort.forkSession;
 
   // The one session catalog (plan §7.6 "Flat/tree queries"; ticket #49). The
   // shell subscribes to the store's catalog slice and resolves the flat and
@@ -314,10 +332,10 @@ export function WebuiClientFoundationApp(
         // The composer store clears a slot's draft and history on delete so
         // a fresh session does not inherit the deleted session's text.
         composer: composerStore,
-        port: transport ?? {},
+        port: sessionsPort,
         importSession: importWebuiSessionFile,
       }),
-    [sessionStore, composerStore, transport],
+    [sessionStore, composerStore, sessionsPort],
   );
   const [projectRecords, setProjectRecords] = useState<readonly WebuiClientProject[] | undefined>();
   useEffect(() => {
@@ -336,8 +354,8 @@ export function WebuiClientFoundationApp(
   // The slash-command runner the composer submits through (ticket #49
   // criterion 8): the component holds no transport call, it calls the workflow.
   const commandWorkflows = useMemo(
-    () => createWebuiCommandWorkflows({ port: transport ?? {} }),
-    [transport],
+    () => createWebuiCommandWorkflows({ port: composerPort }),
+    [composerPort],
   );
   // The one workspace query owner (ticket #51): it caches the workspace file
   // tree, file contents, the working-tree review and the git environment, and
@@ -1027,8 +1045,8 @@ export function WebuiClientFoundationApp(
         composer: composerStore,
         turns: {
           resumeSession: transport?.resumeSession ?? (async () => {}),
-          ...(transport?.loadMessages
-            ? { loadMessages: transport.loadMessages }
+          ...(loadMessages
+            ? { loadMessages }
             : {}),
         },
         // The composition root holds the port and cuts the turn capability
@@ -1036,7 +1054,7 @@ export function WebuiClientFoundationApp(
         // their caller, and an unwired operation is simply absent from the
         // slice. `WebuiTransport` satisfies the port structurally.
         turnCapabilities: transport ?? {},
-        ...(transport?.loadMessages ? { loadMessages: transport.loadMessages } : {}),
+        ...(loadMessages ? { loadMessages } : {}),
       }),
     [
       providedApplication,
@@ -1044,7 +1062,7 @@ export function WebuiClientFoundationApp(
       sessionStore,
       composerStore,
       browserStorage,
-      transport?.loadMessages,
+      loadMessages,
       transport?.resumeSession,
       watchEvents,
     ],
@@ -1482,29 +1500,29 @@ export function WebuiClientFoundationApp(
                     recentWorkspaceDirs={recentWorkspaceDirs}
                     runCommand={commandWorkflows.canRunCommand ? commandWorkflows.runCommand : undefined}
                     sendMessage={transport?.sendMessage}
-                    enqueueMessage={transport?.enqueueMessage}
+                    enqueueMessage={composerPort.enqueueMessage}
                     loadMessages={loadMessages}
-                    getTurnDiff={transport?.getTurnDiff}
-                    revertTurnDiff={transport?.revertTurnDiff}
-                    reapplyTurnDiff={transport?.reapplyTurnDiff}
+                    getTurnDiff={transcriptPort.getTurnDiff}
+                    revertTurnDiff={transcriptPort.revertTurnDiff}
+                    reapplyTurnDiff={transcriptPort.reapplyTurnDiff}
                     getSessionForkOptions={getSessionForkOptions}
                     forkSession={forkSession}
-                    getSessionRewindPreview={transport?.getSessionRewindPreview}
-                    rewindSession={transport?.rewindSession}
-                    editSessionMessage={transport?.editSessionMessage}
-                    getGoal={transport?.getGoal}
+                    getSessionRewindPreview={transcriptPort.getSessionRewindPreview}
+                    rewindSession={transcriptPort.rewindSession}
+                    editSessionMessage={transcriptPort.editSessionMessage}
+                    getGoal={goalPort.getGoal}
                     getActiveTurn={transport?.getActiveTurn}
-                    createGoal={transport?.createGoal}
-                    patchGoal={transport?.patchGoal}
-                    clearGoal={transport?.clearGoal}
-                    isGoalEnabled={transport?.isGoalEnabled}
-                    listPendingPermissions={transport?.listPendingPermissions}
-                    getPendingQuestionnaire={transport?.getPendingQuestionnaire}
-                    replyPermission={transport?.replyPermission}
-                    replyQuestionnaire={transport?.replyQuestionnaire}
-                    dismissQuestionnaire={transport?.dismissQuestionnaire}
-                    listQueueMessages={transport?.listQueueMessages}
-                    deleteQueueItem={transport?.deleteQueueItem}
+                    createGoal={goalPort.createGoal}
+                    patchGoal={goalPort.patchGoal}
+                    clearGoal={goalPort.clearGoal}
+                    isGoalEnabled={goalPort.isGoalEnabled}
+                    listPendingPermissions={interactionsPort.listPendingPermissions}
+                    getPendingQuestionnaire={interactionsPort.getPendingQuestionnaire}
+                    replyPermission={interactionsPort.replyPermission}
+                    replyQuestionnaire={interactionsPort.replyQuestionnaire}
+                    dismissQuestionnaire={interactionsPort.dismissQuestionnaire}
+                    listQueueMessages={composerPort.listQueueMessages}
+                    deleteQueueItem={composerPort.deleteQueueItem}
                     listModels={transport?.listModels}
                     listSkills={transport?.listSkills}
                     listWorkspaceFileTree={transport?.listWorkspaceFileTree}
@@ -1537,14 +1555,14 @@ export function WebuiClientFoundationApp(
                         onOpenFile={({ sessionId, workspaceDir, reference }) => dispatchWorkspacePanel({ type: "open-file", sessionId, workspaceDir, path: reference.path, ...(reference.lineStart !== undefined ? { lineStart: reference.lineStart } : {}), ...(reference.lineEnd !== undefined ? { lineEnd: reference.lineEnd } : {}) })}
                         onOpenTurnReview={(command) => dispatchWorkspacePanel(command)}
                         {...(initialMessages ? { initialMessages } : {})}
-                        getTurnDiff={transport?.getTurnDiff}
-                        revertTurnDiff={transport?.revertTurnDiff}
-                        reapplyTurnDiff={transport?.reapplyTurnDiff}
+                        getTurnDiff={transcriptPort.getTurnDiff}
+                        revertTurnDiff={transcriptPort.revertTurnDiff}
+                        reapplyTurnDiff={transcriptPort.reapplyTurnDiff}
                         getSessionForkOptions={getSessionForkOptions}
                         forkSession={forkSession}
-                        getSessionRewindPreview={transport?.getSessionRewindPreview}
-                        rewindSession={transport?.rewindSession}
-                        editSessionMessage={transport?.editSessionMessage}
+                        getSessionRewindPreview={transcriptPort.getSessionRewindPreview}
+                        rewindSession={transcriptPort.rewindSession}
+                        editSessionMessage={transcriptPort.editSessionMessage}
                         answerPlanBuild={planReviewWorkflow.answerPlanBuild}
                         onOpenPlanFile={({ sessionId: planSessionId, path, content }) => dispatchWorkspacePanel({ type: "open-plan-file", sessionId: planSessionId, workspaceDir: selectedSession?.workspaceDir ?? "", path, content })}
                       />
