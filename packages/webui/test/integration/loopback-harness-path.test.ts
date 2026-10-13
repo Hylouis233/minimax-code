@@ -34,6 +34,7 @@ import { WebSocket } from "ws";
 import type { RawData } from "ws";
 
 import { WebuiService } from "../../src/server/service.js";
+import { createOperationRegistry } from "../../src/server/operation/operations.js";
 import type { WebuiHarnessPort } from "../../src/runtime/port.js";
 import type {
   WebuiRuntimeEvent,
@@ -152,6 +153,84 @@ function awaitFrame(
   });
 }
 
+/** Poll a condition the socket cannot signal; the stream has no ack of its own. */
+async function waitFor(
+  predicate: () => boolean,
+  timeoutMs = 2_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate()) {
+    if (Date.now() > deadline) throw new Error("condition was not met in time");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
+/**
+ * A terminal-process port stand-in: the six terminal operations talk to this
+ * narrow port, so the test can drive delivery without a real PTY. The PTY itself
+ * is the boundary this test does not cover.
+ */
+function stubTerminalPort() {
+  const calls: string[] = [];
+  const listeners = new Set<(data: string) => void>();
+  let disposed = 0;
+  return {
+    calls,
+    emit(data: string) {
+      for (const listener of [...listeners]) listener(data);
+    },
+    disposeCount: () => disposed,
+    create(workspaceDir: string) {
+      calls.push(`create:${workspaceDir}`);
+      return { terminalId: "t-terminal", status: "running" as const };
+    },
+    list() {
+      return [
+        { terminalId: "t-terminal", status: "running" as const, output: "" },
+      ];
+    },
+    write(terminalId: string, data: string) {
+      calls.push(`write:${terminalId}:${data}`);
+      return { success: true as const };
+    },
+    resize(terminalId: string, cols: number, rows: number) {
+      calls.push(`resize:${terminalId}:${cols}x${rows}`);
+      return { success: true as const };
+    },
+    dispose(terminalId: string) {
+      calls.push(`dispose:${terminalId}`);
+      return { success: true as const };
+    },
+    async *watch(terminalId: string, signal?: AbortSignal) {
+      calls.push(`watch:${terminalId}`);
+      const queue: string[] = [];
+      let wake: (() => void) | undefined;
+      const listener = (data: string) => {
+        queue.push(data);
+        wake?.();
+      };
+      listeners.add(listener);
+      try {
+        while (!signal?.aborted) {
+          if (!queue.length) {
+            await new Promise<void>((resolve) => {
+              wake = resolve;
+            });
+          } else {
+            yield { terminalId, data: queue.shift() ?? "", exited: false };
+          }
+        }
+      } finally {
+        listeners.delete(listener);
+      }
+    },
+    disposeBySession() {
+      disposed += 1;
+      calls.push("disposeBySession");
+    },
+  };
+}
+
 describe("loopback to harness-port evidence", () => {
   let service: WebuiService | undefined;
 
@@ -164,6 +243,7 @@ describe("loopback to harness-port evidence", () => {
     const port = scriptedPort();
     service = new WebuiService({
       port,
+      operations: createOperationRegistry(port),
       // A fixed token keeps the URL readable and the refusal assertions
       // independent of whatever the per-start generator produced.
       credential: { token: "loopback-integration-token" },
@@ -249,5 +329,82 @@ describe("loopback to harness-port evidence", () => {
     const relisten = new WebSocket(base);
     relisten.on("error", () => undefined);
     await expect(once(relisten, "open")).rejects.toThrow();
+  });
+  it("delivers terminal traffic through the registry the host assembled", async () => {
+    const port = scriptedPort();
+    const terminal = stubTerminalPort();
+    // The registry is built by the host from both ports and handed to the
+    // service, which binds it (T14).
+    service = new WebuiService({
+      port,
+      operations: createOperationRegistry(port, terminal),
+      terminal,
+      credential: { token: "loopback-terminal-token" },
+      webSocketHeartbeatIntervalMs: 30_000,
+    });
+    const info = await service.start();
+    const url = `ws://127.0.0.1:${info.tcpPort}/?token=${info.credential.token}`;
+    const client = openClient(url);
+    await client.upgrade;
+
+    // 1. A terminal is created through the real dispatcher and the port.
+    const created = await once_(client.ws, {
+      kind: "request",
+      protocolVersion: info.protocolVersion,
+      requestId: "r-term-create",
+      operation: "createTerminal",
+      body: { workspaceDir: "/synthetic/workspace" },
+    });
+    expect(created.kind).toBe("response");
+    expect(JSON.stringify(created)).toContain("t-terminal");
+    expect(terminal.calls).toContain("create:/synthetic/workspace");
+
+    // 2. Watching delivers what the port produces: the request is acknowledged
+    //    and then the output arrives as event frames on the same socket.
+    const delivered = awaitFrame(
+      client.ws,
+      (frame) => frame.kind === "event" && frame.requestId === "r-term-watch",
+    );
+    client.ws.send(
+      JSON.stringify({
+        kind: "request",
+        protocolVersion: info.protocolVersion,
+        requestId: "r-term-watch",
+        operation: "watchTerminal",
+        body: { terminalId: "t-terminal" },
+      }),
+    );
+    await waitFor(() => terminal.calls.includes("watch:t-terminal"));
+    terminal.emit("hello from the pty\n");
+    const frame = await delivered;
+    expect(JSON.stringify(frame)).toContain("hello from the pty");
+    expect(terminal.calls).toContain("watch:t-terminal");
+
+    // 3. Write, resize and dispose reach the port with their arguments intact.
+    for (const [requestId, operation, body] of [
+      ["r-term-write", "writeTerminal", { terminalId: "t-terminal", data: "ls\n" }],
+      ["r-term-resize", "resizeTerminal", { terminalId: "t-terminal", cols: 120, rows: 40 }],
+      ["r-term-dispose", "disposeTerminal", { terminalId: "t-terminal" }],
+    ] as const) {
+      await once_(client.ws, {
+        kind: "request",
+        protocolVersion: info.protocolVersion,
+        requestId,
+        operation,
+        body,
+      });
+    }
+    expect(terminal.calls).toEqual(
+      expect.arrayContaining([
+        "write:t-terminal:ls\n",
+        "resize:t-terminal:120x40",
+        "dispose:t-terminal",
+      ]),
+    );
+
+    // 4. Shutdown disposes the terminals the port owns.
+    await service.close();
+    service = undefined;
+    expect(terminal.disposeCount()).toBe(1);
   });
 });

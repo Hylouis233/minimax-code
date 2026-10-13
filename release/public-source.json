@@ -3867,6 +3867,7 @@
     "packages/webui/src/server/projections/index.ts",
     "packages/webui/src/server/projections/usage.ts",
     "packages/webui/src/server/service.ts",
+    "packages/webui/src/server/terminal-port.ts",
     "packages/webui/src/server/terminal.ts",
     "packages/webui/src/server/websocket-server.ts",
     "packages/webui/src/shared/contracts/account.ts",

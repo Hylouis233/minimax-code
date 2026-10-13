@@ -6,7 +6,7 @@
 // supplied by the service, and when it is absent these operations stay
 // unregistered (see `operations.ts`) rather than becoming registered operations
 // that fail with a missing-capability error.
-import type { WebuiTerminalManager } from "../../terminal.js";
+import type { WebuiTerminalProcessPort } from "../../terminal-port.js";
 import {
   createTerminalOperation,
   listTerminalsOperation,
@@ -33,7 +33,7 @@ type DedicatedHandler<Descriptor> = WebuiOperationHandler<
 >;
 
 export function createTerminalHandlerEntries(
-  terminal: WebuiTerminalManager,
+  terminal: WebuiTerminalProcessPort,
 ): ReadonlyMap<string, WebuiOperationRegistryEntry> {
   const createTerminal: DedicatedHandler<typeof createTerminalOperation> = async (
     _context,

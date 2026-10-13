@@ -30,9 +30,8 @@ if (!process.env.WEBUI_SERVER_TSX) {
   const { createWebuiRuntimeHost, createHarnessPortFromHost } = await import(
     "../packages/webui/src/runtime/index.ts"
   );
-  const { WebuiService } = await import(
-    "../packages/webui/src/server/index.ts"
-  );
+  const { WebuiService, WebuiTerminalManager, createOperationRegistry } =
+    await import("../packages/webui/src/server/index.ts");
   const dataDir =
     process.env.MINIMAX_DATA_DIR?.trim() || path.join(os.homedir(), ".minimax");
   const tcpPort = Number(process.env.WEBUI_SERVER_PORT ?? 8787);
@@ -44,8 +43,14 @@ if (!process.env.WEBUI_SERVER_TSX) {
     dataDir,
     appVersion: "webui-dev",
   });
+  const port = createHarnessPortFromHost(assembled.host);
+  // The registry and the terminal port are assembled here, by the host, and the
+  // network service binds what it was handed (T14).
+  const terminal = new WebuiTerminalManager();
   const service = new WebuiService({
-    port: createHarnessPortFromHost(assembled.host),
+    port,
+    operations: createOperationRegistry(port, terminal),
+    terminal,
     tcpPort,
     dev: true,
     clientDir,

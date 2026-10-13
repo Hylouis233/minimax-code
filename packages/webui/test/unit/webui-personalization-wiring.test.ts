@@ -23,6 +23,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { WebuiErrorCode, WEBUI_PROTOCOL_VERSION } from "../../src/shared/envelope.js";
 import { WebuiService } from "../../src/server/service.js";
+import { createOperationRegistry } from "../../src/server/operation/operations.js";
 import type { WebuiHarnessPort } from "../../src/runtime/port.js";
 import type { WebuiAgentMemoryView, WebuiGlobalInstructionsView, WebuiMemorySettingsView, WebuiUserProfileView } from "../../src/shared/contracts/personalization.js";
 
@@ -83,7 +84,7 @@ afterEach(async () => {
 });
 
 async function serve(port: WebuiHarnessPort): Promise<string> {
-  const service = new WebuiService({ port });
+  const service = new WebuiService({ port, operations: createOperationRegistry(port) });
   services.push(service);
   const info = await service.start();
   return `${info.boundUrl}/?token=${encodeURIComponent(info.credential.token)}`;

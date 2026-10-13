@@ -2,13 +2,15 @@ import os from "node:os";
 import process from "node:process";
 import { createRequire } from "node:module";
 
+import type { WebuiTerminalProcessPort } from "./terminal-port.js";
+
 type Pty = { readonly pid: number; write(data: string): void; resize(cols: number, rows: number): void; kill(): void; onData(listener: (data: string) => void): void; onExit(listener: () => void): void };
 type PtyModule = { spawn(shell: string, args: string[], options: Record<string, unknown>): Pty };
 const require = createRequire(import.meta.url);
 
 type Terminal = { readonly id: string; readonly pty: Pty; readonly output: string[]; readonly listeners: Set<(data: string) => void>; exited: boolean };
 
-export class WebuiTerminalManager {
+export class WebuiTerminalManager implements WebuiTerminalProcessPort {
   private readonly terminals = new Map<string, Terminal>();
   constructor(private readonly loadPty: () => PtyModule = () => require("node-pty") as PtyModule) {}
   create(workspaceDir: string) {
@@ -29,7 +31,17 @@ export class WebuiTerminalManager {
     this.terminals.set(id, terminal);
     return { terminalId: id, status: "running" as const };
   }
-  list() { return [...this.terminals.values()].map((terminal) => ({ terminalId: terminal.id, status: terminal.exited ? "exited" : "running", output: terminal.output.join("") })); }
+  list(): readonly {
+    readonly terminalId: string;
+    readonly status: "running" | "exited";
+    readonly output: string;
+  }[] {
+    return [...this.terminals.values()].map((terminal) => ({
+      terminalId: terminal.id,
+      status: terminal.exited ? ("exited" as const) : ("running" as const),
+      output: terminal.output.join(""),
+    }));
+  }
   write(terminalId: string, data: string) { this.get(terminalId).pty.write(data); return { success: true as const }; }
   resize(terminalId: string, cols: number, rows: number) { this.get(terminalId).pty.resize(cols, rows); return { success: true as const }; }
   dispose(terminalId: string) { const terminal = this.get(terminalId); terminal.pty.kill(); this.terminals.delete(terminalId); return { success: true as const }; }

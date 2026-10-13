@@ -19,6 +19,7 @@ import { Readable } from "node:stream";
 import type { IncomingMessage } from "node:http";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WebuiService } from "../../src/server/service.js";
+import { createOperationRegistry } from "../../src/server/operation/operations.js";
 import { readRequestBody } from "../../src/server/http/session-transfer.js";
 import type {
   WebuiCreateSessionRequest,
@@ -88,6 +89,7 @@ async function serve(
 ): Promise<string> {
   const service = new WebuiService({
     port: port(over),
+    operations: createOperationRegistry(port(over)),
     credential: { token },
     dev: options.dev ?? true,
   });

@@ -25,6 +25,7 @@ import {
   WebuiErrorCode,
   WEBUI_PROTOCOL_VERSION,
   WebuiService,
+  createOperationRegistry,
   isWebuiFrame,
   type WebuiCreateSessionResult,
   type WebuiEnqueueMessageRequest,
@@ -717,7 +718,7 @@ describe("WebUI service", () => {
     url: string;
     credential: { token: string };
   }> {
-    service = new WebuiService({ port });
+    service = new WebuiService({ port, operations: createOperationRegistry(port) });
     const info = await service.start();
     expect(info.host).toBe("127.0.0.1");
     expect(info.tcpPort).toBeGreaterThan(0);
@@ -1465,6 +1466,7 @@ describe("WebUI service", () => {
   it("terminates WebSocket connections that stop answering heartbeat pings", async () => {
     service = new WebuiService({
       port,
+      operations: createOperationRegistry(port),
       tcpPort: 0,
       dev: true,
       webSocketHeartbeatIntervalMs: 10,
@@ -1690,6 +1692,7 @@ describe("WebUI service", () => {
     try {
       const devService = new WebuiService({
         port,
+        operations: createOperationRegistry(port),
         dev: true,
         clientDir: fixtureDir,
       });
@@ -1706,6 +1709,7 @@ describe("WebUI service", () => {
       // Default mode still requires the credential on the same paths.
       const prodService = new WebuiService({
         port,
+        operations: createOperationRegistry(port),
         clientDir: fixtureDir,
       });
       try {
@@ -1747,6 +1751,7 @@ describe("WebUI service", () => {
       );
       service = new WebuiService({
         port,
+        operations: createOperationRegistry(port),
         dev: true,
         clientDir: workspaceDir,
       });
@@ -2116,7 +2121,7 @@ describe("WebUI service", () => {
     // The HTTP asset path is only half of the contract — the WebSocket
     // upgrade must follow the same gate so the runtime configuration the
     // page boots with can actually connect.
-    service = new WebuiService({ port, dev: true });
+    service = new WebuiService({ port, operations: createOperationRegistry(port), dev: true });
     await service.start();
     const url = `ws://127.0.0.1:${service.info().tcpPort}`;
     const { upgrade } = openClient(url);
@@ -2877,7 +2882,7 @@ describe("WebUI operation allowlist", () => {
 
   it("enforces structural validation on every request body", async () => {
     const port = new ScriptedHarnessPort();
-    const service = new WebuiService({ port });
+    const service = new WebuiService({ port, operations: createOperationRegistry(port) });
     try {
       await service.start();
       // The transport already exercises this with the ws test; here we
@@ -3410,21 +3415,21 @@ describe("WebUI runtime host assembly", () => {
 describe("WebUI loopback binding invariant", () => {
   it("refuses to construct the service when the host is a LAN address", async () => {
     const harness = new ScriptedHarnessPort();
-    expect(() => new WebuiService({ port: harness, host: "0.0.0.0" })).toThrow(
+    expect(() => new WebuiService({ port: harness, operations: createOperationRegistry(harness), host: "0.0.0.0" })).toThrow(
       /loopback/i,
     );
-    expect(() => new WebuiService({ port: harness, host: "10.0.0.5" })).toThrow(
+    expect(() => new WebuiService({ port: harness, operations: createOperationRegistry(harness), host: "10.0.0.5" })).toThrow(
       /loopback/i,
     );
     expect(
-      () => new WebuiService({ port: harness, host: "evil.example" }),
+      () => new WebuiService({ port: harness, operations: createOperationRegistry(harness), host: "evil.example" }),
     ).toThrow(/loopback/i);
   });
 
   it("accepts the documented loopback addresses", async () => {
     const harness = new ScriptedHarnessPort();
     for (const host of ["127.0.0.1", "localhost", "::1", "[::1]"]) {
-      const candidate = new WebuiService({ port: harness, host });
+      const candidate = new WebuiService({ port: harness, operations: createOperationRegistry(harness), host });
       await candidate.close();
     }
   });
@@ -3833,7 +3838,7 @@ describe("WebUI shutdown order (criterion 7)", () => {
         events.push("port.close");
       },
     };
-    const localService = new WebuiService({ port: recordingPort });
+    const localService = new WebuiService({ port: recordingPort, operations: createOperationRegistry(recordingPort) });
     const localInfo = await localService.start();
     const url = `${localInfo.boundUrl}/?token=${encodeURIComponent(
       localInfo.credential.token,
@@ -4221,7 +4226,7 @@ describe("WebUI shutdown order (criterion 7)", () => {
         await closeGate;
       },
     };
-    const localService = new WebuiService({ port: recordingPort });
+    const localService = new WebuiService({ port: recordingPort, operations: createOperationRegistry(recordingPort) });
     const localInfo = await localService.start();
     const url = `${localInfo.boundUrl}/?token=${encodeURIComponent(
       localInfo.credential.token,

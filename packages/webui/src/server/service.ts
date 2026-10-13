@@ -5,7 +5,7 @@
 //   * a harness port (real: script of the host's `CliService` facade;
 //     test: scripted stand-in),
 //   * a per-start credential,
-//   * the operation registry built from the port,
+//   * the operation registry the host assembled from that port,
 //   * the access control rules described in ADR 0004.
 //
 // The network lifecycle now lives in dedicated modules (plan section 7.1):
@@ -20,17 +20,14 @@
 
 import type { IncomingMessage, Server, ServerResponse } from "node:http";
 
-import {
-  createOperationRegistry,
-  type WebuiOperationRegistryEntry,
-} from "./operation/operations.js";
+import type { WebuiOperationRegistryEntry } from "./operation/operations.js";
 import {
   createWebuiCredential,
   type WebuiCredential,
 } from "./credentials.js";
 import { WEBUI_PROTOCOL_VERSION } from "../shared/envelope.js";
 import type { WebuiHarnessPort } from "../runtime/port.js";
-import { WebuiTerminalManager } from "./terminal.js";
+import type { WebuiTerminalProcessPort } from "./terminal-port.js";
 import { isLoopbackBindAddress } from "./access-policy.js";
 import {
   createHttpListener,
@@ -62,6 +59,21 @@ function readEnvFlag(name: string): boolean {
 
 export interface WebuiServiceOptions {
   readonly port: WebuiHarnessPort;
+  /**
+   * The complete, preassembled operation registry. The host builds it from its
+   * own port (`createOperationRegistry(port, terminalPort)`), so the network
+   * service binds what it was handed instead of projecting the harness port
+   * member by member (T14; plan §6 bind-handlers, §7 D10). The registry is
+   * exhaustive by construction: an operation missing from it fails the inbound
+   * lookup, which is the same error a cold-started runtime produces.
+   */
+  readonly operations: ReadonlyMap<string, WebuiOperationRegistryEntry>;
+  /**
+   * The terminal-process port the registry's terminal operations were built
+   * with. The service owns its lifecycle and disposes it on close; T15 moves the
+   * implementation and the resource ownership behind this port.
+   */
+  readonly terminal?: WebuiTerminalProcessPort;
   /**
    * Loopback host the service binds to. The service refuses to start
    * when this is anything other than `127.0.0.1`, `localhost`, `::1` or
@@ -125,7 +137,7 @@ export class WebuiService {
   private readonly operations: ReadonlyMap<string, WebuiOperationRegistryEntry>;
   private readonly httpServer: Server;
   private readonly wsServer: WebuiWebSocketServer;
-  private readonly terminalManager = new WebuiTerminalManager();
+  private readonly terminal: WebuiTerminalProcessPort | undefined;
   private readonly httpContext: WebuiHttpRouterContext;
   private accepting = true;
   private startedPromise: Promise<WebuiServiceInfo> | undefined;
@@ -149,147 +161,8 @@ export class WebuiService {
     // widened by a stray `WEBUI_DEV=1` in the environment.
     this.dev = options.dev ?? readEnvFlag("WEBUI_DEV");
     this.clientDirOverride = options.clientDir;
-    this.operations = createOperationRegistry({
-      version: () => ({
-        version: this.port.version().version,
-        protocolVersion: this.port.version().protocolVersion,
-      }),
-      runCommand: (request) => this.port.runCommand(request),
-      listSessions: (request) => this.port.listSessions(request),
-      getActiveTurn: (request) => this.port.getActiveTurn(request),
-      listVisibleProjects: (request) => {
-        if (!this.port.listVisibleProjects) throw new Error("runtime host does not expose project listing");
-        return this.port.listVisibleProjects(request);
-      },
-      getSessionTree: (request) => this.port.getSessionTree(request),
-      archiveSession: (request) => this.port.archiveSession(request),
-      deleteSession: (request) => this.port.deleteSession(request),
-      updateSession: (request) => this.port.updateSession(request),
-      getSessionForkOptions: (request) => this.port.getSessionForkOptions(request),
-      forkSession: (request) => this.port.forkSession(request),
-      createSession: (request) => this.port.createSession(request),
-      getSession: (request) => this.port.getSession(request),
-      getMessages: (request) => this.port.getMessages(request),
-      getSessionDiff: (request) => this.port.getSessionDiff(request),
-      getTurnDiff: (request) => this.port.getTurnDiff(request),
-      revertTurnDiff: (request) => this.port.revertTurnDiff(request),
-      reapplyTurnDiff: (request) => this.port.reapplyTurnDiff(request),
-      getSessionRewindPreview: (request) => this.port.getSessionRewindPreview(request),
-      rewindSession: (request) => this.port.rewindSession(request),
-      editSessionMessage: (request) => this.port.editSessionMessage(request),
-      isGoalEnabled: () => this.port.isGoalEnabled(),
-      getGoal: (request) => this.port.getGoal(request),
-      createGoal: (request) => this.port.createGoal(request),
-      patchGoal: (request) => this.port.patchGoal(request),
-      clearGoal: (request) => this.port.clearGoal(request),
-      listWorkspaceFileTree: (request) => this.port.listWorkspaceFileTree(request),
-      readWorkspaceFile: (request) => this.port.readWorkspaceFile(request),
-      getWorkspaceEnvironment: (request) => this.port.getWorkspaceEnvironment(request),
-      mutateWorkspaceGit: (request) => this.port.mutateWorkspaceGit(request),
-      getWorkspaceReviewSummary: (request) => this.port.getWorkspaceReviewSummary(request),
-      listWorkspaceReviewFileDiffs: (request) => this.port.listWorkspaceReviewFileDiffs(request),
-      getWorkspaceReviewFileContent: (request) => this.port.getWorkspaceReviewFileContent(request),
-      searchWorkspaceReviewDiffs: (request) => this.port.searchWorkspaceReviewDiffs(request),
-      readCanvas: (request) => this.port.readCanvas(request),
-      applyCanvas: (request) => this.port.applyCanvas(request),
-      readWorkspaceArchive: (request) => this.port.readWorkspaceArchive(request),
-      extractWorkspaceArchive: (request) => this.port.extractWorkspaceArchive(request),
-      sendMessage: (request, signal) => this.port.sendMessage(request, signal),
-      enqueueMessage: (request) => this.port.enqueueMessage(request),
-      resumeSession: (request, signal) =>
-        this.port.resumeSession(request, signal),
-      watchEvents: (signal) => this.port.watchEvents(signal),
-      listPendingPermissions: () => this.port.listPendingPermissions(),
-      getPendingQuestionnaire: (request) =>
-        this.port.getPendingQuestionnaire(request),
-      replyPermission: (request) => this.port.replyPermission(request),
-      replyQuestionnaire: (request) => this.port.replyQuestionnaire(request),
-      dismissQuestionnaire: (request) =>
-        this.port.dismissQuestionnaire(request),
-      abortSession: (request) => this.port.abortSession(request),
-      listQueueMessages: (request) => this.port.listQueueMessages(request),
-      deleteQueueItem: (request) => this.port.deleteQueueItem(request),
-      listModels: (request) => this.port.listModels(request),
-      selectModel: (request) => this.port.selectModel(request),
-      listSkills: (request) => this.port.listSkills(request),
-      pluginManagement: (request) => {
-        if (!this.port.pluginManagement) throw new Error("runtime host does not expose plugin management");
-        return this.port.pluginManagement(request);
-      },
-      getPermissionMode: () => {
-        if (!this.port.getPermissionMode) throw new Error("runtime host does not expose permission mode reads");
-        return this.port.getPermissionMode();
-      },
-      setPermissionMode: (request) => {
-        if (!this.port.setPermissionMode) throw new Error("runtime host does not expose permission mode updates");
-        return this.port.setPermissionMode(request);
-      },
-      // These four are optional on `WebuiHarnessPort`, so the projection has to
-      // forward them explicitly. Omitting one is silent: the handler layer sees
-      // `undefined` and throws "runtime host does not expose ... reads", which
-      // looks like a host problem instead of a missing forwarding line.
-      getGlobalInstructions: async () => {
-        if (!this.port.getGlobalInstructions) throw new Error("runtime host does not expose global instructions reads");
-        return this.port.getGlobalInstructions();
-      },
-      setGlobalInstructions: async (request) => {
-        if (!this.port.setGlobalInstructions) throw new Error("runtime host does not expose global instructions updates");
-        return this.port.setGlobalInstructions(request);
-      },
-      getAgentMemory: async (request) => {
-        if (!this.port.getAgentMemory) throw new Error("runtime host does not expose agent memory reads");
-        return this.port.getAgentMemory(request);
-      },
-      setAgentMemory: async (request) => {
-        if (!this.port.setAgentMemory) throw new Error("runtime host does not expose agent memory updates");
-        return this.port.setAgentMemory(request);
-      },
-      getUserProfile: async () => {
-        if (!this.port.getUserProfile) throw new Error("runtime host does not expose user profile reads");
-        return this.port.getUserProfile();
-      },
-      setUserProfile: async (request) => {
-        if (!this.port.setUserProfile) throw new Error("runtime host does not expose user profile updates");
-        return this.port.setUserProfile(request);
-      },
-      getMemorySettings: async () => {
-        if (!this.port.getMemorySettings) throw new Error("runtime host does not expose memory settings");
-        return this.port.getMemorySettings();
-      },
-      setMemorySettings: async (request) => {
-        if (!this.port.setMemorySettings) throw new Error("runtime host does not expose memory settings updates");
-        return this.port.setMemorySettings(request);
-      },
-      getSessionUsage: (request) => this.port.getSessionUsage(request),
-      getUsageQuota: (request) => this.port.getUsageQuota(request),
-      getSigninPanel: () => this.port.getSigninPanel(),
-      beginAccountLogin: () => this.port.beginAccountLogin(),
-      getAccountLoginStatus: () => this.port.getAccountLoginStatus(),
-      cancelAccountLogin: () => this.port.cancelAccountLogin(),
-      signOutAccount: () => this.port.signOutAccount(),
-      claimSignin: () => this.port.claimSignin(),
-      getAccountStatus: (request) => this.port.getAccountStatus(request),
-      listUserModelProviders: () => this.port.listUserModelProviders(),
-      createUserModelProvider: (request) => this.port.createUserModelProvider(request),
-      updateUserModelProvider: (request) => this.port.updateUserModelProvider(request),
-      deleteUserModelProvider: (providerId) => this.port.deleteUserModelProvider(providerId),
-      testUserModelProvider: (request) => this.port.testUserModelProvider(request),
-      testUserModel: (request) => this.port.testUserModel(request),
-      discoverUserModelsCandidate: (request) => this.port.discoverUserModelsCandidate(request),
-      saveUserModelProviderCandidate: (request) => this.port.saveUserModelProviderCandidate(request),
-      listProviderPresets: () => this.port.listProviderPresets(),
-      getMiniMaxApiKeyStatus: () => this.port.getMiniMaxApiKeyStatus(),
-      upsertMiniMaxApiKey: (request) => this.port.upsertMiniMaxApiKey(request),
-      getCodexOAuthStatus: () => this.port.getCodexOAuthStatus(),
-      getMiniMaxModelSource: () => this.port.getMiniMaxModelSource(),
-      setMiniMaxModelSource: (request) => this.port.setMiniMaxModelSource(request),
-      testUserModelCandidate: (request) => this.port.testUserModelCandidate(request),
-      revealModelProviderApiKey: (request) => this.port.revealModelProviderApiKey(request),
-      startCodexOAuthLogin: (request) => this.port.startCodexOAuthLogin(request),
-      cancelCodexOAuthLogin: (request) => this.port.cancelCodexOAuthLogin(request),
-      refreshModels: () => this.port.refreshModels(),
-      requestCompaction: (request) => this.port.requestCompaction(request),
-    }, this.terminalManager);
+    this.operations = options.operations;
+    this.terminal = options.terminal;
     this.httpServer = createHttpListener(options.httpServerFactory);
     this.wsServer = new WebuiWebSocketServer({
       maxMessageBytes: this.maxMessageBytes,
@@ -358,7 +231,7 @@ export class WebuiService {
    * then tear down the host.
    */
   async close(): Promise<void> {
-    this.terminalManager.disposeBySession();
+    this.terminal?.disposeBySession();
     if (!this.accepting && !this.bound) return;
     this.accepting = false;
     // Force-terminate every connection before the server closes; otherwise

@@ -4,7 +4,11 @@ import os from "node:os";
 import path from "node:path";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { WebuiService } from "../server/server.js";
+import {
+  WebuiService,
+  WebuiTerminalManager,
+  createOperationRegistry,
+} from "../server/server.js";
 import {
   createHarnessPortFromHost,
   createWebuiRuntimeHost,
@@ -22,8 +26,12 @@ const dataDir = process.env.MINIMAX_DATA_DIR?.trim() || path.join(os.homedir(), 
 process.env.MAVIS_BUILTIN_AGENTS_V2_DIR ??= path.join(packageRoot, "assets/agents");
 process.env.MAVIS_BUILTIN_AGENTS_DIR ??= path.join(packageRoot, "assets/agents");
 const assembled = await createWebuiRuntimeHost({ dataDir, appVersion: version });
+const port = createHarnessPortFromHost(assembled.host);
+const terminal = new WebuiTerminalManager();
 const service = new WebuiService({
-  port: createHarnessPortFromHost(assembled.host),
+  port,
+  operations: createOperationRegistry(port, terminal),
+  terminal,
   host: "127.0.0.1",
   tcpPort,
   dev: true,

@@ -31,7 +31,7 @@ import type {
   WebuiOperationRegistryEntry,
   WebuiOperationRegistration,
 } from "./operation-contract.js";
-import type { WebuiTerminalManager } from "../terminal.js";
+import type { WebuiTerminalProcessPort } from "../terminal-port.js";
 export {
   getSigninPanelOperation,
   claimSigninOperation,
@@ -61,7 +61,7 @@ export type {
  */
 export function createOperationRegistry(
   port: WebuiOperationPort,
-  terminal?: WebuiTerminalManager,
+  terminal?: WebuiTerminalProcessPort,
 ): ReadonlyMap<string, WebuiOperationRegistryEntry> {
   const registry = new Map<string, WebuiOperationRegistryEntry>();
   const entries = new Map<string, WebuiOperationRegistryEntry>([
