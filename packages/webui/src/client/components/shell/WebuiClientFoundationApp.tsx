@@ -136,7 +136,7 @@ import { createWebuiPluginWorkflows } from "../../application/plugins/plugin-wor
 import { webuiActiveTurnProbeFor } from "../../application/turn/active-turn-probe.js";
 import { startWebuiSessionTransferDownload } from "../../infrastructure/session-transfer-download.js";
 import { importWebuiSessionFile } from "../../infrastructure/session-import.js";
-import type { TeamModeSessionChoices } from "../../team-mode.js";
+import type { TeamModeSessionChoices } from "../../infrastructure/team-mode.js";
 import {
   initialWebuiWorkspaceProgress,
   projectWebuiWorkspaceHistory,

@@ -11,12 +11,12 @@
 // on quota, and a failure degrades to "no counts" rather than taking the rail
 // down with it.
 
-import { isNoProjectFlag } from "../no-project.js";
+import { isNoProjectFlag } from "./no-project.js";
 import {
   parseTeamModeOff,
   parseTeamModeSessionChoices,
   type TeamModeSessionChoices,
-} from "../team-mode.js";
+} from "./team-mode.js";
 
 export const SESSION_UNREAD_STORAGE_KEY = "mavis-session-unread";
 export const MODEL_FAVORITES_KEY = "webui:model-favorites:v1";

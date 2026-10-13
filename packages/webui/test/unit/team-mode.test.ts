@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { readSessionOverlay, toggleSessionOverlay } from "../../src/client/infrastructure/storage.js";
 import {
   isTeamModeLocked,
-} from "../../src/client/team-mode.js";
+} from "../../src/client/infrastructure/team-mode.js";
 import {
   createWebuiBrowserStorage,
   getWebuiBrowserStorage,
