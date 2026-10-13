@@ -1,0 +1,138 @@
+// The Git-import dialog (plan §15.1's `PluginImportDialog.tsx` row, ticket #72). It is the
+// marketplace's "从 Git 仓库导入插件" surface, cut out of `PluginManagement.tsx` where it was
+// `:1481-1591` of one 1594-line file.
+//
+// It is rendered by the catalogue's existing conditional, so it mounts and unmounts on the same
+// condition it always did, and it owns no state: the URL, the preview and the busy/error flags are
+// the catalogue's, which is what keeps a failed preview from discarding what the user typed
+// (`previewPlugin` sets the error and leaves the preview alone) and a failed import from closing the
+// dialog (`importPlugin` closes and clears only after `mutate` reports success).
+
+import type { ReactElement } from "react";
+
+import { readWebuiPluginRow as read, type WebuiPluginRow as Row } from "../../projection/plugin-rows.js";
+
+export interface PluginImportDialogProps {
+  readonly url: string;
+  /** A keystroke clears the preview: the shown package no longer answers the URL. */
+  readonly onUrlChange: (value: string) => void;
+  readonly preview: Row | undefined;
+  readonly error: string;
+  readonly busy: boolean;
+  readonly onPreview: () => void;
+  readonly onImport: () => void;
+  readonly onClose: () => void;
+}
+
+export function PluginImportDialog({ url, onUrlChange, preview, error, busy, onPreview, onImport, onClose }: PluginImportDialogProps): ReactElement {
+  return (
+    <div
+      className="webui-plugin-backdrop"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget)
+          onClose();
+      }}
+    >
+      <section
+        className="webui-plugin-dialog webui-plugin-import-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="plugin-import-title"
+      >
+        <header>
+          <div>
+            <h2 id="plugin-import-title">从 Git 仓库导入插件</h2>
+            <p>输入 GitHub 插件仓库或子目录 URL</p>
+          </div>
+          <button
+            onClick={() => onClose()}
+            aria-label="关闭"
+          >
+            ×
+          </button>
+        </header>
+        <div className="webui-plugin-form webui-plugin-import-body">
+          <label className="wide">
+            仓库 URL
+            <input
+              aria-label="仓库 URL"
+              value={url}
+              onChange={(event) => {
+                onUrlChange(event.currentTarget.value);
+              }}
+              placeholder="https://github.com/owner/repository"
+            />
+          </label>
+          {preview ? (
+            <div className="webui-plugin-import-preview">
+              <strong>
+                {read(
+                  ((preview.plugin as Row)?.summary as Row) || {},
+                  "displayName",
+                  "name",
+                )}
+              </strong>
+              <p>
+                {read(
+                  ((preview.plugin as Row)?.summary as Row) || {},
+                  "description",
+                )}
+              </p>
+              <span>
+                技能{" "}
+                {String((preview.plugin as Row)?.skillCount ?? 0)} ·
+                MCP{" "}
+                {String((preview.plugin as Row)?.mcpServerCount ?? 0)}
+              </span>
+              {preview.canImport !== true ? (
+                <ul className="webui-plugin-diagnostics" role="status">
+                  {Array.isArray(preview.diagnostics) &&
+                  preview.diagnostics.length > 0 ? (
+                    (preview.diagnostics as Row[]).map(
+                      (diagnostic, index) => (
+                        <li key={`${read(diagnostic, "code")}-${index}`}>
+                          {[
+                            read(diagnostic, "code"),
+                            read(diagnostic, "capability", "name"),
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </li>
+                      ),
+                    )
+                  ) : (
+                    <li>当前插件包还不能导入，请检查仓库内容后重试。</li>
+                  )}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+        {error ? (
+          <p role="alert" className="webui-plugin-error">
+            {error}
+          </p>
+        ) : null}
+        <footer>
+          <button onClick={() => onClose()}>取消</button>
+          {preview ? (
+            <button
+              disabled={busy || preview.canImport !== true}
+              onClick={() => onImport()}
+            >
+              导入插件
+            </button>
+          ) : (
+            <button
+              disabled={busy || !url.trim()}
+              onClick={() => onPreview()}
+            >
+              预览
+            </button>
+          )}
+        </footer>
+      </section>
+    </div>
+  );
+}

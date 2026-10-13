@@ -10,8 +10,9 @@ import {
 } from "../bindings/use-query-state.js";
 import { WebuiIconAgent } from "../icons.js";
 import { ToggleSwitch } from "./ToggleSwitch.js";
+import { readWebuiPluginRow as read, type WebuiPluginRow as Row } from "../projection/plugin-rows.js";
+import { PluginImportDialog } from "./plugins/PluginImportDialog.js";
 
-type Row = Record<string, unknown>;
 type Area = "plugins" | "skills" | "apps" | "mcp" | "agents";
 type PluginManagementSelection = {
   readonly area: Area;
@@ -105,11 +106,6 @@ const MARKETPLACE_CATEGORY: Readonly<Record<string, number>> = {
   productivity: MarketplaceCategory.PRODUCTIVITY,
   science_and_healthcare: MarketplaceCategory.SCIENCE_AND_HEALTHCARE,
   education: MarketplaceCategory.EDUCATION,
-};
-const read = (row: Row, ...keys: string[]): string => {
-  for (const key of keys)
-    if (typeof row[key] === "string") return row[key] as string;
-  return "";
 };
 const rows = (value: unknown, key: string): Row[] => {
   if (!value || typeof value !== "object") return [];
@@ -1479,115 +1475,19 @@ export function PluginManagement({
         </div>
       ) : null}
       {pluginImportDialog ? (
-        <div
-          className="webui-plugin-backdrop"
-          role="presentation"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget)
-              setPluginImportDialog(false);
+        <PluginImportDialog
+          url={pluginUrl}
+          onUrlChange={(value) => {
+            setPluginUrl(value);
+            setPluginPreview(undefined);
           }}
-        >
-          <section
-            className="webui-plugin-dialog webui-plugin-import-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="plugin-import-title"
-          >
-            <header>
-              <div>
-                <h2 id="plugin-import-title">从 Git 仓库导入插件</h2>
-                <p>输入 GitHub 插件仓库或子目录 URL</p>
-              </div>
-              <button
-                onClick={() => setPluginImportDialog(false)}
-                aria-label="关闭"
-              >
-                ×
-              </button>
-            </header>
-            <div className="webui-plugin-form webui-plugin-import-body">
-              <label className="wide">
-                仓库 URL
-                <input
-                  aria-label="仓库 URL"
-                  value={pluginUrl}
-                  onChange={(event) => {
-                    setPluginUrl(event.currentTarget.value);
-                    setPluginPreview(undefined);
-                  }}
-                  placeholder="https://github.com/owner/repository"
-                />
-              </label>
-              {pluginPreview ? (
-                <div className="webui-plugin-import-preview">
-                  <strong>
-                    {read(
-                      ((pluginPreview.plugin as Row)?.summary as Row) || {},
-                      "displayName",
-                      "name",
-                    )}
-                  </strong>
-                  <p>
-                    {read(
-                      ((pluginPreview.plugin as Row)?.summary as Row) || {},
-                      "description",
-                    )}
-                  </p>
-                  <span>
-                    技能{" "}
-                    {String((pluginPreview.plugin as Row)?.skillCount ?? 0)} ·
-                    MCP{" "}
-                    {String((pluginPreview.plugin as Row)?.mcpServerCount ?? 0)}
-                  </span>
-                  {pluginPreview.canImport !== true ? (
-                    <ul className="webui-plugin-diagnostics" role="status">
-                      {Array.isArray(pluginPreview.diagnostics) &&
-                      pluginPreview.diagnostics.length > 0 ? (
-                        (pluginPreview.diagnostics as Row[]).map(
-                          (diagnostic, index) => (
-                            <li key={`${read(diagnostic, "code")}-${index}`}>
-                              {[
-                                read(diagnostic, "code"),
-                                read(diagnostic, "capability", "name"),
-                              ]
-                                .filter(Boolean)
-                                .join(" · ")}
-                            </li>
-                          ),
-                        )
-                      ) : (
-                        <li>当前插件包还不能导入，请检查仓库内容后重试。</li>
-                      )}
-                    </ul>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-            {error ? (
-              <p role="alert" className="webui-plugin-error">
-                {error}
-              </p>
-            ) : null}
-            <footer>
-              <button onClick={() => setPluginImportDialog(false)}>取消</button>
-              {pluginPreview ? (
-                <button
-                  disabled={busy || pluginPreview.canImport !== true}
-                  onClick={() => void importPlugin()}
-                >
-                  导入插件
-                </button>
-              ) : (
-                <button
-                  disabled={busy || !pluginUrl.trim()}
-                  onClick={() => void previewPlugin()}
-                >
-                  预览
-                </button>
-              )}
-            </footer>
-          </section>
-        </div>
+          preview={pluginPreview}
+          error={error}
+          busy={busy}
+          onPreview={() => void previewPlugin()}
+          onImport={() => void importPlugin()}
+          onClose={() => setPluginImportDialog(false)}
+        />
       ) : null}
     </section>
   );
