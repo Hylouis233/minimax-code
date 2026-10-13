@@ -22,7 +22,7 @@ import { ArchonShell } from "./ArchonShell.js";
 import { WEBUI_COMPOSER_HOME_KEY } from "../application/composer/composer-history.js";
 import { Composer } from "./composer/Composer.js";
 import { GreetingSkeleton } from "./TranscriptSkeletons.js";
-import { LeftRail } from "./LeftRail.js";
+import { LeftRail } from "./sessions/LeftRail.js";
 import {
   readProjectNames,
   readProjectPins,
@@ -64,8 +64,8 @@ import {
   filterWebuiSessionsByQuery,
   sessionHash,
   sessionLabel,
-} from "./SessionRail.js";
-import { RailRow } from "./RailRow.js";
+} from "./sessions/SessionRail.js";
+import { RailRow } from "./sessions/RailRow.js";
 import {
   WebuiIconBrand,
   WebuiIconContextExport,
@@ -89,7 +89,7 @@ import type {
   WebuiWorkspaceProgressState,
   WebuiWorkspaceSubagent,
 } from "../projection/workspace-progress.js";
-import type { WebuiProjectGroup } from "./SessionRail.js";
+import type { WebuiProjectGroup } from "./sessions/SessionRail.js";
 import { createWebuiCommandWorkflows } from "../application/composer/command-workflows.js";
 import { createWebuiComposerStore } from "../application/composer/composer-store.js";
 import {

@@ -20,7 +20,7 @@ import {
 import {
   WebuiProjectList,
   WebuiSessionList,
-} from "../../src/client/components/SessionRail.js";
+} from "../../src/client/components/sessions/SessionRail.js";
 import { WebuiClientFoundationApp } from "../../src/client/components/WebuiClientFoundationApp.js";
 import { formatWebuiUnreadBadge } from "../../src/client/projection/unread-badge.js";
 import {

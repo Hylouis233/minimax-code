@@ -9,7 +9,7 @@ import {
   selectWebuiRailViewTabs,
   type WebuiRailView,
 } from "../../src/client/rail-buckets.js";
-import { WebuiProjectList } from "../../src/client/components/SessionRail.js";
+import { WebuiProjectList } from "../../src/client/components/sessions/SessionRail.js";
 import type { WebuiSessionActivityMap } from "../../src/client/projection/session-activity.js";
 import type { WebuiClientSession } from "../../src/client/contracts/sessions/session-view.js";
 

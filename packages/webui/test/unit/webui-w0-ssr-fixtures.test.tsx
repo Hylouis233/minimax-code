@@ -20,7 +20,7 @@ import {
   WebuiFeedbackActions,
   WebuiMessageActionButton,
 } from "../../src/client/components/MessageActions.js";
-import { LeftRail } from "../../src/client/components/LeftRail.js";
+import { LeftRail } from "../../src/client/components/sessions/LeftRail.js";
 import { WebuiQuestionnaireResponse } from "../../src/client/components/SessionTranscript.js";
 import {
   mergeOlderTranscriptPage,

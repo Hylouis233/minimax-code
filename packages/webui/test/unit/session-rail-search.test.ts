@@ -30,7 +30,7 @@ import {
   matchesWebuiSessionQuery,
   sessionLabel,
   type WebuiProjectGroup,
-} from "../../src/client/components/SessionRail.js";
+} from "../../src/client/components/sessions/SessionRail.js";
 
 const session = (over: Partial<WebuiClientSession> & { sessionId: string }): WebuiClientSession => ({
   agentName: "main",

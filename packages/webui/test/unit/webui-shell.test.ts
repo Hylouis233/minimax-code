@@ -33,7 +33,7 @@ import {
   resolveDefaultExpandedProjectKey,
   sessionHash,
   sortWebuiProjectSessionIds,
-} from "../../src/client/components/SessionRail.js";
+} from "../../src/client/components/sessions/SessionRail.js";
 import { WebuiSessionTranscript as BaseWebuiSessionTranscript } from "../../src/client/components/SessionTranscript.js";
 import { WebuiWorkspaceDirectoryBrowser } from "../../src/client/components/workspace/WebuiWorkspaceDirectoryBrowser.js";
 import {

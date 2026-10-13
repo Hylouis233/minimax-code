@@ -33,28 +33,28 @@ import {
   WebuiIconSessionStarMark,
   WebuiIconSessionDisclosure,
   WebuiIconAgent,
-} from "../icons.js";
-import { WebuiContextMenu, type WebuiContextMenuItem } from "./ContextMenu.js";
+} from "../../icons.js";
+import { WebuiContextMenu, type WebuiContextMenuItem } from "../ContextMenu.js";
 import {
   webuiRailMenuFor,
   type WebuiRailMenuEntry,
   type WebuiRailMenuSubject,
-} from "../projection/rail-menu.js";
+} from "../../projection/rail-menu.js";
 import { RailRow } from "./RailRow.js";
 import {
   formatWebuiSessionAge,
   type WebuiSessionActivityMap,
-} from "../projection/session-activity.js";
+} from "../../projection/session-activity.js";
 import {
   filterWebuiRailViewSessions,
   selectWebuiRailViewTabs,
   type WebuiRailView,
   type WebuiRailViewTab,
-} from "../rail-buckets.js";
-import { formatWebuiUnreadBadge } from "../projection/unread-badge.js";
-import type { WebuiClientSession, WebuiClientSessionPage, WebuiClientSessionTreePage, WebuiClientProject } from "../contracts/sessions/session-view.js";
-import { teamModeCopy } from "../team-mode.js";
-import { workspaceProjectName } from "../projection/workspace-name.js";
+} from "../../rail-buckets.js";
+import { formatWebuiUnreadBadge } from "../../projection/unread-badge.js";
+import type { WebuiClientSession, WebuiClientSessionPage, WebuiClientSessionTreePage, WebuiClientProject } from "../../contracts/sessions/session-view.js";
+import { teamModeCopy } from "../../team-mode.js";
+import { workspaceProjectName } from "../../projection/workspace-name.js";
 
 const PROJECT_SESSION_BATCH_SIZE = 6;
 
