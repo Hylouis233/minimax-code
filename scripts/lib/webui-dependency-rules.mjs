@@ -431,6 +431,170 @@ export function classifyLayers(relative) {
 }
 
 // ---------------------------------------------------------------------------
+// Roles: the second, ownership-bearing dimension
+// ---------------------------------------------------------------------------
+
+/**
+ * Target roles (plan §5.1/§5.3). A file's *layer* decides which direction an
+ * edge may point; its *role* decides who owns the behaviour behind it. Both are
+ * needed: `client/bindings/` and `client/components/` are the same layer
+ * (`bindings`) but different roles, and `client/application/session-store.ts`
+ * (assembly) and `client/application/models/...` (a business owner) are the same
+ * path prefix but different roles.
+ */
+export const ROLES = Object.freeze([
+  /** `client/main.tsx` — boot entry. */
+  "entry",
+  /** Application assembly, session-record repository, scope manager, routes. */
+  "assembly",
+  /** Conversation substrate: turn/history/stream lifecycle and lease primitives. */
+  "conversation",
+  /** A feature's published contracts (capability port, view types). */
+  "feature-contracts",
+  /** A feature's owner/workflows and use-case policy. */
+  "feature-application",
+  /** A feature's pure projections. */
+  "feature-projection",
+  /** A feature's React binding (the bridge that may hold capability objects). */
+  "feature-bindings",
+  /** A feature's React presentation. */
+  "feature-ui",
+  /** A file directly under a feature root, with no role directory of its own. */
+  "feature-root",
+  /** Browser IO: wire, storage, DOM, file and download adapters. */
+  "platform",
+  /** Reusable presentation mechanics with no business policy. */
+  "ui",
+  /** Shell layout and route-facing composition. */
+  "shell",
+  /** The current global React binding bridge, which has no target home. */
+  "bindings",
+  /** Pure projections no single business owns (the current `projection/common/`). */
+  "projection-common",
+  /** Browser contracts no single business owns (`contracts/transport.ts`, …). */
+  "contracts-shared",
+  /** Stylesheets. */
+  "styles",
+  /** A client path no rule recognises yet. */
+  "unknown",
+  /** Server, runtime or shared code, which carries no client role. */
+  "outside",
+]);
+
+/** Which home a path sits in, so a rule can be scoped to the migrated part. */
+export const HOMES = Object.freeze(["current", "target", "outside"]);
+
+/**
+ * Role directory name → role, for the target `client/features/<business>/`
+ * layout. A feature keeps the same local role names the plan §5.1 lists
+ * (`application/`, `projection/`, `bindings/`, `ui/`, `contracts/`), so the
+ * mapping is a table rather than a second naming scheme.
+ */
+const FEATURE_ROLE_DIRECTORIES = Object.freeze({
+  application: "feature-application",
+  projection: "feature-projection",
+  bindings: "feature-bindings",
+  ui: "feature-ui",
+  contracts: "feature-contracts",
+});
+
+/** Target top-level homes that are not features. */
+const TARGET_HOME_ROLES = Object.freeze({
+  "client/conversation": { role: "conversation", business: null },
+  "client/platform": { role: "platform", business: null },
+  "client/ui": { role: "ui", business: null },
+  "client/shell": { role: "shell", business: null },
+  "client/main.tsx": { role: "entry", business: null },
+});
+
+/**
+ * Current top-level homes → role + which path segment names the business.
+ * `business: "none"` means the home carries no business; `business: "segment"`
+ * means the first segment below the home is the business name unless
+ * `businessless` lists an exception for that home.
+ */
+const CURRENT_HOME_ROLES = Object.freeze([
+  { prefix: "client/components/", role: "feature-ui", business: "segment", businessless: { shell: "shell", shared: "ui" } },
+  { prefix: "client/application/", role: "feature-application", business: "segment", flat: { role: "assembly", business: null } },
+  { prefix: "client/projection/", role: "feature-projection", business: "segment", businessless: { common: "projection-common" } },
+  { prefix: "client/contracts/", role: "feature-contracts", business: "segment", flat: { role: "contracts-shared", business: null } },
+  { prefix: "client/bindings/", role: "bindings", business: "none" },
+  { prefix: "client/infrastructure/", role: "platform", business: "none" },
+  { prefix: "client/mechanisms/", role: "conversation", business: "none" },
+  { prefix: "client/styles/", role: "styles", business: "none" },
+]);
+
+/**
+ * Maps a source path (relative to `packages/webui/src`) to its role: the
+ * behaviour it owns, the business that owns it (or `null`) and the home it sits
+ * in. Both the current technical homes and the target business-first homes are
+ * recognised, so one role rule holds before, during and after the migration —
+ * a defect is not re-spelled when the file moves.
+ *
+ * @param {string} relative
+ * @returns {{ readonly role: string, readonly business: string | null, readonly home: string }}
+ */
+export function classifyRole(relative) {
+  const normalized = relative.split(path.sep).join("/");
+
+  if (normalized.startsWith("client/features/")) {
+    const [business, ...tail] = normalized.slice("client/features/".length).split("/");
+    if (!business) return { role: "unknown", business: null, home: "target" };
+    if (tail.length === 0) return { role: "feature-root", business, home: "target" };
+    return {
+      role: FEATURE_ROLE_DIRECTORIES[tail[0]] ?? "feature-root",
+      business,
+      home: "target",
+    };
+  }
+
+  for (const [prefix, entry] of Object.entries(TARGET_HOME_ROLES)) {
+    if (normalized === prefix || normalized.startsWith(`${prefix}/`)) {
+      return { role: entry.role, business: entry.business, home: "target" };
+    }
+  }
+
+  for (const home of CURRENT_HOME_ROLES) {
+    if (!normalized.startsWith(home.prefix)) continue;
+    const rest = normalized.slice(home.prefix.length);
+    const segments = rest.split("/");
+    if (home.business === "none") return { role: home.role, business: null, home: "current" };
+    // A file directly below the home (`application/query-store.ts`) is not a
+    // business: the current layout keeps flat assembly / shared contract modules
+    // there, and they have their own role.
+    if (segments.length === 1) {
+      const flat = home.flat ?? { role: home.role, business: null };
+      return { role: flat.role, business: flat.business, home: "current" };
+    }
+    const segment = segments[0];
+    const override = home.businessless?.[segment];
+    if (override) return { role: override, business: null, home: "current" };
+    return { role: home.role, business: segment, home: "current" };
+  }
+
+  if (normalized.startsWith("client/")) return { role: "unknown", business: null, home: "current" };
+  return { role: "outside", business: null, home: "outside" };
+}
+
+/**
+ * True when a path is presentation: a file that submits commands and receives
+ * none of the capability objects those commands are reached through. This is the
+ * call-site rule's missing half — `classifyLayers` maps `client/components/`
+ * and `client/bindings/` to the same layer, so the layer set cannot tell the
+ * shell and its panels from the bridge that legitimately holds a capability.
+ *
+ * It is a role judgement rather than a path prefix so it holds in both
+ * spellings: `client/components/composer/` and `client/features/composer/ui/` are
+ * the same presentation, and a file must not escape the rule by arriving at its
+ * target home. Both spellings classify as presentation today, so the substitution
+ * adds no violation to the current tree.
+ */
+export function isPresentationRole(relative) {
+  const { role } = classifyRole(relative);
+  return role === "feature-ui" || role === "ui" || role === "shell";
+}
+
+// ---------------------------------------------------------------------------
 // Normaliser
 // ---------------------------------------------------------------------------
 
@@ -1603,19 +1767,6 @@ const CALL_FORBIDDEN_LAYERS = new Set([
 ]);
 
 /**
- * Paths whose files are presentation and therefore may not hold a capability
- * call, even though their classified layer is `bindings`. This is not a
- * directory denylist for imports (see the `ALLOWED_EDGES` note: nothing is
- * forbidden merely because a directory is named); it is the call-site rule's
- * missing half. The rule asks whether the *caller* owns capability
- * interactions, and the plan answers that per directory: `client/bindings/` is
- * the bridge that converts a writer into a command surface, `client/components/`
- * is the shell and its panels, which submit commands and receive none of the
- * capability objects these methods are reached through.
- */
-const CALL_PRESENTATION_PREFIX = "client/components/";
-
-/**
  * The policy governing a call site. The invoked method's own declaration names
  * the interface it belongs to, and that name is authoritative: a type alias such
  * as `Pick<SessionPort, "deleteSession">` (or any other holder whose property
@@ -1647,7 +1798,7 @@ function forbiddenActualCallRule(graph) {
     // than one target layer, and `classifyLayers` is the only place that could
     // grow a second one.
     const forbiddenLayer = layers.some((layer) => CALL_FORBIDDEN_LAYERS.has(layer));
-    const presentation = site.file.startsWith(CALL_PRESENTATION_PREFIX);
+    const presentation = isPresentationRole(site.file);
     if (!forbiddenLayer && !presentation) continue;
     // Name the interface the method was declared in when that is known, so the
     // message points at the capability contract rather than at whatever local
@@ -1661,6 +1812,217 @@ function forbiddenActualCallRule(graph) {
       detail: `${site.file}:${site.line}: ${layers.join("|")}${presentation ? " (presentation)" : ""} may not invoke writer or business-RPC method "${holder}.${site.method}"`,
     });
   }
+  return { pass: violations.length === 0, violations };
+}
+
+/**
+ * Roles that belong to a business. `duplicateOwnerRule` uses this set to group
+ * files by owner; `roleRule` uses it to tell a peer business import from an
+ * import of shared mechanics.
+ */
+const BUSINESS_BEARING_ROLES = new Set([
+  "feature-contracts",
+  "feature-application",
+  "feature-projection",
+  "feature-bindings",
+  "feature-ui",
+  "feature-root",
+]);
+
+/**
+ * Business roles a feature may not reach into without an approved peer entry.
+ * `feature-contracts` is absent on purpose: a feature's contracts are its
+ * published capability port and view types (plan §5.1), which is exactly what a
+ * peer is allowed to consume.
+ */
+const FEATURE_PRIVATE_ROLES = new Set([
+  "feature-application",
+  "feature-projection",
+  "feature-bindings",
+  "feature-ui",
+  "feature-root",
+]);
+
+/**
+ * Destination roles a migrated source role may not import at all — no peer
+ * approval can grant these, because the defect is the kind of thing being
+ * reached for, not which business owns it.
+ *
+ * - `conversation` (plan §5.1, §5.3.3): depends on pure shared DTOs and injected
+ *   IO/writer contracts, so the assembly and the concrete browser adapters are
+ *   both out of reach.
+ * - `feature-ui` (plan §5.3.1): invokes its own public binding/commands; a
+ *   feature's presentation does not call an IO port or the assembly.
+ * - `shell` (plan §5.1): composes feature public UI/bindings, so the assembly
+ *   and the transport are not its to construct.
+ */
+const ROLE_FORBIDDEN_TARGETS = Object.freeze({
+  conversation: new Set(["assembly", "platform", ...FEATURE_PRIVATE_ROLES]),
+  "feature-ui": new Set(["assembly", "platform"]),
+  shell: new Set(["assembly", "platform"]),
+});
+
+/**
+ * Cross-business imports the check accepts deliberately. Loaded from
+ * `webui-peer-imports.json` so the list is data a reviewer can diff, and so
+ * every migration that needs one records why. Read lazily and cached: the
+ * module stays side-effect-free to import.
+ *
+ * @returns {ReadonlyArray<{readonly from: string, readonly to: string, readonly reason?: string}>}
+ */
+export function loadApprovedPeerImports() {
+  if (approvedPeerImportsCache === null) {
+    approvedPeerImportsCache = Object.freeze(
+      JSON.parse(
+        readFileSync(new URL("./webui-peer-imports.json", import.meta.url), "utf8"),
+      ).entries ?? [],
+    );
+  }
+  return approvedPeerImportsCache;
+}
+
+/** @type {ReadonlyArray<{from: string, to: string, reason?: string}> | null} */
+let approvedPeerImportsCache = null;
+
+/**
+ * The role rules: who may reach whom, judged by role rather than by directory.
+ *
+ * Three judgements, and they are deliberately different in kind:
+ *
+ * 1. **Duplicate live owner.** One business may have one authoritative home per
+ *    role. A business holding the same role in both a current technical home and
+ *    its target feature home is two live owners, which is what the migration is
+ *    supposed to remove atomically (plan §9 W6, Spec decision 20). This one
+ *    applies to every home, because it is the rule that makes the *other* two
+ *    enforceable during the migration.
+ * 2. **Forbidden by kind.** A migrated source role reaching a role it never
+ *    owns (`ROLE_FORBIDDEN_TARGETS`, plus `client/ui/` reaching any business at
+ *    all).
+ * 3. **Unapproved peer import.** A feature reaching another business's private
+ *    role. Contracts need no approval; everything else does.
+ *
+ * Judgements 2 and 3 are limited to files that have already moved to a target
+ * home. The current homes cannot satisfy them yet — shell and Composer construct
+ * owners today, and that is T02–T19's work — so enforcing them there would
+ * report the migration's *starting state* as a defect. Judgement 1 is the
+ * migration gate that holds in the meantime, and no rule is relaxed once a file
+ * moves.
+ *
+ * @param {object} graph
+ * @param {readonly Array<{from: string, to: string, reason?: string}>} approved
+ * @returns {{ pass: boolean, violations: Array<object> }}
+ */
+export function roleRule(graph, approved = loadApprovedPeerImports()) {
+  const violations = [];
+  const files = graph.files ?? [];
+  const fileSet = new Set(files);
+
+  // 1. Duplicate live owner: same business, same role, both homes.
+  const owners = new Map();
+  for (const file of files) {
+    const { role, business, home } = classifyRole(file);
+    if (!business || home === "outside" || !BUSINESS_BEARING_ROLES.has(role)) continue;
+    const key = `${business} ${role}`;
+    if (!owners.has(key)) owners.set(key, { current: [], target: [] });
+    owners.get(key)[home === "target" ? "target" : "current"].push(file);
+  }
+  for (const [key, homes] of owners) {
+    if (homes.current.length === 0 || homes.target.length === 0) continue;
+    const [business, role] = key.split(" ");
+    violations.push({
+      kind: "role",
+      rule: "duplicate-owner",
+      file: homes.target[0],
+      from: homes.current[0],
+      to: homes.target[0],
+      detail:
+        `${business}/${role} has two live owners: ${homes.current.join(", ")} and ` +
+        `${homes.target.join(", ")}. Move the behaviour and delete the previous home in one change; ` +
+        `two homes may not both write it.`,
+    });
+  }
+
+  // 2. and 3. Role edges, over files that already sit in a target home.
+  const approvals = new Map(approved.map((entry) => [pairKey(entry.from, entry.to), entry]));
+  const usedApprovals = new Set();
+  for (const edge of graph.edges ?? []) {
+    const from = classifyRole(edge.from);
+    const to = classifyRole(edge.to);
+    if (from.home !== "target" || to.home === "outside") continue;
+
+    const forbidden = ROLE_FORBIDDEN_TARGETS[from.role];
+    const uiReachesBusiness = from.role === "ui" && FEATURE_PRIVATE_ROLES.has(to.role);
+    if (forbidden?.has(to.role) || uiReachesBusiness) {
+      violations.push({
+        kind: "role",
+        rule: "role-import",
+        file: edge.from,
+        line: edge.line,
+        from: edge.from,
+        to: edge.to,
+        detail:
+          `${edge.from}:${edge.line}: ${from.role} may not import ${to.role} (${edge.to}). ` +
+          `Take the capability as an injected contract instead (plan §5.3).`,
+      });
+      continue;
+    }
+
+    // Only a feature reaching across businesses is judged here. The entry, the
+    // shell, the assembly and the conversation substrate each have their own
+    // composition contract, and the one for their *kind* of dependency is
+    // `ROLE_FORBIDDEN_TARGETS` above.
+    if (
+      from.business === null ||
+      !FEATURE_PRIVATE_ROLES.has(to.role) ||
+      to.business === null ||
+      to.business === from.business
+    )
+      continue;
+
+    const key = pairKey(edge.from, edge.to);
+    if (approvals.has(key)) {
+      usedApprovals.add(key);
+      continue;
+    }
+    violations.push({
+      kind: "role",
+      rule: "private-peer-import",
+      file: edge.from,
+      line: edge.line,
+      from: edge.from,
+      to: edge.to,
+      detail:
+        `${edge.from}:${edge.line}: imports ${to.business}'s private ${to.role} (${edge.to}). ` +
+        `Consume its published contracts or add a reviewed entry to ` +
+        `scripts/lib/webui-peer-imports.json with the reason it is deliberate.`,
+    });
+  }
+
+  // A peer approval that no longer matches a measured edge is stale: the edge it
+  // excused was removed, so the exception has to go too.
+  for (const [key, entry] of approvals) {
+    if (usedApprovals.has(key)) continue;
+    if (!fileSet.has(entry.from) || !fileSet.has(entry.to)) {
+      violations.push({
+        kind: "role",
+        rule: "stale-peer-approval",
+        file: entry.from,
+        from: entry.from,
+        to: entry.to,
+        detail: `approved peer import ${key} names a file that no longer exists — delete the entry.`,
+      });
+      continue;
+    }
+    violations.push({
+      kind: "role",
+      rule: "stale-peer-approval",
+      file: entry.from,
+      from: entry.from,
+      to: entry.to,
+      detail: `approved peer import ${key} is no longer measured — delete the entry.`,
+    });
+  }
+
   return { pass: violations.length === 0, violations };
 }
 
@@ -1729,6 +2091,7 @@ export const rules = Object.freeze([
   forbiddenGlobalRule,
   forbiddenNodeBuiltinRule,
   forbiddenActualCallRule,
+  roleRule,
   unresolvedRule,
   nonLiteralDynamicRule,
   cycleRule,
@@ -1747,6 +2110,7 @@ export const rules = Object.freeze([
  *   cycles: Array<object>,
  *   nodeBuiltins: Array<object>,
  *   forbiddenCalls: Array<object>,
+ *   roleViolations: Array<object>,
  * }}
  */
 export function evaluateGraph(graph) {
@@ -1756,15 +2120,17 @@ export function evaluateGraph(graph) {
   const browserGlobals = results[2].violations;
   const nodeBuiltins = results[3].violations;
   const forbiddenCalls = results[4].violations;
-  const unresolved = results[5].violations;
-  const nonLiteralDynamic = results[6].violations;
-  const cycles = results[7].violations;
+  const roleViolations = results[5].violations;
+  const unresolved = results[6].violations;
+  const nonLiteralDynamic = results[7].violations;
+  const cycles = results[8].violations;
   const violations = [
     ...direction,
     ...browserOnly,
     ...browserGlobals,
     ...nodeBuiltins,
     ...forbiddenCalls,
+    ...roleViolations,
     ...unresolved,
     ...nonLiteralDynamic,
     ...cycles,
@@ -1777,6 +2143,7 @@ export function evaluateGraph(graph) {
     browserGlobals,
     nodeBuiltins,
     forbiddenCalls,
+    roleViolations,
     sharedNodeBuiltins: nodeBuiltins,
     unresolved,
     nonLiteralDynamic,

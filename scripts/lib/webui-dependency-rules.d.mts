@@ -29,6 +29,59 @@ export const CATEGORIES: Readonly<Record<string, CategoryDefinition>>;
 /** Maps a source path (relative to `packages/webui/src`) to target layers. */
 export function classifyLayers(relative: string): string[];
 
+/** Target roles (plan §5.1/§5.3): the ownership-bearing dimension. */
+export const ROLES: readonly string[];
+
+/** Which home a path sits in, so a rule can be scoped to the migrated part. */
+export const HOMES: readonly string[];
+
+export interface RoleClassification {
+  readonly role: string;
+  readonly business: string | null;
+  readonly home: string;
+}
+
+/**
+ * Maps a source path to the role it owns, the business that owns it and the home
+ * it sits in. Both the current technical homes and the target business-first
+ * homes are recognised.
+ */
+export function classifyRole(relative: string): RoleClassification;
+
+/** True when a path is presentation (a feature's `ui/`, generic `ui/`, shell). */
+export function isPresentationRole(relative: string): boolean;
+
+/** One reviewed cross-business import the role check accepts. */
+export interface ApprovedPeerImport {
+  readonly from: string;
+  readonly to: string;
+  readonly reason?: string;
+}
+
+/** Reads `webui-peer-imports.json` lazily and caches the result. */
+export function loadApprovedPeerImports(): readonly ApprovedPeerImport[];
+
+/** One role-rule finding. `rule` names which role judgement produced it. */
+export interface RoleViolation {
+  readonly kind: "role";
+  readonly rule: "duplicate-owner" | "role-import" | "private-peer-import" | "stale-peer-approval";
+  readonly file: string;
+  readonly from: string;
+  readonly to: string;
+  readonly line?: number;
+  readonly detail: string;
+}
+
+/**
+ * The role rules: duplicate live owners, role-forbidden imports and unapproved
+ * cross-business imports. `approved` defaults to the reviewed list on disk and
+ * exists so fixtures can drive the rule with their own approvals.
+ */
+export function roleRule(
+  graph: DependencyGraph,
+  approved?: readonly ApprovedPeerImport[],
+): { readonly pass: boolean; readonly violations: readonly RoleViolation[] };
+
 /** Normalises an absolute path to the src-relative POSIX form, or `null`. */
 export function normaliseSourcePath(
   repositoryRoot: string,
@@ -209,6 +262,8 @@ export interface GraphViolation {
   readonly line?: number;
   readonly global?: string;
   readonly specifier?: string;
+  /** `Interface.method` for a forbidden capability call (`forbidden-call`). */
+  readonly target?: string;
   readonly cycle?: readonly string[];
   readonly canonical?: string;
   readonly detail: string;
@@ -250,6 +305,7 @@ export interface GraphEvaluation {
   readonly browserGlobals: readonly GraphViolation[];
   readonly nodeBuiltins: readonly NodeBuiltinViolation[];
   readonly forbiddenCalls: readonly GraphViolation[];
+  readonly roleViolations: readonly RoleViolation[];
   readonly sharedNodeBuiltins: readonly NodeBuiltinViolation[];
   readonly unresolved: readonly GraphViolation[];
   readonly nonLiteralDynamic: readonly GraphViolation[];

@@ -154,7 +154,8 @@ const failed =
   result.browserOnly.length > 0 ||
   result.browserGlobals.length > 0 ||
   result.nodeBuiltins.length > 0 ||
-  result.forbiddenCalls.length > 0;
+  result.forbiddenCalls.length > 0 ||
+  result.roleViolations.length > 0;
 
 const summary = {
   ok: !failed,
@@ -170,6 +171,7 @@ const summary = {
   nodeBuiltins: result.nodeBuiltins,
   sharedNodeBuiltins: result.nodeBuiltins,
   forbiddenCalls: result.forbiddenCalls,
+  roleViolations: result.roleViolations,
   cycles: result.cycles.map((entry) => entry.canonical),
   newCycles: newCycles.map((entry) => entry.canonical),
   staleCycles: staleCycles.map((entry) => entry.canonical),
@@ -196,6 +198,7 @@ if (values.json) {
   lines.push(
     `  structural exceptions: ${measuredStructural.length} (allowed ${(baseline.allowances ?? []).length})`,
   );
+  lines.push(`  role violations: ${result.roleViolations.length}`);
   if (result.browserOnly.length) {
     lines.push("");
     lines.push(
@@ -205,6 +208,11 @@ if (values.json) {
   }
   for (const violation of [...result.browserGlobals, ...result.nodeBuiltins, ...result.forbiddenCalls])
     lines.push(`  ${violation.detail}`);
+  if (result.roleViolations.length) {
+    lines.push("");
+    lines.push(`Role violations (${result.roleViolations.length}) — ownership, not direction:`);
+    for (const violation of result.roleViolations) lines.push(`  ${violation.detail}`);
+  }
   if (newViolations.length) {
     lines.push("");
     lines.push(`NEW violations (${newViolations.length}), not in the baseline:`);

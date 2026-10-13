@@ -58,7 +58,7 @@ const BUSINESSES = [
     // the third view of the same writer surface and belongs to `interactions`;
     // the groups themselves are the two interfaces `session-commands.ts` draws.
     declarations: [
-      { module: "application/turn-capabilities.ts", name: "WebuiTurnCapabilitySlice" },
+      { module: "application/turn/turn-capabilities.ts", name: "WebuiTurnCapabilitySlice" },
       { module: "application/sessions/session-commands.ts", name: "WebuiStreamPhaseCommands" },
       { module: "application/sessions/session-commands.ts", name: "WebuiTurnLifecycleCommands" },
       { module: "application/sessions/session-commands.ts", name: "WebuiTurnCommandWriter" },
@@ -96,7 +96,7 @@ const BUSINESSES = [
     // publishes commands, while no component ever names it. §5.6 gives the carve
     // the refresh, the write commands and the versioned apply. Added by ticket #66.
     declarations: [
-      { module: "application/goal-coordinator.ts", name: "WebuiGoalCoordinator" },
+      { module: "application/goal/goal-coordinator.ts", name: "WebuiGoalCoordinator" },
     ],
   },
 ];
@@ -104,12 +104,19 @@ const BUSINESSES = [
 /** Members of an exported interface, or of an object-shaped type alias. */
 function declarationMembers(relativePath, name) {
   const absolute = path.join(root, "packages/webui/src/client", relativePath);
-  const source = ts.createSourceFile(
-    absolute,
-    readFileSync(absolute, "utf8"),
-    ts.ScriptTarget.Latest,
-    true,
-  );
+  let text;
+  try {
+    text = readFileSync(absolute, "utf8");
+  } catch (error) {
+    // A listed module that no longer exists is a stale mapping, not a missing
+    // file: say which declaration moved instead of surfacing a bare ENOENT.
+    throw new Error(
+      `webui-command-surface: ${relativePath} does not exist, but it is listed as the home of ` +
+        `${name}. Repoint the declaration at its current module instead of removing it, so the ` +
+        `published surface stays recorded (${error.code ?? error.message}).`,
+    );
+  }
+  const source = ts.createSourceFile(absolute, text, ts.ScriptTarget.Latest, true);
   for (const statement of source.statements) {
     const isInterface = ts.isInterfaceDeclaration(statement);
     const isTypeAlias = ts.isTypeAliasDeclaration(statement);
