@@ -59,10 +59,10 @@ const BUSINESSES = [
     // the groups themselves are the two interfaces `session-commands.ts` draws.
     declarations: [
       { module: "application/turn-capabilities.ts", name: "WebuiTurnCapabilitySlice" },
-      { module: "application/session-commands.ts", name: "WebuiStreamPhaseCommands" },
-      { module: "application/session-commands.ts", name: "WebuiTurnLifecycleCommands" },
-      { module: "application/session-commands.ts", name: "WebuiTurnCommandWriter" },
-      { module: "application/turn-coordinator.ts", name: "WebuiTurnCoordinator" },
+      { module: "application/sessions/session-commands.ts", name: "WebuiStreamPhaseCommands" },
+      { module: "application/sessions/session-commands.ts", name: "WebuiTurnLifecycleCommands" },
+      { module: "application/sessions/session-commands.ts", name: "WebuiTurnCommandWriter" },
+      { module: "application/turn/turn-coordinator.ts", name: "WebuiTurnCoordinator" },
     ],
   },
   {
@@ -71,23 +71,23 @@ const BUSINESSES = [
     // than under `turn` because the state it writes is `interactions`' own
     // (§5.6); the fact that one module declares both views is not ownership.
     declarations: [
-      { module: "application/session-commands.ts", name: "WebuiInteractionCommands" },
+      { module: "application/sessions/session-commands.ts", name: "WebuiInteractionCommands" },
       // §5.6: the carve's owner publishes the permission reply and the
       // answer/dismiss commands. Added by ticket #66, which split the two duties
       // out of the composer and gave each business its own owner.
       {
-        module: "application/interaction-coordinator.ts",
+        module: "application/interactions/interaction-coordinator.ts",
         name: "WebuiInteractionCoordinator",
       },
     ],
   },
   {
     business: "composer",
-    // §5.6's composer row: the owner module is `application/composer-store.ts`, and
+    // §5.6's composer row: the owner module is `application/composer/composer-store.ts`, and
     // its published commands are what B3's session delete invokes (`purgeSlot`).
     // Recorded by ticket #68, which consumes that command.
     declarations: [
-      { module: "application/composer-store.ts", name: "WebuiComposerStore" },
+      { module: "application/composer/composer-store.ts", name: "WebuiComposerStore" },
     ],
   },
   {

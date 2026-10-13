@@ -56,7 +56,7 @@ entry, and do not repoint it: the blob id would stop resolving.
 | Frozen path | Baseline source | Blob |
 | --- | --- | --- |
 | `client/contracts.ts` | `packages/webui/src/client/contracts.ts` | `c7d88ad19dfb` |
-| `client/projection/transcript/message-parts.ts` | `packages/webui/src/client/projection/transcript/message-parts.ts` | `cdb2b58b2c38` |
+| `client/projection/message-parts.ts` | `packages/webui/src/client/projection/message-parts.ts` | `cdb2b58b2c38` |
 | `server/commands/descriptors.ts` | `packages/webui/src/server/commands/descriptors.ts` | `c23ca48804f5` |
 | `server/commands/runner.ts` | `packages/webui/src/server/commands/runner.ts` | `fe26c8dde975` |
 | `server/envelope.ts` | `packages/webui/src/server/envelope.ts` | `ab55d0cd89e5` |
