@@ -24,6 +24,7 @@
 // This module is framework-free — no React, no DOM, no storage — so it can be
 // unit-tested against a scripted port.
 
+import type { WebuiIdentityEpochs } from "../identity-epochs.js";
 import {
   createWebuiQueryStore,
   idleWebuiQueryState,
@@ -149,8 +150,18 @@ export interface WebuiSettingsWorkflows {
 
 export function createWebuiSettingsWorkflows(deps: {
   readonly port: WebuiSettingsPortSlice;
+  /**
+   * The application's opaque generation context (§4.5; T02). An instruction,
+   * memory, profile or preference write changes the configuration answers were
+   * computed under, so the write advances that generation.
+   */
+  readonly identityEpochs?: WebuiIdentityEpochs;
 }): WebuiSettingsWorkflows {
   const { port } = deps;
+  /** Called after a write landed: only a successful write retires answers. */
+  const afterConfigurationWrite = (): void => {
+    deps.identityEpochs?.advance("configuration");
+  };
   // The cached-read fence is not this module's: `query-store.ts` holds the one
   // implementation of the snapshot, the listener set and the version guard, and
   // every owner that caches transport answers reads through it (§16.3).
@@ -174,6 +185,7 @@ export function createWebuiSettingsWorkflows(deps: {
   const saveInstructions = async (content: string): Promise<WebuiGlobalInstructionsView> => {
     if (!port.setGlobalInstructions) throw new Error("当前运行时不支持自定义指令读写。");
     const value = await port.setGlobalInstructions({ content });
+    afterConfigurationWrite();
     set((current) => ({
       ...current,
       instructions: { status: "ready", value },
@@ -193,6 +205,7 @@ export function createWebuiSettingsWorkflows(deps: {
   const saveProfile = async (fields: WebuiUserProfileFields): Promise<WebuiUserProfileView> => {
     if (!port.setUserProfile) throw new Error("当前运行时不支持「关于你」读写。");
     const value = await port.setUserProfile(fields);
+    afterConfigurationWrite();
     set((current) => ({
       ...current,
       profile: { status: "ready", value },
@@ -212,6 +225,7 @@ export function createWebuiSettingsWorkflows(deps: {
   const saveAgentMemory = async (content: string): Promise<WebuiAgentMemoryView> => {
     if (!port.setAgentMemory) throw new Error("当前运行时不支持长期记忆读写。");
     const value = await port.setAgentMemory({ content });
+    afterConfigurationWrite();
     set((current) => ({
       ...current,
       agentMemory: { status: "ready", value },
@@ -234,6 +248,7 @@ export function createWebuiSettingsWorkflows(deps: {
   }): Promise<WebuiMemorySettingsView> => {
     if (!port.setMemorySettings) throw new Error("当前运行时不支持记忆开关。");
     const value = await port.setMemorySettings(patch);
+    afterConfigurationWrite();
     set((current) => ({
       ...current,
       memorySettings: { status: "ready", value },
@@ -281,6 +296,7 @@ export function createWebuiSettingsWorkflows(deps: {
   const setModelSource = async (source: WebuiModelSource): Promise<void> => {
     if (!port.setMiniMaxModelSource) throw new Error("当前运行时不支持切换模型来源。");
     const value = await port.setMiniMaxModelSource(source);
+    afterConfigurationWrite();
     set((current) => ({
       ...current,
       modelSource: { status: "ready", value },

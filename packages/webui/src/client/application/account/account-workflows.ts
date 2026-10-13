@@ -22,6 +22,7 @@
 // against a scripted port. The components read its snapshot and submit
 // commands; they hold no store writer and call no transport method directly.
 
+import type { WebuiIdentityEpochs } from "../identity-epochs.js";
 import type { AccountPort } from "../../contracts/account/account-port.js";
 import type {
   WebuiAccountLoginView,
@@ -164,8 +165,33 @@ export interface WebuiAccountWorkflows {
 
 export function createWebuiAccountWorkflows(deps: {
   readonly port: WebuiAccountPortSlice;
+  /**
+   * The application's opaque generation context (§4.5; T02). Sign-in, sign-out,
+   * a claim and an authoritative status answer that reports a different identity
+   * all retire the answers computed under the previous credential generation.
+   */
+  readonly identityEpochs?: WebuiIdentityEpochs;
 }): WebuiAccountWorkflows {
   const { port } = deps;
+  /** Called after the credential facts changed; never before they did. */
+  const afterCredentialChange = (): void => {
+    deps.identityEpochs?.advance("credentials");
+  };
+  /**
+   * The credential-relevant projection of one status answer: only the fields
+   * that say *who* the browser is signed in as. An answer that repeats them is
+   * not a reconciliation and must not retire anything — otherwise every poll
+   * would invalidate the answers it just read.
+   */
+  const credentialFingerprint = (
+    value: Record<string, unknown> | undefined,
+  ): string =>
+    JSON.stringify([
+      value?.signedIn ?? null,
+      value?.accountId ?? value?.account_id ?? null,
+      value?.plan ?? null,
+    ]);
+  let lastCredentialFingerprint: string | undefined;
   let state = initialWebuiAccountWorkflowsState;
   const listeners = new Set<() => void>();
   const versions = new Map<string, number>();
@@ -222,7 +248,12 @@ export function createWebuiAccountWorkflows(deps: {
         },
       };
     });
-    if (view.state === "authenticated") stopLoginPolling();
+    if (view.state === "authenticated") {
+      stopLoginPolling();
+      // Sign-in completed: the credential generation moves, so answers captured
+      // while signed out cannot commit afterwards.
+      afterCredentialChange();
+    }
   };
 
   const pollLoginStatus = (): void => {
@@ -308,6 +339,14 @@ export function createWebuiAccountWorkflows(deps: {
       const value = await read(sessionId ? { sessionId } : undefined);
       if (!isCurrent(key, version)) return;
       set((current) => ({ ...current, account: { status: "ready", value } }));
+      // Authoritative reconciliation: the runtime is the credential authority,
+      // so an answer that reports a *different* identity advances the epoch. The
+      // first answer establishes the baseline instead of retiring everything.
+      const fingerprint = credentialFingerprint(value);
+      if (lastCredentialFingerprint !== undefined && fingerprint !== lastCredentialFingerprint) {
+        afterCredentialChange();
+      }
+      lastCredentialFingerprint = fingerprint;
     } catch (reason) {
       if (!isCurrent(key, version)) return;
       set((current) => ({
@@ -370,6 +409,9 @@ export function createWebuiAccountWorkflows(deps: {
     set((current) => ({ ...current, signin: { ...current.signin, claiming: true, error: undefined } }));
     try {
       const result = await claim();
+      // A claim changes the account's credential facts, so it retires the
+      // answers computed under the previous generation.
+      afterCredentialChange();
       set((current) => ({
         ...current,
         signin: {
@@ -394,6 +436,11 @@ export function createWebuiAccountWorkflows(deps: {
     try {
       await signOut();
       set((current) => ({ ...current, signOut: { signingOut: false } }));
+      // The account that just left owned the previous credential generation:
+      // retire it before the re-reads, so an answer still in flight for the old
+      // identity cannot land as current.
+      lastCredentialFingerprint = undefined;
+      afterCredentialChange();
       // The account and quota answers belong to the account that just left:
       // re-read both so no surface keeps showing the previous identity.
       await Promise.all([loadAccount(), loadUsage(true)]);

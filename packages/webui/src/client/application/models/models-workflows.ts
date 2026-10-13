@@ -21,6 +21,7 @@
 //
 // Framework-free: no React, no DOM, no storage.
 
+import type { WebuiIdentityEpochs } from "../identity-epochs.js";
 import type { ModelsPort } from "../../contracts/models/provider-port.js";
 import type { WebuiModelEntry } from "../../../shared/contracts/models.js";
 import {
@@ -122,8 +123,21 @@ export function createWebuiModelsWorkflows(deps: {
   readonly port: WebuiModelsPortSlice;
   /** `settings`' api-key status read, invoked after `upsertApiKey` writes. */
   readonly refreshApiKeyStatus: () => Promise<void>;
+  /**
+   * The application's opaque generation context (§4.5; T02). A provider or
+   * credential write changes what the catalogue means, so the answers computed
+   * under the previous generation are retired here rather than by each reader.
+   */
+  readonly identityEpochs?: WebuiIdentityEpochs;
 }): WebuiModelsWorkflows {
   const { port, refreshApiKeyStatus } = deps;
+  const afterConfigurationWrite = (): void => {
+    deps.identityEpochs?.advance("configuration");
+  };
+  const afterCredentialWrite = (): void => {
+    deps.identityEpochs?.advance("credentials");
+    deps.identityEpochs?.advance("configuration");
+  };
   const { getSnapshot, subscribe, set, readInto, unavailable } =
     createWebuiQueryStore(initialWebuiModelsWorkflowsState);
 
@@ -164,6 +178,10 @@ export function createWebuiModelsWorkflows(deps: {
   /** A provider mutation refreshes the provider list and marks models stale. */
   const afterProviderMutation = async (): Promise<void> => {
     markModels();
+    // The write landed, so answers computed under the previous configuration are
+    // no longer current. Advancing after the mutation — never before — is what
+    // keeps a failed write from retiring answers that are still true.
+    afterConfigurationWrite();
     await loadProviders();
   };
 
@@ -269,6 +287,9 @@ export function createWebuiModelsWorkflows(deps: {
     if (!port.upsertMiniMaxApiKey) throw new Error("当前运行时不支持保存 API key。");
     const result = await port.upsertMiniMaxApiKey(body);
     markModels();
+    // A credential write retires both generations: the credential changed, and
+    // the catalogue it unlocks may have too.
+    afterCredentialWrite();
     // The api-key *status* read is `settings`' (§5.6), so this owner calls that
     // owner's published command instead of holding a second copy of the read.
     await refreshApiKeyStatus();

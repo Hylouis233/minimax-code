@@ -363,11 +363,17 @@ export function WebuiClientFoundationApp(
   // manager; those components submit commands and read the snapshot instead of
   // holding their own copies of the answers.
   const accountWorkflows = useMemo(
-    () => createWebuiAccountWorkflows({ port: accountPort }),
+    () => createWebuiAccountWorkflows({
+      port: accountPort,
+      identityEpochs: application.identityEpochs,
+    }),
     [accountPort],
   );
   const settingsWorkflows = useMemo(
-    () => createWebuiSettingsWorkflows({ port: settingsPort }),
+    () => createWebuiSettingsWorkflows({
+      port: settingsPort,
+      identityEpochs: application.identityEpochs,
+    }),
     [settingsPort],
   );
   // `models` owns the catalogue, the selection and the provider list (plan §5.6),
@@ -378,8 +384,9 @@ export function WebuiClientFoundationApp(
     () => createWebuiModelsWorkflows({
       port: modelsPort,
       refreshApiKeyStatus: () => settingsWorkflows.loadApiKeyStatus(),
+      identityEpochs: application.identityEpochs,
     }),
-    [modelsPort, settingsWorkflows],
+    [modelsPort, settingsWorkflows, application.identityEpochs],
   );
   // The runtime handshake fact is a `SettingsPort` method, so it is read through
   // the settings owner like every other settings read rather than invoked here.
