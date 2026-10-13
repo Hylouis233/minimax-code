@@ -156,8 +156,8 @@ No implementation issue is closed or claimed in this preparation. Repository pro
 
 Appended after publication; the publication contract and receipt above are unchanged, and the tracker issues remain the source of truth for per-ticket status and evidence. The machine-readable record is `executionState` in `webui-architecture-tickets.json`.
 
-| As of | Branch | Commits | T01 | T02 | T03 | Frontier |
+| As of | Branch | Commits | T01 | T02 | T03 | T04 | Frontier |
 | --- | --- | --- | --- | --- | --- |
-| 2026-10-13 | `feat/webui-t01-conformance-gates` | `138ea4fc`, `801e0bad`, `f598b760`, `47455ae2`, `eceb6549`, `ab35a6dd`, `de02f7a7`, `c5858a3f`, `7b359694`, `4afa78a7`, `5f7418aa`, `db2a5739`, `1e866b5d`, `4d0d1713`, `77ec5915` | implemented locally; evidence on [#127](https://github.com/mcode-webui/minimax-code/issues/127) | implemented locally; evidence on [#128](https://github.com/mcode-webui/minimax-code/issues/128) | implemented locally; evidence on [#129](https://github.com/mcode-webui/minimax-code/issues/129) | T04 (in progress), T14, T17 |
+| 2026-10-13 | `feat/webui-t01-conformance-gates` | `138ea4fc`, `801e0bad`, `f598b760`, `47455ae2`, `eceb6549`, `ab35a6dd`, `de02f7a7`, `c5858a3f`, `7b359694`, `4afa78a7`, `5f7418aa`, `db2a5739`, `1e866b5d`, `4d0d1713`, `77ec5915`, `0f0d7b45`, `25da9c23`, `519dc358` | implemented locally; evidence on [#127](https://github.com/mcode-webui/minimax-code/issues/127) | implemented locally; evidence on [#128](https://github.com/mcode-webui/minimax-code/issues/128) | implemented locally; evidence on [#129](https://github.com/mcode-webui/minimax-code/issues/129) | implemented locally; evidence on [#130](https://github.com/mcode-webui/minimax-code/issues/130) | T05, T06, T14, T17 |
 
-The branch is local: no commit has been pushed. T04 (`conversation-turn-commands`, `session-interest-lease-manager`, `home-adoption-transaction`, `delivery-disposer-registry`), T14 and T17 are the executable dependents of the completed tickets' outputs.
+The branch is local: no commit has been pushed. T05, T06, T14 and T17 are the executable dependents of the completed tickets' outputs.

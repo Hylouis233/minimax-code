@@ -1051,17 +1051,21 @@
       "db2a5739",
       "1e866b5d",
       "4d0d1713",
-      "77ec5915"
+      "77ec5915",
+      "0f0d7b45",
+      "25da9c23",
+      "519dc358"
     ],
     "published": false,
     "tickets": {
       "T01": "implemented locally, acceptance evidence recorded on #127",
       "T02": "implemented locally, acceptance evidence recorded on #128",
       "T03": "implemented locally, acceptance evidence recorded on #129",
-      "T04": "in progress locally: four produced targets delivered (conversation-turn-commands, session-interest-lease-manager, home-adoption-transaction, delivery-disposer-registry); remaining: recheck/gap-recovery consolidation and leasing the real send/mutation paths"
+      "T04": "implemented locally, acceptance evidence recorded on #130"
     },
     "frontier": [
-      "T04",
+      "T05",
+      "T06",
       "T14",
       "T17"
     ]
