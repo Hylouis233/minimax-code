@@ -1,6 +1,6 @@
 # The WebUI client is organized by business within its existing layers
 
-**Status: Accepted**
+**Status: Superseded as the future target by [ADR 0016](0016-webui-business-first-modules-and-application-owned-lifetimes.md).** The implementation and historical decision recorded below remain unchanged.
 **Date: 2026-10-13**
 **Supersedes:** none. This decision supplements the layer and process boundaries in
 [ADR 0014](0014-webui-splits-its-internal-capability-and-orchestration-layers.md); it does not amend them.

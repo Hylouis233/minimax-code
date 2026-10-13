@@ -79,8 +79,9 @@ _Avoid_: stream handler, reader
 
 ### WebUI client layers
 
-The seven layers of the browser side, from the surface inwards. A file's layer is
-readable from its path, because the path names the layer and then the business.
+The browser's responsibility roles, from the surface inwards. A business groups
+the roles that serve it; application-wide coordination and shared presentation
+remain distinct from the business they compose.
 
 **Component**:
 The React shell and the panels it renders. Owns rendering and interaction state;
@@ -88,8 +89,8 @@ submits named commands and holds no writer.
 
 **React binding**:
 React subscriptions, application context, browser navigation and DOM effects. The
-bridge that converts a writer into a command surface, and the layer that reaches the
-application.
+bridge that reads application snapshots and invokes published commands. It does
+not create business owners or acquire write authority.
 _Avoid_: provider, hook layer
 
 **Projection**:
@@ -155,16 +156,16 @@ _Avoid_: survey, form, prompt
 ### Business
 
 **Business**:
-One user-facing area of the WebUI client, together with the logic that serves only
-it. The WebUI client has twelve of them; `turn` is one even though the user never
-sees it, because it owns the turn substrate.
+One cohesive area of WebUI behavior, together with its resource identity,
+owned policies and public commands or read models. A business may serve several
+presentation surfaces without belonging to any one of them.
 _Avoid_: surface, feature, area, panel, section — each already names something else
 here
 
 **Turn substrate**:
-The state and rules behind a running turn: the stream part of the session store,
-the lease and its generation, the stream loop, the turn intents and the active-turn
-read. It belongs to the `turn` business, and every other business reads it.
+The state and rules behind a running turn: its delivery identity, stream lease,
+generation fence, turn intents and active-turn read. It is part of the conversation
+substrate rather than a presentation business.
 _Avoid_: core, engine, backbone, runtime (that is the Node-side module group)
 
 **Capability**:
@@ -174,17 +175,17 @@ _Avoid_: feature, service, function
 
 **Capability port**:
 The typed boundary through which the browser asks for one group of capabilities.
-The WebUI client has eight, and one wire operation belongs to exactly one of them.
+Its methods describe available IO rather than permission to own business state.
 _Avoid_: interface, API, adapter
 
 **Capability slice**:
-The subset of one capability port that one business is given. A business receives a
-slice — never the whole port, and never the composed transport.
+The subset of capability methods supplied to a business owner. Presentation
+receives the owner's commands and read model instead of its capability slice.
 _Avoid_: port slice, partial port
 
 **Client transport**:
-The browser's single composed object of capability methods. It is internal to the
-composition root; a business is given its slice instead.
+The browser IO adapter for wire operations and delivery channels. Application
+composition supplies its capabilities to owners; presentation does not call it.
 _Avoid_: transport layer, API client, gateway
 
 **Harness port**:
@@ -265,6 +266,16 @@ The single writable copy of session and interaction records. One per application
 instance.
 _Avoid_: cache, state container, model
 
+**Session-record repository**:
+The application's canonical browser session records, with independently owned
+slices and narrow write authority. It is not the harness's durable session store.
+_Avoid_: global business store, copied session map
+
+**Business owner**:
+The authority for one business's resource identity, policy, commands and read
+models, independent of which presentation surface currently consumes them.
+_Avoid_: component owner, capability slice, generic manager
+
 **Session catalog**:
 The single copy of every session record, plus the two query results that reference
 it. Flat and tree are two queries, not two sets of entities, so a rename patches
@@ -293,6 +304,68 @@ _Avoid_: controller, orchestrator, dispatcher
 **Draft**:
 The composer's unsent input, kept per session key.
 _Avoid_: text, input value, buffer
+
+### Temporal ownership in the WebUI
+
+**Conversation substrate**:
+The shared rules for session and turn delivery identity, generation-fenced stream
+updates, canonical history integration and recovery. It does not own the policies
+of goals, interactions, model providers or workspace resources.
+_Avoid_: conversation business, god store, second runtime
+
+**Session scope**:
+An application's retained ownership context for one session, including the work
+that remains eligible to settle after the selected view changes.
+_Avoid_: selected component, mounted session, tab lifetime
+
+**Interest lease**:
+A claim that a session or resource is needed by a selected view, secondary consumer,
+delivery attempt or unsettled command. Releasing one claim does not release the others.
+_Avoid_: visibility, subscription count, selection flag
+
+**Owner incarnation**:
+The identity of one live resource owner. A result belonging to a previous
+incarnation cannot commit into its replacement.
+_Avoid_: stream generation, selected session
+
+**Freshness revision**:
+The requirement an authoritative read must cover after a resource is invalidated.
+An earlier read cannot clear a later dirty revision.
+_Avoid_: stream cursor, request number
+
+**Selected slot**:
+A read destination owned by the current selection and its generation, distinct
+from a resource cache that stores each answer under its own identity.
+_Avoid_: global cache, shared answer
+
+**Delivery detach**:
+Ending one client's observation of a turn or terminal. It does not stop the
+host's execution or destroy a terminal process.
+_Avoid_: abort, stop, process disposal
+
+**Delivery attachment**:
+One client's observation attempt for a turn or terminal, with its own cleanup
+and temporal ownership independently of the host execution.
+_Avoid_: turn execution, process lifetime
+
+**Execution abort**:
+An explicit request to stop the harness's running turn. It is distinct from
+closing the client's delivery attachment.
+_Avoid_: detach, view cleanup, connection close
+
+**Command settlement**:
+Completion of an accepted command's outcome and required invalidation obligations,
+even when the initiating view is no longer selected.
+_Avoid_: view cleanup, response received
+
+**Turn review**:
+The review of a particular turn's changeset, including its revert or reapply outcome.
+_Avoid_: working-tree snapshot, workspace review
+
+**Workspace review**:
+The review of a working tree at a particular snapshot, including its file diffs
+and search results. Its identity is distinct from a turn changeset.
+_Avoid_: turn review, session diff
 
 **Unread**:
 The count of events a session accumulated while it was not the selected one.

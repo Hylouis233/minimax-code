@@ -1,0 +1,946 @@
+{
+  "schemaVersion": 1,
+  "programme": "webui-architecture-redesign",
+  "repository": "mcode-webui/minimax-code",
+  "sourceBaseline": "5d89bff9c2e25fb79e1278ec276d1fbf17c0882f",
+  "authority": "docs/webui/PLAN-webui-architecture-review.md",
+  "specification": "docs/webui/SPEC-webui-architecture-redesign.md",
+  "triageLabel": "ready-for-agent",
+  "countingRule": "21 implementation tickets T01-T21, excluding the parent specification issue; each produced target has exactly one carrier; consumer integrations are not second producers",
+  "parentIssue": null,
+  "authorityCommit": null,
+  "tickets": [
+    {
+      "id": "T01",
+      "title": "Establish WebUI migration conformance and role-aware prefactoring gates",
+      "blockedBy": [],
+      "workPackages": [
+        "W0",
+        "W9"
+      ],
+      "sourceSections": [
+        "1.1",
+        "3 P5",
+        "5.3",
+        "8.1",
+        "9 W0"
+      ],
+      "stories": [
+        6,
+        37,
+        38
+      ],
+      "targets": [
+        "baseline-conformance-ledger",
+        "role-check-expansion",
+        "command-generator-source-mapping"
+      ],
+      "delivers": "Developers can start the migration with reproducible behavior baselines and checks that recognize the accepted business/role homes without accepting duplicate ownership.",
+      "acceptance": [
+        "Pin the product baseline and inventory canonical resources, public commands and existing verification seams; classify the accepted correction ledger separately from structural equivalence.",
+        "Restore command-surface generation against the actual source home without changing published command meaning or frozen protocol expectations; reproduce the existing ENOENT before repair.",
+        "Expand role/public-private import checks to recognize target homes alongside current homes; reject private peer imports, presentation business IO/writer construction and conversation imports of feature implementation.",
+        "Prove check sensitivity with legal and illegal dependency/call fixtures, including type-only imports and callable props, without adding blanket exemptions or new baseline violations.",
+        "Run representative current application, wire and browser baseline scenarios and record actual PASS/FAIL/unrun boundaries; no production ownership migration occurs in this prefactoring ticket.",
+        "Register required test/generator inputs and source inventory; publish the baseline ledger for downstream tickets and leave the applicable prefactoring gates green."
+      ],
+      "verification": "Existing dependency-rule/tool tests plus public application/stream/protocol/browser baseline scenarios; deliberately illegal fixtures prove the role check can fail.",
+      "nonGoals": "No feature refactor, product behavior redesign, frozen-oracle edit or suppression of an existing failing gate.",
+      "issue": null
+    },
+    {
+      "id": "T02",
+      "title": "Boot and dispose one explicitly assembled WebUI application",
+      "blockedBy": [
+        "T01"
+      ],
+      "workPackages": [
+        "W1"
+      ],
+      "sourceSections": [
+        "3 P1",
+        "4.1",
+        "9 W1"
+      ],
+      "stories": [
+        4,
+        5,
+        6
+      ],
+      "targets": [
+        "application-assembly-lifecycle",
+        "unread-assembly-parity",
+        "opaque-identity-freshness-context"
+      ],
+      "delivers": "Real browser boot and offline fixtures use one dormant assembly with correct selected-session unread hydration, one ingress and explicit cleanup.",
+      "acceptance": [
+        "Construct owners without IO; start receives initial selection, hydrates persisted state before the first unread write, installs existing authoritative handlers and opens one event ingress.",
+        "Production, standalone preview and SSR fixtures use the same assembly; SSR starts no IO and required production wiring absence fails clearly.",
+        "Enforce constructed-to-started-to-disposed lifecycle, idempotent start/dispose, fresh epochs for fresh instances and refusal to restart a disposed store.",
+        "Remove the shell's alternate application factory and root storage divergence without duplicating live stores, subscriptions or authority.",
+        "Exercise actual root assembly inputs, remount/replay and selected-session storage traces; timers and ingress stop at disposal and late callbacks cannot commit.",
+        "Produce the opaque credential/config epoch context and public invalidation contract used by all owners; successful Account/Models/Settings commands and authoritative runtime reconciliation advance their applicable epochs without exposing credential values.",
+        "Assemble existing real workspace, history, queue and other business owners behind narrow application commands, exposing required reconciliation adapters before T05. These are real paths, not no-op placeholders or new copies of owner policy; existing event semantics remain single-path until T05 replaces them atomically."
+      ],
+      "verification": "Public assembled lifecycle with injected storage/channel plus built-client boot/remount and real loopback startup/shutdown.",
+      "nonGoals": "Does not install T05 domain policy or redefine Composer resets.",
+      "issue": null
+    },
+    {
+      "id": "T03",
+      "title": "Fence keyed queries through one Models owner and model selection path",
+      "blockedBy": [
+        "T02"
+      ],
+      "workPackages": [
+        "W4",
+        "W6"
+      ],
+      "sourceSections": [
+        "3 P3",
+        "3 P4",
+        "4.5",
+        "5.2 models",
+        "6 ModelPicker"
+      ],
+      "stories": [
+        15,
+        16,
+        17,
+        18
+      ],
+      "targets": [
+        "request-freshness-primitive",
+        "models-public-owner",
+        "model-picker-responsibility-cut"
+      ],
+      "delivers": "Model catalogues and selection remain correct across slow responses, session/provider changes and invalidation, with one business owner consumed by model presentation.",
+      "acceptance": [
+        "Provide explicit resource-keyed and selected-slot contracts; commit checks owner incarnation, request generation and selected identity where appropriate.",
+        "Coalesce only equal response-affecting key/freshness/incarnation reads; invalidation cannot join an obsolete request as a completed repair.",
+        "Key model answers by global versus session/agent context and opaque credential/config generations; provider changes invalidate affected answers and status owners through published commands.",
+        "Models public commands/read models own catalogue, provider CRUD/test/discovery and selection; preserve supported favorite, variant, focus and draft-preview behavior.",
+        "Move model grouping/key/focus rules and coherent menu/draft editor UI into Models' target home; do not split individual hover callbacks mechanically.",
+        "Reproduce late A overwriting selected B on the old seam, then prove keyed independence, selected-slot suppression, freshness coverage and disposed-owner rejection through public commands."
+      ],
+      "verification": "Assembled Models commands/read models with adversarial capabilities plus model keyboard/focus/provider browser scenarios.",
+      "nonGoals": "The common primitive owns mechanics only; no global business cache or duplicate Composer model owner remains in the final programme.",
+      "issue": null
+    },
+    {
+      "id": "T04",
+      "title": "Run headless turn delivery with retained scopes and coherent home adoption",
+      "blockedBy": [
+        "T02"
+      ],
+      "workPackages": [
+        "W2"
+      ],
+      "sourceSections": [
+        "4.2",
+        "4.3",
+        "4.6",
+        "8.1",
+        "9 W2"
+      ],
+      "stories": [
+        10,
+        11,
+        12,
+        13,
+        14
+      ],
+      "targets": [
+        "conversation-turn-commands",
+        "session-interest-lease-manager",
+        "home-adoption-transaction",
+        "delivery-disposer-registry"
+      ],
+      "delivers": "Send, attach, retry and stop work through the application's conversation API even when the initiating React surface changes or disappears.",
+      "acceptance": [
+        "Move writer/sink construction and send/attach/retry/stop orchestration into bounded conversation commands, leaving React bindings as subscriptions and invocations.",
+        "Separate selected, secondary, delivery and settlement leases; selection release cannot abandon accepted attempts or invalidation obligations, and eligible work prevents owner/fence recreation.",
+        "Preserve generation/cursor/resume-overflow/refusal settlement semantics; superseded attempts cannot write or release a newer lease.",
+        "Coordinate home record, writer identity, selected session and draft/history adoption with batched notifications and no intermediate mixed identity.",
+        "Track actual independent stream disposers; disposal/detach closes client delivery and fences callbacks without implicitly aborting harness execution.",
+        "Test headless/public send, attach, retry, explicit stop, navigation during accepted work, successful adoption and purge tombstones with non-empty delivery traces."
+      ],
+      "verification": "Assembled conversation command/stream traces, existing lease/recovery tests and real loopback send/resume/detach/stop paths.",
+      "nonGoals": "No goal/provider/workspace policy in conversation and no all-session automatic attachment.",
+      "issue": null
+    },
+    {
+      "id": "T05",
+      "title": "Commit and reconcile goals and interactions through permanent application routes",
+      "blockedBy": [
+        "T03",
+        "T04"
+      ],
+      "workPackages": [
+        "W3",
+        "W6"
+      ],
+      "sourceSections": [
+        "3 P2",
+        "4.3",
+        "4.4",
+        "5.2 interactions",
+        "5.2 goal",
+        "5.5"
+      ],
+      "stories": [
+        7,
+        8,
+        9,
+        25,
+        26,
+        27
+      ],
+      "targets": [
+        "permanent-domain-event-routing",
+        "goal-session-owner",
+        "interaction-session-owner",
+        "retained-goal-view-reconciliation"
+      ],
+      "delivers": "Recognized session facts and matching permission/questionnaire/goal operations update the right owners without requiring a mounted Composer.",
+      "acceptance": [
+        "Install permanent owner routes before ingress; remove UI-populated effects registry and whole-set effect replacement in the same atomic ownership transfer.",
+        "Goal and interaction owners have independent session-keyed fences and narrow writers; all facts, reads and accepted command outcomes use their owner commit path.",
+        "Recognized data events for valid non-purged identities commit while unmounted; inactive read-required resources remain dirty and interested scopes reconcile on selection/reconnect.",
+        "Keep acknowledgement as acceptance rather than a subscription barrier; test events before/after ready and reconnect gaps without duplicate subscriptions or owner writes.",
+        "Preserve request-specific permission/questionnaire settlement, goal CRUD/steering and ordered progress effects; reset goal input presentation without clearing retained goal truth.",
+        "Remove goal/interaction factory construction and business handler registration from Composer; move their binding/UI responsibilities to the target businesses and publish interfaces for Composer/Transcript.",
+        "Permanent routes call T02's real application-owned workspace/history/queue reconciliation commands through explicit temporary adapters; later carriers replace that owner's implementation without installing a second route or writer. No missing route is hidden by a no-op.",
+        "Reproduce the empty-registry goal commit gap and verify accepted compatibility spellings plus actual emitter integration, stale responses, dirty coverage and tombstone behavior."
+      ],
+      "verification": "Assembled installed event ingress and goal/interaction commands; real loopback emitter/reconnect paths and goal/questionnaire browser behavior.",
+      "nonGoals": "No generic internal event bus, background fetch fan-out or new interaction UX.",
+      "issue": null
+    },
+    {
+      "id": "T06",
+      "title": "Unify canonical history, context reads and transcript live handoff",
+      "blockedBy": [
+        "T03",
+        "T04",
+        "T05"
+      ],
+      "workPackages": [
+        "W2",
+        "W4",
+        "W6"
+      ],
+      "sourceSections": [
+        "2.2",
+        "4.2",
+        "4.5",
+        "5.2 transcript",
+        "6 SessionTranscript"
+      ],
+      "stories": [
+        17,
+        23,
+        24,
+        25,
+        36
+      ],
+      "targets": [
+        "conversation-history-interface",
+        "transcript-public-view-and-feedback",
+        "compatible-context-read-sharing"
+      ],
+      "delivers": "History pagination, live/settled display, context usage and feedback remain coherent through one canonical history interface without duplicate messages or conflicting readers.",
+      "acceptance": [
+        "Replace singleton selected-session request ownership with keyed session/page history and separately fenced selected presentation.",
+        "Preserve older-page merge, context snapshot precedence, cursor recovery and one rendering source per turn; compatible context inspection joins the correct owner read.",
+        "Do not conflate pagination anchors, stream recovery or differing result coverage merely to deduplicate requests.",
+        "Transcript owns grouping/view projection, scroll binding and feedback commands; compose public interaction/review surfaces without importing their private writers or implementing their query policy.",
+        "Move transcript contracts/projections/bindings/UI to its target home and history rules to conversation; cut the large transcript by coherent view-model, scroll and response responsibilities.",
+        "Verify fast session switches, overlapping page/context readers, accepted goal-message events, feedback errors, live-to-history handoff and non-empty message counts."
+      ],
+      "verification": "Assembled history/transcript outcomes plus frozen message/turn fixtures and built-browser scrolling/live handoff.",
+      "nonGoals": "Turn/workspace review query ownership is produced by T10, not copied here.",
+      "issue": null
+    },
+    {
+      "id": "T07",
+      "title": "Own session catalogue, rail overlays and lifecycle commands in Sessions",
+      "blockedBy": [
+        "T04",
+        "T05",
+        "T06"
+      ],
+      "workPackages": [
+        "W4",
+        "W6"
+      ],
+      "sourceSections": [
+        "5.2 sessions",
+        "5.4",
+        "6 SessionRail",
+        "8.1"
+      ],
+      "stories": [
+        1,
+        2,
+        4,
+        14,
+        34,
+        36
+      ],
+      "targets": [
+        "sessions-catalogue-and-overlays",
+        "session-lifecycle-and-transfer-commands",
+        "session-rail-responsibility-cut"
+      ],
+      "delivers": "Session rail, archived settings and import/export entry surfaces use one Sessions owner whose successful mutations update every relevant view and purge deleted state coherently.",
+      "acceptance": [
+        "Own flat/tree/project catalogue, activity/unread and browser rail overlays; one entity update feeds both catalogue query views.",
+        "Expose create/select/archive/fork/rename/import/export/delete commands and availability/outcomes; settings and shell invoke them instead of owning alternate paths.",
+        "Successful delete coordinates record/draft/query/interest purge and tombstones; failed deletion retains state and accepted late work cannot resurrect the ID.",
+        "Consume T04 home-adoption transaction rather than producing a second transaction; retain storage keys/formats/normalization/pruning and selected-session unread semantics.",
+        "Move rail grouping/filtering/activity rules and cohesive project expansion/list/row/menu units into Sessions; preserve menus, search, pins/stars, pagination and transfer behavior.",
+        "Verify public mutation/read-model traces and real rail/archive/import/export browser entry paths, including hidden surfaces and session switches."
+      ],
+      "verification": "Assembled Sessions commands/read models, transfer loopback integration and rail browser menu/search/overlay scenarios.",
+      "nonGoals": "No second catalogue/session store, product reclassification of projects or hidden default workspace changes.",
+      "issue": null
+    },
+    {
+      "id": "T08",
+      "title": "Serve plugin management and Composer catalogues through typed Plugins ownership",
+      "blockedBy": [
+        "T03"
+      ],
+      "workPackages": [
+        "W4",
+        "W6"
+      ],
+      "sourceSections": [
+        "2.5",
+        "4.5",
+        "5.2 plugins",
+        "6 PluginCatalogue"
+      ],
+      "stories": [
+        17,
+        19,
+        20
+      ],
+      "targets": [
+        "plugins-typed-action-adapters",
+        "plugins-resource-owners",
+        "plugin-catalogue-form-cuts",
+        "composer-plugin-skill-catalogue-api"
+      ],
+      "delivers": "Marketplace, installed plugins, skills, MCP and agent forms plus Composer catalogue readers use typed named intents and independent correct resource queries.",
+      "acceptance": [
+        "Cover the complete existing plugin-management action union, validator action set and input-shape population with a typed internal action/result adapter; preserve the wire operation and accepted behavior.",
+        "Separate catalogue-selection, detail, installed-plugin and runtime-skill identities including session/agent/workspace context where applicable; management and mention readers cannot overwrite each other.",
+        "Publish named listing/detail/mutation commands and Composer-facing installed-plugin/runtime-skill read models; no caller must dispatch an arbitrary wire action string.",
+        "Split the large catalogue into cohesive catalogue composition and MCP/agent/skill/import form units; local form drafts stay local and mutation errors remain distinct from availability.",
+        "Move Plugins implementation to its business home, preserving reload/filter/preview/import/install/enable/delete/agent-chat behavior and targeted mutation invalidation.",
+        "Parse the three authoritative action populations and prove exhaustive non-duplicated coverage; test stale detail/list requests and catalogue/form/mention consumer outcomes."
+      ],
+      "verification": "Assembled Plugins commands with actual internal adapters, server validator/wire compatibility and catalogue/MCP/browser consumers.",
+      "nonGoals": "No new plugin action, service, unrestricted dispatch or copied Composer catalogue query.",
+      "issue": null
+    },
+    {
+      "id": "T09",
+      "title": "Make browser account status and login follow one Account lifetime",
+      "blockedBy": [
+        "T03"
+      ],
+      "workPackages": [
+        "W4",
+        "W6"
+      ],
+      "sourceSections": [
+        "4.1",
+        "4.5",
+        "5.2 account",
+        "8.1"
+      ],
+      "stories": [
+        21,
+        22,
+        36
+      ],
+      "targets": [
+        "account-browser-owner-and-polling",
+        "account-presentation-and-status-api"
+      ],
+      "delivers": "Account login, status, check-in, sign-out and Composer credential-status readers agree across account/session switches while polling and stale callbacks clean up correctly.",
+      "acceptance": [
+        "Use one application-owned Account workflow with attempt/credential/config epochs and public account/API-key/OAuth credential-status, quota/login/check-in/sign-out commands and availability; migrate credential-status reads currently owned by Settings rather than create another copy.",
+        "Move polling and request truth out of presentation; hidden/remounted consumers acquire appropriate interest without duplicating owner state or timers.",
+        "Sign-out/switch invalidates obsolete status and model-dependent answers through public collaboration and preserves real revoke/wipe runtime semantics.",
+        "Keep tokens/auth leases/refresh ownership runtime-side; browser query keys use opaque generations, never credential values.",
+        "Preserve signed-out, unavailable, failure/retry and accepted quota degradation branches; failed mutation does not pretend success.",
+        "Move account contracts/projections/bindings/UI together and test pending login, late account response, session switch and disposal through public seams and account browser fixtures."
+      ],
+      "verification": "Assembled Account capability/storage/timer traces and browser account/login/status scenarios; real cloud acceptance separately labeled.",
+      "nonGoals": "Runtime quota adapter/projection extraction is produced by T17; no new credential behavior.",
+      "issue": null
+    },
+    {
+      "id": "T10",
+      "title": "Own turn changesets and workspace snapshots through distinct Review APIs",
+      "blockedBy": [
+        "T03",
+        "T06"
+      ],
+      "workPackages": [
+        "W5",
+        "W6"
+      ],
+      "sourceSections": [
+        "4.5",
+        "5.2 review",
+        "6 workspace-queries",
+        "8.1"
+      ],
+      "stories": [
+        15,
+        16,
+        29
+      ],
+      "targets": [
+        "turn-review-owner",
+        "workspace-review-owner",
+        "cross-family-review-invalidation",
+        "review-consumer-integration"
+      ],
+      "delivers": "Transcript diff cards and workspace review share authoritative query/mutation ownership while turn changeset and working-tree snapshot identities stay distinct.",
+      "acceptance": [
+        "Own turn diff queries/revert/reapply and workspace summary/file-diff/search in separate resource families; preserve snapshot mismatch handling and bounded stale-snapshot retry.",
+        "Remove DiffCard-owned IO/query truth and extract only the review responsibility from the mixed workspace query owner; T11 owns files/environment responsibility.",
+        "Turn mutations invalidate the affected turn and workspace families as part of settlement; applicable external mutations mark affected turn resources dirty without global unrelated reloads.",
+        "Preserve unsupported versus mutation-failed outcomes and presentation expansion/search selection as local independent state.",
+        "Publish and integrate Review command/read APIs in both existing surfaces, with target business contracts/projections/bindings/UI and no schema identity substitution.",
+        "Test two simultaneous consumers, stale snapshots, failed and successful mutation outcomes and invalidation freshness through public APIs and visible review behavior."
+      ],
+      "verification": "Assembled Review read/command traces, loopback mutation/snapshot paths and transcript/workspace review browser consumers.",
+      "nonGoals": "No file/environment cache takeover, universal review snapshot or new Git mutation semantics.",
+      "issue": null
+    },
+    {
+      "id": "T11",
+      "title": "Own workspace files, environment and panel use cases beyond React mounting",
+      "blockedBy": [
+        "T04",
+        "T10"
+      ],
+      "workPackages": [
+        "W5",
+        "W6"
+      ],
+      "sourceSections": [
+        "4.4",
+        "4.5",
+        "5.2 workspace",
+        "6 workspace-queries",
+        "8.1"
+      ],
+      "stories": [
+        15,
+        16,
+        30,
+        36
+      ],
+      "targets": [
+        "workspace-files-environment-owners",
+        "workspace-panel-state",
+        "workspace-canvas-preview-directory-usecases"
+      ],
+      "delivers": "File/tree/environment/Git/canvas/preview/directory-browser behavior stays correct across workspace/tab switches through application owners and stable panel state.",
+      "acceptance": [
+        "Extract files/tree/content and environment identities from the mixed query owner; compose T10 Review APIs rather than reimplementing review policy.",
+        "Workspace Git events directly invalidate matched environment/review owners without shell revision relay; preserve existing coalescing and unrelated-workspace isolation.",
+        "Own panel/tab state with existing session persistence semantics; tab close releases its interests and file/read commit rights without stopping unrelated accepted work.",
+        "Canvas/archive/preview/directory-browser commands have explicit outcome and freshness ownership; presentation performs DOM geometry/rendering only, with archive parsing produced by T16.",
+        "Move workspace contracts/projections/bindings/UI to its home and preserve file ranges/content/path, canvas gestures, media/HTML preview restrictions and error branches.",
+        "Test stale tab/file responses, inline-content supersession, workspace aliases, invalidation bursts and public panel actions plus real HTTP/file/Git paths and browser panel scenarios."
+      ],
+      "verification": "Assembled workspace commands/query snapshots, HTTP range/content/path integration and panel/canvas/preview browser behavior.",
+      "nonGoals": "T15 produces terminal ownership and T16 produces archive parser policy; this ticket only composes their existing/adopted public capabilities.",
+      "issue": null
+    },
+    {
+      "id": "T12",
+      "title": "Own permission preferences and compose settings pages from their actual businesses",
+      "blockedBy": [
+        "T03",
+        "T07",
+        "T09"
+      ],
+      "workPackages": [
+        "W4",
+        "W6"
+      ],
+      "sourceSections": [
+        "5.2 settings",
+        "5.3",
+        "8.1"
+      ],
+      "stories": [
+        18,
+        21,
+        34,
+        36
+      ],
+      "targets": [
+        "settings-owner-and-business-page-composition",
+        "settings-permission-preference-and-version-owner"
+      ],
+      "delivers": "Instructions, memory, profile, permission preferences, providers, account and archived-session setting surfaces invoke the correct public business commands and coherent read models.",
+      "acceptance": [
+        "Settings owns instruction/memory/profile policies and permission-preference reads/writes, exposes their named commands for Composer, and preserves its runtime-version read owner; Models, Account and Sessions own their own setting-page resources and credential-status queries.",
+        "Remove raw transport/function forwarding and private peer imports from settings presentation and shell wiring; inject or compose published read/command APIs.",
+        "Preserve existing read/write error, absence, normalization and runtime file/auth contracts; command failure cannot be returned as success.",
+        "Move settings contracts/projections/bindings/UI into its business home, including shared glyph relocation only through T18's generic presentation home.",
+        "Verify pending agent/profile changes, shared setting-page mutations and hidden/remount behavior through application outcomes and built-browser settings scenarios."
+      ],
+      "verification": "Assembled Settings commands with actual peer public APIs, loopback personalization/profile paths and settings browser scenarios.",
+      "nonGoals": "No duplicate models/account/archive owner, new preference or changed credential persistence.",
+      "issue": null
+    },
+    {
+      "id": "T13",
+      "title": "Drive Composer submission, queue and editor through composed business owners",
+      "blockedBy": [
+        "T03",
+        "T04",
+        "T05",
+        "T06",
+        "T07",
+        "T08",
+        "T09",
+        "T12"
+      ],
+      "workPackages": [
+        "W4",
+        "W6"
+      ],
+      "sourceSections": [
+        "5.2 composer",
+        "5.5",
+        "6 WebuiComposer",
+        "8.1"
+      ],
+      "stories": [
+        13,
+        17,
+        18,
+        19,
+        22,
+        27,
+        28,
+        36
+      ],
+      "targets": [
+        "composer-submission-and-queue-owner",
+        "composer-field-transition-controller",
+        "composer-editor-menu-toolbar-cut"
+      ],
+      "delivers": "Ordinary sends, enqueues, commands, goals, attachments and mention/skill menus use one composed Composer workflow while all accepted field transitions and keyboard behavior remain.",
+      "acceptance": [
+        "Consume published Sessions/Conversation/Goal/Interaction/Models/Plugins/Account/History and T12 Settings permission-preference commands; remove Composer's duplicate catalogue/status/context/preference RPC state.",
+        "Keep one application-owned active controller with the complete field transition matrix for selection/home adoption, hide/remount, accepted/successful/failed submit and disposal.",
+        "Fence the selected queue destination independently; retain session-gated retry, committed-intent input history, staging carryover and distinct goal/plan mode rules.",
+        "Own send/queue/goal/command orchestration and attachment/file-read outcomes outside rendering; runtime execution and visible sending/phase remain distinct.",
+        "Cut the large Composer into coherent editor/staging, toolbar, mention/slash/menu and transcript-placement presentation, with local caret/geometry/focus and no hook-per-state-variable fragmentation.",
+        "Verify all submission branches, current button/Enter shared gate, pending-selection results, goal reset/loading, seed deduplication, refusal/retry and queue failure without silently clearing input.",
+        "Move Composer roles to its business home and demonstrate the complete built-client input-to-owner-to-transport path with unchanged visible affordances."
+      ],
+      "verification": "Assembled Composer intents/outcomes and actual owner collaborations plus composer keyboard/menu/attachment/queue/goal browser scenarios.",
+      "nonGoals": "No new Composer reset UX, background attachment policy or peer owner recreation.",
+      "issue": null
+    },
+    {
+      "id": "T14",
+      "title": "Bind loopback operations without redundant service forwarding",
+      "blockedBy": [
+        "T01"
+      ],
+      "workPackages": [
+        "W7"
+      ],
+      "sourceSections": [
+        "3 P6",
+        "4.6",
+        "6 bind-handlers",
+        "7 D10",
+        "9 W7"
+      ],
+      "stories": [
+        35,
+        37
+      ],
+      "targets": [
+        "network-registry-injection",
+        "domain-operation-binding-tables",
+        "semantic-forwarding-preservation",
+        "terminal-process-port-contract"
+      ],
+      "delivers": "Clients still retrieve data and stream execution through the authenticated loopback server, with runtime methods bound once and semantic adapters retained.",
+      "acceptance": [
+        "Inject a complete preassembled operation registry and runtime/terminal ports into the network service; delete identity-only forwarding closures without bypassing network ingress.",
+        "Produce the narrow terminal-process port consumed initially by the existing real terminal manager; T15 later migrates its implementation and service resource ownership behind that same port. Registry simplification does not wait for terminal relocation.",
+        "Keep typed shared binding machinery and explicit per-domain binding tables colocated with descriptors; preserve exhaustive operation completeness and deterministic registration/serialization.",
+        "Retain validators/allowlisting, exact optional-capability guards/errors, receiver binding, version projections, sign-out revoke/wipe, message/context projections and dedicated stream/terminal handlers.",
+        "Never select a runtime property by client input or enumerate runtime methods as exposed operations; no reflection or one-file-per-operation fragmentation.",
+        "Compare the complete existing operation population against frozen validator/frame/call/error/signal traces, including absent and non-callable capability cases.",
+        "Exercise actual loopback unary data retrieval, send/resume/events, terminal delivery and shutdown with the new assembled registry; no client-side access path disappears."
+      ],
+      "verification": "Frozen wire and host-shape invariants plus real loopback request/stream/terminal lifecycle paths.",
+      "nonGoals": "No public operation change, validator tightening, protocol topology change or removal of host adaptation.",
+      "issue": null
+    },
+    {
+      "id": "T15",
+      "title": "Separate service-owned terminal processes from browser delivery and xterm attachments",
+      "blockedBy": [
+        "T11",
+        "T14"
+      ],
+      "workPackages": [
+        "W5",
+        "W6"
+      ],
+      "sourceSections": [
+        "2.5",
+        "4.6",
+        "5.2 terminal",
+        "8.1",
+        "9 W5"
+      ],
+      "stories": [
+        11,
+        31,
+        32
+      ],
+      "targets": [
+        "terminal-runtime-service-scope",
+        "terminal-browser-owner-and-binding"
+      ],
+      "delivers": "Terminal creation/input/resize/watch and explicit disposal remain usable while hiding or closing a presentation attachment leaves the service-owned process intact.",
+      "acceptance": [
+        "Move native process implementation into runtime with one manager per WebUI service resource scope; inject a terminal port into network registry/HTTP lifecycle rather than sharing a host-wide singleton.",
+        "Browser Terminal owner publishes catalogue/process commands and actual watch disposers; local xterm/fit/resize observers remain presentation bindings.",
+        "View release detaches watch/xterm only; explicit process disposal and service shutdown kill the proper PTYs with preserved teardown trace.",
+        "Cancellation finalizes listeners/parked iterators exactly once; test no-output waiting, exit, abort, detach and repeated disposal with visible resource traces.",
+        "Preserve process count limit, terminal identity, output/exited state and resize coalescing; no implicit session/tab-based process deletion is introduced.",
+        "Integrate workspace presentation against public Terminal API and exercise real native PTY create/write/resize/detach/dispose in the owning integration environment."
+      ],
+      "verification": "Application terminal commands and loopback iterator cancellation plus real native PTY and xterm attachment behavior; fixtures and native evidence remain distinct.",
+      "nonGoals": "No terminal protocol redesign, new process scope or kill-on-unmount behavior.",
+      "issue": null
+    },
+    {
+      "id": "T16",
+      "title": "Modernize archive parsing behind preserved workspace preview and extraction policy",
+      "blockedBy": [
+        "T01",
+        "T11"
+      ],
+      "workPackages": [
+        "W8"
+      ],
+      "sourceSections": [
+        "3 P7",
+        "6 workspace-archive",
+        "8.1",
+        "8.2",
+        "9 W8"
+      ],
+      "stories": [
+        30,
+        33
+      ],
+      "targets": [
+        "archive-parser-conformance-and-adapter",
+        "archive-policy-and-extraction-workflow"
+      ],
+      "delivers": "Supported workspace archive listing/extraction uses a mature parser adapter while preserving path, expansion, truncation and write-safety contracts visible to the user.",
+      "acceptance": [
+        "Evaluate mature parser implementations against the existing supported format, entry/path/symlink, size/expansion and corruption contract; select and record a conforming dependency/license/version with evidence.",
+        "Keep parsing distinct from runtime path/expansion policy and listing/extraction workflows; no dependency-avoidance rationale justifies reimplementing mature formats.",
+        "Preserve recognized-but-unsupported outcomes, listing limits/truncation, prefix/destination behavior, exclusive/no-half-file writes and truthful partial extraction results.",
+        "Refactor the large archive module along parser/policy/workflow responsibility, integrating Workspace public commands without browser-side filesystem access.",
+        "Run real synthetic-file ZIP/TAR/gzip, unsafe-path/link/budget/corruption and partial-write conformance through the actual adapter/workflow, plus loopback preview/extraction consumers.",
+        "Fail explicitly if a required conformance case is unsupported; do not weaken safety tests, silently add formats or claim correctness from a stub parser."
+      ],
+      "verification": "Actual chosen parser with filesystem conformance/security corpus, runtime archive workflows and loopback/browser archive consumer behavior.",
+      "nonGoals": "No new archive feature or relaxed limits; parser selection is this ticket's executable work, not an unresolved operator question.",
+      "issue": null
+    },
+    {
+      "id": "T17",
+      "title": "Separate quota requests and projections while retaining one runtime cache owner",
+      "blockedBy": [
+        "T01"
+      ],
+      "workPackages": [
+        "W8"
+      ],
+      "sourceSections": [
+        "6 usage-quota",
+        "8.1",
+        "9 W8"
+      ],
+      "stories": [
+        21,
+        22
+      ],
+      "targets": [
+        "runtime-quota-request-projection-boundary"
+      ],
+      "delivers": "Quota/check-in/account consumers retain their established signed-in, refresh, failure and degradation outcomes while cloud request and pure payload projection become maintainable seams.",
+      "acceptance": [
+        "Keep one runtime quota/account identity/cache orchestration owner; extract coherent request and pure payload projection responsibilities only where the boundary hides real complexity.",
+        "Preserve identity keys, TTLs, in-flight sharing, force-refresh, signing, auth rejection/invalidation and accepted credits-only degradation.",
+        "Use the existing public result contract so browser Account does not need a parallel cache or credential owner.",
+        "Compare deterministic request/response/error/cache traces with the real imported implementation and assert clocks/identity changes, not only fixture values.",
+        "Exercise cloud acceptance only with authorized environment and report it separately; offline synthetic fetch outcomes prove their declared seam only.",
+        "Record a coherent keep decision for portions of the large module that remain one responsibility; do not split each endpoint into a service."
+      ],
+      "verification": "Runtime quota public outcomes with controlled real adapter/clock traces; optional live endpoint acceptance clearly separated.",
+      "nonGoals": "No TTL/degradation/product pricing change, browser token persistence or generic global cache.",
+      "issue": null
+    },
+    {
+      "id": "T18",
+      "title": "Migrate remaining browser IO and generic presentation mechanics to their target homes",
+      "blockedBy": [
+        "T12",
+        "T13",
+        "T14",
+        "T15",
+        "T16",
+        "T17"
+      ],
+      "workPackages": [
+        "W6",
+        "W7"
+      ],
+      "sourceSections": [
+        "5.1",
+        "5.3",
+        "6 additional seams",
+        "9 W6"
+      ],
+      "stories": [
+        1,
+        2,
+        35,
+        37
+      ],
+      "targets": [
+        "platform-wire-domain-adapters",
+        "platform-browser-storage-file-dom-adapters",
+        "generic-ui-and-react-binding-mechanics"
+      ],
+      "delivers": "Completed businesses obtain IO through injected platform adapters and reusable presentation through a generic UI home, with no alternate technical-root homes left for those populations.",
+      "acceptance": [
+        "Use the role expansion from T01, then mechanically migrate only platform IO and genuinely generic UI/binding populations not produced by earlier business tickets.",
+        "Separate wire lifecycle mechanics from domain method tables using canonical operation identifiers; preserve unary deadlines, finite stream completion/errors, event reconnect and terminal-watch behavior.",
+        "Keep browser storage/DOM/file/download adapters injected, with identical keys/normalization and no platform import of application or business implementation.",
+        "Generic glyph/markdown/math/overlay/subscription mechanics contain no business policy; feature bindings produced by their carriers are consumed, not moved a second time.",
+        "Compare moved bodies with AST-aware equivalence and exercise built consumer paths; no stale imports, compatibility re-export shims, duplicated writer or per-feature transport instance remains.",
+        "Update source inventory/build inputs and role/public API checks for the exact migrated population; publish the remaining-population census for T21 contract retirement."
+      ],
+      "verification": "Expand-migrate-contract wide-refactor batch with moved-body equivalence, dependency/build checks and existing wire/storage/UI consumer scenarios.",
+      "nonGoals": "No second ownership migration for businesses, new generic bus/cache or changed socket topology.",
+      "issue": null
+    },
+    {
+      "id": "T19",
+      "title": "Finish the WebUI shell as layout and public business composition",
+      "blockedBy": [
+        "T02",
+        "T07",
+        "T08",
+        "T09",
+        "T11",
+        "T12",
+        "T13",
+        "T15",
+        "T18"
+      ],
+      "workPackages": [
+        "W6"
+      ],
+      "sourceSections": [
+        "3 P1",
+        "5.1",
+        "6 WebuiClientFoundationApp",
+        "9 W6"
+      ],
+      "stories": [
+        1,
+        5,
+        34,
+        36,
+        37
+      ],
+      "targets": [
+        "shell-layout-only-composition",
+        "shell-public-navigation-and-view-reactions"
+      ],
+      "delivers": "The shell displays rail, Composer, settings, catalogue and workspace through public business APIs while owning only layout/visibility/navigation presentation.",
+      "acceptance": [
+        "Remove remaining business factories, canonical writes, raw capability relay, query truth, activity probes and workspace invalidation relay from shell; earlier carriers produce their replacement owners.",
+        "Compose named business screens/read models and owner commands; shell reactions subscribe after authoritative commits and cannot replace routes.",
+        "Keep UI-only menu/visibility/layout and injected navigation behavior; preserve plugin-surface hide/remount, memory handoff and session selection placement.",
+        "Cut the large foundation app into coherent layout/public composition without introducing another dependency container, service locator or shell business owner.",
+        "Move shell and its public presentation helpers to the target home; no consumer imports shell implementation for a business rule.",
+        "Verify complete browser screen switching, initial boot, pending turn while catalogue shown, rail/workspace placement and layout controls with zero shell-owned business RPC/writer call sites."
+      ],
+      "verification": "Assembled public application plus built browser screen/navigation behavior and sensitive source call/import checks.",
+      "nonGoals": "Does not recreate owners already delivered by prior tickets or redesign screens.",
+      "issue": null
+    },
+    {
+      "id": "T20",
+      "title": "Co-locate feature styles while preserving the effective WebUI cascade",
+      "blockedBy": [
+        "T19"
+      ],
+      "workPackages": [
+        "W6"
+      ],
+      "sourceSections": [
+        "6 shell.css",
+        "6 tokens.css",
+        "8.1",
+        "8.2"
+      ],
+      "stories": [
+        1,
+        36
+      ],
+      "targets": [
+        "feature-css-ownership",
+        "shared-token-authority-keep-decision"
+      ],
+      "delivers": "Styles follow their business or generic shell/UI owner without changing effective layout, responsive behavior or shared design-token authority.",
+      "acceptance": [
+        "Classify the large shell stylesheet's rule populations by actual consumer ownership; global reset/layout/primitives remain global and feature rules follow their target business.",
+        "Retain one coherent shared token authority; a file-length threshold is not a reason to split token declarations.",
+        "Preserve stylesheet loading order, specificity, cascade, media queries and effective declarations; delete shadowed rules only after direct equivalence evidence.",
+        "Build the served client styles and compare computed styles plus representative real screenshots at existing responsive scenarios, including overlay/scroll/composer reserved space.",
+        "Run current browser interactions/accessibility selectors and record exact visual comparisons; raw CSS byte equality alone cannot establish parity."
+      ],
+      "verification": "Built effective-style comparisons and real browser screenshots/geometry/interactions at pinned viewport/theme scenarios.",
+      "nonGoals": "No visual redesign, new tokens/theme or numerical stylesheet line target.",
+      "issue": null
+    },
+    {
+      "id": "T21",
+      "title": "Retire migration forms and verify the complete WebUI architecture contract",
+      "blockedBy": [
+        "T01",
+        "T02",
+        "T03",
+        "T04",
+        "T05",
+        "T06",
+        "T07",
+        "T08",
+        "T09",
+        "T10",
+        "T11",
+        "T12",
+        "T13",
+        "T14",
+        "T15",
+        "T16",
+        "T17",
+        "T18",
+        "T19",
+        "T20"
+      ],
+      "workPackages": [
+        "W9"
+      ],
+      "sourceSections": [
+        "5.3",
+        "6",
+        "8",
+        "9 W9",
+        "9.1",
+        "9.2",
+        "10"
+      ],
+      "stories": [
+        2,
+        3,
+        35,
+        36,
+        37,
+        38
+      ],
+      "targets": [
+        "migration-contract-retirement",
+        "final-generated-architecture-docs",
+        "complete-integration-acceptance-evidence"
+      ],
+      "delivers": "Developers can use the complete target architecture with authoritative documentation, no alternate owner homes and verified behavior across declared application, protocol and browser boundaries.",
+      "acceptance": [
+        "Parse the board coverage and final source population: every target has one producing carrier, every accepted business has its public home, and every large-file responsibility has a completed cut or coherent keep decision.",
+        "Contract temporary old forms only after all consumers migrated; no compatibility re-export shims, stale source-tool mappings, duplicated complete stores, UI handler registries or generic capability hooks remain.",
+        "Finalize role/public API checks, package guide, command surface, business navigation, ADR/context links, source inventory, build inputs and suite registration to reflect the delivered tree.",
+        "Execute the complete applicable repository verifier on reviewed clean committed integration state, plus generated business navigation; fix covered failures without rewriting frozen oracles or suppressing gates.",
+        "Execute representative real loopback send/resume/event/terminal/file/transfer/shutdown and built-browser parity including screenshots, adversarial selection/epoch/invalidation and Composer field transitions.",
+        "Record offline, transport, native terminal, cloud, visual, performance and platform evidence distinctly; applicable performance/cross-platform requirements have actual receipts or clearly documented external gates.",
+        "Compare declared extension scenarios against the final public homes and report measured request/resource behavior without claiming improvement from plausible structure alone.",
+        "Update authoritative programme state and blockers from verified outputs; readiness of this ticket does not imply its dependent implementation work is already complete."
+      ],
+      "verification": "Full declared integration verification and coverage/population audit; a green narrow gate cannot substitute for the complete acceptance scope.",
+      "nonGoals": "No new eviction/flow-control/protocol design, reopened product scope or hidden implementation waiver.",
+      "issue": null
+    }
+  ],
+  "largeFileCarriers": {
+    "client/components/composer/WebuiComposer.tsx": [
+      "T13"
+    ],
+    "client/components/shell/WebuiClientFoundationApp.tsx": [
+      "T19"
+    ],
+    "client/components/sessions/SessionRail.tsx": [
+      "T07"
+    ],
+    "client/components/plugins/PluginCatalogue.tsx": [
+      "T08"
+    ],
+    "client/components/models/ModelPicker.tsx": [
+      "T03"
+    ],
+    "server/operation/bind-handlers.ts": [
+      "T14"
+    ],
+    "runtime/workspace-archive.ts": [
+      "T16"
+    ],
+    "client/application/workspace/workspace-queries.ts": [
+      "T10",
+      "T11"
+    ],
+    "client/components/transcript/SessionTranscript.tsx": [
+      "T06"
+    ],
+    "client/styles/shell.css": [
+      "T20"
+    ],
+    "client/styles/tokens.css": [
+      "T20"
+    ],
+    "runtime/usage-quota.ts": [
+      "T17"
+    ]
+  },
+  "partitionRule": "The mixed workspace query file has two disjoint produced responsibilities: T10 produces review queries, T11 produces files/environment queries. Large-file carrier describes completion of its responsibility cut, not exclusive edits; all producing targets above remain unique. T19 consumes factories/state moved by prior business tickets rather than producing them again. T18 moves only the platform/generic UI residual population."
+}
