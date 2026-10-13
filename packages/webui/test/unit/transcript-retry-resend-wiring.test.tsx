@@ -88,8 +88,6 @@ import {
   WebuiSessionStoreProvider,
 } from "../../src/client/bindings/application-context.js";
 import { createWebuiApplication } from "../../src/client/application/create-application.js";
-import { createWebuiPortSlices } from "../../src/client/application/port-slices.js";
-import { WebuiPortSlicesProvider } from "../../src/client/bindings/port-slices-context.js";
 import { initialWebuiStreamState } from "../../src/client/projection/stream-state.js";
 import type { WebuiStreamLoopSink } from "../../src/client/mechanisms/stream-loop.js";
 
@@ -155,12 +153,6 @@ function renderComposer(props: {
   });
   const html = renderToStaticMarkup(
     <WebuiApplicationProvider application={application}>
-      {/* The composer reads the transcript capability off its slice (plan §8
-        * Phase 2, A4-s3) rather than off a prop, so the slice is what has to
-        * carry it here — otherwise the "did not call loadMessages" assertion
-        * below would pass because nothing was wired, not because the path is
-        * correct. */}
-      <WebuiPortSlicesProvider slices={createWebuiPortSlices({ loadMessages: props.loadMessages })}>
       {createElement(WebuiComposer, {
         sessionId,
         agentName: "main",
@@ -172,8 +164,8 @@ function renderComposer(props: {
         teamModeOff: false,
         favoritesStorage: { read: () => [], write: () => undefined },
         sendMessage: props.sendMessage ?? (async () => undefined),
+        loadMessages: props.loadMessages,
       } as React.ComponentProps<typeof WebuiComposer>)}
-      </WebuiPortSlicesProvider>
     </WebuiApplicationProvider>,
   );
   const form = createdElements.find((element) => element.type === "form");

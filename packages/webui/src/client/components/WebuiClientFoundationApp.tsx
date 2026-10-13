@@ -108,7 +108,10 @@ import {
 } from "../application/selectors.js";
 import { WEBUI_HOME_SESSION_KEY } from "../application/state.js";
 import { createWebuiEventEffectsRegistry } from "../application/event-effects-registry.js";
-import { useWebuiPortSlicesOptional } from "../bindings/port-slices-context.js";
+import {
+  WebuiPortSlicesProvider,
+  useWebuiPortSlicesOptional,
+} from "../bindings/port-slices-context.js";
 import { createWebuiPortSlices } from "../application/port-slices.js";
 import { WebuiApplicationProvider } from "../bindings/application-context.js";
 import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js";
@@ -254,11 +257,19 @@ export function WebuiClientFoundationApp(
     [providedSlices, transport],
   );
   const sessionsPort = portSlices.sessions;
+  const getSessionForkOptions = sessionsPort.getSessionForkOptions;
+  const forkSession = sessionsPort.forkSession;
   const transcriptPort = portSlices.transcript;
   const composerPort = portSlices.composer;
+  const goalPort = portSlices.goal;
+  const interactionsPort = portSlices.interactions;
   const workspacePort = portSlices.workspace;
   const pluginsPort = portSlices.plugins;
   const settingsPort = portSlices.settings;
+  const modelsPort = portSlices.models;
+  const accountPort = portSlices.account;
+  const turnPort = portSlices.turn;
+  const shellPort = portSlices.shell;
   // The one application session store for this mount (plan §7.6; ticket #45).
   // A caller (tests, SSR) may inject one; production omits the prop and the
   // shell creates exactly one. The shell provides this exact object through
@@ -369,8 +380,8 @@ export function WebuiClientFoundationApp(
   // manager; those components submit commands and read the snapshot instead of
   // holding their own copies of the answers.
   const accountWorkflows = useMemo(
-    () => createWebuiAccountWorkflows({ port: transport ?? {} }),
-    [transport],
+    () => createWebuiAccountWorkflows({ port: accountPort }),
+    [accountPort],
   );
   const settingsWorkflows = useMemo(
     () => createWebuiSettingsWorkflows({ port: settingsPort }),
@@ -962,8 +973,8 @@ export function WebuiClientFoundationApp(
   // started were missed while the stream was down, and the stream cannot
   // replay them. `SessionComposer` closes the same gap the same way.
   const [activityProbeNonce, setActivityProbeNonce] = useState(0);
-  const watchEvents = transport?.watchEvents;
-  const getActiveTurn = transport?.getActiveTurn;
+  const watchEvents = shellPort.watchEvents;
+  const getActiveTurn = turnPort.activeTurn;
   // One shared, deduplicated probe for the transport (plan §7.1 slice): the
   // rail and the composer ask the same `getActiveTurn`, so a same-session probe
   // racing between them collapses to one round trip.
@@ -1043,7 +1054,7 @@ export function WebuiClientFoundationApp(
         },
         composer: composerStore,
         turns: {
-          resumeSession: transport?.resumeSession ?? (async () => {}),
+          resumeSession: turnPort.resume ?? (async () => {}),
           ...(loadMessages
             ? { loadMessages }
             : {}),
@@ -1052,7 +1063,20 @@ export function WebuiClientFoundationApp(
         // slice here (ticket #57): the turn intents receive no capability from
         // their caller, and an unwired operation is simply absent from the
         // slice. `WebuiTransport` satisfies the port structurally.
-        turnCapabilities: transport ?? {},
+        // The port the application cuts turn's slice from, built from the slice
+        // this mount already holds: the composed transport is not handed across
+        // this boundary any more either (A4-s5). `WebuiTurnCapabilityPort` names
+        // the port's members, the slice names turn's, so the mapping is spelled
+        // out rather than left to a structural match.
+        turnCapabilities: {
+          ...(turnPort.send ? { sendMessage: turnPort.send } : {}),
+          ...(turnPort.resume ? { resumeSession: turnPort.resume } : {}),
+          ...(turnPort.load ? { loadMessages: turnPort.load } : {}),
+          ...(turnPort.stop ? { abortSession: turnPort.stop } : {}),
+          ...(turnPort.enqueue ? { enqueueMessage: turnPort.enqueue } : {}),
+          ...(turnPort.createSession ? { createSession: turnPort.createSession } : {}),
+          ...(turnPort.activeTurn ? { getActiveTurn: turnPort.activeTurn } : {}),
+        },
         ...(loadMessages ? { loadMessages } : {}),
       }),
     [
@@ -1062,7 +1086,7 @@ export function WebuiClientFoundationApp(
       composerStore,
       browserStorage,
       loadMessages,
-      transport?.resumeSession,
+      turnPort.resume,
       watchEvents,
     ],
   );
@@ -1098,7 +1122,7 @@ export function WebuiClientFoundationApp(
   // recovery path, no button. It runs through the turn coordinator, which owns
   // the refusal reset, the recorded cursor and one attempt per click.
   const retrySessionStream =
-    selectedSessionId && transport?.resumeSession
+    selectedSessionId && turnPort.resume
       ? () => {
           void application.turns.retry(selectedSessionId);
         }
@@ -1186,6 +1210,13 @@ export function WebuiClientFoundationApp(
 
   return (
     <WebuiEventEffectsRegistryProvider registry={eventEffectsRegistry}>
+      {/* The slices are provided, not only read (plan §8 Phase 2). A consumer
+        * below reads its business's slice from this context; production mounts
+        * the composition root's instances (A4-s2) and this re-provides the same
+        * objects, while a host that renders the shell from props gets the slices
+        * the shell cut from that prop — the same narrowed shape either way, and
+        * the reason a child component never has to fall back to the transport. */}
+      <WebuiPortSlicesProvider slices={portSlices}>
     <WebuiWorkspaceQueriesProvider queries={workspaceQueries}>
     <WebuiAccountWorkflowsProvider workflows={accountWorkflows}>
     <WebuiSettingsWorkflowsProvider workflows={settingsWorkflows}>
@@ -1497,9 +1528,40 @@ export function WebuiClientFoundationApp(
                     setWorkspaceMenuOpen={setWorkspaceMenuOpen}
                     recentWorkspaceDirs={recentWorkspaceDirs}
                     runCommand={commandWorkflows.canRunCommand ? commandWorkflows.runCommand : undefined}
-                    sendMessage={transport?.sendMessage}
-                    getActiveTurn={transport?.getActiveTurn}
-                    getAccountStatus={transport?.getAccountStatus}
+                    createSession={sessionWorkflows.createSession}
+                    sendMessage={turnPort.send}
+                    getActiveTurn={turnPort.activeTurn}
+                    enqueueMessage={composerPort.enqueueMessage}
+                    loadMessages={loadMessages}
+                    getTurnDiff={transcriptPort.getTurnDiff}
+                    revertTurnDiff={transcriptPort.revertTurnDiff}
+                    reapplyTurnDiff={transcriptPort.reapplyTurnDiff}
+                    getSessionForkOptions={getSessionForkOptions}
+                    forkSession={forkSession}
+                    getSessionRewindPreview={transcriptPort.getSessionRewindPreview}
+                    rewindSession={transcriptPort.rewindSession}
+                    editSessionMessage={transcriptPort.editSessionMessage}
+                    getGoal={goalPort.getGoal}
+                    createGoal={goalPort.createGoal}
+                    patchGoal={goalPort.patchGoal}
+                    clearGoal={goalPort.clearGoal}
+                    isGoalEnabled={goalPort.isGoalEnabled}
+                    listPendingPermissions={interactionsPort.listPendingPermissions}
+                    getPendingQuestionnaire={interactionsPort.getPendingQuestionnaire}
+                    replyPermission={interactionsPort.replyPermission}
+                    replyQuestionnaire={interactionsPort.replyQuestionnaire}
+                    dismissQuestionnaire={interactionsPort.dismissQuestionnaire}
+                    listQueueMessages={composerPort.listQueueMessages}
+                    deleteQueueItem={composerPort.deleteQueueItem}
+                    listModels={modelsPort.listModels}
+                    selectModel={modelsPort.selectModel}
+                    listSkills={pluginsPort.listSkills}
+                    pluginManagement={pluginsPort.pluginManagement}
+                    listWorkspaceFileTree={workspacePort.listWorkspaceFileTree}
+                    browseWorkspaceDirs={workspacePort.browseWorkspaceDirs}
+                    getPermissionMode={settingsPort.getPermissionMode}
+                    setPermissionMode={settingsPort.setPermissionMode}
+                    getAccountStatus={accountPort.getAccountStatus}
                     draft={draft}
                     onDraftChange={setDraft}
                     seedAttachment={memoryHandoff}
@@ -1523,6 +1585,14 @@ export function WebuiClientFoundationApp(
                         onOpenFile={({ sessionId, workspaceDir, reference }) => dispatchWorkspacePanel({ type: "open-file", sessionId, workspaceDir, path: reference.path, ...(reference.lineStart !== undefined ? { lineStart: reference.lineStart } : {}), ...(reference.lineEnd !== undefined ? { lineEnd: reference.lineEnd } : {}) })}
                         onOpenTurnReview={(command) => dispatchWorkspacePanel(command)}
                         {...(initialMessages ? { initialMessages } : {})}
+                        getTurnDiff={transcriptPort.getTurnDiff}
+                        revertTurnDiff={transcriptPort.revertTurnDiff}
+                        reapplyTurnDiff={transcriptPort.reapplyTurnDiff}
+                        getSessionForkOptions={getSessionForkOptions}
+                        forkSession={forkSession}
+                        getSessionRewindPreview={transcriptPort.getSessionRewindPreview}
+                        rewindSession={transcriptPort.rewindSession}
+                        editSessionMessage={transcriptPort.editSessionMessage}
                         answerPlanBuild={planReviewWorkflow.answerPlanBuild}
                         onOpenPlanFile={({ sessionId: planSessionId, path, content }) => dispatchWorkspacePanel({ type: "open-plan-file", sessionId: planSessionId, workspaceDir: selectedSession?.workspaceDir ?? "", path, content })}
                       />
@@ -1550,7 +1620,7 @@ export function WebuiClientFoundationApp(
                 </aside>
               </div>
             ) : null}
-            {!homeMode && workspacePanel.open ? <WebuiWorkspacePanel state={workspacePanel} dispatch={dispatchWorkspacePanel} sessionId={selectedSessionId} workspaceDir={selectedSession?.workspaceDir} onClose={() => dispatchWorkspacePanel({ type: "close-panel" })} /> : null}
+            {!homeMode && workspacePanel.open ? <WebuiWorkspacePanel state={workspacePanel} dispatch={dispatchWorkspacePanel} sessionId={selectedSessionId} workspaceDir={selectedSession?.workspaceDir} workspaceFileUrl={workspacePort.workspaceFileUrl} readWorkspaceArchive={workspacePort.readWorkspaceArchive} extractWorkspaceArchive={workspacePort.extractWorkspaceArchive} readCanvas={workspacePort.readCanvas} applyCanvas={workspacePort.applyCanvas} createTerminal={workspacePort.createTerminal} listTerminals={workspacePort.listTerminals} writeTerminal={workspacePort.writeTerminal} resizeTerminal={workspacePort.resizeTerminal} disposeTerminal={workspacePort.disposeTerminal} watchTerminal={workspacePort.watchTerminal} onClose={() => dispatchWorkspacePanel({ type: "close-panel" })} /> : null}
             </>}
           </main>
         </div>
@@ -1563,6 +1633,7 @@ export function WebuiClientFoundationApp(
     </WebuiSettingsWorkflowsProvider>
     </WebuiAccountWorkflowsProvider>
     </WebuiWorkspaceQueriesProvider>
+      </WebuiPortSlicesProvider>
     </WebuiEventEffectsRegistryProvider>
   );
 }

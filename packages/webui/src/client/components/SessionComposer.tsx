@@ -25,10 +25,14 @@ import {
   type FormEvent,
   type ReactElement,
 } from "react";
+import type {WebuiClientMessageEnqueuer} from "../contracts/composer/composer-port.js";
 import type {WebuiClientMessageSender} from "../contracts/turn/execution-port.js";
 import { looksLikeAbsoluteWorkspacePath } from "../paths.js";
 import type { WebuiClientMessageLoader } from "../contracts/transcript/message-view.js";
+import type { WebuiModelSelectionRequest } from "../contracts/models/model-view.js";
+import type { WebuiClientSessionCreator } from "../contracts/sessions/session-port.js";
 import type { WebuiClientSessionPage, WebuiClientSession } from "../contracts/sessions/session-view.js";
+import type { WebuiTransport } from "../contracts/transport.js";
 import { projectWebuiMessageToStreamMessage, readUsageNumber } from "../projection/message-projection.js";
 import { webuiAnswersEndTurn } from "../projection/questionnaire-state.js";
 import {
@@ -64,21 +68,38 @@ import {
   useWebuiSessionState,
 } from "../bindings/use-session-state.js";
 import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js";
-import { useWebuiPortSlice } from "../bindings/port-slices-context.js";
 import { useWebuiEventEffectsRegistry } from "../bindings/event-effects-context.js";
 import { webuiSessionStatusType } from "../projection/stream-state.js";
 
 /** Capability subset the session composer consumes. Single source of truth
- *  the workspace slice owns; the browser reads it there rather than taking it
- *  as a prop. */
+ *  lives in `WebuiTransport`; this alias keeps the prop block free of
+ *  per-key `WebuiTransport["x"]` redeclarations. */
+type WebuiSessionComposerCapabilities = Pick<
+  WebuiTransport,
+  | "loadMessages"
+  | "getTurnDiff"
+  | "revertTurnDiff"
+  | "reapplyTurnDiff"
+  | "getSessionForkOptions"
+  | "forkSession"
+  | "getSessionRewindPreview"
+  | "rewindSession"
+  | "editSessionMessage"
+  | "patchGoal"
+  | "clearGoal"
+>;
 import type {
   WebuiGoal,
+  WebuiGoalCreateRequest,
+  WebuiGoalEnabledResult,
+  WebuiGoalSessionRequest,
 } from "../../shared/contracts/goal.js";
 import type {
   WebuiActiveTurnRequest,
   WebuiActiveTurnResult,
 } from "../../shared/contracts/session.js";
 import type {
+  WebuiInteractionReplyResult,
   WebuiPendingPermission,
   WebuiQuestionnaireAnswer,
   WebuiQuestionnaireRequest,
@@ -298,26 +319,22 @@ function readBrowserFile(file: File): Promise<string> {
  * directory. So the server enumerates this machine's directories and the
  * user picks from what it reports.
  *
- * When the workspace slice carries no `browseWorkspaceDirs` — a static fixture
+ * When the transport has no `browseWorkspaceDirs` — a static fixture
  * transport, or a server that predates the operation — the browser falls
  * back to a manual absolute-path field. Either way a failure is shown in
  * the popover; it never resolves to a silent no-op.
  */
 export function WebuiWorkspaceDirectoryBrowser({
+  browseWorkspaceDirs,
   initialDir,
   onSelect,
   onCancel,
 }: {
+  readonly browseWorkspaceDirs?: WebuiTransport["browseWorkspaceDirs"];
   readonly initialDir?: string;
   readonly onSelect: (dir: string) => void;
   readonly onCancel: () => void;
 }): ReactElement {
-
-  // The workspace slice (plan §8 Phase 2, A4-s4): the directory browser reads the
-  // one capability it uses off its own slice instead of taking it as a prop.
-  const workspacePort = useWebuiPortSlice("workspace");
-  const browseWorkspaceDirs = workspacePort?.browseWorkspaceDirs;
-
   const [listing, setListing] = useState<WebuiWorkspaceDirectoryListing>();
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(false);
@@ -551,6 +568,7 @@ export function WebuiComposer({
   sessionLayout = false,
   usageQuota,
   agentName,
+  createSession,
   createSessionWorkspaceDir,
   onWorkspaceChange,
   workspaceMenuOpen,
@@ -558,7 +576,31 @@ export function WebuiComposer({
   recentWorkspaceDirs = EMPTY_WORKSPACE_DIRS,
   runCommand,
   sendMessage,
+  loadMessages,
+  getTurnDiff,
+  revertTurnDiff,
+  reapplyTurnDiff,
+  getSessionForkOptions,
+  forkSession,
+  getSessionRewindPreview,
+  rewindSession,
+  editSessionMessage,
+  getGoal,
   getActiveTurn,
+  createGoal,
+  patchGoal,
+  clearGoal,
+  isGoalEnabled,
+  listPendingPermissions,
+  getPendingQuestionnaire,
+  replyPermission,
+  replyQuestionnaire,
+  dismissQuestionnaire,
+  listQueueMessages,
+  deleteQueueItem,
+  listModels,
+  listSkills,
+  selectModel,
   getAccountStatus,
   draft,
   onDraftChange,
@@ -566,7 +608,13 @@ export function WebuiComposer({
   onInputSubmitted,
   onNeedsSession,
   onSessionCreated,
+  enqueueMessage,
   teamModeOff,
+  listWorkspaceFileTree,
+  browseWorkspaceDirs,
+  pluginManagement,
+  getPermissionMode,
+  setPermissionMode,
   sessions = [],
   workspaceDir,
   onSelectSession,
@@ -579,6 +627,7 @@ export function WebuiComposer({
   readonly sessionLayout?: boolean;
   readonly usageQuota?: WebuiUsageQuotaResult;
   readonly agentName: string;
+  readonly createSession?: WebuiClientSessionCreator;
   readonly createSessionWorkspaceDir?: string;
   readonly onWorkspaceChange: (workspaceDir?: string) => void;
   /** Open state for the workspace picker; owned by the parent so the
@@ -591,11 +640,25 @@ export function WebuiComposer({
   readonly recentWorkspaceDirs?: readonly string[];
   readonly runCommand?: (request: { readonly command: WebuiRunCommandName; readonly input?: string; readonly sessionId?: string; readonly agentName?: string; readonly workspaceDir?: string; }) => Promise<Record<string, unknown>>;
   readonly sendMessage?: WebuiClientMessageSender;
+  readonly enqueueMessage?: WebuiClientMessageEnqueuer;
 
+  readonly getGoal?: (request: WebuiGoalSessionRequest) => Promise<WebuiGoal | undefined>;
   /** Authoritative active-turn probe; resolves the `recheck` case and the
    * missed-event gap that a reconnect or a slow subscribe can open. */
   readonly getActiveTurn?: (request: WebuiActiveTurnRequest) => Promise<WebuiActiveTurnResult>;
+  readonly createGoal?: (request: WebuiGoalCreateRequest) => Promise<WebuiGoal>;
 
+  readonly isGoalEnabled?: () => Promise<WebuiGoalEnabledResult>;
+  readonly listPendingPermissions?: () => Promise<{ readonly requests: readonly WebuiPendingPermission[] }>;
+  readonly getPendingQuestionnaire?: (request: { readonly name: string; readonly sessionId: string }) => Promise<{ readonly request?: WebuiQuestionnaireRequest }>;
+  readonly replyPermission?: (request: { readonly name: string; readonly requestId: string; readonly reply: "allowOnce" | "allowAlways" | "deny" }) => Promise<WebuiInteractionReplyResult>;
+  readonly replyQuestionnaire?: (request: { readonly name: string; readonly requestId: string; readonly schemaVersion: number; readonly answers: readonly WebuiQuestionnaireAnswer[] }) => Promise<WebuiInteractionReplyResult>;
+  readonly dismissQuestionnaire?: (request: { readonly name: string; readonly requestId: string }) => Promise<WebuiInteractionReplyResult>;
+  readonly listQueueMessages?: (request: { readonly id: string }) => Promise<{ readonly items?: readonly WebuiQueueItem[]; readonly paused?: boolean; readonly pendingCount?: number }>;
+  readonly deleteQueueItem?: (request: { readonly id: string; readonly itemId: string }) => Promise<{ readonly item?: WebuiQueueItem }>;
+  readonly listModels?: (request?: { readonly sessionId?: string }) => Promise<readonly WebuiModelEntry[]>;
+  readonly listSkills?: (request?: { readonly agentName?: string }) => Promise<{ readonly skills: readonly { readonly name: string; readonly displayName?: string; readonly description?: string }[] }>;
+  readonly selectModel?: (request: WebuiModelSelectionRequest) => Promise<{ readonly success?: boolean }>;
   readonly getAccountStatus?: (request?: { readonly sessionId?: string }) => Promise<Record<string, unknown>>;
   /** The draft lives on the shell so it survives silent first-session creation. */
   readonly draft: string;
@@ -632,62 +695,16 @@ export function WebuiComposer({
     readonly read: () => string[];
     readonly write: (ids: readonly string[]) => void;
   };
+  readonly listWorkspaceFileTree?: WebuiTransport["listWorkspaceFileTree"];
+  readonly browseWorkspaceDirs?: WebuiTransport["browseWorkspaceDirs"];
+  readonly pluginManagement?: WebuiTransport["pluginManagement"];
+  readonly getPermissionMode?: WebuiTransport["getPermissionMode"];
+  readonly setPermissionMode?: WebuiTransport["setPermissionMode"];
   readonly sessions?: readonly WebuiClientSession[];
   readonly workspaceDir?: string;
   readonly onSelectSession?: (sessionId: string) => void;
   readonly onOpenPluginManagement?: (area: "plugins" | "skills") => void;
-}): ReactElement {
-
-  // The workspace, models, plugins and settings slices (plan §8 Phase 2, A4-s4):
-  // the same move as the five above, for the four businesses this step names.
-  const workspacePort = useWebuiPortSlice("workspace");
-  const modelsPort = useWebuiPortSlice("models");
-  const pluginsPort = useWebuiPortSlice("plugins");
-  const settingsPort = useWebuiPortSlice("settings");
-  const listWorkspaceFileTree = workspacePort?.listWorkspaceFileTree;
-  const browseWorkspaceDirs = workspacePort?.browseWorkspaceDirs;
-  const listModels = modelsPort?.listModels;
-  const selectModel = modelsPort?.selectModel;
-  const pluginManagement = pluginsPort?.pluginManagement;
-  const listSkills = pluginsPort?.listSkills;
-  const getPermissionMode = settingsPort?.getPermissionMode;
-  const setPermissionMode = settingsPort?.setPermissionMode;
-
-
-  // The five business slices (plan §8 Phase 2, A4-s3). Each business's
-  // capabilities arrive through that business's slice rather than through a prop
-  // the shell had to relay: what this component can reach is decided by the
-  // provider, and a member the host does not wire is `undefined` exactly as the
-  // former optional prop was. A missing provider leaves every member undefined —
-  // the same shape as a host with nothing wired, which is what SSR renders.
-  const sessionsPort = useWebuiPortSlice("sessions");
-  const transcriptPort = useWebuiPortSlice("transcript");
-  const goalPort = useWebuiPortSlice("goal");
-  const interactionsPort = useWebuiPortSlice("interactions");
-  const composerPort = useWebuiPortSlice("composer");
-  const createSession = sessionsPort?.createSession;
-  const getSessionForkOptions = sessionsPort?.getSessionForkOptions;
-  const forkSession = sessionsPort?.forkSession;
-  const loadMessages = transcriptPort?.loadMessages;
-  const getTurnDiff = transcriptPort?.getTurnDiff;
-  const revertTurnDiff = transcriptPort?.revertTurnDiff;
-  const reapplyTurnDiff = transcriptPort?.reapplyTurnDiff;
-  const getSessionRewindPreview = transcriptPort?.getSessionRewindPreview;
-  const rewindSession = transcriptPort?.rewindSession;
-  const editSessionMessage = transcriptPort?.editSessionMessage;
-  const getGoal = goalPort?.getGoal;
-  const createGoal = goalPort?.createGoal;
-  const patchGoal = goalPort?.patchGoal;
-  const clearGoal = goalPort?.clearGoal;
-  const isGoalEnabled = goalPort?.isGoalEnabled;
-  const listPendingPermissions = interactionsPort?.listPendingPermissions;
-  const getPendingQuestionnaire = interactionsPort?.getPendingQuestionnaire;
-  const replyPermission = interactionsPort?.replyPermission;
-  const replyQuestionnaire = interactionsPort?.replyQuestionnaire;
-  const dismissQuestionnaire = interactionsPort?.dismissQuestionnaire;
-  const enqueueMessage = composerPort?.enqueueMessage;
-  const listQueueMessages = composerPort?.listQueueMessages;
-  const deleteQueueItem = composerPort?.deleteQueueItem;
+} & WebuiSessionComposerCapabilities): ReactElement {
   const { dom } = useWebuiBrowserCapabilities();
   const { stream, sending } = useWebuiSessionState(sessionId);
   const { phase, lifecycle, readStream, attachTurn, sendTurn: submitTurn, stopTurn } =
@@ -2524,7 +2541,7 @@ export function WebuiComposer({
                 className="webui-workspace-menu webui-workspace-menu--desktop"
               >
                 <WebuiWorkspaceDirectoryBrowser
-
+                  browseWorkspaceDirs={browseWorkspaceDirs}
                   initialDir={createSessionWorkspaceDir}
                   onSelect={(dir) => {
                     setWorkspaceBrowserOpen(false);

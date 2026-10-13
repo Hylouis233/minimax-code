@@ -21,6 +21,7 @@ yet, not that it publishes nothing.
 | turn | `WebuiStreamPhaseCommands` | `markStreamPhase` | `application/session-commands.ts` |
 | turn | `WebuiStreamPhaseCommands` | `settleStoppedStream` | `application/session-commands.ts` |
 | turn | `WebuiStreamPhaseCommands` | `startStreaming` | `application/session-commands.ts` |
+| turn | `WebuiTurnCapabilitySlice` | `activeTurn` | `application/turn-capabilities.ts` |
 | turn | `WebuiTurnCapabilitySlice` | `createSession` | `application/turn-capabilities.ts` |
 | turn | `WebuiTurnCapabilitySlice` | `enqueue` | `application/turn-capabilities.ts` |
 | turn | `WebuiTurnCapabilitySlice` | `load` | `application/turn-capabilities.ts` |

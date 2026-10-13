@@ -35,6 +35,13 @@ export interface WebuiTurnCapabilitySlice {
   readonly load?: WebuiClientMessageLoader;
   /** **stop** — abort the running turn. */
   readonly stop?: TurnExecutionPort["abortSession"];
+  /**
+   * The active-turn probe (§4.12 gives `turn` "the in-flight read"). It rides on
+   * this slice from A4-s5 because the presentation that renders a turn no longer
+   * receives it as a prop: with it here, a consumer reads the probe the same way
+   * it reads send/resume/stop.
+   */
+  readonly activeTurn?: TurnExecutionPort["getActiveTurn"];
   /** The queue's write; a send while a turn is in flight enqueues instead. */
   readonly enqueue?: ComposerPort["enqueueMessage"];
   /** Create the session a first message needs before that message is sent. */
@@ -48,6 +55,7 @@ export interface WebuiTurnCapabilitySlice {
  */
 export interface WebuiTurnCapabilityPort {
   readonly sendMessage?: TurnExecutionPort["sendMessage"];
+  readonly getActiveTurn?: TurnExecutionPort["getActiveTurn"];
   readonly resumeSession?: TurnExecutionPort["resumeSession"];
   readonly loadMessages?: WebuiClientMessageLoader;
   readonly abortSession?: TurnExecutionPort["abortSession"];
@@ -64,6 +72,7 @@ export function createWebuiTurnCapabilitySlice(
     ...(port.resumeSession ? { resume: port.resumeSession } : {}),
     ...(port.loadMessages ? { load: port.loadMessages } : {}),
     ...(port.abortSession ? { stop: port.abortSession } : {}),
+    ...(port.getActiveTurn ? { activeTurn: port.getActiveTurn } : {}),
     ...(port.enqueueMessage ? { enqueue: port.enqueueMessage } : {}),
     ...(port.createSession ? { createSession: port.createSession } : {}),
   };

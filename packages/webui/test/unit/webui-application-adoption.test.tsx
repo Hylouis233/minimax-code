@@ -52,15 +52,13 @@ describe("the shell adopts the application the composition root provides", () =>
   it("reads the provided store's catalog, not one seeded from the prop", () => {
     const { application } = applicationWith("adopted-session");
     const markup = renderToStaticMarkup(
-      createElement(
-        WebuiApplicationProvider,
-        { application },
-        createElement(WebuiClientFoundationApp, {
-          label: "webui-foundation",
-          locationHash: "#session=adopted-session",
-          sessionPage: sessionPage("prop-session") as never,
-        }),
-      ),
+      <WebuiApplicationProvider application={application}>
+        <WebuiClientFoundationApp
+          label="webui-foundation"
+          locationHash="#session=adopted-session"
+          sessionPage={sessionPage("prop-session") as never}
+        />
+      </WebuiApplicationProvider>,
     );
 
     expect(markup).toContain("adopted-session");
@@ -85,14 +83,12 @@ describe("the shell adopts the application the composition root provides", () =>
   it("renders the adopted application's own snapshot state", () => {
     const { application } = applicationWith("adopted-session");
     const markup = renderToStaticMarkup(
-      createElement(
-        WebuiApplicationProvider,
-        { application },
-        createElement(WebuiClientFoundationApp, {
-          label: "webui-foundation",
-          locationHash: "#session=adopted-session",
-        }),
-      ),
+      <WebuiApplicationProvider application={application}>
+        <WebuiClientFoundationApp
+          label="webui-foundation"
+          locationHash="#session=adopted-session"
+        />
+      </WebuiApplicationProvider>,
     );
 
     // The shell ran: the archon shell marker is the outermost thing it renders,
