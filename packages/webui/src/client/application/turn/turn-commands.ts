@@ -52,6 +52,7 @@ import {
 } from "../sessions/session-commands.js";
 import type { WebuiTurnCapabilitySlice } from "./turn-capabilities.js";
 import type { WebuiDeliveryDisposers } from "./delivery-disposers.js";
+import type { WebuiSessionScopeManager } from "../sessions/session-scope.js";
 import { stopWebuiTurn } from "./turn-coordinator.js";
 
 /** Adapts the application's session-aware event call to the composer commands. */
@@ -90,13 +91,13 @@ export interface WebuiAttachTurnDeps {
  * send uses — so history anchoring, cursor resume, `resume_overflow` resync, the
  * lease and every terminal exit stay handled in exactly one place.
  */
-export function attachWebuiTurn(deps: WebuiAttachTurnDeps): void {
+export function attachWebuiTurn(deps: WebuiAttachTurnDeps): Promise<void> {
   const { sessionId, turnId, resumeSession, loadMessages, readStream, setSending, sink } = deps;
-  if (!sessionId || !resumeSession) return;
+  if (!sessionId || !resumeSession) return Promise.resolve();
   const existing = readStream();
-  if (existing.subscription) return;
+  if (existing.subscription) return Promise.resolve();
   setSending(true);
-  void runWebuiStreamLoop(
+  return runWebuiStreamLoop(
     { resumeSession, loadMessages, projection: streamRecoveryProjection, streamState: streamStateBundle },
     {
       sessionId,
@@ -289,6 +290,12 @@ export interface WebuiTurnCommandContext {
    * the attempt then simply cannot be detached by this client.
    */
   readonly deliveries?: WebuiDeliveryDisposers;
+  /**
+   * The session scope (plan §4.3). An accepted attempt takes a **delivery** lease
+   * for as long as it runs, so navigating away cannot release a session that still
+   * owes a turn — and the lease ends when the attempt does, not when the view does.
+   */
+  readonly scope?: WebuiSessionScopeManager;
 }
 
 /** What a surface supplies to send: intent and data, never a writer or a sink. */
@@ -363,18 +370,40 @@ export function createWebuiConversationTurnCommands(
    * to know the operation is missing.
    */
   const recordKey = (): string => sessionId ?? WEBUI_HOME_SESSION_KEY;
-  /** Hands each attempt's own disposer to the registry as it opens. */
-  const onDelivery = (handle: { readonly close: () => void }): void => {
-    context.deliveries?.track(recordKey(), handle);
+  /**
+   * One attempt's hold on its session: the registered disposer and the delivery
+   * lease. Both start when the attempt opens and end when it settles — a
+   * navigation in between must not release either.
+   */
+  const holdDelivery = (): {
+    readonly onDelivery: (handle: { readonly close: () => void }) => void;
+    readonly release: () => void;
+  } => {
+    let releaseHandle: (() => void) | undefined;
+    let releaseInterest: (() => void) | undefined;
+    return {
+      onDelivery: (handle) => {
+        releaseHandle = context.deliveries?.track(recordKey(), handle);
+        releaseInterest = context.scope?.acquire(recordKey(), "delivery", `attempt:${recordKey()}`);
+      },
+      release: () => {
+        releaseHandle?.();
+        releaseInterest?.();
+        releaseHandle = undefined;
+        releaseInterest = undefined;
+      },
+    };
   };
-  const loopDeps = (): Omit<WebuiStreamLoopDeps, "projection" | "streamState"> => ({
+  const loopDeps = (
+    hold: { readonly onDelivery: (handle: { readonly close: () => void }) => void },
+  ): Omit<WebuiStreamLoopDeps, "projection" | "streamState"> => ({
     ...(capabilities?.send
-      ? { sendMessage: (body, onFrame) => capabilities.send!(body, onFrame, onDelivery) }
+      ? { sendMessage: (body, onFrame) => capabilities.send!(body, onFrame, hold.onDelivery) }
       : {}),
     ...(capabilities?.resume
       ? {
           resumeSession: (body, onFrame) =>
-            capabilities.resume!(body, onFrame, onDelivery),
+            capabilities.resume!(body, onFrame, hold.onDelivery),
         }
       : {}),
     ...(capabilities?.load ? { loadMessages: capabilities.load } : {}),
@@ -395,9 +424,10 @@ export function createWebuiConversationTurnCommands(
     }).releaseStreamSubscription(generation);
   };
 
-  const attach = (turnId: string | undefined): void => {
+  const attach = (turnId: string | undefined): Promise<void> => {
     const writer = writerFor();
-    attachWebuiTurn({
+    const hold = holdDelivery();
+    return attachWebuiTurn({
       sessionId,
       turnId,
       ...(capabilities?.resume ? { resumeSession: capabilities.resume } : {}),
@@ -405,7 +435,7 @@ export function createWebuiConversationTurnCommands(
       readStream,
       setSending: writer.setTurnSending,
       sink: writer.createSink(),
-    });
+    }).finally(hold.release);
   };
 
   const probeDeps = (): Pick<WebuiRecheckSubscriptionDeps, "probe"> &
@@ -434,6 +464,7 @@ export function createWebuiConversationTurnCommands(
       }),
     send: async (intent) => {
       const writer = writerFor();
+      const hold = holdDelivery();
       await sendWebuiTurn({
         sessionId,
         message: intent.message,
@@ -444,7 +475,7 @@ export function createWebuiConversationTurnCommands(
         sending: intent.sending,
         callbacks: intent.callbacks,
         readStream,
-        deps: loopDeps(),
+        deps: loopDeps(hold),
         ...(capabilities?.enqueue ? { enqueueMessage: capabilities.enqueue } : {}),
         ...(capabilities?.createSession ? { createSession: capabilities.createSession } : {}),
         ...(intent.createSessionWorkspaceDir
@@ -454,9 +485,11 @@ export function createWebuiConversationTurnCommands(
         // The writer and, through it, the sink are built here: the caller names
         // no key and holds no factory.
         createWriter: () => writer,
-      });
+      }).finally(hold.release);
     },
-    attach,
+    attach: (turnId) => {
+      void attach(turnId);
+    },
     stop: async () => {
       if (!sessionId || !capabilities?.stop) return;
       const writer = storeWriterFor();

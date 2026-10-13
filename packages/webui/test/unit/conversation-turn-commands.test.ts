@@ -12,6 +12,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createWebuiConversationTurnCommands } from "../../src/client/application/turn/turn-commands.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
+import { createWebuiSessionScopeManager } from "../../src/client/application/sessions/session-scope.js";
+import { createWebuiDeliveryDisposers } from "../../src/client/application/turn/delivery-disposers.js";
 import { WEBUI_HOME_SESSION_KEY } from "../../src/client/application/state.js";
 
 /** A resume that never settles: the attachment's lease stays claimed. */
@@ -195,5 +197,56 @@ describe("recheck and gap recovery are the command set's, not the view's", () =>
     // The stale lease was released (scoped to its generation) and the live turn
     // attached in its place.
     expect(store.readSession("s1").stream.subscription?.turnId).toBe("t-new");
+  });
+});
+
+describe("an accepted attempt leases its session", () => {
+  it("keeps the session interesting across a navigation and releases it when the attempt settles", async () => {
+    const store = createWebuiSessionStore();
+    const scope = createWebuiSessionScopeManager();
+    const deliveries = createWebuiDeliveryDisposers();
+    let settle!: () => void;
+    const send = vi.fn(
+      async (
+        _body: unknown,
+        _onFrame: unknown,
+        onDelivery?: (handle: { close: () => void }) => void,
+      ) => {
+        onDelivery?.({ close: () => undefined });
+        return new Promise<void>((resolve) => {
+          settle = resolve;
+        });
+      },
+    );
+    const commands = createWebuiConversationTurnCommands({
+      store,
+      sessionId: "s1",
+      capabilities: { send: send as never },
+      deliveries,
+      scope,
+    });
+
+    void commands.send({
+      message: "hello",
+      sending: false,
+      callbacks: { onDraftChange: () => undefined },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // The attempt holds a delivery lease, and its real disposer is registered.
+    expect(scope.kinds("s1")).toContain("delivery");
+    expect(deliveries.count("s1")).toBe(1);
+
+    // Navigating away must not release a session that still owes a turn.
+    scope.select("s2");
+    expect(scope.isInterested("s1")).toBe(true);
+    expect(scope.mayEvict("s1")).toBe(false);
+
+    // The attempt ends on its own: the lease and the registration end with it.
+    settle();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(scope.isInterested("s1")).toBe(false);
+    expect(scope.mayEvict("s1")).toBe(true);
+    expect(deliveries.count()).toBe(0);
   });
 });

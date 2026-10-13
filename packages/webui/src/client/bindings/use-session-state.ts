@@ -194,6 +194,9 @@ export function useWebuiSessionCommands(sessionId: string | undefined): {
   // The registry the application disposes with: an attempt this client started
   // is closable by the application rather than only by its own loop.
   const deliveries = application?.deliveries;
+  // The scope the attempt leases against, so navigating away cannot release a
+  // session that still owes a turn (plan §4.3).
+  const scope = application?.sessionScope;
   return useMemo(() => {
     const writerFor = () =>
       sessionId
@@ -207,6 +210,7 @@ export function useWebuiSessionCommands(sessionId: string | undefined): {
       sessionId,
       ...(capabilities ? { capabilities } : {}),
       ...(deliveries ? { deliveries } : {}),
+      ...(scope ? { scope } : {}),
     });
     // Two views, built from the same writer and handed out separately
     // (ticket #58). The interaction view is published by its own hook
