@@ -275,6 +275,7 @@
       "packages/webui/test/unit/plugin-dialog-hosting.test.ts",
       "packages/webui/test/unit/personalization-sections.test.ts",
       "packages/webui/test/unit/account-menu-panels.test.ts",
+      "packages/webui/test/unit/webui-shell-seam.test.ts",
       "packages/webui/test/unit/turn-command-views.test.ts",
       "packages/webui/test/unit/turn-substrate-fences.test.ts",
       "packages/webui/test/unit/output-error.test.tsx",
