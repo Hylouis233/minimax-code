@@ -176,7 +176,7 @@ describe("interaction coordinator — permission replies", () => {
 });
 
 describe("interaction coordinator — questionnaire replies", () => {
-  it("answers with the requester's name, clears it and hands the phase decision over", async () => {
+  it("answers with the requester's name, clears it, and applies the phase decision itself", async () => {
     const replyQuestionnaire = vi.fn().mockResolvedValue({ ok: true });
     const { c, s, st } = coordinator({ replyQuestionnaire });
     const answers = [{ questionId: "a", value: "yes" }] as never;
