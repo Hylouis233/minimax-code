@@ -10,7 +10,7 @@
 
 import type { ReactElement } from "react";
 
-import { readWebuiPluginRow as read, type WebuiPluginRow as Row } from "../../projection/plugin-rows.js";
+import { readWebuiPluginRow as read, type WebuiPluginRow as Row } from "../../contracts/plugins/plugin-rows.js";
 
 export interface PluginImportDialogProps {
   readonly url: string;

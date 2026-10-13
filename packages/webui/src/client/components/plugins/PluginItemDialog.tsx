@@ -14,7 +14,7 @@
 
 import type { Dispatch, ReactElement, SetStateAction } from "react";
 
-import { readWebuiPluginRow as read, type WebuiPluginRow as Row } from "../../projection/plugin-rows.js";
+import { readWebuiPluginRow as read, type WebuiPluginRow as Row } from "../../contracts/plugins/plugin-rows.js";
 import { ToggleSwitch } from "../shared/ToggleSwitch.js";
 
 export interface PluginItemDialogProps {

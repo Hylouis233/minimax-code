@@ -25,7 +25,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
-import { describeWebuiMcpServerStatus } from "../../src/client/components/plugins/PluginCatalogue.js";
+import { describeWebuiMcpServerStatus } from "../../src/client/projection/plugins/mcp-status.js";
 
 const SOURCE = readFileSync(
   new URL("../../src/client/components/plugins/PluginCatalogue.tsx", import.meta.url),

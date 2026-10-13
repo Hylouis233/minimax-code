@@ -10,9 +10,10 @@ import {
 } from "../../bindings/use-query-state.js";
 import { WebuiIconAgent } from "../shell/icons.js";
 import { ToggleSwitch } from "../shared/ToggleSwitch.js";
-import { readWebuiPluginRow as read, type WebuiPluginRow as Row } from "../../projection/plugin-rows.js";
+import { readWebuiPluginRow as read, type WebuiPluginRow as Row } from "../../contracts/plugins/plugin-rows.js";
 import { PluginImportDialog } from "./PluginImportDialog.js";
 import { PluginItemDialog } from "./PluginItemDialog.js";
+import { describeWebuiMcpServerStatus } from "../../projection/plugins/mcp-status.js";
 
 type Area = "plugins" | "skills" | "apps" | "mcp" | "agents";
 type PluginCatalogueSelection = {
@@ -29,50 +30,6 @@ const sameSelection = (
   left.view === right.view &&
   left.query === right.query &&
   left.category === right.category;
-
-/**
- * One MCP server's connection state, as the row shows it.
- *
- * The runtime already classifies every server
- * (`LocalMcpPublicServerStatus`: `available` / `configured` / `disabled` /
- * `error` / `unavailable`) and attaches the failure's own reason to the two
- * trouble states — the D-3 gap was that the row rendered none of it, so a
- * server that could not connect was indistinguishable from a healthy one
- * unless you already knew to look elsewhere. `configured` is deliberately
- * NOT trouble: it means enabled and not currently connected, which is the
- * resting state of a server that connects on use.
- */
-export interface WebuiMcpServerStatusView {
-  readonly key:
-    | "available"
-    | "configured"
-    | "disabled"
-    | "error"
-    | "unavailable"
-    | "unknown";
-  readonly label: string;
-  readonly tone: string;
-  readonly reason?: string;
-}
-
-export function describeWebuiMcpServerStatus(item: Row): WebuiMcpServerStatusView {
-  const status = read(item, "status");
-  const reason = read(item, "error", "errorMessage") || undefined;
-  switch (status) {
-    case "available":
-      return { key: "available", label: "已连接", tone: "text-text_default_secondary" };
-    case "configured":
-      return { key: "configured", label: "未连接", tone: "text-text_default_tertiary" };
-    case "disabled":
-      return { key: "disabled", label: "已停用", tone: "text-text_default_tertiary" };
-    case "error":
-      return { key: "error", label: "连接失败", tone: "text-text_label_danger_secondary_default", reason };
-    case "unavailable":
-      return { key: "unavailable", label: "不可用", tone: "text-text_label_warning_secondary_default", reason };
-    default:
-      return { key: "unknown", label: "未知状态", tone: "text-text_default_tertiary" };
-  }
-}
 
 const CATEGORIES: readonly { id: Area; label: string }[] = [
   { id: "plugins", label: "插件" },
