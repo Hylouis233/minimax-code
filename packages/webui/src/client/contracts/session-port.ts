@@ -9,8 +9,8 @@ import type {
   WebuiClientProject,
   WebuiClientSessionPage,
   WebuiClientSessionTreePage,
-} from "./session-view.js";
-import type { WebuiClientMessageLoader } from "./message-view.js";
+} from "./sessions/session-view.js";
+import type { WebuiClientMessageLoader } from "./transcript/message-view.js";
 import type {
   WebuiEditSessionMessageRequest,
   WebuiEditSessionMessageResult,

@@ -14,7 +14,7 @@ import { ActivityIndicator, MessageAfterQueryStreamingPlaceholder, MessagePassiv
 import { TurnNavigator, type TurnSummary } from "./TurnNavigator.js";
 import { MessageItem } from "./MessageItem.js";
 import { formatWebuiMessageTimestamp } from "./MessageActions.js";
-import type { WebuiMessageActionCapabilities } from "../contracts/transcript-view.js";
+import type { WebuiMessageActionCapabilities } from "../contracts/transcript/transcript-view.js";
 import { useWebuiSessionQuestionnaire, useWebuiSessionState, useWebuiSessionStream, useWebuiTranscriptHistoryOwner } from "../bindings/use-session-state.js";
 import { isTurnLive } from "../projection/composer-state.js";
 import {
@@ -23,8 +23,8 @@ import {
   webuiPlanPath,
 } from "../projection/plan-mode.js";
 import { WebuiPlanDeliveryCard } from "./PlanModeCards.js";
-import type { WebuiClientMessagePage } from "../contracts/message-view.js";
-import type { WebuiTranscriptItem } from "../contracts/transcript-view.js";
+import type { WebuiClientMessagePage } from "../contracts/transcript/message-view.js";
+import type { WebuiTranscriptItem } from "../contracts/transcript/transcript-view.js";
 import type { WebuiTransport } from "../contracts/transport.js";
 import type { WebuiQuestionnaireRequest } from "../../shared/contracts/interactions.js";
 
@@ -43,7 +43,7 @@ type WebuiSessionTranscriptCapabilities = Pick<
   | "editSessionMessage"
 >;
 import type { WebuiTurnDiffView } from "../../shared/contracts/session.js";
-import type { WebuiQuestionnaireResponseSummary } from "../contracts/transcript-view.js";
+import type { WebuiQuestionnaireResponseSummary } from "../contracts/transcript/transcript-view.js";
 import type { WebuiMessageFileReference } from "../projection/message-file-reference.js";
 import type { WorkspacePanelCommand } from "../projection/workspace-panel-state.js";
 import {

@@ -21,7 +21,7 @@
 // to every reader, and dropping them keeps a structural comparison honest.
 
 import type { ExecutionPort } from "../contracts/execution-port.js";
-import type { WebuiClientMessageLoader } from "../contracts/message-view.js";
+import type { WebuiClientMessageLoader } from "../contracts/transcript/message-view.js";
 import type { WebuiClientSessionCreator } from "../contracts/session-port.js";
 
 /** The capabilities a turn is run with, published as one object. */

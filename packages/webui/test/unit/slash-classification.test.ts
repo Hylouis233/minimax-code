@@ -10,7 +10,7 @@ import {
   classifyWebuiSlashCommand,
   isWebuiRunnableCommand,
   sectionWebuiSlashPalette,
-} from "../../src/client/contracts/slash-command.js";
+} from "../../src/client/contracts/composer/slash-command.js";
 import { resolveWebuiSubmissionIntent } from "../../src/client/projection/composer-state.js";
 
 /**

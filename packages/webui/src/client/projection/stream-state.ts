@@ -13,7 +13,7 @@ import type {
   WebuiSubscriptionReleaseScope,
   WebuiStreamPayloadKind,
   WebuiStreamPayloadRecognised,
-} from "../contracts/stream-state.js";
+} from "../contracts/turn/stream-state.js";
 export type {
   WebuiStreamMessage,
   WebuiStreamSubscription,
@@ -21,7 +21,7 @@ export type {
   WebuiSubscriptionReleaseScope,
   WebuiStreamPayloadKind,
   WebuiStreamPayloadRecognised,
-} from "../contracts/stream-state.js";
+} from "../contracts/turn/stream-state.js";
 
 /**
  * Monotonic client-side stream identity. Only the client can tell two

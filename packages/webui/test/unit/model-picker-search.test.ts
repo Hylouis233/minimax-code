@@ -33,7 +33,7 @@ import {
   toggleFavoriteId,
 } from "../../src/client/projection/model-favorites.js";
 import { createWebuiBrowserStorage } from "../../src/client/infrastructure/storage.js";
-import type { WebuiModelPickerEntry } from "../../src/client/contracts/model-view.js";
+import type { WebuiModelPickerEntry } from "../../src/client/contracts/models/model-view.js";
 
 function entry(
   providerId: string,

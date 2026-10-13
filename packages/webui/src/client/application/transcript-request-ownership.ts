@@ -11,7 +11,7 @@
 //
 // `WebuiOwnedTranscriptState` stays because `mergeOlderTranscriptPage` takes it.
 
-import type { WebuiClientMessagePage } from "../contracts/message-view.js";
+import type { WebuiClientMessagePage } from "../contracts/transcript/message-view.js";
 
 function mergeQueryCollapseViews(
   current: NonNullable<WebuiClientMessagePage["queryCollapseViews"]>,

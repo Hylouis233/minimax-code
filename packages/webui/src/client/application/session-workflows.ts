@@ -17,7 +17,7 @@ import type { SessionPort, WebuiClientSessionCreator } from "../contracts/sessio
 import type {
   WebuiClientProject,
   WebuiClientSessionPage,
-} from "../contracts/session-view.js";
+} from "../contracts/sessions/session-view.js";
 import type { WebuiSessionListItem } from "../../shared/contracts/session.js";
 import {
   patchWebuiCatalogEntity,

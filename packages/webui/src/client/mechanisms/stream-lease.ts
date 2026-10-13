@@ -21,7 +21,7 @@ import type {
   WebuiStreamState,
   WebuiStreamSubscription,
   WebuiSubscriptionReleaseScope,
-} from "../contracts/stream-state.js";
+} from "../contracts/turn/stream-state.js";
 
 export type WebuiLeaseOwner = WebuiStreamSubscription["owner"];
 

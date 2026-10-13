@@ -50,7 +50,7 @@ import type {
   WebuiTurnCapabilitySlice,
 } from "./turn-capabilities.js";
 import { createWebuiTurnCapabilitySlice } from "./turn-capabilities.js";
-import type { WebuiClientMessageLoader } from "../contracts/message-view.js";
+import type { WebuiClientMessageLoader } from "../contracts/transcript/message-view.js";
 
 export interface WebuiApplicationDeps {
   /** Opens the process-event channel. Called exactly once per instance. */

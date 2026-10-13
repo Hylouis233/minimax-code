@@ -3,7 +3,7 @@
 // The diff-state machine the review UI consumes. Split from the former
 // `client/contracts.ts`.
 
-import type { WebuiTurnDiffView } from "../../shared/contracts/session.js";
+import type { WebuiTurnDiffView } from "../../../shared/contracts/session.js";
 
 export interface WebuiDiffState {
   readonly view?: WebuiTurnDiffView;

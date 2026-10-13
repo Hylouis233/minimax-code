@@ -187,7 +187,7 @@ export const ALLOWED_EDGES = Object.freeze({
  * `client/projection/stream-state.ts` used to be listed here. It has since
  * become a pure `view` projection: `classifyLayers` gives it exactly `view`
  * via `PROJECTION_SPLIT`, its only imports are shared contracts, the leaf
- * `client/contracts/stream-state.ts` declarations and the `workspace-progress`
+ * `client/contracts/turn/stream-state.ts` declarations and the `workspace-progress`
  * projection, and no mechanism reaches into it any more. Listing it
  * contradicted that classification, so the entry was removed rather than left
  * asserting a mixture that no longer exists.
@@ -366,7 +366,7 @@ const PROJECTION_SPLIT = Object.freeze({
   // the stream loop and the test-only instrumentation consumed it directly; both
   // now take it by injection instead (plan §7.2), so the module is a pure `view`
   // projection and no mechanism reaches into it. The state shapes it operates on
-  // live in `client/contracts/stream-state.ts` for the same reason.
+  // live in `client/contracts/turn/stream-state.ts` for the same reason.
   "stream-state": ["view"],
 });
 

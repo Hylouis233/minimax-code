@@ -14,7 +14,7 @@ import {
   rankWebuiSlashPalette,
   sectionWebuiSlashPalette,
   WEBUI_RUN_COMMAND_NAMES,
-} from "../../src/client/contracts/slash-command.js";
+} from "../../src/client/contracts/composer/slash-command.js";
 
 // These tests cover sectioning, four-rank filtering, lite-mode filtering,
 // and the `isWebuiRunnableCommand` narrowing.

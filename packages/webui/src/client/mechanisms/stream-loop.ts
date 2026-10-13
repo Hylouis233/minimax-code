@@ -17,7 +17,7 @@ import type { WebuiClientMessageSender, WebuiClientSessionResumer } from "../con
 import type {
   WebuiClientMessage,
   WebuiClientMessageLoader,
-} from "../contracts/message-view.js";
+} from "../contracts/transcript/message-view.js";
 
 import type {
   WebuiStreamMessage,
@@ -25,7 +25,7 @@ import type {
   WebuiStreamState,
   WebuiStreamSubscription,
   WebuiSubscriptionReleaseScope,
-} from "../contracts/stream-state.js";
+} from "../contracts/turn/stream-state.js";
 import type { WebuiStreamFrame } from "../../shared/contracts/stream.js";
 import type { WebuiAttachmentInput } from "../../shared/contracts/messages.js";
 import { isWebuiLeaseGenerationCurrent } from "./stream-lease.js";

@@ -19,7 +19,7 @@ import {
 } from "../../src/client/mechanisms/stream-lease.js";
 import { streamStateBundle } from "../../src/client/application/stream-state-bundle.js";
 import { initialWebuiStreamState } from "../../src/client/projection/stream-state.js";
-import type { WebuiStreamState } from "../../src/client/contracts/stream-state.js";
+import type { WebuiStreamState } from "../../src/client/contracts/turn/stream-state.js";
 
 /** What the loop sink's `claimSubscription` does, without a React store. */
 function claimFromLoop(state: WebuiStreamState): {

@@ -76,11 +76,11 @@ import {
   WebuiIconSidebarToggle,
   WebuiIconSites,
 } from "../icons.js";
-import type { WebuiClientSession, WebuiClientSessionPage, WebuiClientProject } from "../contracts/session-view.js";
+import type { WebuiClientSession, WebuiClientSessionPage, WebuiClientProject } from "../contracts/sessions/session-view.js";
 import type {
   WebuiClientMessage,
   WebuiClientMessagePage,
-} from "../contracts/message-view.js";
+} from "../contracts/transcript/message-view.js";
 import type { WebuiTransport } from "../contracts/transport.js";
 import type { WebuiTodo } from "./WorkspacePanels.js";
 import type { WebuiUsageQuotaResult } from "../../shared/contracts/usage-quota.js";

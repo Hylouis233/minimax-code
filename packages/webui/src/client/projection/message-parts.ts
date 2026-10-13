@@ -14,7 +14,7 @@ import { basenamePath } from "../paths.js";
 import type {
   WebuiQuestionnaireResponseAnswer,
   WebuiQuestionnaireResponseSummary,
-} from "../contracts/transcript-view.js";
+} from "../contracts/transcript/transcript-view.js";
 
 export interface WebuiMessageForParts {
   readonly msgId: string;

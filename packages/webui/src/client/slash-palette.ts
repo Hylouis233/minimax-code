@@ -16,7 +16,7 @@ import {
   type SlashDirectAction,
   type SlashSendIntent,
   type WebuiSlashPaletteFields,
-} from "./contracts/slash-command.js";
+} from "./contracts/composer/slash-command.js";
 import {
   WebuiIconCommandCompact,
   WebuiIconCommandGoal,

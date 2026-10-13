@@ -7,7 +7,7 @@
 
 import type { WebuiModelEntry } from "../../shared/contracts/models.js";
 import type { WebuiVersionInfo } from "../../shared/contracts/version.js";
-import type { WebuiModelSelectionRequest } from "./model-view.js";
+import type { WebuiModelSelectionRequest } from "./models/model-view.js";
 import type {
   WebuiAgentMemoryView,
   WebuiGlobalInstructionsView,

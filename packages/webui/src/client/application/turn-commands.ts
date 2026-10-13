@@ -21,7 +21,7 @@ import type {
   WebuiClientMessageEnqueuer,
   WebuiClientSessionResumer,
 } from "../contracts/execution-port.js";
-import type { WebuiClientMessageLoader } from "../contracts/message-view.js";
+import type { WebuiClientMessageLoader } from "../contracts/transcript/message-view.js";
 import type { WebuiClientSessionCreator } from "../contracts/session-port.js";
 import type { WebuiAttachmentInput } from "../../shared/contracts/messages.js";
 import type { WebuiTurnCommandWriter } from "./session-commands.js";

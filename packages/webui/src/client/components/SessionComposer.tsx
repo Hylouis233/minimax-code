@@ -27,10 +27,10 @@ import {
 } from "react";
 import type { WebuiClientMessageEnqueuer, WebuiClientMessageSender } from "../contracts/execution-port.js";
 import { looksLikeAbsoluteWorkspacePath } from "../paths.js";
-import type { WebuiClientMessageLoader } from "../contracts/message-view.js";
-import type { WebuiModelSelectionRequest } from "../contracts/model-view.js";
+import type { WebuiClientMessageLoader } from "../contracts/transcript/message-view.js";
+import type { WebuiModelSelectionRequest } from "../contracts/models/model-view.js";
 import type { WebuiClientSessionCreator } from "../contracts/session-port.js";
-import type { WebuiClientSessionPage, WebuiClientSession } from "../contracts/session-view.js";
+import type { WebuiClientSessionPage, WebuiClientSession } from "../contracts/sessions/session-view.js";
 import type { WebuiTransport } from "../contracts/transport.js";
 import { projectWebuiMessageToStreamMessage, readUsageNumber } from "../projection/message-projection.js";
 import { webuiAnswersEndTurn } from "../projection/questionnaire-state.js";
@@ -180,7 +180,7 @@ import {
   rankWebuiSlashPalette,
   sectionWebuiSlashPalette,
   type WebuiRunCommandName,
-} from "../contracts/slash-command.js";
+} from "../contracts/composer/slash-command.js";
 
 const WEBUI_SLASH_FALLBACK_SECTIONED: SlashCommandEntry[] = await (async () => {
   const { resolveWebuiSlashSkills } = await import("../slash-palette.js");

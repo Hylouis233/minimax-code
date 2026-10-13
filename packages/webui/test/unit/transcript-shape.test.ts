@@ -7,7 +7,7 @@ import {
   WEBUI_HISTORICAL_FIELD_TABLE,
   WEBUI_LIVE_FIELD_TABLE,
 } from "../../src/client/projection/transcript-shape.js";
-import type { WebuiClientMessage } from "../../src/client/contracts/message-view.js";
+import type { WebuiClientMessage } from "../../src/client/contracts/transcript/message-view.js";
 import type { WebuiStreamMessage } from "../../src/client/projection/stream-state.js";
 import {
   projectWebuiMessage,

@@ -37,7 +37,7 @@ import type {
   WebuiModelPickerDraft,
   WebuiModelPickerEntry,
   WebuiModelProviderGroup,
-} from "../contracts/model-view.js";
+} from "../contracts/models/model-view.js";
 import { evaluateOutsideClose } from "../projection/outside-close.js";
 import {
   resolveEffortOptions,

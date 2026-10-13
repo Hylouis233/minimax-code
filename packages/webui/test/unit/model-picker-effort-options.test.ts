@@ -16,7 +16,7 @@ import {
   thinkingDraftPatch,
   variantForEffort,
 } from "../../src/client/projection/thinking-control.js";
-import type { WebuiModelPickerEntry } from "../../src/client/contracts/model-view.js";
+import type { WebuiModelPickerEntry } from "../../src/client/contracts/models/model-view.js";
 import type { WebuiModelEntry } from "../../src/shared/contracts/models.js";
 
 function entry(over: Partial<WebuiModelPickerEntry> = {}): WebuiModelPickerEntry {

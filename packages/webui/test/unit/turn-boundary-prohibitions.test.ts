@@ -124,7 +124,7 @@ describe("prohibition 2 — turn's rules are filed inside turn", () => {
 describe("prohibition 3 — the stream-phase value set is enumerated exactly once", () => {
   const PHASES = ["idle", "streaming", "waiting", "reconnecting", "refused", "done"];
 
-  it("keeps the union in contracts/stream-state.ts and nowhere else", () => {
+  it("keeps the union in contracts/turn/stream-state.ts and nowhere else", () => {
     const enumerations = clientModules().filter((modulePath) => {
       const source = read(modulePath);
       return PHASES.every((phase) => new RegExp(`"${phase}"`, "u").test(source));
@@ -132,7 +132,7 @@ describe("prohibition 3 — the stream-phase value set is enumerated exactly onc
     // `WebuiConnectionState` also says "reconnecting", which is a *different*
     // closed set — a connection state, not a stream phase. Only the stream
     // phase's six values together identify the one enumeration.
-    expect(enumerations).toEqual(["contracts/stream-state.ts"]);
+    expect(enumerations).toEqual(["contracts/turn/stream-state.ts"]);
   });
 
   it("derives the phase type from the union instead of re-listing it", () => {

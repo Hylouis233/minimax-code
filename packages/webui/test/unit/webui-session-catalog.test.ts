@@ -22,7 +22,7 @@ import {
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 import { createWebuiSessionWorkflows } from "../../src/client/application/session-workflows.js";
 import { selectWebuiWorkspaceProgress } from "../../src/client/projection/workspace-progress.js";
-import type { WebuiClientSession } from "../../src/client/contracts/session-view.js";
+import type { WebuiClientSession } from "../../src/client/contracts/sessions/session-view.js";
 
 function session(
   over: Partial<WebuiClientSession> & { sessionId: string },

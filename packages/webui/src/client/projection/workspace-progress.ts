@@ -3,21 +3,21 @@ import {
   recordValue,
   stringAmongKeys,
 } from "../value-readers.js";
-import type { WebuiClientMessage } from "../contracts/message-view.js";
+import type { WebuiClientMessage } from "../contracts/transcript/message-view.js";
 import type {
   WebuiWorkspaceTodoStatus,
   WebuiWorkspaceTodo,
   WebuiWorkspaceSubagentStatus,
   WebuiWorkspaceSubagent,
   WebuiWorkspaceProgressState,
-} from "../contracts/stream-state.js";
+} from "../contracts/turn/stream-state.js";
 export type {
   WebuiWorkspaceTodoStatus,
   WebuiWorkspaceTodo,
   WebuiWorkspaceSubagentStatus,
   WebuiWorkspaceSubagent,
   WebuiWorkspaceProgressState,
-} from "../contracts/stream-state.js";
+} from "../contracts/turn/stream-state.js";
 
 export const initialWebuiWorkspaceProgress: WebuiWorkspaceProgressState = {
   todos: [],

@@ -58,8 +58,8 @@ import {
   subscribeToSessionHash,
 } from "../../src/client/components/WebuiClientFoundationApp.js";
 import type { WebuiClientMessageEnqueuer, WebuiClientMessageSender, WebuiClientSessionResumer } from "../../src/client/contracts/execution-port.js";
-import type { WebuiClientMessageLoader } from "../../src/client/contracts/message-view.js";
-import type { WebuiTranscriptItem } from "../../src/client/contracts/transcript-view.js";
+import type { WebuiClientMessageLoader } from "../../src/client/contracts/transcript/message-view.js";
+import type { WebuiTranscriptItem } from "../../src/client/contracts/transcript/transcript-view.js";
 import {
   buildWebuiModelSelectionRequest,
   webuiModelOptionValue,

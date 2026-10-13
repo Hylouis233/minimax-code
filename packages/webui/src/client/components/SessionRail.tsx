@@ -46,7 +46,7 @@ import {
   type WebuiRailView,
 } from "../rail-buckets.js";
 import { formatWebuiUnreadBadge } from "../projection/unread-badge.js";
-import type { WebuiClientSession, WebuiClientSessionPage, WebuiClientSessionTreePage, WebuiClientProject } from "../contracts/session-view.js";
+import type { WebuiClientSession, WebuiClientSessionPage, WebuiClientSessionTreePage, WebuiClientProject } from "../contracts/sessions/session-view.js";
 import { teamModeCopy } from "../team-mode.js";
 
 const PROJECT_SESSION_BATCH_SIZE = 6;

@@ -35,7 +35,7 @@
 
 import type { WebuiActiveTurnResult } from "../../shared/contracts/session.js";
 import type { WebuiRuntimeEvent } from "../../shared/contracts/stream.js";
-import type { WebuiClientSession } from "../contracts/session-view.js";
+import type { WebuiClientSession } from "../contracts/sessions/session-view.js";
 import {
   applyWebuiActiveTurn,
   applyWebuiUnreadCounts,

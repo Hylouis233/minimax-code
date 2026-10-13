@@ -13,7 +13,7 @@ import { parseWebuiMessageFileReference, type WebuiMessageFileReference } from "
 import { webuiActivitySummary } from "../projection/tool-projection.js";
 import { MessageAttachments, type MessageAttachment } from "./MessageAttachments.js";
 import type { WebuiTurnDiffView } from "../../shared/contracts/session.js";
-import type { WebuiTranscriptProcessSegment, WebuiTranscriptActivityPart } from "../contracts/transcript-view.js";
+import type { WebuiTranscriptProcessSegment, WebuiTranscriptActivityPart } from "../contracts/transcript/transcript-view.js";
 import type { WebuiTransport } from "../contracts/transport.js";
 
 /** Capability subset the assistant body passes through to its diff card.

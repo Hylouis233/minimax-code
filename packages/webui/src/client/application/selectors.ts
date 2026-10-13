@@ -7,7 +7,7 @@
 // shape of the whole application state.
 
 import type { WebuiGoal } from "../../shared/contracts/goal.js";
-import type { WebuiClientMessagePage } from "../contracts/message-view.js";
+import type { WebuiClientMessagePage } from "../contracts/transcript/message-view.js";
 import type {
   WebuiPendingPermission,
   WebuiQuestionnaireRequest,

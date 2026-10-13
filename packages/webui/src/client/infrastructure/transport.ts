@@ -1,7 +1,7 @@
 import type { WebuiClientMessageSender, WebuiClientSessionResumer } from "../contracts/execution-port.js";
-import type { WebuiClientMessageLoader, WebuiClientMessagePage } from "../contracts/message-view.js";
+import type { WebuiClientMessageLoader, WebuiClientMessagePage } from "../contracts/transcript/message-view.js";
 import type { WebuiClientCreateSessionRequest, WebuiClientCreateSessionResult, WebuiClientSessionLoader, WebuiClientSessionTreeLoader } from "../contracts/session-port.js";
-import type { WebuiClientSessionPage, WebuiClientSessionTreePage, WebuiClientProject } from "../contracts/session-view.js";
+import type { WebuiClientSessionPage, WebuiClientSessionTreePage, WebuiClientProject } from "../contracts/sessions/session-view.js";
 import type { WebuiTransport } from "../contracts/transport.js";
 import type {
   WebuiInteractionReplyResult,

@@ -27,7 +27,7 @@ import { createWebuiTranscriptHistoryOwner } from "../../src/client/application/
 import { selectWebuiSessionTranscriptPage } from "../../src/client/application/selectors.js";
 import { createWebuiAccountWorkflows } from "../../src/client/application/account-workflows.js";
 import { createWebuiSettingsWorkflows } from "../../src/client/application/settings-workflows.js";
-import type { WebuiClientMessagePage } from "../../src/client/contracts/message-view.js";
+import type { WebuiClientMessagePage } from "../../src/client/contracts/transcript/message-view.js";
 import type { WebuiUsageQuotaResult } from "../../src/shared/contracts/usage-quota.js";
 import type { WebuiVersionInfo } from "../../src/shared/contracts/version.js";
 import type { WebuiSessionActivityMap } from "../../src/client/projection/session-activity.js";

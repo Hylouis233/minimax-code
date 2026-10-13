@@ -12,7 +12,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { WebuiClientFoundationApp } from "../../src/client/components/WebuiClientFoundationApp.js";
-import type { WebuiClientMessage, WebuiClientMessagePage } from "../../src/client/contracts/message-view.js";
+import type { WebuiClientMessage, WebuiClientMessagePage } from "../../src/client/contracts/transcript/message-view.js";
 
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 import type { WebuiUsageQuotaResult } from "../../src/shared/contracts/usage-quota.js";
