@@ -32,3 +32,12 @@ export type WebuiDiffStateAction =
   | { readonly type: "dismiss-mutation-error" }
   | { readonly type: "toggle-expanded" }
   | { readonly type: "toggle-review" };
+
+/** The state a card shows before anything was read for its turn. Published with
+ *  the type because every surface starts from it. */
+export const initialWebuiDiffState: WebuiDiffState = {
+  unsupported: false,
+  busy: false,
+  expanded: false,
+  reviewing: false,
+};

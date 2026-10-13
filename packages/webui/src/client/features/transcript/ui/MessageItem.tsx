@@ -32,9 +32,6 @@ import type {
  *  per-key `WebuiTransport["x"]` redeclarations. */
 type WebuiMessageItemCapabilities = Pick<
   WebuiTransport,
-  | "getTurnDiff"
-  | "revertTurnDiff"
-  | "reapplyTurnDiff"
   | "getSessionForkOptions"
   | "forkSession"
   | "getSessionRewindPreview"
@@ -67,9 +64,6 @@ import {
 export function MessageItem({
   view,
   wallClockDurationMs,
-  getTurnDiff,
-  revertTurnDiff,
-  reapplyTurnDiff,
   getSessionForkOptions,
   forkSession,
   getSessionRewindPreview,
@@ -282,9 +276,6 @@ export function MessageItem({
         turnId={turnId}
         changeSetId={initialDiff?.changeSetId}
         initialDiff={initialDiff}
-        getTurnDiff={getTurnDiff}
-        revertTurnDiff={revertTurnDiff}
-        reapplyTurnDiff={reapplyTurnDiff}
         thinking={thinking}
         thinkingDurationMs={thinkingDurationMs}
         tools={tools}

@@ -297,12 +297,7 @@ export const WEBUI_REVIEW_DIFF_BATCH_SIZE = 5;
 // and nothing else.
 // ---------------------------------------------------------------------------
 
-export const initialWebuiDiffState: WebuiDiffState = {
-  unsupported: false,
-  busy: false,
-  expanded: false,
-  reviewing: false,
-};
+export { initialWebuiDiffState } from "../contracts/review-view.js";
 
 export function reduceWebuiDiffState(
   state: WebuiDiffState,

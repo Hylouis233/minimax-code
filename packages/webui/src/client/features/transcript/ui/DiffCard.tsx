@@ -1,36 +1,22 @@
 // WebuiDiffCard — the diff-card renderer.
 //
-// The pure state machine it renders moved to `projection/transcript/review-state.ts` (plan
-// §5.6's `transcript` row, §10 S13): the reducer, the failure copy and the
-// mutation decisions are review's, and the review page is the second reader of
-// them. What is left here is the component and its capability subset.
+// It renders; it does not own the query or the mutation. Those belong to the
+// review owner (plan §5.2 review row, T10): the card asks the owner for a turn
+// and the owner answers with whatever the runtime said — an answer a second
+// surface asked for is the same answer. What stays here is presentation: which
+// files are shown, whether the review panel is open, and the confirmation.
 //
-// W3 tier 2 lift: the component was moved verbatim out of `app.tsx`; the lift was
-// move-only.
+// The runtime keys a turn diff by the turn: an `assistantMessageId` is answered
+// only for the turn's LAST assistant message, and any other message of the same
+// turn yields an empty file list (it also wins over `turnId` when both are sent).
+// The rendered group is keyed by its first message, so the card asks by turn
+// whenever the group knows one.
 
-import { useEffect, useMemo, useState, type ReactElement } from "react";
+import { useState, type ReactElement } from "react";
 import { WebuiIconDiffFile, WebuiIconDiffSummary } from "../../../components/shell/icons.js";
-import type {
-  WebuiGetTurnDiffRequest,
-  WebuiTurnDiffView,
-} from "../../../../shared/contracts/session.js";
-import type { WebuiDiffState } from "../contracts/review-view.js";
-import {
-  buildWebuiDiffMutationRequest,
-  confirmWebuiDiffMutation,
-  initialWebuiDiffState,
-  reduceWebuiDiffState,
-  resolveWebuiDiffMutation,
-} from "../projection/review-state.js";
-import type { WebuiTransport } from "../../../contracts/transport.js";
-
-/** Capability subset the diff card consumes. The contract lives in
- * `WebuiTransport`; this alias keeps the prop block compact and avoids
- * per-key `WebuiTransport["x"]` redeclarations. */
-type WebuiDiffCardCapabilities = Pick<
-  WebuiTransport,
-  "getTurnDiff" | "revertTurnDiff" | "reapplyTurnDiff"
->;
+import type { WebuiTurnDiffView } from "../../../../shared/contracts/session.js";
+import type { WebuiDiffState } from "../../review/contracts/review-view.js";
+import { useWebuiTurnReview } from "../../../bindings/use-turn-review.js";
 
 export function WebuiDiffCard({
   sessionId,
@@ -39,9 +25,6 @@ export function WebuiDiffCard({
   changeSetId,
   initialView,
   initialState,
-  getTurnDiff,
-  revertTurnDiff,
-  reapplyTurnDiff,
   onReview,
 }: {
   readonly sessionId?: string;
@@ -51,65 +34,36 @@ export function WebuiDiffCard({
   readonly initialView?: WebuiTurnDiffView;
   readonly initialState?: Partial<WebuiDiffState>;
   readonly onReview?: (view: WebuiTurnDiffView, selectedPath?: string) => void;
-} & WebuiDiffCardCapabilities): ReactElement | null {
-  const [diffState, setDiffState] = useState<WebuiDiffState>(() => ({
-    ...initialWebuiDiffState,
-    ...initialState,
-    ...(initialView ? { view: initialView } : {}),
-  }));
-  const { view, unsupported, busy, expanded, reviewing, mutationError } = diffState;
-  const request = useMemo<WebuiGetTurnDiffRequest | undefined>(() => {
-    if (!sessionId || !getTurnDiff) return undefined;
-    // The runtime keys a turn diff by the turn: an `assistantMessageId` is
-    // answered only for the turn's LAST assistant message, and any other
-    // message of the same turn yields an empty file list (it also wins over
-    // `turnId` when both are sent). The rendered group is keyed by its first
-    // message, so ask by turn whenever the group knows one.
-    return {
-      id: sessionId,
-      ...(turnId ? { turnId } : assistantMessageId ? { assistantMessageId } : {}),
-      ...(changeSetId ? { changeSetId } : {}),
-    };
-  }, [assistantMessageId, changeSetId, getTurnDiff, sessionId, turnId]);
+}): ReactElement | null {
+  // Presentation, owned here and nowhere else (T10: "presentation expansion and
+  // search selection stay local independent state").
+  const [expanded, setExpanded] = useState(initialState?.expanded ?? false);
+  const [reviewing, setReviewing] = useState(initialState?.reviewing ?? false);
+  const { state: reviewState, mutate: runMutation, dismissError } = useWebuiTurnReview(
+    sessionId
+      ? {
+          sessionId,
+          ...(turnId ? { turnId } : {}),
+          ...(assistantMessageId ? { assistantMessageId } : {}),
+          ...(changeSetId ? { changeSetId } : {}),
+        }
+      : undefined,
+  );
+  // The owner's answer, or the seed the caller passed for a first render (an
+  // SSR pass, or the shell's initial markup). The seed is an initial value, not
+  // a second owner: once the owner has an answer for the turn, that is the one.
+  const view = reviewState.view ?? initialView;
+  const unsupported = reviewState.unsupported || (initialState?.unsupported ?? false);
+  const busy = reviewState.busy;
+  const mutationError = reviewState.mutationError ?? initialState?.mutationError;
 
-  useEffect(() => {
-    if (!request || !getTurnDiff) return undefined;
-    let cancelled = false;
-    void getTurnDiff(request)
-      .then((nextView) => {
-        if (!cancelled) setDiffState((current) => reduceWebuiDiffState(current, { type: "loaded", view: nextView }));
-      })
-      .catch(() => {
-        // The runtime deliberately reports an unavailable diff capability as a
-        // neutral card state. The client must not infer success from edit-tool
-        // output when the authoritative application is unavailable.
-        if (!cancelled) setDiffState((current) => reduceWebuiDiffState(current, { type: "unsupported" }));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [getTurnDiff, request]);
-
-  const mutate = async (action: "revert" | "reapply") => {
-    if (!request || busy) return;
-    const handler = action === "revert" ? revertTurnDiff : reapplyTurnDiff;
-    if (!handler) {
-      setDiffState((current) => reduceWebuiDiffState(current, { type: "unsupported" }));
-      return;
-    }
+  const mutate = (action: "revert" | "reapply") => {
+    if (busy) return;
+    // The confirmation is the card's: the owner is told what to do, not how it
+    // was agreed.
     const confirmed = window.confirm(action === "revert" ? "撤销这轮文件改动？" : "重新应用这轮文件改动？");
     if (!confirmed) return;
-    const mutationRequest = buildWebuiDiffMutationRequest(diffState, request, action);
-    if (!mutationRequest) return;
-    setDiffState((current) => confirmWebuiDiffMutation(current, confirmed));
-    try {
-      const result = await handler(mutationRequest);
-      setDiffState((current) => reduceWebuiDiffState(current, resolveWebuiDiffMutation(action, result)));
-    } catch (error) {
-      setDiffState((current) => reduceWebuiDiffState(current, resolveWebuiDiffMutation(action, undefined, error)));
-    } finally {
-      setDiffState((current) => ({ ...current, busy: false }));
-    }
+    runMutation(action);
   };
 
   if (unsupported)
@@ -119,7 +73,7 @@ export function WebuiDiffCard({
         <span className="webui-diff-neutral-copy">当前运行时未提供 session diff 能力。</span>
       </div>
     );
-  if ((!getTurnDiff || !request) && !view) return null;
+  if (!view) return null;
   if (!view || (view.fileChanges ?? []).length === 0) return null;
   const files = view.fileChanges ?? [];
   const shown = expanded ? files : files.slice(0, 3);
@@ -166,7 +120,7 @@ export function WebuiDiffCard({
               撤销
             </button>
           )}
-          <button type="button" className="webui-diff-review" data-webui-diff-review="true" data-testid="turn-diff-review" onClick={() => { if (view) onReview?.(view); if (!onReview) setDiffState((current) => reduceWebuiDiffState(current, { type: "toggle-review" })); }}>
+          <button type="button" className="webui-diff-review" data-webui-diff-review="true" data-testid="turn-diff-review" onClick={() => { if (view) onReview?.(view); if (!onReview) setReviewing((open) => !open); }}>
             {reviewing ? "关闭 Review" : "Review"}
           </button>
         </div>
@@ -184,7 +138,7 @@ export function WebuiDiffCard({
         ))}
       </ul>
       {files.length > 3 ? (
-        <button type="button" className="webui-diff-expand" data-webui-diff-expand="true" data-testid="turn-diff-show-more" onClick={() => setDiffState((current) => reduceWebuiDiffState(current, { type: "toggle-expanded" }))}>
+        <button type="button" className="webui-diff-expand" data-webui-diff-expand="true" data-testid="turn-diff-show-more" onClick={() => setExpanded((open) => !open)}>
           {expanded ? "收起" : `展开其余 ${files.length - 3} 个`}
         </button>
       ) : null}
@@ -207,7 +161,7 @@ export function WebuiDiffCard({
             <span className="webui-diff-error-title">这轮文件改动没有生效</span>
             <span className="webui-diff-error-reason" data-testid="turn-diff-mutation-error-reason">{mutationError}</span>
           </span>
-          <button type="button" className="webui-diff-error-dismiss" data-testid="turn-diff-mutation-error-dismiss" onClick={() => setDiffState((current) => reduceWebuiDiffState(current, { type: "dismiss-mutation-error" }))}>
+          <button type="button" className="webui-diff-error-dismiss" data-testid="turn-diff-mutation-error-dismiss" onClick={dismissError}>
             知道了
           </button>
         </div>

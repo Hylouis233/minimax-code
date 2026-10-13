@@ -30,9 +30,6 @@ import type { WebuiQuestionnaireRequest } from "../../../../shared/contracts/int
  *  prop block free of per-key `WebuiTransport["x"]` redeclarations. */
 type WebuiSessionTranscriptCapabilities = Pick<
   WebuiTransport,
-  | "getTurnDiff"
-  | "revertTurnDiff"
-  | "reapplyTurnDiff"
   | "getSessionForkOptions"
   | "forkSession"
   | "getSessionRewindPreview"
@@ -67,9 +64,6 @@ const EMPTY_TRANSCRIPT_PAGE: WebuiClientMessagePage = {};
 export function WebuiSessionTranscript({
   sessionId,
   initialMessages,
-  getTurnDiff,
-  revertTurnDiff,
-  reapplyTurnDiff,
   getSessionForkOptions,
   forkSession,
   getSessionRewindPreview,
@@ -425,9 +419,6 @@ export function WebuiSessionTranscript({
               <MessageItem
                 view={assistantView}
                 wallClockDurationMs={group.wallClockDurationMs}
-                getTurnDiff={getTurnDiff}
-                revertTurnDiff={revertTurnDiff}
-                reapplyTurnDiff={reapplyTurnDiff}
                 getSessionForkOptions={getSessionForkOptions}
                 forkSession={forkSession}
                 getSessionRewindPreview={getSessionRewindPreview}

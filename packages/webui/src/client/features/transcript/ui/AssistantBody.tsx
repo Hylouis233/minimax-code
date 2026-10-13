@@ -14,16 +14,9 @@ import { webuiActivitySummary } from "../projection/tool-projection.js";
 import { MessageAttachments, type MessageAttachment } from "./MessageAttachments.js";
 import type { WebuiTurnDiffView } from "../../../../shared/contracts/session.js";
 import type { WebuiTranscriptProcessSegment, WebuiTranscriptActivityPart } from "../contracts/transcript-view.js";
-import type { WebuiTransport } from "../../../contracts/transport.js";
 
-/** Capability subset the assistant body passes through to its diff card.
- *  Single source of truth lives in `WebuiTransport`; this alias keeps the
- *  prop block free of per-key `WebuiTransport["x"]` redeclarations. */
-type WebuiAssistantBodyCapabilities = Pick<
-  WebuiTransport,
-  "getTurnDiff" | "revertTurnDiff" | "reapplyTurnDiff"
->;
 import { WebuiDiffCard } from "./DiffCard.js";
+import { useWebuiTurnReviewAvailable } from "../../../bindings/use-turn-review.js";
 import {
   WebuiActivityGroup,
   type WebuiActivityGroupItem,
@@ -184,9 +177,6 @@ export function WebuiAssistantBody({
   turnId,
   changeSetId,
   initialDiff,
-  getTurnDiff,
-  revertTurnDiff,
-  reapplyTurnDiff,
   onOpenFile,
   onOpenTurnReview,
   thinking,
@@ -232,7 +222,7 @@ export function WebuiAssistantBody({
   readonly processSegments?: readonly WebuiTranscriptProcessSegment[];
   readonly processInitiallyExpanded?: boolean;
   readonly processForceExpanded?: boolean;
-} & WebuiAssistantBodyCapabilities): ReactElement {
+}): ReactElement {
   const segments = processSegments?.length
     ? processSegments
     : [
@@ -286,11 +276,15 @@ export function WebuiAssistantBody({
     typeof processingStartedAtMs === "number" ||
     typeof totalRequestDurationMs === "number" ||
     typeof wallClockDurationMs === "number";
+  // Whether the runtime can answer a turn diff at all: the owner holds the
+  // capability, and this decides whether edit-tool output may be read as the
+  // authoritative diff (see `WebuiActivityGroup`).
+  const authoritativeDiffAvailable = useWebuiTurnReviewAvailable();
   const renderProcessContent = (processExpanded: boolean) => {
     const renderedRows = renderActivityParts(
       orderedProcessEntries,
       streaming,
-      Boolean(getTurnDiff),
+      authoritativeDiffAvailable,
       processExpanded,
       processingStartedAtMs,
       onOpenFile,
@@ -357,9 +351,6 @@ export function WebuiAssistantBody({
         turnId={turnId}
         changeSetId={changeSetId}
         initialView={initialDiff}
-        getTurnDiff={getTurnDiff}
-        revertTurnDiff={revertTurnDiff}
-        reapplyTurnDiff={reapplyTurnDiff}
         onReview={onOpenTurnReview}
       />
       {attachments?.length ? (

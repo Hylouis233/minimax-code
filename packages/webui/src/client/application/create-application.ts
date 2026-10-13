@@ -81,6 +81,11 @@ import type {
   WebuiTurnCapabilitySlice,
 } from "./turn/turn-capabilities.js";
 import { createWebuiTurnCapabilitySlice } from "./turn/turn-capabilities.js";
+import {
+  createWebuiTurnReviewOwner,
+  type WebuiTurnReviewOwner,
+} from "../features/review/application/turn-review-owner.js";
+import type { WebuiTurnReviewPort } from "../features/review/contracts/turn-review.js";
 import type { WebuiClientMessageLoader } from "../features/transcript/contracts/message-view.js";
 
 export interface WebuiApplicationDeps {
@@ -107,6 +112,13 @@ export interface WebuiApplicationDeps {
    * the loop's absent-capability guards exist for.
    */
   readonly turnCapabilities?: WebuiTurnCapabilityPort;
+  /**
+   * The turn-review capability. The application owns the review family's query
+   * and mutation (plan §5.2 review row), so a surface reads it from the
+   * application rather than holding its own copy; the absent case is the state
+   * the owner's own `unsupported` outcome covers.
+   */
+  readonly turnReview?: WebuiTurnReviewPort;
   readonly loadMessages?: WebuiClientMessageLoader;
   /**
    * The unread storage adapter (`infrastructure/storage.ts`), injected because
@@ -199,6 +211,8 @@ export interface WebuiApplication {
   readonly turns: WebuiTurnCoordinator;
   /** The published turn capability slice (send / resume / load / stop). */
   readonly turnCapabilities: WebuiTurnCapabilitySlice;
+  /** The one owner of a turn's diff query and revert/reapply (T10). */
+  readonly turnReview: WebuiTurnReviewOwner;
   readonly transcriptHistory: WebuiTranscriptHistoryOwner;
   /** The one owner of unread hydration ordering (plan §7.6). */
   readonly unread: WebuiUnreadController;
@@ -432,6 +446,7 @@ export function createWebuiApplication(
   const turnCapabilities = createWebuiTurnCapabilitySlice(
     deps.turnCapabilities ?? {},
   );
+  const turnReview = createWebuiTurnReviewOwner({ port: deps.turnReview ?? {} });
   const transcriptHistory = createWebuiTranscriptHistoryOwner({
     // The substrate writes the transcript slice through this contract rather than
     // through the record repository (plan §5.3).
@@ -477,6 +492,7 @@ export function createWebuiApplication(
     events,
     turns,
     turnCapabilities,
+    turnReview,
     transcriptHistory,
     unread,
     composer,

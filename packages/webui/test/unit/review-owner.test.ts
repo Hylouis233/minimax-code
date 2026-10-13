@@ -19,7 +19,7 @@ import {
   initialWebuiDiffState,
   reduceWebuiDiffState,
   resolveWebuiDiffMutation,
-} from "../../src/client/features/transcript/projection/review-state.js";
+} from "../../src/client/features/review/projection/review-state.js";
 
 const CLIENT = new URL("../../src/client/", import.meta.url);
 const read = (relative: string): string => readFileSync(new URL(relative, CLIENT), "utf8");
@@ -51,7 +51,7 @@ describe("the diff machine has one owner", () => {
     ].filter(
       (file) => /export function reduceWebuiDiffState\(/u.test(read(file)),
     );
-    expect(declarers).toEqual(["features/transcript/projection/review-state.ts"]);
+    expect(declarers).toEqual(["features/review/projection/review-state.ts"]);
   });
 
   it("leaves the transcript's card with no machine of its own", () => {
@@ -61,13 +61,13 @@ describe("the diff machine has one owner", () => {
     expect(card).not.toContain("export function reduceWebuiDiffState(");
     expect(card).not.toContain("export const initialWebuiDiffState");
     expect(card).not.toContain("switch (action.type)");
-    expect(card).toContain("reduceWebuiDiffState(current,");
     expect(card).not.toContain("WEBUI_DIFF_FAILURE_COPY");
-    // ...and it reads the owner instead.
-    // The card and the machine are siblings in the transcript's feature home, so
-    // the card reads it by a sibling path; what matters is that it reads the
-    // review owner rather than declaring a machine of its own.
-    expect(card).toContain('from "../projection/review-state.js"');
+    // It does not read the machine either: the query, the mutation and the
+    // machine's decisions are the review owner's (T10), and the card reads the
+    // owner's answer through its binding. Reading the projection directly is what
+    // the dependency gate refuses, so this assertion and that rule agree.
+    expect(card).not.toContain("review-state.js");
+    expect(card).toContain("useWebuiTurnReview(");
   });
 
   it("keeps the failure copy in exactly one module", () => {
@@ -78,12 +78,12 @@ describe("the diff machine has one owner", () => {
     ].filter(
       (file) => read(file).includes("unsafe_path:"),
     );
-    expect(holders).toEqual(["features/transcript/projection/review-state.ts"]);
+    expect(holders).toEqual(["features/review/projection/review-state.ts"]);
   });
 });
 
 describe("the two readers share it", () => {
-  it("is read by the transcript's card and by the review page, and by nothing else", () => {
+  it("is read by the turn-review owner and by the review page, and by nothing else", () => {
     // Scanned rather than listed: the review page moved to
     // `components/workspace/` in ticket #70, so a hardcoded path went stale
     // while the acceptance ("one owner, two readers") still held. Scanning the
@@ -92,12 +92,16 @@ describe("the two readers share it", () => {
     // sibling path, so the scan covers both homes and matches the imported module
     // rather than a path fragment: what is asserted is "one owner, two readers",
     // not where either of them sits.
+    // The machine has one home and two readers: the owner, which answers for a
+    // turn, and the review page, which renders the working tree. The surfaces do
+    // not read it — the transcript's card reads the owner — so this list is the
+    // pair the "one owner" promise is about, and a third reader fails here.
     const readers = [...modulesUnder("components/"), ...modulesUnder("features/")]
       .filter((file) => /from "[^"]*\breview-state\.js"/u.test(read(file)))
       .sort();
     expect(readers).toEqual([
       "components/workspace/ReviewSettingsPage.tsx",
-      "features/transcript/ui/DiffCard.tsx",
+      "features/review/application/turn-review-owner.ts",
     ]);
   });
 

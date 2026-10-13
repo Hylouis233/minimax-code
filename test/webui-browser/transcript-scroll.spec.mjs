@@ -98,6 +98,14 @@ test("the follower pins again once the reader is back at the end", async ({ page
   // Back at the end: the next growth is followed again.
   await setScrollTop(page, 100000);
   await expect.poll(() => endGap(page)).toBeLessThanOrEqual(4);
+  // Let the scroll this assignment produced be processed BEFORE the content
+  // grows. Otherwise the browser may deliver it after the growth, when the
+  // viewport is no longer at the end, and the still-set gesture intent releases
+  // the follower — a race in the case, not in the policy, and one this wait
+  // removes.
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
   await grow(page, "m2", 40);
   await expect.poll(() => endGap(page)).toBeLessThanOrEqual(4);
 });

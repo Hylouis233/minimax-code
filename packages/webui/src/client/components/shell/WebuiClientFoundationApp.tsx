@@ -1504,9 +1504,6 @@ export function WebuiClientFoundationApp(
                         onOpenFile={({ sessionId, workspaceDir, reference }) => dispatchWorkspacePanel({ type: "open-file", sessionId, workspaceDir, path: reference.path, ...(reference.lineStart !== undefined ? { lineStart: reference.lineStart } : {}), ...(reference.lineEnd !== undefined ? { lineEnd: reference.lineEnd } : {}) })}
                         onOpenTurnReview={(command) => dispatchWorkspacePanel(command)}
                         {...(initialMessages ? { initialMessages } : {})}
-                        getTurnDiff={transcriptPort.getTurnDiff}
-                        revertTurnDiff={transcriptPort.revertTurnDiff}
-                        reapplyTurnDiff={transcriptPort.reapplyTurnDiff}
                         getSessionForkOptions={getSessionForkOptions}
                         forkSession={forkSession}
                         getSessionRewindPreview={transcriptPort.getSessionRewindPreview}
