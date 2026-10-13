@@ -11,7 +11,7 @@ import {
   formatWebuiGoalDuration,
   WEBUI_GOAL_STATUS_COPY,
   WEBUI_GOAL_WAIT_COPY,
-} from "../../projection/goal-state.js";
+} from "../../projection/goal/goal-state.js";
 import type {
   WebuiGoal,
   WebuiGoalStatus,

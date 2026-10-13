@@ -33,7 +33,7 @@ import {
   buildWebuiGoalStatusPatch,
   projectWebuiThreadGoalMessage,
   WEBUI_GOAL_STATUS_COPY,
-} from "../../src/client/projection/goal-state.js";
+} from "../../src/client/projection/goal/goal-state.js";
 import {
   canAdvanceWebuiQuestionnaireStep,
   sortWebuiQuestionnaireOptions,

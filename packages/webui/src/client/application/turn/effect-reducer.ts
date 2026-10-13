@@ -66,7 +66,7 @@ import { claimWebuiSubscriptionTurn, decideWebuiSessionStart, matchesWebuiTermin
 import {
   releaseWebuiSubscription,
 } from "../../mechanisms/stream-lease.js";
-import { projectWebuiThreadGoalMessage } from "../../projection/goal-state.js";
+import { projectWebuiThreadGoalMessage } from "../../projection/goal/goal-state.js";
 
 /** The slice of component state the reducer mutates. Workspace progress
  *  lives on the stream slice (where `app.tsx` puts it) — see the source
