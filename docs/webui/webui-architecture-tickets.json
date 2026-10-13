@@ -1079,7 +1079,8 @@
       "fbf64911",
       "7b3a0807",
       "39fc07f6",
-      "3c454bc8"
+      "3c454bc8",
+      "7803d467"
     ],
     "published": false,
     "tickets": {
@@ -1091,7 +1092,7 @@
       "T06": "closed 2026-10-14, acceptance evidence recorded on #132",
       "T10": "closed 2026-10-14 (issue #136, comment 6156644369): both review families have their own owners and both consumers are browser-verified",
       "T14": "closed 2026-10-14 (issue #140, comment 6156919983): the host assembles the registry and the terminal-process port; the service binds what it was handed",
-      "T07": "in progress: the sessions owner's files took their business-first homes; the behaviour work (one entity update for both catalogue views, lifecycle commands as the only path, delete purge/tombstones, rail cut and its injection refactor) is next"
+      "T07": "in progress: the sessions owner's files and rail UI have their homes, the rail's platform read is injected, and the catalogue already feeds both query views from one entity map; the remaining acceptance work is the delete purge/tombstone evidence and the archive/import/export browser entry paths"
     },
     "frontier": [
       "T07",
@@ -1100,9 +1101,9 @@
       "T17"
     ],
     "notes": [
-      "T07 slice 1 (3c454bc8): application/sessions/*, projection/sessions/* moved into features/sessions/; session-scope.ts (the interest-lease manager) moved to conversation/ because it is a substrate concern.",
-      "T07 did not move two things and the reasons are recorded: session-store.ts stays in the application layer (it owns application/state.ts, and conversation may not reach the assembly state container), and bindings/use-session-state.ts stays a shared binding (the shell and the transcript both read it). The rail UI move needs the platform-import injection refactor first.",
-      "T07's remaining work: the rail responsibility cut (pure grouping already lives in features/sessions/projection/rail-buckets.ts; the rail's list/row/menu units stay together by interaction), one entity update feeding both catalogue views, lifecycle commands as the only path, delete purge + tombstones, and the browser entry paths (rail/archive/import/export)."
+      "T07 slice 2 (7803d467): components/sessions/* -> features/sessions/ui/; the rail's team-mode tooltip is injected from the composition root instead of imported from the platform layer; the six cross-business reads the rail carries are recorded as reviewed peer entries naming the ticket that retires each.",
+      "T07 acceptance status as of 7803d467: (1) catalogue/activity/overlays owned in features/sessions with one entity map feeding both query views - already true by construction (patchWebuiCatalogEntity + selectWebuiCatalogFlatPage/TreePage). (2) lifecycle commands exposed as WebuiSessionWorkflows (rename/archive/archiveMany/remove/unarchive/fork/createSession/importSession/loadFlat/loadTree/refresh) and the shell holds no transport call for session entities; the transcript's message-level fork still reads the sessions port through a recorded peer edge. (5) rail units moved as cohesive interaction groups.",
+      "T07 remaining: (3) delete purge/tombstone evidence - failed deletion retains state and accepted late work cannot resurrect the id; (6) browser entry paths for archive/import/export (the rail's search/pin/star/menu/unread paths already have specs: rail-search, rail-pin, rail-star, rail-context-menu, unread-persistence)."
     ]
   },
   "publicationVerification": {
