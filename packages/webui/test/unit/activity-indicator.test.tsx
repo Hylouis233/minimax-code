@@ -29,9 +29,8 @@ import {
   MessageAfterQueryStreamingPlaceholder,
   MessagePassiveLoadingPlaceholder,
   MessageViewportStreamingLoader,
-  pickWeightedPhrase,
-  bucketPhrases,
 } from "../../src/client/components/transcript/ActivityIndicator.js";
+import { pickWeightedPhrase, bucketPhrases } from "../../src/client/projection/turn/activity-phrase.js";
 
 describe("ActivityIndicator markup (desktop parity)", () => {
   beforeEach(() => {

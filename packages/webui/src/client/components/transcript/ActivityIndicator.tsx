@@ -28,6 +28,8 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import lottie from "lottie-web";
 import streamingRoseLoaderData from "../../assets/lottie/streaming-rose-loader.json";
+import { bucketPhrases, pickWeightedPhrase, computeThinkingPhraseStartDelay, shouldPlayActivityIndicator } from "../../projection/turn/activity-phrase.js";
+import type { ThinkingPhraseSet } from "../../projection/turn/activity-phrase.js";
 
 export interface LottiePlayerProps {
   play: boolean;
@@ -92,12 +94,6 @@ export function LottiePlayer(props: LottiePlayerProps): React.JSX.Element {
   );
 }
 
-export interface ThinkingPhraseSet {
-  basic: readonly string[];
-  specific: readonly string[];
-  motion: readonly string[];
-}
-
 export const DEFAULT_THINKING_PHRASES: ThinkingPhraseSet = {
   basic: [
     "分析中…",
@@ -160,69 +156,6 @@ export interface ThinkingPhraseRotationOptions {
   rotationIntervalMs?: number;
   phrases?: ThinkingPhraseSet;
   random?: () => number;
-}
-
-interface WeightedPhraseBucket {
-  key: keyof ThinkingPhraseSet;
-  weight: number;
-  phrases: readonly string[];
-}
-
-const DEFAULT_WEIGHTS: readonly { key: keyof ThinkingPhraseSet; weight: number }[] = [
-  { key: "basic", weight: 0.75 },
-  { key: "specific", weight: 0.15 },
-  { key: "motion", weight: 0.1 },
-];
-
-export function bucketPhrases(phrases: ThinkingPhraseSet): WeightedPhraseBucket[] {
-  return DEFAULT_WEIGHTS.map((entry) => ({
-    key: entry.key,
-    weight: entry.weight,
-    phrases: phrases[entry.key] ?? [],
-  })).filter((bucket) => bucket.phrases.length > 0);
-}
-
-export function pickWeightedPhrase(
-  buckets: readonly WeightedPhraseBucket[],
-  previous: string | null,
-  random: () => number = Math.random,
-): string | null {
-  if (buckets.length === 0) return null;
-  const totalWeight = buckets.reduce((sum, bucket) => sum + bucket.weight, 0);
-  if (totalWeight <= 0) return null;
-  let threshold = random() * totalWeight;
-  let chosen: WeightedPhraseBucket | null = null;
-  for (const bucket of buckets) {
-    threshold -= bucket.weight;
-    if (threshold <= 0) {
-      chosen = bucket;
-      break;
-    }
-  }
-  if (!chosen) {
-    chosen = buckets[buckets.length - 1] ?? null;
-  }
-  if (!chosen) return null;
-  const pool = chosen.phrases;
-  if (pool.length === 0) return null;
-  let candidates = pool;
-  if (previous && pool.length > 1) {
-    const filtered = pool.filter((entry) => entry !== previous);
-    if (filtered.length > 0) candidates = filtered;
-  }
-  return candidates[Math.floor(random() * candidates.length)] ?? null;
-}
-
-export function computeThinkingPhraseStartDelay(
-  startMinMs: number,
-  startMaxMs: number,
-  random: () => number = Math.random,
-): number {
-  return startMinMs + random() * Math.max(0, startMaxMs - startMinMs);
-}
-
-export function shouldPlayActivityIndicator(prefersReducedMotion: boolean): boolean {
-  return !prefersReducedMotion;
 }
 
 function useThinkingPhrase(

@@ -39,13 +39,9 @@ import {
   toggleWebuiQuestionnaireOption,
 } from "../../src/client/projection/interactions/questionnaire-state.js";
 import {
-  computeThinkingPhraseStartDelay,
   DEFAULT_THINKING_PHRASE_ROTATION_INTERVAL_MS,
-  pickWeightedPhrase,
-  shouldPlayActivityIndicator,
-  bucketPhrases,
-  type ThinkingPhraseSet,
 } from "../../src/client/components/transcript/ActivityIndicator.js";
+import { computeThinkingPhraseStartDelay, pickWeightedPhrase, shouldPlayActivityIndicator, bucketPhrases, type ThinkingPhraseSet } from "../../src/client/projection/turn/activity-phrase.js";
 import { initialWebuiStreamState, reduceWebuiStreamFrame } from "../../src/client/projection/turn/stream-state.js";
 import {
   getSessionDiffOperation,
