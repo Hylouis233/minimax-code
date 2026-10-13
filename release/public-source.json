@@ -3639,6 +3639,7 @@
     "packages/webui/src/client/components/WorkspaceHtmlPreview.tsx",
     "packages/webui/src/client/components/WorkspaceMediaPreview.tsx",
     "packages/webui/src/client/components/WorkspacePanels.tsx",
+    "packages/webui/src/client/components/models/ProviderFormPanel.tsx",
     "packages/webui/src/client/components/settings/PersonalizationSettings.tsx",
     "packages/webui/src/client/components/settings/UsageModelSettings.tsx",
     "packages/webui/src/client/components/settings/settings-glyphs.tsx",

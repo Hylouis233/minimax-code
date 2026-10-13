@@ -13,6 +13,20 @@ export function recordValue(value: unknown): Record<string, unknown> | undefined
     : undefined;
 }
 
+/**
+ * The defaulted pair. `recordValue`/`stringValue` answer "is this one?"; these answer with the
+ * empty record or string when it is not, which is the reading the settings and provider surfaces
+ * want and used to each declare for themselves (§5.1's fourth prohibition: a rule shared across
+ * businesses gets one owner).
+ */
+export function recordOf(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === "object" ? value as Record<string, unknown> : {};
+}
+
+export function textOf(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
 export function stringValue(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value : undefined;
 }
