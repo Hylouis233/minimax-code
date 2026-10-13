@@ -293,6 +293,7 @@
       "packages/webui/test/unit/webui-application-adoption.test.tsx",
       "packages/webui/test/unit/review-panel.test.tsx",
       "packages/webui/test/unit/review-state.test.ts",
+      "packages/webui/test/unit/query-store.test.ts",
       "packages/webui/test/unit/webui-round3-acceptance.test.tsx",
       "packages/webui/test/unit/webui-w0-store-sequence.test.ts",
       "packages/webui/test/unit/webui-w0-projections.test.ts",

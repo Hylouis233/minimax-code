@@ -22,6 +22,11 @@
 // unit-tested against a scripted port.
 
 import type { ModelsPort } from "../contracts/models/models-port.js";
+import {
+  createWebuiQueryStore,
+  idleWebuiQueryState,
+  type WebuiQueryState,
+} from "./query-store.js";
 import type { SettingsPort } from "../contracts/settings/settings-port.js";
 import type { WebuiVersionInfo } from "../../shared/contracts/version.js";
 import type { WebuiModelEntry } from "../../shared/contracts/models.js";
@@ -78,12 +83,6 @@ export type WebuiSettingsPortSlice = Pick<
     | "refreshModels"
   >;
 
-export interface WebuiSettingsQueryState<T> {
-  readonly status: "idle" | "loading" | "ready" | "error";
-  readonly value?: T;
-  readonly error?: string;
-}
-
 export type WebuiModelSource = "token_plan" | "minimax_api_key";
 
 export interface WebuiSettingsWorkflowsState {
@@ -91,16 +90,16 @@ export interface WebuiSettingsWorkflowsState {
   readonly revision: number;
   /** Bumps when the model list must be re-read (a provider changed). */
   readonly modelsRevision: number;
-  readonly instructions: WebuiSettingsQueryState<WebuiGlobalInstructionsView>;
-  readonly profile: WebuiSettingsQueryState<WebuiUserProfileView>;
-  readonly agentMemory: WebuiSettingsQueryState<WebuiAgentMemoryView>;
-  readonly memorySettings: WebuiSettingsQueryState<WebuiMemorySettingsView>;
-  readonly models: WebuiSettingsQueryState<readonly WebuiModelEntry[]>;
-  readonly providers: WebuiSettingsQueryState<readonly Record<string, unknown>[]>;
-  readonly presets: WebuiSettingsQueryState<readonly Record<string, unknown>[]>;
-  readonly apiKeyStatus: WebuiSettingsQueryState<Record<string, unknown>>;
-  readonly codexOAuth: WebuiSettingsQueryState<Record<string, unknown>>;
-  readonly modelSource: WebuiSettingsQueryState<WebuiModelSource>;
+  readonly instructions: WebuiQueryState<WebuiGlobalInstructionsView>;
+  readonly profile: WebuiQueryState<WebuiUserProfileView>;
+  readonly agentMemory: WebuiQueryState<WebuiAgentMemoryView>;
+  readonly memorySettings: WebuiQueryState<WebuiMemorySettingsView>;
+  readonly models: WebuiQueryState<readonly WebuiModelEntry[]>;
+  readonly providers: WebuiQueryState<readonly Record<string, unknown>[]>;
+  readonly presets: WebuiQueryState<readonly Record<string, unknown>[]>;
+  readonly apiKeyStatus: WebuiQueryState<Record<string, unknown>>;
+  readonly codexOAuth: WebuiQueryState<Record<string, unknown>>;
+  readonly modelSource: WebuiQueryState<WebuiModelSource>;
   /**
    * The runtime handshake fact (version, protocolVersion, dataDir).
    *
@@ -108,32 +107,24 @@ export interface WebuiSettingsWorkflowsState {
    * owner rather than invoked by a component: the shell and the surfaces it
    * feeds read `runtimeVersion.value` from the snapshot.
    */
-  readonly runtimeVersion: WebuiSettingsQueryState<WebuiVersionInfo>;
-}
-
-function idle<T>(): WebuiSettingsQueryState<T> {
-  return { status: "idle" };
+  readonly runtimeVersion: WebuiQueryState<WebuiVersionInfo>;
 }
 
 export const initialWebuiSettingsWorkflowsState: WebuiSettingsWorkflowsState = {
   revision: 0,
   modelsRevision: 0,
-  instructions: idle(),
-  profile: idle(),
-  agentMemory: idle(),
-  memorySettings: idle(),
-  models: idle(),
-  providers: idle(),
-  presets: idle(),
-  apiKeyStatus: idle(),
-  codexOAuth: idle(),
-  modelSource: idle(),
-  runtimeVersion: idle(),
+  instructions: idleWebuiQueryState(),
+  profile: idleWebuiQueryState(),
+  agentMemory: idleWebuiQueryState(),
+  memorySettings: idleWebuiQueryState(),
+  models: idleWebuiQueryState(),
+  providers: idleWebuiQueryState(),
+  presets: idleWebuiQueryState(),
+  apiKeyStatus: idleWebuiQueryState(),
+  codexOAuth: idleWebuiQueryState(),
+  modelSource: idleWebuiQueryState(),
+  runtimeVersion: idleWebuiQueryState(),
 };
-
-function message(reason: unknown): string {
-  return reason instanceof Error ? reason.message : String(reason);
-}
 
 export interface WebuiSettingsWorkflows {
   readonly getSnapshot: () => WebuiSettingsWorkflowsState;
@@ -235,72 +226,11 @@ export function createWebuiSettingsWorkflows(deps: {
   readonly port: WebuiSettingsPortSlice;
 }): WebuiSettingsWorkflows {
   const { port } = deps;
-  let state = initialWebuiSettingsWorkflowsState;
-  const listeners = new Set<() => void>();
-  const versions = new Map<string, number>();
-  const bump = (key: string): number => {
-    const next = (versions.get(key) ?? 0) + 1;
-    versions.set(key, next);
-    return next;
-  };
-  const isCurrent = (key: string, version: number): boolean =>
-    (versions.get(key) ?? 0) === version;
-
-  const set = (
-    update: (current: WebuiSettingsWorkflowsState) => WebuiSettingsWorkflowsState,
-  ): void => {
-    const next = update(state);
-    if (next === state) return;
-    state = next;
-    for (const listener of listeners) listener();
-  };
-
-  /** The cached-read fields, so a helper can address one by name. */
-  type WebuiSettingsQueryField =
-    | "instructions"
-    | "profile"
-    | "agentMemory"
-    | "memorySettings"
-    | "models"
-    | "providers"
-    | "presets"
-    | "apiKeyStatus"
-    | "codexOAuth"
-    | "modelSource"
-    | "runtimeVersion";
-
-  /** Store a query result under its field, keeping the state type honest. */
-  const withQuery = <T>(
-    current: WebuiSettingsWorkflowsState,
-    field: WebuiSettingsQueryField,
-    value: WebuiSettingsQueryState<T>,
-  ): WebuiSettingsWorkflowsState =>
-    ({ ...current, [field]: value }) as WebuiSettingsWorkflowsState;
-
-  /**
-   * A generic cached read: one key, one version guard, one error field. A
-   * superseded answer is dropped rather than applied over a newer one.
-   */
-  const readInto = async <T>(
-    field: WebuiSettingsQueryField,
-    key: string,
-    fetch: () => Promise<T>,
-  ): Promise<void> => {
-    const version = bump(key);
-    set((current) => withQuery(current, field, { status: "loading" }));
-    try {
-      const value = await fetch();
-      if (!isCurrent(key, version)) return;
-      set((current) => withQuery(current, field, { status: "ready", value }));
-    } catch (reason) {
-      if (!isCurrent(key, version)) return;
-      set((current) => withQuery(current, field, { status: "error", error: message(reason) }));
-    }
-  };
-
-  const unavailable = (field: WebuiSettingsQueryField, error: string): void => {
-    set((current) => withQuery(current, field, { status: "error", error }));
-  };
+  // The cached-read fence is not this module's: `query-store.ts` holds the one
+  // implementation of the snapshot, the listener set and the version guard, and
+  // every owner that caches transport answers reads through it (§16.3).
+  const { getSnapshot, subscribe, set, withQuery, readInto, unavailable } =
+    createWebuiQueryStore(initialWebuiSettingsWorkflowsState);
 
   const markRevision = (): void => {
     set((current) => ({ ...current, revision: current.revision + 1 }));
@@ -596,13 +526,8 @@ export function createWebuiSettingsWorkflows(deps: {
   };
 
   return {
-    getSnapshot: () => state,
-    subscribe: (listener) => {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
+    getSnapshot,
+    subscribe,
     canReadInstructions: port.getGlobalInstructions !== undefined,
     canWriteInstructions: port.setGlobalInstructions !== undefined,
     canReadProfile: port.getUserProfile !== undefined,
