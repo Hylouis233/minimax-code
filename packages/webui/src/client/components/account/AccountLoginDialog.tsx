@@ -20,12 +20,12 @@
 
 import { useEffect, useRef, type ReactElement } from "react";
 import { createPortal } from "react-dom";
-import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js";
-import type { WebuiAccountLoginView } from "../../shared/contracts/account.js";
+import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
+import type { WebuiAccountLoginView } from "../../../shared/contracts/account.js";
 import {
   useWebuiAccountWorkflows,
   useWebuiAccountWorkflowsState,
-} from "../bindings/use-query-state.js";
+} from "../../bindings/use-query-state.js";
 
 /** Everything the panel can show, derived (not fetched). */
 export type WebuiAccountLoginPhase =

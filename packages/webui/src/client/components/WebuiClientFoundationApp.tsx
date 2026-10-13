@@ -55,7 +55,7 @@ import {
   type WebuiPluginManagementArea,
   type WebuiShellSurfaceCommand,
 } from "../projection/shell-surface.js";
-import { ConversationUsageBanner } from "./ConversationUsageBanner.js";
+import { ConversationUsageBanner } from "./account/ConversationUsageBanner.js";
 import { PluginCatalogue } from "./plugins/PluginCatalogue.js";
 import { WebuiComposer } from "./SessionComposer.js";
 import { WebuiSessionTranscript } from "./SessionTranscript.js";

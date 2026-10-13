@@ -16,7 +16,7 @@ import { createPortal } from "react-dom";
 import { WebuiIconBell, WebuiIconBrand, WebuiIconCommandUsage } from "../../icons.js";
 import { SigninClaimResult } from "@mavis/shared/daily-signin";
 import { SettingsModal } from "../SettingsModal.js";
-import { AccountLoginDialog } from "../AccountLoginDialog.js";
+import { AccountLoginDialog } from "./AccountLoginDialog.js";
 import type { MemoryHandoff } from "../settings/MemoryManagerDialog.js";
 import type { WebuiVersionInfo } from "../../../shared/contracts/version.js";
 import { evaluateOutsideClose } from "../../projection/outside-close.js";

@@ -4,7 +4,7 @@ import { describe, it, expect, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { ConversationUsageBanner } from "../../src/client/components/ConversationUsageBanner.js";
+import { ConversationUsageBanner } from "../../src/client/components/account/ConversationUsageBanner.js";
 
 const baseNotice = {
   kind: "five_hour",
