@@ -44,7 +44,7 @@ function sink(): WebuiInteractionSink & Record<string, unknown> {
  * and these are turn's state, so the flow invokes turn's named commands and the
  * sink carries only this business's own projection writes.
  */
-function streams() {
+function streams(): NonNullable<Parameters<typeof createWebuiInteractionCoordinator>[0]["streams"]> {
   return {
     markStreamPhase: vi.fn(),
     startStreaming: vi.fn(),

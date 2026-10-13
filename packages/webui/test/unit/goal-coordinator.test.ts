@@ -131,6 +131,10 @@ describe("the two fences are independent", () => {
         replacePendingPermissions: vi.fn(),
         removePendingPermission: vi.fn(),
         applyQuestionnaire: vi.fn(),
+      } as never,
+      // The four transitions left `sink` for turn's published stream-phase commands (§5.1
+      // prohibition 1 is about writers); this suite still handed them in as sink members.
+      streams: {
         awaitInteraction: vi.fn(),
         resumeAfterPermission: vi.fn(),
         afterQuestionnaireAnswer: vi.fn(),
