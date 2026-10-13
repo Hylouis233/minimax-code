@@ -10,8 +10,8 @@ import type { ClaimSigninData, SigninPanel } from "@mavis/shared/daily-signin";
 //
 // | Declaration | Wire purpose | Producer | Consumers |
 // | --- | --- | --- | --- |
-// | `WebuiSigninPanelView` | The daily check-in panel (streak, today's status, claimability). | Runtime `getSigninPanel` (`runtime/harness/account.ts`; host `getSigninPanel`, the shared `SigninPanel`). | `client/contracts/account-port.ts`; `client/components/UserMenu.tsx`. |
-// | `WebuiClaimSigninView` | The result of claiming today's check-in. | Runtime `claimSignin` (`runtime/harness/account.ts`; host `claimSignin`). | `client/contracts/account-port.ts`; `client/components/UserMenu.tsx`. |
+// | `WebuiSigninPanelView` | The daily check-in panel (streak, today's status, claimability). | Runtime `getSigninPanel` (`runtime/harness/account.ts`; host `getSigninPanel`, the shared `SigninPanel`). | `client/contracts/account-port.ts`; `client/components/account/UserMenuSignin.tsx`. |
+// | `WebuiClaimSigninView` | The result of claiming today's check-in. | Runtime `claimSignin` (`runtime/harness/account.ts`; host `claimSignin`). | `client/contracts/account-port.ts`; `client/components/account/UserMenuSignin.tsx`. |
 // | `WebuiAccountLoginPromptView` | The device-authorization prompt (code, verification URI, expiry) the login dialog shows. | Runtime `beginAccountLogin` / `getAccountLoginStatus` (`runtime/harness/account.ts`; host OAuth core). | unverified — nested in `WebuiAccountLoginView.prompt`; no direct importer. |
 // | `WebuiAccountLoginView` | One answer for both account questions: idle / pending(+prompt) / authenticated / error. | Runtime `beginAccountLogin` / `getAccountLoginStatus`. | `client/contracts/account-port.ts`; `client/components/AccountLoginDialog.tsx`; `server/operation/provider.ts` (response type). |
 export type WebuiSigninPanelView = SigninPanel;

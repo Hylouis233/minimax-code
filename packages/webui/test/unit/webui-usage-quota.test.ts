@@ -21,7 +21,7 @@ import { getUsageQuotaOperation } from "../../src/server/operation/operations.js
 import {
   UsagePanel,
   formatUsageResetLabel,
-} from "../../src/client/components/UserMenu.js";
+} from "../../src/client/components/account/UserMenuUsage.js";
 
 const REMAINS_PERCENT_BODY = {
   model_remains: [
