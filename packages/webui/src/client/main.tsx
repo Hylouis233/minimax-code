@@ -20,7 +20,7 @@ import {
   getWebuiBrowserStorage,
 } from "./infrastructure/storage.js";
 import { createWebuiApplication } from "./application/create-application.js";
-import { createWebuiEventEffectsRegistry } from "./application/event-effects-registry.js";
+import { createWebuiEventEffectsRegistry } from "./application/turn/event-effects-registry.js";
 import { createWebuiPortSlices } from "./application/port-slices.js";
 import { createWebuiOpenEventChannel } from "./bindings/event-channel-adapter.js";
 import { WebuiApplicationProvider } from "./bindings/application-context.js";

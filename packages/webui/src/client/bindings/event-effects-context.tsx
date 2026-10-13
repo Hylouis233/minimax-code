@@ -14,7 +14,7 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 
-import type { WebuiEventEffectsRegistry } from "../application/event-effects-registry.js";
+import type { WebuiEventEffectsRegistry } from "../application/turn/event-effects-registry.js";
 
 const WebuiEventEffectsRegistryContext = createContext<
   WebuiEventEffectsRegistry | undefined

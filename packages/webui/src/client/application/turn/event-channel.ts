@@ -7,7 +7,7 @@
 // reconnection live in `client/infrastructure/` and are supplied at
 // composition time, which is what keeps `application` off the transport.
 
-import type { WebuiRuntimeEvent } from "../../shared/contracts/stream.js";
+import type { WebuiRuntimeEvent } from "../../../shared/contracts/stream.js";
 
 /**
  * The single long-lived subscription to the server's process events.

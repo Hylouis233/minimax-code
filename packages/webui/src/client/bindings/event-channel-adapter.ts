@@ -23,7 +23,7 @@
 import type {
   WebuiOpenEventChannel,
   WebuiProcessEventChannel,
-} from "../application/event-channel.js";
+} from "../application/turn/event-channel.js";
 import type {WebuiClientEventWatcher} from "../contracts/shell/watch-port.js";
 
 /**

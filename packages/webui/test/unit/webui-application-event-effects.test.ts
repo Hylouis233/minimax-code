@@ -15,8 +15,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createWebuiApplication } from "../../src/client/application/create-application.js";
-import type { WebuiEventEffects } from "../../src/client/application/event-coordinator.js";
-import type { WebuiProcessEventChannel } from "../../src/client/application/event-channel.js";
+import type { WebuiEventEffects } from "../../src/client/application/turn/event-coordinator.js";
+import type { WebuiProcessEventChannel } from "../../src/client/application/turn/event-channel.js";
 import type { WebuiRuntimeEvent } from "../../src/shared/contracts/stream.js";
 
 interface FakeChannel {

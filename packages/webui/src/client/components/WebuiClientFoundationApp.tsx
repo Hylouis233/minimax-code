@@ -107,7 +107,7 @@ import {
   selectWebuiSessionTranscriptPage,
 } from "../application/selectors.js";
 import { WEBUI_HOME_SESSION_KEY } from "../application/state.js";
-import { createWebuiEventEffectsRegistry } from "../application/event-effects-registry.js";
+import { createWebuiEventEffectsRegistry } from "../application/turn/event-effects-registry.js";
 import {
   WebuiPortSlicesProvider,
   useWebuiPortSlicesOptional,
@@ -133,7 +133,7 @@ import { createWebuiAccountWorkflows } from "../application/account/account-work
 import { createWebuiModelsWorkflows } from "../application/models-workflows.js";
 import { createWebuiSettingsWorkflows } from "../application/settings/settings-workflows.js";
 import { createWebuiPluginWorkflows } from "../application/plugins/plugin-workflows.js";
-import { webuiActiveTurnProbeFor } from "../application/active-turn-probe.js";
+import { webuiActiveTurnProbeFor } from "../application/turn/active-turn-probe.js";
 import { startWebuiSessionTransferDownload } from "../infrastructure/session-transfer-download.js";
 import { importWebuiSessionFile } from "../infrastructure/session-import.js";
 import type { TeamModeSessionChoices } from "../team-mode.js";
@@ -145,7 +145,7 @@ import {
 } from "../projection/workspace-progress.js";
 import { createWebuiApplication, type WebuiApplication } from "../application/create-application.js";
 import { createWebuiPlanReviewWorkflow } from "../application/interactions/interaction-coordinator.js";
-import type { WebuiEventEffects } from "../application/event-coordinator.js";
+import type { WebuiEventEffects } from "../application/turn/event-coordinator.js";
 import { createWebuiOpenEventChannel } from "../bindings/event-channel-adapter.js";
 import type { WebuiWorkspaceGitChangedSignal } from "../projection/workspace-panel-state.js";
 import { ConnectionStatus } from "../ConnectionStatus.js";

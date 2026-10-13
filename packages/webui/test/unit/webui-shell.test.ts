@@ -136,7 +136,7 @@ const loopWithProjection = (
     sink,
   );
 import { createSessionOperation } from "../../src/server/operation/operations.js";
-import { stopWebuiTurn } from "../../src/client/application/turn-coordinator.js";
+import { stopWebuiTurn } from "../../src/client/application/turn/turn-coordinator.js";
 import {
   initialWebuiStreamState,
   ownsWebuiStreamGeneration,
@@ -148,7 +148,7 @@ import { projectWebuiTodos, WebuiProgressOverviewPanel, WebuiProgressPanel, Webu
 import { initialWorkspacePanelState, reduceWorkspacePanelState } from "../../src/client/projection/workspace-panel-state.js";
 import type { WebuiStreamFrame } from "../../src/shared/contracts/stream.js";
 import type { WebuiWorkspaceEnvironment } from "../../src/shared/contracts/workspace.js";
-import { streamStateBundle } from "../../src/client/application/stream-state-bundle.js";
+import { streamStateBundle } from "../../src/client/application/turn/stream-state-bundle.js";
 
 function renderShell(label = "webui-foundation"): string {
   return renderToStaticMarkup(

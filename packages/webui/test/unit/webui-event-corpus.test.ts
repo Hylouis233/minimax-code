@@ -20,12 +20,12 @@ import { describe, expect, it } from "vitest";
 import {
   applyWebuiEffectCommands,
   type WebuiEffectHandlers,
-} from "../../src/client/application/event-coordinator.js";
+} from "../../src/client/application/turn/event-coordinator.js";
 import {
   initialWebuiEffectState,
   reduceWebuiEffect,
   type WebuiEffectState,
-} from "../../src/client/projection/effect-reducer.js";
+} from "../../src/client/application/turn/effect-reducer.js";
 import { eventSessionId } from "../../src/client/projection/event-parsers.js";
 import { initialWebuiStreamState } from "../../src/client/projection/stream-state.js";
 import type { WebuiRuntimeEvent } from "../../src/shared/contracts/stream.js";

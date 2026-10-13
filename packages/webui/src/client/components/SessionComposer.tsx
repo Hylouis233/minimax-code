@@ -63,8 +63,8 @@ import {
   createWebuiComposerAttachStreamEffect,
   recheckWebuiSubscription,
   recoverMissedWebuiTurn,
-} from "../application/turn-commands.js";
-import { webuiActiveTurnProbeFor } from "../application/active-turn-probe.js";
+} from "../application/turn/turn-commands.js";
+import { webuiActiveTurnProbeFor } from "../application/turn/active-turn-probe.js";
 import {
   useWebuiInteractionCommands,
   useWebuiSessionCommands,

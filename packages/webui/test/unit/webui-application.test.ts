@@ -20,9 +20,9 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createWebuiApplication } from "../../src/client/application/create-application.js";
-import { createWebuiEventEffectsRegistry } from "../../src/client/application/event-effects-registry.js";
-import { createWebuiComposerAttachStreamEffect } from "../../src/client/application/turn-commands.js";
-import type { WebuiProcessEventChannel } from "../../src/client/application/event-channel.js";
+import { createWebuiEventEffectsRegistry } from "../../src/client/application/turn/event-effects-registry.js";
+import { createWebuiComposerAttachStreamEffect } from "../../src/client/application/turn/turn-commands.js";
+import type { WebuiProcessEventChannel } from "../../src/client/application/turn/event-channel.js";
 import type { WebuiRuntimeEvent } from "../../src/shared/contracts/stream.js";
 import type {WebuiClientSessionResumer} from "../../src/client/contracts/turn/execution-port.js";
 

@@ -18,21 +18,21 @@ import {
   createWebuiEventCoordinator,
   type WebuiEventCoordinator,
   type WebuiEventEffects,
-} from "./event-coordinator.js";
-import type { WebuiOpenEventChannel } from "./event-channel.js";
+} from "./turn/event-coordinator.js";
+import type { WebuiOpenEventChannel } from "./turn/event-channel.js";
 import { createWebuiSessionStore } from "./session-store.js";
 import type { WebuiSessionStore } from "./session-store.js";
 import {
   createWebuiStreamLeaseController,
   type WebuiStreamLeaseController,
-} from "./stream-lease-controller.js";
+} from "./turn/stream-lease-controller.js";
 import type { WebuiApplicationState } from "./state.js";
 import { WEBUI_HOME_SESSION_KEY } from "./state.js";
 import {
   createWebuiTurnCoordinator,
   type WebuiTurnCoordinator,
-} from "./turn-coordinator.js";
-import type { WebuiTurnCoordinatorDeps } from "./turn-coordinator.js";
+} from "./turn/turn-coordinator.js";
+import type { WebuiTurnCoordinatorDeps } from "./turn/turn-coordinator.js";
 import {
   createWebuiUnreadController,
   type WebuiUnreadController,

@@ -24,12 +24,12 @@ import {
   reduceWebuiEffect,
   type WebuiEffectCommand,
   type WebuiEffectState,
-} from "../../src/client/projection/effect-reducer.js";
+} from "../../src/client/application/turn/effect-reducer.js";
 import {
   applyWebuiEffectCommands,
   applyWebuiEventToSession,
   type WebuiEffectHandlers,
-} from "../../src/client/application/event-coordinator.js";
+} from "../../src/client/application/turn/event-coordinator.js";
 import {
   initialWebuiStreamState,
   isWebuiSubscriptionProbeCurrent,

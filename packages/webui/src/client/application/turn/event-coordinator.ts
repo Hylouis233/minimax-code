@@ -19,28 +19,28 @@
 // only removes that one listener. The channel's lifetime belongs to the
 // application, so unsubscribing never tears it down.
 
-import type { WebuiRuntimeEvent } from "../../shared/contracts/stream.js";
-import type { WebuiGoal } from "../../shared/contracts/goal.js";
+import type { WebuiRuntimeEvent } from "../../../shared/contracts/stream.js";
+import type { WebuiGoal } from "../../../shared/contracts/goal.js";
 import {
   reduceWebuiEffect,
-} from "../projection/effect-reducer.js";
+} from "./effect-reducer.js";
 import type {
   WebuiEffectCommand,
   WebuiEffectState,
-} from "../projection/effect-reducer.js";
+} from "./effect-reducer.js";
 import type {
   WebuiPendingPermission,
   WebuiQuestionnaireAnswer,
   WebuiQuestionnaireRequest,
-} from "../../shared/contracts/interactions.js";
-import type { WebuiStreamState } from "../projection/stream-state.js";
+} from "../../../shared/contracts/interactions.js";
+import type { WebuiStreamState } from "../../projection/stream-state.js";
 // The same resolver the effect reducer's own session guard uses. It carries
 // the nested-goal fallback for `thread_goal.*` events, whose payload declares
 // the id inside `goal` rather than at the top level. Reading the top level
 // only here dropped every such event before it could reach the reducer.
-import { eventSessionId } from "../projection/event-parsers.js";
+import { eventSessionId } from "../../projection/event-parsers.js";
 import type { WebuiProcessEventChannel } from "./event-channel.js";
-import type { WebuiSessionStore } from "./session-store.js";
+import type { WebuiSessionStore } from "../session-store.js";
 import type { WebuiStreamLeaseController } from "./stream-lease-controller.js";
 
 export interface WebuiEffectHandlers {

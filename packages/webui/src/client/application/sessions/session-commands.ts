@@ -49,7 +49,7 @@ import {
   buildWebuiStreamLoopSink,
   type WebuiStreamLoopSink,
 } from "../../mechanisms/stream-loop.js";
-import { streamStateBundle } from "../stream-state-bundle.js";
+import { streamStateBundle } from "../turn/stream-state-bundle.js";
 
 /** The phases the stream slice can be moved to by name. */
 export type WebuiStreamPhase = WebuiStreamState["phase"];

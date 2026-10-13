@@ -17,8 +17,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createWebuiApplication } from "../../src/client/application/create-application.js";
-import { createWebuiEventEffectsRegistry } from "../../src/client/application/event-effects-registry.js";
-import type { WebuiProcessEventChannel } from "../../src/client/application/event-channel.js";
+import { createWebuiEventEffectsRegistry } from "../../src/client/application/turn/event-effects-registry.js";
+import type { WebuiProcessEventChannel } from "../../src/client/application/turn/event-channel.js";
 import { createWebuiOpenEventChannel } from "../../src/client/bindings/event-channel-adapter.js";
 import type {WebuiClientEventWatcher} from "../../src/client/contracts/shell/watch-port.js";
 import type {WebuiClientSessionResumer} from "../../src/client/contracts/turn/execution-port.js";

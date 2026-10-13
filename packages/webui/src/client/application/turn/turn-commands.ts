@@ -17,25 +17,25 @@
 // preserved verbatim. Nothing here opens a channel: the process-event ingress
 // stays exactly where it is.
 
-import type {WebuiClientMessageEnqueuer} from "../contracts/composer/command-port.js";
-import type {WebuiClientSessionResumer} from "../contracts/turn/execution-port.js";
-import type { WebuiClientMessageLoader } from "../contracts/transcript/message-view.js";
-import type { WebuiClientSessionCreator } from "../contracts/sessions/session-port.js";
-import type { WebuiAttachmentInput } from "../../shared/contracts/messages.js";
-import type { WebuiTurnCommandWriter } from "./sessions/session-commands.js";
+import type {WebuiClientMessageEnqueuer} from "../../contracts/composer/command-port.js";
+import type {WebuiClientSessionResumer} from "../../contracts/turn/execution-port.js";
+import type { WebuiClientMessageLoader } from "../../contracts/transcript/message-view.js";
+import type { WebuiClientSessionCreator } from "../../contracts/sessions/session-port.js";
+import type { WebuiAttachmentInput } from "../../../shared/contracts/messages.js";
+import type { WebuiTurnCommandWriter } from "../sessions/session-commands.js";
 import {
   buildWebuiComposerHandlers,
   submitWebuiComposerTurn,
   type WebuiComposerSubmitHandlers,
   type WebuiComposerTurnCallbacks,
-} from "./composer/composer-workflows.js";
-import { isWebuiSubscriptionProbeCurrent, ownsWebuiStreamGeneration, resolveWebuiSubscriptionRecheck, type WebuiStreamState } from "../projection/stream-state.js";
-import { streamRecoveryProjection } from "../projection/stream-recovery.js";
+} from "../composer/composer-workflows.js";
+import { isWebuiSubscriptionProbeCurrent, ownsWebuiStreamGeneration, resolveWebuiSubscriptionRecheck, type WebuiStreamState } from "../../projection/stream-state.js";
+import { streamRecoveryProjection } from "../../projection/stream-recovery.js";
 import {
   runWebuiStreamLoop,
   type WebuiStreamLoopDeps,
   type WebuiStreamLoopSink,
-} from "../mechanisms/stream-loop.js";
+} from "../../mechanisms/stream-loop.js";
 import {
   webuiActiveTurnProbeFor,
   type WebuiActiveTurnProbe,

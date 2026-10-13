@@ -21,7 +21,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createWebuiApplication } from "../../src/client/application/create-application.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
-import type { WebuiProcessEventChannel } from "../../src/client/application/event-channel.js";
+import type { WebuiProcessEventChannel } from "../../src/client/application/turn/event-channel.js";
 import type {WebuiClientSessionResumer} from "../../src/client/contracts/turn/execution-port.js";
 import type { WebuiStreamState } from "../../src/client/projection/stream-state.js";
 

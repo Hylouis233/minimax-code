@@ -19,18 +19,18 @@
 // fences its own writes and releases on terminal, error or cancellation, so the
 // retry cannot strand a "thinking" indicator or let a superseded attempt write.
 
-import type {WebuiClientSessionResumer} from "../contracts/turn/execution-port.js";
-import type { WebuiClientMessageLoader } from "../contracts/transcript/message-view.js";
-import { streamRecoveryProjection } from "../projection/stream-recovery.js";
-import type { WebuiStreamState } from "../projection/stream-state.js";
-import { reduceWebuiStreamFrame } from "../projection/stream-state.js";
-import { fenceWebuiLeaseStream } from "../mechanisms/stream-lease.js";
+import type {WebuiClientSessionResumer} from "../../contracts/turn/execution-port.js";
+import type { WebuiClientMessageLoader } from "../../contracts/transcript/message-view.js";
+import { streamRecoveryProjection } from "../../projection/stream-recovery.js";
+import type { WebuiStreamState } from "../../projection/stream-state.js";
+import { reduceWebuiStreamFrame } from "../../projection/stream-state.js";
+import { fenceWebuiLeaseStream } from "../../mechanisms/stream-lease.js";
 import {
   applyWebuiStreamLoopExtra,
   runWebuiStreamLoop,
   type WebuiStreamLoopSink,
-} from "../mechanisms/stream-loop.js";
-import type { WebuiSessionStore, WebuiSessionWriter } from "./session-store.js";
+} from "../../mechanisms/stream-loop.js";
+import type { WebuiSessionStore, WebuiSessionWriter } from "../session-store.js";
 import type { WebuiStreamLeaseController } from "./stream-lease-controller.js";
 import { streamStateBundle } from "./stream-state-bundle.js";
 

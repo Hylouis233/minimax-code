@@ -20,11 +20,11 @@
 // process-event channel (ticket #45, the atomic ingress flip).
 
 import type { WebuiEventEffects } from "./event-coordinator.js";
-import type { WebuiGoal } from "../../shared/contracts/goal.js";
+import type { WebuiGoal } from "../../../shared/contracts/goal.js";
 import type {
   WebuiQuestionnaireAnswer,
   WebuiQuestionnaireRequest,
-} from "../../shared/contracts/interactions.js";
+} from "../../../shared/contracts/interactions.js";
 
 export interface WebuiEventEffectsRegistry {
   /**

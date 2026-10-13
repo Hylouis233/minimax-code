@@ -13,9 +13,9 @@
 // latter can call in without forming a cycle): the only collaborator is the
 // error formatter.
 
-import type {WebuiClientMessageEnqueuer} from "../contracts/composer/command-port.js";
-import type { WebuiAttachmentInput } from "../../shared/contracts/messages.js";
-import { formatWebuiError } from "../value-readers.js";
+import type {WebuiClientMessageEnqueuer} from "../../contracts/composer/command-port.js";
+import type { WebuiAttachmentInput } from "../../../shared/contracts/messages.js";
+import { formatWebuiError } from "../../value-readers.js";
 
 export interface WebuiQueueTurnArgs {
   readonly sessionId: string;

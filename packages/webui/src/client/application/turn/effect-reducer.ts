@@ -45,28 +45,28 @@
 //           `payload.error` is a string; other shapes leave `refusal`
 //           alone.
 
-import type { WebuiGoal } from "../../shared/contracts/goal.js";
+import type { WebuiGoal } from "../../../shared/contracts/goal.js";
 import type {
   WebuiPendingPermission,
   WebuiQuestionnaireRequest,
-} from "../../shared/contracts/interactions.js";
-import type { WebuiRuntimeEvent } from "../../shared/contracts/stream.js";
+} from "../../../shared/contracts/interactions.js";
+import type { WebuiRuntimeEvent } from "../../../shared/contracts/stream.js";
 import {
   eventSessionId,
   pendingPermissionFromEvent,
   questionnaireFromEvent,
   replacePermission,
-} from "./event-parsers.js";
+} from "../../projection/event-parsers.js";
 import {
   initialWebuiWorkspaceProgress,
   reduceWebuiWorkspaceProgressEvent,
   type WebuiWorkspaceProgressState,
-} from "./workspace-progress.js";
-import { claimWebuiSubscriptionTurn, decideWebuiSessionStart, matchesWebuiTerminalTurn, type WebuiStreamState } from "./stream-state.js";
+} from "../../projection/workspace-progress.js";
+import { claimWebuiSubscriptionTurn, decideWebuiSessionStart, matchesWebuiTerminalTurn, type WebuiStreamState } from "../../projection/stream-state.js";
 import {
   releaseWebuiSubscription,
-} from "../mechanisms/stream-lease.js";
-import { projectWebuiThreadGoalMessage } from "./goal-state.js";
+} from "../../mechanisms/stream-lease.js";
+import { projectWebuiThreadGoalMessage } from "../../projection/goal-state.js";
 
 /** The slice of component state the reducer mutates. Workspace progress
  *  lives on the stream slice (where `app.tsx` puts it) — see the source

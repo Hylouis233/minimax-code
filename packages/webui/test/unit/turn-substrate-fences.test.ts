@@ -35,7 +35,7 @@ import {
   runWebuiStreamLoop,
   type WebuiStreamLoopSink,
 } from "../../src/client/mechanisms/stream-loop.js";
-import { streamStateBundle } from "../../src/client/application/stream-state-bundle.js";
+import { streamStateBundle } from "../../src/client/application/turn/stream-state-bundle.js";
 import { streamRecoveryProjection } from "../../src/client/projection/stream-recovery.js";
 import {
   createWebuiSessionStore,

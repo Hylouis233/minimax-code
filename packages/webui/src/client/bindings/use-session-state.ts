@@ -52,10 +52,10 @@ import {
   type WebuiStreamPhaseCommands,
   type WebuiTurnLifecycleCommands,
 } from "../application/sessions/session-commands.js";
-import { attachWebuiTurn, sendWebuiTurn } from "../application/turn-commands.js";
-import { stopWebuiTurn } from "../application/turn-coordinator.js";
+import { attachWebuiTurn, sendWebuiTurn } from "../application/turn/turn-commands.js";
+import { stopWebuiTurn } from "../application/turn/turn-coordinator.js";
 import { buildWebuiStreamLoopSink } from "../mechanisms/stream-loop.js";
-import { streamStateBundle } from "../application/stream-state-bundle.js";
+import { streamStateBundle } from "../application/turn/stream-state-bundle.js";
 import {
   useWebuiApplicationOptional,
   useWebuiSessionStoreContext,

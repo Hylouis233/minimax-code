@@ -4,11 +4,11 @@ import type { WebuiGoal, WebuiGoalCreateRequest, WebuiGoalPatchRequest } from ".
 import type { WebuiAttachmentInput } from "../../../shared/contracts/messages.js";
 import { formatWebuiError } from "../../value-readers.js";
 import { looksLikeAbsoluteWorkspacePath } from "../../paths.js";
-import { queueWebuiTurn } from "../queue-command.js";
+import { queueWebuiTurn } from "../turn/queue-command.js";
 import { ownsWebuiStreamGeneration, type WebuiStreamState } from "../../projection/stream-state.js";
 import { runWebuiStreamLoop, type WebuiStreamLoopDeps, type WebuiStreamLoopSink } from "../../mechanisms/stream-loop.js";
 import { streamRecoveryProjection } from "../../projection/stream-recovery.js";
-import { streamStateBundle } from "../stream-state-bundle.js";
+import { streamStateBundle } from "../turn/stream-state-bundle.js";
 
 export interface WebuiComposerSubmitArgs {
   readonly sessionId?: string;
