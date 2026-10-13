@@ -208,4 +208,20 @@ describe("prohibition 4 — a rule shared across businesses gets one owner every
       expect(read(file)).toContain(`from "${specifier}"`);
     }
   });
+  it("a session switch resets the goal VIEW without clearing the retained goal", () => {
+    // T01 ledger C4: the selection effect called `applyGoal(undefined)` before
+    // the re-read, which wrote `goal: undefined` into the record of the session
+    // being opened and destroyed truth that session already had. The correction
+    // is un-drivable in a unit test (it needs a mounted React tree), so it is
+    // pinned as a source tripwire — the same shape this suite already uses for
+    // wiring a render cannot observe.
+    const composer = flat(read("components/composer/WebuiComposer.tsx"));
+    const at = composer.indexOf("void goalCoordinator.refreshGoal().then(");
+    expect(at).toBeGreaterThan(-1);
+    // The window is the selection effect: the mode reset, the re-read, and
+    // nothing that clears the canonical goal.
+    const effect = composer.slice(Math.max(0, at - 500), at + 200);
+    expect(effect).toContain("setGoalMode(false);");
+    expect(effect).not.toContain("applyGoal(undefined)");
+  });
 });
