@@ -24,7 +24,7 @@ import { readFileSync } from "node:fs";
 import {
   WebuiContextMenu,
   placeWebuiContextMenu,
-} from "../../src/client/components/ContextMenu.js";
+} from "../../src/client/components/shared/ContextMenu.js";
 import { WebuiInteractionPanel } from "../../src/client/components/interactions/InteractionPanel.js";
 import {
   WebuiProjectList,

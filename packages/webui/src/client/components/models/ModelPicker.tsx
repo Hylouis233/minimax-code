@@ -32,7 +32,7 @@ import {
 } from "react";
 
 import { WebuiIconChevronDown } from "../../icons.js";
-import { ToggleSwitch } from "../ToggleSwitch.js";
+import { ToggleSwitch } from "../shared/ToggleSwitch.js";
 import type {
   WebuiModelPickerDraft,
   WebuiModelPickerEntry,

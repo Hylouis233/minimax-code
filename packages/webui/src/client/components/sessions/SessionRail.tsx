@@ -34,7 +34,7 @@ import {
   WebuiIconSessionDisclosure,
   WebuiIconAgent,
 } from "../../icons.js";
-import { WebuiContextMenu, type WebuiContextMenuItem } from "../ContextMenu.js";
+import { WebuiContextMenu, type WebuiContextMenuItem } from "../shared/ContextMenu.js";
 import {
   webuiRailMenuFor,
   type WebuiRailMenuEntry,

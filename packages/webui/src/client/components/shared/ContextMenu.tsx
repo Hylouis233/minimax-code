@@ -9,9 +9,9 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
-import { WebuiIconContextChevron } from "../icons.js";
-import { evaluateOutsideClose } from "../projection/outside-close.js";
-import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js";
+import { WebuiIconContextChevron } from "../../icons.js";
+import { evaluateOutsideClose } from "../../projection/outside-close.js";
+import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
 
 export function placeWebuiContextMenu({
   x,

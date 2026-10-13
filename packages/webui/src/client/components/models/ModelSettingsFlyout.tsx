@@ -38,7 +38,7 @@ import {
   type RefObject,
 } from "react";
 
-import { ToggleSwitch } from "../ToggleSwitch.js";
+import { ToggleSwitch } from "../shared/ToggleSwitch.js";
 import {
   flyoutStyle,
   positionFlyout,
