@@ -330,11 +330,24 @@ export function createWebuiWorkspaceQueries(deps: {
       },
     }));
     void listTree({ workspaceDir })
-      .then((files) => {
+      .then((answer) => {
         if (!isCurrent(key, version)) return;
+        // The panel renders the tree it is handed, so an answer that is not a
+        // tree must not reach it: it becomes an error state instead of a
+        // "files is not iterable" crash inside the render (T11).
+        const files = Array.isArray(answer) ? answer : undefined;
         set((current) =>
           current.fileTree.workspaceDir === workspaceDir
-            ? { ...current, fileTree: { ...current.fileTree, files, loading: false, error: undefined } }
+            ? {
+                ...current,
+                fileTree: files
+                  ? { ...current.fileTree, files, loading: false, error: undefined }
+                  : {
+                      ...initialWebuiWorkspaceFileTreeState,
+                      workspaceDir,
+                      error: "工作区文件列表返回了意外的结果。",
+                    },
+              }
             : current,
         );
       })

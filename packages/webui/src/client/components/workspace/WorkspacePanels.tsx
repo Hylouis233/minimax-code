@@ -366,7 +366,15 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   const [expandedDirectories, setExpandedDirectories] = useState<ReadonlySet<string>>(() => new Set());
   const [fileCodeMode, setFileCodeMode] = useState(false);
   const [reviewSearchQuery, setReviewSearchQuery] = useState("");
-  const [terminals, setTerminals] = useState<readonly Record<string, unknown>[]>([]);
+  const [terminals, setTerminalsState] = useState<readonly Record<string, unknown>[]>([]);
+  /**
+   * A terminal list answer is rendered directly (`terminals.find`, `terminals.map`),
+   * so a runtime that answers something else must not reach the render: it becomes
+   * an empty list (T11).
+   */
+  const setTerminals = (answer: unknown): void => {
+    setTerminalsState(Array.isArray(answer) ? (answer as readonly Record<string, unknown>[]) : []);
+  };
   const [activeTerminalId, setActiveTerminalId] = useState<string>();
   const [terminalError, setTerminalError] = useState<string>();
   const terminalHost = useRef<HTMLDivElement>(null);
@@ -386,7 +394,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   const activeFileResult = activeTab?.kind === "file-preview" ? fileResults.get(activeTab.id)?.content : undefined;
   const selectedFilePath = activeTab?.kind === "file-preview" ? activeFileResult?.resolvedPath ?? activeTab.path : undefined;
   const hasFileWorkspace = tab === "files" || activeTab?.kind === "file-preview" || activeTab?.kind === "review";
-  const visibleFiles = filterWorkspaceFiles(fileTree.files, fileSearch);
+  const visibleFiles = filterWorkspaceFiles(fileTree.files ?? [], fileSearch);
   const currentPanelState = useRef(state);
   currentPanelState.current = state;
   const filesRef = useRef(fileResults);

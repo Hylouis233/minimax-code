@@ -110,7 +110,11 @@ export function installFixtureTransport() {
 
   const clone = (value) => JSON.parse(JSON.stringify(value));
   const matches = (body, condition) => Object.entries(condition).every(([key, value]) => body?.[key] === value);
+  /** Operations the fixture deliberately answers with nothing, so a case can see
+   *  what the client does with a runtime that does not know them. */
+  const unanswered = new Set();
   const responseFor = (operation, body) => {
+    if (unanswered.has(operation)) return {};
     if (operation === "listSessions") {
       if (body?.onlyArchived) {
         return {
@@ -316,6 +320,8 @@ export function installFixtureTransport() {
     archived() { return [...archivedIds]; },
     /** What the runtime answers for a turn's diff, and what a revert returns. */
     setTurnDiff(next) { turnDiff = clone(next); },
+    /** Answer this operation with an empty object, as an unknown op would be. */
+    unanswer(operation) { unanswered.add(operation); },
     // The tree projection the rail and the composer both read. Mutable for the
     // same reason `setPage` is: the app fetches it on boot, so a test that only
     // wants to poison it later has no other way to say what the server answers
