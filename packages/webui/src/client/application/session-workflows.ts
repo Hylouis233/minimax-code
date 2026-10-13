@@ -14,6 +14,7 @@
 // unit-tested against a scripted port.
 
 import type { SessionPort, WebuiClientSessionCreator } from "../contracts/sessions/session-port.js";
+import type { WebuiComposerStore } from "./composer-store.js";
 import type {
   WebuiClientProject,
   WebuiClientSessionPage,
@@ -43,15 +44,6 @@ export interface WebuiSessionCatalogStore {
    * server delete commits and the catalog entity has been removed.
    */
   readonly purgeSession: (sessionId: string) => void;
-}
-
-/**
- * The composer store's reader/writer — drafts and input history per slot.
- * The session workflow takes only the purge method because a delete is the
- * single trigger for clearing a session's draft.
- */
-export interface WebuiComposerPurger {
-  readonly purgeSlot: (key: string) => void;
 }
 
 /**
@@ -180,8 +172,13 @@ export interface WebuiSessionWorkflows {
 
 export function createWebuiSessionWorkflows(deps: {
   readonly store: WebuiSessionCatalogStore;
-  /** The composer purger; absent means drafts outlive the delete (a soft-loss). */
-  readonly composer?: WebuiComposerPurger;
+  /**
+   * The composer's published purge command (§5.6: "`purgeSlot` becomes a published
+   * command (no injected optional)"). It used to be optional, and absent meant
+   * drafts outlive the delete — a soft-loss the plan refuses to keep as a
+   * configuration of this module, so the delete **cannot compile** without it.
+   */
+  readonly composer: Pick<WebuiComposerStore, "purgeSlot">;
   readonly port: QueryPort & MutationPort;
   /** Injected browser IO; absent means the import operation is not wired. */
   readonly importSession?: WebuiSessionImporter;
@@ -385,7 +382,7 @@ export function createWebuiSessionWorkflows(deps: {
       // later merge, including the `refresh()` below.
       removedSessionIds.add(sessionId);
       store.purgeSession(sessionId);
-      composer?.purgeSlot(sessionId);
+      composer.purgeSlot(sessionId);
       commitCatalog((current) => removeWebuiCatalogSessions(current, [sessionId]));
       dropRemovedArchivedRows();
       await refresh();
@@ -407,7 +404,7 @@ export function createWebuiSessionWorkflows(deps: {
       // could still be showing, so it takes the same teardown as `remove`.
       removedSessionIds.add(sessionId);
       store.purgeSession(sessionId);
-      composer?.purgeSlot(sessionId);
+      composer.purgeSlot(sessionId);
       commitCatalog((current) => removeWebuiCatalogSessions(current, [sessionId]));
       dropRemovedArchivedRows();
       await loadArchived();

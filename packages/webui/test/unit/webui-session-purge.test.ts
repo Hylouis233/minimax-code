@@ -53,6 +53,13 @@ import type { WebuiClientSession } from "../../src/client/contracts/sessions/ses
 import type { WebuiSessionListItem } from "../../src/shared/contracts/session.js";
 import type { WebuiStreamFrame } from "../../src/shared/contracts/stream.js";
 
+/**
+ * A purger spy for the cases whose subject is something else. §5.6 makes the
+ * dependency required, so every construction supplies one; the cases below assert
+ * the *other* teardown effects.
+ */
+const purger = () => ({ purgeSlot: vi.fn() });
+
 function session(over: Partial<WebuiClientSession> & { sessionId: string }): WebuiClientSession {
   return { agentName: "main", createdAt: 1, updatedAt: 100, ...over };
 }
@@ -304,6 +311,7 @@ describe("R7 · the delete workflow teardown", () => {
     };
     const workflows = createWebuiSessionWorkflows({
       store,
+      composer: purger(),
       port: {
         deleteSession: async () => ({ success: true }),
         loadSessions,
@@ -383,6 +391,7 @@ describe("R7 · the archived-list delete fence", () => {
     };
     const workflows = createWebuiSessionWorkflows({
       store,
+      composer: purger(),
       port: {
         deleteSession: async () => ({ success: true }),
         listArchivedSessions,
@@ -419,6 +428,7 @@ describe("R7 · the archived-list delete fence", () => {
     };
     const workflows = createWebuiSessionWorkflows({
       store,
+      composer: purger(),
       port: {
         deleteSession: async () => ({ success: true }),
         listArchivedSessions,
@@ -447,6 +457,7 @@ describe("R7 · the archived-list delete fence", () => {
     const store = createWebuiSessionStore();
     const workflows = createWebuiSessionWorkflows({
       store,
+      composer: purger(),
       port: {
         deleteSession: async () => ({ success: true }),
         listArchivedSessions: async () => ({
@@ -478,6 +489,7 @@ describe("R7 · the archived-list delete fence", () => {
     };
     const workflows = createWebuiSessionWorkflows({
       store,
+      composer: purger(),
       port: {
         listArchivedSessions,
       } as unknown as Parameters<typeof createWebuiSessionWorkflows>[0]["port"],
@@ -708,5 +720,41 @@ describe("R7 · the command surface carries no raw writer", () => {
 
     expect(home.get().messages).toEqual([]);
     expect(sessionCell.get().messages.map((message) => message.id)).toEqual(["m1"]);
+  });
+});
+
+/**
+ * §5.6's composer row: "`purgeSlot` becomes a published command (no injected
+ * optional)". The optional was the soft-loss path — absent meant the deleted
+ * session's draft and history outlived it.
+ *
+ * The compile-time half is **not** asserted here, and deliberately: this suite is
+ * not in a type-checked program (`tsconfig.test.json` lists two files, neither of
+ * them this one), so a `@ts-expect-error` written here would never be checked and
+ * would read as a guard while guarding nothing. The demonstration is a probe
+ * against the real client program — remove the dependency from the shell's
+ * construction and `tsc -p tsconfig.client.json` rejects it — and its output is
+ * recorded on the ticket. What stays here is the runtime half: the delete reaches
+ * the command on both paths.
+ */
+describe("a session delete invokes the composer's purge command", () => {
+  it("purges the slot on both deletion paths", async () => {
+    const purged: string[] = [];
+    const store = createWebuiSessionStore({
+      catalog: createWebuiSessionCatalogFromPage(page("a", "b")),
+    });
+    const workflows = createWebuiSessionWorkflows({
+      store,
+      composer: { purgeSlot: (key: string) => purged.push(key) },
+      port: {
+        deleteSession: async () => ({ success: true }),
+        loadSessions: async () => page("b"),
+        loadSessionTree: async () => ({ sessions: [], hasMore: false }),
+        listArchivedSessions: async () => ({ sessions: [], hasMore: false }),
+      } as unknown as Parameters<typeof createWebuiSessionWorkflows>[0]["port"],
+    });
+    await workflows.remove("a");
+    await workflows.removeArchived("b");
+    expect(purged).toEqual(["a", "b"]);
   });
 });

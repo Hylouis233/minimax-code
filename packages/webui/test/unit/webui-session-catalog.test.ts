@@ -24,6 +24,13 @@ import { createWebuiSessionWorkflows } from "../../src/client/application/sessio
 import { selectWebuiWorkspaceProgress } from "../../src/client/projection/workspace-progress.js";
 import type { WebuiClientSession } from "../../src/client/contracts/sessions/session-view.js";
 
+/**
+ * The composer purger the workflows now require (§5.6: `purgeSlot` is a published
+ * command, not an optional). These cases are about the catalog, so the purger is a
+ * no-op.
+ */
+const purger = () => ({ purgeSlot: () => undefined });
+
 function session(
   over: Partial<WebuiClientSession> & { sessionId: string },
 ): WebuiClientSession {
@@ -156,6 +163,7 @@ describe("session workflows", () => {
     };
     const workflows = createWebuiSessionWorkflows({
       store,
+      composer: purger(),
       port: port as unknown as Parameters<
         typeof createWebuiSessionWorkflows
       >[0]["port"],
@@ -192,6 +200,7 @@ describe("session workflows", () => {
     });
     const workflows = createWebuiSessionWorkflows({
       store,
+      composer: purger(),
       port: {
         deleteSession: async () => ({ success: true }),
         loadSessions: async () => ({ sessions: [], hasMore: false }),
@@ -206,6 +215,7 @@ describe("session workflows", () => {
     const store = createWebuiSessionStore();
     const workflows = createWebuiSessionWorkflows({
       store,
+      composer: purger(),
       port: {
         getSessionForkOptions: async () => ({ canFork: false, unavailableReason: "no boundary" }),
         forkSession: async () => ({ session: { sessionId: "forked" } }),

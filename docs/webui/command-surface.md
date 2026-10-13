@@ -12,6 +12,24 @@ yet, not that it publishes nothing.
 
 | Business | Declaration | Member | Declared in |
 | --- | --- | --- | --- |
+| composer | `WebuiComposerStore` | `adoptHome` | `application/composer-store.ts` |
+| composer | `WebuiComposerStore` | `getSnapshot` | `application/composer-store.ts` |
+| composer | `WebuiComposerStore` | `purgeSlot` | `application/composer-store.ts` |
+| composer | `WebuiComposerStore` | `readDraft` | `application/composer-store.ts` |
+| composer | `WebuiComposerStore` | `readHistory` | `application/composer-store.ts` |
+| composer | `WebuiComposerStore` | `readMentionRange` | `application/composer-store.ts` |
+| composer | `WebuiComposerStore` | `readModes` | `application/composer-store.ts` |
+| composer | `WebuiComposerStore` | `readQueue` | `application/composer-store.ts` |
+| composer | `WebuiComposerStore` | `readRetry` | `application/composer-store.ts` |
+| composer | `WebuiComposerStore` | `readStaging` | `application/composer-store.ts` |
+| composer | `WebuiComposerStore` | `recordInput` | `application/composer-store.ts` |
+| composer | `WebuiComposerStore` | `setDraft` | `application/composer-store.ts` |
+| composer | `WebuiComposerStore` | `setMentionRange` | `application/composer-store.ts` |
+| composer | `WebuiComposerStore` | `setModes` | `application/composer-store.ts` |
+| composer | `WebuiComposerStore` | `setQueue` | `application/composer-store.ts` |
+| composer | `WebuiComposerStore` | `setRetry` | `application/composer-store.ts` |
+| composer | `WebuiComposerStore` | `setStaging` | `application/composer-store.ts` |
+| composer | `WebuiComposerStore` | `subscribe` | `application/composer-store.ts` |
 | goal | `WebuiGoalCoordinator` | `applyGoal` | `application/goal-coordinator.ts` |
 | goal | `WebuiGoalCoordinator` | `clearGoal` | `application/goal-coordinator.ts` |
 | goal | `WebuiGoalCoordinator` | `createGoal` | `application/goal-coordinator.ts` |

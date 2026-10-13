@@ -82,6 +82,15 @@ const BUSINESSES = [
     ],
   },
   {
+    business: "composer",
+    // §5.6's composer row: the owner module is `application/composer-store.ts`, and
+    // its published commands are what B3's session delete invokes (`purgeSlot`).
+    // Recorded by ticket #68, which consumes that command.
+    declarations: [
+      { module: "application/composer-store.ts", name: "WebuiComposerStore" },
+    ],
+  },
+  {
     business: "goal",
     // §4 criterion C: `goal` owns state, has its own lifecycle events and
     // publishes commands, while no component ever names it. §5.6 gives the carve
