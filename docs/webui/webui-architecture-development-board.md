@@ -151,3 +151,13 @@ Authority snapshot: `486dc644838f403a1956786d1e821a5039702bcc` (pushed document 
 Issues are child issues of the specification and use native blocking edges. Every body retains a readable Source and explicit textual blockers as an auditable mirror. Before dispatch, read the current issue body/dependencies and the cited authority; verify required producing-ticket outputs and do not rely on comments alone to discharge an edge.
 
 No implementation issue is closed or claimed in this preparation. Repository product gates, live behavior and performance remain implementation acceptance, not evidence inferred from publication. Existing command-generator path drift is carried by T01.
+
+## Execution state
+
+Appended after publication; the publication contract and receipt above are unchanged, and the tracker issues remain the source of truth for per-ticket status and evidence. The machine-readable record is `executionState` in `webui-architecture-tickets.json`.
+
+| As of | Branch | Commits | T01 | Frontier |
+| --- | --- | --- | --- | --- |
+| 2026-10-13 | `feat/webui-t01-conformance-gates` | `138ea4fc`, `801e0bad` | implemented locally; acceptance evidence on [#127](https://github.com/mcode-webui/minimax-code/issues/127) | T02, T14, T17 |
+
+The branch is local: T01's commits were not pushed. T02 (`application-assembly-lifecycle`), T14 (`network-registry-injection`) and T17 (`runtime-quota-request-projection-boundary`) are the executable dependents of T01's outputs.

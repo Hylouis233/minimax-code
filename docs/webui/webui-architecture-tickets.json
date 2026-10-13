@@ -1031,6 +1031,25 @@
     ]
   },
   "partitionRule": "The mixed workspace query file has two disjoint produced responsibilities: T10 produces review queries, T11 produces files/environment queries. Large-file carrier describes completion of its responsibility cut, not exclusive edits; all producing targets above remain unique. T19 consumes factories/state moved by prior business tickets rather than producing them again. T18 moves only the platform/generic UI residual population.",
+  "executionState": {
+    "comment": "Appended after publication; the publication receipt below is unchanged. The tracker issues stay the source of truth for per-ticket status and evidence.",
+    "asOf": "2026-10-13",
+    "branch": "feat/webui-t01-conformance-gates",
+    "baseCommit": "4affbc0478d02cc4294946e0dba7f3c25789eb26",
+    "commits": [
+      "138ea4fc",
+      "801e0bad"
+    ],
+    "published": false,
+    "tickets": {
+      "T01": "implemented locally, acceptance evidence recorded on #127"
+    },
+    "frontier": [
+      "T02",
+      "T14",
+      "T17"
+    ]
+  },
   "publicationVerification": {
     "status": "PASS",
     "date": "2026-10-13",
