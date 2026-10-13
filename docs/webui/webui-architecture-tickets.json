@@ -1080,7 +1080,8 @@
       "7b3a0807",
       "39fc07f6",
       "3c454bc8",
-      "7803d467"
+      "7803d467",
+      "9fba8e90"
     ],
     "published": false,
     "tickets": {
@@ -1092,7 +1093,7 @@
       "T06": "closed 2026-10-14, acceptance evidence recorded on #132",
       "T10": "closed 2026-10-14 (issue #136, comment 6156644369): both review families have their own owners and both consumers are browser-verified",
       "T14": "closed 2026-10-14 (issue #140, comment 6156919983): the host assembles the registry and the terminal-process port; the service binds what it was handed",
-      "T07": "in progress: the sessions owner's files and rail UI have their homes, the rail's platform read is injected, and the catalogue already feeds both query views from one entity map; the remaining acceptance work is the delete purge/tombstone evidence and the archive/import/export browser entry paths"
+      "T07": "in progress: acceptance 1, 2 (with one recorded peer edge), 3, 4 and 5 are delivered and verified; acceptance 6 is delivered for the rail and the archived surface, and the import/export browser entries are the last item"
     },
     "frontier": [
       "T07",
@@ -1101,9 +1102,8 @@
       "T17"
     ],
     "notes": [
-      "T07 slice 2 (7803d467): components/sessions/* -> features/sessions/ui/; the rail's team-mode tooltip is injected from the composition root instead of imported from the platform layer; the six cross-business reads the rail carries are recorded as reviewed peer entries naming the ticket that retires each.",
-      "T07 acceptance status as of 7803d467: (1) catalogue/activity/overlays owned in features/sessions with one entity map feeding both query views - already true by construction (patchWebuiCatalogEntity + selectWebuiCatalogFlatPage/TreePage). (2) lifecycle commands exposed as WebuiSessionWorkflows (rename/archive/archiveMany/remove/unarchive/fork/createSession/importSession/loadFlat/loadTree/refresh) and the shell holds no transport call for session entities; the transcript's message-level fork still reads the sessions port through a recorded peer edge. (5) rail units moved as cohesive interaction groups.",
-      "T07 remaining: (3) delete purge/tombstone evidence - failed deletion retains state and accepted late work cannot resurrect the id; (6) browser entry paths for archive/import/export (the rail's search/pin/star/menu/unread paths already have specs: rail-search, rail-pin, rail-star, rail-context-menu, unread-persistence)."
+      "T07 slice 3 (9fba8e90): the delete teardown's failure half is pinned (a refused delete purges nothing, keeps the selection and delivery leases, and drops the settlement lease it took) and so is the interest revocation on a successful delete; the archived entry surface now has a built-client case (rail menu archives -> archived settings page reads it through the same owner -> 取消归档 takes it back with {id, archived:false}).",
+      "T07's last item: the import/export browser entry paths. Both are HTTP (POST /session-import, GET /session-transfer), and the browser harness answers only the WebSocket: it has no HTTP server, so a browser case needs the harness to serve or intercept those two routes. The routes themselves are already covered over a real WebuiService and loopback HTTP (session-transfer-route.test.ts) and so are the client adapters (session-transfer-download.test.ts); what is missing is only the rail's button + file-picker entry, so the browser case can stub the network and say so."
     ]
   },
   "publicationVerification": {
