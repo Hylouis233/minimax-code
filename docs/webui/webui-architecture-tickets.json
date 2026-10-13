@@ -1076,7 +1076,7 @@
       "T17"
     ],
     "notes": [
-      "T05 C4 evidence: the correction (a session switch resets the goal presentation without clearing the retained goal) is pinned by a source tripwire in goal-interaction-prohibitions.test.ts, verified to discriminate (restoring the old clear fails it). The browser regression case is still not in the repository: it passes standalone, and in the full browser run the post-switch banner still shows the PREVIOUS session's goal while the rail reports the new session active. That symptom is unexplained and is the item that keeps T05 open.",
+      "T05 C4 evidence: the correction (a session switch resets the goal presentation without clearing the retained goal) is pinned by a source tripwire in goal-interaction-prohibitions.test.ts, verified to discriminate (restoring the old clear fails it). The browser regression case is still not in the repository, and its in-suite behaviour is now narrowed: with a per-session goal fixture the full browser run shows NO banner for the session that was opened, i.e. the goal event emitted for the second session did not commit in that run, while the same case passes standalone. Follow-up: find why the second session's goal event does not land in the full-suite run (fixture channel acceptance vs. the case's emit timing), then land the case.",
       "T05 effects-registry removal landed as 2a8c7fcf: the earlier browser failure was a legitimate behaviour change (an accepted channel reconciles the session's goal per §4.3), not a regression."
     ]
   },
