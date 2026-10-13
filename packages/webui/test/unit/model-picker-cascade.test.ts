@@ -28,7 +28,7 @@ import {
   modelHasSettings,
   rowHasFlyout,
   thinkingCommitOutcome,
-} from "../../src/client/projection/model-picker-cascade.js";
+} from "../../src/client/projection/models/model-picker-cascade.js";
 import {
   FLYOUT_ANCHOR_GAP,
   flyoutStyle,

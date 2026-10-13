@@ -151,7 +151,7 @@ import type { WebuiWorkspaceGitChangedSignal } from "../../projection/workspace-
 import { ConnectionStatus } from "./ConnectionStatus.js";
 import { deriveConversationUsageNotice } from "../../projection/message-projection.js";
 import { deriveRecentWorkspaceDirs } from "../../projection/composer/composer-state.js";
-import { normalizeFavoriteModelIds } from "../../projection/model-favorites.js";
+import { normalizeFavoriteModelIds } from "../../projection/models/model-favorites.js";
 
 // The hash plumbing moved to `client/bindings/navigation.ts` (plan §7.2). Both
 // symbols stay re-exported here: `main.tsx` re-exports `subscribeToSessionHash`

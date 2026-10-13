@@ -24,7 +24,7 @@ import { describe, expect, it } from "vitest";
 import {
   MODEL_FLYOUT_HOVER_DELAY_MS,
   hoverArrival,
-} from "../../src/client/projection/model-picker-hover.js";
+} from "../../src/client/projection/models/model-picker-hover.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const componentDir = path.resolve(here, "../../src/client/components");

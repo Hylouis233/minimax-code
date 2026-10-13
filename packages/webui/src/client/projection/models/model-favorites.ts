@@ -20,7 +20,7 @@
  * infrastructure adapter rather than reaching for browser globals, so a
  * server render cannot touch storage.
  */
-import type { WebuiModelProviderGroup } from "../contracts/models/model-view.js";
+import type { WebuiModelProviderGroup } from "../../contracts/models/model-view.js";
 
 /** The section id the favourites list renders under. */
 export const FAVORITES_SECTION_ID = "__favorites";

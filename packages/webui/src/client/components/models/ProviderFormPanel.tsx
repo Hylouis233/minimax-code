@@ -22,8 +22,8 @@ import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalList
 import { CSS } from "@dnd-kit/utilities";
 
 import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
-import { reorderModelIds } from "../../projection/model-reorder.js";
-import { projectProviderHeaders, type ProviderHeaderDraft } from "../../projection/usage-settings.js";
+import { reorderModelIds } from "../../projection/models/model-reorder.js";
+import { projectProviderHeaders, type ProviderHeaderDraft } from "../../projection/models/usage-settings.js";
 import { recordOf, textOf } from "../../contracts/value-readers.js";
 import { ToggleSwitch } from "../shared/ToggleSwitch.js";
 import { CloseIcon, IconButton, RefreshIcon } from "../settings/settings-atoms.js";

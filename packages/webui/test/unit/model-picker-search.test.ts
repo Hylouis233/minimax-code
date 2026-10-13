@@ -25,13 +25,13 @@ import {
   filterModelGroups,
   fuzzyMatches,
   isSearchEmpty,
-} from "../../src/client/projection/model-picker-search.js";
+} from "../../src/client/projection/models/model-picker-search.js";
 import {
   FAVORITES_SECTION_ID,
   normalizeFavoriteModelIds,
   orderModelGroups,
   toggleFavoriteId,
-} from "../../src/client/projection/model-favorites.js";
+} from "../../src/client/projection/models/model-favorites.js";
 import { createWebuiBrowserStorage } from "../../src/client/infrastructure/storage.js";
 import type { WebuiModelPickerEntry } from "../../src/client/contracts/models/model-view.js";
 

@@ -20,7 +20,7 @@ import {
   isThinkingOn,
   resolveThinkingVerdict,
   thinkingControlShape,
-} from "../../src/client/projection/thinking-control.js";
+} from "../../src/client/projection/models/thinking-control.js";
 import { ThinkingTrigger } from "../../src/client/components/composer/ThinkingTrigger.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));

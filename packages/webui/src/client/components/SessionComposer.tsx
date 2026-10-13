@@ -53,7 +53,7 @@ import {
   contextBreakdownRows,
   drawableBreakdownRows,
 } from "../projection/composer/context-breakdown.js";
-import { isTokenPlanModel } from "../projection/token-plan-model.js";
+import { isTokenPlanModel } from "../projection/models/token-plan-model.js";
 import type { WebuiRecordedTurn } from "../projection/composer/composer-state.js";
 import type {
   WebuiComposerAttachment,
@@ -132,7 +132,7 @@ import {
   chipLevelLabel,
   resolveEffortOptions,
   thinkingDraftPatch,
-} from "../projection/thinking-control.js";
+} from "../projection/models/thinking-control.js";
 import {
   WebuiIconAttach,
   WebuiIconCheck,

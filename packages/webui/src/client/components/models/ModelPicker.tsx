@@ -42,25 +42,25 @@ import { evaluateOutsideClose } from "../../projection/common/outside-close.js";
 import {
   resolveEffortOptions,
   thinkingDraftPatch,
-} from "../../projection/thinking-control.js";
+} from "../../projection/models/thinking-control.js";
 import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
 import {
   filterModelGroups,
   isSearchEmpty,
-} from "../../projection/model-picker-search.js";
+} from "../../projection/models/model-picker-search.js";
 import {
   orderModelGroups,
   toggleFavoriteId,
-} from "../../projection/model-favorites.js";
+} from "../../projection/models/model-favorites.js";
 import {
   isPreview,
   rowHasFlyout,
   type CascadeTier,
-} from "../../projection/model-picker-cascade.js";
+} from "../../projection/models/model-picker-cascade.js";
 import {
   MODEL_FLYOUT_HOVER_DELAY_MS,
   hoverArrival,
-} from "../../projection/model-picker-hover.js";
+} from "../../projection/models/model-picker-hover.js";
 import {
   ModelSettingsFlyout,
   type ModelSettingsFlyoutProps,

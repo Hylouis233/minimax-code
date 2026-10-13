@@ -25,7 +25,7 @@
 import type {
   WebuiModelPickerDraft,
   WebuiModelPickerEntry,
-} from "../contracts/models/model-view.js";
+} from "../../contracts/models/model-view.js";
 
 /** Which control shape a model's thinking options render as. */
 export type ThinkingControlShape = "switch" | "radiogroup" | null;

@@ -44,7 +44,7 @@ import {
   positionFlyout,
   type FlyoutRect,
 } from "../../projection/common/flyout-position.js";
-import { resolveThinkingVerdict } from "../../projection/thinking-control.js";
+import { resolveThinkingVerdict } from "../../projection/models/thinking-control.js";
 import type { WebuiModelPickerDraft, WebuiModelPickerEntry } from "../../contracts/models/model-view.js";
 
 function formatContextWindow(value: number): string {
