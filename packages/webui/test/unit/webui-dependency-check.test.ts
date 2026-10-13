@@ -65,7 +65,11 @@ afterAll(() => {
  * Writes a synthetic `${repositoryRoot}/packages/webui/src` tree and returns the
  * parsed, resolved evaluation, using the same builder and rules as the CLI.
  */
-function evaluateFixture(files: Record<string, string>, options: ts.CompilerOptions = compilerOptions) {
+function evaluateFixture(
+  files: Record<string, string>,
+  options: ts.CompilerOptions = compilerOptions,
+  approved: readonly { readonly from: string; readonly to: string }[] = [],
+) {
   const root = mkdtempSync(path.join(os.tmpdir(), "webui-dependency-"));
   temporaryRoots.push(root);
   const sourceRoot = path.join(root, "packages/webui/src");
@@ -81,7 +85,9 @@ function evaluateFixture(files: Record<string, string>, options: ts.CompilerOpti
     compilerOptions: { ...options, baseUrl: options.baseUrl ?? sourceRoot },
     files: absoluteFiles,
   });
-  return { graph, result: evaluateGraph(graph) };
+  // A fixture graph states its own approved peers: the repository's list names
+  // files the fixture does not contain, which the rule would report as stale.
+  return { graph, result: evaluateGraph(graph, { approvedPeerImports: approved }) };
 }
 
 function runCli(args: string[]) {
@@ -189,7 +195,7 @@ describe("layer matrix", () => {
     expect(classifyLayers("client/projection/common/router.ts")).toEqual(["view"]);
     expect(classifyLayers("client/projection/sessions/rail-buckets.ts")).toEqual(["view"]);
     expect(classifyLayers("client/components/composer/slash-palette.ts")).toEqual(["bindings"]);
-    expect(classifyLayers("client/components/transcript/markdown.tsx")).toEqual(["bindings"]);
+    expect(classifyLayers("client/features/transcript/ui/markdown.tsx")).toEqual(["bindings"]);
     expect(classifyLayers("client/components/shell/icons.tsx")).toEqual(["bindings"]);
     expect(classifyLayers("client/components/shell/ConnectionStatus.tsx")).toEqual(["bindings"]);
   });

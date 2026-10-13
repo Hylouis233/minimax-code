@@ -142,7 +142,7 @@ import {
   WebuiIconSkillGeneric,
   type WebuiIconProps,
 } from "../shell/icons.js";
-import { OutputError } from "../transcript/OutputError.js";
+import { OutputError } from "../../features/transcript/ui/OutputError.js";
 import {
   resolveWebuiSubmissionIntent,
   resolveWebuiComposerEnterAction,

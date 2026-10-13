@@ -214,7 +214,7 @@ describe("the duplicate-owner rule", () => {
       // A business still waiting to migrate keeps its current home while another
       // business has already moved: the rule compares business and role, so two
       // different businesses never collide across homes.
-      "client/components/transcript/SessionTranscript.tsx": leaf,
+      "client/features/transcript/ui/SessionTranscript.tsx": leaf,
       "client/application/models/models-workflows.ts": leaf,
     });
     expect(roleRule(graph, []).violations).toEqual([]);
@@ -447,7 +447,7 @@ describe("the call-site rule follows the role, not the prefix", () => {
         "void port.submitTurn({});",
       ),
     });
-    const result = evaluateGraph(graph);
+    const result = evaluateGraph(graph, { approvedPeerImports: [] });
     expect(result.forbiddenCalls).toHaveLength(1);
     expect(result.forbiddenCalls[0]).toMatchObject({
       file: "client/features/composer/ui/ComposerPanel.tsx",
@@ -480,7 +480,7 @@ describe("the call-site rule follows the role, not the prefix", () => {
         ),
       });
       expect(
-        evaluateGraph(graph).forbiddenCalls.map((violation) => violation.target),
+        evaluateGraph(graph, { approvedPeerImports: [] }).forbiddenCalls.map((violation) => violation.target),
         label,
       ).toEqual(["ComposerPort.submitTurn"]);
     }
@@ -495,8 +495,8 @@ describe("the call-site rule follows the role, not the prefix", () => {
         "export function use(onSubmit: (body: unknown) => Promise<void>): void {\n" +
         "  void onSubmit({});\n}\n",
     });
-    expect(evaluateGraph(graph).forbiddenCalls).toEqual([]);
-    expect(evaluateGraph(graph).pass).toBe(true);
+    expect(evaluateGraph(graph, { approvedPeerImports: [] }).forbiddenCalls).toEqual([]);
+    expect(evaluateGraph(graph, { approvedPeerImports: [] }).pass).toBe(true);
   });
 
   it("keeps a feature's bindings and application free to hold the capability", () => {
@@ -511,7 +511,7 @@ describe("the call-site rule follows the role, not the prefix", () => {
         "void port.submitTurn({});",
       ),
     });
-    expect(evaluateGraph(graph).forbiddenCalls).toEqual([]);
+    expect(evaluateGraph(graph, { approvedPeerImports: [] }).forbiddenCalls).toEqual([]);
   });
 
   it("rejects a writer factory held by presentation, in either spelling", () => {
@@ -527,7 +527,7 @@ describe("the call-site rule follows the role, not the prefix", () => {
         'export function use(store: WebuiSessionStore): void {\n  store.createSessionWriter("session");\n}\n',
     });
     expect(
-      evaluateGraph(graph)
+      evaluateGraph(graph, { approvedPeerImports: [] })
         .forbiddenCalls.map((violation) => violation.file)
         .sort(),
     ).toEqual([
@@ -552,7 +552,7 @@ describe("the role rules feed the dependency gate", () => {
       "client/features/composer/application/submit.ts":
         'export { leaf } from "../../goal/application/goal-coordinator.js";\n',
     });
-    const result = evaluateGraph(graph);
+    const result = evaluateGraph(graph, { approvedPeerImports: [] });
     expect(result.roleViolations.map((violation) => violation.rule).sort()).toEqual([
       "private-peer-import",
       "role-import",

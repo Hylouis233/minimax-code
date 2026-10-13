@@ -8,13 +8,13 @@
 
 import { useState, type ReactElement } from "react";
 import { WebuiMarkdown } from "./markdown.js";
-import { basenamePath } from "../../projection/common/paths.js";
-import { parseWebuiMessageFileReference, type WebuiMessageFileReference } from "../../features/transcript/projection/message-file-reference.js";
-import { webuiActivitySummary } from "../../features/transcript/projection/tool-projection.js";
+import { basenamePath } from "../../../projection/common/paths.js";
+import { parseWebuiMessageFileReference, type WebuiMessageFileReference } from "../projection/message-file-reference.js";
+import { webuiActivitySummary } from "../projection/tool-projection.js";
 import { MessageAttachments, type MessageAttachment } from "./MessageAttachments.js";
-import type { WebuiTurnDiffView } from "../../../shared/contracts/session.js";
-import type { WebuiTranscriptProcessSegment, WebuiTranscriptActivityPart } from "../../features/transcript/contracts/transcript-view.js";
-import type { WebuiTransport } from "../../contracts/transport.js";
+import type { WebuiTurnDiffView } from "../../../../shared/contracts/session.js";
+import type { WebuiTranscriptProcessSegment, WebuiTranscriptActivityPart } from "../contracts/transcript-view.js";
+import type { WebuiTransport } from "../../../contracts/transport.js";
 
 /** Capability subset the assistant body passes through to its diff card.
  *  Single source of truth lives in `WebuiTransport`; this alias keeps the

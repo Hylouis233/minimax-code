@@ -1,4 +1,15 @@
 {
   "comment": "Cross-business imports the WebUI role check accepts deliberately. Plan §5.3.2 lets a feature import another feature's *approved public* interface; a feature's contracts are its published surface and need no entry, but any other cross-business edge does. Each entry names both files so a reviewer sees the exact dependency, and a `reason` so the next migration can judge whether it should survive. An entry that no longer matches a measured edge fails the check (see `roleRule`), so the list shrinks as ownership transfers instead of accumulating.",
-  "entries": []
+  "entries": [
+    {
+      "from": "client/features/transcript/ui/PlanDelivery.tsx",
+      "to": "client/components/interactions/PlanModeCards.tsx",
+      "reason": "The transcript renders the interaction business's plan decision card as the response surface of a plan turn (plan 5.2 transcript row: uses the interaction answer API). The card is that business's own UI; this edge becomes a peer's public UI when interactions migrates to features/interactions/ui/, and the entry goes then."
+    },
+    {
+      "from": "client/features/transcript/ui/MessageItem.tsx",
+      "to": "client/projection/sessions/action-requests.ts",
+      "reason": "The transcript's message actions build session commands (fork / edit / rewind). Those builders are the sessions business's public command shape, filed under its projection until sessions publishes its command surface; the entry goes when it does."
+    }
+  ]
 }

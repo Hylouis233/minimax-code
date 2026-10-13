@@ -21,7 +21,7 @@ import {
 import { ArchonShell } from "./ArchonShell.js";
 import { WEBUI_COMPOSER_HOME_KEY } from "../../application/composer/composer-history.js";
 import { Composer } from "../composer/Composer.js";
-import { GreetingSkeleton } from "../transcript/TranscriptSkeletons.js";
+import { GreetingSkeleton } from "../../features/transcript/ui/TranscriptSkeletons.js";
 import { LeftRail } from "../sessions/LeftRail.js";
 import {
   readProjectNames,
@@ -31,7 +31,7 @@ import {
   toggleSessionOverlay,
   writeProjectName,
 } from "../../infrastructure/storage.js";
-import { Transcript } from "../transcript/Transcript.js";
+import { Transcript } from "../../features/transcript/ui/Transcript.js";
 import { UserMenu } from "../account/UserMenu.js";
 import { MEMORY_HANDOFF_PROMPT, type MemoryHandoff } from "../settings/MemoryManagerDialog.js";
 import {
@@ -58,7 +58,7 @@ import {
 import { ConversationUsageBanner } from "../account/ConversationUsageBanner.js";
 import { PluginCatalogue } from "../plugins/PluginCatalogue.js";
 import { WebuiComposer } from "../composer/WebuiComposer.js";
-import { WebuiSessionTranscript } from "../transcript/SessionTranscript.js";
+import { WebuiSessionTranscript } from "../../features/transcript/ui/SessionTranscript.js";
 import {
   WebuiProjectList,
   filterWebuiSessionsByQuery,

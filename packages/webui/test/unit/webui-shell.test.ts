@@ -34,7 +34,7 @@ import {
   sessionHash,
   sortWebuiProjectSessionIds,
 } from "../../src/client/components/sessions/SessionRail.js";
-import { WebuiSessionTranscript as BaseWebuiSessionTranscript } from "../../src/client/components/transcript/SessionTranscript.js";
+import { WebuiSessionTranscript as BaseWebuiSessionTranscript } from "../../src/client/features/transcript/ui/SessionTranscript.js";
 import { WebuiWorkspaceDirectoryBrowser } from "../../src/client/components/workspace/WebuiWorkspaceDirectoryBrowser.js";
 import {
   WebuiIconContextArchive,
@@ -51,7 +51,7 @@ import {
   TurnElapsedRow,
   WebuiThinkingBlock,
   WebuiToolResults,
-} from "../../src/client/components/transcript/TranscriptPrimitives.js";
+} from "../../src/client/features/transcript/ui/TranscriptPrimitives.js";
 import {
   WebuiClientFoundationApp,
   readSessionIdFromHash,

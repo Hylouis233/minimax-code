@@ -55,7 +55,7 @@ describe("the diff machine has one owner", () => {
   });
 
   it("leaves the transcript's card with no machine of its own", () => {
-    const card = flat(read("components/transcript/DiffCard.tsx"));
+    const card = flat(read("features/transcript/ui/DiffCard.tsx"));
     // It CALLS the machine (every state update goes through it) and does not
     // declare one: no reducer, no initial-state literal, no switch, no copy table.
     expect(card).not.toContain("export function reduceWebuiDiffState(");
@@ -64,7 +64,10 @@ describe("the diff machine has one owner", () => {
     expect(card).toContain("reduceWebuiDiffState(current,");
     expect(card).not.toContain("WEBUI_DIFF_FAILURE_COPY");
     // ...and it reads the owner instead.
-    expect(card).toContain('from "../../features/transcript/projection/review-state.js"');
+    // The card and the machine are siblings in the transcript's feature home, so
+    // the card reads it by a sibling path; what matters is that it reads the
+    // review owner rather than declaring a machine of its own.
+    expect(card).toContain('from "../projection/review-state.js"');
   });
 
   it("keeps the failure copy in exactly one module", () => {
@@ -85,12 +88,16 @@ describe("the two readers share it", () => {
     // `components/workspace/` in ticket #70, so a hardcoded path went stale
     // while the acceptance ("one owner, two readers") still held. Scanning the
     // tree makes a third reader fail here and a relocation a no-op.
-    const readers = modulesUnder("components/")
-      .filter((file) => read(file).includes("/features/transcript/projection/review-state.js"))
+    // The transcript's card now lives in the feature home and reads the owner by a
+    // sibling path, so the scan covers both homes and matches the imported module
+    // rather than a path fragment: what is asserted is "one owner, two readers",
+    // not where either of them sits.
+    const readers = [...modulesUnder("components/"), ...modulesUnder("features/")]
+      .filter((file) => /from "[^"]*\breview-state\.js"/u.test(read(file)))
       .sort();
     expect(readers).toEqual([
-      "components/transcript/DiffCard.tsx",
       "components/workspace/ReviewSettingsPage.tsx",
+      "features/transcript/ui/DiffCard.tsx",
     ]);
   });
 

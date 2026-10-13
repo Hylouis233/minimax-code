@@ -23,7 +23,7 @@
 
 import { useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
-import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
+import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import {
   WebuiIconMessageCopy,
   WebuiIconMessageCopied,
@@ -35,12 +35,12 @@ import {
   WebuiIconMessageLikeOff,
   WebuiIconMessageLikeOn,
   WebuiIconMessageRewind,
-} from "../shell/icons.js";
-import type { WebuiGetSessionRewindPreviewResult } from "../../../shared/contracts/session.js";
-import type { WebuiMessageActionCapabilities } from "../../features/transcript/contracts/transcript-view.js";
-import { formatWebuiMessageTimestamp } from "../../features/transcript/projection/message-timestamp.js";
-import { toggleWebuiFeedback, copyWebuiMessageText, scheduleWebuiCopiedReset } from "../../application/transcript/message-feedback.js";
-import type { WebuiCopyDependencies } from "../../application/transcript/message-feedback.js";
+} from "../../../components/shell/icons.js";
+import type { WebuiGetSessionRewindPreviewResult } from "../../../../shared/contracts/session.js";
+import type { WebuiMessageActionCapabilities } from "../contracts/transcript-view.js";
+import { formatWebuiMessageTimestamp } from "../projection/message-timestamp.js";
+import { toggleWebuiFeedback, copyWebuiMessageText, scheduleWebuiCopiedReset } from "../../../application/transcript/message-feedback.js";
+import type { WebuiCopyDependencies } from "../../../application/transcript/message-feedback.js";
 
 export function WebuiMessageActionButton({
   testId,

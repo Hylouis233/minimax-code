@@ -8,7 +8,7 @@ import {
   initialWebuiDiffState,
   reduceWebuiDiffState,
 } from "../../src/client/features/transcript/projection/review-state.js";
-import { WebuiDiffCard } from "../../src/client/components/transcript/DiffCard.js";
+import { WebuiDiffCard } from "../../src/client/features/transcript/ui/DiffCard.js";
 import { WebuiGoalBanner } from "../../src/client/components/goal/GoalBanner.js";
 import { WebuiInteractionPanel } from "../../src/client/components/interactions/InteractionPanel.js";
 import { chunkWebuiWorkspaceReviewFileIds, WebuiDiffFileSection } from "../../src/client/components/workspace/WorkspacePanels.js";
@@ -17,9 +17,9 @@ import {
   WebuiFeedbackActions,
   WebuiMessageActions,
   WebuiRewindDialog,
-} from "../../src/client/components/transcript/MessageActions.js";
+} from "../../src/client/features/transcript/ui/MessageActions.js";
 import { copyWebuiMessageText, scheduleWebuiCopiedReset, toggleWebuiFeedback } from "../../src/client/application/transcript/message-feedback.js";
-import { MessageItem } from "../../src/client/components/transcript/MessageItem.js";
+import { MessageItem } from "../../src/client/features/transcript/ui/MessageItem.js";
 import { PluginCatalogue } from "../../src/client/components/plugins/PluginCatalogue.js";
 import {
   buildWebuiEditRequest,
@@ -40,8 +40,8 @@ import {
 } from "../../src/client/projection/interactions/questionnaire-state.js";
 import {
   DEFAULT_THINKING_PHRASE_ROTATION_INTERVAL_MS,
-} from "../../src/client/components/transcript/ActivityIndicator.js";
-import { computeThinkingPhraseStartDelay, pickWeightedPhrase, shouldPlayActivityIndicator, bucketPhrases, type ThinkingPhraseSet } from "../../src/client/projection/turn/activity-phrase.js";
+} from "../../src/client/features/transcript/ui/ActivityIndicator.js";
+import { computeThinkingPhraseStartDelay, pickWeightedPhrase, shouldPlayActivityIndicator, bucketPhrases, type ThinkingPhraseSet } from "../../src/client/ui/activity-phrase.js";
 import { initialWebuiStreamState, reduceWebuiStreamFrame } from "../../src/client/projection/turn/stream-state.js";
 import {
   getSessionDiffOperation,

@@ -18,7 +18,7 @@
 
 import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "node:fs";
-import { SKELETON_CONTENT_MAX_WIDTH_PX } from "../../src/client/components/transcript/TranscriptSkeletons.js";
+import { SKELETON_CONTENT_MAX_WIDTH_PX } from "../../src/client/features/transcript/ui/TranscriptSkeletons.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -520,7 +520,7 @@ describe("W0 · structural declarations W5 must preserve", () => {
     // can drift again.
     const skeletons = readFileSync(
       new URL(
-        "../../src/client/components/transcript/TranscriptSkeletons.tsx",
+        "../../src/client/features/transcript/ui/TranscriptSkeletons.tsx",
         import.meta.url,
       ),
       "utf8",

@@ -2141,8 +2141,14 @@ export const rules = Object.freeze([
  *   roleViolations: Array<object>,
  * }}
  */
-export function evaluateGraph(graph) {
-  const results = rules.map((rule) => rule(graph));
+export function evaluateGraph(graph, options = {}) {
+  // The approved-peer list is injectable so a fixture graph can state its own:
+  // entries that name files the graph does not contain are stale by construction
+  // and would fail every fixture that is not about them.
+  const approved = options.approvedPeerImports ?? loadApprovedPeerImports();
+  const results = rules.map((rule) =>
+    rule === roleRule ? rule(graph, approved) : rule(graph),
+  );
   const direction = results[0].violations;
   const browserOnly = results[1].violations;
   const browserGlobals = results[2].violations;

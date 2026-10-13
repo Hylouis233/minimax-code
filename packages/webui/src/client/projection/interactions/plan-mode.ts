@@ -48,22 +48,7 @@ export const WEBUI_PLAN_COPY = {
   send: "发送",
 } as const;
 
-/** Whether this request is a plan-mode request at all. The desktop gates every
- *  plan surface on the same predicate (`mode === "plan"`). */
-export function isWebuiPlanRequest(
-  request: WebuiQuestionnaireRequest | undefined,
-): boolean {
-  return request?.mode === "plan";
-}
 
-/** A plan request that already carries the written plan file. This is what the
- *  desktop calls `planReview`, and it selects the decision card over the
- *  entry confirmation. */
-export function isWebuiPlanReviewRequest(
-  request: WebuiQuestionnaireRequest | undefined,
-): boolean {
-  return isWebuiPlanRequest(request) && request?.modePayload?.planReview !== undefined;
-}
 
 /** A plan request that has NOT reached a written file — the runtime asking
  *  permission to enter plan mode at all. The complement of
@@ -74,20 +59,7 @@ export function isWebuiPlanEnterRequest(
   return isWebuiPlanRequest(request) && request?.modePayload?.planReview === undefined;
 }
 
-/** The plan markdown, or "" when the request has not reached the file yet. */
-export function webuiPlanMarkdown(
-  request: WebuiQuestionnaireRequest | undefined,
-): string {
-  return request?.modePayload?.planReview?.markdown ?? "";
-}
 
-/** The plan file's absolute path, or undefined. */
-export function webuiPlanPath(
-  request: WebuiQuestionnaireRequest | undefined,
-): string | undefined {
-  const path = request?.modePayload?.planReview?.path;
-  return path === undefined || !path.trim() ? undefined : path;
-}
 
 /** The warning line the desktop shows under the plan title, taken from the
  *  `plan-review` step's description. */
@@ -283,3 +255,16 @@ export function buildWebuiPlanEnterAnswers(
     },
   ];
 }
+
+// The published derivations (see `contracts/interactions/plan-mode.ts`), re-exported
+// for the surfaces that already read them from this module. They are
+// re-exported here for the surfaces that already read them from this module; a
+// consumer outside the interactions business reads the contract.
+import { isWebuiPlanRequest } from "../../contracts/interactions/plan-mode.js";
+
+export {
+  isWebuiPlanRequest,
+  isWebuiPlanReviewRequest,
+  webuiPlanMarkdown,
+  webuiPlanPath,
+} from "../../contracts/interactions/plan-mode.js";

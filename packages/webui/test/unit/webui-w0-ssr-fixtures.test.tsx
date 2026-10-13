@@ -19,9 +19,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   WebuiFeedbackActions,
   WebuiMessageActionButton,
-} from "../../src/client/components/transcript/MessageActions.js";
+} from "../../src/client/features/transcript/ui/MessageActions.js";
 import { LeftRail } from "../../src/client/components/sessions/LeftRail.js";
-import { WebuiQuestionnaireResponse } from "../../src/client/components/transcript/QuestionnaireResponse.js";
+import { WebuiQuestionnaireResponse } from "../../src/client/features/transcript/ui/QuestionnaireResponse.js";
 import {
   mergeOlderTranscriptPage,
   type WebuiOwnedTranscriptState,
@@ -29,7 +29,7 @@ import {
 import {
   WebuiActivityGroup,
   WebuiTurnProcess,
-} from "../../src/client/components/transcript/TranscriptPrimitives.js";
+} from "../../src/client/features/transcript/ui/TranscriptPrimitives.js";
 
 const READ_TOOL = { tool_call_name: "read", tool_call_args: "README.md" };
 const EDIT_TOOL = {

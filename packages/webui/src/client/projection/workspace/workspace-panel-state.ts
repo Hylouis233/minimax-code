@@ -70,20 +70,11 @@ export type WorkspacePanelTab = {
     WebuiWorkspaceTabShapes[K];
 }[WebuiWorkspaceTabKind];
 
-/**
- * The kinds an `open-tab` command may name: exactly those whose add-menu entry is
- * an `open-tab`. Derived, so a kind that gains or loses a menu entry moves this
- * union with it.
- */
-export type WebuiWorkspaceMenuTabKind = Extract<
-  WebuiWorkspaceAddMenuOpen,
-  { readonly type: "open-tab" }
->["kind"];
+// Both unions describe the shape of a panel command, so they live with it in the
+// workspace's contract (see `contracts/workspace/panel-command.ts`); they are
+// re-exported here for the panel code that already read them from this module.
+export type { WebuiWorkspaceAddMenuOpen, WebuiWorkspaceMenuTabKind };
 
-/** How an add-menu entry opens its tab. Data, so the component only dispatches it. */
-export type WebuiWorkspaceAddMenuOpen =
-  | { readonly type: "open-workspace-review" }
-  | { readonly type: "open-tab"; readonly kind: "files" | "canvas" | "terminal" };
 
 export interface WebuiWorkspaceTabKindEntry {
   /** The tab's label, and the add-menu entry's when it has one. */
@@ -211,26 +202,14 @@ export function setWorkspaceSessionProgressPanelOpen(
   return updated;
 }
 
-export type WorkspacePanelCommand =
-  | { readonly type: "open-file"; readonly sessionId: string; readonly workspaceDir: string; readonly path: string; readonly lineStart?: number; readonly lineEnd?: number }
-  /**
-   * Open the session's plan file. It sits in the session's artifacts
-   * directory rather than the workspace, so the content rides along instead of
-   * being read through `readWorkspaceFile`, which refuses to leave the
-   * workspace root.
-   */
-  | { readonly type: "open-plan-file"; readonly sessionId: string; readonly workspaceDir: string; readonly path: string; readonly content: string }
-  | { readonly type: "open-workspace-review"; readonly sessionId: string; readonly workspaceDir: string; readonly selectedPath?: string }
-  | { readonly type: "open-turn-review"; readonly sessionId: string; readonly workspaceDir: string; readonly messageId: string; readonly assistantMessageId?: string; readonly turnId?: string; readonly changeSetId?: string; readonly files: WebuiTurnDiffView["fileChanges"]; readonly selectedPath?: string }
-  | { readonly type: "open-primary-view"; readonly kind: "files"; readonly sessionId?: string; readonly workspaceDir?: string }
-  | { readonly type: "open-tab"; readonly kind: WebuiWorkspaceMenuTabKind; readonly sessionId?: string; readonly workspaceDir?: string }
-  | { readonly type: "select-tab"; readonly tabId: string }
-  | { readonly type: "select-review-file"; readonly tabId: string; readonly path: string }
-  | { readonly type: "set-review-snapshot"; readonly tabId: string; readonly reviewSnapshotId: string }
-  | { readonly type: "close-tab"; readonly tabId: string }
-  | { readonly type: "close-panel" }
-  | { readonly type: "toggle-expanded" }
-  | { readonly type: "toggle-add-menu" };
+import type {
+  WebuiWorkspaceAddMenuOpen,
+  WebuiWorkspaceMenuTabKind,
+  WorkspacePanelCommand,
+} from "../../contracts/workspace/panel-command.js";
+
+export type { WorkspacePanelCommand };
+
 
 export const initialWorkspacePanelState: WorkspacePanelState = {
   open: false,

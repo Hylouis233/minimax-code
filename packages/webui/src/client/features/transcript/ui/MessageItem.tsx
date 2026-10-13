@@ -13,19 +13,19 @@
 
 import { useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
-import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
+import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import type {
   WebuiGetSessionForkOptionsResult,
   WebuiGetSessionRewindPreviewResult,
-} from "../../../shared/contracts/session.js";
-import type { WebuiTransport } from "../../contracts/transport.js";
-import type { WebuiMessageFileReference } from "../../features/transcript/projection/message-file-reference.js";
-import type { WorkspacePanelCommand } from "../../projection/workspace/workspace-panel-state.js";
+} from "../../../../shared/contracts/session.js";
+import type { WebuiTransport } from "../../../contracts/transport.js";
+import type { WebuiMessageFileReference } from "../projection/message-file-reference.js";
+import type { WorkspacePanelCommand } from "../../../contracts/workspace/panel-command.js";
 import type {
   WebuiHistoricalTurnView,
   WebuiLiveTurnView,
   WebuiTurnView,
-} from "../../features/transcript/projection/transcript-shape.js";
+} from "../projection/transcript-shape.js";
 
 /** Capability subset the message item consumes. Single source of truth
  *  lives in `WebuiTransport`; this alias keeps the prop block free of
@@ -42,7 +42,7 @@ type WebuiMessageItemCapabilities = Pick<
   | "editSessionMessage"
 >;
 import { WebuiAssistantBody } from "./AssistantBody.js";
-import { WebuiIconCommandGoal } from "../shell/icons.js";
+import { WebuiIconCommandGoal } from "../../../components/shell/icons.js";
 import {
   WebuiMessageActions,
   WebuiRewindDialog,
@@ -52,7 +52,7 @@ import {
   buildWebuiMessageForkRequest,
   buildWebuiRewindRequest,
   webuiClientRequestId,
-} from "../../projection/sessions/action-requests.js";
+} from "../../../projection/sessions/action-requests.js";
 
 /**
  * The single message renderer shared by persisted history and the live turn.

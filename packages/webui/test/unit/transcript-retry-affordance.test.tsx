@@ -18,8 +18,8 @@ import { describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { OutputError } from "../../src/client/components/transcript/OutputError.js";
-import { WebuiAssistantBody } from "../../src/client/components/transcript/AssistantBody.js";
+import { OutputError } from "../../src/client/features/transcript/ui/OutputError.js";
+import { WebuiAssistantBody } from "../../src/client/features/transcript/ui/AssistantBody.js";
 import { WebuiClientFoundationApp } from "../../src/client/components/shell/WebuiClientFoundationApp.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 import { WebuiApplicationProvider } from "../../src/client/bindings/application-context.js";

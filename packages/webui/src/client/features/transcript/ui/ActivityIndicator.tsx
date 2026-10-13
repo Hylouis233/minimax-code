@@ -27,9 +27,9 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import lottie from "lottie-web";
-import streamingRoseLoaderData from "../../assets/lottie/streaming-rose-loader.json";
-import { bucketPhrases, pickWeightedPhrase, computeThinkingPhraseStartDelay, shouldPlayActivityIndicator } from "../../projection/turn/activity-phrase.js";
-import type { ThinkingPhraseSet } from "../../projection/turn/activity-phrase.js";
+import streamingRoseLoaderData from "../../../assets/lottie/streaming-rose-loader.json";
+import { bucketPhrases, pickWeightedPhrase, computeThinkingPhraseStartDelay, shouldPlayActivityIndicator } from "../../../ui/activity-phrase.js";
+import type { ThinkingPhraseSet } from "../../../ui/activity-phrase.js";
 
 export interface LottiePlayerProps {
   play: boolean;

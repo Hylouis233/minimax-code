@@ -11,9 +11,9 @@
 
 import { useCallback, useState, type ReactElement } from "react";
 
-import type { WebuiQuestionnaireRequest } from "../../../shared/contracts/interactions.js";
-import { webuiPlanMarkdown, webuiPlanPath } from "../../projection/interactions/plan-mode.js";
-import { WebuiPlanDeliveryCard } from "../interactions/PlanModeCards.js";
+import type { WebuiQuestionnaireRequest } from "../../../../shared/contracts/interactions.js";
+import { webuiPlanMarkdown, webuiPlanPath } from "../../../contracts/interactions/plan-mode.js";
+import { WebuiPlanDeliveryCard } from "../../../components/interactions/PlanModeCards.js";
 
 export function WebuiTranscriptPlanDelivery({
   sessionId,

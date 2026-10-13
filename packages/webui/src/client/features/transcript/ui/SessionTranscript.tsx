@@ -13,17 +13,17 @@ import { ChatSkeleton } from "./TranscriptSkeletons.js";
 import { ActivityIndicator, MessageAfterQueryStreamingPlaceholder, MessagePassiveLoadingPlaceholder } from "./ActivityIndicator.js";
 import { TurnNavigator, type TurnSummary } from "./TurnNavigator.js";
 import { MessageItem } from "./MessageItem.js";
-import { formatWebuiMessageTimestamp } from "../../features/transcript/projection/message-timestamp.js";
-import type { WebuiMessageActionCapabilities } from "../../features/transcript/contracts/transcript-view.js";
-import { useWebuiSessionQuestionnaire, useWebuiSessionState, useWebuiSessionStream, useWebuiTranscriptHistoryOwner } from "../../bindings/use-session-state.js";
-import { isTurnLive } from "../../contracts/turn/stream-state.js";
-import { isWebuiPlanReviewRequest } from "../../projection/interactions/plan-mode.js";
+import { formatWebuiMessageTimestamp } from "../projection/message-timestamp.js";
+import type { WebuiMessageActionCapabilities } from "../contracts/transcript-view.js";
+import { useWebuiSessionQuestionnaire, useWebuiSessionState, useWebuiSessionStream, useWebuiTranscriptHistoryOwner } from "../../../bindings/use-session-state.js";
+import { isTurnLive } from "../../../contracts/turn/stream-state.js";
+import { isWebuiPlanReviewRequest } from "../../../contracts/interactions/plan-mode.js";
 import { WebuiTranscriptPlanDelivery } from "./PlanDelivery.js";
 import { WebuiQuestionnaireResponse } from "./QuestionnaireResponse.js";
-import type { WebuiClientMessagePage } from "../../features/transcript/contracts/message-view.js";
-import type { WebuiTranscriptItem } from "../../features/transcript/contracts/transcript-view.js";
-import type { WebuiTransport } from "../../contracts/transport.js";
-import type { WebuiQuestionnaireRequest } from "../../../shared/contracts/interactions.js";
+import type { WebuiClientMessagePage } from "../contracts/message-view.js";
+import type { WebuiTranscriptItem } from "../contracts/transcript-view.js";
+import type { WebuiTransport } from "../../../contracts/transport.js";
+import type { WebuiQuestionnaireRequest } from "../../../../shared/contracts/interactions.js";
 
 /** Capability subset the transcript passes through to each message item.
  *  Single source of truth lives in `WebuiTransport`; this alias keeps the
@@ -39,28 +39,28 @@ type WebuiSessionTranscriptCapabilities = Pick<
   | "rewindSession"
   | "editSessionMessage"
 >;
-import type { WebuiTurnDiffView } from "../../../shared/contracts/session.js";
-import type { WebuiQuestionnaireResponseSummary } from "../../features/transcript/contracts/transcript-view.js";
-import type { WebuiMessageFileReference } from "../../features/transcript/projection/message-file-reference.js";
-import type { WorkspacePanelCommand } from "../../projection/workspace/workspace-panel-state.js";
+import type { WebuiTurnDiffView } from "../../../../shared/contracts/session.js";
+import type { WebuiQuestionnaireResponseSummary } from "../contracts/transcript-view.js";
+import type { WebuiMessageFileReference } from "../projection/message-file-reference.js";
+import type { WorkspacePanelCommand } from "../../../contracts/workspace/panel-command.js";
 import {
   groupWebuiTranscriptItems,
   projectWebuiTranscriptMessages,
   projectWebuiQueryDurations,
   projectWebuiProcessSegments,
-} from "../../features/transcript/projection/transcript-projection.js";
-import { projectWebuiTranscriptMessage } from "../../features/transcript/projection/message-projection.js";
-import { projectWebuiTranscriptView } from "../../features/transcript/projection/transcript-view-model.js";
+} from "../projection/transcript-projection.js";
+import { projectWebuiTranscriptMessage } from "../projection/message-projection.js";
+import { projectWebuiTranscriptView } from "../projection/transcript-view-model.js";
 import {
   projectHistoricalTurnView,
   projectLiveTurnView,
   type WebuiLiveTurnView,
   type WebuiTurnView,
-} from "../../features/transcript/projection/transcript-shape.js";
+} from "../projection/transcript-shape.js";
 import {
   transcriptViewport,
   useWebuiTranscriptScroll,
-} from "../../bindings/use-transcript-scroll.js";
+} from "../../../bindings/use-transcript-scroll.js";
 
 const EMPTY_TRANSCRIPT_PAGE: WebuiClientMessagePage = {};
 

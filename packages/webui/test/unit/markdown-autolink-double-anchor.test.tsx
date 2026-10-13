@@ -1,4 +1,4 @@
-// Two defects in `src/client/components/transcript/markdown.tsx` that the C-5 verification found
+// Two defects in `src/client/features/transcript/ui/markdown.tsx` that the C-5 verification found
 // while checking transcript file/line anchors. Both pre-date this file's other
 // work; neither is caused by the C-1/C-2 code-block changes.
 //
@@ -22,7 +22,7 @@
 import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { WebuiMarkdown } from "../../src/client/components/transcript/markdown.js";
+import { WebuiMarkdown } from "../../src/client/features/transcript/ui/markdown.js";
 import { parseWebuiMessageFileReference } from "../../src/client/features/transcript/projection/message-file-reference.js";
 
 function render(source: string): string {

@@ -16,7 +16,7 @@ import {
   WebuiIconChevronDown,
   WebuiIconDiffFile,
   WebuiIconDiffSummary,
-} from "../shell/icons.js";
+} from "../../../components/shell/icons.js";
 import { WebuiMarkdown } from "./markdown.js";
 import {
   isWebuiEditTool,
@@ -31,7 +31,7 @@ import {
   toolCallResourcePath,
   webuiActivitySummary,
   webuiEditFileStat,
-} from "../../features/transcript/projection/tool-projection.js";
+} from "../projection/tool-projection.js";
 
 function WebuiToolRow({
   tool,

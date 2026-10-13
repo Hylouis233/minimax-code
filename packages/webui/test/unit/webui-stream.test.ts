@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   isSafeWebuiMarkdownHref,
   WebuiMarkdown,
-} from "../../src/client/components/transcript/markdown.js";
+} from "../../src/client/features/transcript/ui/markdown.js";
 import {
   applyFrameCursor,
   applyFrameData,
