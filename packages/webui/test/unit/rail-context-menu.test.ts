@@ -69,11 +69,11 @@ describe("the flat views' context menu wiring", () => {
   it("renders the menu portal in the flat-view branch, not only the projects one", () => {
     // The regression this whole suite exists for: the early return predates
     // the menu, so a portal rendered only in the projects branch leaves the
-    // flat views setting state that no subtree paints. Both branches must
-    // render <WebuiContextMenu>; one shared render above the split would also
-    // pass this, and would be fine — the assertion is "the flat view paints
-    // the menu", not "the file contains two copies".
-    expect(flatViewBranch()).toContain("<WebuiContextMenu");
+    // flat views setting state that no subtree paints. Both branches mount
+    // `RailContextMenu`, the in-file region that renders `<WebuiContextMenu>`
+    // (§16.10's third region); the assertion is "the flat view paints the
+    // menu", not "the file contains two copies of the portal".
+    expect(flatViewBranch()).toContain("<RailContextMenu");
   });
 
   it("keeps the flat rows' binding optional so un-wired hosts keep the native menu", () => {

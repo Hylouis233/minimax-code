@@ -525,7 +525,21 @@ function ProjectExpansion({
   );
 }
 
-export function WebuiProjectList({
+export /**
+ * The rail's context menu (plan §16.10's three in-file regions: the context menu).
+ *
+ * `WebuiProjectList` has two returns — the empty/loading branch and the populated one — and both mount
+ * the menu over the same list state. Naming it once is what makes the third region a region: the menu's
+ * position and items stay the list's state, and this component only renders them.
+ */
+function RailContextMenu({ menu, onClose }: {
+  readonly menu: { readonly x: number; readonly y: number; readonly items: readonly WebuiContextMenuItem[] };
+  readonly onClose: () => void;
+}): ReactElement {
+  return <WebuiContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={onClose} />;
+}
+
+function WebuiProjectList({
   page,
   treePage,
   projectRecords,
@@ -911,12 +925,7 @@ export function WebuiProjectList({
          * projects branch alone left a right-click here setting state that no
          * subtree ever painted — the row appeared to do nothing. */}
         {contextMenu ? (
-          <WebuiContextMenu
-            x={contextMenu.x}
-            y={contextMenu.y}
-            items={contextMenu.items}
-            onClose={() => setContextMenu(undefined)}
-          />
+          <RailContextMenu menu={contextMenu} onClose={() => setContextMenu(undefined)} />
         ) : null}
       </section>
     );
@@ -1077,12 +1086,7 @@ export function WebuiProjectList({
         </div>
       ) : null}
       {contextMenu ? (
-        <WebuiContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
-          items={contextMenu.items}
-          onClose={() => setContextMenu(undefined)}
-        />
+          <RailContextMenu menu={contextMenu} onClose={() => setContextMenu(undefined)} />
       ) : null}
     </section>
   );
