@@ -3,12 +3,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import {
-  WebuiDiffCard,
   buildWebuiDiffMutationRequest,
   confirmWebuiDiffMutation,
   initialWebuiDiffState,
   reduceWebuiDiffState,
-} from "../../src/client/components/DiffCard.js";
+} from "../../src/client/projection/review-state.js";
+import { WebuiDiffCard } from "../../src/client/components/DiffCard.js";
 import { WebuiGoalBanner } from "../../src/client/components/GoalBanner.js";
 import { WebuiInteractionPanel } from "../../src/client/components/InteractionPanel.js";
 import { chunkWebuiWorkspaceReviewFileIds, projectWebuiUnifiedDiffLines, WebuiDiffFileSection } from "../../src/client/components/WorkspacePanels.js";

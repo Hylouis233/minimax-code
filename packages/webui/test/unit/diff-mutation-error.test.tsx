@@ -3,13 +3,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import {
-  WebuiDiffCard,
   buildWebuiDiffMutationRequest,
   describeWebuiDiffFailure,
   initialWebuiDiffState,
   reduceWebuiDiffState,
   resolveWebuiDiffMutation,
-} from "../../src/client/components/DiffCard.js";
+} from "../../src/client/projection/review-state.js";
+import { WebuiDiffCard } from "../../src/client/components/DiffCard.js";
 import type { WebuiTurnDiffView } from "../../src/shared/contracts/session.js";
 
 /* Why these tests are about the shape of a FAILED mutation, not about markup:
