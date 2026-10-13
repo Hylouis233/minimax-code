@@ -33,7 +33,7 @@ import type {
   WebuiQuestionnaireAnswer,
   WebuiQuestionnaireRequest,
 } from "../../../shared/contracts/interactions.js";
-import type { WebuiStreamState } from "../../projection/stream-state.js";
+import type { WebuiStreamState } from "../../projection/turn/stream-state.js";
 // The same resolver the effect reducer's own session guard uses. It carries
 // the nested-goal fallback for `thread_goal.*` events, whose payload declares
 // the id inside `goal` rather than at the top level. Reading the top level

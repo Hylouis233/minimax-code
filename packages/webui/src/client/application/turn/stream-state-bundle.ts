@@ -12,7 +12,7 @@
 // loop; TypeScript's structural compatibility is what the caller's expected type
 // checks against.
 
-import { recogniseWebuiStreamPayload, reduceWebuiStreamFrame } from "../../projection/stream-state.js";
+import { recogniseWebuiStreamPayload, reduceWebuiStreamFrame } from "../../projection/turn/stream-state.js";
 import {
   nextWebuiLeaseGeneration,
   releaseWebuiSubscription,

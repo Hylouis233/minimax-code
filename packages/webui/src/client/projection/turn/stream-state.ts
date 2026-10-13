@@ -1,11 +1,11 @@
-import type { WebuiStreamFrame } from "../../shared/contracts/stream.js";
-import { recordValue } from "../contracts/value-readers.js";
+import type { WebuiStreamFrame } from "../../../shared/contracts/stream.js";
+import { recordValue } from "../../contracts/value-readers.js";
 import {
   initialWebuiWorkspaceProgress,
   reduceWebuiWorkspaceProgressEvent,
   reduceWebuiWorkspaceProgressMessage,
   type WebuiWorkspaceProgressState,
-} from "./workspace-progress.js";
+} from "../workspace-progress.js";
 import type {
   WebuiStreamMessage,
   WebuiStreamSubscription,
@@ -13,7 +13,7 @@ import type {
   WebuiSubscriptionReleaseScope,
   WebuiStreamPayloadKind,
   WebuiStreamPayloadRecognised,
-} from "../contracts/turn/stream-state.js";
+} from "../../contracts/turn/stream-state.js";
 export type {
   WebuiStreamMessage,
   WebuiStreamSubscription,
@@ -21,7 +21,7 @@ export type {
   WebuiSubscriptionReleaseScope,
   WebuiStreamPayloadKind,
   WebuiStreamPayloadRecognised,
-} from "../contracts/turn/stream-state.js";
+} from "../../contracts/turn/stream-state.js";
 
 /**
  * Monotonic client-side stream identity. Only the client can tell two

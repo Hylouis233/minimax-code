@@ -42,7 +42,7 @@ import {
   initialWebuiApplicationSessionState,
   WEBUI_HOME_SESSION_KEY,
 } from "../application/state.js";
-import type { WebuiStreamState } from "../projection/stream-state.js";
+import type { WebuiStreamState } from "../projection/turn/stream-state.js";
 import {
   createWebuiInteractionCommands,
   createWebuiStreamPhaseCommands,

@@ -5,9 +5,9 @@ import type { WebuiAttachmentInput } from "../../../shared/contracts/messages.js
 import { formatWebuiError } from "../../contracts/value-readers.js";
 import { looksLikeAbsoluteWorkspacePath } from "../../projection/common/paths.js";
 import { queueWebuiTurn } from "../turn/queue-command.js";
-import { ownsWebuiStreamGeneration, type WebuiStreamState } from "../../projection/stream-state.js";
+import { ownsWebuiStreamGeneration, type WebuiStreamState } from "../../projection/turn/stream-state.js";
 import { runWebuiStreamLoop, type WebuiStreamLoopDeps, type WebuiStreamLoopSink } from "../../mechanisms/stream-loop.js";
-import { streamRecoveryProjection } from "../../projection/stream-recovery.js";
+import { streamRecoveryProjection } from "../../projection/turn/stream-recovery.js";
 import { streamStateBundle } from "../turn/stream-state-bundle.js";
 
 export interface WebuiComposerSubmitArgs {

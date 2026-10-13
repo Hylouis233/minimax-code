@@ -36,7 +36,7 @@ import {
   reduceWebuiStreamFrame,
   resolveWebuiSubscriptionRecheck,
   type WebuiStreamState,
-} from "../../src/client/projection/stream-state.js";
+} from "../../src/client/projection/turn/stream-state.js";
 import {
   initialWebuiWorkspaceProgress,
   reduceWebuiWorkspaceProgressEvent,

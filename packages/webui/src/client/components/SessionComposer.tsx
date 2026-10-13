@@ -79,7 +79,7 @@ import { useWebuiPortSlice } from "../bindings/port-slices-context.js";
 import { useWebuiEventEffectsRegistry } from "../bindings/event-effects-context.js";
 import { useWebuiVersionCells } from "../bindings/version-cells.js";
 import { useWebuiComposerStore } from "../bindings/composer-store.js";
-import { webuiSessionStatusType } from "../projection/stream-state.js";
+import { webuiSessionStatusType } from "../projection/turn/stream-state.js";
 
 /** Capability subset the session composer consumes. Single source of truth
  *  lives in `WebuiTransport`; this alias keeps the prop block free of

@@ -29,8 +29,8 @@ import {
   type WebuiComposerSubmitHandlers,
   type WebuiComposerTurnCallbacks,
 } from "../composer/composer-workflows.js";
-import { isWebuiSubscriptionProbeCurrent, ownsWebuiStreamGeneration, resolveWebuiSubscriptionRecheck, type WebuiStreamState } from "../../projection/stream-state.js";
-import { streamRecoveryProjection } from "../../projection/stream-recovery.js";
+import { isWebuiSubscriptionProbeCurrent, ownsWebuiStreamGeneration, resolveWebuiSubscriptionRecheck, type WebuiStreamState } from "../../projection/turn/stream-state.js";
+import { streamRecoveryProjection } from "../../projection/turn/stream-recovery.js";
 import {
   runWebuiStreamLoop,
   type WebuiStreamLoopDeps,

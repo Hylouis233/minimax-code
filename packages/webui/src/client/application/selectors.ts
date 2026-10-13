@@ -13,7 +13,7 @@ import type {
   WebuiQuestionnaireRequest,
 } from "../../shared/contracts/interactions.js";
 import type { WebuiSessionActivity } from "../projection/sessions/session-activity.js";
-import type { WebuiStreamState } from "../projection/stream-state.js";
+import type { WebuiStreamState } from "../projection/turn/stream-state.js";
 import { initialWebuiApplicationSessionState } from "./state.js";
 import type {
   WebuiApplicationSessionState,

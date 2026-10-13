@@ -94,7 +94,7 @@ import {
   type WebuiStreamLoopDeps,
   type WebuiStreamLoopSink,
 } from "../../src/client/mechanisms/stream-loop.js";
-import { streamRecoveryProjection } from "../../src/client/projection/stream-recovery.js";
+import { streamRecoveryProjection } from "../../src/client/projection/turn/stream-recovery.js";
 
 /**
  * The three writes `buildWebuiComposerHandlers` needs, taken from the **real**
@@ -143,7 +143,7 @@ import {
   reduceWebuiStreamFrame,
   settleAbortedStream,
   type WebuiStreamState,
-} from "../../src/client/projection/stream-state.js";
+} from "../../src/client/projection/turn/stream-state.js";
 import { projectWebuiTodos, WebuiProgressOverviewPanel, WebuiProgressPanel, WebuiSubagentsPanel, WebuiWorkspacePanel, WebuiWorkspacePanelControls } from "../../src/client/components/workspace/WorkspacePanels.js";
 import { initialWorkspacePanelState, reduceWorkspacePanelState } from "../../src/client/projection/workspace-panel-state.js";
 import type { WebuiStreamFrame } from "../../src/shared/contracts/stream.js";

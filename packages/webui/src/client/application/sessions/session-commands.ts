@@ -42,8 +42,8 @@ import type {
 import {
   initialWebuiStreamState,
   settleAbortedStream,
-} from "../../projection/stream-state.js";
-import type { WebuiStreamState } from "../../projection/stream-state.js";
+} from "../../projection/turn/stream-state.js";
+import type { WebuiStreamState } from "../../projection/turn/stream-state.js";
 import { releaseWebuiSubscription } from "../../mechanisms/stream-lease.js";
 import {
   buildWebuiStreamLoopSink,

@@ -26,8 +26,8 @@ import {
   createWebuiStreamPhaseCommands,
   createWebuiTurnLifecycleCommands,
 } from "../../src/client/application/sessions/session-commands.js";
-import { initialWebuiStreamState } from "../../src/client/projection/stream-state.js";
-import type { WebuiStreamState } from "../../src/client/projection/stream-state.js";
+import { initialWebuiStreamState } from "../../src/client/projection/turn/stream-state.js";
+import type { WebuiStreamState } from "../../src/client/projection/turn/stream-state.js";
 
 /** The view a command belongs to, and why. */
 const DISPOSITION: readonly {

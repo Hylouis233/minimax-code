@@ -21,9 +21,9 @@
 
 import type {WebuiClientSessionResumer} from "../../contracts/turn/execution-port.js";
 import type { WebuiClientMessageLoader } from "../../contracts/transcript/message-view.js";
-import { streamRecoveryProjection } from "../../projection/stream-recovery.js";
-import type { WebuiStreamState } from "../../projection/stream-state.js";
-import { reduceWebuiStreamFrame } from "../../projection/stream-state.js";
+import { streamRecoveryProjection } from "../../projection/turn/stream-recovery.js";
+import type { WebuiStreamState } from "../../projection/turn/stream-state.js";
+import { reduceWebuiStreamFrame } from "../../projection/turn/stream-state.js";
 import { fenceWebuiLeaseStream } from "../../mechanisms/stream-lease.js";
 import {
   applyWebuiStreamLoopExtra,

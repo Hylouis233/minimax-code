@@ -44,7 +44,7 @@ import { WEBUI_HOME_SESSION_KEY } from "../../src/client/application/state.js";
 import {
   initialWebuiStreamState,
   type WebuiStreamState,
-} from "../../src/client/projection/stream-state.js";
+} from "../../src/client/projection/turn/stream-state.js";
 import type { WebuiStreamLoopExtra } from "../../src/client/mechanisms/stream-loop.js";
 import { buildWebuiStreamLoopSink } from "../../src/client/mechanisms/stream-loop.js";
 import { streamStateBundle } from "../../src/client/application/turn/stream-state-bundle.js";

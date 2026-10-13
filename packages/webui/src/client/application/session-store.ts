@@ -28,7 +28,7 @@ import type {
 import { initialWebuiSessionActivity } from "../projection/sessions/session-activity.js";
 import type { WebuiSessionCatalogState } from "./sessions/session-catalog.js";
 import { initialWebuiSessionCatalogState } from "./sessions/session-catalog.js";
-import type { WebuiStreamState } from "../projection/stream-state.js";
+import type { WebuiStreamState } from "../projection/turn/stream-state.js";
 import type { WebuiGoal } from "../../shared/contracts/goal.js";
 import type {
   WebuiPendingPermission,
