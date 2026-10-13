@@ -21,7 +21,7 @@ import type {
 import type { WebuiVersionInfo } from "../../shared/contracts/version.js";
 import { SettingsModal } from "./SettingsModal.js";
 import { AccountLoginDialog } from "./AccountLoginDialog.js";
-import type { MemoryHandoff } from "./settings/PersonalizationSettings.js";
+import type { MemoryHandoff } from "./settings/MemoryManagerDialog.js";
 import { evaluateOutsideClose } from "../projection/outside-close.js";
 import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js";
 import {

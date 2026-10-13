@@ -26,14 +26,16 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import {
+  PersonalizationSettings,
+} from "../../src/client/components/settings/PersonalizationSettings.js";
+import { PERSONALIZATION_SECTION_HINTS } from "../../src/client/components/settings/settings-atoms.js";
+import {
   MEMORY_DELETE_CONFIRM,
   MEMORY_HANDOFF_PROMPT,
   MemoryManagerDialog,
-  PersonalizationSettings,
   formatMemoryTimestamp,
   isMemorySaveable,
-} from "../../src/client/components/settings/PersonalizationSettings.js";
-import { PERSONALIZATION_SECTION_HINTS } from "../../src/client/components/settings/settings-atoms.js";
+} from "../../src/client/components/settings/MemoryManagerDialog.js";
 import { resolveEditorSeed } from "../../src/client/components/settings/GlobalInstructionsSection.js";
 import { isProfileSaveable } from "../../src/client/components/settings/UserProfileSection.js";
 
@@ -94,7 +96,7 @@ describe("记忆摘要 save button states", () => {
     // the stylesheet test.
     const source = readFileSync(
       new URL(
-        "../../src/client/components/settings/PersonalizationSettings.tsx",
+        "../../src/client/components/settings/MemoryManagerDialog.tsx",
         import.meta.url,
       ),
       "utf8",

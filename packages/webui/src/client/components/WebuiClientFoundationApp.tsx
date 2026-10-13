@@ -33,7 +33,7 @@ import {
 } from "../infrastructure/storage.js";
 import { Transcript } from "./Transcript.js";
 import { UserMenu } from "./UserMenu.js";
-import { MEMORY_HANDOFF_PROMPT, type MemoryHandoff } from "./settings/PersonalizationSettings.js";
+import { MEMORY_HANDOFF_PROMPT, type MemoryHandoff } from "./settings/MemoryManagerDialog.js";
 import {
   WebuiWorkspacePanel,
   WebuiProgressOverviewPanel,
