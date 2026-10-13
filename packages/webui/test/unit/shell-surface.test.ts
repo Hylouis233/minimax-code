@@ -94,7 +94,7 @@ describe("shell surface wiring", () => {
     // A second flag is how the two got out of step: the gate read `open`, the
     // area came from elsewhere, and nothing tied either to navigation.
     expect(shell).toContain('from "../projection/shell-surface.js"');
-    expect(shell).toContain("pluginManagementArea ? <PluginManagement");
+    expect(shell).toContain("pluginManagementArea ? <PluginCatalogue");
     expect(shell).not.toContain("setPluginManagementOpen");
     expect(shell).not.toContain("setPluginManagementArea");
   });

@@ -26,15 +26,15 @@ import { readWebuiSource, squashWhitespace } from "./support/source-text.js";
 import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { PluginManagement } from "../../src/client/components/PluginManagement.js";
+import { PluginCatalogue } from "../../src/client/components/plugins/PluginCatalogue.js";
 const marketplace = (initialArea: "plugins" | "skills"): string =>
   renderToStaticMarkup(
-    createElement(PluginManagement, {
+    createElement(PluginCatalogue, {
       initialArea,
     }),
   );
 
-const component = squashWhitespace(readWebuiSource("components/PluginManagement.tsx"));
+const component = squashWhitespace(readWebuiSource("components/plugins/PluginCatalogue.tsx"));
 // The listing composition — the skill-hub paging and its unknowable total —
 // moved into the application plugin owner (ticket #52). The two assertions
 // below pin that behaviour where it now lives, with the same intent.

@@ -21,7 +21,7 @@ import {
   toggleWebuiFeedback,
 } from "../../src/client/components/MessageActions.js";
 import { MessageItem } from "../../src/client/components/MessageItem.js";
-import { PluginManagement } from "../../src/client/components/PluginManagement.js";
+import { PluginCatalogue } from "../../src/client/components/plugins/PluginCatalogue.js";
 import {
   buildWebuiEditRequest,
   buildWebuiForkRequest,
@@ -524,7 +524,7 @@ describe("round-3 stream state and transcript render units", () => {
 describe("plugin management WebUI operation", () => {
   it("renders its entry surface and rejects actions outside the allowlist", () => {
     const markup = renderToStaticMarkup(
-      createElement(PluginManagement, {}),
+      createElement(PluginCatalogue, {}),
     );
     expect(markup).toContain('data-testid="plugin-management"');
     expect(markup).toContain("市场");

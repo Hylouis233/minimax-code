@@ -3,27 +3,27 @@ import {
   InstalledPluginSource,
   MarketplaceCategory,
 } from "@mavis/protocol/local";
-import type { WebuiPluginManagementAction } from "../../shared/plugin-management.js";
+import type { WebuiPluginManagementAction } from "../../../shared/plugin-management.js";
 import {
   useWebuiPluginWorkflows,
   useWebuiPluginWorkflowsState,
-} from "../bindings/use-query-state.js";
-import { WebuiIconAgent } from "../icons.js";
-import { ToggleSwitch } from "./ToggleSwitch.js";
-import { readWebuiPluginRow as read, type WebuiPluginRow as Row } from "../projection/plugin-rows.js";
-import { PluginImportDialog } from "./plugins/PluginImportDialog.js";
-import { PluginItemDialog } from "./plugins/PluginItemDialog.js";
+} from "../../bindings/use-query-state.js";
+import { WebuiIconAgent } from "../../icons.js";
+import { ToggleSwitch } from "../ToggleSwitch.js";
+import { readWebuiPluginRow as read, type WebuiPluginRow as Row } from "../../projection/plugin-rows.js";
+import { PluginImportDialog } from "./PluginImportDialog.js";
+import { PluginItemDialog } from "./PluginItemDialog.js";
 
 type Area = "plugins" | "skills" | "apps" | "mcp" | "agents";
-type PluginManagementSelection = {
+type PluginCatalogueSelection = {
   readonly area: Area;
   readonly view: "market" | "personal";
   readonly query: string;
   readonly category: string;
 };
 const sameSelection = (
-  left: PluginManagementSelection,
-  right: PluginManagementSelection,
+  left: PluginCatalogueSelection,
+  right: PluginCatalogueSelection,
 ): boolean =>
   left.area === right.area &&
   left.view === right.view &&
@@ -120,7 +120,7 @@ const rows = (value: unknown, key: string): Row[] => {
     : [];
 };
 
-export function PluginManagement({
+export function PluginCatalogue({
   initialArea = "plugins",
   onChatWithAgent,
 }: {
@@ -133,7 +133,7 @@ export function PluginManagement({
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
-  const selectionRef = useRef<PluginManagementSelection>({
+  const selectionRef = useRef<PluginCatalogueSelection>({
     area,
     view,
     query,

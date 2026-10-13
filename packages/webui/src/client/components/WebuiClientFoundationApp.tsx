@@ -56,7 +56,7 @@ import {
   type WebuiShellSurfaceCommand,
 } from "../projection/shell-surface.js";
 import { ConversationUsageBanner } from "./ConversationUsageBanner.js";
-import { PluginManagement } from "./PluginManagement.js";
+import { PluginCatalogue } from "./plugins/PluginCatalogue.js";
 import { WebuiComposer } from "./SessionComposer.js";
 import { WebuiSessionTranscript } from "./SessionTranscript.js";
 import {
@@ -1437,7 +1437,7 @@ export function WebuiClientFoundationApp(
             data-webui-shell-region="surface"
             className="relative flex min-h-0 min-w-0 flex-1 flex-row"
           >
-            {pluginManagementArea ? <PluginManagement initialArea={pluginManagementArea} onChatWithAgent={async (name) => {
+            {pluginManagementArea ? <PluginCatalogue initialArea={pluginManagementArea} onChatWithAgent={async (name) => {
               const creator = sessionWorkflows.createSession;
               if (!creator) throw new Error("当前 WebUI 未连接会话创建服务");
               const created = await creator({ name });

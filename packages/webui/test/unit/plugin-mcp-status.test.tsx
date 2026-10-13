@@ -25,10 +25,10 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
-import { describeWebuiMcpServerStatus } from "../../src/client/components/PluginManagement.js";
+import { describeWebuiMcpServerStatus } from "../../src/client/components/plugins/PluginCatalogue.js";
 
 const SOURCE = readFileSync(
-  new URL("../../src/client/components/PluginManagement.tsx", import.meta.url),
+  new URL("../../src/client/components/plugins/PluginCatalogue.tsx", import.meta.url),
   "utf8",
 );
 
