@@ -31,7 +31,7 @@ import {
   MessageViewportStreamingLoader,
   pickWeightedPhrase,
   bucketPhrases,
-} from "../../src/client/components/ActivityIndicator.js";
+} from "../../src/client/components/transcript/ActivityIndicator.js";
 
 describe("ActivityIndicator markup (desktop parity)", () => {
   beforeEach(() => {

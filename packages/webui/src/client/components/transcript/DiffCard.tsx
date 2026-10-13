@@ -9,20 +9,20 @@
 // move-only.
 
 import { useEffect, useMemo, useState, type ReactElement } from "react";
-import { WebuiIconDiffFile, WebuiIconDiffSummary } from "./shell/icons.js";
+import { WebuiIconDiffFile, WebuiIconDiffSummary } from "../shell/icons.js";
 import type {
   WebuiGetTurnDiffRequest,
   WebuiTurnDiffView,
-} from "../../shared/contracts/session.js";
-import type { WebuiDiffState } from "../contracts/transcript/review-view.js";
+} from "../../../shared/contracts/session.js";
+import type { WebuiDiffState } from "../../contracts/transcript/review-view.js";
 import {
   buildWebuiDiffMutationRequest,
   confirmWebuiDiffMutation,
   initialWebuiDiffState,
   reduceWebuiDiffState,
   resolveWebuiDiffMutation,
-} from "../projection/review-state.js";
-import type { WebuiTransport } from "../contracts/transport.js";
+} from "../../projection/review-state.js";
+import type { WebuiTransport } from "../../contracts/transport.js";
 
 /** Capability subset the diff card consumes. The contract lives in
  * `WebuiTransport`; this alias keeps the prop block compact and avoids

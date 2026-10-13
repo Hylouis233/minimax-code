@@ -23,7 +23,7 @@
 
 import { useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
-import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js";
+import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
 import {
   WebuiIconMessageCopy,
   WebuiIconMessageCopied,
@@ -35,9 +35,9 @@ import {
   WebuiIconMessageLikeOff,
   WebuiIconMessageLikeOn,
   WebuiIconMessageRewind,
-} from "./shell/icons.js";
-import type { WebuiGetSessionRewindPreviewResult } from "../../shared/contracts/session.js";
-import type { WebuiMessageActionCapabilities } from "../contracts/transcript/transcript-view.js";
+} from "../shell/icons.js";
+import type { WebuiGetSessionRewindPreviewResult } from "../../../shared/contracts/session.js";
+import type { WebuiMessageActionCapabilities } from "../../contracts/transcript/transcript-view.js";
 
 export function toggleWebuiFeedback(
   value: "like" | "dislike" | undefined,

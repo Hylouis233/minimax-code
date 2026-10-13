@@ -9,7 +9,7 @@ import { describe, it, expect } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { TurnNavigator } from "../../src/client/components/TurnNavigator.js";
+import { TurnNavigator } from "../../src/client/components/transcript/TurnNavigator.js";
 
 const baseTurns = [
   { id: "turn-1", state: "default" as const },

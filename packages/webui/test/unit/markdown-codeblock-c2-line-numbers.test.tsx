@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { WebuiMarkdown } from "../../src/client/markdown.js";
+import { WebuiMarkdown } from "../../src/client/components/transcript/markdown.js";
 
 function render(source: string): string {
   return renderToStaticMarkup(createElement(WebuiMarkdown, { source }));

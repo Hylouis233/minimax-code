@@ -27,7 +27,7 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import lottie from "lottie-web";
-import streamingRoseLoaderData from "../assets/lottie/streaming-rose-loader.json";
+import streamingRoseLoaderData from "../../assets/lottie/streaming-rose-loader.json";
 
 export interface LottiePlayerProps {
   play: boolean;

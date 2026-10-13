@@ -2,7 +2,7 @@ import * as React from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { WebuiClientFoundationApp } from "./components/shell/WebuiClientFoundationApp.js";
 export { WebuiSessionList } from "./components/sessions/SessionRail.js";
-export { WebuiSessionTranscript } from "./components/SessionTranscript.js";
+export { WebuiSessionTranscript } from "./components/transcript/SessionTranscript.js";
 export {
   WebuiClientFoundationApp,
 } from "./components/shell/WebuiClientFoundationApp.js";

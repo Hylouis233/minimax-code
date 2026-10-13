@@ -77,7 +77,7 @@ import {
   planWebuiRetryResend,
   resendRecordedWebuiTurn,
 } from "../../src/client/components/SessionComposer.js";
-import { OutputError } from "../../src/client/components/OutputError.js";
+import { OutputError } from "../../src/client/components/transcript/OutputError.js";
 import {
   buildWebuiComposerHandlers,
   submitWebuiComposerTurn,

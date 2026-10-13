@@ -8,10 +8,10 @@ import {
   ChatSkeleton,
   GreetingSkeleton,
   SKELETON_CONTENT_MAX_WIDTH_PX,
-} from "../../src/client/components/TranscriptSkeletons.js";
-import { WebuiActivityGroup, WebuiThinkingBlock, WebuiTurnProcess } from "../../src/client/components/TranscriptPrimitives.js";
-import { WebuiAssistantBody } from "../../src/client/components/AssistantBody.js";
-import { WebuiMarkdown } from "../../src/client/markdown.js";
+} from "../../src/client/components/transcript/TranscriptSkeletons.js";
+import { WebuiActivityGroup, WebuiThinkingBlock, WebuiTurnProcess } from "../../src/client/components/transcript/TranscriptPrimitives.js";
+import { WebuiAssistantBody } from "../../src/client/components/transcript/AssistantBody.js";
+import { WebuiMarkdown } from "../../src/client/components/transcript/markdown.js";
 
 function countByClass(html: string, className: string): number {
   const re = new RegExp(`class="[^"]*\\b${className}\\b`, "g");

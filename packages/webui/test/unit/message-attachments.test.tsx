@@ -7,7 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   MessageAttachments,
   type MessageAttachment,
-} from "../../src/client/components/MessageAttachments.js";
+} from "../../src/client/components/transcript/MessageAttachments.js";
 
 const baseAttachments: MessageAttachment[] = [
   {

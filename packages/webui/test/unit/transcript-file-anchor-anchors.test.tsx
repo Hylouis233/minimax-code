@@ -18,7 +18,7 @@ import { describe, it, expect } from "vitest";
 import { createElement, isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { WebuiMarkdown } from "../../src/client/markdown.js";
+import { WebuiMarkdown } from "../../src/client/components/transcript/markdown.js";
 import {
   parseWebuiMessageFileReference,
   type WebuiMessageFileReference,

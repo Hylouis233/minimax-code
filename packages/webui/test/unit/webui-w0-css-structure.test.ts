@@ -18,7 +18,7 @@
 
 import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "node:fs";
-import { SKELETON_CONTENT_MAX_WIDTH_PX } from "../../src/client/components/TranscriptSkeletons.js";
+import { SKELETON_CONTENT_MAX_WIDTH_PX } from "../../src/client/components/transcript/TranscriptSkeletons.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
