@@ -302,6 +302,12 @@ export function createWebuiApplication(
   const selectSession = (sessionId: string | undefined): void => {
     sessionScope.select(sessionId);
     store.select(sessionId);
+    // Selecting is where a retained dirty marker pays out: the session was
+    // marked while nothing needed it, and now something does (plan §4.3).
+    if (sessionId !== undefined && dirtyResources.has(sessionId)) {
+      dirtyResources.delete(sessionId);
+      reconcileSession(sessionId);
+    }
   };
   const readActiveSessionId =
     deps.readActiveSessionId ?? (() => store.getSelectedSessionId());
@@ -337,6 +343,12 @@ export function createWebuiApplication(
    * they cannot replace a route (plan §4.4).
    */
   const workspaceGitListeners = new Set<(payload: WebuiWorkspaceGitChangedPayload) => void>();
+  /**
+   * The dirty markers a read-required event left behind for a session nothing
+   * needs yet. They survive until interest arrives or the session is purged —
+   * the alternative, dropping the event, is the silent loss plan §4.3 forbids.
+   */
+  const dirtyResources = new Set<string>();
   const channelReadyListeners = new Set<() => void>();
   const notify = <T>(listeners: Set<(value: T) => void>, value: T): void => {
     for (const listener of [...listeners]) listener(value);
@@ -382,7 +394,13 @@ export function createWebuiApplication(
       refreshGoal: (sessionId) => goals.owner(sessionId).refreshGoal(),
       invalidatePending: (sessionId) => interactions.owner(sessionId).invalidatePendingReads(),
       refreshPending: (sessionId) => {
-        if (!sessionScope.isInterested(sessionId)) return;
+        if (!sessionScope.isInterested(sessionId)) {
+          // No interest yet: retain the marker and reconcile when it arrives,
+          // rather than fanning out a background read (plan §4.3).
+          dirtyResources.add(sessionId);
+          return;
+        }
+        dirtyResources.delete(sessionId);
         return interactions.owner(sessionId).refresh();
       },
       attachStream: (sessionId, turnId, mode) => {
@@ -394,6 +412,7 @@ export function createWebuiApplication(
       // subscribed: a reconnect is a possible observation gap, not a barrier.
       channelReady: () => {
         for (const sessionId of sessionScope.interested()) {
+          dirtyResources.delete(sessionId);
           reconcileSession(sessionId);
           turnCommandsFor(sessionId).recover();
         }
@@ -499,6 +518,7 @@ export function createWebuiApplication(
       interactions.dispose();
       workspaceGitListeners.clear();
       channelReadyListeners.clear();
+      dirtyResources.clear();
       turnCommands.clear();
       store.dispose();
       channel?.close?.();

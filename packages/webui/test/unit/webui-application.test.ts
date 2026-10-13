@@ -130,6 +130,27 @@ describe("stage 4 — the four call sites' handling through the coordinator", ()
     expect(getGoal).not.toHaveBeenCalled();
   });
 
+  it("retains a read-required event for a session nothing needs, and pays it out on selection", () => {
+    const listPendingPermissions = vi.fn(async () => ({ requests: [] }));
+    const { application, channels } = makeApplication({
+      interactionsPort: { listPendingPermissions },
+    });
+
+    // Nothing needs s1 yet: the marker is retained instead of a background read
+    // (plan §4.3), which is the alternative to the silent drop the old registry
+    // produced.
+    channels[0]!.emit(event("session.queue.updated", { sessionId: "s1" }));
+    expect(listPendingPermissions).not.toHaveBeenCalled();
+
+    // Interest arrives: the retained marker pays out once.
+    application.select("s1");
+    expect(listPendingPermissions).toHaveBeenCalledTimes(1);
+
+    application.select("s2");
+    application.select("s1");
+    expect(listPendingPermissions).toHaveBeenCalledTimes(1);
+  });
+
   it("delivers a workspace-git event to the surfaces that subscribed", () => {
     const { application, channels } = makeApplication();
     const seen: unknown[] = [];
