@@ -1078,7 +1078,8 @@
       "8385c423",
       "fbf64911",
       "7b3a0807",
-      "39fc07f6"
+      "39fc07f6",
+      "3c454bc8"
     ],
     "published": false,
     "tickets": {
@@ -1089,7 +1090,8 @@
       "T05": "closed 2026-10-13, acceptance evidence recorded on #131",
       "T06": "closed 2026-10-14, acceptance evidence recorded on #132",
       "T10": "closed 2026-10-14 (issue #136, comment 6156644369): both review families have their own owners and both consumers are browser-verified",
-      "T14": "closed 2026-10-14 (issue #140, comment 6156919983): the host assembles the registry and the terminal-process port; the service binds what it was handed"
+      "T14": "closed 2026-10-14 (issue #140, comment 6156919983): the host assembles the registry and the terminal-process port; the service binds what it was handed",
+      "T07": "in progress: the sessions owner's files took their business-first homes; the behaviour work (one entity update for both catalogue views, lifecycle commands as the only path, delete purge/tombstones, rail cut and its injection refactor) is next"
     },
     "frontier": [
       "T07",
@@ -1098,9 +1100,9 @@
       "T17"
     ],
     "notes": [
-      "T14 closed 2026-10-14 (39fc07f6). The identity-only forwarding closures left service.ts (372 -> 245 lines); the host assembles createOperationRegistry(port, terminalPort) and injects it, and the optional-capability guards stay in the binding tables where their descriptors are.",
-      "T14 produced WebuiTerminalProcessPort (server/terminal-port.ts), implemented by the real WebuiTerminalManager and consumed by the terminal handler entries and the registry. T15 moves the implementation and the service's terminal resource ownership behind that port; the real-PTY delivery evidence belongs to T15.",
-      "The production entry points (scripts/run-webui-server.mjs, release/webui-npm/bin/mcode-webui.mjs) now build both ports and the registry; the production boot with a real runtime host answered version/listSessions/listWorkspaceFileTree over the loopback (39fc07f6)."
+      "T07 slice 1 (3c454bc8): application/sessions/*, projection/sessions/* moved into features/sessions/; session-scope.ts (the interest-lease manager) moved to conversation/ because it is a substrate concern.",
+      "T07 did not move two things and the reasons are recorded: session-store.ts stays in the application layer (it owns application/state.ts, and conversation may not reach the assembly state container), and bindings/use-session-state.ts stays a shared binding (the shell and the transcript both read it). The rail UI move needs the platform-import injection refactor first.",
+      "T07's remaining work: the rail responsibility cut (pure grouping already lives in features/sessions/projection/rail-buckets.ts; the rail's list/row/menu units stay together by interaction), one entity update feeding both catalogue views, lifecycle commands as the only path, delete purge + tombstones, and the browser entry paths (rail/archive/import/export)."
     ]
   },
   "publicationVerification": {
