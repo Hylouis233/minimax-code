@@ -1067,7 +1067,8 @@
       "c027a9f9",
       "2e7466d1",
       "bd5b0512",
-      "f40fe67c"
+      "f40fe67c",
+      "82ee436b"
     ],
     "published": false,
     "tickets": {
@@ -1076,7 +1077,7 @@
       "T03": "implemented locally, acceptance evidence recorded on #129",
       "T04": "implemented locally, acceptance evidence recorded on #130",
       "T05": "closed 2026-10-13, acceptance evidence recorded on #131",
-      "T06": "in progress: keyed per-session/page history ownership, the view model cut with the turn-live predicate at its owner, the scroll binding, the response surfaces and the shared context read delivered; a true read/refresh split, the transcript feedback-error verification and the contracts/projections relocation still open"
+      "T06": "in progress: keyed per-session/page ownership, the view model cut, the scroll binding, the response surfaces, the shared context read and the read/refresh split are delivered; the transcript's physical relocation to its target home (and history rules to conversation) and the transcript feedback-error check remain"
     },
     "frontier": [
       "T06",
@@ -1084,8 +1085,9 @@
       "T17"
     ],
     "notes": [
-      "T06 delivered: keyed history ownership (a0d33dfa); view model + turn-live predicate at its owner (2086cf52); scroll binding, plus the repair of the follower the view-model slice deleted and a browser case that catches its absence (d658677c); response surfaces cut into QuestionnaireResponse.tsx and PlanDelivery.tsx, SessionTranscript.tsx now 487 lines from 814 (c027a9f9); context inspection reuses the transcript's history read through the owner's ensurePage (2e7466d1, with the discriminating unit case in the follow-up).",
-      "T06 open: a true read/refresh split. loadPage invalidates before reading, so a transcript read after an inspection read supersedes it instead of joining it (one request each, the inspection's answer refused). The join needs loadPage to read and a separate refresh for the mount and the live-to-idle handoff; the existing fence case 'an older response loses to a newer request for the same session' then moves to refresh. The browser count case does not discriminate the composer's read in this fixture (measured at 2 with and without it) - its evidence is the unit case."
+      "T06 read/refresh split (82ee436b): loadPage reads through the resource so two readers of one key share one request; refreshPage is the invalidate-then-read verb, used by the transcript's live-to-idle handoff. A superseded read still reports stale rather than claiming a newer read's answer (it compares the entry against what its own fetch returned; a joining read produced nothing and accepts the entry).",
+      "T06 remaining: the physical relocation. Measured: contracts/transcript 4 files, projection/transcript 9, components/transcript 15, application/transcript 3, with ~105 importing files across src/test/browser specs. The dependency gate derives roles from directory names in scripts/lib/webui-dependency-rules.mjs, so the move needs those role rules extended for features/<business>/{application,projection,bindings,ui,contracts} and the baseline regenerated - do the gate extension first, then move one cluster at a time with verification. T18 (blocked by T12-T17) owns what remains after the per-business moves, so the transcript's own move belongs to this ticket.",
+      "T06 delivered earlier: keyed history ownership (a0d33dfa); view model + turn-live predicate at its owner (2086cf52); scroll binding + repair of the deleted follower and the browser case that catches it (d658677c); response surfaces (c027a9f9); shared context read (2e7466d1, bd5b0512)."
     ]
   },
   "publicationVerification": {
