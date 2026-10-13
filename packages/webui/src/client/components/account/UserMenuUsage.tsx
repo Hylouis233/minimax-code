@@ -5,7 +5,7 @@
 // point the menu renders; it takes the state and two callbacks and holds no state of its own.
 
 import type { ReactElement } from "react";
-import { formatWebuiCredits } from "../../value-readers.js";
+import { formatWebuiCredits } from "../../contracts/value-readers.js";
 import type {
   WebuiUsageQuotaResult,
   WebuiUsageQuotaVideoView,

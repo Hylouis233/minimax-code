@@ -1,5 +1,5 @@
 import type { WebuiStreamFrame } from "../../shared/contracts/stream.js";
-import { recordValue } from "../value-readers.js";
+import { recordValue } from "../contracts/value-readers.js";
 import {
   initialWebuiWorkspaceProgress,
   reduceWebuiWorkspaceProgressEvent,

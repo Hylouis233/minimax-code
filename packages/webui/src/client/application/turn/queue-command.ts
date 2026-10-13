@@ -15,7 +15,7 @@
 
 import type {WebuiClientMessageEnqueuer} from "../../contracts/composer/command-port.js";
 import type { WebuiAttachmentInput } from "../../../shared/contracts/messages.js";
-import { formatWebuiError } from "../../value-readers.js";
+import { formatWebuiError } from "../../contracts/value-readers.js";
 
 export interface WebuiQueueTurnArgs {
   readonly sessionId: string;

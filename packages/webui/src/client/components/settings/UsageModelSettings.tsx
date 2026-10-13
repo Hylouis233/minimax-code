@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactElement } from "react";
-import { formatWebuiCredits, recordOf, textOf } from "../../value-readers.js";
+import { formatWebuiCredits, recordOf, textOf } from "../../contracts/value-readers.js";
 import { useWebuiAccountWorkflows, useWebuiAccountWorkflowsState, useWebuiModelsWorkflows, useWebuiModelsWorkflowsState, useWebuiSettingsWorkflows, useWebuiSettingsWorkflowsState } from "../../bindings/use-query-state.js";
 import { ToggleSwitch } from "../shared/ToggleSwitch.js";
 import { formatResetLabel, getActiveSourceBadge, type ProviderHeaderDraft } from "../../projection/usage-settings.js";

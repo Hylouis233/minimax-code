@@ -16,7 +16,7 @@ import {
   recordValue,
   stringAmongKeys,
   stringValue,
-} from "../../src/client/value-readers.js";
+} from "../../src/client/contracts/value-readers.js";
 
 describe("the coercion readers", () => {
   it("takes an object as a record and rejects everything else", () => {

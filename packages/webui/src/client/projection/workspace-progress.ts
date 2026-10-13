@@ -2,7 +2,7 @@ import {
   numberAmongKeys,
   recordValue,
   stringAmongKeys,
-} from "../value-readers.js";
+} from "../contracts/value-readers.js";
 import type { WebuiClientMessage } from "../contracts/transcript/message-view.js";
 import type {
   WebuiWorkspaceTodoStatus,
