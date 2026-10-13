@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { DESKTOP_SETTINGS_TABS, filterSettingsTabs, GENERIC_FILE_ROW_ORDER, GENERIC_RADIO_CONTRACT, GENERIC_SECTION_TEST_IDS, resolveThemePreference, SETTINGS_GROUPS, SETTINGS_ICON_PATHS } from "../../src/client/components/SettingsModal.js";
+import { GENERIC_FILE_ROW_ORDER, GENERIC_RADIO_CONTRACT, GENERIC_SECTION_TEST_IDS, SETTINGS_GROUPS, SETTINGS_ICON_PATHS } from "../../src/client/components/SettingsModal.js";
+import { DESKTOP_SETTINGS_TABS, filterSettingsTabs, resolveThemePreference } from "../../src/client/projection/settings/settings-view.js";
 import { DisabledBillingActions, UsageModelSettings } from "../../src/client/components/settings/UsageModelSettings.js";
 import { reorderModelIds } from "../../src/client/projection/models/model-reorder.js";
 import { formatResetLabel, getActiveSourceBadge, projectProviderHeaders } from "../../src/client/projection/models/usage-settings.js";
