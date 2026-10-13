@@ -194,6 +194,27 @@ server/      →  runtime/port.ts  ↔  runtime/  →  shared/
 - Storage and DOM access belong in `client/infrastructure/` or `client/bindings/`; application and projection modules receive capabilities or values instead of reading browser globals.
 - No new module may import the shell, and no two modules may own the same Map/state.
 
+**Roles are enforced as well as layers.** `classifyRole` reads the role a file owns (assembly,
+conversation, a feature's `application` / `projection` / `bindings` / `ui` / `contracts`, platform,
+generic ui, shell, entry), the business that owns it and the home it sits in, and recognizes the
+current technical directories and the target `client/features/<business>/` homes as the same thing.
+`pnpm check:webui-dependency` reports zero role violations today and fails on:
+
+- a business holding the same role in two homes at once — a migration that left its previous copy
+  behind;
+- the conversation substrate reaching feature implementation, the assembly or `client/platform/`;
+  presentation or shell reaching the assembly or the platform adapters; `client/ui/` reaching any
+  business at all;
+- a feature reaching another business's *private* role. A feature's `contracts/` is public and needs
+  no entry; anything else needs a reviewed entry in `scripts/lib/webui-peer-imports.json`, and an
+  entry whose edge is gone (or whose file was deleted) fails the check, so an exception cannot
+  outlive its reason.
+
+The capability-call rule uses the same role judgement instead of the `client/components/` prefix, so
+it still applies after a component moves to `client/features/<business>/ui/`. The measured baseline,
+the correction ledger and the recorded scenario results are in
+`docs/webui/webui-architecture-baseline-ledger.md`.
+
 `runtime/mcode-tools-entry.ts` has one declared `non-literal-dynamic-import` allowance in
 `scripts/lib/webui-dependency-baseline.json`. The runtime URL targets the generated embedded
 artifact, which has no source-tree path for the resolver. `pnpm check:webui-dependency` reports

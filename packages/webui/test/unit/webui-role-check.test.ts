@@ -15,9 +15,10 @@
 // the composition root, and the reviewed entry a deliberate peer import needs.
 
 import { afterAll, describe, expect, it } from "vitest";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import {
   ROLES,
@@ -36,6 +37,8 @@ const compilerOptions: ts.CompilerOptions = {
   target: ts.ScriptTarget.ESNext,
   allowImportingTsExtensions: true,
 };
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
 
 const temporaryRoots: string[] = [];
 
@@ -528,5 +531,39 @@ describe("the call-site rule follows the role, not the prefix", () => {
       "client/components/composer/WebuiComposer.tsx",
       "client/features/composer/ui/WebuiComposer.tsx",
     ]);
+  });
+});
+
+// The rule only matters if the gate reacts to it. These two assertions cover the
+// wiring the measured result depends on: `evaluateGraph` surfaces the findings
+// under `roleViolations` and fails on them, and the CLI's own pass/fail condition
+// reads that list. The CLI cannot be pointed at a fixture tree — it always scans
+// `packages/webui/src` — so the second assertion is a source check, the same
+// shape the provisional-judgement wiring test uses.
+describe("the role rules feed the dependency gate", () => {
+  it("surfaces role findings in the evaluation and fails on them", () => {
+    const graph = buildFixture({
+      "client/platform/transport.ts": leaf,
+      "client/conversation/history.ts": 'export { leaf } from "../platform/transport.js";\n',
+      "client/features/goal/application/goal-coordinator.ts": leaf,
+      "client/features/composer/application/submit.ts":
+        'export { leaf } from "../../goal/application/goal-coordinator.js";\n',
+    });
+    const result = evaluateGraph(graph);
+    expect(result.roleViolations.map((violation) => violation.rule).sort()).toEqual([
+      "private-peer-import",
+      "role-import",
+    ]);
+    expect(result.pass).toBe(false);
+  });
+
+  it("is part of the CLI's failure condition", () => {
+    const cli = readFileSync(
+      path.resolve(repoRoot, "scripts/check-webui-dependency.mjs"),
+      "utf8",
+    );
+    const failedBlock = cli.slice(cli.indexOf("const failed ="), cli.indexOf("const summary = {"));
+    expect(failedBlock).toContain("result.roleViolations.length > 0");
+    expect(cli.slice(cli.indexOf("const summary = {"))).toContain("roleViolations,");
   });
 });
