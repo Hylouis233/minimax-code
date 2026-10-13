@@ -26,7 +26,7 @@ import {
   initialWebuiAccountWorkflowsState,
   type WebuiAccountWorkflows,
   type WebuiAccountWorkflowsState,
-} from "../application/account-workflows.js";
+} from "../application/account/account-workflows.js";
 import {
   initialWebuiSettingsWorkflowsState,
   type WebuiSettingsWorkflows,

@@ -22,13 +22,13 @@
 // against a scripted port. The components read its snapshot and submit
 // commands; they hold no store writer and call no transport method directly.
 
-import type { AccountPort } from "../contracts/account/account-port.js";
+import type { AccountPort } from "../../contracts/account/account-port.js";
 import type {
   WebuiAccountLoginView,
   WebuiClaimSigninView,
   WebuiSigninPanelView,
-} from "../../shared/contracts/account.js";
-import type { WebuiUsageQuotaResult } from "../../shared/contracts/usage-quota.js";
+} from "../../../shared/contracts/account.js";
+import type { WebuiUsageQuotaResult } from "../../../shared/contracts/usage-quota.js";
 
 /** The transport methods this owner drives. Absent means "not wired". */
 export type WebuiAccountPortSlice = Pick<
