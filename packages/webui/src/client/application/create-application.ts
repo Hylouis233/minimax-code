@@ -154,6 +154,23 @@ export interface WebuiApplication {
    */
   readonly identityEpochs: WebuiIdentityEpochs;
   /**
+   * The one reconciliation entry point (plan §4.4: "Reconnect and selection use
+   * the same reconciliation entry point, with per-key request coalescing and
+   * epoch guards").
+   *
+   * It runs the authoritative re-reads the installed routes own for one session —
+   * the pending-interaction read, the goal re-read and the pending invalidation —
+   * and is what a selection change or a suspected observation gap calls instead of
+   * each surface inventing its own probe. `sessionId` defaults to the application's
+   * selection.
+   *
+   * Today the routes are the ones the mounted surfaces registered (the same
+   * objects the channel's coordinator runs), so this adds a named entry point
+   * without a second path; T05 replaces the registration with permanent
+   * application-owned routes behind the same call.
+   */
+  readonly reconcile: (sessionId?: string) => void;
+  /**
    * Commit home→session adoption as one transition: carry the home turn's live
    * record onto the created session, move the home composer slot onto it and
    * select it. Both store writes are no-notify; the caller writes the hash and
@@ -306,6 +323,16 @@ export function createWebuiApplication(
     composer,
     versionCells,
     identityEpochs,
+    reconcile: (sessionId) => {
+      // A disposed instance reconciles nothing: its store is fenced, so a read
+      // that landed now could not commit anyway.
+      if (lifecycle === "disposed") return;
+      const target = sessionId ?? readActiveSessionId();
+      if (!target) return;
+      eventEffects.slot.invalidatePending?.(target);
+      eventEffects.slot.refreshPending?.(target);
+      eventEffects.slot.refreshGoal?.(target);
+    },
     adoptHomeSession: (sessionId) => {
       // One committed transition: the home turn's live record moves onto the
       // created session, the composer's home slot moves onto it, and the

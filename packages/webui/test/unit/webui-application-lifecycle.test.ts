@@ -333,3 +333,60 @@ describe("the identity epoch context", () => {
     application.dispose();
   });
 });
+
+// The one reconciliation entry point (plan §4.4). A selection change and a
+// suspected observation gap must reach the same authoritative re-reads instead
+// of each surface probing on its own, and the re-reads are the ones the
+// installed routes own — asserted through the routes themselves, not a copy.
+describe("the reconciliation entry point", () => {
+  it("runs the installed session's authoritative re-reads", () => {
+    const refreshPending = vi.fn();
+    const refreshGoal = vi.fn();
+    const invalidatePending = vi.fn();
+    const { application } = makeApplication();
+    application.setEventEffects({
+      invalidatePending,
+      refreshPending,
+      refreshGoal,
+    });
+
+    application.reconcile(SESSION);
+
+    expect(invalidatePending).toHaveBeenCalledWith(SESSION);
+    expect(refreshPending).toHaveBeenCalledWith(SESSION);
+    expect(refreshGoal).toHaveBeenCalledWith(SESSION);
+    application.dispose();
+  });
+
+  it("defaults to the application's own selection", () => {
+    const refreshPending = vi.fn();
+    const { application } = makeApplication();
+    application.setEventEffects({ refreshPending });
+    application.start({ initialSessionId: SESSION });
+
+    application.reconcile();
+
+    expect(refreshPending).toHaveBeenCalledWith(SESSION);
+    application.dispose();
+  });
+
+  it("does nothing when there is no session to reconcile", () => {
+    const refreshPending = vi.fn();
+    const { application } = makeApplication();
+    application.setEventEffects({ refreshPending });
+    application.start();
+    application.reconcile();
+    expect(refreshPending).not.toHaveBeenCalled();
+    application.dispose();
+  });
+
+  it("stops reconciling after disposal", () => {
+    const refreshPending = vi.fn();
+    const { application } = makeApplication();
+    application.setEventEffects({ refreshPending });
+    application.start({ initialSessionId: SESSION });
+    application.dispose();
+    application.reconcile(SESSION);
+    expect(refreshPending).not.toHaveBeenCalled();
+  });
+});
