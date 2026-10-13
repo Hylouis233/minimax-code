@@ -3765,6 +3765,7 @@
     "packages/webui/src/client/projection/transcript/tool-projection.ts",
     "packages/webui/src/client/projection/transcript/transcript-projection.ts",
     "packages/webui/src/client/projection/transcript/transcript-shape.ts",
+    "packages/webui/src/client/projection/transcript/transcript-view-model.ts",
     "packages/webui/src/client/projection/turn/activity-phrase.ts",
     "packages/webui/src/client/projection/turn/stream-recovery.ts",
     "packages/webui/src/client/projection/turn/stream-state.ts",

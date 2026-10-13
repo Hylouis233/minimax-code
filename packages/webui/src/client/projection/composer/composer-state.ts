@@ -3,12 +3,6 @@ import type {
   WebuiSlashCommandFields,
 } from "../../contracts/composer/slash-command.js";
 import { classifyWebuiSlashCommand } from "../../contracts/composer/slash-command.js";
-import type { WebuiStreamState } from "../turn/stream-state.js";
-
-export function isTurnLive(phase: WebuiStreamState["phase"] | undefined): boolean {
-  return phase === "streaming" || phase === "waiting" || phase === "reconnecting";
-}
-
 export type WebuiSubmissionIntent =
   | { readonly kind: "activate-goal-mode" }
   | { readonly kind: "activate-plan-mode" }

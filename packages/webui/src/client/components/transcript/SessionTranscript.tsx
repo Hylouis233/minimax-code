@@ -16,7 +16,7 @@ import { MessageItem } from "./MessageItem.js";
 import { formatWebuiMessageTimestamp } from "../../projection/transcript/message-timestamp.js";
 import type { WebuiMessageActionCapabilities } from "../../contracts/transcript/transcript-view.js";
 import { useWebuiSessionQuestionnaire, useWebuiSessionState, useWebuiSessionStream, useWebuiTranscriptHistoryOwner } from "../../bindings/use-session-state.js";
-import { isTurnLive } from "../../projection/composer/composer-state.js";
+import { isTurnLive } from "../../projection/turn/stream-state.js";
 import {
   isWebuiPlanReviewRequest,
   webuiPlanMarkdown,
@@ -53,6 +53,7 @@ import {
   projectWebuiProcessSegments,
 } from "../../projection/transcript/transcript-projection.js";
 import { projectWebuiTranscriptMessage } from "../../projection/transcript/message-projection.js";
+import { projectWebuiTranscriptView } from "../../projection/transcript/transcript-view-model.js";
 import {
   projectHistoricalTurnView,
   projectLiveTurnView,
@@ -308,207 +309,45 @@ export function WebuiSessionTranscript({
     void historyOwner?.loadPage(sessionId);
     return undefined;
   }, [historyOwner, sessionId, turnLive]);
-  const messages = useMemo(
-    () => projectWebuiTranscriptMessages(visiblePage, stream.messages, streamPhase !== "done"),
-    [visiblePage, stream.messages, streamPhase],
-  );
-  const transcriptProjection = useMemo(() => {
-    const messageProjections = messages.map((message) =>
-      projectWebuiTranscriptMessage(message),
-    );
-    return {
-      messageProjections,
-      items: messageProjections.flatMap((projection) => projection.items),
-    };
-  }, [messages]);
-  const { messageProjections, items } = transcriptProjection;
-  // 每条消息使用统一视图；历史适配器提供持久化字段，实时适配器提供流式标记。
-  // MessageItem 只通过 view 属性读取这些值。
-  const turnViewsByMessageId = useMemo(
+  // One view model, derived in one place (`projection/transcript/
+  // transcript-view-model.ts`); this component renders what it returns.
+  const view = useMemo(
     () =>
-      new Map<string, WebuiTurnView>(
-        messageProjections.map(({ message, items: projectedItems }) => [
-          message.msgId,
-          projectHistoricalTurnView(message, sessionId, projectedItems),
-        ]),
-      ),
-    [messageProjections, sessionId],
-  );
-  // Group by message so one turn renders as one block, the way the desktop
-  // does: a process disclosure carrying the thinking and the tool steps, then
-  // the assistant's markdown. A user turn is its own block.
-  const queryDurationByMessageId = useMemo(
-    () => projectWebuiQueryDurations(
-      visiblePage.messages ?? [],
-      visiblePage.queryCollapseViews ?? [],
-    ),
-    [visiblePage.messages, visiblePage.queryCollapseViews],
-  );
-  const groups = useMemo(
-    () => groupWebuiTranscriptItems(items, queryDurationByMessageId),
-    [items, queryDurationByMessageId],
-  );
-  const liveAssistantMessages = useMemo(
-    () => stream.messages.filter((message) => message.role !== "user"),
-    [stream.messages],
-  );
-  const liveAssistantView = useMemo(
-    () => projectLiveTurnView(stream.messages, {
-      sessionId,
-      streaming: streamPhase === "streaming",
-      processingStartedAtMs: stream.processingStartedAtMs,
-    }),
-    [sessionId, stream.messages, stream.processingStartedAtMs, streamPhase],
-  );
-  /**
-   * A goal run injects a synthetic user continuation between model calls, and
-   * a user item always opens a NEW group — so one live turn can own several
-   * assistant groups. Broadcasting the turn-wide `liveAssistantView` into every
-   * one of them duplicated the streamed content across the transcript and left
-   * a second activity pulse stranded mid-thread.
-   *
-   * Project each group's live view from its OWN messages instead. A group's
-   * items carry every message id merged into it, so this stays exact whether the
-   * group holds one assistant message or several. Groups with no live message
-   * (pure history, and the user-only continuation bubble) get no entry and keep
-   * the historical branch below.
-   */
-  const liveGroupViews = useMemo(() => {
-    if (!turnLive) return undefined;
-    const views = new Map<string, WebuiLiveTurnView>();
-    for (const group of groups) {
-      const owned = new Set(group.items.map((item) => item.messageId));
-      const own = stream.messages.filter((message) => owned.has(message.id));
-      if (own.length === 0) continue;
-      const view = projectLiveTurnView(own, {
+      projectWebuiTranscriptView({
         sessionId,
-        streaming: streamPhase === "streaming",
+        visiblePage,
+        streamMessages: stream.messages,
+        streamPhase,
         processingStartedAtMs: stream.processingStartedAtMs,
-      });
-      if (view) views.set(group.messageId, view);
-    }
-    return views.size > 0 ? views : undefined;
-  }, [groups, sessionId, stream.messages, stream.processingStartedAtMs, streamPhase, turnLive]);
-  /**
-   * The trailing live assistant group owns the live activity row, so the
-   * `推理中…` indicator is rendered exactly once and always trails the
-   * transcript. Earlier live groups still render their own live content, but as
-   * settled history: a second pulse earlier in the thread is exactly the state
-   * this guards against.
-   */
-  const trailingLiveGroupId = useMemo(() => {
-    for (let index = groups.length - 1; index >= 0; index -= 1) {
-      const group = groups[index];
-      if (!group) continue;
-      const owned = new Set(group.items.map((item) => item.messageId));
-      if (stream.messages.some((message) => owned.has(message.id))) {
-        return group.messageId;
-      }
-    }
-    return undefined;
-  }, [groups, stream.messages]);
-  const liveActivityGroupId = useMemo(() => {
-    if (!trailingLiveGroupId) return undefined;
-    return liveGroupViews?.has(trailingLiveGroupId)
-      ? trailingLiveGroupId
-      : undefined;
-  }, [liveGroupViews, trailingLiveGroupId]);
-  /**
-   * The activity indicator falls back to transcript level when the last live
-   * group is the goal continuation BUBBLE rather than an assistant group: no
-   * message body is left to host the row, the previous round has settled, and
-   * the next model call has not started thinking yet.
-   */
-  const liveActivityAtTranscriptLevel =
-    trailingLiveGroupId !== undefined && liveActivityGroupId === undefined;
-  useLayoutEffect(() => {
-    const transcript = transcriptRef.current;
-    const viewport = transcriptViewport(transcript);
-    if (!transcript || !viewport) return undefined;
-    if (
-      previousTurnStateRef.current.sessionId !== sessionId ||
-      (turnLive && !previousTurnStateRef.current.turnLive)
-    ) {
-      autoFollowRef.current = true;
-      manualScrollIntentRef.current = false;
-    }
-    const followBottom = () => pinTranscriptToBottom(viewport, autoFollowRef.current);
-    const onScroll = () => {
-      if (webuiScrollFollowsBottom(viewport)) {
-        autoFollowRef.current = true;
-        manualScrollIntentRef.current = false;
-      } else if (manualScrollIntentRef.current) {
-        autoFollowRef.current = false;
-      }
-    };
-    const onIntent = (event: "wheel" | "touchmove", deltaY: number) => {
-      if (webuiScrollIntent({ event, deltaY, metrics: viewport }) === "ignore") return;
-      manualScrollIntentRef.current = true;
-    };
-    const onWheel = (event: WheelEvent) => { onIntent("wheel", event.deltaY); };
-    let lastTouchY: number | undefined;
-    const onTouchStart = (event: TouchEvent) => { lastTouchY = event.touches[0]?.clientY; };
-    const onTouchMove = (event: TouchEvent) => {
-      const y = event.touches[0]?.clientY;
-      if (lastTouchY === undefined || y === undefined) return;
-      const deltaY = lastTouchY - y;
-      lastTouchY = y;
-      onIntent("touchmove", deltaY);
-    };
-    viewport.addEventListener("scroll", onScroll, { passive: true });
-    viewport.addEventListener("wheel", onWheel, { passive: true });
-    viewport.addEventListener("touchstart", onTouchStart, { passive: true });
-    viewport.addEventListener("touchmove", onTouchMove, { passive: true });
-    const stopObserving = observeTranscriptHeight(transcript, followBottom);
-    followBottom();
-    return () => {
-      stopObserving?.();
-      viewport.removeEventListener("scroll", onScroll);
-      viewport.removeEventListener("wheel", onWheel);
-      viewport.removeEventListener("touchstart", onTouchStart);
-      viewport.removeEventListener("touchmove", onTouchMove);
-    };
-  }, [sessionId, turnLive]);
-  useLayoutEffect(() => {
-    const viewport = transcriptViewport(transcriptRef.current);
-    if (viewport) pinTranscriptToBottom(viewport, autoFollowRef.current);
-  }, [items, turnLive]);
-  // One follower for the whole transcript, not one per way of arriving at it.
-  //
-  // Desktop's message viewport keeps a single policy, and this is it: auto-follow
-  // is armed on a session change and when a turn goes live; a gesture releases it
-  // only when the viewport can answer that gesture; and being back at the bottom
-  // re-arms it. A non-live session used to have a second follower that released
-  // on any wheel or touchmove wherever the viewport sat and then never re-armed,
-  // so content arriving after such a gesture stayed below the fold — and a wheel
-  // at the bottom, which Desktop records as `wheel-intent:ignored-boundary`, was
-  // enough to trigger it.
-  //
-  // Pinning cannot be a one-off either: after the first paint the content keeps
-  // growing (highlighting, images, markdown tables), and a single jump lands on
-  // the bottom of that frame's height, short of the real end by nearly a screen.
-  // The ResizeObserver inside the follower above is what keeps it pinned.
-  const showEmptyState = !turnLive && !error && !loading && items.length === 0;
-  // The right-rail navigator's tick list mirrors the assistant turns visible
-  // on the page. A user turn isn't a tick — only the assistant block that
-  // follows it counts. The first assistant group is `active` while we have
-  // nothing settled; the last is `running` while streaming is live.
-  const turns = useMemo<readonly TurnSummary[]>(() => {
-    const assistantGroups = groups.filter((group) =>
-      group.items.some((item) => item.kind === "assistant"),
-    );
-    if (assistantGroups.length === 0) return [];
-    const lastIndex = assistantGroups.length - 1;
-    return assistantGroups.map((group, index) => ({
-      id: group.messageId,
-      state:
-        index === lastIndex && streamPhase === "streaming"
-          ? "running"
-          : index === 0
-            ? "active"
-            : "default",
-    }));
-  }, [groups, streamPhase]);
+        turnLive,
+        loading,
+        error,
+      }),
+    [
+      error,
+      loading,
+      sessionId,
+      stream.messages,
+      stream.processingStartedAtMs,
+      streamPhase,
+      turnLive,
+      visiblePage,
+    ],
+  );
+  const {
+    messageProjections,
+    items,
+    turnViewsByMessageId,
+    groups,
+    liveAssistantMessages,
+    liveAssistantView,
+    liveGroupViews,
+    trailingLiveGroupId,
+    liveActivityGroupId,
+    liveActivityAtTranscriptLevel,
+    turns,
+    showEmptyState,
+  } = view;
   const loadOlder = visiblePage.hasMore && visiblePage.nextCursor
     ? () => {
         if (loading) return;

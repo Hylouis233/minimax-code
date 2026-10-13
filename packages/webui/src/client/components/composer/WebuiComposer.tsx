@@ -146,8 +146,8 @@ import { OutputError } from "../transcript/OutputError.js";
 import {
   resolveWebuiSubmissionIntent,
   resolveWebuiComposerEnterAction,
-  isTurnLive,
 } from "../../projection/composer/composer-state.js";
+import { isTurnLive } from "../../projection/turn/stream-state.js";
 import {
   submitWebuiGoal,
 } from "../../application/composer/composer-workflows.js";

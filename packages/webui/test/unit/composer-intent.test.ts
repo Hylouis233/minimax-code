@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import {
   deriveRecentWorkspaceDirs,
-  isTurnLive,
   resolveWebuiComposerEnterAction,
   resolveWebuiSubmissionIntent,
   type WebuiSubmissionIntent,
 } from "../../src/client/projection/composer/composer-state.js";
+import { isTurnLive } from "../../src/client/projection/turn/stream-state.js";
 import type { SlashCommandEntry } from "../../src/client/components/composer/slash-palette.js";
 import {
   findWebuiMentionRange,
