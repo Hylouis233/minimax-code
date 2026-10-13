@@ -9,8 +9,8 @@ import type {
   WebuiAccountLoginView,
   WebuiClaimSigninView,
   WebuiSigninPanelView,
-} from "../../shared/contracts/account.js";
-import type { WebuiUsageQuotaResult } from "../../shared/contracts/usage-quota.js";
+} from "../../../shared/contracts/account.js";
+import type { WebuiUsageQuotaResult } from "../../../shared/contracts/usage-quota.js";
 
 export interface AccountPort {
   readonly getUsageQuota?: (request?: {

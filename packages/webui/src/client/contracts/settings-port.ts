@@ -54,15 +54,6 @@ export interface SettingsPort {
   readonly listModels?: (request?: {
     readonly sessionId?: string;
   }) => Promise<readonly WebuiModelEntry[]>;
-  readonly listSkills?: (request?: {
-    readonly agentName?: string;
-  }) => Promise<{
-    readonly skills: readonly {
-      readonly name: string;
-      readonly displayName?: string;
-      readonly description?: string;
-    }[];
-  }>;
   readonly selectModel?: (
     request: WebuiModelSelectionRequest,
   ) => Promise<{ readonly success?: boolean }>;

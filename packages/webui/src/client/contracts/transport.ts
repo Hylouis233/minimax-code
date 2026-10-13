@@ -19,9 +19,9 @@ import type { ExecutionPort } from "./execution-port.js";
 import type { InteractionPort } from "./interaction-port.js";
 import type { WorkspacePort } from "./workspace-port.js";
 import type { SettingsPort } from "./settings-port.js";
-import type { AccountPort } from "./account-port.js";
-import type { PluginPort } from "./plugin-port.js";
-import type { TerminalPort } from "./terminal-port.js";
+import type { AccountPort } from "./account/account-port.js";
+import type { PluginPort } from "./plugins/plugin-port.js";
+import type { TerminalPort } from "./workspace/terminal-port.js";
 
 export interface WebuiTransport
   extends SessionPort,

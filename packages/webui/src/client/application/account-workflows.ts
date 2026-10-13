@@ -22,7 +22,7 @@
 // against a scripted port. The components read its snapshot and submit
 // commands; they hold no store writer and call no transport method directly.
 
-import type { AccountPort } from "../contracts/account-port.js";
+import type { AccountPort } from "../contracts/account/account-port.js";
 import type {
   WebuiAccountLoginView,
   WebuiClaimSigninView,

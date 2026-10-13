@@ -5,7 +5,7 @@
 // `transport.ts` composes it. Every method stays optional — `undefined` means
 // "the operation is not wired".
 
-import type { WebuiTerminalFrame } from "../../shared/contracts/terminal.js";
+import type { WebuiTerminalFrame } from "../../../shared/contracts/terminal.js";
 
 /**
  * A terminal's viewport, in cells, as the browser reports it.
