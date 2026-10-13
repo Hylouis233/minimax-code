@@ -25,6 +25,10 @@ import {
 } from "../projection/composer-history.js";
 
 import type { WebuiQueueItem } from "../../shared/contracts/queue.js";
+import type {
+  WebuiComposerAttachment,
+  WebuiComposerUrlReference,
+} from "../projection/composer-interactions.js";
 
 export interface WebuiComposerPersistence {
   readonly loadComposer: <T>(parse: (raw: string | null | undefined) => T) => T;
@@ -50,12 +54,36 @@ export const WEBUI_COMPOSER_EMPTY_QUEUE: WebuiComposerQueueState = {
 };
 
 /**
+ * The staged attachments and URL references, with the upload's in-flight flag and
+ * the seed guard that keeps one memory-handoff attachment from being staged twice
+ * (§5.6 lists attachments and url references as the composer's own state).
+ *
+ * Live, like the queue, and for the same reason: one composer instance is mounted
+ * at a time, so a single field reproduces exactly what the component's own state
+ * did — including surviving a session switch, which today's component state also
+ * does because nothing remounts it.
+ */
+export interface WebuiComposerStagingState {
+  readonly attachments: readonly WebuiComposerAttachment[];
+  readonly urlReferences: readonly WebuiComposerUrlReference[];
+  readonly busy: boolean;
+  readonly seedToken?: string;
+}
+
+export const WEBUI_COMPOSER_EMPTY_STAGING: WebuiComposerStagingState = {
+  attachments: [],
+  urlReferences: [],
+  busy: false,
+};
+
+/**
  * What a subscriber sees: the persisted slots plus the live queue. One store, one
  * subscription — the queue rides the snapshot rather than getting a second channel,
  * because two subscriptions to one owner is the arrangement this programme forbids.
  */
 export interface WebuiComposerSnapshot extends WebuiComposerPersisted {
   readonly queue: WebuiComposerQueueState;
+  readonly staging: WebuiComposerStagingState;
 }
 
 export interface WebuiComposerStore {
@@ -90,6 +118,17 @@ export interface WebuiComposerStore {
   readonly purgeSlot: (key: string) => void;
   /** The live queue mirror. */
   readonly readQueue: () => WebuiComposerQueueState;
+  /** The staged attachments and url references. */
+  readonly readStaging: () => WebuiComposerStagingState;
+  /**
+   * Replace part of the staging. A function receives the current state, so a
+   * caller that removes one attachment hands back the array it received.
+   */
+  readonly setStaging: (
+    next:
+      | Partial<WebuiComposerStagingState>
+      | ((current: WebuiComposerStagingState) => Partial<WebuiComposerStagingState>),
+  ) => void;
   /**
    * Replace the live queue mirror. A partial update keeps the other half; a
    * function receives the current state, so a caller that removes one item does
@@ -110,9 +149,10 @@ export function createWebuiComposerStore(options?: {
 }): WebuiComposerStore {
   let state = options?.initial ?? options?.storage?.loadComposer(parseWebuiComposerPersisted) ?? { drafts: {}, history: {} };
   let queue = WEBUI_COMPOSER_EMPTY_QUEUE;
+  let staging = WEBUI_COMPOSER_EMPTY_STAGING;
   // One stable object per change: a fresh snapshot on *every* `getSnapshot()` call
   // would make `useSyncExternalStore` re-render forever.
-  let snapshot: WebuiComposerSnapshot = { ...state, queue };
+  let snapshot: WebuiComposerSnapshot = { ...state, queue, staging };
   const listeners = new Set<() => void>();
 
   const notify = (): void => {
@@ -137,7 +177,7 @@ export function createWebuiComposerStore(options?: {
     const next = update(state);
     if (next === state) return;
     state = next;
-    snapshot = { ...state, queue };
+    snapshot = { ...state, queue, staging };
     options?.storage?.saveComposer(state, serializeWebuiComposerPersisted, keepKeys);
     notify();
   };
@@ -181,7 +221,25 @@ export function createWebuiComposerStore(options?: {
       // an unchanged result must not notify.
       if (items === queue.items && paused === queue.paused) return;
       queue = { items, paused };
-      snapshot = { ...state, queue };
+      snapshot = { ...state, queue, staging };
+      notify();
+    },
+    readStaging: () => snapshot.staging,
+    setStaging: (next) => {
+      const patch = typeof next === "function" ? next(staging) : next;
+      const attachments = patch.attachments ?? staging.attachments;
+      const urlReferences = patch.urlReferences ?? staging.urlReferences;
+      const busy = patch.busy ?? staging.busy;
+      const seedToken = "seedToken" in patch ? patch.seedToken : staging.seedToken;
+      if (
+        attachments === staging.attachments &&
+        urlReferences === staging.urlReferences &&
+        busy === staging.busy &&
+        seedToken === staging.seedToken
+      )
+        return;
+      staging = { attachments, urlReferences, busy, ...(seedToken === undefined ? {} : { seedToken }) };
+      snapshot = { ...state, queue, staging };
       notify();
     },
     purgeSlot: (key) => {

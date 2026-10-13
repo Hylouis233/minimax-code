@@ -54,6 +54,10 @@ import {
   drawableBreakdownRows,
 } from "../projection/context-breakdown.js";
 import { isTokenPlanModel } from "../projection/token-plan-model.js";
+import type {
+  WebuiComposerAttachment,
+  WebuiComposerUrlReference,
+} from "../projection/composer-interactions.js";
 import {
   createWebuiComposerAttachStreamEffect,
   recheckWebuiSubscription,
@@ -193,20 +197,6 @@ const WEBUI_SLASH_FALLBACK_SECTIONED: SlashCommandEntry[] = await (async () => {
 
 // Desktop keeps the viewport pinned through the short hand-off window where
 // the live turn is replaced by the refreshed historical transcript.
-
-interface ComposerAttachment {
-  readonly id: string;
-  readonly fileName: string;
-  readonly mimeType: string;
-  readonly sizeBytes: number;
-  readonly dataUrl: string;
-  readonly kind: "image" | "file";
-}
-
-interface ComposerUrlReference {
-  readonly id: string;
-  readonly url: string;
-}
 
 interface ComposerCatalogEntry {
   readonly name: string;
@@ -790,11 +780,12 @@ export function WebuiComposer({
   // live state: not persisted, and not per-slot, because unlike the draft it does
   // not survive a session switch.
   const composerStore = useWebuiComposerStore();
-  const queueState = useSyncExternalStore(
+  const composerSnapshot = useSyncExternalStore(
     composerStore.subscribe,
     composerStore.getSnapshot,
     composerStore.getSnapshot,
-  ).queue;
+  );
+  const queueState = composerSnapshot.queue;
   const queueItems = queueState.items;
   const queuePaused = queueState.paused;
   const setQueueItems = composerStore.setQueue;
@@ -802,9 +793,41 @@ export function WebuiComposer({
   const [accountStatus, setAccountStatus] = useState<Record<string, unknown>>();
   const [commandOutput, setCommandOutput] = useState<string>();
   const [commandRunning, setCommandRunning] = useState(false);
-  const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
-  const [urlReferences, setUrlReferences] = useState<ComposerUrlReference[]>([]);
-  const [attachmentBusy, setAttachmentBusy] = useState(false);
+  // The staged attachments and URL references are the composer's own state, kept
+  // by its owner module (§5.6) and read from the same snapshot as the queue.
+  const attachments = composerSnapshot.staging.attachments;
+  const urlReferences = composerSnapshot.staging.urlReferences;
+  const attachmentBusy = composerSnapshot.staging.busy;
+  const setAttachments = useCallback(
+    (
+      next:
+        | readonly WebuiComposerAttachment[]
+        | ((current: readonly WebuiComposerAttachment[]) => readonly WebuiComposerAttachment[]),
+    ) => {
+      composerStore.setStaging((current) => ({
+        attachments: typeof next === "function" ? next(current.attachments) : next,
+      }));
+    },
+    [composerStore],
+  );
+  const setUrlReferences = useCallback(
+    (
+      next:
+        | readonly WebuiComposerUrlReference[]
+        | ((current: readonly WebuiComposerUrlReference[]) => readonly WebuiComposerUrlReference[]),
+    ) => {
+      composerStore.setStaging((current) => ({
+        urlReferences: typeof next === "function" ? next(current.urlReferences) : next,
+      }));
+    },
+    [composerStore],
+  );
+  const setAttachmentBusy = useCallback(
+    (next: boolean) => {
+      composerStore.setStaging({ busy: next });
+    },
+    [composerStore],
+  );
   const [composerMenu, setComposerMenu] = useState<"root" | "skills" | "plugins">();
   const [installedPlugins, setInstalledPlugins] = useState<readonly ComposerCatalogEntry[]>([]);
   const [pluginsLoading, setPluginsLoading] = useState(false);
@@ -1485,7 +1508,7 @@ export function WebuiComposer({
     setAttachmentBusy(true);
     setInteractionError(undefined);
     try {
-      const additions = await Promise.all(files.map(async (file): Promise<ComposerAttachment> => {
+      const additions = await Promise.all(files.map(async (file): Promise<WebuiComposerAttachment> => {
         const dataUrl = await readBrowserFile(file);
         const fileName = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
         return {
@@ -1504,14 +1527,14 @@ export function WebuiComposer({
       setAttachmentBusy(false);
     }
   };
-  const seededTokenRef = useRef<string>();
+  const seededToken = composerSnapshot.staging.seedToken;
   useEffect(() => {
     const seed = seedAttachment;
-    if (!seed || seededTokenRef.current === seed.token) return;
+    if (!seed || seededToken === seed.token) return;
     // Mark it consumed before anything that can bail. A seed the composer
     // refuses has to stay refused; retrying on every attachment change would
     // pin the error in place.
-    seededTokenRef.current = seed.token;
+    composerStore.setStaging({ seedToken: seed.token });
     const limitError = webuiAttachmentLimitError(attachments, [{ sizeBytes: seed.sizeBytes }]);
     if (limitError) {
       setInteractionError(limitError);

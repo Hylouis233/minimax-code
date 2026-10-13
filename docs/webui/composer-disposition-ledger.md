@@ -26,20 +26,28 @@ history are in it today) with `application/composer-workflows.ts`. §5.6's targe
 
 | Element | Today | Disposition | Target |
 | --- | --- | --- | --- |
-| `attachments` `:786` | component-local `useState` | composer state (§5.6 may-write: attachments) | `composer-store.ts`, one row per slot |
-| `urlReferences` `:787` | component-local `useState` | composer state (§5.6 may-write: url references) | idem |
-| `attachmentBusy` `:788` | component-local `useState` | composer state (the upload's in-flight flag rides with the attachments it gates) | idem |
-| `seededTokenRef` `:1484` | component-local `useRef` | composer state (the attachment seed's dedupe guard) | idem |
+| `attachments` `:786` | **resolved** — `composerSnapshot.staging.attachments` | composer state (§5.6 may-write: attachments) | `composer-store.ts`: `readStaging()` / `setStaging()`, on the same subscription |
+| `urlReferences` `:787` | **resolved** — `staging.urlReferences` | composer state (§5.6 may-write: url references) | same |
+| `attachmentBusy` `:788` | **resolved** — `staging.busy` | composer state (the upload's flag rides with what it gates) | same |
+| `seededTokenRef` `:1484` | **resolved** — `staging.seedToken` | composer state (the seed's dedupe guard) | same |
+
+The two view types moved with the state: `WebuiComposerAttachment` and
+`WebuiComposerUrlReference` now live in `projection/composer-interactions.ts`, beside the
+attachment limit rule that already belonged to the composer's projection — an application
+module may not import component types, and the owner has to hold them.
 | `mentionRange` `:797` | component-local `useState` | composer state (§5.6 may-write: mention/slash ranges) | idem |
 | `slashDraftRef` `:1339` | component-local `useRef` | composer state (§5.6 may-write: slash ranges) | idem |
 | `slashRangeRef` `:1340` | component-local `useRef` | composer state (same) | idem |
 | `queueItems` `:780` | **resolved** — read from the owner as `queueState.items` | composer state (§4.2 names `:780` as the temporary home) | `composer-store.ts`: `readQueue()` / `setQueue()`, on the one subscription |
 | `queuePaused` `:781` | **resolved** — `queueState.paused` | same | same |
 
-The queue is **live state**: not persisted and not per-slot. Unlike the draft it does not
-survive a session switch, and keying it by session would make switching back resurrect a
-stale list — a behaviour change, not a reorganisation. `composer-history.test.ts` asserts
-both halves (`does not persist the live queue`, and the snapshot it rides).
+The queue is **live state**: not persisted, and a single field rather than one per slot.
+The reason is what today's code actually does — nothing remounts the composer when the
+session changes, so the component's own state survives a session switch, and one live field
+reproduces exactly that. Keying it by session would be the behaviour change here: it would
+drop the current list on the way out and show a different one on the way back.
+`composer-history.test.ts` asserts the half that matters (`does not persist the live state`,
+and the snapshot the live state rides).
 | `recordedTurn` `:1757` | component-local `useState` | composer state (§4.2 field 1: the retry record) | `composer-store.ts` |
 | `recordedTurnRef` `:1756` | component-local `useRef` | composer state (its guard) | `composer-store.ts` |
 | `planMode` `:777` | component-local `useState` | composer state (§4.2 field 1: input mode flags) | `composer-store.ts` |
@@ -127,10 +135,10 @@ this file must stop holding. `open` `:2647`, `hovered` `:2648`, `breakdownOpen` 
 ticket is not blocked.
 
 **Not yet in its final home** (this carve's work, in the order the code allows):
-1. §1 — thirteen elements move into `composer-store.ts`. **Two done** (the queue, §4.2's
-   two named rows); eleven left: `attachments`, `urlReferences`, `attachmentBusy`,
-   `seededTokenRef`, `mentionRange`, `slashDraftRef`, `slashRangeRef`, `recordedTurn`,
-   `recordedTurnRef`, `planMode`, `goalMode`.
+1. §1 — thirteen elements move into `composer-store.ts`. **Six done** (the queue — §4.2's
+   two named rows — and the attachment staging, four rows); seven left: `mentionRange`,
+   `slashDraftRef`, `slashRangeRef`, `recordedTurn`, `recordedTurnRef`, `planMode`,
+   `goalMode`.
 2. §2 — **done** (the two cells above).
 3. §4 — the caches whose owner module does not exist yet lose their local copy in that
    owner's carve; until then the ledger records the API each one resolves against, and the
