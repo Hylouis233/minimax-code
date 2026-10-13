@@ -58,6 +58,60 @@ describe("a late page after a session switch is discarded", () => {
     await expect(first).resolves.toEqual({ status: "stale" });
     expect(store.readSession("S").transcript.page.messages?.map((m) => m.msgId)).toEqual(["newer"]);
   });
+
+  // The fence above is per key, not per owner. A head read and an older-page read
+  // for one session are different keys (plan §4.5: "stream recovery and
+  // older-page pagination cannot be assumed to share one key"), so the newer
+  // request for one of them must not cancel the other. The singleton this
+  // replaced shared one request id across both, which made one of these two
+  // answers stale — the conflation the ticket calls out.
+  it("does not let a newer older-page request cancel the head request for that session", async () => {
+    const releases: Record<string, (page: WebuiClientMessagePage) => void> = {};
+    const store = createWebuiSessionStore();
+    const owner = createWebuiTranscriptHistoryOwner({
+      store,
+      loadMessages: ({ before }) =>
+        new Promise<WebuiClientMessagePage>((resolve) => {
+          releases[before ?? "head"] = resolve;
+        }),
+    });
+    owner.selectSession("S");
+    owner.seed("S", page("S-3"));
+    const head = owner.loadPage("S");
+    const older = owner.loadOlder("S", "c1");
+    releases["head"]!(page("S-3"));
+    await expect(head).resolves.toMatchObject({ status: "applied" });
+    releases["c1"]!(page("S-1", "S-2"));
+    await expect(older).resolves.toMatchObject({ status: "applied" });
+    expect(store.readSession("S").transcript.page.messages?.map((m) => m.msgId)).toEqual([
+      "S-1",
+      "S-2",
+      "S-3",
+    ]);
+  });
+
+  it("reports a handle as no longer current once a newer request for its key landed", async () => {
+    const releases: Array<(page: WebuiClientMessagePage) => void> = [];
+    const store = createWebuiSessionStore();
+    const owner = createWebuiTranscriptHistoryOwner({
+      store,
+      loadMessages: () => new Promise<WebuiClientMessagePage>((resolve) => releases.push(resolve)),
+    });
+    const first = owner.loadPage("S");
+    const second = owner.loadPage("S");
+    releases[1]!(page("newer"));
+    const applied = await second;
+    releases[0]!(page("older"));
+    await first;
+    expect(applied.status).toBe("applied");
+    if (applied.status !== "applied") return;
+    // The scroll restore is bound to this answer being the one the key still
+    // holds, which is what keeps a superseded page from moving the viewport.
+    expect(owner.isCurrentPage(applied.page)).toBe(true);
+    expect(
+      owner.isCurrentPage({ ...applied.page, token: { ...applied.page.token, revision: 0 } }),
+    ).toBe(false);
+  });
 });
 
 describe("live-to-history handover renders a completed turn once", () => {

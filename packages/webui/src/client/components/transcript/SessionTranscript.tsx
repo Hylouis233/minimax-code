@@ -523,7 +523,7 @@ export function WebuiSessionTranscript({
           requestAnimationFrame(() => {
             if (
               outcome.status === "applied" &&
-              historyOwner.isCurrentRequest(sessionId, outcome.requestId) &&
+              historyOwner.isCurrentPage(outcome.page) &&
               transcriptRef.current?.dataset.webuiTranscript === sessionId &&
               viewport?.isConnected &&
               previousScrollTop !== undefined
