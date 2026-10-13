@@ -1063,7 +1063,10 @@
       "344dd225",
       "a0d33dfa",
       "2086cf52",
-      "d658677c"
+      "d658677c",
+      "c027a9f9",
+      "2e7466d1",
+      "HEAD"
     ],
     "published": false,
     "tickets": {
@@ -1072,7 +1075,7 @@
       "T03": "implemented locally, acceptance evidence recorded on #129",
       "T04": "implemented locally, acceptance evidence recorded on #130",
       "T05": "closed 2026-10-13, acceptance evidence recorded on #131",
-      "T06": "in progress: keyed per-session/page history ownership (a0d33dfa), the transcript view model with the turn-live predicate at its owner (2086cf52) and the scroll binding (d658677c) delivered; transcript public view/feedback commands, compatible context read sharing and the contracts/projections relocation still open"
+      "T06": "in progress: keyed per-session/page history ownership, the view model cut with the turn-live predicate at its owner, the scroll binding, the response surfaces and the shared context read delivered; a true read/refresh split, the transcript feedback-error verification and the contracts/projections relocation still open"
     },
     "frontier": [
       "T06",
@@ -1080,9 +1083,8 @@
       "T17"
     ],
     "notes": [
-      "T06 third slice (d658677c): the transcript's auto-follow follower, viewport lookup, pin and height observer moved into bindings/use-transcript-scroll.ts. It also repairs a regression the previous slice introduced — the two scroll layout effects sat inside the replaced block and were deleted, and nothing failed; the new test/webui-browser/transcript-scroll.spec.mjs catches it (both cases fail with the binding removed).",
-      "T06 remaining: transcript-owned feedback commands, a context read shared with history per plan 4.5 (a compatible history answer may be reused for context-only inspection; pagination and stream recovery may not share a key), and the contracts/projections/bindings relocation.",
-      "T06 first slice (a0d33dfa): transcript history is a keyed resource per (sessionId, anchor) plus a selected-view slot, replacing the singleton request ownership."
+      "T06 delivered: keyed history ownership (a0d33dfa); view model + turn-live predicate at its owner (2086cf52); scroll binding, plus the repair of the follower the view-model slice deleted and a browser case that catches its absence (d658677c); response surfaces cut into QuestionnaireResponse.tsx and PlanDelivery.tsx, SessionTranscript.tsx now 487 lines from 814 (c027a9f9); context inspection reuses the transcript's history read through the owner's ensurePage (2e7466d1, with the discriminating unit case in the follow-up).",
+      "T06 open: a true read/refresh split. loadPage invalidates before reading, so a transcript read after an inspection read supersedes it instead of joining it (one request each, the inspection's answer refused). The join needs loadPage to read and a separate refresh for the mount and the live-to-idle handoff; the existing fence case 'an older response loses to a newer request for the same session' then moves to refresh. The browser count case does not discriminate the composer's read in this fixture (measured at 2 with and without it) - its evidence is the unit case."
     ]
   },
   "publicationVerification": {
