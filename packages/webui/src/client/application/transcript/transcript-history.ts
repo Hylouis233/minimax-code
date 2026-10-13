@@ -51,6 +51,17 @@ export interface WebuiTranscriptHistoryOwner {
   ) => Promise<WebuiTranscriptLoadOutcome>;
   /** Whether the page a load produced is still the one its key holds. */
   readonly isCurrentPage: (handle: WebuiTranscriptPageHandle) => boolean;
+  /**
+   * The head page for a session, from this owner's keyed resource: a cached answer
+   * is returned as it is, and otherwise one read is issued (or joined, when the
+   * transcript is already reading the same key).
+   *
+   * This is the seam a *context-only* inspection uses (plan §4.5: "context-only
+   * inspection can reuse a compatible history response"). It exists so the
+   * composer reads the transcript's page instead of issuing its own `getMessages`
+   * for the same session, which used to cost a second page read on every switch.
+   */
+  readonly ensurePage: (sessionId: string) => Promise<WebuiClientMessagePage | undefined>;
 }
 
 export type WebuiTranscriptLoadOutcome =
@@ -180,9 +191,23 @@ export function createWebuiTranscriptHistoryOwner(deps: {
     }
   };
 
+  const ensurePage = async (
+    sessionId: string,
+  ): Promise<WebuiClientMessagePage | undefined> => {
+    const key = keyOf(sessionId, undefined);
+    const cached = pages.read(key);
+    if (cached?.status === "ready") return cached.value;
+    if (!deps.loadMessages) return undefined;
+    const loadMessages = deps.loadMessages;
+    await pages.load(key, () => loadMessages({ id: sessionId }));
+    const entry = pages.read(key);
+    return entry?.status === "ready" ? entry.value : undefined;
+  };
+
   return {
     selectSession,
     seed,
+    ensurePage,
     loadPage: (sessionId) => load(sessionId),
     loadOlder: (sessionId, cursor) => load(sessionId, cursor),
     isCurrentPage: (handle) =>

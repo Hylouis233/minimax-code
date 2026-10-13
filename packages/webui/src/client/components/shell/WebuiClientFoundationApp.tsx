@@ -1462,7 +1462,6 @@ export function WebuiClientFoundationApp(
                     sendMessage={turnPort.send}
                     getActiveTurn={turnPort.activeTurn}
                     enqueueMessage={composerPort.enqueueMessage}
-                    loadMessages={loadMessages}
                     getTurnDiff={transcriptPort.getTurnDiff}
                     revertTurnDiff={transcriptPort.revertTurnDiff}
                     reapplyTurnDiff={transcriptPort.reapplyTurnDiff}

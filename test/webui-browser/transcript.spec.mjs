@@ -166,3 +166,28 @@ test("a late questionnaire.dismiss cannot revive the turn after a local skip", a
   await expect(page.getByTestId("questionnaire-composer")).toHaveCount(0);
   await expect(page.getByText("思考中…")).toHaveCount(0);
 });
+
+test("a session switch reads the page once per need, not once per reader", async ({ page }) => {
+  // The composer used to load the page itself, only to read `contextSnapshot`
+  // from it: with the transcript's own read and the workspace history progress
+  // read, a switch cost three `getMessages` for one session. Context inspection
+  // now joins the transcript history owner's keyed read (plan §4.5), so the
+  // composer's page read is gone.
+  await configureFixture(page, () => undefined);
+  await openApp(page);
+
+  await switchSession(page, "B");
+  await expect(page.getByText("History B synthetic")).toBeVisible();
+  await expect.poll(() => page.evaluate(() =>
+    window.__fixture.requests.filter(
+      (request) => request.operation === "getMessages" && request.body?.id === "B",
+    ).length,
+  )).toBeLessThanOrEqual(2);
+
+  const reads = await page.evaluate(() =>
+    window.__fixture.requests
+      .filter((request) => request.operation === "getMessages" && request.body?.id === "B")
+      .length,
+  );
+  expect(reads).toBeGreaterThan(0);
+});

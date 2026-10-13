@@ -60,6 +60,7 @@ import {
   useWebuiSessionPermissions,
   useWebuiSessionQuestionnaire,
   useWebuiSessionState,
+  useWebuiTranscriptHistoryOwner,
 } from "../../bindings/use-session-state.js";
 import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
 import { ContextUsageIndicator } from "../sessions/ContextUsageIndicator.js";
@@ -80,7 +81,6 @@ import { webuiSessionStatusType } from "../../projection/turn/stream-state.js";
  *  per-key `WebuiTransport["x"]` redeclarations. */
 type WebuiSessionComposerCapabilities = Pick<
   WebuiTransport,
-  | "loadMessages"
   | "getTurnDiff"
   | "revertTurnDiff"
   | "reapplyTurnDiff"
@@ -327,7 +327,6 @@ export function WebuiComposer({
   recentWorkspaceDirs = EMPTY_WORKSPACE_DIRS,
   runCommand,
   sendMessage,
-  loadMessages,
   getTurnDiff,
   revertTurnDiff,
   reapplyTurnDiff,
@@ -648,18 +647,23 @@ export function WebuiComposer({
   const workspacePickerRef = useRef<HTMLDivElement | null>(null);
   const fieldId = useId();
   const contextUsage = stream.contextUsage ?? stream.messages.at(-1)?.contextUsage;
+  // Context inspection joins the transcript's history read (plan §4.5:
+  // "context-only inspection can reuse a compatible history response"). This used
+  // to issue its own `getMessages` for the session, so every switch paid a second
+  // page read whose only product was `contextSnapshot`.
+  const transcriptHistory = useWebuiTranscriptHistoryOwner();
   useEffect(() => {
-    if (!sessionId || webuiSessionStatusType(sessionStatus) === "started" || !loadMessages) return;
+    if (!sessionId || webuiSessionStatusType(sessionStatus) === "started") return;
     let cancelled = false;
-    void loadMessages({ id: sessionId }).then((page) => {
-      if (cancelled) return;
+    void transcriptHistory?.ensurePage(sessionId).then((page) => {
+      if (cancelled || !page) return;
       const snapshot = readContextUsageSnapshot(page.contextSnapshot);
       const fromMessages = latestContextUsage((page.messages ?? []).map(projectWebuiMessageToStreamMessage));
       const contextUsage = snapshot ?? fromMessages;
       if (contextUsage) lifecycle.setContextUsage(contextUsage);
     }).catch(() => undefined);
     return () => { cancelled = true; };
-  }, [sessionId, sessionStatus, loadMessages]);
+  }, [sessionId, sessionStatus, transcriptHistory]);
 
   useEffect(() => {
     if (!sessionId) {
