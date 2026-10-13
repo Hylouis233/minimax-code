@@ -149,7 +149,7 @@ import type { WebuiEventEffects } from "../../application/turn/event-coordinator
 import { createWebuiOpenEventChannel } from "../../bindings/event-channel-adapter.js";
 import type { WebuiWorkspaceGitChangedSignal } from "../../projection/workspace-panel-state.js";
 import { ConnectionStatus } from "./ConnectionStatus.js";
-import { deriveConversationUsageNotice } from "../../projection/message-projection.js";
+import { deriveConversationUsageNotice } from "../../projection/transcript/message-projection.js";
 import { deriveRecentWorkspaceDirs } from "../../projection/composer/composer-state.js";
 import { normalizeFavoriteModelIds } from "../../projection/models/model-favorites.js";
 

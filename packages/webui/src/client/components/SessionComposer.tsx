@@ -34,7 +34,7 @@ import type { WebuiModelSelectionRequest } from "../contracts/models/model-view.
 import type { WebuiClientSessionCreator } from "../contracts/sessions/session-port.js";
 import type { WebuiClientSessionPage, WebuiClientSession } from "../contracts/sessions/session-view.js";
 import type { WebuiTransport } from "../contracts/transport.js";
-import { projectWebuiMessageToStreamMessage, readUsageNumber } from "../projection/message-projection.js";
+import { projectWebuiMessageToStreamMessage, readUsageNumber } from "../projection/transcript/message-projection.js";
 import { createWebuiGoalCoordinator } from "../application/goal-coordinator.js";
 import {
   createWebuiInteractionCoordinator,

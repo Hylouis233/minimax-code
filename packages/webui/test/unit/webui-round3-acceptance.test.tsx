@@ -7,7 +7,7 @@ import {
   confirmWebuiDiffMutation,
   initialWebuiDiffState,
   reduceWebuiDiffState,
-} from "../../src/client/projection/review-state.js";
+} from "../../src/client/projection/transcript/review-state.js";
 import { WebuiDiffCard } from "../../src/client/components/transcript/DiffCard.js";
 import { WebuiGoalBanner } from "../../src/client/components/goal/GoalBanner.js";
 import { WebuiInteractionPanel } from "../../src/client/components/interactions/InteractionPanel.js";

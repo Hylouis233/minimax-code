@@ -8,7 +8,7 @@ import {
   selectWebuiReviewVisibleFiles,
   webuiReviewLineTarget,
   type WebuiReviewFile,
-} from "../../src/client/projection/review-state.js";
+} from "../../src/client/projection/transcript/review-state.js";
 
 const files: readonly WebuiReviewFile[] = [
   { fileId: "f1", path: "src/one.ts", status: "modified", type: "text", additions: 3, deletions: 1 },

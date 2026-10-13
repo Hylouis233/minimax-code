@@ -1,9 +1,9 @@
 // Transcript projection 负责将 transcript items 分组为渲染区块。
 // `groupWebuiTranscriptItems` 是供 renderer 使用的 helper；每组对应一个 user bubble 或 assistant turn。
 
-import type { WebuiClientMessage, WebuiClientMessagePage, WebuiQueryCollapseView } from "../contracts/transcript/message-view.js";
-import type { WebuiTranscriptItem, WebuiTranscriptActivityPart, WebuiTranscriptProcessSegment } from "../contracts/transcript/transcript-view.js";
-import type { WebuiStreamMessage } from "./stream-state.js";
+import type { WebuiClientMessage, WebuiClientMessagePage, WebuiQueryCollapseView } from "../../contracts/transcript/message-view.js";
+import type { WebuiTranscriptItem, WebuiTranscriptActivityPart, WebuiTranscriptProcessSegment } from "../../contracts/transcript/transcript-view.js";
+import type { WebuiStreamMessage } from "../stream-state.js";
 import { readUsageNumber } from "./message-projection.js";
 
 /** A render block: one user bubble, or one assistant turn. The transcript

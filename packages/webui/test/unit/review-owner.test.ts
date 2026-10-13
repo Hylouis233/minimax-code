@@ -19,7 +19,7 @@ import {
   initialWebuiDiffState,
   reduceWebuiDiffState,
   resolveWebuiDiffMutation,
-} from "../../src/client/projection/review-state.js";
+} from "../../src/client/projection/transcript/review-state.js";
 
 const CLIENT = new URL("../../src/client/", import.meta.url);
 const read = (relative: string): string => readFileSync(new URL(relative, CLIENT), "utf8");

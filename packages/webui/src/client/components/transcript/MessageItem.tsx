@@ -19,13 +19,13 @@ import type {
   WebuiGetSessionRewindPreviewResult,
 } from "../../../shared/contracts/session.js";
 import type { WebuiTransport } from "../../contracts/transport.js";
-import type { WebuiMessageFileReference } from "../../projection/message-file-reference.js";
+import type { WebuiMessageFileReference } from "../../projection/transcript/message-file-reference.js";
 import type { WorkspacePanelCommand } from "../../projection/workspace-panel-state.js";
 import type {
   WebuiHistoricalTurnView,
   WebuiLiveTurnView,
   WebuiTurnView,
-} from "../../projection/transcript-shape.js";
+} from "../../projection/transcript/transcript-shape.js";
 
 /** Capability subset the message item consumes. Single source of truth
  *  lives in `WebuiTransport`; this alias keeps the prop block free of

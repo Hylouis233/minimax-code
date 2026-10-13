@@ -31,7 +31,7 @@ import {
   toolCallResourcePath,
   webuiActivitySummary,
   webuiEditFileStat,
-} from "../../projection/tool-projection.js";
+} from "../../projection/transcript/tool-projection.js";
 
 function WebuiToolRow({
   tool,

@@ -74,10 +74,10 @@ import {
   type WebuiComposerSubmitHandlers,
 } from "../../src/client/application/composer/composer-workflows.js";
 import { createWebuiTurnLifecycleCommands } from "../../src/client/application/sessions/session-commands.js";
-import { projectWebuiMessage } from "../../src/client/projection/message-projection.js";
-import { projectLiveTurnView } from "../../src/client/projection/transcript-shape.js";
+import { projectWebuiMessage } from "../../src/client/projection/transcript/message-projection.js";
+import { projectLiveTurnView } from "../../src/client/projection/transcript/transcript-shape.js";
 import { buildWebuiQuestionnaireAnswers } from "../../src/client/projection/interactions/questionnaire-state.js";
-import { groupWebuiTranscriptItems } from "../../src/client/projection/transcript-projection.js";
+import { groupWebuiTranscriptItems } from "../../src/client/projection/transcript/transcript-projection.js";
 import type {
   WebuiGoal,
   WebuiGoalPatchRequest,

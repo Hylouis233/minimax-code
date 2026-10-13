@@ -26,7 +26,7 @@ import {
   webuiReviewLineTarget,
   type WebuiReviewFile,
   type WebuiReviewState,
-} from "../../projection/review-state.js";
+} from "../../projection/transcript/review-state.js";
 import {
   groupWebuiWorktreeWorkspaces,
   type WebuiWorktreeSourceSession,

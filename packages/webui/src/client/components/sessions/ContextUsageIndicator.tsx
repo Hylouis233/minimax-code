@@ -15,7 +15,7 @@ import {
   sameContextUsagePlacement,
   type ContextUsagePlacement,
 } from "../../projection/composer/context-usage-popover.js";
-import { readUsageNumber } from "../../projection/message-projection.js";
+import { readUsageNumber } from "../../projection/transcript/message-projection.js";
 import { isTokenPlanModel } from "../../projection/models/token-plan-model.js";
 import { formatUsageResetLabel } from "../account/UserMenuUsage.js";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactElement } from "react";

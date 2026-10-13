@@ -6,19 +6,19 @@ import {
   WEBUI_FIELD_OWNERSHIP_TABLE,
   WEBUI_HISTORICAL_FIELD_TABLE,
   WEBUI_LIVE_FIELD_TABLE,
-} from "../../src/client/projection/transcript-shape.js";
+} from "../../src/client/projection/transcript/transcript-shape.js";
 import type { WebuiClientMessage } from "../../src/client/contracts/transcript/message-view.js";
 import type { WebuiStreamMessage } from "../../src/client/projection/stream-state.js";
 import {
   projectWebuiMessage,
   projectWebuiTranscriptMessage,
-} from "../../src/client/projection/message-projection.js";
+} from "../../src/client/projection/transcript/message-projection.js";
 import {
   groupWebuiTranscriptItems,
   projectWebuiTranscriptMessages,
   projectWebuiQueryDurations,
   projectWebuiProcessSegments,
-} from "../../src/client/projection/transcript-projection.js";
+} from "../../src/client/projection/transcript/transcript-projection.js";
 
 /**
  * Pure tests for the two transcript adapters. The leaf renderer tests

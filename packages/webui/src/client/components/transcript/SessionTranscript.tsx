@@ -44,21 +44,21 @@ type WebuiSessionTranscriptCapabilities = Pick<
 >;
 import type { WebuiTurnDiffView } from "../../../shared/contracts/session.js";
 import type { WebuiQuestionnaireResponseSummary } from "../../contracts/transcript/transcript-view.js";
-import type { WebuiMessageFileReference } from "../../projection/message-file-reference.js";
+import type { WebuiMessageFileReference } from "../../projection/transcript/message-file-reference.js";
 import type { WorkspacePanelCommand } from "../../projection/workspace-panel-state.js";
 import {
   groupWebuiTranscriptItems,
   projectWebuiTranscriptMessages,
   projectWebuiQueryDurations,
   projectWebuiProcessSegments,
-} from "../../projection/transcript-projection.js";
-import { projectWebuiTranscriptMessage } from "../../projection/message-projection.js";
+} from "../../projection/transcript/transcript-projection.js";
+import { projectWebuiTranscriptMessage } from "../../projection/transcript/message-projection.js";
 import {
   projectHistoricalTurnView,
   projectLiveTurnView,
   type WebuiLiveTurnView,
   type WebuiTurnView,
-} from "../../projection/transcript-shape.js";
+} from "../../projection/transcript/transcript-shape.js";
 import {
   webuiScrollBottomTop,
   webuiScrollFollowsBottom,

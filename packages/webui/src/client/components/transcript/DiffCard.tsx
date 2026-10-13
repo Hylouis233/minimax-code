@@ -21,7 +21,7 @@ import {
   initialWebuiDiffState,
   reduceWebuiDiffState,
   resolveWebuiDiffMutation,
-} from "../../projection/review-state.js";
+} from "../../projection/transcript/review-state.js";
 import type { WebuiTransport } from "../../contracts/transport.js";
 
 /** Capability subset the diff card consumes. The contract lives in

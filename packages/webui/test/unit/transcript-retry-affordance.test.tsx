@@ -22,7 +22,7 @@ import { OutputError } from "../../src/client/components/transcript/OutputError.
 import { WebuiAssistantBody } from "../../src/client/components/transcript/AssistantBody.js";
 import { WebuiClientFoundationApp } from "../../src/client/components/shell/WebuiClientFoundationApp.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
-import { projectMessageParts } from "../../src/client/projection/message-parts.js";
+import { projectMessageParts } from "../../src/client/projection/transcript/message-parts.js";
 import type { WebuiClientMessage } from "../../src/client/contracts/transcript/message-view.js";
 
 /** Captures the retry control's click handler out of a static render. */
