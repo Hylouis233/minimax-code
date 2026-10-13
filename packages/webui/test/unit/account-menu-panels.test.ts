@@ -79,3 +79,23 @@ describe("the account answers come from the one owner", () => {
     }
   });
 });
+
+describe("the two cross-surface jumps stay in the menu", () => {
+  it("sends the check-in panel's 查看用量 on to the quota popover", () => {
+    // The one that starts inside the panel that is going away, so it has to close check-in first.
+    expect(shell).toContain("setSigninOpen(false);\n                    loadUsage();");
+  });
+
+  it("sends the quota popover's login action on to the login dialog", () => {
+    expect(shell).toContain("onLogin={() => { setOpen(false); setLoginOpen(true); }}");
+  });
+});
+
+describe("a quota failure is an error with a retry, not an empty panel", () => {
+  it("renders the error state with a retry control wired to the loader", () => {
+    expect(usage).toContain('state.status === "error" ? (');
+    expect(usage).toContain('data-testid="usage-popover-error"');
+    expect(usage).toContain("onClick={onRetry}");
+    expect(usage).toContain("重试");
+  });
+});
