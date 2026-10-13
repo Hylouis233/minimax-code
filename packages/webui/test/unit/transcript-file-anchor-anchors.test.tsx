@@ -22,7 +22,7 @@ import { WebuiMarkdown } from "../../src/client/components/transcript/markdown.j
 import {
   parseWebuiMessageFileReference,
   type WebuiMessageFileReference,
-} from "../../src/client/projection/transcript/message-file-reference.js";
+} from "../../src/client/features/transcript/projection/message-file-reference.js";
 
 function render(source: string, onOpenFile?: (reference: WebuiMessageFileReference) => void): string {
   return renderToStaticMarkup(createElement(WebuiMarkdown, { source, onOpenFile }));

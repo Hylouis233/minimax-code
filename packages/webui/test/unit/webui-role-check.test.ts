@@ -225,8 +225,11 @@ describe("the duplicate-owner rule", () => {
     // second. A business whose target home appears while its current home still
     // exists is the migration leftover this gate is for.
     const graph = buildFixture({
-      "client/projection/transcript/timestamps.ts": leaf,
       "client/features/transcript/projection/timestamps.ts": leaf,
+      // The same business and role still sitting in its current home: that is the
+      // duplicate, and the second file name has to differ or the object literal
+      // collapses the fixture to one file and asserts nothing.
+      "client/projection/transcript/older-timestamps.ts": leaf,
     });
     expect(rulesOf(roleRule(graph, []).violations)).toEqual(["duplicate-owner"]);
   });

@@ -31,7 +31,7 @@ import type { WebuiModelSelectionRequest } from "../../contracts/models/model-vi
 import type { WebuiClientSessionCreator } from "../../contracts/sessions/session-port.js";
 import type { WebuiClientSessionPage, WebuiClientSession } from "../../contracts/sessions/session-view.js";
 import type { WebuiTransport } from "../../contracts/transport.js";
-import { projectWebuiMessageToStreamMessage, readUsageNumber } from "../../projection/transcript/message-projection.js";
+import { projectWebuiMessageToStreamMessage, readUsageNumber } from "../../features/transcript/projection/message-projection.js";
 import {
   createWebuiInteractionCoordinator,
 } from "../../application/interactions/interaction-coordinator.js";
@@ -147,7 +147,7 @@ import {
   resolveWebuiSubmissionIntent,
   resolveWebuiComposerEnterAction,
 } from "../../projection/composer/composer-state.js";
-import { isTurnLive } from "../../projection/turn/stream-state.js";
+import { isTurnLive } from "../../contracts/turn/stream-state.js";
 import {
   submitWebuiGoal,
 } from "../../application/composer/composer-workflows.js";

@@ -9,12 +9,12 @@
 import {
   recordValue,
   stringAmongKeys,
-} from "../../contracts/value-readers.js";
-import { basenamePath } from "../common/paths.js";
+} from "../../../contracts/value-readers.js";
+import { basenamePath } from "../../../projection/common/paths.js";
 import type {
   WebuiQuestionnaireResponseAnswer,
   WebuiQuestionnaireResponseSummary,
-} from "../../features/transcript/contracts/transcript-view.js";
+} from "../contracts/transcript-view.js";
 
 export interface WebuiMessageForParts {
   readonly msgId: string;

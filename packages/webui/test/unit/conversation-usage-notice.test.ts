@@ -12,7 +12,7 @@
 // does however high its percentage reads.
 import { describe, expect, it } from "vitest";
 
-import { deriveConversationUsageNotice } from "../../src/client/projection/transcript/message-projection.js";
+import { deriveConversationUsageNotice } from "../../src/client/features/transcript/projection/message-projection.js";
 import type { WebuiUsageQuotaResult } from "../../src/shared/contracts/usage-quota.js";
 
 function signedIn(

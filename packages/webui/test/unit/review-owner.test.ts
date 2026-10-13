@@ -6,7 +6,7 @@
 // Two surfaces render a diff — the transcript's card on an assistant message and
 // the review page over a whole change set — and the machine, the failure copy and
 // the mutation decisions used to be filed in the first of them. They live in
-// `projection/transcript/review-state.ts` now, and this file asserts both halves of the
+// `features/transcript/projection/review-state.ts` now, and this file asserts both halves of the
 // acceptance: one machine, two readers, and no private copy in either.
 
 import { describe, expect, it } from "vitest";
@@ -19,7 +19,7 @@ import {
   initialWebuiDiffState,
   reduceWebuiDiffState,
   resolveWebuiDiffMutation,
-} from "../../src/client/projection/transcript/review-state.js";
+} from "../../src/client/features/transcript/projection/review-state.js";
 
 const CLIENT = new URL("../../src/client/", import.meta.url);
 const read = (relative: string): string => readFileSync(new URL(relative, CLIENT), "utf8");
@@ -41,10 +41,17 @@ function modulesUnder(prefix: string): string[] {
 
 describe("the diff machine has one owner", () => {
   it("is declared in the review module and nowhere else", () => {
-    const declarers = [...modulesUnder("components/"), ...modulesUnder("projection/")].filter(
+    // Both homes are scanned: the transcript's projections moved to
+    // `features/transcript/projection/`, and a scan of the old home alone would
+    // find nothing and pass for the wrong reason.
+    const declarers = [
+      ...modulesUnder("components/"),
+      ...modulesUnder("projection/"),
+      ...modulesUnder("features/"),
+    ].filter(
       (file) => /export function reduceWebuiDiffState\(/u.test(read(file)),
     );
-    expect(declarers).toEqual(["projection/transcript/review-state.ts"]);
+    expect(declarers).toEqual(["features/transcript/projection/review-state.ts"]);
   });
 
   it("leaves the transcript's card with no machine of its own", () => {
@@ -57,14 +64,18 @@ describe("the diff machine has one owner", () => {
     expect(card).toContain("reduceWebuiDiffState(current,");
     expect(card).not.toContain("WEBUI_DIFF_FAILURE_COPY");
     // ...and it reads the owner instead.
-    expect(card).toContain('from "../../projection/transcript/review-state.js"');
+    expect(card).toContain('from "../../features/transcript/projection/review-state.js"');
   });
 
   it("keeps the failure copy in exactly one module", () => {
-    const holders = [...modulesUnder("components/"), ...modulesUnder("projection/")].filter(
+    const holders = [
+      ...modulesUnder("components/"),
+      ...modulesUnder("projection/"),
+      ...modulesUnder("features/"),
+    ].filter(
       (file) => read(file).includes("unsafe_path:"),
     );
-    expect(holders).toEqual(["projection/transcript/review-state.ts"]);
+    expect(holders).toEqual(["features/transcript/projection/review-state.ts"]);
   });
 });
 
@@ -75,7 +86,7 @@ describe("the two readers share it", () => {
     // while the acceptance ("one owner, two readers") still held. Scanning the
     // tree makes a third reader fail here and a relocation a no-op.
     const readers = modulesUnder("components/")
-      .filter((file) => read(file).includes("/projection/transcript/review-state.js"))
+      .filter((file) => read(file).includes("/features/transcript/projection/review-state.js"))
       .sort();
     expect(readers).toEqual([
       "components/transcript/DiffCard.tsx",

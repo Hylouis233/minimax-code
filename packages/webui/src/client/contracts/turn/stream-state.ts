@@ -68,6 +68,19 @@ export interface WebuiStreamMessage {
  * This field is deliberately independent of `phase`. `phase` answers "is a
  * turn live"; this answers "is *this* client attached to it".
  */
+/**
+ * The one predicate for "this turn is still live": streaming, waiting on the
+ * model, or reconnecting.
+ *
+ * It is published here, next to the stream state it reads, because more than one
+ * business needs the answer and they must agree on it: the transcript decides
+ * whether a live view belongs in the message column, and the composer decides the
+ * send affordance. Both read it from the business that owns the phase.
+ */
+export function isTurnLive(phase: WebuiStreamState["phase"] | undefined): boolean {
+  return phase === "streaming" || phase === "waiting" || phase === "reconnecting";
+}
+
 export interface WebuiStreamSubscription {
   /** `local-send` was opened by `sendMessage`; `recovered` was opened after
    * the server started a turn we did not initiate. */

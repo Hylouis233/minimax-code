@@ -23,7 +23,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react";
-import { parseWebuiMessageFileReference } from "../../projection/transcript/message-file-reference.js";
+import { parseWebuiMessageFileReference } from "../../features/transcript/projection/message-file-reference.js";
 
 // The same `highlight.js/lib/core` registration `components/workspace/WorkspacePanels.tsx`
 // performs for the file viewer — the full `highlight.js` bundle is never

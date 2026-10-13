@@ -8,7 +8,7 @@ import {
   initialWebuiDiffState,
   reduceWebuiDiffState,
   resolveWebuiDiffMutation,
-} from "../../src/client/projection/transcript/review-state.js";
+} from "../../src/client/features/transcript/projection/review-state.js";
 import { WebuiDiffCard } from "../../src/client/components/transcript/DiffCard.js";
 import type { WebuiTurnDiffView } from "../../src/shared/contracts/session.js";
 

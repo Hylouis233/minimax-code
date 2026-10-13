@@ -13,10 +13,10 @@ import { ChatSkeleton } from "./TranscriptSkeletons.js";
 import { ActivityIndicator, MessageAfterQueryStreamingPlaceholder, MessagePassiveLoadingPlaceholder } from "./ActivityIndicator.js";
 import { TurnNavigator, type TurnSummary } from "./TurnNavigator.js";
 import { MessageItem } from "./MessageItem.js";
-import { formatWebuiMessageTimestamp } from "../../projection/transcript/message-timestamp.js";
+import { formatWebuiMessageTimestamp } from "../../features/transcript/projection/message-timestamp.js";
 import type { WebuiMessageActionCapabilities } from "../../features/transcript/contracts/transcript-view.js";
 import { useWebuiSessionQuestionnaire, useWebuiSessionState, useWebuiSessionStream, useWebuiTranscriptHistoryOwner } from "../../bindings/use-session-state.js";
-import { isTurnLive } from "../../projection/turn/stream-state.js";
+import { isTurnLive } from "../../contracts/turn/stream-state.js";
 import { isWebuiPlanReviewRequest } from "../../projection/interactions/plan-mode.js";
 import { WebuiTranscriptPlanDelivery } from "./PlanDelivery.js";
 import { WebuiQuestionnaireResponse } from "./QuestionnaireResponse.js";
@@ -41,22 +41,22 @@ type WebuiSessionTranscriptCapabilities = Pick<
 >;
 import type { WebuiTurnDiffView } from "../../../shared/contracts/session.js";
 import type { WebuiQuestionnaireResponseSummary } from "../../features/transcript/contracts/transcript-view.js";
-import type { WebuiMessageFileReference } from "../../projection/transcript/message-file-reference.js";
+import type { WebuiMessageFileReference } from "../../features/transcript/projection/message-file-reference.js";
 import type { WorkspacePanelCommand } from "../../projection/workspace/workspace-panel-state.js";
 import {
   groupWebuiTranscriptItems,
   projectWebuiTranscriptMessages,
   projectWebuiQueryDurations,
   projectWebuiProcessSegments,
-} from "../../projection/transcript/transcript-projection.js";
-import { projectWebuiTranscriptMessage } from "../../projection/transcript/message-projection.js";
-import { projectWebuiTranscriptView } from "../../projection/transcript/transcript-view-model.js";
+} from "../../features/transcript/projection/transcript-projection.js";
+import { projectWebuiTranscriptMessage } from "../../features/transcript/projection/message-projection.js";
+import { projectWebuiTranscriptView } from "../../features/transcript/projection/transcript-view-model.js";
 import {
   projectHistoricalTurnView,
   projectLiveTurnView,
   type WebuiLiveTurnView,
   type WebuiTurnView,
-} from "../../projection/transcript/transcript-shape.js";
+} from "../../features/transcript/projection/transcript-shape.js";
 import {
   transcriptViewport,
   useWebuiTranscriptScroll,

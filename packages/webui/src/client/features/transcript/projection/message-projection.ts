@@ -14,15 +14,15 @@ import {
   numberValue,
   recordValue,
   stringValue,
-} from "../../contracts/value-readers.js";
-import type { WebuiClientMessage, WebuiMessageAttachment } from "../../features/transcript/contracts/message-view.js";
-import type { WebuiTranscriptItem } from "../../features/transcript/contracts/transcript-view.js";
-import type { WebuiStreamMessage } from "../turn/stream-state.js";
+} from "../../../contracts/value-readers.js";
+import type { WebuiClientMessage, WebuiMessageAttachment } from "../contracts/message-view.js";
+import type { WebuiTranscriptItem } from "../contracts/transcript-view.js";
+import type { WebuiStreamMessage } from "../../../contracts/turn/stream-state.js";
 import type {
   WebuiFileDiffInfoView,
   WebuiTurnDiffView,
-} from "../../../shared/contracts/session.js";
-import type { WebuiUsageQuotaResult } from "../../../shared/contracts/usage-quota.js";
+} from "../../../../shared/contracts/session.js";
+import type { WebuiUsageQuotaResult } from "../../../../shared/contracts/usage-quota.js";
 import {
   projectMessageParts,
   type WebuiMessageForParts,

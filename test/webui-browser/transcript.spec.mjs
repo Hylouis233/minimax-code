@@ -192,10 +192,14 @@ test("a session switch reads the page once per need, not once per reader", async
         (request) => request.operation === "getMessages" && request.body?.id === "B",
       ).length,
     );
-  // The two readers that legitimately need a page: the transcript and the
-  // workspace history progress.
-  await expect.poll(reads).toBe(2);
+  // ONE read for the page, shared by every reader that needs it: the transcript,
+  // the composer's context inspection and the workspace history progress all
+  // reach it through the history owner's keyed resource. The join is why the count
+  // did not grow when the context read started going through the owner, and a
+  // reader that stopped joining (or a new one that issues its own request) makes
+  // this 2.
+  await expect.poll(reads).toBe(1);
   // Settled: nothing else may read the same page afterwards.
   await page.waitForTimeout(400);
-  expect(await reads()).toBe(2);
+  expect(await reads()).toBe(1);
 });

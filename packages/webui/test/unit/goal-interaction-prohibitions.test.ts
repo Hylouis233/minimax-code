@@ -145,7 +145,7 @@ describe("prohibition 3 — the set of valid values is enumerated in exactly one
 
   /**
    * The scan is scoped to **runtime event kinds**, which is the closed set the
-   * registry owns. `projection/transcript/message-parts.ts` names message-block kinds
+   * registry owns. `features/transcript/projection/message-parts.ts` names message-block kinds
    * (`agent_joined`, `communication.message`, `delegation.message`,
    * `questionnaire.response`) — a different set, enumerated at that one site, whose
    * dotted and underscored spellings are a payload tolerance in the same class as
@@ -154,7 +154,7 @@ describe("prohibition 3 — the set of valid values is enumerated in exactly one
    * exemption: the two cases below still fail if a *third* module names a runtime
    * event kind.
    */
-  const MESSAGE_BLOCK_KINDS = "projection/transcript/message-parts.ts";
+  const MESSAGE_BLOCK_KINDS = "features/transcript/projection/message-parts.ts";
 
   it("goal: no module but the registry and the reducer names a goal kind", () => {
     const naming = clientModules().filter((file) => {

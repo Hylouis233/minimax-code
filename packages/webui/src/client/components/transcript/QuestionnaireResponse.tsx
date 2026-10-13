@@ -8,7 +8,7 @@
 import type { ReactElement } from "react";
 
 import type { WebuiQuestionnaireResponseSummary } from "../../features/transcript/contracts/transcript-view.js";
-import { formatWebuiMessageTimestamp } from "../../projection/transcript/message-timestamp.js";
+import { formatWebuiMessageTimestamp } from "../../features/transcript/projection/message-timestamp.js";
 
 /**
  * Historical questionnaire-response projection. Once the user submits a

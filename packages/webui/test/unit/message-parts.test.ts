@@ -3,8 +3,8 @@ import {
   groupTurnMessages,
   projectMessageParts,
   stripQuestionnaireResponse,
-} from "../../src/client/projection/transcript/message-parts.js";
-import { projectWebuiMessage } from "../../src/client/projection/transcript/message-projection.js";
+} from "../../src/client/features/transcript/projection/message-parts.js";
+import { projectWebuiMessage } from "../../src/client/features/transcript/projection/message-projection.js";
 import {
   toolCallLabel,
   toolCallStatus,
@@ -12,7 +12,7 @@ import {
   toolCallIconCategory,
   WEBUI_DESKTOP_TOOL_ICON_GROUPS,
   WEBUI_DESKTOP_TOOL_DISPLAY_LABELS,
-} from "../../src/client/projection/transcript/tool-projection.js";
+} from "../../src/client/features/transcript/projection/tool-projection.js";
 
 describe("Desktop message parts projection", () => {
   it("normalizes Desktop tool lifecycle states without inventing completion", () => {

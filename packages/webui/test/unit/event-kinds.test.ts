@@ -123,8 +123,8 @@ describe("no second enumeration site can exist", () => {
       "projection/interactions/event-parsers.ts",
       "projection/goal/goal-state.ts",
       "projection/interactions/questionnaire-state.ts",
-      "projection/transcript/message-projection.ts",
-      "projection/transcript/transcript-projection.ts",
+      "features/transcript/projection/message-projection.ts",
+      "features/transcript/projection/transcript-projection.ts",
     ];
     const literal = /"(?:thread_goal|permission|questionnaire)\.[a-z_.]+"/u;
     for (const file of files) {

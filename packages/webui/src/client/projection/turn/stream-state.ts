@@ -54,17 +54,6 @@ export const initialWebuiStreamState: WebuiStreamState = {
  */
 export type WebuiSessionStartDecision = "attach" | "claim" | "hold" | "recheck";
 
-/**
- * The one predicate for "this turn is still live": streaming, waiting on the
- * model, or reconnecting. It belongs to the business that owns the stream phase
- * rather than to a consumer's projection — the transcript reads it to decide
- * whether a live view belongs in the message column, and the composer reads it to
- * decide the send affordance, and both must agree on what live means.
- */
-export function isTurnLive(phase: WebuiStreamState["phase"] | undefined): boolean {
-  return phase === "streaming" || phase === "waiting" || phase === "reconnecting";
-}
-
 export function decideWebuiSessionStart(
   state: WebuiStreamState,
   turnId: string | undefined,

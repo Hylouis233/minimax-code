@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseWebuiMessageFileReference } from "../../src/client/projection/transcript/message-file-reference.js";
+import { parseWebuiMessageFileReference } from "../../src/client/features/transcript/projection/message-file-reference.js";
 import { WebuiMarkdown } from "../../src/client/components/transcript/markdown.js";
 import { mergeWorkspaceFileChildren, WebuiFilePreview } from "../../src/client/components/workspace/WorkspacePanels.js";
 import { webuiFileLanguage } from "../../src/client/projection/workspace/panel-projection.js";
