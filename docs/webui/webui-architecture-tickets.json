@@ -1071,7 +1071,9 @@
       "82ee436b",
       "131c0a6e",
       "ee32d9ea",
-      "a6386d57"
+      "a6386d57",
+      "822863f2",
+      "792c969b"
     ],
     "published": false,
     "tickets": {
@@ -1080,18 +1082,19 @@
       "T03": "implemented locally, acceptance evidence recorded on #129",
       "T04": "implemented locally, acceptance evidence recorded on #130",
       "T05": "closed 2026-10-13, acceptance evidence recorded on #131",
-      "T06": "in progress: the behavioural slices are delivered and the transcript's contracts, projections and UI now sit in features/transcript/; the history rules still live in application/transcript (the conversation home is the remaining move)"
+      "T06": "closed 2026-10-14, acceptance evidence recorded on #132"
     },
     "frontier": [
-      "T06",
+      "T07",
+      "T08",
+      "T09",
+      "T10",
       "T14",
       "T17"
     ],
     "notes": [
-      "T06 relocation (131c0a6e, ee32d9ea, a6386d57): contracts, projections and UI moved to client/features/transcript/{contracts,projection,ui}; component/transcript is gone. The gate went first: classifyLayers now maps the business-first homes and client/conversation|platform|ui|shell to the layers their files carry, pinned by webui-dependency-check.test.ts, because an unmapped path classifies unknown - reported rather than constrained.",
-      "T06 relocation exposed and fixed four cross-business reads rather than exempting them: isTurnLive published in contracts/turn/stream-state.ts; the workspace panel command unions in contracts/workspace/panel-command.ts; the plan-request derivations in contracts/interactions/plan-mode.ts; activity-phrase moved to client/ui/ as reusable presentation mechanics. Two edges remain as reviewed peer imports with the migration that removes them (transcript ui -> interactions plan card; transcript ui -> sessions action-request builders).",
-      "T06 remaining: the history rules move (application/transcript -> client/conversation), and the transcript feedback-error check from the ticket's verification list. SessionTranscript.tsx is 487 lines from 814 at the start of this ticket.",
-      "Test-support change worth knowing: evaluateGraph now takes the approved-peer list as an option, and the fixtures pass their own - the repository's list names files a fixture graph does not contain, which the stale-entry rule reports."
+      "T06 closed with all six acceptance criteria evidenced on #132: keyed per-session/page history with a separately fenced presentation; the shared context read; the anchor/join cases; the view model, scroll binding and response surfaces; the move to features/transcript plus history rules and the request primitive to client/conversation with an injected writer; and the verification list including the refusing clipboard.",
+      "The frontier after T06 is T07, T08, T09, T10, T14 and T17 - every ticket whose blockers are now closed. T11 waits on T10, T12 on T07/T09, T15 on T11/T14, T16 on T11, T18 on T12-T17, T19 on T07-T18."
     ]
   },
   "publicationVerification": {
