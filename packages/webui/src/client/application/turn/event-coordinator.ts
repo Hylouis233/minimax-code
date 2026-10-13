@@ -160,8 +160,32 @@ export interface WebuiEventEffects {
   readonly channelReady?: () => void;
 }
 
+/**
+ * The permanent domain routes (T05's `permanent-domain-event-routing`).
+ *
+ * These are installed by the application assembly **before** ingress opens, and
+ * they are not part of the replaceable effect set: a view reaction may subscribe
+ * after a commit, but it cannot displace the route that owns the commit. The
+ * distinction is the correction the T01 ledger's C2 records — an event set
+ * registered by a subtree supplied its own goal handler for the session it was
+ * mounted on, and a goal event for any other session was dropped, because the
+ * handler's presence suppressed the coordinator's own write and then found no
+ * registration to route to.
+ *
+ * They are required, not optional: a missing route would be a silent drop, and
+ * `createWebuiApplication` always installs them.
+ */
+export interface WebuiDomainEventRoutes {
+  /** The goal write path for one session, through that session's owner. */
+  readonly setGoal: (sessionId: string, goal: WebuiGoal | undefined) => void;
+  /** The steering re-read for one session, through that session's owner. */
+  readonly refreshGoal: (sessionId: string) => void | Promise<unknown>;
+}
+
 export interface WebuiEventCoordinatorDeps {
   readonly store: WebuiSessionStore;
+  /** The permanent owner routes. See `WebuiDomainEventRoutes`. */
+  readonly routes: WebuiDomainEventRoutes;
   readonly leases: WebuiStreamLeaseController;
   readonly readActiveSessionId: () => string | undefined;
   /**
@@ -203,7 +227,9 @@ export function createWebuiEventCoordinator(
 
   const handlersFor = (sessionId: string): WebuiEffectHandlers => ({
     refreshPending: () => effects.refreshPending?.(sessionId),
-    refreshGoal: () => effects.refreshGoal?.(sessionId),
+    // The route, never the replaceable set: a mounted view cannot take the goal
+    // read away from the owner that fences it.
+    refreshGoal: () => deps.routes.refreshGoal(sessionId),
     setSending: (sending) =>
       store.updateSession(sessionId, (current) => ({ ...current, sending })),
     setStream: (patch) =>
@@ -222,11 +248,9 @@ export function createWebuiEventCoordinator(
         questionnaire: patch(current.questionnaire),
       })),
     setGoal: (goal) => {
-      if (effects.setGoal) {
-        effects.setGoal(sessionId, goal);
-        return;
-      }
-      store.updateSession(sessionId, (current) => ({ ...current, goal }));
+      // Every goal write goes through the session's owner, so the version fence
+      // sees it and a late re-read cannot resurrect what it replaced.
+      deps.routes.setGoal(sessionId, goal);
     },
     attachStream: (turnId, mode) =>
       effects.attachStream?.(sessionId, turnId, mode),

@@ -34,6 +34,11 @@ import {
   createWebuiDeliveryDisposers,
   type WebuiDeliveryDisposers,
 } from "./turn/delivery-disposers.js";
+import {
+  createWebuiGoalSessionOwners,
+  type WebuiGoalSessionOwners,
+} from "./goal/goal-session-owners.js";
+import type { WebuiGoalPortSlice } from "./goal/goal-coordinator.js";
 import type { WebuiApplicationState } from "./state.js";
 import { WEBUI_HOME_SESSION_KEY } from "./state.js";
 import {
@@ -102,6 +107,12 @@ export interface WebuiApplicationDeps {
   };
   /** Seed for the composer store (SSR / tests). */
   readonly composer?: WebuiComposerStore;
+  /**
+   * The goal capability, so the application can own the goal owner rather than
+   * the view that happens to be mounted (T05). Absent on a host with nothing
+   * wired, which is the state the owner's own absent-capability handling covers.
+   */
+  readonly goalPort?: WebuiGoalPortSlice;
 }
 
 export type WebuiApplicationLifecycleState = "constructed" | "started" | "disposed";
@@ -145,6 +156,11 @@ export interface WebuiApplication {
    * mounting: a delivery or settlement lease outlives the view that started it.
    */
   readonly sessionScope: WebuiSessionScopeManager;
+  /**
+   * The goal owners, one per session (T05). An event route commits through them
+   * whether or not a view is mounted, and each session has its own fence.
+   */
+  readonly goals: WebuiGoalSessionOwners;
   /**
    * The client deliveries this application can actually close (plan §4.3).
    * Disposal closes them; it never aborts a host turn.
@@ -254,6 +270,12 @@ export function createWebuiApplication(
   const leases = createWebuiStreamLeaseController(store);
   const sessionScope = createWebuiSessionScopeManager();
   const deliveries = createWebuiDeliveryDisposers();
+  // The goal owners are the application's, not a view's: a goal event commits
+  // through the session's owner even with nothing mounted (plan §4.4).
+  const goals = createWebuiGoalSessionOwners({
+    store,
+    ...(deps.goalPort ? { port: deps.goalPort } : {}),
+  });
   /**
    * The one selection command. Selecting activates the new session's scope and
    * releases the previous selection's lease — and only that lease, so an
@@ -297,6 +319,12 @@ export function createWebuiApplication(
     leases,
     readActiveSessionId,
     unread,
+    // The permanent routes, installed here — before `start` opens ingress — and
+    // outside the replaceable effect set, so no view can displace them.
+    routes: {
+      setGoal: (sessionId, goal) => goals.owner(sessionId).applyGoal(goal),
+      refreshGoal: (sessionId) => goals.owner(sessionId).refreshGoal(),
+    },
     effects: eventEffects.slot,
   });
   const turns = createWebuiTurnCoordinator({
@@ -346,6 +374,7 @@ export function createWebuiApplication(
     leases,
     sessionScope,
     deliveries,
+    goals,
     events,
     turns,
     turnCapabilities,
@@ -387,6 +416,7 @@ export function createWebuiApplication(
       // running (plan §4.3, §8.1).
       deliveries.closeAll();
       sessionScope.dispose();
+      goals.dispose();
       store.dispose();
       channel?.close?.();
       channel = undefined;

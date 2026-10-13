@@ -16,18 +16,26 @@ import { createWebuiEventCoordinator } from "../../src/client/application/turn/e
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 import { createWebuiStreamLeaseController } from "../../src/client/application/turn/stream-lease-controller.js";
 import { createWebuiUnreadController } from "../../src/client/application/sessions/unread.js";
+import { createWebuiGoalSessionOwners } from "../../src/client/application/goal/goal-session-owners.js";
 
 function coordinator() {
   const store = createWebuiSessionStore();
   const leases = createWebuiStreamLeaseController(store);
   const unread = createWebuiUnreadController({ store });
+  // The permanent goal route, installed exactly as the assembly installs it: the
+  // owner is the application's, so a goal event commits with nothing registered.
+  const goals = createWebuiGoalSessionOwners({ store });
   const events = createWebuiEventCoordinator({
     store,
     leases,
     readActiveSessionId: () => store.getSelectedSessionId(),
     unread,
+    routes: {
+      setGoal: (sessionId, goal) => goals.owner(sessionId).applyGoal(goal),
+      refreshGoal: (sessionId) => goals.owner(sessionId).refreshGoal(),
+    },
   });
-  return { store, events };
+  return { store, events, goals };
 }
 
 const event = (type: string, payload: Record<string, unknown>) =>

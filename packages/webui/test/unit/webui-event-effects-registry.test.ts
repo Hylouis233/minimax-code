@@ -119,8 +119,11 @@ describe("the coordinator runs the registered effect handlers", () => {
     fake.emit(event("session.queue.updated", { sessionId: "s1" }));
     expect(refreshPending).toHaveBeenCalledWith("s1");
 
+    // The goal re-read is the application route's, not a registered effect: a
+    // mounted view cannot take the goal read away from the owner that fences it
+    // (T05). The registered set still carries the other hooks, asserted below.
     fake.emit(event("thread_goal.objective_updated_steering", { sessionId: "s1", goalId: "g1" }));
-    expect(refreshGoal).toHaveBeenCalledWith("s1");
+    expect(refreshGoal).not.toHaveBeenCalled();
 
     fake.emit(event("session.start", { sessionId: "s1", turnId: "t1" }));
     expect(attachStream).toHaveBeenCalledWith("s1", "t1", "attach");

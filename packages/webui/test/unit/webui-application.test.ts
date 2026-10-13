@@ -355,12 +355,16 @@ describe("stage 4 — the four call sites' handling through the coordinator", ()
         goalId: "g1",
       }),
     );
-    expect(refreshGoal).toHaveBeenCalledWith("s1");
+    // The goal read and write belong to the application's route, not to the
+    // registered set (T05): the registered goal hooks are not consulted at all.
+    expect(refreshGoal).not.toHaveBeenCalled();
+    expect(setGoal).not.toHaveBeenCalled();
 
-    // A goal-bearing event routes its write through the session's registered
-    // goal writer, so the composer's version guard still owns every write.
+    // A goal-bearing event commits through the session's owner, which the
+    // application created — so the version fence still owns every write.
     fake.emit(event("thread_goal.cleared", { sessionId: "s1" }));
-    expect(setGoal).toHaveBeenCalledWith("s1", undefined);
+    expect(probeApp.store.readSession("s1").goal).toBeUndefined();
+    expect(probeApp.goals.sessions()).toContain("s1");
   });
 
   it("invalidates the workspace panel git and review queries through the coordinator", () => {

@@ -32,7 +32,6 @@ import type { WebuiClientSessionCreator } from "../../contracts/sessions/session
 import type { WebuiClientSessionPage, WebuiClientSession } from "../../contracts/sessions/session-view.js";
 import type { WebuiTransport } from "../../contracts/transport.js";
 import { projectWebuiMessageToStreamMessage, readUsageNumber } from "../../projection/transcript/message-projection.js";
-import { createWebuiGoalCoordinator } from "../../application/goal/goal-coordinator.js";
 import {
   createWebuiInteractionCoordinator,
 } from "../../application/interactions/interaction-coordinator.js";
@@ -69,6 +68,10 @@ import { ContextUsageIndicator } from "../sessions/ContextUsageIndicator.js";
 import { useWebuiPortSlice } from "../../bindings/port-slices-context.js";
 import { useWebuiEventEffectsRegistry } from "../../bindings/event-effects-context.js";
 import { useWebuiVersionCells } from "../../bindings/version-cells.js";
+import {
+  useWebuiGoalOwner,
+  useWebuiGoalReaction,
+} from "../../bindings/goal-owner.js";
 import { useWebuiComposerStore } from "../../bindings/composer-store.js";
 import { webuiSessionStatusType } from "../../projection/turn/stream-state.js";
 
@@ -443,7 +446,6 @@ export function WebuiComposer({
   // published command surface and nothing else — which is why these businesses'
   // findings clear at this carve and could not clear in Phase 2: the capability
   // needed an owner to move into first.
-  const goalPort = useWebuiPortSlice("goal");
   const interactionsPort = useWebuiPortSlice("interactions");
   // The two interaction members this component still names directly, for the
   // registration effect's dependencies (below). A host with no provider has no
@@ -492,7 +494,6 @@ export function WebuiComposer({
   // application creates it — a counter inside a per-render coordinator would
   // reset and silently disable the guard it protects.
   const versionCells = useWebuiVersionCells();
-  const goalVersionRef = versionCells.goal;
   const pendingVersionRef = versionCells.pending;
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
@@ -514,22 +515,11 @@ export function WebuiComposer({
     agentName,
     pendingVersionRef,
   });
-  // The goal duty has its own owner (plan §8 Phase 3 B1; §5.6: this component's
-  // interaction coordinator "loses the goal duty it absorbed"). Two owners, two
-  // version cells: a goal write cannot fence a pending read, and a pending reply
-  // cannot fence a goal read — which is the property `goal-coordinator.test.ts`
-  // asserts rather than assumes.
-  const goalCoordinator = createWebuiGoalCoordinator({
-    port: { ...goalPort },
-    sink: {
-      applyGoal: interactionCommands.applyGoal,
-      afterGoalReRead: (next) => {
-        if (next) setGoalMode(next.status !== "complete");
-      },
-    },
-    sessionId,
-    goalVersionRef,
-  });
+  // The goal owner is the application's, keyed by session (T05): this component
+  // reads the one for the session it is showing instead of constructing one, so a
+  // goal event commits whether or not this view is mounted and each session has
+  // its own fence.
+  const goalCoordinator = useWebuiGoalOwner(sessionId);
   const applyGoal = goalCoordinator.applyGoal;
   const [goalEnabled, setGoalEnabled] = useState(true);
   // The composer's owner, read once for everything this component keeps in it
@@ -761,12 +751,10 @@ export function WebuiComposer({
       answerQuestionnaire: (request, answers) => interactionCoordinator.answerQuestionnaire(request, answers),
       invalidatePending: () => interactionCoordinator.invalidatePendingReads(),
       refreshPending: () => refreshPending(),
-      refreshGoal,
-      // The coordinator's set-goal command routes here, so a goal-bearing
-      // event performs the same version bump `applyGoal` owns — a late steering
-      // re-read cannot resurrect the goal the event just replaced. Every goal
-      // write still goes through `applyGoal`.
-      setGoal: (_targetSessionId, nextGoal) => applyGoal(nextGoal),
+      // The goal read and write are not registered here any more: they are the
+      // application's permanent route through the session's owner (T05), so a
+      // goal event commits for any session, mounted or not, and this view cannot
+      // displace that route by registering its own.
       attachStream: createWebuiComposerAttachStreamEffect(
         attachToTurn,
         recheckSubscription,
@@ -908,6 +896,16 @@ export function WebuiComposer({
     setComposerCaret(caret);
   }, [draft]);
 
+  /**
+   * The view's half of a steering re-read: after one lands, the composer's goal
+   * mode follows the goal it returned. A subscription rather than a replaceable
+   * effect, so a reaction cannot displace the authoritative route (plan §4.4),
+   * and it is keyed by the session whose goal it describes.
+   */
+  useWebuiGoalReaction(sessionId, (next) => {
+    if (next) setGoalMode(next.status !== "complete");
+  });
+
   const goalEnabledProbe = goalCoordinator.isGoalEnabled;
   useEffect(() => {
     if (!goalEnabledProbe) {
@@ -926,11 +924,11 @@ export function WebuiComposer({
   }, [goalEnabledProbe]);
 
   useEffect(() => {
-    // Reset on every session switch, then read through the owner. The fence and
-    // the apply both live in `refreshGoal` now: this component used to hand-roll
-    // a second copy of it here, which is the duplication the goal carve removes —
-    // one write path and one fenced read, not two of each.
-    applyGoal(undefined);
+    // Reset the VIEW on every session switch, then read through the owner. The
+    // canonical goal is not cleared: it belongs to the session's record, and
+    // clearing it here destroyed the retained goal of the session being opened
+    // before the re-read could answer (the T01 ledger's C4). What resets is the
+    // presentation, which is this component's own state.
     setGoalMode(false);
     if (!sessionId || !goalEnabled) return undefined;
     let cancelled = false;

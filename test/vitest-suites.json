@@ -389,7 +389,8 @@
       "packages/webui/test/unit/conversation-turn-commands.test.ts",
       "packages/webui/test/unit/session-scope.test.ts",
       "packages/webui/test/unit/home-adoption-transaction.test.ts",
-      "packages/webui/test/unit/delivery-disposers.test.ts"
+      "packages/webui/test/unit/delivery-disposers.test.ts",
+      "packages/webui/test/unit/goal-session-owners.test.ts"
     ]
   }
 }
