@@ -251,6 +251,15 @@ describe("round-3 message actions", () => {
     expect(await copyWebuiMessageText("fallback", { fallback: () => { fallbackCalls += 1; } })).toBe(true);
     expect(fallbackCalls).toBe(1);
     expect(await copyWebuiMessageText("missing", {})).toBe(false);
+    // A clipboard that REFUSES is the failure the toolbar actually meets (no
+    // permission, insecure context). The command reports it as a result instead of
+    // throwing, so the button simply does not claim it copied — and the failure
+    // never becomes an unhandled rejection.
+    expect(
+      await copyWebuiMessageText("denied", {
+        clipboard: { writeText: async () => { throw new Error("denied"); } },
+      }),
+    ).toBe(false);
     const scheduled: number[] = [];
     let copied = true;
     let reset!: () => void;
