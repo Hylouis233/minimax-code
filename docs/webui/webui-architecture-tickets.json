@@ -1054,17 +1054,19 @@
       "77ec5915",
       "0f0d7b45",
       "25da9c23",
-      "519dc358"
+      "519dc358",
+      "a521a39a"
     ],
     "published": false,
     "tickets": {
       "T01": "implemented locally, acceptance evidence recorded on #127",
       "T02": "implemented locally, acceptance evidence recorded on #128",
       "T03": "implemented locally, acceptance evidence recorded on #129",
-      "T04": "implemented locally, acceptance evidence recorded on #130"
+      "T04": "implemented locally, acceptance evidence recorded on #130",
+      "T05": "in progress locally: permanent-domain-event-routing and goal-session-owner landed; interaction-session-owner and retained-goal-view-reconciliation remain"
     },
     "frontier": [
-      "T05",
+      "T05 (in progress)",
       "T06",
       "T14",
       "T17"
