@@ -230,27 +230,6 @@ export function reconcileFocusedRow(
   return sameModel ?? sameIdentity ?? focused;
 }
 
-function formatContextWindow(value: number): string {
-  if (value >= 1_000_000) return `${value / 1_000_000}M`;
-  if (value >= 1_000) return `${Math.round(value / 1_000)}K`;
-  return String(value);
-}
-
-function resolveCurrentEffort(model: WebuiModelPickerEntry): string | undefined {
-  const options = resolveEffortOptions(model);
-  if (options.length === 0) return undefined;
-  const thinking = model.thinking?.effort?.trim();
-  if (thinking && options.includes(thinking)) return thinking;
-  if (options.includes("default")) return "default";
-  const defaultEffort = model.defaultEffort?.trim();
-  if (defaultEffort && options.includes(defaultEffort)) return defaultEffort;
-  return model.variant === "thinking"
-    ? options.includes("on")
-      ? "on"
-      : options[0]
-    : options[0];
-}
-
 /**
  * The model column. A group header is a line of text, not an option: it lives
  * inside a `role="group"`, which carries the name through `aria-label`, so the
@@ -1055,30 +1034,6 @@ export function WebuiModelPicker({
     (selected ? `${selected.providerId}/${selected.modelId}` : undefined) ??
     triggerLabel ??
     "Model";
-
-  const focusedEffort = (() => {
-    if (!focusedModel) return undefined;
-    if (focusedDraft.thinkingEffort !== undefined) {
-      if (focusedDraft.thinkingEffort !== null)
-        return focusedDraft.thinkingEffort;
-      return "default";
-    }
-    if (focusedDraft.variant !== undefined) {
-      // The user has committed an "off" draft → variant === "" → effort "off".
-      return focusedDraft.variant === "thinking" ? "on" : "off";
-    }
-    return resolveCurrentEffort(focusedModel);
-  })();
-
-  const focusedContextLimit = (() => {
-    if (!focusedModel) return undefined;
-    if (focusedDraft.contextLimit !== undefined)
-      return focusedDraft.contextLimit;
-    return focusedModel.contextLimit;
-  })();
-
-
-
 
   return (
     <div
