@@ -1060,7 +1060,8 @@
       "2a8c7fcf",
       "f8023447",
       "e8c6a960",
-      "344dd225"
+      "344dd225",
+      "a0d33dfa"
     ],
     "published": false,
     "tickets": {
@@ -1068,7 +1069,8 @@
       "T02": "implemented locally, acceptance evidence recorded on #128",
       "T03": "implemented locally, acceptance evidence recorded on #129",
       "T04": "implemented locally, acceptance evidence recorded on #130",
-      "T05": "closed 2026-10-13, acceptance evidence recorded on #131"
+      "T05": "closed 2026-10-13, acceptance evidence recorded on #131",
+      "T06": "in progress: conversation-history-interface's keyed per-session/page ownership delivered (a0d33dfa); transcript-public-view-and-feedback and compatible-context-read-sharing still open"
     },
     "frontier": [
       "T06",
@@ -1076,8 +1078,8 @@
       "T17"
     ],
     "notes": [
-      "T05 closed with all eight acceptance criteria evidenced on #131. The one boundary: an accepted channel re-reads the session's goal per plan 4.3, so a session with an active goal reopens the composer in goal mode; the settings-account-tab retry case asserts the composer is present and usable instead of the message-mode placeholder, and that change is recorded as a behaviour change in the T05 comment.",
-      "The C4 browser case is stable in the suite (101 passed) and was verified to discriminate by restoring the old clear. The earlier failures came from the fixture answering every session's getGoal with the same goal, which let one session's read overwrite another's record."
+      "T06 first slice (a0d33dfa): transcript history is now a keyed resource per (sessionId, anchor) plus a selected-view slot, replacing the singleton request ownership. Remaining for T06: the transcript's public view and feedback commands, sharing a compatible context read, moving transcript contracts/projections/bindings to their target homes, and cutting the large transcript by view-model/scroll/response responsibilities.",
+      "T05 closed with all eight acceptance criteria evidenced on #131. One boundary: an accepted channel re-reads the session's goal per plan 4.3, so a session with an active goal reopens the composer in goal mode; the settings-account-tab retry case asserts the composer is present and usable instead of the message-mode placeholder."
     ]
   },
   "publicationVerification": {
