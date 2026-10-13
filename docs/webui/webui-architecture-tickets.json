@@ -1055,7 +1055,8 @@
       "0f0d7b45",
       "25da9c23",
       "519dc358",
-      "a521a39a"
+      "a521a39a",
+      "688f0fa3"
     ],
     "published": false,
     "tickets": {
@@ -1063,13 +1064,16 @@
       "T02": "implemented locally, acceptance evidence recorded on #128",
       "T03": "implemented locally, acceptance evidence recorded on #129",
       "T04": "implemented locally, acceptance evidence recorded on #130",
-      "T05": "in progress locally: permanent-domain-event-routing and goal-session-owner landed; interaction-session-owner and retained-goal-view-reconciliation remain"
+      "T05": "in progress locally: permanent-domain-event-routing, goal-session-owner and interaction-session-owner landed; the effects-registry removal is attempted and reverted (see below); retained-goal-view-reconciliation remains"
     },
     "frontier": [
       "T05 (in progress)",
       "T06",
       "T14",
       "T17"
+    ],
+    "notes": [
+      "T05 effects-registry removal: an attempt (routes-only coordinator, no WebuiEventEffects, no setEventEffects, no registry) is saved outside the repository at minimax-code-webui-work/w0-baseline/t05-registry-removal-attempt.patch. It is reverted because the built-client browser suite's error-boundary retry case (settings-account-tab.spec.mjs:303) stops recovering the composer after the retry: the rail and transcript come back and the composer does not render. The rest of that patch's checks were green (154 unit files, boundary 294 inputs, commands current), so the regression is local to the composer/shell remount path."
     ]
   },
   "publicationVerification": {
