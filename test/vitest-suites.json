@@ -273,6 +273,7 @@
       "packages/webui/test/unit/provider-form-panel.test.ts",
       "packages/webui/test/unit/plugin-action-inventory.test.ts",
       "packages/webui/test/unit/plugin-dialog-hosting.test.ts",
+      "packages/webui/test/unit/personalization-sections.test.ts",
       "packages/webui/test/unit/turn-command-views.test.ts",
       "packages/webui/test/unit/turn-substrate-fences.test.ts",
       "packages/webui/test/unit/output-error.test.tsx",
