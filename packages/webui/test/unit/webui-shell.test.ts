@@ -84,7 +84,7 @@ import type {
 } from "../../src/shared/contracts/goal.js";
 import type { WebuiQuestionnaireRequest } from "../../src/shared/contracts/interactions.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
-import { createWebuiTranscriptHistoryOwner } from "../../src/client/application/transcript-history.js";
+import { createWebuiTranscriptHistoryOwner } from "../../src/client/application/transcript/transcript-history.js";
 import { WEBUI_HOME_SESSION_KEY } from "../../src/client/application/state.js";
 import { WebuiSessionStoreProvider } from "../../src/client/bindings/application-context.js";
 import {

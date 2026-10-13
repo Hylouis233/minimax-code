@@ -13,7 +13,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
-import { createWebuiTranscriptHistoryOwner } from "../../src/client/application/transcript-history.js";
+import { createWebuiTranscriptHistoryOwner } from "../../src/client/application/transcript/transcript-history.js";
 import { projectWebuiTranscriptMessages } from "../../src/client/projection/transcript-projection.js";
 import type { WebuiClientMessagePage } from "../../src/client/contracts/transcript/message-view.js";
 

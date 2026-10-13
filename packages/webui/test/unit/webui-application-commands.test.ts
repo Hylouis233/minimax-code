@@ -23,7 +23,7 @@ import {
 } from "../../src/client/application/turn-commands.js";
 import { initialWebuiStreamState } from "../../src/client/projection/stream-state.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
-import { createWebuiTranscriptHistoryOwner } from "../../src/client/application/transcript-history.js";
+import { createWebuiTranscriptHistoryOwner } from "../../src/client/application/transcript/transcript-history.js";
 import { selectWebuiSessionTranscriptPage } from "../../src/client/application/selectors.js";
 import { createWebuiAccountWorkflows } from "../../src/client/application/account/account-workflows.js";
 import { createWebuiSettingsWorkflows } from "../../src/client/application/settings/settings-workflows.js";

@@ -1,8 +1,8 @@
 import type {
   WebuiClientMessageLoader,
   WebuiClientMessagePage,
-} from "../contracts/transcript/message-view.js";
-import type { WebuiSessionStore } from "./session-store.js";
+} from "../../contracts/transcript/message-view.js";
+import type { WebuiSessionStore } from "../session-store.js";
 import { mergeOlderTranscriptPage } from "./transcript-request-ownership.js";
 
 export interface WebuiTranscriptHistoryOwner {

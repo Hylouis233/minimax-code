@@ -48,7 +48,7 @@ import {
 import {
   createWebuiTranscriptHistoryOwner,
   type WebuiTranscriptHistoryOwner,
-} from "./transcript-history.js";
+} from "./transcript/transcript-history.js";
 import type {
   WebuiTurnCapabilityPort,
   WebuiTurnCapabilitySlice,
