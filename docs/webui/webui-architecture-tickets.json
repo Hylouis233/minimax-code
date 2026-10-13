@@ -1075,7 +1075,8 @@
       "822863f2",
       "792c969b",
       "f36a4e1d",
-      "8385c423"
+      "8385c423",
+      "fbf64911"
     ],
     "published": false,
     "tickets": {
@@ -1085,7 +1086,7 @@
       "T04": "implemented locally, acceptance evidence recorded on #130",
       "T05": "closed 2026-10-13, acceptance evidence recorded on #131",
       "T06": "closed 2026-10-14, acceptance evidence recorded on #132",
-      "T10": "in progress: both review families have their own owners and the surfaces read them; the browser evidence for the review consumers (transcript diff card, workspace review panel) is still missing"
+      "T10": "in progress: the transcript review consumer is browser-verified through the owner; the workspace review consumer's browser case is still missing"
     },
     "frontier": [
       "T07",
@@ -1096,9 +1097,8 @@
       "T17"
     ],
     "notes": [
-      "T10 second slice (8385c423): the workspace-review family left the mixed workspace-queries owner for features/review/application/workspace-review-owner.ts (summary, per-snapshot diffs, search, snapshot identity, one retry per tab+snapshot); the mixed owner forwards it and composes a stable snapshot; the turn family's settled mutations invalidate the review family through the shell; the business-navigation generator learned the business-first homes and its table was regenerated.",
-      "T10 remaining: browser evidence for the review consumers. There is no browser spec for the transcript's diff card or the workspace review panel, and the ticket's verification seam names 'transcript/workspace review browser consumers'. Next: a built-client case that reads a turn diff through the fixture, reverts it, and watches the review views refresh on the announced invalidation.",
-      "Worth keeping: the browser suite caught what unit tests could not — composing the panel snapshot with a fresh object in getSnapshot is an infinite render loop under useSyncExternalStore (12 'Maximum update depth exceeded' in one run)."
+      "T10 browser evidence (fbf64911): the fixture answers the review families, and review-consumers.spec.mjs drives the diff card through the owner (the owner issues the read; a settled revert is what the card shows). It found a real wiring gap: the application's turnReview port was never supplied by main.tsx, so the card rendered 'unsupported' for every user.",
+      "T10 remaining: the workspace review consumer's browser case. Opening the review tab needs the file side panel driven first (the add-menu trigger lives in the panel's tab strip, which only exists while the panel is open) and the attempt did not reach it. The invalidation path is unit-pinned (turn owner announces, review owner refuses a stale snapshot and retries once)."
     ]
   },
   "publicationVerification": {
