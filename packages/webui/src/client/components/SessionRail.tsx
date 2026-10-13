@@ -35,6 +35,11 @@ import {
   WebuiIconAgent,
 } from "../icons.js";
 import { WebuiContextMenu, type WebuiContextMenuItem } from "./ContextMenu.js";
+import {
+  webuiRailMenuFor,
+  type WebuiRailMenuEntry,
+  type WebuiRailMenuSubject,
+} from "../projection/rail-menu.js";
 import { RailRow } from "./RailRow.js";
 import {
   formatWebuiSessionAge,
@@ -205,6 +210,35 @@ export function filterWebuiProjectsByQuery(
   );
 }
 
+/**
+ * What the rail-menu wiring needs, gathered from the component's props and the
+ * subject being opened for. `session` and `project` are optional because the two
+ * menus use disjoint halves of it; each wiring entry reads the one its subject
+ * supplies.
+ */
+interface RailMenuHandlers {
+  readonly session?: WebuiClientSession;
+  readonly project?: WebuiProjectGroup;
+  readonly pinned: boolean;
+  readonly starred: boolean;
+  readonly archived: boolean;
+  readonly hasWorkspaceDir: boolean;
+  readonly onToggleSessionPin?: (session: WebuiClientSession) => void;
+  readonly onToggleSessionStar?: (session: WebuiClientSession) => void;
+  readonly onRenameSession?: (session: WebuiClientSession) => void;
+  readonly onArchiveSession?: (session: WebuiClientSession) => void;
+  readonly onForkSession?: (session: WebuiClientSession, worktree: boolean) => void;
+  readonly onCopySession?: (
+    session: WebuiClientSession,
+    kind: "sessionId" | "workspaceDir",
+  ) => void;
+  readonly onExportSession?: (session: WebuiClientSession) => void;
+  readonly onDeleteSession?: (session: WebuiClientSession) => void;
+  readonly onRenameProject?: (project: WebuiProjectGroup) => void;
+  readonly onToggleProjectPin?: (project: WebuiProjectGroup) => void;
+  readonly onArchiveProject?: (project: WebuiProjectGroup) => void;
+}
+
 export function WebuiProjectList({
   page,
   treePage,
@@ -349,197 +383,164 @@ export function WebuiProjectList({
     });
   };
 
+  /**
+   * The host render branch for the rail's context menu (plan §10 S1, S4). What the
+   * menu *is* lives in `projection/rail-menu.ts`; what each declared key *does* —
+   * its icon, whether it is enabled, and what it calls — is this one table. A
+   * second place that enumerates the items is what S1's acceptance forbids, so the
+   * two builders below read the registry and nothing here lists a label.
+   */
+  const railMenuWiring: Readonly<
+    Record<
+      string,
+      {
+        readonly icon: (handlers: RailMenuHandlers) => ReactElement;
+        readonly enabled: (handlers: RailMenuHandlers) => boolean;
+        readonly select?: (handlers: RailMenuHandlers) => () => void;
+      }
+    >
+  > = {
+    pin: {
+      icon: (h) => <WebuiIconContextPin pinned={h.pinned} />,
+      enabled: (h) => Boolean(h.onToggleSessionPin),
+      select: (h) => () => h.onToggleSessionPin?.(h.session as WebuiClientSession),
+    },
+    star: {
+      icon: (h) => <WebuiIconSessionStar starred={h.starred} />,
+      enabled: (h) => Boolean(h.onToggleSessionStar),
+      select: (h) => () => h.onToggleSessionStar?.(h.session as WebuiClientSession),
+    },
+    rename: {
+      icon: () => <WebuiIconContextRename />,
+      enabled: (h) => Boolean(h.onRenameSession),
+      select: (h) => () => h.onRenameSession?.(h.session as WebuiClientSession),
+    },
+    archive: {
+      icon: () => <WebuiIconContextArchive />,
+      enabled: (h) => Boolean(h.onArchiveSession),
+      select: (h) => () => h.onArchiveSession?.(h.session as WebuiClientSession),
+    },
+    "fork-current": {
+      icon: () => <WebuiIconContextFork />,
+      enabled: (h) => Boolean(h.onForkSession),
+      select: (h) => () => h.onForkSession?.(h.session as WebuiClientSession, false),
+    },
+    "fork-worktree": {
+      icon: () => <WebuiIconContextFork />,
+      enabled: (h) => Boolean(h.onForkSession),
+      select: (h) => () => h.onForkSession?.(h.session as WebuiClientSession, true),
+    },
+    "show-folder": { icon: () => <WebuiIconFolder />, enabled: () => false },
+    copy: { icon: () => <WebuiIconContextCopy />, enabled: () => true },
+    "copy-workspace-dir": {
+      icon: () => <WebuiIconContextCopy />,
+      enabled: (h) => h.hasWorkspaceDir && Boolean(h.onCopySession),
+      select: (h) => () =>
+        h.onCopySession?.(h.session as WebuiClientSession, "workspaceDir"),
+    },
+    "copy-session-id": {
+      icon: () => <WebuiIconContextCopy />,
+      enabled: (h) => Boolean(h.onCopySession),
+      select: (h) => () =>
+        h.onCopySession?.(h.session as WebuiClientSession, "sessionId"),
+    },
+    export: {
+      icon: () => <WebuiIconContextExport />,
+      enabled: (h) => Boolean(h.onExportSession),
+      select: (h) => () => h.onExportSession?.(h.session as WebuiClientSession),
+    },
+    feedback: { icon: () => <WebuiIconContextFeedback />, enabled: () => false },
+    delete: {
+      icon: () => <WebuiIconContextTrash />,
+      enabled: (h) => Boolean(h.onDeleteSession),
+      select: (h) => () => h.onDeleteSession?.(h.session as WebuiClientSession),
+    },
+    "rename-project": {
+      icon: () => <WebuiIconContextRename />,
+      enabled: (h) => Boolean(h.onRenameProject),
+      select: (h) => () => h.onRenameProject?.(h.project as WebuiProjectGroup),
+    },
+    "toggle-pin-project": {
+      icon: (h) => <WebuiIconContextPin pinned={h.pinned} />,
+      enabled: (h) => Boolean(h.onToggleProjectPin),
+      select: (h) => () => h.onToggleProjectPin?.(h.project as WebuiProjectGroup),
+    },
+    "show-project-in-folder": { icon: () => <WebuiIconFolder />, enabled: () => false },
+    "archive-project-sessions": {
+      icon: () => <WebuiIconContextArchive />,
+      enabled: (h) => Boolean(h.onArchiveProject),
+      select: (h) => () => h.onArchiveProject?.(h.project as WebuiProjectGroup),
+    },
+    "remove-project": { icon: () => <WebuiIconContextTrash />, enabled: () => false },
+  };
+
+  const buildRailMenu = (
+    subject: WebuiRailMenuSubject,
+    handlers: RailMenuHandlers,
+  ): readonly WebuiContextMenuItem[] => {
+    const render = (entry: WebuiRailMenuEntry): WebuiContextMenuItem => {
+      if (entry.kind === "divider") return { kind: "divider", key: entry.key };
+      const wiring = railMenuWiring[entry.key];
+      const enabled =
+        entry.unwired !== true && wiring !== undefined && wiring.enabled(handlers);
+      return {
+        kind: "item",
+        key: entry.key,
+        label: typeof entry.label === "string" ? entry.label : (entry.label?.({
+          pinned: handlers.pinned,
+          starred: handlers.starred,
+          archived: handlers.archived,
+        }) ?? entry.key),
+        ...(wiring ? { icon: wiring.icon(handlers) } : {}),
+        ...(entry.danger ? { danger: true } : {}),
+        ...(enabled ? {} : { disabled: true }),
+        ...(enabled && wiring?.select ? { onSelect: wiring.select(handlers) } : {}),
+        ...(entry.submenu ? { submenu: entry.submenu.map(render) } : {}),
+      };
+    };
+    return webuiRailMenuFor(subject, {
+      pinned: handlers.pinned,
+      starred: handlers.starred,
+      archived: handlers.archived,
+    }).map(render);
+  };
+
   const openSessionMenu = (event: MouseEvent<HTMLElement>, session: WebuiClientSession, isChild = false) => {
-    const items: readonly WebuiContextMenuItem[] = isChild
-      ? [
-        {
-          kind: "item",
-          key: "rename",
-          label: "重命名",
-          icon: <WebuiIconContextRename />,
-          disabled: !onRenameSession,
-          onSelect: () => onRenameSession?.(session),
-        },
-        {
-          kind: "item",
-          key: "export",
-          label: "导出会话",
-          icon: <WebuiIconContextExport />,
-          disabled: !onExportSession,
-          onSelect: () => onExportSession?.(session),
-        },
-        {
-          kind: "item",
-          key: "copy-session-id",
-          label: "复制会话 ID",
-          icon: <WebuiIconContextCopy />,
-          disabled: !onCopySession,
-          onSelect: () => onCopySession?.(session, "sessionId"),
-        },
-        {
-          kind: "item",
-          key: "delete",
-          label: "删除",
-          icon: <WebuiIconContextTrash />,
-          danger: true,
-          disabled: !onDeleteSession,
-          onSelect: () => onDeleteSession?.(session),
-        },
-      ]
-      : [
-        {
-          kind: "item",
-          key: "pin",
-          label: pinnedSessions?.[session.sessionId] ? "取消置顶" : "置顶",
-          icon: <WebuiIconContextPin pinned={Boolean(pinnedSessions?.[session.sessionId])} />,
-          disabled: !onToggleSessionPin,
-          onSelect: () => onToggleSessionPin?.(session),
-        },
-        {
-          kind: "item",
-          key: "star",
-          label: starredSessions?.[session.sessionId] ? "取消收藏" : "收藏",
-          icon: <WebuiIconSessionStar starred={Boolean(starredSessions?.[session.sessionId])} />,
-          disabled: !onToggleSessionStar,
-          onSelect: () => onToggleSessionStar?.(session),
-        },
-        {
-          kind: "item",
-          key: "rename",
-          label: "重命名",
-          icon: <WebuiIconContextRename />,
-          disabled: !onRenameSession,
-          onSelect: () => onRenameSession?.(session),
-        },
-        {
-          kind: "item",
-          key: "archive",
-          label: session.archived ? "取消归档" : "归档",
-          icon: <WebuiIconContextArchive />,
-          disabled: !onArchiveSession,
-          onSelect: () => onArchiveSession?.(session),
-        },
-        { kind: "divider", key: "fork-divider" },
-        {
-          kind: "item",
-          key: "fork-current",
-          label: "复制为新会话",
-          icon: <WebuiIconContextFork />,
-          disabled: !onForkSession,
-          onSelect: () => onForkSession?.(session, false),
-        },
-        {
-          kind: "item",
-          key: "fork-worktree",
-          label: "复制到新工作树",
-          icon: <WebuiIconContextFork />,
-          disabled: !onForkSession,
-          onSelect: () => onForkSession?.(session, true),
-        },
-        { kind: "divider", key: "copy-divider" },
-        {
-          kind: "item",
-          key: "show-folder",
-          label: "在文件夹中显示",
-          icon: <WebuiIconFolder />,
-          disabled: true,
-        },
-        {
-          kind: "item",
-          key: "copy",
-          label: "复制",
-          icon: <WebuiIconContextCopy />,
-          submenu: [
-            {
-              kind: "item",
-              key: "copy-workspace-dir",
-              label: "复制工作目录",
-              icon: <WebuiIconContextCopy />,
-              disabled: !session.workspaceDir || !onCopySession,
-              onSelect: () => onCopySession?.(session, "workspaceDir"),
-            },
-            {
-              kind: "item",
-              key: "copy-session-id",
-              label: "复制会话 ID",
-              icon: <WebuiIconContextCopy />,
-              disabled: !onCopySession,
-              onSelect: () => onCopySession?.(session, "sessionId"),
-            },
-          ],
-        },
-        {
-          kind: "item",
-          key: "export",
-          label: "导出会话",
-          icon: <WebuiIconContextExport />,
-          disabled: !onExportSession,
-          onSelect: () => onExportSession?.(session),
-        },
-        {
-          kind: "item",
-          key: "feedback",
-          label: "问题反馈",
-          icon: <WebuiIconContextFeedback />,
-          disabled: true,
-        },
-        { kind: "divider", key: "delete-divider" },
-        {
-          kind: "item",
-          key: "delete",
-          label: "删除",
-          icon: <WebuiIconContextTrash />,
-          danger: true,
-          disabled: !onDeleteSession,
-          onSelect: () => onDeleteSession?.(session),
-        },
-      ];
-    showContextMenu(event, items);
+    showContextMenu(
+      event,
+      buildRailMenu(isChild ? "child-session" : "session", {
+        session,
+        pinned: Boolean(pinnedSessions?.[session.sessionId]),
+        starred: Boolean(starredSessions?.[session.sessionId]),
+        archived: Boolean(session.archived),
+        hasWorkspaceDir: Boolean(session.workspaceDir),
+        onToggleSessionPin,
+        onToggleSessionStar,
+        onRenameSession,
+        onArchiveSession,
+        onForkSession,
+        onCopySession,
+        onExportSession,
+        onDeleteSession,
+      }),
+    );
   };
 
   const openProjectMenu = (event: MouseEvent<HTMLElement>, project: WebuiProjectGroup) => {
     if (!project.workspaceDir) return;
-    showContextMenu(event, [
-      {
-        kind: "item",
-        key: "rename-project",
-        label: "重命名项目",
-        icon: <WebuiIconContextRename />,
-        disabled: !onRenameProject,
-        onSelect: () => onRenameProject?.(project),
-      },
-      {
-        kind: "item",
-        key: "toggle-pin-project",
-        label: pinnedProjects?.[project.key] ? "取消置顶项目" : "置顶项目",
-        icon: <WebuiIconContextPin pinned={Boolean(pinnedProjects?.[project.key])} />,
-        disabled: !onToggleProjectPin,
-        onSelect: () => onToggleProjectPin?.(project),
-      },
-      {
-        kind: "item",
-        key: "show-project-in-folder",
-        label: "在文件夹中显示",
-        icon: <WebuiIconFolder />,
-        disabled: true,
-      },
-      {
-        kind: "item",
-        key: "archive-project-sessions",
-        label: "归档对话",
-        icon: <WebuiIconContextArchive />,
-        disabled: !onArchiveProject,
-        onSelect: () => onArchiveProject?.(project),
-      },
-      {
-        kind: "item",
-        key: "remove-project",
-        label: "移除",
-        icon: <WebuiIconContextTrash />,
-        danger: true,
-        disabled: true,
-      },
-    ]);
+    showContextMenu(
+      event,
+      buildRailMenu("project", {
+        project,
+        pinned: Boolean(pinnedProjects?.[project.key]),
+        starred: false,
+        archived: false,
+        hasWorkspaceDir: true,
+        onRenameProject,
+        onToggleProjectPin,
+        onArchiveProject,
+      }),
+    );
   };
 
   useEffect(() => {
