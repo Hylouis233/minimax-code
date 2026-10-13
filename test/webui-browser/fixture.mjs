@@ -84,6 +84,23 @@ export function installFixtureTransport() {
   // in but quota-less, not as signed out).
   let usageQuotaResult = {};
   let activeTurn;
+  // The review families' answers. T10's consumers read them: the transcript's diff
+  // card asks for a turn's diff and can revert it, and the workspace review panel
+  // asks for the working tree's summary.
+  let turnDiff = {
+    status: "active",
+    changeSetId: "cs-1",
+    sourceMessageId: "assistant-diff",
+    canUndo: true,
+    canReapply: false,
+    fileChanges: [{ file: "a.ts", additions: 2, deletions: 1 }],
+  };
+  const workspaceReviewSummary = {
+    repositoryId: "repo-1",
+    reviewSnapshotId: "snap-1",
+    files: [{ fileId: "a.ts", path: "a.ts", additions: 2, deletions: 1 }],
+    totals: { files: 1, additions: 2, deletions: 1 },
+  };
   const requests = [];
   const sockets = new Set();
 
@@ -101,6 +118,16 @@ export function installFixtureTransport() {
     if (operation === "listSkills") return { skills: [] };
     if (operation === "listPendingPermissions") return { requests: [] };
     if (operation === "getActiveTurn") return activeTurn;
+    if (operation === "getTurnDiff") return clone(turnDiff);
+    if (operation === "revertTurnDiff") {
+      turnDiff = { ...turnDiff, status: "reverted", canUndo: false, canReapply: true };
+      return { success: true, turnDiff: clone(turnDiff) };
+    }
+    if (operation === "reapplyTurnDiff") {
+      turnDiff = { ...turnDiff, status: "active", canUndo: true, canReapply: false };
+      return { ...clone(turnDiff), success: true };
+    }
+    if (operation === "getWorkspaceReviewSummary") return clone(workspaceReviewSummary);
     if (operation === "getPendingQuestionnaire") return questionnaire ? { request: questionnaire } : {};
     if (operation === "beginAccountLogin") {
       accountLoginState = {
@@ -252,6 +279,8 @@ export function installFixtureTransport() {
     // blocking — the transcript's own request is the second of the three.
     delayEvery(operation, condition) { held.push({ operation, condition }); },
     setPage(sessionId, page) { pages[sessionId] = clone(page); },
+    /** What the runtime answers for a turn's diff, and what a revert returns. */
+    setTurnDiff(next) { turnDiff = clone(next); },
     // The tree projection the rail and the composer both read. Mutable for the
     // same reason `setPage` is: the app fetches it on boot, so a test that only
     // wants to poison it later has no other way to say what the server answers

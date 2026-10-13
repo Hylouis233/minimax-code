@@ -105,6 +105,14 @@ function WebuiClientRoot({
             : {}),
         },
         turnCapabilities: transport,
+        // The review families' capabilities. The application owns both owners
+        // (T10), so a surface reads a turn's diff through the application rather
+        // than holding the transport.
+        turnReview: {
+          ...(transport.getTurnDiff ? { getTurnDiff: transport.getTurnDiff } : {}),
+          ...(transport.revertTurnDiff ? { revertTurnDiff: transport.revertTurnDiff } : {}),
+          ...(transport.reapplyTurnDiff ? { reapplyTurnDiff: transport.reapplyTurnDiff } : {}),
+        },
         ...(transport.loadMessages
           ? { loadMessages: transport.loadMessages }
           : {}),
