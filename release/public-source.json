@@ -3641,6 +3641,8 @@
     "packages/webui/src/client/components/WorkspacePanels.tsx",
     "packages/webui/src/client/components/settings/PersonalizationSettings.tsx",
     "packages/webui/src/client/components/settings/UsageModelSettings.tsx",
+    "packages/webui/src/client/components/settings/settings-glyphs.tsx",
+    "packages/webui/src/client/components/workspace/SettingsReviewPage.tsx",
     "packages/webui/src/client/contracts/account/account-port.ts",
     "packages/webui/src/client/contracts/composer/composer-port.ts",
     "packages/webui/src/client/contracts/composer/slash-command.ts",

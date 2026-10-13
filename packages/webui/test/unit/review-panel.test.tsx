@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { WebuiReviewPanel, WebuiReviewWorkspacePicker } from "../../src/client/components/SettingsModal.js";
+import { WebuiReviewPanel, WebuiReviewWorkspacePicker } from "../../src/client/components/workspace/SettingsReviewPage.js";
 import {
   initialWebuiReviewState,
   reduceWebuiReviewState,
@@ -314,11 +314,17 @@ describe("tab-to-page wiring", () => {
  * exact expressions, so removing the picker call or hard-coding the prop back
  * in turns them red. */
 describe("the chosen workspace reaches the review load", () => {
+  /* The page has its own file (plan §5.6: the coding settings page is `workspace`,
+   * ticket #70), so the slice reads it directly and stops at the picker — the
+   * page's own call is what these assertions are about. */
   const source = readFileSync(
-    fileURLToPath(new URL("../../src/client/components/SettingsModal.tsx", import.meta.url)),
+    fileURLToPath(new URL("../../src/client/components/workspace/SettingsReviewPage.tsx", import.meta.url)),
     "utf8",
   );
-  const page = source.slice(source.indexOf("function SettingsReviewPage"), source.indexOf("function SettingsWorktreePage"));
+  const page = source.slice(
+    source.indexOf("export function SettingsReviewPage"),
+    source.indexOf("export function WebuiReviewWorkspacePicker"),
+  );
 
   /* Without this the picker would render a list built from nothing. Scoped to
    * the review page's own call: the worktree page is handed the same loader, so
