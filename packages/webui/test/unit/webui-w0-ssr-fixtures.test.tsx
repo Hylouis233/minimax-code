@@ -25,7 +25,7 @@ import { WebuiQuestionnaireResponse } from "../../src/client/features/transcript
 import {
   mergeOlderTranscriptPage,
   type WebuiOwnedTranscriptState,
-} from "../../src/client/application/transcript/transcript-request-ownership.js";
+} from "../../src/client/conversation/transcript-request-ownership.js";
 import {
   WebuiActivityGroup,
   WebuiTurnProcess,

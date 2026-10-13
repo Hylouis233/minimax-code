@@ -39,8 +39,8 @@ import {
 import type { WebuiGetSessionRewindPreviewResult } from "../../../../shared/contracts/session.js";
 import type { WebuiMessageActionCapabilities } from "../contracts/transcript-view.js";
 import { formatWebuiMessageTimestamp } from "../projection/message-timestamp.js";
-import { toggleWebuiFeedback, copyWebuiMessageText, scheduleWebuiCopiedReset } from "../../../application/transcript/message-feedback.js";
-import type { WebuiCopyDependencies } from "../../../application/transcript/message-feedback.js";
+import { toggleWebuiFeedback, copyWebuiMessageText, scheduleWebuiCopiedReset } from "../application/message-feedback.js";
+import type { WebuiCopyDependencies } from "../application/message-feedback.js";
 
 export function WebuiMessageActionButton({
   testId,

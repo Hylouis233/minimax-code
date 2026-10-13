@@ -25,7 +25,7 @@ import type { WebuiIdentityEpochs } from "../identity-epochs.js";
 import {
   createWebuiKeyedResource,
   type WebuiResourceKey,
-} from "../request-freshness.js";
+} from "../../conversation/request-freshness.js";
 import type { ModelsPort } from "../../contracts/models/provider-port.js";
 import type { WebuiModelEntry } from "../../../shared/contracts/models.js";
 import {

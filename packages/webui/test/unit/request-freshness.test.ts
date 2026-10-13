@@ -16,7 +16,7 @@ import {
   createWebuiKeyedResource,
   createWebuiSelectedSlot,
   serializeWebuiResourceKey,
-} from "../../src/client/application/request-freshness.js";
+} from "../../src/client/conversation/request-freshness.js";
 import { createWebuiQueryStore } from "../../src/client/application/query-store.js";
 
 /** A promise whose settlement the test decides. */

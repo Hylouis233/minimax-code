@@ -22,8 +22,11 @@ import {
   sendWebuiTurn,
 } from "../../src/client/application/turn/turn-commands.js";
 import { initialWebuiStreamState } from "../../src/client/projection/turn/stream-state.js";
-import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
-import { createWebuiTranscriptHistoryOwner } from "../../src/client/application/transcript/transcript-history.js";
+import {
+  createWebuiSessionStore,
+  createWebuiTranscriptHistoryWriter,
+} from "../../src/client/application/session-store.js";
+import { createWebuiTranscriptHistoryOwner } from "../../src/client/conversation/transcript-history.js";
 import { selectWebuiSessionTranscriptPage } from "../../src/client/application/selectors.js";
 import { createWebuiAccountWorkflows } from "../../src/client/application/account/account-workflows.js";
 import { createWebuiSettingsWorkflows } from "../../src/client/application/settings/settings-workflows.js";
@@ -65,7 +68,7 @@ describe("application-owned transcript history", () => {
     let resolveA: (page: WebuiClientMessagePage) => void = () => {};
     const store = createWebuiSessionStore();
     const owner = createWebuiTranscriptHistoryOwner({
-      store,
+      transcript: createWebuiTranscriptHistoryWriter(store),
       loadMessages: vi.fn(
         ({ id }: { readonly id: string; readonly before?: string }): Promise<WebuiClientMessagePage> =>
           id === "A"
@@ -91,7 +94,7 @@ describe("application-owned transcript history", () => {
     let resolveA: (page: WebuiClientMessagePage) => void = () => {};
     const store = createWebuiSessionStore();
     const owner = createWebuiTranscriptHistoryOwner({
-      store,
+      transcript: createWebuiTranscriptHistoryWriter(store),
       loadMessages: vi.fn(
         ({ id }: { readonly id: string; readonly before?: string }): Promise<WebuiClientMessagePage> =>
           id === "A"
@@ -126,7 +129,7 @@ describe("application-owned transcript history", () => {
     const pending: Array<(page: WebuiClientMessagePage) => void> = [];
     const store = createWebuiSessionStore();
     const owner = createWebuiTranscriptHistoryOwner({
-      store,
+      transcript: createWebuiTranscriptHistoryWriter(store),
       loadMessages: vi.fn(
         (): Promise<WebuiClientMessagePage> =>
           new Promise((resolve) => {

@@ -20,7 +20,7 @@ import {
   type WebuiEventCoordinator,
 } from "./turn/event-coordinator.js";
 import type { WebuiOpenEventChannel, WebuiProcessEventChannel } from "./turn/event-channel.js";
-import { createWebuiSessionStore } from "./session-store.js";
+import { createWebuiSessionStore, createWebuiTranscriptHistoryWriter } from "./session-store.js";
 import type { WebuiSessionStore } from "./session-store.js";
 import {
   createWebuiStreamLeaseController,
@@ -75,7 +75,7 @@ import {
 import {
   createWebuiTranscriptHistoryOwner,
   type WebuiTranscriptHistoryOwner,
-} from "./transcript/transcript-history.js";
+} from "../conversation/transcript-history.js";
 import type {
   WebuiTurnCapabilityPort,
   WebuiTurnCapabilitySlice,
@@ -433,7 +433,9 @@ export function createWebuiApplication(
     deps.turnCapabilities ?? {},
   );
   const transcriptHistory = createWebuiTranscriptHistoryOwner({
-    store,
+    // The substrate writes the transcript slice through this contract rather than
+    // through the record repository (plan §5.3).
+    transcript: createWebuiTranscriptHistoryWriter(store),
     loadMessages: deps.loadMessages,
   });
   // The ingress handle: nothing is opened at construction. `start` opens exactly

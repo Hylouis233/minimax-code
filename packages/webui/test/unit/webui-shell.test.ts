@@ -84,8 +84,11 @@ import type {
   WebuiGoalPatchRequest,
 } from "../../src/shared/contracts/goal.js";
 import type { WebuiQuestionnaireRequest } from "../../src/shared/contracts/interactions.js";
-import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
-import { createWebuiTranscriptHistoryOwner } from "../../src/client/application/transcript/transcript-history.js";
+import {
+  createWebuiSessionStore,
+  createWebuiTranscriptHistoryWriter,
+} from "../../src/client/application/session-store.js";
+import { createWebuiTranscriptHistoryOwner } from "../../src/client/conversation/transcript-history.js";
 import { WEBUI_HOME_SESSION_KEY } from "../../src/client/application/state.js";
 import { WebuiSessionStoreProvider } from "../../src/client/bindings/application-context.js";
 import {
@@ -3460,7 +3463,7 @@ describe("canonical transcript page wins over the initial render seed", () => {
     const refreshedStore = createWebuiSessionStore();
     let load = 0;
     const owner = createWebuiTranscriptHistoryOwner({
-      store: refreshedStore,
+      transcript: createWebuiTranscriptHistoryWriter(refreshedStore),
       loadMessages: async ({ before }) => {
         if (before) return {
           messages: [{ msgId: "older", role: "user", msgContent: "OLDER-CANONICAL" }],

@@ -30,6 +30,7 @@ import type { WebuiSessionCatalogState } from "./sessions/session-catalog.js";
 import { initialWebuiSessionCatalogState } from "./sessions/session-catalog.js";
 import type { WebuiStreamState } from "../projection/turn/stream-state.js";
 import type { WebuiGoal } from "../../shared/contracts/goal.js";
+import type { WebuiTranscriptHistoryWriter } from "../conversation/transcript-history.js";
 import type {
   WebuiPendingPermission,
   WebuiQuestionnaireRequest,
@@ -404,4 +405,21 @@ export function createWebuiSessionStore(options?: {
   };
 
   return store;
+}
+
+/**
+ * The conversation substrate's view of the transcript slice, satisfied by this
+ * store. The substrate may not import the record repository (plan §5.3), so the
+ * assembly hands it this instead: one narrow writer over the slice it owns.
+ */
+export function createWebuiTranscriptHistoryWriter(
+  store: WebuiSessionStore,
+): WebuiTranscriptHistoryWriter {
+  return {
+    updateTranscript: (sessionId, update) =>
+      store.updateSession(sessionId, (current) => ({
+        ...current,
+        transcript: update(current.transcript),
+      })),
+  };
 }

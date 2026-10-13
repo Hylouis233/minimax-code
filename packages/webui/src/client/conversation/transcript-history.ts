@@ -24,14 +24,36 @@
 import type {
   WebuiClientMessageLoader,
   WebuiClientMessagePage,
-} from "../../features/transcript/contracts/message-view.js";
+} from "../features/transcript/contracts/message-view.js";
 import {
   createWebuiKeyedResource,
   createWebuiSelectedSlot,
   type WebuiCommitToken,
-} from "../request-freshness.js";
-import type { WebuiSessionStore } from "../session-store.js";
+} from "./request-freshness.js";
 import { mergeOlderTranscriptPage } from "./transcript-request-ownership.js";
+
+/**
+ * The slice this owner writes, as a contract the assembly satisfies.
+ *
+ * The conversation substrate may not reach the session-record repository (plan
+ * §5.3: conversation depends on pure shared DTOs and injected IO/writer
+ * contracts), so what it needs is stated here and the application adapts its
+ * store to it.
+ */
+export interface WebuiTranscriptHistoryWriter {
+  readonly updateTranscript: (
+    sessionId: string,
+    update: (current: WebuiTranscriptRecord) => WebuiTranscriptRecord,
+  ) => void;
+}
+
+/** The transcript slice of one session's record, as this owner reads it. */
+export interface WebuiTranscriptRecord {
+  readonly page: WebuiClientMessagePage;
+  readonly generation: number;
+  readonly loading: boolean;
+  readonly error?: string;
+}
 
 /** The page a load produced, and the identity a later check is made against. */
 export interface WebuiTranscriptPageHandle {
@@ -84,7 +106,7 @@ export type WebuiTranscriptLoadOutcome =
 
 /** Owns transcript history RPCs and commits their results into the one session map. */
 export function createWebuiTranscriptHistoryOwner(deps: {
-  readonly store: WebuiSessionStore;
+  readonly transcript: WebuiTranscriptHistoryWriter;
   readonly loadMessages?: WebuiClientMessageLoader;
 }): WebuiTranscriptHistoryOwner {
   const pages = createWebuiKeyedResource<WebuiClientMessagePage>();
@@ -100,24 +122,16 @@ export function createWebuiTranscriptHistoryOwner(deps: {
     if (presentation.identity() === sessionId) return;
     presentation.select(sessionId);
     if (sessionId)
-      deps.store.updateSession(sessionId, (current) => ({
+      deps.transcript.updateTranscript(sessionId, (current) => ({
         ...current,
-        transcript: {
-          ...current.transcript,
-          generation: current.transcript.generation + 1,
-          loading: !current.transcript.page.messages,
-        },
+        generation: current.generation + 1,
+        loading: !current.page.messages,
       }));
   };
 
   const seed = (sessionId: string, page: WebuiClientMessagePage): void => {
-    deps.store.updateSession(sessionId, (current) =>
-      current.transcript.page.messages
-        ? current
-        : {
-            ...current,
-            transcript: { ...current.transcript, page, loading: false },
-          },
+    deps.transcript.updateTranscript(sessionId, (current) =>
+      current.page.messages ? current : { ...current, page, loading: false },
     );
   };
 
@@ -142,9 +156,10 @@ export function createWebuiTranscriptHistoryOwner(deps: {
     if (mode === "fresh") pages.invalidate(key);
     // Captured before the read: refused if the presentation has moved on.
     const presentationToken = presentation.capture();
-    deps.store.updateSession(sessionId, (state) => ({
+    deps.transcript.updateTranscript(sessionId, (state) => ({
       ...state,
-      transcript: { ...state.transcript, loading: true, error: undefined },
+      loading: true,
+      error: undefined,
     }));
     const loadMessages = deps.loadMessages;
     // What THIS read produced. A joining read produces nothing (its fetch is
@@ -167,9 +182,10 @@ export function createWebuiTranscriptHistoryOwner(deps: {
       // waiting for any more.
       if (entry?.status === "error" && own.value === undefined) {
         const failure = entry.error;
-        deps.store.updateSession(sessionId, (state) => ({
+        deps.transcript.updateTranscript(sessionId, (state) => ({
           ...state,
-          transcript: { ...state.transcript, error: failure, loading: false },
+          error: failure,
+          loading: false,
         }));
         return { status: "failed" };
       }
@@ -189,8 +205,8 @@ export function createWebuiTranscriptHistoryOwner(deps: {
     ) {
       return { status: "stale" };
     }
-    deps.store.updateSession(sessionId, (state) => {
-      const current = state.transcript;
+    deps.transcript.updateTranscript(sessionId, (state) => {
+      const current = state;
       const olderResult = cursor
         ? mergeOlderTranscriptPage(
             {
@@ -205,12 +221,9 @@ export function createWebuiTranscriptHistoryOwner(deps: {
         : undefined;
       return {
         ...state,
-        transcript: {
-          ...state.transcript,
-          page: olderResult?.state.page ?? page,
-          loading: false,
-          ...(olderResult?.error ? { error: olderResult.error } : {}),
-        },
+        page: olderResult?.state.page ?? page,
+        loading: false,
+        ...(olderResult?.error ? { error: olderResult.error } : {}),
       };
     });
     return {

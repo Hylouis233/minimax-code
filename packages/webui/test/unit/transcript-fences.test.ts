@@ -12,8 +12,11 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
-import { createWebuiTranscriptHistoryOwner } from "../../src/client/application/transcript/transcript-history.js";
+import {
+  createWebuiSessionStore,
+  createWebuiTranscriptHistoryWriter,
+} from "../../src/client/application/session-store.js";
+import { createWebuiTranscriptHistoryOwner } from "../../src/client/conversation/transcript-history.js";
 import { projectWebuiTranscriptMessages } from "../../src/client/features/transcript/projection/transcript-projection.js";
 import type { WebuiClientMessagePage } from "../../src/client/features/transcript/contracts/message-view.js";
 
@@ -27,7 +30,7 @@ describe("a late page after a session switch is discarded", () => {
     let releaseA: (page: WebuiClientMessagePage) => void = () => undefined;
     const store = createWebuiSessionStore();
     const owner = createWebuiTranscriptHistoryOwner({
-      store,
+      transcript: createWebuiTranscriptHistoryWriter(store),
       loadMessages: ({ id }) =>
         id === "A"
           ? new Promise<WebuiClientMessagePage>((resolve) => { releaseA = resolve; })
@@ -51,7 +54,7 @@ describe("a late page after a session switch is discarded", () => {
     const releases: Array<(page: WebuiClientMessagePage) => void> = [];
     const store = createWebuiSessionStore();
     const owner = createWebuiTranscriptHistoryOwner({
-      store,
+      transcript: createWebuiTranscriptHistoryWriter(store),
       loadMessages: () => new Promise<WebuiClientMessagePage>((resolve) => releases.push(resolve)),
     });
     const first = owner.loadPage("S");
@@ -73,7 +76,7 @@ describe("a late page after a session switch is discarded", () => {
     const releases: Record<string, (page: WebuiClientMessagePage) => void> = {};
     const store = createWebuiSessionStore();
     const owner = createWebuiTranscriptHistoryOwner({
-      store,
+      transcript: createWebuiTranscriptHistoryWriter(store),
       loadMessages: ({ before }) =>
         new Promise<WebuiClientMessagePage>((resolve) => {
           releases[before ?? "head"] = resolve;
@@ -98,7 +101,7 @@ describe("a late page after a session switch is discarded", () => {
     const releases: Array<(page: WebuiClientMessagePage) => void> = [];
     const store = createWebuiSessionStore();
     const owner = createWebuiTranscriptHistoryOwner({
-      store,
+      transcript: createWebuiTranscriptHistoryWriter(store),
       loadMessages: () => new Promise<WebuiClientMessagePage>((resolve) => releases.push(resolve)),
     });
     const first = owner.loadPage("S");
@@ -132,7 +135,7 @@ describe("live-to-history handover renders a completed turn once", () => {
 
   it("does not let the live seed replace a page the owner already holds", () => {
     const store = createWebuiSessionStore();
-    const owner = createWebuiTranscriptHistoryOwner({ store });
+    const owner = createWebuiTranscriptHistoryOwner({ transcript: createWebuiTranscriptHistoryWriter(store) });
     owner.selectSession("S");
     owner.seed("S", page("from-history"));
     // The second seed — the same turn arriving from the live path — is refused,
@@ -149,7 +152,7 @@ describe("a context-only inspection reuses the history answer", () => {
     const loads: string[] = [];
     const store = createWebuiSessionStore();
     const owner = createWebuiTranscriptHistoryOwner({
-      store,
+      transcript: createWebuiTranscriptHistoryWriter(store),
       loadMessages: ({ id }) => {
         loads.push(id);
         return Promise.resolve(page("S-1"));
@@ -174,7 +177,7 @@ describe("a context-only inspection reuses the history answer", () => {
     const releases: Array<(page: WebuiClientMessagePage) => void> = [];
     const store = createWebuiSessionStore();
     const owner = createWebuiTranscriptHistoryOwner({
-      store,
+      transcript: createWebuiTranscriptHistoryWriter(store),
       loadMessages: ({ id }) => {
         loads.push(id);
         return new Promise<WebuiClientMessagePage>((resolve) => releases.push(resolve));
