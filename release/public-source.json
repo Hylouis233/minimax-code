@@ -3646,6 +3646,7 @@
     "packages/webui/src/client/components/plugins/PluginCatalogue.tsx",
     "packages/webui/src/client/components/plugins/PluginImportDialog.tsx",
     "packages/webui/src/client/components/plugins/PluginItemDialog.tsx",
+    "packages/webui/src/client/components/sessions/ContextUsageIndicator.tsx",
     "packages/webui/src/client/components/settings/GlobalInstructionsSection.tsx",
     "packages/webui/src/client/components/settings/MemoryManagerDialog.tsx",
     "packages/webui/src/client/components/settings/MemorySection.tsx",

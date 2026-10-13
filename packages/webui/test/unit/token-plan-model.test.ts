@@ -30,10 +30,11 @@ import {
 } from "@mavis/config";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const composerPath = path.resolve(
+const indicatorPath = path.resolve(
   here,
-  "../../src/client/components/SessionComposer.tsx",
+  "../../src/client/components/sessions/ContextUsageIndicator.tsx",
 );
+const composerPath = path.resolve(here, "../../src/client/components/SessionComposer.tsx");
 
 describe("token plan model — the mirrored provider ids", () => {
   it("still equals the ones @mavis/config exports", () => {
@@ -97,13 +98,13 @@ describe("token plan model — whose usage the plan pays for", () => {
 });
 
 describe("context panel — what the plan section is bound to", () => {
-  const composer = readFileSync(composerPath, "utf8");
+  const indicatorSource = readFileSync(indicatorPath, "utf8");
 
   it("gates the plan meters on the SELECTED model, not on being signed in", () => {
     // `signedIn` alone is what printed Zhipu's context usage under a MiniMax
     // plan heading. Both halves are required, and the model half is the new one.
-    const indicator = composer.slice(
-      composer.indexOf("function ContextUsageIndicator"),
+    const indicator = indicatorSource.slice(
+      indicatorSource.indexOf("function ContextUsageIndicator"),
     );
     expect(indicator).toContain("isTokenPlanModel(planModel)");
     expect(indicator).not.toContain("usageQuota?.signedIn ? usageQuota : undefined");
@@ -111,14 +112,15 @@ describe("context panel — what the plan section is bound to", () => {
 
   it("is handed the selected model rather than any model", () => {
     // The whole list would make the gate depend on which model happens to be in
-    // the catalogue rather than which one is in front of the user.
-    expect(composer).toContain("planModel={selectedModel}");
+    // the catalogue rather than which one is in front of the user. The call site
+    // belongs to the composer, so this read is the composer's.
+    expect(readFileSync(composerPath, "utf8")).toContain("planModel={selectedModel}");
   });
 });
 
 describe("context panel — hover names it, click opens it", () => {
-  const composer = readFileSync(composerPath, "utf8");
-  const indicator = composer.slice(composer.indexOf("function ContextUsageIndicator"));
+  const indicatorSource = readFileSync(indicatorPath, "utf8");
+  const indicator = indicatorSource.slice(indicatorSource.indexOf("function ContextUsageIndicator"));
 
   it("does not open the panel on hover", () => {
     // The panel is six breakdown rows plus a set of plan meters. Opening that
@@ -161,8 +163,8 @@ describe("context panel — hover names it, click opens it", () => {
 });
 
 describe("context panel — the six-category split is folded until asked for", () => {
-  const composer = readFileSync(composerPath, "utf8");
-  const indicator = composer.slice(composer.indexOf("function ContextUsageIndicator"));
+  const indicatorSource = readFileSync(indicatorPath, "utf8");
+  const indicator = indicatorSource.slice(indicatorSource.indexOf("function ContextUsageIndicator"));
 
   it("starts folded, not expanded", () => {
     // Six rows of percentages is a reading task. The panel opens on the two
