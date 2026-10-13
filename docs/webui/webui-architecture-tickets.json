@@ -1077,7 +1077,8 @@
       "f36a4e1d",
       "8385c423",
       "fbf64911",
-      "7b3a0807"
+      "7b3a0807",
+      "39fc07f6"
     ],
     "published": false,
     "tickets": {
@@ -1087,18 +1088,19 @@
       "T04": "implemented locally, acceptance evidence recorded on #130",
       "T05": "closed 2026-10-13, acceptance evidence recorded on #131",
       "T06": "closed 2026-10-14, acceptance evidence recorded on #132",
-      "T10": "closed 2026-10-14 (issue #136, comment 6156644369): both review families have their own owners and both consumers are browser-verified"
+      "T10": "closed 2026-10-14 (issue #136, comment 6156644369): both review families have their own owners and both consumers are browser-verified",
+      "T14": "closed 2026-10-14 (issue #140, comment 6156919983): the host assembles the registry and the terminal-process port; the service binds what it was handed"
     },
     "frontier": [
       "T07",
       "T08",
       "T09",
-      "T14",
       "T17"
     ],
     "notes": [
-      "T10 closed 2026-10-14. The turn review owner and the workspace review owner each own their identity and freshness; the surfaces read them through the application; review-consumers.spec.mjs pins both consumers in the built client.",
-      "T11 inherits two findings the browser suite surfaced: the workspace panel crashes the whole UI on an unanswered read (filterWorkspaceFiles over a non-array, terminals.find over an object) instead of rendering an unsupported or empty state — the fixture now answers listWorkspaceFileTree and listTerminals, which is what a runtime does. The same class of gap in the application's composition root (turnReview was never supplied, so the diff card said 'capability unavailable' for every user) was fixed under T10."
+      "T14 closed 2026-10-14 (39fc07f6). The identity-only forwarding closures left service.ts (372 -> 245 lines); the host assembles createOperationRegistry(port, terminalPort) and injects it, and the optional-capability guards stay in the binding tables where their descriptors are.",
+      "T14 produced WebuiTerminalProcessPort (server/terminal-port.ts), implemented by the real WebuiTerminalManager and consumed by the terminal handler entries and the registry. T15 moves the implementation and the service's terminal resource ownership behind that port; the real-PTY delivery evidence belongs to T15.",
+      "The production entry points (scripts/run-webui-server.mjs, release/webui-npm/bin/mcode-webui.mjs) now build both ports and the registry; the production boot with a real runtime host answered version/listSessions/listWorkspaceFileTree over the loopback (39fc07f6)."
     ]
   },
   "publicationVerification": {
