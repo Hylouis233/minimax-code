@@ -63,6 +63,7 @@ import {
 } from "../projection/model-picker-hover.js";
 import {
   ModelSettingsFlyout,
+  type ModelSettingsFlyoutProps,
   type FlyoutAnchor,
 } from "./ModelSettingsFlyout.js";
 import type { FlyoutRect } from "../projection/flyout-position.js";
@@ -402,6 +403,225 @@ export function WebuiModelMenuList({
         </div>
       ))}
     </div>
+  );
+}
+
+type WebuiModelMenuClusterProps = Pick<
+  Parameters<typeof WebuiModelMenuList>[0],
+  | "groups"
+  | "selected"
+  | "focusedRowId"
+  | "favoriteKeys"
+  | "onFocus"
+  | "onHoverIntent"
+  | "onHoverLeave"
+  | "onSelect"
+  | "onToggleFavorite"
+  | "onRowMount"
+> & {
+  readonly query: string;
+  readonly searchId: string;
+  readonly searchIsEmpty: boolean;
+  /** A keystroke re-filters the list and retracts a pending fly-out: one act, so one callback. */
+  readonly onQueryChange: (value: string) => void;
+  /** Focusing the field is the user asking a different question; the fly-out answered the last one. */
+  readonly onSearchFocus: () => void;
+  /** Arrows move the focused row while the field holds focus. */
+  readonly onMoveRow: (delta: number) => void;
+};
+
+type WebuiModelDraftEditorProps = Pick<ModelSettingsFlyoutProps, "anchor" | "preview" | "onRetract"> & {
+  readonly open: boolean;
+  readonly tier: CascadeTier;
+  readonly model: WebuiModelPickerEntry | undefined;
+  readonly draft: WebuiModelPickerDraft;
+  /** Write the draft back where the drafts map lives — the picker's state, not this file's. */
+  readonly onCommitDraft: (draft: WebuiModelPickerDraft) => void;
+  readonly onSettingChange: ModelPickerProps["onSettingChange"];
+  readonly onSelect: ModelPickerProps["onSelect"];
+  /** A window choice completes the selection, so the menu closes behind it. */
+  readonly onCloseMenu: () => void;
+};
+
+/**
+ * The menu's cluster: the search field and the list it filters, with the keyboard the field owns.
+ *
+ * One declaration because "how does typing in the picker's search box behave" is one behaviour, and
+ * it used to be spread across the field's three handlers plus the list call beside them: the input
+ * that re-filters, the focus that retracts a fly-out, and the arrows that move the focused row
+ * without the field ever holding focus.
+ *
+ * A controlled region — the query, the focused row and the catalogue are the picker's, and the
+ * cluster owns nothing but the markup and the wiring it is handed.
+ */
+function WebuiModelMenuCluster({
+  query,
+  searchId,
+  searchIsEmpty,
+  onQueryChange,
+  onSearchFocus,
+  onMoveRow,
+  groups,
+  selected,
+  focusedRowId,
+  favoriteKeys,
+  onFocus,
+  onHoverIntent,
+  onHoverLeave,
+  onSelect,
+  onToggleFavorite,
+  onRowMount,
+}: WebuiModelMenuClusterProps): ReactElement {
+  return (
+    <div className="webui-model-menu-column">
+      <div className="webui-model-menu-search">
+        <label className="webui-model-search-field" htmlFor={searchId}>
+          <span className="sr-only">搜索模型</span>
+          <input
+            id={searchId}
+            type="search"
+            value={query}
+            placeholder="搜索模型…"
+            aria-label="搜索模型"
+            className="webui-model-search-input"
+            data-webui-model-search="true"
+            onChange={(event) => {
+              // A keystroke re-filters the list, and the row the open
+              // panel was anchored to may be one of the rows that just
+              // went. Its element unmounts, the anchor stops resolving,
+              // and the panel is left describing a model the user can no
+              // longer see. The search box taking the interaction is the
+              // same act either way: nothing here is a row the pointer
+              // is on.
+              onQueryChange(event.currentTarget.value);
+            }}
+            onFocus={onSearchFocus}
+            onKeyDown={(event) => {
+              // The menu opens WITHOUT focus, so the search field is
+              // reachable by Tab rather than by autofocus — and autofocus
+              // is what it used to do. Focusing the field on open is wrong
+              // for a menu whose first job is picking from a short list:
+              // it drops a caret and a blinking cursor into a text box
+              // nobody asked to type in, and typing then filters the list
+              // by accident.
+              //
+              // "No autofocus" must not mean "no keyboard", so the arrows
+              // that used to work by virtue of the field holding focus now
+              // work here explicitly. Caret movement inside the field is
+              // left alone: this is a single-line search box, and stealing
+              // Left/Right would break editing a query.
+              if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+              event.preventDefault();
+              onMoveRow(event.key === "ArrowDown" ? 1 : -1);
+            }}
+          />
+        </label>
+      </div>
+      {searchIsEmpty ? (
+        <div className="webui-model-search-empty">没有匹配的模型</div>
+      ) : (
+        <WebuiModelMenuList
+          groups={groups}
+          selected={selected}
+          focusedRowId={focusedRowId}
+          favoriteKeys={favoriteKeys}
+          onFocus={onFocus}
+          onHoverIntent={onHoverIntent}
+          onHoverLeave={onHoverLeave}
+          onSelect={onSelect}
+          onToggleFavorite={onToggleFavorite}
+          onRowMount={onRowMount}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * The drafts editor: one model's draft and the two controls that write it.
+ *
+ * The `drafts` map decides what a model's selection *means*, so "add a per-model draft field" is a
+ * change to one declaration — the draft's shape, the options it offers and the two writes — instead
+ * of a read of the whole picker. It owns no state: the draft and the map it is committed into are
+ * the picker's, which is what keeps a menu close from losing an edit in flight.
+ */
+function WebuiModelDraftEditor({
+  open,
+  tier,
+  model,
+  draft,
+  anchor,
+  preview,
+  onCommitDraft,
+  onSettingChange,
+  onSelect,
+  onCloseMenu,
+  onRetract,
+}: WebuiModelDraftEditorProps): ReactElement | null {
+  const effortOptions = model ? resolveEffortOptions(model) : [];
+  const contextOptions = model?.contextWindowOptions ?? [];
+
+  /**
+   * Commit a thinking option, in whichever shape that option implies.
+   *
+   * "default" RESETS the effort to the model's configured default (null, not
+   * the empty string — the wire distinguishes them), "on"/"off" flip the wire
+   * VARIANT rather than recording a level, and a depth level records itself.
+   * Splitting these three is the reason the option is reported verbatim by the
+   * fly-out instead of being pre-mapped there.
+   *
+   * It SELECTS the model. Same reasoning as `handleContextChange`: the fly-out
+   * belongs to a row, so choosing a level inside it is a statement about that
+   * row. Unlike a window, though, a level is a mid-visit edit — the user may
+   * still want a window next, and this panel is flat precisely so both fit in
+   * one visit — so the menu stays open and the row carries the tick.
+   */
+  const handleThinkingChange = (option: string) => {
+    if (!model) return;
+    const next: WebuiModelPickerDraft = {
+      ...draft,
+      ...thinkingDraftPatch(model, option),
+    };
+    onCommitDraft(next);
+    onSettingChange(model, next);
+    onSelect(model, next);
+  };
+
+  /**
+   * Commit a context window. This CLOSES: picking a window is the commitment
+   * that completes the selection, where a level is a mid-visit edit.
+   *
+   * It also SELECTS the model. The fly-out belongs to a row, and choosing an
+   * option inside it is a statement about that row — a user who picks "1M" next
+   * to M3 has chosen M3, and leaving the row unselected while closing the menu
+   * made the action read as "changed a setting" and left the tick beside a
+   * model they had just picked out of step. The row click is the same two calls
+   * in a different order, so both routes to a finished selection look alike.
+   */
+  const handleContextChange = (value: number) => {
+    if (!model) return;
+    const next: WebuiModelPickerDraft = {
+      ...draft,
+      contextLimit: value,
+    };
+    onCommitDraft(next);
+    onSettingChange(model, next);
+    onSelect(model, next);
+    onCloseMenu();
+  };
+  if (!open || tier !== "settings") return null;
+  return (
+    <ModelSettingsFlyout
+      model={model}
+      effortOptions={effortOptions}
+      contextOptions={contextOptions}
+      anchor={anchor}
+      draft={draft}
+      preview={preview}
+      onThinkingChange={handleThinkingChange}
+      onContextChange={handleContextChange}
+      onRetract={onRetract}
+    />
   );
 }
 
@@ -803,6 +1023,27 @@ export function WebuiModelPicker({
     rowElements.current.get(row.rowId)?.scrollIntoView({ block: "nearest" });
   };
 
+  /**
+   * The three seams the menu cluster takes. Each is one behaviour the cluster would otherwise have
+   * to reach for the picker's state to perform.
+   */
+  const handleSearchChange = (value: string) => {
+    retractFlyout();
+    setQuery(value);
+  };
+  const handleSearchFocus = () => retractFlyout();
+  const handleRowMount = (rowId: string, element: HTMLElement | null) => {
+    if (element) rowElements.current.set(rowId, element);
+    else rowElements.current.delete(rowId);
+  };
+  const handleCommitDraft = (draft: WebuiModelPickerDraft) => {
+    setDrafts((current) => ({ ...current, [focusedKeyString]: draft }));
+  };
+  const handleCloseFlyout = () => {
+    setOpen(false);
+    setFocusedRow(undefined);
+  };
+
   const favoriteKeys = useMemo(
     () => new Set(favoriteIds),
     [favoriteIds],
@@ -836,60 +1077,8 @@ export function WebuiModelPicker({
     return focusedModel.contextLimit;
   })();
 
-  const focusedEffortOptions = focusedModel
-    ? resolveEffortOptions(focusedModel)
-    : [];
-  const focusedContextOptions = focusedModel?.contextWindowOptions ?? [];
 
-  /**
-   * Commit a thinking option, in whichever shape that option implies.
-   *
-   * "default" RESETS the effort to the model's configured default (null, not
-   * the empty string — the wire distinguishes them), "on"/"off" flip the wire
-   * VARIANT rather than recording a level, and a depth level records itself.
-   * Splitting these three is the reason the option is reported verbatim by the
-   * fly-out instead of being pre-mapped there.
-   *
-   * It SELECTS the model. Same reasoning as `handleContextChange`: the fly-out
-   * belongs to a row, so choosing a level inside it is a statement about that
-   * row. Unlike a window, though, a level is a mid-visit edit — the user may
-   * still want a window next, and this panel is flat precisely so both fit in
-   * one visit — so the menu stays open and the row carries the tick.
-   */
-  const handleThinkingChange = (option: string) => {
-    if (!focusedModel) return;
-    const draft: WebuiModelPickerDraft = {
-      ...focusedDraft,
-      ...thinkingDraftPatch(focusedModel, option),
-    };
-    setDrafts((current) => ({ ...current, [focusedKeyString]: draft }));
-    onSettingChange(focusedModel, draft);
-    onSelect(focusedModel, draft);
-  };
 
-  /**
-   * Commit a context window. This CLOSES: picking a window is the commitment
-   * that completes the selection, where a level is a mid-visit edit.
-   *
-   * It also SELECTS the model. The fly-out belongs to a row, and choosing an
-   * option inside it is a statement about that row — a user who picks "1M" next
-   * to M3 has chosen M3, and leaving the row unselected while closing the menu
-   * made the action read as "changed a setting" and left the tick beside a
-   * model they had just picked out of step. The row click is the same two calls
-   * in a different order, so both routes to a finished selection look alike.
-   */
-  const handleContextChange = (value: number) => {
-    if (!focusedModel) return;
-    const draft: WebuiModelPickerDraft = {
-      ...focusedDraft,
-      contextLimit: value,
-    };
-    setDrafts((current) => ({ ...current, [focusedKeyString]: draft }));
-    onSettingChange(focusedModel, draft);
-    onSelect(focusedModel, draft);
-    setOpen(false);
-    setFocusedRow(undefined);
-  };
 
   return (
     <div
@@ -944,92 +1133,39 @@ export function WebuiModelPicker({
             if (event.key === "Escape") handleRetract();
           }}
         >
-          <div className="webui-model-menu-column">
-            <div className="webui-model-menu-search">
-              <label className="webui-model-search-field" htmlFor={searchId}>
-                <span className="sr-only">搜索模型</span>
-                <input
-                  id={searchId}
-                  type="search"
-                  value={query}
-                  placeholder="搜索模型…"
-                  aria-label="搜索模型"
-                  className="webui-model-search-input"
-                  data-webui-model-search="true"
-                  onChange={(event) => {
-                    // A keystroke re-filters the list, and the row the open
-                    // panel was anchored to may be one of the rows that just
-                    // went. Its element unmounts, the anchor stops resolving,
-                    // and the panel is left describing a model the user can no
-                    // longer see. The search box taking the interaction is the
-                    // same act either way: nothing here is a row the pointer
-                    // is on.
-                    retractFlyout();
-                    setQuery(event.currentTarget.value);
-                  }}
-                  onFocus={() => {
-                    // Focusing the search box is the user asking a different
-                    // question, and the fly-out is the answer to the previous
-                    // one. Left up it covers the very results the search was
-                    // opened to read.
-                    retractFlyout();
-                  }}
-                  onKeyDown={(event) => {
-                    // The menu opens WITHOUT focus, so the search field is
-                    // reachable by Tab rather than by autofocus — and autofocus
-                    // is what it used to do. Focusing the field on open is wrong
-                    // for a menu whose first job is picking from a short list:
-                    // it drops a caret and a blinking cursor into a text box
-                    // nobody asked to type in, and typing then filters the list
-                    // by accident.
-                    //
-                    // "No autofocus" must not mean "no keyboard", so the arrows
-                    // that used to work by virtue of the field holding focus now
-                    // work here explicitly. Caret movement inside the field is
-                    // left alone: this is a single-line search box, and stealing
-                    // Left/Right would break editing a query.
-                    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-                    event.preventDefault();
-                    moveFocusedRow(event.key === "ArrowDown" ? 1 : -1);
-                  }}
-                />
-              </label>
-            </div>
-            {searchIsEmpty ? (
-              <div className="webui-model-search-empty">没有匹配的模型</div>
-            ) : (
-              <WebuiModelMenuList
-                groups={groupedModels}
-                selected={selected}
-                focusedRowId={focused?.rowId}
-                favoriteKeys={favoriteKeys}
-                onFocus={handleRowFocus}
-                onHoverIntent={handleHoverIntent}
-                onHoverLeave={handleHoverLeave}
-                onSelect={handleSelectModel}
-                onToggleFavorite={handleToggleFavorite}
-                onRowMount={(rowId, element) => {
-                  if (element) rowElements.current.set(rowId, element);
-                  else rowElements.current.delete(rowId);
-                }}
-              />
-            )}
-          </div>
+          <WebuiModelMenuCluster
+            query={query}
+            searchId={searchId}
+            searchIsEmpty={searchIsEmpty}
+            onQueryChange={handleSearchChange}
+            onSearchFocus={handleSearchFocus}
+            onMoveRow={moveFocusedRow}
+            groups={groupedModels}
+            selected={selected}
+            focusedRowId={focused?.rowId}
+            favoriteKeys={favoriteKeys}
+            onFocus={handleRowFocus}
+            onHoverIntent={handleHoverIntent}
+            onHoverLeave={handleHoverLeave}
+            onSelect={handleSelectModel}
+            onToggleFavorite={handleToggleFavorite}
+            onRowMount={handleRowMount}
+          />
         </div>
       ) : null}
-      {open && tier === "settings" ? (
-        <ModelSettingsFlyout
-          model={focusedModel}
-          effortOptions={focusedEffortOptions}
-          contextOptions={focusedContextOptions}
-          anchor={flyoutAnchor}
-          draft={focusedDraft}
-          preview={flyoutIsPreview}
-          onThinkingChange={handleThinkingChange}
-          onContextChange={handleContextChange}
-          onRetract={handleRetract}
-        />
-      ) : null}
+      <WebuiModelDraftEditor
+        open={open}
+        tier={tier}
+        model={focusedModel}
+        draft={focusedDraft}
+        anchor={flyoutAnchor}
+        preview={flyoutIsPreview}
+        onCommitDraft={handleCommitDraft}
+        onSettingChange={onSettingChange}
+        onSelect={onSelect}
+        onCloseMenu={handleCloseFlyout}
+        onRetract={handleRetract}
+      />
     </div>
   );
 }

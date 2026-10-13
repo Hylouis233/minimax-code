@@ -200,8 +200,16 @@ describe("model picker — the hover wiring", () => {
     // it, since a keystroke can unmount the very row the panel is anchored to
     // and leave it describing a model that is no longer in the list.
     expect(picker).toContain("const retractFlyout = () => {");
-    expect(picker).toMatch(/onFocus=\{\(\) => \{\s*\n\s*\/\/[\s\S]*?retractFlyout\(\);/u);
-    expect(picker).toMatch(/onChange=\{\(event\) => \{[\s\S]*?retractFlyout\(\);/u);
+    // Since the cut (ticket #71) the field lives in `WebuiModelMenuCluster` and retracts through
+    // the picker's own seams. Both routes are asserted ACROSS that boundary — the field asks
+    // (`onFocus={onSearchFocus}`, and the keystroke's `onQueryChange`), and the picker's seam
+    // performs the retraction. A no-op seam would leave the old form green while the panel
+    // stopped going away, which is the defect this case exists for.
+    expect(picker).toContain("onFocus={onSearchFocus}");
+    expect(picker).toContain("onQueryChange(event.currentTarget.value);");
+    expect(picker).toContain("const handleSearchFocus = () => retractFlyout();");
+    expect(picker).toContain("const handleSearchChange = (value: string) => {");
+    expect(picker.slice(picker.indexOf("const handleSearchChange"), picker.indexOf("const handleSearchFocus"))).toContain("retractFlyout();");
   });
 
   it("keeps the row's highlight instant and its panel delayed", () => {

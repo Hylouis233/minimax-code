@@ -137,9 +137,14 @@ describe("cascade — the thinking switch does not finish the visit", () => {
       picker.indexOf("const handleThinkingChange"),
       picker.indexOf("const handleContextChange"),
     );
-    expect(handler).toContain("onSelect(focusedModel, draft)");
+    // The handler moved into `WebuiModelDraftEditor` (ticket #71: the drafts editor is one
+    // declaration), where the draft it commits is the prop `draft` and its replacement is `next`.
+    // The chain still has to reach the picker's `onSelect`, so that call site is asserted too.
+    expect(handler).toContain("onSelect(model, next)");
+    expect(picker).toContain("onSelect={onSelect}");
     // And no premature close: the level is a mid-visit edit.
     expect(handler).not.toContain("setOpen(false)");
+    expect(handler).not.toContain("onCloseMenu()");
   });
 });
 
@@ -150,8 +155,13 @@ describe("cascade — a click inside the fly-out finishes the selection", () => 
       picker.indexOf("const handleContextChange"),
       picker.indexOf("return (", picker.indexOf("const handleContextChange")),
     );
-    expect(handler).toContain("onSelect(focusedModel, draft)");
-    expect(handler).toContain("setOpen(false)");
+    expect(handler).toContain("onSelect(model, next)");
+    // Closing is the picker's, reached through the editor's one seam: the handler asks for the
+    // close and the picker's `handleCloseFlyout` performs it.
+    expect(handler).toContain("onCloseMenu();");
+    expect(picker).toContain("onCloseMenu={handleCloseFlyout}");
+    expect(picker).toContain("const handleCloseFlyout = () => {");
+    expect(picker).toContain("setOpen(false);");
   });
 
   it("leaves NOTHING in the fly-out disabled while previewing", () => {
@@ -393,6 +403,10 @@ describe("cascade — the shape the source has to keep", () => {
   it("keeps the list container from being duplicated", () => {
     // The list is rendered from one place; a second copy would be a second
     // scroll container inside the same menu.
-    expect(picker.match(/WebuiModelMenuList/g) ?? []).toHaveLength(2);
+    // The list is rendered from one place, and since the cut (ticket #71) that one place is the
+    // menu cluster — which is itself rendered once. Counting render sites rather than mentions:
+    // the cluster's props type names `WebuiModelMenuList` too.
+    expect(picker.match(/<WebuiModelMenuList/g) ?? []).toHaveLength(1);
+    expect(picker.match(/<WebuiModelMenuCluster/g) ?? []).toHaveLength(1);
   });
 });
