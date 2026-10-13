@@ -3939,6 +3939,7 @@
     "packages/webui/test/unit/vite-dev-proxy.test.ts",
     "packages/webui/test/unit/webui-application-bindings.test.tsx",
     "packages/webui/test/unit/webui-application-commands.test.ts",
+    "packages/webui/test/unit/webui-application-event-effects.test.ts",
     "packages/webui/test/unit/webui-application.test.ts",
     "packages/webui/test/unit/webui-auth-context.test.ts",
     "packages/webui/test/unit/webui-boundary-check.test.ts",

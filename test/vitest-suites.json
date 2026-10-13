@@ -282,6 +282,7 @@
       "packages/webui/test/unit/worktree-panel.test.tsx",
       "packages/webui/test/unit/worktree-state.test.ts",
       "packages/webui/test/unit/webui-port-slices.test.ts",
+      "packages/webui/test/unit/webui-application-event-effects.test.ts",
       "packages/webui/test/unit/review-panel.test.tsx",
       "packages/webui/test/unit/review-state.test.ts",
       "packages/webui/test/unit/webui-round3-acceptance.test.tsx",

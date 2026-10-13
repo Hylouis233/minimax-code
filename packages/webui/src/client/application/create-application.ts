@@ -115,8 +115,56 @@ export interface WebuiApplication {
    * the React selection once.
    */
   readonly adoptHomeSession: (sessionId: string) => void;
+  /**
+   * Replace the effects the event coordinator runs.
+   *
+   * The coordinator reads its effects through a slot rather than a value, so the
+   * application can be constructed before the effects exist — the composition
+   * root builds the application and provides it, and the subtree below it
+   * registers the per-session handlers and its own view reactions once it is
+   * mounted. Registration **replaces** the whole set and returns a detach that
+   * restores the set in force before the call, so a remount is symmetric.
+   *
+   * Members the set does not carry are removed rather than forwarded as
+   * no-ops: the coordinator branches on their presence (`if (effects.setGoal)`
+   * chooses between the registered write path and its own store write), so an
+   * always-present forwarder would silently take the registered branch.
+   */
+  readonly setEventEffects: (effects: WebuiEventEffects) => () => void;
   /** Tear down: detach the coordinator, dispose the store, close the channel. */
   readonly dispose: () => void;
+}
+
+/**
+ * The effects slot the coordinator reads.
+ *
+ * The coordinator captures the object **once** and closes over it, so the slot's
+ * identity is what stays stable while its members change: registering rewrites
+ * the keys in place. Members the registration does not carry are deleted rather
+ * than left as permanent forwarders, because the coordinator branches on their
+ * presence — `if (effects.setGoal)` at `event-coordinator.ts` chooses between the
+ * registered goal write path and its own store write, and a forwarder that is
+ * always defined would take the registered branch on a host that registered
+ * nothing.
+ */
+function createEventEffectsSlot(initial: WebuiEventEffects): {
+  readonly slot: WebuiEventEffects;
+  readonly snapshot: () => WebuiEventEffects;
+  readonly replace: (next: WebuiEventEffects) => void;
+} {
+  const slot: Record<string, unknown> = {};
+  const replace = (next: WebuiEventEffects): void => {
+    for (const key of Object.keys(slot)) delete slot[key];
+    for (const [key, value] of Object.entries(next)) {
+      if (value !== undefined) slot[key] = value;
+    }
+  };
+  replace(initial);
+  return {
+    slot: slot as WebuiEventEffects,
+    snapshot: () => ({ ...(slot as WebuiEventEffects) }),
+    replace,
+  };
 }
 
 export function createWebuiApplication(
@@ -136,12 +184,17 @@ export function createWebuiApplication(
   });
   unread.hydrate(readActiveSessionId());
   const composer = deps.composer ?? createWebuiComposerStore();
+  // The effects slot: the initial set is the composition root's, and a later
+  // registration (the subtree that owns the effects) replaces it in place. The
+  // coordinator holds the slot object, not a copy of its members, so a
+  // registration made after construction is what the next event sees.
+  const eventEffects = createEventEffectsSlot(deps.effects ?? {});
   const events = createWebuiEventCoordinator({
     store,
     leases,
     readActiveSessionId,
     unread,
-    ...(deps.effects ? { effects: deps.effects } : {}),
+    effects: eventEffects.slot,
   });
   const turns = createWebuiTurnCoordinator({
     store,
@@ -183,6 +236,11 @@ export function createWebuiApplication(
       store.migrateSession(WEBUI_HOME_SESSION_KEY, sessionId);
       composer.adoptHome(sessionId);
       store.select(sessionId);
+    },
+    setEventEffects: (next) => {
+      const previous = eventEffects.snapshot();
+      eventEffects.replace(next);
+      return () => eventEffects.replace(previous);
     },
     dispose: () => {
       detach();
