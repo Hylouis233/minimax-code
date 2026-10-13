@@ -18,7 +18,7 @@ import { describe, expect, it } from "vitest";
 const read = (relative: string): string =>
   readFileSync(fileURLToPath(new URL(relative, import.meta.url)), "utf8");
 
-const shell = read("../../src/client/components/WebuiClientFoundationApp.tsx");
+const shell = read("../../src/client/components/shell/WebuiClientFoundationApp.tsx");
 const main = read("../../src/client/main.tsx");
 
 describe("the shell forwards zero transport members", () => {

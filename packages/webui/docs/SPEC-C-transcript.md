@@ -20,7 +20,7 @@ item below says which it is.
 
 **Roadmap says: ❌ not met.** Confirmed — and cheaper to fix than that implies.
 
-`client/markdown.tsx` renders every fence as
+`client/components/transcript/markdown.tsx` renders every fence as
 
 ```tsx
 <pre><code data-language={token.lang ?? undefined}>{token.text}</code></pre>
@@ -138,7 +138,7 @@ send/resume loop. Per `AGENTS.md`, tests drive them **directly** — no DOM.
 This is the one place the report understates the source: the anchor feature is
 **implemented**, not merely scaffolded.
 
-`client/markdown.tsx` already has:
+`client/components/transcript/markdown.tsx` already has:
 
 - a `webuiFileReference` marked-extension registered on `marked` (line ~48),
 - `fileReferenceAnchor()` (line ~71) which renders a clickable anchor,

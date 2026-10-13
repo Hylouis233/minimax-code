@@ -1,4 +1,4 @@
-// Two defects in `src/client/markdown.tsx` that the C-5 verification found
+// Two defects in `src/client/components/transcript/markdown.tsx` that the C-5 verification found
 // while checking transcript file/line anchors. Both pre-date this file's other
 // work; neither is caused by the C-1/C-2 code-block changes.
 //

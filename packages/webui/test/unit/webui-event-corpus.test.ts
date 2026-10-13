@@ -9,7 +9,7 @@
 // session-stream projection. That projection is gone — it attached a
 // per-session snapshot to every stream frame and nothing on the client read it
 // — so this file re-points the corpus at the module that actually renders:
-// `client/projection/effect-reducer.ts` through `client/projection/event-parsers.ts`.
+// `client/application/turn/effect-reducer.ts` through `client/projection/interactions/event-parsers.ts`.
 //
 // Every expected value below is read from the fixture, never from an
 // implementation constant, so a change on either side fails the test.

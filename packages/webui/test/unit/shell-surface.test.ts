@@ -72,7 +72,7 @@ describe("shell surface", () => {
 
 describe("shell surface wiring", () => {
   const shell = readFileSync(
-    new URL("../../src/client/components/WebuiClientFoundationApp.tsx", import.meta.url),
+    new URL("../../src/client/components/shell/WebuiClientFoundationApp.tsx", import.meta.url),
     "utf8",
   );
 

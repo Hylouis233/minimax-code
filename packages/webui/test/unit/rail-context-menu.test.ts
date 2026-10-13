@@ -27,7 +27,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
 const SOURCE = readFileSync(
-  new URL("../../src/client/components/SessionRail.tsx", import.meta.url),
+  new URL("../../src/client/components/sessions/SessionRail.tsx", import.meta.url),
   "utf8",
 );
 

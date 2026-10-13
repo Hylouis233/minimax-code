@@ -366,7 +366,7 @@ describe("WebuiProjectList under a search query", () => {
 // right. The screen was checked by hand against a real rail.
 describe("rail search wiring in WebuiClientFoundationApp", () => {
   const source = readFileSync(
-    new URL("../../src/client/components/WebuiClientFoundationApp.tsx", import.meta.url),
+    new URL("../../src/client/components/shell/WebuiClientFoundationApp.tsx", import.meta.url),
     "utf8",
   );
 

@@ -26,7 +26,7 @@ import { ThinkingTrigger } from "../../src/client/components/composer/ThinkingTr
 const here = path.dirname(fileURLToPath(import.meta.url));
 const componentPath = path.resolve(
   here,
-  "../../src/client/components/ThinkingTrigger.tsx",
+  "../../src/client/components/composer/ThinkingTrigger.tsx",
 );
 
 const BINARY = ["off", "on"];

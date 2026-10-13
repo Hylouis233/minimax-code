@@ -131,7 +131,7 @@ describe("the rail's export button", () => {
   // route for it. The gap is the wire between the button and the URL, and
   // that wire is only visible in the source.
   const shell = readFileSync(
-    new URL("../../src/client/components/WebuiClientFoundationApp.tsx", import.meta.url),
+    new URL("../../src/client/components/shell/WebuiClientFoundationApp.tsx", import.meta.url),
     "utf8",
   );
 

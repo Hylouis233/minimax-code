@@ -130,13 +130,58 @@ describe("layer matrix", () => {
     expect(classifyLayers("client/contracts/transport.ts")).toEqual(["contracts"]);
     // The reducer is a pure `view` projection now that the stream loop and the
     // test-only instrumentation take it by injection instead of importing it.
-    expect(classifyLayers("client/projection/stream-state.ts")).toEqual(["view"]);
+    // `client/projection/` classifies by basename, so the `turn/` sub-directory
+    // does not change the verdict.
+    expect(classifyLayers("client/projection/turn/stream-state.ts")).toEqual(["view"]);
     // The migrated modules are decided by their directory now, so no
     // provenance entry is needed for them.
     expect(classifyLayers("client/mechanisms/stream-loop.ts")).toEqual(["mechanisms"]);
     expect(classifyLayers("client/infrastructure/transport.ts")).toEqual([
       "infrastructure",
     ]);
+  });
+
+  it("classifies the two client-root files by path rule alone", () => {
+    // These are the only two files plan §6.1 keeps at the client root. Their
+    // `root` layer used to come from `CLIENT_FILE_PROVENANCE`, which C-fin
+    // deleted, so it is now stated as a path rule — and these assertions exist
+    // to fail if that rule is ever dropped.
+    expect(classifyLayers("client/main.tsx")).toEqual(["root"]);
+    expect(classifyLayers("client/global.d.ts")).toEqual(["root"]);
+  });
+
+  it("classifies every relocated module from its own path", () => {
+    // Phase 4 moved each former client-root module under a layer directory. None
+    // of these has a provenance entry any more; each is decided by its prefix,
+    // or — under `client/projection/` — by its basename.
+    expect(classifyLayers("client/infrastructure/team-mode.ts")).toEqual(["infrastructure"]);
+    expect(classifyLayers("client/infrastructure/no-project.ts")).toEqual(["infrastructure"]);
+    expect(classifyLayers("client/contracts/value-readers.ts")).toEqual(["contracts"]);
+    expect(classifyLayers("client/projection/common/paths.ts")).toEqual(["view"]);
+    expect(classifyLayers("client/projection/common/router.ts")).toEqual(["view"]);
+    expect(classifyLayers("client/projection/sessions/rail-buckets.ts")).toEqual(["view"]);
+    expect(classifyLayers("client/components/composer/slash-palette.ts")).toEqual(["bindings"]);
+    expect(classifyLayers("client/components/transcript/markdown.tsx")).toEqual(["bindings"]);
+    expect(classifyLayers("client/components/shell/icons.tsx")).toEqual(["bindings"]);
+    expect(classifyLayers("client/components/shell/ConnectionStatus.tsx")).toEqual(["bindings"]);
+  });
+
+  it("classifies the two re-filed projections as application by prefix", () => {
+    // `composer-history` and `effect-reducer` were the only two modules the gate
+    // classified `application` while they sat in `client/projection/`
+    // (plan §7.2). They moved under `client/application/`, so the prefix rule now
+    // carries that verdict and `PROJECTION_SPLIT` is gone.
+    expect(classifyLayers("client/application/composer/composer-history.ts")).toEqual(["application"]);
+    expect(classifyLayers("client/application/turn/effect-reducer.ts")).toEqual(["application"]);
+    expect(classifyLayers("client/application/transcript/transcript-request-ownership.ts")).toEqual(["application"]);
+  });
+
+  it("classifies a client-root file with no rule as unknown", () => {
+    // With the provenance table deleted, a file re-created at an old client-root
+    // path classifies `unknown` — whose allowed-edge set is empty — instead of
+    // silently inheriting a layer its deleted entry used to assert.
+    expect(classifyLayers("client/team-mode.ts")).toEqual(["unknown"]);
+    expect(classifyLayers("client/projection/nothing-here.ts")).toEqual(["view"]);
   });
 
   it("recognises the post-migration layout too", () => {
@@ -159,12 +204,15 @@ describe("layer matrix", () => {
     // The four resolved entries must not come back: each is now judged by its
     // path, and listing it again would assert a mixture that no longer exists.
     expect(KNOWN_AMBIGUOUS_FILES).not.toContain("runtime/port.ts");
+    // Both names are asserted: the path the file used to sit at, and the one it
+    // occupies now. A relocated entry must not come back under either spelling.
     expect(KNOWN_AMBIGUOUS_FILES).not.toContain("client/slash-palette.ts");
+    expect(KNOWN_AMBIGUOUS_FILES).not.toContain("client/components/composer/slash-palette.ts");
     expect(KNOWN_AMBIGUOUS_FILES).not.toContain("server/envelope.ts");
     expect(KNOWN_AMBIGUOUS_FILES).not.toContain("server/service.ts");
     // Entries removed earlier stay removed.
     expect(KNOWN_AMBIGUOUS_FILES).not.toContain(
-      "client/projection/stream-state.ts",
+      "client/projection/turn/stream-state.ts",
     );
     expect(KNOWN_AMBIGUOUS_FILES).not.toContain("client/stream.ts");
     expect(KNOWN_AMBIGUOUS_FILES).not.toContain("client/contracts.ts");
@@ -179,7 +227,7 @@ describe("layer matrix", () => {
   // should fail first.
   it("classifies the files the empty list removed", () => {
     expect(classifyLayers("runtime/port.ts")).toEqual(["runtime-port"]);
-    expect(classifyLayers("client/slash-palette.ts")).toEqual(["bindings"]);
+    expect(classifyLayers("client/components/composer/slash-palette.ts")).toEqual(["bindings"]);
     expect(classifyLayers("server/envelope.ts")).toEqual(["server"]);
     expect(classifyLayers("server/service.ts")).toEqual(["server"]);
   });
@@ -291,11 +339,11 @@ describe("provisional judgements for plan section 7.5 mixed files", () => {
     // The blind spot this fixes: the removed `stream-state.ts` entry would have
     // made every one of its edges look provisional. It is a plain `view` file
     // now, so its violations (if any) are ordinary judgements.
-    expect(touchesAmbiguousFile("client/projection/stream-state.ts", "client/y.ts"))
+    expect(touchesAmbiguousFile("client/projection/turn/stream-state.ts", "client/y.ts"))
       .toBe(false);
     // Same for the four entries resolved by this refactor: with the real list
     // empty, none of them makes an edge provisional.
-    expect(touchesAmbiguousFile("client/slash-palette.ts", "server/service.ts"))
+    expect(touchesAmbiguousFile("client/components/composer/slash-palette.ts", "server/service.ts"))
       .toBe(false);
   });
 

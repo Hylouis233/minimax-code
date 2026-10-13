@@ -184,9 +184,9 @@ export const ALLOWED_EDGES = Object.freeze({
  * genuinely two-layer file appears, add it here *and* implement symbol-level
  * ownership — the list alone only surfaces the violation, it does not decide it.
  *
- * `client/projection/stream-state.ts` used to be listed here. It has since
- * become a pure `view` projection: `classifyLayers` gives it exactly `view`
- * via `PROJECTION_SPLIT`, its only imports are shared contracts, the leaf
+ * `client/projection/turn/stream-state.ts` used to be listed here. It has since
+ * become a pure `view` projection: `classifyLayers` gives it exactly `view`,
+ * its only imports are shared contracts, the leaf
  * `client/contracts/turn/stream-state.ts` declarations and the `workspace-progress`
  * projection, and no mechanism reaches into it any more. Listing it
  * contradicted that classification, so the entry was removed rather than left
@@ -209,10 +209,10 @@ export const ALLOWED_EDGES = Object.freeze({
  * obsolete too. All three are removed here rather than left pointing at paths
  * that no longer exist.
  *
- * The same rule applies to `CLIENT_FILE_PROVENANCE` below: an entry for a file
- * that no longer sits at that path is deleted, so a re-created file at the old
- * path classifies as `unknown` and is reported instead of silently inheriting a
- * stale layer.
+ * The same rule applied to `CLIENT_FILE_PROVENANCE`, now deleted along with
+ * `PROJECTION_SPLIT`: an entry for a file that no longer sits at that path is
+ * deleted, so a re-created file at the old path classifies as `unknown` and is
+ * reported instead of silently inheriting a stale layer.
  *
  * `runtime/port.ts` used to be listed here. The entry claimed the module "pulls
  * the shared plugin-management / canvas / model contract shapes into the same
@@ -225,7 +225,7 @@ export const ALLOWED_EDGES = Object.freeze({
  * its inline type query. A type-only re-export is not a second layer either, so
  * the entry asserted a mixture that did not exist.
  *
- * `client/slash-palette.ts` used to be listed here, and this one *was* a real
+ * `client/components/composer/slash-palette.ts` used to be listed here, and this one *was* a real
  * mixture: the module re-exported the leaf `contracts/slash-command.js` symbols
  * and imported React icon components in the same file, so it was simultaneously
  * a contract barrel and a presentation module. The two forwarding `export { }`
@@ -318,29 +318,25 @@ export const CATEGORIES = Object.freeze({
 // Provenance: current path -> target layer(s)
 // ---------------------------------------------------------------------------
 
-// Explicit provenance for current `client/*` top-level files that move or split.
-// Values are arrays because a split file genuinely has more than one target
-// layer; the plan names the destinations (§7.1, §7.2, §7.3).
-const CLIENT_FILE_PROVENANCE = Object.freeze({
-  "main.tsx": ["root"],
-  "global.d.ts": ["root"],
-  "team-mode.ts": ["infrastructure"],
-  "no-project.ts": ["infrastructure"],
-  "value-readers.ts": ["contracts"],
-  "paths.ts": ["view"],
-  "rail-buckets.ts": ["view"],
-  "router.ts": ["view"],
-  "slash-palette.ts": ["bindings"],
-  "markdown.tsx": ["bindings"],
-  "icons.tsx": ["bindings"],
-  "ConnectionStatus.tsx": ["bindings"],
-});
+// The provenance tables this section used to declare are gone (Phase 4, C-fin).
+// Every entry of `CLIENT_FILE_PROVENANCE` had left `client/` root by the time it
+// was deleted, and each of those files now classifies identically from its own
+// prefix: `team-mode`/`no-project` under `client/infrastructure/`,
+// `value-readers` under `client/contracts/`, `paths`/`rail-buckets`/`router`
+// under `client/projection/` (a basename lookup that still finds them `view`),
+// and `slash-palette`/`markdown`/`icons`/`ConnectionStatus` under
+// `client/components/`. The two files that stay at the client root by plan §6.1
+// carry an explicit path rule above instead. `PROJECTION_SPLIT` is gone for the
+// same reason: `composer-history` and `effect-reducer` moved under
+// `client/application/`, `transcript-request-ownership` with them, `stream-state`
+// is `view` by the basename fallback, and `file-line-navigation` names no file
+// in the package.
 
 // `client/projection/*` classification, from plan §2's "Required module
 // classification" table. Files not listed here are pure view projections.
 // `session-activity` is the relocated pure activity rules (plan §7.3, ticket
 // #49): it moved from `client/session-activity.ts` (classified `domain`) to
-// `client/projection/session-activity.ts`, keeping that layer.
+// `client/projection/sessions/session-activity.ts`, keeping that layer.
 const PROJECTION_DOMAIN = new Set([
   "action-requests",
   "context-usage",
@@ -356,19 +352,6 @@ const PROJECTION_DOMAIN = new Set([
   "workspace-progress",
   "worktree-state",
 ]);
-const PROJECTION_SPLIT = Object.freeze({
-  "composer-history": ["application"],
-  "effect-reducer": ["application"],
-  "transcript-request-ownership": ["application"],
-  "file-line-navigation": ["bindings"],
-  // `stream-state.ts` is the pure frame reducer split out of `client/stream.ts`
-  // (plan §7.3). Its predecessor carried a `mechanisms` classification because
-  // the stream loop and the test-only instrumentation consumed it directly; both
-  // now take it by injection instead (plan §7.2), so the module is a pure `view`
-  // projection and no mechanism reaches into it. The state shapes it operates on
-  // live in `client/contracts/turn/stream-state.ts` for the same reason.
-  "stream-state": ["view"],
-});
 
 // Current `server/*` files whose destination is `runtime/`. Everything else
 // under `server/` stays the loopback network layer.
@@ -405,8 +388,12 @@ function basenameWithoutExtension(relative) {
 export function classifyLayers(relative) {
   const normalized = relative.split(path.sep).join("/");
 
-  // Composition root (browser) — explicit exception per plan §7.5.
+  // Composition root (browser) — explicit exception per plan §7.5. `main.tsx`
+  // and `global.d.ts` are the two files plan §6.1 keeps at the client root, so
+  // their layer has to be stated here; `global.d.ts` used to get it from
+  // `CLIENT_FILE_PROVENANCE`, which C-fin deleted.
   if (normalized === "client/main.tsx") return ["root"];
+  if (normalized === "client/global.d.ts") return ["root"];
 
   // Target layout (post-migration, and the layout fixtures use).
   if (normalized.startsWith("client/components/")) return ["bindings"];
@@ -432,15 +419,14 @@ export function classifyLayers(relative) {
     return SERVER_RUNTIME_PROVENANCE.has(rest) ? ["runtime"] : ["server"];
   }
   if (normalized.startsWith("client/projection/")) {
-    const base = basenameWithoutExtension(normalized);
-    if (PROJECTION_SPLIT[base]) return [...PROJECTION_SPLIT[base]];
-    if (PROJECTION_DOMAIN.has(base)) return ["domain"];
+    const b = basenameWithoutExtension(normalized);
+    if (PROJECTION_DOMAIN.has(b)) return ["domain"];
     return ["view"];
   }
-  if (normalized.startsWith("client/")) {
-    const rest = normalized.slice("client/".length);
-    return CLIENT_FILE_PROVENANCE[rest] ? [...CLIENT_FILE_PROVENANCE[rest]] : ["unknown"];
-  }
+  // No provenance table remains for `client/` root files, so anything still
+  // sitting at the root classifies `unknown` and is reported rather than
+  // inheriting a layer a deleted entry used to assert.
+  if (normalized.startsWith("client/")) return ["unknown"];
   return ["unknown"];
 }
 

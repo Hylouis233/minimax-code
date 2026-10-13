@@ -189,7 +189,7 @@ describe("ConnectionStatus host layout calls", () => {
     // before Q-1 the component existed with zero consumers, which is exactly
     // the gap that made every connection state invisible.
     const source = readFileSync(
-      new URL("../../src/client/components/WebuiClientFoundationApp.tsx", import.meta.url),
+      new URL("../../src/client/components/shell/WebuiClientFoundationApp.tsx", import.meta.url),
       "utf8",
     );
     const mountAt = source.indexOf("<ConnectionStatus");

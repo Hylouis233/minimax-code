@@ -35,7 +35,7 @@ const union = [...unionSrc.matchAll(/^\s*\|\s*"(\w+)"/gmu)].map((m) => m[1]!);
 const serverSrc = read(new URL("server/operation/plugin-management.ts", SRC));
 const serverActions = [...serverSrc.matchAll(/^\s*"(\w+)",?$/gmu)].map((m) => m[1]!);
 
-const workflowSrc = read(new URL("application/plugin-workflows.ts", CLIENT));
+const workflowSrc = read(new URL("application/plugins/plugin-workflows.ts", CLIENT));
 
 const sorted = (values: readonly string[]): string[] => [...values].sort();
 
@@ -85,11 +85,11 @@ describe("each action's business is the one the inventory records", () => {
     // The allowance is per module and each entry states its reason; a new module reaching this port
     // fails the case rather than passing a count.
     const allowed = [
-      "application/plugin-workflows.ts", // the owner
+      "application/plugins/plugin-workflows.ts", // the owner
       "application/port-slices.ts", // the slice's cut
       "contracts/plugins/plugin-port.ts", // the declaration
       "infrastructure/transport.ts", // the wire
-      "components/WebuiClientFoundationApp.tsx", // the composition root that builds the slice
+      "components/shell/WebuiClientFoundationApp.tsx", // the composition root that builds the slice
       "components/SessionComposer.tsx", // the declared reader of `listInstalledPlugins` (§4.2, §4.8)
     ];
     const reach = [..."application contracts infrastructure components bindings projection".split(" ")]

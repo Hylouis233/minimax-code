@@ -541,7 +541,7 @@ export function WebuiComposer({
   const questionnaire = useWebuiSessionQuestionnaire(sessionId);
   const goal = useWebuiSessionGoal(sessionId);
   const interactionCommands = useWebuiInteractionCommands(sessionId);
-  // The interaction flows (plan §7.1 `client/application/interaction-coordinator.ts`).
+  // The interaction flows (plan §7.1 `client/application/interactions/interaction-coordinator.ts`).
   // The policy — what counts as an accepted reply, what state transition follows
   // it, which permissions a re-read keeps — lives there. This component supplies
   // the wiring and keeps the one error slot that every other flow in this file

@@ -77,7 +77,7 @@ describe("effort options — the binary case", () => {
 const FLYOUT_SOURCE = readFileSync(
   path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
-    "../../src/client/components/ModelSettingsFlyout.tsx",
+    "../../src/client/components/models/ModelSettingsFlyout.tsx",
   ),
   "utf8",
 );

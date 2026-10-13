@@ -142,7 +142,7 @@ describe("SPEC-C C-5 transcript file/line anchors", () => {
 
   // ---------------------------------------------------------------------
   // Two real defects found while verifying C-5. Both lived in
-  // `src/client/markdown.tsx`. They were first pinned with `it.fails` so the
+  // `src/client/components/transcript/markdown.tsx`. They were first pinned with `it.fails` so the
   // suite stayed green while the bugs were live; both are now fixed, so the
   // assertions below run as ordinary tests and guard the fix.
   //

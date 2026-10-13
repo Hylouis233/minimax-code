@@ -1,4 +1,4 @@
-// The interaction coordinator (plan §7.1 `client/application/interaction-coordinator.ts`).
+// The interaction coordinator (plan §7.1 `client/application/interactions/interaction-coordinator.ts`).
 //
 // One owner for the interaction flows the composer used to run inline: the
 // permission and questionnaire replies, and the authoritative re-read of pending

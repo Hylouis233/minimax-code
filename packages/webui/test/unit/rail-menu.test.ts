@@ -23,7 +23,7 @@ import {
   type WebuiRailMenuState,
 } from "../../src/client/projection/rail-menu.js";
 
-const RAIL = new URL("../../src/client/components/SessionRail.tsx", import.meta.url);
+const RAIL = new URL("../../src/client/components/sessions/SessionRail.tsx", import.meta.url);
 const rail = readFileSync(RAIL, "utf8");
 const flat = (text: string): string => text.replace(/\s+/gu, " ");
 

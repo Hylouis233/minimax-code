@@ -520,7 +520,7 @@ describe("W0 · structural declarations W5 must preserve", () => {
     // can drift again.
     const skeletons = readFileSync(
       new URL(
-        "../../src/client/components/TranscriptSkeletons.tsx",
+        "../../src/client/components/transcript/TranscriptSkeletons.tsx",
         import.meta.url,
       ),
       "utf8",

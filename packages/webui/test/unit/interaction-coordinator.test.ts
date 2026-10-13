@@ -1,5 +1,5 @@
 // The interaction coordinator's policy (plan §7.1
-// `client/application/interaction-coordinator.ts`).
+// `client/application/interactions/interaction-coordinator.ts`).
 //
 // These pin the decisions the composer used to make inline: what counts as an
 // accepted reply, what state transition follows it, which permissions a re-read
