@@ -53,13 +53,23 @@
     },
     {
       "from": "client/features/sessions/ui/ContextUsageIndicator.tsx",
-      "to": "client/projection/account/usage.ts",
+      "to": "client/features/account/projection/usage.ts",
       "reason": "The chip shows account usage, which Account owns. Reviewed peer edge until Account publishes the usage read (T09 owns the account lifetime)."
     },
     {
       "from": "client/features/sessions/ui/SessionRail.tsx",
       "to": "client/projection/workspace/workspace-name.ts",
       "reason": "The rail labels a project by its workspace name, which the Workspace business derives. Reviewed peer edge until Workspace publishes the name projection."
+    },
+    {
+      "from": "client/features/account/ui/UserMenu.tsx",
+      "to": "client/components/settings/MemoryManagerDialog.tsx",
+      "reason": "The user menu opens the settings business's memory dialog. It is an Account surface opening a Settings surface; the entry goes when Settings publishes that dialog as a public contract (T12 owns the settings composition)."
+    },
+    {
+      "from": "client/features/account/ui/UserMenu.tsx",
+      "to": "client/components/settings/SettingsModal.tsx",
+      "reason": "The user menu opens the settings modal. It is an Account surface opening the settings composition; the entry goes when Settings publishes the open command as a public contract (T12)."
     }
   ]
 }

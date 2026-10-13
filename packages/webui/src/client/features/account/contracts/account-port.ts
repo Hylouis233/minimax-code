@@ -9,8 +9,8 @@ import type {
   WebuiAccountLoginView,
   WebuiClaimSigninView,
   WebuiSigninPanelView,
-} from "../../../shared/contracts/account.js";
-import type { WebuiUsageQuotaResult } from "../../../shared/contracts/usage-quota.js";
+} from "../../../../shared/contracts/account.js";
+import type { WebuiUsageQuotaResult } from "../../../../shared/contracts/usage-quota.js";
 
 export interface AccountPort {
   readonly getUsageQuota?: (request?: {
@@ -27,4 +27,9 @@ export interface AccountPort {
     readonly sessionId?: string;
   }) => Promise<Record<string, unknown>>;
   readonly signOut?: () => Promise<{ readonly success?: boolean }>;
+  /** Credential-status reads. They answer *which* credential the runtime holds,
+   *  so they belong to the Account lifetime, not to the settings surface that
+   *  happens to render them (T09). */
+  readonly getMiniMaxApiKeyStatus?: () => Promise<Record<string, unknown>>;
+  readonly getCodexOAuthStatus?: () => Promise<Record<string, unknown>>;
 }

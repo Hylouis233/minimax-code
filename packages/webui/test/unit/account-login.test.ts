@@ -21,7 +21,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createWebuiAccountLoginSession } from "../../src/runtime/account-login.js";
-import { deriveWebuiAccountLoginPhase } from "../../src/client/application/account/login-phase.js";
+import { deriveWebuiAccountLoginPhase } from "../../src/client/features/account/application/login-phase.js";
 
 /** A controllable core: the test decides when the prompt lands and when the
  *  attempt settles, including the cancellation rejection. */

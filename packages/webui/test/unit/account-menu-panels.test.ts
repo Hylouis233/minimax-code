@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const DIR = new URL("../../src/client/components/account/", import.meta.url);
+const DIR = new URL("../../src/client/features/account/ui/", import.meta.url);
 const read = (name: string): string => readFileSync(fileURLToPath(new URL(name, DIR)), "utf8");
 
 const shell = read("UserMenu.tsx");

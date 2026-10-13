@@ -5,13 +5,13 @@
 // point the menu renders; it takes the state and two callbacks and holds no state of its own.
 
 import type { ReactElement } from "react";
-import { formatWebuiCredits } from "../../contracts/value-readers.js";
+import { formatWebuiCredits } from "../../../contracts/value-readers.js";
 import type {
   WebuiUsageQuotaResult,
   WebuiUsageQuotaVideoView,
   WebuiUsageQuotaWindowView,
-} from "../../../shared/contracts/usage-quota.js";
-import { formatUsageResetLabel } from "../../projection/account/usage.js";
+} from "../../../../shared/contracts/usage-quota.js";
+import { formatUsageResetLabel } from "../projection/usage.js";
 
 export interface UsageState {
   readonly status: "idle" | "loading" | "ready" | "error";

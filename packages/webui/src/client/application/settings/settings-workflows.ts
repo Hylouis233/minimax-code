@@ -74,8 +74,6 @@ export interface WebuiSettingsWorkflowsState {
   readonly profile: WebuiQueryState<WebuiUserProfileView>;
   readonly agentMemory: WebuiQueryState<WebuiAgentMemoryView>;
   readonly memorySettings: WebuiQueryState<WebuiMemorySettingsView>;
-  readonly apiKeyStatus: WebuiQueryState<Record<string, unknown>>;
-  readonly codexOAuth: WebuiQueryState<Record<string, unknown>>;
   readonly modelSource: WebuiQueryState<WebuiModelSource>;
   /**
    * The runtime handshake fact (version, protocolVersion, dataDir).
@@ -93,8 +91,6 @@ export const initialWebuiSettingsWorkflowsState: WebuiSettingsWorkflowsState = {
   profile: idleWebuiQueryState(),
   agentMemory: idleWebuiQueryState(),
   memorySettings: idleWebuiQueryState(),
-  apiKeyStatus: idleWebuiQueryState(),
-  codexOAuth: idleWebuiQueryState(),
   modelSource: idleWebuiQueryState(),
   runtimeVersion: idleWebuiQueryState(),
 };
@@ -111,8 +107,6 @@ export interface WebuiSettingsWorkflows {
   readonly canWriteMemory: boolean;
   readonly canReadMemorySettings: boolean;
   readonly canWriteMemorySettings: boolean;
-  readonly canReadApiKeyStatus: boolean;
-  readonly canReadCodexOAuth: boolean;
   readonly canStartCodexOAuth: boolean;
   readonly canReadModelSource: boolean;
   readonly canSetModelSource: boolean;
@@ -140,8 +134,6 @@ export interface WebuiSettingsWorkflows {
     readonly proactive?: boolean;
   }) => Promise<WebuiMemorySettingsView>;
 
-  readonly loadApiKeyStatus: () => Promise<void>;
-  readonly loadCodexOAuthStatus: () => Promise<void>;
   readonly startCodexOAuth: (body?: Record<string, unknown>) => Promise<unknown>;
   readonly cancelCodexOAuth: (loginId: string) => Promise<unknown>;
   readonly loadModelSource: () => Promise<void>;
@@ -259,22 +251,6 @@ export function createWebuiSettingsWorkflows(deps: {
 
   /** A provider mutation refreshes the provider list and marks models stale. */
 
-  const loadApiKeyStatus = async (): Promise<void> => {
-    if (!port.getMiniMaxApiKeyStatus) {
-      unavailable("apiKeyStatus", "MiniMax API key status unavailable");
-      return;
-    }
-    await readInto("apiKeyStatus", "apiKeyStatus", () => port.getMiniMaxApiKeyStatus!());
-  };
-
-  const loadCodexOAuthStatus = async (): Promise<void> => {
-    if (!port.getCodexOAuthStatus) {
-      unavailable("codexOAuth", "当前运行时不支持 Codex 登录状态。");
-      return;
-    }
-    await readInto("codexOAuth", "codexOAuth", () => port.getCodexOAuthStatus!());
-  };
-
   const startCodexOAuth = async (body?: Record<string, unknown>): Promise<unknown> => {
     if (!port.startCodexOAuthLogin) throw new Error("当前运行时不支持 Codex 登录。");
     return port.startCodexOAuthLogin(body);
@@ -324,8 +300,6 @@ export function createWebuiSettingsWorkflows(deps: {
     canWriteMemory: port.setAgentMemory !== undefined,
     canReadMemorySettings: port.getMemorySettings !== undefined,
     canWriteMemorySettings: port.setMemorySettings !== undefined,
-    canReadApiKeyStatus: port.getMiniMaxApiKeyStatus !== undefined,
-    canReadCodexOAuth: port.getCodexOAuthStatus !== undefined,
     canStartCodexOAuth: port.startCodexOAuthLogin !== undefined,
     canReadModelSource: port.getMiniMaxModelSource !== undefined,
     canSetModelSource: port.setMiniMaxModelSource !== undefined,
@@ -338,8 +312,6 @@ export function createWebuiSettingsWorkflows(deps: {
     saveAgentMemory,
     loadMemorySettings,
     saveMemorySettings,
-    loadApiKeyStatus,
-    loadCodexOAuthStatus,
     startCodexOAuth,
     cancelCodexOAuth,
     loadModelSource,

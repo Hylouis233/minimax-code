@@ -22,14 +22,14 @@
 // against a scripted port. The components read its snapshot and submit
 // commands; they hold no store writer and call no transport method directly.
 
-import type { WebuiIdentityEpochs } from "../identity-epochs.js";
-import type { AccountPort } from "../../contracts/account/account-port.js";
+import type { WebuiIdentityEpochs } from "../../../application/identity-epochs.js";
+import type { AccountPort } from "../contracts/account-port.js";
 import type {
   WebuiAccountLoginView,
   WebuiClaimSigninView,
   WebuiSigninPanelView,
-} from "../../../shared/contracts/account.js";
-import type { WebuiUsageQuotaResult } from "../../../shared/contracts/usage-quota.js";
+} from "../../../../shared/contracts/account.js";
+import type { WebuiUsageQuotaResult } from "../../../../shared/contracts/usage-quota.js";
 
 /** The transport methods this owner drives. Absent means "not wired". */
 export type WebuiAccountPortSlice = Pick<
@@ -42,6 +42,8 @@ export type WebuiAccountPortSlice = Pick<
   | "getAccountLoginStatus"
   | "cancelAccountLogin"
   | "signOut"
+  | "getMiniMaxApiKeyStatus"
+  | "getCodexOAuthStatus"
 >;
 
 /** The poll interval the login dialog used, preserved. */
@@ -86,8 +88,21 @@ export interface WebuiAccountSignOutState {
   readonly error?: string;
 }
 
+/**
+ * One credential-status read. `error` carries the unavailable message too: an
+ * un-wired capability and a failed read are both "no answer", and the surface
+ * that renders them already distinguishes the two by their text (T09).
+ */
+export interface WebuiAccountCredentialStatusState {
+  readonly status: "idle" | "loading" | "ready" | "error";
+  readonly value?: Record<string, unknown>;
+  readonly error?: string;
+}
+
 export interface WebuiAccountWorkflowsState {
   readonly account: WebuiAccountRecordState;
+  readonly apiKeyStatus: WebuiAccountCredentialStatusState;
+  readonly codexOAuth: WebuiAccountCredentialStatusState;
   readonly usage: WebuiUsageQuotaState;
   readonly signin: WebuiSigninState;
   readonly login: WebuiAccountLoginState;
@@ -115,8 +130,13 @@ export const initialWebuiAccountSignOutState: WebuiAccountSignOutState = {
   signingOut: false,
 };
 
+export const initialWebuiAccountCredentialStatusState: WebuiAccountCredentialStatusState =
+  { status: "idle" };
+
 export const initialWebuiAccountWorkflowsState: WebuiAccountWorkflowsState = {
   account: initialWebuiAccountRecordState,
+  apiKeyStatus: initialWebuiAccountCredentialStatusState,
+  codexOAuth: initialWebuiAccountCredentialStatusState,
   usage: initialWebuiUsageQuotaState,
   signin: initialWebuiSigninState,
   login: initialWebuiAccountLoginState,
@@ -156,6 +176,19 @@ export interface WebuiAccountWorkflows {
   readonly stopLoginPolling: () => void;
   /** Sign out for real, then start a fresh device flow in the same surface. */
   readonly switchAccount: () => Promise<void>;
+
+  readonly canReadApiKeyStatus: boolean;
+  readonly canReadCodexOAuth: boolean;
+  /** Read the MiniMax API key status. A superseded answer is dropped. */
+  readonly loadApiKeyStatus: () => Promise<void>;
+  /** Read the Codex OAuth status once. */
+  readonly loadCodexOAuthStatus: () => Promise<void>;
+  /**
+   * Poll the Codex OAuth status while a login surface needs it, and stop when the
+   * last holder releases. The timer lives here so a hidden or remounted surface
+   * cannot leave a second one behind (T09; plan §4.1).
+   */
+  readonly acquireCodexOAuthPolling: () => () => void;
 
   /** Sign out, then refresh the account and usage answers. */
   readonly signOutAccount: () => Promise<void>;
@@ -212,7 +245,73 @@ export function createWebuiAccountWorkflows(deps: {
     for (const listener of listeners) listener();
   };
 
+  /**
+   * The credential-status loader. Both reads share it: one version key each, so a
+   * superseded answer is dropped instead of overwriting a newer one.
+   */
+  const loadCredentialStatus = async (
+    key: "apiKeyStatus" | "codexOAuth",
+    read: (() => Promise<Record<string, unknown>>) | undefined,
+    unavailableMessage: string,
+  ): Promise<void> => {
+    if (!read) {
+      set((current) => ({
+        ...current,
+        [key]: { status: "error", error: unavailableMessage },
+      }));
+      return;
+    }
+    const version = bump(key);
+    set((current) => ({
+      ...current,
+      [key]: { ...current[key], status: "loading" },
+    }));
+    try {
+      const value = await read();
+      if (!isCurrent(key, version)) return;
+      set((current) => ({ ...current, [key]: { status: "ready", value } }));
+    } catch (error) {
+      if (!isCurrent(key, version)) return;
+      set((current) => ({
+        ...current,
+        [key]: { status: "error", error: message(error) },
+      }));
+    }
+  };
+
+  /** The Codex OAuth status poll: one timer for the whole owner, however many
+   *  surfaces hold an interest, and no timer at all while nobody does. */
+  let codexPollTimer: ReturnType<typeof setInterval> | undefined;
+  let codexPollHolders = 0;
+  const stopCodexPolling = (): void => {
+    if (codexPollTimer === undefined) return;
+    clearInterval(codexPollTimer);
+    codexPollTimer = undefined;
+  };
+
   let loginTimer: ReturnType<typeof setInterval> | undefined;
+
+  const acquireCodexOAuthPolling = (): (() => void) => {
+    codexPollHolders += 1;
+    if (codexPollTimer === undefined && port.getCodexOAuthStatus) {
+      void loadCredentialStatus(
+        "codexOAuth",
+        port.getCodexOAuthStatus,
+        "当前运行时不支持 Codex 登录状态。",
+      );
+      codexPollTimer = setInterval(() => {
+        void loadCredentialStatus(
+          "codexOAuth",
+          port.getCodexOAuthStatus,
+          "当前运行时不支持 Codex 登录状态。",
+        );
+      }, 1000);
+    }
+    return () => {
+      codexPollHolders = Math.max(0, codexPollHolders - 1);
+      if (codexPollHolders === 0) stopCodexPolling();
+    };
+  };
 
   const stopLoginPolling = (): void => {
     if (loginTimer === undefined) return;
@@ -471,6 +570,21 @@ export function createWebuiAccountWorkflows(deps: {
     canReadSignin: port.getSigninPanel !== undefined,
     canClaimSignin: port.claimSignin !== undefined,
     canSignOut: port.signOut !== undefined,
+    canReadApiKeyStatus: port.getMiniMaxApiKeyStatus !== undefined,
+    canReadCodexOAuth: port.getCodexOAuthStatus !== undefined,
+    loadApiKeyStatus: () =>
+      loadCredentialStatus(
+        "apiKeyStatus",
+        port.getMiniMaxApiKeyStatus,
+        "MiniMax API key status unavailable",
+      ),
+    loadCodexOAuthStatus: () =>
+      loadCredentialStatus(
+        "codexOAuth",
+        port.getCodexOAuthStatus,
+        "当前运行时不支持 Codex 登录状态。",
+      ),
+    acquireCodexOAuthPolling,
     loadAccount,
     loadUsage,
     loadSigninPanel,

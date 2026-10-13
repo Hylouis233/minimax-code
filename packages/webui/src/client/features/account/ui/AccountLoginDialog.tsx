@@ -20,13 +20,13 @@
 
 import { useEffect, useRef, type ReactElement } from "react";
 import { createPortal } from "react-dom";
-import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
+import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import {
   useWebuiAccountWorkflows,
   useWebuiAccountWorkflowsState,
-} from "../../bindings/use-query-state.js";
-import { deriveWebuiAccountLoginPhase } from "../../application/account/login-phase.js";
-import type { WebuiAccountLoginPhase } from "../../application/account/login-phase.js";
+} from "../../../bindings/use-query-state.js";
+import { deriveWebuiAccountLoginPhase } from "../application/login-phase.js";
+import type { WebuiAccountLoginPhase } from "../application/login-phase.js";
 
 export function AccountLoginPanel({
   phase,

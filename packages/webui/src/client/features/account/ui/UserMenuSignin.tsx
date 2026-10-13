@@ -12,7 +12,7 @@ import {
   isSigninPanelClaimable,
   isSigninPanelClaimedToday,
 } from "@mavis/shared/daily-signin";
-import type { WebuiSigninPanelView } from "../../../shared/contracts/account.js";
+import type { WebuiSigninPanelView } from "../../../../shared/contracts/account.js";
 
 export interface SigninState {
   readonly loading: boolean;

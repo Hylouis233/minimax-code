@@ -32,7 +32,7 @@ import {
   writeProjectName,
 } from "../../infrastructure/storage.js";
 import { Transcript } from "../../features/transcript/ui/Transcript.js";
-import { UserMenu } from "../account/UserMenu.js";
+import { UserMenu } from "../../features/account/ui/UserMenu.js";
 import { MEMORY_HANDOFF_PROMPT, type MemoryHandoff } from "../settings/MemoryManagerDialog.js";
 import {
   WebuiWorkspacePanel,
@@ -55,7 +55,7 @@ import {
   type WebuiPluginManagementArea,
   type WebuiShellSurfaceCommand,
 } from "../../projection/shell/shell-surface.js";
-import { ConversationUsageBanner } from "../account/ConversationUsageBanner.js";
+import { ConversationUsageBanner } from "../../features/account/ui/ConversationUsageBanner.js";
 import { PluginCatalogue } from "../plugins/PluginCatalogue.js";
 import { WebuiComposer } from "../composer/WebuiComposer.js";
 import { WebuiSessionTranscript } from "../../features/transcript/ui/SessionTranscript.js";
@@ -118,7 +118,7 @@ import {
   WebuiWorkspaceQueriesProvider,
 } from "../../bindings/use-query-state.js";
 import { createWebuiWorkspaceQueries } from "../../application/workspace/workspace-queries.js";
-import { createWebuiAccountWorkflows } from "../../application/account/account-workflows.js";
+import { createWebuiAccountWorkflows } from "../../features/account/application/account-workflows.js";
 import { createWebuiModelsWorkflows } from "../../application/models/models-workflows.js";
 import { createWebuiSettingsWorkflows } from "../../application/settings/settings-workflows.js";
 import { createWebuiPluginWorkflows } from "../../application/plugins/plugin-workflows.js";
@@ -377,10 +377,12 @@ export function WebuiClientFoundationApp(
   const modelsWorkflows = useMemo(
     () => createWebuiModelsWorkflows({
       port: modelsPort,
-      refreshApiKeyStatus: () => settingsWorkflows.loadApiKeyStatus(),
+      // The credential-status read belongs to the Account lifetime (T09), so a
+      // provider mutation refreshes it through that owner's published command.
+      refreshApiKeyStatus: () => accountWorkflows.loadApiKeyStatus(),
       identityEpochs: application.identityEpochs,
     }),
-    [modelsPort, settingsWorkflows, application.identityEpochs],
+    [modelsPort, accountWorkflows, application.identityEpochs],
   );
   // The runtime handshake fact is a `SettingsPort` method, so it is read through
   // the settings owner like every other settings read rather than invoked here.

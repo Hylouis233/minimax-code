@@ -17,7 +17,7 @@ import {
 } from "../../../projection/composer/context-usage-popover.js";
 import { readUsageNumber } from "../../transcript/projection/message-projection.js";
 import { isTokenPlanModel } from "../../../projection/models/token-plan-model.js";
-import { formatUsageResetLabel } from "../../../projection/account/usage.js";
+import { formatUsageResetLabel } from "../../account/projection/usage.js";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactElement } from "react";
 
 export function ContextUsageIndicator({ usage, usageQuota, planModel }: {

@@ -70,23 +70,23 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
   const quota = accountState.usage.result;
   const quotaLoading = accountState.usage.status === "idle" || accountState.usage.status === "loading";
   const quotaError = accountState.usage.status === "error" ? accountState.usage.error : undefined;
-  const apiStatus = settingsState.apiKeyStatus.value;
-  const apiLoading = settingsState.apiKeyStatus.status === "idle" || settingsState.apiKeyStatus.status === "loading";
-  const apiError = settingsState.apiKeyStatus.status === "error" ? settingsState.apiKeyStatus.error : undefined;
+  const apiStatus = accountState.apiKeyStatus.value;
+  const apiLoading = accountState.apiKeyStatus.status === "idle" || accountState.apiKeyStatus.status === "loading";
+  const apiError = accountState.apiKeyStatus.status === "error" ? accountState.apiKeyStatus.error : undefined;
   const providers = modelsState.providers.value ?? [];
   const providerLoading = modelsState.providers.status === "idle" || modelsState.providers.status === "loading";
   const providerError = providerActionError ?? (modelsState.providers.status === "error" ? modelsState.providers.error : undefined);
   const presets = modelsState.presets.value ?? [];
-  const oauth = settingsState.codexOAuth.value;
+  const oauth = accountState.codexOAuth.value;
   const activeSource = settingsState.modelSource.value;
   const sourceLoaded = settingsState.modelSource.status === "ready";
 
   const loadQuota = () => { void account?.loadUsage(); };
-  const loadApiStatus = () => { void settings?.loadApiKeyStatus(); };
+  const loadApiStatus = () => { void account?.loadApiKeyStatus(); };
   const loadProviders = () => { setProviderActionError(undefined); void models?.loadProviders(); };
   useEffect(() => {
-    void account?.loadUsage(); void settings?.loadApiKeyStatus(); void models?.loadProviders();
-    void settings?.loadModelSource(); void settings?.loadCodexOAuthStatus();
+    void account?.loadUsage(); void account?.loadApiKeyStatus(); void models?.loadProviders();
+    void settings?.loadModelSource(); void account?.loadCodexOAuthStatus();
   // Owner objects are stable; the initial loads are keyed on the session as before.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
@@ -94,11 +94,13 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
     const timer = setInterval(() => setQuotaClock(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+  // The poll is the owner's, not this component's: the surface acquires an
+  // interest while a Codex login is pending and releases it on unmount, so a
+  // hidden or remounted surface cannot leave a second timer behind (T09).
   useEffect(() => {
-    if (!oauthLoginId || !settings) return;
-    const timer = setInterval(() => { void settings.loadCodexOAuthStatus(); }, 1000);
-    return () => clearInterval(timer);
-  }, [settings, oauthLoginId]);
+    if (!oauthLoginId || !account) return;
+    return account.acquireCodexOAuthPolling();
+  }, [account, oauthLoginId]);
 
   const chooseSource = async (source: "token_plan" | "minimax_api_key") => {
     setSourceTab(source === "token_plan" ? "token-plan" : "minimax-api");

@@ -7,7 +7,8 @@
 //
 //   LC-1  the panel renders inside the same `sourceTab === "custom"` conditional it occupied
 //   LC-2  the session-keyed preload effect stays in the parent, still keyed on `[sessionId]`
-//   LC-3  both intervals stay in the parent and are still cleared
+//   LC-3  the parent keeps its quota clock, and the Codex OAuth poll is the Account
+//         owner's (T09): the surface acquires an interest, the owner owns the timer
 //   LC-4  the provider drafts are parent state
 //   LC-6  `ProviderPresetPicker` still resets on unmount (it lives inside the form's conditional)
 //
@@ -22,6 +23,12 @@ const read = (relative: string): string =>
   readFileSync(fileURLToPath(new URL(relative, CLIENT)), "utf8");
 
 const parent = read("settings/UsageModelSettings.tsx");
+const accountOwner = readFileSync(
+  fileURLToPath(
+    new URL("../../src/client/features/account/application/account-workflows.ts", import.meta.url),
+  ),
+  "utf8",
+);
 const panel = read("models/ProviderFormPanel.tsx");
 
 /** The slice from one marker to the next, so an assertion cannot be satisfied from elsewhere. */
@@ -32,21 +39,27 @@ describe("the parent keeps the lifetime", () => {
   it("LC-2 keeps the session-keyed preload in the parent", () => {
     const effect = between(parent, "useEffect(() => {", "}, [sessionId]);");
     expect(effect).toContain("account?.loadUsage()");
-    expect(effect).toContain("settings?.loadApiKeyStatus()");
+    // The credential-status reads belong to the Account owner (T09).
+    expect(effect).toContain("account?.loadApiKeyStatus()");
     expect(effect).toContain("models?.loadProviders()");
     expect(effect).toContain("settings?.loadModelSource()");
-    expect(effect).toContain("settings?.loadCodexOAuthStatus()");
+    expect(effect).toContain("account?.loadCodexOAuthStatus()");
     expect(parent).toContain("}, [sessionId]);");
     // and NOT in the panel: a panel-side preload would run per mount
     expect(panel).not.toContain("loadProviders()");
     expect(panel).not.toContain("useEffect(");
   });
 
-  it("LC-3 keeps both intervals in the parent, with their cleanups", () => {
+  it("LC-3 keeps the quota clock in the parent and the OAuth poll in its owner", () => {
     expect(parent).toContain("setInterval(() => setQuotaClock(Date.now()), 1000)");
     expect(parent).toContain("clearInterval(timer)");
-    expect(parent).toContain("setInterval(() => { void settings.loadCodexOAuthStatus(); }, 1000)");
-    expect(parent.match(/clearInterval\(timer\)/gu) ?? []).toHaveLength(2);
+    // The surface asks the owner for the poll instead of running its own timer,
+    // and releases it on unmount.
+    expect(parent).toContain("return account.acquireCodexOAuthPolling();");
+    expect(parent).not.toContain("setInterval(() => { void settings.loadCodexOAuthStatus(); }, 1000)");
+    // The timer itself lives in the Account owner, with its own cleanup.
+    expect(accountOwner).toContain("setInterval(");
+    expect(accountOwner).toContain("clearInterval(codexPollTimer)");
     expect(panel).not.toContain("setInterval(");
   });
 

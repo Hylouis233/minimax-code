@@ -8,7 +8,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createWebuiAccountWorkflows } from "../../src/client/application/account/account-workflows.js";
+import { createWebuiAccountWorkflows } from "../../src/client/features/account/application/account-workflows.js";
 import type { WebuiAccountLoginView } from "../../src/shared/contracts/account.js";
 
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));

@@ -8,7 +8,7 @@
 // The text below is the declaration as it stood in the source module — no
 // behaviour change.
 
-import type { WebuiAccountLoginView } from "../../../shared/contracts/account.js";
+import type { WebuiAccountLoginView } from "../../../../shared/contracts/account.js";
 
 /** Everything the panel can show, derived (not fetched). */
 export type WebuiAccountLoginPhase =

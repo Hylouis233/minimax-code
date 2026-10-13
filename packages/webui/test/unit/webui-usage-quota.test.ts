@@ -20,8 +20,8 @@ import {
 import { getUsageQuotaOperation } from "../../src/server/operation/operations.js";
 import {
   UsagePanel,
-} from "../../src/client/components/account/UserMenuUsage.js";
-import { formatUsageResetLabel } from "../../src/client/projection/account/usage.js";
+} from "../../src/client/features/account/ui/UserMenuUsage.js";
+import { formatUsageResetLabel } from "../../src/client/features/account/projection/usage.js";
 
 const REMAINS_PERCENT_BODY = {
   model_remains: [

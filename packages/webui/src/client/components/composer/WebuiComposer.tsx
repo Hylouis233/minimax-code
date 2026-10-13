@@ -113,7 +113,7 @@ import type {
   WebuiWorkspaceFile,
 } from "../../../shared/contracts/workspace.js";
 import type { WebuiUsageQuotaResult } from "../../../shared/contracts/usage-quota.js";
-import { formatUsageResetLabel } from "../../projection/account/usage.js";
+import { formatUsageResetLabel } from "../../features/account/projection/usage.js";
 import { WebuiGoalBanner } from "../goal/GoalBanner.js";
 import { WebuiInteractionPanel } from "../interactions/InteractionPanel.js";
 import { WebuiQueuePanel } from "./QueuePanel.js";

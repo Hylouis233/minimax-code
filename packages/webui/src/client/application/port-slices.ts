@@ -46,7 +46,7 @@
 // provider, A4-s3/s4 move the consumers, A4-s5 is where the shell forwards zero
 // transport members.
 
-import type { AccountPort } from "../contracts/account/account-port.js";
+import type { AccountPort } from "../features/account/contracts/account-port.js";
 import type { ComposerPort } from "../contracts/composer/command-port.js";
 import type { GoalPort } from "../contracts/goal/goal-port.js";
 import type { InteractionPort } from "../contracts/interactions/interaction-port.js";

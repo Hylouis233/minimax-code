@@ -12,7 +12,7 @@ import {
   getSigninPanelOperation,
   claimSigninOperation,
 } from "../../src/server/operation/operations.js";
-import { SigninCard } from "../../src/client/components/account/UserMenuSignin.js";
+import { SigninCard } from "../../src/client/features/account/ui/UserMenuSignin.js";
 
 const PANEL = {
   scene: SigninPanelScene.Active,
