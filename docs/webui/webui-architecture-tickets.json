@@ -1076,7 +1076,8 @@
       "792c969b",
       "f36a4e1d",
       "8385c423",
-      "fbf64911"
+      "fbf64911",
+      "7b3a0807"
     ],
     "published": false,
     "tickets": {
@@ -1086,19 +1087,18 @@
       "T04": "implemented locally, acceptance evidence recorded on #130",
       "T05": "closed 2026-10-13, acceptance evidence recorded on #131",
       "T06": "closed 2026-10-14, acceptance evidence recorded on #132",
-      "T10": "in progress: the transcript review consumer is browser-verified through the owner; the workspace review consumer's browser case is still missing"
+      "T10": "closed 2026-10-14 (issue #136, comment 6156644369): both review families have their own owners and both consumers are browser-verified"
     },
     "frontier": [
       "T07",
       "T08",
       "T09",
-      "T10",
       "T14",
       "T17"
     ],
     "notes": [
-      "T10 browser evidence (fbf64911): the fixture answers the review families, and review-consumers.spec.mjs drives the diff card through the owner (the owner issues the read; a settled revert is what the card shows). It found a real wiring gap: the application's turnReview port was never supplied by main.tsx, so the card rendered 'unsupported' for every user.",
-      "T10 remaining: the workspace review consumer's browser case. Opening the review tab needs the file side panel driven first (the add-menu trigger lives in the panel's tab strip, which only exists while the panel is open) and the attempt did not reach it. The invalidation path is unit-pinned (turn owner announces, review owner refuses a stale snapshot and retries once)."
+      "T10 closed 2026-10-14. The turn review owner and the workspace review owner each own their identity and freshness; the surfaces read them through the application; review-consumers.spec.mjs pins both consumers in the built client.",
+      "T11 inherits two findings the browser suite surfaced: the workspace panel crashes the whole UI on an unanswered read (filterWorkspaceFiles over a non-array, terminals.find over an object) instead of rendering an unsupported or empty state — the fixture now answers listWorkspaceFileTree and listTerminals, which is what a runtime does. The same class of gap in the application's composition root (turnReview was never supplied, so the diff card said 'capability unavailable' for every user) was fixed under T10."
     ]
   },
   "publicationVerification": {
