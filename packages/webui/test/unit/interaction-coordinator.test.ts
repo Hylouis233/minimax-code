@@ -14,6 +14,7 @@ import {
   createWebuiPlanReviewWorkflow,
   type WebuiInteractionSink,
 } from "../../src/client/application/interaction-coordinator.js";
+import { webuiAnswersEndTurn } from "../../src/client/projection/questionnaire-state.js";
 import type { WebuiPendingPermission, WebuiQuestionnaireRequest } from "../../src/shared/contracts/interactions.js";
 
 const permission = (
@@ -34,21 +35,35 @@ function sink(): WebuiInteractionSink & Record<string, unknown> {
     replacePendingPermissions: vi.fn(),
     removePendingPermission: vi.fn(),
     applyQuestionnaire: vi.fn(),
-    awaitInteraction: vi.fn(),
-    resumeAfterPermission: vi.fn(),
-    afterQuestionnaireAnswer: vi.fn(),
-    afterQuestionnaireDismiss: vi.fn(),
   } as never;
 }
 
-function coordinator(port: Record<string, unknown>, s = sink()) {
+/**
+ * `turn`'s published stream-phase commands, as this suite hands them in. The four
+ * transitions are no longer sink callbacks: §5.1 prohibition 1 is about writers,
+ * and these are turn's state, so the flow invokes turn's named commands and the
+ * sink carries only this business's own projection writes.
+ */
+function streams() {
+  return {
+    markStreamPhase: vi.fn(),
+    startStreaming: vi.fn(),
+    endStreaming: vi.fn(),
+    awaitInteraction: vi.fn(),
+    settleStoppedStream: vi.fn(),
+  } as never;
+}
+
+function coordinator(port: Record<string, unknown>, s = sink(), st = streams()) {
   const pendingVersionRef = { current: 0 };
   return {
     s,
+    st,
     pendingVersionRef,
     c: createWebuiInteractionCoordinator({
       port: port as never,
       sink: s,
+      streams: st,
       sessionId: "s1",
       agentName: "fallback-agent",
       pendingVersionRef,
@@ -60,7 +75,7 @@ describe("plan-review workflow ownership", () => {
   it("submits the plan decision through the application and clears the shared questionnaire projection", async () => {
     const request = questionnaire({ requester: { agentName: "reviewer" } }) as WebuiQuestionnaireRequest;
     const replyQuestionnaire = vi.fn(async () => ({ ok: true as const }));
-    const { c, s, pendingVersionRef } = coordinator({ replyQuestionnaire });
+    const { c, s, st, pendingVersionRef } = coordinator({ replyQuestionnaire });
     const workflow = createWebuiPlanReviewWorkflow({ answerQuestionnaire: c.answerQuestionnaire });
     await workflow.answerPlanBuild(request);
     expect(replyQuestionnaire).toHaveBeenCalledWith({
@@ -70,14 +85,14 @@ describe("plan-review workflow ownership", () => {
       answers: [{ stepId: "plan-review", selectedOptionIds: ["approve"], selectedOther: false }],
     });
     expect(s.applyQuestionnaire).toHaveBeenCalledWith(undefined);
-    expect(s.afterQuestionnaireAnswer).toHaveBeenCalledOnce();
+    expect(st.markStreamPhase).toHaveBeenCalledOnce();
     expect(pendingVersionRef.current).toBe(2);
   });
 
   it("does not let a pending refresh revive the questionnaire after plan execution", async () => {
     const request = questionnaire({ id: "plan-q" }) as WebuiQuestionnaireRequest;
     let resolveRefresh: (value: { request: WebuiQuestionnaireRequest }) => void = () => {};
-    const { c, s } = coordinator({
+    const { c, s, st } = coordinator({
       getPendingQuestionnaire: () => new Promise((resolve) => { resolveRefresh = resolve; }),
       replyQuestionnaire: async () => ({ ok: true as const }),
     });
@@ -88,12 +103,12 @@ describe("plan-review workflow ownership", () => {
     await refresh;
     expect(s.applyQuestionnaire).toHaveBeenCalledTimes(1);
     expect(s.applyQuestionnaire).toHaveBeenCalledWith(undefined);
-    expect(s.afterQuestionnaireAnswer).toHaveBeenCalledOnce();
+    expect(st.markStreamPhase).toHaveBeenCalledOnce();
   });
 
   it("keeps the pending questionnaire when the runtime rejects the plan decision", async () => {
     const request = questionnaire() as WebuiQuestionnaireRequest;
-    const { c, s } = coordinator({ replyQuestionnaire: async () => ({ ok: false }) });
+    const { c, s, st } = coordinator({ replyQuestionnaire: async () => ({ ok: false }) });
     const workflow = createWebuiPlanReviewWorkflow({
       answerQuestionnaire: c.answerQuestionnaire,
     });
@@ -102,7 +117,7 @@ describe("plan-review workflow ownership", () => {
   });
 
   it("reports an unavailable questionnaire capability instead of accepting a no-op", async () => {
-    const { c, s } = coordinator({});
+    const { c, s, st } = coordinator({});
     const workflow = createWebuiPlanReviewWorkflow({
       answerQuestionnaire: c.answerQuestionnaire,
     });
@@ -115,7 +130,7 @@ describe("plan-review workflow ownership", () => {
 describe("interaction coordinator — permission replies", () => {
   it("applies an accepted reply: drops the request and resumes the turn", async () => {
     const replyPermission = vi.fn().mockResolvedValue({ success: true });
-    const { c, s } = coordinator({ replyPermission });
+    const { c, s, st } = coordinator({ replyPermission });
     await expect(c.replyPermission(permission(), "allowOnce")).resolves.toEqual({
       ok: true,
     });
@@ -125,11 +140,11 @@ describe("interaction coordinator — permission replies", () => {
       reply: "allowOnce",
     });
     expect(s.removePendingPermission).toHaveBeenCalledWith("req-1");
-    expect(s.resumeAfterPermission).toHaveBeenCalledTimes(1);
+    expect(st.startStreaming).toHaveBeenCalledTimes(1);
   });
 
   it("reports a reply the server no longer holds, and changes nothing", async () => {
-    const { c, s } = coordinator({
+    const { c, s, st } = coordinator({
       replyPermission: vi.fn().mockResolvedValue({ success: false }),
     });
     const outcome = await c.replyPermission(permission(), "deny");
@@ -138,7 +153,7 @@ describe("interaction coordinator — permission replies", () => {
       error: "The permission request was no longer pending",
     });
     expect(s.removePendingPermission).not.toHaveBeenCalled();
-    expect(s.resumeAfterPermission).not.toHaveBeenCalled();
+    expect(st.startStreaming).not.toHaveBeenCalled();
   });
 
   it("carries a thrown transport failure back as a message", async () => {
@@ -152,7 +167,7 @@ describe("interaction coordinator — permission replies", () => {
   });
 
   it("is a no-op when the capability is not wired", async () => {
-    const { c, s } = coordinator({});
+    const { c, s, st } = coordinator({});
     await expect(c.replyPermission(permission(), "allowOnce")).resolves.toEqual({
       ok: true,
     });
@@ -163,7 +178,7 @@ describe("interaction coordinator — permission replies", () => {
 describe("interaction coordinator — questionnaire replies", () => {
   it("answers with the requester's name, clears it and hands the phase decision over", async () => {
     const replyQuestionnaire = vi.fn().mockResolvedValue({ ok: true });
-    const { c, s } = coordinator({ replyQuestionnaire });
+    const { c, s, st } = coordinator({ replyQuestionnaire });
     const answers = [{ questionId: "a", value: "yes" }] as never;
     await expect(
       c.answerQuestionnaire(questionnaire({ requester: { agentName: "other" } }), answers),
@@ -176,7 +191,11 @@ describe("interaction coordinator — questionnaire replies", () => {
     });
     expect(s.applyQuestionnaire).toHaveBeenCalledWith(undefined);
     // The skip/answer distinction is the sink's, not this owner's.
-    expect(s.afterQuestionnaireAnswer).toHaveBeenCalledWith(answers);
+    // The answers→phase rule moved into the flow with the transition: a
+        // skip ends the turn, an answer resumes it.
+        expect(st.markStreamPhase).toHaveBeenCalledWith(
+          webuiAnswersEndTurn(answers) ? "idle" : "streaming",
+        );
   });
 
   it("falls back to the coordinator's agent name when the request names none", async () => {
@@ -189,29 +208,29 @@ describe("interaction coordinator — questionnaire replies", () => {
   });
 
   it("rejects a questionnaire the server did not accept", async () => {
-    const { c, s } = coordinator({
+    const { c, s, st } = coordinator({
       replyQuestionnaire: vi.fn().mockResolvedValue({ ok: false }),
     });
     await expect(
       c.answerQuestionnaire(questionnaire(), [] as never),
     ).resolves.toEqual({ ok: false, error: "The questionnaire was not accepted" });
     expect(s.applyQuestionnaire).not.toHaveBeenCalled();
-    expect(s.afterQuestionnaireAnswer).not.toHaveBeenCalled();
+    expect(st.markStreamPhase).not.toHaveBeenCalled();
   });
 
   it("dismisses without resuming the turn", async () => {
     const dismissQuestionnaire = vi.fn().mockResolvedValue({ ok: true });
-    const { c, s } = coordinator({ dismissQuestionnaire });
+    const { c, s, st } = coordinator({ dismissQuestionnaire });
     await expect(c.dismissQuestionnaire(questionnaire())).resolves.toEqual({
       ok: true,
     });
     expect(s.applyQuestionnaire).toHaveBeenCalledWith(undefined);
-    expect(s.afterQuestionnaireDismiss).toHaveBeenCalledTimes(1);
-    expect(s.afterQuestionnaireAnswer).not.toHaveBeenCalled();
+    expect(st.endStreaming).toHaveBeenCalledTimes(1);
+    expect(st.markStreamPhase).not.toHaveBeenCalled();
   });
 
   it("reports a dismissal the server refused", async () => {
-    const { c, s } = coordinator({
+    const { c, s, st } = coordinator({
       dismissQuestionnaire: vi.fn().mockResolvedValue({ ok: false }),
     });
     await expect(c.dismissQuestionnaire(questionnaire())).resolves.toEqual({
@@ -238,26 +257,26 @@ describe("interaction coordinator — the authoritative re-read", () => {
     const getPendingQuestionnaire = vi
       .fn()
       .mockResolvedValue({ request: undefined });
-    const { c, s } = coordinator({ listPendingPermissions, getPendingQuestionnaire });
+    const { c, s, st } = coordinator({ listPendingPermissions, getPendingQuestionnaire });
     await expect(c.refresh()).resolves.toEqual({ ok: true });
     expect(s.replacePendingPermissions).toHaveBeenCalledWith([
       expect.objectContaining({ requestId: "mine" }),
     ]);
-    expect(s.awaitInteraction).toHaveBeenCalledTimes(1);
+    expect(st.awaitInteraction).toHaveBeenCalledTimes(1);
   });
 
   it("does not await when nothing is pending", async () => {
-    const { c, s } = coordinator({
+    const { c, s, st } = coordinator({
       listPendingPermissions: vi.fn().mockResolvedValue({ requests: [] }),
       getPendingQuestionnaire: vi.fn().mockResolvedValue({ request: undefined }),
     });
     await c.refresh();
-    expect(s.awaitInteraction).not.toHaveBeenCalled();
+    expect(st.awaitInteraction).not.toHaveBeenCalled();
     expect(s.applyQuestionnaire).toHaveBeenCalledWith(undefined);
   });
 
   it("carries a failed re-read back as a message instead of writing state", async () => {
-    const { c, s } = coordinator({
+    const { c, s, st } = coordinator({
       listPendingPermissions: vi.fn().mockRejectedValue(new Error("offline")),
       getPendingQuestionnaire: vi.fn().mockResolvedValue({ request: undefined }),
     });
@@ -268,7 +287,7 @@ describe("interaction coordinator — the authoritative re-read", () => {
   it("does not restore a permission snapshot after an accepted reply", async () => {
     let release!: (value: unknown) => void;
     const staleRead = new Promise((resolve) => { release = resolve; });
-    const { c, s } = coordinator({
+    const { c, s, st } = coordinator({
       listPendingPermissions: vi.fn().mockReturnValue(staleRead),
       getPendingQuestionnaire: vi.fn().mockResolvedValue({ request: undefined }),
       replyPermission: vi.fn().mockResolvedValue({ success: true }),
@@ -282,8 +301,64 @@ describe("interaction coordinator — the authoritative re-read", () => {
   });
 
   it("is a no-op when neither read is wired", async () => {
-    const { c, s } = coordinator({});
+    const { c, s, st } = coordinator({});
     await expect(c.refresh()).resolves.toEqual({ ok: true });
     expect(s.replacePendingPermissions).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * §5.1 prohibition 1, asserted rather than described: an owner may invoke another
+ * business's published command and may not be handed that business's state
+ * writers. The four stream-phase transitions are `turn`'s state, and §5.1 states
+ * this violation in its own evidence ("one `sink` holding four interaction
+ * writers, four stream-phase writers…"), so the shape is checked in both
+ * directions — the sink type cannot carry one, and the transitions are reached
+ * through the command view by name.
+ */
+describe("prohibition 1: the interaction owner holds no stream writer", () => {
+  type StreamMemberInSink = Extract<
+    keyof WebuiInteractionSink,
+    | "awaitInteraction"
+    | "startStreaming"
+    | "resumeAfterPermission"
+    | "endStreaming"
+    | "afterQuestionnaireAnswer"
+    | "afterQuestionnaireDismiss"
+    | "markStreamPhase"
+  >;
+  type OnlyTrue<T extends true> = T;
+
+  it("cannot be typed: the sink has no stream member at all", () => {
+    const narrow: OnlyTrue<StreamMemberInSink extends never ? true : never> = true;
+    expect(narrow).toBe(true);
+  });
+
+  it("cannot be reached at runtime: the transition goes through turn's command", async () => {
+    const { c, s, st } = coordinator(
+      { replyPermission: vi.fn().mockResolvedValue({ success: true }) },
+      sink(),
+      streams() as never,
+    );
+    await c.replyPermission(
+      { requestId: "r1", agentName: "mavis", sessionId: "s1" } as never,
+      "allowOnce",
+    );
+    expect(st.startStreaming).toHaveBeenCalledTimes(1);
+    for (const member of ["startStreaming", "endStreaming", "markStreamPhase", "awaitInteraction"]) {
+      expect(s).not.toHaveProperty(member);
+    }
+  });
+
+  it("still writes only this business's own projection state", async () => {
+    // The counterweight: narrowing the sink must not have removed a write this
+    // business legitimately owns.
+    const { c, s, st } = coordinator({
+      listPendingPermissions: vi.fn().mockResolvedValue({ requests: [] }),
+      getPendingQuestionnaire: vi.fn().mockResolvedValue({ request: undefined }),
+    });
+    await c.refresh();
+    expect(s.replacePendingPermissions).toHaveBeenCalledTimes(1);
+    expect(s.applyQuestionnaire).toHaveBeenCalledTimes(1);
   });
 });

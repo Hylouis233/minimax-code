@@ -34,7 +34,6 @@ import type { WebuiClientSessionCreator } from "../contracts/sessions/session-po
 import type { WebuiClientSessionPage, WebuiClientSession } from "../contracts/sessions/session-view.js";
 import type { WebuiTransport } from "../contracts/transport.js";
 import { projectWebuiMessageToStreamMessage, readUsageNumber } from "../projection/message-projection.js";
-import { webuiAnswersEndTurn } from "../projection/questionnaire-state.js";
 import { createWebuiGoalCoordinator } from "../application/goal-coordinator.js";
 import {
   createWebuiInteractionCoordinator,
@@ -744,14 +743,14 @@ export function WebuiComposer({
       replacePendingPermissions: interactionCommands.replacePendingPermissions,
       removePendingPermission: interactionCommands.removePendingPermission,
       applyQuestionnaire: interactionCommands.applyQuestionnaire,
-      awaitInteraction: phase.awaitInteraction,
-      resumeAfterPermission: phase.startStreaming,
-      afterQuestionnaireAnswer: (answers) =>
-        phase.markStreamPhase(
-          webuiAnswersEndTurn(answers) ? "idle" : "streaming",
-        ),
-      afterQuestionnaireDismiss: phase.endStreaming,
     },
+    // turn's published stream-phase commands (plan §8 Phase 3 B1; §5.1
+    // prohibition 1). The four transitions used to be handed in as sink
+    // callbacks, which is the "injected optional object" shape §5.2 calls the
+    // violation; an owner may invoke another business's published command, and
+    // the outcome→transition policy now lives with the flow that owns it rather
+    // than in this wiring.
+    streams: phase,
     sessionId,
     agentName,
     pendingVersionRef,

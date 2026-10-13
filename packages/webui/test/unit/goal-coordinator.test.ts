@@ -176,3 +176,65 @@ describe("the two fences are independent", () => {
     expect(interactions).not.toHaveProperty("goalVersion");
   });
 });
+
+/**
+ * The write commands' failure recovery (ticket #66's "goal … failure-recovery
+ * cases"). These are new in this carve: publishing `patchGoal`/`clearGoal` put
+ * them on the versioned write path, so what happens when they fail is now this
+ * owner's behaviour rather than the caller's.
+ */
+describe("goal coordinator — the published writes recover without applying", () => {
+  it("a patch that rejects applies nothing and bumps nothing", async () => {
+    const { c, s, goalVersionRef } = coordinator({
+      patchGoal: vi.fn().mockRejectedValue(new Error("offline")),
+    });
+    await expect(
+      c.patchGoal!({ sessionId: "s1", objective: "next" } as never),
+    ).rejects.toThrow("offline");
+    expect(s.applyGoal).not.toHaveBeenCalled();
+    expect(goalVersionRef.current).toBe(0);
+  });
+
+  it("a patch that lands applies the returned goal, so the fence covers it", async () => {
+    const next = { status: "active", objective: "next" };
+    const { c, s, goalVersionRef } = coordinator({
+      patchGoal: vi.fn().mockResolvedValue(next),
+    });
+    await expect(
+      c.patchGoal!({ sessionId: "s1", objective: "next" } as never),
+    ).resolves.toEqual(next);
+    expect(s.applyGoal).toHaveBeenCalledWith(next);
+    // The write went through the versioned path: a read already in flight
+    // captured the older version and will now stand down.
+    expect(goalVersionRef.current).toBe(1);
+  });
+
+  it("a clear the server refuses applies nothing", async () => {
+    const { c, s, goalVersionRef } = coordinator({
+      clearGoal: vi.fn().mockResolvedValue({ success: false }),
+    });
+    await expect(c.clearGoal!({ sessionId: "s1" } as never)).resolves.toEqual({
+      success: false,
+    });
+    expect(s.applyGoal).not.toHaveBeenCalled();
+    expect(goalVersionRef.current).toBe(0);
+  });
+
+  it("a clear that lands applies undefined", async () => {
+    const { c, s } = coordinator({
+      clearGoal: vi.fn().mockResolvedValue({ success: true }),
+    });
+    await c.clearGoal!({ sessionId: "s1" } as never);
+    expect(s.applyGoal).toHaveBeenCalledWith(undefined);
+  });
+
+  it("does not publish a write the host does not wire", () => {
+    // Optionality preserved where it was: a host with no patch capability gets no
+    // command, so the caller's "not wired" branch behaves as it did against the
+    // port rather than calling a function that silently does nothing.
+    const { c } = coordinator();
+    expect(c.patchGoal).toBeUndefined();
+    expect(c.clearGoal).toBeUndefined();
+    expect(c.isGoalEnabled).toBeUndefined();
+  });
+});

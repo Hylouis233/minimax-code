@@ -33,6 +33,8 @@ import type {
   WebuiQuestionnaireRequest,
 } from "../../shared/contracts/interactions.js";
 import { buildWebuiPlanApproveAnswers } from "../projection/plan-mode.js";
+import { webuiAnswersEndTurn } from "../projection/questionnaire-state.js";
+import type { WebuiStreamPhaseCommands } from "./session-commands.js";
 import type { WebuiVersionCell } from "./version-cell.js";
 
 /** The transport methods this owner drives. Absent means "not wired". */
@@ -54,20 +56,6 @@ export interface WebuiInteractionSink {
   readonly applyQuestionnaire: (
     request: WebuiQuestionnaireRequest | undefined,
   ) => void;
-  readonly awaitInteraction: () => void;
-  /** The turn resumes after an allowed permission. */
-  readonly resumeAfterPermission: () => void;
-  /**
-   * The turn resumes after an answer, or ends after a skip — see
-   * `webuiAnswersEndTurn`. Leaving `streaming` after a skip strands the
-   * transcript's thinking pulse, because a finished turn never sends the
-   * `[DONE]` frame that would otherwise clear it.
-   */
-  readonly afterQuestionnaireAnswer: (
-    answers: readonly WebuiQuestionnaireAnswer[],
-  ) => void;
-  /** A dismissal never resumes the turn: the runtime only marks it dismissed. */
-  readonly afterQuestionnaireDismiss: () => void;
 }
 
 /**
@@ -103,6 +91,20 @@ export interface WebuiInteractionCoordinator {
 export interface WebuiInteractionCoordinatorOptions {
   readonly port: WebuiInteractionPortSlice;
   readonly sink: WebuiInteractionSink;
+  /**
+   * `turn`'s published stream-phase commands, invoked through their names.
+   *
+   * Prohibition 1 is about **writers**, not about calling: this owner may invoke
+   * another business's published command, and may not be handed that business's
+   * state writers. The four stream transitions used to arrive as sink callbacks —
+   * `awaitInteraction`, `resumeAfterPermission`, `afterQuestionnaireAnswer`,
+   * `afterQuestionnaireDismiss` — which is the shape §5.1 states as its evidence
+   * for the violation ("one `sink` holding four interaction writers, four
+   * stream-phase writers…"). They are turn's state and turn's commands, so the
+   * flow calls them here and the outcome→transition policy stays with the flow
+   * that knows it.
+   */
+  readonly streams: WebuiStreamPhaseCommands;
   /** Persists request/mutation order across render-scoped coordinator objects. */
   readonly pendingVersionRef: WebuiVersionCell;
   /** The session these flows belong to. Absent means nothing to refresh. */
@@ -138,6 +140,7 @@ export function createWebuiInteractionCoordinator({
   sessionId,
   agentName,
   pendingVersionRef,
+  streams,
 }: WebuiInteractionCoordinatorOptions): WebuiInteractionCoordinator {
   const {
     listPendingPermissions,
@@ -173,7 +176,7 @@ export function createWebuiInteractionCoordinator({
         sink.replacePendingPermissions(sessionPermissions);
         sink.applyQuestionnaire(questionnaireResult?.request);
         if (sessionPermissions.length > 0 || questionnaireResult?.request)
-          sink.awaitInteraction();
+          streams.awaitInteraction();
         return { ok: true };
       } catch (error) {
         return { ok: false, error: describe(error) };
@@ -195,7 +198,8 @@ export function createWebuiInteractionCoordinator({
           throw new Error("The permission request was no longer pending");
         invalidatePendingReads();
         sink.removePendingPermission(permission.requestId);
-        sink.resumeAfterPermission();
+        // An allowed permission resumes the turn: a `turn` command, not a writer.
+        streams.startStreaming();
         return { ok: true };
       } catch (error) {
         return { ok: false, error: describe(error) };
@@ -216,7 +220,14 @@ export function createWebuiInteractionCoordinator({
         if (result.ok !== true) throw new Error("The questionnaire was not accepted");
         invalidatePendingReads();
         sink.applyQuestionnaire(undefined);
-        sink.afterQuestionnaireAnswer(answers);
+        // The answers→phase rule is this flow's policy (`webuiAnswersEndTurn`
+        // decides whether a skip ended the turn); the transition itself is turn's
+        // command. Leaving `streaming` after a skip strands the transcript's
+        // thinking pulse, because a finished turn never sends the frame that
+        // would clear it.
+        streams.markStreamPhase(
+          webuiAnswersEndTurn(answers) ? "idle" : "streaming",
+        );
         return { ok: true };
       } catch (error) {
         return { ok: false, error: describe(error) };
@@ -235,7 +246,8 @@ export function createWebuiInteractionCoordinator({
           throw new Error("The questionnaire could not be dismissed");
         invalidatePendingReads();
         sink.applyQuestionnaire(undefined);
-        sink.afterQuestionnaireDismiss();
+        // A dismissal never resumes the turn: the runtime only marks it dismissed.
+        streams.endStreaming();
         return { ok: true };
       } catch (error) {
         return { ok: false, error: describe(error) };
