@@ -141,3 +141,69 @@ describe("the terminal watch", () => {
     expect(frames).toEqual([{ chunk: "one" }, { chunk: "two" }]);
   });
 });
+
+// The delivery handle (`stream`'s third argument; T04's
+// `delivery-disposer-registry`). A streaming operation used to return a promise
+// and nothing else, so the client held no disposer at all: the only ways a stream
+// could end were `[DONE]`, an error, or the socket dropping. These cases pin the
+// handle the application can now keep, and that detaching is about THIS client's
+// observation only — the request was already accepted by the host.
+describe("the delivery handle a streaming operation hands out", () => {
+  it("stops delivering frames and closes the socket when it is closed", async () => {
+    const transport = transportWith(ControllableSocket);
+    const frames: unknown[] = [];
+    let delivery: { close: () => void } | undefined;
+    const settled = transport.sendMessage(
+      { id: "s1", content: "hello" },
+      (frame) => frames.push(frame),
+      (handle) => {
+        delivery = handle;
+      },
+    );
+    await tick();
+    const socket = ControllableSocket.latest!;
+    const id = socket.request.requestId;
+    socket.deliver({ kind: "event", requestId: id, body: { dataJson: "{\"chunk\":1}" } });
+    expect(frames).toHaveLength(1);
+
+    expect(delivery).toBeDefined();
+    delivery!.close();
+    // A detach settles the operation: there is no error to report, because the
+    // host accepted this request long ago. Failing here would make a deliberate
+    // detach look like a dropped connection.
+    await expect(settled).resolves.toBeUndefined();
+
+    // And it only stops the client watching.
+    socket.deliver({ kind: "event", requestId: id, body: { dataJson: "{\"chunk\":2}" } });
+    expect(frames).toHaveLength(1);
+  });
+
+  it("hands out one for an attachment too", async () => {
+    const transport = transportWith(ControllableSocket);
+    let delivery: { close: () => void } | undefined;
+    void transport.resumeSession({ id: "s1" }, () => undefined, (handle) => {
+      delivery = handle;
+    });
+    await tick();
+    expect(delivery).toBeDefined();
+    // Closing twice is harmless: a detach and a terminal exit can both race here.
+    delivery!.close();
+    delivery!.close();
+  });
+
+  it("still settles on [DONE] when nobody detaches", async () => {
+    const transport = transportWith(ControllableSocket);
+    const frames: unknown[] = [];
+    const settled = transport.sendMessage(
+      { id: "s1", content: "hello" },
+      (frame) => frames.push(frame),
+      () => undefined,
+    );
+    await tick();
+    const socket = ControllableSocket.latest!;
+    const id = socket.request.requestId;
+    socket.deliver({ kind: "event", requestId: id, body: { dataJson: "[DONE]" } });
+    await expect(settled).resolves.toBeUndefined();
+    expect(frames).toHaveLength(1);
+  });
+});

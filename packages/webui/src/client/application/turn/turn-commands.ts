@@ -51,6 +51,7 @@ import {
   createWebuiTurnLifecycleCommands,
 } from "../sessions/session-commands.js";
 import type { WebuiTurnCapabilitySlice } from "./turn-capabilities.js";
+import type { WebuiDeliveryDisposers } from "./delivery-disposers.js";
 import { stopWebuiTurn } from "./turn-coordinator.js";
 
 /** Adapts the application's session-aware event call to the composer commands. */
@@ -282,6 +283,12 @@ export interface WebuiTurnCommandContext {
   readonly store: WebuiSessionStore;
   readonly sessionId: string | undefined;
   readonly capabilities?: WebuiTurnCapabilitySlice;
+  /**
+   * Where each attempt's real disposer is registered, so the application holds
+   * something it can close (plan §4.3). Absent on a host that has no registry;
+   * the attempt then simply cannot be detached by this client.
+   */
+  readonly deliveries?: WebuiDeliveryDisposers;
 }
 
 /** What a surface supplies to send: intent and data, never a writer or a sink. */
@@ -344,9 +351,21 @@ export function createWebuiConversationTurnCommands(
    * and the loop refuses with its own stated reason instead of a caller having
    * to know the operation is missing.
    */
+  const recordKey = (): string => sessionId ?? WEBUI_HOME_SESSION_KEY;
+  /** Hands each attempt's own disposer to the registry as it opens. */
+  const onDelivery = (handle: { readonly close: () => void }): void => {
+    context.deliveries?.track(recordKey(), handle);
+  };
   const loopDeps = (): Omit<WebuiStreamLoopDeps, "projection" | "streamState"> => ({
-    ...(capabilities?.send ? { sendMessage: capabilities.send } : {}),
-    ...(capabilities?.resume ? { resumeSession: capabilities.resume } : {}),
+    ...(capabilities?.send
+      ? { sendMessage: (body, onFrame) => capabilities.send!(body, onFrame, onDelivery) }
+      : {}),
+    ...(capabilities?.resume
+      ? {
+          resumeSession: (body, onFrame) =>
+            capabilities.resume!(body, onFrame, onDelivery),
+        }
+      : {}),
     ...(capabilities?.load ? { loadMessages: capabilities.load } : {}),
   });
 
@@ -380,7 +399,7 @@ export function createWebuiConversationTurnCommands(
       attachWebuiTurn({
         sessionId,
         turnId,
-        ...(capabilities?.resume ? { resumeSession: capabilities.resume } : {}),
+        ...(loopDeps().resumeSession ? { resumeSession: loopDeps().resumeSession } : {}),
         ...(capabilities?.load ? { loadMessages: capabilities.load } : {}),
         readStream,
         setSending: writer.setTurnSending,

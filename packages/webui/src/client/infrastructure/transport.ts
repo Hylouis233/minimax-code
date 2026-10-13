@@ -15,6 +15,7 @@ import type {
   WebuiEnqueueMessageResult,
 } from "../../shared/contracts/queue.js";
 import type { WebuiModelEntry } from "../../shared/contracts/models.js";
+import type { WebuiDeliveryHandle } from "../contracts/turn/execution-port.js";
 import type {
   WebuiRuntimeEvent,
   WebuiStreamFrame,
@@ -201,17 +202,22 @@ export function createWebuiTransport({
     operation: string,
     body: unknown,
     onFrame: (frame: WebuiStreamFrame) => void,
+    onDelivery?: (handle: WebuiDeliveryHandle) => void,
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       let settled = false;
+      // A detached delivery must not deliver, and `close()` is not a promise that
+      // the socket stops emitting — the same rule `watchTerminal` follows.
+      let detached = false;
       const fail = (session: WebuiWireSession, error: Error) => {
         if (settled) return;
         settled = true;
         session.close();
         reject(error);
       };
-      openWireSession(operation, body, {
+      const session = openWireSession(operation, body, {
         frame: (session, frame) => {
+          if (detached) return;
           if (frame.kind === "error") {
             fail(session, new Error(frame.message ?? `${operation} refused`));
             return;
@@ -228,6 +234,20 @@ export function createWebuiTransport({
         invalidFrame: (session) => fail(session, new Error("WebUI returned invalid JSON")),
         closed: (session) => fail(session, new Error("WebUI connection closed before [DONE]")),
         failed: (session) => fail(session, new Error("WebUI connection failed")),
+      });
+      onDelivery?.({
+        close: () => {
+          if (settled) return;
+          // Detaching SETTLES the operation rather than failing it: the host
+          // accepted this request long ago, so there is no error to report and no
+          // recovery to attempt — the client simply stops watching. Failing here
+          // would hand the loop a transport error and make a deliberate detach
+          // look like a dropped connection.
+          detached = true;
+          settled = true;
+          session.close();
+          resolve();
+        },
       });
     });
   }
@@ -319,9 +339,11 @@ export function createWebuiTransport({
     disposeTerminal: (body) => request("disposeTerminal", body),
     watchTerminal,
     createSession: (body) => request("createSession", body),
-    sendMessage: (body, onFrame) => stream("sendMessage", body, onFrame),
+    sendMessage: (body, onFrame, onDelivery) =>
+      stream("sendMessage", body, onFrame, onDelivery),
     enqueueMessage: (body) => request("enqueueMessage", body),
-    resumeSession: (body, onFrame) => stream("resumeSession", body, onFrame),
+    resumeSession: (body, onFrame, onDelivery) =>
+      stream("resumeSession", body, onFrame, onDelivery),
     watchEvents: createWebuiEventChannel({ websocketUrl, webSocket }),
     listPendingPermissions: () => request("listPendingPermissions", {}),
     getPendingQuestionnaire: (body) => request("getPendingQuestionnaire", body),

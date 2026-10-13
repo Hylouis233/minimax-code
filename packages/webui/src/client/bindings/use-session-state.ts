@@ -185,7 +185,11 @@ export function useWebuiSessionCommands(sessionId: string | undefined): {
   // The published slice. Absent outside a provider (SSR, unit tests) and
   // partial on a host that wires only some operations — both are the states the
   // loop's absent-capability guards are written for.
-  const capabilities = useWebuiApplicationOptional()?.turnCapabilities;
+  const application = useWebuiApplicationOptional();
+  const capabilities = application?.turnCapabilities;
+  // The registry the application disposes with: an attempt this client started
+  // is closable by the application rather than only by its own loop.
+  const deliveries = application?.deliveries;
   return useMemo(() => {
     const writerFor = () =>
       sessionId
@@ -198,6 +202,7 @@ export function useWebuiSessionCommands(sessionId: string | undefined): {
       store,
       sessionId,
       ...(capabilities ? { capabilities } : {}),
+      ...(deliveries ? { deliveries } : {}),
     });
     // Two views, built from the same writer and handed out separately
     // (ticket #58). The interaction view is published by its own hook

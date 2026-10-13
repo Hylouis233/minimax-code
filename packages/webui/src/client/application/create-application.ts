@@ -30,6 +30,10 @@ import {
   createWebuiSessionScopeManager,
   type WebuiSessionScopeManager,
 } from "./sessions/session-scope.js";
+import {
+  createWebuiDeliveryDisposers,
+  type WebuiDeliveryDisposers,
+} from "./turn/delivery-disposers.js";
 import type { WebuiApplicationState } from "./state.js";
 import { WEBUI_HOME_SESSION_KEY } from "./state.js";
 import {
@@ -141,6 +145,11 @@ export interface WebuiApplication {
    * mounting: a delivery or settlement lease outlives the view that started it.
    */
   readonly sessionScope: WebuiSessionScopeManager;
+  /**
+   * The client deliveries this application can actually close (plan §4.3).
+   * Disposal closes them; it never aborts a host turn.
+   */
+  readonly deliveries: WebuiDeliveryDisposers;
   readonly events: WebuiEventCoordinator;
   readonly turns: WebuiTurnCoordinator;
   /** The published turn capability slice (send / resume / load / stop). */
@@ -244,6 +253,7 @@ export function createWebuiApplication(
   const store = deps.store ?? createWebuiSessionStore();
   const leases = createWebuiStreamLeaseController(store);
   const sessionScope = createWebuiSessionScopeManager();
+  const deliveries = createWebuiDeliveryDisposers();
   /**
    * The one selection command. Selecting activates the new session's scope and
    * releases the previous selection's lease — and only that lease, so an
@@ -335,6 +345,7 @@ export function createWebuiApplication(
     store,
     leases,
     sessionScope,
+    deliveries,
     events,
     turns,
     turnCapabilities,
@@ -371,6 +382,10 @@ export function createWebuiApplication(
       if (lifecycle === "disposed") return;
       detach?.();
       detach = undefined;
+      // Close what this client is observing before fencing the store: the
+      // attempt's frames can no longer reach a snapshot, and the host turn keeps
+      // running (plan §4.3, §8.1).
+      deliveries.closeAll();
       sessionScope.dispose();
       store.dispose();
       channel?.close?.();

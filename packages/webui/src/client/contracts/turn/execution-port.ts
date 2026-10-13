@@ -20,6 +20,18 @@ import type {
 } from "../../../shared/contracts/session.js";
 import type { WebuiStreamFrame } from "../../../shared/contracts/stream.js";
 
+/**
+ * The client's half of an accepted delivery (plan §4.3, §4.3 disposal row).
+ *
+ * Closing it stops **this client** observing the attempt — no further frames are
+ * delivered — and nothing else: the host turn keeps running, and cancelling it
+ * stays a separate command. That separation is the whole point of the handle, so
+ * a delivery that is detached is not a delivery that was aborted.
+ */
+export interface WebuiDeliveryHandle {
+  readonly close: () => void;
+}
+
 export type WebuiClientMessageSender = (
   request: {
     readonly id: string;
@@ -28,6 +40,12 @@ export type WebuiClientMessageSender = (
     readonly attachments?: readonly WebuiAttachmentInput[];
   },
   onFrame: (frame: WebuiStreamFrame) => void,
+  /**
+   * Receives the delivery handle once the attempt has opened, so the caller can
+   * keep the actual disposer rather than a promise it cannot reach into. An
+   * implementation that cannot cancel simply never calls it.
+   */
+  onDelivery?: (handle: WebuiDeliveryHandle) => void,
 ) => Promise<void>;
 
 export type WebuiClientSessionResumer = (
@@ -38,6 +56,7 @@ export type WebuiClientSessionResumer = (
     readonly drainQueued?: boolean;
   },
   onFrame: (frame: WebuiStreamFrame) => void,
+  onDelivery?: (handle: WebuiDeliveryHandle) => void,
 ) => Promise<void>;
 
 export interface TurnExecutionPort {
