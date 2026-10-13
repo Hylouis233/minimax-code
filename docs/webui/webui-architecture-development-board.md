@@ -156,8 +156,8 @@ No implementation issue is closed or claimed in this preparation. Repository pro
 
 Appended after publication; the publication contract and receipt above are unchanged, and the tracker issues remain the source of truth for per-ticket status and evidence. The machine-readable record is `executionState` in `webui-architecture-tickets.json`.
 
-| As of | Branch | Commits | T01 | Frontier |
-| --- | --- | --- | --- | --- |
-| 2026-10-13 | `feat/webui-t01-conformance-gates` | `138ea4fc`, `801e0bad` | implemented locally; acceptance evidence on [#127](https://github.com/mcode-webui/minimax-code/issues/127) | T02, T14, T17 |
+| As of | Branch | Commits | T01 | T02 | Frontier |
+| --- | --- | --- | --- | --- | --- |
+| 2026-10-13 | `feat/webui-t01-conformance-gates` | `138ea4fc`, `801e0bad`, `f598b760`, `47455ae2`, `eceb6549`, `ab35a6dd`, `de02f7a7` | implemented locally; evidence on [#127](https://github.com/mcode-webui/minimax-code/issues/127) | implemented locally; evidence on [#128](https://github.com/mcode-webui/minimax-code/issues/128) | T03, T04, T14, T17 |
 
-The branch is local: T01's commits were not pushed. T02 (`application-assembly-lifecycle`), T14 (`network-registry-injection`) and T17 (`runtime-quota-request-projection-boundary`) are the executable dependents of T01's outputs.
+The branch is local: no commit has been pushed. T03 (`request-freshness-primitive`, `models-public-owner`, `model-picker-responsibility-cut`), T04 (`conversation-turn-commands`, `session-interest-lease-manager`, `home-adoption-transaction`, `delivery-disposer-registry`), T14 and T17 are the executable dependents of T01/T02's outputs.

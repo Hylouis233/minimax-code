@@ -1038,14 +1038,21 @@
     "baseCommit": "4affbc0478d02cc4294946e0dba7f3c25789eb26",
     "commits": [
       "138ea4fc",
-      "801e0bad"
+      "801e0bad",
+      "f598b760",
+      "47455ae2",
+      "eceb6549",
+      "ab35a6dd",
+      "de02f7a7"
     ],
     "published": false,
     "tickets": {
-      "T01": "implemented locally, acceptance evidence recorded on #127"
+      "T01": "implemented locally, acceptance evidence recorded on #127",
+      "T02": "implemented locally, acceptance evidence recorded on #128"
     },
     "frontier": [
-      "T02",
+      "T03",
+      "T04",
       "T14",
       "T17"
     ]
