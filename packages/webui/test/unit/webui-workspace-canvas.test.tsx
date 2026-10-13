@@ -61,7 +61,7 @@ import {
   stepCanvasZoom,
   type CanvasNodeLayout,
   type CanvasNodeView,
-} from "../../src/client/components/WorkspaceCanvas.js";
+} from "../../src/client/components/workspace/WorkspaceCanvas.js";
 import type { WebuiCanvasDocument } from "../../src/shared/contracts/canvas.js";
 
 const LAYOUT: CanvasNodeLayout = { x: 100, y: 200, width: 240, height: 180, zIndex: 3 };

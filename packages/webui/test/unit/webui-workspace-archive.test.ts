@@ -41,7 +41,7 @@ import {
   WorkspaceArchiveListing,
   WorkspaceArchiveNotice,
   WorkspaceArchiveView,
-} from "../../src/client/components/WorkspaceArchiveView.js";
+} from "../../src/client/components/workspace/WorkspaceArchiveView.js";
 
 /** Fixtures live in the OS temp dir; nothing is written into the repo tree. */
 let workspace = "";

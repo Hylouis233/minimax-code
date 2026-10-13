@@ -3,8 +3,8 @@
 // container in `WorkspacePanels.tsx` only imports from it.
 
 import type { ReactElement } from "react";
-import type { WebuiWorkspaceFile } from "../../shared/contracts/workspace.js";
-import { WebuiIconChevronLeft, WebuiIconFile } from "./shell/icons.js";
+import type { WebuiWorkspaceFile } from "../../../shared/contracts/workspace.js";
+import { WebuiIconChevronLeft, WebuiIconFile } from "../shell/icons.js";
 
 // The pure tree helpers moved to `projection/workspace-file-tree.ts` so the
 // tree query owner merges with the same function the component walks with
@@ -14,7 +14,7 @@ export {
   mergeWorkspaceFileChildren,
   findWorkspaceFile,
   getWorkspaceFileParentPaths,
-} from "../projection/workspace-file-tree.js";
+} from "../../projection/workspace-file-tree.js";
 
 const BYTE_UNITS = ["B", "KB", "MB", "GB", "TB"] as const;
 const BYTE_STEP = 1024;

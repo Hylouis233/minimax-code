@@ -8,7 +8,7 @@ import type {
   WebuiArchiveEntry,
   WebuiWorkspaceArchiveExtractResult,
   WebuiWorkspaceArchiveListing,
-} from "../../shared/contracts/workspace.js";
+} from "../../../shared/contracts/workspace.js";
 
 export type WorkspaceArchiveViewProps = {
   /** Absolute workspace root; every archive path below is relative to it. */

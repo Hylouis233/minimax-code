@@ -23,7 +23,7 @@ import {
   WorkspaceMediaNotice,
   WorkspaceMediaPreview,
   WorkspaceVideoPreview,
-} from "../../src/client/components/WorkspaceMediaPreview.js";
+} from "../../src/client/components/workspace/WorkspaceMediaPreview.js";
 
 const FILE_URL = "http://127.0.0.1:8787/workspace-file?token=t";
 const DATA_URL = "data:image/png;base64,iVBORw0KGgo=";

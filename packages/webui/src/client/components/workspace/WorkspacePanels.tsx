@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
-import { basenamePath } from "../paths.js";
+import { basenamePath } from "../../paths.js";
 import hljs from "highlight.js/lib/core";
 import bash from "highlight.js/lib/languages/bash";
 import c from "highlight.js/lib/languages/c";
@@ -18,9 +18,9 @@ import typescript from "highlight.js/lib/languages/typescript";
 import toml from "highlight.js/lib/languages/ini";
 import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
-import { WebuiMarkdown } from "./transcript/markdown.js";
-import type { WebuiCanvasDocument } from "../../shared/contracts/canvas.js";
-import type { WebuiFileDiffInfoView } from "../../shared/contracts/session.js";
+import { WebuiMarkdown } from "../transcript/markdown.js";
+import type { WebuiCanvasDocument } from "../../../shared/contracts/canvas.js";
+import type { WebuiFileDiffInfoView } from "../../../shared/contracts/session.js";
 import type {
   WebuiWorkspaceEnvironment,
   WebuiWorkspaceFile,
@@ -28,33 +28,33 @@ import type {
   WebuiWorkspaceGitMutationRequest,
   WebuiWorkspaceArchiveListing,
   WebuiWorkspaceArchiveExtractResult,
-} from "../../shared/contracts/workspace.js";
+} from "../../../shared/contracts/workspace.js";
 import type {
   WebuiWorkspaceReviewSearchResult,
   WebuiWorkspaceReviewSummary,
-} from "../../shared/contracts/review.js";
+} from "../../../shared/contracts/review.js";
 import type {
   WebuiWorkspaceTabKind,
   WorkspacePanelCommand,
   WorkspacePanelState,
   WorkspacePanelTab,
-} from "../projection/workspace-panel-state.js";
+} from "../../projection/workspace-panel-state.js";
 import {
   webuiWorkspaceAddMenu,
   webuiWorkspaceTabLabel,
-} from "../projection/workspace-panel-state.js";
-import { focusWebuiFileLine, webuiFileLineTargetId } from "../bindings/browser-effects.js";
+} from "../../projection/workspace-panel-state.js";
+import { focusWebuiFileLine, webuiFileLineTargetId } from "../../bindings/browser-effects.js";
 import {
   projectWebuiWorkspaceHistory,
   type WebuiWorkspaceSubagent,
   type WebuiWorkspaceTodo,
-} from "../projection/workspace-progress.js";
+} from "../../projection/workspace-progress.js";
 import {
   TERMINAL_RESIZE_DEBOUNCE_MS,
   terminalResizeRequest,
-} from "../projection/terminal-size.js";
-import type { WebuiTerminalSize } from "../contracts/workspace/terminal-port.js";
-import { WebuiIconAgent, WebuiIconCheck, WebuiIconChevronDown, WebuiIconClose, WebuiIconDiffFile, WebuiIconFile, WebuiIconFolder, WebuiIconRunLocation, WebuiIconSearch, WebuiIconSidebarToggle, WebuiIconWorkspaceCanvas, WebuiIconWorkspaceExpand, WebuiIconWorkspaceReview, WebuiIconWorkspaceTerminal } from "./shell/icons.js";
+} from "../../projection/terminal-size.js";
+import type { WebuiTerminalSize } from "../../contracts/workspace/terminal-port.js";
+import { WebuiIconAgent, WebuiIconCheck, WebuiIconChevronDown, WebuiIconClose, WebuiIconDiffFile, WebuiIconFile, WebuiIconFolder, WebuiIconRunLocation, WebuiIconSearch, WebuiIconSidebarToggle, WebuiIconWorkspaceCanvas, WebuiIconWorkspaceExpand, WebuiIconWorkspaceReview, WebuiIconWorkspaceTerminal } from "../shell/icons.js";
 import { FileTree, filterWorkspaceFiles, findWorkspaceFile, getWorkspaceFileParentPaths, mergeWorkspaceFileChildren } from "./WorkspaceFileTree.js";
 import { WorkspaceMediaPreview, isMediaContent } from "./WorkspaceMediaPreview.js";
 import { WorkspaceCanvas } from "./WorkspaceCanvas.js";
@@ -65,12 +65,12 @@ import {
   WEBUI_WORKSPACE_REVIEW_DIFF_BATCH_SIZE,
   chunkWebuiWorkspaceReviewFileIds,
   type WebuiWorkspaceQueries,
-} from "../application/workspace/workspace-queries.js";
+} from "../../application/workspace/workspace-queries.js";
 import {
   useWebuiWorkspaceQueries,
   useWebuiWorkspaceQueriesState,
-} from "../bindings/use-query-state.js";
-import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js";
+} from "../../bindings/use-query-state.js";
+import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
 
 export type WebuiTodo = WebuiWorkspaceTodo;
 // `mergeWorkspaceFileChildren`, `chunkWebuiWorkspaceReviewFileIds` and
