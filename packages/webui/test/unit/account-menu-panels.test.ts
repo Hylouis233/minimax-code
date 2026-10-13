@@ -74,7 +74,10 @@ describe("the account answers come from the one owner", () => {
   it("has the menu read the snapshot and call published commands, and hold no transport", () => {
     expect(shell).toContain("useWebuiAccountWorkflowsState()");
     for (const source of [shell, signin, usage]) {
-      expect(source).not.toContain("transport");
+      // No member is read off a composed transport — the word appears in the shell's own comment
+      // explaining that, which is why the assertion is about the read and not the token.
+      // `webui-shell-seam.test.ts` holds the whole shell to that, comment lines included.
+      expect(source).not.toMatch(/transport\./u);
       expect(source).not.toContain("invoke(");
     }
   });

@@ -168,7 +168,8 @@ describe("context-usage panel — placed from the ring, not from CSS offsets", (
 
 describe("context-usage panel — the shape the source has to keep", () => {
   const css = readClient("styles/shell.css");
-  const composer = readClient("components/SessionComposer.tsx");
+  // The panel moved to its own module (ticket #77); the composer keeps the call site.
+  const indicator = readClient("components/sessions/ContextUsageIndicator.tsx");
   // The panel's OWN declaration block and nothing after it. Slicing to the end of
   // the sheet would match every later rule, including rules that have nothing to
   // do with this panel — which is how a tripwire starts passing for the wrong
@@ -210,17 +211,17 @@ describe("context-usage panel — the shape the source has to keep", () => {
   });
 
   it("takes its coordinates from a measurement of the ring and the panel", () => {
-    expect(composer).toContain("anchor: anchor.getBoundingClientRect()");
-    expect(composer).toContain("surface: { width: rect.width, height: rect.height }");
-    expect(composer).toContain("viewport: { width: window.innerWidth, height: window.innerHeight }");
-    expect(composer).toContain("style={placement ? contextUsagePopoverStyle(placement) : undefined}");
+    expect(indicator).toContain("anchor: anchor.getBoundingClientRect()");
+    expect(indicator).toContain("surface: { width: rect.width, height: rect.height }");
+    expect(indicator).toContain("viewport: { width: window.innerWidth, height: window.innerHeight }");
+    expect(indicator).toContain("style={placement ? contextUsagePopoverStyle(placement) : undefined}");
   });
 
   it("re-measures while open, and follows the ring when the column scrolls", () => {
     // The panel is fixed and the composer is not, so a scroll that moves one and
     // not the other leaves the panel pointing at nothing.
-    expect(composer).toMatch(/useLayoutEffect\(\(\) => \{\s*if \(open\) measurePanel\(\);/u);
-    expect(composer).toContain('window.addEventListener("scroll", measurePanel, true)');
-    expect(composer).toContain('window.addEventListener("resize", measurePanel)');
+    expect(indicator).toMatch(/useLayoutEffect\(\(\) => \{\s*if \(open\) measurePanel\(\);/u);
+    expect(indicator).toContain('window.addEventListener("scroll", measurePanel, true)');
+    expect(indicator).toContain('window.addEventListener("resize", measurePanel)');
   });
 });
