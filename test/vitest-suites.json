@@ -266,6 +266,7 @@
       "packages/webui/test/unit/turn-boundary-prohibitions.test.ts",
       "packages/webui/test/unit/goal-interaction-prohibitions.test.ts",
       "packages/webui/test/unit/rail-menu.test.ts",
+      "packages/webui/test/unit/session-single-source.test.ts",
       "packages/webui/test/unit/turn-command-views.test.ts",
       "packages/webui/test/unit/turn-substrate-fences.test.ts",
       "packages/webui/test/unit/output-error.test.tsx",

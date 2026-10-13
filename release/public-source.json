@@ -3920,6 +3920,7 @@
     "packages/webui/test/unit/session-activity.test.ts",
     "packages/webui/test/unit/session-import.test.ts",
     "packages/webui/test/unit/session-rail-search.test.ts",
+    "packages/webui/test/unit/session-single-source.test.ts",
     "packages/webui/test/unit/session-stream-retry.test.ts",
     "packages/webui/test/unit/session-transfer-download.test.ts",
     "packages/webui/test/unit/session-transfer-route.test.ts",
