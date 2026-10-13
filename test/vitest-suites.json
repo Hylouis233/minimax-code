@@ -270,6 +270,7 @@
       "packages/webui/test/unit/review-owner.test.ts",
       "packages/webui/test/unit/transcript-fences.test.ts",
       "packages/webui/test/unit/workspace-tab-registry.test.ts",
+      "packages/webui/test/unit/provider-form-panel.test.ts",
       "packages/webui/test/unit/turn-command-views.test.ts",
       "packages/webui/test/unit/turn-substrate-fences.test.ts",
       "packages/webui/test/unit/output-error.test.tsx",
