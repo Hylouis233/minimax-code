@@ -82,7 +82,7 @@ import type {
   WebuiClientMessagePage,
 } from "../../contracts/transcript/message-view.js";
 import type { WebuiTransport } from "../../contracts/transport.js";
-import type { WebuiTodo } from "../workspace/WorkspacePanels.js";
+import type { WebuiTodo } from "../../projection/workspace/panel-projection.js";
 import type { WebuiUsageQuotaResult } from "../../../shared/contracts/usage-quota.js";
 import type { WebuiVersionInfo } from "../../../shared/contracts/version.js";
 import type {

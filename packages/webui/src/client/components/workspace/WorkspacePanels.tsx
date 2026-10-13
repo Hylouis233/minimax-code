@@ -43,12 +43,7 @@ import {
   webuiWorkspaceAddMenu,
   webuiWorkspaceTabLabel,
 } from "../../projection/workspace/workspace-panel-state.js";
-import { focusWebuiFileLine, webuiFileLineTargetId } from "../../bindings/browser-effects.js";
-import {
-  projectWebuiWorkspaceHistory,
-  type WebuiWorkspaceSubagent,
-  type WebuiWorkspaceTodo,
-} from "../../projection/workspace/workspace-progress.js";
+import { focusWebuiFileLine, webuiFileLineTargetId } from "../../bindings/browser-effects.js";import { type WebuiWorkspaceSubagent } from "../../projection/workspace/workspace-progress.js";
 import {
   TERMINAL_RESIZE_DEBOUNCE_MS,
   terminalResizeRequest,
@@ -56,7 +51,8 @@ import {
 import type { WebuiTerminalSize } from "../../contracts/workspace/terminal-port.js";
 import { WebuiIconAgent, WebuiIconCheck, WebuiIconChevronDown, WebuiIconClose, WebuiIconDiffFile, WebuiIconFile, WebuiIconFolder, WebuiIconRunLocation, WebuiIconSearch, WebuiIconSidebarToggle, WebuiIconWorkspaceCanvas, WebuiIconWorkspaceExpand, WebuiIconWorkspaceReview, WebuiIconWorkspaceTerminal } from "../shell/icons.js";
 import { FileTree, filterWorkspaceFiles, findWorkspaceFile, getWorkspaceFileParentPaths, mergeWorkspaceFileChildren } from "./WorkspaceFileTree.js";
-import { WorkspaceMediaPreview, isMediaContent } from "./WorkspaceMediaPreview.js";
+import { WorkspaceMediaPreview } from "./WorkspaceMediaPreview.js";
+import { isMediaContent } from "../../projection/workspace/media-preview.js";
 import { WorkspaceCanvas } from "./WorkspaceCanvas.js";
 import type { CanvasOperation } from "./WorkspaceCanvas.js";
 import { WorkspaceArchiveView } from "./WorkspaceArchiveView.js";
@@ -71,8 +67,8 @@ import {
   useWebuiWorkspaceQueriesState,
 } from "../../bindings/use-query-state.js";
 import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
-
-export type WebuiTodo = WebuiWorkspaceTodo;
+import { webuiFileLanguage, projectWebuiUnifiedDiffLines, isWorkspaceArchivePath, isWorkspaceHtmlPath } from "../../projection/workspace/panel-projection.js";
+import type { WebuiTodo } from "../../projection/workspace/panel-projection.js";
 // `mergeWorkspaceFileChildren`, `chunkWebuiWorkspaceReviewFileIds` and
 // `WEBUI_WORKSPACE_REVIEW_DIFF_BATCH_SIZE` are re-exported below: the panel
 // tests import them from this module, which stays the panel's public surface.
@@ -106,18 +102,6 @@ for (const [name, language] of Object.entries(FILE_CODE_LANGUAGES)) {
   if (!hljs.getLanguage(name)) hljs.registerLanguage(name, language);
 }
 
-const FILE_LANGUAGE_BY_EXTENSION: Readonly<Record<string, string>> = {
-  c: "c", cjs: "javascript", cpp: "cpp", css: "css", go: "go", h: "c", htm: "xml", html: "xml", java: "java",
-  js: "javascript", json: "json", jsx: "javascript", md: "markdown", mjs: "javascript", mts: "typescript",
-  py: "python", rs: "rust", sh: "bash", svg: "xml", toml: "toml", ts: "typescript", tsx: "typescript", xml: "xml", yaml: "yaml", yml: "yaml",
-};
-
-export function webuiFileLanguage(path: string): string | undefined {
-  const extension = path.split(".").at(-1)?.toLowerCase();
-  const language = extension ? FILE_LANGUAGE_BY_EXTENSION[extension] : undefined;
-  return language && hljs.getLanguage(language) ? language : undefined;
-}
-
 function highlightFileLine(line: string, language: string | undefined): string | undefined {
   if (!language || !hljs.getLanguage(language)) return undefined;
   try {
@@ -125,46 +109,6 @@ function highlightFileLine(line: string, language: string | undefined): string |
   } catch {
     return undefined;
   }
-}
-
-export type WebuiUnifiedDiffLine = {
-  readonly kind: "addition" | "context" | "deletion" | "hunk" | "noNewline";
-  readonly content: string;
-  readonly oldLine?: number;
-  readonly newLine?: number;
-};
-
-export function projectWebuiUnifiedDiffLines(diff: string): WebuiUnifiedDiffLine[] {
-  let oldLine: number | undefined;
-  let newLine: number | undefined;
-  const lines: WebuiUnifiedDiffLine[] = [];
-  for (const raw of diff.split(/\r?\n/u)) {
-    const hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/u.exec(raw);
-    if (hunk) {
-      oldLine = Number(hunk[1]);
-      newLine = Number(hunk[2]);
-      lines.push({ kind: "hunk", content: raw });
-      continue;
-    }
-    if (!raw || raw.startsWith("diff --git ") || raw.startsWith("index ") || raw.startsWith("--- ") || raw.startsWith("+++ ")) continue;
-    if (raw.startsWith("\\")) {
-      // "\ No newline at end of file" records a fact about the line before it
-      // and takes no number of its own. Desktop's renderer keeps it as its own
-      // row with no gutter numbers and neutral text, so it is carried through
-      // as a marker instead of dropped.
-      lines.push({ kind: "noNewline", content: raw });
-      continue;
-    }
-    if (raw.startsWith("+")) {
-      lines.push({ kind: "addition", ...(newLine === undefined ? {} : { newLine: newLine++ }), content: raw.slice(1) });
-    } else if (raw.startsWith("-")) {
-      lines.push({ kind: "deletion", ...(oldLine === undefined ? {} : { oldLine: oldLine++ }), content: raw.slice(1) });
-    } else {
-      const content = raw.startsWith(" ") ? raw.slice(1) : raw;
-      lines.push({ kind: "context", ...(oldLine === undefined ? {} : { oldLine: oldLine++ }), ...(newLine === undefined ? {} : { newLine: newLine++ }), content });
-    }
-  }
-  return lines;
 }
 
 export function WebuiDiffFileSection({ file, selected, loading = false, error, onSelect }: { readonly file: WebuiFileDiffInfoView; readonly selected: boolean; readonly loading?: boolean; readonly error?: string; readonly onSelect?: () => void }): ReactElement {
@@ -190,12 +134,6 @@ export function WebuiDiffFileSection({ file, selected, loading = false, error, o
       </span>;
     })}</code></pre> : <p className="webui-turn-review-unavailable">当前运行时没有提供该文件的文本 patch。</p>}
   </details>;
-}
-
-export function projectWebuiTodos(messages: readonly Record<string, unknown>[]): WebuiTodo[] {
-  return projectWebuiWorkspaceHistory(
-    messages as never,
-  ).todos as WebuiTodo[];
 }
 
 export function WebuiProgressPanel({ todos, showProgress = true, showEmptyProgress = true, collapsed = false, onToggle }: { readonly todos: readonly WebuiTodo[]; readonly showProgress?: boolean; readonly showEmptyProgress?: boolean; readonly collapsed?: boolean; readonly onToggle?: () => void }): ReactElement | null {
@@ -348,22 +286,6 @@ export function WebuiProgressOverviewPanel({ workspaceDir, isDefaultWorkspace = 
     <WebuiProgressPanel todos={todos} showProgress={showProgress} showEmptyProgress={showEmptyProgress} collapsed={progressCollapsed} onToggle={onToggleProgress} />
     <WebuiSubagentsPanel subagents={subagents} collapsed={subagentsCollapsed} onToggle={onToggleSubagents} onMemberClick={onMemberClick} />
   </div>;
-}
-
-const WORKSPACE_ARCHIVE_EXTENSIONS = [".zip", ".tar", ".tgz", ".gz", ".bz2", ".xz", ".7z", ".rar"] as const;
-const WORKSPACE_HTML_EXTENSIONS = [".html", ".htm"] as const;
-
-function hasExtension(path: string, extensions: readonly string[]): boolean {
-  const lower = path.toLowerCase();
-  return extensions.some((extension) => lower.endsWith(extension));
-}
-
-export function isWorkspaceArchivePath(path: string): boolean {
-  return hasExtension(path, WORKSPACE_ARCHIVE_EXTENSIONS);
-}
-
-export function isWorkspaceHtmlPath(path: string): boolean {
-  return hasExtension(path, WORKSPACE_HTML_EXTENSIONS);
 }
 
 export function WebuiFilePreview({ tab, result, codeMode, workspaceFileUrl, readWorkspaceArchive, extractWorkspaceArchive }: {

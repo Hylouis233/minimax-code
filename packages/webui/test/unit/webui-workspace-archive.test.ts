@@ -36,12 +36,11 @@ import { createHarnessPortFromHost } from "../../src/runtime/harness/adapter.js"
 import type { WebuiRuntimeCliService } from "../../src/runtime/harness/host-contract.js";
 import type { WebuiWorkspaceArchiveListing } from "../../src/shared/contracts/workspace.js";
 import {
-  archiveDestinationFor,
-  formatArchiveSize,
   WorkspaceArchiveListing,
   WorkspaceArchiveNotice,
   WorkspaceArchiveView,
 } from "../../src/client/components/workspace/WorkspaceArchiveView.js";
+import { archiveDestinationFor, formatArchiveSize } from "../../src/client/projection/workspace/archive-projection.js";
 
 /** Fixtures live in the OS temp dir; nothing is written into the repo tree. */
 let workspace = "";

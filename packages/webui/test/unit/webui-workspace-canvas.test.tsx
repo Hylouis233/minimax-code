@@ -28,40 +28,11 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   CANVAS_GESTURE_ATTRIBUTE,
-  CANVAS_MIN_NODE_SIZE,
   CANVAS_NODE_ID_ATTRIBUTE,
-  CANVAS_NUDGE_STEP,
-  CANVAS_NUDGE_STEP_LARGE,
-  CANVAS_ZOOM_MAX,
-  CANVAS_ZOOM_MIN,
-  CANVAS_ZOOM_STEP,
   WorkspaceCanvas,
-  applyCanvasLayoutPreview,
-  buildCanvasAddFileMutation,
-  buildCanvasOperation,
-  buildCanvasRemoveNodeMutation,
-  buildCanvasUpdateLayoutMutation,
-  canvasArrowDirection,
-  canvasKeyStep,
-  canvasLayoutsEqual,
-  canvasPointerMoveLayout,
-  canvasPointerResizeLayout,
-  clampCanvasZoom,
-  createCanvasNodeId,
-  createCanvasOperationId,
-  describeCanvasError,
-  nextCanvasNodeLayout,
-  nextCanvasZIndex,
-  normalizeCanvasLayout,
-  nudgeCanvasLayout,
-  parseCanvasNodes,
-  pointerDeltaToCanvas,
-  resizeCanvasLayoutBy,
-  resolveCanvasPointerGesture,
-  stepCanvasZoom,
   type CanvasNodeLayout,
-  type CanvasNodeView,
 } from "../../src/client/components/workspace/WorkspaceCanvas.js";
+import { CANVAS_MIN_NODE_SIZE, CANVAS_NUDGE_STEP, CANVAS_NUDGE_STEP_LARGE, CANVAS_ZOOM_MAX, CANVAS_ZOOM_MIN, CANVAS_ZOOM_STEP, applyCanvasLayoutPreview, buildCanvasAddFileMutation, buildCanvasOperation, buildCanvasRemoveNodeMutation, buildCanvasUpdateLayoutMutation, canvasArrowDirection, canvasKeyStep, canvasLayoutsEqual, canvasPointerMoveLayout, canvasPointerResizeLayout, clampCanvasZoom, createCanvasNodeId, createCanvasOperationId, describeCanvasError, nextCanvasNodeLayout, nextCanvasZIndex, normalizeCanvasLayout, nudgeCanvasLayout, parseCanvasNodes, pointerDeltaToCanvas, resizeCanvasLayoutBy, resolveCanvasPointerGesture, stepCanvasZoom, type CanvasNodeView } from "../../src/client/projection/workspace/canvas-projection.js";
 import type { WebuiCanvasDocument } from "../../src/shared/contracts/canvas.js";
 
 const LAYOUT: CanvasNodeLayout = { x: 100, y: 200, width: 240, height: 180, zIndex: 3 };
