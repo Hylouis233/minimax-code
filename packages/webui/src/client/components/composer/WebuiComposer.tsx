@@ -55,12 +55,7 @@ import type {
   WebuiComposerAttachment,
   WebuiComposerUrlReference,
 } from "../../projection/composer/composer-interactions.js";
-import {
-  createWebuiComposerAttachStreamEffect,
-  recheckWebuiSubscription,
-  recoverMissedWebuiTurn,
-} from "../../application/turn/turn-commands.js";
-import { webuiActiveTurnProbeFor } from "../../application/turn/active-turn-probe.js";
+import { createWebuiComposerAttachStreamEffect } from "../../application/turn/turn-commands.js";
 import {
   useWebuiInteractionCommands,
   useWebuiSessionCommands,
@@ -459,8 +454,15 @@ export function WebuiComposer({
 
   const { dom } = useWebuiBrowserCapabilities();
   const { stream, sending } = useWebuiSessionState(sessionId);
-  const { phase, lifecycle, readStream, attachTurn, sendTurn: submitTurn, stopTurn } =
-    useWebuiSessionCommands(sessionId);
+  const {
+    phase,
+    lifecycle,
+    attachTurn,
+    recheckTurn,
+    recoverTurn,
+    sendTurn: submitTurn,
+    stopTurn,
+  } = useWebuiSessionCommands(sessionId);
   // The per-session effects registry the shell provides (ticket #45). The
   // composer registers this session's event handlers here so the application
   // event coordinator — the sole consumer of the process-event channel — runs
@@ -713,32 +715,17 @@ export function WebuiComposer({
           error instanceof Error ? error.message : String(error),
         );
     });
-    // The current stream slice is read through the application-store binding
-    // (`useWebuiSessionCommands`), never a module-level map.
-    // One shared, deduplicated probe per transport (plan §7.1 slice): the shell
-    // and this composer ask the same `getActiveTurn`, so a same-session probe
-    // racing between them collapses to a single round trip.
-    const activeTurnProbe = webuiActiveTurnProbeFor(getActiveTurn);
-
-    // The attach/recheck/gap-recovery commands now live in the application
-    // layer (`application/turn/turn-commands.ts`). These are the component's
-    // bindings onto them, closing over the current session and its setters —
-    // the same shape `stopWebuiTurn` already uses. The attempt's sink is minted
-    // inside `attachTurn` (the binding owns the store writer), so this component
-    // submits the intent and holds no factory of its own.
+    // The attach/recheck/gap-recovery commands live in the application layer
+    // (`application/turn/turn-commands.ts`), behind the binding: the probe, the
+    // store writer, the attempt's sink and the record key are all chosen there.
+    // This component submits intents and holds no factory of its own (T04).
     const attachToTurn = (turnId: string | undefined) => {
       attachTurn({ turnId });
     };
 
     /** `session.start` named a turn we do not hold while holding another. */
     const recheckSubscription = (turnId: string | undefined) => {
-      recheckWebuiSubscription({
-        sessionId,
-        probe: activeTurnProbe,
-        readStream,
-        releaseSubscription: lifecycle.releaseStreamSubscription,
-        attach: attachToTurn,
-      });
+      recheckTurn(turnId);
     };
 
     /**
@@ -748,12 +735,7 @@ export function WebuiComposer({
      * turn id and never refreshes on those events. Ask the server instead.
      */
     const recoverMissedTurn = () => {
-      recoverMissedWebuiTurn({
-        sessionId,
-        probe: activeTurnProbe,
-        readStream,
-        attach: attachToTurn,
-      });
+      recoverTurn();
     };
 
     // Goal steering events announce that the objective moved without carrying

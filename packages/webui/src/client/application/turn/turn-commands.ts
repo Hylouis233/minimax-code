@@ -322,6 +322,17 @@ export interface WebuiTurnSendIntent {
 export interface WebuiConversationTurnCommands {
   readonly send: (intent: WebuiTurnSendIntent) => Promise<void>;
   readonly attach: (turnId: string | undefined) => void;
+  /**
+   * `session.start` named a turn we do not hold while holding another: ask the
+   * authoritative active turn whether the held lease is stale or concurrent.
+   */
+  readonly recheck: (turnId: string | undefined) => void;
+  /**
+   * Gap recovery: a `session.start` can arrive before this client subscribed, or
+   * be missed while the event channel reconnects, and the session list cannot
+   * answer the question. Ask the server instead.
+   */
+  readonly recover: () => void;
   readonly stop: () => Promise<void>;
 }
 
@@ -369,7 +380,58 @@ export function createWebuiConversationTurnCommands(
     ...(capabilities?.load ? { loadMessages: capabilities.load } : {}),
   });
 
+  // One shared, deduplicated probe per transport: `webuiActiveTurnProbeFor` keys
+  // its cache by the `getActiveTurn` function, so the shell's rail probe and this
+  // command set collapse a same-session probe into one round trip.
+  const activeTurnProbe = (): WebuiActiveTurnProbe | undefined =>
+    webuiActiveTurnProbeFor(capabilities?.activeTurn);
+
+  /** Drop the lease only if it still carries the generation the probe decided is stale. */
+  const releaseSubscription = (generation: number): void => {
+    const writer = storeWriterFor();
+    createWebuiTurnLifecycleCommands({
+      setStream: writer.setStream,
+      setSending: writer.setSending,
+    }).releaseStreamSubscription(generation);
+  };
+
+  const attach = (turnId: string | undefined): void => {
+    const writer = writerFor();
+    attachWebuiTurn({
+      sessionId,
+      turnId,
+      ...(capabilities?.resume ? { resumeSession: capabilities.resume } : {}),
+      ...(capabilities?.load ? { loadMessages: capabilities.load } : {}),
+      readStream,
+      setSending: writer.setTurnSending,
+      sink: writer.createSink(),
+    });
+  };
+
+  const probeDeps = (): Pick<WebuiRecheckSubscriptionDeps, "probe"> &
+    Pick<WebuiRecoverMissedTurnDeps, "probe"> => {
+    const probe = activeTurnProbe();
+    return probe ? { probe } : {};
+  };
+
   return {
+    recheck: (turnId) =>
+      recheckWebuiSubscription({
+        sessionId,
+        ...(capabilities?.activeTurn ? { getActiveTurn: capabilities.activeTurn } : {}),
+        ...probeDeps(),
+        readStream,
+        releaseSubscription,
+        attach,
+      }),
+    recover: () =>
+      recoverMissedWebuiTurn({
+        sessionId,
+        ...(capabilities?.activeTurn ? { getActiveTurn: capabilities.activeTurn } : {}),
+        ...probeDeps(),
+        readStream,
+        attach,
+      }),
     send: async (intent) => {
       const writer = writerFor();
       await sendWebuiTurn({
@@ -394,18 +456,7 @@ export function createWebuiConversationTurnCommands(
         createWriter: () => writer,
       });
     },
-    attach: (turnId) => {
-      const writer = writerFor();
-      attachWebuiTurn({
-        sessionId,
-        turnId,
-        ...(loopDeps().resumeSession ? { resumeSession: loopDeps().resumeSession } : {}),
-        ...(capabilities?.load ? { loadMessages: capabilities.load } : {}),
-        readStream,
-        setSending: writer.setTurnSending,
-        sink: writer.createSink(),
-      });
-    },
+    attach,
     stop: async () => {
       if (!sessionId || !capabilities?.stop) return;
       const writer = storeWriterFor();

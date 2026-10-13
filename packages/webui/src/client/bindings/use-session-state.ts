@@ -179,6 +179,10 @@ export function useWebuiSessionCommands(sessionId: string | undefined): {
   readonly readStream: () => WebuiStreamState;
   readonly attachTurn: (input: WebuiTurnAttachIntent) => void;
   readonly sendTurn: (input: WebuiTurnSendIntent) => Promise<void>;
+  /** Recheck a lease a `session.start` no longer matches (T04). */
+  readonly recheckTurn: (turnId: string | undefined) => void;
+  /** Gap recovery for a `session.start` missed before the subscription was live. */
+  readonly recoverTurn: () => void;
   readonly stopTurn: () => Promise<void>;
 } {
   const store = useWebuiSessionStoreContext();
@@ -220,6 +224,8 @@ export function useWebuiSessionCommands(sessionId: string | undefined): {
       // the attempt's sink and the transports cut from the capability slice are
       // the application's own construction (T04). This hook names none of them.
       attachTurn: ({ turnId }) => turnCommands.attach(turnId),
+      recheckTurn: (turnId) => turnCommands.recheck(turnId),
+      recoverTurn: () => turnCommands.recover(),
       sendTurn: ({ onDraftChange, onNeedsSession, onSessionCreated, onQueued, ...args }) =>
         turnCommands.send({
           ...args,

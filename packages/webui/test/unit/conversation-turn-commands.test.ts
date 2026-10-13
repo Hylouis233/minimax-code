@@ -136,3 +136,64 @@ describe("the conversation turn commands", () => {
   });
 });
 
+describe("recheck and gap recovery are the command set's, not the view's", () => {
+  const busy = { turnId: "t-1", busyReason: "turn" as const, locallyOwned: false };
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it("recovers a turn the client never saw, on the session's record", async () => {
+    const store = createWebuiSessionStore();
+    const commands = createWebuiConversationTurnCommands({
+      store,
+      sessionId: "s1",
+      capabilities: { resume: openStream as never, activeTurn: (async () => busy) as never },
+    });
+
+    commands.recover();
+    await tick();
+
+    // The command chose the probe, the key and the sink: the attachment landed
+    // on the session's record with the turn the server named.
+    expect(store.readSession("s1").stream.subscription?.turnId).toBe("t-1");
+    expect(store.readSession("s1").sending).toBe(true);
+  });
+
+  it("shares one probe across recovery calls in the same round trip", async () => {
+    const store = createWebuiSessionStore();
+    const getActiveTurn = vi.fn(async () => busy);
+    const commands = createWebuiConversationTurnCommands({
+      store,
+      sessionId: "s1",
+      capabilities: { resume: openStream as never, activeTurn: getActiveTurn as never },
+    });
+
+    // Two callers, one session, one round trip: the probe is the transport's
+    // shared one, not a second one built here.
+    commands.recover();
+    commands.recover();
+    await tick();
+
+    expect(getActiveTurn).toHaveBeenCalledTimes(1);
+  });
+
+  it("retargets a lease a session.start no longer matches", async () => {
+    const store = createWebuiSessionStore();
+    const commands = createWebuiConversationTurnCommands({
+      store,
+      sessionId: "s1",
+      capabilities: {
+        resume: openStream as never,
+        activeTurn: (async () => ({ ...busy, turnId: "t-new" })) as never,
+      },
+    });
+
+    commands.attach("t-old");
+    expect(store.readSession("s1").stream.subscription?.turnId).toBe("t-old");
+
+    commands.recheck("t-new");
+    await tick();
+
+    // The stale lease was released (scoped to its generation) and the live turn
+    // attached in its place.
+    expect(store.readSession("s1").stream.subscription?.turnId).toBe("t-new");
+  });
+});
