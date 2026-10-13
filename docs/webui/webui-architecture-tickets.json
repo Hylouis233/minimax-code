@@ -1058,7 +1058,8 @@
       "a521a39a",
       "688f0fa3",
       "2a8c7fcf",
-      "f8023447"
+      "f8023447",
+      "e8c6a960"
     ],
     "published": false,
     "tickets": {
@@ -1075,8 +1076,8 @@
       "T17"
     ],
     "notes": [
-      "T05 C4 browser evidence: the composer no longer clears the canonical goal when a session switch resets the goal presentation (a521a39a). The unit-level retained-truth cases pass. A browser regression case was written twice and withdrawn: the switch it drives lands on a session the goal-retention fixture does not carry in its rail (the page snapshot shows a different session), so the case asserted nothing about the switch. It needs a fixture whose second session exists in the tree; the withdrawn case is not kept in the repository.",
-      "T05 effects-registry removal landed as 2a8c7fcf after the earlier revert: the browser failure that blocked it was a legitimate behaviour change (an accepted channel now reconciles the session's goal per §4.3, so a session with an active goal reopens the composer in goal mode), not a regression. The retry case now asserts the composer is present and usable."
+      "T05 C4 evidence: the correction (a session switch resets the goal presentation without clearing the retained goal) is pinned by a source tripwire in goal-interaction-prohibitions.test.ts, verified to discriminate (restoring the old clear fails it). The browser regression case is still not in the repository: it passes standalone, and in the full browser run the post-switch banner still shows the PREVIOUS session's goal while the rail reports the new session active. That symptom is unexplained and is the item that keeps T05 open.",
+      "T05 effects-registry removal landed as 2a8c7fcf: the earlier browser failure was a legitimate behaviour change (an accepted channel reconciles the session's goal per §4.3), not a regression."
     ]
   },
   "publicationVerification": {
