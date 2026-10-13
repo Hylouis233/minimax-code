@@ -3593,6 +3593,7 @@
     "packages/webui/src/client/bindings/use-connection-health.ts",
     "packages/webui/src/client/bindings/use-query-state.tsx",
     "packages/webui/src/client/bindings/use-session-state.ts",
+    "packages/webui/src/client/bindings/version-cells.ts",
     "packages/webui/src/client/client.js",
     "packages/webui/src/client/components/AccountLoginDialog.tsx",
     "packages/webui/src/client/components/ActivityIndicator.tsx",

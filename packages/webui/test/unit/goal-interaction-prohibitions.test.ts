@@ -15,6 +15,7 @@ import { readdirSync, readFileSync } from "node:fs";
 
 import type { WebuiInteractionSink } from "../../src/client/application/interaction-coordinator.js";
 import type { WebuiGoalSink } from "../../src/client/application/goal-coordinator.js";
+import { createWebuiVersionCells } from "../../src/client/application/version-cell.js";
 
 const CLIENT_ROOT = new URL("../../src/client/", import.meta.url);
 
@@ -98,6 +99,23 @@ describe("prohibition 2 — a rule may not be filed under a module that does not
     expect(flat(read("application/interaction-coordinator.ts"))).toContain(
       "webuiAnswersEndTurn(answers)",
     );
+  });
+
+  it("the two fence cells are created by the application, not by the component", () => {
+    // §4.2 field 6: the composer owns neither fence. The cell has to outlive a
+    // render, so the application creates the instance and the business reads the
+    // one it is handed.
+    const composer = flat(read("components/SessionComposer.tsx"));
+    expect(composer).toContain("useWebuiVersionCells()");
+    expect(composer).not.toMatch(/useRef\(0\)/u);
+    expect(flat(read("application/create-application.ts"))).toContain(
+      "const versionCells = createWebuiVersionCells();",
+    );
+    // One type, two objects: independence is structural, not conventional.
+    const cells = createWebuiVersionCells();
+    expect(cells.goal).not.toBe(cells.pending);
+    cells.goal.current += 1;
+    expect(cells.pending.current).toBe(0);
   });
 
   it("goal: no component holds a goal fence or a goal read of its own", () => {

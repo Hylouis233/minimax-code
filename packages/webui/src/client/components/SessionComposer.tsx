@@ -70,6 +70,7 @@ import {
 import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js";
 import { useWebuiPortSlice } from "../bindings/port-slices-context.js";
 import { useWebuiEventEffectsRegistry } from "../bindings/event-effects-context.js";
+import { useWebuiVersionCells } from "../bindings/version-cells.js";
 import { webuiSessionStatusType } from "../projection/stream-state.js";
 
 /** Capability subset the session composer consumes. Single source of truth
@@ -727,14 +728,18 @@ export function WebuiComposer({
   // it, which permissions a re-read keeps — lives there. This component supplies
   // the wiring and keeps the one error slot that every other flow in this file
   // also writes, which is why the flows return an outcome instead of an error.
-  // Bumped by every write to the goal, so a steering re-read that lands after
-  // a newer update can tell it is stale and stand down. EVERY writer must go
-  // through `applyGoal` — a direct store write here would let an in-flight read
-  // resurrect the state it was meant to replace. The cell is held here and the
-  // policy is the coordinator's: it is constructed per render, so a counter
-  // living inside it would reset and silently disable both guards.
-  const goalVersionRef = useRef(0);
-  const pendingVersionRef = useRef(0);
+  // The two fence cells come from the application, not from this component
+  // (§4.2 field 6: the composer owns neither the goal's fence nor interactions'
+  // late-read protection). Bumped by every write, so a steering re-read that
+  // lands after a newer update can tell it is stale and stand down; EVERY goal
+  // writer must go through `applyGoal`, because a direct store write would let
+  // an in-flight read resurrect the state it was meant to replace. The policy is
+  // each coordinator's; the cell has to outlive a render, which is why the
+  // application creates it — a counter inside a per-render coordinator would
+  // reset and silently disable the guard it protects.
+  const versionCells = useWebuiVersionCells();
+  const goalVersionRef = versionCells.goal;
+  const pendingVersionRef = versionCells.pending;
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
   const interactionCoordinator = createWebuiInteractionCoordinator({

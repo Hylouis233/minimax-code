@@ -42,6 +42,10 @@ import {
   type WebuiComposerStore,
 } from "./composer-store.js";
 import {
+  createWebuiVersionCells,
+  type WebuiVersionCells,
+} from "./version-cell.js";
+import {
   createWebuiTranscriptHistoryOwner,
   type WebuiTranscriptHistoryOwner,
 } from "./transcript-history.js";
@@ -108,6 +112,11 @@ export interface WebuiApplication {
   readonly unread: WebuiUnreadController;
   /** The one owner of composer drafts and input history (plan §7.6). */
   readonly composer: WebuiComposerStore;
+  /**
+   * The two version cells, one per fence (§4.2 field 6). The application owns the
+   * instance; the business owns the policy and reads the cell it is given.
+   */
+  readonly versionCells: WebuiVersionCells;
   /**
    * Commit home→session adoption as one transition: carry the home turn's live
    * record onto the created session, move the home composer slot onto it and
@@ -184,6 +193,12 @@ export function createWebuiApplication(
   });
   unread.hydrate(readActiveSessionId());
   const composer = deps.composer ?? createWebuiComposerStore();
+  // The two fence cells (§8 Phase 3 B2). Created once per application, because
+  // the coordinator that uses one is constructed on every render and a counter
+  // living in it would reset; published, because §4.2 field 6 makes the goal's
+  // fence `goal`'s state and interactions' late-read protection `interactions'`,
+  // so the component must not be the thing that declares them.
+  const versionCells = createWebuiVersionCells();
   // The effects slot: the initial set is the composition root's, and a later
   // registration (the subtree that owns the effects) replaces it in place. The
   // coordinator holds the slot object, not a copy of its members, so a
@@ -228,6 +243,7 @@ export function createWebuiApplication(
     transcriptHistory,
     unread,
     composer,
+    versionCells,
     adoptHomeSession: (sessionId) => {
       // One committed transition: the home turn's live record moves onto the
       // created session, the composer's home slot moves onto it, and the

@@ -40,19 +40,21 @@ history are in it today) with `application/composer-workflows.ts`. §5.6's targe
 | `planMode` `:777` | component-local `useState` | composer state (§4.2 field 1: input mode flags) | `composer-store.ts` |
 | `goalMode` `:776` | component-local `useState` | composer state (§4.2 field 1: input mode flags) | `composer-store.ts` |
 
-## 2. Foreign state in a temporary home — the two fence cells
+## 2. Foreign state in a temporary home — the two fence cells (resolved)
 
 There is a fourth disposition, and the composer holds exactly two of them:
 
 | Element | Today | Why it is foreign | Disposition |
 | --- | --- | --- | --- |
-| `goalVersionRef` `:736` | `useRef(0)` in the component, handed to `WebuiGoalCoordinator` | §4.2 field 6: the composer **does not own** "the goal entity and its version fence (→ `goal`)" | the cell is created by the owner, not passed in: today's comment explains it correctly — the coordinator is constructed per render, so a counter inside it would reset — and the answer to that is to construct the coordinator (or at least its cell) in the application layer, which B1's `createWebuiApplication` already owns |
-| `pendingVersionRef` `:737` | `useRef(0)` in the component, handed to `WebuiInteractionCoordinator` | §4.2 field 6: the composer does not own interactions' late-read protection | same |
+| `goalVersionRef` `:736` | was `useRef(0)` here; now `versionCells.goal`, read from the application | §4.2 field 6: the composer **does not own** "the goal entity and its version fence (→ `goal`)" | **resolved:** `createWebuiApplication` creates the pair (`const versionCells = createWebuiVersionCells();`) and the composer reads it through `bindings/version-cells.ts#useWebuiVersionCells`. The fallback in that hook is a per-mount pair for a composer mounted without an application (unit tests, a standalone surface), so the guard keeps working rather than silently comparing against a counter that resets every render |
+| `pendingVersionRef` `:737` | was `useRef(0)` here; now `versionCells.pending` | §4.2 field 6: the composer does not own interactions' late-read protection | **resolved:** same construction; `createWebuiVersionCells()` returns one type and two independent objects |
 
 This is the ledger earning its keep: B1 gave each business its own cell and its own policy,
-and the *creation* of both cells still sits in the component it was moved out of. B2 moves
-it, and `goal-coordinator.test.ts`'s independence cases (`a goal write does not bump the
-pending cell`, `a pending reply does not bump the goal cell`) keep the two from merging.
+and the *creation* of both cells still sat in the component it was moved out of. The pair is
+asserted in `goal-interaction-prohibitions.test.ts` (the application creates it, the composer
+holds no `useRef(0)`, and bumping one cell leaves the other at zero) and the independence
+cases in `goal-coordinator.test.ts` (`a goal write does not bump the pending cell`, `a pending
+reply does not bump the goal cell`) keep the two from merging.
 
 ## 3. Local view state — stays in the component (§5.5)
 
@@ -121,8 +123,8 @@ ticket is not blocked.
 
 **Not yet in its final home** (this carve's work, in the order the code allows):
 1. §1 — thirteen elements move into `composer-store.ts` (the queue and the retry record
-   are the two §4.2 names explicitly).
-2. §2 — the two fence cells stop being created in the component.
+   are the two §4.2 names explicitly). **Not started.**
+2. §2 — **done** (the two cells above).
 3. §4 — the caches whose owner module does not exist yet lose their local copy in that
    owner's carve; until then the ledger records the API each one resolves against, and the
    composer's `useState` is a cache of a published read rather than a second source.
