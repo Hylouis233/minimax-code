@@ -615,8 +615,8 @@ tells the executor which files each row moves.
 | --- | --- | --- | --- | --- | --- |
 | `sessions` | `application/session-store.ts` (root, per §6.1's tree), `application/sessions/session-catalog.ts` | the session store (the single writable copy), the catalog read model, unread hydration ordering, and the per-session context-window consumption published for the composer's ring — **not** the rail's view state, and **not** the ring's `open`/`breakdownOpen`/`placement`, which are the component's view state | create / select / archive / fork / rename / import / export / delete, mark-read, `contextWindowUsage(sessionId)`, and `purge` as the published form of today's injected `purgeSlot` | **`unread.ts` — the already-correct shared rule (§5.1.4) and the template for the rest** | `purgeSlot` becomes a published command (no injected optional); `workspaceProjectName` leaves `SessionRail.tsx:144` for `workspace`; the two storage-key maps leave `LeftRail.tsx`; **`ContextUsageIndicator` leaves `SessionComposer.tsx` for `components/sessions/`, reads `account`'s quota and `models`' selection without writing either, and owns no state beyond its own view state — it is React/DOM presentation and MUST NOT be filed under `client/projection/`**; **`ArchivedSessionsPage` files under `components/sessions/`** (the second entry point §4.1 already names), and the archived state must **not** be added back into `session-workflows.ts`, which holds two machines |
 | `composer` | `application/composer/composer-store.ts`, `composer-workflows.ts` | draft text, input history, attachments and url references, mention/slash ranges, toolbar and queue state | `setDraft`, `recordComposerInput`, attachments, `chooseMention`, `chooseCommand`, the queue commands | — (its own) | The `sink` (`SessionComposer.tsx:750-769`) stops carrying four businesses' writers; the model, goal and interaction duties leave the composer |
-| `transcript` | `application/transcript/` (request ownership) + `projection/transcript/` | the transcript view model derived from the substrate | load a history page, load older, request a turn review (an invocation of `review`) | the **`review` state machine** — owner module `application/transcript/review-state.ts`, extracted from `DiffCard.tsx`'s reducer, with two readers (§10 S13). A capability's home is inside the business that presents it | `DiffCard.tsx`'s reducer and its five other pure functions leave the component file |
-| `workspace` | `application/workspace/workspace-queries.ts` + `projection/workspace/` | the file-tree query state and the git state. Panel open/expanded/active is the **component's** view state | `dispatchWorkspacePanel`, file read, git mutate (declared) | **the tab-kind enumeration — one registry, replacing the three sites at `workspace-panel-state.ts:3-9`, `WorkspacePanels.tsx:631`, `:655-657`** | the terminal *tab* stays; the terminal *process* does not (it is `workspace`'s capability, confirmed against Desktop in §14.4); **the coding and worktree settings pages are `workspace`' — `SettingsReviewPage` and `WebuiReviewPanel` file under `components/workspace/`, and their review commands are the `review` capability's, not `settings`'; `WebuiWorktreePanel` likewise** |
+| `transcript` | `application/transcript/` (request ownership) + `projection/transcript/` | the transcript view model derived from the substrate | load a history page, load older, request a turn review (an invocation of `review`) | the **`review` state machine** — owner module `projection/transcript/review-state.ts` (§15.1's row for the existing file, and §7's rule: the module is pure, so it files under `projection/`), extracted from `DiffCard.tsx`'s reducer, with two readers (§10 S13). A capability's home is inside the business that presents it | `DiffCard.tsx`'s reducer and its five other pure functions leave the component file |
+| `workspace` | `application/workspace/workspace-queries.ts` + `projection/workspace/` | the file-tree query state and the git state. Panel open/expanded/active is the **component's** view state | `dispatchWorkspacePanel`, file read, git mutate (declared) | **the tab-kind enumeration — one registry, replacing the three sites at `workspace-panel-state.ts:3-9`, `WorkspacePanels.tsx:631`, `:655-657`** | the terminal *tab* stays; the terminal *process* does not (it is `workspace`'s capability, confirmed against Desktop in §14.4); **the coding and worktree settings pages are `workspace`' — `ReviewSettingsPage` and `WebuiReviewPanel` file under `components/workspace/`, and their review commands are the `review` capability's, not `settings`'; `WebuiWorktreePanel` likewise** |
 | `interactions` | `application/interactions/interaction-coordinator.ts` | pending permission and questionnaire state, the replies, late-read protection | `replacePendingPermissions`, `removePendingPermission`, `applyQuestionnaire` | — (its own) | the coordinator loses the goal duty it absorbed as a third responsibility |
 | `goal` | `application/goal/` + `projection/goal/` | the goal entity projection, status and version, **the version fence** | `createGoal`, `patchGoal`, `clearGoal`, `refreshGoal`, goal-mode entry/exit | the fence lives here and only here; it is WebUI-local (§14.4) | `GoalBanner.tsx` and `goal-state.ts` move here, not to `interactions` |
 | `models` | `application/models/` + `projection/models/` | the model catalogue query state, selection command state, thinking state, the provider list | `listModels`, `selectModel`, provider CRUD | — (its own) | `ModelPicker.tsx`'s five pure functions leave the component; permission mode stays in `settings`; **provider CRUD (`upsertApiKey` `:146`, `patchProviderModels` and `updateProvider` `:232-233`) is this row's duty, not `settings`' — `UsageModelSettings` renders it and must not own it** |
@@ -1721,6 +1721,38 @@ that carries the skill listing §4.2 and §4.8 publish to the composer's palette
 holds it. It files under `client/contracts/plugins/` (the operator's decision, 2026-10-12); the inventory
 that found it is `docs/webui/plugin-action-inventory.md`. The three cells' line budget is re-derived at
 A3, because a line count here is a sizing estimate, not a source partition.
+
+**Phase 3's own modules — the rows the carves create (added 2026-10-13; not folded into the counts above).**
+Phase 3 *creates* modules as well as moving them: a carve that separates a duty has to leave the separated code
+somewhere, and §6.1's tree is what names that somewhere. The rows below are the modules Phase 3 has created so
+far, each with the target §6.1's tree and §5.6's owner rows give it. **They are additions, not a correction: the
+arithmetic above (`148` printed, `144` executable, `127` sources) counts the pre-Phase-3 tree, and `#122` (E3)
+re-derives every affected figure** — a reader checking that arithmetic against this table finds it still holds
+for the rows above this paragraph.
+
+| from | to | lines | created by |
+| --- | --- | ---: | --- |
+| `client/application/models-workflows.ts` | `client/application/models/models-workflows.ts` | 310 | the `models` duty carve: §5.6 gives that business the catalogue, the selection and the provider list |
+| `client/application/goal-coordinator.ts` | `client/application/goal/goal-coordinator.ts` | 178 | B1, separating the goal duty from the interaction coordinator (§5.6 `goal`) |
+| `client/application/turn-capabilities.ts` | `client/application/turn/turn-capabilities.ts` | 79 | §8 Phase 1 step 1; §5.6's `turn` row names the turn capability slice as `turn`'s |
+| `client/projection/event-kinds.ts` | `client/projection/common/event-kinds.ts` | 156 | B1's S9 registry — the one enumeration of the goal and interaction event families, shared by two businesses, so it files at the non-business home (§6.1) rather than under either |
+| `client/projection/rail-menu.ts` | `client/projection/sessions/rail-menu.ts` | 119 | B3's S1 — the rail is a place the user works and the menu is the rail's rule (§4.1) |
+| `client/projection/workspace-name.ts` | `client/projection/workspace/workspace-name.ts` | 23 | B3, moving the rule off `SessionRail.tsx` (§5.6 `workspace`) |
+| `client/components/workspace/ReviewSettingsPage.tsx` | *(at its target)* | 317 | §16.10 `execute`. Created as `SettingsReviewPage.tsx` and renamed to this row's basename on 2026-10-13, so the tree matches §15.1 and §16.10 |
+| `client/components/settings/settings-glyphs.tsx` | `client/components/shared/settings-glyphs.tsx` | 31 | extracted so the review page and the settings pages share one glyph module instead of two copies; no business owns it, so `components/shared/`, §6.1's non-business home |
+
+**Three Phase 3 modules need no row.** `client/application/query-store.ts` (115 lines — the cached-read fence
+§16.3 requires to exist once), `client/application/version-cell.ts` (42 — one version cell per fence) and
+`client/application/port-slices.ts` (296 — the per-business slice constructor) are **root-shared application
+modules**, which §6.1's tree provides for beside `create-application.ts`, `state.ts`, `session-store.ts` and
+`selectors.ts`. Their Phase 4 target is their current path.
+
+**Four of the contract rows above carried a basename the A3 re-file did not use; aligned on 2026-10-13.**
+`composer/command-port.ts` is on disk as `composer/composer-port.ts`, `shell/watch-port.ts` as
+`shell/event-port.ts`, `models/provider-port.ts` as `models/models-port.ts`, and
+`transcript/session-read-port.ts` as `transcript/transcript-port.ts`. The rows' basenames are the authority and
+the tree moved to them. This rename stays inside `client/contracts/`, which §6.1 classifies by prefix, so —
+unlike a rename inside `client/projection/` — it cannot change a module's classification.
 
 **What this table cannot prove.** It is a mapping, not a census. `PROJECTION_SPLIT` and
 `CLIENT_FILE_PROVENANCE` are tables of *mappings*, and a mapping outlives the file it described — two of
