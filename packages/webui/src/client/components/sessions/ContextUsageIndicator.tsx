@@ -5,18 +5,18 @@
 // arithmetic that keeps the popover inside the viewport. Its opted-in flag, hover and breakdown state
 // live here; the composer passes the usage it read, the quota, and the selected model in.
 
-import type { WebuiModelEntry } from "../../shared/contracts/models.js";
-import type { WebuiUsageQuotaResult } from "../../shared/contracts/usage-quota.js";
-import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js";
-import { breakdownSegmentPercent, breakdownShareLabel, breakdownSwatchStyle, contextBreakdownRows, drawableBreakdownRows } from "../projection/context-breakdown.js";
+import type { WebuiModelEntry } from "../../../shared/contracts/models.js";
+import type { WebuiUsageQuotaResult } from "../../../shared/contracts/usage-quota.js";
+import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
+import { breakdownSegmentPercent, breakdownShareLabel, breakdownSwatchStyle, contextBreakdownRows, drawableBreakdownRows } from "../../projection/context-breakdown.js";
 import {
   contextUsagePopoverStyle,
   positionContextUsagePopover,
   sameContextUsagePlacement,
   type ContextUsagePlacement,
-} from "../projection/context-usage-popover.js";
-import { readUsageNumber } from "../projection/message-projection.js";
-import { isTokenPlanModel } from "../projection/token-plan-model.js";
+} from "../../projection/context-usage-popover.js";
+import { readUsageNumber } from "../../projection/message-projection.js";
+import { isTokenPlanModel } from "../../projection/token-plan-model.js";
 import { formatUsageResetLabel } from "../account/UserMenuUsage.js";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactElement } from "react";
 

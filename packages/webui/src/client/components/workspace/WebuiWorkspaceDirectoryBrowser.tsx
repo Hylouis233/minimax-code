@@ -4,12 +4,12 @@
 // accepts a typed absolute path, and hands the chosen directory back. It owns its listing, loading and
 // error state; the composer owns the open/closed flag and the value, and passes the browse command in.
 
-import type { type ReactElement } from "react";
-import { WebuiIconFolder } from "../icons.js";
-import type { WebuiTransport } from "../contracts/transport.js";
-import type { WebuiWorkspaceDirectoryListing } from "../../shared/contracts/workspace.js";
-import { looksLikeAbsoluteWorkspacePath } from "../paths.js";
-import { useCallback, useEffect, useState } from "react";
+
+import { WebuiIconFolder } from "../../icons.js";
+import type { WebuiTransport } from "../../contracts/transport.js";
+import type { WebuiWorkspaceDirectoryListing } from "../../../shared/contracts/workspace.js";
+import { looksLikeAbsoluteWorkspacePath } from "../../paths.js";
+import { useCallback, useEffect, useState, type ReactElement } from "react";
 
 export function WebuiWorkspaceDirectoryBrowser({
   browseWorkspaceDirs,

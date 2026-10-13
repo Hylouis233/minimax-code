@@ -539,7 +539,7 @@ function RailContextMenu({ menu, onClose }: {
   return <WebuiContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={onClose} />;
 }
 
-function WebuiProjectList({
+export function WebuiProjectList({
   page,
   treePage,
   projectRecords,
