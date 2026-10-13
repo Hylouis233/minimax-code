@@ -1061,7 +1061,8 @@
       "f8023447",
       "e8c6a960",
       "344dd225",
-      "a0d33dfa"
+      "a0d33dfa",
+      "2086cf52"
     ],
     "published": false,
     "tickets": {
@@ -1070,7 +1071,7 @@
       "T03": "implemented locally, acceptance evidence recorded on #129",
       "T04": "implemented locally, acceptance evidence recorded on #130",
       "T05": "closed 2026-10-13, acceptance evidence recorded on #131",
-      "T06": "in progress: conversation-history-interface's keyed per-session/page ownership delivered (a0d33dfa); transcript-public-view-and-feedback and compatible-context-read-sharing still open"
+      "T06": "in progress: keyed per-session/page history ownership (a0d33dfa) and the transcript view model cut with the turn-live predicate moved to its owner (2086cf52) delivered; transcript public view/feedback commands, compatible context read sharing and the contracts/projections relocation still open"
     },
     "frontier": [
       "T06",
@@ -1078,8 +1079,8 @@
       "T17"
     ],
     "notes": [
-      "T06 first slice (a0d33dfa): transcript history is now a keyed resource per (sessionId, anchor) plus a selected-view slot, replacing the singleton request ownership. Remaining for T06: the transcript's public view and feedback commands, sharing a compatible context read, moving transcript contracts/projections/bindings to their target homes, and cutting the large transcript by view-model/scroll/response responsibilities.",
-      "T05 closed with all eight acceptance criteria evidenced on #131. One boundary: an accepted channel re-reads the session's goal per plan 4.3, so a session with an active goal reopens the composer in goal mode; the settings-account-tab retry case asserts the composer is present and usable instead of the message-mode placeholder."
+      "T06 second slice (2086cf52): the transcript's eleven projection memos became one pure view model in projection/transcript/transcript-view-model.ts (SessionTranscript.tsx 814 to 653 lines) and isTurnLive moved from the composer projection to the turn business that owns the stream phase. Remaining for T06: transcript-owned feedback commands, a compatible context read shared with history, the contracts/projections/bindings relocation, and the scroll binding cut.",
+      "T06 first slice (a0d33dfa): transcript history is a keyed resource per (sessionId, anchor) plus a selected-view slot, replacing the singleton request ownership."
     ]
   },
   "publicationVerification": {
