@@ -12,30 +12,7 @@ import { createPortal } from "react-dom";
 import { WebuiIconContextChevron } from "../shell/icons.js";
 import { evaluateOutsideClose } from "../../projection/common/outside-close.js";
 import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
-
-export function placeWebuiContextMenu({
-  x,
-  y,
-  width,
-  height,
-  viewportWidth,
-  viewportHeight,
-  padding = 8,
-}: {
-  readonly x: number;
-  readonly y: number;
-  readonly width: number;
-  readonly height: number;
-  readonly viewportWidth: number;
-  readonly viewportHeight: number;
-  readonly padding?: number;
-}): { readonly left: number; readonly top: number } {
-  const maxLeft = Math.max(padding, viewportWidth - width - padding);
-  const left = Math.min(Math.max(padding, x), maxLeft);
-  const flippedTop = y + height + padding > viewportHeight ? y - height : y;
-  const maxTop = Math.max(padding, viewportHeight - height - padding);
-  return { left, top: Math.min(Math.max(padding, flippedTop), maxTop) };
-}
+import { placeWebuiContextMenu } from "../../projection/shell/context-menu.js";
 
 export type WebuiContextMenuItem =
   | { readonly kind: "divider"; readonly key: string }

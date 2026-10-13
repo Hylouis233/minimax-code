@@ -23,8 +23,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
 import {
   WebuiContextMenu,
-  placeWebuiContextMenu,
 } from "../../src/client/components/shared/ContextMenu.js";
+import { placeWebuiContextMenu } from "../../src/client/projection/shell/context-menu.js";
 import { WebuiInteractionPanel } from "../../src/client/components/interactions/InteractionPanel.js";
 import {
   WebuiProjectList,
