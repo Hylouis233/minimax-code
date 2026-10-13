@@ -28,9 +28,7 @@ import {
 import type {WebuiClientMessageSender} from "../contracts/turn/execution-port.js";
 import { looksLikeAbsoluteWorkspacePath } from "../paths.js";
 import type { WebuiClientMessageLoader } from "../contracts/transcript/message-view.js";
-import type { WebuiModelSelectionRequest } from "../contracts/models/model-view.js";
 import type { WebuiClientSessionPage, WebuiClientSession } from "../contracts/sessions/session-view.js";
-import type { WebuiTransport } from "../contracts/transport.js";
 import { projectWebuiMessageToStreamMessage, readUsageNumber } from "../projection/message-projection.js";
 import { webuiAnswersEndTurn } from "../projection/questionnaire-state.js";
 import {
@@ -71,8 +69,8 @@ import { useWebuiEventEffectsRegistry } from "../bindings/event-effects-context.
 import { webuiSessionStatusType } from "../projection/stream-state.js";
 
 /** Capability subset the session composer consumes. Single source of truth
- *  lives in `WebuiTransport`; this alias keeps the prop block free of
- *  per-key `WebuiTransport["x"]` redeclarations. */
+ *  the workspace slice owns; the browser reads it there rather than taking it
+ *  as a prop. */
 import type {
   WebuiGoal,
 } from "../../shared/contracts/goal.js";
@@ -300,22 +298,25 @@ function readBrowserFile(file: File): Promise<string> {
  * directory. So the server enumerates this machine's directories and the
  * user picks from what it reports.
  *
- * When the transport has no `browseWorkspaceDirs` — a static fixture
+ * When the workspace slice carries no `browseWorkspaceDirs` — a static fixture
  * transport, or a server that predates the operation — the browser falls
  * back to a manual absolute-path field. Either way a failure is shown in
  * the popover; it never resolves to a silent no-op.
  */
 export function WebuiWorkspaceDirectoryBrowser({
-  browseWorkspaceDirs,
   initialDir,
   onSelect,
   onCancel,
 }: {
-  readonly browseWorkspaceDirs?: WebuiTransport["browseWorkspaceDirs"];
   readonly initialDir?: string;
   readonly onSelect: (dir: string) => void;
   readonly onCancel: () => void;
 }): ReactElement {
+
+  // The workspace slice (plan §8 Phase 2, A4-s4): the directory browser reads the
+  // one capability it uses off its own slice instead of taking it as a prop.
+  const workspacePort = useWebuiPortSlice("workspace");
+  const browseWorkspaceDirs = workspacePort?.browseWorkspaceDirs;
 
   const [listing, setListing] = useState<WebuiWorkspaceDirectoryListing>();
   const [error, setError] = useState<string>();
@@ -558,9 +559,6 @@ export function WebuiComposer({
   runCommand,
   sendMessage,
   getActiveTurn,
-  listModels,
-  listSkills,
-  selectModel,
   getAccountStatus,
   draft,
   onDraftChange,
@@ -569,11 +567,6 @@ export function WebuiComposer({
   onNeedsSession,
   onSessionCreated,
   teamModeOff,
-  listWorkspaceFileTree,
-  browseWorkspaceDirs,
-  pluginManagement,
-  getPermissionMode,
-  setPermissionMode,
   sessions = [],
   workspaceDir,
   onSelectSession,
@@ -603,9 +596,6 @@ export function WebuiComposer({
    * missed-event gap that a reconnect or a slow subscribe can open. */
   readonly getActiveTurn?: (request: WebuiActiveTurnRequest) => Promise<WebuiActiveTurnResult>;
 
-  readonly listModels?: (request?: { readonly sessionId?: string }) => Promise<readonly WebuiModelEntry[]>;
-  readonly listSkills?: (request?: { readonly agentName?: string }) => Promise<{ readonly skills: readonly { readonly name: string; readonly displayName?: string; readonly description?: string }[] }>;
-  readonly selectModel?: (request: WebuiModelSelectionRequest) => Promise<{ readonly success?: boolean }>;
   readonly getAccountStatus?: (request?: { readonly sessionId?: string }) => Promise<Record<string, unknown>>;
   /** The draft lives on the shell so it survives silent first-session creation. */
   readonly draft: string;
@@ -642,16 +632,27 @@ export function WebuiComposer({
     readonly read: () => string[];
     readonly write: (ids: readonly string[]) => void;
   };
-  readonly listWorkspaceFileTree?: WebuiTransport["listWorkspaceFileTree"];
-  readonly browseWorkspaceDirs?: WebuiTransport["browseWorkspaceDirs"];
-  readonly pluginManagement?: WebuiTransport["pluginManagement"];
-  readonly getPermissionMode?: WebuiTransport["getPermissionMode"];
-  readonly setPermissionMode?: WebuiTransport["setPermissionMode"];
   readonly sessions?: readonly WebuiClientSession[];
   readonly workspaceDir?: string;
   readonly onSelectSession?: (sessionId: string) => void;
   readonly onOpenPluginManagement?: (area: "plugins" | "skills") => void;
 }): ReactElement {
+
+  // The workspace, models, plugins and settings slices (plan §8 Phase 2, A4-s4):
+  // the same move as the five above, for the four businesses this step names.
+  const workspacePort = useWebuiPortSlice("workspace");
+  const modelsPort = useWebuiPortSlice("models");
+  const pluginsPort = useWebuiPortSlice("plugins");
+  const settingsPort = useWebuiPortSlice("settings");
+  const listWorkspaceFileTree = workspacePort?.listWorkspaceFileTree;
+  const browseWorkspaceDirs = workspacePort?.browseWorkspaceDirs;
+  const listModels = modelsPort?.listModels;
+  const selectModel = modelsPort?.selectModel;
+  const pluginManagement = pluginsPort?.pluginManagement;
+  const listSkills = pluginsPort?.listSkills;
+  const getPermissionMode = settingsPort?.getPermissionMode;
+  const setPermissionMode = settingsPort?.setPermissionMode;
+
 
   // The five business slices (plan §8 Phase 2, A4-s3). Each business's
   // capabilities arrive through that business's slice rather than through a prop
@@ -2523,7 +2524,7 @@ export function WebuiComposer({
                 className="webui-workspace-menu webui-workspace-menu--desktop"
               >
                 <WebuiWorkspaceDirectoryBrowser
-                  browseWorkspaceDirs={browseWorkspaceDirs}
+
                   initialDir={createSessionWorkspaceDir}
                   onSelect={(dir) => {
                     setWorkspaceBrowserOpen(false);

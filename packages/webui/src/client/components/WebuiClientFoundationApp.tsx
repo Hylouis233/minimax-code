@@ -256,6 +256,9 @@ export function WebuiClientFoundationApp(
   const sessionsPort = portSlices.sessions;
   const transcriptPort = portSlices.transcript;
   const composerPort = portSlices.composer;
+  const workspacePort = portSlices.workspace;
+  const pluginsPort = portSlices.plugins;
+  const settingsPort = portSlices.settings;
   // The one application session store for this mount (plan §7.6; ticket #45).
   // A caller (tests, SSR) may inject one; production omits the prop and the
   // shell creates exactly one. The shell provides this exact object through
@@ -358,8 +361,8 @@ export function WebuiClientFoundationApp(
   // discards a late response from a superseded request. Provided to the two
   // workspace panels, which submit query commands and read its snapshot.
   const workspaceQueries = useMemo(
-    () => createWebuiWorkspaceQueries({ port: transport ?? {} }),
-    [transport],
+    () => createWebuiWorkspaceQueries({ port: workspacePort }),
+    [workspacePort],
   );
   // The account, settings and plugin owners (ticket #52). One of each per
   // mount, provided to the user menu, the settings dialog and the plugin
@@ -370,8 +373,8 @@ export function WebuiClientFoundationApp(
     [transport],
   );
   const settingsWorkflows = useMemo(
-    () => createWebuiSettingsWorkflows({ port: transport ?? {} }),
-    [transport],
+    () => createWebuiSettingsWorkflows({ port: settingsPort }),
+    [settingsPort],
   );
   // The runtime handshake fact is a `SettingsPort` method, so it is read through
   // the settings owner like every other settings read rather than invoked here.
@@ -388,8 +391,8 @@ export function WebuiClientFoundationApp(
     void settingsWorkflows.loadVersion();
   }, [runtimeVersion, settingsWorkflows]);
   const pluginWorkflows = useMemo(
-    () => createWebuiPluginWorkflows({ port: transport ?? {} }),
-    [transport],
+    () => createWebuiPluginWorkflows({ port: pluginsPort }),
+    [pluginsPort],
   );
   // The usage quota is an `AccountPort` method, so it is read through the
   // account owner that already caches it for the user menu and the settings
@@ -1496,14 +1499,6 @@ export function WebuiClientFoundationApp(
                     runCommand={commandWorkflows.canRunCommand ? commandWorkflows.runCommand : undefined}
                     sendMessage={transport?.sendMessage}
                     getActiveTurn={transport?.getActiveTurn}
-                    listModels={transport?.listModels}
-                    listSkills={transport?.listSkills}
-                    listWorkspaceFileTree={transport?.listWorkspaceFileTree}
-                    browseWorkspaceDirs={transport?.browseWorkspaceDirs}
-                    pluginManagement={transport?.pluginManagement}
-                    getPermissionMode={transport?.getPermissionMode}
-                    setPermissionMode={transport?.setPermissionMode}
-                    selectModel={transport?.selectModel}
                     getAccountStatus={transport?.getAccountStatus}
                     draft={draft}
                     onDraftChange={setDraft}
@@ -1555,7 +1550,7 @@ export function WebuiClientFoundationApp(
                 </aside>
               </div>
             ) : null}
-            {!homeMode && workspacePanel.open ? <WebuiWorkspacePanel state={workspacePanel} dispatch={dispatchWorkspacePanel} sessionId={selectedSessionId} workspaceDir={selectedSession?.workspaceDir} workspaceFileUrl={transport?.workspaceFileUrl} readWorkspaceArchive={transport?.readWorkspaceArchive} extractWorkspaceArchive={transport?.extractWorkspaceArchive} readCanvas={transport?.readCanvas} applyCanvas={transport?.applyCanvas} createTerminal={transport?.createTerminal} listTerminals={transport?.listTerminals} writeTerminal={transport?.writeTerminal} resizeTerminal={transport?.resizeTerminal} disposeTerminal={transport?.disposeTerminal} watchTerminal={transport?.watchTerminal} onClose={() => dispatchWorkspacePanel({ type: "close-panel" })} /> : null}
+            {!homeMode && workspacePanel.open ? <WebuiWorkspacePanel state={workspacePanel} dispatch={dispatchWorkspacePanel} sessionId={selectedSessionId} workspaceDir={selectedSession?.workspaceDir} onClose={() => dispatchWorkspacePanel({ type: "close-panel" })} /> : null}
             </>}
           </main>
         </div>

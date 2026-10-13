@@ -19,7 +19,6 @@ import toml from "highlight.js/lib/languages/ini";
 import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
 import { WebuiMarkdown } from "../markdown.js";
-import type { WebuiCanvasDocument } from "../../shared/contracts/canvas.js";
 import type { WebuiFileDiffInfoView } from "../../shared/contracts/session.js";
 import type {
   WebuiWorkspaceEnvironment,
@@ -34,6 +33,7 @@ import type {
   WebuiWorkspaceReviewSummary,
 } from "../../shared/contracts/review.js";
 import type { WorkspacePanelCommand, WorkspacePanelState, WorkspacePanelTab } from "../projection/workspace-panel-state.js";
+import { useWebuiPortSlice } from "../bindings/port-slices-context.js";
 import { focusWebuiFileLine, webuiFileLineTargetId } from "../bindings/browser-effects.js";
 import {
   projectWebuiWorkspaceHistory,
@@ -49,7 +49,6 @@ import { WebuiIconAgent, WebuiIconCheck, WebuiIconChevronDown, WebuiIconClose, W
 import { FileTree, filterWorkspaceFiles, findWorkspaceFile, getWorkspaceFileParentPaths, mergeWorkspaceFileChildren } from "./WorkspaceFileTree.js";
 import { WorkspaceMediaPreview, isMediaContent } from "./WorkspaceMediaPreview.js";
 import { WorkspaceCanvas } from "./WorkspaceCanvas.js";
-import type { CanvasOperation } from "./WorkspaceCanvas.js";
 import { WorkspaceArchiveView } from "./WorkspaceArchiveView.js";
 import { WorkspaceHtmlPreview } from "./WorkspaceHtmlPreview.js";
 import {
@@ -394,26 +393,33 @@ export function WebuiFilePreview({ tab, result, codeMode, workspaceFileUrl, read
   </div>;
 }
 
-export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, workspaceFileUrl, readWorkspaceArchive, extractWorkspaceArchive, readCanvas, applyCanvas, createTerminal, listTerminals, writeTerminal, resizeTerminal, disposeTerminal, watchTerminal, onClose }: {
+export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, onClose }: {
   readonly state: WorkspacePanelState;
   readonly dispatch: (command: WorkspacePanelCommand) => void;
   readonly sessionId?: string; readonly workspaceDir?: string;
-  readonly workspaceFileUrl?: (request: { readonly workspaceDir: string; readonly path: string }) => string;
-  readonly readWorkspaceArchive?: (request: { readonly workspaceDir: string; readonly path: string; readonly prefix?: string }) => Promise<WebuiWorkspaceArchiveListing>;
-  readonly extractWorkspaceArchive?: (request: { readonly workspaceDir: string; readonly path: string; readonly destination: string; readonly prefix?: string }) => Promise<WebuiWorkspaceArchiveExtractResult>;
-  readonly readCanvas?: (request: { sessionId: string }) => Promise<WebuiCanvasDocument>;
   // The canvas builds its own operation objects, so the panel adopts the
   // component's operation type rather than restating it: one definition, and
   // a drift between the two would only surface as a call the runtime rejects.
-  readonly applyCanvas?: (request: { sessionId: string; operation: CanvasOperation }) => Promise<{ readonly operationId: string; readonly document: WebuiCanvasDocument }>;
-  readonly createTerminal?: (request: { workspaceDir: string }) => Promise<{ terminalId: string; status: string }>;
-  readonly listTerminals?: () => Promise<readonly Record<string, unknown>[]>;
-  readonly writeTerminal?: (request: { terminalId: string; data: string }) => Promise<unknown>;
-  readonly resizeTerminal?: (request: WebuiTerminalSize) => Promise<unknown>;
-  readonly disposeTerminal?: (request: { terminalId: string }) => Promise<unknown>;
-  readonly watchTerminal?: (request: { terminalId: string }, onFrame: (frame: { terminalId: string; data: string; exited: boolean }) => void) => () => void;
   readonly onClose?: () => void;
 }): ReactElement {
+
+  // The workspace slice (plan §8 Phase 2, A4-s4): the panel reads the workspace
+  // capability — including the terminal capability §9 puts inside this business —
+  // off its slice rather than receiving it as eleven props. An unwired member is
+  // `undefined`, the same value the optional prop carried.
+  const workspacePort = useWebuiPortSlice("workspace");
+  const workspaceFileUrl = workspacePort?.workspaceFileUrl;
+  const readWorkspaceArchive = workspacePort?.readWorkspaceArchive;
+  const extractWorkspaceArchive = workspacePort?.extractWorkspaceArchive;
+  const readCanvas = workspacePort?.readCanvas;
+  const applyCanvas = workspacePort?.applyCanvas;
+  const createTerminal = workspacePort?.createTerminal;
+  const listTerminals = workspacePort?.listTerminals;
+  const writeTerminal = workspacePort?.writeTerminal;
+  const resizeTerminal = workspacePort?.resizeTerminal;
+  const disposeTerminal = workspacePort?.disposeTerminal;
+  const watchTerminal = workspacePort?.watchTerminal;
+
   const { dom } = useWebuiBrowserCapabilities();
   // Query truth lives in the owner; this component reads its snapshot and
   // submits query commands. Display state — active tab, expansion, search box,
