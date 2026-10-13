@@ -25,7 +25,7 @@ import {
   type FormEvent,
   type ReactElement,
 } from "react";
-import type { WebuiClientMessageEnqueuer, WebuiClientMessageSender, WebuiClientSessionResumer } from "../contracts/execution-port.js";
+import type { WebuiClientMessageEnqueuer, WebuiClientMessageSender } from "../contracts/execution-port.js";
 import { looksLikeAbsoluteWorkspacePath } from "../paths.js";
 import type { WebuiClientMessageLoader } from "../contracts/message-view.js";
 import type { WebuiModelSelectionRequest } from "../contracts/model-view.js";
@@ -52,7 +52,6 @@ import {
   drawableBreakdownRows,
 } from "../projection/context-breakdown.js";
 import { isTokenPlanModel } from "../projection/token-plan-model.js";
-import { stopWebuiTurn } from "../application/turn-coordinator.js";
 import {
   createWebuiComposerAttachStreamEffect,
   recheckWebuiSubscription,
@@ -576,7 +575,6 @@ export function WebuiComposer({
   recentWorkspaceDirs = EMPTY_WORKSPACE_DIRS,
   runCommand,
   sendMessage,
-  resumeSession,
   loadMessages,
   getTurnDiff,
   revertTurnDiff,
@@ -597,7 +595,6 @@ export function WebuiComposer({
   replyPermission,
   replyQuestionnaire,
   dismissQuestionnaire,
-  abortSession,
   listQueueMessages,
   deleteQueueItem,
   listModels,
@@ -643,7 +640,6 @@ export function WebuiComposer({
   readonly runCommand?: (request: { readonly command: WebuiRunCommandName; readonly input?: string; readonly sessionId?: string; readonly agentName?: string; readonly workspaceDir?: string; }) => Promise<Record<string, unknown>>;
   readonly sendMessage?: WebuiClientMessageSender;
   readonly enqueueMessage?: WebuiClientMessageEnqueuer;
-  readonly resumeSession?: WebuiClientSessionResumer;
 
   readonly getGoal?: (request: WebuiGoalSessionRequest) => Promise<WebuiGoal | undefined>;
   /** Authoritative active-turn probe; resolves the `recheck` case and the
@@ -657,7 +653,6 @@ export function WebuiComposer({
   readonly replyPermission?: (request: { readonly name: string; readonly requestId: string; readonly reply: "allowOnce" | "allowAlways" | "deny" }) => Promise<WebuiInteractionReplyResult>;
   readonly replyQuestionnaire?: (request: { readonly name: string; readonly requestId: string; readonly schemaVersion: number; readonly answers: readonly WebuiQuestionnaireAnswer[] }) => Promise<WebuiInteractionReplyResult>;
   readonly dismissQuestionnaire?: (request: { readonly name: string; readonly requestId: string }) => Promise<WebuiInteractionReplyResult>;
-  readonly abortSession?: (request: { readonly id: string }) => Promise<{ readonly success?: boolean }>;
   readonly listQueueMessages?: (request: { readonly id: string }) => Promise<{ readonly items?: readonly WebuiQueueItem[]; readonly paused?: boolean; readonly pendingCount?: number }>;
   readonly deleteQueueItem?: (request: { readonly id: string; readonly itemId: string }) => Promise<{ readonly item?: WebuiQueueItem }>;
   readonly listModels?: (request?: { readonly sessionId?: string }) => Promise<readonly WebuiModelEntry[]>;
@@ -711,7 +706,8 @@ export function WebuiComposer({
 } & WebuiSessionComposerCapabilities): ReactElement {
   const { dom } = useWebuiBrowserCapabilities();
   const { stream, sending } = useWebuiSessionState(sessionId);
-  const { commands, readStream, attachTurn, sendTurn: submitTurn } = useWebuiSessionCommands(sessionId);
+  const { commands, readStream, attachTurn, sendTurn: submitTurn, stopTurn } =
+    useWebuiSessionCommands(sessionId);
   // The per-session effects registry the shell provides (ticket #45). The
   // composer registers this session's event handlers here so the application
   // event coordinator — the sole consumer of the process-event channel — runs
@@ -904,7 +900,7 @@ export function WebuiComposer({
     // inside `attachTurn` (the binding owns the store writer), so this component
     // submits the intent and holds no factory of its own.
     const attachToTurn = (turnId: string | undefined) => {
-      attachTurn({ turnId, resumeSession, loadMessages });
+      attachTurn({ turnId });
     };
 
     /** `session.start` named a turn we do not hold while holding another. */
@@ -982,7 +978,6 @@ export function WebuiComposer({
     getPendingQuestionnaire,
     listPendingPermissions,
     listQueueMessages,
-    resumeSession,
     sessionId,
   ]);
 
@@ -1207,15 +1202,13 @@ export function WebuiComposer({
   };
 
   const handleStop = async () => {
-    if (!sessionId || !abortSession) return;
+    if (!sessionId) return;
     setInteractionError(undefined);
     try {
-      await stopWebuiTurn({
-        abortSession,
-        sessionId,
-        setSending: commands.setTurnSending,
-        settleStream: commands.settleStoppedStream,
-      });
+      // The stop capability comes from the application's turn capability
+      // slice, inside the binding; this component submits the intent only
+      // (ticket #57).
+      await stopTurn();
     } catch (error) {
       setInteractionError(
         error instanceof Error ? error.message : String(error),
@@ -1742,9 +1735,6 @@ export function WebuiComposer({
         setUrlReferences([]);
       },
       sending,
-      deps: { sendMessage, resumeSession, loadMessages },
-      enqueueMessage,
-      createSession,
       createSessionWorkspaceDir,
       teamModeOff,
       onDraftChange,

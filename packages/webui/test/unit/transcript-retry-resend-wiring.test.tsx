@@ -83,7 +83,11 @@ import {
   submitWebuiComposerTurn,
 } from "../../src/client/application/composer-workflows.js";
 import { createWebuiSessionStore, type WebuiSessionStore } from "../../src/client/application/session-store.js";
-import { WebuiSessionStoreProvider } from "../../src/client/bindings/application-context.js";
+import {
+  WebuiApplicationProvider,
+  WebuiSessionStoreProvider,
+} from "../../src/client/bindings/application-context.js";
+import { createWebuiApplication } from "../../src/client/application/create-application.js";
 import { initialWebuiStreamState } from "../../src/client/projection/stream-state.js";
 import type { WebuiStreamLoopSink } from "../../src/client/mechanisms/stream-loop.js";
 
@@ -134,8 +138,21 @@ function renderComposer(props: {
   const sessionId = props.sessionId ?? SESSION_ID;
   const sessionStore = createWebuiSessionStore();
   seedFailedTurn(sessionStore, sessionId, props.refusal);
+  // Ticket #57: the send capability reaches the turn through the application's
+  // published slice, not through the composer's props. The composer still takes
+  // `sendMessage` for the submit affordance it renders, but the wire call under
+  // test is the slice's.
+  const application = createWebuiApplication({
+    openEventChannel: () => ({ subscribe: () => () => undefined }),
+    store: sessionStore,
+    turns: { resumeSession: async () => undefined },
+    turnCapabilities: {
+      sendMessage: props.sendMessage ?? (async () => undefined),
+      ...(props.loadMessages ? { loadMessages: props.loadMessages } : {}),
+    },
+  });
   const html = renderToStaticMarkup(
-    <WebuiSessionStoreProvider store={sessionStore}>
+    <WebuiApplicationProvider application={application}>
       {createElement(WebuiComposer, {
         sessionId,
         agentName: "main",
@@ -147,10 +164,9 @@ function renderComposer(props: {
         teamModeOff: false,
         favoritesStorage: { read: () => [], write: () => undefined },
         sendMessage: props.sendMessage ?? (async () => undefined),
-        abortSession: props.abortSession,
         loadMessages: props.loadMessages,
       } as React.ComponentProps<typeof WebuiComposer>)}
-    </WebuiSessionStoreProvider>,
+    </WebuiApplicationProvider>,
   );
   const form = createdElements.find((element) => element.type === "form");
   const outputError = createdElements.find((element) => element.type === OutputError);

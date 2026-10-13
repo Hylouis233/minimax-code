@@ -13,6 +13,14 @@
 // writer for the owner key, so the composer submits `applyGoal` /
 // `replacePendingPermissions` and holds no writer for that state (plan §7.6;
 // ticket #45).
+//
+// Since ticket #57 the turn intents take **no capabilities**. `attachTurn`,
+// `sendTurn` and `stopTurn` are submitted with intent and data only; the
+// capabilities they run on are read, at call time, from the application's
+// published turn capability slice (`application/turn-capabilities.ts`), which
+// the composition root cut from the port it holds in a closure. A host with
+// nothing wired has no slice member for the operation, and the loop's own
+// absent-capability guard refuses the turn with a stated reason.
 
 import { useMemo } from "react";
 
@@ -28,6 +36,7 @@ import type {
   WebuiPendingPermission,
   WebuiQuestionnaireRequest,
 } from "../../shared/contracts/interactions.js";
+import type { WebuiAttachmentInput } from "../../shared/contracts/messages.js";
 import type { WebuiApplicationSessionState } from "../application/state.js";
 import {
   initialWebuiApplicationSessionState,
@@ -41,12 +50,8 @@ import {
   type WebuiInteractionCommands,
   type WebuiSessionCommands,
 } from "../application/session-commands.js";
-import {
-  attachWebuiTurn,
-  sendWebuiTurn,
-  type WebuiAttachTurnDeps,
-  type WebuiSendTurnArgs,
-} from "../application/turn-commands.js";
+import { attachWebuiTurn, sendWebuiTurn } from "../application/turn-commands.js";
+import { stopWebuiTurn } from "../application/turn-coordinator.js";
 import { buildWebuiStreamLoopSink } from "../mechanisms/stream-loop.js";
 import { streamStateBundle } from "../application/stream-state-bundle.js";
 import {
@@ -125,39 +130,57 @@ export function useWebuiInteractionCommands(
 }
 
 /**
- * The stream/sending command surface for one session (or the home slot), plus
- * the two turn intents and an imperative `readStream` for the async turn paths
- * that cannot subscribe (plan §7.6; ticket #45 prerequisite 5).
- *
- * The store writer stays inside this hook, and so does the attempt's sink: a
- * component *submits* `attachTurn` / `sendTurn` and never receives a factory
- * that could mint a lease of its own and take one from a newer turn. The
- * callbacks each intent needs are plain data; the capabilities it needs
- * (`resumeSession`, `sendMessage`, …) are the ones the component already holds
- * for its transport. `readStream` reads the current slice off the same store
- * rather than a module-level map.
+ * What a component submits to attach to a turn. The turn id and nothing else:
+ * `resumeSession` / `loadMessages` are no longer the caller's to supply — the
+ * composition root holds the port, and the binding reads the slice at call
+ * time (ticket #57). A field for either one is rejected here.
  */
-export type WebuiTurnAttachIntent = Omit<
-  WebuiAttachTurnDeps,
-  "sessionId" | "readStream" | "setSending" | "sink"
->;
+export type WebuiTurnAttachIntent = {
+  /** The turn named by the event, or `undefined` when it carried none. */
+  readonly turnId: string | undefined;
+};
 
-/** What a component submits to send (or retry) a turn. */
-export interface WebuiTurnSendIntent
-  extends Omit<WebuiSendTurnArgs, "sessionId" | "callbacks" | "createWriter" | "readStream"> {
+/** What a component submits to send (or retry) a turn — intent and data only. */
+export interface WebuiTurnSendIntent {
+  readonly message: string;
+  readonly clientIntent?: string;
+  readonly planMode?: boolean;
+  readonly attachments?: readonly WebuiAttachmentInput[];
+  readonly onAttachmentsSubmitted?: () => void;
+  readonly sending: boolean;
+  readonly createSessionWorkspaceDir?: string;
+  readonly teamModeOff?: boolean;
   readonly onDraftChange: (next: string) => void;
   readonly onNeedsSession?: (draft: string) => void;
   readonly onSessionCreated?: (sessionId: string) => void;
   readonly onQueued?: () => void;
 }
 
+/**
+ * The stream/sending command surface for one session (or the home slot), the
+ * three turn intents (`attachTurn` / `sendTurn` / `stopTurn`) and an imperative
+ * `readStream` for the async turn paths that cannot subscribe (plan §7.6;
+ * ticket #45 prerequisite 5).
+ *
+ * The store writer stays inside this hook, and so does the attempt's sink: a
+ * component *submits* an intent and never receives a factory that could mint a
+ * lease of its own and take one from a newer turn. The capabilities each intent
+ * needs come from the application's turn capability slice, read here at call
+ * time, so the component supplies none of them (ticket #57). `readStream` reads
+ * the current slice off the same store rather than a module-level map.
+ */
 export function useWebuiSessionCommands(sessionId: string | undefined): {
   readonly commands: WebuiSessionCommands;
   readonly readStream: () => WebuiStreamState;
   readonly attachTurn: (input: WebuiTurnAttachIntent) => void;
   readonly sendTurn: (input: WebuiTurnSendIntent) => Promise<void>;
+  readonly stopTurn: () => Promise<void>;
 } {
   const store = useWebuiSessionStoreContext();
+  // The published slice. Absent outside a provider (SSR, unit tests) and
+  // partial on a host that wires only some operations — both are the states the
+  // loop's absent-capability guards are written for.
+  const capabilities = useWebuiApplicationOptional()?.turnCapabilities;
   return useMemo(() => {
     const writerFor = () =>
       sessionId
@@ -166,20 +189,21 @@ export function useWebuiSessionCommands(sessionId: string | undefined): {
     const writer = writerFor();
     const readStream = () =>
       store.readSession(sessionId ?? WEBUI_HOME_SESSION_KEY).stream;
+    const commands = createWebuiSessionCommands({
+      setStream: writer.setStream,
+      setSending: writer.setSending,
+    });
     return {
-      commands: createWebuiSessionCommands({
-        setStream: writer.setStream,
-        setSending: writer.setSending,
-      }),
+      commands,
       readStream,
       // One sink per attachment, minted here: it claims the lease, fences every
       // write against the generation it claimed, and releases it on terminal.
-      attachTurn: ({ turnId, resumeSession, loadMessages }) =>
+      attachTurn: ({ turnId }) =>
         attachWebuiTurn({
           sessionId,
           turnId,
-          resumeSession,
-          loadMessages,
+          ...(capabilities?.resume ? { resumeSession: capabilities.resume } : {}),
+          ...(capabilities?.load ? { loadMessages: capabilities.load } : {}),
           readStream,
           setSending: writer.setSending,
           sink: buildWebuiStreamLoopSink(writer.setStream, streamStateBundle),
@@ -196,11 +220,32 @@ export function useWebuiSessionCommands(sessionId: string | undefined): {
           ...args,
           readStream,
           callbacks: { onDraftChange, onNeedsSession, onSessionCreated, onQueued },
+          // The loop's transport capabilities, cut from the slice. An unwired
+          // operation is absent, and the loop refuses with its own reason
+          // instead of the component having to know it is missing.
+          deps: {
+            ...(capabilities?.send ? { sendMessage: capabilities.send } : {}),
+            ...(capabilities?.resume ? { resumeSession: capabilities.resume } : {}),
+            ...(capabilities?.load ? { loadMessages: capabilities.load } : {}),
+          },
+          ...(capabilities?.enqueue ? { enqueueMessage: capabilities.enqueue } : {}),
+          ...(capabilities?.createSession
+            ? { createSession: capabilities.createSession }
+            : {}),
           // Builds the turn's writer — and, through it, the sink — inside the
           // command, so the home→session migration keeps working without the
           // component ever naming a key or holding a factory.
           createWriter: () => createWebuiTurnCommands(writerFor()),
         }),
+      stopTurn: async () => {
+        if (!sessionId || !capabilities?.stop) return;
+        await stopWebuiTurn({
+          abortSession: capabilities.stop,
+          sessionId,
+          setSending: commands.setTurnSending,
+          settleStream: commands.settleStoppedStream,
+        });
+      },
     };
-  }, [store, sessionId]);
+  }, [store, sessionId, capabilities]);
 }

@@ -45,6 +45,11 @@ import {
   createWebuiTranscriptHistoryOwner,
   type WebuiTranscriptHistoryOwner,
 } from "./transcript-history.js";
+import type {
+  WebuiTurnCapabilityPort,
+  WebuiTurnCapabilitySlice,
+} from "./turn-capabilities.js";
+import { createWebuiTurnCapabilitySlice } from "./turn-capabilities.js";
 import type { WebuiClientMessageLoader } from "../contracts/message-view.js";
 
 export interface WebuiApplicationDeps {
@@ -62,6 +67,15 @@ export interface WebuiApplicationDeps {
   readonly effects?: WebuiEventEffects;
   /** Transport-facing dependencies of the turn coordinator. */
   readonly turns: Omit<WebuiTurnCoordinatorDeps, "store" | "leases">;
+  /**
+   * The port the turn capability slice is cut from — the composition root's
+   * closure over the transport (plan §8 Phase 1 step 1). The slice is built
+   * here, not by the component that submits a turn intent, so `attachTurn` /
+   * `sendTurn` / `stopTurn` receive no capability from their caller. Absent on
+   * a host with nothing wired (SSR, unit tests), which is exactly the state
+   * the loop's absent-capability guards exist for.
+   */
+  readonly turnCapabilities?: WebuiTurnCapabilityPort;
   readonly loadMessages?: WebuiClientMessageLoader;
   /**
    * The unread storage adapter (`infrastructure/storage.ts`), injected because
@@ -87,6 +101,8 @@ export interface WebuiApplication {
   readonly leases: WebuiStreamLeaseController;
   readonly events: WebuiEventCoordinator;
   readonly turns: WebuiTurnCoordinator;
+  /** The published turn capability slice (send / resume / load / stop). */
+  readonly turnCapabilities: WebuiTurnCapabilitySlice;
   readonly transcriptHistory: WebuiTranscriptHistoryOwner;
   /** The one owner of unread hydration ordering (plan §7.6). */
   readonly unread: WebuiUnreadController;
@@ -132,6 +148,12 @@ export function createWebuiApplication(
     leases,
     ...deps.turns,
   });
+  // The slice is cut once, here, from the port the composition root holds. A
+  // caller of `attachTurn` / `sendTurn` / `stopTurn` never supplies a
+  // capability again (plan §8 Phase 1 step 1).
+  const turnCapabilities = createWebuiTurnCapabilitySlice(
+    deps.turnCapabilities ?? {},
+  );
   const transcriptHistory = createWebuiTranscriptHistoryOwner({
     store,
     loadMessages: deps.loadMessages,
@@ -149,6 +171,7 @@ export function createWebuiApplication(
     leases,
     events,
     turns,
+    turnCapabilities,
     transcriptHistory,
     unread,
     composer,

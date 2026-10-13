@@ -1009,6 +1009,11 @@ export function WebuiClientFoundationApp(
             ? { loadMessages: transport.loadMessages }
             : {}),
         },
+        // The composition root holds the port and cuts the turn capability
+        // slice here (ticket #57): the turn intents receive no capability from
+        // their caller, and an unwired operation is simply absent from the
+        // slice. `WebuiTransport` satisfies the port structurally.
+        turnCapabilities: transport ?? {},
         ...(transport?.loadMessages ? { loadMessages: transport.loadMessages } : {}),
       }),
     [
@@ -1439,7 +1444,6 @@ export function WebuiClientFoundationApp(
                     runCommand={commandWorkflows.canRunCommand ? commandWorkflows.runCommand : undefined}
                     sendMessage={transport?.sendMessage}
                     enqueueMessage={transport?.enqueueMessage}
-                    resumeSession={transport?.resumeSession}
                     loadMessages={loadMessages}
                     getTurnDiff={transport?.getTurnDiff}
                     revertTurnDiff={transport?.revertTurnDiff}
@@ -1460,7 +1464,6 @@ export function WebuiClientFoundationApp(
                     replyPermission={transport?.replyPermission}
                     replyQuestionnaire={transport?.replyQuestionnaire}
                     dismissQuestionnaire={transport?.dismissQuestionnaire}
-                    abortSession={transport?.abortSession}
                     listQueueMessages={transport?.listQueueMessages}
                     deleteQueueItem={transport?.deleteQueueItem}
                     listModels={transport?.listModels}

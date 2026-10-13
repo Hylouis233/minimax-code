@@ -62,6 +62,10 @@ const steps = [
   // Source-level direction check: it must surface before the build and the
   // metafile check, because `import type` edges never reach build output.
   { name: "check:webui-dependency", script: "check:webui-dependency" },
+  // The generated command surface is a source-level record like the two checks
+  // above it: it reads the published command declarations, so it has to be
+  // current before the build rather than after.
+  { name: "check:webui-commands", script: "check:webui-commands", docs: true, windows: true },
   { name: "build:webui", script: "build:webui" },
   { name: "check:webui-boundary", script: "check:webui-boundary" },
   { name: "test:webui", script: "test:webui" },
