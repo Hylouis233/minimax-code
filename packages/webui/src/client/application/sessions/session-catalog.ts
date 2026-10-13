@@ -20,7 +20,7 @@ import type {
   WebuiClientSession,
   WebuiClientSessionPage,
   WebuiClientSessionTreePage,
-} from "../contracts/sessions/session-view.js";
+} from "../../contracts/sessions/session-view.js";
 
 /** One tree query node: the root session id and its child session ids. */
 export interface WebuiCatalogTreeQueryNode {

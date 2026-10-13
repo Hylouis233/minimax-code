@@ -33,9 +33,9 @@
 // The probe is the deduplicated one (`active-turn-probe.ts`): the shell asks
 // the same transport, so a same-session probe collapses to one round trip.
 
-import type { WebuiActiveTurnResult } from "../../shared/contracts/session.js";
-import type { WebuiRuntimeEvent } from "../../shared/contracts/stream.js";
-import type { WebuiClientSession } from "../contracts/sessions/session-view.js";
+import type { WebuiActiveTurnResult } from "../../../shared/contracts/session.js";
+import type { WebuiRuntimeEvent } from "../../../shared/contracts/stream.js";
+import type { WebuiClientSession } from "../../contracts/sessions/session-view.js";
 import {
   applyWebuiActiveTurn,
   applyWebuiUnreadCounts,
@@ -43,8 +43,8 @@ import {
   reduceWebuiSessionActivity,
   seedWebuiSessionActivity,
   type WebuiSessionActivityMap,
-} from "../projection/session-activity.js";
-import type { WebuiActiveTurnProbe } from "./active-turn-probe.js";
+} from "../../projection/session-activity.js";
+import type { WebuiActiveTurnProbe } from "../active-turn-probe.js";
 
 /**
  * The activity slice's write authority: the application store's activity

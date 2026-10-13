@@ -51,7 +51,7 @@ import {
   type WebuiInteractionCommands,
   type WebuiStreamPhaseCommands,
   type WebuiTurnLifecycleCommands,
-} from "../application/session-commands.js";
+} from "../application/sessions/session-commands.js";
 import { attachWebuiTurn, sendWebuiTurn } from "../application/turn-commands.js";
 import { stopWebuiTurn } from "../application/turn-coordinator.js";
 import { buildWebuiStreamLoopSink } from "../mechanisms/stream-loop.js";

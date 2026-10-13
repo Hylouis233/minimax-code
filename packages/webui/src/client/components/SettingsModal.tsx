@@ -27,7 +27,7 @@ import {
 } from "../bindings/use-query-state.js";
 import { useWebuiSessionStoreContext } from "../bindings/application-context.js";
 import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js";
-import { selectWebuiCatalogFlatPage } from "../application/session-catalog.js";
+import { selectWebuiCatalogFlatPage } from "../application/sessions/session-catalog.js";
 
 export type SettingsTabKey = "desktop" | "shortcuts" | "voice" | "custom-instructions" | "usage" | "connection" | "account" | "coding" | "worktree" | "archived";
 export interface SettingsTabDefinition { readonly key: SettingsTabKey; readonly group: "preferences" | "management" | "coding" | "archived"; readonly label: string; readonly icon: string; readonly disabled?: boolean; }

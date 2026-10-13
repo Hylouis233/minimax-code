@@ -13,13 +13,13 @@
 // This module is framework-free — no React, no DOM, no storage — so it can be
 // unit-tested against a scripted port.
 
-import type { SessionPort, WebuiClientSessionCreator } from "../contracts/sessions/session-port.js";
-import type { WebuiComposerStore } from "./composer/composer-store.js";
+import type { SessionPort, WebuiClientSessionCreator } from "../../contracts/sessions/session-port.js";
+import type { WebuiComposerStore } from "../composer/composer-store.js";
 import type {
   WebuiClientProject,
   WebuiClientSessionPage,
-} from "../contracts/sessions/session-view.js";
-import type { WebuiSessionListItem } from "../../shared/contracts/session.js";
+} from "../../contracts/sessions/session-view.js";
+import type { WebuiSessionListItem } from "../../../shared/contracts/session.js";
 import {
   patchWebuiCatalogEntity,
   reduceWebuiCatalogFlatAppended,

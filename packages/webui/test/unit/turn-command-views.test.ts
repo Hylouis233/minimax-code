@@ -25,7 +25,7 @@ import {
   createWebuiInteractionCommands,
   createWebuiStreamPhaseCommands,
   createWebuiTurnLifecycleCommands,
-} from "../../src/client/application/session-commands.js";
+} from "../../src/client/application/sessions/session-commands.js";
 import { initialWebuiStreamState } from "../../src/client/projection/stream-state.js";
 import type { WebuiStreamState } from "../../src/client/projection/stream-state.js";
 

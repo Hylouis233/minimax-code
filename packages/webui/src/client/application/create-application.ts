@@ -36,7 +36,7 @@ import type { WebuiTurnCoordinatorDeps } from "./turn-coordinator.js";
 import {
   createWebuiUnreadController,
   type WebuiUnreadController,
-} from "./unread.js";
+} from "./sessions/unread.js";
 import {
   createWebuiComposerStore,
   type WebuiComposerStore,

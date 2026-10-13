@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest";
 import { createWebuiEventCoordinator } from "../../src/client/application/event-coordinator.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 import { createWebuiStreamLeaseController } from "../../src/client/application/stream-lease-controller.js";
-import { createWebuiUnreadController } from "../../src/client/application/unread.js";
+import { createWebuiUnreadController } from "../../src/client/application/sessions/unread.js";
 
 function coordinator() {
   const store = createWebuiSessionStore();

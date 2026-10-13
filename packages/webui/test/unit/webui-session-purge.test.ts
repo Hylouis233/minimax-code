@@ -29,17 +29,17 @@ import {
   reduceWebuiCatalogFlatLoaded,
   selectWebuiCatalogFlatPage,
   removeWebuiCatalogSessions,
-} from "../../src/client/application/session-catalog.js";
+} from "../../src/client/application/sessions/session-catalog.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 import {
   createWebuiSessionWorkflows,
-} from "../../src/client/application/session-workflows.js";
+} from "../../src/client/application/sessions/session-workflows.js";
 import { createWebuiComposerStore } from "../../src/client/application/composer/composer-store.js";
 import {
   createWebuiInteractionCommands,
   createWebuiTurnLifecycleCommands,
   createWebuiTurnCommands,
-} from "../../src/client/application/session-commands.js";
+} from "../../src/client/application/sessions/session-commands.js";
 import { WEBUI_HOME_SESSION_KEY } from "../../src/client/application/state.js";
 import {
   initialWebuiStreamState,

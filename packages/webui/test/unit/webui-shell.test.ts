@@ -73,7 +73,7 @@ import {
   submitWebuiComposerTurn,
   type WebuiComposerSubmitHandlers,
 } from "../../src/client/application/composer/composer-workflows.js";
-import { createWebuiTurnLifecycleCommands } from "../../src/client/application/session-commands.js";
+import { createWebuiTurnLifecycleCommands } from "../../src/client/application/sessions/session-commands.js";
 import { projectWebuiMessage } from "../../src/client/projection/message-projection.js";
 import { projectLiveTurnView } from "../../src/client/projection/transcript-shape.js";
 import { buildWebuiQuestionnaireAnswers } from "../../src/client/projection/questionnaire-state.js";

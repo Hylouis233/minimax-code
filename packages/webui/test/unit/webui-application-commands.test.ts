@@ -14,7 +14,7 @@ import { createWebuiActiveTurnProbe, webuiActiveTurnProbeFor } from "../../src/c
 import {
   createWebuiUnreadController,
   type WebuiUnreadStore,
-} from "../../src/client/application/unread.js";
+} from "../../src/client/application/sessions/unread.js";
 import { queueWebuiTurn } from "../../src/client/application/queue-command.js";
 import {
   recoverMissedWebuiTurn,

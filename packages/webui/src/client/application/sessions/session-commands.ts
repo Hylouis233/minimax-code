@@ -34,22 +34,22 @@
 // member's disposition is recorded in `docs/webui/command-surface.md`, which
 // `pnpm check:webui-commands` keeps current.
 
-import type { WebuiGoal } from "../../shared/contracts/goal.js";
+import type { WebuiGoal } from "../../../shared/contracts/goal.js";
 import type {
   WebuiPendingPermission,
   WebuiQuestionnaireRequest,
-} from "../../shared/contracts/interactions.js";
+} from "../../../shared/contracts/interactions.js";
 import {
   initialWebuiStreamState,
   settleAbortedStream,
-} from "../projection/stream-state.js";
-import type { WebuiStreamState } from "../projection/stream-state.js";
-import { releaseWebuiSubscription } from "../mechanisms/stream-lease.js";
+} from "../../projection/stream-state.js";
+import type { WebuiStreamState } from "../../projection/stream-state.js";
+import { releaseWebuiSubscription } from "../../mechanisms/stream-lease.js";
 import {
   buildWebuiStreamLoopSink,
   type WebuiStreamLoopSink,
-} from "../mechanisms/stream-loop.js";
-import { streamStateBundle } from "./stream-state-bundle.js";
+} from "../../mechanisms/stream-loop.js";
+import { streamStateBundle } from "../stream-state-bundle.js";
 
 /** The phases the stream slice can be moved to by name. */
 export type WebuiStreamPhase = WebuiStreamState["phase"];

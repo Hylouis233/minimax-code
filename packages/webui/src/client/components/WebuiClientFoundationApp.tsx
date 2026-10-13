@@ -100,8 +100,8 @@ import {
   createWebuiSessionCatalogFromPage,
   selectWebuiCatalogFlatPage,
   selectWebuiCatalogTreePage,
-} from "../application/session-catalog.js";
-import { createWebuiSessionWorkflows } from "../application/session-workflows.js";
+} from "../application/sessions/session-catalog.js";
+import { createWebuiSessionWorkflows } from "../application/sessions/session-workflows.js";
 import {
   selectWebuiSessionStream,
   selectWebuiSessionTranscriptPage,

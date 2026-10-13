@@ -22,7 +22,7 @@ import type {WebuiClientSessionResumer} from "../contracts/turn/execution-port.j
 import type { WebuiClientMessageLoader } from "../contracts/transcript/message-view.js";
 import type { WebuiClientSessionCreator } from "../contracts/sessions/session-port.js";
 import type { WebuiAttachmentInput } from "../../shared/contracts/messages.js";
-import type { WebuiTurnCommandWriter } from "./session-commands.js";
+import type { WebuiTurnCommandWriter } from "./sessions/session-commands.js";
 import {
   buildWebuiComposerHandlers,
   submitWebuiComposerTurn,

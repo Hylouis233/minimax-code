@@ -26,8 +26,8 @@ import type {
   WebuiSessionActivityMap,
 } from "../projection/session-activity.js";
 import { initialWebuiSessionActivity } from "../projection/session-activity.js";
-import type { WebuiSessionCatalogState } from "./session-catalog.js";
-import { initialWebuiSessionCatalogState } from "./session-catalog.js";
+import type { WebuiSessionCatalogState } from "./sessions/session-catalog.js";
+import { initialWebuiSessionCatalogState } from "./sessions/session-catalog.js";
 import type { WebuiStreamState } from "../projection/stream-state.js";
 import type { WebuiGoal } from "../../shared/contracts/goal.js";
 import type {
