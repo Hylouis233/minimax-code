@@ -21,50 +21,12 @@
 import { useEffect, useRef, type ReactElement } from "react";
 import { createPortal } from "react-dom";
 import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
-import type { WebuiAccountLoginView } from "../../../shared/contracts/account.js";
 import {
   useWebuiAccountWorkflows,
   useWebuiAccountWorkflowsState,
 } from "../../bindings/use-query-state.js";
-
-/** Everything the panel can show, derived (not fetched). */
-export type WebuiAccountLoginPhase =
-  | { readonly kind: "loading" }
-  | {
-      readonly kind: "pending";
-      readonly userCode?: string;
-      readonly verificationUri?: string;
-      readonly verificationUriComplete?: string;
-    }
-  | { readonly kind: "authenticated" }
-  | { readonly kind: "error"; readonly error: string };
-
-/**
- * Derive the view phase from a server answer. `idle` with no attempt means
- * the dialog just started (or the host has no session); a `pending` answer
- * without a prompt yet is the network being slower than the first reply —
- * the panel says 等待设备码 rather than guessing a code.
- */
-export function deriveWebuiAccountLoginPhase(
-  view: WebuiAccountLoginView | undefined,
-): WebuiAccountLoginPhase {
-  if (!view) return { kind: "loading" };
-  switch (view.state) {
-    case "authenticated":
-      return { kind: "authenticated" };
-    case "error":
-      return { kind: "error", error: view.error };
-    case "pending":
-      return {
-        kind: "pending",
-        userCode: view.prompt?.userCode,
-        verificationUri: view.prompt?.verificationUri,
-        verificationUriComplete: view.prompt?.verificationUriComplete,
-      };
-    default:
-      return { kind: "loading" };
-  }
-}
+import { deriveWebuiAccountLoginPhase } from "../../application/account/login-phase.js";
+import type { WebuiAccountLoginPhase } from "../../application/account/login-phase.js";
 
 export function AccountLoginPanel({
   phase,
