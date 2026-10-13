@@ -17,7 +17,7 @@
 import { describe, it, expect } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { webuiAnswersEndTurn } from "../../src/client/projection/questionnaire-state.js";
+import { webuiAnswersEndTurn } from "../../src/client/projection/interactions/questionnaire-state.js";
 import {
   buildWebuiPlanApproveAnswers,
   buildWebuiPlanEnterAnswers,
@@ -32,7 +32,7 @@ import {
   webuiPlanSummary,
   webuiPlanTitle,
   WEBUI_PLAN_REVIEW_STEP_ID,
-} from "../../src/client/projection/plan-mode.js";
+} from "../../src/client/projection/interactions/plan-mode.js";
 import {
   WebuiPlanDeliveryCard,
   WebuiPlanEnterConfirmation,

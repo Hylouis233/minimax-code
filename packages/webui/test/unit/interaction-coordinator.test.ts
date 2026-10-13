@@ -14,7 +14,7 @@ import {
   createWebuiPlanReviewWorkflow,
   type WebuiInteractionSink,
 } from "../../src/client/application/interactions/interaction-coordinator.js";
-import { webuiAnswersEndTurn } from "../../src/client/projection/questionnaire-state.js";
+import { webuiAnswersEndTurn } from "../../src/client/projection/interactions/questionnaire-state.js";
 import type { WebuiPendingPermission, WebuiQuestionnaireRequest } from "../../src/shared/contracts/interactions.js";
 
 const permission = (

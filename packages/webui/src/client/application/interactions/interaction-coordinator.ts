@@ -32,8 +32,8 @@ import type {
   WebuiQuestionnaireAnswer,
   WebuiQuestionnaireRequest,
 } from "../../../shared/contracts/interactions.js";
-import { buildWebuiPlanApproveAnswers } from "../../projection/plan-mode.js";
-import { webuiAnswersEndTurn } from "../../projection/questionnaire-state.js";
+import { buildWebuiPlanApproveAnswers } from "../../projection/interactions/plan-mode.js";
+import { webuiAnswersEndTurn } from "../../projection/interactions/questionnaire-state.js";
 import type { WebuiStreamPhaseCommands } from "../sessions/session-commands.js";
 import type { WebuiVersionCell } from "../version-cell.js";
 

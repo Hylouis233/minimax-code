@@ -38,7 +38,7 @@ import {
   canAdvanceWebuiQuestionnaireStep,
   sortWebuiQuestionnaireOptions,
   toggleWebuiQuestionnaireOption,
-} from "../../src/client/projection/questionnaire-state.js";
+} from "../../src/client/projection/interactions/questionnaire-state.js";
 import {
   computeThinkingPhraseStartDelay,
   DEFAULT_THINKING_PHRASE_ROTATION_INTERVAL_MS,

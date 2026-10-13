@@ -26,7 +26,7 @@ import {
   reduceWebuiEffect,
   type WebuiEffectState,
 } from "../../src/client/application/turn/effect-reducer.js";
-import { eventSessionId } from "../../src/client/projection/event-parsers.js";
+import { eventSessionId } from "../../src/client/projection/interactions/event-parsers.js";
 import { initialWebuiStreamState } from "../../src/client/projection/stream-state.js";
 import type { WebuiRuntimeEvent } from "../../src/shared/contracts/stream.js";
 

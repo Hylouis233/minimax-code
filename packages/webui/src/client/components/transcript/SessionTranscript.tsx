@@ -21,7 +21,7 @@ import {
   isWebuiPlanReviewRequest,
   webuiPlanMarkdown,
   webuiPlanPath,
-} from "../../projection/plan-mode.js";
+} from "../../projection/interactions/plan-mode.js";
 import { WebuiPlanDeliveryCard } from "../interactions/PlanModeCards.js";
 import type { WebuiClientMessagePage } from "../../contracts/transcript/message-view.js";
 import type { WebuiTranscriptItem } from "../../contracts/transcript/transcript-view.js";

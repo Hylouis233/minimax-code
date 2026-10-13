@@ -13,7 +13,7 @@ import {
   optionIdsForStep,
   sortWebuiQuestionnaireOptions,
   toggleWebuiQuestionnaireOption,
-} from "../../projection/questionnaire-state.js";
+} from "../../projection/interactions/questionnaire-state.js";
 import { WebuiPlanSurface } from "./PlanModeCards.js";
 import type {
   WebuiPendingPermission,

@@ -56,7 +56,7 @@ import {
   pendingPermissionFromEvent,
   questionnaireFromEvent,
   replacePermission,
-} from "../../projection/event-parsers.js";
+} from "../../projection/interactions/event-parsers.js";
 import {
   initialWebuiWorkspaceProgress,
   reduceWebuiWorkspaceProgressEvent,

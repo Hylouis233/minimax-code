@@ -76,7 +76,7 @@ import {
 import { createWebuiTurnLifecycleCommands } from "../../src/client/application/sessions/session-commands.js";
 import { projectWebuiMessage } from "../../src/client/projection/message-projection.js";
 import { projectLiveTurnView } from "../../src/client/projection/transcript-shape.js";
-import { buildWebuiQuestionnaireAnswers } from "../../src/client/projection/questionnaire-state.js";
+import { buildWebuiQuestionnaireAnswers } from "../../src/client/projection/interactions/questionnaire-state.js";
 import { groupWebuiTranscriptItems } from "../../src/client/projection/transcript-projection.js";
 import type {
   WebuiGoal,
