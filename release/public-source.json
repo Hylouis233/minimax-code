@@ -4150,6 +4150,7 @@
     "test/webui-browser/composer.spec.mjs",
     "test/webui-browser/connection-status.spec.mjs",
     "test/webui-browser/fixture.mjs",
+    "test/webui-browser/goal-retention.spec.mjs",
     "test/webui-browser/harness.mjs",
     "test/webui-browser/plugin-mcp-status.spec.mjs",
     "test/webui-browser/questionnaire.spec.mjs",
