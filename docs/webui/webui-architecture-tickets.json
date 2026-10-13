@@ -1043,15 +1043,19 @@
       "47455ae2",
       "eceb6549",
       "ab35a6dd",
-      "de02f7a7"
+      "de02f7a7",
+      "c5858a3f",
+      "7b359694",
+      "4afa78a7",
+      "5f7418aa"
     ],
     "published": false,
     "tickets": {
       "T01": "implemented locally, acceptance evidence recorded on #127",
-      "T02": "implemented locally, acceptance evidence recorded on #128"
+      "T02": "implemented locally, acceptance evidence recorded on #128",
+      "T03": "implemented locally, acceptance evidence recorded on #129"
     },
     "frontier": [
-      "T03",
       "T04",
       "T14",
       "T17"
