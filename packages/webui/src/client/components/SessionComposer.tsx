@@ -69,6 +69,7 @@ import {
   useWebuiSessionState,
 } from "../bindings/use-session-state.js";
 import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js";
+import { useWebuiPortSlice } from "../bindings/port-slices-context.js";
 import { useWebuiEventEffectsRegistry } from "../bindings/event-effects-context.js";
 import { webuiSessionStatusType } from "../projection/stream-state.js";
 
@@ -86,8 +87,6 @@ type WebuiSessionComposerCapabilities = Pick<
   | "getSessionRewindPreview"
   | "rewindSession"
   | "editSessionMessage"
-  | "patchGoal"
-  | "clearGoal"
 >;
 import type {
   WebuiGoal,
@@ -586,17 +585,7 @@ export function WebuiComposer({
   getSessionRewindPreview,
   rewindSession,
   editSessionMessage,
-  getGoal,
   getActiveTurn,
-  createGoal,
-  patchGoal,
-  clearGoal,
-  isGoalEnabled,
-  listPendingPermissions,
-  getPendingQuestionnaire,
-  replyPermission,
-  replyQuestionnaire,
-  dismissQuestionnaire,
   listQueueMessages,
   deleteQueueItem,
   listModels,
@@ -643,18 +632,10 @@ export function WebuiComposer({
   readonly sendMessage?: WebuiClientMessageSender;
   readonly enqueueMessage?: WebuiClientMessageEnqueuer;
 
-  readonly getGoal?: (request: WebuiGoalSessionRequest) => Promise<WebuiGoal | undefined>;
   /** Authoritative active-turn probe; resolves the `recheck` case and the
    * missed-event gap that a reconnect or a slow subscribe can open. */
   readonly getActiveTurn?: (request: WebuiActiveTurnRequest) => Promise<WebuiActiveTurnResult>;
-  readonly createGoal?: (request: WebuiGoalCreateRequest) => Promise<WebuiGoal>;
 
-  readonly isGoalEnabled?: () => Promise<WebuiGoalEnabledResult>;
-  readonly listPendingPermissions?: () => Promise<{ readonly requests: readonly WebuiPendingPermission[] }>;
-  readonly getPendingQuestionnaire?: (request: { readonly name: string; readonly sessionId: string }) => Promise<{ readonly request?: WebuiQuestionnaireRequest }>;
-  readonly replyPermission?: (request: { readonly name: string; readonly requestId: string; readonly reply: "allowOnce" | "allowAlways" | "deny" }) => Promise<WebuiInteractionReplyResult>;
-  readonly replyQuestionnaire?: (request: { readonly name: string; readonly requestId: string; readonly schemaVersion: number; readonly answers: readonly WebuiQuestionnaireAnswer[] }) => Promise<WebuiInteractionReplyResult>;
-  readonly dismissQuestionnaire?: (request: { readonly name: string; readonly requestId: string }) => Promise<WebuiInteractionReplyResult>;
   readonly listQueueMessages?: (request: { readonly id: string }) => Promise<{ readonly items?: readonly WebuiQueueItem[]; readonly paused?: boolean; readonly pendingCount?: number }>;
   readonly deleteQueueItem?: (request: { readonly id: string; readonly itemId: string }) => Promise<{ readonly item?: WebuiQueueItem }>;
   readonly listModels?: (request?: { readonly sessionId?: string }) => Promise<readonly WebuiModelEntry[]>;
@@ -706,6 +687,24 @@ export function WebuiComposer({
   readonly onSelectSession?: (sessionId: string) => void;
   readonly onOpenPluginManagement?: (area: "plugins" | "skills") => void;
 } & WebuiSessionComposerCapabilities): ReactElement {
+
+
+  // The two slices this carve owns (plan §8 Phase 3 B1, ticket #66). The composer
+  // reads them and hands each to the owner that drives it; the calls themselves
+  // happen in `goal-coordinator.ts` and `interaction-coordinator.ts`, which are
+  // application modules. What the presentation invokes is therefore the owners'
+  // published command surface and nothing else — which is why these businesses'
+  // findings clear at this carve and could not clear in Phase 2: the capability
+  // needed an owner to move into first.
+  const goalPort = useWebuiPortSlice("goal");
+  const interactionsPort = useWebuiPortSlice("interactions");
+  // The two interaction members this component still names directly, for the
+  // registration effect's dependencies (below). A host with no provider has no
+  // slice, hence the optional read: the dependency is `undefined` there, which is
+  // the same "not wired" value the props carried.
+  const getPendingQuestionnaire = interactionsPort?.getPendingQuestionnaire;
+  const listPendingPermissions = interactionsPort?.listPendingPermissions;
+
   const { dom } = useWebuiBrowserCapabilities();
   const { stream, sending } = useWebuiSessionState(sessionId);
   const { phase, lifecycle, readStream, attachTurn, sendTurn: submitTurn, stopTurn } =
@@ -740,13 +739,7 @@ export function WebuiComposer({
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
   const interactionCoordinator = createWebuiInteractionCoordinator({
-    port: {
-      listPendingPermissions,
-      getPendingQuestionnaire,
-      replyPermission,
-      replyQuestionnaire,
-      dismissQuestionnaire,
-    },
+    port: { ...interactionsPort },
     sink: {
       replacePendingPermissions: interactionCommands.replacePendingPermissions,
       removePendingPermission: interactionCommands.removePendingPermission,
@@ -769,7 +762,7 @@ export function WebuiComposer({
   // cannot fence a goal read — which is the property `goal-coordinator.test.ts`
   // asserts rather than assumes.
   const goalCoordinator = createWebuiGoalCoordinator({
-    port: { ...(getGoal ? { getGoal } : {}) },
+    port: { ...goalPort },
     sink: {
       applyGoal: interactionCommands.applyGoal,
       afterGoalReRead: (next) => {
@@ -987,6 +980,8 @@ export function WebuiComposer({
     agentName,
     effectsRegistry,
     getActiveTurn,
+    // These two come from the interactions slice now (the coordinator reads it);
+    // the members are stable for the mount, so the registration does not churn.
     getPendingQuestionnaire,
     listPendingPermissions,
     listQueueMessages,
@@ -1109,13 +1104,14 @@ export function WebuiComposer({
     setComposerCaret(caret);
   }, [draft]);
 
+  const goalEnabledProbe = goalCoordinator.isGoalEnabled;
   useEffect(() => {
-    if (!isGoalEnabled) {
+    if (!goalEnabledProbe) {
       setGoalEnabled(true);
       return undefined;
     }
     let cancelled = false;
-    void isGoalEnabled()
+    void goalEnabledProbe()
       .then((result) => {
         if (cancelled) return;
         setGoalEnabled(result.enabled);
@@ -1123,38 +1119,24 @@ export function WebuiComposer({
       })
       .catch(() => { if (!cancelled) setGoalEnabled(false); });
     return () => { cancelled = true; };
-  }, [isGoalEnabled]);
+  }, [goalEnabledProbe]);
 
   useEffect(() => {
-    if (!sessionId || !getGoal || !goalEnabled) {
-      applyGoal(undefined);
-      setGoalMode(false);
-      return undefined;
-    }
+    // Reset on every session switch, then read through the owner. The fence and
+    // the apply both live in `refreshGoal` now: this component used to hand-roll
+    // a second copy of it here, which is the duplication the goal carve removes —
+    // one write path and one fenced read, not two of each.
     applyGoal(undefined);
     setGoalMode(false);
+    if (!sessionId || !goalEnabled) return undefined;
     let cancelled = false;
-    // Same stale-window as the steering re-read: this request can be overtaken
-    // by a `thread_goal.*` event while it is in flight, and answering with the
-    // older snapshot would resurrect what the event just replaced.
-    const versionAtRequest = goalCoordinator.goalVersion();
-    void getGoal({ sessionId })
-      .then((nextGoal) => {
-        if (cancelled) return;
-        if (goalCoordinator.goalVersion() !== versionAtRequest) return;
-        applyGoal(nextGoal);
-        if (nextGoal) setGoalMode(nextGoal.status !== "complete");
-      })
-      .catch(() => {
-        // Same guard on the error path: a rejection must not erase a goal that
-        // a newer event installed while this request was in flight.
-        if (!cancelled && goalCoordinator.goalVersion() === versionAtRequest)
-          applyGoal(undefined);
-      });
+    void goalCoordinator.refreshGoal().then((outcome) => {
+      if (!cancelled && !outcome.ok) setGoalEnabled(false);
+    });
     return () => {
       cancelled = true;
     };
-  }, [getGoal, goalEnabled, sessionId]);
+  }, [goalEnabled, sessionId]);
 
   useEffect(() => {
     if (!listModels && !getAccountStatus) return undefined;
@@ -1594,7 +1576,7 @@ export function WebuiComposer({
     }
   };
   const activateGoalMode = () => {
-    if (!goalEnabled || !createGoal) return;
+    if (!goalEnabled || !goalCoordinator.createGoal) return;
     setGoalMode(true);
     setPlanMode(false);
     onDraftChange("");
@@ -1839,7 +1821,7 @@ export function WebuiComposer({
     }
     if (resolvedIntent.kind === "submit-goal") {
       const { objective } = resolvedIntent;
-      if (!createGoal || !goalEnabled) return;
+      if (!goalCoordinator.createGoal || !goalEnabled) return;
       setGoalSubmitting(true);
       setInteractionError(undefined);
       try {
@@ -1848,8 +1830,8 @@ export function WebuiComposer({
             sessionId,
             objective,
             currentGoal: goal,
-            createGoal,
-            patchGoal,
+            createGoal: goalCoordinator.createGoal,
+            patchGoal: goalCoordinator.patchGoal,
             createSession,
             createSessionWorkspaceDir,
             teamModeOff,
@@ -2009,7 +1991,7 @@ export function WebuiComposer({
           onChange={(event) => { void addFiles(event.currentTarget.files); event.currentTarget.value = ""; }}
         />
         <div className={sessionLayout && sessionId && goalEnabled && goal ? "webui-goal-composer-panel" : undefined}>
-        {sessionId && goalEnabled && goal ? <WebuiGoalBanner goal={goal} patchGoal={patchGoal} clearGoal={clearGoal} onEditGoal={editGoalInComposer} onCleared={clearLocalGoal} interactionBlocked={Boolean(questionnaire || permissions.length > 0)} /> : null}
+        {sessionId && goalEnabled && goal ? <WebuiGoalBanner goal={goal} patchGoal={goalCoordinator.patchGoal} clearGoal={goalCoordinator.clearGoal} onEditGoal={editGoalInComposer} onCleared={clearLocalGoal} interactionBlocked={Boolean(questionnaire || permissions.length > 0)} /> : null}
         {!composerReplaced ? (
         <form
           onSubmit={submit}
@@ -2412,7 +2394,7 @@ export function WebuiComposer({
                     })}
                   </div> : null}
                 </div>
-                {goalEnabled && createGoal && goalMode ? (
+                {goalEnabled && goalCoordinator.createGoal && goalMode ? (
                   <button
                     type="button"
                     className={`webui-goal-mode-button${goalMode ? " is-active" : ""}`}

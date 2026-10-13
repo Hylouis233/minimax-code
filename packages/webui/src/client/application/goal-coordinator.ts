@@ -19,11 +19,20 @@
 // store write arrive through the port and the sink.
 
 import type { GoalPort } from "../contracts/goal/goal-port.js";
-import type { WebuiGoal } from "../../shared/contracts/goal.js";
+import type {
+  WebuiGoal,
+  WebuiGoalCreateRequest,
+  WebuiGoalEnabledResult,
+  WebuiGoalPatchRequest,
+  WebuiGoalSessionRequest,
+} from "../../shared/contracts/goal.js";
 import type { WebuiVersionCell } from "./version-cell.js";
 
 /** The goal capability this owner drives. Absent means the operation is unwired. */
-export type WebuiGoalPortSlice = Pick<GoalPort, "getGoal">;
+export type WebuiGoalPortSlice = Pick<
+  GoalPort,
+  "getGoal" | "isGoalEnabled" | "createGoal" | "patchGoal" | "clearGoal"
+>;
 
 /** The store write a goal flow drives. */
 export interface WebuiGoalSink {
@@ -60,6 +69,33 @@ export interface WebuiGoalCoordinator {
    * carrying the new goal, so the banner is re-read rather than patched.
    */
   readonly refreshGoal: () => Promise<WebuiGoalOutcome>;
+  /**
+   * The enable probe, published as part of this business's surface. `undefined`
+   * when the host does not wire it, which is what lets a caller keep its
+   * "assume enabled" default instead of inventing one.
+   */
+  readonly isGoalEnabled?: () => Promise<WebuiGoalEnabledResult>;
+  /**
+   * The objective patch — this business's published write, not a capability a
+   * presentation reaches for.
+   *
+   * It applies the returned goal on the versioned write path. That is the point
+   * of publishing it: the write used to leave the store to the `thread_goal.*`
+   * event, which left an in-flight re-read free to answer with the pre-patch
+   * objective and overwrite it — the failure the fence exists to prevent, on the
+   * one writer the fence did not cover.
+   */
+  readonly patchGoal?: (request: WebuiGoalPatchRequest) => Promise<WebuiGoal>;
+  /** The clear, published the same way; a successful clear applies `undefined`. */
+  readonly clearGoal?: (
+    request: WebuiGoalSessionRequest,
+  ) => Promise<{ readonly success: boolean }>;
+  /**
+   * The create, published so no caller needs the port. The create's own result is
+   * applied by its caller (the submit flow constructs the session's goal and
+   * commits it as one transition), so this one does not apply it here.
+   */
+  readonly createGoal?: (request: WebuiGoalCreateRequest) => Promise<WebuiGoal>;
 }
 
 export interface WebuiGoalCoordinatorOptions {
@@ -80,7 +116,7 @@ export function createWebuiGoalCoordinator({
   goalVersionRef,
   sessionId,
 }: WebuiGoalCoordinatorOptions): WebuiGoalCoordinator {
-  const { getGoal } = port;
+  const { getGoal, isGoalEnabled, createGoal, patchGoal, clearGoal } = port;
 
   const applyGoal = (goal: WebuiGoal | undefined): void => {
     goalVersionRef.current += 1;
@@ -88,6 +124,32 @@ export function createWebuiGoalCoordinator({
   };
 
   return {
+    ...(isGoalEnabled ? { isGoalEnabled } : {}),
+
+    ...(patchGoal
+      ? {
+          patchGoal: async (request: WebuiGoalPatchRequest) => {
+            const next = await patchGoal(request);
+            // The versioned write path, so a re-read already in flight cannot
+            // answer with the objective this patch just replaced.
+            applyGoal(next);
+            return next;
+          },
+        }
+      : {}),
+
+    ...(createGoal ? { createGoal } : {}),
+
+    ...(clearGoal
+      ? {
+          clearGoal: async (request: WebuiGoalSessionRequest) => {
+            const result = await clearGoal(request);
+            if (result.success) applyGoal(undefined);
+            return result;
+          },
+        }
+      : {}),
+
     goalVersion: () => goalVersionRef.current,
 
     applyGoal,

@@ -261,9 +261,7 @@ export function WebuiClientFoundationApp(
   const forkSession = sessionsPort.forkSession;
   const transcriptPort = portSlices.transcript;
   const composerPort = portSlices.composer;
-  const goalPort = portSlices.goal;
-  const interactionsPort = portSlices.interactions;
-  const workspacePort = portSlices.workspace;
+      const workspacePort = portSlices.workspace;
   const pluginsPort = portSlices.plugins;
   const settingsPort = portSlices.settings;
   const modelsPort = portSlices.models;
@@ -1541,16 +1539,6 @@ export function WebuiClientFoundationApp(
                     getSessionRewindPreview={transcriptPort.getSessionRewindPreview}
                     rewindSession={transcriptPort.rewindSession}
                     editSessionMessage={transcriptPort.editSessionMessage}
-                    getGoal={goalPort.getGoal}
-                    createGoal={goalPort.createGoal}
-                    patchGoal={goalPort.patchGoal}
-                    clearGoal={goalPort.clearGoal}
-                    isGoalEnabled={goalPort.isGoalEnabled}
-                    listPendingPermissions={interactionsPort.listPendingPermissions}
-                    getPendingQuestionnaire={interactionsPort.getPendingQuestionnaire}
-                    replyPermission={interactionsPort.replyPermission}
-                    replyQuestionnaire={interactionsPort.replyQuestionnaire}
-                    dismissQuestionnaire={interactionsPort.dismissQuestionnaire}
                     listQueueMessages={composerPort.listQueueMessages}
                     deleteQueueItem={composerPort.deleteQueueItem}
                     listModels={modelsPort.listModels}
