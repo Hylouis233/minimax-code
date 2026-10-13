@@ -4,7 +4,7 @@
 // provides it here; a component that owns a session's effect handlers reads the
 // registry from this context and registers them against the session id, and it
 // never holds the channel. This is the React half of
-// `application/event-effects-registry.ts` (plan §7.2 `client/bindings/`): it
+// `application/turn/event-effects-registry.ts` (plan §7.2 `client/bindings/`): it
 // contains no business rule of its own and never subscribes to the
 // process-event stream.
 //

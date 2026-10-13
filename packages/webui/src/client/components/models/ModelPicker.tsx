@@ -781,7 +781,7 @@ export function WebuiModelPicker({
       if (!rootRef.current) return;
       const insideContainer = rootRef.current.contains(event.target as Node);
       // The four-surface outside-close policy lives in
-      // `projection/outside-close.ts`; ModelPicker's per-surface variant
+      // `projection/common/outside-close.ts`; ModelPicker's per-surface variant
       // subscribes to `pointerdown` only (no keydown listener). Routing
       // through `evaluateOutsideClose` keeps the four call sites
       // consistent without changing the original close semantics.

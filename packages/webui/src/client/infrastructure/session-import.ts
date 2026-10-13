@@ -5,7 +5,7 @@
 // rejects a format it cannot restore, and posts it; it decides nothing about the
 // session's identity or where it belongs — the agent and workspace come from the
 // caller's context. That business decision and the rail's import request live in
-// `application/session-workflows.ts`, which receives this importer as an injected
+// `application/sessions/session-workflows.ts`, which receives this importer as an injected
 // capability (type `WebuiSessionImporter`) from the composition root, so this
 // adapter is never absorbed into a business workflow module.
 //

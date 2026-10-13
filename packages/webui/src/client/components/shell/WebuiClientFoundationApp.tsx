@@ -291,7 +291,7 @@ export function WebuiClientFoundationApp(
     [providedApplication, providedSessionStore],
   );
   // The one per-session effects registry for this mount (plan §7.1
-  // `application/event-coordinator.ts`; ticket #45). The shell holds it and
+  // `application/turn/event-coordinator.ts`; ticket #45). The shell holds it and
   // provides it; the composer registers its session's effect handlers here and
   // `asWebuiEventEffects()` is what the application coordinator consumes over
   // the single process-event channel.
@@ -534,7 +534,7 @@ export function WebuiClientFoundationApp(
   //
   // The shell used to call `transport.loadMessages` itself and keep the answer
   // in local state, with its own `cancelled` flag — a second reader of an RPC
-  // the transcript history owner (`application/transcript-history.ts`) already
+  // the transcript history owner (`application/transcript/transcript-history.ts`) already
   // owns, fetches and commits into the session store. It now projects the
   // owner's committed page, so the RPC, its request fence and its error state
   // have one owner and one caller. `SessionTranscript` still drives the load

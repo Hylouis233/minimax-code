@@ -1,7 +1,7 @@
 // React subscription to the application query owners (plan §7.2
 // `client/bindings/use-query-state.ts`; ticket #51).
 //
-// The workspace query owner lives in `application/workspace-queries.ts` and is
+// The workspace query owner lives in `application/workspace/workspace-queries.ts` and is
 // created once by the composition root. This binding is the only React edge to
 // it: components read its snapshot and submit query commands, and they never
 // receive a transport method or a store writer for these queries (plan §7.6).

@@ -1,4 +1,4 @@
-// The plugin workflow owner (plan §7.1 `application/plugin-workflows.ts`;
+// The plugin workflow owner (plan §7.1 `application/plugins/plugin-workflows.ts`;
 // §7.6 "Plugin list" row; §7.7 stage 5; ticket #52).
 //
 // One owner for the plugin manager: the marketplace/installed/skill/app/mcp/

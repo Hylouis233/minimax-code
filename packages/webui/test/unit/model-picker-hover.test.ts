@@ -2,7 +2,7 @@
 //
 // Two halves, split for the same reason `model-picker-cascade.test.ts` splits.
 //
-// The RULES are pure functions in `projection/model-picker-hover.ts` and are
+// The RULES are pure functions in `projection/models/model-picker-hover.ts` and are
 // driven directly below: what the pointer arriving on a row does to a fly-out
 // that may already be open, and how long a pointer has to rest. Those are the
 // decisions that decide whether the panel chases the cursor, so they are pinned
@@ -27,7 +27,7 @@ import {
 } from "../../src/client/projection/models/model-picker-hover.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const componentDir = path.resolve(here, "../../src/client/components");
+const componentDir = path.resolve(here, "../../src/client/components/models");
 const picker = readFileSync(
   path.join(componentDir, "ModelPicker.tsx"),
   "utf8",

@@ -1,5 +1,5 @@
 // The session entity catalog: one copy of every session record, plus the two
-// query results that reference it (plan §7.1 `application/session-catalog.ts`;
+// query results that reference it (plan §7.1 `application/sessions/session-catalog.ts`;
 // §7.6 "Flat/tree queries"; §7.7 stage 5; ticket #49 correction 1).
 //
 // Flat and tree are **two queries, not two sets of entities**. Each keeps its

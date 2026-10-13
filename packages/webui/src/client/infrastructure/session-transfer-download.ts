@@ -4,7 +4,7 @@
 // ticket #51): this is **browser download IO**. It resolves the transfer target
 // and hands a URL to the browser to navigate to; it decides nothing about which
 // session may be exported. That business decision and the rail's export request
-// live in `application/session-workflows.ts`, and the composition root supplies
+// live in `application/sessions/session-workflows.ts`, and the composition root supplies
 // this adapter — it is never absorbed into a business workflow module.
 //
 // `GET /session-transfer` writes a `mcode-webui-session-transfer@1` file: the

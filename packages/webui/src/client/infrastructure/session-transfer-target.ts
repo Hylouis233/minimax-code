@@ -5,7 +5,7 @@
 // reads the injected runtime config (`globalThis.__WEBUI_CONFIG__`) and resolves
 // the transfer origin and token at call time. It is deliberately not absorbed
 // into a workflow module: the decision of *which* session to export and *where*
-// to import it into lives in `application/session-workflows.ts`, and the two
+// to import it into lives in `application/sessions/session-workflows.ts`, and the two
 // request adapters (`session-transfer-download.ts`, `session-import.ts`) consume
 // this resolver for the shared origin/token answer. Because it reads a global it
 // is not a pure rule module and belongs to infrastructure.

@@ -6,7 +6,7 @@
 // the rail still lit up as if nothing had happened.
 //
 // No DOM framework is allowed in this package, so the transitions live in
-// `projection/shell-surface.ts` and are driven here directly. The wiring that
+// `projection/shell/shell-surface.ts` and are driven here directly. The wiring that
 // the reducer cannot see (the rail anchors resolving through the
 // `hashchange` subscription, and the shell effect that watches the selected
 // session id) is covered by the source assertions at the bottom.
@@ -93,7 +93,7 @@ describe("shell surface wiring", () => {
   it("gates the marketplace on the surface rather than a separate boolean", () => {
     // A second flag is how the two got out of step: the gate read `open`, the
     // area came from elsewhere, and nothing tied either to navigation.
-    expect(shell).toContain('from "../projection/shell-surface.js"');
+    expect(shell).toContain('from "../../projection/shell/shell-surface.js"');
     expect(shell).toContain("pluginManagementArea ? <PluginCatalogue");
     expect(shell).not.toContain("setPluginManagementOpen");
     expect(shell).not.toContain("setPluginManagementArea");

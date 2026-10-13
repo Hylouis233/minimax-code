@@ -19,7 +19,7 @@
 // carve (§5.6: this coordinator "loses the goal duty it absorbed") and lives in
 // `goal-coordinator.ts` with its own version cell, so the two fences cannot bump
 // each other. The event coordinator still
-// reaches them through `application/event-effects-registry.ts` — that registry is
+// reaches them through `application/turn/event-effects-registry.ts` — that registry is
 // the per-session routing seam, not an owner, and the composer registers this
 // coordinator's commands with it. This owner is constructed per
 // session, so a re-read cannot land in the wrong one by construction rather than

@@ -29,7 +29,7 @@ item below says which it is.
 Plain text, no highlighter, no `hljs` import.
 
 The cost is lower than the report implies: `highlight.js@10.7.3` is **already a
-declared dependency of this package**, `components/WorkspacePanels.tsx` already
+declared dependency of this package**, `components/workspace/WorkspacePanels.tsx` already
 registers 15 languages against `highlight.js/lib/core`, and the module types are
 already declared in `client/global.d.ts`. The roadmap's "依赖缓存 grep 全空" is
 wrong for `packages/webui/package.json`; the highlighter exists, it is simply

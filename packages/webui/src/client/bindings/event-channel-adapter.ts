@@ -2,7 +2,7 @@
 // bridge).
 //
 // The application event coordinator consumes a `WebuiProcessEventChannel`
-// (`application/event-channel.ts`); the only concrete source of that stream is
+// (`application/turn/event-channel.ts`); the only concrete source of that stream is
 // the transport's `watchEvents` socket. This module is the adapter between the
 // two: it turns the transport's event frames into the application channel shape
 // the coordinator subscribes to.

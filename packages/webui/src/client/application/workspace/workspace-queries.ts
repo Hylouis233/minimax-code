@@ -1,7 +1,7 @@
 // The workspace query owner: one cache for the workspace file tree, file
 // contents, the working-tree review (summary, file diffs and search) and the
 // git environment, with request versions, loading and error state, and exact
-// invalidation (plan §7.1 `application/workspace-queries.ts`; §7.6 "Workspace
+// invalidation (plan §7.1 `application/workspace/workspace-queries.ts`; §7.6 "Workspace
 // panel state"; §7.7 stage 5; ticket #51).
 //
 // The two problems this closes, both named in the ticket:

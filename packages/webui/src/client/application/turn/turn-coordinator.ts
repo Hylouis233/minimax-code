@@ -1,4 +1,4 @@
-// The turn coordinator (plan §7.1 `application/turn-coordinator.ts`).
+// The turn coordinator (plan §7.1 `application/turn/turn-coordinator.ts`).
 //
 // Stage 4 of this slice brings over one owning command: the **manual retry**,
 // the arm the connection banner's "重试连接" button runs. It replaces

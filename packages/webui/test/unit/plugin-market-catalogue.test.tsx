@@ -38,7 +38,7 @@ const component = squashWhitespace(readWebuiSource("components/plugins/PluginCat
 // The listing composition — the skill-hub paging and its unknowable total —
 // moved into the application plugin owner (ticket #52). The two assertions
 // below pin that behaviour where it now lives, with the same intent.
-const owner = squashWhitespace(readWebuiSource("application/plugin-workflows.ts"));
+const owner = squashWhitespace(readWebuiSource("application/plugins/plugin-workflows.ts"));
 
 describe("plugin marketplace catalogue", () => {
   it("offers 插件 and 技能 instead of 市场 and 个人", () => {

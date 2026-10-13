@@ -6,7 +6,7 @@ import type { ReactElement } from "react";
 import type { WebuiWorkspaceFile } from "../../../shared/contracts/workspace.js";
 import { WebuiIconChevronLeft, WebuiIconFile } from "../shell/icons.js";
 
-// The pure tree helpers moved to `projection/workspace-file-tree.ts` so the
+// The pure tree helpers moved to `projection/workspace/workspace-file-tree.ts` so the
 // tree query owner merges with the same function the component walks with
 // (ticket #51). Re-exported here so this module's public surface is unchanged.
 export {

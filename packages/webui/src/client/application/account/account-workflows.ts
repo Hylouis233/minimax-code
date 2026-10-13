@@ -1,4 +1,4 @@
-// The account workflow owner (plan §7.1 `application/account-workflows.ts`;
+// The account workflow owner (plan §7.1 `application/account/account-workflows.ts`;
 // §7.6 "Goal"/"Settings" rows; §7.7 stage 5; ticket #52).
 //
 // One owner for everything the account surfaces read and write: the account

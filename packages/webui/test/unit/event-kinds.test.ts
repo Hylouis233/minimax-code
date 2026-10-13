@@ -82,7 +82,7 @@ describe("the registry answers for the kinds it owns", () => {
 
 /** Every goal or interaction label the effect reducer switches on. */
 function reducerKindLabels(): readonly string[] {
-  const source = squashWhitespace(readWebuiSource("projection/effect-reducer.ts"));
+  const source = squashWhitespace(readWebuiSource("application/turn/effect-reducer.ts"));
   const labels = source.match(
     /case "(?:thread_goal|permission|questionnaire)\.[a-z_.]+":/gu,
   );
@@ -108,7 +108,7 @@ describe("no second enumeration site can exist", () => {
     // event is a goal event, and the projector asks it which types carry an
     // objective.
     const literal = /"(?:thread_goal|permission|questionnaire)\.[a-z_.]+"/u;
-    for (const file of ["projection/event-parsers.ts", "projection/goal-state.ts"]) {
+    for (const file of ["projection/interactions/event-parsers.ts", "projection/goal/goal-state.ts"]) {
       expect(squashWhitespace(readWebuiSource(file))).not.toMatch(literal);
     }
   });
@@ -120,11 +120,11 @@ describe("no second enumeration site can exist", () => {
     // not a runtime event kind, so it is excluded by matching only the three
     // event namespaces.
     const files = [
-      "projection/event-parsers.ts",
-      "projection/goal-state.ts",
-      "projection/questionnaire-state.ts",
-      "projection/message-projection.ts",
-      "projection/transcript-projection.ts",
+      "projection/interactions/event-parsers.ts",
+      "projection/goal/goal-state.ts",
+      "projection/interactions/questionnaire-state.ts",
+      "projection/transcript/message-projection.ts",
+      "projection/transcript/transcript-projection.ts",
     ];
     const literal = /"(?:thread_goal|permission|questionnaire)\.[a-z_.]+"/u;
     for (const file of files) {

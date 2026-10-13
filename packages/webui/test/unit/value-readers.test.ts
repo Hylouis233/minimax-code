@@ -1,6 +1,6 @@
 // The shared value readers and formatters (U17 / U19).
 //
-// `value-readers.ts` is the leaf the whole projection layer reads through —
+// `contracts/value-readers.ts` is the leaf the whole projection layer reads through —
 // `recordValue` alone is called from four modules — and it had no test file at
 // all. Two of its behaviours were the ones that drifted when copies existed:
 // "an all-blank string counts as absent", and the credit rounding the desktop

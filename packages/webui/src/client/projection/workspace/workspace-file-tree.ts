@@ -1,7 +1,7 @@
 // Pure workspace file-tree helpers (view layer).
 //
-// Moved here from `components/WorkspaceFileTree.tsx` so the one tree structure
-// is shared: the tree query owner (`application/workspace-queries.ts`) merges a
+// Moved here from `components/workspace/WorkspaceFileTree.tsx` so the one tree structure
+// is shared: the tree query owner (`application/workspace/workspace-queries.ts`) merges a
 // directory's freshly loaded children with the same function the tree component
 // filters and walks with, instead of a second copy living beside each consumer
 // (plan §7.1 "never copied, leaving two implementations"; ticket #51). The

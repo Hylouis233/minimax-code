@@ -5,7 +5,7 @@
 // `0.0%`. Drawing zero asserts that the engine looked at that category and
 // found it empty, which is a claim this process does not get to make on the
 // engine's behalf. So the suite drives the PRODUCT functions in
-// `projection/context-breakdown.ts`, and every assertion below is about a state
+// `projection/composer/context-breakdown.ts`, and every assertion below is about a state
 // the previous inline implementation got wrong.
 import { describe, expect, it } from "vitest";
 

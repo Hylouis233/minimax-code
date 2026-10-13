@@ -76,8 +76,8 @@ export type WebuiTodo = WebuiWorkspaceTodo;
 // `mergeWorkspaceFileChildren`, `chunkWebuiWorkspaceReviewFileIds` and
 // `WEBUI_WORKSPACE_REVIEW_DIFF_BATCH_SIZE` are re-exported below: the panel
 // tests import them from this module, which stays the panel's public surface.
-// The implementations moved to `projection/workspace-file-tree.ts` and
-// `application/workspace-queries.ts`.
+// The implementations moved to `projection/workspace/workspace-file-tree.ts` and
+// `application/workspace/workspace-queries.ts`.
 export {
   mergeWorkspaceFileChildren,
   chunkWebuiWorkspaceReviewFileIds,

@@ -1,6 +1,6 @@
 // Browser-local model picker view types.
 //
-// `components/ModelPicker.tsx` and `projection/action-requests.ts` consume
+// `components/models/ModelPicker.tsx` and `projection/sessions/action-requests.ts` consume
 // these; they are declared here so the projection layer can compose a
 // selection request without importing the React component. Split from the
 // former `client/contracts.ts`.
@@ -45,8 +45,8 @@ export interface WebuiModelPickerDraft {
  * One provider's rows in the picker, or the favourites section that repeats
  * starred rows above them.
  *
- * Moved here from `components/ModelPicker.tsx` so the pure picker projections
- * (`projection/model-favorites.ts`, `projection/model-picker-search.ts`) can
+ * Moved here from `components/models/ModelPicker.tsx` so the pure picker projections
+ * (`projection/models/model-favorites.ts`, `projection/models/model-picker-search.ts`) can
  * consume it without importing a React component (plan §3).
  */
 export interface WebuiModelProviderGroup {

@@ -4,7 +4,7 @@
 // The browser persistence half of the former `client/session-unread.ts`: the
 // storage key, the read that validates every stored value, and the write that
 // keeps only positive counts. It decides no unread business rule — the badge
-// format lives in `projection/unread-badge.ts` and the ordering lives with the
+// format lives in `projection/common/unread-badge.ts` and the ordering lives with the
 // commands that call this module — it only reads and writes what it is given.
 //
 // Every access is wrapped: storage may be absent (SSR, private mode) or throw
@@ -186,7 +186,7 @@ export function writeWebuiUnreadCounts(
 
 // ---------------------------------------------------------------------------
 // The rail's overlay flags (plan §5.1.2, §5.6's `sessions` row). They used to
-// live in `components/LeftRail.tsx`, which the package's own guide forbids —
+// live in `components/sessions/LeftRail.tsx`, which the package's own guide forbids —
 // "browser storage IO in a component file" — and §5.1.2 records the instance:
 // the overlay/pins adapter is "storage filed in a component named `LeftRail`".
 // The component keeps the frame; the adapter lives with the other storage keys

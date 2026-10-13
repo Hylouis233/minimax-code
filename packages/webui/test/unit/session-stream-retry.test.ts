@@ -1,5 +1,5 @@
 // Unit tests for the turn coordinator's manual retry — the manual arm of the
-// stream loop's recovery, now owned by `application/turn-coordinator.ts`
+// stream loop's recovery, now owned by `application/turn/turn-coordinator.ts`
 // (ticket #45, the atomic ingress flip).
 //
 // This suite used to drive `client/session-stream-retry.ts`. That module is

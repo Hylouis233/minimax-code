@@ -8,7 +8,7 @@ import type { WebuiFileDiffInfoView } from "../../../shared/contracts/session.js
 /* Attachment shape — used by the components layer, declared here so the
  * projection layer can return an `attachments` array without importing the
  * React component. The actual component lives at
- * `components/MessageAttachments.tsx`. */
+ * `components/transcript/MessageAttachments.tsx`. */
 
 export type WebuiMessageAttachmentType = "image" | "file";
 

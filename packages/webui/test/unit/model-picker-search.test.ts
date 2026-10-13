@@ -1,7 +1,7 @@
 // The model picker's search box and starred section (roadmap H, 模型搜索).
 //
-// The suite drives the PRODUCT functions in `projection/model-picker-search.ts`
-// and `projection/model-favorites.ts`, not copies of them. An earlier revision
+// The suite drives the PRODUCT functions in `projection/models/model-picker-search.ts`
+// and `projection/models/model-favorites.ts`, not copies of them. An earlier revision
 // of the source implementation kept a hand-written mirror of the grouping loop
 // in the test file, and that mirror stayed green through a regression in the
 // exact place the test claimed to defend — the product code is imported here so

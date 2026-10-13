@@ -2,7 +2,7 @@
 //
 // Two shapes, applied to the same feature (see the skill's testing rule):
 //
-//   1. The parsing and payload rules live in `projection/plan-mode.ts` as pure
+//   1. The parsing and payload rules live in `projection/interactions/plan-mode.ts` as pure
 //      functions, so the title/summary extraction and the three answer payloads
 //      are asserted directly, including the fence handling that a rendered card
 //      cannot distinguish.

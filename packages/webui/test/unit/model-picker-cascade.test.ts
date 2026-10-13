@@ -2,7 +2,7 @@
 //
 // Two halves, and the split is deliberate.
 //
-// The RULES are pure functions in `projection/model-picker-cascade.ts` and are
+// The RULES are pure functions in `projection/models/model-picker-cascade.ts` and are
 // driven directly below: when a click completes the selection, when controls are
 // live versus previewed, and what Escape does from each tier. Those are the
 // decisions that are easy to state and easy to get subtly wrong, so they are
@@ -37,7 +37,7 @@ import {
 import type { WebuiModelPickerEntry } from "../../src/client/contracts/models/model-view.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const componentDir = path.resolve(here, "../../src/client/components");
+const componentDir = path.resolve(here, "../../src/client/components/models");
 
 function readComponent(file: string): string {
   return readFileSync(path.join(componentDir, file), "utf8");

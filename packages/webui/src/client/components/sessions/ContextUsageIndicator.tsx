@@ -133,7 +133,7 @@ export function ContextUsageIndicator({ usage, usageQuota, planModel }: {
   const circumference = 2 * Math.PI * 7;
   const label = `${percent}% · ${formatContextTokens(used)} / ${formatContextTokens(limit)} tokens`;
   // Always all six categories, in the reference's fixed order, with a dash for
-  // whatever the engine did not report. See `projection/context-breakdown.ts`
+  // whatever the engine did not report. See `projection/composer/context-breakdown.ts`
   // for why a missing category is a dash and not `0.0%`.
   const breakdownRows = contextBreakdownRows(usage.components, used);
   const drawableRows = drawableBreakdownRows(breakdownRows);

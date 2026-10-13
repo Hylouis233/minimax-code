@@ -1,4 +1,4 @@
-// The application unread controller (plan §7.1 `application/unread.ts`;
+// The application unread controller (plan §7.1 `application/sessions/unread.ts`;
 // §7.6 "Unread"; ticket #49 criterion 4).
 //
 // It is the **single owner of unread hydration ordering**. The ordering rules

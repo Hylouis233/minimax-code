@@ -19,8 +19,26 @@ const read = (relative: string): string =>
   readFileSync(new URL(relative, CLIENT_ROOT), "utf8");
 const flat = (text: string): string => text.replace(/\s+/gu, " ");
 
-const appModules = (): string[] =>
-  readdirSync(APP_ROOT).filter((name) => name.endsWith(".ts"));
+/**
+ * Every `client/application/**` module, as a path relative to that directory.
+ *
+ * Recursive on purpose. Phase 4 filed each business under `application/<business>/`,
+ * and a flat `readdirSync` would have stopped seeing `sessions/unread.ts` — the
+ * assertion below would then have passed *because it could no longer find the
+ * second constructor*, which is the exact failure this suite exists to catch.
+ */
+const appModules = (): string[] => {
+  const out: string[] = [];
+  const walk = (dir: URL, prefix: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) walk(new URL(`${relative}/`, dir), relative);
+      else if (entry.name.endsWith(".ts")) out.push(relative);
+    }
+  };
+  walk(APP_ROOT, "");
+  return out;
+};
 
 describe("the session state source is single", () => {
   it("holds the session map in exactly one module", () => {
@@ -35,11 +53,13 @@ describe("the session state source is single", () => {
       read(`application/${name}`).includes("createWebuiUnreadController("),
     );
     // The module that defines it, plus the composition root that creates it.
-    expect(callers.sort()).toEqual(["create-application.ts", "unread.ts"]);
+    // Both paths are relative to `client/application/`, so the owner's business
+    // directory is part of the expected value.
+    expect(callers.sort()).toEqual(["create-application.ts", "sessions/unread.ts"]);
   });
 
   it("derives the shell's page from the catalog instead of holding sessions", () => {
-    const shell = flat(read("components/WebuiClientFoundationApp.tsx"));
+    const shell = flat(read("components/shell/WebuiClientFoundationApp.tsx"));
     // The catalog is a subscription to the application store...
     expect(shell).toContain("selectWebuiCatalogFlatPage(catalog)");
     expect(shell).toContain("useSyncExternalStore(");

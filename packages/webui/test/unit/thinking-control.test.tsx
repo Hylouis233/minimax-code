@@ -1,6 +1,6 @@
 // The composer's thinking trigger (roadmap H, 模型与用量).
 //
-// The suite drives the PRODUCT functions in `projection/thinking-control.ts`.
+// The suite drives the PRODUCT functions in `projection/models/thinking-control.ts`.
 // Almost every assertion here is about the three-valued verdict rather than
 // about a boolean, because collapsing the third value into `false` is the
 // mistake this module exists to make impossible: it renders an unstated state

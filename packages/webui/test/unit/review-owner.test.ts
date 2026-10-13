@@ -6,7 +6,7 @@
 // Two surfaces render a diff — the transcript's card on an assistant message and
 // the review page over a whole change set — and the machine, the failure copy and
 // the mutation decisions used to be filed in the first of them. They live in
-// `projection/review-state.ts` now, and this file asserts both halves of the
+// `projection/transcript/review-state.ts` now, and this file asserts both halves of the
 // acceptance: one machine, two readers, and no private copy in either.
 
 import { describe, expect, it } from "vitest";
@@ -44,11 +44,11 @@ describe("the diff machine has one owner", () => {
     const declarers = [...modulesUnder("components/"), ...modulesUnder("projection/")].filter(
       (file) => /export function reduceWebuiDiffState\(/u.test(read(file)),
     );
-    expect(declarers).toEqual(["projection/review-state.ts"]);
+    expect(declarers).toEqual(["projection/transcript/review-state.ts"]);
   });
 
   it("leaves the transcript's card with no machine of its own", () => {
-    const card = flat(read("components/DiffCard.tsx"));
+    const card = flat(read("components/transcript/DiffCard.tsx"));
     // It CALLS the machine (every state update goes through it) and does not
     // declare one: no reducer, no initial-state literal, no switch, no copy table.
     expect(card).not.toContain("export function reduceWebuiDiffState(");
@@ -57,14 +57,14 @@ describe("the diff machine has one owner", () => {
     expect(card).toContain("reduceWebuiDiffState(current,");
     expect(card).not.toContain("WEBUI_DIFF_FAILURE_COPY");
     // ...and it reads the owner instead.
-    expect(card).toContain('from "../projection/review-state.js"');
+    expect(card).toContain('from "../../projection/transcript/review-state.js"');
   });
 
   it("keeps the failure copy in exactly one module", () => {
     const holders = [...modulesUnder("components/"), ...modulesUnder("projection/")].filter(
       (file) => read(file).includes("unsafe_path:"),
     );
-    expect(holders).toEqual(["projection/review-state.ts"]);
+    expect(holders).toEqual(["projection/transcript/review-state.ts"]);
   });
 });
 
@@ -75,10 +75,10 @@ describe("the two readers share it", () => {
     // while the acceptance ("one owner, two readers") still held. Scanning the
     // tree makes a third reader fail here and a relocation a no-op.
     const readers = modulesUnder("components/")
-      .filter((file) => read(file).includes("/projection/review-state.js"))
+      .filter((file) => read(file).includes("/projection/transcript/review-state.js"))
       .sort();
     expect(readers).toEqual([
-      "components/DiffCard.tsx",
+      "components/transcript/DiffCard.tsx",
       "components/workspace/ReviewSettingsPage.tsx",
     ]);
   });

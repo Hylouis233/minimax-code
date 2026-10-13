@@ -2,7 +2,7 @@
 // B2; ticket #67).
 //
 // §4.2 field 1 gives `composer` the queue's state, and §5.6 puts the owner at
-// `application/composer-store.ts`. The component used to hold the queue in
+// `application/composer/composer-store.ts`. The component used to hold the queue in
 // `useState`, which is the temporary home the ledger recorded at `:780-781`.
 //
 // The fallback keeps a composer mounted without an application (unit tests, a

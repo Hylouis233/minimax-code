@@ -84,7 +84,7 @@ describe("prohibition 1 — a business may not hold a writer for another busines
     // owner's published command is the legal form); `interaction-coordinator.ts`
     // holds that command view — `prohibition 1` in `interaction-coordinator.test.ts`
     // asserts the runtime half.
-    expect(flat(read("application/interaction-coordinator.ts"))).toContain(
+    expect(flat(read("application/interactions/interaction-coordinator.ts"))).toContain(
       "readonly streams: WebuiStreamPhaseCommands;",
     );
   });
@@ -96,7 +96,7 @@ describe("prohibition 2 — a rule may not be filed under a module that does not
     // interaction flow's, so both moved into the owner in this carve.
     const composer = flat(read("components/SessionComposer.tsx"));
     expect(composer).not.toContain("webuiAnswersEndTurn");
-    expect(flat(read("application/interaction-coordinator.ts"))).toContain(
+    expect(flat(read("application/interactions/interaction-coordinator.ts"))).toContain(
       "webuiAnswersEndTurn(answers)",
     );
   });
@@ -137,7 +137,7 @@ describe("prohibition 3 — the set of valid values is enumerated in exactly one
 
   /**
    * The scan is scoped to **runtime event kinds**, which is the closed set the
-   * registry owns. `projection/message-parts.ts` names message-block kinds
+   * registry owns. `projection/transcript/message-parts.ts` names message-block kinds
    * (`agent_joined`, `communication.message`, `delegation.message`,
    * `questionnaire.response`) — a different set, enumerated at that one site, whose
    * dotted and underscored spellings are a payload tolerance in the same class as
@@ -146,12 +146,12 @@ describe("prohibition 3 — the set of valid values is enumerated in exactly one
    * exemption: the two cases below still fail if a *third* module names a runtime
    * event kind.
    */
-  const MESSAGE_BLOCK_KINDS = "projection/message-parts.ts";
+  const MESSAGE_BLOCK_KINDS = "projection/transcript/message-parts.ts";
 
   it("goal: no module but the registry and the reducer names a goal kind", () => {
     const naming = clientModules().filter((file) => {
       if (file === "projection/event-kinds.ts") return false;
-      if (file === "projection/effect-reducer.ts") return false; // §10 S9 keeps the reducer's switch
+      if (file === "application/turn/effect-reducer.ts") return false; // §10 S9 keeps the reducer's switch
       if (file === MESSAGE_BLOCK_KINDS) return false; // message-block kinds, not event kinds
       return literal.test(flat(read(file)));
     });
@@ -165,7 +165,7 @@ describe("prohibition 3 — the set of valid values is enumerated in exactly one
     const naming = clientModules().filter(
       (file) =>
         file !== "projection/event-kinds.ts" &&
-        file !== "projection/effect-reducer.ts" &&
+        file !== "application/turn/effect-reducer.ts" &&
         file !== MESSAGE_BLOCK_KINDS &&
         /"(?:permission|questionnaire)\.[a-z_.]+"/u.test(flat(read(file))),
     );
@@ -180,7 +180,7 @@ describe("prohibition 4 — a rule shared across businesses gets one owner every
     );
     // One declaration. The render path and the interaction flow both read it, and
     // neither restates it — which is the whole of this prohibition.
-    expect(declaring).toEqual(["projection/questionnaire-state.ts"]);
+    expect(declaring).toEqual(["projection/interactions/questionnaire-state.ts"]);
   });
 
   it("the goal version cell is declared once and shared as a type", () => {
@@ -189,9 +189,15 @@ describe("prohibition 4 — a rule shared across businesses gets one owner every
     );
     expect(declaring).toEqual(["application/version-cell.ts"]);
     // Read as a type by both fences, one cell each — the independence the two
-    // coordinators assert in their own suites.
-    for (const file of ["application/goal-coordinator.ts", "application/interaction-coordinator.ts"]) {
-      expect(read(file)).toContain('from "./version-cell.js"');
+    // coordinators assert in their own suites. Phase 4 filed the interaction
+    // coordinator under `application/interactions/` while `goal-coordinator.ts`
+    // stayed at the `application/` floor, so the two fences reach the same cell
+    // from one level apart.
+    for (const [file, specifier] of [
+      ["application/goal-coordinator.ts", './version-cell.js'],
+      ["application/interactions/interaction-coordinator.ts", '../version-cell.js'],
+    ]) {
+      expect(read(file)).toContain(`from "${specifier}"`);
     }
   });
 });

@@ -5,7 +5,7 @@
 // racing the running turn, the message drains behind it. The orchestration —
 // enqueue against the transport, clear the draft, hand off attachments, refresh
 // the queue panel, and surface a refusal inline on failure — used to live inside
-// `submitWebuiComposerTurn`'s `sending` branch in `projection/composer-state.ts`.
+// `submitWebuiComposerTurn`'s `sending` branch in `projection/composer/composer-state.ts`.
 // It moves here so the application owns the command, and `composer-state` calls
 // this one implementation rather than carrying its own copy.
 //

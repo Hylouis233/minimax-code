@@ -1,6 +1,6 @@
 // WebuiDiffCard — the diff-card renderer.
 //
-// The pure state machine it renders moved to `projection/review-state.ts` (plan
+// The pure state machine it renders moved to `projection/transcript/review-state.ts` (plan
 // §5.6's `transcript` row, §10 S13): the reducer, the failure copy and the
 // mutation decisions are review's, and the review page is the second reader of
 // them. What is left here is the component and its capability subset.

@@ -3,7 +3,7 @@
 // The renderable transcript shapes the components consume, plus the
 // questionnaire-response render record they carry. Split from the former
 // `client/contracts.ts`. `WebuiQuestionnaireResponseSummary` and its answer
-// record moved here from `projection/message-parts.ts` so this leaf contract
+// record moved here from `projection/transcript/message-parts.ts` so this leaf contract
 // no longer reaches into projection implementation.
 
 import type { WebuiTurnDiffView } from "../../../shared/contracts/session.js";
@@ -12,8 +12,8 @@ import type { WebuiMessageAttachment } from "./message-view.js";
 /**
  * Which per-message toolbar actions the runtime offers for one message.
  *
- * Moved here from `components/MessageActions.tsx` so the pure transcript
- * projection (`projection/transcript-shape.ts`) can name it without importing
+ * Moved here from `components/transcript/MessageActions.tsx` so the pure transcript
+ * projection (`projection/transcript/transcript-shape.ts`) can name it without importing
  * a React component (plan §3).
  */
 export type WebuiMessageActionCapabilities = {

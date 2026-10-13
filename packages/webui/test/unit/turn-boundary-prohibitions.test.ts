@@ -40,11 +40,11 @@ function read(relativePath: string): string {
 /** The modules `turn` owns: its capability slice, commands, loop and lease. */
 const TURN_MODULES = [
   "application/turn-capabilities.ts",
-  "application/turn-commands.ts",
-  "application/turn-coordinator.ts",
-  "application/session-commands.ts",
-  "application/stream-state-bundle.ts",
-  "application/stream-lease-controller.ts",
+  "application/turn/turn-commands.ts",
+  "application/turn/turn-coordinator.ts",
+  "application/sessions/session-commands.ts",
+  "application/turn/stream-state-bundle.ts",
+  "application/turn/stream-lease-controller.ts",
   "mechanisms/stream-loop.ts",
   "mechanisms/stream-lease.ts",
 ];
@@ -68,7 +68,7 @@ describe("prohibition 1 — turn holds no writer for another business's state", 
       // turn module: the lease controller, which patches the `stream` field and
       // nothing else.
       if (members.includes("updateSession")) {
-        expect(modulePath).toBe("application/stream-lease-controller.ts");
+        expect(modulePath).toBe("application/turn/stream-lease-controller.ts");
         const calls = source.split("store.updateSession(").slice(1);
         expect(calls).toHaveLength(2);
         for (const call of calls) {
@@ -89,7 +89,7 @@ describe("prohibition 1 — turn holds no writer for another business's state", 
     // `setGoal` as *parameter types* of the interaction command factory. The
     // writer behind them belongs to `interactions`; this module must not be able
     // to reach it.
-    const source = read("application/session-commands.ts");
+    const source = read("application/sessions/session-commands.ts");
     expect(source).not.toMatch(/from "\.\.?\/[^"]*session-store\.js"/u);
     expect(source).not.toMatch(/createInteractionWriter/u);
     expect(source).not.toMatch(/updateSession\(/u);
@@ -136,7 +136,7 @@ describe("prohibition 3 — the stream-phase value set is enumerated exactly onc
   });
 
   it("derives the phase type from the union instead of re-listing it", () => {
-    expect(read("application/session-commands.ts")).toContain(
+    expect(read("application/sessions/session-commands.ts")).toContain(
       'WebuiStreamState["phase"]',
     );
   });
@@ -163,7 +163,7 @@ describe("prohibition 4 — turn's shared rules have exactly one owner", () => {
         // beside `stream-lease.ts` (`./`), every other layer reaches it from one
         // level (or more) below `mechanisms/`.
         expect(read(user)).toMatch(
-          /from "(\.\/|\.\.\/mechanisms\/)stream-lease\.js"/u,
+          /from "(\.\/(?:\.\.\/)*|.*?\/mechanisms\/)stream-lease\.js"/u,
         );
       }
       expect(users.length).toBeGreaterThan(1);

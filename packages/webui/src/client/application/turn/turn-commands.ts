@@ -1,5 +1,5 @@
 // The turn commands the composer runs through the application layer
-// (plan §7.1 `application/turn-coordinator.ts`: "owns send/queue/stop/retry").
+// (plan §7.1 `application/turn/turn-coordinator.ts`: "owns send/queue/stop/retry").
 //
 // The stop command already lives in `turn-coordinator.ts`. This module moves
 // the rest of the composer's owned execution out of the 3000-line component and

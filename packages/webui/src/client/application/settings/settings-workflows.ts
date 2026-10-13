@@ -1,4 +1,4 @@
-// The settings workflow owner (plan §7.1 `application/settings-workflows.ts`;
+// The settings workflow owner (plan §7.1 `application/settings/settings-workflows.ts`;
 // §7.6 "Settings" row; §7.7 stage 5; ticket #52).
 //
 // One owner for every *settings* surface the browser reads and writes:

@@ -787,7 +787,7 @@ export function WebuiComposer({
     const activeTurnProbe = webuiActiveTurnProbeFor(getActiveTurn);
 
     // The attach/recheck/gap-recovery commands now live in the application
-    // layer (`application/turn-commands.ts`). These are the component's
+    // layer (`application/turn/turn-commands.ts`). These are the component's
     // bindings onto them, closing over the current session and its setters —
     // the same shape `stopWebuiTurn` already uses. The attempt's sink is minted
     // inside `attachTurn` (the binding owns the store writer), so this component

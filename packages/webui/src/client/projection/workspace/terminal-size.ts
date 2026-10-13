@@ -23,7 +23,7 @@
  *     reported" and leave the new one at the default.
  *
  * The observer and the timers that feed these rules live in
- * `components/WorkspacePanels.tsx`, in the same split `model-picker-hover.ts`
+ * `components/workspace/WorkspacePanels.tsx`, in the same split `model-picker-hover.ts`
  * uses: the decision is data, the scheduling belongs to the surface that owns
  * the clock.
  */

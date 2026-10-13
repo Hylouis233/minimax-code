@@ -1,6 +1,6 @@
 // The per-session effects registry (ticket #45, pre-flip bridge).
 //
-// The event coordinator (`application/event-coordinator.ts`) is the sole
+// The event coordinator (`application/turn/event-coordinator.ts`) is the sole
 // consumer of the process-event channel, but the effects it runs — the
 // authoritative permission/questionnaire re-read, the goal-version-guarded
 // goal re-read, the attach/recheck decision and the reconnect probe — close

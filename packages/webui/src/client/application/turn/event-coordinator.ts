@@ -1,4 +1,4 @@
-// The application event coordinator (plan §7.1 `application/event-coordinator.ts`).
+// The application event coordinator (plan §7.1 `application/turn/event-coordinator.ts`).
 //
 // It is the **sole consumer of the process-event channel** and the sole owner of
 // the two write paths that used to be spread across the shell, the composer and

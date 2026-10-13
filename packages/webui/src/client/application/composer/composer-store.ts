@@ -1,4 +1,4 @@
-// The application composer store (plan §7.1 `application/composer-store.ts`;
+// The application composer store (plan §7.1 `application/composer/composer-store.ts`;
 // §7.6 "Draft"; ticket #49 criterion 5).
 //
 // The composer's per-session drafts and input history used to live in the

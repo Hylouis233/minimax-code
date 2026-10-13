@@ -1,5 +1,5 @@
 // The session workflows: the business requests that load and mutate session
-// entities, bound to the single catalog (plan §7.1 `application/session-workflows.ts`;
+// entities, bound to the single catalog (plan §7.1 `application/sessions/session-workflows.ts`;
 // §7.7 stage 5; ticket #49 correction 2 and criterion 8).
 //
 // The foundation shell used to call `transport.loadSessions` /

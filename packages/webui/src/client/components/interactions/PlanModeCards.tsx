@@ -2,7 +2,7 @@
 //
 // The runtime raises plan mode on the same questionnaire channel as every other
 // interaction, and the request is recognised by `mode: "plan"` (see
-// `projection/plan-mode.ts`). The desktop renders three distinct surfaces for
+// `projection/interactions/plan-mode.ts`). The desktop renders three distinct surfaces for
 // that channel and so does this file:
 //
 //   * `plan-enter-confirmation`  — asked before plan mode starts.

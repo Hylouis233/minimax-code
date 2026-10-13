@@ -25,7 +25,7 @@ import {
 } from "react";
 import { parseWebuiMessageFileReference } from "../../projection/transcript/message-file-reference.js";
 
-// The same `highlight.js/lib/core` registration `components/WorkspacePanels.tsx`
+// The same `highlight.js/lib/core` registration `components/workspace/WorkspacePanels.tsx`
 // performs for the file viewer — the full `highlight.js` bundle is never
 // imported, and `registerLanguage` is idempotent, so the two callers share one
 // core instance.

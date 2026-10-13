@@ -2,7 +2,7 @@
 // component-facing transcript items, plus the small diff/usage helpers the
 // projection relies on.
 //
-// The split is deliberate: `projection/message-parts.ts` turns the same wire
+// The split is deliberate: `projection/transcript/message-parts.ts` turns the same wire
 // message into Desktop-style `parts[]`, and this module adapts those parts
 // into the `WebuiTranscriptItem[]` shape the components already render. It
 // also owns the `readMessageDiff` / `readMessageUsage` / `readUsageNumber`
