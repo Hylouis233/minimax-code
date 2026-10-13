@@ -49,6 +49,7 @@ import {
   filterWebuiRailViewSessions,
   selectWebuiRailViewTabs,
   type WebuiRailView,
+  type WebuiRailViewTab,
 } from "../rail-buckets.js";
 import { formatWebuiUnreadBadge } from "../projection/unread-badge.js";
 import type { WebuiClientSession, WebuiClientSessionPage, WebuiClientSessionTreePage, WebuiClientProject } from "../contracts/sessions/session-view.js";
@@ -237,6 +238,291 @@ interface RailMenuHandlers {
   readonly onRenameProject?: (project: WebuiProjectGroup) => void;
   readonly onToggleProjectPin?: (project: WebuiProjectGroup) => void;
   readonly onArchiveProject?: (project: WebuiProjectGroup) => void;
+}
+
+/**
+ * The rail's view strip (plan §16.10's three in-file regions: the rail-view strip).
+ *
+ * Markup and one callback: the active view stays `WebuiProjectList`'s, because the
+ * shell may pass it in and an in-file cut must not change a lifetime. Both of that
+ * component's render branches show this strip, which is the other reason it is one
+ * declaration rather than two copies.
+ */
+function RailViewTabs({
+  tabs,
+  activeView,
+  onSelect,
+}: {
+  readonly tabs: readonly WebuiRailViewTab[];
+  readonly activeView: WebuiRailView;
+  readonly onSelect: (view: WebuiRailView) => void;
+}) {
+  return (
+    <div className="webui-rail-view-tabs" role="tablist" data-webui-rail-view-tabs="true">
+      {tabs.map((entry) => (
+        <button
+          key={entry.view}
+          type="button"
+          data-webui-rail-view={entry.view}
+          role="tab"
+          aria-selected={activeView === entry.view}
+          className="webui-rail-view-tab"
+          onClick={() => onSelect(entry.view)}
+        >
+          {entry.label}
+          {entry.view === "projects" ? null : (
+            <span className="webui-rail-view-count" data-webui-rail-view-count={entry.view}>
+              {entry.count}
+            </span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * One project's expansion (plan §16.10's three in-file regions: the project-list
+ * expansion): the sessions under a project's row, each collapsible to its child
+ * sessions, with the "更多" control that reveals the next batch.
+ *
+ * A cut, not a move: the state stays in `WebuiProjectList` and arrives as props and
+ * callbacks, so the lifetimes are exactly what they were — which is what §16.10
+ * requires of an in-file region. Nothing here is stateful.
+ */
+function ProjectExpansion({
+  projectKey,
+  expanded,
+  sessionsById,
+  childrenByParentId,
+  visibleSessionIds,
+  hasMore,
+  expandedSessionIds,
+  selectedSessionId,
+  activity,
+  now,
+  pinnedSessions,
+  starredSessions,
+  onToggleChildren,
+  onShowMore,
+  onToggleSessionPin,
+  onToggleSessionStar,
+  onArchiveSession,
+  onSessionContextMenu,
+}: {
+  readonly projectKey: string;
+  readonly expanded: boolean;
+  readonly sessionsById: ReadonlyMap<string, WebuiClientSession>;
+  readonly childrenByParentId: ReadonlyMap<string, readonly WebuiClientSession[]>;
+  readonly visibleSessionIds: readonly string[];
+  readonly hasMore: boolean;
+  readonly expandedSessionIds: ReadonlySet<string>;
+  readonly selectedSessionId?: string;
+  readonly activity?: WebuiSessionActivityMap;
+  readonly now?: number;
+  readonly pinnedSessions?: Readonly<Record<string, boolean>>;
+  readonly starredSessions?: Readonly<Record<string, boolean>>;
+  readonly onToggleChildren: (sessionId: string) => void;
+  readonly onShowMore: () => void;
+  readonly onToggleSessionPin?: (session: WebuiClientSession) => void;
+  readonly onToggleSessionStar?: (session: WebuiClientSession) => void;
+  readonly onArchiveSession?: (session: WebuiClientSession) => void;
+  readonly onSessionContextMenu: (
+    event: MouseEvent<HTMLElement>,
+    session: WebuiClientSession,
+    isChild?: boolean,
+  ) => void;
+}) {
+  return (
+                <div
+                  className={`webui-expandable-motion${expanded ? " is-open" : ""}`}
+                  aria-hidden={!expanded}
+                  ref={(element) => element?.toggleAttribute("inert", !expanded)}
+                >
+                  <ul
+                    className="webui-project-session-list"
+                    data-webui-project-sessions={projectKey}
+                  >
+                    {visibleSessionIds.map((sessionId) => {
+                      const session = sessionsById.get(sessionId);
+                      if (!session) return null;
+                      const children = childrenByParentId.get(session.sessionId) ?? [];
+                      const childrenExpanded = expandedSessionIds.has(session.sessionId);
+                      const sessionActive = session.sessionId === selectedSessionId;
+                      return (
+                        <li key={session.sessionId}>
+                          <div
+                            className="webui-project-session-row group/session"
+                            data-webui-session-active={sessionActive ? "true" : "false"}
+                          >
+                            <span className="webui-session-leading-marker">
+                            {children.length > 0 ? (
+                              <button
+                                type="button"
+                                className="webui-session-disclosure"
+                                aria-label={`${childrenExpanded ? "收起" : "展开"}子会话：${sessionLabel(session)}`}
+                                aria-expanded={childrenExpanded}
+                                title={childrenExpanded ? "收起子会话" : "展开子会话"}
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  onToggleChildren(session.sessionId);
+                                }}
+                              >
+                                <WebuiIconSessionDisclosure className={childrenExpanded ? "is-expanded" : undefined} />
+                              </button>
+                            ) : <span aria-hidden="true" className="webui-session-leading-line" />}
+                            </span>
+                            <a
+                              href={sessionHash(session.sessionId)}
+                              data-webui-session-link={session.sessionId}
+                              data-webui-session-active={sessionActive ? "true" : "false"}
+                              onContextMenu={(event) => onSessionContextMenu(event, session)}
+                              className="webui-project-session-card text-text_default_primary"
+                            >
+                              <span className="min-w-0 flex-1 truncate">
+                                {sessionLabel(session)}
+                              </span>
+                              <SessionActivityMeta
+                                session={session}
+                                activity={activity}
+                                now={now}
+                                pinned={Boolean(pinnedSessions?.[session.sessionId])}
+                                starred={Boolean(starredSessions?.[session.sessionId])}
+                              />
+                            </a>
+                            <div className="webui-session-row-actions">
+                              {onToggleSessionPin ? (
+                                <button
+                                  type="button"
+                                  aria-label={`${pinnedSessions?.[session.sessionId] ? "取消置顶" : "置顶"}：${sessionLabel(session)}`}
+                                  title={pinnedSessions?.[session.sessionId] ? "取消置顶" : "置顶"}
+                                  className="webui-rail-action"
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    onToggleSessionPin(session);
+                                  }}
+                                >
+                                  {/* The glyph draws the ACTION, not the state: already
+                                   *  pinned means the click unpins, so the button offers
+                                   *  the slashed pin. Same component the context menu
+                                   *  uses, so the two cannot drift apart. */}
+                                  <WebuiIconContextPin pinned={Boolean(pinnedSessions?.[session.sessionId])} />
+                                </button>
+                              ) : null}
+                              {onToggleSessionStar ? (
+                                <button
+                                  type="button"
+                                  aria-label={`${starredSessions?.[session.sessionId] ? "取消收藏" : "收藏"}：${sessionLabel(session)}`}
+                                  title={starredSessions?.[session.sessionId] ? "取消收藏" : "收藏"}
+                                  className="webui-rail-action"
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    onToggleSessionStar(session);
+                                  }}
+                                >
+                                  {/* Outline until starred, yellow fill after. Unlike the
+                                   *  pin, this glyph shows the state rather than the
+                                   *  action: a filled star is not read as "remove"
+                                   *  anywhere in the world's icon vocabulary. */}
+                                  <WebuiIconSessionStar starred={Boolean(starredSessions?.[session.sessionId])} />
+                                </button>
+                              ) : null}
+                              {onArchiveSession ? (
+                                <button
+                                  type="button"
+                                  aria-label={`${session.archived ? "取消归档" : "归档"}：${sessionLabel(session)}`}
+                                  title={session.archived ? "取消归档" : "归档"}
+                                  className="webui-rail-action"
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    onArchiveSession(session);
+                                  }}
+                                >
+                                  <WebuiIconContextArchive />
+                                </button>
+                              ) : null}
+                              <button
+                                type="button"
+                                aria-label={`${sessionLabel(session)} 更多操作`}
+                                title="更多操作"
+                                className="webui-rail-action"
+                                onClick={(event) => onSessionContextMenu(event, session)}
+                              >
+                                <WebuiIconMore />
+                              </button>
+                            </div>
+                          </div>
+                          {children.length > 0 && childrenExpanded ? (
+                            <ul
+                              className="webui-project-child-session-list"
+                              data-webui-project-child-sessions={session.sessionId}
+                            >
+                              {children.map((child) => (
+                                <li key={child.sessionId}>
+                                  <div className="webui-project-child-session-row group/session">
+                                    <a
+                                      href={sessionHash(child.sessionId)}
+                                      data-webui-session-link={child.sessionId}
+                                      data-webui-session-child-of={session.sessionId}
+                                      data-webui-session-active={
+                                        child.sessionId === selectedSessionId
+                                          ? "true"
+                                          : "false"
+                                      }
+                                      onContextMenu={(event) => onSessionContextMenu(event, child, true)}
+                                      className="webui-project-child-session-card text-text_default_primary"
+                                    >
+                                      <WebuiIconAgent className="size-4 shrink-0" />
+                                      <span className="min-w-0 flex-1 truncate">
+                                        {sessionLabel(child)}
+                                      </span>
+                                      <SessionActivityMeta
+                                        session={child}
+                                        activity={activity}
+                                        now={now}
+                                        pinned={Boolean(pinnedSessions?.[child.sessionId])}
+                                        starred={Boolean(starredSessions?.[child.sessionId])}
+                                      />
+                                    </a>
+                                    <div className="webui-session-row-actions">
+                                      <button
+                                        type="button"
+                                        aria-label={`${sessionLabel(child)} 更多操作`}
+                                        title="更多操作"
+                                        className="webui-rail-action"
+                                        onClick={(event) => onSessionContextMenu(event, child, true)}
+                                      >
+                                        <WebuiIconMore />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                    {hasMore ? (
+                      <li key={`${projectKey}-more`}>
+                        <button
+                          type="button"
+                          className="webui-project-session-more text-text_default_tertiary"
+                          onClick={() => {
+                            onShowMore();
+                          }}
+                        >
+                          更多
+                        </button>
+                      </li>
+                    ) : null}
+                  </ul>
+                </div>
+  );
 }
 
 export function WebuiProjectList({
@@ -598,40 +884,13 @@ export function WebuiProjectList({
   const activeTab = railTabs.find((entry) => entry.view === activeView);
   const activeTabLabel = activeTab?.label ?? "项目";
 
-  const railViewTabs = (
-    <div
-      className="webui-rail-view-tabs"
-      role="tablist"
-      data-webui-rail-view-tabs="true"
-    >
-      {railTabs.map((entry) => (
-        <button
-          key={entry.view}
-          type="button"
-          data-webui-rail-view={entry.view}
-          role="tab"
-          aria-selected={activeView === entry.view}
-          className="webui-rail-view-tab"
-          onClick={() => setActiveView(entry.view)}
-        >
-          {entry.label}
-          {entry.view === "projects" ? null : (
-            <span className="webui-rail-view-count" data-webui-rail-view-count={entry.view}>
-              {entry.count}
-            </span>
-          )}
-        </button>
-      ))}
-    </div>
-  );
-
   // Not a header the user can dismiss: the count is the point. The rail keeps
   // the session the reader is on in the main column whatever the tab says, so
   // an empty tab means "nothing is running", not "you lost your conversation".
   if (activeView !== "projects") {
     return (
       <section data-webui-project-list="true" data-webui-rail-view-active={activeView}>
-        {railViewTabs}
+        <RailViewTabs tabs={railTabs} activeView={activeView} onSelect={setActiveView} />
         <WebuiSessionList
           page={{ sessions: viewSessions, hasMore: false }}
           loading={loading}
@@ -665,7 +924,7 @@ export function WebuiProjectList({
 
   return (
     <section data-webui-project-list="true">
-      {railViewTabs}
+      <RailViewTabs tabs={railTabs} activeView={activeView} onSelect={setActiveView} />
       <div
         className="flex h-7 items-center px-2 text-sm font-normal leading-5 text-text_default_tertiary"
         data-webui-rail-section-header="true"
@@ -766,204 +1025,40 @@ export function WebuiProjectList({
                     ) : null}
                   </div>
                 </div>
-                <div
-                  className={`webui-expandable-motion${expanded ? " is-open" : ""}`}
-                  aria-hidden={!expanded}
-                  ref={(element) => element?.toggleAttribute("inert", !expanded)}
-                >
-                  <ul
-                    className="webui-project-session-list"
-                    data-webui-project-sessions={project.key}
-                  >
-                    {visibleSessionIds.map((sessionId) => {
-                      const session = sessionsById.get(sessionId);
-                      if (!session) return null;
-                      const children = childrenByParentId.get(session.sessionId) ?? [];
-                      const childrenExpanded = expandedSessions.has(session.sessionId);
-                      const sessionActive = session.sessionId === selectedSessionId;
-                      return (
-                        <li key={session.sessionId}>
-                          <div
-                            className="webui-project-session-row group/session"
-                            data-webui-session-active={sessionActive ? "true" : "false"}
-                          >
-                            <span className="webui-session-leading-marker">
-                            {children.length > 0 ? (
-                              <button
-                                type="button"
-                                className="webui-session-disclosure"
-                                aria-label={`${childrenExpanded ? "收起" : "展开"}子会话：${sessionLabel(session)}`}
-                                aria-expanded={childrenExpanded}
-                                title={childrenExpanded ? "收起子会话" : "展开子会话"}
-                                onClick={(event) => {
-                                  event.preventDefault();
-                                  event.stopPropagation();
-                                  setExpandedSessions((current) => {
-                                    const next = new Set(current);
-                                    if (next.has(session.sessionId)) next.delete(session.sessionId);
-                                    else next.add(session.sessionId);
-                                    return next;
-                                  });
-                                }}
-                              >
-                                <WebuiIconSessionDisclosure className={childrenExpanded ? "is-expanded" : undefined} />
-                              </button>
-                            ) : <span aria-hidden="true" className="webui-session-leading-line" />}
-                            </span>
-                            <a
-                              href={sessionHash(session.sessionId)}
-                              data-webui-session-link={session.sessionId}
-                              data-webui-session-active={sessionActive ? "true" : "false"}
-                              onContextMenu={(event) => openSessionMenu(event, session)}
-                              className="webui-project-session-card text-text_default_primary"
-                            >
-                              <span className="min-w-0 flex-1 truncate">
-                                {sessionLabel(session)}
-                              </span>
-                              <SessionActivityMeta
-                                session={session}
-                                activity={activity}
-                                now={now}
-                                pinned={Boolean(pinnedSessions?.[session.sessionId])}
-                                starred={Boolean(starredSessions?.[session.sessionId])}
-                              />
-                            </a>
-                            <div className="webui-session-row-actions">
-                              {onToggleSessionPin ? (
-                                <button
-                                  type="button"
-                                  aria-label={`${pinnedSessions?.[session.sessionId] ? "取消置顶" : "置顶"}：${sessionLabel(session)}`}
-                                  title={pinnedSessions?.[session.sessionId] ? "取消置顶" : "置顶"}
-                                  className="webui-rail-action"
-                                  onClick={(event) => {
-                                    event.preventDefault();
-                                    event.stopPropagation();
-                                    onToggleSessionPin(session);
-                                  }}
-                                >
-                                  {/* The glyph draws the ACTION, not the state: already
-                                   *  pinned means the click unpins, so the button offers
-                                   *  the slashed pin. Same component the context menu
-                                   *  uses, so the two cannot drift apart. */}
-                                  <WebuiIconContextPin pinned={Boolean(pinnedSessions?.[session.sessionId])} />
-                                </button>
-                              ) : null}
-                              {onToggleSessionStar ? (
-                                <button
-                                  type="button"
-                                  aria-label={`${starredSessions?.[session.sessionId] ? "取消收藏" : "收藏"}：${sessionLabel(session)}`}
-                                  title={starredSessions?.[session.sessionId] ? "取消收藏" : "收藏"}
-                                  className="webui-rail-action"
-                                  onClick={(event) => {
-                                    event.preventDefault();
-                                    event.stopPropagation();
-                                    onToggleSessionStar(session);
-                                  }}
-                                >
-                                  {/* Outline until starred, yellow fill after. Unlike the
-                                   *  pin, this glyph shows the state rather than the
-                                   *  action: a filled star is not read as "remove"
-                                   *  anywhere in the world's icon vocabulary. */}
-                                  <WebuiIconSessionStar starred={Boolean(starredSessions?.[session.sessionId])} />
-                                </button>
-                              ) : null}
-                              {onArchiveSession ? (
-                                <button
-                                  type="button"
-                                  aria-label={`${session.archived ? "取消归档" : "归档"}：${sessionLabel(session)}`}
-                                  title={session.archived ? "取消归档" : "归档"}
-                                  className="webui-rail-action"
-                                  onClick={(event) => {
-                                    event.preventDefault();
-                                    event.stopPropagation();
-                                    onArchiveSession(session);
-                                  }}
-                                >
-                                  <WebuiIconContextArchive />
-                                </button>
-                              ) : null}
-                              <button
-                                type="button"
-                                aria-label={`${sessionLabel(session)} 更多操作`}
-                                title="更多操作"
-                                className="webui-rail-action"
-                                onClick={(event) => openSessionMenu(event, session)}
-                              >
-                                <WebuiIconMore />
-                              </button>
-                            </div>
-                          </div>
-                          {children.length > 0 && childrenExpanded ? (
-                            <ul
-                              className="webui-project-child-session-list"
-                              data-webui-project-child-sessions={session.sessionId}
-                            >
-                              {children.map((child) => (
-                                <li key={child.sessionId}>
-                                  <div className="webui-project-child-session-row group/session">
-                                    <a
-                                      href={sessionHash(child.sessionId)}
-                                      data-webui-session-link={child.sessionId}
-                                      data-webui-session-child-of={session.sessionId}
-                                      data-webui-session-active={
-                                        child.sessionId === selectedSessionId
-                                          ? "true"
-                                          : "false"
-                                      }
-                                      onContextMenu={(event) => openSessionMenu(event, child, true)}
-                                      className="webui-project-child-session-card text-text_default_primary"
-                                    >
-                                      <WebuiIconAgent className="size-4 shrink-0" />
-                                      <span className="min-w-0 flex-1 truncate">
-                                        {sessionLabel(child)}
-                                      </span>
-                                      <SessionActivityMeta
-                                        session={child}
-                                        activity={activity}
-                                        now={now}
-                                        pinned={Boolean(pinnedSessions?.[child.sessionId])}
-                                        starred={Boolean(starredSessions?.[child.sessionId])}
-                                      />
-                                    </a>
-                                    <div className="webui-session-row-actions">
-                                      <button
-                                        type="button"
-                                        aria-label={`${sessionLabel(child)} 更多操作`}
-                                        title="更多操作"
-                                        className="webui-rail-action"
-                                        onClick={(event) => openSessionMenu(event, child, true)}
-                                      >
-                                        <WebuiIconMore />
-                                      </button>
-                                    </div>
-                                  </div>
-                                </li>
-                              ))}
-                            </ul>
-                          ) : null}
-                        </li>
-                      );
-                    })}
-                    {orderedSessionIds.length > visibleSessionCount ? (
-                      <li key={`${project.key}-more`}>
-                        <button
-                          type="button"
-                          className="webui-project-session-more text-text_default_tertiary"
-                          onClick={() => {
-                            setVisibleProjectSessionCounts((current) => ({
-                              ...current,
-                              [project.key]:
-                                (current[project.key] ?? PROJECT_SESSION_BATCH_SIZE) +
-                                PROJECT_SESSION_BATCH_SIZE,
-                            }));
-                          }}
-                        >
-                          更多
-                        </button>
-                      </li>
-                    ) : null}
-                  </ul>
-                </div>
+                <ProjectExpansion
+                  projectKey={project.key}
+                  expanded={expanded}
+                  sessionsById={sessionsById}
+                  childrenByParentId={childrenByParentId}
+                  visibleSessionIds={visibleSessionIds}
+                  hasMore={orderedSessionIds.length > visibleSessionCount}
+                  expandedSessionIds={expandedSessions}
+                  selectedSessionId={selectedSessionId}
+                  activity={activity}
+                  now={now}
+                  pinnedSessions={pinnedSessions}
+                  starredSessions={starredSessions}
+                  onToggleChildren={(sessionId) =>
+                    setExpandedSessions((current) => {
+                      const next = new Set(current);
+                      if (next.has(sessionId)) next.delete(sessionId);
+                      else next.add(sessionId);
+                      return next;
+                    })
+                  }
+                  onShowMore={() =>
+                    setVisibleProjectSessionCounts((current) => ({
+                      ...current,
+                      [project.key]:
+                        (current[project.key] ?? PROJECT_SESSION_BATCH_SIZE) +
+                        PROJECT_SESSION_BATCH_SIZE,
+                    }))
+                  }
+                  onToggleSessionPin={onToggleSessionPin}
+                  onToggleSessionStar={onToggleSessionStar}
+                  onArchiveSession={onArchiveSession}
+                  onSessionContextMenu={openSessionMenu}
+                />
               </li>
             );
           })}
