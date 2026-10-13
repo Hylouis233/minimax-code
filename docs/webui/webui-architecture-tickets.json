@@ -1059,7 +1059,8 @@
       "688f0fa3",
       "2a8c7fcf",
       "f8023447",
-      "e8c6a960"
+      "e8c6a960",
+      "344dd225"
     ],
     "published": false,
     "tickets": {
@@ -1067,17 +1068,16 @@
       "T02": "implemented locally, acceptance evidence recorded on #128",
       "T03": "implemented locally, acceptance evidence recorded on #129",
       "T04": "implemented locally, acceptance evidence recorded on #130",
-      "T05": "implemented locally except one evidence item: permanent-domain-event-routing, goal-session-owner and interaction-session-owner are delivered; retained-goal-view-reconciliation's correction (C4) is in source and unit-verified, its browser regression case is not delivered"
+      "T05": "closed 2026-10-13, acceptance evidence recorded on #131"
     },
     "frontier": [
-      "T05 (in progress)",
       "T06",
       "T14",
       "T17"
     ],
     "notes": [
-      "T05 C4 evidence: the correction (a session switch resets the goal presentation without clearing the retained goal) is pinned by a source tripwire in goal-interaction-prohibitions.test.ts, verified to discriminate (restoring the old clear fails it). The browser regression case is still not in the repository, and its in-suite behaviour is now narrowed: with a per-session goal fixture the full browser run shows NO banner for the session that was opened, i.e. the goal event emitted for the second session did not commit in that run, while the same case passes standalone. Follow-up: find why the second session's goal event does not land in the full-suite run (fixture channel acceptance vs. the case's emit timing), then land the case.",
-      "T05 effects-registry removal landed as 2a8c7fcf: the earlier browser failure was a legitimate behaviour change (an accepted channel reconciles the session's goal per §4.3), not a regression."
+      "T05 closed with all eight acceptance criteria evidenced on #131. The one boundary: an accepted channel re-reads the session's goal per plan 4.3, so a session with an active goal reopens the composer in goal mode; the settings-account-tab retry case asserts the composer is present and usable instead of the message-mode placeholder, and that change is recorded as a behaviour change in the T05 comment.",
+      "The C4 browser case is stable in the suite (101 passed) and was verified to discriminate by restoring the old clear. The earlier failures came from the fixture answering every session's getGoal with the same goal, which let one session's read overwrite another's record."
     ]
   },
   "publicationVerification": {
