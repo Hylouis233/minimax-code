@@ -21,7 +21,7 @@ import {
   initialWebuiWorkspaceQueriesState,
   type WebuiWorkspaceQueries,
   type WebuiWorkspaceQueriesState,
-} from "../application/workspace-queries.js";
+} from "../application/workspace/workspace-queries.js";
 import {
   initialWebuiAccountWorkflowsState,
   type WebuiAccountWorkflows,

@@ -28,19 +28,19 @@
 // This module is framework-free — no React, no DOM, no storage — so it can be
 // unit-tested against a scripted port.
 
-import type { WorkspacePort } from "../contracts/workspace/workspace-port.js";
+import type { WorkspacePort } from "../../contracts/workspace/workspace-port.js";
 import type {
   WebuiWorkspaceEnvironment,
   WebuiWorkspaceFile,
   WebuiWorkspaceFileContent,
   WebuiWorkspaceGitMutationRequest,
-} from "../../shared/contracts/workspace.js";
+} from "../../../shared/contracts/workspace.js";
 import type {
   WebuiWorkspaceReviewDiffs,
   WebuiWorkspaceReviewSearchResult,
   WebuiWorkspaceReviewSummary,
-} from "../../shared/contracts/review.js";
-import { mergeWorkspaceFileChildren } from "../projection/workspace-file-tree.js";
+} from "../../../shared/contracts/review.js";
+import { mergeWorkspaceFileChildren } from "../../projection/workspace-file-tree.js";
 
 /** The transport methods this owner drives. Absent means "not wired". */
 export type WebuiWorkspaceQueryPort = Pick<

@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { createWebuiWorkspaceQueries } from "../../src/client/application/workspace-queries.js";
+import { createWebuiWorkspaceQueries } from "../../src/client/application/workspace/workspace-queries.js";
 import type { WebuiWorkspaceFileContent } from "../../src/shared/contracts/workspace.js";
 import type { WebuiWorkspaceReviewSummary } from "../../src/shared/contracts/review.js";
 

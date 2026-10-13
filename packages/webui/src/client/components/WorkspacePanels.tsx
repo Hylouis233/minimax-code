@@ -65,7 +65,7 @@ import {
   WEBUI_WORKSPACE_REVIEW_DIFF_BATCH_SIZE,
   chunkWebuiWorkspaceReviewFileIds,
   type WebuiWorkspaceQueries,
-} from "../application/workspace-queries.js";
+} from "../application/workspace/workspace-queries.js";
 import {
   useWebuiWorkspaceQueries,
   useWebuiWorkspaceQueriesState,
