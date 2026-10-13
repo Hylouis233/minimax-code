@@ -61,7 +61,7 @@ import {
   initialWebuiWorkspaceProgress,
   reduceWebuiWorkspaceProgressEvent,
   type WebuiWorkspaceProgressState,
-} from "../../projection/workspace-progress.js";
+} from "../../projection/workspace/workspace-progress.js";
 import { claimWebuiSubscriptionTurn, decideWebuiSessionStart, matchesWebuiTerminalTurn, type WebuiStreamState } from "../../projection/turn/stream-state.js";
 import {
   releaseWebuiSubscription,

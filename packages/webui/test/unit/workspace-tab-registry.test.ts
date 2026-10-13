@@ -24,7 +24,7 @@ import {
   webuiWorkspaceTabLabel,
   type WebuiWorkspaceTabKind,
   type WorkspacePanelTab,
-} from "../../src/client/projection/workspace-panel-state.js";
+} from "../../src/client/projection/workspace/workspace-panel-state.js";
 
 const CLIENT = new URL("../../src/client/", import.meta.url);
 const read = (relative: string): string => readFileSync(new URL(relative, CLIENT), "utf8");

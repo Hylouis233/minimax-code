@@ -145,7 +145,7 @@ import {
   type WebuiStreamState,
 } from "../../src/client/projection/turn/stream-state.js";
 import { projectWebuiTodos, WebuiProgressOverviewPanel, WebuiProgressPanel, WebuiSubagentsPanel, WebuiWorkspacePanel, WebuiWorkspacePanelControls } from "../../src/client/components/workspace/WorkspacePanels.js";
-import { initialWorkspacePanelState, reduceWorkspacePanelState } from "../../src/client/projection/workspace-panel-state.js";
+import { initialWorkspacePanelState, reduceWorkspacePanelState } from "../../src/client/projection/workspace/workspace-panel-state.js";
 import type { WebuiStreamFrame } from "../../src/shared/contracts/stream.js";
 import type { WebuiWorkspaceEnvironment } from "../../src/shared/contracts/workspace.js";
 import { streamStateBundle } from "../../src/client/application/turn/stream-state-bundle.js";

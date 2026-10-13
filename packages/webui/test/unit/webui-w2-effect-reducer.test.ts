@@ -40,7 +40,7 @@ import {
 import {
   initialWebuiWorkspaceProgress,
   reduceWebuiWorkspaceProgressEvent,
-} from "../../src/client/projection/workspace-progress.js";
+} from "../../src/client/projection/workspace/workspace-progress.js";
 import type {
   WebuiPendingPermission,
   WebuiQuestionnaireRequest,

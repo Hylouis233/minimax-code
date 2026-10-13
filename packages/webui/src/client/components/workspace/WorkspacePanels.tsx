@@ -38,21 +38,21 @@ import type {
   WorkspacePanelCommand,
   WorkspacePanelState,
   WorkspacePanelTab,
-} from "../../projection/workspace-panel-state.js";
+} from "../../projection/workspace/workspace-panel-state.js";
 import {
   webuiWorkspaceAddMenu,
   webuiWorkspaceTabLabel,
-} from "../../projection/workspace-panel-state.js";
+} from "../../projection/workspace/workspace-panel-state.js";
 import { focusWebuiFileLine, webuiFileLineTargetId } from "../../bindings/browser-effects.js";
 import {
   projectWebuiWorkspaceHistory,
   type WebuiWorkspaceSubagent,
   type WebuiWorkspaceTodo,
-} from "../../projection/workspace-progress.js";
+} from "../../projection/workspace/workspace-progress.js";
 import {
   TERMINAL_RESIZE_DEBOUNCE_MS,
   terminalResizeRequest,
-} from "../../projection/terminal-size.js";
+} from "../../projection/workspace/terminal-size.js";
 import type { WebuiTerminalSize } from "../../contracts/workspace/terminal-port.js";
 import { WebuiIconAgent, WebuiIconCheck, WebuiIconChevronDown, WebuiIconClose, WebuiIconDiffFile, WebuiIconFile, WebuiIconFolder, WebuiIconRunLocation, WebuiIconSearch, WebuiIconSidebarToggle, WebuiIconWorkspaceCanvas, WebuiIconWorkspaceExpand, WebuiIconWorkspaceReview, WebuiIconWorkspaceTerminal } from "../shell/icons.js";
 import { FileTree, filterWorkspaceFiles, findWorkspaceFile, getWorkspaceFileParentPaths, mergeWorkspaceFileChildren } from "./WorkspaceFileTree.js";

@@ -40,7 +40,7 @@ import type {
   WebuiWorkspaceReviewSearchResult,
   WebuiWorkspaceReviewSummary,
 } from "../../../shared/contracts/review.js";
-import { mergeWorkspaceFileChildren } from "../../projection/workspace-file-tree.js";
+import { mergeWorkspaceFileChildren } from "../../projection/workspace/workspace-file-tree.js";
 
 /** The transport methods this owner drives. Absent means "not wired". */
 export type WebuiWorkspaceQueryPort = Pick<

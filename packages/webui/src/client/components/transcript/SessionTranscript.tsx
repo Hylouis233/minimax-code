@@ -45,7 +45,7 @@ type WebuiSessionTranscriptCapabilities = Pick<
 import type { WebuiTurnDiffView } from "../../../shared/contracts/session.js";
 import type { WebuiQuestionnaireResponseSummary } from "../../contracts/transcript/transcript-view.js";
 import type { WebuiMessageFileReference } from "../../projection/transcript/message-file-reference.js";
-import type { WorkspacePanelCommand } from "../../projection/workspace-panel-state.js";
+import type { WorkspacePanelCommand } from "../../projection/workspace/workspace-panel-state.js";
 import {
   groupWebuiTranscriptItems,
   projectWebuiTranscriptMessages,

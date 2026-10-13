@@ -5,7 +5,7 @@ import {
   reduceWebuiWorkspaceProgressEvent,
   reduceWebuiWorkspaceProgressMessage,
   type WebuiWorkspaceProgressState,
-} from "../workspace-progress.js";
+} from "../workspace/workspace-progress.js";
 import type {
   WebuiStreamMessage,
   WebuiStreamSubscription,

@@ -7,7 +7,7 @@
 // (plan §7.1 "never copied, leaving two implementations"; ticket #51). The
 // component re-exports these names, so its public surface is unchanged.
 
-import type { WebuiWorkspaceFile } from "../../shared/contracts/workspace.js";
+import type { WebuiWorkspaceFile } from "../../../shared/contracts/workspace.js";
 
 export function filterWorkspaceFiles(
   files: readonly WebuiWorkspaceFile[],

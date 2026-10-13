@@ -46,7 +46,7 @@ import {
   setWorkspaceSessionProgressPanelOpen,
   type WorkspacePanelCommand,
   type WorkspacePanelSessionStates,
-} from "../../projection/workspace-panel-state.js";
+} from "../../projection/workspace/workspace-panel-state.js";
 import {
   initialWebuiShellSurface,
   isPluginManagementSurface,
@@ -88,7 +88,7 @@ import type { WebuiVersionInfo } from "../../../shared/contracts/version.js";
 import type {
   WebuiWorkspaceProgressState,
   WebuiWorkspaceSubagent,
-} from "../../projection/workspace-progress.js";
+} from "../../projection/workspace/workspace-progress.js";
 import type { WebuiProjectGroup } from "../sessions/SessionRail.js";
 import { createWebuiCommandWorkflows } from "../../application/composer/command-workflows.js";
 import { createWebuiComposerStore } from "../../application/composer/composer-store.js";
@@ -142,12 +142,12 @@ import {
   projectWebuiWorkspaceHistory,
   selectWebuiWorkspaceProgress,
   webuiWorkspaceSubagentStatus,
-} from "../../projection/workspace-progress.js";
+} from "../../projection/workspace/workspace-progress.js";
 import { createWebuiApplication, type WebuiApplication } from "../../application/create-application.js";
 import { createWebuiPlanReviewWorkflow } from "../../application/interactions/interaction-coordinator.js";
 import type { WebuiEventEffects } from "../../application/turn/event-coordinator.js";
 import { createWebuiOpenEventChannel } from "../../bindings/event-channel-adapter.js";
-import type { WebuiWorkspaceGitChangedSignal } from "../../projection/workspace-panel-state.js";
+import type { WebuiWorkspaceGitChangedSignal } from "../../projection/workspace/workspace-panel-state.js";
 import { ConnectionStatus } from "./ConnectionStatus.js";
 import { deriveConversationUsageNotice } from "../../projection/transcript/message-projection.js";
 import { deriveRecentWorkspaceDirs } from "../../projection/composer/composer-state.js";

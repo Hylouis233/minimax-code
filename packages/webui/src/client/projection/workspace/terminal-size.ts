@@ -27,7 +27,7 @@
  * uses: the decision is data, the scheduling belongs to the surface that owns
  * the clock.
  */
-import type { WebuiTerminalSize } from "../contracts/workspace/terminal-port.js";
+import type { WebuiTerminalSize } from "../../contracts/workspace/terminal-port.js";
 
 /**
  * How long a measured size must hold still before the runtime hears about it.

@@ -20,7 +20,7 @@ import type {
 } from "../../../shared/contracts/session.js";
 import type { WebuiTransport } from "../../contracts/transport.js";
 import type { WebuiMessageFileReference } from "../../projection/transcript/message-file-reference.js";
-import type { WorkspacePanelCommand } from "../../projection/workspace-panel-state.js";
+import type { WorkspacePanelCommand } from "../../projection/workspace/workspace-panel-state.js";
 import type {
   WebuiHistoricalTurnView,
   WebuiLiveTurnView,

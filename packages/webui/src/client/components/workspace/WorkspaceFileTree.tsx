@@ -14,7 +14,7 @@ export {
   mergeWorkspaceFileChildren,
   findWorkspaceFile,
   getWorkspaceFileParentPaths,
-} from "../../projection/workspace-file-tree.js";
+} from "../../projection/workspace/workspace-file-tree.js";
 
 const BYTE_UNITS = ["B", "KB", "MB", "GB", "TB"] as const;
 const BYTE_STEP = 1024;
