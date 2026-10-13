@@ -26,6 +26,10 @@ import {
   createWebuiStreamLeaseController,
   type WebuiStreamLeaseController,
 } from "./turn/stream-lease-controller.js";
+import {
+  createWebuiSessionScopeManager,
+  type WebuiSessionScopeManager,
+} from "./sessions/session-scope.js";
 import type { WebuiApplicationState } from "./state.js";
 import { WEBUI_HOME_SESSION_KEY } from "./state.js";
 import {
@@ -132,6 +136,11 @@ export interface WebuiApplication {
   readonly select: (sessionId: string | undefined) => void;
   readonly store: WebuiSessionStore;
   readonly leases: WebuiStreamLeaseController;
+  /**
+   * Why each session is still needed (plan §4.3). Independent of component
+   * mounting: a delivery or settlement lease outlives the view that started it.
+   */
+  readonly sessionScope: WebuiSessionScopeManager;
   readonly events: WebuiEventCoordinator;
   readonly turns: WebuiTurnCoordinator;
   /** The published turn capability slice (send / resume / load / stop). */
@@ -234,6 +243,16 @@ export function createWebuiApplication(
 ): WebuiApplication {
   const store = deps.store ?? createWebuiSessionStore();
   const leases = createWebuiStreamLeaseController(store);
+  const sessionScope = createWebuiSessionScopeManager();
+  /**
+   * The one selection command. Selecting activates the new session's scope and
+   * releases the previous selection's lease — and only that lease, so an
+   * accepted delivery or an outstanding settlement survives the navigation.
+   */
+  const selectSession = (sessionId: string | undefined): void => {
+    sessionScope.select(sessionId);
+    store.select(sessionId);
+  };
   const readActiveSessionId =
     deps.readActiveSessionId ?? (() => store.getSelectedSessionId());
   // The one unread controller: hydration ordering and the single persistence
@@ -303,7 +322,7 @@ export function createWebuiApplication(
       // Order matters: the route the caller booted at is applied first, so the
       // unread restore drops the count for the session being opened rather than
       // raising the badge the user is looking at.
-      if (initialSessionId !== undefined) store.select(initialSessionId);
+      if (initialSessionId !== undefined) selectSession(initialSessionId);
       unread.hydrate(initialSessionId ?? readActiveSessionId());
       channel = deps.openEventChannel();
       detach = events.attach(channel);
@@ -312,9 +331,10 @@ export function createWebuiApplication(
     },
     getSnapshot: store.getSnapshot,
     subscribe: store.subscribe,
-    select: store.select,
+    select: selectSession,
     store,
     leases,
+    sessionScope,
     events,
     turns,
     turnCapabilities,
@@ -340,7 +360,7 @@ export function createWebuiApplication(
       // re-reads the target in its own effect); selection notifies once.
       store.migrateSession(WEBUI_HOME_SESSION_KEY, sessionId);
       composer.adoptHome(sessionId);
-      store.select(sessionId);
+      selectSession(sessionId);
     },
     setEventEffects: (next) => {
       const previous = eventEffects.snapshot();
@@ -351,6 +371,7 @@ export function createWebuiApplication(
       if (lifecycle === "disposed") return;
       detach?.();
       detach = undefined;
+      sessionScope.dispose();
       store.dispose();
       channel?.close?.();
       channel = undefined;
