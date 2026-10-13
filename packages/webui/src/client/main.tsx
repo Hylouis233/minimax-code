@@ -19,6 +19,13 @@ import {
   createWebuiBrowserStorage,
   getWebuiBrowserStorage,
 } from "./infrastructure/storage.js";
+import { createWebuiApplication } from "./application/create-application.js";
+import { createWebuiEventEffectsRegistry } from "./application/event-effects-registry.js";
+import { createWebuiPortSlices } from "./application/port-slices.js";
+import { createWebuiOpenEventChannel } from "./bindings/event-channel-adapter.js";
+import { WebuiApplicationProvider } from "./bindings/application-context.js";
+import { WebuiEventEffectsRegistryProvider } from "./bindings/event-effects-context.js";
+import { WebuiPortSlicesProvider } from "./bindings/port-slices-context.js";
 
 declare const document: {
   getElementById(elementId: string): HTMLElement | null;
@@ -36,6 +43,78 @@ interface WebuiRuntimeConfig {
 const config = (
   globalThis as unknown as { __WEBUI_CONFIG__?: WebuiRuntimeConfig }
 ).__WEBUI_CONFIG__;
+
+/**
+ * The composition root (plan §8 Phase 2, A4-s2).
+ *
+ * It builds the one application for the page — the store, the event coordinator
+ * and the single `watchEvents` channel — cuts the per-business port slices from
+ * the transport, and provides them through the owner contexts. The shell below
+ * adopts the instance rather than building its own, so a page has one store and
+ * one channel instead of two.
+ *
+ * The transport stays at module scope and arrives as a prop: it is IO for the
+ * page, it is constructed once, and its identity has to be stable across renders
+ * (W2.5). The application is constructed per mount and disposed on unmount, so a
+ * remount cannot leave a second channel open.
+ */
+function WebuiClientRoot({
+  transport,
+  dataDir,
+}: {
+  readonly transport: ReturnType<typeof createWebuiTransport>;
+  readonly dataDir?: string;
+}): JSX.Element {
+  const effectsRegistry = React.useMemo(
+    () => createWebuiEventEffectsRegistry(),
+    [],
+  );
+  const slices = React.useMemo(
+    () => createWebuiPortSlices(transport),
+    [transport],
+  );
+  const application = React.useMemo(
+    () =>
+      createWebuiApplication({
+        // The live ingress: the transport's `watchEvents` watcher, adapted to
+        // the application channel shape.
+        openEventChannel: transport.watchEvents
+          ? createWebuiOpenEventChannel(transport.watchEvents)
+          : () => ({ subscribe: () => () => undefined }),
+        // The registry is the initial registration. The shell below composes its
+        // own view reactions on top and registers them through
+        // `setEventEffects`, because it renders after this instance exists.
+        effects: effectsRegistry.asWebuiEventEffects(),
+        turns: {
+          resumeSession: transport.resumeSession ?? (async () => {}),
+          ...(transport.loadMessages
+            ? { loadMessages: transport.loadMessages }
+            : {}),
+        },
+        turnCapabilities: transport,
+        ...(transport.loadMessages
+          ? { loadMessages: transport.loadMessages }
+          : {}),
+      }),
+    [effectsRegistry, transport],
+  );
+  React.useEffect(() => () => application.dispose(), [application]);
+
+  return (
+    <WebuiEventEffectsRegistryProvider registry={effectsRegistry}>
+      <WebuiApplicationProvider application={application}>
+        <WebuiPortSlicesProvider slices={slices}>
+          <WebuiClientFoundationApp
+            label="webui-foundation"
+            hostLabel={location.host}
+            dataDir={dataDir}
+            transport={transport}
+          />
+        </WebuiPortSlicesProvider>
+      </WebuiApplicationProvider>
+    </WebuiEventEffectsRegistryProvider>
+  );
+}
 
 if (!rootElement || !config) {
   // Boot failures before this point used to be bare `throw`s, and the error
@@ -74,12 +153,11 @@ const browserCapabilities = {
 // identity is stable across renders. Each method is still optional
 // on `WebuiTransport`, so the panel branches continue to gate on
 // `transport?.X` just like they used to gate on `X`.
-const app = <WebuiClientFoundationApp
-    label="webui-foundation"
-    hostLabel={location.host}
-    dataDir={runtimeConfig.dataDir}
-    transport={transport}
-  />;
+//
+// The transport is the module-scope instance; the application, its store and
+// the port slices are built by the root below, once per mount, and provided to
+// the shell (plan §8 Phase 2, A4-s2).
+const app = <WebuiClientRoot transport={transport} dataDir={runtimeConfig.dataDir} />;
 const currentRoute = route(location.pathname);
 root.render(
   // The boundary wraps the app, not the 404: a 404 is a legitimate render and
