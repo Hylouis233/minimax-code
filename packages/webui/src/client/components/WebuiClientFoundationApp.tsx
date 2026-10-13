@@ -110,7 +110,11 @@ import { WEBUI_HOME_SESSION_KEY } from "../application/state.js";
 import { createWebuiEventEffectsRegistry } from "../application/event-effects-registry.js";
 import { WebuiApplicationProvider } from "../bindings/application-context.js";
 import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js";
-import { WebuiEventEffectsRegistryProvider } from "../bindings/event-effects-context.js";
+import {
+  WebuiEventEffectsRegistryProvider,
+  useWebuiEventEffectsRegistry,
+} from "../bindings/event-effects-context.js";
+import { useWebuiApplicationOptional } from "../bindings/application-context.js";
 import {
   WebuiAccountWorkflowsProvider,
   WebuiPluginWorkflowsProvider,
@@ -217,6 +221,13 @@ export function WebuiClientFoundationApp(
   props: WebuiClientFoundationAppProps,
 ): ReactElement {
   const { storage: browserStorage } = useWebuiBrowserCapabilities();
+  // The application may already exist: when the composition root constructs it
+  // and provides it (plan §8 Phase 2, A4-s2), the shell adopts that instance —
+  // its store, its composer owner and its lifetime — instead of building a
+  // second one. With no provider (SSR, unit tests, and every host that renders
+  // the shell from props) the shell builds its own exactly as before, which is
+  // what keeps this slice revertible.
+  const providedApplication = useWebuiApplicationOptional();
   const {
     label,
     sessionPage,
@@ -240,22 +251,24 @@ export function WebuiClientFoundationApp(
   const seedSessionPageRef = useRef(sessionPage);
   const sessionStore = useMemo(
     () =>
+      providedApplication?.store ??
       providedSessionStore ??
       createWebuiSessionStore(
         seedSessionPageRef.current
           ? { catalog: createWebuiSessionCatalogFromPage(seedSessionPageRef.current) }
           : undefined,
       ),
-    [providedSessionStore],
+    [providedApplication, providedSessionStore],
   );
   // The one per-session effects registry for this mount (plan §7.1
   // `application/event-coordinator.ts`; ticket #45). The shell holds it and
   // provides it; the composer registers its session's effect handlers here and
   // `asWebuiEventEffects()` is what the application coordinator consumes over
   // the single process-event channel.
+  const providedRegistry = useWebuiEventEffectsRegistry();
   const eventEffectsRegistry = useMemo(
-    () => createWebuiEventEffectsRegistry(),
-    [],
+    () => providedRegistry ?? createWebuiEventEffectsRegistry(),
+    [providedRegistry],
   );
   // Each method comes from `transport`. Re-binding to the same local
   // name as before keeps the rest of the function body identical.
@@ -286,8 +299,10 @@ export function WebuiClientFoundationApp(
   // Composer store declared before sessionWorkflows so the delete-success purge
   // (R7) can hand the workflows the same instance.
   const composerStore = useMemo(
-    () => createWebuiComposerStore({ storage: browserStorage }),
-    [browserStorage],
+    () =>
+      providedApplication?.composer ??
+      createWebuiComposerStore({ storage: browserStorage }),
+    [providedApplication, browserStorage],
   );
   // The session workflows: the loads and mutations the shell used to call
   // through `transport` and then patch onto two structures by hand. The shell
@@ -983,8 +998,15 @@ export function WebuiClientFoundationApp(
   // Exactly one application per mount. It owns the one session store (the same
   // map the shell reads its slices off) and the one channel; disposing it
   // detaches the coordinator and closes the channel.
+  //
+  // When the composition root provides an application, that instance *is* the
+  // one — the shell builds nothing and adopts its store, composer owner and
+  // lifetime (A4-s2). The constructor arguments below still describe the host
+  // that renders the shell from props, which is every SSR and unit-test caller
+  // and is what reverting the provider wiring falls back to.
   const application: WebuiApplication = useMemo(
     () =>
+      providedApplication ??
       createWebuiApplication({
         // The live ingress: the transport's `watchEvents` watcher, adapted to
         // the application channel shape. With no transport wired (SSR, tests)
@@ -1017,6 +1039,7 @@ export function WebuiClientFoundationApp(
         ...(transport?.loadMessages ? { loadMessages: transport.loadMessages } : {}),
       }),
     [
+      providedApplication,
       applicationEffects,
       sessionStore,
       composerStore,
@@ -1026,7 +1049,23 @@ export function WebuiClientFoundationApp(
       watchEvents,
     ],
   );
-  useEffect(() => () => application.dispose(), [application]);
+  // The effects are registered rather than only handed to the constructor, so a
+  // host that provides the application — and therefore cannot supply them at
+  // construction — still gets the shell's own view reactions and the per-session
+  // registry behind them (`setEventEffects`, ticket #61). Detaching on unmount is
+  // what a remount of the shell undoes.
+  useEffect(() => {
+    if (!providedApplication) return undefined;
+    return providedApplication.setEventEffects(applicationEffects);
+  }, [providedApplication, applicationEffects]);
+  // The owner disposes: the shell disposes the instance it built, and leaves a
+  // provided one alone — its lifetime belongs to whoever built it.
+  useEffect(
+    () => () => {
+      if (!providedApplication) application.dispose();
+    },
+    [application, providedApplication],
+  );
 
   // A `workspace.git.changed` signal invalidates exactly the views it affects:
   // the owner matches the signal against the review and environment views it

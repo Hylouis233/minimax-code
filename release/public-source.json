@@ -3937,6 +3937,7 @@
     "packages/webui/test/unit/turn-substrate-fences.test.ts",
     "packages/webui/test/unit/value-readers.test.ts",
     "packages/webui/test/unit/vite-dev-proxy.test.ts",
+    "packages/webui/test/unit/webui-application-adoption.test.tsx",
     "packages/webui/test/unit/webui-application-bindings.test.tsx",
     "packages/webui/test/unit/webui-application-commands.test.ts",
     "packages/webui/test/unit/webui-application-event-effects.test.ts",

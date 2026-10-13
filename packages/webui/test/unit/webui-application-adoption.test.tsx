@@ -1,0 +1,104 @@
+// The shell adopting an application the composition root built (plan §8 Phase 2,
+// A4-s2; ticket #61).
+//
+// The invariant is "one application, one store, one channel" — and the failure it
+// guards against is the quiet one: a shell that *also* builds an instance renders
+// fine, passes every other suite, and leaves the page with two stores and two
+// channels. So the assertion is not "it renders"; it is that the shell reads the
+// provided instance's store and not one of its own.
+//
+// The observable used is the session catalog. The shell seeds its own store from
+// the `sessionPage` prop, so a running adoption shows the provided store's session
+// and *not* the prop's. Both directions are tested: with a provider the prop is
+// ignored (the provided store wins), and with no provider the prop is used (the
+// fallback every SSR and unit-test caller takes).
+
+import { describe, expect, it } from "vitest";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+
+import { createWebuiApplication } from "../../src/client/application/create-application.js";
+import { createWebuiSessionCatalogFromPage } from "../../src/client/application/session-catalog.js";
+import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
+import { WebuiApplicationProvider } from "../../src/client/bindings/application-context.js";
+import { WebuiClientFoundationApp } from "../../src/client/components/WebuiClientFoundationApp.js";
+
+const sessionPage = (sessionId: string) => ({
+  sessions: [
+    {
+      sessionId,
+      agentName: "main",
+      createdAt: 1,
+      updatedAt: 2,
+      workspaceDir: "/tmp/project",
+    },
+  ],
+  hasMore: false,
+});
+
+function applicationWith(sessionId: string) {
+  const store = createWebuiSessionStore({
+    catalog: createWebuiSessionCatalogFromPage(sessionPage(sessionId) as never),
+  });
+  const application = createWebuiApplication({
+    openEventChannel: () => ({ subscribe: () => () => undefined }),
+    store,
+    turns: { resumeSession: async () => {} },
+  });
+  return { application, store };
+}
+
+describe("the shell adopts the application the composition root provides", () => {
+  it("reads the provided store's catalog, not one seeded from the prop", () => {
+    const { application } = applicationWith("adopted-session");
+    const markup = renderToStaticMarkup(
+      createElement(
+        WebuiApplicationProvider,
+        { application },
+        createElement(WebuiClientFoundationApp, {
+          label: "webui-foundation",
+          locationHash: "#session=adopted-session",
+          sessionPage: sessionPage("prop-session") as never,
+        }),
+      ),
+    );
+
+    expect(markup).toContain("adopted-session");
+    expect(markup).not.toContain("prop-session");
+    application.dispose();
+  });
+
+  it("still builds its own application and store with no provider", () => {
+    // The fallback path: every SSR and unit-test caller, and what reverting the
+    // provider wiring returns to.
+    const markup = renderToStaticMarkup(
+      createElement(WebuiClientFoundationApp, {
+        label: "webui-foundation",
+        locationHash: "#session=prop-session",
+        sessionPage: sessionPage("prop-session") as never,
+      }),
+    );
+
+    expect(markup).toContain("prop-session");
+  });
+
+  it("renders the adopted application's own snapshot state", () => {
+    const { application } = applicationWith("adopted-session");
+    const markup = renderToStaticMarkup(
+      createElement(
+        WebuiApplicationProvider,
+        { application },
+        createElement(WebuiClientFoundationApp, {
+          label: "webui-foundation",
+          locationHash: "#session=adopted-session",
+        }),
+      ),
+    );
+
+    // The shell ran: the archon shell marker is the outermost thing it renders,
+    // so the adoption path produced a full render rather than an empty one.
+    expect(markup).toContain('data-webui-archon-shell="true"');
+    expect(markup.length).toBeGreaterThan(1000);
+    application.dispose();
+  });
+});
