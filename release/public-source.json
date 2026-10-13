@@ -3912,6 +3912,7 @@
     "packages/webui/test/unit/overlay-geometry.test.ts",
     "packages/webui/test/unit/paths.test.ts",
     "packages/webui/test/unit/personalization-settings.test.tsx",
+    "packages/webui/test/unit/plugin-action-inventory.test.ts",
     "packages/webui/test/unit/plugin-market-catalogue.test.tsx",
     "packages/webui/test/unit/plugin-mcp-status.test.tsx",
     "packages/webui/test/unit/plugin-workflows.test.ts",
