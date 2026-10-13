@@ -65,3 +65,26 @@ test("a revert the owner settles is what the card shows", async ({ page }) => {
   await expect(card).toHaveAttribute("data-webui-diff-state", "reverted");
   await expect(page.getByTestId("turn-diff-undo")).toContainText("重新应用");
 });
+
+test("a settled revert refreshes the workspace review family", async ({ page }) => {
+  await openSessionWithDiff(page);
+  // The review tab lives in the workspace panel, which is the file side panel.
+  await page
+    .getByTestId("workspace-panel-controls")
+    .getByRole("button", { name: "工作区文件侧栏" })
+    .click();
+  await page.getByRole("button", { name: "添加标签" }).click();
+  await page.getByRole("menuitem", { name: "变更" }).click();
+  await expect(page.getByTestId("workspace-review")).toBeVisible();
+  await expect.poll(() => requests(page, "getWorkspaceReviewSummary")).toBeGreaterThan(0);
+  const before = await requests(page, "getWorkspaceReviewSummary");
+
+  // The revert settles in the turn family and announces it; the review family is
+  // invalidated and re-reads the working tree it just changed (plan §4.5).
+  page.on("dialog", (dialog) => void dialog.accept());
+  await page.getByTestId("turn-diff-undo").click();
+  await expect.poll(() => requests(page, "revertTurnDiff")).toBeGreaterThan(0);
+  await expect
+    .poll(() => requests(page, "getWorkspaceReviewSummary"))
+    .toBeGreaterThan(before);
+});

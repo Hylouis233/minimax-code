@@ -128,6 +128,14 @@ export function installFixtureTransport() {
       return { ...clone(turnDiff), success: true };
     }
     if (operation === "getWorkspaceReviewSummary") return clone(workspaceReviewSummary);
+    // The workspace file tree. The panel renders it on open, so an unanswered
+    // read is not an option: the runtime answers an array of nodes.
+    if (operation === "listTerminals") return [];
+    if (operation === "listWorkspaceFileTree")
+      return [
+        { path: "a.ts", name: "a.ts", type: "file", size: 120, modifiedAt: 1_700_000_000_000 },
+        { path: "src", name: "src", type: "directory", children: [] },
+      ];
     if (operation === "getPendingQuestionnaire") return questionnaire ? { request: questionnaire } : {};
     if (operation === "beginAccountLogin") {
       accountLoginState = {
