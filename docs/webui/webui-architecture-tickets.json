@@ -1074,7 +1074,8 @@
       "a6386d57",
       "822863f2",
       "792c969b",
-      "f36a4e1d"
+      "f36a4e1d",
+      "8385c423"
     ],
     "published": false,
     "tickets": {
@@ -1084,7 +1085,7 @@
       "T04": "implemented locally, acceptance evidence recorded on #130",
       "T05": "closed 2026-10-13, acceptance evidence recorded on #131",
       "T06": "closed 2026-10-14, acceptance evidence recorded on #132",
-      "T10": "in progress: the turn-review family has one owner and the diff card reads it (f36a4e1d); the workspace-review family is still inside the mixed workspace-queries owner"
+      "T10": "in progress: both review families have their own owners and the surfaces read them; the browser evidence for the review consumers (transcript diff card, workspace review panel) is still missing"
     },
     "frontier": [
       "T07",
@@ -1095,8 +1096,9 @@
       "T17"
     ],
     "notes": [
-      "T10 next slice, with the approach measured out: the workspace-review family (reviewSummary/reviewDiffs/reviewSearch, reviewRevision, refreshStaleReview, the snapshot-mismatch retry) lives in application/workspace/workspace-queries.ts (828 lines) together with T11's file tree/contents/environment, and the shell consumes it through WebuiWorkspaceQueriesProvider. Extract it into features/review/application/workspace-review-owner.ts with its own state and version map, created by the application from an injected workspace-review port (getWorkspaceReviewSummary / listWorkspaceReviewFileDiffs / getWorkspaceReviewFileContent / searchWorkspaceReviewDiffs), and have workspace-queries.ts delegate its review members to it (its state read merges the owner's slice, its review commands forward) so the panels keep their shape and the review truth has one home. Then wire the turn owner's announced mutations to the review owner's invalidate.",
-      "T10 first slice (f36a4e1d): features/review/ is a business home (the machine and its view contract moved out of the transcript), turn-review-owner.ts owns a turn's diff query and revert/reapply with the plan's turn-review key, unsupported and failed stay distinct, a settled mutation is announced for the workspace family's invalidation, and the diff card reads the owner while keeping only presentation."
+      "T10 second slice (8385c423): the workspace-review family left the mixed workspace-queries owner for features/review/application/workspace-review-owner.ts (summary, per-snapshot diffs, search, snapshot identity, one retry per tab+snapshot); the mixed owner forwards it and composes a stable snapshot; the turn family's settled mutations invalidate the review family through the shell; the business-navigation generator learned the business-first homes and its table was regenerated.",
+      "T10 remaining: browser evidence for the review consumers. There is no browser spec for the transcript's diff card or the workspace review panel, and the ticket's verification seam names 'transcript/workspace review browser consumers'. Next: a built-client case that reads a turn diff through the fixture, reverts it, and watches the review views refresh on the announced invalidation.",
+      "Worth keeping: the browser suite caught what unit tests could not — composing the panel snapshot with a fresh object in getSnapshot is an infinite render loop under useSyncExternalStore (12 'Maximum update depth exceeded' in one run)."
     ]
   },
   "publicationVerification": {
