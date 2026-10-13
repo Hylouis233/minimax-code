@@ -150,6 +150,7 @@ function renderComposer(props: {
       ...(props.loadMessages ? { loadMessages: props.loadMessages } : {}),
     },
   });
+  application.start();
   const html = renderToStaticMarkup(
     <WebuiApplicationProvider application={application}>
       {createElement(WebuiComposer, {

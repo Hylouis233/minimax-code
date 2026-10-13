@@ -91,13 +91,7 @@ import type {
 } from "../../projection/workspace/workspace-progress.js";
 import type { WebuiProjectGroup } from "../sessions/SessionRail.js";
 import { createWebuiCommandWorkflows } from "../../application/composer/command-workflows.js";
-import { createWebuiComposerStore } from "../../application/composer/composer-store.js";
 import {
-  createWebuiSessionStore,
-  type WebuiSessionStore,
-} from "../../application/session-store.js";
-import {
-  createWebuiSessionCatalogFromPage,
   selectWebuiCatalogFlatPage,
   selectWebuiCatalogTreePage,
 } from "../../application/sessions/session-catalog.js";
@@ -143,10 +137,9 @@ import {
   selectWebuiWorkspaceProgress,
   webuiWorkspaceSubagentStatus,
 } from "../../projection/workspace/workspace-progress.js";
-import { createWebuiApplication, type WebuiApplication } from "../../application/create-application.js";
+import type { WebuiApplication } from "../../application/create-application.js";
 import { createWebuiPlanReviewWorkflow } from "../../application/interactions/interaction-coordinator.js";
 import type { WebuiEventEffects } from "../../application/turn/event-coordinator.js";
-import { createWebuiOpenEventChannel } from "../../bindings/event-channel-adapter.js";
 import type { WebuiWorkspaceGitChangedSignal } from "../../projection/workspace/workspace-panel-state.js";
 import { ConnectionStatus } from "./ConnectionStatus.js";
 import { deriveConversationUsageNotice } from "../../projection/transcript/message-projection.js";
@@ -198,14 +191,27 @@ export interface WebuiClientFoundationAppProps {
    * is `undefined` iff the operation is not wired.
    */
   readonly transport?: WebuiTransport;
-  /**
-   * The one application session store. Optional so tests and SSR can inject a
-   * pre-seeded instance; production (`main.tsx`) omits it and the shell creates
-   * and provides exactly one per mount. It is never a second map — the shell
-   * provides this exact object through `WebuiSessionStoreProvider`, and every
-   * consumer reads it through the bindings (plan §7.6; ticket #45).
-   */
-  readonly sessionStore?: WebuiSessionStore;
+}
+
+/**
+ * The assembled application this shell renders, or a named failure.
+ *
+ * The shell composes what the assembly built; it does not build one (plan §4.1,
+ * §5.1). A host that renders it without an application has a wiring defect, and
+ * the failure says which wiring: an absent owner is an assembly error, never a
+ * silent second composition that behaves differently from production.
+ */
+function requireApplication(
+  application: WebuiApplication | undefined,
+): WebuiApplication {
+  if (!application) {
+    throw new Error(
+      "WebUI assembly error: WebuiClientFoundationApp was rendered without an application. " +
+        "Build one with createWebuiApplication and provide it through WebuiApplicationProvider; " +
+        "the shell no longer constructs a fallback assembly (plan §4.1).",
+    );
+  }
+  return application;
 }
 
 function useSelectedSessionId(
@@ -228,13 +234,11 @@ export function WebuiClientFoundationApp(
   props: WebuiClientFoundationAppProps,
 ): ReactElement {
   const { storage: browserStorage } = useWebuiBrowserCapabilities();
-  // The application may already exist: when the composition root constructs it
-  // and provides it (plan §8 Phase 2, A4-s2), the shell adopts that instance —
-  // its store, its composer owner and its lifetime — instead of building a
-  // second one. With no provider (SSR, unit tests, and every host that renders
-  // the shell from props) the shell builds its own exactly as before, which is
-  // what keeps this slice revertible.
-  const providedApplication = useWebuiApplicationOptional();
+  // One application, assembled and owned by the composition root (plan §4.1).
+  // The shell adopts that instance — its store, its composer owner and its
+  // lifetime — and builds nothing of its own; a missing one is an assembly
+  // error rather than a second composition with different inputs.
+  const application = requireApplication(useWebuiApplicationOptional());
   const {
     label,
     sessionPage,
@@ -245,7 +249,6 @@ export function WebuiClientFoundationApp(
     dataDir,
     hostLabel,
     transport,
-    sessionStore: providedSessionStore,
   } = props;
   // The per-business port slices (plan §8 Phase 2, A4-s3). A business reads its
   // own slice instead of reaching into the composed transport, so what it *can*
@@ -269,27 +272,12 @@ export function WebuiClientFoundationApp(
   const modelsPort = portSlices.models;
   const accountPort = portSlices.account;
   const turnPort = portSlices.turn;
-  const shellPort = portSlices.shell;
-  // The one application session store for this mount (plan §7.6; ticket #45).
-  // A caller (tests, SSR) may inject one; production omits the prop and the
-  // shell creates exactly one. The shell provides this exact object through
-  // `WebuiSessionStoreProvider` and reads its own slices off it — never a
-  // second, module-level map.
-  // The seed page is read once (it never changes for a mount): seeding the
-  // catalog from it is how SSR/first paint and the tests start with entities
-  // already present, without a second map.
-  const seedSessionPageRef = useRef(sessionPage);
-  const sessionStore = useMemo(
-    () =>
-      providedApplication?.store ??
-      providedSessionStore ??
-      createWebuiSessionStore(
-        seedSessionPageRef.current
-          ? { catalog: createWebuiSessionCatalogFromPage(seedSessionPageRef.current) }
-          : undefined,
-      ),
-    [providedApplication, providedSessionStore],
-  );
+  // The one application store, taken from the assembled application. There is no
+  // second map: the shell provides this exact object through
+  // `WebuiSessionStoreProvider` and reads its own slices off it (plan §7.6). A
+  // host that needs a seeded catalogue (SSR first paint, a fixture) seeds the
+  // store it passes to the assembly; the shell does not build one to seed.
+  const sessionStore = application.store;
   // The one per-session effects registry for this mount (plan §7.1
   // `application/turn/event-coordinator.ts`; ticket #45). The shell holds it and
   // provides it; the composer registers its session's effect handlers here and
@@ -326,12 +314,7 @@ export function WebuiClientFoundationApp(
   const loading = catalog.flat.loading;
   // Composer store declared before sessionWorkflows so the delete-success purge
   // (R7) can hand the workflows the same instance.
-  const composerStore = useMemo(
-    () =>
-      providedApplication?.composer ??
-      createWebuiComposerStore({ storage: browserStorage }),
-    [providedApplication, browserStorage],
-  );
+  const composerStore = application.composer;
   // The session workflows: the loads and mutations the shell used to call
   // through `transport` and then patch onto two structures by hand. The shell
   // submits a workflow and holds no transport call for session entities.
@@ -984,7 +967,6 @@ export function WebuiClientFoundationApp(
   // started were missed while the stream was down, and the stream cannot
   // replay them. `SessionComposer` closes the same gap the same way.
   const [activityProbeNonce, setActivityProbeNonce] = useState(0);
-  const watchEvents = shellPort.watchEvents;
   const getActiveTurn = turnPort.activeTurn;
   // One shared, deduplicated probe for the transport (plan §7.1 slice): the
   // rail and the composer ask the same `getActiveTurn`, so a same-session probe
@@ -993,22 +975,6 @@ export function WebuiClientFoundationApp(
     () => webuiActiveTurnProbeFor(getActiveTurn),
     [getActiveTurn],
   );
-
-  // The application instance is built from the live process-event ingress
-  // (ticket #45, the atomic ingress flip). One call opens exactly one
-  // `watchEvents` channel; the event coordinator is its sole consumer,
-  // reducing each event into the retained activity slice and running the
-  // session effects the composer registered. Components subscribe to
-  // application snapshots and never open a channel of their own — the shell's
-  // own subscription, the composer's and the two panels' are all gone.
-  //
-  // The open session is read through a ref rather than closing over it, so the
-  // single subscription never tears down on a session switch: the events
-  // arriving during a switch would otherwise belong to neither the old nor the
-  // new closure, and a turn finishing while the user clicks through the rail
-  // would be lost.
-  const selectedSessionIdRef = useRef(selectedSessionId);
-  selectedSessionIdRef.current = selectedSessionId;
 
   // The application-wide effects the coordinator runs. It composes the
   // per-session registry the composer registers into with the shell's own
@@ -1034,90 +1000,17 @@ export function WebuiClientFoundationApp(
     [eventEffectsRegistry],
   );
 
-  // Exactly one application per mount. It owns the one session store (the same
-  // map the shell reads its slices off) and the one channel; disposing it
-  // detaches the coordinator and closes the channel.
-  //
-  // When the composition root provides an application, that instance *is* the
-  // one — the shell builds nothing and adopts its store, composer owner and
-  // lifetime (A4-s2). The constructor arguments below still describe the host
-  // that renders the shell from props, which is every SSR and unit-test caller
-  // and is what reverting the provider wiring falls back to.
-  const application: WebuiApplication = useMemo(
-    () =>
-      providedApplication ??
-      createWebuiApplication({
-        // The live ingress: the transport's `watchEvents` watcher, adapted to
-        // the application channel shape. With no transport wired (SSR, tests)
-        // the application still exists but opens nothing.
-        openEventChannel: watchEvents
-          ? createWebuiOpenEventChannel(watchEvents)
-          : () => ({ subscribe: () => () => undefined }),
-        store: sessionStore,
-        readActiveSessionId: () => selectedSessionIdRef.current,
-        effects: applicationEffects,
-        // The unread controller hydrates from the same storage adapter the
-        // shell used (same key, same validation, same format) — injected
-        // because the application layer may not import infrastructure.
-        unreadStorage: {
-          read: browserStorage.readUnreadCounts,
-          write: browserStorage.writeUnreadCounts,
-        },
-        composer: composerStore,
-        turns: {
-          resumeSession: turnPort.resume ?? (async () => {}),
-          ...(loadMessages
-            ? { loadMessages }
-            : {}),
-        },
-        // The composition root holds the port and cuts the turn capability
-        // slice here (ticket #57): the turn intents receive no capability from
-        // their caller, and an unwired operation is simply absent from the
-        // slice. `WebuiTransport` satisfies the port structurally.
-        // The port the application cuts turn's slice from, built from the slice
-        // this mount already holds: the composed transport is not handed across
-        // this boundary any more either (A4-s5). `WebuiTurnCapabilityPort` names
-        // the port's members, the slice names turn's, so the mapping is spelled
-        // out rather than left to a structural match.
-        turnCapabilities: {
-          ...(turnPort.send ? { sendMessage: turnPort.send } : {}),
-          ...(turnPort.resume ? { resumeSession: turnPort.resume } : {}),
-          ...(turnPort.load ? { loadMessages: turnPort.load } : {}),
-          ...(turnPort.stop ? { abortSession: turnPort.stop } : {}),
-          ...(turnPort.enqueue ? { enqueueMessage: turnPort.enqueue } : {}),
-          ...(turnPort.createSession ? { createSession: turnPort.createSession } : {}),
-          ...(turnPort.activeTurn ? { getActiveTurn: turnPort.activeTurn } : {}),
-        },
-        ...(loadMessages ? { loadMessages } : {}),
-      }),
-    [
-      providedApplication,
-      applicationEffects,
-      sessionStore,
-      composerStore,
-      browserStorage,
-      loadMessages,
-      turnPort.resume,
-      watchEvents,
-    ],
-  );
-  // The effects are registered rather than only handed to the constructor, so a
-  // host that provides the application — and therefore cannot supply them at
-  // construction — still gets the shell's own view reactions and the per-session
-  // registry behind them (`setEventEffects`, ticket #61). Detaching on unmount is
-  // what a remount of the shell undoes.
-  useEffect(() => {
-    if (!providedApplication) return undefined;
-    return providedApplication.setEventEffects(applicationEffects);
-  }, [providedApplication, applicationEffects]);
-  // The owner disposes: the shell disposes the instance it built, and leaves a
-  // provided one alone — its lifetime belongs to whoever built it.
+  // The shell registers its own view reactions instead of handing them to the
+  // constructor: the application is assembled and owned outside this component,
+  // so `setEventEffects` is how the shell's `channelReady` / workspace-git
+  // reactions join the per-session registry (`ticket #61`). Detaching on unmount
+  // is what a remount of the shell undoes.
   useEffect(
-    () => () => {
-      if (!providedApplication) application.dispose();
-    },
-    [application, providedApplication],
+    () => application.setEventEffects(applicationEffects),
+    [application, applicationEffects],
   );
+  // The shell never disposes the application: its lifetime belongs to the
+  // composition root that built it (plan §4.1).
 
   // A `workspace.git.changed` signal invalidates exactly the views it affects:
   // the owner matches the signal against the review and environment views it
@@ -1138,6 +1031,14 @@ export function WebuiClientFoundationApp(
           void application.turns.retry(selectedSessionId);
         }
       : undefined;
+
+  // The application's selection follows the route the shell resolved. The
+  // coordinator and the unread controller judge events against the selected
+  // session, so the store's selection is the one record of it — the shell does
+  // not keep a second copy to hand over (plan §4.2, §4.3).
+  useEffect(() => {
+    application.select(selectedSessionId);
+  }, [application, selectedSessionId]);
 
   // Persistence is the unread controller's job now (ticket #49 criterion 4):
   // it subscribes to the activity slice and writes the positive counts after

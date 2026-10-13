@@ -60,6 +60,7 @@ function commandsFor(
     },
     turnCapabilities: capabilities,
   });
+  application.start();
   let captured: ReturnType<typeof useWebuiSessionCommands> | undefined;
   function Probe() {
     captured = useWebuiSessionCommands(sessionId);

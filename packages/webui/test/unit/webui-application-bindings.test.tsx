@@ -42,6 +42,7 @@ function makeApplication() {
       resumeSession: (async () => {}) as unknown as WebuiClientSessionResumer,
     },
   });
+  application.start();
   return { application, channel: fake };
 }
 

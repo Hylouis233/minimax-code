@@ -63,10 +63,13 @@ function WebuiClientRoot({
   transport,
   dataDir,
   storage,
+  initialSessionId,
 }: {
   readonly transport: ReturnType<typeof createWebuiTransport>;
   readonly dataDir?: string;
   readonly storage: ReturnType<typeof createWebuiBrowserStorage>;
+  /** The session the initial route names, parsed from the hash by the entry. */
+  readonly initialSessionId?: string;
 }): JSX.Element {
   const effectsRegistry = React.useMemo(
     () => createWebuiEventEffectsRegistry(),
@@ -84,7 +87,9 @@ function WebuiClientRoot({
     () =>
       createWebuiApplication({
         // The live ingress: the transport's `watchEvents` watcher, adapted to
-        // the application channel shape.
+        // the application channel shape. It is opened by `start` below, not
+        // here: construction stays dormant so an SSR-shaped or test render can
+        // build the same assembly without touching the network.
         openEventChannel: transport.watchEvents
           ? createWebuiOpenEventChannel(transport.watchEvents)
           : () => ({ subscribe: () => () => undefined }),
@@ -92,6 +97,13 @@ function WebuiClientRoot({
         // own view reactions on top and registers them through
         // `setEventEffects`, because it renders after this instance exists.
         effects: effectsRegistry.asWebuiEventEffects(),
+        // The same storage adapter the shell used to inject by hand, so the
+        // production boot persists and restores unread counts exactly as the
+        // fixture assembly always did (plan §4.1; correction C1).
+        unreadStorage: {
+          read: storage.readUnreadCounts,
+          write: storage.writeUnreadCounts,
+        },
         turns: {
           resumeSession: transport.resumeSession ?? (async () => {}),
           ...(transport.loadMessages
@@ -104,9 +116,17 @@ function WebuiClientRoot({
           : {}),
         composer,
       }),
-    [composer, effectsRegistry, transport],
+    [composer, effectsRegistry, transport, storage],
   );
-  React.useEffect(() => () => application.dispose(), [application]);
+  // One lifecycle per mount: start once, dispose only when this instance is
+  // replaced or the root unmounts. The initial route is read through a ref
+  // because it is the *initial* route — a later hash change selects through the
+  // shell, it does not restart the application.
+  const initialSessionIdRef = React.useRef(initialSessionId);
+  React.useEffect(() => {
+    application.start({ initialSessionId: initialSessionIdRef.current });
+    return () => application.dispose();
+  }, [application]);
 
   return (
     <WebuiEventEffectsRegistryProvider registry={effectsRegistry}>

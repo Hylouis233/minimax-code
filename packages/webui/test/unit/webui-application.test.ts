@@ -80,6 +80,7 @@ function makeApplication(effects = {}) {
     effects,
     turns: { resumeSession },
   });
+  application.start();
   return { application, channels, opened: () => opened };
 }
 
@@ -183,6 +184,7 @@ describe("the turn coordinator's manual retry", () => {
       openEventChannel: () => fake.channel,
       turns: { resumeSession },
     });
+    application.start();
     return { application, channel: fake };
   }
 
@@ -336,11 +338,12 @@ describe("stage 4 — the four call sites' handling through the coordinator", ()
       setGoal,
     });
     const fake = makeChannel();
-    createWebuiApplication({
+    const probeApp = createWebuiApplication({
       openEventChannel: () => fake.channel,
       effects: registry.asWebuiEventEffects(),
       turns: { resumeSession: (async () => {}) as unknown as WebuiClientSessionResumer },
     });
+    probeApp.start();
 
     fake.emit(event("session.queue.updated", { sessionId: "s1" }));
     expect(invalidatePending).toHaveBeenCalledWith("s1");
@@ -382,11 +385,12 @@ describe("stage 4 — the four call sites' handling through the coordinator", ()
     registry.register("s1", { channelReady: firstReady });
     registry.register("s2", { channelReady: secondReady });
     const fake = makeChannel();
-    createWebuiApplication({
+    const probeApp = createWebuiApplication({
       openEventChannel: () => fake.channel,
       effects: registry.asWebuiEventEffects(),
       turns: { resumeSession: (async () => {}) as unknown as WebuiClientSessionResumer },
     });
+    probeApp.start();
     // The server accepted the channel again; each session re-reads its
     // authoritative state, which is how a missed `session.start` is recovered.
     fake.ready();

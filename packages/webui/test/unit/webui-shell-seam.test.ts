@@ -42,13 +42,28 @@ describe("the shell forwards zero transport members", () => {
 });
 
 describe("the shell keeps its startup duties", () => {
-  it("disposes exactly the application instance it constructed", () => {
-    // An injected application belongs to its provider; only a self-built one is the shell's to stop.
-    expect(shell).toContain("if (!providedApplication) application.dispose();");
+  it("constructs no application of its own", () => {
+    // The alternate factory is gone (plan §4.1): the shell renders the
+    // application the composition root assembled, and a missing one is a named
+    // assembly error rather than a second composition with different inputs.
+    expect(shell).not.toMatch(/createWebuiApplication\(\{/u);
+    expect(shell).toContain("requireApplication(");
+    expect(shell).toContain("WebUI assembly error");
   });
 
-  it("opens one event channel", () => {
-    expect(shell.match(/createWebuiOpenEventChannel\(/gu) ?? []).toHaveLength(1);
+  it("opens no event channel and disposes no application", () => {
+    // Both belong to the entry that owns the instance: the shell neither opens
+    // the ingress nor ends a lifetime it did not begin.
+    expect(shell.match(/createWebuiOpenEventChannel\(/gu) ?? []).toHaveLength(0);
+    expect(shell).not.toContain("application.dispose()");
+  });
+
+  it("leaves the lifecycle to the entry", () => {
+    // One construct, one start, one dispose per boot, and the start carries the
+    // route so unread hydration sees the selected session before its first write.
+    expect(main).toContain("application.start({ initialSessionId:");
+    expect(main).toContain("application.dispose()");
+    expect(main).toContain("unreadStorage:");
   });
 
   it("leaves the error boundary at the composition root", () => {

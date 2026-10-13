@@ -12,6 +12,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { WebuiClientFoundationApp } from "../../src/client/components/shell/WebuiClientFoundationApp.js";
+import { shellElement } from "../support/shell-fixture.js";
 import type { WebuiClientMessage, WebuiClientMessagePage } from "../../src/client/contracts/transcript/message-view.js";
 
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
@@ -78,7 +79,7 @@ function sessionShell(opts: {
     },
   }));
   return renderToStaticMarkup(
-    createElement(WebuiClientFoundationApp, {
+    shellElement({
       label: "webui-foundation",
       sessionStore,
       locationHash: `#session=${SESSION_ID}`,
@@ -183,7 +184,7 @@ describe("WebUI transcript widget wiring", () => {
   it("renders ChatSkeleton while the transcript is loading with no items", () => {
     // Force the loading state by holding loadMessages unresolved.
     const html = renderToStaticMarkup(
-      createElement(WebuiClientFoundationApp, {
+      shellElement({
         label: "webui-foundation",
         locationHash: `#session=${SESSION_ID}`,
         sessionPage: {

@@ -19,7 +19,7 @@ import {
   type WebuiEventCoordinator,
   type WebuiEventEffects,
 } from "./turn/event-coordinator.js";
-import type { WebuiOpenEventChannel } from "./turn/event-channel.js";
+import type { WebuiOpenEventChannel, WebuiProcessEventChannel } from "./turn/event-channel.js";
 import { createWebuiSessionStore } from "./session-store.js";
 import type { WebuiSessionStore } from "./session-store.js";
 import {
@@ -95,7 +95,35 @@ export interface WebuiApplicationDeps {
   readonly composer?: WebuiComposerStore;
 }
 
+export type WebuiApplicationLifecycleState = "constructed" | "started" | "disposed";
+
+/** What `start` needs from the caller: the route it booted at. */
+export interface WebuiApplicationStart {
+  /**
+   * The session the initial route names, or `undefined` for the home surface.
+   * Parsed by the entry (it owns the browser location), passed in so hydration
+   * sees the same selection the first render will.
+   */
+  readonly initialSessionId?: string;
+}
+
 export interface WebuiApplication {
+  /**
+   * The lifecycle state (plan §4.1). `constructed` performs no IO; `started` has
+   * one open ingress; `disposed` is terminal and refuses to restart.
+   */
+  readonly state: () => WebuiApplicationLifecycleState;
+  /**
+   * Hydrate persisted browser state for `initialSessionId`, install the
+   * assembly's routes and open the one event ingress.
+   *
+   * Idempotent while started, and a refusal (returning `false`, opening
+   * nothing) after disposal. The initial selection is passed in rather than
+   * read later, because the route has to be known *before* unread hydration:
+   * `hydrate` drops the stored count for the session being opened, so an
+   * unread value hydrated without it is the badge the user was about to read.
+   */
+  readonly start: (options?: WebuiApplicationStart) => boolean;
   /** The current application snapshot; stable until something changes. */
   readonly getSnapshot: () => WebuiApplicationState;
   /** Subscribe to snapshot changes. Returns a detach; never closes a channel. */
@@ -184,14 +212,16 @@ export function createWebuiApplication(
   const readActiveSessionId =
     deps.readActiveSessionId ?? (() => store.getSelectedSessionId());
   // The one unread controller: hydration ordering and the single persistence
-  // writer. It is hydrated *before* the channel is opened, so a counted event
-  // can never arrive against an un-hydrated map (the gate `recordEvent` holds).
+  // writer. It is *not* hydrated here: hydration is the one thing that reads
+  // persisted browser state, so it belongs to `start`, after the initial route
+  // is known. `recordEvent` stays gated on the hydration flag, and the ingress
+  // is opened after hydration in the same call, so the ordering guarantee is
+  // unchanged (plan §4.1).
   const unread = createWebuiUnreadController({
     store,
     ...(deps.unreadStorage?.read ? { read: deps.unreadStorage.read } : {}),
     ...(deps.unreadStorage?.write ? { write: deps.unreadStorage.write } : {}),
   });
-  unread.hydrate(readActiveSessionId());
   const composer = deps.composer ?? createWebuiComposerStore();
   // The two fence cells (§8 Phase 3 B2). Created once per application, because
   // the coordinator that uses one is constructed on every render and a counter
@@ -226,12 +256,31 @@ export function createWebuiApplication(
     store,
     loadMessages: deps.loadMessages,
   });
-  // Exactly one channel per application instance, opened once. The coordinator
-  // is its sole consumer; nothing else subscribes to it directly.
-  const channel = deps.openEventChannel();
-  const detach = events.attach(channel);
+  // The ingress handle: nothing is opened at construction. `start` opens exactly
+  // one channel and attaches the coordinator to it; `dispose` detaches, disposes
+  // the store that fences late commits, and closes the channel.
+  let lifecycle: WebuiApplicationLifecycleState = "constructed";
+  let channel: WebuiProcessEventChannel | undefined;
+  let detach: (() => void) | undefined;
 
   return {
+    state: () => lifecycle,
+    start: (options) => {
+      // A disposed instance is terminal: no hydration, no ingress, no second
+      // life through the same object (plan §4.1).
+      if (lifecycle === "disposed") return false;
+      if (lifecycle === "started") return true;
+      const initialSessionId = options?.initialSessionId;
+      // Order matters: the route the caller booted at is applied first, so the
+      // unread restore drops the count for the session being opened rather than
+      // raising the badge the user is looking at.
+      if (initialSessionId !== undefined) store.select(initialSessionId);
+      unread.hydrate(initialSessionId ?? readActiveSessionId());
+      channel = deps.openEventChannel();
+      detach = events.attach(channel);
+      lifecycle = "started";
+      return true;
+    },
     getSnapshot: store.getSnapshot,
     subscribe: store.subscribe,
     select: store.select,
@@ -259,9 +308,13 @@ export function createWebuiApplication(
       return () => eventEffects.replace(previous);
     },
     dispose: () => {
-      detach();
+      if (lifecycle === "disposed") return;
+      detach?.();
+      detach = undefined;
       store.dispose();
-      channel.close?.();
+      channel?.close?.();
+      channel = undefined;
+      lifecycle = "disposed";
     },
   };
 }

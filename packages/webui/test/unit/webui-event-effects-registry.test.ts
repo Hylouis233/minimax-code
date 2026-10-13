@@ -109,11 +109,12 @@ describe("the coordinator runs the registered effect handlers", () => {
     });
 
     const fake = makeChannel();
-    createWebuiApplication({
+    const probeApp = createWebuiApplication({
       openEventChannel: () => fake.channel,
       effects: registry.asWebuiEventEffects(),
       turns: { resumeSession },
     });
+    probeApp.start();
 
     fake.emit(event("session.queue.updated", { sessionId: "s1" }));
     expect(refreshPending).toHaveBeenCalledWith("s1");
@@ -147,11 +148,12 @@ describe("the bindings-layer transport event-channel adapter", () => {
       };
     };
 
-    createWebuiApplication({
+    const probeApp = createWebuiApplication({
       openEventChannel: createWebuiOpenEventChannel(watcher),
       effects: registry.asWebuiEventEffects(),
       turns: { resumeSession },
     });
+    probeApp.start();
 
     // A frame off the transport reaches the coordinator through the adapter…
     onEvent?.(event("session.queue.updated", { sessionId: "s1" }));

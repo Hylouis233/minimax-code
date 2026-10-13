@@ -22,6 +22,9 @@ import {
   WebuiSessionList,
 } from "../../src/client/components/sessions/SessionRail.js";
 import { WebuiClientFoundationApp } from "../../src/client/components/shell/WebuiClientFoundationApp.js";
+import { shellElement } from "../support/shell-fixture.js";
+import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
+import { createWebuiSessionCatalogFromPage } from "../../src/client/application/sessions/session-catalog.js";
 import { formatWebuiUnreadBadge } from "../../src/client/projection/common/unread-badge.js";
 import {
   readWebuiUnreadCounts,
@@ -357,14 +360,18 @@ describe("rail rendering", () => {
     // The wiring test. Every assertion above passes even if the app stops
     // passing `activity`/`now` down, because they hand the props to the rail
     // themselves. Rendering the real shell is what proves the connection.
+    // The catalogue is seeded where the target architecture seeds it: into the
+    // store the assembly is given, not by the shell from a prop (plan §4.1).
+    const page = { sessions: [session({ sessionId: "mvs_a" })], hasMore: false };
     const html = renderToStaticMarkup(
-      createElement(WebuiClientFoundationApp, {
-        label: "webui-foundation",
-        sessionPage: {
-          sessions: [session({ sessionId: "mvs_a" })],
-          hasMore: false,
+      shellElement(
+        { label: "webui-foundation", sessionPage: page },
+        {
+          store: createWebuiSessionStore({
+            catalog: createWebuiSessionCatalogFromPage(page as never),
+          }),
         },
-      }),
+      ),
     );
     expect(html).toMatch(/data-webui-session-age="true"/u);
   });
@@ -809,6 +816,15 @@ describe("host wiring", () => {
       "utf8",
     ),
   );
+  // The entry assembles the application and owns its lifecycle (plan §4.1): the
+  // shell renders the instance and constructs nothing, so the construction and
+  // the ingress assertions below point here.
+  const entrySource = strip(
+    readFileSync(
+      path.join(import.meta.dirname, "..", "..", "src", "client", "main.tsx"),
+      "utf8",
+    ),
+  );
 
   /**
    * The `useEffect` block that mentions `marker`, from its `useEffect(` up to
@@ -834,8 +850,12 @@ describe("host wiring", () => {
     // application event coordinator is the channel's single consumer, and it
     // now routes every event to the unread controller rather than reducing the
     // activity map itself (ticket #49 criterion 4).
-    expect(appSource).toMatch(/createWebuiApplication\(/u);
-    expect(appSource).toMatch(/createWebuiOpenEventChannel\(watchEvents\)/u);
+    //
+    // The assembly and the ingress are the entry's: the shell renders the
+    // instance it is given and constructs nothing (plan §4.1).
+    expect(entrySource).toMatch(/createWebuiApplication\(/u);
+    expect(entrySource).toMatch(/createWebuiOpenEventChannel\(transport\.watchEvents\)/u);
+    expect(appSource).not.toMatch(/createWebuiApplication\(\{/u);
     // No call site opens a second channel.
     expect(appSource).not.toMatch(/watchEvents\?\.\(/u);
 
@@ -845,10 +865,11 @@ describe("host wiring", () => {
     expect(coordinatorSource).not.toMatch(/reduceWebuiSessionActivity\(/u);
     expect(unreadSource).toMatch(/reduceWebuiSessionActivity\(/u);
 
-    // And the ref is kept current, so the single subscription always judges
-    // the turn against the session the user has open.
+    // And the selection is the store's, kept current from the route the shell
+    // resolved, so the single subscription always judges the turn against the
+    // session the user has open without the shell holding a second copy.
     expect(appSource).toMatch(
-      /selectedSessionIdRef\.current\s*=\s*selectedSessionId\s*;/u,
+      /application\.select\(\s*selectedSessionId\s*\)\s*;/u,
     );
   });
 

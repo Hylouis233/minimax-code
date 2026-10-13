@@ -56,6 +56,7 @@ function makeApplication(effects: WebuiEventEffects = {}) {
     effects,
     turns: { resumeSession: async () => {} },
   });
+  application.start();
   return { application, fake };
 }
 

@@ -22,6 +22,8 @@ import { OutputError } from "../../src/client/components/transcript/OutputError.
 import { WebuiAssistantBody } from "../../src/client/components/transcript/AssistantBody.js";
 import { WebuiClientFoundationApp } from "../../src/client/components/shell/WebuiClientFoundationApp.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
+import { WebuiApplicationProvider } from "../../src/client/bindings/application-context.js";
+import { createWebuiApplicationFixture } from "../support/application-fixture.js";
 import { projectMessageParts } from "../../src/client/projection/transcript/message-parts.js";
 import type { WebuiClientMessage } from "../../src/client/contracts/transcript/message-view.js";
 
@@ -309,17 +311,22 @@ describe("C-4.3 image and text in one assistant message render together, in orde
       },
     ];
 
-    // The shell is handed the one application store, so the transcript reads
-    // exactly this instance (ticket #45). A fresh store starts at the idle
-    // phase this case wants; no prior turn can bleed in.
+    // The shell renders the assembled application's store, so the transcript
+    // reads exactly this instance. A fresh store starts at the idle phase this
+    // case wants; no prior turn can bleed in. The application is constructed
+    // dormant (no ingress) because this fixture renders markup, not a session.
     const sessionStore = createWebuiSessionStore();
+    const application = createWebuiApplicationFixture({
+      store: sessionStore,
+    });
 
     const html = renderToStaticMarkup(
-      createElement(WebuiClientFoundationApp, {
-        label: "webui-foundation",
-        sessionStore,
-        locationHash: `#session=${SESSION_ID}`,
-        sessionPage: {
+      createElement(WebuiApplicationProvider, {
+        application,
+        children: createElement(WebuiClientFoundationApp, {
+          label: "webui-foundation",
+          locationHash: `#session=${SESSION_ID}`,
+          sessionPage: {
           sessions: [
             {
               sessionId: SESSION_ID,
@@ -331,12 +338,13 @@ describe("C-4.3 image and text in one assistant message render together, in orde
           ],
           hasMore: false,
         },
-        initialMessages: { messages, hasMore: false },
-        transport: {
-          loadMessages: async () => ({ messages, hasMore: false }),
-          watchEvents: () => () => undefined,
-        },
-      } as React.ComponentProps<typeof WebuiClientFoundationApp>),
+          initialMessages: { messages, hasMore: false },
+          transport: {
+            loadMessages: async () => ({ messages, hasMore: false }),
+            watchEvents: () => () => undefined,
+          },
+        } as React.ComponentProps<typeof WebuiClientFoundationApp>),
+      }),
     );
 
     expect(html).toContain("这是两张图的对比。");

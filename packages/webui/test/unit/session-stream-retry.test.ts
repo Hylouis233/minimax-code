@@ -58,12 +58,15 @@ function pendingResume() {
 
 function appWithResume(resumeSession: WebuiClientSessionResumer) {
   // The command reads and writes the shared store; the application is built on
-  // it (not a second map) so the assertions observe the same records.
-  return createWebuiApplication({
+  // it (not a second map) so the assertions observe the same records. The
+  // instance is started explicitly: construction opens no ingress (plan §4.1).
+  const application = createWebuiApplication({
     openEventChannel: () => channel,
     store,
     turns: { resumeSession },
   });
+  application.start();
+  return application;
 }
 
 describe("the turn coordinator's manual retry", () => {
@@ -113,6 +116,7 @@ describe("the turn coordinator's manual retry", () => {
         }),
       },
     });
+    application.start();
 
     void application.turns.retry(sessionId);
     // The loadMessages history seeding is awaited inside the loop; flush the
@@ -143,6 +147,7 @@ describe("the turn coordinator's manual retry", () => {
       store,
       turns: { resumeSession },
     });
+    application.start();
 
     return application.turns.retry(sessionId).then(() => {
       const stream = store.readSession(sessionId).stream;

@@ -57,6 +57,7 @@ import {
   readSessionIdFromHash,
   subscribeToSessionHash,
 } from "../../src/client/components/shell/WebuiClientFoundationApp.js";
+import { shellElement } from "../support/shell-fixture.js";
 import type {WebuiClientMessageEnqueuer} from "../../src/client/contracts/composer/command-port.js";
 import type {WebuiClientMessageSender, WebuiClientSessionResumer} from "../../src/client/contracts/turn/execution-port.js";
 import type { WebuiClientMessageLoader } from "../../src/client/contracts/transcript/message-view.js";
@@ -153,13 +154,13 @@ import { streamStateBundle } from "../../src/client/application/turn/stream-stat
 
 function renderShell(label = "webui-foundation"): string {
   return renderToStaticMarkup(
-    createElement(WebuiClientFoundationApp, { label }),
+    shellElement({ label }),
   );
 }
 
 function renderSessionShell(): string {
   return renderToStaticMarkup(
-    createElement(WebuiClientFoundationApp, {
+    shellElement({
       label: "webui-foundation",
       locationHash: "#session=session-1",
       sessionPage: {
@@ -1150,7 +1151,7 @@ describe("WebUI shell — desktop anatomy", () => {
     // the field must accept text even though nothing is selected yet — leaving it
     // disabled is what made the first screen look like it could not be used at all.
     const html = renderToStaticMarkup(
-      createElement(WebuiClientFoundationApp, {
+      shellElement({
         label: "webui-foundation",
         transport: { sendMessage: async () => undefined },
       }),
@@ -2654,7 +2655,7 @@ describe("WebUI composer transcriptIncomplete", () => {
     // and assert the paragraph is absent — the state-side tests
     // above pin the flag's truthiness; this guards the markup side.
     const html = renderToStaticMarkup(
-      createElement(WebuiClientFoundationApp, {
+      shellElement({
         label: "webui-foundation",
         transport: { sendMessage: () => Promise.resolve() },
       }),

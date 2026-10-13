@@ -45,6 +45,7 @@ function applicationWith(sessionId: string) {
     store,
     turns: { resumeSession: async () => {} },
   });
+  application.start();
   return { application, store };
 }
 
@@ -66,18 +67,19 @@ describe("the shell adopts the application the composition root provides", () =>
     application.dispose();
   });
 
-  it("still builds its own application and store with no provider", () => {
-    // The fallback path: every SSR and unit-test caller, and what reverting the
-    // provider wiring returns to.
-    const markup = renderToStaticMarkup(
-      createElement(WebuiClientFoundationApp, {
-        label: "webui-foundation",
-        locationHash: "#session=prop-session",
-        sessionPage: sessionPage("prop-session") as never,
-      }),
-    );
-
-    expect(markup).toContain("prop-session");
+  it("still renders the shell when no application is provided", () => {
+    // The fallback is gone: a host that renders the shell without an assembled
+    // application has a wiring defect, and it must say so rather than silently
+    // composing a second application with different inputs (plan §4.1).
+    expect(() =>
+      renderToStaticMarkup(
+        createElement(WebuiClientFoundationApp, {
+          label: "webui-foundation",
+          locationHash: "#session=prop-session",
+          sessionPage: sessionPage("prop-session") as never,
+        }),
+      ),
+    ).toThrow(/WebUI assembly error/);
   });
 
   it("renders the adopted application's own snapshot state", () => {
