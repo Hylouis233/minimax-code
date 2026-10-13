@@ -19,10 +19,10 @@ import {
   type ReactElement,
 } from "react";
 import { ArchonShell } from "./ArchonShell.js";
-import { WEBUI_COMPOSER_HOME_KEY } from "../application/composer/composer-history.js";
-import { Composer } from "./composer/Composer.js";
-import { GreetingSkeleton } from "./TranscriptSkeletons.js";
-import { LeftRail } from "./sessions/LeftRail.js";
+import { WEBUI_COMPOSER_HOME_KEY } from "../../application/composer/composer-history.js";
+import { Composer } from "../composer/Composer.js";
+import { GreetingSkeleton } from "../TranscriptSkeletons.js";
+import { LeftRail } from "../sessions/LeftRail.js";
 import {
   readProjectNames,
   readProjectPins,
@@ -30,15 +30,15 @@ import {
   toggleProjectPin,
   toggleSessionOverlay,
   writeProjectName,
-} from "../infrastructure/storage.js";
-import { Transcript } from "./Transcript.js";
-import { UserMenu } from "./account/UserMenu.js";
-import { MEMORY_HANDOFF_PROMPT, type MemoryHandoff } from "./settings/MemoryManagerDialog.js";
+} from "../../infrastructure/storage.js";
+import { Transcript } from "../Transcript.js";
+import { UserMenu } from "../account/UserMenu.js";
+import { MEMORY_HANDOFF_PROMPT, type MemoryHandoff } from "../settings/MemoryManagerDialog.js";
 import {
   WebuiWorkspacePanel,
   WebuiProgressOverviewPanel,
   WebuiWorkspacePanelControls,
-} from "./WorkspacePanels.js";
+} from "../WorkspacePanels.js";
 import {
   getWorkspacePanelSessionState,
   initialWorkspacePanelSessionState,
@@ -46,7 +46,7 @@ import {
   setWorkspaceSessionProgressPanelOpen,
   type WorkspacePanelCommand,
   type WorkspacePanelSessionStates,
-} from "../projection/workspace-panel-state.js";
+} from "../../projection/workspace-panel-state.js";
 import {
   initialWebuiShellSurface,
   isPluginManagementSurface,
@@ -54,18 +54,18 @@ import {
   webuiPluginManagementArea,
   type WebuiPluginManagementArea,
   type WebuiShellSurfaceCommand,
-} from "../projection/shell-surface.js";
-import { ConversationUsageBanner } from "./account/ConversationUsageBanner.js";
-import { PluginCatalogue } from "./plugins/PluginCatalogue.js";
-import { WebuiComposer } from "./SessionComposer.js";
-import { WebuiSessionTranscript } from "./SessionTranscript.js";
+} from "../../projection/shell-surface.js";
+import { ConversationUsageBanner } from "../account/ConversationUsageBanner.js";
+import { PluginCatalogue } from "../plugins/PluginCatalogue.js";
+import { WebuiComposer } from "../SessionComposer.js";
+import { WebuiSessionTranscript } from "../SessionTranscript.js";
 import {
   WebuiProjectList,
   filterWebuiSessionsByQuery,
   sessionHash,
   sessionLabel,
-} from "./sessions/SessionRail.js";
-import { RailRow } from "./sessions/RailRow.js";
+} from "../sessions/SessionRail.js";
+import { RailRow } from "../sessions/RailRow.js";
 import {
   WebuiIconBrand,
   WebuiIconContextExport,
@@ -75,51 +75,51 @@ import {
   WebuiIconSearch,
   WebuiIconSidebarToggle,
   WebuiIconSites,
-} from "../icons.js";
-import type { WebuiClientSession, WebuiClientSessionPage, WebuiClientProject } from "../contracts/sessions/session-view.js";
+} from "./icons.js";
+import type { WebuiClientSession, WebuiClientSessionPage, WebuiClientProject } from "../../contracts/sessions/session-view.js";
 import type {
   WebuiClientMessage,
   WebuiClientMessagePage,
-} from "../contracts/transcript/message-view.js";
-import type { WebuiTransport } from "../contracts/transport.js";
-import type { WebuiTodo } from "./WorkspacePanels.js";
-import type { WebuiUsageQuotaResult } from "../../shared/contracts/usage-quota.js";
-import type { WebuiVersionInfo } from "../../shared/contracts/version.js";
+} from "../../contracts/transcript/message-view.js";
+import type { WebuiTransport } from "../../contracts/transport.js";
+import type { WebuiTodo } from "../WorkspacePanels.js";
+import type { WebuiUsageQuotaResult } from "../../../shared/contracts/usage-quota.js";
+import type { WebuiVersionInfo } from "../../../shared/contracts/version.js";
 import type {
   WebuiWorkspaceProgressState,
   WebuiWorkspaceSubagent,
-} from "../projection/workspace-progress.js";
-import type { WebuiProjectGroup } from "./sessions/SessionRail.js";
-import { createWebuiCommandWorkflows } from "../application/composer/command-workflows.js";
-import { createWebuiComposerStore } from "../application/composer/composer-store.js";
+} from "../../projection/workspace-progress.js";
+import type { WebuiProjectGroup } from "../sessions/SessionRail.js";
+import { createWebuiCommandWorkflows } from "../../application/composer/command-workflows.js";
+import { createWebuiComposerStore } from "../../application/composer/composer-store.js";
 import {
   createWebuiSessionStore,
   type WebuiSessionStore,
-} from "../application/session-store.js";
+} from "../../application/session-store.js";
 import {
   createWebuiSessionCatalogFromPage,
   selectWebuiCatalogFlatPage,
   selectWebuiCatalogTreePage,
-} from "../application/sessions/session-catalog.js";
-import { createWebuiSessionWorkflows } from "../application/sessions/session-workflows.js";
+} from "../../application/sessions/session-catalog.js";
+import { createWebuiSessionWorkflows } from "../../application/sessions/session-workflows.js";
 import {
   selectWebuiSessionStream,
   selectWebuiSessionTranscriptPage,
-} from "../application/selectors.js";
-import { WEBUI_HOME_SESSION_KEY } from "../application/state.js";
-import { createWebuiEventEffectsRegistry } from "../application/turn/event-effects-registry.js";
+} from "../../application/selectors.js";
+import { WEBUI_HOME_SESSION_KEY } from "../../application/state.js";
+import { createWebuiEventEffectsRegistry } from "../../application/turn/event-effects-registry.js";
 import {
   WebuiPortSlicesProvider,
   useWebuiPortSlicesOptional,
-} from "../bindings/port-slices-context.js";
-import { createWebuiPortSlices } from "../application/port-slices.js";
-import { WebuiApplicationProvider } from "../bindings/application-context.js";
-import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js";
+} from "../../bindings/port-slices-context.js";
+import { createWebuiPortSlices } from "../../application/port-slices.js";
+import { WebuiApplicationProvider } from "../../bindings/application-context.js";
+import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
 import {
   WebuiEventEffectsRegistryProvider,
   useWebuiEventEffectsRegistry,
-} from "../bindings/event-effects-context.js";
-import { useWebuiApplicationOptional } from "../bindings/application-context.js";
+} from "../../bindings/event-effects-context.js";
+import { useWebuiApplicationOptional } from "../../bindings/application-context.js";
 import {
   WebuiAccountWorkflowsProvider,
   WebuiPluginWorkflowsProvider,
@@ -127,31 +127,31 @@ import {
   WebuiModelsWorkflowsProvider,
   WebuiSettingsWorkflowsProvider,
   WebuiWorkspaceQueriesProvider,
-} from "../bindings/use-query-state.js";
-import { createWebuiWorkspaceQueries } from "../application/workspace/workspace-queries.js";
-import { createWebuiAccountWorkflows } from "../application/account/account-workflows.js";
-import { createWebuiModelsWorkflows } from "../application/models-workflows.js";
-import { createWebuiSettingsWorkflows } from "../application/settings/settings-workflows.js";
-import { createWebuiPluginWorkflows } from "../application/plugins/plugin-workflows.js";
-import { webuiActiveTurnProbeFor } from "../application/turn/active-turn-probe.js";
-import { startWebuiSessionTransferDownload } from "../infrastructure/session-transfer-download.js";
-import { importWebuiSessionFile } from "../infrastructure/session-import.js";
-import type { TeamModeSessionChoices } from "../team-mode.js";
+} from "../../bindings/use-query-state.js";
+import { createWebuiWorkspaceQueries } from "../../application/workspace/workspace-queries.js";
+import { createWebuiAccountWorkflows } from "../../application/account/account-workflows.js";
+import { createWebuiModelsWorkflows } from "../../application/models-workflows.js";
+import { createWebuiSettingsWorkflows } from "../../application/settings/settings-workflows.js";
+import { createWebuiPluginWorkflows } from "../../application/plugins/plugin-workflows.js";
+import { webuiActiveTurnProbeFor } from "../../application/turn/active-turn-probe.js";
+import { startWebuiSessionTransferDownload } from "../../infrastructure/session-transfer-download.js";
+import { importWebuiSessionFile } from "../../infrastructure/session-import.js";
+import type { TeamModeSessionChoices } from "../../team-mode.js";
 import {
   initialWebuiWorkspaceProgress,
   projectWebuiWorkspaceHistory,
   selectWebuiWorkspaceProgress,
   webuiWorkspaceSubagentStatus,
-} from "../projection/workspace-progress.js";
-import { createWebuiApplication, type WebuiApplication } from "../application/create-application.js";
-import { createWebuiPlanReviewWorkflow } from "../application/interactions/interaction-coordinator.js";
-import type { WebuiEventEffects } from "../application/turn/event-coordinator.js";
-import { createWebuiOpenEventChannel } from "../bindings/event-channel-adapter.js";
-import type { WebuiWorkspaceGitChangedSignal } from "../projection/workspace-panel-state.js";
-import { ConnectionStatus } from "../ConnectionStatus.js";
-import { deriveConversationUsageNotice } from "../projection/message-projection.js";
-import { deriveRecentWorkspaceDirs } from "../projection/composer-state.js";
-import { normalizeFavoriteModelIds } from "../projection/model-favorites.js";
+} from "../../projection/workspace-progress.js";
+import { createWebuiApplication, type WebuiApplication } from "../../application/create-application.js";
+import { createWebuiPlanReviewWorkflow } from "../../application/interactions/interaction-coordinator.js";
+import type { WebuiEventEffects } from "../../application/turn/event-coordinator.js";
+import { createWebuiOpenEventChannel } from "../../bindings/event-channel-adapter.js";
+import type { WebuiWorkspaceGitChangedSignal } from "../../projection/workspace-panel-state.js";
+import { ConnectionStatus } from "./ConnectionStatus.js";
+import { deriveConversationUsageNotice } from "../../projection/message-projection.js";
+import { deriveRecentWorkspaceDirs } from "../../projection/composer-state.js";
+import { normalizeFavoriteModelIds } from "../../projection/model-favorites.js";
 
 // The hash plumbing moved to `client/bindings/navigation.ts` (plan §7.2). Both
 // symbols stay re-exported here: `main.tsx` re-exports `subscribeToSessionHash`
@@ -159,7 +159,7 @@ import { normalizeFavoriteModelIds } from "../projection/model-favorites.js";
 import {
   readSessionIdFromHash,
   subscribeToSessionHash,
-} from "../bindings/navigation.js";
+} from "../../bindings/navigation.js";
 export { readSessionIdFromHash, subscribeToSessionHash };
 
 export interface WebuiClientFoundationAppProps {

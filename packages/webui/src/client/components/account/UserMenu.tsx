@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
-import { WebuiIconBell, WebuiIconBrand, WebuiIconCommandUsage } from "../../icons.js";
+import { WebuiIconBell, WebuiIconBrand, WebuiIconCommandUsage } from "../shell/icons.js";
 import { SigninClaimResult } from "@mavis/shared/daily-signin";
 import { SettingsModal } from "../SettingsModal.js";
 import { AccountLoginDialog } from "./AccountLoginDialog.js";

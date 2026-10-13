@@ -1,18 +1,18 @@
 import * as React from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { WebuiClientFoundationApp } from "./components/WebuiClientFoundationApp.js";
+import { WebuiClientFoundationApp } from "./components/shell/WebuiClientFoundationApp.js";
 export { WebuiSessionList } from "./components/sessions/SessionRail.js";
 export { WebuiSessionTranscript } from "./components/SessionTranscript.js";
 export {
   WebuiClientFoundationApp,
-} from "./components/WebuiClientFoundationApp.js";
+} from "./components/shell/WebuiClientFoundationApp.js";
 export { subscribeToSessionHash } from "./bindings/navigation.js";
 import { createWebuiTransport } from "./infrastructure/transport.js";
 import { route } from "./router.js";
-import { NotFound } from "./components/NotFound.js";
-import { ArchonPage } from "./components/ArchonPage.js";
-import { WebuiErrorBoundary } from "./components/WebuiErrorBoundary.js";
-import { WebuiStartupFallback } from "./components/StartupFallback.js";
+import { NotFound } from "./components/shell/NotFound.js";
+import { ArchonPage } from "./components/shell/ArchonPage.js";
+import { WebuiErrorBoundary } from "./components/shell/WebuiErrorBoundary.js";
+import { WebuiStartupFallback } from "./components/shell/StartupFallback.js";
 import { WebuiBrowserCapabilitiesProvider } from "./bindings/browser-capabilities.js";
 import { createWebuiBrowserDom } from "./infrastructure/browser-dom.js";
 import {

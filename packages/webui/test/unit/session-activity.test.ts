@@ -21,7 +21,7 @@ import {
   WebuiProjectList,
   WebuiSessionList,
 } from "../../src/client/components/sessions/SessionRail.js";
-import { WebuiClientFoundationApp } from "../../src/client/components/WebuiClientFoundationApp.js";
+import { WebuiClientFoundationApp } from "../../src/client/components/shell/WebuiClientFoundationApp.js";
 import { formatWebuiUnreadBadge } from "../../src/client/projection/unread-badge.js";
 import {
   readWebuiUnreadCounts,

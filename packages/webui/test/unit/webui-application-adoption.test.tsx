@@ -21,7 +21,7 @@ import { createWebuiApplication } from "../../src/client/application/create-appl
 import { createWebuiSessionCatalogFromPage } from "../../src/client/application/sessions/session-catalog.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 import { WebuiApplicationProvider } from "../../src/client/bindings/application-context.js";
-import { WebuiClientFoundationApp } from "../../src/client/components/WebuiClientFoundationApp.js";
+import { WebuiClientFoundationApp } from "../../src/client/components/shell/WebuiClientFoundationApp.js";
 
 const sessionPage = (sessionId: string) => ({
   sessions: [

@@ -27,7 +27,7 @@ import {
   WebuiIconSkillCodeReview,
   WebuiIconSkillDiagnosingBugs,
   WebuiIconSkillGeneric,
-} from "../../icons.js";
+} from "../shell/icons.js";
 
 /**
  * Three states a slash command can be in at runtime. Distinct from the

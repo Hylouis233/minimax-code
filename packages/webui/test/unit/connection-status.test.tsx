@@ -12,7 +12,7 @@ import {
   ConnectionStatus as BaseConnectionStatus,
   projectWebuiConnectionState,
   type ConnectionStatusProps,
-} from "../../src/client/ConnectionStatus.js";
+} from "../../src/client/components/shell/ConnectionStatus.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 import { WebuiSessionStoreProvider } from "../../src/client/bindings/application-context.js";
 import type { WebuiStreamState } from "../../src/client/projection/stream-state.js";

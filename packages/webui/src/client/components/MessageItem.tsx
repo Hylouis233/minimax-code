@@ -42,7 +42,7 @@ type WebuiMessageItemCapabilities = Pick<
   | "editSessionMessage"
 >;
 import { WebuiAssistantBody } from "./AssistantBody.js";
-import { WebuiIconCommandGoal } from "../icons.js";
+import { WebuiIconCommandGoal } from "./shell/icons.js";
 import {
   WebuiMessageActions,
   WebuiRewindDialog,

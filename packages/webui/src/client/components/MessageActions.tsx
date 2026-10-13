@@ -35,7 +35,7 @@ import {
   WebuiIconMessageLikeOff,
   WebuiIconMessageLikeOn,
   WebuiIconMessageRewind,
-} from "../icons.js";
+} from "./shell/icons.js";
 import type { WebuiGetSessionRewindPreviewResult } from "../../shared/contracts/session.js";
 import type { WebuiMessageActionCapabilities } from "../contracts/transcript/transcript-view.js";
 

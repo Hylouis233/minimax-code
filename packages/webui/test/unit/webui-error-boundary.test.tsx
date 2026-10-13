@@ -5,7 +5,7 @@ import {
   describeWebuiBoundaryError,
   WebuiErrorBoundary,
   WebuiErrorBoundaryFallback,
-} from "../../src/client/components/WebuiErrorBoundary.js";
+} from "../../src/client/components/shell/WebuiErrorBoundary.js";
 
 /**
  * The webui suite runs in the `node` environment with no DOM, and React does

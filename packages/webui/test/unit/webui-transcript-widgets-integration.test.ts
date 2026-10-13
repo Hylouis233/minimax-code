@@ -11,7 +11,7 @@ import { describe, it, expect } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { WebuiClientFoundationApp } from "../../src/client/components/WebuiClientFoundationApp.js";
+import { WebuiClientFoundationApp } from "../../src/client/components/shell/WebuiClientFoundationApp.js";
 import type { WebuiClientMessage, WebuiClientMessagePage } from "../../src/client/contracts/transcript/message-view.js";
 
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";

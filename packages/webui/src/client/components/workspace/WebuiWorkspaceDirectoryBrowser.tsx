@@ -5,7 +5,7 @@
 // error state; the composer owns the open/closed flag and the value, and passes the browse command in.
 
 
-import { WebuiIconFolder } from "../../icons.js";
+import { WebuiIconFolder } from "../shell/icons.js";
 import type { WebuiTransport } from "../../contracts/transport.js";
 import type { WebuiWorkspaceDirectoryListing } from "../../../shared/contracts/workspace.js";
 import { looksLikeAbsoluteWorkspacePath } from "../../paths.js";

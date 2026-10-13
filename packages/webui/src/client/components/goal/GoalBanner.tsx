@@ -27,7 +27,7 @@ import {
   WebuiIconClose,
   WebuiIconContextRename,
   WebuiIconContextTrash,
-} from "../../icons.js";
+} from "../shell/icons.js";
 
 function GoalPauseIcon(): ReactElement {
   return <svg viewBox="0 0 20 20" width="18" height="18" fill="none" aria-hidden="true"><path d="M6 4.5v11M14 4.5v11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>;

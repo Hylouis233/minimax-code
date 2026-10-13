@@ -8,7 +8,7 @@ import {
   useWebuiPluginWorkflows,
   useWebuiPluginWorkflowsState,
 } from "../../bindings/use-query-state.js";
-import { WebuiIconAgent } from "../../icons.js";
+import { WebuiIconAgent } from "../shell/icons.js";
 import { ToggleSwitch } from "../shared/ToggleSwitch.js";
 import { readWebuiPluginRow as read, type WebuiPluginRow as Row } from "../../projection/plugin-rows.js";
 import { PluginImportDialog } from "./PluginImportDialog.js";

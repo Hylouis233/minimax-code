@@ -9,7 +9,7 @@
 // move-only.
 
 import { useEffect, useMemo, useState, type ReactElement } from "react";
-import { WebuiIconDiffFile, WebuiIconDiffSummary } from "../icons.js";
+import { WebuiIconDiffFile, WebuiIconDiffSummary } from "./shell/icons.js";
 import type {
   WebuiGetTurnDiffRequest,
   WebuiTurnDiffView,

@@ -31,7 +31,7 @@ import {
   type ReactElement,
 } from "react";
 
-import { WebuiIconChevronDown } from "../../icons.js";
+import { WebuiIconChevronDown } from "../shell/icons.js";
 import { ToggleSwitch } from "../shared/ToggleSwitch.js";
 import type {
   WebuiModelPickerDraft,

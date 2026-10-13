@@ -36,7 +36,7 @@ import {
   WebuiIconClose,
   WebuiIconCommandPlan,
   WebuiIconMessageEdit,
-} from "../../icons.js";
+} from "../shell/icons.js";
 import type {
   WebuiQuestionnaireAnswer,
   WebuiQuestionnaireRequest,

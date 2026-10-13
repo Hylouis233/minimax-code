@@ -46,7 +46,7 @@ import {
   WebuiIconContextRename,
   WebuiIconContextTrash,
   WebuiIconFolder,
-} from "../../src/client/icons.js";
+} from "../../src/client/components/shell/icons.js";
 import {
   TurnElapsedRow,
   WebuiThinkingBlock,
@@ -56,7 +56,7 @@ import {
   WebuiClientFoundationApp,
   readSessionIdFromHash,
   subscribeToSessionHash,
-} from "../../src/client/components/WebuiClientFoundationApp.js";
+} from "../../src/client/components/shell/WebuiClientFoundationApp.js";
 import type {WebuiClientMessageEnqueuer} from "../../src/client/contracts/composer/command-port.js";
 import type {WebuiClientMessageSender, WebuiClientSessionResumer} from "../../src/client/contracts/turn/execution-port.js";
 import type { WebuiClientMessageLoader } from "../../src/client/contracts/transcript/message-view.js";

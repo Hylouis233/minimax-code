@@ -147,7 +147,7 @@ import {
   WebuiIconSend,
   WebuiIconSkillGeneric,
   type WebuiIconProps,
-} from "../icons.js";
+} from "./shell/icons.js";
 import { OutputError } from "./OutputError.js";
 import {
   resolveWebuiSubmissionIntent,

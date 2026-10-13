@@ -33,7 +33,7 @@ import {
   WebuiIconSessionStarMark,
   WebuiIconSessionDisclosure,
   WebuiIconAgent,
-} from "../../icons.js";
+} from "../shell/icons.js";
 import { WebuiContextMenu, type WebuiContextMenuItem } from "../shared/ContextMenu.js";
 import {
   webuiRailMenuFor,
