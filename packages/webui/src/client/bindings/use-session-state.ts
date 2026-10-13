@@ -45,10 +45,12 @@ import {
 import type { WebuiStreamState } from "../projection/stream-state.js";
 import {
   createWebuiInteractionCommands,
-  createWebuiSessionCommands,
+  createWebuiStreamPhaseCommands,
   createWebuiTurnCommands,
+  createWebuiTurnLifecycleCommands,
   type WebuiInteractionCommands,
-  type WebuiSessionCommands,
+  type WebuiStreamPhaseCommands,
+  type WebuiTurnLifecycleCommands,
 } from "../application/session-commands.js";
 import { attachWebuiTurn, sendWebuiTurn } from "../application/turn-commands.js";
 import { stopWebuiTurn } from "../application/turn-coordinator.js";
@@ -170,7 +172,13 @@ export interface WebuiTurnSendIntent {
  * the current slice off the same store rather than a module-level map.
  */
 export function useWebuiSessionCommands(sessionId: string | undefined): {
-  readonly commands: WebuiSessionCommands;
+  /**
+   * The stream-phase view: the five commands that move or settle `phase`. A
+   * consumer handed this object cannot reach a lifecycle or interaction write.
+   */
+  readonly phase: WebuiStreamPhaseCommands;
+  /** The turn-lifecycle view: open, clear, record, close, and the `sending` flag. */
+  readonly lifecycle: WebuiTurnLifecycleCommands;
   readonly readStream: () => WebuiStreamState;
   readonly attachTurn: (input: WebuiTurnAttachIntent) => void;
   readonly sendTurn: (input: WebuiTurnSendIntent) => Promise<void>;
@@ -189,12 +197,17 @@ export function useWebuiSessionCommands(sessionId: string | undefined): {
     const writer = writerFor();
     const readStream = () =>
       store.readSession(sessionId ?? WEBUI_HOME_SESSION_KEY).stream;
-    const commands = createWebuiSessionCommands({
+    // Two views, built from the same writer and handed out separately
+    // (ticket #58). The interaction view is published by its own hook
+    // (`useWebuiInteractionCommands`), which is the third group.
+    const phase = createWebuiStreamPhaseCommands({ setStream: writer.setStream });
+    const lifecycle = createWebuiTurnLifecycleCommands({
       setStream: writer.setStream,
       setSending: writer.setSending,
     });
     return {
-      commands,
+      phase,
+      lifecycle,
       readStream,
       // One sink per attachment, minted here: it claims the lease, fences every
       // write against the generation it claimed, and releases it on terminal.
@@ -242,8 +255,8 @@ export function useWebuiSessionCommands(sessionId: string | undefined): {
         await stopWebuiTurn({
           abortSession: capabilities.stop,
           sessionId,
-          setSending: commands.setTurnSending,
-          settleStream: commands.settleStoppedStream,
+          setSending: lifecycle.setTurnSending,
+          settleStream: phase.settleStoppedStream,
         });
       },
     };

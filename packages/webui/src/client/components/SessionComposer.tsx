@@ -706,7 +706,7 @@ export function WebuiComposer({
 } & WebuiSessionComposerCapabilities): ReactElement {
   const { dom } = useWebuiBrowserCapabilities();
   const { stream, sending } = useWebuiSessionState(sessionId);
-  const { commands, readStream, attachTurn, sendTurn: submitTurn, stopTurn } =
+  const { phase, lifecycle, readStream, attachTurn, sendTurn: submitTurn, stopTurn } =
     useWebuiSessionCommands(sessionId);
   // The per-session effects registry the shell provides (ticket #45). The
   // composer registers this session's event handlers here so the application
@@ -750,13 +750,13 @@ export function WebuiComposer({
       replacePendingPermissions: interactionCommands.replacePendingPermissions,
       removePendingPermission: interactionCommands.removePendingPermission,
       applyQuestionnaire: interactionCommands.applyQuestionnaire,
-      awaitInteraction: commands.awaitInteraction,
-      resumeAfterPermission: commands.startStreaming,
+      awaitInteraction: phase.awaitInteraction,
+      resumeAfterPermission: phase.startStreaming,
       afterQuestionnaireAnswer: (answers) =>
-        commands.markStreamPhase(
+        phase.markStreamPhase(
           webuiAnswersEndTurn(answers) ? "idle" : "streaming",
         ),
-      afterQuestionnaireDismiss: commands.endStreaming,
+      afterQuestionnaireDismiss: phase.endStreaming,
       applyGoal: interactionCommands.applyGoal,
       afterGoalReRead: (next) => {
         if (next) setGoalMode(next.status !== "complete");
@@ -851,7 +851,7 @@ export function WebuiComposer({
       const snapshot = readContextUsageSnapshot(page.contextSnapshot);
       const fromMessages = latestContextUsage((page.messages ?? []).map(projectWebuiMessageToStreamMessage));
       const contextUsage = snapshot ?? fromMessages;
-      if (contextUsage) commands.setContextUsage(contextUsage);
+      if (contextUsage) lifecycle.setContextUsage(contextUsage);
     }).catch(() => undefined);
     return () => { cancelled = true; };
   }, [sessionId, sessionStatus, loadMessages]);
@@ -864,8 +864,8 @@ export function WebuiComposer({
       setAccountStatus(undefined);
       // The live turn bleeds the same way: the module-level runtime map kept
       // the previous turn's stream under the welcome hero on every 新建任务.
-      commands.clearStream();
-      commands.setTurnSending(false);
+      lifecycle.clearStream();
+      lifecycle.setTurnSending(false);
       return undefined;
     }
     let cancelled = false;
@@ -909,7 +909,7 @@ export function WebuiComposer({
         sessionId,
         probe: activeTurnProbe,
         readStream,
-        releaseSubscription: commands.releaseStreamSubscription,
+        releaseSubscription: lifecycle.releaseStreamSubscription,
         attach: attachToTurn,
       });
     };

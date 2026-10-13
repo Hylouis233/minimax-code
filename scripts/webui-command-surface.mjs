@@ -54,12 +54,24 @@ const BUSINESSES = [
   {
     business: "turn",
     // §4.12 field 3: "the stream-phase group, the turn-lifecycle group, and the
-    // turn capability slice (send/resume/load/stop)".
+    // turn capability slice (send/resume/load/stop)". The interaction group is
+    // the third view of the same writer surface and belongs to `interactions`;
+    // the groups themselves are the two interfaces `session-commands.ts` draws.
     declarations: [
       { module: "application/turn-capabilities.ts", name: "WebuiTurnCapabilitySlice" },
-      { module: "application/session-commands.ts", name: "WebuiSessionCommands" },
+      { module: "application/session-commands.ts", name: "WebuiStreamPhaseCommands" },
+      { module: "application/session-commands.ts", name: "WebuiTurnLifecycleCommands" },
       { module: "application/session-commands.ts", name: "WebuiTurnCommandWriter" },
       { module: "application/turn-coordinator.ts", name: "WebuiTurnCoordinator" },
+    ],
+  },
+  {
+    business: "interactions",
+    // The interaction view of the same writer surface. It is listed here rather
+    // than under `turn` because the state it writes is `interactions`' own
+    // (§5.6); the fact that one module declares both views is not ownership.
+    declarations: [
+      { module: "application/session-commands.ts", name: "WebuiInteractionCommands" },
     ],
   },
 ];

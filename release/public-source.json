@@ -3927,6 +3927,7 @@
     "packages/webui/test/unit/transcript-shape.test.ts",
     "packages/webui/test/unit/transcript-skeletons.test.tsx",
     "packages/webui/test/unit/turn-boundary-prohibitions.test.ts",
+    "packages/webui/test/unit/turn-command-views.test.ts",
     "packages/webui/test/unit/turn-navigator.test.tsx",
     "packages/webui/test/unit/turn-substrate-fences.test.ts",
     "packages/webui/test/unit/value-readers.test.ts",

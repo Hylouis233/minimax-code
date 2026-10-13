@@ -23,6 +23,16 @@
 // opens a channel or reads a transport: the process-event ingress is untouched,
 // and the write targets are injected exactly as `turn-commands.ts` already
 // injects the setters it moved out of the composer.
+//
+// Since ticket #58 the surface is **three views, not one bag**, matching plan §8
+// Phase 1 step 2: `WebuiStreamPhaseCommands` (the phase field only),
+// `WebuiTurnLifecycleCommands` (opening, clearing, recording and closing a
+// turn's stream, and the `sending` flag) and `WebuiInteractionCommands` (the
+// pending interactions). Each is a separate object with its own factory and its
+// own injected targets, so a consumer handed one view cannot reach another's
+// commands — the narrowing is structural rather than a convention. Every
+// member's disposition is recorded in `docs/webui/command-surface.md`, which
+// `pnpm check:webui-commands` keeps current.
 
 import type { WebuiGoal } from "../../shared/contracts/goal.js";
 import type {
@@ -44,31 +54,11 @@ import { streamStateBundle } from "./stream-state-bundle.js";
 /** The phases the stream slice can be moved to by name. */
 export type WebuiStreamPhase = WebuiStreamState["phase"];
 
-/** The write targets the stream and sending commands are bound to. */
-export interface WebuiSessionCommandTargets {
-  readonly setStream: (
-    update: (current: WebuiStreamState) => WebuiStreamState,
-  ) => void;
-  readonly setSending: (sending: boolean) => void;
-}
-
-export interface WebuiSessionCommands {
-  /**
-   * Replace the live stream with the idle initial state — returning to a blank
-   * composer (New Task), so the previous session's turn cannot bleed through.
-   */
-  readonly clearStream: () => void;
-  /** Apply the history-derived context snapshot without exposing the stream writer. */
-  readonly setContextUsage: (contextUsage: Record<string, unknown>) => void;
-  /**
-   * The stream a turn is about to open: the slice resets to the initial state
-   * with a live phase and a fresh elapsed anchor. Intent-named because the
-   * reset is what "a turn starts here" means; the component has no way to reach
-   * the slice otherwise.
-   */
-  readonly resetStreamForTurn: () => void;
-  /** Record or clear the refusal banner's message. */
-  readonly setStreamRefusal: (refusal: string | undefined) => void;
+/**
+ * The **stream-phase** view: every member moves or settles the `phase` field and
+ * writes nothing else.
+ */
+export interface WebuiStreamPhaseCommands {
   /** Move the stream's phase without touching any other field. */
   readonly markStreamPhase: (phase: WebuiStreamPhase) => void;
   /** A turn is live: it is streaming. */
@@ -82,31 +72,13 @@ export interface WebuiSessionCommands {
    * the claim marker so the loop it silenced cannot write again.
    */
   readonly settleStoppedStream: () => void;
-  /**
-   * Release the subscription this client holds **only** if the live lease still
-   * carries that generation, so a probe that started before a newer turn cannot
-   * clear the newer lease.
-   */
-  readonly releaseStreamSubscription: (generation: number) => void;
-  /** The `sending` indicator the composer renders from. */
-  readonly setTurnSending: (sending: boolean) => void;
 }
 
-export function createWebuiSessionCommands(
-  targets: WebuiSessionCommandTargets,
-): WebuiSessionCommands {
-  const { setStream, setSending } = targets;
+export function createWebuiStreamPhaseCommands(
+  targets: WebuiStreamPhaseTargets,
+): WebuiStreamPhaseCommands {
+  const { setStream } = targets;
   return {
-    clearStream: () => setStream(() => initialWebuiStreamState),
-    setContextUsage: (contextUsage) =>
-      setStream((current) => ({ ...current, contextUsage })),
-    resetStreamForTurn: () =>
-      setStream(() => ({
-        ...initialWebuiStreamState,
-        phase: "streaming",
-        processingStartedAtMs: Date.now(),
-      })),
-    setStreamRefusal: (refusal) => setStream((current) => ({ ...current, refusal })),
     markStreamPhase: (phase) => setStream((current) => ({ ...current, phase })),
     startStreaming: () =>
       setStream((current) => ({ ...current, phase: "streaming" })),
@@ -114,9 +86,73 @@ export function createWebuiSessionCommands(
     awaitInteraction: () =>
       setStream((current) => ({ ...current, phase: "waiting" })),
     settleStoppedStream: () => setStream(settleAbortedStream),
+  };
+}
+
+/** The write target both turn views are bound to. */
+export interface WebuiStreamWriteTarget {
+  readonly setStream: (
+    update: (current: WebuiStreamState) => WebuiStreamState,
+  ) => void;
+}
+
+/** The stream-phase view needs no `sending` write, and is not given one. */
+export type WebuiStreamPhaseTargets = WebuiStreamWriteTarget;
+
+/**
+ * The **turn-lifecycle** view: opening a turn's stream, clearing it for a new
+ * task, recording what it carries and closing it. It is the one view that also
+ * writes the `sending` indicator, because `sending` is the submit's lifecycle
+ * flag rather than part of the phase.
+ */
+export interface WebuiTurnLifecycleCommands {
+  /**
+   * The stream a turn is about to open: the slice resets to the initial state
+   * with a live phase and a fresh elapsed anchor. Intent-named because the
+   * reset is what "a turn starts here" means.
+   */
+  readonly resetStreamForTurn: () => void;
+  /**
+   * Replace the live stream with the idle initial state — returning to a blank
+   * composer (New Task), so the previous session's turn cannot bleed through.
+   */
+  readonly clearStream: () => void;
+  /** Apply the history-derived context snapshot without exposing the stream writer. */
+  readonly setContextUsage: (contextUsage: Record<string, unknown>) => void;
+  /** Record or clear the refusal banner's message. */
+  readonly setStreamRefusal: (refusal: string | undefined) => void;
+  /** The `sending` indicator the composer renders from. */
+  readonly setTurnSending: (sending: boolean) => void;
+  /**
+   * Release the subscription this client holds **only** if the live lease still
+   * carries that generation, so a probe that started before a newer turn cannot
+   * clear the newer lease.
+   */
+  readonly releaseStreamSubscription: (generation: number) => void;
+}
+
+export interface WebuiTurnLifecycleTargets extends WebuiStreamWriteTarget {
+  readonly setSending: (sending: boolean) => void;
+}
+
+export function createWebuiTurnLifecycleCommands(
+  targets: WebuiTurnLifecycleTargets,
+): WebuiTurnLifecycleCommands {
+  const { setStream, setSending } = targets;
+  return {
+    resetStreamForTurn: () =>
+      setStream(() => ({
+        ...initialWebuiStreamState,
+        phase: "streaming",
+        processingStartedAtMs: Date.now(),
+      })),
+    clearStream: () => setStream(() => initialWebuiStreamState),
+    setContextUsage: (contextUsage) =>
+      setStream((current) => ({ ...current, contextUsage })),
+    setStreamRefusal: (refusal) => setStream((current) => ({ ...current, refusal })),
+    setTurnSending: (sending) => setSending(sending),
     releaseStreamSubscription: (generation) =>
       setStream((current) => releaseWebuiSubscription(current, { generation })),
-    setTurnSending: (sending) => setSending(sending),
   };
 }
 
@@ -203,7 +239,7 @@ export function createWebuiTurnCommands(writer: {
     readonly setSending: (sending: boolean) => void;
   };
 }): WebuiTurnCommandWriter {
-  const commands = createWebuiSessionCommands({
+  const lifecycle = createWebuiTurnLifecycleCommands({
     setStream: writer.setStream,
     setSending: writer.setSending,
   });
@@ -212,9 +248,9 @@ export function createWebuiTurnCommands(writer: {
     // The attempt's sink, built from this writer's own `setStream`: the fence
     // travels with the writer instead of being a convention the caller honours.
     createSink: () => buildWebuiStreamLoopSink(writer.setStream, streamStateBundle),
-    resetStreamForTurn: commands.resetStreamForTurn,
-    setStreamRefusal: commands.setStreamRefusal,
-    setTurnSending: commands.setTurnSending,
+    resetStreamForTurn: lifecycle.resetStreamForTurn,
+    setStreamRefusal: lifecycle.setStreamRefusal,
+    setTurnSending: lifecycle.setTurnSending,
     ...(writer.migrateToSession
       ? {
           migrateToSession: (sessionId: string) =>

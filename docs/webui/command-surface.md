@@ -12,17 +12,15 @@ yet, not that it publishes nothing.
 
 | Business | Declaration | Member | Declared in |
 | --- | --- | --- | --- |
-| turn | `WebuiSessionCommands` | `awaitInteraction` | `application/session-commands.ts` |
-| turn | `WebuiSessionCommands` | `clearStream` | `application/session-commands.ts` |
-| turn | `WebuiSessionCommands` | `endStreaming` | `application/session-commands.ts` |
-| turn | `WebuiSessionCommands` | `markStreamPhase` | `application/session-commands.ts` |
-| turn | `WebuiSessionCommands` | `releaseStreamSubscription` | `application/session-commands.ts` |
-| turn | `WebuiSessionCommands` | `resetStreamForTurn` | `application/session-commands.ts` |
-| turn | `WebuiSessionCommands` | `setContextUsage` | `application/session-commands.ts` |
-| turn | `WebuiSessionCommands` | `setStreamRefusal` | `application/session-commands.ts` |
-| turn | `WebuiSessionCommands` | `settleStoppedStream` | `application/session-commands.ts` |
-| turn | `WebuiSessionCommands` | `setTurnSending` | `application/session-commands.ts` |
-| turn | `WebuiSessionCommands` | `startStreaming` | `application/session-commands.ts` |
+| interactions | `WebuiInteractionCommands` | `applyGoal` | `application/session-commands.ts` |
+| interactions | `WebuiInteractionCommands` | `applyQuestionnaire` | `application/session-commands.ts` |
+| interactions | `WebuiInteractionCommands` | `removePendingPermission` | `application/session-commands.ts` |
+| interactions | `WebuiInteractionCommands` | `replacePendingPermissions` | `application/session-commands.ts` |
+| turn | `WebuiStreamPhaseCommands` | `awaitInteraction` | `application/session-commands.ts` |
+| turn | `WebuiStreamPhaseCommands` | `endStreaming` | `application/session-commands.ts` |
+| turn | `WebuiStreamPhaseCommands` | `markStreamPhase` | `application/session-commands.ts` |
+| turn | `WebuiStreamPhaseCommands` | `settleStoppedStream` | `application/session-commands.ts` |
+| turn | `WebuiStreamPhaseCommands` | `startStreaming` | `application/session-commands.ts` |
 | turn | `WebuiTurnCapabilitySlice` | `createSession` | `application/turn-capabilities.ts` |
 | turn | `WebuiTurnCapabilitySlice` | `enqueue` | `application/turn-capabilities.ts` |
 | turn | `WebuiTurnCapabilitySlice` | `load` | `application/turn-capabilities.ts` |
@@ -36,3 +34,9 @@ yet, not that it publishes nothing.
 | turn | `WebuiTurnCommandWriter` | `setStreamRefusal` | `application/session-commands.ts` |
 | turn | `WebuiTurnCommandWriter` | `setTurnSending` | `application/session-commands.ts` |
 | turn | `WebuiTurnCoordinator` | `retry` | `application/turn-coordinator.ts` |
+| turn | `WebuiTurnLifecycleCommands` | `clearStream` | `application/session-commands.ts` |
+| turn | `WebuiTurnLifecycleCommands` | `releaseStreamSubscription` | `application/session-commands.ts` |
+| turn | `WebuiTurnLifecycleCommands` | `resetStreamForTurn` | `application/session-commands.ts` |
+| turn | `WebuiTurnLifecycleCommands` | `setContextUsage` | `application/session-commands.ts` |
+| turn | `WebuiTurnLifecycleCommands` | `setStreamRefusal` | `application/session-commands.ts` |
+| turn | `WebuiTurnLifecycleCommands` | `setTurnSending` | `application/session-commands.ts` |

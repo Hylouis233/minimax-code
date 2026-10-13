@@ -37,7 +37,7 @@ import {
 import { createWebuiComposerStore } from "../../src/client/application/composer-store.js";
 import {
   createWebuiInteractionCommands,
-  createWebuiSessionCommands,
+  createWebuiTurnLifecycleCommands,
   createWebuiTurnCommands,
 } from "../../src/client/application/session-commands.js";
 import { WEBUI_HOME_SESSION_KEY } from "../../src/client/application/state.js";
@@ -534,7 +534,7 @@ describe("R7 · the catalog delete fence", () => {
 describe("R7 · the command surface carries no raw writer", () => {
   it("offers intents only: no reducer taking stream, permission or questionnaire writer", () => {
     const cell = streamCell();
-    const commands = createWebuiSessionCommands({
+    const lifecycle = createWebuiTurnLifecycleCommands({
       setStream: cell.setStream,
       setSending: () => undefined,
     });
@@ -547,7 +547,7 @@ describe("R7 · the command surface carries no raw writer", () => {
     // The three writes the finding named are gone. `updateStream` is the one a
     // component used to reach through four call sites; the two interaction
     // updaters were unreachable but still exported.
-    expect(Object.keys(commands)).not.toContain("updateStream");
+    expect(Object.keys(lifecycle)).not.toContain("updateStream");
     expect(Object.keys(interaction)).not.toContain("updatePermissions");
     expect(Object.keys(interaction)).not.toContain("updateQuestionnaire");
 
@@ -555,16 +555,16 @@ describe("R7 · the command surface carries no raw writer", () => {
     // let a component mint a fresh generation at will and take the lease from a
     // newer turn; opening a turn's stream now belongs to the binding that owns
     // the store writer (plan §7.2 `:555`, §7.6 `:583`).
-    expect(Object.keys(commands)).not.toContain("createStreamSink");
-    expect(Object.keys(commands)).not.toContain("createSink");
+    expect(Object.keys(lifecycle)).not.toContain("createStreamSink");
+    expect(Object.keys(lifecycle)).not.toContain("createSink");
     expect(
-      Object.values(commands).filter((value) => typeof value === "function"),
-    ).toHaveLength(Object.keys(commands).length);
+      Object.values(lifecycle).filter((value) => typeof value === "function"),
+    ).toHaveLength(Object.keys(lifecycle).length);
   });
 
   it("hands out a sink whose writes the owner fences by generation", () => {
     const cell = streamCell();
-    const commands = createWebuiSessionCommands({
+    const lifecycle = createWebuiTurnLifecycleCommands({
       setStream: cell.setStream,
       setSending: () => undefined,
     });
@@ -586,7 +586,7 @@ describe("R7 · the command surface carries no raw writer", () => {
 
   it("releases only the named generation, so a stale probe cannot clear a newer lease", () => {
     const cell = streamCell();
-    const commands = createWebuiSessionCommands({
+    const lifecycle = createWebuiTurnLifecycleCommands({
       setStream: cell.setStream,
       setSending: () => undefined,
     });
@@ -594,16 +594,16 @@ describe("R7 · the command surface carries no raw writer", () => {
     const generation = sink.claimSubscription?.("local-send");
     expect(cell.get().subscription).toBeDefined();
 
-    commands.releaseStreamSubscription((generation ?? 0) - 1);
+    lifecycle.releaseStreamSubscription((generation ?? 0) - 1);
     expect(cell.get().subscription).toBeDefined();
 
-    commands.releaseStreamSubscription(generation ?? 0);
+    lifecycle.releaseStreamSubscription(generation ?? 0);
     expect(cell.get().subscription).toBeUndefined();
   });
 
   it("does not let a superseded sink take the lease back by re-claiming", () => {
     const cell = streamCell();
-    const commands = createWebuiSessionCommands({
+    const lifecycle = createWebuiTurnLifecycleCommands({
       setStream: cell.setStream,
       setSending: () => undefined,
     });
@@ -635,7 +635,7 @@ describe("R7 · the command surface carries no raw writer", () => {
 
   it("keeps the generation fence out of reach of setStreamExtra", () => {
     const cell = streamCell();
-    const commands = createWebuiSessionCommands({
+    const lifecycle = createWebuiTurnLifecycleCommands({
       setStream: cell.setStream,
       setSending: () => undefined,
     });
