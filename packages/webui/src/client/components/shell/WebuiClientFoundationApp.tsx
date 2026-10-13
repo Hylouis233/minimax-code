@@ -1038,6 +1038,17 @@ export function WebuiClientFoundationApp(
     workspaceQueries.invalidateWorkspaceGit(workspaceGitChanged);
   }, [workspaceGitChanged, workspaceQueries]);
 
+  // A settled turn mutation (revert / reapply) changed the working tree, so the
+  // review views for it are stale. The turn owner announces the settlement and
+  // this is where the affected family is invalidated (plan §4.5: a mutation
+  // commits once, then invokes the affected owners' explicit invalidation
+  // commands) — no panel keeps a refresh token for it.
+  useEffect(() => {
+    const turnReview = application?.turnReview;
+    if (!turnReview) return undefined;
+    return turnReview.subscribeMutations(() => workspaceQueries.invalidateReview());
+  }, [application, workspaceQueries]);
+
   // The manual arm of the stream loop's recovery. Undefined on the home screen
   // (no session to resume) and on hosts without a `resumeSession` transport: no
   // recovery path, no button. It runs through the turn coordinator, which owns

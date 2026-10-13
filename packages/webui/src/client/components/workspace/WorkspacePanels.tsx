@@ -57,11 +57,11 @@ import { WorkspaceCanvas } from "./WorkspaceCanvas.js";
 import type { CanvasOperation } from "./WorkspaceCanvas.js";
 import { WorkspaceArchiveView } from "./WorkspaceArchiveView.js";
 import { WorkspaceHtmlPreview } from "./WorkspaceHtmlPreview.js";
+import { type WebuiWorkspaceQueries } from "../../application/workspace/workspace-queries.js";
 import {
   WEBUI_WORKSPACE_REVIEW_DIFF_BATCH_SIZE,
   chunkWebuiWorkspaceReviewFileIds,
-  type WebuiWorkspaceQueries,
-} from "../../application/workspace/workspace-queries.js";
+} from "../../features/review/application/workspace-review-owner.js";
 import {
   useWebuiWorkspaceQueries,
   useWebuiWorkspaceQueriesState,
@@ -73,7 +73,7 @@ import type { WebuiTodo } from "../../projection/workspace/panel-projection.js";
 // `WEBUI_WORKSPACE_REVIEW_DIFF_BATCH_SIZE` are re-exported below: the panel
 // tests import them from this module, which stays the panel's public surface.
 // The implementations moved to `projection/workspace/workspace-file-tree.ts` and
-// `application/workspace/workspace-queries.ts`.
+// the review owner (`features/review/application/workspace-review-owner.ts`).
 export {
   mergeWorkspaceFileChildren,
   chunkWebuiWorkspaceReviewFileIds,

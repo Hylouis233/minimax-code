@@ -36,9 +36,33 @@ const layers = [
   ["Browser contracts", "contracts"],
 ];
 
+/**
+ * The role directory a business keeps inside its business-first home (plan §5.1:
+ * "Within a substantial feature, `application/`, `projection/`, `bindings/`,
+ * `ui/` and `contracts/` are useful local role names").
+ */
+const FEATURE_ROLE_DIRECTORY = {
+  components: "ui",
+  application: "application",
+  projection: "projection",
+  contracts: "contracts",
+};
+
+/**
+ * Where this business's <layer> files are delivered now: its current technical
+ * home, or — once it has moved — the role directory inside
+ * `client/features/<business>/`. A migration that moves a population is not a
+ * business losing its files, and a table that said "—" for every moved business
+ * would report the migration as a deletion.
+ */
 function existingBusinessPaths(business, layer) {
   const relative = `client/${layer}/${business}/`;
-  return existsSync(path.join(sourceRoot, layer, business)) ? `\`${relative}\`` : "—";
+  if (existsSync(path.join(sourceRoot, layer, business))) return `\`${relative}\``;
+  const role = FEATURE_ROLE_DIRECTORY[layer];
+  const featureRelative = `client/features/${business}/${role}/`;
+  return existsSync(path.join(sourceRoot, "features", business, role))
+    ? `\`${featureRelative}\``
+    : "—";
 }
 
 function render() {

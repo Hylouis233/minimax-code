@@ -35,12 +35,14 @@ import type {
   WebuiWorkspaceFileContent,
   WebuiWorkspaceGitMutationRequest,
 } from "../../../shared/contracts/workspace.js";
-import type {
-  WebuiWorkspaceReviewDiffs,
-  WebuiWorkspaceReviewSearchResult,
-  WebuiWorkspaceReviewSummary,
-} from "../../../shared/contracts/review.js";
 import { mergeWorkspaceFileChildren } from "../../projection/workspace/workspace-file-tree.js";
+import { createWebuiWorkspaceReviewOwner } from "../../features/review/application/workspace-review-owner.js";
+import { initialWebuiWorkspaceReviewState } from "../../features/review/contracts/workspace-review.js";
+import type {
+  WebuiWorkspaceReviewDiffState,
+  WebuiWorkspaceReviewSearchState,
+  WebuiWorkspaceReviewSummaryState,
+} from "../../features/review/contracts/workspace-review.js";
 
 /** The transport methods this owner drives. Absent means "not wired". */
 export type WebuiWorkspaceQueryPort = Pick<
@@ -82,51 +84,16 @@ export interface WebuiWorkspaceEnvironmentState {
   readonly error?: string;
 }
 
-/** The review-summary query for one tab's workspace. `stale` is set while a
- * refresh runs over a previous summary, so the UI can say so without blanking. */
-export interface WebuiWorkspaceReviewSummaryState {
-  readonly tabId?: string;
-  readonly workspaceDir?: string;
-  readonly summary?: WebuiWorkspaceReviewSummary;
-  readonly loading: boolean;
-  readonly error?: string;
-  readonly stale?: boolean;
-}
-
-/** One file's diff outcome inside the review-diffs query. */
-export interface WebuiWorkspaceReviewDiffFile {
-  readonly diff?: string;
-  readonly error?: string;
-  readonly binary?: boolean;
-}
-
-/** The review-diffs query for one snapshot of one workspace. */
-export interface WebuiWorkspaceReviewDiffState {
-  readonly tabId?: string;
-  readonly workspaceDir?: string;
-  readonly snapshotId?: string;
-  readonly loading: boolean;
-  readonly diffs: Readonly<Record<string, WebuiWorkspaceReviewDiffFile>>;
-  readonly error?: string;
-}
-
-/** The review-search query for one snapshot of one workspace. */
-export interface WebuiWorkspaceReviewSearchState {
-  readonly tabId?: string;
-  readonly workspaceDir?: string;
-  readonly snapshotId?: string;
-  readonly loading: boolean;
-  readonly result?: WebuiWorkspaceReviewSearchResult;
-  readonly error?: string;
-}
-
+/**
+ * What the panels read. The review fields are the review owner's slice, merged in
+ * on read (plan §5.2 review row): this module used to hold them together with the
+ * file tree, the file contents and the environment — three concerns with different
+ * identities and different invalidation. The review half now lives in
+ * `features/review/application/workspace-review-owner.ts`; what stays here is
+ * T11's.
+ */
 export interface WebuiWorkspaceQueriesState {
-  /**
-   * Bumps when the review views for the active workspace are invalidated — a
-   * commit, a git-changed signal or a stale-snapshot retry. Effects that reload
-   * a review query key on it, so invalidation is an explicit, single signal
-   * instead of an ad-hoc refresh token per panel.
-   */
+  /** The review owner's revision, re-exposed for the views that reload on it. */
   readonly reviewRevision: number;
   /** Bumps when the environment query for the active workspace is invalidated. */
   readonly environmentRevision: number;
@@ -150,40 +117,26 @@ export const initialWebuiWorkspaceFileTreeState: WebuiWorkspaceFileTreeState = {
 export const initialWebuiWorkspaceEnvironmentState: WebuiWorkspaceEnvironmentState =
   { loading: false };
 
-export const initialWebuiWorkspaceReviewSummaryState: WebuiWorkspaceReviewSummaryState =
-  { loading: false };
+/** The slice this module owns; the review slice is merged in from its owner. */
+type WebuiWorkspaceLocalState = Omit<
+  WebuiWorkspaceQueriesState,
+  "reviewRevision" | "reviewSummary" | "reviewDiffs" | "reviewSearch"
+>;
 
-export const initialWebuiWorkspaceReviewDiffState: WebuiWorkspaceReviewDiffState = {
-  loading: false,
-  diffs: {},
-};
-
-export const initialWebuiWorkspaceReviewSearchState: WebuiWorkspaceReviewSearchState =
-  { loading: false };
-
-export const initialWebuiWorkspaceQueriesState: WebuiWorkspaceQueriesState = {
-  reviewRevision: 0,
+export const initialWebuiWorkspaceLocalState: WebuiWorkspaceLocalState = {
   environmentRevision: 0,
   fileTree: initialWebuiWorkspaceFileTreeState,
   files: new Map(),
   environment: initialWebuiWorkspaceEnvironmentState,
-  reviewSummary: initialWebuiWorkspaceReviewSummaryState,
-  reviewDiffs: initialWebuiWorkspaceReviewDiffState,
-  reviewSearch: initialWebuiWorkspaceReviewSearchState,
 };
 
-/** The batch size the review diff loader uses, preserved from the panel. */
-export const WEBUI_WORKSPACE_REVIEW_DIFF_BATCH_SIZE = 5;
 
-export function chunkWebuiWorkspaceReviewFileIds(
-  fileIds: readonly string[],
-): string[][] {
-  const batches: string[][] = [];
-  for (let index = 0; index < fileIds.length; index += WEBUI_WORKSPACE_REVIEW_DIFF_BATCH_SIZE) {
-    batches.push(fileIds.slice(index, index + WEBUI_WORKSPACE_REVIEW_DIFF_BATCH_SIZE));
-  }
-  return batches;
-}
+/** The composed default: this module's slice plus the review owner's initial one,
+ *  for the consumers that need a snapshot before anything was read. */
+export const initialWebuiWorkspaceQueriesState: WebuiWorkspaceQueriesState = {
+  ...initialWebuiWorkspaceLocalState,
+  ...initialWebuiWorkspaceReviewState,
+};
 
 function message(reason: unknown): string {
   return reason instanceof Error ? reason.message : String(reason);
@@ -211,6 +164,9 @@ export interface WebuiWorkspaceQueries {
   readonly canReadEnvironment: boolean;
   readonly canMutateGit: boolean;
   readonly canReview: boolean;
+  /** The review family's invalidation (forwarded to its owner). A settled turn
+   *  mutation calls this: the working tree it changed is what review views. */
+  readonly invalidateReview: () => void;
   readonly canSearchReviewDiffs: boolean;
 
   /** Reset the file tree to `workspaceDir` (a workspace switch clears the
@@ -240,7 +196,7 @@ export interface WebuiWorkspaceQueries {
   readonly loadReviewSummary: (
     tabId: string,
     workspaceDir: string,
-  ) => Promise<WebuiWorkspaceReviewSummary | undefined>;
+  ) => Promise<WebuiWorkspaceReviewSummaryState["summary"]>;
   /** Load every file's diff for one snapshot, in batches. Stale snapshots are
    * refused and trigger a review invalidation rather than applying. */
   readonly loadReviewDiffs: (request: {
@@ -287,7 +243,11 @@ export function createWebuiWorkspaceQueries(deps: {
   readonly port: WebuiWorkspaceQueryPort;
 }): WebuiWorkspaceQueries {
   const { port } = deps;
-  let state = initialWebuiWorkspaceQueriesState;
+  let state: WebuiWorkspaceLocalState = initialWebuiWorkspaceLocalState;
+  // The review family has its own owner (plan §5.2 review row, T10). This module
+  // keeps T11's slice and forwards the review members, so the panels that read one
+  // composed snapshot keep their shape while the review truth has one home.
+  const review = createWebuiWorkspaceReviewOwner({ port });
   const listeners = new Set<() => void>();
   // One monotonic counter per request key: a completion applies only while its
   // version is the live one for that key (ticket #51 "late response discarded").
@@ -300,12 +260,24 @@ export function createWebuiWorkspaceQueries(deps: {
   const isCurrent = (key: string, version: number): boolean =>
     (versions.get(key) ?? 0) === version;
 
+  /**
+   * The composed snapshot the panels read. It is rebuilt only when one of its two
+   * halves changes, because `useSyncExternalStore` compares snapshots by identity:
+   * a fresh object per call is an infinite render loop, which is exactly what a
+   * plain `{ ...state, ...review.read() }` in `getSnapshot` produced.
+   */
+  let snapshot: WebuiWorkspaceQueriesState = { ...state, ...review.read() };
+  const compose = (): void => {
+    snapshot = { ...state, ...review.read() };
+  };
+
   const set = (
-    update: (current: WebuiWorkspaceQueriesState) => WebuiWorkspaceQueriesState,
+    update: (current: WebuiWorkspaceLocalState) => WebuiWorkspaceLocalState,
   ): void => {
     const next = update(state);
     if (next === state) return;
     state = next;
+    compose();
     for (const listener of listeners) listener();
   };
 
@@ -323,14 +295,6 @@ export function createWebuiWorkspaceQueries(deps: {
   // The environment reload is coalesced: a burst of git-changed signals for one
   // workspace collapses to one reload, exactly as the panel's 350 ms timer did.
   let environmentTimer: ReturnType<typeof setTimeout> | undefined;
-  // Snapshot ids a stale review already retried for a tab, so a stale loop
-  // cannot thrash the refresh.
-  const retriedSnapshots = new Set<string>();
-
-  const invalidateReview = (): void => {
-    set((current) => ({ ...current, reviewRevision: current.reviewRevision + 1 }));
-  };
-
   const selectWorkspace = (workspaceDir: string | undefined): void => {
     set((current) =>
       current.fileTree.workspaceDir === workspaceDir
@@ -496,215 +460,6 @@ export function createWebuiWorkspaceQueries(deps: {
     });
   };
 
-  const refreshStaleReview = (tabId: string, snapshotId: string): void => {
-    const retryKey = `${tabId}:${snapshotId}`;
-    if (retriedSnapshots.has(retryKey)) return;
-    retriedSnapshots.add(retryKey);
-    invalidateReview();
-  };
-
-  const loadReviewSummary = async (
-    tabId: string,
-    workspaceDir: string,
-  ): Promise<WebuiWorkspaceReviewSummary | undefined> => {
-    const key = `reviewSummary:${tabId}`;
-    const version = bump(key);
-    if (!port.getWorkspaceReviewSummary) {
-      set((current) => ({
-        ...current,
-        reviewSummary: {
-          tabId,
-          workspaceDir,
-          loading: false,
-          error: "工作区变更审查能力暂不可用。",
-        },
-      }));
-      return undefined;
-    }
-    const getSummary = port.getWorkspaceReviewSummary;
-    set((current) => ({
-      ...current,
-      reviewSummary: {
-        tabId,
-        workspaceDir,
-        summary: current.reviewSummary.tabId === tabId ? current.reviewSummary.summary : undefined,
-        loading: true,
-        stale: current.reviewSummary.tabId === tabId && Boolean(current.reviewSummary.summary),
-      },
-    }));
-    try {
-      const summary = await getSummary({ workspaceDir });
-      if (!isCurrent(key, version)) return undefined;
-      set((current) => ({
-        ...current,
-        reviewSummary: { tabId, workspaceDir, summary, loading: false },
-      }));
-      return summary;
-    } catch (reason) {
-      if (!isCurrent(key, version)) return undefined;
-      set((current) => ({
-        ...current,
-        reviewSummary: {
-          tabId,
-          workspaceDir,
-          summary: current.reviewSummary.tabId === tabId ? current.reviewSummary.summary : undefined,
-          loading: false,
-          stale: current.reviewSummary.tabId === tabId && Boolean(current.reviewSummary.summary),
-          error: message(reason),
-        },
-      }));
-      return undefined;
-    }
-  };
-
-  const loadReviewDiffs = async (request: {
-    readonly tabId: string;
-    readonly workspaceDir: string;
-    readonly snapshotId: string;
-    readonly fileIds: readonly string[];
-  }): Promise<void> => {
-    const { tabId, workspaceDir, snapshotId, fileIds } = request;
-    const key = `reviewDiffs:${tabId}`;
-    const version = bump(key);
-    if (!port.listWorkspaceReviewFileDiffs) {
-      set((current) => ({
-        ...current,
-        reviewDiffs: {
-          tabId,
-          workspaceDir,
-          snapshotId,
-          loading: false,
-          diffs: {},
-          error: "工作区文件差异能力暂不可用。",
-        },
-      }));
-      return;
-    }
-    const listDiffs = port.listWorkspaceReviewFileDiffs;
-    set((current) => ({
-      ...current,
-      reviewDiffs: { tabId, workspaceDir, snapshotId, loading: true, diffs: {} },
-    }));
-    const diffs: Record<string, WebuiWorkspaceReviewDiffFile> = {};
-    try {
-      for (const batch of chunkWebuiWorkspaceReviewFileIds(fileIds)) {
-        const result: WebuiWorkspaceReviewDiffs = await listDiffs({
-          workspaceDir,
-          reviewSnapshotId: snapshotId,
-          fileIds: batch,
-        });
-        if (!isCurrent(key, version)) return;
-        if (result.reviewSnapshotId !== snapshotId) {
-          set((current) => ({
-            ...current,
-            reviewDiffs: {
-              tabId,
-              workspaceDir,
-              snapshotId,
-              loading: false,
-              diffs,
-              error: "工作区变更已更新，正在刷新审查…",
-            },
-          }));
-          refreshStaleReview(tabId, snapshotId);
-          return;
-        }
-        for (const fileDiff of result.diffs) {
-          diffs[fileDiff.fileId] = {
-            ...(fileDiff.diff?.type === "text"
-              ? { diff: fileDiff.diff.diff ?? fileDiff.diff.content }
-              : fileDiff.diff?.type === "binary"
-                ? { binary: true }
-                : {}),
-            ...(fileDiff.error ?? fileDiff.errorCode
-              ? { error: fileDiff.error ?? fileDiff.errorCode }
-              : {}),
-          };
-        }
-        set((current) => ({
-          ...current,
-          reviewDiffs: { tabId, workspaceDir, snapshotId, loading: true, diffs: { ...diffs } },
-        }));
-      }
-      if (!isCurrent(key, version)) return;
-      set((current) => ({
-        ...current,
-        reviewDiffs: { tabId, workspaceDir, snapshotId, loading: false, diffs: { ...diffs } },
-      }));
-    } catch (reason) {
-      if (!isCurrent(key, version)) return;
-      set((current) => ({
-        ...current,
-        reviewDiffs: {
-          tabId,
-          workspaceDir,
-          snapshotId,
-          loading: false,
-          diffs: { ...diffs },
-          error: message(reason),
-        },
-      }));
-      refreshStaleReview(tabId, snapshotId);
-    }
-  };
-
-  const searchReviewDiffs = async (request: {
-    readonly tabId: string;
-    readonly workspaceDir: string;
-    readonly snapshotId: string;
-    readonly query: string;
-  }): Promise<void> => {
-    const { tabId, workspaceDir, snapshotId, query } = request;
-    if (!port.searchWorkspaceReviewDiffs) return;
-    const key = `reviewSearch:${tabId}`;
-    const version = bump(key);
-    const search = port.searchWorkspaceReviewDiffs;
-    set((current) => ({
-      ...current,
-      reviewSearch: { tabId, workspaceDir, snapshotId, loading: true },
-    }));
-    try {
-      const result = await search({
-        workspaceDir,
-        reviewSnapshotId: snapshotId,
-        query,
-        includeUntrackedFiles: true,
-      });
-      if (!isCurrent(key, version)) return;
-      if (result.reviewSnapshotId !== snapshotId) {
-        set((current) => ({
-          ...current,
-          reviewSearch: {
-            tabId,
-            workspaceDir,
-            snapshotId,
-            loading: false,
-            error: "工作区变更已更新，正在刷新审查…",
-          },
-        }));
-        refreshStaleReview(tabId, snapshotId);
-        return;
-      }
-      set((current) => ({
-        ...current,
-        reviewSearch: { tabId, workspaceDir, snapshotId, loading: false, result },
-      }));
-    } catch (reason) {
-      if (!isCurrent(key, version)) return;
-      set((current) => ({
-        ...current,
-        reviewSearch: {
-          tabId,
-          workspaceDir,
-          snapshotId,
-          loading: false,
-          error: message(reason),
-        },
-      }));
-      refreshStaleReview(tabId, snapshotId);
-    }
-  };
-
   const loadEnvironment = (workspaceDir: string): void => {
     const key = `environment:${workspaceDir}`;
     const version = bump(key);
@@ -761,7 +516,7 @@ export function createWebuiWorkspaceQueries(deps: {
     // Exactly the views this mutation affects: the git environment and the
     // review of the workspace it ran in. Nothing else reloads.
     invalidateEnvironment(request.workspaceDir, 0);
-    invalidateReview();
+    review.invalidate();
     return result;
   };
 
@@ -783,6 +538,12 @@ export function createWebuiWorkspaceQueries(deps: {
     );
   };
 
+  // A review change is a change to the composed snapshot the panels read.
+  review.subscribe(() => {
+    compose();
+    for (const listener of [...listeners]) listener();
+  });
+
   const invalidateWorkspaceGit = (signal: {
     readonly workspace?: string;
     readonly aliases?: readonly string[];
@@ -791,7 +552,7 @@ export function createWebuiWorkspaceQueries(deps: {
       workspaceDir !== undefined &&
       (signal.workspace === workspaceDir || Boolean(signal.aliases?.includes(workspaceDir)));
     // Review views for the workspace the signal names, at once.
-    if (matches(state.reviewSummary.workspaceDir)) invalidateReview();
+    review.invalidateForWorkspace(signal);
     // The environment reload is coalesced into the previous 350 ms window.
     if (matches(state.environment.workspaceDir)) {
       invalidateEnvironment(state.environment.workspaceDir!, 350);
@@ -799,7 +560,7 @@ export function createWebuiWorkspaceQueries(deps: {
   };
 
   return {
-    getSnapshot: () => state,
+    getSnapshot: () => snapshot,
     subscribe: (listener) => {
       listeners.add(listener);
       return () => {
@@ -810,16 +571,19 @@ export function createWebuiWorkspaceQueries(deps: {
     canReadFile: port.readWorkspaceFile !== undefined,
     canReadEnvironment: port.getWorkspaceEnvironment !== undefined,
     canMutateGit: port.mutateWorkspaceGit !== undefined,
-    canReview: port.getWorkspaceReviewSummary !== undefined,
-    canSearchReviewDiffs: port.searchWorkspaceReviewDiffs !== undefined,
+    canReview: review.canReview,
+    canSearchReviewDiffs: review.canSearchDiffs,
     selectWorkspace,
     loadFileTree,
     loadDirectory,
     readFile,
     setInlineFile,
-    loadReviewSummary,
-    loadReviewDiffs,
-    searchReviewDiffs,
+    /** The review family's invalidation, re-exposed so a caller that settles a
+     *  turn mutation can refresh the working tree the mutation changed (T10). */
+    invalidateReview: review.invalidate,
+    loadReviewSummary: review.loadSummary,
+    loadReviewDiffs: review.loadDiffs,
+    searchReviewDiffs: review.search,
     loadEnvironment,
     mutateGit,
     reportDirectoryError,
