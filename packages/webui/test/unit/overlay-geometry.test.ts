@@ -15,8 +15,8 @@ import { describe, expect, it } from "vitest";
 import {
   clampOverlayToViewport,
   overlayAxisStart,
-} from "../../src/client/projection/overlay-geometry.js";
-import { positionFlyout } from "../../src/client/projection/flyout-position.js";
+} from "../../src/client/projection/common/overlay-geometry.js";
+import { positionFlyout } from "../../src/client/projection/common/flyout-position.js";
 import { positionContextUsagePopover } from "../../src/client/projection/context-usage-popover.js";
 
 const MARGIN = 8;

@@ -33,7 +33,7 @@ import {
   FLYOUT_ANCHOR_GAP,
   flyoutStyle,
   positionFlyout,
-} from "../../src/client/projection/flyout-position.js";
+} from "../../src/client/projection/common/flyout-position.js";
 import type { WebuiModelPickerEntry } from "../../src/client/contracts/models/model-view.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));

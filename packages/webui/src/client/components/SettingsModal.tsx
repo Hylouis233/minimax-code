@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactElement, type ReactNode } from "react";
 import type { WebuiSessionListItem } from "../../shared/contracts/session.js";
 import type { WebuiVersionInfo } from "../../shared/contracts/version.js";
-import { basenamePath } from "../paths.js";
+import { basenamePath } from "../projection/common/paths.js";
 import {
   groupWebuiWorktreeWorkspaces,
   selectWebuiPrimaryWorkspace,

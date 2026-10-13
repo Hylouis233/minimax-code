@@ -8,7 +8,7 @@
 import { WebuiIconFolder } from "../shell/icons.js";
 import type { WebuiTransport } from "../../contracts/transport.js";
 import type { WebuiWorkspaceDirectoryListing } from "../../../shared/contracts/workspace.js";
-import { looksLikeAbsoluteWorkspacePath } from "../../paths.js";
+import { looksLikeAbsoluteWorkspacePath } from "../../projection/common/paths.js";
 import { useCallback, useEffect, useState, type ReactElement } from "react";
 
 export function WebuiWorkspaceDirectoryBrowser({

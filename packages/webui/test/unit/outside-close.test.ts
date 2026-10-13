@@ -4,7 +4,7 @@ import {
   evaluateComposerDismiss,
   evaluateOutsideClose,
   type WebuiOutsideCloseSurface,
-} from "../../src/client/projection/outside-close.js";
+} from "../../src/client/projection/common/outside-close.js";
 
 /**
  * Pure tests for the six outside-close strategies.

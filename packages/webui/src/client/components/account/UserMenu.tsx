@@ -19,7 +19,7 @@ import { SettingsModal } from "../SettingsModal.js";
 import { AccountLoginDialog } from "./AccountLoginDialog.js";
 import type { MemoryHandoff } from "../settings/MemoryManagerDialog.js";
 import type { WebuiVersionInfo } from "../../../shared/contracts/version.js";
-import { evaluateOutsideClose } from "../../projection/outside-close.js";
+import { evaluateOutsideClose } from "../../projection/common/outside-close.js";
 import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
 import { useWebuiAccountWorkflows, useWebuiAccountWorkflowsState } from "../../bindings/use-query-state.js";
 import { SIGNIN, SigninCard, formatSigninError, type SigninState } from "./UserMenuSignin.js";

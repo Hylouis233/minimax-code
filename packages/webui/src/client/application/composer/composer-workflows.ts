@@ -3,7 +3,7 @@ import type { WebuiClientCreateSessionResult, WebuiClientSessionCreator } from "
 import type { WebuiGoal, WebuiGoalCreateRequest, WebuiGoalPatchRequest } from "../../../shared/contracts/goal.js";
 import type { WebuiAttachmentInput } from "../../../shared/contracts/messages.js";
 import { formatWebuiError } from "../../contracts/value-readers.js";
-import { looksLikeAbsoluteWorkspacePath } from "../../paths.js";
+import { looksLikeAbsoluteWorkspacePath } from "../../projection/common/paths.js";
 import { queueWebuiTurn } from "../turn/queue-command.js";
 import { ownsWebuiStreamGeneration, type WebuiStreamState } from "../../projection/stream-state.js";
 import { runWebuiStreamLoop, type WebuiStreamLoopDeps, type WebuiStreamLoopSink } from "../../mechanisms/stream-loop.js";

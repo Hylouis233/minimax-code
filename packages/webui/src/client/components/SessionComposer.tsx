@@ -157,7 +157,7 @@ import {
 import {
   submitWebuiGoal,
 } from "../application/composer/composer-workflows.js";
-import { evaluateComposerDismiss, evaluateOutsideClose } from "../projection/outside-close.js";
+import { evaluateComposerDismiss, evaluateOutsideClose } from "../projection/common/outside-close.js";
 import {
   buildWebuiModelSelectionRequest,
 } from "../projection/action-requests.js";

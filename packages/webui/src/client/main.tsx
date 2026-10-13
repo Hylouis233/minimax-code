@@ -8,7 +8,7 @@ export {
 } from "./components/shell/WebuiClientFoundationApp.js";
 export { subscribeToSessionHash } from "./bindings/navigation.js";
 import { createWebuiTransport } from "./infrastructure/transport.js";
-import { route } from "./router.js";
+import { route } from "./projection/common/router.js";
 import { NotFound } from "./components/shell/NotFound.js";
 import { ArchonPage } from "./components/shell/ArchonPage.js";
 import { WebuiErrorBoundary } from "./components/shell/WebuiErrorBoundary.js";

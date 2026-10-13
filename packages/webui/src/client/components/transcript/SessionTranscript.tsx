@@ -63,7 +63,7 @@ import {
   webuiScrollBottomTop,
   webuiScrollFollowsBottom,
   webuiScrollIntent,
-} from "../../projection/transcript-scroll.js";
+} from "../../projection/common/transcript-scroll.js";
 
 const EMPTY_TRANSCRIPT_PAGE: WebuiClientMessagePage = {};
 

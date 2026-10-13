@@ -8,7 +8,7 @@
 
 import { useState, type ReactElement } from "react";
 import { WebuiMarkdown } from "./markdown.js";
-import { basenamePath } from "../../paths.js";
+import { basenamePath } from "../../projection/common/paths.js";
 import { parseWebuiMessageFileReference, type WebuiMessageFileReference } from "../../projection/message-file-reference.js";
 import { webuiActivitySummary } from "../../projection/tool-projection.js";
 import { MessageAttachments, type MessageAttachment } from "./MessageAttachments.js";

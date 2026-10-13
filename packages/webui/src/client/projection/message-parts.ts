@@ -10,7 +10,7 @@ import {
   recordValue,
   stringAmongKeys,
 } from "../contracts/value-readers.js";
-import { basenamePath } from "../paths.js";
+import { basenamePath } from "./common/paths.js";
 import type {
   WebuiQuestionnaireResponseAnswer,
   WebuiQuestionnaireResponseSummary,

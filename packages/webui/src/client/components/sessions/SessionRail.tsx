@@ -51,7 +51,7 @@ import {
   type WebuiRailView,
   type WebuiRailViewTab,
 } from "../../rail-buckets.js";
-import { formatWebuiUnreadBadge } from "../../projection/unread-badge.js";
+import { formatWebuiUnreadBadge } from "../../projection/common/unread-badge.js";
 import type { WebuiClientSession, WebuiClientSessionPage, WebuiClientSessionTreePage, WebuiClientProject } from "../../contracts/sessions/session-view.js";
 import { teamModeCopy } from "../../infrastructure/team-mode.js";
 import { workspaceProjectName } from "../../projection/workspace-name.js";

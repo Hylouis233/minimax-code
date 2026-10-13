@@ -38,7 +38,7 @@ import type {
   WebuiModelPickerEntry,
   WebuiModelProviderGroup,
 } from "../../contracts/models/model-view.js";
-import { evaluateOutsideClose } from "../../projection/outside-close.js";
+import { evaluateOutsideClose } from "../../projection/common/outside-close.js";
 import {
   resolveEffortOptions,
   thinkingDraftPatch,
@@ -66,7 +66,7 @@ import {
   type ModelSettingsFlyoutProps,
   type FlyoutAnchor,
 } from "./ModelSettingsFlyout.js";
-import type { FlyoutRect } from "../../projection/flyout-position.js";
+import type { FlyoutRect } from "../../projection/common/flyout-position.js";
 
 // Re-export so existing importers keep their import path stable.
 export type {

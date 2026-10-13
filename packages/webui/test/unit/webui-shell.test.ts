@@ -65,7 +65,7 @@ import {
   buildWebuiModelSelectionRequest,
   webuiModelOptionValue,
 } from "../../src/client/projection/action-requests.js";
-import { looksLikeAbsoluteWorkspacePath } from "../../src/client/paths.js";
+import { looksLikeAbsoluteWorkspacePath } from "../../src/client/projection/common/paths.js";
 import {
   buildWebuiComposerHandlers,
   createdSessionId,

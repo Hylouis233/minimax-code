@@ -4,7 +4,7 @@
 
 import { useState, type ReactElement } from "react";
 import type { WebuiWorkspaceFileContent } from "../../../shared/contracts/workspace.js";
-import { basenamePath } from "../../paths.js";
+import { basenamePath } from "../../projection/common/paths.js";
 
 export type WorkspaceMediaPreviewProps = {
   /** The file path the preview tab was opened with, used for `alt` text. */

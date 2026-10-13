@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 import {
   basenamePath,
   looksLikeAbsoluteWorkspacePath,
-} from "../../src/client/paths.js";
+} from "../../src/client/projection/common/paths.js";
 
 describe("basenamePath", () => {
   it("takes the last segment of a POSIX path", () => {

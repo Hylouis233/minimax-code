@@ -22,7 +22,7 @@ import {
   WebuiSessionList,
 } from "../../src/client/components/sessions/SessionRail.js";
 import { WebuiClientFoundationApp } from "../../src/client/components/shell/WebuiClientFoundationApp.js";
-import { formatWebuiUnreadBadge } from "../../src/client/projection/unread-badge.js";
+import { formatWebuiUnreadBadge } from "../../src/client/projection/common/unread-badge.js";
 import {
   readWebuiUnreadCounts,
   SESSION_UNREAD_STORAGE_KEY,
