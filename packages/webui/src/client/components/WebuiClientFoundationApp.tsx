@@ -132,7 +132,7 @@ import { createWebuiWorkspaceQueries } from "../application/workspace-queries.js
 import { createWebuiAccountWorkflows } from "../application/account/account-workflows.js";
 import { createWebuiModelsWorkflows } from "../application/models-workflows.js";
 import { createWebuiSettingsWorkflows } from "../application/settings-workflows.js";
-import { createWebuiPluginWorkflows } from "../application/plugin-workflows.js";
+import { createWebuiPluginWorkflows } from "../application/plugins/plugin-workflows.js";
 import { webuiActiveTurnProbeFor } from "../application/active-turn-probe.js";
 import { startWebuiSessionTransferDownload } from "../infrastructure/session-transfer-download.js";
 import { importWebuiSessionFile } from "../infrastructure/session-import.js";

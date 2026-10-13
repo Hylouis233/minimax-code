@@ -41,7 +41,7 @@ import {
   initialWebuiPluginWorkflowsState,
   type WebuiPluginWorkflows,
   type WebuiPluginWorkflowsState,
-} from "../application/plugin-workflows.js";
+} from "../application/plugins/plugin-workflows.js";
 import {
   initialWebuiArchivedSessionsState,
   type WebuiArchivedSessionsState,

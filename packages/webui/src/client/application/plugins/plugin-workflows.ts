@@ -23,7 +23,7 @@
 // This module is framework-free — no React, no DOM — so it can be unit-tested
 // against a scripted port.
 
-import type { PluginPort } from "../contracts/plugins/plugin-port.js";
+import type { PluginPort } from "../../contracts/plugins/plugin-port.js";
 import {
   InstalledPluginSource,
   MarketplaceCategory,
