@@ -29,6 +29,7 @@ import {
   rowHasFlyout,
   thinkingCommitOutcome,
 } from "../../src/client/projection/models/model-picker-cascade.js";
+import { resolveModelDraftSelection } from "../../src/client/projection/models/model-draft.js";
 import {
   FLYOUT_ANCHOR_GAP,
   flyoutStyle,
@@ -112,7 +113,9 @@ describe("cascade — a model's own settings decide whether its row is worth des
       picker.indexOf("const handleSelectModel"),
       picker.indexOf("const handleHoverRow"),
     );
-    expect(handler).toContain("setOpen(false)");
+    // The close is the workflow's decision (`closes: true` for a selection),
+    // performed through the picker's one close seam.
+    expect(handler).toContain("close: handleCloseFlyout");
     expect(handler).not.toContain("setTier");
   });
 });
@@ -132,15 +135,25 @@ describe("cascade — the thinking switch does not finish the visit", () => {
     // say so. Without this the commit changed a setting on a model that stayed
     // unpicked — the action read as "edited something" and the menu still sat
     // open on a row with no tick beside it.
+    const resolution = resolveModelDraftSelection({
+      model: WITH_SETTINGS,
+      draft: {},
+      change: { kind: "thinking", option: "max" },
+    });
+    // The decision: a level selects the row and writes the setting, and does NOT
+    // finish the visit.
+    expect(resolution.commitsSettings).toBe(true);
+    expect(resolution.closes).toBe(false);
+    expect(resolution.draft.thinkingEffort).toBe("max");
+
     const picker = readComponent("ModelPicker.tsx");
     const handler = picker.slice(
       picker.indexOf("const handleThinkingChange"),
       picker.indexOf("const handleContextChange"),
     );
-    // The handler moved into `WebuiModelDraftEditor` (ticket #71: the drafts editor is one
-    // declaration), where the draft it commits is the prop `draft` and its replacement is `next`.
-    // The chain still has to reach the picker's `onSelect`, so that call site is asserted too.
-    expect(handler).toContain("onSelect(model, next)");
+    // The handler routes the level through the one workflow; the selection it
+    // performs reaches the picker's `onSelect`.
+    expect(handler).toContain('commitChange({ kind: "thinking", option })');
     expect(picker).toContain("onSelect={onSelect}");
     // And no premature close: the level is a mid-visit edit.
     expect(handler).not.toContain("setOpen(false)");
@@ -150,15 +163,27 @@ describe("cascade — the thinking switch does not finish the visit", () => {
 
 describe("cascade — a click inside the fly-out finishes the selection", () => {
   it("selects the row from the context window", () => {
+    const resolution = resolveModelDraftSelection({
+      model: WITH_SETTINGS,
+      draft: {},
+      change: { kind: "context", value: 1_000_000 },
+    });
+    // The decision: a window selects the row, writes the setting and completes
+    // the visit.
+    expect(resolution.commitsSettings).toBe(true);
+    expect(resolution.closes).toBe(true);
+    expect(resolution.draft.contextLimit).toBe(1_000_000);
+
     const picker = readComponent("ModelPicker.tsx");
     const handler = picker.slice(
       picker.indexOf("const handleContextChange"),
       picker.indexOf("return (", picker.indexOf("const handleContextChange")),
     );
-    expect(handler).toContain("onSelect(model, next)");
-    // Closing is the picker's, reached through the editor's one seam: the handler asks for the
-    // close and the picker's `handleCloseFlyout` performs it.
-    expect(handler).toContain("onCloseMenu();");
+    expect(handler).toContain('commitChange({ kind: "context", value })');
+    // Closing is the picker's, reached through the editor's one seam: the
+    // workflow asks for the close and the picker's `handleCloseFlyout` performs
+    // it.
+    expect(picker).toContain("close: onCloseMenu");
     expect(picker).toContain("onCloseMenu={handleCloseFlyout}");
     expect(picker).toContain("const handleCloseFlyout = () => {");
     expect(picker).toContain("setOpen(false);");

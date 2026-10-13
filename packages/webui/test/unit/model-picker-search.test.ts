@@ -16,11 +16,12 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 
+import { WebuiModelMenuList } from "../../src/client/components/models/ModelPicker.js";
 import {
   groupModelsByProvider,
   modelKey,
-  WebuiModelMenuList,
-} from "../../src/client/components/models/ModelPicker.js";
+  projectModelPickerSections,
+} from "../../src/client/projection/models/model-picker-rows.js";
 import {
   filterModelGroups,
   fuzzyMatches,
@@ -178,6 +179,34 @@ describe("model picker favourites — the toggle", () => {
     const current = ["a"];
     toggleFavoriteId(current, "b");
     expect(current).toEqual(["a"]);
+  });
+});
+
+describe("model picker sections — one projection of the catalogue", () => {
+  it("narrows by the search BEFORE hoisting, so a filtered-out star stays out", () => {
+    // The order is the whole point: hoisting on the unfiltered list would keep a
+    // starred model visible while the user is searching for something else.
+    const sections = projectModelPickerSections({
+      models: CATALOGUE,
+      query: "MiniMax",
+      favoriteIds: ["zai/glm-5.3/"],
+      favoritesLabel: "收藏",
+    });
+    expect(sections.some((group) => group.id === FAVORITES_SECTION_ID)).toBe(false);
+    expect(sections.flatMap((group) => group.models.map((m) => m.modelId))).not.toContain(
+      "glm-5.3",
+    );
+  });
+
+  it("hoists the shortlist above the providers when the star is in the result", () => {
+    const sections = projectModelPickerSections({
+      models: CATALOGUE,
+      query: "",
+      favoriteIds: ["zai/glm-5.3/"],
+      favoritesLabel: "收藏",
+    });
+    expect(sections[0]?.id).toBe(FAVORITES_SECTION_ID);
+    expect(sections[0]?.label).toBe("收藏");
   });
 });
 

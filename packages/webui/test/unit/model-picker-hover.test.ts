@@ -32,6 +32,13 @@ const picker = readFileSync(
   path.join(componentDir, "ModelPicker.tsx"),
   "utf8",
 );
+// The row rules' home is the Models projection (T03's responsibility cut); the
+// picker reads them from there. Read both, so "the rule exists" and "the picker
+// uses the rule" are separate assertions.
+const rows = readFileSync(
+  path.resolve(here, "../../src/client/projection/models/model-picker-rows.ts"),
+  "utf8",
+);
 
 describe("model picker — a hover that is not yet a decision", () => {
   it("waits long enough to outlast a sweep, and short enough to feel obeyed", () => {
@@ -230,7 +237,7 @@ describe("model picker — the hover wiring", () => {
     // keyed by the model holds whichever copy mounted last — the provider's.
     // Hovering the shortlist's line then opened the panel beside a different
     // line entirely, at the other end of the list.
-    expect(picker).toContain("export function rowIdOf(groupId: string, key: string): string {");
+    expect(rows).toContain("export function rowIdOf(groupId: string, key: string): string {");
     expect(picker).toContain("const rowId = rowIdOf(group.id, key);");
     expect(picker).toContain("rowElements.current.get(focused.rowId)");
     // The keyboard walks rows for the same reason: a walk keyed by model would

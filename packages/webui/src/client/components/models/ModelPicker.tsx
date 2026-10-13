@@ -39,19 +39,22 @@ import type {
   WebuiModelProviderGroup,
 } from "../../contracts/models/model-view.js";
 import { evaluateOutsideClose } from "../../projection/common/outside-close.js";
+import { resolveEffortOptions } from "../../projection/models/thinking-control.js";
 import {
-  resolveEffortOptions,
-  thinkingDraftPatch,
-} from "../../projection/models/thinking-control.js";
+  applyModelDraftResolution,
+  resolveModelDraftSelection,
+  type ModelDraftChange,
+} from "../../projection/models/model-draft.js";
+import {
+  modelKey,
+  projectModelPickerSections,
+  reconcileFocusedRow,
+  rowIdOf,
+  type FocusedRow,
+} from "../../projection/models/model-picker-rows.js";
 import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
-import {
-  filterModelGroups,
-  isSearchEmpty,
-} from "../../projection/models/model-picker-search.js";
-import {
-  orderModelGroups,
-  toggleFavoriteId,
-} from "../../projection/models/model-favorites.js";
+import { isSearchEmpty } from "../../projection/models/model-picker-search.js";
+import { toggleFavoriteId } from "../../projection/models/model-favorites.js";
 import {
   isPreview,
   rowHasFlyout,
@@ -104,131 +107,6 @@ export interface ModelPickerProps {
   };
 }
 
-/** Group label: the provider's display name, falling back to its id. */
-function providerGroupLabel(model: WebuiModelPickerEntry): string {
-  const name = model.providerName?.trim();
-  return name || model.providerId;
-}
-
-/**
- * Groups by provider, keeping the catalog's own order — the same grouping the
- * TUI picker applies (see `packages/tui/src/tui/features/model/picker.ts`).
- *
- * Buckets on `providerId` and carries the display name alongside, rather than
- * bucketing on the name itself. Same visible result for the ordinary case
- * where every provider has a distinct name, and the right result for the
- * case where two do not.
- */
-export function groupModelsByProvider(
-  models: readonly WebuiModelPickerEntry[],
-): readonly WebuiModelProviderGroup[] {
-  const order: string[] = [];
-  const buckets = new Map<string, WebuiModelPickerEntry[]>();
-  const labels = new Map<string, string>();
-  for (const model of models) {
-    const id = model.providerId;
-    const bucket = buckets.get(id);
-    if (bucket) {
-      bucket.push(model);
-      continue;
-    }
-    buckets.set(id, [model]);
-    labels.set(id, providerGroupLabel(model));
-    order.push(id);
-  }
-  return order.map((id) => ({
-    id,
-    label: labels.get(id) ?? id,
-    models: buckets.get(id) ?? [],
-  }));
-}
-
-/**
- * The stable identity of one row: `providerId/modelId/variant`.
- *
- * The variant is part of the key because the picker lists the same model
- * twice when it offers an off/on pair, and a star on one of them is a
- * statement about that row, not about the model name.
- */
-export function modelKey(model: WebuiModelPickerEntry): string {
-  return `${model.providerId}/${model.modelId}/${model.variant ?? ""}`;
-}
-
-/**
- * A row's identity: the group it is rendered in, plus the model.
- *
- * A starred model is rendered TWICE — under its provider and again in the
- * shortlist — so the model key is not a row key. Anything per-ROW has to use
- * this: the highlight, the fly-out's anchor rectangle, where the arrow keys
- * think they are. Keyed by the model alone, all three point at whichever copy
- * mounted last, which is the provider's, and the panel then opens beside a
- * different line than the one the pointer is on.
- */
-export function rowIdOf(groupId: string, key: string): string {
-  return `${groupId}::${key}`;
-}
-
-/**
- * The part of a model key that survives the model's OWN settings changing.
- *
- * A key carries the variant, because a model offering an off/on pair is two
- * rows and a star on one of them is a statement about that row. Which makes the
- * key a poor thing to hold onto across a change made TO that row: switching the
- * thinking toggle off rewrites the variant, the re-derived catalogue renames the
- * row, and the key captured a moment earlier now names a row nobody renders.
- */
-export function modelIdentity(key: string): string {
-  const at = key.lastIndexOf("/");
-  return at === -1 ? key : key.slice(0, at);
-}
-
-/** The row the pointer or the keyboard is on: which model, and which line of it. */
-export interface FocusedRow {
-  readonly key: string;
-  readonly rowId: string;
-}
-
-/**
- * The focused row, re-pointed at the row that exists NOW.
- *
- * A row id is derived, not durable: it is built from the model and the group the
- * model is rendered in, and BOTH are re-derived whenever a setting is committed.
- * The user pressing the fly-out's own switch is one of those commits, so the act
- * of configuring a two-state model renames that model's row — and the highlight
- * goes dark while the fly-out loses its anchor, cannot measure, and drops out of
- * the flow it was anchored to. Nothing recovers it but moving the pointer, so the
- * panel stays beside nothing until the user goes back to the row and re-opens it.
- *
- * So the id is checked against the rows on screen rather than trusted to have
- * survived. Returns its argument UNCHANGED when the row is still there, which
- * keeps a stable input referentially stable — a fresh object every render would
- * rebuild the fly-out's anchor resolver and its scroll listeners with it. Returns
- * it unchanged when the row is genuinely GONE as well: a row that is not there
- * has nothing to re-point at, and the paths that remove rows (a search
- * keystroke, a filter) retract the panel themselves.
- */
-export function reconcileFocusedRow(
-  focused: FocusedRow | undefined,
-  groups: readonly WebuiModelProviderGroup[],
-): FocusedRow | undefined {
-  if (!focused) return undefined;
-  const identity = modelIdentity(focused.key);
-  let sameModel: FocusedRow | undefined;
-  let sameIdentity: FocusedRow | undefined;
-  for (const group of groups) {
-    for (const model of group.models) {
-      const key = modelKey(model);
-      const rowId = rowIdOf(group.id, key);
-      if (rowId === focused.rowId) return focused;
-      if (key === focused.key) sameModel ??= { key, rowId };
-      if (modelIdentity(key) === identity) sameIdentity ??= { key, rowId };
-    }
-  }
-  // The same model under a new group is this very row, re-homed. Failing that,
-  // the same model under a new VARIANT is the row the pointer is still on, and
-  // the switch that was just pressed is what renamed it.
-  return sameModel ?? sameIdentity ?? focused;
-}
 
 /**
  * The model column. A group header is a line of text, not an option: it lives
@@ -555,15 +433,27 @@ function WebuiModelDraftEditor({
    * still want a window next, and this panel is flat precisely so both fit in
    * one visit — so the menu stays open and the row carries the tick.
    */
+  /**
+   * The one place a change to this row becomes a selection. The decision is
+   * `resolveModelDraftSelection`'s; this performs it with the fly-out's own
+   * surfaces, so a level, a window and a row click cannot drift apart.
+   */
+  const commitChange = (change: ModelDraftChange) => {
+    if (!model) return;
+    applyModelDraftResolution(
+      resolveModelDraftSelection({ model, draft, change }),
+      {
+        commitDraft: onCommitDraft,
+        commitSettings: (next) => onSettingChange(model, next),
+        select: (next) => onSelect(model, next),
+        close: onCloseMenu,
+      },
+    );
+  };
+
   const handleThinkingChange = (option: string) => {
     if (!model) return;
-    const next: WebuiModelPickerDraft = {
-      ...draft,
-      ...thinkingDraftPatch(model, option),
-    };
-    onCommitDraft(next);
-    onSettingChange(model, next);
-    onSelect(model, next);
+    commitChange({ kind: "thinking", option });
   };
 
   /**
@@ -579,14 +469,7 @@ function WebuiModelDraftEditor({
    */
   const handleContextChange = (value: number) => {
     if (!model) return;
-    const next: WebuiModelPickerDraft = {
-      ...draft,
-      contextLimit: value,
-    };
-    onCommitDraft(next);
-    onSettingChange(model, next);
-    onSelect(model, next);
-    onCloseMenu();
+    commitChange({ kind: "context", value });
   };
   if (!open || tier !== "settings") return null;
   return (
@@ -640,16 +523,19 @@ export function WebuiModelPicker({
     Readonly<Record<string, WebuiModelPickerDraft>>
   >({});
 
-  // Order matters and is deliberate: filter FIRST, then hoist. Hoisting on the
-  // unfiltered list would keep a starred model visible while the user is
-  // searching for something else, which is the one thing a search must not do.
-  // The other order would also mean the favourites section is rebuilt on every
-  // keystroke even when no star is in the result set.
-  const groupedModels = useMemo(() => {
-    const grouped = groupModelsByProvider(models);
-    const filtered = filterModelGroups(grouped, query);
-    return orderModelGroups(filtered, favoriteIds, "收藏", modelKey);
-  }, [models, query, favoriteIds]);
+  // Grouping, the search narrowing and the shortlist hoist are one projection
+  // rule (`projectModelPickerSections`), including why the order is
+  // filter-then-hoist.
+  const groupedModels = useMemo(
+    () =>
+      projectModelPickerSections({
+        models,
+        query,
+        favoriteIds,
+        favoritesLabel: "收藏",
+      }),
+    [models, query, favoriteIds],
+  );
 
   /**
    * Where the pointer's answer points NOW, which is not always where it pointed
@@ -808,16 +694,31 @@ export function WebuiModelPicker({
   const focusedDraft: WebuiModelPickerDraft =
     focusedModel ? (drafts[focusedKeyString] ?? {}) : {};
 
+  /**
+   * A click means "this is the one", and it finishes. The settings are a hover
+   * away — hovering the row is a second away from here, and the row the pointer
+   * is on is the one being clicked — so there is nothing left to visit, and
+   * keeping the menu open would strand the user on a surface they have already
+   * answered.
+   *
+   * A plain selection writes no settings: the row's settings were committed when
+   * they were edited and the local draft mirrors that, so re-committing here
+   * would be a second write of the same thing.
+   */
   const handleSelectModel = (model: WebuiModelPickerEntry) => {
-    const draft = drafts[modelKey(model)] ?? {};
-    onSelect(model, draft);
-    // A click means "this is the one", and it finishes. The settings are a
-    // hover away — hovering the row is a second away from here, and the row the
-    // pointer is on is the one being clicked — so there is nothing left to
-    // visit, and keeping the menu open would strand the user on a surface they
-    // have already answered.
-    setOpen(false);
-    setFocusedRow(undefined);
+    applyModelDraftResolution(
+      resolveModelDraftSelection({
+        model,
+        draft: drafts[modelKey(model)] ?? {},
+        change: { kind: "select" },
+      }),
+      {
+        commitDraft: handleCommitDraft,
+        commitSettings: (next) => onSettingChange(model, next),
+        select: (next) => onSelect(model, next),
+        close: handleCloseFlyout,
+      },
+    );
   };
 
   /**

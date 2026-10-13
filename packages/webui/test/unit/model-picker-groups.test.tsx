@@ -3,14 +3,16 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 
 import {
+  WebuiModelMenuList,
+  WebuiModelPicker,
+} from "../../src/client/components/models/ModelPicker.js";
+import {
   groupModelsByProvider,
   modelIdentity,
   modelKey,
   reconcileFocusedRow,
   rowIdOf,
-  WebuiModelMenuList,
-  WebuiModelPicker,
-} from "../../src/client/components/models/ModelPicker.js";
+} from "../../src/client/projection/models/model-picker-rows.js";
 import type { WebuiModelPickerEntry } from "../../src/client/contracts/models/model-view.js";
 
 function entry(
