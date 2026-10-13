@@ -1,6 +1,6 @@
 import { createWebuiMemoryStorage } from "./support/memory-storage.js";
 import { beforeEach, describe, expect, it } from "vitest";
-import { readSessionOverlay, toggleSessionOverlay } from "../../src/client/components/LeftRail.js";
+import { readSessionOverlay, toggleSessionOverlay } from "../../src/client/infrastructure/storage.js";
 import {
   isTeamModeLocked,
 } from "../../src/client/team-mode.js";

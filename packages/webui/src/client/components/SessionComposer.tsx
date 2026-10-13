@@ -160,7 +160,7 @@ import { evaluateComposerDismiss, evaluateOutsideClose } from "../projection/out
 import {
   buildWebuiModelSelectionRequest,
 } from "../projection/action-requests.js";
-import { workspaceProjectName } from "./SessionRail.js";
+import { workspaceProjectName } from "../projection/workspace-name.js";
 import {
   findWebuiMentionRange,
   findWebuiSlashRange,

@@ -3719,6 +3719,7 @@
     "packages/webui/src/client/projection/unread-badge.ts",
     "packages/webui/src/client/projection/usage-settings.ts",
     "packages/webui/src/client/projection/workspace-file-tree.ts",
+    "packages/webui/src/client/projection/workspace-name.ts",
     "packages/webui/src/client/projection/workspace-panel-state.ts",
     "packages/webui/src/client/projection/workspace-progress.ts",
     "packages/webui/src/client/projection/worktree-state.ts",

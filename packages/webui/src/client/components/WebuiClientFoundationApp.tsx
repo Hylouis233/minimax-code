@@ -22,15 +22,15 @@ import { ArchonShell } from "./ArchonShell.js";
 import { WEBUI_COMPOSER_HOME_KEY } from "../projection/composer-history.js";
 import { Composer } from "./Composer.js";
 import { GreetingSkeleton } from "./TranscriptSkeletons.js";
+import { LeftRail } from "./LeftRail.js";
 import {
-  LeftRail,
   readProjectNames,
   readProjectPins,
   readSessionOverlay,
   toggleProjectPin,
   toggleSessionOverlay,
   writeProjectName,
-} from "./LeftRail.js";
+} from "../infrastructure/storage.js";
 import { Transcript } from "./Transcript.js";
 import { UserMenu } from "./UserMenu.js";
 import { MEMORY_HANDOFF_PROMPT, type MemoryHandoff } from "./settings/PersonalizationSettings.js";

@@ -48,6 +48,7 @@ import {
 import { formatWebuiUnreadBadge } from "../projection/unread-badge.js";
 import type { WebuiClientSession, WebuiClientSessionPage, WebuiClientSessionTreePage, WebuiClientProject } from "../contracts/sessions/session-view.js";
 import { teamModeCopy } from "../team-mode.js";
+import { workspaceProjectName } from "../projection/workspace-name.js";
 
 const PROJECT_SESSION_BATCH_SIZE = 6;
 
@@ -139,14 +140,6 @@ export function filterWebuiSessionsByQuery(
 ): readonly WebuiClientSession[] {
   if (!query.trim()) return sessions;
   return sessions.filter((session) => matchesWebuiSessionQuery(session, query));
-}
-
-export function workspaceProjectName(workspaceDir?: string): string {
-  const value = workspaceDir?.trim();
-  if (!value) return "未选项目";
-  const normalized = value.replace(/[\\/]+$/u, "");
-  const parts = normalized.split(/[\\/]/u).filter(Boolean);
-  return parts.at(-1) || normalized;
 }
 
 export function sessionHash(sessionId: string): string {
