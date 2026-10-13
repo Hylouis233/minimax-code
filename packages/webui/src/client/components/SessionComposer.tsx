@@ -169,7 +169,6 @@ import {
   replaceWebuiSlashToken,
   webuiAttachmentLimitError,
   webuiTextAttachmentDataUrl,
-  type WebuiMentionRange,
 } from "../projection/composer-interactions.js";
 import {
   shouldRecallWebuiHistory,
@@ -847,7 +846,10 @@ export function WebuiComposer({
   const [skillsMenuError, setSkillsMenuError] = useState<string>();
   const [workspaceFiles, setWorkspaceFiles] = useState<readonly { readonly path: string; readonly name: string; readonly type?: string }[]>([]);
   const [workspaceBrowserOpen, setWorkspaceBrowserOpen] = useState(false);
-  const [mentionRange, setMentionRange] = useState<WebuiMentionRange>();
+  // The mention range is the composer's own state (§5.6: mention/slash ranges); the
+  // slash range is derived (`commandRange` below), so only this half is state.
+  const mentionRange = composerSnapshot.mentionRange;
+  const setMentionRange = composerStore.setMentionRange;
   const [mentionIndex, setMentionIndex] = useState(0);
   const [permissionMode, setPermissionModeValue] = useState<WebuiComposerPermissionMode>();
   const [permissionMenuOpen, setPermissionMenuOpen] = useState(false);

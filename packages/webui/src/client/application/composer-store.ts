@@ -28,6 +28,7 @@ import type { WebuiQueueItem } from "../../shared/contracts/queue.js";
 import type {
   WebuiComposerAttachment,
   WebuiComposerUrlReference,
+  WebuiMentionRange,
 } from "../projection/composer-interactions.js";
 import type { WebuiRecordedTurn } from "../projection/composer-state.js";
 
@@ -106,6 +107,12 @@ export interface WebuiComposerSnapshot extends WebuiComposerPersisted {
    * asking the server what was asked (§4.2 field 1: the retry record).
    */
   readonly retry: WebuiRecordedTurn | undefined;
+  /**
+   * The `@` mention range the menu is anchored to (§5.6: mention/slash ranges).
+   * The slash range is *not* here, because it is not state: `commandRange` is
+   * derived from the draft and the caret on every render.
+   */
+  readonly mentionRange: WebuiMentionRange | undefined;
 }
 
 export interface WebuiComposerStore {
@@ -142,6 +149,9 @@ export interface WebuiComposerStore {
   readonly readQueue: () => WebuiComposerQueueState;
   /** The staged attachments and url references. */
   readonly readStaging: () => WebuiComposerStagingState;
+  /** The mention range. */
+  readonly readMentionRange: () => WebuiMentionRange | undefined;
+  readonly setMentionRange: (next: WebuiMentionRange | undefined) => void;
   /** The input modes. */
   readonly readModes: () => WebuiComposerModes;
   readonly setModes: (
@@ -188,9 +198,17 @@ export function createWebuiComposerStore(options?: {
   let staging = WEBUI_COMPOSER_EMPTY_STAGING;
   let modes = WEBUI_COMPOSER_EMPTY_MODES;
   let retry: WebuiRecordedTurn | undefined;
+  let mentionRange: WebuiMentionRange | undefined;
   // One stable object per change: a fresh snapshot on *every* `getSnapshot()` call
   // would make `useSyncExternalStore` re-render forever.
-  let snapshot: WebuiComposerSnapshot = { ...state, queue, staging, modes, retry };
+  let snapshot: WebuiComposerSnapshot = {
+    ...state,
+    queue,
+    staging,
+    modes,
+    retry,
+    mentionRange,
+  };
   const listeners = new Set<() => void>();
 
   const notify = (): void => {
@@ -215,7 +233,7 @@ export function createWebuiComposerStore(options?: {
     const next = update(state);
     if (next === state) return;
     state = next;
-    snapshot = { ...state, queue, staging, modes, retry };
+    snapshot = { ...state, queue, staging, modes, retry, mentionRange };
     options?.storage?.saveComposer(state, serializeWebuiComposerPersisted, keepKeys);
     notify();
   };
@@ -259,7 +277,7 @@ export function createWebuiComposerStore(options?: {
       // an unchanged result must not notify.
       if (items === queue.items && paused === queue.paused) return;
       queue = { items, paused };
-      snapshot = { ...state, queue, staging, modes, retry };
+      snapshot = { ...state, queue, staging, modes, retry, mentionRange };
       notify();
     },
     readStaging: () => snapshot.staging,
@@ -277,7 +295,7 @@ export function createWebuiComposerStore(options?: {
       )
         return;
       staging = { attachments, urlReferences, busy, ...(seedToken === undefined ? {} : { seedToken }) };
-      snapshot = { ...state, queue, staging, modes, retry };
+      snapshot = { ...state, queue, staging, modes, retry, mentionRange };
       notify();
     },
     readModes: () => snapshot.modes,
@@ -287,7 +305,22 @@ export function createWebuiComposerStore(options?: {
       const plan = patch.plan ?? modes.plan;
       if (goal === modes.goal && plan === modes.plan) return;
       modes = { goal, plan };
-      snapshot = { ...state, queue, staging, modes, retry };
+      snapshot = { ...state, queue, staging, modes, retry, mentionRange };
+      notify();
+    },
+    readMentionRange: () => snapshot.mentionRange,
+    setMentionRange: (next) => {
+      if (next === mentionRange) return;
+      if (
+        next &&
+        mentionRange &&
+        next.start === mentionRange.start &&
+        next.end === mentionRange.end &&
+        next.query === mentionRange.query
+      )
+        return;
+      mentionRange = next;
+      snapshot = { ...state, queue, staging, modes, retry, mentionRange };
       notify();
     },
     readRetry: () => snapshot.retry,
@@ -295,7 +328,7 @@ export function createWebuiComposerStore(options?: {
       if (next === retry) return;
       if (next && retry && next.session === retry.session && next.message === retry.message) return;
       retry = next;
-      snapshot = { ...state, queue, staging, modes, retry };
+      snapshot = { ...state, queue, staging, modes, retry, mentionRange };
       notify();
     },
     purgeSlot: (key) => {

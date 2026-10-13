@@ -35,9 +35,24 @@ The two view types moved with the state: `WebuiComposerAttachment` and
 `WebuiComposerUrlReference` now live in `projection/composer-interactions.ts`, beside the
 attachment limit rule that already belonged to the composer's projection — an application
 module may not import component types, and the owner has to hold them.
-| `mentionRange` `:797` | component-local `useState` | composer state (§5.6 may-write: mention/slash ranges) | idem |
-| `slashDraftRef` `:1339` | component-local `useRef` | composer state (§5.6 may-write: slash ranges) | idem |
-| `slashRangeRef` `:1340` | component-local `useRef` | composer state (same) | idem |
+| `mentionRange` `:797` | **resolved** — `composerSnapshot.mentionRange` | composer state (§5.6 may-write: mention/slash ranges) | `composer-store.ts`: `readMentionRange()` / `setMentionRange()` |
+| `slashDraftRef` `:1339` | **reclassified — not state** | see below | stays |
+| `slashRangeRef` `:1340` | **reclassified — not state** | see below | stays |
+
+**The two slash refs are a stale-closure workaround, not the composer's state**, and the
+ledger corrects itself here rather than moving them for symmetry. What they hold is a mirror
+of a *prop* (`draft`) and of a *derivation* (`commandRange = findWebuiSlashRange(draft,
+composerCaret)`), and their comment says exactly why they exist: "so the listener always sees
+the latest values without re-attaching on every keystroke". §5.6's "mention/slash ranges" is
+satisfied by the two real things — `mentionRange` (state, now in the owner) and `commandRange`
+(derived, owned by nobody because it is recomputed). Moving a mirror into the owner would
+give the same value two homes, which is the shape this programme forbids, so they stay where
+they are: local implementation detail of one effect, in §3's category.
+
+That also answers the question left open last round. The refs only disappear if the draft
+becomes readable synchronously from the owner — but they should not disappear, because they
+are not state to relocate. The draft can keep flowing as a prop, and whether the shell writes
+it or invokes an owner command is `shell`'s decision in its own carve, not B2's.
 | `queueItems` `:780` | **resolved** — read from the owner as `queueState.items` | composer state (§4.2 names `:780` as the temporary home) | `composer-store.ts`: `readQueue()` / `setQueue()`, on the one subscription |
 | `queuePaused` `:781` | **resolved** — `queueState.paused` | same | same |
 
@@ -139,10 +154,11 @@ this file must stop holding. `open` `:2647`, `hovered` `:2648`, `breakdownOpen` 
 ticket is not blocked.
 
 **Not yet in its final home** (this carve's work, in the order the code allows):
-1. §1 — thirteen elements move into `composer-store.ts`. **Ten done** (the queue — §4.2's
-   two named rows — the attachment staging, the two input modes and the retry record, whose
-   ref is gone rather than moved); three left, all in the next group: `mentionRange`,
-   `slashDraftRef`, `slashRangeRef`.
+1. §1 — **done: eleven elements moved into `composer-store.ts`** (the queue — §4.2's two
+   named rows — the attachment staging, the two input modes, the retry record, `mentionRange`),
+   one ref deleted rather than moved (`recordedTurnRef`), and the last two reclassified as
+   view state with the reason recorded above. Nothing this component owns is left
+   component-local.
 2. §2 — **done** (the two cells above).
 3. §4 — the caches whose owner module does not exist yet lose their local copy in that
    owner's carve; until then the ledger records the API each one resolves against, and the
