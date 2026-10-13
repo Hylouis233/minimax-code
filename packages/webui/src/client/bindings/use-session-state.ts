@@ -52,10 +52,7 @@ import {
   type WebuiStreamPhaseCommands,
   type WebuiTurnLifecycleCommands,
 } from "../application/sessions/session-commands.js";
-import { attachWebuiTurn, sendWebuiTurn } from "../application/turn/turn-commands.js";
-import { stopWebuiTurn } from "../application/turn/turn-coordinator.js";
-import { buildWebuiStreamLoopSink } from "../mechanisms/stream-loop.js";
-import { streamStateBundle } from "../application/turn/stream-state-bundle.js";
+import { createWebuiConversationTurnCommands } from "../application/turn/turn-commands.js";
 import {
   useWebuiApplicationOptional,
   useWebuiSessionStoreContext,
@@ -197,6 +194,11 @@ export function useWebuiSessionCommands(sessionId: string | undefined): {
     const writer = writerFor();
     const readStream = () =>
       store.readSession(sessionId ?? WEBUI_HOME_SESSION_KEY).stream;
+    const turnCommands = createWebuiConversationTurnCommands({
+      store,
+      sessionId,
+      ...(capabilities ? { capabilities } : {}),
+    });
     // Two views, built from the same writer and handed out separately
     // (ticket #58). The interaction view is published by its own hook
     // (`useWebuiInteractionCommands`), which is the third group.
@@ -209,56 +211,16 @@ export function useWebuiSessionCommands(sessionId: string | undefined): {
       phase,
       lifecycle,
       readStream,
-      // One sink per attachment, minted here: it claims the lease, fences every
-      // write against the generation it claimed, and releases it on terminal.
-      attachTurn: ({ turnId }) =>
-        attachWebuiTurn({
-          sessionId,
-          turnId,
-          ...(capabilities?.resume ? { resumeSession: capabilities.resume } : {}),
-          ...(capabilities?.load ? { loadMessages: capabilities.load } : {}),
-          readStream,
-          setSending: writer.setSending,
-          sink: buildWebuiStreamLoopSink(writer.setStream, streamStateBundle),
-        }),
-      sendTurn: ({
-        onDraftChange,
-        onNeedsSession,
-        onSessionCreated,
-        onQueued,
-        ...args
-      }) =>
-        sendWebuiTurn({
-          sessionId,
+      // The three turn intents are invocations now: the record key, the writer,
+      // the attempt's sink and the transports cut from the capability slice are
+      // the application's own construction (T04). This hook names none of them.
+      attachTurn: ({ turnId }) => turnCommands.attach(turnId),
+      sendTurn: ({ onDraftChange, onNeedsSession, onSessionCreated, onQueued, ...args }) =>
+        turnCommands.send({
           ...args,
-          readStream,
           callbacks: { onDraftChange, onNeedsSession, onSessionCreated, onQueued },
-          // The loop's transport capabilities, cut from the slice. An unwired
-          // operation is absent, and the loop refuses with its own reason
-          // instead of the component having to know it is missing.
-          deps: {
-            ...(capabilities?.send ? { sendMessage: capabilities.send } : {}),
-            ...(capabilities?.resume ? { resumeSession: capabilities.resume } : {}),
-            ...(capabilities?.load ? { loadMessages: capabilities.load } : {}),
-          },
-          ...(capabilities?.enqueue ? { enqueueMessage: capabilities.enqueue } : {}),
-          ...(capabilities?.createSession
-            ? { createSession: capabilities.createSession }
-            : {}),
-          // Builds the turn's writer — and, through it, the sink — inside the
-          // command, so the home→session migration keeps working without the
-          // component ever naming a key or holding a factory.
-          createWriter: () => createWebuiTurnCommands(writerFor()),
         }),
-      stopTurn: async () => {
-        if (!sessionId || !capabilities?.stop) return;
-        await stopWebuiTurn({
-          abortSession: capabilities.stop,
-          sessionId,
-          setSending: lifecycle.setTurnSending,
-          settleStream: phase.settleStoppedStream,
-        });
-      },
+      stopTurn: () => turnCommands.stop(),
     };
   }, [store, sessionId, capabilities]);
 }

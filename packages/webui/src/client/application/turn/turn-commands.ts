@@ -43,6 +43,15 @@ import {
 } from "./active-turn-probe.js";
 import { streamStateBundle } from "./stream-state-bundle.js";
 import type { WebuiEventEffects } from "./event-coordinator.js";
+import type { WebuiSessionStore } from "../session-store.js";
+import { WEBUI_HOME_SESSION_KEY } from "../state.js";
+import {
+  createWebuiStreamPhaseCommands,
+  createWebuiTurnCommands,
+  createWebuiTurnLifecycleCommands,
+} from "../sessions/session-commands.js";
+import type { WebuiTurnCapabilitySlice } from "./turn-capabilities.js";
+import { stopWebuiTurn } from "./turn-coordinator.js";
 
 /** Adapts the application's session-aware event call to the composer commands. */
 export function createWebuiComposerAttachStreamEffect(
@@ -262,4 +271,136 @@ export async function sendWebuiTurn(args: WebuiSendTurnArgs): Promise<void> {
     },
     turnHandlers,
   );
+}
+
+/**
+ * What a turn command needs to run: the application-owned canonical record
+ * repository, the session it is about, and the published capability slice
+ * (§4.2; T04's `conversation-turn-commands`).
+ */
+export interface WebuiTurnCommandContext {
+  readonly store: WebuiSessionStore;
+  readonly sessionId: string | undefined;
+  readonly capabilities?: WebuiTurnCapabilitySlice;
+}
+
+/** What a surface supplies to send: intent and data, never a writer or a sink. */
+export interface WebuiTurnSendIntent {
+  readonly message: string;
+  readonly clientIntent?: string;
+  readonly planMode?: boolean;
+  readonly attachments?: readonly WebuiAttachmentInput[];
+  readonly onAttachmentsSubmitted?: () => void;
+  readonly sending: boolean;
+  readonly callbacks: WebuiComposerTurnCallbacks;
+  readonly createSessionWorkspaceDir?: string;
+  readonly teamModeOff?: boolean;
+}
+
+/**
+ * The turn commands a surface invokes, with the application's own construction
+ * behind them.
+ *
+ * A binding used to choose the record key, build the writer, mint the sink and
+ * cut the transports out of the capability slice — four decisions about
+ * application state, made in a React hook. They are made once here instead, so a
+ * binding is a subscription plus an invocation, and a second surface (or a
+ * headless caller) gets the same key choice, the same sink and the same
+ * absent-capability refusal without repeating any of it.
+ *
+ * The record key is `sessionId ?? WEBUI_HOME_SESSION_KEY`: a first message may
+ * create the session it is sent to, and the writer's own `migrateToSession`
+ * carries the attempt from the home slot to that session.
+ */
+export interface WebuiConversationTurnCommands {
+  readonly send: (intent: WebuiTurnSendIntent) => Promise<void>;
+  readonly attach: (turnId: string | undefined) => void;
+  readonly stop: () => Promise<void>;
+}
+
+export function createWebuiConversationTurnCommands(
+  context: WebuiTurnCommandContext,
+): WebuiConversationTurnCommands {
+  const { store, sessionId, capabilities } = context;
+
+  /**
+   * The record writer for this turn: the session's, or the home slot's before a
+   * first message creates the session. Kept as the store writer as well, because
+   * the stop command needs the stream/sending writes the command adapter does not
+   * publish.
+   */
+  const storeWriterFor = () =>
+    sessionId
+      ? store.createSessionWriter({ kind: "session", sessionId })
+      : store.createSessionWriter({ kind: "home" });
+  const writerFor = (): WebuiTurnCommandWriter => createWebuiTurnCommands(storeWriterFor());
+
+  /** The live slice. The home→session migration changes which key this reads. */
+  const readStream = (): WebuiStreamState =>
+    store.readSession(sessionId ?? WEBUI_HOME_SESSION_KEY).stream;
+
+  /**
+   * The loop's transports, cut from the slice: an unwired operation is absent,
+   * and the loop refuses with its own stated reason instead of a caller having
+   * to know the operation is missing.
+   */
+  const loopDeps = (): Omit<WebuiStreamLoopDeps, "projection" | "streamState"> => ({
+    ...(capabilities?.send ? { sendMessage: capabilities.send } : {}),
+    ...(capabilities?.resume ? { resumeSession: capabilities.resume } : {}),
+    ...(capabilities?.load ? { loadMessages: capabilities.load } : {}),
+  });
+
+  return {
+    send: async (intent) => {
+      const writer = writerFor();
+      await sendWebuiTurn({
+        sessionId,
+        message: intent.message,
+        ...(intent.clientIntent ? { clientIntent: intent.clientIntent } : {}),
+        ...(intent.planMode ? { planMode: intent.planMode } : {}),
+        attachments: intent.attachments,
+        onAttachmentsSubmitted: intent.onAttachmentsSubmitted,
+        sending: intent.sending,
+        callbacks: intent.callbacks,
+        readStream,
+        deps: loopDeps(),
+        ...(capabilities?.enqueue ? { enqueueMessage: capabilities.enqueue } : {}),
+        ...(capabilities?.createSession ? { createSession: capabilities.createSession } : {}),
+        ...(intent.createSessionWorkspaceDir
+          ? { createSessionWorkspaceDir: intent.createSessionWorkspaceDir }
+          : {}),
+        ...(intent.teamModeOff ? { teamModeOff: intent.teamModeOff } : {}),
+        // The writer and, through it, the sink are built here: the caller names
+        // no key and holds no factory.
+        createWriter: () => writer,
+      });
+    },
+    attach: (turnId) => {
+      const writer = writerFor();
+      attachWebuiTurn({
+        sessionId,
+        turnId,
+        ...(capabilities?.resume ? { resumeSession: capabilities.resume } : {}),
+        ...(capabilities?.load ? { loadMessages: capabilities.load } : {}),
+        readStream,
+        setSending: writer.setTurnSending,
+        sink: writer.createSink(),
+      });
+    },
+    stop: async () => {
+      if (!sessionId || !capabilities?.stop) return;
+      const writer = storeWriterFor();
+      const lifecycle = createWebuiTurnLifecycleCommands({
+        setStream: writer.setStream,
+        setSending: writer.setSending,
+      });
+      const phase = createWebuiStreamPhaseCommands({ setStream: writer.setStream });
+      await stopWebuiTurn({
+        abortSession: capabilities.stop,
+        sessionId,
+        setSending: lifecycle.setTurnSending,
+        settleStream: phase.settleStoppedStream,
+      });
+    },
+  };
 }

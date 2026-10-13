@@ -3891,6 +3891,7 @@
     "packages/webui/test/unit/context-breakdown.test.ts",
     "packages/webui/test/unit/context-usage-indicator.test.ts",
     "packages/webui/test/unit/context-usage-popover.test.ts",
+    "packages/webui/test/unit/conversation-turn-commands.test.ts",
     "packages/webui/test/unit/conversation-usage-banner.test.tsx",
     "packages/webui/test/unit/conversation-usage-notice.test.ts",
     "packages/webui/test/unit/diff-mutation-error.test.tsx",
