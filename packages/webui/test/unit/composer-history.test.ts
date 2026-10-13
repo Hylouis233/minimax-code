@@ -271,7 +271,25 @@ describe("composer persistence ownership", () => {
     expect(createWebuiComposerStore({ storage: adapter }).getSnapshot()).toEqual({
       drafts: { home: "draft" },
       history: { home: ["sent"] },
+      // The snapshot carries the live queue too (§4.2 field 1: the queue's state
+      // is the composer's, and it rides this one subscription); it starts empty
+      // because nothing persisted it.
+      queue: { items: [], paused: false },
     });
+  });
+
+  it("does not persist the live queue", () => {
+    // The queue is runtime state: it must survive neither a reload nor a switch.
+    // If it ever lands in the adapter, this fails.
+    const memory = createWebuiMemoryStorage();
+    const adapter = createWebuiBrowserStorage(memory);
+    const composer = createWebuiComposerStore({ storage: adapter });
+    composer.setDraft("home", "draft");
+    composer.setQueue({ items: [{ itemId: "q1" } as never], paused: true });
+    expect(composer.readQueue().paused).toBe(true);
+    const stored = memory.getItem("webui.composer.state.v1") ?? "";
+    expect(stored).not.toContain("q1");
+    expect(stored).not.toContain("queue");
   });
 
   it("does not access browser storage without an injected adapter", () => {

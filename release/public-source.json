@@ -3586,6 +3586,7 @@
     "packages/webui/src/client/bindings/application-context.tsx",
     "packages/webui/src/client/bindings/browser-capabilities.tsx",
     "packages/webui/src/client/bindings/browser-effects.ts",
+    "packages/webui/src/client/bindings/composer-store.ts",
     "packages/webui/src/client/bindings/event-channel-adapter.ts",
     "packages/webui/src/client/bindings/event-effects-context.tsx",
     "packages/webui/src/client/bindings/navigation.ts",

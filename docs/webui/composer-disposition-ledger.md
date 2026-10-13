@@ -33,8 +33,13 @@ history are in it today) with `application/composer-workflows.ts`. §5.6's targe
 | `mentionRange` `:797` | component-local `useState` | composer state (§5.6 may-write: mention/slash ranges) | idem |
 | `slashDraftRef` `:1339` | component-local `useRef` | composer state (§5.6 may-write: slash ranges) | idem |
 | `slashRangeRef` `:1340` | component-local `useRef` | composer state (same) | idem |
-| `queueItems` `:780` | component-local `useState` | **composer state — §4.2 names this line as the temporary home** | `composer-store.ts` |
-| `queuePaused` `:781` | component-local `useState` | **composer state — §4.2 names this line as the temporary home** | `composer-store.ts` |
+| `queueItems` `:780` | **resolved** — read from the owner as `queueState.items` | composer state (§4.2 names `:780` as the temporary home) | `composer-store.ts`: `readQueue()` / `setQueue()`, on the one subscription |
+| `queuePaused` `:781` | **resolved** — `queueState.paused` | same | same |
+
+The queue is **live state**: not persisted and not per-slot. Unlike the draft it does not
+survive a session switch, and keying it by session would make switching back resurrect a
+stale list — a behaviour change, not a reorganisation. `composer-history.test.ts` asserts
+both halves (`does not persist the live queue`, and the snapshot it rides).
 | `recordedTurn` `:1757` | component-local `useState` | composer state (§4.2 field 1: the retry record) | `composer-store.ts` |
 | `recordedTurnRef` `:1756` | component-local `useRef` | composer state (its guard) | `composer-store.ts` |
 | `planMode` `:777` | component-local `useState` | composer state (§4.2 field 1: input mode flags) | `composer-store.ts` |
@@ -122,8 +127,10 @@ this file must stop holding. `open` `:2647`, `hovered` `:2648`, `breakdownOpen` 
 ticket is not blocked.
 
 **Not yet in its final home** (this carve's work, in the order the code allows):
-1. §1 — thirteen elements move into `composer-store.ts` (the queue and the retry record
-   are the two §4.2 names explicitly). **Not started.**
+1. §1 — thirteen elements move into `composer-store.ts`. **Two done** (the queue, §4.2's
+   two named rows); eleven left: `attachments`, `urlReferences`, `attachmentBusy`,
+   `seededTokenRef`, `mentionRange`, `slashDraftRef`, `slashRangeRef`, `recordedTurn`,
+   `recordedTurnRef`, `planMode`, `goalMode`.
 2. §2 — **done** (the two cells above).
 3. §4 — the caches whose owner module does not exist yet lose their local copy in that
    owner's carve; until then the ledger records the API each one resolves against, and the

@@ -24,14 +24,46 @@ import {
   type WebuiComposerPersisted,
 } from "../projection/composer-history.js";
 
+import type { WebuiQueueItem } from "../../shared/contracts/queue.js";
+
 export interface WebuiComposerPersistence {
   readonly loadComposer: <T>(parse: (raw: string | null | undefined) => T) => T;
   readonly saveComposer: <T>(state: T, serialize: (state: T, keepKeys?: readonly string[]) => string, keepKeys?: readonly string[]) => void;
 }
 
+/**
+ * The live queue mirror (§4.2 field 1: "the queue's state (`queueItems`,
+ * `queuePaused` — component-local today)"). It is the composer's state, but it is
+ * **not** persisted and **not** per-slot: unlike the draft it does not survive a
+ * session switch, and the composer that renders it is a single instance. Keying it
+ * by session would make switching back resurrect a stale list, which is a behaviour
+ * change, not a reorganisation.
+ */
+export interface WebuiComposerQueueState {
+  readonly items: readonly WebuiQueueItem[];
+  readonly paused: boolean;
+}
+
+export const WEBUI_COMPOSER_EMPTY_QUEUE: WebuiComposerQueueState = {
+  items: [],
+  paused: false,
+};
+
+/**
+ * What a subscriber sees: the persisted slots plus the live queue. One store, one
+ * subscription — the queue rides the snapshot rather than getting a second channel,
+ * because two subscriptions to one owner is the arrangement this programme forbids.
+ */
+export interface WebuiComposerSnapshot extends WebuiComposerPersisted {
+  readonly queue: WebuiComposerQueueState;
+}
+
 export interface WebuiComposerStore {
-  /** The current persisted state; stable until something changes. */
-  readonly getSnapshot: () => WebuiComposerPersisted;
+  /**
+   * The current state; stable until something changes, so it is safe as a
+   * `useSyncExternalStore` snapshot.
+   */
+  readonly getSnapshot: () => WebuiComposerSnapshot;
   /** Subscribe to changes. Returns a detach. */
   readonly subscribe: (listener: () => void) => () => void;
   /** The draft text for one slot, or the empty string. */
@@ -56,6 +88,18 @@ export interface WebuiComposerStore {
    * re-emerge with a stale draft or replay history.
    */
   readonly purgeSlot: (key: string) => void;
+  /** The live queue mirror. */
+  readonly readQueue: () => WebuiComposerQueueState;
+  /**
+   * Replace the live queue mirror. A partial update keeps the other half; a
+   * function receives the current state, so a caller that removes one item does
+   * not have to read the snapshot first.
+   */
+  readonly setQueue: (
+    next:
+      | Partial<WebuiComposerQueueState>
+      | ((current: WebuiComposerQueueState) => Partial<WebuiComposerQueueState>),
+  ) => void;
 }
 
 export function createWebuiComposerStore(options?: {
@@ -65,6 +109,10 @@ export function createWebuiComposerStore(options?: {
   readonly storage?: WebuiComposerPersistence;
 }): WebuiComposerStore {
   let state = options?.initial ?? options?.storage?.loadComposer(parseWebuiComposerPersisted) ?? { drafts: {}, history: {} };
+  let queue = WEBUI_COMPOSER_EMPTY_QUEUE;
+  // One stable object per change: a fresh snapshot on *every* `getSnapshot()` call
+  // would make `useSyncExternalStore` re-render forever.
+  let snapshot: WebuiComposerSnapshot = { ...state, queue };
   const listeners = new Set<() => void>();
 
   const notify = (): void => {
@@ -89,12 +137,13 @@ export function createWebuiComposerStore(options?: {
     const next = update(state);
     if (next === state) return;
     state = next;
+    snapshot = { ...state, queue };
     options?.storage?.saveComposer(state, serializeWebuiComposerPersisted, keepKeys);
     notify();
   };
 
   return {
-    getSnapshot: () => state,
+    getSnapshot: () => snapshot,
     subscribe: (listener) => {
       listeners.add(listener);
       return () => {
@@ -122,6 +171,18 @@ export function createWebuiComposerStore(options?: {
     },
     adoptHome: (targetKey) => {
       apply((current) => migrateWebuiHomeComposerState(current, targetKey), [targetKey]);
+    },
+    readQueue: () => snapshot.queue,
+    setQueue: (next) => {
+      const patch = typeof next === "function" ? next(queue) : next;
+      const items = patch.items ?? queue.items;
+      const paused = patch.paused ?? queue.paused;
+      // Reference equality, not deep: the caller passes the array it received, so
+      // an unchanged result must not notify.
+      if (items === queue.items && paused === queue.paused) return;
+      queue = { items, paused };
+      snapshot = { ...state, queue };
+      notify();
     },
     purgeSlot: (key) => {
       apply((current) => {

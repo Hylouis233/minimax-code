@@ -22,6 +22,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type FormEvent,
   type ReactElement,
 } from "react";
@@ -71,6 +72,7 @@ import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js
 import { useWebuiPortSlice } from "../bindings/port-slices-context.js";
 import { useWebuiEventEffectsRegistry } from "../bindings/event-effects-context.js";
 import { useWebuiVersionCells } from "../bindings/version-cells.js";
+import { useWebuiComposerStore } from "../bindings/composer-store.js";
 import { webuiSessionStatusType } from "../projection/stream-state.js";
 
 /** Capability subset the session composer consumes. Single source of truth
@@ -782,8 +784,20 @@ export function WebuiComposer({
   const [planMode, setPlanMode] = useState(false);
   const [goalSubmitting, setGoalSubmitting] = useState(false);
   const [interactionError, setInteractionError] = useState<string>();
-  const [queueItems, setQueueItems] = useState<readonly WebuiQueueItem[]>([]);
-  const [queuePaused, setQueuePaused] = useState(false);
+  // The queue mirror is the composer's own state, and its owner is the composer
+  // store (§4.2 field 1: "the queue's state (`queueItems`, `queuePaused` —
+  // component-local today)"; §5.6's composer row names the owner module). It is
+  // live state: not persisted, and not per-slot, because unlike the draft it does
+  // not survive a session switch.
+  const composerStore = useWebuiComposerStore();
+  const queueState = useSyncExternalStore(
+    composerStore.subscribe,
+    composerStore.getSnapshot,
+    composerStore.getSnapshot,
+  ).queue;
+  const queueItems = queueState.items;
+  const queuePaused = queueState.paused;
+  const setQueueItems = composerStore.setQueue;
   const [models, setModels] = useState<readonly WebuiModelEntry[]>([]);
   const [accountStatus, setAccountStatus] = useState<Record<string, unknown>>();
   const [commandOutput, setCommandOutput] = useState<string>();
@@ -885,8 +899,10 @@ export function WebuiComposer({
       if (listQueueMessages) {
         const queue = await listQueueMessages({ id: sessionId });
         if (cancelled) return;
-        setQueueItems(queue.items ?? []);
-        setQueuePaused(queue.paused === true);
+        setQueueItems({
+          items: queue.items ?? [],
+          paused: queue.paused === true,
+        });
       }
     };
     void refreshPending().catch((error: unknown) => {
@@ -1219,9 +1235,11 @@ export function WebuiComposer({
     setInteractionError(undefined);
     try {
       await deleteQueueItem({ id: sessionId, itemId: item.itemId });
-      setQueueItems((current) =>
-        current.filter((candidate) => candidate.itemId !== item.itemId),
-      );
+      setQueueItems((current) => ({
+        items: current.items.filter(
+          (candidate) => candidate.itemId !== item.itemId,
+        ),
+      }));
     } catch (error) {
       setInteractionError(
         error instanceof Error ? error.message : String(error),
@@ -1742,8 +1760,10 @@ export function WebuiComposer({
         if (!sessionId || !listQueueMessages) return;
         void listQueueMessages({ id: sessionId })
           .then((queue) => {
-            setQueueItems(queue.items ?? []);
-            setQueuePaused(queue.paused === true);
+            setQueueItems({
+              items: queue.items ?? [],
+              paused: queue.paused === true,
+            });
           })
           .catch((error: unknown) => {
             setInteractionError(
