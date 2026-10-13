@@ -384,7 +384,8 @@
       "packages/webui/test/unit/terminal-size.test.ts",
       "packages/webui/test/unit/webui-role-check.test.ts",
       "packages/webui/test/unit/webui-application-lifecycle.test.ts",
-      "packages/webui/test/unit/webui-identity-epoch-wiring.test.ts"
+      "packages/webui/test/unit/webui-identity-epoch-wiring.test.ts",
+      "packages/webui/test/unit/request-freshness.test.ts"
     ]
   }
 }
