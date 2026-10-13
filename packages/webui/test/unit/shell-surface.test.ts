@@ -19,7 +19,7 @@ import {
   reduceWebuiShellSurface,
   webuiPluginManagementArea,
   type WebuiShellSurface,
-} from "../../src/client/projection/shell-surface.js";
+} from "../../src/client/projection/shell/shell-surface.js";
 
 const open = (surface: WebuiShellSurface, area: "plugins" | "skills"): WebuiShellSurface =>
   reduceWebuiShellSurface(surface, { type: "open-plugin-management", area });
