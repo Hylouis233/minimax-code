@@ -79,6 +79,15 @@ the modules no single business owns.
 | `questionnaire-state.ts`, `goal-state.ts`, `workspace-progress.ts` | Interaction, goal and workspace-progress derivations. |
 | `composer-state.ts` | Pure composer intent, enter-key, path and recent-workspace state rules. Submission workflows and session ID extraction live in `application/composer/composer-workflows.ts`. |
 | `action-requests.ts` | Request builders for actions (model selection and friends). |
+| `workspace/canvas-projection.ts`, `workspace/panel-projection.ts` | The canvas geometry (pointer gestures, zoom, nudges, the mutations they build) and what a workspace panel renders (a diff, a todo list, a preview). |
+| `workspace/workspace-file-tree.ts`, `workspace/archive-projection.ts`, `workspace/html-preview.ts`, `workspace/media-preview.ts` | How a file's size and time read, where an archive entry unpacks, and whether a preview is media or reaches outside its own directory. |
+| `turn/activity-phrase.ts` | Which phrase the activity indicator shows, and when it starts. |
+| `settings/settings-view.ts` | Which theme the app uses, and which settings tabs are shown. |
+| `account/usage.ts`, `plugins/mcp-status.ts`, `shell/context-menu.ts` | The usage-reset label, one MCP server's row status, where a context menu opens. |
+| `transcript/message-timestamp.ts` | How a message's timestamp reads. |
+
+Each of these was carved out of the component that rendered it (Phase 4b), so the
+derivation is testable without a DOM and the component holds only what it draws.
 
 `composer-history.ts` and `effect-reducer.ts` are **not** listed here: both are classified
 `application` by the dependency check and now live at
