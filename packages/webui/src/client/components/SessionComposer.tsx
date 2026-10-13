@@ -35,6 +35,7 @@ import type { WebuiClientSessionPage, WebuiClientSession } from "../contracts/se
 import type { WebuiTransport } from "../contracts/transport.js";
 import { projectWebuiMessageToStreamMessage, readUsageNumber } from "../projection/message-projection.js";
 import { webuiAnswersEndTurn } from "../projection/questionnaire-state.js";
+import { createWebuiGoalCoordinator } from "../application/goal-coordinator.js";
 import {
   createWebuiInteractionCoordinator,
 } from "../application/interaction-coordinator.js";
@@ -742,7 +743,6 @@ export function WebuiComposer({
     port: {
       listPendingPermissions,
       getPendingQuestionnaire,
-      getGoal,
       replyPermission,
       replyQuestionnaire,
       dismissQuestionnaire,
@@ -758,17 +758,28 @@ export function WebuiComposer({
           webuiAnswersEndTurn(answers) ? "idle" : "streaming",
         ),
       afterQuestionnaireDismiss: phase.endStreaming,
+    },
+    sessionId,
+    agentName,
+    pendingVersionRef,
+  });
+  // The goal duty has its own owner (plan §8 Phase 3 B1; §5.6: this component's
+  // interaction coordinator "loses the goal duty it absorbed"). Two owners, two
+  // version cells: a goal write cannot fence a pending read, and a pending reply
+  // cannot fence a goal read — which is the property `goal-coordinator.test.ts`
+  // asserts rather than assumes.
+  const goalCoordinator = createWebuiGoalCoordinator({
+    port: { ...(getGoal ? { getGoal } : {}) },
+    sink: {
       applyGoal: interactionCommands.applyGoal,
       afterGoalReRead: (next) => {
         if (next) setGoalMode(next.status !== "complete");
       },
     },
     sessionId,
-    agentName,
     goalVersionRef,
-    pendingVersionRef,
   });
-  const applyGoal = interactionCoordinator.applyGoal;
+  const applyGoal = goalCoordinator.applyGoal;
   const [goalEnabled, setGoalEnabled] = useState(true);
   const [goalMode, setGoalMode] = useState(false);
   const [planMode, setPlanMode] = useState(false);
@@ -936,7 +947,7 @@ export function WebuiComposer({
     // arrived while it was in flight: the version guard makes that decision,
     // and it has one implementation here, shared by the event callback and the
     // registered effects.
-    const refreshGoal = () => interactionCoordinator.refreshGoal();
+    const refreshGoal = () => goalCoordinator.refreshGoal();
 
     // The mount probe. A turn that started before this client read the server
     // is still running, so `getActiveTurn` returns it; a turn that starts after
@@ -1126,18 +1137,18 @@ export function WebuiComposer({
     // Same stale-window as the steering re-read: this request can be overtaken
     // by a `thread_goal.*` event while it is in flight, and answering with the
     // older snapshot would resurrect what the event just replaced.
-    const versionAtRequest = interactionCoordinator.goalVersion();
+    const versionAtRequest = goalCoordinator.goalVersion();
     void getGoal({ sessionId })
       .then((nextGoal) => {
         if (cancelled) return;
-        if (interactionCoordinator.goalVersion() !== versionAtRequest) return;
+        if (goalCoordinator.goalVersion() !== versionAtRequest) return;
         applyGoal(nextGoal);
         if (nextGoal) setGoalMode(nextGoal.status !== "complete");
       })
       .catch(() => {
         // Same guard on the error path: a rejection must not erase a goal that
         // a newer event installed while this request was in flight.
-        if (!cancelled && interactionCoordinator.goalVersion() === versionAtRequest)
+        if (!cancelled && goalCoordinator.goalVersion() === versionAtRequest)
           applyGoal(undefined);
       });
     return () => {

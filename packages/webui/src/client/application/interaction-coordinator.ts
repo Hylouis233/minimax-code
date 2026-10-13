@@ -13,18 +13,19 @@
 // not run, so these commands return an outcome instead of writing an error
 // themselves.
 //
-// All four of the duties §7.1 names for this file are here: the permission and
-// questionnaire replies, the pending/questionnaire re-read, the goal re-read, and
-// the late-read protection both re-reads need. The event coordinator still
+// Three of the four duties §7.1 named for this file stay here: the permission and
+// questionnaire replies, the pending/questionnaire re-read, and the late-read
+// protection that re-read needs. The fourth — the goal re-read — left at the B1
+// carve (§5.6: this coordinator "loses the goal duty it absorbed") and lives in
+// `goal-coordinator.ts` with its own version cell, so the two fences cannot bump
+// each other. The event coordinator still
 // reaches them through `application/event-effects-registry.ts` — that registry is
 // the per-session routing seam, not an owner, and the composer registers this
 // coordinator's commands with it. This owner is constructed per
 // session, so a re-read cannot land in the wrong one by construction rather than
 // by a guard.
 
-import type { GoalPort } from "../contracts/goal/goal-port.js";
 import type { InteractionPort } from "../contracts/interactions/interaction-port.js";
-import type { WebuiGoal } from "../../shared/contracts/goal.js";
 import type {
   WebuiInteractionReplyResult,
   WebuiPendingPermission,
@@ -32,6 +33,7 @@ import type {
   WebuiQuestionnaireRequest,
 } from "../../shared/contracts/interactions.js";
 import { buildWebuiPlanApproveAnswers } from "../projection/plan-mode.js";
+import type { WebuiVersionCell } from "./version-cell.js";
 
 /** The transport methods this owner drives. Absent means "not wired". */
 export type WebuiInteractionPortSlice = Pick<
@@ -41,13 +43,7 @@ export type WebuiInteractionPortSlice = Pick<
   | "replyPermission"
   | "replyQuestionnaire"
   | "dismissQuestionnaire"
-> &
-  // `getGoal` stays on this slice because the coordinator still drives the
-  // goal refresh while the goal carve has not happened (plan §5.6: the
-  // coordinator "loses the goal duty it absorbed as a third responsibility" at
-  // the `interactions` carve). The declaration re-file puts it on the port that
-  // owns it, so the duty can leave without moving a type.
-  Pick<GoalPort, "getGoal">;
+>;
 
 /** The store writes and stream-phase transitions a flow drives. */
 export interface WebuiInteractionSink {
@@ -72,15 +68,6 @@ export interface WebuiInteractionSink {
   ) => void;
   /** A dismissal never resumes the turn: the runtime only marks it dismissed. */
   readonly afterQuestionnaireDismiss: () => void;
-  /** The one goal write path the coordinator drives. */
-  readonly applyGoal: (goal: WebuiGoal | undefined) => void;
-  /**
-   * After a steering re-read actually lands. The re-read is eventually
-   * consistent, so the caller may want to reconcile view-only state (the
-   * composer's goal mode) with what the read returned; the coordinator does not
-   * own that state and does not guess at it.
-   */
-  readonly afterGoalReRead: (goal: WebuiGoal | undefined) => void;
 }
 
 /**
@@ -111,42 +98,13 @@ export interface WebuiInteractionCoordinator {
   readonly dismissQuestionnaire: (
     request: WebuiQuestionnaireRequest,
   ) => Promise<WebuiInteractionOutcome>;
-  /**
-   * The goal version, bumped by every goal write. A re-read captures it before
-   * asking and compares after, so a late answer cannot resurrect the goal a
-   * newer write already replaced.
-   */
-  readonly goalVersion: () => number;
-  /**
-   * The one goal write path. Every writer goes through it — a direct store write
-   * would let an in-flight re-read resurrect the state it was meant to replace.
-   */
-  readonly applyGoal: (goal: WebuiGoal | undefined) => void;
-  /**
-   * The steering re-read. Goal events announce that the objective moved without
-   * carrying the new goal, so the banner is re-read rather than patched.
-   */
-  readonly refreshGoal: () => Promise<WebuiInteractionOutcome>;
-}
-
-/**
- * The goal version cell. It is injected rather than held here because this
- * coordinator is deliberately stateless: a component may construct it on every
- * render, and a counter that lived in the coordinator would reset each time and
- * silently disable the guards it protects. The *policy* — bump on every write,
- * capture before a read and compare after — stays here; only the storage is the
- * caller's.
- */
-export interface WebuiGoalVersionCell {
-  current: number;
 }
 
 export interface WebuiInteractionCoordinatorOptions {
   readonly port: WebuiInteractionPortSlice;
   readonly sink: WebuiInteractionSink;
-  readonly goalVersionRef: WebuiGoalVersionCell;
   /** Persists request/mutation order across render-scoped coordinator objects. */
-  readonly pendingVersionRef: WebuiGoalVersionCell;
+  readonly pendingVersionRef: WebuiVersionCell;
   /** The session these flows belong to. Absent means nothing to refresh. */
   readonly sessionId?: string;
   /** Fallback requester name when the request carries none. */
@@ -179,21 +137,15 @@ export function createWebuiInteractionCoordinator({
   sink,
   sessionId,
   agentName,
-  goalVersionRef,
   pendingVersionRef,
 }: WebuiInteractionCoordinatorOptions): WebuiInteractionCoordinator {
   const {
     listPendingPermissions,
     getPendingQuestionnaire,
-    getGoal,
     replyPermission,
     replyQuestionnaire,
     dismissQuestionnaire,
   } = port;
-  const applyGoal = (goal: WebuiGoal | undefined): void => {
-    goalVersionRef.current += 1;
-    sink.applyGoal(goal);
-  };
   const invalidatePendingReads = (): void => {
     pendingVersionRef.current += 1;
   };
@@ -265,31 +217,6 @@ export function createWebuiInteractionCoordinator({
         invalidatePendingReads();
         sink.applyQuestionnaire(undefined);
         sink.afterQuestionnaireAnswer(answers);
-        return { ok: true };
-      } catch (error) {
-        return { ok: false, error: describe(error) };
-      }
-    },
-
-    goalVersion: () => goalVersionRef.current,
-
-    applyGoal,
-
-    refreshGoal: async () => {
-      if (!sessionId || !getGoal) return { ok: true };
-      // The same monotonically increasing cell orders reads and writes. A
-      // later read supersedes an earlier one even when no event or user write
-      // lands between them.
-      const versionAtRequest = ++goalVersionRef.current;
-      try {
-        const nextGoal = await getGoal({ sessionId });
-        // A newer write landed while this read was in flight: its answer is
-        // stale and is dropped rather than applied over the newer goal.
-        if (goalVersionRef.current !== versionAtRequest) return { ok: true };
-        // Query completion is a goal commit too; keep every commit on the
-        // versioned entry point so the next in-flight read observes it.
-        applyGoal(nextGoal);
-        sink.afterGoalReRead(nextGoal);
         return { ok: true };
       } catch (error) {
         return { ok: false, error: describe(error) };
