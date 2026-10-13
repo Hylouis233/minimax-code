@@ -61,41 +61,11 @@ import {
   type WebuiTurnView,
 } from "../../projection/transcript/transcript-shape.js";
 import {
-  webuiScrollBottomTop,
-  webuiScrollFollowsBottom,
-  webuiScrollIntent,
-} from "../../projection/common/transcript-scroll.js";
+  transcriptViewport,
+  useWebuiTranscriptScroll,
+} from "../../bindings/use-transcript-scroll.js";
 
 const EMPTY_TRANSCRIPT_PAGE: WebuiClientMessagePage = {};
-
-const TRANSCRIPT_VIEWPORT_SELECTOR = '[data-webui-session-scroll="true"]';
-
-/**
- * The scroll viewport that carries the transcript.
- *
- * It is an ancestor rather than the transcript element itself, and four places
- * need it, so the selector lives here instead of being spelled out each time.
- */
-function transcriptViewport(element: Element | null): HTMLElement | undefined {
-  return element?.closest<HTMLElement>(TRANSCRIPT_VIEWPORT_SELECTOR) ?? undefined;
-}
-
-/** Pin the viewport to the last message, when this follower is armed. */
-function pinTranscriptToBottom(viewport: HTMLElement, armed: boolean): void {
-  if (armed) viewport.scrollTop = webuiScrollBottomTop(viewport);
-}
-
-/**
- * Watch the transcript's own height, so content that grows after the first paint
- * (highlighting, images, tables) keeps being followed. Returns `undefined` where
- * the environment has no `ResizeObserver`; the caller has nothing to disconnect.
- */
-function observeTranscriptHeight(element: Element, onResize: () => void): (() => void) | undefined {
-  if (typeof ResizeObserver === "undefined") return undefined;
-  const observer = new ResizeObserver(onResize);
-  observer.observe(element);
-  return () => observer.disconnect();
-}
 
 /**
  * Historical questionnaire-response projection. Once the user submits a
@@ -255,8 +225,6 @@ export function WebuiSessionTranscript({
   const transcriptRef = useRef<HTMLElement | null>(null);
   const stream = useWebuiSessionStream(sessionId);
   const streamPhase = stream.phase;
-  const autoFollowRef = useRef(true);
-  const manualScrollIntentRef = useRef(false);
   // The plan file is a MESSAGE in the transcript, not a floating card: the
   // desktop renders it as the footer of the turn that wrote the plan. It lives
   // on the pending questionnaire, so the transcript reads the same channel the
@@ -348,6 +316,14 @@ export function WebuiSessionTranscript({
     turns,
     showEmptyState,
   } = view;
+  // The scroll binding owns the viewport, the auto-follow policy and the pin
+  // (plan §6: scroll is one of the three responsibilities cut out of this file).
+  const { releaseAutoFollow } = useWebuiTranscriptScroll({
+    transcriptRef,
+    sessionId,
+    turnLive,
+    contentKey: items,
+  });
   const loadOlder = visiblePage.hasMore && visiblePage.nextCursor
     ? () => {
         if (loading) return;
@@ -355,7 +331,7 @@ export function WebuiSessionTranscript({
         if (!requestedCursor) return;
         // 翻历史是用户主动往上走：交还控制权，否则更早消息并进来之后
         // 贴底跟随会把他从正在读的位置拽回末尾。
-        autoFollowRef.current = false;
+        releaseAutoFollow();
         const viewport = transcriptViewport(transcriptRef.current);
         const previousScrollTop = viewport?.scrollTop;
         void historyOwner?.loadOlder(sessionId, requestedCursor).then((outcome) => {
