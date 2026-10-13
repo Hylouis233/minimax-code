@@ -678,11 +678,15 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
         <div className="webui-workspace-add-anchor">
           <button type="button" className="webui-workspace-add-trigger" aria-label="添加标签" aria-haspopup="menu" aria-expanded={state.addMenuOpen} onClick={() => dispatch({ type: "toggle-add-menu" })}>+</button>
           {state.addMenuOpen ? <div className="webui-workspace-add-menu" role="menu" aria-label="添加工作区标签">
-            {webuiWorkspaceAddMenu().map((entry) => entry.opens.type === "open-workspace-review"
-              ? (sessionId && workspaceDir
-                  ? <button key={entry.kind} type="button" role="menuitem" onClick={() => dispatch({ type: "open-workspace-review", sessionId, workspaceDir })}>{addMenuGlyph(entry.kind)}<span>{entry.label}</span></button>
-                  : null)
-              : <button key={entry.kind} type="button" role="menuitem" onClick={() => dispatch({ type: "open-tab", kind: entry.opens.kind, sessionId, workspaceDir })}>{addMenuGlyph(entry.kind)}<span>{entry.label}</span></button>)}
+            {webuiWorkspaceAddMenu().map((entry) => {
+              // Bound to a const so the discriminated union narrows in the branch below.
+              const opens = entry.opens;
+              return opens.type === "open-workspace-review"
+                ? (sessionId && workspaceDir
+                    ? <button key={entry.kind} type="button" role="menuitem" onClick={() => dispatch({ type: "open-workspace-review", sessionId, workspaceDir })}>{addMenuGlyph(entry.kind)}<span>{entry.label}</span></button>
+                    : null)
+                : <button key={entry.kind} type="button" role="menuitem" onClick={() => dispatch({ type: "open-tab", kind: opens.kind, sessionId, workspaceDir })}>{addMenuGlyph(entry.kind)}<span>{entry.label}</span></button>;
+            })}
           </div> : null}
         </div>
       </div>
