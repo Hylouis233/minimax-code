@@ -250,7 +250,11 @@ export function createWebuiModelsWorkflows(deps: {
     readonly sessionId?: string;
   }): Promise<void> => {
     if (!port.selectModel) throw new Error("当前运行时不支持模型切换。");
-    await port.selectModel(request);
+    // The answer's own `success` flag is the runtime's verdict, and a refused
+    // selection must not read as one that landed: the composer's raw-prop version
+    // checked it, and moving the call here moves the check with it.
+    const answer = await port.selectModel(request);
+    if (answer?.success === false) throw new Error("The model could not be selected");
     // The selection is a property of the model list: re-read so the marked row
     // follows, and bump this owner's revision so its readers refresh.
     await loadModels(request.sessionId);

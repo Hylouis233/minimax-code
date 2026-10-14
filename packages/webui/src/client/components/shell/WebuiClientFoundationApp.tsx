@@ -1521,8 +1521,6 @@ export function WebuiClientFoundationApp(
                     editSessionMessage={transcriptPort.editSessionMessage}
                     listQueueMessages={composerPort.listQueueMessages}
                     deleteQueueItem={composerPort.deleteQueueItem}
-                    listModels={modelsPort.listModels}
-                    selectModel={modelsPort.selectModel}
                     pluginCatalogue={composerPluginCatalogue}
                     listWorkspaceFileTree={workspacePort.listWorkspaceFileTree}
                     browseWorkspaceDirs={workspacePort.browseWorkspaceDirs}

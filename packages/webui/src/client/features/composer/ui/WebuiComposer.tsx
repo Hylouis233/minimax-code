@@ -70,6 +70,10 @@ import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilit
 import { ContextUsageIndicator } from "../../../features/sessions/ui/ContextUsageIndicator.js";
 import { useWebuiPortSlice } from "../../../bindings/port-slices-context.js";
 import {
+  useWebuiModelsWorkflows,
+  useWebuiModelsWorkflowsState,
+} from "../../../bindings/use-query-state.js";
+import {
   useWebuiSettingsWorkflows,
   useWebuiSettingsWorkflowsState,
 } from "../../../bindings/use-query-state.js";
@@ -327,8 +331,6 @@ export function WebuiComposer({
   getActiveTurn,
   listQueueMessages,
   deleteQueueItem,
-  listModels,
-  selectModel,
   getAccountStatus,
   draft,
   onDraftChange,
@@ -374,8 +376,6 @@ export function WebuiComposer({
 
   readonly listQueueMessages?: (request: { readonly id: string }) => Promise<{ readonly items?: readonly WebuiQueueItem[]; readonly paused?: boolean; readonly pendingCount?: number }>;
   readonly deleteQueueItem?: (request: { readonly id: string; readonly itemId: string }) => Promise<{ readonly item?: WebuiQueueItem }>;
-  readonly listModels?: (request?: { readonly sessionId?: string }) => Promise<readonly WebuiModelEntry[]>;
-  readonly selectModel?: (request: WebuiModelSelectionRequest) => Promise<{ readonly success?: boolean }>;
   readonly getAccountStatus?: (request?: { readonly sessionId?: string }) => Promise<Record<string, unknown>>;
   /** The draft lives on the shell so it survives silent first-session creation. */
   readonly draft: string;
@@ -533,7 +533,22 @@ export function WebuiComposer({
   const queueItems = queueState.items;
   const queuePaused = queueState.paused;
   const setQueueItems = composerStore.setQueue;
-  const [models, setModels] = useState<readonly WebuiModelEntry[]>([]);
+  // The model catalogue is the models owner's cached read (T13 criterion 1):
+  // the composer used to hold a second copy fed by its own 2s poll of the raw
+  // `listModels` port method.
+  const modelsWorkflows = useWebuiModelsWorkflows();
+  const modelsSnapshot = useWebuiModelsWorkflowsState();
+  /**
+   * Which session the visible catalogue was read for.
+   *
+   * The surface used to clear its own copy on home so one session's models could
+   * not bleed into the next. It no longer holds a copy, so it gates instead:
+   * the owner's cached read is rendered only while it answers for the session
+   * on screen.
+   */
+  const [modelsScope, setModelsScope] = useState<string | undefined>(undefined);
+  const models: readonly WebuiModelEntry[] =
+    modelsScope === sessionId ? (modelsSnapshot.models.value ?? []) : [];
   const [accountStatus, setAccountStatus] = useState<Record<string, unknown>>();
   const [commandOutput, setCommandOutput] = useState<string>();
   const [commandRunning, setCommandRunning] = useState(false);
@@ -660,9 +675,10 @@ export function WebuiComposer({
 
   useEffect(() => {
     if (!sessionId) {
-      // Inspection data belongs to a session. Clear it when New Task returns to
-      // home so the previous session's model/account state cannot bleed into the composer.
-      setModels([]);
+      // Inspection data belongs to a session. On home the account answer is
+      // cleared and the catalogue read is re-scoped below, so the previous
+      // session's state cannot bleed into the composer (T13).
+      setModelsScope(undefined);
       setAccountStatus(undefined);
       // The live turn bleeds the same way: the module-level runtime map kept
       // the previous turn's stream under the welcome hero on every 新建任务.
@@ -896,16 +912,16 @@ export function WebuiComposer({
   }, [goalEnabled, sessionId]);
 
   useEffect(() => {
-    if (!listModels && !getAccountStatus) return undefined;
+    if (!modelsWorkflows && !getAccountStatus) return undefined;
     let cancelled = false;
     const refreshInspection = async () => {
-      const [nextModels, nextAccount] = await Promise.all([
-        listModels?.({ sessionId }),
+      const [, nextAccount] = await Promise.all([
+        modelsWorkflows?.loadModels(sessionId),
         getAccountStatus?.({ sessionId }),
       ]);
       if (cancelled) return;
-      setModels(nextModels ?? []);
       setAccountStatus(nextAccount);
+      setModelsScope(sessionId);
     };
     void refreshInspection().catch((error: unknown) => {
       if (!cancelled)
@@ -920,7 +936,7 @@ export function WebuiComposer({
       cancelled = true;
       clearInterval(timer);
     };
-  }, [getAccountStatus, listModels, sessionId]);
+  }, [getAccountStatus, modelsWorkflows, sessionId]);
 
   const handlePermission = async (
     permission: WebuiPendingPermission,
@@ -992,18 +1008,14 @@ export function WebuiComposer({
     model: WebuiModelEntry,
     draft: WebuiModelPickerDraft,
   ) => {
-    if (!selectModel) return;
+    if (!modelsWorkflows) return;
     setInteractionError(undefined);
     try {
-      const result = await selectModel(
+      // The owner checks the runtime's own success flag and re-reads the
+      // catalogue, so the marked row follows the write.
+      await modelsWorkflows.selectModel(
         buildWebuiModelSelectionRequest(model, draft, sessionId),
       );
-      if (result.success === false)
-        throw new Error("The model could not be selected");
-      const refreshed = await listModels?.({
-        ...(sessionId ? { sessionId } : {}),
-      });
-      if (refreshed) setModels(refreshed);
     } catch (error) {
       setInteractionError(
         error instanceof Error ? error.message : String(error),
