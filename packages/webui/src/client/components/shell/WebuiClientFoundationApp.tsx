@@ -110,13 +110,13 @@ import { WebuiApplicationProvider } from "../../bindings/application-context.js"
 import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
 import { useWebuiApplicationOptional } from "../../bindings/application-context.js";
 import {
-  WebuiAccountWorkflowsProvider,
   WebuiPluginWorkflowsProvider,
   WebuiSessionWorkflowsProvider,
   WebuiModelsWorkflowsProvider,
   WebuiSettingsWorkflowsProvider,
   WebuiWorkspaceQueriesProvider,
 } from "../../bindings/use-query-state.js";
+import { WebuiAccountWorkflowsProvider } from "../../features/account/bindings/use-account-workflows.js";
 import { createWebuiWorkspaceQueries } from "../../features/workspace/application/workspace-queries.js";
 import { createWebuiAccountWorkflows } from "../../features/account/application/account-workflows.js";
 import { createWebuiModelsWorkflows } from "../../features/models/application/models-workflows.js";

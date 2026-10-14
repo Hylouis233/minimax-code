@@ -16,8 +16,6 @@ import { UsageModelSettings } from "./UsageModelSettings.js";
 import { PersonalizationSettings } from "./PersonalizationSettings.js";
 import type { MemoryHandoff } from "./MemoryManagerDialog.js";
 import {
-  useWebuiAccountWorkflows,
-  useWebuiAccountWorkflowsState,
   useWebuiArchivedSessionsState,
   useWebuiSessionWorkflows,
   useWebuiSettingsWorkflows,
@@ -25,6 +23,10 @@ import {
   useWebuiModelsWorkflowsState,
   useWebuiSettingsWorkflowsState,
 } from "../../bindings/use-query-state.js";
+import {
+  useWebuiAccountWorkflows,
+  useWebuiAccountWorkflowsState,
+} from "../../features/account/bindings/use-account-workflows.js";
 import { useWebuiSessionStoreContext } from "../../bindings/application-context.js";
 import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
 import { selectWebuiCatalogFlatPage } from "../../features/sessions/application/session-catalog.js";

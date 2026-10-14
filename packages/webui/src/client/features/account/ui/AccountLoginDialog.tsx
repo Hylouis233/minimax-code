@@ -24,7 +24,7 @@ import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilit
 import {
   useWebuiAccountWorkflows,
   useWebuiAccountWorkflowsState,
-} from "../../../bindings/use-query-state.js";
+} from "../bindings/use-account-workflows.js";
 import { deriveWebuiAccountLoginPhase } from "../application/login-phase.js";
 import type { WebuiAccountLoginPhase } from "../application/login-phase.js";
 

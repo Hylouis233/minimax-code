@@ -21,7 +21,7 @@ import type { MemoryHandoff } from "../../../components/settings/MemoryManagerDi
 import type { WebuiVersionInfo } from "../../../../shared/contracts/version.js";
 import { evaluateOutsideClose } from "../../../projection/common/outside-close.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
-import { useWebuiAccountWorkflows, useWebuiAccountWorkflowsState } from "../../../bindings/use-query-state.js";
+import { useWebuiAccountWorkflows, useWebuiAccountWorkflowsState } from "../bindings/use-account-workflows.js";
 import { SIGNIN, SigninCard, formatSigninError, type SigninState } from "./UserMenuSignin.js";
 import { UsagePanel, type UsageState } from "./UserMenuUsage.js";
 

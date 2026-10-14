@@ -3638,6 +3638,7 @@
     "packages/webui/src/client/conversation/transcript-request-ownership.ts",
     "packages/webui/src/client/features/account/application/account-workflows.ts",
     "packages/webui/src/client/features/account/application/login-phase.ts",
+    "packages/webui/src/client/features/account/bindings/use-account-workflows.tsx",
     "packages/webui/src/client/features/account/contracts/account-port.ts",
     "packages/webui/src/client/features/account/projection/usage.ts",
     "packages/webui/src/client/features/account/ui/AccountLoginDialog.tsx",

@@ -23,11 +23,6 @@ import {
   type WebuiWorkspaceQueriesState,
 } from "../features/workspace/application/workspace-queries.js";
 import {
-  initialWebuiAccountWorkflowsState,
-  type WebuiAccountWorkflows,
-  type WebuiAccountWorkflowsState,
-} from "../features/account/application/account-workflows.js";
-import {
   initialWebuiSettingsWorkflowsState,
   type WebuiSettingsWorkflows,
   type WebuiSettingsWorkflowsState,
@@ -101,41 +96,6 @@ function initialSnapshot(): WebuiWorkspaceQueriesState {
 // provider reads the initial snapshot and submits no-ops, which is what an SSR
 // render or a unit test that mounts a panel without the runtime should get.
 // ---------------------------------------------------------------------------
-
-const WebuiAccountWorkflowsContext = createContext<WebuiAccountWorkflows | undefined>(
-  undefined,
-);
-
-export function WebuiAccountWorkflowsProvider({
-  workflows,
-  children,
-}: {
-  readonly workflows: WebuiAccountWorkflows;
-  readonly children: ReactNode;
-}): JSX.Element {
-  return (
-    <WebuiAccountWorkflowsContext.Provider value={workflows}>
-      {children}
-    </WebuiAccountWorkflowsContext.Provider>
-  );
-}
-
-export function useWebuiAccountWorkflows(): WebuiAccountWorkflows | undefined {
-  return useContext(WebuiAccountWorkflowsContext);
-}
-
-export function useWebuiAccountWorkflowsState(): WebuiAccountWorkflowsState {
-  const workflows = useContext(WebuiAccountWorkflowsContext);
-  return useSyncExternalStore(
-    workflows ? workflows.subscribe : noopSubscribe,
-    workflows ? workflows.getSnapshot : accountInitialSnapshot,
-    workflows ? workflows.getSnapshot : accountInitialSnapshot,
-  );
-}
-
-function accountInitialSnapshot(): WebuiAccountWorkflowsState {
-  return initialWebuiAccountWorkflowsState;
-}
 
 const WebuiSettingsWorkflowsContext = createContext<WebuiSettingsWorkflows | undefined>(
   undefined,
