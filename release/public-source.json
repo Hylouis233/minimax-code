@@ -3729,6 +3729,7 @@
     "packages/webui/src/client/features/transcript/ui/TurnNavigator.tsx",
     "packages/webui/src/client/features/transcript/ui/markdown.tsx",
     "packages/webui/src/client/features/workspace/application/workspace-environment-owner.ts",
+    "packages/webui/src/client/features/workspace/application/workspace-files-owner.ts",
     "packages/webui/src/client/features/workspace/application/workspace-queries.ts",
     "packages/webui/src/client/global.d.ts",
     "packages/webui/src/client/index.html",
