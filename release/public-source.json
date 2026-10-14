@@ -3927,6 +3927,7 @@
     "packages/webui/src/shared/session-transfer-format.ts",
     "packages/webui/tailwind.config.cjs",
     "packages/webui/test-results/.last-run.json",
+    "packages/webui/test/integration/adapter-conversions.test.ts",
     "packages/webui/test/integration/loopback-harness-path.test.ts",
     "packages/webui/test/integration/real-host-loopback.test.ts",
     "packages/webui/test/integration/real-host-model-turn.test.ts",

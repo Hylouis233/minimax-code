@@ -238,6 +238,7 @@
       "test/executable-resolution.test.ts"
     ],
     "webui": [
+      "packages/webui/test/integration/adapter-conversions.test.ts",
       "packages/webui/test/integration/loopback-harness-path.test.ts",
       "packages/webui/test/integration/real-host-model-turn.test.ts",
       "packages/webui/test/integration/real-host-loopback.test.ts",
