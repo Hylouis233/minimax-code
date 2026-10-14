@@ -68,7 +68,6 @@ import type {
   WebuiGoalCreateRequest,
   WebuiGoalPatchRequest,
 } from "../../src/shared/contracts/goal.js";
-import type { WebuiCanvasDocument } from "../../src/shared/contracts/canvas.js";
 import { createWebuiTransport } from "../../src/client/infrastructure/transport.js";
 import { WebuiTerminalManager } from "../../src/runtime/terminal.js";
 import { getWorkspaceReviewSummaryOperation, listWorkspaceReviewFileDiffsOperation, getWorkspaceReviewFileContentOperation, searchWorkspaceReviewDiffsOperation } from "../../src/server/operation/workspace.js";
@@ -335,11 +334,11 @@ class ScriptedHarnessPort implements WebuiHarnessPort {
     return { type: "text" as const, content: "fixture content\n" };
   }
 
-  async readCanvas(): Promise<WebuiCanvasDocument> {
+  async readCanvas() {
     return { schemaVersion: 1, canvasId: "canvas-fixture", sessionId: "fixture-session", changeSeq: 0, nodes: [], updatedAtMs: 0 };
   }
 
-  async applyCanvas(request: { readonly sessionId: string; readonly operation: Record<string, unknown> }): Promise<{ readonly operationId: string; readonly document: WebuiCanvasDocument }> {
+  async applyCanvas(request: { readonly sessionId: string; readonly operation: Record<string, unknown> }) {
     return { operationId: String(request.operation.operationId ?? "fixture-operation"), document: await this.readCanvas() };
   }
 

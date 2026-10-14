@@ -11,16 +11,8 @@
 // source and never falls back to the legacy provider map (config-side
 // enforcement drops a hand-written `provider.minimax_api` entry at read time).
 
-import {
-  CUSTOM_PROVIDER_ID_PREFIX,
-  MINIMAX_API_PROVIDER_ID,
-} from '@mavis/shared/provider-ids';
-
-/**
- * The two reserved ids come from `@mavis/shared/provider-ids`, the same
- * definitions `@mavis/config` re-exports.
- */
-export { MINIMAX_API_PROVIDER_ID, CUSTOM_PROVIDER_ID_PREFIX };
+export const MINIMAX_API_PROVIDER_ID = 'minimax_api';
+export const CUSTOM_PROVIDER_ID_PREFIX = 'custom_provider:';
 
 export type ModelProviderSource = 'provider' | 'minimax_api' | 'custom_provider';
 

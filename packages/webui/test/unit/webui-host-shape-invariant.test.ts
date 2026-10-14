@@ -27,7 +27,6 @@
 
 import { describe, expect, it } from "vitest";
 import type { WebuiHarnessPort } from "../../src/runtime/port.js";
-import type { WebuiCanvasDocument } from "../../src/shared/contracts/canvas.js";
 import {
   createOperationRegistry,
   editSessionMessageOperation,
@@ -247,7 +246,7 @@ class FullPort implements WebuiHarnessPort {
   async searchWorkspaceReviewDiffs(request: { readonly reviewSnapshotId: string; readonly pageIndex?: number; readonly pageSize?: number }) {
     return { reviewSnapshotId: request.reviewSnapshotId, matchedFiles: [], totalMatches: 0, totalMatchedFiles: 0, pageIndex: request.pageIndex ?? 0, pageSize: request.pageSize ?? 20, matchesBeforePage: 0, hasPreviousPage: false, hasNextPage: false };
   }
-  async readCanvas(): Promise<WebuiCanvasDocument> {
+  async readCanvas() {
     return {
       schemaVersion: 1,
       canvasId: "invariant",
@@ -257,7 +256,7 @@ class FullPort implements WebuiHarnessPort {
       updatedAtMs: 0,
     };
   }
-  async applyCanvas(): Promise<{ readonly operationId: string; readonly document: WebuiCanvasDocument }> {
+  async applyCanvas() {
     return {
       operationId: "invariant",
       document: {

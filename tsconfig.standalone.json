@@ -166,9 +166,6 @@
       "@mavis/local-runtime-v2/canonical-history": [
         "./packages/local-runtime-v2/src/infra/file/canonical-history.ts"
       ],
-      "@mavis/local-runtime-v2/canvas-wire": [
-        "./packages/local-runtime-v2/src/service/canvas/wire.ts"
-      ],
       "@mavis/local-runtime-v2/cli-service": [
         "./packages/local-runtime-v2/src/local/index.ts"
       ],
@@ -235,9 +232,6 @@
       "@mavis/shared/agent-avatar": [
         "./packages/shared/src/agent-avatar.ts"
       ],
-      "@mavis/shared/agent-defaults": [
-        "./packages/shared/src/agent-defaults.ts"
-      ],
       "@mavis/shared/agent-mention": [
         "./packages/shared/src/agent-mention/index.ts"
       ],
@@ -270,9 +264,6 @@
       ],
       "@mavis/shared/image-dimensions": [
         "./packages/shared/src/image-dimensions.ts"
-      ],
-      "@mavis/shared/instruction-limits": [
-        "./packages/shared/src/instruction-limits.ts"
       ],
       "@mavis/shared/keyed-operation-lane": [
         "./packages/shared/src/keyed-operation-lane.ts"
@@ -348,9 +339,6 @@
       ],
       "@mavis/shared/product-time": [
         "./packages/shared/src/product-time.ts"
-      ],
-      "@mavis/shared/provider-ids": [
-        "./packages/shared/src/provider-ids.ts"
       ],
       "@mavis/shared/questionnaire": [
         "./packages/shared/src/questionnaire.ts"
