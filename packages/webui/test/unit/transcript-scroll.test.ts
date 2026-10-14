@@ -5,7 +5,7 @@ import {
   webuiScrollBottomTop,
   webuiScrollFollowsBottom,
   webuiScrollIntent,
-} from "../../src/client/projection/common/transcript-scroll.js";
+} from "../../src/client/features/transcript/projection/transcript-scroll.js";
 
 describe("transcript scroll geometry", () => {
   it("pins the viewport to the last message", () => {

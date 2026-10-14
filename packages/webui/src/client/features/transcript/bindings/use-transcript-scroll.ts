@@ -28,7 +28,7 @@ import {
   webuiScrollBottomTop,
   webuiScrollFollowsBottom,
   webuiScrollIntent,
-} from "../projection/common/transcript-scroll.js";
+} from "../projection/transcript-scroll.js";
 
 const TRANSCRIPT_VIEWPORT_SELECTOR = '[data-webui-session-scroll="true"]';
 

@@ -57,7 +57,7 @@ import {
 import {
   transcriptViewport,
   useWebuiTranscriptScroll,
-} from "../../../bindings/use-transcript-scroll.js";
+} from "../bindings/use-transcript-scroll.js";
 
 const EMPTY_TRANSCRIPT_PAGE: WebuiClientMessagePage = {};
 
