@@ -1913,6 +1913,26 @@ export function loadApprovedPeerImports() {
 let approvedPeerImportsCache = null;
 
 /**
+ * Role exceptions: edges the role rules tolerate while A-004's migration is
+ * unfinished, each with the module pair, an owner and the condition that ends
+ * it. The rules judge every home, so an old-home edge that cannot move yet is
+ * carried here explicitly instead of escaping judgement by where it sits.
+ */
+export function loadRoleExceptions() {
+  if (roleExceptionsCache === null) {
+    roleExceptionsCache = Object.freeze(
+      JSON.parse(
+        readFileSync(new URL("./webui-role-exceptions.json", import.meta.url), "utf8"),
+      ).entries ?? [],
+    );
+  }
+  return roleExceptionsCache;
+}
+
+/** @type {ReadonlyArray<{from: string, to: string, owner?: string, exitCondition?: string}> | null} */
+let roleExceptionsCache = null;
+
+/**
  * The role rules: who may reach whom, judged by role rather than by directory.
  *
  * Three judgements, and they are deliberately different in kind:
@@ -1938,9 +1958,10 @@ let approvedPeerImportsCache = null;
  *
  * @param {object} graph
  * @param {readonly Array<{from: string, to: string, reason?: string}>} approved
+ * @param {readonly Array<{from: string, to: string, owner?: string, exitCondition?: string}>} exceptions
  * @returns {{ pass: boolean, violations: Array<object> }}
  */
-export function roleRule(graph, approved = loadApprovedPeerImports()) {
+export function roleRule(graph, approved = loadApprovedPeerImports(), exceptions = []) {
   const violations = [];
   const files = graph.files ?? [];
   const fileSet = new Set(files);
@@ -1970,17 +1991,30 @@ export function roleRule(graph, approved = loadApprovedPeerImports()) {
     });
   }
 
-  // 2. and 3. Role edges, over files that already sit in a target home.
+  // 2. and 3. Role edges, judged in every home (see the comment inside the loop).
   const approvals = new Map(approved.map((entry) => [pairKey(entry.from, entry.to), entry]));
   const usedApprovals = new Set();
+  const exceptionMap = new Map(exceptions.map((entry) => [pairKey(entry.from, entry.to), entry]));
+  const usedExceptions = new Set();
+  const excepted = (edge) => {
+    const key = pairKey(edge.from, edge.to);
+    if (!exceptionMap.has(key)) return false;
+    usedExceptions.add(key);
+    return true;
+  };
   for (const edge of graph.edges ?? []) {
     const from = classifyRole(edge.from);
     const to = classifyRole(edge.to);
-    if (from.home !== "target" || to.home === "outside") continue;
+    // Judged in every home, not only in a target home: whether a role edge is
+    // forbidden cannot depend on which of the two directory spellings the file
+    // happens to use (gate review G-005). The edges that cannot move yet are the
+    // ones listed in `webui-role-exceptions.json`.
+    if (to.home === "outside") continue;
 
     const forbidden = ROLE_FORBIDDEN_TARGETS[from.role];
     const uiReachesBusiness = from.role === "ui" && FEATURE_PRIVATE_ROLES.has(to.role);
     if (forbidden?.has(to.role) || uiReachesBusiness) {
+      if (excepted(edge)) continue;
       violations.push({
         kind: "role",
         rule: "role-import",
@@ -2012,6 +2046,7 @@ export function roleRule(graph, approved = loadApprovedPeerImports()) {
       usedApprovals.add(key);
       continue;
     }
+    if (excepted(edge)) continue;
     violations.push({
       kind: "role",
       rule: "private-peer-import",
@@ -2048,6 +2083,22 @@ export function roleRule(graph, approved = loadApprovedPeerImports()) {
       from: entry.from,
       to: entry.to,
       detail: `approved peer import ${key} is no longer measured — delete the entry.`,
+    });
+  }
+
+  // A role exception that no longer matches a measured violation is stale: the
+  // edge it excused was removed or is legal again, so the exception has to go
+  // too. This is what keeps the list shrinking as A-004's migration proceeds
+  // instead of becoming a standing allowance.
+  for (const [key, entry] of exceptionMap) {
+    if (usedExceptions.has(key)) continue;
+    violations.push({
+      kind: "role",
+      rule: "stale-role-exception",
+      file: entry.from,
+      from: entry.from,
+      to: entry.to,
+      detail: `role exception ${key} is no longer measured — delete the entry.`,
     });
   }
 
@@ -2146,8 +2197,12 @@ export function evaluateGraph(graph, options = {}) {
   // entries that name files the graph does not contain are stale by construction
   // and would fail every fixture that is not about them.
   const approved = options.approvedPeerImports ?? loadApprovedPeerImports();
+  // The role exceptions are injectable for the same reason: a fixture graph that
+  // does not contain the excepted edge would report the ledger's entries as
+  // stale. Only a run over the real tree loads them.
+  const exceptions = options.roleExceptions ?? loadRoleExceptions();
   const results = rules.map((rule) =>
-    rule === roleRule ? rule(graph, approved) : rule(graph),
+    rule === roleRule ? rule(graph, approved, exceptions) : rule(graph),
   );
   const direction = results[0].violations;
   const browserOnly = results[1].violations;

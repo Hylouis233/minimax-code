@@ -4139,6 +4139,7 @@
     "scripts/lib/webui-dependency-rules.d.mts",
     "scripts/lib/webui-dependency-rules.mjs",
     "scripts/lib/webui-peer-imports.json",
+    "scripts/lib/webui-role-exceptions.json",
     "scripts/lib/workspace-sources-plugin.mjs",
     "scripts/package-cli-release.mjs",
     "scripts/package-webui-npm.mjs",

@@ -1,0 +1,101 @@
+{
+  "comment": "Role-rule exceptions the role check accepts while A-004's migration is unfinished. The role rules judge every home, so an edge that used to escape judgement by sitting in an old home now needs an explicit entry here: module pair, owner, and the condition that ends the exception. Each entry names both files, so a reviewer sees the exact dependency. An entry that no longer matches a measured edge fails the check (see `roleRule`), so the list shrinks as the modules move instead of accumulating.",
+  "entries": [
+    {
+      "from": "client/components/shell/WebuiClientFoundationApp.tsx",
+      "to": "client/infrastructure/storage.ts",
+      "owner": "T19 (shell 收尾)",
+      "exitCondition": "The shell stops reading platform storage directly and takes it through the feature port that owns the state; the import goes with the last direct read."
+    },
+    {
+      "from": "client/components/shell/WebuiClientFoundationApp.tsx",
+      "to": "client/infrastructure/session-transfer-download.ts",
+      "owner": "T19 (shell 收尾)",
+      "exitCondition": "Session transfer download moves behind the sessions feature's published surface; the shell calls that instead."
+    },
+    {
+      "from": "client/components/shell/WebuiClientFoundationApp.tsx",
+      "to": "client/infrastructure/team-mode.ts",
+      "owner": "T19 (shell 收尾)",
+      "exitCondition": "Team mode is read through the feature that owns it, not from the shell."
+    },
+    {
+      "from": "client/components/shell/WebuiClientFoundationApp.tsx",
+      "to": "client/application/selectors.ts",
+      "owner": "T19 (shell 收尾)",
+      "exitCondition": "The assembly's selectors are reached through the composition root's own interface rather than imported by the shell."
+    },
+    {
+      "from": "client/components/shell/WebuiClientFoundationApp.tsx",
+      "to": "client/application/state.ts",
+      "owner": "T19 (shell 收尾)",
+      "exitCondition": "Shell state stops living in the application assembly's store; the last reader moves with it."
+    },
+    {
+      "from": "client/components/shell/WebuiClientFoundationApp.tsx",
+      "to": "client/application/create-application.ts",
+      "owner": "T19 (shell 收尾)",
+      "exitCondition": "The shell no longer constructs the application; the composition root owns construction and hands the shell what it needs."
+    },
+    {
+      "from": "client/components/shared/ContextMenu.tsx",
+      "to": "client/projection/shell/context-menu.ts",
+      "owner": "T18 (剩余平台/通用 UI)",
+      "exitCondition": "The shared menu takes its projection as an injected contract instead of reaching into the shell's projection."
+    },
+    {
+      "from": "client/application/turn/effect-reducer.ts",
+      "to": "client/features/interactions/projection/event-parsers.ts",
+      "owner": "T21 (退役迁移形式)",
+      "exitCondition": "The turn substrate moves to client/features/turn/application/ and consumes interactions' published contracts."
+    },
+    {
+      "from": "client/application/turn/effect-reducer.ts",
+      "to": "client/features/workspace/projection/workspace-progress.ts",
+      "owner": "T21 (退役迁移形式)",
+      "exitCondition": "The turn substrate moves to client/features/turn/application/ and consumes workspace's published contracts."
+    },
+    {
+      "from": "client/application/turn/effect-reducer.ts",
+      "to": "client/features/goal/projection/goal-state.ts",
+      "owner": "T21 (退役迁移形式)",
+      "exitCondition": "The turn substrate moves to client/features/turn/application/ and consumes goal's published contracts."
+    },
+    {
+      "from": "client/application/turn/event-coordinator.ts",
+      "to": "client/features/interactions/projection/event-parsers.ts",
+      "owner": "T21 (退役迁移形式)",
+      "exitCondition": "The turn substrate moves to client/features/turn/application/ and consumes interactions' published contracts."
+    },
+    {
+      "from": "client/application/turn/turn-commands.ts",
+      "to": "client/features/sessions/application/session-commands.ts",
+      "owner": "T21 (退役迁移形式)",
+      "exitCondition": "The turn substrate moves to client/features/turn/application/ and consumes sessions' published contracts."
+    },
+    {
+      "from": "client/application/turn/turn-commands.ts",
+      "to": "client/features/composer/application/composer-workflows.ts",
+      "owner": "T21 (退役迁移形式)",
+      "exitCondition": "The turn substrate moves to client/features/turn/application/ and consumes composer's published contracts."
+    },
+    {
+      "from": "client/projection/turn/stream-recovery.ts",
+      "to": "client/features/transcript/projection/message-projection.ts",
+      "owner": "T21 (退役迁移形式)",
+      "exitCondition": "The turn substrate moves to client/features/turn/projection/ and consumes transcript's published contracts."
+    },
+    {
+      "from": "client/projection/turn/stream-recovery.ts",
+      "to": "client/features/composer/projection/context-usage.ts",
+      "owner": "T21 (退役迁移形式)",
+      "exitCondition": "The turn substrate moves to client/features/turn/projection/ and consumes composer's published contracts."
+    },
+    {
+      "from": "client/projection/turn/stream-state.ts",
+      "to": "client/features/workspace/projection/workspace-progress.ts",
+      "owner": "T21 (退役迁移形式)",
+      "exitCondition": "The turn substrate moves to client/features/turn/projection/ and consumes workspace's published contracts."
+    }
+  ]
+}

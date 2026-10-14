@@ -61,6 +61,20 @@ export interface ApprovedPeerImport {
 /** Reads `webui-peer-imports.json` lazily and caches the result. */
 export function loadApprovedPeerImports(): readonly ApprovedPeerImport[];
 
+/**
+ * One role-rule exception: an edge the rules tolerate for now, with the module
+ * pair, an owner and the condition that ends it (A-004 item 4). An entry whose
+ * edge is no longer measured fails the check.
+ */
+export interface RoleException {
+  readonly from: string;
+  readonly to: string;
+  readonly owner?: string;
+  readonly exitCondition?: string;
+}
+
+export function loadRoleExceptions(): readonly RoleException[];
+
 /** One role-rule finding. `rule` names which role judgement produced it. */
 export interface RoleViolation {
   readonly kind: "role";
@@ -80,6 +94,7 @@ export interface RoleViolation {
 export function roleRule(
   graph: DependencyGraph,
   approved?: readonly ApprovedPeerImport[],
+  exceptions?: readonly RoleException[],
 ): { readonly pass: boolean; readonly violations: readonly RoleViolation[] };
 
 /** Normalises an absolute path to the src-relative POSIX form, or `null`. */
@@ -317,6 +332,8 @@ export function evaluateGraph(
   options?: {
     /** A fixture graph states its own approved peers; omitted reads the repo's list. */
     readonly approvedPeerImports?: readonly ApprovedPeerImport[];
+    /** Likewise for the role exceptions: omitted reads the repo's ledger. */
+    readonly roleExceptions?: readonly RoleException[];
   },
 ): GraphEvaluation;
 
