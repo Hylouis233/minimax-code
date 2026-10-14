@@ -11,18 +11,21 @@
 // Split out of `runtime/assembly.ts` so the assembly wires resources and this
 // file states what "adopt an externally supplied provider" means.
 
-export type WebuiBrowserToolExposure = "compact" | "full" | "both";
+import type { CreateLocalRuntimeHostOptions } from "@mavis/local-runtime-v2/process-local";
 
-export interface WebuiBrowserAdapter {
-  readonly getCapabilities?: () => unknown;
-  readonly disposeSession?: (sessionId: string) => Promise<void>;
-  execute(
-    context: unknown,
-    action: string,
-    input: Record<string, unknown>,
-    signal?: AbortSignal,
-  ): Promise<unknown>;
-}
+/**
+ * The runtime's own browser-adapter type, read off the options the factory
+ * takes. The WebUI never constructs one — the host process supplies it — so
+ * this is a forwarding slot, not a shape to declare here.
+ */
+export type WebuiBrowserAdapter = NonNullable<
+  CreateLocalRuntimeHostOptions["browserAdapter"]
+>;
+
+/** The runtime's own tool-exposure type, read off the same options. */
+export type WebuiBrowserToolExposure = NonNullable<
+  CreateLocalRuntimeHostOptions["browserToolExposure"]
+>;
 
 export interface WebuiBrowserProvider {
   readonly adapter: WebuiBrowserAdapter;

@@ -25,9 +25,14 @@
 //
 // So this module mirrors the runtime's storage contract rather than
 // reimplementing a second one: same paths, same name guard, same 32KiB cap on
-// AGENTS.md, same temp-file-then-rename write. The two literals copied out of
-// the runtime are pinned by tests in `profile-files.test.ts` so they cannot
-// drift silently.
+// AGENTS.md, same temp-file-then-rename write. That cap is still a copied
+// literal, pinned by a test in `profile-files.test.ts` so it cannot drift
+// silently: the runtime keeps two copies of it (one exported by
+// `local-runtime-v2/.../persistence/global-instructions.ts`, one private in
+// `.../preparation/static-prompt-reader.ts`) and reaching either through a
+// barrel is what broke `check:webui-boundary` above. The `user.md` ceiling is
+// not in that position — `@mavis/shared/memory-limits` is a real export entry —
+// so it is imported instead of restated.
 //
 // Topics, daily notes, summary and archive are out of scope. They have their
 // own lifecycles (TTL cleanup, snapshots, a 4KB cap) and belong with the
@@ -43,6 +48,7 @@
 // that actually touches the filesystem cannot live on the client side of the
 // seam.
 
+import { MEMORY_TAIL_INJECTION_CAP_CHARS } from "@mavis/shared/memory-limits";
 import { randomBytes } from "node:crypto";
 import { mkdir, open, readFile, rename, stat, unlink } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
@@ -71,14 +77,15 @@ const GLOBAL_INSTRUCTIONS_FILE = "AGENTS.md";
 const USER_MEMORY_FILE = "user.md";
 
 /**
- * Mirrors `MEMORY_TAIL_INJECTION_CAP_CHARS` in `packages/shared/src/memory-limits.ts`.
+ * The composer's soft character ceiling for `user.md`, taken from the shared
+ * definition (`@mavis/shared/memory-limits`) rather than restated here.
  *
  * This is a soft ceiling, not a rejection: the composer truncates the profile
  * to its tail once it passes this mark, so anything the user writes above it is
  * accepted on disk and then never reaches the model. The panel reports the
  * number so the user learns that from the editor instead of from silence.
  */
-export const USER_PROFILE_MAX_CHARS = 10 * 1024;
+export const USER_PROFILE_MAX_CHARS = MEMORY_TAIL_INJECTION_CAP_CHARS;
 
 /**
  * The `关于你` region of `user.md`.

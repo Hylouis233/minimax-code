@@ -1,11 +1,20 @@
-// The exact surface of the runtime `cliService` the WebUI talks to, and the
+// The surface of the runtime `cliService` the WebUI forwards to, and the
 // harness host handle the runtime assembly hands to the adapter.
 //
-// The host shape is structural so the WebUI does not need to bundle the whole
-// harness layer to type-check; the runtime assembly passes the host directly at
-// process start. `WebuiRuntimeCliService` is exported as the single source of
-// truth so the assembly layer can type its `cliService?: WebuiRuntimeCliService`
-// slot without re-spelling it.
+// This file states the members the WebUI forwards, and its member types are the
+// WebUI's own wire projections of what the runtime returns. `runtime/assembly.ts`
+// types the *options* it forwards against the real `CreateLocalRuntimeHostOptions`
+// (the inputs are checked, not mirrored). The results are the remaining gap: a
+// runtime view type (`SessionPage`, `GetMessagesResult`, ...) does not satisfy the
+// wire projection declared for it here, which is why the factory's return still
+// carries one assertion. Closing that gap means deriving each member and
+// converting explicitly at the adapter.
+//
+// The six personalization members this interface used to declare
+// (`getGlobalInstructions`, `setGlobalInstructions`, `getAgentMemory`,
+// `setAgentMemory`, `getUserProfile`, `setUserProfile`) were called by no
+// adapter and exist on no runtime host: the settings adapter reads and writes
+// the profile files itself (`harness/settings.ts` -> `profile-files.ts`).
 
 import type {
   WebuiSessionListRequest,
@@ -74,18 +83,15 @@ import type {
   WebuiGoalCreateRequest,
   WebuiGoalPatchRequest,
 } from "../../shared/contracts/goal.js";
-import type {
-  WebuiGlobalInstructionsView,
-  WebuiMemorySettingsView,
-} from "../../shared/contracts/personalization.js";
+import type { WebuiMemorySettingsView } from "../../shared/contracts/personalization.js";
 
 /**
- * The exact surface of the runtime `cliService` the WebUI talks to. The
- * runtime harness is responsible for satisfying this shape; the WebUI's only
- * job is to forward requests here. Methods optional on the live cliService
- * stay optional here too — `createHarnessPortFromHost` projects them back
- * with `requireCliService` so every wire-error is a single, uniform
- * `runtime host does not expose the CLI service` message.
+ * The members the WebUI forwards to the runtime `cliService`. The runtime
+ * harness satisfies this shape, and the WebUI's only job is to forward requests
+ * here. Methods optional on the live cliService stay optional here too —
+ * `createHarnessPortFromHost` projects them back with `requireCliService` so
+ * every wire-error is a single, uniform `runtime host does not expose the CLI
+ * service` message.
  *
  * Exported as the single source of truth so the assembly layer can type its
  * `cliService?: WebuiRuntimeCliService` slot without re-spelling it.
@@ -266,31 +272,17 @@ export interface WebuiRuntimeCliService {
   setPermissionMode(request: {
     readonly mode: "default" | "auto" | "bypassPermissions";
   }): Promise<unknown>;
-  getGlobalInstructions(): Promise<WebuiGlobalInstructionsView>;
-  setGlobalInstructions(request: {
-    readonly content: string;
-  }): Promise<WebuiGlobalInstructionsView>;
-  getAgentMemory(request?: { readonly includeContent?: boolean }): Promise<import("../../shared/contracts/personalization.js").WebuiAgentMemoryView>;
-  setAgentMemory(request: {
-    readonly content: string;
-  }): Promise<import("../../shared/contracts/personalization.js").WebuiAgentMemoryView>;
-  getUserProfile(): Promise<import("../../shared/contracts/personalization.js").WebuiUserProfileView>;
-  setUserProfile(request: {
-    readonly nickname: string;
-    readonly occupation: string;
-    readonly moreAbout: string;
-  }): Promise<import("../../shared/contracts/personalization.js").WebuiUserProfileView>;
   /**
    * Optional on purpose: a host without the configuration capability still has
-   * to type-check. The handlers below fail closed with one clear message rather
-   * than crashing on `undefined` — a missing method is not the same statement as
-   * `enabled: false`.
+   * to type-check. `requireMemorySettings` fails closed with one clear message
+   * rather than crashing on `undefined` — a missing method is not the same
+   * statement as `enabled: false`.
    */
-  getMemorySettings?(): Promise<import("../../shared/contracts/personalization.js").WebuiMemorySettingsView>;
+  getMemorySettings?(): Promise<WebuiMemorySettingsView>;
   setMemorySettings?(request: {
     readonly enabled?: boolean;
     readonly proactive?: boolean;
-  }): Promise<import("../../shared/contracts/personalization.js").WebuiMemorySettingsView>;
+  }): Promise<WebuiMemorySettingsView>;
   selectModel(request: {
     readonly providerId: string;
     readonly modelId: string;

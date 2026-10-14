@@ -111,47 +111,32 @@ import type {
 } from "./browser-provider.js";
 
 /**
- * Structural shape of the options the WebUI assembly forwards to the
- * harness factory. Mirrors the relevant fields of
- * `CreateLocalRuntimeHostOptions` (declared in
- * `packages/local-runtime/src/runtime/host-factory-types.ts:103` and
- * extended by `packages/local-runtime-v2/src/local/host-contract.ts:56`).
+ * The options the WebUI assembly forwards to the harness factory: the runtime's
+ * own fields, picked from the real `CreateLocalRuntimeHostOptions` instead of
+ * re-spelled.
  *
- * Defining the type locally lets the assembly type-check against the
- * real field set without depending on the harness package's exported
- * type, whose transitive imports (vendored pi-mono) collapse in this
- * repo's typecheck (see the v7 brief's item 3). The factory signature
- * still uses the upstream type so production wiring is unchanged.
+ * The hand-written copy that used to live here is why the factory call carried a
+ * double assertion: the copy described one field set, the runtime's type
+ * described another, and only the cast reconciled them. The runtime's
+ * declaration is the one the factory checks, so it is the one this type derives
+ * from — an unsupported field or a wrong literal is now a compile error at the
+ * object below, not a runtime surprise.
  */
-export interface WebuiForwardedRuntimeHostOptions {
-  readonly dataDir: string;
-  readonly appVersion?: string;
-  readonly runtimeOwnerKind: "webui";
-  readonly runtimeMode: "clean";
-  readonly startupExecutionPolicy: "quarantined";
-  readonly capabilities: {
-    readonly cliEmbedded: true;
-    readonly questionnaireReply: true;
-    readonly permissionPrompt: true;
-    readonly elicitation: true;
-  };
-  readonly enableLiveMcp: true;
-  readonly configGetter: () => ReturnType<typeof getDefaultLocalRuntimeConfig>;
-  /**
-   * Assembly step 3 of `docs/webui-v1-scope.md`. Managed MiniMax login sends no
-   * API key — the credential is an OAuth access token — so the runtime resolves
-   * it through this pair, and the harness defaults both to undefined when they
-   * are absent. Absent them, every turn on a managed provider fails at the
-   * agent preflight with "managed OAuth bearer is not synced".
-   */
-  readonly authContextGetter: () => WebuiAuthContext | undefined;
-  readonly authContextInvalidator: (
-    rejectedAccessToken?: string,
-    loginEpoch?: string,
-  ) => void;
-  readonly browserAdapter?: WebuiBrowserAdapter;
-  readonly browserToolExposure?: WebuiBrowserToolExposure;
-}
+export type WebuiForwardedRuntimeHostOptions = Pick<
+  CreateLocalRuntimeHostOptions,
+  | "dataDir"
+  | "appVersion"
+  | "runtimeOwnerKind"
+  | "runtimeMode"
+  | "startupExecutionPolicy"
+  | "capabilities"
+  | "enableLiveMcp"
+  | "configGetter"
+  | "authContextGetter"
+  | "authContextInvalidator"
+  | "browserAdapter"
+  | "browserToolExposure"
+>;
 
 /**
  * Factory signature the assembly delegates to. The default is
@@ -327,18 +312,9 @@ export async function createWebuiRuntimeHost(
       ? { browserToolExposure: browser.browserToolExposure }
       : {}),
   };
-  // The factory parameter is `CreateLocalRuntimeHostOptions`, but in this
-  // typecheck the upstream type collapses to `{}` (no keys) because the
-  // transitive import chain through `@mavis/local-runtime-v2` →
-  // `@mavis/local-runtime` → `@mavis/agent-core` → `@earendil-works/pi-*`
-  // fails to resolve — the vendored pi-mono packages ship no `dist/` and
-  // there is no workspace build script that emits one (see the v7 brief's
-  // item 3). The forwarded fields are correct against the source type
-  // (`runtimeOwnerKind` / `runtimeMode` /
-  // `startupExecutionPolicy` / `capabilities` all live in
-  // `packages/local-runtime/src/runtime/host-factory-types.ts:32-47`); the
-  // cast below is narrowly scoped to the factory boundary and exists only
-  // because the typecheck can't see the upstream shape.
+  // The factory signature is the runtime's own: `forwardedOptions` is derived
+  // from `CreateLocalRuntimeHostOptions`, so the call is checked field by field
+  // instead of reconciled by a cast.
   let host: Omit<
     WebuiAssembledHost,
     | "invalidateAuth"
@@ -351,9 +327,7 @@ export async function createWebuiRuntimeHost(
     | "signOutAccount"
   >;
   try {
-    host = await factory(
-      forwardedOptions as unknown as CreateLocalRuntimeHostOptions,
-    );
+    host = await factory(forwardedOptions);
   } catch (error) {
     // The factory is allowed to fail before it returns an apiHost.  The
     // capability owners were already acquired above, so release them on this
@@ -461,9 +435,18 @@ const defaultWebuiRuntimeHostFactory: WebuiRuntimeHostFactory = async (
   options,
 ) => {
   const { createLocalRuntimeHostV2 } = await import("@mavis/local-runtime-v2");
-  return (await createLocalRuntimeHostV2(
-    options,
-  )) as unknown as Omit<
+  // The remaining assertion, and it is not about the options: the factory takes
+  // the runtime's own `CreateLocalRuntimeHostOptions` (checked above, no cast
+  // needed) but returns the runtime's `CreatedLocalRuntimeHost`, whose
+  // `cliService` is the real `CliService`. `WebuiRuntimeCliService` still
+  // declares the WebUI's wire projections of the *results*
+  // (`WebuiSessionPage`, `WebuiMessagesResult`, ...), which the runtime's view
+  // types (`SessionPage`, `GetMessagesResult`, ...) do not satisfy — measured at
+  // 40 incompatible members. Replacing those projections with a per-member
+  // derivation plus an explicit runtime -> wire conversion is the rest of this
+  // work; until it lands, the cast is where that difference is stated instead of
+  // being hidden in the mirror.
+  return (await createLocalRuntimeHostV2(options)) as unknown as Omit<
     WebuiAssembledHost,
     | "invalidateAuth"
     | "getUsageQuota"
