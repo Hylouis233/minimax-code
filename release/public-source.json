@@ -3878,6 +3878,7 @@
     "packages/webui/src/server/operation/account.ts",
     "packages/webui/src/server/operation/agent-memory.ts",
     "packages/webui/src/server/operation/bind-handlers.ts",
+    "packages/webui/src/server/operation/binding-mechanism.ts",
     "packages/webui/src/server/operation/common.ts",
     "packages/webui/src/server/operation/goal.ts",
     "packages/webui/src/server/operation/handlers/account.ts",
