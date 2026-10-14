@@ -326,7 +326,7 @@ describe("the rail view tabs", () => {
 
 describe("the view tab styling", () => {
   const shellCss = readFileSync(
-    path.join(import.meta.dirname, "..", "..", "src", "client", "styles", "shell.css"),
+    path.join(import.meta.dirname, "..", "..", "src", "client", "features", "sessions", "ui", "sessions.css"),
     "utf8",
   );
   // Comments come off first: the rules are commented at length about why the

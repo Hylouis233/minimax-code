@@ -205,7 +205,7 @@ describe("context panel — the six-category split is folded until asked for", (
     // visible and in the accessibility tree. A DOM assertion passes on this;
     // only the stylesheet says otherwise.
     const css = readFileSync(
-      path.resolve(here, "../../src/client/styles/shell.css"),
+      path.resolve(here, "../../src/client/features/transcript/ui/transcript.css"),
       "utf8",
     );
     expect(css).toContain(".webui-context-usage-components[hidden] { display: none; }");

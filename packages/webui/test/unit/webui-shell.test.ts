@@ -819,7 +819,7 @@ describe("WebUI shell", () => {
 
   it("keeps the first project session aligned after its leading marker", () => {
     const styles = readFileSync(
-      new URL("../../src/client/styles/shell.css", import.meta.url),
+      new URL("../../src/client/features/sessions/ui/sessions.css", import.meta.url),
       "utf8",
     );
     const projectSessionsRule = styles.match(
@@ -839,7 +839,7 @@ describe("WebUI shell", () => {
 
   it("keeps subagent sessions visibly nested under their parent session", () => {
     const styles = readFileSync(
-      new URL("../../src/client/styles/shell.css", import.meta.url),
+      new URL("../../src/client/features/sessions/ui/sessions.css", import.meta.url),
       "utf8",
     );
     const childListRule = styles.match(
@@ -975,7 +975,7 @@ describe("WebUI shell — desktop anatomy", () => {
 
   it("keeps the rail scrollable without showing a scrollbar", () => {
     const styles = readFileSync(
-      new URL("../../src/client/styles/shell.css", import.meta.url),
+      new URL("../../src/client/features/sessions/ui/sessions.css", import.meta.url),
       "utf8",
     );
     const railScrollRule = styles.match(
@@ -1230,7 +1230,7 @@ describe("WebUI shell — desktop anatomy", () => {
 
   it("does not add the generic blue focus ring to the composer input", () => {
     const styles = readFileSync(
-      new URL("../../src/client/styles/shell.css", import.meta.url),
+      new URL("../../src/client/features/composer/ui/composer.css", import.meta.url),
       "utf8",
     );
     const composerFocusRule = styles.match(

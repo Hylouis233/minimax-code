@@ -146,10 +146,19 @@ function declarationsFor(selector: string, rules: CssRule[] = shellRules): strin
 }
 
 beforeAll(() => {
-  shellCss = readFileSync(path.join(stylesDir, "shell.css"), "utf8");
   indexCss = readFileSync(path.join(stylesDir, "index.css"), "utf8");
+  // The rules under test are the ones the browser actually gets (T20). The
+  // feature rules moved out of `shell.css` into their own business files, so
+  // reading that file alone would now assert over the shared population only;
+  // the sources are therefore taken from the entry's own import list, in import
+  // order, which is also what keeps this in step with the next move.
+  const sources = [...indexCss.matchAll(/@import\s+"([^"]+\.css)"/gu)]
+    .map((match) => match[1])
+    .filter((specifier) => !specifier.startsWith("katex/"))
+    .map((specifier) => path.resolve(stylesDir, specifier));
+  shellCss = sources.map((source) => readFileSync(source, "utf8")).join("\n");
   transcriptCss = readFileSync(
-    path.join(stylesDir, "transcript-widgets.css"),
+    path.resolve(stylesDir, "../features/transcript/ui/transcript-widgets.css"),
     "utf8",
   );
   shellRules = parseRules(shellCss);
@@ -414,8 +423,8 @@ describe("W0 · stylesheet composition", () => {
     expect(imports).toEqual([
       "./tokens.css",
       "./shell.css",
-      "./transcript-widgets.css",
-      "./plan-mode.css",
+      "../features/transcript/ui/transcript-widgets.css",
+      "../features/interactions/ui/plan-mode.css",
       "katex/dist/katex.min.css",
     ]);
   });

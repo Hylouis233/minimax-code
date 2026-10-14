@@ -378,7 +378,7 @@ describe("rail rendering", () => {
 });
 describe("spinner colour", () => {
   const shellCss = readFileSync(
-    path.join(import.meta.dirname, "..", "..", "src", "client", "styles", "shell.css"),
+    path.join(import.meta.dirname, "..", "..", "src", "client", "features", "sessions", "ui", "sessions.css"),
     "utf8",
   );
   const start = shellCss.indexOf(".webui-rail-spinner {");
@@ -412,7 +412,7 @@ describe("spinner colour", () => {
 
 describe("unread badge styling", () => {
   const shellCss = readFileSync(
-    path.join(import.meta.dirname, "..", "..", "src", "client", "styles", "shell.css"),
+    path.join(import.meta.dirname, "..", "..", "src", "client", "features", "sessions", "ui", "sessions.css"),
     "utf8",
   );
   const start = shellCss.indexOf(".webui-rail-unread-badge {");

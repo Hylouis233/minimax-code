@@ -419,7 +419,7 @@ describe("thinking trigger — the icon is the whole trigger", () => {
     const css = readFileSync(
       path.resolve(
         path.dirname(fileURLToPath(import.meta.url)),
-        "../../src/client/styles/shell.css",
+        "../../src/client/features/composer/ui/composer.css",
       ),
       "utf8",
     );

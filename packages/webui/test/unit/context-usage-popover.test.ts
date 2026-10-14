@@ -167,7 +167,7 @@ describe("context-usage panel — placed from the ring, not from CSS offsets", (
 });
 
 describe("context-usage panel — the shape the source has to keep", () => {
-  const css = readClient("styles/shell.css");
+  const css = readClient("features/transcript/ui/transcript.css");
   // The panel moved to its own module (ticket #77); the composer keeps the call site.
   const indicator = readClient("features/sessions/ui/ContextUsageIndicator.tsx");
   // The panel's OWN declaration block and nothing after it. Slicing to the end of

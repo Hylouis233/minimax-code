@@ -1,0 +1,500 @@
+/* account — moved out of styles/shell.css (T20); rules kept in their original relative order. */
+@layer components {
+
+
+  /* ------------------------------------------------------------ user menu */
+
+  .webui-user-menu-anchor {
+    position: relative;
+    min-height: 52px;
+    padding: 2px 4px 3px;
+  }
+  .webui-user-menu-anchor-collapsed {
+    display: flex;
+    justify-content: center;
+    padding: 6px 0;
+  }
+  .webui-user-menu-trigger,
+  .webui-user-menu-trigger-rail {
+    display: flex;
+    align-items: center;
+    color: var(--text_default_primary);
+    transition: background-color 120ms ease;
+  }
+  .webui-user-menu-trigger {
+    width: 100%;
+    height: 48px;
+    border-radius: 10px;
+    padding: 0 8px;
+    text-align: left;
+  }
+  .webui-user-menu-trigger:hover,
+  .webui-user-menu-trigger[aria-expanded="true"] {
+    background-color: var(--bg_interaction_tertiary_hover);
+  }
+  .webui-user-menu-trigger-rail {
+    width: 36px;
+    height: 36px;
+    justify-content: center;
+    border-radius: var(--radius_full);
+    color: var(--icon_default_primary);
+  }
+  .webui-user-menu-trigger-rail:hover,
+  .webui-user-menu-trigger-rail[aria-expanded="true"] {
+    background-color: var(--bg_interaction_tertiary_hover);
+  }
+  .webui-user-menu-trigger-rail > svg {
+    width: 24px;
+    height: 24px;
+  }
+  .webui-user-menu-avatar {
+    display: flex;
+    width: 28px;
+    height: 28px;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border: 1px solid var(--border_light);
+    border-radius: var(--radius_full);
+  }
+  .webui-user-menu-avatar > svg {
+    width: 100%;
+    height: 100%;
+  }
+  .webui-user-menu-identity {
+    display: flex;
+    min-width: 0;
+    max-width: 135px;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 2px;
+    margin-left: 8px;
+    overflow: hidden;
+  }
+  .webui-user-menu-identity > span,
+  .webui-user-menu-identity > small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .webui-user-menu-identity > span {
+    font-size: 14px;
+    line-height: 20px;
+  }
+  .webui-user-menu-identity > small {
+    color: var(--text_default_tertiary);
+    font-size: 12px;
+    line-height: 16px;
+  }
+  .webui-user-menu-bell {
+    display: flex;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+    color: var(--icon_default_primary);
+    opacity: 0.4;
+  }
+  .webui-user-menu-popover {
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 4px;
+    z-index: 110;
+    width: 244px;
+    border: 1px solid var(--border_default);
+    border-radius: 12px;
+    background-color: var(--bg_grouped_secondary_elevated);
+    box-shadow: 0 0 10px var(--shadow_default);
+    padding: 4px;
+    transform-origin: bottom left;
+    animation: webui-menu-enter 150ms cubic-bezier(.2, .7, .2, 1) both;
+  }
+  .webui-user-menu-anchor-collapsed .webui-user-menu-popover {
+    left: 48px;
+  }
+  .webui-user-menu-uid {
+    display: flex;
+    height: 24px;
+    align-items: center;
+    overflow: hidden;
+    border-radius: 6px;
+    padding: 0 6px;
+    color: var(--text_default_tertiary);
+    font-size: 12px;
+    line-height: 16px;
+    white-space: nowrap;
+  }
+  .webui-user-menu-list {
+    display: flex;
+    flex-direction: column;
+  }
+  .webui-user-menu-item {
+    position: relative;
+    display: flex;
+    width: 100%;
+    height: 32px;
+    align-items: center;
+    gap: 8px;
+    border-radius: 8px;
+    padding: 0 6px;
+    color: var(--text_default_primary);
+    font-size: 14px;
+    line-height: 20px;
+    text-align: left;
+    white-space: nowrap;
+  }
+  .webui-user-menu-item:hover,
+  .webui-user-menu-item[data-active="true"] {
+    background-color: var(--bg_interaction_tertiary_hover);
+  }
+  .webui-user-menu-item > svg {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 auto;
+    color: var(--icon_default_primary);
+  }
+  .webui-user-menu-shortcut {
+    margin-left: auto;
+    color: var(--text_default_tertiary);
+    font-size: 12px;
+    opacity: 0;
+    transition: opacity 120ms ease;
+  }
+  .webui-user-menu-item:hover .webui-user-menu-shortcut,
+  .webui-user-menu-item:focus-visible .webui-user-menu-shortcut {
+    opacity: 1;
+  }
+  .webui-user-menu-chevron {
+    margin-left: auto;
+    color: var(--icon_default_secondary);
+  }
+  .webui-user-menu-divider {
+    height: 8px;
+    flex: 0 0 auto;
+    pointer-events: none;
+    position: relative;
+  }
+  .webui-user-menu-divider::after {
+    content: "";
+    position: absolute;
+    top: 4px;
+    right: 0;
+    left: 0;
+    height: 1px;
+    background-color: var(--border_default);
+  }
+  .webui-user-menu-usage-anchor {
+    position: relative;
+  }
+  .webui-user-menu-usage-panel {
+    position: absolute;
+    top: -176px;
+    left: calc(100% + 4px);
+    z-index: 111;
+    width: 222px;
+    min-height: 154px;
+    border: 1px solid var(--border_default);
+    border-radius: 12px;
+    background-color: var(--bg_grouped_secondary_elevated);
+    box-shadow: 0 0 20px var(--shadow_default);
+    padding: 12px;
+    color: var(--text_default_primary);
+    font-size: 12px;
+    line-height: 16px;
+  }
+
+  .webui-user-menu-usage-hairline {
+    height: 1px;
+    margin: 8px 0;
+    background-color: var(--border_default);
+  }
+
+  .webui-user-menu-usage-signed-out {
+    /* Flex so the 登录 button sits beside the copy, not under it. */
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    color: var(--text_default_secondary);
+    font-size: 13px;
+    line-height: 18px;
+  }
+  .webui-user-menu-usage-content {
+    display: flex;
+    flex-direction: column;
+  }
+  .webui-user-menu-quota-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .webui-user-menu-quota-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .webui-user-menu-quota-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .webui-user-menu-quota-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 400;
+    color: var(--text_default_primary);
+  }
+  .webui-user-menu-quota-value {
+    flex: 0 0 auto;
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 400;
+    color: var(--text_default_primary);
+  }
+  .webui-user-menu-quota-value--tertiary {
+    color: var(--text_default_tertiary);
+  }
+  .webui-user-menu-quota-meta {
+    color: var(--text_default_secondary);
+    font-size: 12px;
+    line-height: 16px;
+  }
+  .webui-user-menu-credits-row {
+    display: flex;
+    height: 32px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    overflow: hidden;
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--text_default_primary);
+  }
+  .webui-user-menu-usage-error {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .webui-user-menu-usage-error-title {
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 500;
+    color: var(--text_default_primary);
+  }
+  .webui-user-menu-usage-retry {
+    align-self: flex-start;
+    margin-top: 4px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 500;
+    color: var(--text_default_primary);
+    cursor: pointer;
+  }
+  .webui-user-menu-usage-retry:hover {
+    text-decoration: underline;
+  }
+  .webui-user-menu-usage-skeleton {
+    display: flex;
+    min-height: 72px;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px 0;
+  }
+  .webui-user-menu-usage-skeleton.is-animated {
+    animation: webui-user-menu-usage-pulse 1.2s ease-in-out infinite;
+  }
+  .webui-user-menu-usage-skeleton-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 4px 0;
+    border-radius: 8px;
+  }
+  .webui-user-menu-usage-skeleton-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .webui-user-menu-usage-skeleton-bar {
+    border-radius: 4px;
+    background: var(--bg_interaction_tertiary_press);
+  }
+  .webui-user-menu-usage-skeleton-bar--a {
+    width: 64px;
+    height: 14px;
+  }
+  .webui-user-menu-usage-skeleton-bar--b {
+    width: 32px;
+    height: 14px;
+  }
+  .webui-user-menu-usage-skeleton-bar--c {
+    width: 96px;
+    height: 12px;
+  }
+  .webui-user-menu-usage-skeleton-bar--d {
+    width: 56px;
+    height: 12px;
+  }
+
+  /* ---- Daily check-in card ----
+   * `.signin-*` rules and the `mavis-button` base are copied from the
+   * desktop stylesheet; the anchor/panel wrapper positions the card the way
+   * desktop's hover popover does (right of the menu, centered on the row).
+   */
+  .webui-user-menu-signin-anchor {
+    position: relative;
+  }
+  .webui-user-menu-signin-panel {
+    position: absolute;
+    top: -84px;
+    left: calc(100% + 11px);
+    z-index: 111;
+  }
+  .signin-card-container {
+    width: 339px;
+    max-width: min(100%, 100vw - 16px);
+  }
+  .signin-card-surface {
+    container-type: inline-size;
+    min-height: 201px;
+    box-shadow: 0 0 20px 0 var(--shadow_default, #0a0a0a14);
+  }
+  .signin-corner-clip {
+    pointer-events: none;
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 96px;
+    height: 80px;
+    overflow: hidden;
+    border-top-right-radius: 16px;
+  }
+  .signin-corner-default img {
+    position: absolute;
+    right: -18.09px;
+    top: -36px;
+    width: 101.089px;
+    height: 109.646px;
+    max-width: none;
+  }
+  .signin-progress-scroll {
+    overflow-x: auto;
+  }
+  .signin-progress {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    min-width: 214px;
+    padding: 0 8px;
+  }
+  .signin-day,
+  .signin-day-dot {
+    display: flex;
+    align-items: center;
+    width: 22px;
+  }
+  .signin-day {
+    flex: 0 0 22px;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .signin-day-dot {
+    position: relative;
+    height: 22px;
+    flex: 0 0 22px;
+    justify-content: center;
+    border-radius: 50%;
+  }
+  .signin-day-ring {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+  .signin-day-check path {
+    vector-effect: non-scaling-stroke;
+  }
+  .signin-day-points {
+    font-size: 11px;
+    line-height: 14px;
+    white-space: nowrap;
+    font-feature-settings: "tnum";
+    font-variant-numeric: tabular-nums;
+  }
+  .signin-connector {
+    width: 0;
+    height: 1.2px;
+    min-width: 0;
+    flex: 1 1 16px;
+    margin-top: 10.4px;
+  }
+  .signin-bonus-tag {
+    pointer-events: none;
+  }
+  .signin-day-claimed-animation {
+    animation: signin-day-claimed 0.36s ease-out;
+  }
+  .signin-claim-button:disabled {
+    cursor: default;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .signin-card-collapsing,
+    .signin-day-claimed-animation {
+      animation: none;
+    }
+  }
+  /* Credits-info tooltip: antd tooltip stand-in (desktop placement top,
+   * maxWidth 340, dark bubble with arrow). */
+  .webui-signin-credits-anchor {
+    position: relative;
+    display: inline-flex;
+  }
+  .webui-signin-credits-link {
+    display: inline;
+    cursor: pointer;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: currentColor;
+    text-underline-offset: 2px;
+  }
+  /* Claiming spinner (desktop uses the antd loading icon). */
+  .webui-signin-claim-spinner {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: webui-signin-claim-spin 0.6s linear infinite;
+  }
+
+  @container (max-width: 265px) {
+    .signin-progress {
+      gap: 3px;
+      padding: 0 4px;
+    }
+    .signin-day-points {
+      font-size: 10px;
+    }
+  }
+}

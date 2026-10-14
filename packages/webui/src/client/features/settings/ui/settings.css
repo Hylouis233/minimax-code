@@ -1,0 +1,723 @@
+/* settings — moved out of styles/shell.css (T20); rules kept in their original relative order. */
+@layer components {
+
+  .webui-workspace-panel { position: relative; display: flex; width: 50%; min-width: 0; min-height: 0; flex: 0 1 50%; flex-direction: column; overflow: hidden; border-left: 1px solid var(--border_default); background: var(--bg_default_primary); color: var(--text_default_primary); animation: webui-panel-enter-right 180ms cubic-bezier(.2, .7, .2, 1) both; }
+  .webui-workspace-panel.is-expanded { position: fixed; inset: 0; }
+  .webui-workspace-panel.is-expanded .webui-workspace-file-tree-panel { width: min(360px, 34vw); flex-basis: min(360px, 34vw); }
+  .webui-progress-panel-motion { position: absolute; top: 56px; right: 12px; z-index: 45; display: block; width: min(288px, calc(100% - 24px)); max-height: calc(100% - 68px); overflow-x: hidden; overflow-y: auto; clip-path: inset(0 0 100% 0 round 16px); opacity: 0; pointer-events: none; transition: clip-path 180ms cubic-bezier(.2, .7, .2, 1), opacity 140ms ease-out; }
+  .webui-progress-panel-motion.is-open { clip-path: inset(0 0 0 0 round 16px); opacity: 1; pointer-events: auto; }
+  .webui-progress-overview-panel { position: static; display: flex; width: 100%; flex-direction: column; overflow: visible; border: 0; background: transparent; padding: 0; }
+  .webui-session-has-progress-panel { box-sizing: border-box; padding-right: 312px; }
+  .webui-workspace-panel-header, .webui-workspace-panel-actions, .webui-workspace-tabs, .webui-workspace-tab { display: flex; align-items: center; }
+  .webui-workspace-panel-header { position: relative; z-index: 2; min-height: 56px; flex: 0 0 56px; justify-content: space-between; gap: var(--spacing_8); border-bottom: 1px solid var(--border_default); padding: 0 var(--spacing_8); }
+  .webui-workspace-tabs { min-width: 0; flex: 1 1 auto; gap: var(--spacing_8); overflow: visible; }
+  .webui-workspace-tab-list { display: flex; min-width: 0; flex: 1 1 0; align-items: center; gap: var(--spacing_4); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+  .webui-workspace-tab-list::-webkit-scrollbar { display: none; }
+  .webui-workspace-tab { max-width: 180px; min-width: 104px; height: 40px; flex: 0 0 auto; gap: var(--spacing_4); border-radius: 10px; background: transparent; color: var(--text_default_secondary); }
+  .webui-workspace-tab.is-active { background: var(--bg_interaction_tertiary_selected); color: var(--text_default_primary); }
+  .webui-workspace-tab button, .webui-workspace-add-trigger, .webui-workspace-panel-actions button, .webui-workspace-add-menu button { display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; padding: var(--spacing_8); color: inherit; }
+  .webui-workspace-tab button:first-child { width: 100%; min-width: 0; height: 100%; justify-content: flex-start; gap: var(--spacing_8); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .webui-workspace-tab-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .webui-workspace-tab-file-icon { width: 16px; height: 16px; flex: 0 0 16px; }
+  .webui-workspace-filetype-badge { display: inline-flex; width: 16px; height: 16px; flex: 0 0 16px; align-items: center; justify-content: center; font-family: ui-monospace, monospace; font-size: 9px; font-weight: 600; line-height: 1; }
+  .webui-workspace-filetype-badge.is-markdown { color: var(--text_default_accent); }
+  .webui-workspace-filetype-badge.is-javascript { border-radius: 2px; background: #f4d54e; color: #403600; }
+  .webui-workspace-filetype-badge.is-typescript { border-radius: 2px; background: #3178c6; color: #fff; }
+  .webui-workspace-filetype-badge.is-json { color: #b88900; font-size: 11px; }
+  .webui-workspace-filetype-badge.is-css { color: #7e57c2; font-size: 7px; }
+  .webui-workspace-filetype-badge.is-html { color: #e44d26; font-size: 11px; font-weight: 700; }
+  .webui-workspace-filetype-badge.is-java { color: #e76f00; font-weight: 700; }
+  .webui-workspace-filetype-badge.is-python { color: #3472a5; font-weight: 700; }
+  .webui-workspace-filetype-badge.is-rust { color: #b7410e; font-weight: 700; }
+  .webui-workspace-filetype-badge.is-shell { color: #555; font-weight: 700; }
+  .webui-workspace-filetype-badge.is-sql { color: #d97706; font-size: 8px; font-weight: 700; }
+  .webui-workspace-filetype-badge.is-go { color: #00add8; font-weight: 700; }
+  .webui-workspace-filetype-badge.is-xml { color: #e37933; font-weight: 700; }
+  .webui-workspace-filetype-badge.is-yaml { color: #cb171e; font-weight: 700; }
+  .webui-workspace-filetype-badge.is-code { color: #3178c6; font-weight: 700; }
+  .webui-workspace-tab button:last-child { position: absolute; top: 50%; right: 4px; width: 22px; height: 22px; transform: translateY(-50%); border-radius: 5px; padding: 0; color: var(--icon_default_tertiary); opacity: 0; }
+  .webui-workspace-tab { position: relative; }
+  .webui-workspace-tab:hover button:last-child, .webui-workspace-tab.is-active button:last-child { opacity: 1; }
+  .webui-workspace-tab:hover button:first-child, .webui-workspace-tab.is-active button:first-child { padding-right: 24px; }
+  .webui-workspace-add-anchor { position: relative; z-index: 4; flex: 0 0 auto; }
+  .webui-workspace-add-trigger { width: 32px; height: 32px; border-radius: 8px; background: var(--bg_default_secondary); color: var(--text_default_primary); font-size: 18px; line-height: 1; }
+  .webui-workspace-add-trigger:hover, .webui-workspace-panel-actions button:hover { background: var(--bg_interaction_tertiary_hover); }
+  .webui-workspace-panel-actions { flex: 0 0 auto; gap: var(--spacing_8); padding-left: var(--spacing_4); }
+  .webui-workspace-panel-actions button { width: 32px; height: 32px; flex: 0 0 32px; border-radius: 8px; color: var(--icon_default_secondary); }
+  .webui-workspace-panel-close { color: var(--icon_default_secondary); }
+  .webui-workspace-panel-body { display: flex; min-width: 0; min-height: 0; flex: 1 1 auto; overflow: hidden; }
+  .webui-workspace-view { display: flex; min-width: 0; min-height: 0; flex: 1 1 auto; flex-direction: column; overflow: auto; }
+  .webui-workspace-file-toolbar { display: flex; min-height: 48px; flex: 0 0 48px; align-items: center; gap: var(--spacing_8); border-bottom: 1px solid var(--border_default); padding: 0 var(--spacing_16); }
+  .webui-workspace-file-breadcrumb { display: flex; min-width: 0; flex: 1 1 auto; align-items: center; gap: var(--spacing_8); overflow: hidden; color: var(--text_default_tertiary); font-size: var(--size_14); white-space: nowrap; }
+  .webui-workspace-file-breadcrumb > span { display: inline-flex; min-width: 0; align-items: center; gap: var(--spacing_8); overflow: hidden; text-overflow: ellipsis; }
+  .webui-workspace-file-breadcrumb .is-current { color: var(--text_default_primary); }
+  .webui-workspace-file-mode { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 2px; border-radius: 8px; background: var(--bg_default_secondary); padding: 2px; }
+  .webui-workspace-file-mode button { min-height: 28px; border: 0; border-radius: 6px; background: transparent; padding: 0 10px; color: var(--text_default_secondary); font-size: var(--size_12); }
+  .webui-workspace-file-mode button[aria-pressed="true"] { background: var(--bg_default_primary); color: var(--text_default_primary); box-shadow: 0 1px 3px rgb(0 0 0 / 12%); }
+  .webui-workspace-edit-action { display: inline-flex; width: 34px; height: 34px; flex: 0 0 34px; align-items: center; justify-content: center; border: 0; border-radius: 8px; background: transparent; color: var(--icon_default_secondary); }
+  .webui-workspace-edit-action:disabled { cursor: default; color: var(--icon_default_tertiary); opacity: .72; }
+  .webui-workspace-edit-action:not(:disabled):hover { background: var(--bg_interaction_tertiary_hover); }
+  .webui-workspace-tree-toggle { display: inline-flex; width: 34px; height: 34px; flex: 0 0 34px; align-items: center; justify-content: center; border: 0; border-radius: 8px; background: transparent; color: var(--icon_default_secondary); }
+  .webui-workspace-tree-toggle:hover, .webui-workspace-tree-toggle[aria-pressed="true"] { background: var(--bg_interaction_tertiary_selected); color: var(--icon_default_primary); }
+  .webui-workspace-file-tree-panel { display: flex; width: clamp(232px, 24vw, 288px); flex: 0 0 clamp(232px, 24vw, 288px); min-height: 0; flex-direction: column; border-left: 1px solid var(--border_default); background: var(--bg_default_primary); animation: webui-panel-enter-right 180ms cubic-bezier(.2, .7, .2, 1) both; }
+  .webui-workspace-file-search { display: flex; height: 40px; flex: 0 0 40px; align-items: center; gap: var(--spacing_8); margin: var(--spacing_8) var(--spacing_12); border: 1px solid var(--border_default); border-radius: 10px; padding: 0 var(--spacing_8); color: var(--icon_default_tertiary); }
+  .webui-workspace-file-search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text_default_primary); font-size: var(--size_14); }
+  .webui-workspace-file-search input::placeholder { color: var(--text_default_tertiary); }
+  .webui-workspace-file-tree-scroll { min-height: 0; flex: 1 1 auto; overflow: auto; padding: 0 var(--spacing_12) var(--spacing_12); }
+  .webui-workspace-file-tree-scroll > [role="status"], .webui-workspace-file-tree-scroll > [role="alert"], .webui-workspace-tree-empty { padding: var(--spacing_8); color: var(--text_default_tertiary); font-size: var(--size_12); }
+  .webui-file-tree-children { padding-left: var(--spacing_12); }
+  .webui-file-tree-children > [role="status"], .webui-file-tree-children > [role="alert"], .webui-file-tree-children > p { margin: 0; padding: 2px var(--spacing_12) 6px; color: var(--text_default_tertiary); font-size: var(--size_12); }
+  .webui-workspace-files-empty { display: flex; min-height: 0; flex: 1 1 auto; flex-direction: column; align-items: center; justify-content: center; gap: var(--spacing_8); color: var(--text_default_tertiary); }
+  .webui-workspace-files-empty strong { color: var(--text_default_secondary); font-size: var(--size_16); font-weight: var(--weight_medium); }
+  .webui-workspace-files-empty p { margin: 0; font-size: var(--size_14); }
+  .webui-workspace-file-document { min-width: 0; min-height: 0; flex: 1 1 auto; overflow: auto; }
+  .webui-workspace-file-document > p { margin: var(--spacing_16); color: var(--text_default_tertiary); }
+  .webui-workspace-file-document > .webui-markdown { max-width: 960px; margin: 0 auto; padding: 32px clamp(24px, 7vw, 64px); }
+  .webui-workspace-image-preview { display: block; max-width: 100%; max-height: calc(100vh - 180px); margin: 24px auto; object-fit: contain; }
+  .webui-file-code { min-width: max-content; min-height: 100%; margin: 0; overflow: auto; background: var(--bg_default_primary); padding: 20px 0; color: var(--text_default_primary); font-family: Hack, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; line-height: 1.65; tab-size: 2; white-space: pre; }
+  .webui-file-code code { display: block; min-width: 100%; }
+  .webui-file-code-line { position: relative; display: block; min-height: 1.65em; padding: 0 24px 0 68px; }
+  .webui-file-code-line::before { position: absolute; left: 0; width: 48px; padding-right: 12px; color: var(--text_default_tertiary); content: attr(data-line-number); text-align: right; user-select: none; }
+  .webui-file-code-line.webui-file-preview-line-active { background: var(--bg_interaction_tertiary_selected); }
+  .webui-file-code .hljs-comment, .webui-file-code .hljs-quote { color: var(--text_default_tertiary); font-style: italic; }
+  .webui-file-code .hljs-keyword, .webui-file-code .hljs-meta .hljs-keyword { color: var(--text_label_accent_default); }
+  .webui-file-code .hljs-string, .webui-file-code .hljs-doctag { color: var(--text_label_positive_secondary_default); }
+  .webui-file-code .hljs-number, .webui-file-code .hljs-literal { color: var(--text_label_warning_secondary_default); }
+  .webui-file-code .hljs-title, .webui-file-code .hljs-title.function_, .webui-file-code .hljs-function, .webui-file-code .hljs-section { color: var(--text_label_accent_default); }
+  .webui-file-code .hljs-type, .webui-file-code .hljs-built_in, .webui-file-code .hljs-title.class_ { color: var(--text_label_danger_secondary_default); }
+  .webui-file-code .hljs-attr, .webui-file-code .hljs-variable, .webui-file-code .hljs-property { color: var(--text_default_secondary); }
+  .webui-workspace-add-menu { position: absolute; top: calc(100% + 4px); left: 0; z-index: 20; display: flex; min-width: 198px; flex-direction: column; gap: 2px; padding: 4px; border: 1px solid var(--border_default); border-radius: 14px; background: var(--bg_grouped_secondary_elevated); box-shadow: 0 8px 24px rgb(0 0 0 / 12%); color: var(--text_default_primary); }
+  .webui-workspace-add-menu button { width: 100%; min-height: 34px; justify-content: flex-start; gap: var(--spacing_8); border-radius: 8px; padding: 0 10px; color: inherit; font-size: var(--size_14); text-align: left; white-space: nowrap; }
+  .webui-workspace-add-menu button:hover { background: var(--bg_interaction_tertiary_hover); }
+  .webui-workspace-add-menu button svg { color: var(--icon_default_secondary); }
+
+  .webui-turn-review { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; overflow: auto; }
+  .webui-turn-review-summary { display: flex; min-height: 48px; flex: 0 0 48px; align-items: center; justify-content: space-between; gap: var(--spacing_12); border-bottom: 1px solid var(--border_default); padding: 0 var(--spacing_16); color: var(--text_default_primary); font-size: var(--size_14); }
+  .webui-turn-review-files { min-width: 0; flex: 1 1 auto; overflow: auto; }
+  .webui-turn-review-file { min-width: 0; border-bottom: 1px solid var(--border_default); }
+  .webui-turn-review-file-heading { position: sticky; top: 0; display: flex; min-width: 0; min-height: 40px; align-items: center; gap: var(--spacing_8); border: 0; background: var(--bg_default_primary); padding: 0 var(--spacing_12); color: var(--text_default_primary); cursor: pointer; list-style: none; }
+  .webui-turn-review-file-heading::-webkit-details-marker { display: none; }
+  .webui-turn-review-file-heading::before { width: 12px; flex: 0 0 12px; color: var(--icon_default_tertiary); content: "›"; font-size: 18px; text-align: center; }
+  .webui-turn-review-file[open] > .webui-turn-review-file-heading::before { content: "⌄"; }
+  .webui-turn-review-file-heading:hover { background: var(--bg_interaction_secondary_default); }
+  .webui-turn-review-file-heading .webui-diff-file-icon { width: 18px; height: 18px; }
+  .webui-turn-review-file-heading .webui-diff-file-icon .webui-workspace-filetype-badge { width: 18px; height: 18px; }
+  .webui-turn-review-file-path { min-width: 0; flex: 1; overflow: hidden; font-size: var(--size_14); text-overflow: ellipsis; white-space: nowrap; }
+  .webui-turn-review-code { width: max-content; min-width: 100%; margin: 0; padding: 0; overflow: auto; background: var(--bg_default_primary); font-size: var(--size_12); line-height: 1.65; white-space: pre; overflow-wrap: normal; }
+  .webui-turn-review-code code { display: block; min-width: max-content; }
+  .webui-turn-review-line { display: grid; min-width: max-content; grid-template-columns: 48px 48px 20px minmax(0, 1fr); }
+  .webui-turn-review-line--addition { background: var(--bg_status_positive); color: #17251d; }
+  .webui-turn-review-line--deletion { background: var(--bg_status_error); color: #302022; }
+  .webui-turn-review-line--hunk { background: var(--bg_grouped_secondary); color: var(--text_default_tertiary); }
+  /* The no-newline marker: Desktop renders it as its own row with no gutter
+     numbers and neutral text, because it records a fact about the line above
+     rather than being a line of the file. */
+  .webui-turn-review-line--noNewline { grid-column: 1 / -1; padding: 1px var(--spacing_12); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--text_default_tertiary); }
+  .webui-turn-review-line-number { border-right: 1px solid var(--border_light); padding: 0 8px 0 4px; color: var(--text_default_tertiary); text-align: right; user-select: none; }
+  .webui-turn-review-line--addition .webui-turn-review-line-number { color: var(--text_status_success); }
+  .webui-turn-review-line--deletion .webui-turn-review-line-number { color: var(--text_status_error); }
+  .webui-turn-review-marker { color: var(--text_default_tertiary); text-align: center; user-select: none; }
+  .webui-turn-review-line--addition .webui-turn-review-marker { color: var(--text_status_success); }
+  .webui-turn-review-line--deletion .webui-turn-review-marker { color: var(--text_status_error); }
+  .webui-turn-review-source { min-width: max-content; padding-right: var(--spacing_16); }
+  .webui-turn-review-hunk { grid-column: 1 / -1; padding: 1px var(--spacing_12); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .webui-turn-review-unavailable, .webui-turn-review-empty { padding: var(--spacing_16); color: var(--text_default_tertiary); font-size: var(--size_14); }
+  .webui-workspace-review-status { flex: 0 0 auto; margin: 0; border-bottom: 1px solid var(--border_light); padding: var(--spacing_8) var(--spacing_12); color: var(--text_default_tertiary); font-size: var(--size_12); }
+  .webui-workspace-review-search { display: flex; flex: 0 0 auto; gap: var(--spacing_8); border-bottom: 1px solid var(--border_light); padding: var(--spacing_8) var(--spacing_12); }
+  .webui-workspace-review-search input { min-width: 0; flex: 1; border: 1px solid var(--border_default); border-radius: var(--radius_8); background: var(--bg_default_primary); padding: 0 var(--spacing_8); color: var(--text_default_primary); font-size: var(--size_14); }
+  .webui-workspace-review-search button { flex: 0 0 auto; border: 1px solid var(--border_default); border-radius: var(--radius_8); background: var(--bg_default_primary); padding: 0 var(--spacing_12); color: var(--text_default_primary); font-size: var(--size_14); }
+  .webui-turn-review .webui-workspace-review-search-results { flex: 0 0 auto; overflow: auto; border-bottom: 1px solid var(--border_light); padding: var(--spacing_8) var(--spacing_12); }
+  .webui-workspace-review-search-results button { max-width: 100%; overflow: hidden; color: var(--text_default_secondary); text-overflow: ellipsis; white-space: nowrap; }
+  .webui-file-preview-line-active { display: inline-block; width: 100%; background: var(--bg_interaction_tertiary_selected); }
+
+  .webui-progress-overview-card { position: relative; display: flex; width: 100%; flex-direction: column; border: .5px solid var(--border_default); border-radius: 16px; background: var(--bg_grouped_secondary_elevated); padding: 6px; box-shadow: 0 6px 24px rgb(0 0 0 / 8%); color: var(--text_default_primary); }
+  .webui-environment-panel, .webui-progress-panel, .webui-subagents-panel { display: flex; flex-shrink: 0; flex-direction: column; overflow: hidden; }
+  .webui-environment-panel + .webui-progress-panel { border-top: 1px solid var(--border_light); }
+  .webui-progress-panel + .webui-subagents-panel { border-top: 1px solid var(--border_light); }
+  .webui-environment-body { padding: 0 6px 6px; }
+  .webui-environment-workspace { overflow: hidden; padding: 0 0 4px; color: var(--text_default_tertiary); font-size: var(--size_12); line-height: 18px; text-overflow: ellipsis; white-space: nowrap; }
+  .webui-environment-actions { display: flex; flex-direction: column; gap: 1px; }
+  .webui-environment-action { display: flex; min-height: 34px; width: 100%; align-items: center; gap: var(--spacing_8); border: 0; border-radius: var(--radius_8); background: transparent; padding: 0 2px; color: var(--text_default_primary); font-size: var(--size_14); text-align: left; }
+  .webui-environment-action small { display: inline-flex; flex-shrink: 0; gap: var(--spacing_8); margin-left: auto; font-size: var(--size_12); }
+  .webui-environment-action small .webui-diff-additions { color: var(--text_label_positive_secondary_default); }
+  .webui-environment-action small .webui-diff-deletions { color: var(--text_label_danger_secondary_default); }
+  .webui-environment-action:not(:disabled):hover { background: var(--bg_interaction_tertiary_hover); }
+  .webui-environment-action:disabled { cursor: default; color: var(--text_default_tertiary); opacity: .72; }
+  .webui-commit-dialog { position: fixed; top: 50%; left: 50%; z-index: 100; display: flex; width: min(420px, calc(100vw - 32px)); transform: translate(-50%, -50%); flex-direction: column; gap: var(--spacing_12); border: 1px solid var(--border_default); border-radius: var(--radius_12); background: var(--bg_grouped_secondary_elevated); padding: var(--spacing_16); box-shadow: 0 12px 40px rgb(0 0 0 / 18%); color: var(--text_default_primary); }
+  .webui-commit-dialog-header, .webui-commit-dialog-actions { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing_8); }
+  .webui-commit-dialog-header button { border: 0; background: transparent; color: var(--icon_default_tertiary); }
+  .webui-commit-dialog-label { display: flex; flex-direction: column; gap: var(--spacing_4); color: var(--text_default_secondary); font-size: var(--size_12); }
+  .webui-commit-dialog-label textarea { min-height: 88px; resize: vertical; border: 1px solid var(--border_default); border-radius: var(--radius_8); background: var(--bg_default_primary); padding: var(--spacing_8); color: var(--text_default_primary); font: inherit; outline: 0; }
+  .webui-commit-dialog-hint, .webui-commit-dialog-error { margin: 0; color: var(--text_default_tertiary); font-size: var(--size_12); }
+  .webui-commit-dialog-error { color: var(--text_label_danger_secondary_default); }
+  .webui-commit-dialog-actions { justify-content: flex-end; }
+  .webui-commit-dialog-actions button { border: 1px solid var(--border_default); border-radius: var(--radius_8); background: transparent; padding: var(--spacing_8) var(--spacing_12); color: var(--text_default_primary); }
+  .webui-commit-dialog-actions button:last-child { border-color: var(--border_accent); background: var(--bg_interaction_primary_default); color: var(--text_default_inverted); }
+  .webui-workspace-panel-controls { position: absolute; top: 16px; right: 12px; z-index: 50; display: flex; align-items: center; gap: 8px; }
+  .webui-workspace-icon-button { display: flex; width: 36px; height: 36px; align-items: center; justify-content: center; border: 0; border-radius: 10px; background: transparent; color: var(--icon_default_secondary); }
+  .webui-workspace-icon-button:not(:disabled):hover, .webui-workspace-icon-button.is-active { background: var(--bg_interaction_tertiary_selected); color: var(--icon_default_primary); }
+  .webui-workspace-icon-button:disabled { cursor: default; opacity: .72; }
+  .webui-workspace-section-title { display: flex; height: 28px; width: 100%; align-items: center; justify-content: space-between; border: 0; background: transparent; padding: 0 var(--spacing_12); color: var(--text_default_secondary); font-size: var(--size_12); text-align: left; }
+  .webui-progress-panel { padding: 0 0 2px; }
+  .webui-progress-row { display: flex; min-height: 30px; align-items: center; gap: var(--spacing_8); border-radius: 10px; padding: 0 var(--spacing_4); font-size: var(--size_12); }
+  .webui-progress-marker { display: inline-flex; width: 18px; height: 18px; flex: 0 0 18px; align-items: center; justify-content: center; border-radius: 50%; font-size: 11px; }
+  .webui-progress-row--completed .webui-progress-marker { background: var(--icon_default_secondary); color: var(--text_default_inverted); }
+  .webui-progress-row--in_progress .webui-progress-marker { background: var(--bg_grouped_tertiary); color: var(--text_default_primary); }
+  .webui-progress-row--pending .webui-progress-marker { background: var(--bg_default_secondary); color: var(--text_default_tertiary); }
+  .webui-progress-row--cancelled .webui-progress-marker { background: var(--bg_default_secondary); color: var(--text_default_tertiary); }
+  .webui-progress-empty { margin: 0; padding: var(--spacing_8) var(--spacing_4); color: var(--text_default_tertiary); font-size: var(--size_12); }
+  .webui-subagent-row { display: flex; min-height: 32px; width: 100%; align-items: center; gap: var(--spacing_8); border: 0; border-radius: var(--radius_8); background: transparent; padding: 0 var(--spacing_4); color: var(--text_default_primary); font-size: var(--size_14); }
+  .webui-subagent-row:hover { background: var(--bg_interaction_tertiary_hover); }
+  .webui-subagent-avatar { display: inline-flex; width: 20px; height: 20px; flex: 0 0 20px; object-fit: contain; }
+  .webui-subagent-status { display: inline-flex; width: 18px; height: 18px; flex: 0 0 18px; align-items: center; justify-content: center; border-radius: 50%; color: var(--text_default_tertiary); font-size: 14px; font-weight: var(--weight_medium); }
+  .webui-subagent-status--completed { background: var(--icon_default_secondary); color: var(--text_default_inverted); }
+  .webui-subagent-status--error { color: var(--text_label_danger_secondary_default); }
+  .webui-workspace-panel-close { display: flex; width: 32px; height: 32px; flex: 0 0 32px; align-items: center; justify-content: center; border: 0; border-radius: var(--radius_8); background: transparent; color: var(--icon_default_tertiary); }
+  .webui-workspace-panel-close:hover { background: var(--bg_interaction_tertiary_hover); color: var(--icon_default_primary); }
+
+  .webui-file-tree-row { display: flex; width: 100%; min-height: 32px; align-items: center; gap: var(--spacing_8); overflow: hidden; border: 0; border-radius: 6px; background: transparent; padding: 0 var(--spacing_4); color: var(--text_default_secondary); text-align: left; text-overflow: ellipsis; white-space: nowrap; font-size: var(--size_14); transition: background-color 120ms ease-out, color 120ms ease-out; }
+  .webui-expandable-motion { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 180ms cubic-bezier(.2, .7, .2, 1), opacity 140ms ease-out; }
+  .webui-expandable-motion > * { min-height: 0; overflow: hidden; }
+  .webui-expandable-motion.is-open { grid-template-rows: 1fr; opacity: 1; }
+  .webui-file-tree-row:hover { background: var(--bg_interaction_tertiary_hover); color: var(--text_default_primary); }
+  .webui-file-tree-row.is-selected { background: var(--bg_interaction_tertiary_selected); color: var(--text_default_primary); }
+
+  .file-tab { display: flex; align-items: center; gap: var(--spacing_4); overflow: hidden; padding: 0 var(--spacing_8); font-size: var(--size_12); white-space: nowrap; }
+  .file-tab button { margin-left: auto; border: 0; background: transparent; color: inherit; }
+
+  .webui-canvas-content, .webui-terminal-empty { position: relative; display: flex; min-height: 300px; height: calc(100% - 180px); flex-direction: column; align-items: center; justify-content: center; gap: var(--spacing_8); padding: var(--spacing_16); color: var(--text_default_secondary); text-align: center; }
+  .webui-canvas-content p, .webui-terminal-empty p { margin: 0; color: var(--text_default_tertiary); font-size: var(--size_12); }
+  .webui-canvas-stage { display: flex; min-width: 160px; min-height: 100px; align-items: center; justify-content: center; gap: var(--spacing_8); transform-origin: center; }
+  .webui-canvas-node { border: 1px solid var(--border_default); border-radius: var(--radius_8); background: var(--bg_grouped_secondary); padding: var(--spacing_8); font-size: var(--size_12); }
+  .webui-canvas-zoom { position: absolute; right: var(--spacing_8); bottom: var(--spacing_8); font-size: var(--size_12); }
+  .webui-terminal-empty button { border: 1px solid var(--border_default); border-radius: var(--radius_8); background: transparent; padding: var(--spacing_8) var(--spacing_12); color: var(--text_default_primary); }
+  .webui-xterm-host { width: 100%; min-height: 260px; overflow: hidden; background: var(--bg_default_secondary); padding: var(--spacing_8); text-align: left; }
+  .webui-xterm-host .xterm { height: 100%; }
+  .webui-xterm-host .xterm-viewport { background: var(--bg_default_secondary) !important; }
+  .webui-terminal-actions { display: flex; gap: var(--spacing_8); }
+  .webui-settings-mask { position: fixed; inset: 0; z-index: 100; display: flex; background: var(--utility_scrim); animation: webui-overlay-enter 160ms ease-out both; }
+  /* The account login dialog: the settings mask's overlay treatment around a
+   * small centered card — a dialog, not a full page, because the entry points
+   * (user menu, usage panel) are popovers over the live shell. */
+  .webui-account-login-mask { position: fixed; inset: 0; z-index: 110; display: flex; align-items: center; justify-content: center; background: var(--utility_scrim); animation: webui-overlay-enter 160ms ease-out both; }
+  .webui-account-login { display: flex; width: min(420px, calc(100vw - 48px)); flex-direction: column; gap: 12px; padding: 20px; border-radius: var(--radius_12); background: var(--bg_default_secondary_elevated); color: var(--text_default_primary); animation: webui-modal-enter 200ms cubic-bezier(.2, .7, .2, 1) both; }
+  .webui-account-login-header { display: flex; align-items: center; justify-content: space-between; }
+  .webui-account-login-header button { border: 0; background: transparent; color: var(--text_default_secondary); font-size: 18px; cursor: pointer; }
+  .webui-account-login-body { display: flex; flex-direction: column; gap: 10px; align-items: center; text-align: center; }
+  .webui-account-login-hint { margin: 0; color: var(--text_default_secondary); }
+  .webui-account-login-code { margin: 0; font-size: 28px; font-weight: 600; letter-spacing: .12em; font-variant-numeric: tabular-nums; }
+  .webui-account-login-uri { color: var(--text_default_primary); }
+  .webui-account-login-status { margin: 0; color: var(--text_default_tertiary); }
+  .webui-account-login-actions { display: flex; gap: 8px; justify-content: center; }
+  .webui-settings-modal { display: flex; width: 100vw; height: 100vh; overflow: hidden; background: var(--bg_default_primary); color: var(--text_default_primary); animation: webui-modal-enter 200ms cubic-bezier(.2, .7, .2, 1) both; }
+  .webui-settings-sidebar { width: 260px; flex: 0 0 260px; overflow-y: hidden; }
+  .webui-settings-back, .webui-settings-nav-item { display: flex; width: 100%; align-items: center; gap: var(--spacing_8); border: 0; background: transparent; color: var(--text_default_secondary); text-align: left; }
+  .webui-settings-back { font-size: var(--size_14); }
+  .webui-settings-back:hover, .webui-settings-nav-item:hover { color: var(--text_default_primary); }
+  .webui-settings-nav-item:disabled { cursor: default; color: var(--text_default_tertiary); opacity: .68; }
+  .webui-settings-search { display: flex; height: 36px; align-items: center; gap: var(--spacing_8); padding: 0 var(--spacing_8); border: 1px solid var(--border_default); border-radius: var(--radius_8); color: var(--text_default_tertiary); }
+  .webui-settings-search input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: inherit; }
+  .webui-settings-search button { border: 0; background: transparent; color: inherit; }
+  .webui-settings-group { margin-top: 0; }
+  .webui-settings-nav > .webui-settings-group:first-child { margin-top: var(--spacing_24); }
+  .webui-settings-group h3 { margin: 0 0 var(--spacing_6); color: var(--text_default_tertiary); font-weight: var(--weight_medium); }
+  .webui-settings-nav-item { border-radius: var(--radius_8); transition: background-color 120ms ease, color 120ms ease; }
+  .webui-settings-nav-item.is-active { background: var(--bg_interaction_tertiary_selected); color: var(--text_default_primary); }
+  .webui-settings-icon { width: 18px; height: 18px; flex: 0 0 18px; }
+  .webui-settings-content { min-width: 0; flex: 1; overflow: auto; animation: webui-settings-content-in 180ms ease both; }
+  .webui-settings-content-header { display: flex; align-items: flex-start; justify-content: space-between; }
+
+  .webui-settings-content h2 { margin: 0; font-size: var(--size_16); font-weight: var(--weight_medium); line-height: 26px; }
+
+  .webui-settings-panels { max-width: 760px; margin: 0 auto; }
+  .webui-settings-panel { margin-bottom: var(--spacing_24); border: 1px solid var(--border_default); border-radius: var(--radius_12); background: var(--bg_grouped_primary); }
+  .webui-settings-panel > h3 { margin: 0; padding: var(--spacing_16) var(--spacing_20) var(--spacing_8); font-size: var(--size_16); font-weight: var(--weight_medium); }
+  .webui-settings-row { display: flex; min-height: 66px; align-items: center; justify-content: space-between; gap: var(--spacing_16); padding: var(--spacing_12) var(--spacing_20); border-top: 1px solid var(--border_default); }
+  .webui-settings-row strong, .webui-settings-row span { display: block; }
+  .webui-settings-row strong { font-size: var(--size_14); font-weight: var(--weight_regular); }
+  .webui-settings-row span { margin-top: var(--spacing_4); color: var(--text_default_tertiary); font-size: var(--size_12); }
+  .webui-settings-row select { min-width: 150px; padding: var(--spacing_8); border: 1px solid var(--border_default); border-radius: var(--radius_8); background: var(--bg_default_primary); color: var(--text_default_primary); }
+
+  .webui-settings-content-header:has(.webui-archived-delete-all) { align-items: center; margin-bottom: var(--spacing_40); }
+  .webui-archived-delete-all { display: inline-flex; height: 36px; align-items: center; gap: 6px; border: 0; border-radius: 12px; padding: 0 12px; background: rgba(255, 59, 48, .1); color: #e5484d; font: inherit; font-size: var(--size_14); cursor: pointer; }
+  .webui-archived-delete-all:hover { background: rgba(255, 59, 48, .16); }
+  .webui-archived-delete-all:disabled { opacity: .45; cursor: default; }
+
+  /* Code review (roadmap E 区 Review 审查模式 / 修复建议+跳转). */
+  .webui-review-page { width: 100%; max-width: 760px; margin: 0 auto; padding: 0 var(--spacing_20) var(--spacing_32); }
+  .webui-review-totals { display: flex; align-items: center; gap: var(--spacing_8); margin-bottom: var(--spacing_12); color: var(--text_default_secondary); font-size: var(--size_12); }
+  .webui-review-search { display: flex; min-width: 0; height: 38px; align-items: center; gap: var(--spacing_8); margin-bottom: var(--spacing_12); border: 1px solid var(--border_default); border-radius: 12px; padding: 0 12px; background: var(--bg_default_primary); color: var(--text_default_secondary); }
+  .webui-review-search:focus-within { border-color: var(--border_accent); }
+  .webui-review-search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text_default_primary); font: inherit; font-size: var(--size_14); }
+  .webui-review-clear { flex: none; border: 0; background: transparent; color: var(--text_default_secondary); font-size: var(--size_12); }
+  .webui-review-files { display: flex; flex-direction: column; gap: var(--spacing_4); margin: 0; padding: 0; list-style: none; }
+  .webui-review-file { border: 0.5px solid var(--border_default); border-radius: 10px; overflow: hidden; }
+  .webui-review-file-heading { display: flex; width: 100%; min-width: 0; align-items: center; gap: var(--spacing_8); padding: 10px 12px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; }
+  .webui-review-file-heading:hover { background: var(--bg_interaction_secondary_default); }
+  .webui-review-file-path { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text_default_primary); font-size: var(--size_12); }
+  .webui-review-file-status { flex: none; color: var(--text_default_tertiary); font-size: var(--size_12); }
+  .webui-review-file-stats { display: inline-flex; flex: none; gap: 4px; font-size: var(--size_12); }
+  .webui-review-file-body { border-top: 0.5px solid var(--border_default); background: var(--bg_default_primary); }
+  .webui-review-file-error { margin: 0; padding: 10px 12px; color: var(--text_label_danger_secondary_default); font-size: var(--size_12); }
+  .webui-review-lines { max-height: 420px; margin: 0; padding: 0; overflow: auto; list-style: none; font-family: var(--font-mono, monospace); font-size: var(--size_12); line-height: 1.6; }
+  .webui-review-line { display: flex; min-width: max-content; }
+  .webui-review-line--addition { background: var(--bg_status_positive); color: #17251d; }
+  .webui-review-line--deletion { background: var(--bg_status_error); color: #302022; }
+  .webui-review-line--hunk { background: var(--bg_interaction_secondary_default); color: var(--text_default_tertiary); }
+  .webui-review-line--meta { color: var(--text_default_tertiary); }
+  .webui-review-line-number { flex: none; width: 48px; padding-right: 8px; opacity: .6; text-align: right; user-select: none; }
+  .webui-review-line-text { flex: 1; padding-right: 12px; white-space: pre; }
+  /* Only a line that survives into the working tree can be jumped to, so the
+     clickable surface is deliberately absent on deletions. */
+  .webui-review-line-jump { display: flex; min-width: max-content; width: 100%; border: 0; padding: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+  .webui-review-line-jump:hover { text-decoration: underline; }
+  .webui-review-line-static { display: flex; min-width: max-content; width: 100%; }
+  .webui-review-loading, .webui-review-empty { margin: 0; padding: var(--spacing_16) 0; color: var(--text_default_secondary); font-size: var(--size_12); }
+  .webui-review-error { margin: 0 0 var(--spacing_8); color: var(--text_label_danger_secondary_default); font-size: var(--size_12); }
+
+  /* Worktree list (roadmap E 区 工作树隔离). */
+  .webui-worktree-section-title { margin: var(--spacing_20) 0 var(--spacing_8); color: var(--text_default_primary); font-size: var(--size_14); }
+  .webui-worktree-branches { display: flex; flex-direction: column; gap: var(--spacing_8); margin: 0; padding: 0; list-style: none; }
+  .webui-worktree-group { padding: 10px 12px; border: 0.5px solid var(--border_default); border-radius: 10px; }
+  .webui-worktree-heading { display: flex; align-items: center; gap: var(--spacing_8); }
+  .webui-worktree-name { display: inline-flex; min-width: 0; flex: 1; align-items: center; gap: 6px; overflow: hidden; color: var(--text_default_primary); font-size: var(--size_14); }
+  .webui-worktree-kind { flex: none; color: var(--text_default_tertiary); font-size: var(--size_12); }
+  .webui-worktree-path { margin: 4px 0 0; overflow: hidden; color: var(--text_default_tertiary); font-size: var(--size_12); text-overflow: ellipsis; white-space: nowrap; }
+  .webui-worktree-sessions { display: flex; flex-direction: column; gap: 2px; margin: var(--spacing_8) 0 0; padding: 0; list-style: none; }
+  .webui-worktree-session { display: flex; min-width: 0; align-items: center; gap: var(--spacing_8); font-size: var(--size_12); }
+  .webui-worktree-session-link { min-width: 0; flex: 1; overflow: hidden; color: var(--text_default_secondary); text-decoration: none; text-overflow: ellipsis; white-space: nowrap; }
+  .webui-worktree-session-link:hover { color: var(--text_default_primary); text-decoration: underline; }
+  .webui-worktree-forked { flex: none; color: var(--text_default_tertiary); }
+  .webui-archived-page { width: 100%; max-width: 760px; margin: 0 auto; padding: 0 var(--spacing_20) var(--spacing_32); }
+  .webui-archived-filters { display: grid; grid-template-columns: minmax(0, 1fr); margin-bottom: var(--spacing_24); }
+  .webui-archived-search { display: flex; min-width: 0; height: 38px; align-items: center; gap: var(--spacing_8); border: 1px solid var(--border_default); border-radius: 12px; padding: 0 12px; background: var(--bg_default_primary); color: var(--text_default_secondary); }
+  .webui-archived-search:focus-within { border-color: var(--border_accent); }
+  .webui-archived-search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text_default_primary); font: inherit; font-size: var(--size_14); }
+  .webui-archived-search input::placeholder { color: var(--text_default_tertiary); }
+  .webui-archived-groups { display: flex; flex-direction: column; gap: var(--spacing_20); }
+  .webui-archived-project-heading { display: flex; min-height: 38px; align-items: center; gap: var(--spacing_12); color: var(--text_default_tertiary); font-size: var(--size_14); }
+  .webui-archived-project-name { display: inline-flex; min-width: 0; flex: 1; align-items: center; gap: var(--spacing_8); overflow: hidden; color: var(--text_default_primary); font-size: var(--size_14); }
+  .webui-archived-project-name svg { flex: 0 0 auto; }
+  .webui-archived-list { overflow: hidden; border: 0; border-radius: 16px; background: var(--bg_grouped_tertiary); padding: 4px 20px; }
+  .webui-archived-row { display: flex; min-width: 0; min-height: 76px; align-items: center; gap: var(--spacing_12); border-bottom: 1px solid var(--border_default); }
+  .webui-archived-row:last-child { border-bottom: 0; }
+  .webui-archived-row-copy { min-width: 0; flex: 1; }
+  .webui-archived-title { overflow: hidden; color: var(--text_default_primary); font-size: var(--size_14); line-height: 20px; text-overflow: ellipsis; white-space: nowrap; }
+  .webui-archived-row time { display: block; margin-top: 2px; color: var(--text_default_tertiary); font-size: var(--size_12); line-height: 18px; }
+  .webui-archived-icon-button { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--text_default_tertiary); cursor: pointer; }
+  .webui-archived-icon-button:hover { background: var(--bg_interaction_tertiary_press); color: var(--text_default_primary); }
+  .webui-archived-unarchive { height: 36px; flex: 0 0 auto; border: 0; border-radius: 12px; padding: 0 12px; background: var(--bg_grouped_tertiary); color: var(--text_default_primary); font: inherit; font-size: var(--size_14); cursor: pointer; }
+  .webui-archived-unarchive:hover { background: var(--bg_interaction_tertiary_press); }
+  .webui-archived-empty { display: grid; min-height: 180px; place-items: center; color: var(--text_default_tertiary); font-size: var(--size_14); }
+  @media (max-width: 760px) { .webui-archived-list { padding: 4px 12px; } .webui-archived-row { gap: 8px; } .webui-archived-unarchive { padding: 0 9px; } }
+
+  .webui-settings-error { margin: 0 var(--spacing_20) var(--spacing_16); color: var(--text_label_danger_secondary_default); font-size: var(--size_12); }
+  .webui-settings-empty-panel { max-width: 760px; min-height: 220px; margin: 0 auto; }
+  .webui-settings-data-dir { max-width: 760px; margin: var(--spacing_32) auto 0; color: var(--text_default_tertiary); font-size: var(--size_12); word-break: break-all; }
+
+  .mavis-settings-theme-preview.is-selected { outline-color: var(--border_accent); }
+  .mavis-settings-theme-preview img { border-radius: var(--radius_8); object-fit: cover; }
+
+  .webui-settings-no-results { padding: var(--spacing_16); color: var(--text_default_secondary); font-size: var(--size_12); }
+  .webui-generic-page { display: flex; width: 100%; min-height: 0; max-width: 704px; flex: 1; margin: 0 auto; flex-direction: column; gap: var(--spacing_16); padding: 0 0 var(--spacing_32); }
+  .webui-generic-section { display: flex; width: 100%; flex-direction: column; gap: var(--spacing_12); }
+  .webui-generic-section > h3 { margin: 0; padding: 0 var(--spacing_16); color: var(--text_default_primary); font-size: var(--size_14); font-weight: var(--weight_medium); line-height: var(--line_height_20); }
+  .webui-generic-card { display: flex; width: 100%; flex-direction: column; border-radius: var(--radius_16); background: var(--bg_grouped_tertiary); padding: var(--spacing_4); }
+  .webui-generic-section[data-testid="app-mode-section"] > .webui-generic-card { background: transparent; padding: 0; }
+  /* Personalization (K area): one editor card. The header lifts the section's
+   * own `> h3` padding so the save button aligns with the title baseline while
+   * the card below keeps the generic horizontal inset. */
+  .webui-personalization-page { display: flex; width: 100%; min-height: 0; max-width: 704px; flex: 1; margin: 0 auto; flex-direction: column; gap: var(--spacing_16); padding: 0 0 var(--spacing_32); }
+  .webui-personalization-header { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: var(--spacing_12); padding: 0 var(--spacing_16); }
+  .webui-personalization-title { display: flex; min-width: 0; align-items: center; gap: var(--spacing_4); }
+  .webui-settings-info-hint-anchor { position: relative; display: inline-flex; flex: none; }
+  /* Reset as a button: a native one brings a border, a background and its own
+   * font, and this control is a 14px circle drawn over the section title. */
+  .webui-settings-info-hint { display: inline-flex; width: 14px; height: 14px; flex: none; align-items: center; justify-content: center; border: 1px solid var(--border_light); border-radius: 50%; background: transparent; padding: 0; color: var(--text_default_tertiary); font-size: 9px; font-style: normal; font-weight: var(--weight_medium); line-height: 1; cursor: help; }
+  .webui-settings-info-hint:hover { border-color: var(--border_accent); color: var(--text_default_secondary); }
+  .webui-settings-info-hint:focus-visible { outline: 2px solid var(--border_accent); outline-offset: 1px; }
+  /* The dark bubble with an arrow is the shell's existing tooltip shape (see
+   * `.webui-signin-credits-tooltip`); measured against the desktop, its 6px
+   * radius, 8/12 padding and 18px line height are the same three numbers, so
+   * this is a third call site on one shape rather than a third shape.
+   *
+   * The hardcoded `rgb(0 0 0 / 85%)` / `#fff` is DELIBERATE and must not be
+   * rebound to a token. The desktop draws these hints with antd's `Tooltip`,
+   * whose colours come from the `colorBgSpotlight` and `colorTextLightSolid`
+   * global tokens — documented defaults `rgba(0,0,0,0.85)` and `#fff` — and
+   * those are theme-independent: the desktop ships a black bubble under BOTH
+   * `.light` and `.dark`, confirmed by looking at it in each. The same source
+   * explains the 6px radius and the 250px max width, which are antd's
+   * `borderRadius` and Tooltip `maxWidth` defaults rather than measurements.
+   * Everything else on this surface is token-driven because it *should* follow
+   * the theme; this bubble should not, so a token binding here would be a
+   * fidelity regression dressed up as a fix.
+   *
+   * The 250 is antd's `Tooltip` `maxWidth` default, which the desktop does not
+   * override — so all three of these bubbles now share one width, and the 340
+   * that used to sit on `.webui-signin-credits-tooltip` is gone. Two more
+   * labels still read 220, but both are under `white-space: nowrap` where the
+   * ceiling cannot shape anything; see the note on `.webui-context-usage-label`.
+   *
+   * `position: absolute` against the anchor, NOT `fixed`: absolute travels
+   * with the section when the panel scrolls, which is what a tooltip attached
+   * to a heading has to do. `pointer-events: none` for the same reason the
+   * context-usage label is — otherwise the pointer leaving the glyph toward
+   * the bubble drops the hover that is showing it. */
+  .webui-settings-info-hint-bubble { position: absolute; bottom: calc(100% + var(--spacing_8)); left: 50%; z-index: 60; width: max-content; max-width: 250px; padding: var(--spacing_8) var(--spacing_12); border-radius: 6px; transform: translateX(-50%) translateY(3px); transform-origin: bottom center; background: rgb(0 0 0 / 85%); box-shadow: 0 6px 16px rgb(0 0 0 / 18%); color: #fff; font-size: var(--size_12); line-height: var(--line_height_18); white-space: normal; text-align: left; opacity: 0; pointer-events: none; visibility: hidden; transition: opacity 120ms ease, transform 120ms ease, visibility 120ms step-end; }
+  .webui-settings-info-hint-bubble::after { position: absolute; top: 100%; left: 50%; border: 5px solid transparent; border-top-color: rgb(0 0 0 / 85%); content: ""; transform: translateX(-50%); }
+  .webui-settings-info-hint-anchor:hover .webui-settings-info-hint-bubble,
+  .webui-settings-info-hint:focus-visible ~ .webui-settings-info-hint-bubble { opacity: 1; transform: translateX(-50%) translateY(0); visibility: visible; transition: opacity 120ms ease, transform 120ms ease, visibility 0s; }
+  /* The memory manager is a dialog, not an expansion. It is portalled to the
+     body, so the z-index is compared against everything else at the root: the
+     settings shell is 100, and this sits above it. */
+  .webui-memory-manager-mask { position: fixed; inset: 0; z-index: 120; display: flex; align-items: center; justify-content: center; background: var(--utility_scrim); animation: webui-overlay-enter 160ms ease-out both; }
+  .webui-memory-manager-surface { display: flex; width: min(640px, calc(100vw - 32px)); max-height: calc(100vh - 64px); overflow: auto; flex-direction: column; gap: var(--spacing_12); border: 1px solid var(--border_default); border-radius: var(--radius_16); background: var(--bg_grouped_secondary); padding: var(--spacing_16); color: var(--text_default_primary); outline: none; }
+  .webui-memory-manager-editor { position: relative; display: flex; min-height: 0; flex: 1; flex-direction: column; gap: var(--spacing_4); }
+  /* The dialog's own editor is the *base* `.mavis-textarea`, not the
+     `mavis-personalization-editor` the two settings-page editors carry, so it
+     keeps a border where those two have none. `!rounded-xl` on the call site is
+     what sets the 12px radius, and `box-shadow` is cleared at every state so the
+     focus reads as a recoloured edge rather than a glow.
+   *
+     The focus ring is an `outline` outside the box, not a recoloured border.
+     The blue itself is `--blue_500` -- the 1px `#0077d9` the desktop draws,
+     which is this app's blue and antd's themed `colorPrimary`, not the
+     `--border_heavy` the bundle's `.mavis-textarea:focus` rule names. But
+     drawing it *as* the border costs the content 1px and leaves the text
+     sitting right against the ring. `outline` paints on the border edge
+     without taking layout, so the content box is identical focused and
+     unfocused and the blue ring sits outside it; `border-color` returns to its
+     resting value for the same reason. Hover still deepens the border itself
+     to `--border_heavy`. */
+  /* Height follows the desktop's `autoSize: {minRows: 13, maxRows: 24}` at
+     `!leading-6`. Measured off the desktop dialog: 24px between baselines, and
+     a 593px box for content long enough to cap out — which is 24 rows. So
+     13 rows + 8px top padding + the 28px the count needs is the floor, and 24
+     rows is the ceiling.
+   *
+     `field-sizing: content` is the native equivalent of antd's autoSize: the
+     browser measures the content and drives `height`, no script involved. Where
+     it is unsupported the editor simply keeps `min-height` and the dialog stays
+     usable, so the fallback is the old behaviour rather than a broken one.
+   *
+     `height: auto` is load-bearing, not tidying. `field-sizing` only has an
+     effect when height is `auto`; the shared rule still sets `height: 300px`,
+     so without this the property was silently inert, the box sat on its
+     `min-height` at 348px, and the text scrolled underneath the count. Nothing
+     errors and nothing is visible in devtools — the declaration is simply
+     ignored.
+     `flex: none` because the desktop marks the field `shrink-0`: its height is
+     its content's, not the leftover space in the dialog.
+   *
+     The face changes too. This is prose, not an editor of code: the desktop
+     runs it at `!text-sm !leading-6` in the UI face, and we were running 12px
+     monospace, which is also why a "13 row" floor was not 312px here. */
+  .webui-memory-manager-editor .webui-personalization-textarea { flex: none; height: auto; field-sizing: content; min-height: 348px; max-height: 612px; border: 1px solid var(--border_default); border-radius: var(--radius_12); background: transparent; padding: var(--spacing_8) 0 28px; font-family: inherit; font-size: var(--size_14); line-height: 24px; }
+  .webui-memory-manager-editor .webui-personalization-textarea:hover { border-color: var(--border_heavy); outline: none; box-shadow: none; }
+  .webui-memory-manager-editor .webui-personalization-textarea:focus { border-color: var(--border_default); outline: 1px solid var(--blue_500); box-shadow: none; }
+  /* The character count sits INSIDE the editor, bottom-right, 14px from each
+     edge. Measured off the desktop dialog at 1:1: the digits land 14px left of
+     the border and 14px above it, and the focus ring around the field reads as
+     1px of `--blue_500`.
+   *
+     Two earlier shapes were wrong. Absolutely positioned over the editor it
+     floated transparently on the panel; as a full-width sibling row below the
+     editor it was outside the control it counts, which is not where the desktop
+     puts it. The desktop's antd `showCount` widens the count suffix to
+     `width:100%` and right-aligns it *inside* the field, so the number and the
+     text share one surface and one border.
+   *
+     `padding: 0 14px` is the measured inset, and `align-items: center` against
+     a 16px line box in the 28px band is what leaves the same 14px to the
+     glyphs. An earlier `bottom: 8px` did the same arithmetic from the band
+     instead; the band is now flush with the editor's bottom edge, so that
+     offset is gone. The editor reserves 28px of bottom padding for the row so
+     the last line of text cannot scroll under it -- the desktop does not reserve
+     anything, and the count there overlaps whenever the text is long enough to
+     scroll. */
+  /* The count gets its own class rather than riding on
+     `.webui-personalization-meta`. That shared rule carries `width: 100%`,
+     `display: flex` and `padding: 8px 12px` for the 「path · size」 row; scoping
+     over it only overrides the properties the scoped rule happens to declare,
+     so the full width survived and `position: absolute` + `width: 100%` +
+     `right: 14px` put the box's left edge at -14px. The digits were then
+     `space-between`-aligned to that left edge, inside 12px of padding — bottom
+     left, floating over the text, on a phantom surface. A shared class is not
+     a base for a one-off control, and the earlier scoped override was the same
+     mistake as the save button's missing `cursor`.
+   *
+     It spans the full width and paints the surface, because the reserved band
+     has to read as the count's row rather than as a gap the text shows
+     through. The 28px here is the same 28px the editor reserves as
+     `padding-bottom`, so the two must move together.
+
+     The bottom radii are the editor's own `--radius_12`, not a value invented
+     to look right. The band is painted after the textarea (it is positioned,
+     the textarea is not), so an opaque square band covers whatever the editor
+     drew underneath it — including the 12px corner curve and the 1px bottom
+     border under it. `.webui-memory-manager-editor` has no padding, no border
+     and the textarea carries no margin, so `right/bottom/left: 0` puts the
+     band's box exactly on the editor's border box: the same outer radius
+     concentric, and no 1px inset arithmetic is needed.
+   *
+     Not fixed: the band's bottom edge is flush with the editor's, so the 1px
+     bottom border is still covered along the full width. The desktop puts its
+     count in antd's `.ant-input-suffix`, which is a sibling of the textarea
+     inside the bordered box, so that border reads all the way around. Closing
+     this would mean insetting the band by 1px and using 11px corners, which
+     moves the already-measured 14px inset to 15px. Left alone pending a
+     pixel check against the desktop. */
+  .webui-memory-manager-count { position: absolute; right: 0; bottom: 0; left: 0; display: flex; height: 28px; align-items: center; justify-content: flex-end; padding: 0 14px; border-radius: 0 0 var(--radius_12) var(--radius_12); background: var(--bg_grouped_secondary); color: var(--text_default_tertiary); font-size: var(--size_12); line-height: var(--line_height_16); }
+  .webui-memory-manager-surface > .webui-mavis-button { align-self: flex-start; }
+  .webui-memory-manager-footer { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing_20); }
+  .webui-memory-manager-actions { display: flex; flex: none; align-items: center; gap: var(--spacing_16); }
+  /* The memory manager's header controls, transcribed from the desktop dialog
+     rather than measured off a capture.
+   *
+     The bundle states all of this: `size-[26px]`, `rounded-lg`, `gap-2`, and a
+     rest fill of `bg-bg_interaction_tertiary_default` that the hover rule
+     replaces with `bg_interaction_tertiary_hover`. That token is
+     `--opacity_black_1_0` in the light theme, so the fill is declared rather
+     than left off -- it is transparent here and not transparent in a theme that
+     raises it, and the desktop's own rule is the thing to copy either way.
+   *
+     An earlier pass took the box down to 20px on a 4px gap, from a dark capture
+     whose two ink centres measured 24px apart. That reading was wrong twice
+     over: the capture gave centres, not boxes, and a centre distance cannot pin
+     a box size without knowing the glyph inset. */
+  .webui-memory-manager-header-actions { display: flex; flex: none; align-items: center; gap: var(--spacing_8); }
+  .webui-memory-manager-header-actions .webui-settings-icon-button { display: flex; width: 26px; height: 26px; flex: none; align-items: center; justify-content: center; border: 0; border-radius: var(--radius_8); padding: 0; background: var(--bg_interaction_tertiary_default); color: var(--text_default_tertiary); cursor: pointer; transition: background-color 120ms ease, color 120ms ease; }
+  .webui-memory-manager-header-actions .webui-settings-icon-button:hover { background: var(--bg_interaction_tertiary_hover); color: var(--text_default_secondary); }
+  .webui-memory-manager-header-actions .webui-settings-icon-button:focus-visible { outline: 2px solid var(--border_accent); outline-offset: 1px; }
+  /* Pull the controls out to the surface's own padding so their right edge
+     lines up with the editor's.
+   *
+   * `.webui-personalization-header` indents its children by 16px, and the
+     manager's editor is a *sibling* of that header rather than a child of it —
+     so the editor starts at the surface's padding and the buttons started 16px
+     further in. Measured on the desktop: the × ink ends 11px short of the
+     editor's right border, and the header's own negative margin is what
+     closes that gap without moving the title. */
+  /* The controls sit on the header row, but the editor they must line up with
+     is a *sibling* of that header, not a child: the editor starts at the
+     surface's own padding while `.webui-personalization-header` indents its
+     children by another 16px. Zeroing the header's right padding puts the
+     controls' right edge on the surface's content edge, which is the editor's
+     edge, by construction.
+   *
+     A negative `margin-right` was the first attempt and did not get there --
+     the header is a stretched flex item, so the box and its padding do not
+     resolve the way a block's would, and the controls landed ~19px short of
+     the border. A padding override is decided by the cascade and does not
+     depend on that. */
+  .webui-memory-manager-surface .webui-personalization-header { position: relative; padding-right: 0; }
+  .webui-memory-manager-menu { position: absolute; z-index: 1; top: calc(100% + var(--spacing_4)); right: var(--spacing_16); display: flex; min-width: 168px; flex-direction: column; border: 1px solid var(--border_default); border-radius: var(--radius_8); background: var(--bg_grouped_secondary); padding: var(--spacing_4); box-shadow: 0 8px 24px rgb(0 0 0 / 28%); }
+  .webui-memory-manager-menu button { display: flex; align-items: center; gap: var(--spacing_8); border: 0; border-radius: var(--radius_4); background: transparent; padding: var(--spacing_8) var(--spacing_12); color: var(--text_default_primary); font-size: var(--size_14); text-align: left; }
+  .webui-memory-manager-menu button:hover:not(:disabled) { background: var(--bg_interaction_tertiary_hover); }
+  .webui-memory-manager-menu button:disabled { opacity: 0.4; }
+  .webui-memory-manager-menu button.is-danger { color: var(--text_label_danger_secondary_default); }
+  .webui-memory-manager-menu-icon { flex: none; }
+  /* 删除记忆's confirmation, measured off the desktop's modal.
+   *
+   * A second modal, not a panel inside the first: the desktop dims the editor
+   * behind a centred dialog, which an inline block cannot do — there is nothing
+   * behind it inside the surface to dim. The scrim is therefore its own
+   * fixed layer at 140, above `.webui-memory-manager-mask`'s 120, because this
+   * dialog is stacked on top of that one rather than inside it.
+   *
+   * 480 wide and 18-radius are the measured values; 20 is the nearest step on
+   * the radius ramp, and the difference only shows on the corner arc. Padding
+   * 24 plus a 22 title line, a 16 gap, two 22 body lines, a 20 gap and a 30
+   * button adds up to the measured 183, which is the number that says the
+   * vertical rhythm is the desktop's and not a guess.
+   *
+   * The footer reuses `.webui-mavis-button-gray` and `-danger` unchanged: those
+   * already resolve to the desktop's own values in the light theme — danger is
+   * `red_400` on `gray_0` text, which is exactly the #f73646 the button measures,
+   * and gray is `bg_interaction_secondary_default`, ~#f5f5f5 against the
+   * measured #f7f7f7. Restating those colours here would be a second place to
+   * drift. */
+  .webui-memory-confirm-mask { position: fixed; inset: 0; z-index: 140; display: flex; align-items: center; justify-content: center; background: var(--utility_scrim); }
+  .webui-memory-confirm { position: relative; display: flex; width: min(480px, calc(100vw - 32px)); flex-direction: column; border: 1px solid var(--border_default); border-radius: var(--radius_20); background: var(--bg_grouped_secondary); padding: var(--spacing_24); outline: none; }
+  .webui-memory-confirm-title { margin: 0; padding-right: var(--spacing_32); color: var(--text_default_primary); font-size: var(--size_16); font-weight: var(--weight_medium); line-height: var(--line_height_22); }
+  .webui-memory-confirm-close { position: absolute; top: var(--spacing_12); right: var(--spacing_12); display: flex; width: 32px; height: 32px; flex: none; align-items: center; justify-content: center; border: 0; border-radius: var(--radius_8); background: transparent; padding: 0; color: var(--text_default_tertiary); cursor: pointer; }
+  .webui-memory-confirm-close:hover { background: var(--bg_interaction_tertiary_hover); color: var(--text_default_secondary); }
+  .webui-memory-confirm-close:focus-visible { outline: 2px solid var(--border_accent); outline-offset: 1px; }
+  .webui-memory-confirm-body { margin: var(--spacing_16) 0 0; color: var(--text_default_secondary); font-size: var(--size_14); line-height: var(--line_height_22); }
+  .webui-memory-confirm-actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--spacing_8); margin-top: var(--spacing_20); }
+  /* 关于你 is ONE control. The desktop's `personalization-profile-section`
+     renders a single TextArea bound to `moreAbout`; `nickname` and `occupation`
+     exist only in the file layer, which still parses and re-emits their
+     `Nickname: ` / `Occupation: ` lines so an existing profile survives a save
+     intact. Drawing inputs for them put two permanently empty boxes above the
+     one field that is actually editable.
+   *
+     The two settings-page editors are height-clamped rather than free: the
+     desktop passes `minHeight: 144, maxHeight: 200` in the style object and
+     `field-sizing: content` is what makes those two numbers the whole rule --
+     the field grows with its text and stops at 200px, exactly as antd resolves
+     a textarea with min/max and no autoSize. The memory dialog overrides both
+     for its own 13-to-24-row range. */
+  .webui-user-profile-fields { display: flex; flex-direction: column; gap: var(--spacing_8); }
+.webui-personalization-textarea { width: 100%; height: auto; field-sizing: content; min-height: 144px; max-height: 200px; resize: none; border: none; outline: none; background: var(--bg_grouped_tertiary); border-radius: var(--radius_16); padding: 10px var(--spacing_16); color: var(--text_default_primary); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--size_12); line-height: var(--line_height_20); }
+  .webui-personalization-textarea::placeholder { color: var(--text_default_tertiary); }
+  .webui-personalization-meta { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: var(--spacing_12); padding: var(--spacing_8) var(--spacing_12); color: var(--text_default_secondary); font-size: var(--size_12); }
+  .webui-personalization-meta span:first-child { min-width: 0; overflow: hidden; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; text-overflow: ellipsis; white-space: nowrap; }
+  .webui-personalization-meta .is-over-limit { color: var(--text_label_danger_secondary_default); }
+  .webui-personalization-saved { margin: 0; padding: 0 var(--spacing_12) var(--spacing_4); color: var(--text_status_success); font-size: var(--size_12); }
+  .webui-generic-row { display: flex; width: 100%; min-height: 56px; align-items: center; justify-content: space-between; gap: 24px; overflow: hidden; border-radius: var(--radius_12); padding: var(--spacing_8) var(--spacing_8) var(--spacing_8) var(--spacing_12); }
+  .webui-generic-row-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: var(--spacing_4); }
+  .webui-generic-row-copy strong { color: var(--text_default_primary); font-size: var(--size_14); font-weight: var(--weight_regular); line-height: var(--line_height_20); }
+  .webui-generic-row-copy span { color: var(--text_default_secondary); font-size: var(--size_12); font-weight: var(--weight_regular); line-height: var(--line_height_16); }
+  .webui-generic-row-control { flex-shrink: 0; }
+  .webui-generic-divider { display: flex; width: 100%; align-items: center; justify-content: center; padding: 6px var(--spacing_12); }
+  .webui-generic-divider span { display: block; width: 100%; height: 1px; background: var(--border_light); }
+  .webui-mode-options { display: flex; width: 100%; gap: var(--spacing_12); }
+  .webui-mode-card { display: flex; height: 118px; min-width: 0; flex: 1; flex-direction: column; align-items: flex-start; justify-content: center; border: 0; padding: 2px; text-align: left; }
+  .webui-mode-card:disabled { cursor: not-allowed; }
+  .webui-mode-inner { position: relative; display: flex; width: 100%; height: 114px; flex-shrink: 0; flex-direction: column; align-items: flex-start; justify-content: center; gap: 10px; border-radius: var(--radius_12); background: var(--bg_interaction_secondary_default); padding: var(--spacing_12) var(--spacing_16); }
+  .webui-mode-icon { display: flex; width: 36px; height: 36px; flex-shrink: 0; align-items: center; justify-content: center; border-radius: 50%; background: var(--bg_grouped_secondary); color: var(--icon_default_primary); }
+  .webui-mode-copy { display: flex; width: 100%; min-width: 0; flex-direction: column; align-items: flex-start; justify-content: center; gap: var(--spacing_4); }
+  .webui-mode-copy strong, .webui-mode-copy span { width: 100%; overflow: hidden; white-space: nowrap; }
+  .webui-mode-copy strong { color: var(--text_default_primary); font-size: var(--size_14); font-weight: var(--weight_regular); line-height: var(--line_height_20); }
+  .webui-mode-copy span { color: var(--text_default_secondary); font-size: var(--size_12); line-height: var(--line_height_16); }
+  .webui-mode-radio { position: absolute; top: 22px; right: var(--spacing_16); display: flex; width: 16px; height: 16px; align-items: center; justify-content: center; color: var(--icon_default_secondary); }
+  .webui-mode-radio.is-selected { width: 20px; height: 20px; color: var(--icon_default_accent); }
+  .webui-mode-radio svg { display: block; }
+  .mavis-settings-appearance-row .webui-generic-row-control { display: flex; }
+  .mavis-settings-theme-selector { display: flex; align-items: flex-start; gap: var(--spacing_12); }
+  .mavis-settings-theme-option { display: flex; width: 100px; flex: 0 0 100px; flex-direction: column; align-items: center; gap: var(--spacing_8); border: 0; background: transparent; padding: 0; color: var(--text_default_secondary); font-size: var(--size_12); line-height: var(--line_height_16); }
+  .mavis-settings-theme-preview { display: block; width: 100px; height: 64px; overflow: hidden; border-radius: var(--radius_8); padding: var(--spacing_4); outline: 2px solid var(--border_light); outline-offset: -2px; }
+  .mavis-settings-theme-preview.is-selected { outline-color: var(--icon_default_accent); }
+  .mavis-settings-theme-preview > span { display: block; width: 100%; height: 100%; overflow: hidden; border-radius: 6px; outline: 1px solid var(--border_light); outline-offset: -1px; }
+  .mavis-settings-theme-preview img { display: block; width: 100%; height: 100%; }
+  .webui-toggle-switch { position: relative; display: inline-flex; width: 40px; height: 20px; flex: 0 0 40px; align-items: center; border: 0; border-radius: 64px; background: rgb(10 10 10 / 8%); padding: 0; cursor: pointer; transition: background-color 200ms ease; }
+  .webui-toggle-switch > span { position: absolute; top: 5px; left: 5px; display: block; width: 18px; height: 10px; border-radius: 64px; background: #fff; box-shadow: none; transition: transform 200ms ease; }
+  .webui-toggle-switch.is-checked { background: #0094fc; }
+  .webui-toggle-switch.is-checked > span { transform: translateX(12px); }
+  .webui-toggle-switch:focus-visible { outline: 2px solid var(--border_accent); outline-offset: 2px; }
+  .webui-toggle-switch:disabled { cursor: default; opacity: .6; }
+  .webui-ant-select { position: relative; display: inline-flex; width: 96px; height: 36px; align-items: center; }
+  .webui-ant-select.is-wide { width: 152px; }
+  .webui-ant-select select { width: 100%; height: 36px; appearance: none; border: 1px solid var(--border_default); border-radius: var(--radius_8); background: transparent; padding: 0 32px 0 11px; color: var(--text_default_primary); font-size: var(--size_14); }
+  .webui-ant-select svg { position: absolute; right: 8px; pointer-events: none; color: var(--text_default_tertiary); }
+  .webui-ant-select select:disabled { cursor: default; opacity: .6; }
+  .webui-mavis-button { min-width: 80px; height: 36px; border: 0; border-radius: var(--radius_8); padding: 0 var(--spacing_12); font-size: var(--size_14); font-weight: var(--weight_medium); }
+  .webui-mavis-button-gray { background: var(--bg_interaction_secondary_default); color: var(--text_default_primary); }
+  .webui-mavis-button-black { background: var(--bg_interaction_primary_default); color: var(--text_label_primary_default); }
+  .webui-mavis-button-danger { background: var(--bg_interaction_danger_primary_default); color: var(--text_label_danger_primary_default); }
+  .webui-mavis-button-danger:hover:not(:disabled) { background: var(--bg_interaction_danger_primary_hover); }
+  /* The section save button, transcribed from the desktop rather than measured
+   * off a capture.
+   *
+   * Both personalization sections render the same control -- the 关于你 header's
+   * `action` and 自定义指令's save are identical in the bundle down to the
+   * geometry overrides -- and both pass `variant: "black"`. That variant is a
+   * filled primary: `.mavis-button.black` is `bg_interaction_primary_default`
+   * with `text_label_primary_default`, and its hover is
+   * `bg_interaction_primary_hover` (80% black). We had been drawing them as
+   * `gray`, which is a light fill -- that is the 记忆摘要「管理」button's
+   * variant, not theirs.
+   *
+   * The disabled state needed no colour of its own, and there is no
+   * `.mavis-button.black.disabled` in the bundle to copy: the generic
+   * `.mavis-button.disabled{opacity:.5;cursor:not-allowed}` is the whole rule.
+   * A disabled 保存 therefore keeps the black fill and the white label and goes
+   * half-transparent. Only the `gray` variant overrides its own disabled fill,
+   * which is why the earlier grey version could keep a fill here at all.
+   *
+   * The geometry comes from the same call site: `!h-[30px] !w-[76px]
+   * !min-w-[76px] !px-0 !py-0 !text-center !font-medium !leading-5`, against a
+   * shared base of 36px tall and 80px wide.
+   *
+   * `cursor` is restated rather than taken from `.webui-mavis-button:disabled`,
+   * which pins `default` and wins the cascade on the properties it declares.
+   * `default` stays right for a dialog button that closes rather than saves. */
+  .webui-section-save-button { width: 76px; min-width: 76px; height: 30px; padding: 0; text-align: center; line-height: var(--line_height_20); }
+  .webui-section-save-button:not(:disabled):hover { background: var(--bg_interaction_primary_hover); }
+  .webui-section-save-button:disabled { opacity: .5; cursor: not-allowed; }
+  .dark .webui-section-save-button:not(:disabled):hover { opacity: .8; }
+  .webui-segmented { gap: 0; background: var(--gray_75); }
+  .webui-segmented button { height: 28px; border: 0; border-radius: 6px; background: transparent; padding: 0 var(--spacing_12); color: var(--text_default_primary); font-size: var(--size_14); }
+  .webui-segmented button.is-selected { background: #fff; }
+  .webui-settings-sidebar { padding: 46px var(--spacing_12) var(--spacing_20); border-right: 0; background: var(--bg_default_scrim); }
+  .webui-settings-back { height: 30px; margin-bottom: var(--spacing_20); border-radius: var(--radius_8); padding: 0 var(--spacing_8); line-height: var(--line_height_20); }
+  .webui-settings-nav-item { min-height: 30px; padding: 0 10px; font-size: var(--size_14); line-height: var(--line_height_20); }
+  .webui-settings-nav-item { color: var(--text_default_primary); }
+  .webui-settings-nav-item.is-active { background: var(--bg_interaction_tertiary_selected); border-radius: var(--radius_8); }
+  .webui-settings-nav-item:focus-visible { outline: 0; box-shadow: inset 0 0 0 1px var(--border_accent); }
+  .webui-settings-group h3 { padding: 16px var(--spacing_8) 6px; font-size: var(--size_14); line-height: var(--line_height_20); }
+  .webui-settings-content { padding: var(--spacing_8) 0 0; background: var(--bg_grouped_secondary); }
+  .webui-settings-content-header { margin: 0 0 var(--spacing_48); padding: 0 var(--spacing_20); }
+  .webui-settings-sidebar, .webui-settings-content { scrollbar-width: none; }
+  .webui-settings-sidebar::-webkit-scrollbar, .webui-settings-content::-webkit-scrollbar { display: none; }
+  @keyframes webui-settings-content-in { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: translateX(0); } }
+  @media (max-height: 680px) {
+    .webui-settings-sidebar { padding-top: 16px; padding-bottom: var(--spacing_12); }
+    .webui-settings-back { margin-bottom: var(--spacing_16); }
+    .webui-settings-nav > .webui-settings-group:first-child { margin-top: 8px; }
+    .webui-settings-group h3 { padding-top: 12px; padding-bottom: 6px; }
+    .webui-settings-nav-item { height: 30px; min-height: 30px; }
+  }
+  .dark .signin-corner-default {
+    opacity: 0.2;
+  }
+  .signin-claim-button.mavis-button {
+    min-height: 32px;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  .mavis-button {
+    border-radius: 8px;
+    padding: 8px 24px;
+    font-size: 14px;
+    line-height: 18px;
+    transition: background-color 0.3s;
+  }
+  .mavis-button.black {
+    background-color: var(--bg_interaction_primary_default);
+    color: var(--text_label_primary_default);
+  }
+  .mavis-button.black:hover {
+    background: var(--bg_interaction_primary_hover) !important;
+  }
+  .dark .mavis-button.black {
+    background-color: var(--bg_interaction_primary_default);
+    color: var(--text_label_primary_default);
+  }
+  .dark .mavis-button.black:hover {
+    opacity: 0.8 !important;
+  }
+  .webui-plugin-form .wide {
+    grid-column: 1 / -1;
+  }
+
+  @media (max-width: 760px) {
+    .webui-settings-sidebar {
+      width: clamp(168px, 28vw, 210px);
+      flex-basis: clamp(168px, 28vw, 210px);
+    }
+
+    .webui-model-menu--two-column {
+      width: min(560px, calc(100vw - 32px));
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    }
+  }
+
+
+  /* ---------------------------------------------------------- segmented pill */
+
+  /* The desktop's source switcher. */
+  .webui-segmented {
+    display: inline-flex;
+    align-items: center;
+    height: 30px;
+    padding: 2px;
+    border-radius: var(--radius_full);
+    background-color: var(--bg_grouped_tertiary);
+  }
+
+  @media (prefers-reduced-motion: reduce) { .webui-settings-content { animation: none; } .webui-toggle-switch, .webui-toggle-switch > span { transition: none; } }
+}

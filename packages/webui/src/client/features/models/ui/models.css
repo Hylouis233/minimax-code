@@ -1,0 +1,392 @@
+/* models — moved out of styles/shell.css (T20); rules kept in their original relative order. */
+@layer components {
+
+  .webui-provider-dialog-backdrop { position: fixed; inset: 0; z-index: 110; display: flex; align-items: center; justify-content: center; background: rgb(10 10 10 / 24%); padding: 24px; }
+  .webui-provider-form { display: flex; width: min(600px, 100%); max-height: 86vh; min-height: 0; flex-direction: column; overflow: hidden; border-radius: 20px; background: var(--bg_default_primary); padding: 24px; color: var(--text_default_primary); box-shadow: 0 0 48px -12px var(--shadow_default); }
+  .webui-provider-form-header { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .webui-provider-form-header h3 { margin: 0; font-size: 18px; font-weight: var(--weight_medium); line-height: 26px; }
+  .webui-provider-form-header > button { display: flex; width: 24px; height: 24px; align-items: center; justify-content: center; border: 0; background: transparent; color: var(--icon_default_tertiary); }
+  .webui-provider-form-header > button svg { width: 18px; height: 18px; }
+  .webui-provider-form-body { display: flex; min-height: 0; flex: 1 1 auto; flex-direction: column; gap: 16px; overflow-y: auto; padding: 0 8px 4px 0; }
+  .webui-provider-form-provider-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+  .webui-provider-form-field { display: flex; min-width: 0; flex-direction: column; gap: 8px; color: var(--text_default_primary); font-size: 14px; line-height: 20px; }
+  .webui-provider-form-field input, .webui-provider-form-field textarea { width: 100%; min-width: 0; height: 40px; border: 1px solid var(--border_default); border-radius: 8px; background: var(--bg_default_primary); padding: 0 12px; color: var(--text_default_primary); font: inherit; outline: none; }
+  .webui-provider-form-field textarea { height: 88px; resize: vertical; padding: 9px 12px; }
+  .webui-provider-form-field input:focus, .webui-provider-form-field textarea:focus { border-color: var(--border_accent); }
+  .webui-provider-picker { position: relative; min-width: 0; }
+  .webui-provider-picker-trigger { display: flex; width: 100%; height: 40px; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid var(--border_default); border-radius: 8px; background: transparent; padding: 0 12px; color: var(--text_default_primary); text-align: left; }
+  .webui-provider-picker-trigger > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .webui-provider-picker-trigger svg { flex: 0 0 auto; color: var(--icon_default_tertiary); }
+  .webui-provider-picker-placeholder { color: var(--text_default_quaternary); }
+  .webui-provider-picker-menu { position: absolute; top: calc(100% + 4px); left: 0; z-index: 120; display: flex; width: min(444px, calc(100vw - 48px)); max-height: 356px; flex-direction: column; overflow: hidden; border: 1px solid var(--border_light); border-radius: 12px; background: var(--bg_default_primary); padding: 4px; box-shadow: 0 8px 24px rgb(0 0 0 / 12%); }
+  .webui-provider-picker-search { display: flex; height: 40px; flex: 0 0 auto; align-items: center; gap: 8px; border: 1px solid var(--border_default); border-radius: 8px; padding: 0 12px; color: var(--icon_default_tertiary); }
+  .webui-provider-picker-search input { min-width: 0; flex: 1; border: 0; background: transparent; color: var(--text_default_primary); font: inherit; outline: 0; }
+  .webui-provider-picker-search input::placeholder { color: var(--text_default_quaternary); }
+  .webui-provider-picker-options { min-height: 0; overflow-y: auto; padding: 4px 0; }
+  .webui-provider-picker-option { display: flex; width: 100%; min-height: 40px; align-items: center; gap: 10px; border: 0; border-radius: 8px; background: transparent; padding: 4px 12px; color: var(--text_default_primary); font-size: 14px; text-align: left; }
+  .webui-provider-picker-option:hover, .webui-provider-picker-option[aria-selected="true"] { background: var(--bg_interaction_tertiary_hover); }
+  .webui-provider-picker-icon { display: flex; width: 28px; height: 28px; flex: 0 0 28px; align-items: center; justify-content: center; overflow: hidden; border: 1px solid var(--border_default); border-radius: 7px; background: var(--bg_default_primary); font-size: 14px; }
+  .webui-provider-picker-icon img { width: 18px; height: 18px; object-fit: contain; }
+  .webui-provider-picker-check { margin-left: auto; color: var(--icon_default_primary); }
+  .webui-provider-picker-empty { margin: 0; padding: 12px; color: var(--text_default_quaternary); font-size: 14px; line-height: 20px; }
+  .webui-provider-picker-other { flex: 0 0 auto; border-top: 1px solid var(--border_light); padding-top: 4px; }
+  .webui-provider-picker-other button { display: flex; width: 100%; height: 32px; align-items: center; gap: 8px; border: 0; border-radius: 8px; background: transparent; padding: 0 12px; color: var(--text_default_secondary); font-size: 14px; text-align: left; }
+  .webui-provider-picker-other button:hover { background: var(--bg_interaction_tertiary_hover); }
+  .webui-provider-form-headers { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; }
+  .webui-provider-form-header-row { display: flex; align-items: center; gap: 8px; }
+  .webui-provider-form-header-row input { height: 36px; min-width: 0; flex: 1; border: 1px solid var(--border_default); border-radius: 8px; background: transparent; padding: 0 10px; color: var(--text_default_primary); }
+  .webui-provider-form-add-header { width: fit-content; height: 32px; border: 1px solid var(--border_default); border-radius: 8px; background: transparent; padding: 0 10px; color: var(--text_default_secondary); }
+  .webui-provider-form-error { margin: 0; color: var(--text_status_error); font-size: 12px; }
+  .webui-provider-form-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; border-top: 1px solid var(--border_light); margin-top: 16px; padding-top: 16px; }
+  .webui-provider-form-actions > label { display: flex; align-items: center; gap: 8px; color: var(--text_default_secondary); font-size: 14px; }
+  .webui-provider-form-actions > span { flex: 1; }
+  .webui-provider-form-actions > button { height: 36px; min-width: 80px; border: 0; border-radius: 8px; background: var(--bg_interaction_secondary_default); padding: 0 12px; color: var(--text_default_primary); font-size: 14px; }
+  .webui-provider-form-actions > button:last-child { background: #8f8f8f; color: #fff; }
+  .webui-provider-form-actions > button:disabled { opacity: .55; }
+  @media (max-width: 720px) { .webui-provider-form-provider-grid { grid-template-columns: minmax(0, 1fr); } .webui-provider-form-actions { flex-wrap: wrap; } }
+  /* --------------------------------------------------------------- surfaces */
+
+  /* Match the desktop navigation rail while keeping the main surface roomy. */
+  .webui-rail {
+    display: flex;
+    flex-direction: column;
+    width: 240px;
+    background-color: var(--bg_default_scrim);
+    transition: width 180ms cubic-bezier(.2, .7, .2, 1);
+  }
+  .webui-model-selector-trigger {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing_4);
+    height: 32px;
+    max-width: 244px;
+    padding: 0 var(--spacing_8);
+    border-radius: 10px;
+    color: var(--text_default_primary);
+    font-size: var(--size_14);
+    line-height: var(--line_height_20);
+    transition: background-color 120ms ease;
+  }
+  .webui-model-selector-trigger:hover:not(:disabled) {
+    background-color: var(--bg_interaction_tertiary_hover);
+  }
+  .webui-model-selector-trigger:disabled {
+    cursor: default;
+    color: var(--text_default_tertiary);
+  }
+  .webui-model-menu-list {
+    display: flex;
+    min-height: 0;
+    height: 100%;
+    flex-direction: column;
+    gap: 2px;
+    overflow-y: auto;
+    padding: var(--spacing_4);
+    border-radius: var(--radius_8);
+    background: var(--bg_grouped_secondary);
+  }
+  /* Provider groups: the wrapper keeps the list's 2px row gap, and the header
+   * is one line of text that never takes a hit area of its own. */
+  .webui-model-menu-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .webui-model-group-header {
+    padding: var(--spacing_4) var(--spacing_12) var(--spacing_2);
+    color: var(--text_default_tertiary);
+    font-size: var(--size_12);
+    line-height: var(--line_height_16);
+  }
+  /* The first header sits flush against the list's own padding; only the
+   * groups after it need the top gap that separates them. */
+  .webui-model-menu-group:first-child .webui-model-group-header {
+    padding-top: var(--spacing_2);
+  }
+  /* Both columns hide their scrollbar: the menu carries a rounded frame and
+   * group padding, and a bar cuts into it. Same recipe as the settings
+   * sidebar — `overflow-y: auto` stays, so the content still scrolls. */
+  .webui-model-menu-list,
+  .webui-model-menu-detail {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .webui-model-menu-list::-webkit-scrollbar,
+  .webui-model-menu-detail::-webkit-scrollbar {
+    display: none;
+  }
+  .webui-model-detail-row {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing_4);
+    padding: var(--spacing_8) 0;
+  }
+  .webui-model-setting-context { order: 0; }
+  .webui-model-setting-effort {
+    order: 1;
+    border-top: 1px solid var(--border_default);
+  }
+  /* The detail column is a `flex-direction: column` container, so the base
+   * switch's `flex: 0 0 40px` lands on the main axis and stretches the 20px
+   * track into a 40px circle. Here it shrinks to its own size and the track is
+   * 40x20 again; the row-context switches elsewhere are untouched. */
+  .webui-model-detail-row .webui-toggle-switch {
+    flex: 0 0 auto;
+    align-self: flex-start;
+  }
+  .webui-model-detail-label {
+    color: var(--text_default_tertiary);
+    font-size: var(--size_14);
+    line-height: var(--line_height_20);
+  }
+  .webui-model-detail-empty {
+    display: flex;
+    min-height: 120px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing_4);
+    padding: var(--spacing_16);
+    text-align: center;
+    border-radius: var(--radius_8);
+    background: var(--bg_grouped_secondary);
+    color: var(--text_default_tertiary);
+  }
+  .webui-model-detail-empty-title {
+    color: var(--text_default_primary);
+    font-size: var(--size_14);
+    line-height: var(--line_height_20);
+    font-weight: 500;
+  }
+  .webui-model-detail-empty-hint {
+    color: var(--text_default_tertiary);
+    font-size: var(--size_12);
+    line-height: var(--line_height_16);
+  }
+  .webui-model-effort-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .webui-model-effort-option {
+    display: flex;
+    width: 100%;
+    min-height: 40px;
+    align-items: center;
+    gap: var(--spacing_8);
+    border-radius: var(--radius_8, 8px);
+    border: 0;
+    background: transparent;
+    padding: 0 var(--spacing_8);
+    color: var(--text_default_primary);
+    font-size: var(--size_14);
+    line-height: var(--line_height_20);
+    cursor: pointer;
+  }
+  .webui-model-effort-option:hover,
+  .webui-model-context-option:hover {
+    background: var(--bg_interaction_tertiary_hover);
+  }
+  /* Same shape as `.webui-model-effort-group` above, and deliberately gap-less:
+   * both are lists of pickable sizes, and a 4px gap in one of them and not the
+   * other would read as the context list being a different kind of control from
+   * the level list, which is the one thing they are not. */
+  .webui-model-context-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .webui-model-context-option {
+    display: flex;
+    width: 100%;
+    min-height: 40px;
+    align-items: center;
+    gap: var(--spacing_8, 8px);
+    padding: 0 var(--spacing_8, 8px);
+    border-radius: var(--radius_8, 8px);
+    background: transparent;
+    color: var(--text_default_primary);
+    font-size: var(--size_14);
+    line-height: var(--line_height_20);
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+  .webui-model-context-value {
+    font-variant-numeric: tabular-nums;
+  }
+  .webui-model-context-hint {
+    color: var(--text_default_tertiary);
+    font-size: var(--size_12);
+    line-height: var(--line_height_16);
+  }
+  .webui-model-context-tick {
+    margin-left: auto;
+  }
+  .webui-model-option-tick {
+    color: var(--text_default_secondary);
+  }
+  /* The provider a repeated row was carried in from, on the favourites section
+   * only. Set in the same voice as the group header it stands in for — one step
+   * down from the model name, which is what a sub-label is. */
+  .webui-model-option-origin {
+    display: block;
+    color: var(--text_default_tertiary);
+    font-size: var(--size_12);
+    line-height: var(--line_height_16);
+  }
+  .webui-model-option[data-focused="true"] {
+    background-color: var(--bg_interaction_tertiary_hover, rgba(0, 0, 0, 0.06));
+  }
+  /* The picker's left column: the search box sits above the scrolling list, so
+   * the two live in one grid cell rather than becoming two grid children. The
+   * list then has to give up `height: 100%` — that height is measured against
+   * the COLUMN, and with a search box above it the list would overflow the
+   * menu by exactly the search box's height. */
+  /* The cascade. One column, sized to the list: the settings live in a fly-out
+   * beside the hovered row, so the menu no longer reserves a second column for
+   * a model the user may never have hovered. The width is what the list needs
+   * to read model names, not what a settings panel would need. */
+  .webui-model-menu--cascade {
+    display: flex;
+    flex-direction: column;
+    width: min(320px, calc(100vw - 32px));
+    max-height: min(420px, calc(100dvh - 112px));
+    padding: var(--spacing_8);
+    overflow: visible;
+  }
+  /* The fly-out is `position: fixed` and placed by the shared
+   * `positionFlyout` engine, so it escapes this list's own `overflow-y: auto`.
+   * It is NOT a child of the menu: a nested surface would be clipped by the
+   * very scrolling container it needs to escape.
+   *
+   * `min-width` rather than `width`: the surface is MEASURED for its clamp and
+   * flip, and a model with two context sizes is legitimately narrower than one
+   * with five. The floor keeps a two-size list from collapsing to a column of
+   * digits. */
+  .webui-model-flyout {
+    z-index: 70;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing_8);
+    min-width: 176px;
+    padding: var(--spacing_8);
+    border: 1px solid var(--border_default);
+    border-radius: var(--radius_12);
+    background: var(--bg_grouped_secondary_elevated);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+    color: var(--text_default_primary);
+  }
+  /* A preview describes a model the user has not picked. The options stay
+   * visible — the point is to see what the model offers before committing to
+   * it — but they are not committable, and saying so with the disabled state is
+   * clearer than hiding the control and leaving the user wondering. */
+  .webui-model-flyout[data-webui-model-preview="true"] {
+    opacity: 0.92;
+  }
+  /* The context sizes, listed in place inside the settings fly-out.
+   * `.webui-model-context-group` is the listbox wrapper and
+   * `.webui-model-context-option` each size; both are shared with the thinking
+   * level rows, which is why the option rule sits with them above. */
+  .webui-model-context-option:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+  .webui-model-context-option:focus-visible,
+  .webui-model-effort-option:focus-visible {
+    outline: 2px solid var(--border_accent);
+    outline-offset: -2px;
+  }
+  /* No `.webui-thinking-brain-slot` rule, and deliberately none: a depth
+   * model has no brain at all. It used to render a non-interactive glyph to
+   * "indicate" the level, and its slot styling went with it — a
+   * control-shaped thing that cannot be controlled is an affordance for a
+   * choice the user has to make somewhere else, and the level is already on
+   * the model chip. */
+  /* No `.webui-thinking-level` rule, and deliberately none. The level rides
+   * the model name in the chip (`.webui-model-chip-level` in ModelPicker) and
+   * is chosen in the picker's settings fly-out, so a control repeating that
+   * word one slot along the toolbar would answer nothing the chip had not. */
+  .webui-model-menu-column {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    gap: var(--spacing_8);
+  }
+  .webui-model-menu-column > .webui-model-menu-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto;
+  }
+  .webui-model-menu-search {
+    flex: 0 0 auto;
+  }
+  .webui-model-search-field {
+    display: block;
+  }
+  .webui-model-search-input {
+    width: 100%;
+    border: 1px solid var(--border_default);
+    border-radius: var(--radius_8);
+    background: var(--bg_grouped_tertiary);
+    padding: var(--spacing_6) var(--spacing_12);
+    color: var(--text_default_primary);
+    font-size: var(--size_14);
+    line-height: var(--line_height_20);
+  }
+  .webui-model-search-input::placeholder {
+    color: var(--text_default_tertiary);
+  }
+  .webui-model-search-input:focus-visible {
+    outline: 2px solid var(--border_accent);
+    outline-offset: -1px;
+  }
+  .webui-model-search-empty {
+    flex: 1 1 auto;
+    padding: var(--spacing_16) var(--spacing_12);
+    color: var(--text_default_tertiary);
+    font-size: var(--size_14);
+    line-height: var(--line_height_20);
+    text-align: center;
+  }
+  /* A row owns the star, so the option has to yield the width instead of
+   * claiming 100% of a box that now has a sibling. `min-width: 0` is what
+   * stops a long model name from pushing the star off the edge instead of
+   * truncating. */
+  .webui-model-option-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing_4);
+  }
+  .webui-model-option-row > .webui-model-option {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto;
+  }
+  /* The star is a control, not a glyph in a row of text: it needs its own hit
+   * area and its own focus ring, or it is unreachable by keyboard and
+   * unhittable on the rows where the name truncates. */
+  .webui-model-option-star {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: var(--spacing_24);
+    height: var(--spacing_24);
+    border-radius: var(--radius_8);
+    color: var(--text_default_tertiary);
+    font-size: var(--size_14);
+    line-height: 1;
+    transition: color 120ms ease, background-color 120ms ease;
+  }
+  .webui-model-option-star:hover {
+    background-color: var(--bg_interaction_tertiary_hover);
+    color: var(--text_default_secondary);
+  }
+  .webui-model-option-star[aria-pressed="true"] {
+    color: var(--text_default_primary);
+  }
+  .webui-model-option-star:focus-visible {
+    outline: 2px solid var(--border_accent);
+    outline-offset: -2px;
+  }
+}

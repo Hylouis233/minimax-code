@@ -16,8 +16,24 @@
 
 @import "./tokens.css";
 @import "./shell.css";
-@import "./transcript-widgets.css";
-@import "./plan-mode.css";
+/* Feature rules follow their business (T20). Each file holds that business's
+ * rules out of the old monolith, in their original relative order, and every one
+ * of them is still inside `@layer components` — Tailwind collects that layer and
+ * emits it at the `@tailwind components` directive below, so what the split had
+ * to preserve is the rules' order relative to each other, which the verifier for
+ * this change checked as an identical rule and declaration multiset. */
+@import "../features/plugins/ui/plugins.css";
+@import "../features/settings/ui/settings.css";
+@import "../features/models/ui/models.css";
+@import "../features/interactions/ui/interactions.css";
+@import "../features/composer/ui/composer.css";
+@import "../features/transcript/ui/transcript.css";
+@import "../features/sessions/ui/sessions.css";
+@import "../features/workspace/ui/workspace.css";
+@import "../features/goal/ui/goal.css";
+@import "../features/account/ui/account.css";
+@import "../features/transcript/ui/transcript-widgets.css";
+@import "../features/interactions/ui/plan-mode.css";
 @import "katex/dist/katex.min.css";
 
 @tailwind base;

@@ -1,0 +1,209 @@
+/* workspace — moved out of styles/shell.css (T20); rules kept in their original relative order. */
+@layer components {
+
+  .webui-workspace-menu--desktop {
+    display: flex;
+    min-width: 240px;
+    max-width: 320px;
+    padding: var(--spacing_4);
+    border-radius: var(--radius_12);
+  }
+  .webui-workspace-menu--desktop .webui-workspace-option--desktop {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: var(--spacing_8, 8px);
+    padding: 8px 10px;
+    border-radius: var(--radius_8, 8px);
+    background: transparent;
+    color: var(--text_default_primary);
+    font-size: var(--size_14, 14px);
+    line-height: var(--line_height_20, 20px);
+    cursor: pointer;
+    border: none;
+    transition: background-color 80ms ease;
+  }
+  .webui-workspace-menu--desktop .webui-workspace-option--desktop:hover {
+    background: var(--bg_interaction_tertiary_hover, rgba(0, 0, 0, 0.06));
+  }
+  .webui-workspace-menu--desktop
+    [data-webui-workspace-action="add-new"]
+    + [data-webui-workspace-action="no-project"] {
+    margin-top: var(--spacing_2);
+  }
+
+  /* These rows carry no `:focus-visible`, so keyboard focus fell through to the
+   * browser's default blue ring — a raw box that matched nothing around it.
+   * Same treatment the send button, the primary/secondary buttons and the
+   * toggle rows already use. */
+  .webui-workspace-option--desktop:focus-visible {
+    outline: 2px solid var(--border_accent);
+    outline-offset: -2px;
+  }
+
+  /* The project row under the composer. It is a LAYOUT element only — the
+   * light surface comes from `.message-input-home-container`, the scrim box
+   * that already wraps the card, so the card and this row read as one
+   * continuous band with no seam. Giving the row its own fill, radius or
+   * shadow is what reintroduced the seam: two greys meeting along one line.
+   * Vertical padding only; the container owns the rounding and the bleed. */
+  .webui-workspace-bar {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: var(--spacing_12);
+    padding: var(--spacing_6) var(--spacing_8) var(--spacing_2);
+  }
+
+  .webui-workspace-bar-trigger {
+    display: flex;
+    min-width: 0;
+    max-width: 260px;
+    min-height: 28px;
+    align-items: center;
+    gap: var(--spacing_8);
+    border: 0;
+    border-radius: var(--radius_8);
+    background: transparent;
+    padding: 0 var(--spacing_8);
+    color: var(--text_default_primary);
+    font-size: var(--size_14);
+    cursor: pointer;
+    transition: background-color 120ms ease;
+  }
+
+  .webui-workspace-bar-trigger:hover:not(:disabled) {
+    background: var(--bg_interaction_tertiary_hover);
+  }
+
+  /* The picker's own subhead, the rule under it, and the selection check.
+   * The header is a label rather than a row: it is not actionable, so it
+   * carries no hit area and the rule below it does the visual separation. */
+  .webui-workspace-menu-header {
+    padding: var(--spacing_4) 10px var(--spacing_4);
+    color: var(--text_default_tertiary);
+    font-size: var(--size_12);
+    line-height: var(--line_height_16, 16px);
+  }
+
+  .webui-workspace-menu-separator {
+    height: 1px;
+    margin: var(--spacing_4) 0;
+    background: var(--border_default);
+  }
+
+  .webui-workspace-option-check {
+    width: var(--size_16);
+    height: var(--size_16);
+    flex: 0 0 var(--size_16);
+    color: var(--icon_default_secondary);
+  }
+
+  /* The directory browser's 取消 / 使用此目录 pair.
+   *
+   * These used to borrow `.webui-commit-dialog-actions`, which is sized for the
+   * 420px centred modal: 8/12 padding and a heavy dark fill read oversized
+   * inside a 240–320px popover, and clashed with the directory rows directly
+   * above them, which are 8/10 on `--radius_8`. They now take the rows' scale
+   * and radius and the project's primary/secondary colours, so the whole panel
+   * reads as one language.
+   *
+   * Geometry is declared once on the shared class rather than reusing
+   * `.webui-button-primary` (8/16) and `.webui-button-secondary` (6/12): those
+   * two differ by 4px of vertical padding, which would render this side-by-side
+   * pair at two different heights. The colours, the hover ramp and the
+   * `:focus-visible` ring are lifted from those buttons unchanged.
+   *
+   * The rule above the pair separates it from the directory list, mirroring
+   * the separator the quick menu uses between `最近` and the commands. */
+  .webui-workspace-browser-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--spacing_8);
+    margin-top: var(--spacing_4);
+    border-top: 1px solid var(--border_default);
+    padding-top: var(--spacing_8);
+  }
+
+  .webui-workspace-browser-action {
+    display: inline-flex;
+    min-height: 28px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border_default);
+    border-radius: var(--radius_8);
+    background: transparent;
+    padding: var(--spacing_4) var(--spacing_12);
+    color: var(--text_default_secondary);
+    font-size: var(--size_14);
+    line-height: var(--line_height_18);
+    cursor: pointer;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+  }
+
+  .webui-workspace-browser-action:hover:not(:disabled) {
+    border-color: var(--border_heavy);
+    background: var(--bg_interaction_tertiary_hover);
+    color: var(--text_default_primary);
+  }
+
+  .webui-workspace-browser-action--primary {
+    border-color: transparent;
+    background: var(--bg_interaction_primary_default);
+    color: var(--text_default_inverted);
+  }
+
+  .webui-workspace-browser-action--primary:hover:not(:disabled) {
+    border-color: transparent;
+    background: var(--bg_interaction_primary_hover);
+    color: var(--text_default_inverted);
+  }
+
+  .webui-workspace-browser-action:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .webui-workspace-browser-action:focus-visible {
+    outline: 2px solid var(--border_accent);
+    outline-offset: 2px;
+  }
+
+  /* Keep the existing desktop surfaces fluid as the browser window narrows.
+   * These rules change only available space and panel placement; typography,
+   * colors, radii and component styling continue to come from the same tokens. */
+  @media (max-width: 1080px) {
+    .webui-session-has-progress-panel {
+      padding-right: 0;
+    }
+
+    .webui-workspace-panel {
+      position: absolute;
+      inset: 0 0 0 auto;
+      width: min(50%, 560px);
+      flex: 0 1 min(50%, 560px);
+      z-index: 40;
+    }
+
+    .webui-workspace-panel.is-expanded {
+      width: 100%;
+      flex-basis: 100%;
+    }
+
+    .webui-workspace-file-tree-panel {
+      width: clamp(180px, 24vw, 260px);
+      flex-basis: clamp(180px, 24vw, 260px);
+    }
+
+    .webui-settings-sidebar {
+      width: clamp(196px, 24vw, 260px);
+      flex-basis: clamp(196px, 24vw, 260px);
+    }
+
+    .webui-model-menu--two-column {
+      min-width: 0;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+    }
+  }
+}
