@@ -1,6 +1,6 @@
 # WebUI groups code by business and gives application work an explicit lifetime
 
-**Status:** Accepted target; implementation pending.
+**Status:** Accepted target; implementation pending. The role and public/private import checks now judge every home (see Consequences); the residual old-home population is carried by an explicit, owned exception ledger (`scripts/lib/webui-role-exceptions.json`) until T18, T19 and T21 move it.
 **Date:** 2026-10-13.
 **Supersedes:** ADR 0015's layer-first physical organization and classification of shell/turn as businesses. **Amends:** ADR 0014's browser-internal placement and binding responsibilities; preserves its browser/loopback/process-local harness boundaries and single-writer semantics.
 
@@ -16,4 +16,4 @@ Review and terminal have distinct internal ownership homes. Review keeps turn ch
 
 ## Consequences
 
-Role and public/private import checks must recognize both dimensions during migration, then retire the old homes. Each migration transfers one authoritative write path; no parallel production event writer, complete session store or feature flag is introduced. A pure move is proved separately from an ownership correction. The old ADR's historical implementation remains evidence, not an alternate target. This record authorizes the destination and its decomposition; this preparation task does not implement it.
+Role and public/private import checks recognize both dimensions during migration, and since A-004 they judge every home: whether a role edge is forbidden no longer depends on which of the two directory spellings the file uses. The residual old-home population is enumerated in `scripts/lib/webui-role-exceptions.json` — module pair, owner and exit condition per entry — and an entry whose edge is no longer measured fails the check, so the ledger shrinks as T18, T19 and T21 move the modules instead of standing in for the retirement. Each migration transfers one authoritative write path; no parallel production event writer, complete session store or feature flag is introduced. A pure move is proved separately from an ownership correction. The old ADR's historical implementation remains evidence, not an alternate target. This record authorizes the destination and its decomposition; this preparation task does not implement it.
