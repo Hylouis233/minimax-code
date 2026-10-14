@@ -5656,6 +5656,14 @@
       "homepage": "https://github.com/yargs/yargs-parser#readme"
     },
     {
+      "name": "yauzl",
+      "versions": [
+        "3.4.0"
+      ],
+      "license": "MIT",
+      "homepage": "https://github.com/thejoshwolfe/yauzl"
+    },
+    {
       "name": "yocto-queue",
       "versions": [
         "0.1.0"

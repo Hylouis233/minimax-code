@@ -1,12 +1,28 @@
 // Reads and extracts the workspace archives the panel previews.
 //
-// Two container formats, parsed here with Node built-ins only: `zip` (scan back
-// for the End Of Central Directory record, walk the central directory it points
-// at, inflate the local file data with `inflateRawSync`) and `tar` (512-byte
-// blocks, `gunzipSync` first for `.tar.gz` / `.tgz`). `@mavis/webui` is a
-// published package, so neither `jszip` nor `tar` may be added as a dependency
-// without changing what every consumer installs; the parsers below are the
-// smallest thing that reads those two formats honestly.
+// Both container formats are read by a mature parser, and only the policy is
+// ours: `zip` through `yauzl`, `tar` / `.tar.gz` through `tar`. The gzip is
+// decompressed here first, under the same uncompressed cap, so that cap is not
+// handed to a library to enforce. T16 replaced two hand-written walks — a
+// central-directory walk with `inflateRawSync`, and a 512-byte header walk with
+// its own checksum, base-256 and pax readers — because reimplementing a mature
+// format is not something to keep for its own sake.
+//
+// The module is organised in three responsibilities, in this order:
+//
+//   * parser — one adapter per format, each translating its parser's entry and
+//     failure vocabulary into this module's. A parser reads bytes and names; it
+//     never decides whether an entry may be written.
+//   * policy — `normalizeEntryName`, `nameVerdict`, `resolveInside`,
+//     `resolveEntryPath`, the refusal vocabulary and the byte/ratio budgets.
+//     Both operations call the SAME implementations; nothing here is
+//     per-operation.
+//   * workflow — `readWorkspaceArchiveListing` and
+//     `extractWorkspaceArchiveDirectory`: the two public operations, their
+//     two-phase shape (every name and declared size validated before anything
+//     is created; no file ever left half-written) and the per-format extraction
+//     pass, because `yauzl` can re-open an entry after the walk and `tar`
+//     cannot.
 //
 // The hardening is ported from the runtime's two battle-tested extractors:
 //   * `packages/local-runtime/src/website-management/deployed-website-source.ts`
@@ -23,9 +39,10 @@
 // `shouldStripArchiveRoot` is the one deliberate non-port — see the comment on
 // `listOneLevel`.
 
-import { lstat, mkdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
+import { lstat, mkdir, open, readFile, realpath, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { gunzipSync, inflateRawSync } from "node:zlib";
+import { gunzipSync } from "node:zlib";
+import { createRequire } from "node:module";
 import type {
   WebuiArchiveEntry,
   WebuiWorkspaceArchiveExtractResult,
@@ -45,6 +62,59 @@ import type {
  * this would refuse legitimate build outputs (`target/`, `.next/`) that are
  * routinely zipped up and opened for inspection.
  */
+
+// ---------------------------------------------------------------------------
+// The zip parser
+// ---------------------------------------------------------------------------
+
+/**
+ * `yauzl`, loaded through `require` and typed here (T16).
+ *
+ * yauzl ships no declarations, and an ambient `declare module "yauzl"` is
+ * ignored while the specifier still resolves to the package's JavaScript — which
+ * is why the type lives at the use site, shaped to what this module calls, the
+ * same way the terminal manager types `node-pty`. The fields below were read
+ * from `node_modules/yauzl/index.js` (v3.4.0).
+ */
+type ZipParserEntry = {
+  readonly fileName: string;
+  readonly uncompressedSize: number;
+  readonly compressedSize: number;
+  readonly externalFileAttributes: number;
+  readonly versionMadeBy: number;
+};
+
+type ZipParserFile = {
+  readEntry(): void;
+  openReadStreamPromise(entry: ZipParserEntry): Promise<NodeJS.ReadableStream>;
+  close(): void;
+  on(event: "entry", listener: (entry: ZipParserEntry) => void): void;
+  on(event: "end", listener: () => void): void;
+  on(event: "error", listener: (error: Error) => void): void;
+  removeListener(event: "entry", listener: (entry: ZipParserEntry) => void): void;
+  removeListener(event: "end", listener: () => void): void;
+  removeListener(event: "error", listener: (error: Error) => void): void;
+};
+
+type ZipParserModule = {
+  fromBufferPromise(
+    buffer: Buffer,
+    options?: {
+      readonly lazyEntries?: boolean;
+      readonly decodeStrings?: boolean;
+      readonly validateEntrySizes?: boolean;
+      readonly autoClose?: boolean;
+    },
+  ): Promise<ZipParserFile>;
+};
+
+const require = createRequire(import.meta.url);
+
+/** Resolved per call so a missing optional dependency fails only when used. */
+function loadZipParser(): ZipParserModule {
+  return require("yauzl") as ZipParserModule;
+}
+
 const WORKSPACE_ARCHIVE_MAX_ARCHIVE_BYTES = 200 * 1024 * 1024;
 
 /**
@@ -166,8 +236,15 @@ type ArchiveEntry = {
   readonly compressedSize: number;
   /** Why this entry is refused, in the panel's own words. */
   readonly unsafeReason?: string;
-  /** Materialises the entry's bytes, charged against `budget`. */
-  read(budget: ExpansionBudget): Buffer;
+  /**
+   * Materialises the entry's bytes, charged against `budget`.
+   *
+   * Carried by zip entries only: `yauzl` hands out a stream per entry and the
+   * central directory is still open, so the bytes can be read after the walk.
+   * `tar` cannot re-open an entry, so tar entries have no `read` — their bytes
+   * are written by `writeTarSelection`'s own streaming pass.
+   */
+  read?(budget: ExpansionBudget): Promise<Buffer>;
 };
 
 type ArchiveContents = {
@@ -176,6 +253,12 @@ type ArchiveContents = {
   readonly totalEntries: number;
   /** True when the entry ceiling cut the container short. */
   readonly truncated: boolean;
+  /**
+   * Releases the parser's handle. A zip's `ZipFile` must outlive every
+   * `entry.read`, so the reader that opened it closes it here once the
+   * operation is done; the tar half has nothing to release.
+   */
+  readonly close?: () => void;
 };
 
 /**
@@ -205,8 +288,9 @@ export async function readWorkspaceArchiveListing(request: {
   const archivePath = await resolveArchiveFile(request.workspaceDir, request.path);
   const { format, buffer } = await readArchive(archivePath);
   const prefix = normalizePrefix(request.prefix);
-  const contents = readContents(buffer, format);
+  const contents = await readContents(buffer, format);
   const level = listOneLevel(contents, prefix);
+  try {
   return {
     archivePath: normalizeArchiveRelativePath(request.path),
     entries: level.entries,
@@ -217,6 +301,9 @@ export async function readWorkspaceArchiveListing(request: {
     // than a page carries (or an entry the reader refused to name).
     truncated: contents.truncated || level.truncated,
   };
+  } finally {
+    contents.close?.();
+  }
 }
 
 /**
@@ -246,7 +333,8 @@ export async function extractWorkspaceArchiveDirectory(request: {
   const archivePath = await resolveArchiveFile(request.workspaceDir, request.path);
   const { format, buffer } = await readArchive(archivePath);
   const prefix = normalizePrefix(request.prefix);
-  const contents = readContents(buffer, format);
+  const contents = await readContents(buffer, format);
+  try {
   const selected = selectForExtraction(contents, prefix);
 
   let declared = 0;
@@ -260,13 +348,13 @@ export async function extractWorkspaceArchiveDirectory(request: {
 
   const root = await prepareExtractionRoot(request.workspaceDir, request.destination);
   const budget: ExpansionBudget = { remaining: WORKSPACE_ARCHIVE_MAX_UNCOMPRESSED_BYTES };
-  let writtenFiles = 0;
-  for (const entry of selected) {
-    if (entry.isDirectory) continue;
-    const target = resolveEntryPath(root, entryPathUnderPrefix(entry, prefix));
-    await writeExtractedFile(root, target, entry, budget);
-    writtenFiles += 1;
-  }
+  // tar cannot re-open an entry after its walk, so its bytes are written by a
+  // second streaming pass; a zip entry is read lazily instead, from the central
+  // directory the parse left open.
+  const writtenFiles =
+    format === "tar"
+      ? await writeTarSelection(buffer, selected, prefix, root, budget)
+      : await writeZipSelection(root, selected, prefix, budget);
 
   return {
     archivePath: normalizeArchiveRelativePath(request.path),
@@ -277,6 +365,11 @@ export async function extractWorkspaceArchiveDirectory(request: {
     // was written out in full.
     ...(contents.truncated ? { truncated: true } : {}),
   };
+  } finally {
+    // The zip parser's handle has to outlive every entry read above, so it is
+    // released here rather than inside the parse.
+    contents.close?.();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -442,34 +535,51 @@ function normalizePrefix(raw: string | undefined): string {
 // ---------------------------------------------------------------------------
 
 const ZIP_END_OF_CENTRAL_DIRECTORY = 0x06054b50;
-const ZIP_CENTRAL_DIRECTORY_ENTRY = 0x02014b50;
-const ZIP_LOCAL_FILE_HEADER = 0x04034b50;
 const ZIP_END_RECORD_SIZE = 22;
 const ZIP_MAX_COMMENT = 0xffff;
 /** The count/offset sentinels that mean "the real value is in the zip64 records". */
 const ZIP_SENTINEL_ENTRIES = 0xffff;
 const ZIP_SENTINEL_32 = 0xffffffff;
 
-type ZipDirectoryEntry = {
-  readonly name: string;
-  readonly method: number;
-  readonly compressedSize: number;
-  readonly uncompressedSize: number;
-  readonly localHeaderOffset: number;
-  readonly unixMode: number | undefined;
-  readonly nameLength: number;
-  readonly extraLength: number;
-  readonly commentLength: number;
-};
+/** The three failures this module names for a zip, so a wrapper cannot invent others. */
+const ZIP_UNREADABLE = "这不是可识别的 ZIP 压缩包（缺少中央目录结束记录，文件可能已截断）。";
+/**
+ * The names yauzl itself refuses while walking the directory.
+ *
+ * A hostile entry name (an absolute path, a `..` component, a backslash, a drive
+ * letter) makes the parser raise instead of handing the entry over, so the
+ * policy layer never sees it. The refusal still has to be *this* module's — the
+ * archive is refused because the entry is unsafe, not because the container is
+ * unreadable — so those two errors are told apart by the shape yauzl gives them.
+ */
+const ZIP_UNSAFE_NAME_PATTERN = /(?:invalid relative path|absolute path|invalid characters in (?:file)?[Nn]ame)[^:]*:\s*(.+)$/u;
+const ZIP_DIRECTORY_CORRUPT = "ZIP 中央目录已损坏，条目记录不完整。";
+const ZIP_ENTRY_CORRUPT = "ZIP 条目已损坏，无法解压。";
 
-function readZipEntries(buffer: Buffer): ArchiveContents {
+/**
+ * ZIP: `yauzl` walks the container, this module keeps the policy (T16).
+ *
+ * The hand-rolled central-directory walk this replaced was a re-implementation
+ * of a mature format — the class of code the plan forbids keeping for its own
+ * sake. What stays here is what is *this* product's policy and not the format's:
+ * the zip64 refusal keeps its named outcome, the entry ceiling still stops a
+ * listing from building a million strings, every name still goes through
+ * `nameVerdict`, the symlink refusal is unchanged, and the byte budget still
+ * charges the bytes as they arrive rather than trusting the header.
+ *
+ * The parser's own failures are translated into the module's messages, because
+ * those messages are what the panel shows and what the conformance corpus
+ * asserts; yauzl's text is about a zip, not about this workspace.
+ */
+async function readZipEntries(buffer: Buffer): Promise<ArchiveContents> {
   const endRecord = findZipEndRecord(buffer);
   const declaredEntries = buffer.readUInt16LE(endRecord + 10);
   const directoryOffset = buffer.readUInt32LE(endRecord + 16);
   const directorySize = buffer.readUInt32LE(endRecord + 12);
-  // The sentinels mean "look in the zip64 end-of-central-directory records",
-  // which this reader does not parse. Refusing by name beats reading a shifted
-  // offset and writing whatever the garbage points at.
+  // The sentinels mean "look in the zip64 end-of-central-directory records".
+  // yauzl could read those; this reader deliberately does not, so the outcome a
+  // zip64 archive gets is the one it already had rather than a silent capability
+  // change (T16's nonGoal: no new archive feature).
   if (
     declaredEntries === ZIP_SENTINEL_ENTRIES ||
     directoryOffset === ZIP_SENTINEL_32 ||
@@ -481,26 +591,67 @@ function readZipEntries(buffer: Buffer): ArchiveContents {
     throw new Error("ZIP 中央目录越界，文件可能已损坏。");
   }
 
-  const entries: ArchiveEntry[] = [];
-  let cursor = directoryOffset;
-  let walked = 0;
-  for (let index = 0; index < declaredEntries; index += 1) {
-    // The walk stops at the ceiling: the count is attacker-controlled, and a
-    // listing must not build a million strings to report that it cannot show a
-    // million strings.
-    if (walked >= WORKSPACE_ARCHIVE_MAX_ENTRIES) break;
-    walked += 1;
-    if (cursor + 46 > buffer.length || buffer.readUInt32LE(cursor) !== ZIP_CENTRAL_DIRECTORY_ENTRY) {
-      throw new Error("ZIP 中央目录已损坏，条目记录不完整。");
-    }
-    const record = readZipDirectoryEntry(buffer, cursor);
-    cursor += 46 + record.nameLength + record.extraLength + record.commentLength;
-    if (cursor > buffer.length) throw new Error("ZIP 中央目录已损坏，条目记录越界。");
-    const entry = zipEntry(buffer, record);
-    if (entry) entries.push(entry);
+  let zip: ZipParserFile;
+  try {
+    zip = await loadZipParser().fromBufferPromise(buffer, {
+      lazyEntries: true,
+      decodeStrings: true,
+      validateEntrySizes: true,
+      autoClose: false,
+    });
+  } catch {
+    throw new Error(ZIP_UNREADABLE);
   }
 
-  return { entries, totalEntries: declaredEntries, truncated: walked < declaredEntries };
+  const entries: ArchiveEntry[] = [];
+  let walked = 0;
+  let ended = false;
+  try {
+    while (walked < WORKSPACE_ARCHIVE_MAX_ENTRIES) {
+      const record = await readNextZipEntry(zip);
+      if (!record) {
+        ended = true;
+        break;
+      }
+      walked += 1;
+      const entry = zipEntry(zip, record);
+      if (entry) entries.push(entry);
+    }
+  } catch (error) {
+    zip.close();
+    const message = error instanceof Error ? error.message : "";
+    // A refusal this module already named keeps its text.
+    if (message === ZIP_ENTRY_CORRUPT) throw error;
+    const unsafeName = ZIP_UNSAFE_NAME_PATTERN.exec(message)?.[1]?.trim();
+    if (unsafeName) throw new Error(`压缩包中存在不安全的条目：${unsafeName}`);
+    throw new Error(ZIP_DIRECTORY_CORRUPT);
+  }
+
+  return {
+    entries,
+    totalEntries: declaredEntries,
+    truncated: !ended || walked < declaredEntries,
+    close: () => zip.close(),
+  };
+}
+
+/** One step of yauzl's lazy entry walk, as a promise; `undefined` ends it. */
+function readNextZipEntry(zip: ZipParserFile): Promise<ZipParserEntry | undefined> {
+  return new Promise((resolve, reject) => {
+    const settle = <T>(value: T): T => {
+      zip.removeListener("entry", onEntry);
+      zip.removeListener("end", onEnd);
+      zip.removeListener("error", onError);
+      return value;
+    };
+    const onEntry = (entry: ZipParserEntry): void => resolve(settle(entry));
+    const onEnd = (): void => resolve(settle(undefined));
+    const onError = (error: Error): void => reject(settle(error));
+    zip.on("entry", onEntry);
+    zip.on("end", onEnd);
+    zip.on("error", onError);
+    zip.readEntry();
+  });
 }
 
 /**
@@ -522,75 +673,73 @@ function findZipEndRecord(buffer: Buffer): number {
   throw new Error("这不是可识别的 ZIP 压缩包（缺少中央目录结束记录，文件可能已截断）。");
 }
 
-function readZipDirectoryEntry(buffer: Buffer, offset: number): ZipDirectoryEntry {
-  const flags = buffer.readUInt16LE(offset + 8);
-  const nameLength = buffer.readUInt16LE(offset + 28);
-  const nameStart = offset + 46;
-  return {
-    // Bit 11 marks UTF-8 names; without it the spec says CP437, which this
-    // module approximates with latin1. The two agree on every ASCII name and
-    // differ only in the C1 box-drawing range.
-    name: buffer.toString(flags & 0x800 ? "utf8" : "latin1", nameStart, nameStart + nameLength),
-    method: buffer.readUInt16LE(offset + 10),
-    compressedSize: buffer.readUInt32LE(offset + 20),
-    uncompressedSize: buffer.readUInt32LE(offset + 24),
-    localHeaderOffset: buffer.readUInt32LE(offset + 42),
-    // The unix mode lives in the high 16 bits of the external attributes, and
-    // only when the archive was written on a unix host (the high byte of
-    // "version made by"). Same rule as the sibling's `isSymbolicLink`, minus
-    // JSZip's `unixPermissions` accessor.
-    unixMode: buffer.readUInt16LE(offset + 4) >> 8 === 3 ? (buffer.readUInt32LE(offset + 38) >>> 16) & 0xffff : undefined,
-    nameLength,
-    extraLength: buffer.readUInt16LE(offset + 30),
-    commentLength: buffer.readUInt16LE(offset + 32),
-  };
-}
-
-function zipEntry(buffer: Buffer, record: ZipDirectoryEntry): ArchiveEntry | undefined {
+/**
+ * One `yauzl` entry as this module's entry.
+ *
+ * The unix-mode read is the one the central directory carried — yauzl exposes
+ * the same `externalFileAttributes`/`versionMadeBy` pair this module used to
+ * decode by hand, so the directory test and the symlink refusal keep their
+ * meaning exactly.
+ */
+function zipEntry(zip: ZipParserFile, record: ZipParserEntry): ArchiveEntry | undefined {
+  const unixHost = record.versionMadeBy >> 8 === 3;
+  const unixMode = unixHost ? (record.externalFileAttributes >>> 16) & 0xffff : undefined;
   const isDirectory =
-    record.name.endsWith("/") || (record.unixMode !== undefined && (record.unixMode & 0o040000) !== 0);
-  // `isSymbolicLink` from the sibling: refuse the link rather than
-  // materialise one, because a symlink written into a workspace is a write
-  // primitive pointing wherever the attacker likes.
-  const symbolicLink = record.unixMode !== undefined && (record.unixMode & 0o170000) === 0o120000;
+    record.fileName.endsWith("/") || (unixMode !== undefined && (unixMode & 0o040000) !== 0);
+  // Refuse the link rather than materialise one, because a symlink written into
+  // a workspace is a write primitive pointing wherever the attacker likes.
+  const symbolicLink = unixMode !== undefined && (unixMode & 0o170000) === 0o120000;
   const verdict = symbolicLink
     ? ({ reason: "条目是符号链接" } satisfies NameVerdict)
-    : nameVerdict(normalizeEntryName(record.name), isDirectory);
+    : nameVerdict(normalizeEntryName(record.fileName), isDirectory);
   if (verdict.drop) return undefined;
   return {
-    rawName: record.name,
+    rawName: record.fileName,
     ...(verdict.path ? { path: verdict.path } : {}),
     isDirectory,
     declaredSize: record.uncompressedSize,
     compressedSize: record.compressedSize,
     ...(verdict.reason ? { unsafeReason: verdict.reason } : {}),
-    read: (budget) => readZipEntryData(buffer, record, isDirectory, budget),
+    read: (budget) => readZipEntryData(zip, record, isDirectory, budget),
   };
 }
 
-function readZipEntryData(
-  buffer: Buffer,
-  record: ZipDirectoryEntry,
+/**
+ * Streams one entry's bytes, charging the shared budget as they arrive.
+ *
+ * The cap is enforced during the stream, not after it: a header claiming twelve
+ * bytes and delivering a gigabyte is stopped while it is still arriving instead
+ * of being allowed to allocate what it asked for. yauzl's own size validation
+ * covers the mismatch between the declared and delivered lengths; both failures
+ * leave the operation with this module's message.
+ */
+async function readZipEntryData(
+  zip: ZipParserFile,
+  record: ZipParserEntry,
   isDirectory: boolean,
   budget: ExpansionBudget,
-): Buffer {
+): Promise<Buffer> {
   if (isDirectory) return Buffer.alloc(0);
-  const header = record.localHeaderOffset;
-  if (header + 30 > buffer.length || buffer.readUInt32LE(header) !== ZIP_LOCAL_FILE_HEADER) {
-    throw new Error("ZIP 条目的本地头已损坏。");
+  if (budget.remaining <= 0) throw new Error("压缩包展开后的体积过大，已拒绝读取。");
+  try {
+    const stream = await zip.openReadStreamPromise(record);
+    const chunks: Buffer[] = [];
+    let total = 0;
+    for await (const chunk of stream) {
+      const bytes = chunk as Buffer;
+      total += bytes.length;
+      if (total > budget.remaining) {
+        (stream as { destroy?: () => void }).destroy?.();
+        throw new Error("压缩包展开后的体积过大，已拒绝读取。");
+      }
+      chunks.push(bytes);
+    }
+    return Buffer.concat(chunks, total);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message.startsWith("压缩包展开后")) throw error;
+    throw new Error(ZIP_ENTRY_CORRUPT);
   }
-  const nameLength = buffer.readUInt16LE(header + 26);
-  const extraLength = buffer.readUInt16LE(header + 28);
-  const start = header + 30 + nameLength + extraLength;
-  const end = start + record.compressedSize;
-  if (end > buffer.length) throw new Error("ZIP 条目数据越界，文件可能已损坏。");
-  // Sizes come from the central directory, never from the local header: with the
-  // streaming flag set, a local header's size fields are zero and the real
-  // values follow the data in a trailing descriptor.
-  const raw = buffer.subarray(start, end);
-  if (record.method === 0) return raw;
-  if (record.method !== 8) throw new Error(`ZIP 条目使用了不支持的压缩方法（${record.method}）。`);
-  return inflateEntry(raw, budget);
 }
 
 // ---------------------------------------------------------------------------
@@ -598,191 +747,263 @@ function readZipEntryData(
 // ---------------------------------------------------------------------------
 
 const TAR_BLOCK_SIZE = 512;
-const TAR_NAME_OFFSET = 0;
-const TAR_NAME_LENGTH = 100;
-const TAR_SIZE_OFFSET = 124;
-const TAR_CHECKSUM_OFFSET = 148;
-const TAR_CHECKSUM_LENGTH = 8;
-const TAR_TYPEFLAG_OFFSET = 156;
-const TAR_PREFIX_OFFSET = 345;
-const TAR_PREFIX_LENGTH = 155;
-const TAR_TYPE_FILE = "0";
-const TAR_TYPE_DIRECTORY = "5";
-const TAR_TYPE_PAX = "x";
-const TAR_TYPE_GLOBAL_PAX = "g";
-const TAR_TYPE_GNU_LONG_NAME = "L";
+/** The two zero blocks a tar writes after its last member, ahead of its padding. */
+const TAR_END_MARKER_BYTES = TAR_BLOCK_SIZE * 2;
 
-function readTarEntries(buffer: Buffer): ArchiveContents {
+/** The failures this module names for a tar, so a wrapper cannot invent others. */
+const TAR_TRUNCATED = "tar 归档没有结束标记，文件可能已截断。";
+const TAR_HEADER_CORRUPT = "tar 头部校验和不匹配，文件可能已损坏。";
+
+async function readTarEntries(buffer: Buffer): Promise<ArchiveContents> {
+  assertTarEndMarker(buffer);
   const entries: ArchiveEntry[] = [];
-  let cursor = 0;
-  // A GNU long-name (`L`) or pax (`x`) header carries the real name of the entry
-  // that follows it, in the data block rather than the 100-byte name field.
-  let overrideName: string | undefined;
   let walked = 0;
-
-  while (cursor + TAR_BLOCK_SIZE <= buffer.length) {
-    if (walked >= WORKSPACE_ARCHIVE_MAX_ENTRIES) break;
-    const header = buffer.subarray(cursor, cursor + TAR_BLOCK_SIZE);
-    if (isZeroBlock(header)) break;
-    walked += 1;
-    verifyTarChecksum(header);
-    const typeflag = String.fromCharCode(header[TAR_TYPEFLAG_OFFSET] ?? 0);
-    const size = readTarSize(header, TAR_SIZE_OFFSET);
-    const dataStart = cursor + TAR_BLOCK_SIZE;
-    const padded = Math.ceil(size / TAR_BLOCK_SIZE) * TAR_BLOCK_SIZE;
-    if (size < 0 || dataStart + padded > buffer.length) {
-      throw new Error("tar 条目越界，文件可能已截断。");
-    }
-    const data = buffer.subarray(dataStart, dataStart + size);
-    const name = overrideName ?? readTarName(header);
-    cursor = dataStart + padded;
-    overrideName = undefined;
-
-    if (typeflag === TAR_TYPE_GNU_LONG_NAME) {
-      overrideName = readNulTerminated(data);
-      continue;
-    }
-    if (typeflag === TAR_TYPE_PAX) {
-      // bsdtar writes one of these per member, carrying extended attributes and
-      // sometimes the real path. It describes the *next* entry, never content.
-      overrideName = readPaxPath(data) ?? overrideName;
-      continue;
-    }
-    if (typeflag === TAR_TYPE_GLOBAL_PAX) continue;
-
-    const isDirectory = typeflag === TAR_TYPE_DIRECTORY || name.endsWith("/");
-    if (!isDirectory && typeflag !== TAR_TYPE_FILE && typeflag !== "\0") {
-      // The tar analogue of the zip symlink refusal, and it covers more: hard
-      // links, devices and FIFOs are all refused, because none of them is
-      // something this panel has any business creating in a workspace.
-      entries.push({
-        rawName: name,
-        isDirectory: false,
-        declaredSize: size,
-        compressedSize: size,
-        unsafeReason: tarTypeRefusal(typeflag),
-        read: () => data,
-      });
-      continue;
-    }
-    const verdict = nameVerdict(normalizeEntryName(name), isDirectory);
-    if (verdict.drop) continue;
-    entries.push({
-      rawName: name,
-      ...(verdict.path ? { path: verdict.path } : {}),
-      isDirectory,
-      declaredSize: size,
-      // A tar member is stored as-is, so its "compressed" size is its own
-      // length; a `.tar.gz` is capped as a whole buffer at gunzip time instead.
-      compressedSize: size,
-      ...(verdict.reason ? { unsafeReason: verdict.reason } : {}),
-      read: () => data,
+  let truncated = false;
+  let refusal: string | undefined;
+  await new Promise<void>((resolve, reject) => {
+    const parser = loadTarParser().t({
+      // A warning is not noise here: `TAR_ENTRY_INVALID` is how the parser
+      // reports a header it cannot trust, and skipping one silently would change
+      // which members the archive is said to hold.
+      onwarn: (warning) => {
+        refusal ??= tarWarningRefusal(tarWarningCode(warning));
+      },
+      onentry: (record) => {
+        if (walked >= WORKSPACE_ARCHIVE_MAX_ENTRIES) {
+          truncated = true;
+          // Drained, not buffered: the walk has to consume the member to reach
+          // the next header, and skipping one costs no memory.
+          record.resume();
+          return;
+        }
+        walked += 1;
+        const entry = tarEntry(record);
+        if (entry) entries.push(entry);
+        record.resume();
+      },
     });
-  }
-
-  return { entries, totalEntries: entries.length, truncated: walked >= WORKSPACE_ARCHIVE_MAX_ENTRIES };
-}
-
-function tarTypeRefusal(typeflag: string): string {
-  if (typeflag === "1") return "条目是硬链接";
-  if (typeflag === "2") return "条目是符号链接";
-  if (typeflag === "3" || typeflag === "4") return "条目是设备文件";
-  if (typeflag === "6") return "条目是 FIFO";
-  return `条目类型不受支持（${JSON.stringify(typeflag)}）`;
+    parser.on("error", (error: Error) => reject(error));
+    parser.on("end", () => resolve());
+    parser.on("close", () => resolve());
+    parser.end(buffer);
+  });
+  if (refusal) throw new Error(refusal);
+  return { entries, totalEntries: entries.length, truncated };
 }
 
 /**
- * The name field, then the ustar prefix field when there is one.
+ * The end-of-archive marker, checked before the walk.
  *
- * Both halves are needed: `ustar` splits a long path between `prefix` (offset
- * 345) and `name`, and dropping the prefix silently renames every member under
- * a deep directory.
+ * `tar` reports a truncated archive by stopping rather than by raising, so this
+ * is what turns a silent short read into the refusal the caller's contract
+ * promises: a conforming archive is block-aligned and ends with two zero blocks.
  */
-function readTarName(header: Buffer): string {
-  const name = readNulTerminated(header.subarray(TAR_NAME_OFFSET, TAR_NAME_OFFSET + TAR_NAME_LENGTH));
-  const prefix = readNulTerminated(header.subarray(TAR_PREFIX_OFFSET, TAR_PREFIX_OFFSET + TAR_PREFIX_LENGTH));
-  return prefix ? `${prefix}/${name}` : name;
-}
-
-function readNulTerminated(bytes: Buffer): string {
-  const end = bytes.indexOf(0);
-  return bytes.subarray(0, end === -1 ? bytes.length : end).toString("utf8");
-}
-
-/**
- * A size field: octal bytes, or a base-256 number when the high bit of the
- * first byte is set — the spec's escape for values that do not fit in octal,
- * which archives with multi-gigabyte members use. The same reader covers the
- * 8-byte checksum field at offset 148.
- */
-function readTarSize(header: Buffer, offset: number): number {
-  const length = offset === TAR_SIZE_OFFSET ? 12 : TAR_CHECKSUM_LENGTH;
-  const first = header[offset] ?? 0;
-  if ((first & 0x80) !== 0) {
-    let value = BigInt(first & 0x7f);
-    for (let index = offset + 1; index < offset + length; index += 1) {
-      value = (value << 8n) | BigInt(header[index] ?? 0);
-    }
-    const asNumber = Number(value);
-    if (!Number.isSafeInteger(asNumber)) throw new Error("tar 条目大小超出可表示范围。");
-    return asNumber;
-  }
-  const text = header.subarray(offset, offset + length).toString("ascii").replace(/[\0 ]/gu, "");
-  if (!text) return 0;
-  if (!/^[0-7]+$/u.test(text)) throw new Error("tar 条目大小字段已损坏。");
-  const value = Number.parseInt(text, 8);
-  if (!Number.isSafeInteger(value) || value < 0) throw new Error("tar 条目大小字段已损坏。");
-  return value;
-}
-
-/**
- * The header checksum, verified before any other field is trusted.
- *
- * It is computed with its own field read as spaces, which is what catches
- * truncation and corruption at the block level instead of leaving a garbage size
- * field to be believed.
- */
-function verifyTarChecksum(header: Buffer): void {
-  const declared = readTarSize(header, TAR_CHECKSUM_OFFSET);
-  let unsigned = 0;
-  let signed = 0;
-  for (let index = 0; index < TAR_BLOCK_SIZE; index += 1) {
-    const inChecksumField = index >= TAR_CHECKSUM_OFFSET && index < TAR_CHECKSUM_OFFSET + TAR_CHECKSUM_LENGTH;
-    const byte = inChecksumField ? 0x20 : header[index] ?? 0;
-    unsigned += byte;
-    signed += byte > 127 ? byte - 256 : byte;
-  }
-  if (declared !== unsigned && declared !== signed) {
-    throw new Error("tar 头部校验和不匹配，文件可能已损坏。");
+function assertTarEndMarker(buffer: Buffer): void {
+  if (buffer.length % TAR_BLOCK_SIZE !== 0) throw new Error(TAR_TRUNCATED);
+  const tail = buffer.subarray(buffer.length - TAR_END_MARKER_BYTES);
+  if (tail.length !== TAR_END_MARKER_BYTES || tail.some((byte) => byte !== 0)) {
+    throw new Error(TAR_TRUNCATED);
   }
 }
 
-function isZeroBlock(header: Buffer): boolean {
-  for (let index = 0; index < header.length; index += 1) {
-    if (header[index] !== 0) return false;
-  }
-  return true;
+/** The warning's own code, whichever field the parser put it in. */
+function tarWarningCode(warning: TarParserWarning): string | undefined {
+  const text = typeof warning === "string" ? warning : (warning.code ?? warning.message);
+  return typeof text === "string" && text.startsWith("TAR_") ? text : undefined;
 }
 
-/** The `path=` record of a pax extended header, when it carries one. */
-function readPaxPath(data: Buffer): string | undefined {
-  let cursor = 0;
-  while (cursor < data.length) {
-    const space = data.indexOf(0x20, cursor);
-    if (space === -1) return undefined;
-    const lengthText = data.subarray(cursor, space).toString("ascii");
-    if (!/^[0-9]+$/u.test(lengthText)) return undefined;
-    const length = Number.parseInt(lengthText, 10);
-    if (length <= 0 || cursor + length > data.length) return undefined;
-    // `%d %s=%s\n`: the length covers its own digits, so the payload ends one
-    // byte before the record boundary.
-    const record = data.subarray(space + 1, cursor + length - 1).toString("utf8").replace(/\n$/u, "");
-    const separator = record.indexOf("=");
-    if (separator !== -1 && record.slice(0, separator) === "path") return record.slice(separator + 1);
-    cursor += length;
-  }
+/** The parser warnings that mean the container cannot be trusted, by name. */
+function tarWarningRefusal(code: string | undefined): string | undefined {
+  if (code === "TAR_BAD_ARCHIVE") return "这不是可识别的 tar 归档。";
+  if (code === "TAR_ENTRY_INVALID") return TAR_HEADER_CORRUPT;
+  if (code === "TAR_ENTRY_ERROR") return "tar 条目数据不完整，文件可能已损坏。";
+  if (code === "TAR_ENTRY_UNSUPPORTED") return "tar 归档使用了不支持的条目类型。";
   return undefined;
 }
+
+/** One parser entry as this module's entry; the policy is applied here. */
+function tarEntry(record: TarParserRecord): ArchiveEntry | undefined {
+  const isDirectory =
+    record.type === "Directory" || record.type === "GNUDumpDir" || record.path.endsWith("/");
+  const regular =
+    record.type === "File" || record.type === "OldFile" || record.type === "ContiguousFile";
+  if (!isDirectory && !regular) {
+    // The tar analogue of the zip symlink refusal, and it covers more: hard
+    // links, devices and FIFOs are all refused, because none of them is
+    // something this panel has any business creating in a workspace.
+    return {
+      rawName: record.path,
+      isDirectory: false,
+      declaredSize: record.size,
+      compressedSize: record.size,
+      unsafeReason: tarTypeRefusal(record.type),
+    };
+  }
+  const verdict = nameVerdict(normalizeEntryName(record.path), isDirectory);
+  if (verdict.drop) return undefined;
+  return {
+    rawName: record.path,
+    ...(verdict.path ? { path: verdict.path } : {}),
+    isDirectory,
+    declaredSize: record.size,
+    // A tar member is stored as-is, so its "compressed" size is its own length;
+    // a `.tar.gz` is capped as a whole buffer at gunzip time instead.
+    compressedSize: record.size,
+    ...(verdict.reason ? { unsafeReason: verdict.reason } : {}),
+  };
+}
+
+function tarTypeRefusal(type: string): string {
+  if (type === "Link") return "条目是硬链接";
+  if (type === "SymbolicLink") return "条目是符号链接";
+  if (type === "CharacterDevice" || type === "BlockDevice") return "条目是设备文件";
+  if (type === "FIFO") return "条目是 FIFO";
+  return `条目类型不受支持（${JSON.stringify(type)}）`;
+}
+
+// ---------------------------------------------------------------------------
+// The tar parser
+// ---------------------------------------------------------------------------
+
+/**
+ * `tar`, loaded through `require` and typed here (T16).
+ *
+ * Only the parser stream is used, so the shape below is what this module calls
+ * rather than the library's whole option surface.
+ */
+type TarParserRecord = NodeJS.ReadableStream & {
+  readonly path: string;
+  readonly type: string;
+  readonly size: number;
+};
+
+/**
+ * tar's warning surface is inconsistent: some paths hand the code over as an
+ * object, others as the bare code string, so both are read.
+ */
+type TarParserWarning = string | { readonly code?: string; readonly message?: string };
+
+type TarParserStream = {
+  on(event: "error", listener: (error: Error) => void): void;
+  on(event: "end" | "close", listener: () => void): void;
+  end(buffer: Buffer): void;
+};
+
+type TarParserModule = {
+  t(options: {
+    readonly onentry: (record: TarParserRecord) => void;
+    readonly onwarn: (warning: TarParserWarning) => void;
+  }): TarParserStream;
+};
+
+function loadTarParser(): TarParserModule {
+  return require("tar") as TarParserModule;
+}
+
+/**
+ * The extraction pass for a tar.
+ *
+ * `tar` cannot re-open an entry after its walk, so the bytes are written here —
+ * a second pass over the same in-memory buffer, under the validation the first
+ * pass already made. A member is in flight only while it is being written, so
+ * the peak is one member rather than the archive; buffering every member would
+ * double what the module already holds, and the archive's own cap is one a
+ * hostile input can reach.
+ */
+async function writeTarSelection(
+  buffer: Buffer,
+  selected: readonly ArchiveEntry[],
+  prefix: string,
+  root: string,
+  budget: ExpansionBudget,
+): Promise<number> {
+  const wanted = new Set<string>();
+  for (const entry of selected) {
+    if (entry.path && !entry.isDirectory) wanted.add(entry.path);
+  }
+  let written = 0;
+  let failure: Error | undefined;
+  await new Promise<void>((resolve, reject) => {
+    const parser = loadTarParser().t({
+      onwarn: (warning) => {
+        const refusal = tarWarningRefusal(tarWarningCode(warning));
+        if (refusal) failure ??= new Error(refusal);
+      },
+      onentry: (record) => {
+        const entry = tarEntry(record);
+        if (!entry || entry.isDirectory || !entry.path || !wanted.has(entry.path)) {
+          record.resume();
+          return;
+        }
+        const target = resolveEntryPath(root, entryPathUnderPrefix(entry, prefix));
+        // The parser waits for this member to be consumed before it emits the
+        // next one, so the writes stay sequential without a queue of their own.
+        void writeTarMember(record, root, target, budget).then(
+          () => {
+            written += 1;
+          },
+          (error: Error) => {
+            failure ??= error;
+            record.resume();
+          },
+        );
+      },
+    });
+    parser.on("error", (error: Error) => reject(error));
+    parser.on("end", () => resolve());
+    parser.on("close", () => resolve());
+    parser.end(buffer);
+  });
+  if (failure) throw failure;
+  return written;
+}
+
+/**
+ * Streams one member to its destination.
+ *
+ * The file is created with `wx` before a byte is written, so an archive can
+ * never clobber a file already in the workspace, and it is unlinked again if the
+ * stream fails — the invariant the buffered path keeps by writing once, kept
+ * here by leaving nothing behind.
+ */
+async function writeTarMember(
+  record: TarParserRecord,
+  root: string,
+  target: string,
+  budget: ExpansionBudget,
+): Promise<void> {
+  const parent = path.dirname(target);
+  await mkdir(parent, { recursive: true });
+  const resolvedParent = await realpath(parent);
+  if (resolvedParent !== root && !resolvedParent.startsWith(rootPrefix(root))) {
+    throw new Error("压缩包条目试图通过符号链接写出解压目录。");
+  }
+  const file = path.join(resolvedParent, path.basename(target));
+  const handle = await open(file, "wx");
+  const declared = Math.max(record.size, 1);
+  let total = 0;
+  try {
+    for await (const chunk of record) {
+      const bytes = chunk as Buffer;
+      total += bytes.length;
+      // Charged as the bytes arrive, against what is left of the shared budget,
+      // so a header that lies about its size is stopped while it is still
+      // arriving rather than after it has been held.
+      if (total > budget.remaining) throw new Error("压缩包展开后的体积过大，已拒绝解压。");
+      if (total / declared > WORKSPACE_ARCHIVE_MAX_EXPANSION_RATIO) {
+        throw new Error("压缩包中存在异常膨胀的条目，已拒绝解压。");
+      }
+      await handle.write(bytes);
+    }
+    budget.remaining -= total;
+  } catch (error) {
+    await handle.close().catch(() => undefined);
+    await unlink(file).catch(() => undefined);
+    throw error;
+  }
+  await handle.close();
+}
+
 
 // ---------------------------------------------------------------------------
 // Dispatch, listing and extraction
@@ -807,7 +1028,7 @@ async function readArchive(archivePath: string): Promise<{ readonly format: Arch
   }
 }
 
-function readContents(buffer: Buffer, format: ArchiveFormat): ArchiveContents {
+async function readContents(buffer: Buffer, format: ArchiveFormat): Promise<ArchiveContents> {
   if (format === "zip") {
     if (buffer.length < ZIP_END_RECORD_SIZE) throw new Error("这个 ZIP 文件太短或已截断。");
     return readZipEntries(buffer);
@@ -896,6 +1117,23 @@ function entryPathUnderPrefix(entry: ArchiveEntry, prefix: string): string {
   return entry.path.slice(prefix.length + 1);
 }
 
+/** The extraction pass for a zip: the walk already happened, so each entry is read in turn. */
+async function writeZipSelection(
+  root: string,
+  selected: readonly ArchiveEntry[],
+  prefix: string,
+  budget: ExpansionBudget,
+): Promise<number> {
+  let writtenFiles = 0;
+  for (const entry of selected) {
+    if (entry.isDirectory) continue;
+    const target = resolveEntryPath(root, entryPathUnderPrefix(entry, prefix));
+    await writeExtractedFile(root, target, entry, budget);
+    writtenFiles += 1;
+  }
+  return writtenFiles;
+}
+
 /**
  * Writes one entry, re-validating its parent directory against the extraction
  * root first.
@@ -916,7 +1154,7 @@ async function writeExtractedFile(
   if (resolvedParent !== root && !resolvedParent.startsWith(rootPrefix(root))) {
     throw new Error("压缩包条目试图通过符号链接写出解压目录。");
   }
-  const data = readEntryBounded(entry, budget);
+  const data = await readEntryBounded(entry, budget);
   // `wx`: refuse to clobber, as the sibling extractor does. An archive the user
   // did not write must never be able to overwrite a file already in their
   // workspace, and a conflict is far better surfaced than silently resolved in
@@ -932,8 +1170,14 @@ async function writeExtractedFile(
  * declared size, so the classic shape — a tiny member that inflates to
  * gigabytes — is caught even when the header is honest about the total.
  */
-function readEntryBounded(entry: ArchiveEntry, budget: ExpansionBudget): Buffer {
-  const data = entry.read(budget);
+function isBufferTooLarge(error: unknown): boolean {
+  return typeof error === "object" && error !== null && (error as { code?: unknown }).code === "ERR_BUFFER_TOO_LARGE";
+}
+
+async function readEntryBounded(entry: ArchiveEntry, budget: ExpansionBudget): Promise<Buffer> {
+  const read = entry.read;
+  if (!read) throw new Error(`压缩包条目无法读取（${entry.rawName}）。`);
+  const data = await read.call(entry, budget);
   if (data.length > budget.remaining) {
     throw new Error("压缩包展开后的体积过大，已拒绝解压。");
   }
@@ -943,30 +1187,6 @@ function readEntryBounded(entry: ArchiveEntry, budget: ExpansionBudget): Buffer 
   }
   budget.remaining -= data.length;
   return data;
-}
-
-/**
- * Inflates one entry, capped at what is *left* of the shared budget rather than
- * at the entry's declared size.
- *
- * That distinction is the whole point: a header claiming 12 bytes and
- * delivering a gigabyte is stopped at the budget instead of being believed, and
- * it never gets to allocate the memory it asked for. zlib signals the cap with
- * `ERR_BUFFER_TOO_LARGE`, which is a refusal rather than an internal failure and
- * is translated into the same message the total cap produces.
- */
-function inflateEntry(raw: Buffer, budget: ExpansionBudget): Buffer {
-  if (budget.remaining <= 0) throw new Error("压缩包展开后的体积过大，已拒绝读取。");
-  try {
-    return inflateRawSync(raw, { maxOutputLength: budget.remaining });
-  } catch (error) {
-    if (isBufferTooLarge(error)) throw new Error("压缩包展开后的体积过大，已拒绝读取。");
-    throw new Error("ZIP 条目已损坏，无法解压。");
-  }
-}
-
-function isBufferTooLarge(error: unknown): boolean {
-  return typeof error === "object" && error !== null && (error as { code?: unknown }).code === "ERR_BUFFER_TOO_LARGE";
 }
 
 function isMissingPath(error: unknown): boolean {
