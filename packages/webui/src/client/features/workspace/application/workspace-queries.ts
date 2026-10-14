@@ -30,6 +30,13 @@ import {
 } from "./workspace-environment-owner.js";
 import { createWebuiWorkspaceReviewOwner } from "../../review/application/workspace-review-owner.js";
 import {
+  createWebuiWorkspaceCanvasOwner,
+  initialWebuiWorkspaceCanvasState,
+  type WebuiWorkspaceCanvasOwner,
+  type WebuiWorkspaceCanvasPort,
+  type WebuiWorkspaceCanvasState,
+} from "./workspace-canvas-owner.js";
+import {
   createWebuiWorkspaceArchiveOwner,
   initialWebuiWorkspaceArchiveState,
   type WebuiWorkspaceArchiveOwner,
@@ -56,6 +63,7 @@ export interface WebuiWorkspaceQueryPort
   extends WebuiWorkspaceFilesPort,
     WebuiWorkspaceEnvironmentPort,
     WebuiWorkspaceArchivePort,
+    WebuiWorkspaceCanvasPort,
     WebuiWorkspaceReviewPort {}
 
 export interface WebuiWorkspaceQueriesState {
@@ -66,6 +74,8 @@ export interface WebuiWorkspaceQueriesState {
   readonly files: ReadonlyMap<string, import("./workspace-files-owner.js").WebuiWorkspaceFileContentState>;
   /** The archive owner's slice: one listing and one extract outcome (T11). */
   readonly archive: WebuiWorkspaceArchiveState;
+  /** The canvas owner's slice: the session's document and the last outcome. */
+  readonly canvas: WebuiWorkspaceCanvasState;
   readonly reviewSummary: WebuiWorkspaceReviewSummaryState;
   readonly reviewDiffs: import("../../review/contracts/workspace-review.js").WebuiWorkspaceReviewDiffState;
   readonly reviewSearch: import("../../review/contracts/workspace-review.js").WebuiWorkspaceReviewSearchState;
@@ -109,6 +119,12 @@ export interface WebuiWorkspaceQueries {
   /** Extract one archive; the outcome is the owner's, not a component's. */
   readonly extractArchive: WebuiWorkspaceArchiveOwner["extract"];
   readonly canReadArchive: boolean;
+  /** Read the session's canvas document (a session already left is dropped). */
+  readonly readCanvas: WebuiWorkspaceCanvasOwner["read"];
+  /** Run one canvas operation; resolves `true` when it landed. */
+  readonly applyCanvas: WebuiWorkspaceCanvasOwner["apply"];
+  readonly canReadCanvas: boolean;
+  readonly canApplyCanvas: boolean;
   readonly canExtractArchive: boolean;
   readonly loadEnvironment: (workspaceDir: string) => void;
   readonly mutateGit: (
@@ -132,6 +148,7 @@ export const initialWebuiWorkspaceQueriesState: WebuiWorkspaceQueriesState = {
   environment: initialWebuiWorkspaceEnvironmentState,
   environmentRevision: 0,
   archive: initialWebuiWorkspaceArchiveState,
+  canvas: initialWebuiWorkspaceCanvasState,
 };
 
 export function createWebuiWorkspaceQueries(deps: {
@@ -141,6 +158,7 @@ export function createWebuiWorkspaceQueries(deps: {
   const files = createWebuiWorkspaceFilesOwner({ port });
   const review = createWebuiWorkspaceReviewOwner({ port });
   const archive = createWebuiWorkspaceArchiveOwner({ port });
+  const canvas = createWebuiWorkspaceCanvasOwner({ port });
   const environment: WebuiWorkspaceEnvironmentOwner =
     createWebuiWorkspaceEnvironmentOwner({
       port,
@@ -155,6 +173,7 @@ export function createWebuiWorkspaceQueries(deps: {
       environment: environment.state(),
       environmentRevision: environment.revision(),
       archive: archive.state(),
+      canvas: canvas.state(),
     };
   };
   let snapshot: WebuiWorkspaceQueriesState = {
@@ -163,6 +182,7 @@ export function createWebuiWorkspaceQueries(deps: {
     environment: environment.state(),
     environmentRevision: environment.revision(),
     archive: archive.state(),
+    canvas: canvas.state(),
   };
   const notify = (): void => {
     compose();
@@ -172,6 +192,7 @@ export function createWebuiWorkspaceQueries(deps: {
   review.subscribe(notify);
   environment.subscribe(notify);
   archive.subscribe(notify);
+  canvas.subscribe(notify);
 
   const invalidateWorkspaceGit = (signal: {
     readonly workspace?: string;
@@ -214,6 +235,10 @@ export function createWebuiWorkspaceQueries(deps: {
     readArchive: archive.read,
     extractArchive: archive.extract,
     canReadArchive: archive.canRead,
+    readCanvas: canvas.read,
+    applyCanvas: canvas.apply,
+    canReadCanvas: canvas.canRead,
+    canApplyCanvas: canvas.canApply,
     canExtractArchive: archive.canExtract,
     loadEnvironment: environment.load,
     mutateGit: environment.mutateGit,
@@ -222,6 +247,7 @@ export function createWebuiWorkspaceQueries(deps: {
     dispose: () => {
       files.dispose();
       archive.dispose();
+      canvas.dispose();
       environment.dispose();
       listeners.clear();
     },

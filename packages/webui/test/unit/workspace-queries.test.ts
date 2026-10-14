@@ -207,3 +207,52 @@ describe("the archive owner drops a listing nobody is looking at", () => {
     expect(queries.getSnapshot().archive.extract.status).toBe("done");
   });
 });
+
+describe("the canvas owner keeps one document per session", () => {
+  const doc = (sessionId: string) => ({ sessionId, nodes: [] }) as never;
+
+  it("drops a document for a session the reader has left", async () => {
+    const first = deferred<never>();
+    const second = deferred<never>();
+    let call = 0;
+    const queries = createWebuiWorkspaceQueries({
+      port: {
+        readCanvas: () => {
+          const pending = call === 0 ? first : second;
+          call += 1;
+          return pending.promise;
+        },
+      },
+    });
+
+    queries.readCanvas("A");
+    queries.readCanvas("B");
+    second.resolve(doc("B"));
+    await flush();
+    first.resolve(doc("A"));
+    await flush();
+
+    const state = queries.getSnapshot().canvas;
+    expect(state.sessionId).toBe("B");
+    expect(state.status).toBe("ready");
+  });
+
+  it("reports a refused operation and keeps the stored document", async () => {
+    const queries = createWebuiWorkspaceQueries({
+      port: {
+        readCanvas: async () => doc("A"),
+        applyCanvas: async () => {
+          throw new Error("refused");
+        },
+      },
+    });
+
+    await queries.readCanvas("A") as never;
+    const landed = await queries.applyCanvas("A", { id: "op", mutations: [] } as never);
+
+    const state = queries.getSnapshot().canvas;
+    expect(landed).toBe(false);
+    expect(state.error).toBe("refused");
+    expect(state.busy).toBe(false);
+  });
+});

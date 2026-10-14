@@ -42,6 +42,10 @@ const CANVAS_PAN_KEY_SCALE = 4;
 // `shared/contracts/canvas.ts` — the wire contract they mirror.
 export type { CanvasMutation, CanvasNodeLayout, CanvasOperation } from "../../../../shared/contracts/canvas.js";
 import type { CanvasMutation, CanvasNodeLayout, CanvasOperation } from "../../../../shared/contracts/canvas.js";
+import {
+  useWebuiWorkspaceQueries,
+  useWebuiWorkspaceQueriesState,
+} from "../../../bindings/use-query-state.js";
 import { DESKTOP_COPY, resolveCanvasPointerGesture, stepCanvasZoom, canvasPointerMoveLayout, canvasPointerResizeLayout, canvasArrowDirection, canvasKeyStep, nudgeCanvasLayout, resizeCanvasLayoutBy, canvasLayoutsEqual, buildCanvasUpdateLayoutMutation, buildCanvasAddFileMutation, buildCanvasRemoveNodeMutation, createCanvasOperationId, createCanvasNodeId, buildCanvasOperation, nextCanvasNodeLayout, describeCanvasError, parseCanvasNodes, applyCanvasLayoutPreview } from "../projection/canvas-projection.js";
 import type { CanvasNodeView, CanvasPointerGesture, CanvasLayoutPreview } from "../projection/canvas-projection.js";
 
@@ -80,28 +84,23 @@ interface CanvasGestureState {
   readonly nodeId?: string;
 }
 
-export function WorkspaceCanvas({ sessionId, readCanvas, applyCanvas }: {
+export function WorkspaceCanvas({ sessionId }: {
   /** The session whose canvas document is shown; absent means no canvas. */
   readonly sessionId?: string;
-  /** Port call that reads the canvas document for a session. */
-  readonly readCanvas?: (request: { sessionId: string }) => Promise<WebuiCanvasDocument>;
-  /**
-   * Port call that applies one operation and returns the document the runtime
-   * actually stored. Absent means the canvas is read-only, and the panel says
-   * so instead of pretending a change was saved.
-   */
-  readonly applyCanvas?: (request: {
-    readonly sessionId: string;
-    readonly operation: CanvasOperation;
-  }) => Promise<{ readonly operationId: string; readonly document: WebuiCanvasDocument }>;
 }): ReactElement {
-  const [canvas, setCanvas] = useState<WebuiCanvasDocument>();
+  // The document, its freshness and the operation outcomes belong to the canvas
+  // owner (T11); what stays here is geometry and gesture (pan, zoom, preview).
+  const queries = useWebuiWorkspaceQueries();
+  const canvasState = useWebuiWorkspaceQueriesState().canvas;
+  const canvas = canvasState.document;
+  const [localError, setLocalError] = useState<string>();
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState<CanvasPan>({ x: 0, y: 0 });
   const [preview, setPreview] = useState<CanvasLayoutPreview>();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string>();
-  const [notice, setNotice] = useState<string>();
+  // The operation's own outcome is the owner's; this is view-side validation.
+  const error = localError ?? canvasState.error;
+  const busy = canvasState.busy;
+    const [notice, setNotice] = useState<string>();
   const [draftPath, setDraftPath] = useState("");
   const gestureRef = useRef<CanvasGestureState>();
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -110,17 +109,9 @@ export function WorkspaceCanvas({ sessionId, readCanvas, applyCanvas }: {
   const applySeqRef = useRef(0);
 
   useEffect(() => {
-    if (!sessionId || !readCanvas) { setCanvas(undefined); return undefined; }
-    let cancelled = false;
-    void readCanvas({ sessionId })
-      .then((next) => { if (!cancelled) { setCanvas(next); setError(undefined); } })
-      .catch((cause: unknown) => {
-        if (cancelled) return;
-        setCanvas(undefined);
-        setError(describeCanvasError(cause));
-      });
-    return () => { cancelled = true; };
-  }, [sessionId, readCanvas]);
+    if (!sessionId) return;
+    queries?.readCanvas(sessionId);
+  }, [queries, sessionId]);
 
   // A different session is a different world: start it at the origin.
   useEffect(() => {
@@ -131,41 +122,33 @@ export function WorkspaceCanvas({ sessionId, readCanvas, applyCanvas }: {
 
   const confirmedNodes = parseCanvasNodes(canvas);
   const nodes = applyCanvasLayoutPreview(confirmedNodes, preview);
-  const readOnly = !applyCanvas || !sessionId;
+  const readOnly = !queries?.canApplyCanvas || !sessionId;
 
   const applyMutations = (
     mutations: readonly CanvasMutation[],
     onSuccess?: () => void,
   ): void => {
-    const port = applyCanvas;
     const targetSessionId = sessionId;
-    if (!port || !targetSessionId) { setError(DESKTOP_COPY.canvasReadOnly); return; }
+    if (!queries?.canApplyCanvas || !targetSessionId) {
+      setLocalError(DESKTOP_COPY.canvasReadOnly);
+      return;
+    }
     let operation: CanvasOperation;
     try {
       operation = buildCanvasOperation(createCanvasOperationId(), mutations);
     } catch (cause: unknown) {
-      setError(describeCanvasError(cause));
+      setLocalError(describeCanvasError(cause));
       return;
     }
-    const seq = ++applySeqRef.current;
-    setBusy(true);
-    setError(undefined);
+    setLocalError(undefined);
     setNotice(undefined);
-    void port({ sessionId: targetSessionId, operation })
-      .then((result) => {
-        if (seq !== applySeqRef.current) return;
-        setCanvas(result.document);
-        setPreview(undefined);
-        onSuccess?.();
-      })
-      .catch((cause: unknown) => {
-        if (seq !== applySeqRef.current) return;
-        // The stored document is still the last one this view read, so drop the
-        // optimistic preview and report the refusal instead of keeping it.
-        setPreview(undefined);
-        setError(describeCanvasError(cause));
-      })
-      .finally(() => { if (seq === applySeqRef.current) setBusy(false); });
+    void queries.applyCanvas(targetSessionId, operation).then((landed: boolean) => {
+      // The owner dropped the answer if the session moved on; only a landed
+      // operation clears the optimistic preview.
+      if (!landed) { setPreview(undefined); return; }
+      setPreview(undefined);
+      onSuccess?.();
+    });
   };
 
   const releaseCapture = (pointerId: number): void => {
@@ -254,7 +237,7 @@ export function WorkspaceCanvas({ sessionId, readCanvas, applyCanvas }: {
   ): void => {
     const direction = canvasArrowDirection(event.key);
     if (!direction) return;
-    if (readOnly) { setError(DESKTOP_COPY.canvasReadOnly); return; }
+    if (readOnly) { setLocalError(DESKTOP_COPY.canvasReadOnly); return; }
     event.preventDefault();
     const step = canvasKeyStep(event.shiftKey);
     // Drag and resize both have a real keyboard equivalent, so the pointer
@@ -268,8 +251,8 @@ export function WorkspaceCanvas({ sessionId, readCanvas, applyCanvas }: {
   const handleAddSubmit = (event: FormEvent): void => {
     event.preventDefault();
     const relativePath = draftPath.trim();
-    if (!relativePath) { setError(DESKTOP_COPY.canvasAddRequired); return; }
-    if (readOnly) { setError(DESKTOP_COPY.canvasReadOnly); return; }
+    if (!relativePath) { setLocalError(DESKTOP_COPY.canvasAddRequired); return; }
+    if (readOnly) { setLocalError(DESKTOP_COPY.canvasReadOnly); return; }
     applyMutations(
       [buildCanvasAddFileMutation(createCanvasNodeId(), nextCanvasNodeLayout(confirmedNodes), { relativePath })],
       () => setDraftPath(""),
