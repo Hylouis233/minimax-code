@@ -235,13 +235,11 @@ export function WebuiClientFoundationApp(
   const getSessionForkOptions = sessionsPort.getSessionForkOptions;
   const forkSession = sessionsPort.forkSession;
   const transcriptPort = portSlices.transcript;
-  const composerPort = portSlices.composer;
   const workspacePort = portSlices.workspace;
   // The browser Terminal owner (T15), built by the assembly for the same reason
   // as the rest: this component renders the provider that `useWebuiPortSlice`
   // reads (see the provider below), so it cannot read through it itself.
   const terminalOwner = application.terminalOwner;
-  const accountPort = portSlices.account;
   const turnPort = portSlices.turn;
   // The one application store, taken from the assembled application. There is no
   // second map: the shell provides this exact object through
@@ -301,7 +299,6 @@ export function WebuiClientFoundationApp(
   }, [sessionWorkflows]);
   // The slash-command runner the composer submits through (ticket #49
   // criterion 8): the component holds no transport call, it calls the workflow.
-  const commandWorkflows = application.commandWorkflows;
   // The one workspace query owner (ticket #51): it caches the workspace file
   // tree, file contents, the working-tree review and the git environment, and
   // discards a late response from a superseded request. Provided to the two
@@ -342,7 +339,6 @@ export function WebuiClientFoundationApp(
   // separate read model from `pluginWorkflows` on purpose: the `@` menu and the
   // plugin manager are two readers with two identities, so neither overwrites the
   // other when one of them reloads (T08).
-  const composerPluginCatalogue = application.composerPluginCatalogue;
   // The usage quota is an `AccountPort` method, so it is read through the
   // account owner that already caches it for the user menu and the settings
   // dialog. The shell used to hold its own copy, fetched independently, with
@@ -1408,25 +1404,6 @@ export function WebuiClientFoundationApp(
                     workspaceMenuOpen={workspaceMenuOpen}
                     setWorkspaceMenuOpen={setWorkspaceMenuOpen}
                     recentWorkspaceDirs={recentWorkspaceDirs}
-                    runCommand={commandWorkflows.canRunCommand ? commandWorkflows.runCommand : undefined}
-                    createSession={sessionWorkflows.createSession}
-                    sendMessage={turnPort.send}
-                    getActiveTurn={turnPort.activeTurn}
-                    enqueueMessage={composerPort.enqueueMessage}
-                    getTurnDiff={transcriptPort.getTurnDiff}
-                    revertTurnDiff={transcriptPort.revertTurnDiff}
-                    reapplyTurnDiff={transcriptPort.reapplyTurnDiff}
-                    getSessionForkOptions={getSessionForkOptions}
-                    forkSession={forkSession}
-                    getSessionRewindPreview={transcriptPort.getSessionRewindPreview}
-                    rewindSession={transcriptPort.rewindSession}
-                    editSessionMessage={transcriptPort.editSessionMessage}
-                    listQueueMessages={composerPort.listQueueMessages}
-                    deleteQueueItem={composerPort.deleteQueueItem}
-                    pluginCatalogue={composerPluginCatalogue}
-                    listWorkspaceFileTree={workspacePort.listWorkspaceFileTree}
-                    browseWorkspaceDirs={workspacePort.browseWorkspaceDirs}
-                    getAccountStatus={accountPort.getAccountStatus}
                     draft={draft}
                     onDraftChange={setDraft}
                     seedAttachment={memoryHandoff}
@@ -1434,7 +1411,6 @@ export function WebuiClientFoundationApp(
                     onInputSubmitted={recordComposerInput}
                     teamModeOff={composerTeamModeOff}
                     favoritesStorage={favoriteStorage}
-                    sessions={page.sessions}
                     workspaceDir={selectedSession?.workspaceDir ?? newTaskWorkspaceDir}
                     onSelectSession={handleSelectComposerSession}
                     onOpenPluginManagement={openPluginManagement}

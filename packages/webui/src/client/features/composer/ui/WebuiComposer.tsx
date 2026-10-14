@@ -11,7 +11,6 @@
 // intents; the component holds no store writer and no sink factory.
 
 import {
-  Fragment,
   useCallback,
   useEffect,
   useId,
@@ -23,14 +22,17 @@ import {
   type FormEvent,
   type ReactElement,
 } from "react";
-import type {WebuiClientMessageEnqueuer} from "../contracts/command-port.js";
-import type {WebuiClientMessageSender} from "../../../contracts/turn/execution-port.js";
-import { WebuiWorkspaceDirectoryBrowser } from "../../../features/workspace/ui/WebuiWorkspaceDirectoryBrowser.js";
-import type { WebuiClientMessageLoader } from "../../../features/transcript/contracts/message-view.js";
-import type { WebuiModelSelectionRequest } from "../../../features/models/contracts/model-view.js";
-import type { WebuiClientSessionCreator } from "../../../contracts/sessions/session-port.js";
-import type { WebuiClientSessionPage, WebuiClientSession } from "../../../contracts/sessions/session-view.js";
-import type { WebuiTransport } from "../../../contracts/transport.js";
+import {
+  WebuiComposerEditorStaging,
+  type WebuiComposerMentionChoice,
+} from "./ComposerEditorStaging.js";
+import { WebuiComposerMenus } from "./ComposerMenus.js";
+import {
+  WebuiComposerModePills,
+  WebuiComposerSubmitButton,
+} from "./ComposerSubmissionControls.js";
+import { WebuiComposerPermissionControl } from "./ComposerPermissionControl.js";
+import { WebuiComposerProjectRow } from "./ComposerProjectRow.js";
 import type {
   WebuiComposerPluginCatalogue,
   WebuiComposerPluginSummary,
@@ -40,6 +42,12 @@ import {
   createWebuiInteractionCoordinator,
 } from "../../../features/interactions/application/interaction-coordinator.js";
 import { latestContextUsage, readContextUsageSnapshot } from "../projection/context-usage.js";
+import { readWebuiComposerSubmitGate } from "../projection/submission-gate.js";
+import { readWebuiComposerGoalModeAfterSubmit } from "../projection/composer-goal-outcome.js";
+import {
+  readWebuiSeedApplication,
+  type WebuiComposerSeed,
+} from "../projection/seed-application.js";
 import {
   contextUsagePopoverStyle,
   positionContextUsagePopover,
@@ -77,6 +85,11 @@ import {
   useWebuiSettingsWorkflows,
   useWebuiSettingsWorkflowsState,
 } from "../../../bindings/use-query-state.js";
+import {
+  useWebuiWorkspaceQueries,
+  useWebuiWorkspaceQueriesState,
+} from "../../../bindings/use-query-state.js";
+import { useWebuiSessionWorkflows } from "../../../bindings/use-query-state.js";
 import { type WebuiPermissionMode } from "../../../features/settings/contracts/settings-port.js";
 import {
   useWebuiGoalOwner,
@@ -87,32 +100,23 @@ import {
   useWebuiInteractionOwner,
 } from "../../../features/interactions/bindings/interaction-owner.js";
 import { useWebuiComposerStore } from "../../../bindings/composer-store.js";
+import {
+  useWebuiApplicationOptional,
+  useWebuiSessionStoreSnapshot,
+} from "../../../bindings/application-context.js";
+import { selectWebuiCatalogFlatPage } from "../../../features/sessions/application/session-catalog.js";
+import {
+  useWebuiAccountWorkflows,
+  useWebuiAccountWorkflowsState,
+} from "../../../features/account/bindings/use-account-workflows.js";
 import { webuiSessionStatusType } from "../../../projection/turn/stream-state.js";
 
-/** Capability subset the session composer consumes. Single source of truth
- *  lives in `WebuiTransport`; this alias keeps the prop block free of
- *  per-key `WebuiTransport["x"]` redeclarations. */
-type WebuiSessionComposerCapabilities = Pick<
-  WebuiTransport,
-  | "getTurnDiff"
-  | "revertTurnDiff"
-  | "reapplyTurnDiff"
-  | "getSessionForkOptions"
-  | "forkSession"
-  | "getSessionRewindPreview"
-  | "rewindSession"
-  | "editSessionMessage"
->;
 import type {
   WebuiGoal,
   WebuiGoalCreateRequest,
   WebuiGoalEnabledResult,
   WebuiGoalSessionRequest,
 } from "../../../../shared/contracts/goal.js";
-import type {
-  WebuiActiveTurnRequest,
-  WebuiActiveTurnResult,
-} from "../../../../shared/contracts/session.js";
 import type {
   WebuiInteractionReplyResult,
   WebuiPendingPermission,
@@ -122,7 +126,6 @@ import type {
 import type { WebuiModelEntry } from "../../../../shared/contracts/models.js";
 import type { WebuiQueueItem } from "../../../../shared/contracts/queue.js";
 import type {
-  WebuiWorkspaceDirectoryListing,
   WebuiWorkspaceFile,
 } from "../../../../shared/contracts/workspace.js";
 import type { WebuiUsageQuotaResult } from "../../../../shared/contracts/usage-quota.js";
@@ -142,18 +145,6 @@ import {
 } from "../../../features/models/projection/thinking-control.js";
 import {
   WebuiIconAttach,
-  WebuiIconCheck,
-  WebuiIconChevronDown,
-  WebuiIconCommandGoal,
-  WebuiIconCommandPlan,
-  WebuiIconFolder,
-  WebuiIconPermissionAuto,
-  WebuiIconPermissionFull,
-  WebuiIconPermissionRequest,
-  WebuiIconPlugins,
-  WebuiIconSend,
-  WebuiIconSkillGeneric,
-  type WebuiIconProps,
 } from "../../../components/shell/icons.js";
 import { OutputError } from "../../../features/transcript/ui/OutputError.js";
 import {
@@ -168,7 +159,6 @@ import { evaluateComposerDismiss, evaluateOutsideClose } from "../../../projecti
 import {
   buildWebuiModelSelectionRequest,
 } from "../../../features/sessions/projection/action-requests.js";
-import { workspaceProjectName } from "../../../features/workspace/projection/workspace-name.js";
 import {
   findWebuiMentionRange,
   findWebuiSlashRange,
@@ -194,7 +184,6 @@ import {
   isWebuiRunnableCommand,
   rankWebuiSlashPalette,
   sectionWebuiSlashPalette,
-  type WebuiRunCommandName,
 } from "../contracts/slash-command.js";
 import { planWebuiRetryResend, resendRecordedWebuiTurn } from "../application/turn-retry.js";
 
@@ -207,65 +196,13 @@ const WEBUI_SLASH_FALLBACK_SECTIONED: SlashCommandEntry[] = await (async () => {
 // Desktop keeps the viewport pinned through the short hand-off window where
 // the live turn is replaced by the refreshed historical transcript.
 
-type ComposerMentionChoice =
-  | { readonly kind: "plugin"; readonly name: string; readonly label: string; readonly detail?: string; readonly section: string }
-  | { readonly kind: "file"; readonly path: string; readonly label: string; readonly section: string }
-  | { readonly kind: "local-file"; readonly label: string; readonly section: string }
-  | { readonly kind: "local-folder"; readonly label: string; readonly section: string }
-  | { readonly kind: "agent"; readonly session: WebuiClientSession; readonly label: string; readonly section: string };
 
-/**
- * The permission preference's closed set is published by the settings business,
- * which owns the preference (T12): the composer renders the control, it does not
- * define what the control can say.
- */
-type WebuiComposerPermissionMode = WebuiPermissionMode;
 
-const PERMISSION_MODE_ORDER = ["default", "auto", "bypassPermissions"] as const;
-
-interface WebuiComposerPermissionOption {
-  readonly label: string;
-  readonly description: string;
-  readonly Icon: (props: WebuiIconProps) => ReactElement;
-}
-
-/** The popover's own question, and where "了解更多" points. The docs page is the
- *  public one the README already links; `/permission` is documented there. */
-const PERMISSION_MODE_QUESTION = "应如何批准 minimax code 操作?";
-const PERMISSION_MODE_LEARN_MORE = "了解更多";
-const PERMISSION_MODE_DOCS_URL = "https://agent.minimax.io/docs/cli/features";
 
 /** Default for `recentWorkspaceDirs`. A module constant, not an inline `[]`, so
  *  the prop keeps one identity across renders when the parent does not supply
  *  it — an inline default would be a fresh array every render. */
 const EMPTY_WORKSPACE_DIRS: readonly string[] = [];
-
-/** Ordered most-restrictive first, mirroring the `ask` / `auto` / `full` actions
- *  the `/permission` command takes. */
-const PERMISSION_MODE_OPTION: Readonly<Record<WebuiComposerPermissionMode, WebuiComposerPermissionOption>> = {
-  default: {
-    label: "请求批准",
-    description: "编辑外部文件和使用互联网时始终询问",
-    Icon: WebuiIconPermissionRequest,
-  },
-  auto: {
-    label: "帮我批准",
-    description: "仅对检测到的风险操作请求批准",
-    Icon: WebuiIconPermissionAuto,
-  },
-  bypassPermissions: {
-    label: "完全访问权限",
-    description: "可不受限制地访问互联网和你电脑上的任何文件",
-    Icon: WebuiIconPermissionFull,
-  },
-};
-
-/** The trigger and the rows share one glyph per mode, so the pill always
- *  previews the icon the popover marks as selected. */
-function PermissionModeIcon({ mode }: { readonly mode: WebuiComposerPermissionMode }): ReactElement {
-  const { Icon } = PERMISSION_MODE_OPTION[mode];
-  return <Icon className="webui-composer-permission-icon" />;
-}
 
 function flattenWorkspaceFiles(files: readonly WebuiWorkspaceFile[]): readonly { readonly path: string; readonly name: string; readonly type?: string }[] {
   const flattened: { path: string; name: string; type?: string }[] = [];
@@ -312,38 +249,18 @@ export function WebuiComposer({
   sessionLayout = false,
   usageQuota,
   agentName,
-  createSession,
   createSessionWorkspaceDir,
   onWorkspaceChange,
   workspaceMenuOpen,
   setWorkspaceMenuOpen,
   recentWorkspaceDirs = EMPTY_WORKSPACE_DIRS,
-  runCommand,
-  sendMessage,
-  getTurnDiff,
-  revertTurnDiff,
-  reapplyTurnDiff,
-  getSessionForkOptions,
-  forkSession,
-  getSessionRewindPreview,
-  rewindSession,
-  editSessionMessage,
-  getActiveTurn,
-  listQueueMessages,
-  deleteQueueItem,
-  getAccountStatus,
   draft,
   onDraftChange,
   inputHistory = [],
   onInputSubmitted,
   onNeedsSession,
   onSessionCreated,
-  enqueueMessage,
   teamModeOff,
-  listWorkspaceFileTree,
-  browseWorkspaceDirs,
-  pluginCatalogue,
-  sessions = [],
   workspaceDir,
   onSelectSession,
   onOpenPluginManagement,
@@ -355,7 +272,6 @@ export function WebuiComposer({
   readonly sessionLayout?: boolean;
   readonly usageQuota?: WebuiUsageQuotaResult;
   readonly agentName: string;
-  readonly createSession?: WebuiClientSessionCreator;
   readonly createSessionWorkspaceDir?: string;
   readonly onWorkspaceChange: (workspaceDir?: string) => void;
   /** Open state for the workspace picker; owned by the parent so the
@@ -366,17 +282,10 @@ export function WebuiComposer({
    *  session history by `deriveRecentWorkspaceDirs`; empty when the user has
    *  no project sessions yet. */
   readonly recentWorkspaceDirs?: readonly string[];
-  readonly runCommand?: (request: { readonly command: WebuiRunCommandName; readonly input?: string; readonly sessionId?: string; readonly agentName?: string; readonly workspaceDir?: string; }) => Promise<Record<string, unknown>>;
-  readonly sendMessage?: WebuiClientMessageSender;
-  readonly enqueueMessage?: WebuiClientMessageEnqueuer;
 
   /** Authoritative active-turn probe; resolves the `recheck` case and the
    * missed-event gap that a reconnect or a slow subscribe can open. */
-  readonly getActiveTurn?: (request: WebuiActiveTurnRequest) => Promise<WebuiActiveTurnResult>;
 
-  readonly listQueueMessages?: (request: { readonly id: string }) => Promise<{ readonly items?: readonly WebuiQueueItem[]; readonly paused?: boolean; readonly pendingCount?: number }>;
-  readonly deleteQueueItem?: (request: { readonly id: string; readonly itemId: string }) => Promise<{ readonly item?: WebuiQueueItem }>;
-  readonly getAccountStatus?: (request?: { readonly sessionId?: string }) => Promise<Record<string, unknown>>;
   /** The draft lives on the shell so it survives silent first-session creation. */
   readonly draft: string;
   readonly onDraftChange: (next: string) => void;
@@ -390,13 +299,7 @@ export function WebuiComposer({
    * that opens the composer, so an effect keyed on anything else would re-attach
    * the same 74KB file on every re-render of this 3000-line component.
    */
-  readonly seedAttachment?: {
-    readonly token: string;
-    readonly fileName: string;
-    readonly mimeType: string;
-    readonly sizeBytes: number;
-    readonly content: string;
-  };
+  readonly seedAttachment?: WebuiComposerSeed;
   /**
    * Submitted-input history for ↑ recall (roadmap Module B: 输入历史/草稿).
    * Keyed by session on the shell; the composer only walks it with the pure
@@ -412,20 +315,16 @@ export function WebuiComposer({
     readonly read: () => string[];
     readonly write: (ids: readonly string[]) => void;
   };
-  readonly listWorkspaceFileTree?: WebuiTransport["listWorkspaceFileTree"];
-  readonly browseWorkspaceDirs?: WebuiTransport["browseWorkspaceDirs"];
   /**
    * What is installed, and what the agent can run, answered by the plugins
    * business (T08). The composer used to hold `pluginManagement` and
    *   `listSkills` itself and dispatch a raw wire verb from an effect; it
    *   now asks a question and receives rows it already recognises.
    */
-  readonly pluginCatalogue?: WebuiComposerPluginCatalogue;
-  readonly sessions?: readonly WebuiClientSession[];
   readonly workspaceDir?: string;
   readonly onSelectSession?: (sessionId: string) => void;
   readonly onOpenPluginManagement?: (area: "plugins" | "skills") => void;
-} & WebuiSessionComposerCapabilities): ReactElement {
+}): ReactElement {
 
   // The two slices this carve owns (plan §8 Phase 3 B1, ticket #66). The composer
   // reads them and hands each to the owner that drives it; the calls themselves
@@ -502,6 +401,28 @@ export function WebuiComposer({
   // (§4.2 field 1: the input modes, the retry record, the queue; §5.6's may-write
   // cell for the staging). One store, one subscription.
   const composerStore = useWebuiComposerStore();
+  // Sessions' published create command, read from its owner rather than relayed
+  // through a prop (plan 4.2 field 4, 4.2 field 8).
+  const sessionWorkflows = useWebuiSessionWorkflows();
+  // The composer's own command workflows and the substrate's capability slice.
+  // Both are published by the assembly; holding them as props was the relay
+  // 4.2 field 8 rules out.
+  const application = useWebuiApplicationOptional();
+  const commandWorkflows = application?.commandWorkflows;
+  const turnCapabilities = application?.turnCapabilities;
+  // Published by the plugins/composer owner; a read model the composer consumes
+  // rather than a prop the shell relays (plan 4.2 field 4).
+  const pluginCatalogue = application?.composerPluginCatalogue;
+  // Sessions' published read model: the one catalog the store holds, resolved to
+  // the flat page (plan 4.2 field 4). The child sessions the mention menu lists
+  // are entries of it, so the component reads them rather than receiving a page.
+  const sessionCatalog = useWebuiSessionStoreSnapshot().catalog;
+  const sessions = useMemo(
+    () => selectWebuiCatalogFlatPage(sessionCatalog).sessions,
+    [sessionCatalog],
+  );
+  const workspaceQueries = useWebuiWorkspaceQueries();
+  const workspaceFileTree = useWebuiWorkspaceQueriesState().fileTree;
   const composerSnapshot = useSyncExternalStore(
     composerStore.subscribe,
     composerStore.getSnapshot,
@@ -533,6 +454,11 @@ export function WebuiComposer({
   const queueItems = queueState.items;
   const queuePaused = queueState.paused;
   const setQueueItems = composerStore.setQueue;
+  // The queue mirror's fence: claim the destination before the read, apply the
+  // answer only while that claim is still live (plan 5.6, queue-mirror row).
+  const claimQueueDestination = composerStore.claimQueueDestination;
+  const applyQueueRead = composerStore.applyQueueRead;
+  const readQueueDestination = composerStore.readQueueDestination;
   // The model catalogue is the models owner's cached read (T13 criterion 1):
   // the composer used to hold a second copy fed by its own 2s poll of the raw
   // `listModels` port method.
@@ -549,7 +475,14 @@ export function WebuiComposer({
   const [modelsScope, setModelsScope] = useState<string | undefined>(undefined);
   const models: readonly WebuiModelEntry[] =
     modelsScope === sessionId ? (modelsSnapshot.models.value ?? []) : [];
-  const [accountStatus, setAccountStatus] = useState<Record<string, unknown>>();
+  // The account status is the account owner's answer, not this component's copy
+  // of an RPC result (plan 4.2 field 4, 5.6). The owner drops a superseded read.
+  const accountWorkflows = useWebuiAccountWorkflows();
+  const accountSnapshot = useWebuiAccountWorkflowsState();
+  // Same scope guard the catalogue read uses: an answer the owner holds for
+  // another session must not bleed into this one, and on home nothing shows.
+  const accountStatus =
+    modelsScope === sessionId ? accountSnapshot.account.value : undefined;
   const [commandOutput, setCommandOutput] = useState<string>();
   const [commandRunning, setCommandRunning] = useState(false);
   // The staged attachments and URL references are the composer's own state, kept
@@ -594,7 +527,6 @@ export function WebuiComposer({
   const [skillsMenuLoading, setSkillsMenuLoading] = useState(false);
   const [skillsMenuError, setSkillsMenuError] = useState<string>();
   const [workspaceFiles, setWorkspaceFiles] = useState<readonly { readonly path: string; readonly name: string; readonly type?: string }[]>([]);
-  const [workspaceBrowserOpen, setWorkspaceBrowserOpen] = useState(false);
   // The mention range is the composer's own state (§5.6: mention/slash ranges); the
   // slash range is derived (`commandRange` below), so only this half is state.
   const mentionRange = composerSnapshot.mentionRange;
@@ -652,7 +584,6 @@ export function WebuiComposer({
   // The workspace picker's own container: the 选择文件夹 trigger plus whichever
   // panel it has open (the 最近 list or the directory browser). The picker has
   // to be judged against THIS, not `composerRegionRef` — see the effect below.
-  const workspacePickerRef = useRef<HTMLDivElement | null>(null);
   const fieldId = useId();
   const contextUsage = stream.contextUsage ?? stream.messages.at(-1)?.contextUsage;
   // Context inspection joins the transcript's history read (plan §4.5:
@@ -679,7 +610,6 @@ export function WebuiComposer({
       // cleared and the catalogue read is re-scoped below, so the previous
       // session's state cannot bleed into the composer (T13).
       setModelsScope(undefined);
-      setAccountStatus(undefined);
       // The live turn bleeds the same way: the module-level runtime map kept
       // the previous turn's stream under the welcome hero on every 新建任务.
       lifecycle.clearStream();
@@ -691,10 +621,11 @@ export function WebuiComposer({
       const outcome = await interactionCoordinator.refresh();
       if (cancelled) return;
       if (!outcome.ok) setInteractionError(outcome.error);
-      if (listQueueMessages) {
-        const queue = await listQueueMessages({ id: sessionId });
-        if (cancelled) return;
-        setQueueItems({
+      const generation = claimQueueDestination(sessionId);
+      const queue = await commandWorkflows?.refreshQueue?.(sessionId);
+      if (cancelled) return;
+      if (queue) {
+        applyQueueRead(sessionId, generation, {
           items: queue.items ?? [],
           paused: queue.paused === true,
         });
@@ -752,12 +683,11 @@ export function WebuiComposer({
     };
   }, [
     agentName,
-    getActiveTurn,
     // These two come from the interactions slice now (the coordinator reads it);
     // the members are stable for the mount, so the registration does not churn.
     getPendingQuestionnaire,
     listPendingPermissions,
-    listQueueMessages,
+    commandWorkflows,
     sessionId,
   ]);
 
@@ -842,18 +772,29 @@ export function WebuiComposer({
   }, [composerMenu, pluginCatalogue, readSlashSkills]);
 
   useEffect(() => {
-    if (!mentionRange || !workspaceDir || !listWorkspaceFileTree) {
+    // The directory listing is `workspace`'s capability (plan 5.6): the composer
+    // asks its owner and reads the answer from the owner's state rather than
+    // holding the operation itself (4.2 field 8 asks for no transport member).
+    if (!mentionRange || !workspaceDir || !workspaceQueries?.canListFileTree) {
       setWorkspaceFiles([]);
       return undefined;
     }
-    let cancelled = false;
-    listWorkspaceFileTree({ workspaceDir })
-      .then((files) => { if (!cancelled) setWorkspaceFiles(flattenWorkspaceFiles(files).slice(0, 100)); })
-      .catch((error: unknown) => {
-        if (!cancelled) setInteractionError(error instanceof Error ? error.message : String(error));
-      });
-    return () => { cancelled = true; };
-  }, [mentionRange !== undefined, workspaceDir, listWorkspaceFileTree]);
+    workspaceQueries.loadFileTree(workspaceDir);
+    return undefined;
+  }, [mentionRange !== undefined, workspaceDir, workspaceQueries]);
+
+  useEffect(() => {
+    if (mentionRange === undefined) {
+      setWorkspaceFiles([]);
+      return;
+    }
+    if (workspaceFileTree.error) {
+      setInteractionError(workspaceFileTree.error);
+      return;
+    }
+    if (workspaceFileTree.workspaceDir !== workspaceDir) return;
+    setWorkspaceFiles(flattenWorkspaceFiles(workspaceFileTree.files).slice(0, 100));
+  }, [mentionRange !== undefined, workspaceDir, workspaceFileTree]);
 
   useLayoutEffect(() => {
     const caret = pendingMentionCaretRef.current;
@@ -912,15 +853,14 @@ export function WebuiComposer({
   }, [goalEnabled, sessionId]);
 
   useEffect(() => {
-    if (!modelsWorkflows && !getAccountStatus) return undefined;
+    if (!modelsWorkflows && !accountWorkflows?.loadAccount) return undefined;
     let cancelled = false;
     const refreshInspection = async () => {
-      const [, nextAccount] = await Promise.all([
+      await Promise.all([
         modelsWorkflows?.loadModels(sessionId),
-        getAccountStatus?.({ sessionId }),
+        accountWorkflows?.loadAccount(sessionId),
       ]);
       if (cancelled) return;
-      setAccountStatus(nextAccount);
       setModelsScope(sessionId);
     };
     void refreshInspection().catch((error: unknown) => {
@@ -936,7 +876,7 @@ export function WebuiComposer({
       cancelled = true;
       clearInterval(timer);
     };
-  }, [getAccountStatus, modelsWorkflows, sessionId]);
+  }, [accountWorkflows, modelsWorkflows, sessionId]);
 
   const handlePermission = async (
     permission: WebuiPendingPermission,
@@ -988,10 +928,13 @@ export function WebuiComposer({
   };
 
   const handleDeleteQueueItem = async (item: WebuiQueueItem) => {
-    if (!deleteQueueItem || !sessionId) return;
+    if (!commandWorkflows?.canRemoveQueued || !sessionId) return;
     setInteractionError(undefined);
     try {
-      await deleteQueueItem({ id: sessionId, itemId: item.itemId });
+      await commandWorkflows.removeQueued({ sessionId, itemId: item.itemId });
+      // The mirror belongs to whichever destination is live now: a removal
+      // answered for an earlier selection must not edit the current slot's queue.
+      if (readQueueDestination() !== sessionId) return;
       setQueueItems((current) => ({
         items: current.items.filter(
           (candidate) => candidate.itemId !== item.itemId,
@@ -1078,7 +1021,7 @@ export function WebuiComposer({
     ? rankWebuiSlashPalette(slashSectioned, commandQuery)
     : [];
   const mentionQuery = mentionRange?.query.toLocaleLowerCase() ?? "";
-  const mentionSuggestions: readonly ComposerMentionChoice[] = mentionRange
+  const mentionSuggestions: readonly WebuiComposerMentionChoice[] = mentionRange
     ? [
         ...installedPlugins
           .filter((plugin) => `${plugin.displayName} ${plugin.name}`.toLocaleLowerCase().includes(mentionQuery))
@@ -1147,30 +1090,8 @@ export function WebuiComposer({
     };
     return dom.listenForPointerDown(onPointerDown);
   }, [composerMenu, dom, permissionMenuOpen, mentionRange]);
-  // The workspace picker had NO outside-close listener at all: the only ways to
-  // close it were re-clicking its trigger, picking a row, or navigating away,
-  // so a stray click anywhere on the page left the panel hanging open. It gets
-  // its own effect rather than joining the listener above because it is a
-  // separate surface with a separate container — the trigger-and-panel wrap —
-  // and it renders below the form, outside the composer's own dismiss group.
-  useEffect(() => {
-    if (!workspaceMenuOpen && !workspaceBrowserOpen) return undefined;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!(event.target instanceof Node)) return;
-      if (
-        evaluateOutsideClose({
-          surface: "workspacePicker",
-          kind: "pointerdown",
-          insideContainer: workspacePickerRef.current?.contains(event.target) === true,
-        }) !== "close"
-      ) {
-        return;
-      }
-      setWorkspaceMenuOpen(false);
-      setWorkspaceBrowserOpen(false);
-    };
-    return dom.listenForPointerDown(onPointerDown);
-  }, [dom, workspaceMenuOpen, workspaceBrowserOpen, setWorkspaceMenuOpen]);
+  // The workspace picker's outside-close listener moved with the row itself
+  // (ComposerProjectRow), which owns that container and its two flags.
   // Flip the popover below the composer when there isn't enough room above
   // for the full 320px cap. The measurement runs in `useLayoutEffect` so the
   // first paint already shows the correct placement — a normal `useEffect`
@@ -1257,30 +1178,23 @@ export function WebuiComposer({
       setAttachmentBusy(false);
     }
   };
-  const seededToken = composerSnapshot.staging.seedToken;
+    const seededToken = composerSnapshot.staging.seedToken;
   useEffect(() => {
-    const seed = seedAttachment;
-    if (!seed || seededToken === seed.token) return;
+    const decision = readWebuiSeedApplication({
+      seed: seedAttachment,
+      consumedToken: seededToken,
+      attachments,
+    });
+    if (decision.kind === "none") return;
     // Mark it consumed before anything that can bail. A seed the composer
     // refuses has to stay refused; retrying on every attachment change would
     // pin the error in place.
-    composerStore.setStaging({ seedToken: seed.token });
-    const limitError = webuiAttachmentLimitError(attachments, [{ sizeBytes: seed.sizeBytes }]);
-    if (limitError) {
-      setInteractionError(limitError);
+    composerStore.setStaging({ seedToken: decision.token });
+    if (decision.kind === "refused") {
+      setInteractionError(decision.error);
       return;
     }
-    setAttachments((current) => [
-      ...current,
-      {
-        id: `seed-${seed.token}`,
-        fileName: seed.fileName,
-        mimeType: seed.mimeType,
-        sizeBytes: seed.sizeBytes,
-        dataUrl: webuiTextAttachmentDataUrl(seed.mimeType, seed.content),
-        kind: "file",
-      },
-    ]);
+    setAttachments((current) => [...current, decision.attachment]);
   }, [attachments, seedAttachment]);
   const attachmentWire = attachments.map((attachment) => ({
     meta: {
@@ -1306,7 +1220,7 @@ export function WebuiComposer({
     pendingMentionCaretRef.current = before.length + inserted.length;
     onDraftChange(`${before}${inserted}${draft.slice(caret)}`);
   };
-  const chooseMention = (choice: ComposerMentionChoice) => {
+  const chooseMention = (choice: WebuiComposerMentionChoice) => {
     setMentionRange(undefined);
     if (choice.kind === "plugin") {
       replaceMention(`@${choice.name}`);
@@ -1333,7 +1247,7 @@ export function WebuiComposer({
     replaceMention("");
     onSelectSession(choice.session.sessionId);
   };
-  const changePermissionMode = async (mode: WebuiComposerPermissionMode) => {
+  const changePermissionMode = async (mode: WebuiPermissionMode) => {
     if (!settingsWorkflows?.canWritePermissionMode) return;
     setPermissionBusy(true);
     setInteractionError(undefined);
@@ -1430,8 +1344,8 @@ export function WebuiComposer({
         : undefined;
   // Typing is always available: composing a message does not need a target yet.
   // The first send creates the target session silently, using the selected project.
-  const canCompose = Boolean(sendMessage);
-  const canQueue = Boolean(enqueueMessage && sessionId);
+  const canCompose = Boolean(turnCapabilities?.send);
+  const canQueue = Boolean(turnCapabilities?.enqueue && sessionId);
   // Turn phase remains part of session runtime state; the transcript owns all
   // visible messages for both the live and settled phases.
   // `isTurnLive` is the single source of truth for the three-value phase
@@ -1470,11 +1384,16 @@ export function WebuiComposer({
     };
   }, [sessionLayout]);
   const messageDraft = [draft.trim(), ...urlReferences.map((reference) => reference.url.trim()).filter(Boolean)].filter(Boolean).join("\n");
-  const sendable = (canCompose || canQueue) && (Boolean(messageDraft) || attachments.length > 0);
-  // The one gate for "a submit can start right now". The send button's
-  // `disabled` and the Enter shortcut both read this value, so the keyboard
-  // can never open a submit path the button itself would have refused.
-  const submitBlocked = !sendable || commandRunning || goalSubmitting;
+  // The button and Enter read one gate (T13 criterion 6); its rule and its
+  // matrix live in the projection.
+  const { submitBlocked } = readWebuiComposerSubmitGate({
+    canCompose,
+    canQueue,
+    draft: messageDraft,
+    attachmentCount: attachments.length,
+    commandRunning,
+    goalSubmitting,
+  });
   /**
    * The one way a turn reaches the wire. `submit` calls it after resolving an
    * intent; the retry affordance calls it with the input recorded at submit
@@ -1510,10 +1429,13 @@ export function WebuiComposer({
       onNeedsSession,
       onSessionCreated,
       onQueued: () => {
-        if (!sessionId || !listQueueMessages) return;
-        void listQueueMessages({ id: sessionId })
+        if (!sessionId || !commandWorkflows?.canRefreshQueue) return;
+        const generation = claimQueueDestination(sessionId);
+        void commandWorkflows
+          .refreshQueue(sessionId)
           .then((queue) => {
-            setQueueItems({
+            if (!queue) return;
+            applyQueueRead(sessionId, generation, {
               items: queue.items ?? [],
               paused: queue.paused === true,
             });
@@ -1607,14 +1529,16 @@ export function WebuiComposer({
             currentGoal: goal,
             createGoal: goalCoordinator.createGoal,
             patchGoal: goalCoordinator.patchGoal,
-            createSession,
+            createSession: sessionWorkflows?.createSession,
             createSessionWorkspaceDir,
             teamModeOff,
           },
           onSessionCreated,
         );
         applyGoal(nextGoal);
-        setGoalMode(nextGoal.status !== "complete");
+        // A finished goal ends goal mode; every other status keeps it (see
+        // composer-goal-outcome).
+        setGoalMode(readWebuiComposerGoalModeAfterSubmit(nextGoal));
         onDraftChange("");
         editingGoalDraftRef.current = false;
       } catch (error) {
@@ -1633,11 +1557,11 @@ export function WebuiComposer({
       // here — the resolver is the source of truth for *which* path, the
       // component is still the source of truth for *whether the host wired
       // the capability* (a disabled host must not reach the run-path).
-      if (!runCommand) return;
+      if (!commandWorkflows?.canRunCommand) return;
       setCommandRunning(true);
       setInteractionError(undefined);
       try {
-        const result = await runCommand({
+        const result = await commandWorkflows.runCommand({
           command: matchedCommand.name,
           ...(input ? { input } : {}),
           ...(sessionId ? { sessionId } : {}),
@@ -1947,94 +1871,37 @@ export function WebuiComposer({
                   className="webui-textarea webui-composer-input text-text_default_primary"
                   data-webui-composer-input="true"
                 />
-                {mentionRange && mentionSuggestions.length > 0 ? (
-                  <div className="webui-composer-mention-menu" role="listbox" aria-label="提及列表" data-webui-mention-menu="true">
-                    {mentionSuggestions.map((choice, index) => (
-                      <Fragment key={`${choice.section}:${choice.kind}:${choice.kind === "agent" ? choice.session.sessionId : choice.kind === "file" ? choice.path : choice.kind === "plugin" ? choice.name : choice.label}`}>
-                        {(index === 0 || mentionSuggestions[index - 1]?.section !== choice.section) ? <div className="webui-composer-mention-section" role="presentation">{choice.section}</div> : null}
-                        <button type="button" role="option" aria-selected={index === mentionIndex} className="webui-composer-mention-option" onMouseDown={(event) => event.preventDefault()} onMouseEnter={() => setMentionIndex(index)} onClick={() => chooseMention(choice)}>
-                          <span>{choice.label}</span>
-                          {choice.kind === "plugin" && choice.detail ? <small>{choice.detail}</small> : null}
-                        </button>
-                      </Fragment>
-                    ))}
-                  </div>
-                ) : null}
-                {attachments.length > 0 ? (
-                  <div className="webui-composer-attachments" data-webui-composer-attachments="true">
-                    {attachments.map((attachment) => <div key={attachment.id} className={`webui-composer-attachment${attachment.kind === "image" ? " is-image" : ""}`}>
-                      {attachment.kind === "image" ? <img src={attachment.dataUrl} alt={attachment.fileName} /> : <span className="webui-composer-attachment-type">{attachment.fileName.split(".").pop()?.toUpperCase() ?? "FILE"}</span>}
-                      <span className="webui-composer-attachment-name" title={attachment.fileName}>{attachment.fileName}</span>
-                      <button type="button" aria-label={`移除 ${attachment.fileName}`} onClick={() => setAttachments((current) => current.filter((item) => item.id !== attachment.id))}>×</button>
-                    </div>)}
-                    {urlReferences.map((reference) => <div key={reference.id} className="webui-composer-url-reference">
-                      <span aria-hidden="true">↗</span>
-                      <input aria-label="URL 引用" value={reference.url} onChange={(event) => setUrlReferences((current) => current.map((item) => item.id === reference.id ? { ...item, url: event.target.value } : item))} />
-                      <button type="button" aria-label="移除 URL 引用" onClick={() => setUrlReferences((current) => current.filter((item) => item.id !== reference.id))}>×</button>
-                    </div>)}
-                    {attachmentBusy ? <span className="webui-composer-attachment-loading" role="status">正在读取文件…</span> : null}
-                  </div>
-                ) : urlReferences.length > 0 ? <div className="webui-composer-attachments" data-webui-composer-attachments="true">{urlReferences.map((reference) => <div key={reference.id} className="webui-composer-url-reference"><span aria-hidden="true">↗</span><input aria-label="URL 引用" value={reference.url} onChange={(event) => setUrlReferences((current) => current.map((item) => item.id === reference.id ? { ...item, url: event.target.value } : item))} /><button type="button" aria-label="移除 URL 引用" onClick={() => setUrlReferences((current) => current.filter((item) => item.id !== reference.id))}>×</button></div>)}</div> : null}
-                {commandSuggestions.length > 0 ? (
-                  <div
-                    role="listbox"
-                    aria-label="命令"
-                    data-webui-command-menu="true"
-                    data-webui-command-menu-placement={slashPanelBelow ? "below" : "above"}
-                    className="webui-command-menu"
-                  >
-                    {commandSuggestions.map((command, index) => {
-                      const Icon = command.icon;
-                      const inert = !command.supported;
-                      const isFirstSkill =
-                        command.paletteSection === "skills" &&
-                        (index === 0 ||
-                          commandSuggestions[index - 1]?.paletteSection !==
-                            "skills");
-                      return (
-                        <Fragment key={command.name}>
-                          {isFirstSkill ? (
-                            <div
-                              role="separator"
-                              data-webui-command-section="skills"
-                              className="webui-command-section-header"
-                            >
-                              技能
-                            </div>
-                          ) : null}
-                          <button
-                            type="button"
-                            role="option"
-                            aria-selected={index === commandIndex}
-                            aria-disabled={inert || undefined}
-                            disabled={inert}
-                            data-webui-command-option-inert={
-                              inert ? "true" : undefined
-                            }
-                            className="webui-command-option"
-                            onMouseDown={(event) => event.preventDefault()}
-                            onMouseEnter={() => {
-                              if (inert) return;
-                              setCommandIndex(index);
-                            }}
-                            onClick={() => {
-                              if (inert) return;
-                              chooseCommand(command.name);
-                            }}
-                          >
-                            <Icon className="webui-command-option-icon text-icon_default_secondary" />
-                            <span className="webui-command-option-label">
-                              {command.label}
-                            </span>
-                            <span className="webui-command-option-description text-text_default_tertiary">
-                              {command.description}
-                            </span>
-                          </button>
-                        </Fragment>
-                      );
-                    })}
-                  </div>
-                ) : null}
+                <WebuiComposerEditorStaging
+                  attachments={attachments}
+                  urlReferences={urlReferences}
+                  attachmentBusy={attachmentBusy}
+                  onRemoveAttachment={(id) =>
+                    setAttachments((current) => current.filter((item) => item.id !== id))
+                  }
+                  onChangeReference={(id, url) =>
+                    setUrlReferences((current) =>
+                      current.map((item) => (item.id === id ? { ...item, url } : item)),
+                    )
+                  }
+                  onRemoveReference={(id) =>
+                    setUrlReferences((current) => current.filter((item) => item.id !== id))
+                  }
+                  mention={
+                    mentionRange && mentionSuggestions.length > 0
+                      ? {
+                          choices: mentionSuggestions,
+                          index: mentionIndex,
+                          onIndexChange: setMentionIndex,
+                          onChoose: chooseMention,
+                        }
+                      : undefined
+                  }
+                  commands={commandSuggestions}
+                  commandIndex={commandIndex}
+                  onCommandIndexChange={setCommandIndex}
+                  onChooseCommand={chooseCommand}
+                  commandPanelBelow={slashPanelBelow}
+                />
               </div>
               <div
                 className="flex w-full items-center gap-3 px-3 pt-1"
@@ -2056,147 +1923,46 @@ export function WebuiComposer({
                 >
                   <WebuiIconAttach />
                 </button>
-        {/* The panel lives inside the trigger's wrap rather than at the end of
-         * the section. Anchoring it to the `+` button means it always clears
-         * that button — the old `bottom: 56px` was measured from the composer
-         * region, so the panel grew over the `+` and the permission pill as
-         * soon as the workspace bar changed the region's height. The wrap is
-         * also the surface's container for outside-close, which is why a click
-         * inside the composer could not dismiss it. */}
-        {composerMenu ? (
-          <div
-            className="webui-composer-menu-stack"
-            data-webui-composer-menu-stack="true"
-            data-webui-open-submenu={composerMenu === "root" ? undefined : composerMenu}
-            onMouseLeave={() => { if (composerMenu !== "root") setComposerMenu("root"); }}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") {
-                event.preventDefault();
-                setComposerMenu(undefined);
-              } else if (event.key === "ArrowRight" && event.target instanceof Element && event.target.closest<HTMLElement>("[data-webui-composer-submenu-trigger]")) {
-                event.preventDefault();
-                const submenu = event.target.closest<HTMLElement>("[data-webui-composer-submenu-trigger]")?.dataset.webuiComposerSubmenuTrigger;
-                const stack = event.currentTarget;
-                if (submenu) window.requestAnimationFrame(() => stack.querySelector<HTMLElement>(`[data-webui-composer-submenu="${submenu}"] [role="menuitem"]`)?.focus());
-              } else if (event.key === "ArrowLeft" && event.target instanceof Element && event.target.closest("[data-webui-composer-submenu]")) {
-                event.preventDefault();
-                const submenu = event.target.closest<HTMLElement>("[data-webui-composer-submenu]")?.dataset.webuiComposerSubmenu;
-                setComposerMenu("root");
-                if (submenu) event.currentTarget.querySelector<HTMLElement>(`[data-webui-composer-submenu-trigger="${submenu}"]`)?.focus();
-              }
-            }}
-          >
-            <div className="webui-composer-menu" role="menu" aria-label="添加附件或技能" data-webui-composer-menu="root">
-              <button type="button" role="menuitem" onMouseEnter={() => { if (composerMenu !== "root") setComposerMenu("root"); }} onFocus={() => { if (composerMenu !== "root") setComposerMenu("root"); }} onClick={() => { setComposerMenu(undefined); fileInputRef.current?.click(); }}><WebuiIconAttach className="webui-composer-menu-icon" />添加文件或图片</button>
-              <button type="button" role="menuitem" aria-haspopup="menu" aria-expanded={composerMenu === "skills"} data-webui-composer-submenu-trigger="skills" onMouseEnter={() => setComposerMenu("skills")} onFocus={() => setComposerMenu("skills")} onClick={() => setComposerMenu("skills")}><WebuiIconSkillGeneric className="webui-composer-menu-icon" />技能 <span aria-hidden="true">›</span></button>
-              <button type="button" role="menuitem" aria-haspopup="menu" aria-expanded={composerMenu === "plugins"} data-webui-composer-submenu-trigger="plugins" onMouseEnter={() => setComposerMenu("plugins")} onFocus={() => setComposerMenu("plugins")} onClick={() => setComposerMenu("plugins")}><WebuiIconPlugins className="webui-composer-menu-icon" />插件 <span aria-hidden="true">›</span></button>
-              <div role="separator" />
-              <button type="button" role="menuitem" onMouseEnter={() => { if (composerMenu !== "root") setComposerMenu("root"); }} onFocus={() => { if (composerMenu !== "root") setComposerMenu("root"); }} onClick={() => { setComposerMenu(undefined); activateGoalMode(); }}><WebuiIconCommandGoal className="webui-composer-menu-icon" />目标</button>
-              <button type="button" role="menuitem" onMouseEnter={() => { if (composerMenu !== "root") setComposerMenu("root"); }} onFocus={() => { if (composerMenu !== "root") setComposerMenu("root"); }} onClick={() => { setComposerMenu(undefined); chooseCommand("plan"); }}><WebuiIconCommandPlan className="webui-composer-menu-icon" />计划</button>
-            </div>
-            {composerMenu === "skills" ? (
-              <div className="webui-composer-menu" role="menu" aria-label="技能" data-webui-composer-menu="skills" data-webui-composer-submenu="skills">
-                {skillsMenuLoading ? <div className="webui-composer-menu-empty">正在加载技能…</div> : skillsMenuError ? <div className="webui-composer-menu-empty" role="alert">{skillsMenuError}</div> : slashSkills.length ? slashSkills.map((skill) => <button key={skill.name} type="button" role="menuitem" onClick={() => { setComposerMenu(undefined); insertAtCaret(`/${skill.name}`); textareaRef.current?.focus(); }}>{skill.displayName ?? skill.name}</button>) : <div className="webui-composer-menu-empty">没有已安装的技能</div>}
-                <div role="separator" />
-                <button type="button" role="menuitem" onClick={() => { setComposerMenu(undefined); onOpenPluginManagement?.("skills"); }}>管理技能</button>
-                <button type="button" role="menuitem" onClick={() => { setComposerMenu(undefined); onOpenPluginManagement?.("skills"); }}>添加技能</button>
-              </div>
-            ) : composerMenu === "plugins" ? (
-              <div className="webui-composer-menu" role="menu" aria-label="插件" data-webui-composer-menu="plugins" data-webui-composer-submenu="plugins">
-                {pluginsLoading ? <div className="webui-composer-menu-empty">正在加载插件…</div> : pluginsError ? <div className="webui-composer-menu-empty" role="alert">{pluginsError}</div> : installedPlugins.length ? installedPlugins.map((plugin) => <button key={plugin.name} type="button" role="menuitem" title={plugin.description} onClick={() => { setComposerMenu(undefined); insertAtCaret(`@${plugin.name}`); textareaRef.current?.focus(); }}>{plugin.displayName}</button>) : <div className="webui-composer-menu-empty">{pluginCatalogue?.available ? "没有已安装的插件" : "插件目录暂不可用"}</div>}
-                <div role="separator" />
-                <button type="button" role="menuitem" onClick={() => { setComposerMenu(undefined); onOpenPluginManagement?.("plugins"); }}>添加插件</button>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
+        <WebuiComposerMenus
+          menu={composerMenu}
+          onMenuChange={setComposerMenu}
+          skills={slashSkills}
+          skillsLoading={skillsMenuLoading}
+          skillsError={skillsMenuError}
+          plugins={installedPlugins}
+          pluginsLoading={pluginsLoading}
+          pluginsError={pluginsError}
+          pluginsAvailable={pluginCatalogue?.available === true}
+          onOpenPluginManagement={onOpenPluginManagement}
+          onAttach={() => fileInputRef.current?.click()}
+          onGoal={activateGoalMode}
+          onPlan={() => chooseCommand("plan")}
+          onInsertSkill={(name) => { insertAtCaret(`/${name}`); textareaRef.current?.focus(); }}
+          onInsertPlugin={(name) => { insertAtCaret(`@${name}`); textareaRef.current?.focus(); }}
+        />
                 </div>
-                <div className="webui-composer-permission-wrap" ref={permissionWrapRef}>
-                  <button
-                    type="button"
-                    className={`webui-composer-permission-button${permissionMode === "bypassPermissions" ? " webui-composer-permission-button--warning" : ""}`}
-                    aria-label={permissionMode ? `授权模式：${PERMISSION_MODE_OPTION[permissionMode].label}` : "授权模式"}
-                    aria-haspopup="menu"
-                    aria-expanded={permissionMenuOpen}
-                    disabled={permissionUnavailable || permissionBusy || !permissionMode}
-                    title={permissionUnavailable ? "授权模式当前不可用" : undefined}
-                    data-testid="composer-permission-mode"
-                    onClick={() => {
-                      setComposerMenu(undefined);
-                      setMentionRange(undefined);
-                      setPermissionMenuOpen((open) => !open);
-                    }}
-                  >
-                    {permissionMode ? <PermissionModeIcon mode={permissionMode} /> : <WebuiIconPermissionRequest className="webui-composer-permission-icon" />}
-                    <span>{permissionMode ? PERMISSION_MODE_OPTION[permissionMode].label : permissionUnavailable ? "授权不可用" : "读取授权模式…"}</span>
-                    <WebuiIconChevronDown className="webui-composer-permission-chevron" />
-                  </button>
-                  {permissionMenuOpen ? <div className="webui-composer-permission-menu" role="menu" aria-label={PERMISSION_MODE_QUESTION} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); setPermissionMenuOpen(false); } }}>
-                    <div className="webui-composer-permission-header">
-                      <span className="webui-composer-permission-question">{PERMISSION_MODE_QUESTION}</span>
-                      <a
-                        className="webui-composer-permission-learn-more"
-                        href={PERMISSION_MODE_DOCS_URL}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onPointerDown={(event) => event.stopPropagation()}
-                      >
-                        {PERMISSION_MODE_LEARN_MORE}
-                      </a>
-                    </div>
-                    {PERMISSION_MODE_ORDER.map((mode) => {
-                      const option = PERMISSION_MODE_OPTION[mode];
-                      const { Icon } = option;
-                      const active = permissionMode === mode;
-                      return (
-                        <button
-                          key={mode}
-                          type="button"
-                          role="menuitemradio"
-                          aria-checked={active}
-                          className="webui-composer-permission-option"
-                          disabled={permissionBusy}
-                          onClick={() => void changePermissionMode(mode)}
-                        >
-                          <Icon className="webui-composer-permission-icon" />
-                          <span className="webui-composer-permission-copy">
-                            <span className="webui-composer-permission-label">{option.label}</span>
-                            <span className="webui-composer-permission-description">{option.description}</span>
-                          </span>
-                          {active ? <WebuiIconCheck className="webui-composer-permission-check" /> : null}
-                        </button>
-                      );
-                    })}
-                  </div> : null}
-                </div>
-                {goalEnabled && goalCoordinator.createGoal && goalMode ? (
-                  <button
-                    type="button"
-                    className={`webui-goal-mode-button${goalMode ? " is-active" : ""}`}
-                    aria-pressed={goalMode}
-                    aria-label="取消目标模式"
-                    data-testid="composer-goal-mode"
-                    disabled={goalSubmitting || Boolean(questionnaire || permissions.length > 0)}
-                    onClick={cancelGoalMode}
-                  >
-                    <WebuiIconCommandGoal />
-                    <span>目标</span>
-                  </button>
-                ) : null}
-                {planMode ? (
-                  <button
-                    type="button"
-                    className="webui-goal-mode-button is-active"
-                    aria-pressed="true"
-                    aria-label="退出计划模式"
-                    data-testid="composer-plan-mode"
-                    disabled={Boolean(questionnaire || permissions.length > 0)}
-                    onClick={cancelPlanMode}
-                  >
-                    <WebuiIconCommandPlan />
-                    <span>计划</span>
-                  </button>
-                ) : null}
+                <WebuiComposerPermissionControl
+                  mode={permissionMode}
+                  busy={permissionBusy}
+                  unavailable={permissionUnavailable}
+                  menuOpen={permissionMenuOpen}
+                  wrapRef={permissionWrapRef}
+                  onToggleRequest={() => {
+                    setComposerMenu(undefined);
+                    setMentionRange(undefined);
+                    setPermissionMenuOpen((open) => !open);
+                  }}
+                  onClose={() => setPermissionMenuOpen(false)}
+                  onChangeMode={(mode) => void changePermissionMode(mode)}
+                />
+                <WebuiComposerModePills
+                  goalActive={goalEnabled && goalCoordinator.createGoal !== undefined && goalMode}
+                  goalSubmitting={goalSubmitting}
+                  planActive={planMode}
+                  interactionBlocked={Boolean(questionnaire || permissions.length > 0)}
+                  onCancelGoal={cancelGoalMode}
+                  onCancelPlan={cancelPlanMode}
+                />
                 {/* 3.2px, written as an arbitrary value on purpose. The
                  * spacing scale is a fixed enumeration, so `gap-0.8` is not a
                  * class that exists and would silently render a ZERO gap
@@ -2247,150 +2013,23 @@ export function WebuiComposer({
                       void handleSelectModel(model, thinkingDraftPatch(model, option));
                     }}
                   />
-                  {sending ? (
-                    <button
-                      type="button"
-                      aria-label="停止"
-                      data-webui-composer-stop="true"
-                      className="webui-send-button webui-send-button--stop"
-                      onClick={() => void handleStop()}
-                    >
-                      <span className="webui-send-stop-square" aria-hidden="true" />
-                    </button>
-                  ) : (
-                    <button
-                      type="submit"
-                      disabled={submitBlocked}
-                      aria-label="发送"
-                      data-webui-composer-submit="true"
-                      className="webui-send-button"
-                    >
-                      <WebuiIconSend />
-                    </button>
-                  )}
+                  <WebuiComposerSubmitButton
+                    sending={sending}
+                    submitBlocked={submitBlocked}
+                    onStop={() => void handleStop()}
+                  />
                 </div>
               </div>
             </div>
 
-        {/* The project row lives INSIDE the scrim container rather than beside
-         * it. `.message-input-home-container` is the light surface that already
-         * wraps the card, so sharing that box is what makes the card and the
-         * band one continuous surface. As siblings they left a seam — the
-         * card's rounded corners, the container's `pb-2` and a second, slightly
-         * different grey all met along one line and read as two stacked boxes. */}
         {!sessionLayout ? (
-          <div
-            className="webui-workspace-bar"
-            data-webui-workspace-toolbar="true"
-          >
-          <div className="relative" ref={workspacePickerRef}>
-            <button
-              type="button"
-              aria-haspopup="listbox"
-              aria-expanded={workspaceMenuOpen}
-              data-webui-workspace-picker="true"
-              className="webui-workspace-bar-trigger"
-              onClick={() => setWorkspaceMenuOpen(!workspaceMenuOpen)}
-            >
-            <span className="flex size-5 shrink-0 items-center justify-center">
-              <WebuiIconFolder />
-            </span>
-            <span className="min-w-0 flex-1 truncate whitespace-nowrap leading-5">
-              {createSessionWorkspaceDir
-                ? workspaceProjectName(createSessionWorkspaceDir)
-                : "选择文件夹"}
-            </span>
-            </button>
-            {workspaceBrowserOpen ? (
-              <div
-                role="dialog"
-                aria-label="选择项目目录"
-                data-webui-workspace-browser-dialog="true"
-                className="webui-workspace-menu webui-workspace-menu--desktop"
-              >
-                <WebuiWorkspaceDirectoryBrowser
-                  browseWorkspaceDirs={browseWorkspaceDirs}
-                  initialDir={createSessionWorkspaceDir}
-                  onSelect={(dir) => {
-                    setWorkspaceBrowserOpen(false);
-                    onWorkspaceChange(dir);
-                  }}
-                  onCancel={() => setWorkspaceBrowserOpen(false)}
-                />
-              </div>
-            ) : workspaceMenuOpen ? (
-              <div
-                role="listbox"
-                aria-label="工作目录"
-                data-webui-workspace-menu="true"
-                className="webui-workspace-menu webui-workspace-menu--desktop"
-              >
-                {/* Desktop shape: a `最近` group of workspaces the user has
-                 * actually been in, a rule, then the two commands. The group
-                 * is omitted entirely when there is no history — an empty
-                 * `最近` header above a divider reads as a broken panel. */}
-                {recentWorkspaceDirs.length > 0 ? (
-                  <>
-                    <div className="webui-workspace-menu-header" aria-hidden="true">
-                      最近
-                    </div>
-                    {recentWorkspaceDirs.map((dir) => {
-                      const active = dir === createSessionWorkspaceDir;
-                      return (
-                        <button
-                          key={dir}
-                          type="button"
-                          role="option"
-                          aria-selected={active}
-                          data-webui-workspace-recent={dir}
-                          className="webui-workspace-option webui-workspace-option--desktop"
-                          title={dir}
-                          onClick={() => onWorkspaceChange(dir)}
-                        >
-                          <WebuiIconFolder className="flex-shrink-0" />
-                          <span className="min-w-0 flex-1 truncate text-left">
-                            {workspaceProjectName(dir)}
-                          </span>
-                          {active ? <WebuiIconCheck className="webui-workspace-option-check" /> : null}
-                        </button>
-                      );
-                    })}
-                    <div className="webui-workspace-menu-separator" role="separator" />
-                  </>
-                ) : null}
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={false}
-                  data-webui-workspace-action="add-new"
-                  className="webui-workspace-option webui-workspace-option--desktop"
-                  onClick={() => {
-                    setWorkspaceMenuOpen(false);
-                    setWorkspaceBrowserOpen(true);
-                  }}
-                >
-                  <WebuiIconFolder className="flex-shrink-0" />
-                  <span className="min-w-0 flex-1 truncate text-left">
-                    选择新项目
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={createSessionWorkspaceDir === undefined}
-                  data-webui-workspace-action="no-project"
-                  className="webui-workspace-option webui-workspace-option--desktop"
-                  onClick={() => onWorkspaceChange(undefined)}
-                >
-                  <WebuiIconFolder className="flex-shrink-0" />
-                  <span className="min-w-0 flex-1 truncate text-left">
-                    不需要项目
-                  </span>
-                </button>
-              </div>
-            ) : null}
-            </div>
-          </div>
+          <WebuiComposerProjectRow
+            projectDir={createSessionWorkspaceDir}
+            recentDirs={recentWorkspaceDirs}
+            menuOpen={workspaceMenuOpen}
+            onMenuOpenChange={setWorkspaceMenuOpen}
+            onSelectProject={onWorkspaceChange}
+          />
         ) : null}
           </div>
         </form>

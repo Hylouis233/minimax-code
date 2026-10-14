@@ -6,7 +6,6 @@
 
 
 import { WebuiIconFolder } from "../../../components/shell/icons.js";
-import type { WebuiTransport } from "../../../contracts/transport.js";
 import type { WebuiWorkspaceDirectoryListing } from "../../../../shared/contracts/workspace.js";
 import { looksLikeAbsoluteWorkspacePath } from "../../../projection/common/paths.js";
 import { useCallback, useEffect, useState, type ReactElement } from "react";
@@ -16,12 +15,10 @@ import {
 } from "../../../bindings/use-query-state.js";
 
 export function WebuiWorkspaceDirectoryBrowser({
-  browseWorkspaceDirs,
   initialDir,
   onSelect,
   onCancel,
 }: {
-  readonly browseWorkspaceDirs?: WebuiTransport["browseWorkspaceDirs"];
   readonly initialDir?: string;
   readonly onSelect: (dir: string) => void;
   readonly onCancel: () => void;
@@ -66,7 +63,7 @@ export function WebuiWorkspaceDirectoryBrowser({
     onSelect(value);
   }, [manualPath, onSelect]);
 
-  if (!browseWorkspaceDirs)
+  if (!queries?.canBrowseWorkspaceDirs)
     return (
       <div className="flex flex-col gap-2" data-webui-workspace-manual="true">
         <label className="webui-commit-dialog-label">

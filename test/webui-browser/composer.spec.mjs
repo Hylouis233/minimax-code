@@ -21,6 +21,7 @@ import {
   configureFixture,
   emitStream,
   openApp,
+  requestCount,
   startTurn,
   switchSession,
   test,
@@ -205,4 +206,49 @@ test("@ opens the mention menu and the local-file picker entry drives the OS cho
   const chips = page.locator('[data-webui-composer-attachments="true"]');
   await expect(chips.getByText("via-mention.md")).toBeVisible();
   await expect(menu).toHaveCount(0);
+});
+
+// The one rule criterion 6 names as the "current button/Enter shared gate",
+// observed on the built client rather than inside a unit: with nothing to
+// submit the button is disabled AND Enter starts nothing, and a draft opens both
+// paths at once. The gate itself is pinned by the unit test; this is the
+// browser-side check that the two consumers really read the same value.
+test("the send button and Enter share one gate: empty refuses, a draft submits", async ({ page }) => {
+  await openApp(page, "#session=A");
+
+  const input = composer(page);
+  const submit = page.getByRole("button", { name: "发送" });
+
+  await expect(submit).toBeDisabled();
+  await input.click();
+  await input.press("Enter");
+  await expect.poll(() => requestCount(page, "sendMessage")).toBe(0);
+
+  await input.pressSequentially("共享闸门");
+  await expect(submit).toBeEnabled();
+  await input.press("Enter");
+  await expect.poll(() => requestCount(page, "sendMessage")).toBe(1);
+  await expect(input).toHaveValue("");
+});
+
+// Criterion 7's input-to-owner-to-transport path, asserted on the request the
+// fixture actually received: the text typed into the composer is what reaches
+// the wire, and the editor is clear afterwards.
+test("a submission carries the typed text to the transport", async ({ page }) => {
+  await openApp(page, "#session=A");
+
+  const input = composer(page);
+  await input.click();
+  await input.pressSequentially("input-to-owner-to-transport");
+  await input.press("Enter");
+
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const request = window.__fixture.requests.find((entry) => entry.operation === "sendMessage");
+        return JSON.stringify(request?.body ?? {}).includes("input-to-owner-to-transport");
+      }),
+    )
+    .toBe(true);
+  await expect(input).toHaveValue("");
 });

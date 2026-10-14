@@ -185,6 +185,32 @@ export interface WebuiComposerStore {
       | Partial<WebuiComposerQueueState>
       | ((current: WebuiComposerQueueState) => Partial<WebuiComposerQueueState>),
   ) => void;
+  /**
+   * Which session the live queue mirror belongs to; `undefined` before any
+   * session has claimed it. Read it to decide whether a deletion's mirror update
+   * still targets the selection that issued it.
+   */
+  readonly readQueueDestination: () => string | undefined;
+  /**
+   * Claim the mirror for one destination and return the generation to check back
+   * with. Every claim — including a reselection of the same key — issues a new
+   * generation, so a read answered for an earlier selection cannot commit to the
+   * current one (plan §5.6, queue-mirror row: fence destination identity and
+   * generation).
+   */
+  readonly claimQueueDestination: (key: string) => number;
+  /**
+   * Apply one read's answer to the mirror, but only while its claim is still the
+   * live one. Returns whether it committed, so the caller can tell a dropped
+   * stale answer from an applied one. A destination is claimed, never cleared:
+   * leaving for home does not wipe the mirror, matching the row's "does not
+   * unconditionally clear on home".
+   */
+  readonly applyQueueRead: (
+    key: string,
+    generation: number,
+    next: WebuiComposerQueueState,
+  ) => boolean;
 }
 
 export function createWebuiComposerStore(options?: {
@@ -199,6 +225,11 @@ export function createWebuiComposerStore(options?: {
   let modes = WEBUI_COMPOSER_EMPTY_MODES;
   let retry: WebuiRecordedTurn | undefined;
   let mentionRange: WebuiMentionRange | undefined;
+  // The queue mirror's destination and its generation. Neither rides the
+  // snapshot: they are read imperatively around an in-flight request, and
+  // publishing them would re-render every subscriber for a fence.
+  let queueDestination: string | undefined;
+  let queueGeneration = 0;
   // One stable object per change: a fresh snapshot on *every* `getSnapshot()` call
   // would make `useSyncExternalStore` re-render forever.
   let snapshot: WebuiComposerSnapshot = {
@@ -346,6 +377,22 @@ export function createWebuiComposerStore(options?: {
         // the prune.
         return { ...current, drafts, history };
       });
+    },
+    readQueueDestination: () => queueDestination,
+    claimQueueDestination: (key) => {
+      queueDestination = key;
+      queueGeneration += 1;
+      return queueGeneration;
+    },
+    applyQueueRead: (key, generation, next) => {
+      if (queueDestination !== key || queueGeneration !== generation) return false;
+      const items = next.items;
+      const paused = next.paused === true;
+      if (items === queue.items && paused === queue.paused) return true;
+      queue = { items, paused };
+      snapshot = { ...state, queue, staging, modes, retry, mentionRange };
+      notify();
+      return true;
     },
   };
 }
