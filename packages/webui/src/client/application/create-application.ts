@@ -41,13 +41,13 @@ import {
 import {
   createWebuiGoalSessionOwners,
   type WebuiGoalSessionOwners,
-} from "./goal/goal-session-owners.js";
-import type { WebuiGoalPortSlice } from "./goal/goal-coordinator.js";
+} from "../features/goal/application/goal-session-owners.js";
+import type { WebuiGoalPortSlice } from "../features/goal/application/goal-coordinator.js";
 import {
   createWebuiInteractionSessionOwners,
   type WebuiInteractionSessionOwners,
-} from "./interactions/interaction-session-owners.js";
-import type { WebuiInteractionPortSlice } from "./interactions/interaction-coordinator.js";
+} from "../features/interactions/application/interaction-session-owners.js";
+import type { WebuiInteractionPortSlice } from "../features/interactions/application/interaction-coordinator.js";
 import {
   selectWebuiCatalogFlatPage,
   selectWebuiCatalogTreePage,

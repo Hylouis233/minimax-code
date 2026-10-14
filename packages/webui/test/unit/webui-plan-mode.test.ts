@@ -2,7 +2,7 @@
 //
 // Two shapes, applied to the same feature (see the skill's testing rule):
 //
-//   1. The parsing and payload rules live in `projection/interactions/plan-mode.ts` as pure
+//   1. The parsing and payload rules live in `features/interactions/projection/plan-mode.ts` as pure
 //      functions, so the title/summary extraction and the three answer payloads
 //      are asserted directly, including the fence handling that a rendered card
 //      cannot distinguish.
@@ -17,7 +17,7 @@
 import { describe, it, expect } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { webuiAnswersEndTurn } from "../../src/client/projection/interactions/questionnaire-state.js";
+import { webuiAnswersEndTurn } from "../../src/client/features/interactions/projection/questionnaire-state.js";
 import {
   buildWebuiPlanApproveAnswers,
   buildWebuiPlanEnterAnswers,
@@ -32,14 +32,14 @@ import {
   webuiPlanSummary,
   webuiPlanTitle,
   WEBUI_PLAN_REVIEW_STEP_ID,
-} from "../../src/client/projection/interactions/plan-mode.js";
+} from "../../src/client/features/interactions/projection/plan-mode.js";
 import {
   WebuiPlanDeliveryCard,
   WebuiPlanEnterConfirmation,
   WebuiPlanReviewDecision,
   WebuiPlanSurface,
-} from "../../src/client/components/interactions/PlanModeCards.js";
-import { WebuiInteractionPanel } from "../../src/client/components/interactions/InteractionPanel.js";
+} from "../../src/client/features/interactions/ui/PlanModeCards.js";
+import { WebuiInteractionPanel } from "../../src/client/features/interactions/ui/InteractionPanel.js";
 import type {
   WebuiQuestionnaireRequest,
   WebuiQuestionnaireStep,

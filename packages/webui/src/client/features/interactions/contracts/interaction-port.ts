@@ -6,7 +6,7 @@
 //
 // Every method stays optional — `undefined` means "the operation is not wired".
 
-import type { WebuiInteractionReplyResult, WebuiPendingPermission, WebuiQuestionnaireAnswer, WebuiQuestionnaireRequest } from "../../../shared/contracts/interactions.js";
+import type { WebuiInteractionReplyResult, WebuiPendingPermission, WebuiQuestionnaireAnswer, WebuiQuestionnaireRequest } from "../../../../shared/contracts/interactions.js";
 
 export interface InteractionPort {
   readonly listPendingPermissions?: () => Promise<{

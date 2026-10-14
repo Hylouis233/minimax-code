@@ -38,7 +38,7 @@ import type {
 import { projectWebuiMessageToStreamMessage, readUsageNumber } from "../../features/transcript/projection/message-projection.js";
 import {
   createWebuiInteractionCoordinator,
-} from "../../application/interactions/interaction-coordinator.js";
+} from "../../features/interactions/application/interaction-coordinator.js";
 import { latestContextUsage, readContextUsageSnapshot } from "../../projection/composer/context-usage.js";
 import {
   contextUsagePopoverStyle,
@@ -72,11 +72,11 @@ import { useWebuiPortSlice } from "../../bindings/port-slices-context.js";
 import {
   useWebuiGoalOwner,
   useWebuiGoalReaction,
-} from "../../bindings/goal-owner.js";
+} from "../../features/goal/bindings/goal-owner.js";
 import {
   useWebuiInteractionAgentNameReader,
   useWebuiInteractionOwner,
-} from "../../bindings/interaction-owner.js";
+} from "../../features/interactions/bindings/interaction-owner.js";
 import { useWebuiComposerStore } from "../../bindings/composer-store.js";
 import { webuiSessionStatusType } from "../../projection/turn/stream-state.js";
 
@@ -118,8 +118,8 @@ import type {
 } from "../../../shared/contracts/workspace.js";
 import type { WebuiUsageQuotaResult } from "../../../shared/contracts/usage-quota.js";
 import { formatUsageResetLabel } from "../../features/account/projection/usage.js";
-import { WebuiGoalBanner } from "../goal/GoalBanner.js";
-import { WebuiInteractionPanel } from "../interactions/InteractionPanel.js";
+import { WebuiGoalBanner } from "../../features/goal/ui/GoalBanner.js";
+import { WebuiInteractionPanel } from "../../features/interactions/ui/InteractionPanel.js";
 import { WebuiQueuePanel } from "./QueuePanel.js";
 import {
   WebuiModelPicker,

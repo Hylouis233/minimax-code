@@ -7,7 +7,7 @@
 //
 // Every method stays optional — `undefined` means "the operation is not wired".
 
-import type { WebuiGoal, WebuiGoalCreateRequest, WebuiGoalEnabledResult, WebuiGoalPatchRequest, WebuiGoalSessionRequest } from "../../../shared/contracts/goal.js";
+import type { WebuiGoal, WebuiGoalCreateRequest, WebuiGoalEnabledResult, WebuiGoalPatchRequest, WebuiGoalSessionRequest } from "../../../../shared/contracts/goal.js";
 
 export interface GoalPort {
   readonly isGoalEnabled?: () => Promise<WebuiGoalEnabledResult>;

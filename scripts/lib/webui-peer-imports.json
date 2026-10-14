@@ -3,8 +3,8 @@
   "entries": [
     {
       "from": "client/features/transcript/ui/PlanDelivery.tsx",
-      "to": "client/components/interactions/PlanModeCards.tsx",
-      "reason": "The transcript renders the interaction business's plan decision card as the response surface of a plan turn (plan 5.2 transcript row: uses the interaction answer API). The card is that business's own UI; this edge becomes a peer's public UI when interactions migrates to features/interactions/ui/, and the entry goes then."
+      "to": "client/features/interactions/ui/PlanModeCards.tsx",
+      "reason": "The transcript renders the interaction business's plan decision card as the response surface of a plan turn (plan 5.2 transcript row: uses the interaction answer API). The card is that business's own UI. T05 moved the interactions business into `client/features/interactions/` and the path was re-pointed then; the entry goes when interactions publishes the delivery/decision card as a public surface instead of a peer's UI module."
     },
     {
       "from": "client/features/transcript/ui/MessageItem.tsx",
@@ -110,6 +110,26 @@
       "from": "client/features/models/ui/ProviderFormPanel.tsx",
       "to": "client/components/settings/settings-atoms.tsx",
       "reason": "The provider form is built from the settings surfaces' presentation atoms (IconButton, the close and refresh glyphs). Before T03 the form sat in `client/components/models/`, a current home the peer rule does not judge; moving it into the models feature home makes the edge measurable. Reviewed peer edge while those atoms are filed under the settings business: they carry no settings policy, so the entry goes when T18 relocates the reusable presentation mechanics to `client/ui/`, or when settings publishes them."
+    },
+    {
+      "from": "client/features/goal/projection/goal-state.ts",
+      "to": "client/projection/turn/stream-state.ts",
+      "reason": "The goal projection reads the turn business's stream-message shape to recognise an already-recorded goal inside a streamed reply. Both files sat in the `projection/` layer before T05 moved goal into its feature home, so the edge was intra-layer; it becomes a reviewed peer edge until turn publishes that view type from its contracts."
+    },
+    {
+      "from": "client/features/interactions/application/interaction-coordinator.ts",
+      "to": "client/features/sessions/application/session-commands.ts",
+      "reason": "The interaction coordinator holds the turn stream-phase command view rather than a stream writer (plan 5.2 interactions row: the transitions are invoked as turn's published commands). Those commands are declared by the sessions business's command module, which both owners sat beside before T05 moved interactions into its feature home. Reviewed peer edge until sessions publishes the command view as a public contract."
+    },
+    {
+      "from": "client/features/interactions/application/interaction-session-owners.ts",
+      "to": "client/features/sessions/application/session-commands.ts",
+      "reason": "The session-keyed interaction owner applies the same session-scoped stream-phase commands after a questionnaire settles, for the same reason as the coordinator entry above. Reviewed peer edge until sessions publishes the command view as a public contract."
+    },
+    {
+      "from": "client/features/interactions/ui/PlanModeCards.tsx",
+      "to": "client/features/transcript/ui/markdown.tsx",
+      "reason": "The plan decision card renders the plan text through the transcript's markdown renderer, the same shared rendering the workspace panel uses. Reviewed peer edge until the transcript publishes markdown as a shared rendering contract."
     }
   ]
 }

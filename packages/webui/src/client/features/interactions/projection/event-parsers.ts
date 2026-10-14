@@ -3,9 +3,9 @@
 import type {
   WebuiPendingPermission,
   WebuiQuestionnaireRequest,
-} from "../../../shared/contracts/interactions.js";
-import { isWebuiGoalEventKind } from "../common/event-kinds.js";
-import type { WebuiRuntimeEvent } from "../../../shared/contracts/stream.js";
+} from "../../../../shared/contracts/interactions.js";
+import { isWebuiGoalEventKind } from "../../../projection/common/event-kinds.js";
+import type { WebuiRuntimeEvent } from "../../../../shared/contracts/stream.js";
 
 /**
  * Extract the session id a runtime event targets, accepting both camelCase

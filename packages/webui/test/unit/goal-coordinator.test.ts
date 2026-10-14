@@ -18,8 +18,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createWebuiGoalCoordinator,
   type WebuiGoalSink,
-} from "../../src/client/application/goal/goal-coordinator.js";
-import { createWebuiInteractionCoordinator } from "../../src/client/application/interactions/interaction-coordinator.js";
+} from "../../src/client/features/goal/application/goal-coordinator.js";
+import { createWebuiInteractionCoordinator } from "../../src/client/features/interactions/application/interaction-coordinator.js";
 
 function goalSink(): WebuiGoalSink & Record<string, unknown> {
   return { applyGoal: vi.fn(), afterGoalReRead: vi.fn() } as never;

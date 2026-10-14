@@ -16,7 +16,7 @@ import { createWebuiEventCoordinator } from "../../src/client/application/turn/e
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 import { createWebuiStreamLeaseController } from "../../src/client/application/turn/stream-lease-controller.js";
 import { createWebuiUnreadController } from "../../src/client/features/sessions/application/unread.js";
-import { createWebuiGoalSessionOwners } from "../../src/client/application/goal/goal-session-owners.js";
+import { createWebuiGoalSessionOwners } from "../../src/client/features/goal/application/goal-session-owners.js";
 
 function coordinator() {
   const store = createWebuiSessionStore();

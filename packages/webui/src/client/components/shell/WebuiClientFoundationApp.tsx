@@ -135,7 +135,7 @@ import {
   webuiWorkspaceSubagentStatus,
 } from "../../features/workspace/projection/workspace-progress.js";
 import type { WebuiApplication } from "../../application/create-application.js";
-import { createWebuiPlanReviewWorkflow } from "../../application/interactions/interaction-coordinator.js";
+import { createWebuiPlanReviewWorkflow } from "../../features/interactions/application/interaction-coordinator.js";
 import type { WebuiWorkspaceGitChangedSignal } from "../../features/workspace/projection/workspace-panel-state.js";
 import { ConnectionStatus } from "./ConnectionStatus.js";
 import { deriveConversationUsageNotice } from "../../features/transcript/projection/message-projection.js";

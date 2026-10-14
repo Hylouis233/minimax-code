@@ -25,17 +25,17 @@
 // session, so a re-read cannot land in the wrong one by construction rather than
 // by a guard.
 
-import type { InteractionPort } from "../../contracts/interactions/interaction-port.js";
+import type { InteractionPort } from "../contracts/interaction-port.js";
 import type {
   WebuiInteractionReplyResult,
   WebuiPendingPermission,
   WebuiQuestionnaireAnswer,
   WebuiQuestionnaireRequest,
-} from "../../../shared/contracts/interactions.js";
-import { buildWebuiPlanApproveAnswers } from "../../projection/interactions/plan-mode.js";
-import { webuiAnswersEndTurn } from "../../projection/interactions/questionnaire-state.js";
-import type { WebuiStreamPhaseCommands } from "../../features/sessions/application/session-commands.js";
-import type { WebuiVersionCell } from "../version-cell.js";
+} from "../../../../shared/contracts/interactions.js";
+import { buildWebuiPlanApproveAnswers } from "../projection/plan-mode.js";
+import { webuiAnswersEndTurn } from "../projection/questionnaire-state.js";
+import type { WebuiStreamPhaseCommands } from "../../sessions/application/session-commands.js";
+import type { WebuiVersionCell } from "../../../application/version-cell.js";
 
 /** The transport methods this owner drives. Absent means "not wired". */
 export type WebuiInteractionPortSlice = Pick<

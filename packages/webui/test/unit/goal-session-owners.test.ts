@@ -10,7 +10,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { createWebuiGoalSessionOwners } from "../../src/client/application/goal/goal-session-owners.js";
+import { createWebuiGoalSessionOwners } from "../../src/client/features/goal/application/goal-session-owners.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 import type { WebuiGoal } from "../../src/shared/contracts/goal.js";
 

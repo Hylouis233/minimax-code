@@ -3,13 +3,13 @@
 // that state into the wire requests and the small view-model pieces
 // (status copy, wait-reason copy, duration formatting, message upsert).
 
-import type { WebuiStreamMessage } from "../turn/stream-state.js";
+import type { WebuiStreamMessage } from "../../../projection/turn/stream-state.js";
 import type {
   WebuiGoal,
   WebuiGoalPatchRequest,
   WebuiGoalStatus,
-} from "../../../shared/contracts/goal.js";
-import { WEBUI_GOAL_OBJECTIVE_EVENT_TYPES } from "../common/event-kinds.js";
+} from "../../../../shared/contracts/goal.js";
+import { WEBUI_GOAL_OBJECTIVE_EVENT_TYPES } from "../../../projection/common/event-kinds.js";
 
 /**
  * Build a synthetic transcript message for one of the

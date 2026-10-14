@@ -13,13 +13,13 @@ import {
   optionIdsForStep,
   sortWebuiQuestionnaireOptions,
   toggleWebuiQuestionnaireOption,
-} from "../../projection/interactions/questionnaire-state.js";
+} from "../projection/questionnaire-state.js";
 import { WebuiPlanSurface } from "./PlanModeCards.js";
 import type {
   WebuiPendingPermission,
   WebuiQuestionnaireAnswer,
   WebuiQuestionnaireRequest,
-} from "../../../shared/contracts/interactions.js";
+} from "../../../../shared/contracts/interactions.js";
 
 export function WebuiInteractionPanel({
   sessionId,

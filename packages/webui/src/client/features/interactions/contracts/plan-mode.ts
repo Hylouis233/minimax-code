@@ -4,7 +4,7 @@
 // published questionnaire payload, declared here so a consumer reads them from
 // the interactions business instead of from the projection that renders them.
 
-import type { WebuiQuestionnaireRequest } from "../../../shared/contracts/interactions.js";
+import type { WebuiQuestionnaireRequest } from "../../../../shared/contracts/interactions.js";
 
 /** Whether this request is a plan-mode request at all. The desktop gates every
  *  plan surface on the same predicate (`mode === "plan"`). */

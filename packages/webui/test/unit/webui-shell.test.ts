@@ -25,7 +25,7 @@ import {
   WebuiContextMenu,
 } from "../../src/client/components/shared/ContextMenu.js";
 import { placeWebuiContextMenu } from "../../src/client/projection/shell/context-menu.js";
-import { WebuiInteractionPanel } from "../../src/client/components/interactions/InteractionPanel.js";
+import { WebuiInteractionPanel } from "../../src/client/features/interactions/ui/InteractionPanel.js";
 import {
   WebuiProjectList,
   WebuiSessionList,
@@ -77,7 +77,7 @@ import {
 import { createWebuiTurnLifecycleCommands } from "../../src/client/features/sessions/application/session-commands.js";
 import { projectWebuiMessage } from "../../src/client/features/transcript/projection/message-projection.js";
 import { projectLiveTurnView } from "../../src/client/features/transcript/projection/transcript-shape.js";
-import { buildWebuiQuestionnaireAnswers } from "../../src/client/projection/interactions/questionnaire-state.js";
+import { buildWebuiQuestionnaireAnswers } from "../../src/client/features/interactions/projection/questionnaire-state.js";
 import { groupWebuiTranscriptItems } from "../../src/client/features/transcript/projection/transcript-projection.js";
 import type {
   WebuiGoal,

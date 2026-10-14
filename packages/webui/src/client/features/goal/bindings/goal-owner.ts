@@ -13,14 +13,14 @@
 
 import { useEffect, useMemo, useRef } from "react";
 
-import type { WebuiGoal } from "../../shared/contracts/goal.js";
-import type { WebuiGoalCoordinator } from "../application/goal/goal-coordinator.js";
+import type { WebuiGoal } from "../../../../shared/contracts/goal.js";
+import type { WebuiGoalCoordinator } from "../application/goal-coordinator.js";
 import {
   createWebuiGoalSessionOwners,
   type WebuiGoalSessionOwners,
-} from "../application/goal/goal-session-owners.js";
-import { WEBUI_HOME_SESSION_KEY } from "../application/state.js";
-import { useWebuiApplicationOptional, useWebuiSessionStoreContext } from "./application-context.js";
+} from "../application/goal-session-owners.js";
+import { WEBUI_HOME_SESSION_KEY } from "../../../application/state.js";
+import { useWebuiApplicationOptional, useWebuiSessionStoreContext } from "../../../bindings/application-context.js";
 
 /** The record key a session-less surface works under: the home slot. */
 export function webuiGoalRecordKey(sessionId: string | undefined): string {

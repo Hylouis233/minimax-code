@@ -21,14 +21,14 @@
 // Framework-free: no React, no DOM. The policy stays in `goal-coordinator.ts`;
 // this module owns *whose* policy it is and when it exists.
 
-import type { WebuiGoal } from "../../../shared/contracts/goal.js";
-import type { WebuiSessionStore } from "../session-store.js";
+import type { WebuiGoal } from "../../../../shared/contracts/goal.js";
+import type { WebuiSessionStore } from "../../../application/session-store.js";
 import {
   createWebuiGoalCoordinator,
   type WebuiGoalCoordinator,
   type WebuiGoalPortSlice,
 } from "./goal-coordinator.js";
-import type { WebuiVersionCell } from "../version-cell.js";
+import type { WebuiVersionCell } from "../../../application/version-cell.js";
 
 export interface WebuiGoalSessionOwners {
   /**

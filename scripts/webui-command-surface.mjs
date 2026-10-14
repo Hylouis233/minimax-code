@@ -76,7 +76,7 @@ const BUSINESSES = [
       // answer/dismiss commands. Added by ticket #66, which split the two duties
       // out of the composer and gave each business its own owner.
       {
-        module: "application/interactions/interaction-coordinator.ts",
+        module: "features/interactions/application/interaction-coordinator.ts",
         name: "WebuiInteractionCoordinator",
       },
     ],
@@ -96,7 +96,7 @@ const BUSINESSES = [
     // publishes commands, while no component ever names it. §5.6 gives the carve
     // the refresh, the write commands and the versioned apply. Added by ticket #66.
     declarations: [
-      { module: "application/goal/goal-coordinator.ts", name: "WebuiGoalCoordinator" },
+      { module: "features/goal/application/goal-coordinator.ts", name: "WebuiGoalCoordinator" },
     ],
   },
 ];

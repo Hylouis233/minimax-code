@@ -11,10 +11,10 @@
 
 import { useEffect, useMemo, useRef } from "react";
 
-import type { WebuiInteractionCoordinator } from "../application/interactions/interaction-coordinator.js";
-import { createWebuiInteractionSessionOwners } from "../application/interactions/interaction-session-owners.js";
-import { WEBUI_HOME_SESSION_KEY } from "../application/state.js";
-import { useWebuiApplicationOptional, useWebuiSessionStoreContext } from "./application-context.js";
+import type { WebuiInteractionCoordinator } from "../application/interaction-coordinator.js";
+import { createWebuiInteractionSessionOwners } from "../application/interaction-session-owners.js";
+import { WEBUI_HOME_SESSION_KEY } from "../../../application/state.js";
+import { useWebuiApplicationOptional, useWebuiSessionStoreContext } from "../../../bindings/application-context.js";
 
 /** The record key a session-less surface works under: the home slot. */
 export function webuiInteractionRecordKey(sessionId: string | undefined): string {

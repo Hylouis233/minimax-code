@@ -8,7 +8,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { createWebuiInteractionSessionOwners } from "../../src/client/application/interactions/interaction-session-owners.js";
+import { createWebuiInteractionSessionOwners } from "../../src/client/features/interactions/application/interaction-session-owners.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 
 const permission = (sessionId: string, requestId: string) =>

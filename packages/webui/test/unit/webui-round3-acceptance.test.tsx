@@ -9,8 +9,8 @@ import {
   reduceWebuiDiffState,
 } from "../../src/client/features/review/projection/review-state.js";
 import { WebuiDiffCard } from "../../src/client/features/transcript/ui/DiffCard.js";
-import { WebuiGoalBanner } from "../../src/client/components/goal/GoalBanner.js";
-import { WebuiInteractionPanel } from "../../src/client/components/interactions/InteractionPanel.js";
+import { WebuiGoalBanner } from "../../src/client/features/goal/ui/GoalBanner.js";
+import { WebuiInteractionPanel } from "../../src/client/features/interactions/ui/InteractionPanel.js";
 import { chunkWebuiWorkspaceReviewFileIds, WebuiDiffFileSection } from "../../src/client/features/workspace/ui/WorkspacePanels.js";
 import { projectWebuiUnifiedDiffLines } from "../../src/client/features/workspace/projection/panel-projection.js";
 import {
@@ -32,12 +32,12 @@ import {
   buildWebuiGoalStatusPatch,
   projectWebuiThreadGoalMessage,
   WEBUI_GOAL_STATUS_COPY,
-} from "../../src/client/projection/goal/goal-state.js";
+} from "../../src/client/features/goal/projection/goal-state.js";
 import {
   canAdvanceWebuiQuestionnaireStep,
   sortWebuiQuestionnaireOptions,
   toggleWebuiQuestionnaireOption,
-} from "../../src/client/projection/interactions/questionnaire-state.js";
+} from "../../src/client/features/interactions/projection/questionnaire-state.js";
 import {
   DEFAULT_THINKING_PHRASE_ROTATION_INTERVAL_MS,
 } from "../../src/client/features/transcript/ui/ActivityIndicator.js";

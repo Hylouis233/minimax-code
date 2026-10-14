@@ -9,7 +9,8 @@
 // session-stream projection. That projection is gone — it attached a
 // per-session snapshot to every stream frame and nothing on the client read it
 // — so this file re-points the corpus at the module that actually renders:
-// `client/application/turn/effect-reducer.ts` through `client/projection/interactions/event-parsers.ts`.
+// `client/application/turn/effect-reducer.ts` through
+// `client/features/interactions/projection/event-parsers.ts`.
 //
 // Every expected value below is read from the fixture, never from an
 // implementation constant, so a change on either side fails the test.
@@ -26,7 +27,7 @@ import {
   reduceWebuiEffect,
   type WebuiEffectState,
 } from "../../src/client/application/turn/effect-reducer.js";
-import { eventSessionId } from "../../src/client/projection/interactions/event-parsers.js";
+import { eventSessionId } from "../../src/client/features/interactions/projection/event-parsers.js";
 import { initialWebuiStreamState } from "../../src/client/projection/turn/stream-state.js";
 import type { WebuiRuntimeEvent } from "../../src/shared/contracts/stream.js";
 

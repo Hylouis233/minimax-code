@@ -18,7 +18,7 @@
 import type {
   WebuiQuestionnaireAnswer,
   WebuiQuestionnaireRequest,
-} from "../../../shared/contracts/interactions.js";
+} from "../../../../shared/contracts/interactions.js";
 
 /** The step id the runtime uses for the post-plan decision. The desktop's
  *  approve / feedback / skip payloads all answer this step. */
@@ -260,11 +260,11 @@ export function buildWebuiPlanEnterAnswers(
 // for the surfaces that already read them from this module. They are
 // re-exported here for the surfaces that already read them from this module; a
 // consumer outside the interactions business reads the contract.
-import { isWebuiPlanRequest } from "../../contracts/interactions/plan-mode.js";
+import { isWebuiPlanRequest } from "../contracts/plan-mode.js";
 
 export {
   isWebuiPlanRequest,
   isWebuiPlanReviewRequest,
   webuiPlanMarkdown,
   webuiPlanPath,
-} from "../../contracts/interactions/plan-mode.js";
+} from "../contracts/plan-mode.js";

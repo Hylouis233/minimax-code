@@ -19,17 +19,17 @@
 // `interaction-coordinator.ts`; this module owns *whose* policy it is and when it
 // exists.
 
-import type { WebuiSessionStore } from "../session-store.js";
+import type { WebuiSessionStore } from "../../../application/session-store.js";
 import {
   createWebuiInteractionCommands,
   createWebuiStreamPhaseCommands,
-} from "../../features/sessions/application/session-commands.js";
+} from "../../sessions/application/session-commands.js";
 import {
   createWebuiInteractionCoordinator,
   type WebuiInteractionCoordinator,
   type WebuiInteractionPortSlice,
 } from "./interaction-coordinator.js";
-import type { WebuiVersionCell } from "../version-cell.js";
+import type { WebuiVersionCell } from "../../../application/version-cell.js";
 
 export interface WebuiInteractionSessionOwners {
   /** The owner for one session, created on first touch and then stable. */

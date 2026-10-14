@@ -13,8 +13,8 @@
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
 
-import type { WebuiInteractionSink } from "../../src/client/application/interactions/interaction-coordinator.js";
-import type { WebuiGoalSink } from "../../src/client/application/goal/goal-coordinator.js";
+import type { WebuiInteractionSink } from "../../src/client/features/interactions/application/interaction-coordinator.js";
+import type { WebuiGoalSink } from "../../src/client/features/goal/application/goal-coordinator.js";
 import { createWebuiVersionCells } from "../../src/client/application/version-cell.js";
 
 const CLIENT_ROOT = new URL("../../src/client/", import.meta.url);
@@ -84,7 +84,7 @@ describe("prohibition 1 — a business may not hold a writer for another busines
     // owner's published command is the legal form); `interaction-coordinator.ts`
     // holds that command view — `prohibition 1` in `interaction-coordinator.test.ts`
     // asserts the runtime half.
-    expect(flat(read("application/interactions/interaction-coordinator.ts"))).toContain(
+    expect(flat(read("features/interactions/application/interaction-coordinator.ts"))).toContain(
       "readonly streams: WebuiStreamPhaseCommands;",
     );
   });
@@ -96,7 +96,7 @@ describe("prohibition 2 — a rule may not be filed under a module that does not
     // interaction flow's, so both moved into the owner in this carve.
     const composer = flat(read("components/composer/WebuiComposer.tsx"));
     expect(composer).not.toContain("webuiAnswersEndTurn");
-    expect(flat(read("application/interactions/interaction-coordinator.ts"))).toContain(
+    expect(flat(read("features/interactions/application/interaction-coordinator.ts"))).toContain(
       "webuiAnswersEndTurn(answers)",
     );
   });
@@ -110,10 +110,10 @@ describe("prohibition 2 — a rule may not be filed under a module that does not
     // neither cell and holds no counter of its own.
     expect(composer).not.toContain("useWebuiVersionCells()");
     expect(composer).not.toMatch(/useRef\(0\)/u);
-    expect(flat(read("application/goal/goal-session-owners.ts"))).toContain(
+    expect(flat(read("features/goal/application/goal-session-owners.ts"))).toContain(
       "const goalVersionRef: WebuiVersionCell = { current: 0 };",
     );
-    expect(flat(read("application/interactions/interaction-session-owners.ts"))).toContain(
+    expect(flat(read("features/interactions/application/interaction-session-owners.ts"))).toContain(
       "const pendingVersionRef: WebuiVersionCell = { current: 0 };",
     );
     expect(flat(read("application/create-application.ts"))).toContain(
@@ -134,7 +134,7 @@ describe("prohibition 2 — a rule may not be filed under a module that does not
     expect(composer).not.toContain("goalVersionRef.current ==");
     expect(composer).not.toContain("goalVersionRef.current +=");
     expect(composer).not.toContain("getGoal({ sessionId })");
-    expect(flat(read("application/goal/goal-coordinator.ts"))).toContain(
+    expect(flat(read("features/goal/application/goal-coordinator.ts"))).toContain(
       "goalVersionRef.current !== versionAtRequest",
     );
   });
@@ -188,7 +188,7 @@ describe("prohibition 4 — a rule shared across businesses gets one owner every
     );
     // One declaration. The render path and the interaction flow both read it, and
     // neither restates it — which is the whole of this prohibition.
-    expect(declaring).toEqual(["projection/interactions/questionnaire-state.ts"]);
+    expect(declaring).toEqual(["features/interactions/projection/questionnaire-state.ts"]);
   });
 
   it("the goal version cell is declared once and shared as a type", () => {
@@ -197,13 +197,15 @@ describe("prohibition 4 — a rule shared across businesses gets one owner every
     );
     expect(declaring).toEqual(["application/version-cell.ts"]);
     // Read as a type by both fences, one cell each — the independence the two
-    // coordinators assert in their own suites. Phase 4 filed the interaction
-    // coordinator under `application/interactions/` and the goal coordinator
-    // under `application/goal/`, so both owners reach the shared cell by their
-    // business-relative path.
+    // coordinators assert in their own suites. T05 moved the two owners into
+    // their feature homes (`features/goal/application/` and
+    // `features/interactions/application/`), so both now reach the shared cell
+    // the assembly creates by ascending out of the feature directory; the cell
+    // itself stays a shared application module, which is why the specifier is
+    // not business-relative any more.
     for (const [file, specifier] of [
-      ["application/goal/goal-coordinator.ts", '../version-cell.js'],
-      ["application/interactions/interaction-coordinator.ts", '../version-cell.js'],
+      ["features/goal/application/goal-coordinator.ts", '../../../application/version-cell.js'],
+      ["features/interactions/application/interaction-coordinator.ts", '../../../application/version-cell.js'],
     ]) {
       expect(read(file)).toContain(`from "${specifier}"`);
     }
