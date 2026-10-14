@@ -1033,7 +1033,7 @@
   "partitionRule": "The mixed workspace query file has two disjoint produced responsibilities: T10 produces review queries, T11 produces files/environment queries. Large-file carrier describes completion of its responsibility cut, not exclusive edits; all producing targets above remain unique. T19 consumes factories/state moved by prior business tickets rather than producing them again. T18 moves only the platform/generic UI residual population.",
   "executionState": {
     "comment": "Appended after publication; the publication receipt below is unchanged. The tracker issues stay the source of truth for per-ticket status and evidence.",
-    "asOf": "2026-10-13",
+    "asOf": "2026-10-14",
     "branch": "feat/webui-t01-conformance-gates",
     "baseCommit": "4affbc0478d02cc4294946e0dba7f3c25789eb26",
     "commits": [
@@ -1091,7 +1091,8 @@
       "b0cc51db",
       "6b12d0c0",
       "53b5dd5c",
-      "71cd9f8b"
+      "71cd9f8b",
+      "d2567749"
     ],
     "published": false,
     "tickets": {
@@ -1105,7 +1106,7 @@
       "T14": "closed 2026-10-14 (issue #140, comment 6156919983): the host assembles the registry and the terminal-process port; the service binds what it was handed",
       "T07": "closed 2026-10-14 (issue #133, comment 6157401861): one Sessions owner holds the catalogue, the rail overlays and the lifecycle commands, with the delete failure/interest evidence and the rail/archive/import/export browser entry paths",
       "T09": "closed 2026-10-14 (issue #135, comment 6157618298): one Account owner holds the status/login/check-in/quota lifetime, the credential reads left Settings, and its timers end with its disposal",
-      "T11": "in progress: five owners behind one composer, closed-tab release, and the archive/canvas/directory-browse commands own their outcomes and freshness; the preview half and the evidence audit remain"
+      "T11": "in progress: five owners behind one composer, closed-tab interest release, archive/canvas/directory-browse outcomes and freshness, and the panel/tab state moved out of the shell into WebuiWorkspacePanelOwner (d2567749, browser-verified); the preview half and the criterion-6 audit remain"
     },
     "frontier": [
       "T08",
