@@ -21,7 +21,7 @@ import type { ShellEventPort } from "./shell/watch-port.js";
 import type { InteractionPort } from "../features/interactions/contracts/interaction-port.js";
 import type { GoalPort } from "../features/goal/contracts/goal-port.js";
 import type { WorkspacePort } from "../features/workspace/contracts/workspace-port.js";
-import type { SettingsPort } from "./settings/settings-port.js";
+import type { SettingsPort } from "../features/settings/contracts/settings-port.js";
 import type { ModelsPort } from "../features/models/contracts/provider-port.js";
 import type { TranscriptPort } from "../features/transcript/contracts/session-read-port.js";
 import type { AccountPort } from "../features/account/contracts/account-port.js";

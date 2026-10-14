@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { createWebuiSettingsWorkflows } from "../../src/client/application/settings/settings-workflows.js";
+import { createWebuiSettingsWorkflows } from "../../src/client/features/settings/application/settings-workflows.js";
 import type { WebuiGlobalInstructionsView } from "../../src/shared/contracts/personalization.js";
 
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));

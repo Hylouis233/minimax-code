@@ -33,7 +33,7 @@ import {
 } from "../../infrastructure/storage.js";
 import { Transcript } from "../../features/transcript/ui/Transcript.js";
 import { UserMenu } from "../../features/account/ui/UserMenu.js";
-import { MEMORY_HANDOFF_PROMPT, type MemoryHandoff } from "../settings/MemoryManagerDialog.js";
+import { MEMORY_HANDOFF_PROMPT, type MemoryHandoff } from "../../features/settings/ui/MemoryManagerDialog.js";
 import {
   WebuiWorkspacePanel,
   WebuiProgressOverviewPanel,
@@ -120,7 +120,7 @@ import { WebuiAccountWorkflowsProvider } from "../../features/account/bindings/u
 import { createWebuiWorkspaceQueries } from "../../features/workspace/application/workspace-queries.js";
 import { createWebuiAccountWorkflows } from "../../features/account/application/account-workflows.js";
 import { createWebuiModelsWorkflows } from "../../features/models/application/models-workflows.js";
-import { createWebuiSettingsWorkflows } from "../../application/settings/settings-workflows.js";
+import { createWebuiSettingsWorkflows } from "../../features/settings/application/settings-workflows.js";
 import { createWebuiPluginWorkflows } from "../../features/plugins/application/plugin-workflows.js";
 import { createWebuiComposerPluginCatalogue } from "../../features/plugins/application/composer-catalogue.js";
 import { createWebuiPluginActions } from "../../features/plugins/contracts/plugin-actions.js";
@@ -1520,8 +1520,6 @@ export function WebuiClientFoundationApp(
                     pluginCatalogue={composerPluginCatalogue}
                     listWorkspaceFileTree={workspacePort.listWorkspaceFileTree}
                     browseWorkspaceDirs={workspacePort.browseWorkspaceDirs}
-                    getPermissionMode={settingsPort.getPermissionMode}
-                    setPermissionMode={settingsPort.setPermissionMode}
                     getAccountStatus={accountPort.getAccountStatus}
                     draft={draft}
                     onDraftChange={setDraft}

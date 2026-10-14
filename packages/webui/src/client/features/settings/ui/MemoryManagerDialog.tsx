@@ -12,10 +12,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { basenamePath } from "../../projection/common/paths.js";
-import type { WebuiAgentMemoryView, WebuiMemorySettingsView } from "../../../shared/contracts/personalization.js";
-import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
-import { ToggleSwitch } from "../shared/ToggleSwitch.js";
+import { basenamePath } from "../../../projection/common/paths.js";
+import type { WebuiAgentMemoryView, WebuiMemorySettingsView } from "../../../../shared/contracts/personalization.js";
+import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
+import { ToggleSwitch } from "../../../components/shared/ToggleSwitch.js";
 
 /**
  * The delete confirmation's copy, copied from the desktop word for word.

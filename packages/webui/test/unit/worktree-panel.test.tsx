@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { WebuiWorktreePanel } from "../../src/client/components/settings/SettingsModal.js";
+import { WebuiWorktreePanel } from "../../src/client/features/settings/ui/SettingsModal.js";
 import {
   groupWebuiWorktreeWorkspaces,
   selectWebuiWorktreeWorkspaces,

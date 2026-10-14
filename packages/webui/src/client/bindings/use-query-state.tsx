@@ -26,7 +26,7 @@ import {
   initialWebuiSettingsWorkflowsState,
   type WebuiSettingsWorkflows,
   type WebuiSettingsWorkflowsState,
-} from "../application/settings/settings-workflows.js";
+} from "../features/settings/application/settings-workflows.js";
 import {
   initialWebuiModelsWorkflowsState,
   type WebuiModelsWorkflows,

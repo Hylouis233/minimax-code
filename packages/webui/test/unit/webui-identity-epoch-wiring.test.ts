@@ -16,7 +16,7 @@ import { describe, expect, it } from "vitest";
 
 import { createWebuiAccountWorkflows } from "../../src/client/features/account/application/account-workflows.js";
 import { createWebuiModelsWorkflows } from "../../src/client/features/models/application/models-workflows.js";
-import { createWebuiSettingsWorkflows } from "../../src/client/application/settings/settings-workflows.js";
+import { createWebuiSettingsWorkflows } from "../../src/client/features/settings/application/settings-workflows.js";
 import { createWebuiIdentityEpochs } from "../../src/client/application/identity-epochs.js";
 
 const noStatusRefresh = async (): Promise<void> => {};

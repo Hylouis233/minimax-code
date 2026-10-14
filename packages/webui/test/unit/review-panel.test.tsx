@@ -286,7 +286,7 @@ describe("choosing a workspace to review", () => {
  */
 describe("tab-to-page wiring", () => {
   const source = readFileSync(
-    fileURLToPath(new URL("../../src/client/components/settings/SettingsModal.tsx", import.meta.url)),
+    fileURLToPath(new URL("../../src/client/features/settings/ui/SettingsModal.tsx", import.meta.url)),
     "utf8",
   );
 

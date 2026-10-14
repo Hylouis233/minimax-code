@@ -8,8 +8,8 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from "react";
 
-import type { WebuiGlobalInstructionsView } from "../../../shared/contracts/personalization.js";
-import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
+import type { WebuiGlobalInstructionsView } from "../../../../shared/contracts/personalization.js";
+import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { PERSONALIZATION_SECTION_HINTS, SectionHeader } from "./settings-atoms.js";
 
 const INSTRUCTIONS_PLACEHOLDER = [

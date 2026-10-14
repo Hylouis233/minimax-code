@@ -70,6 +70,11 @@ import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities
 import { ContextUsageIndicator } from "../../features/sessions/ui/ContextUsageIndicator.js";
 import { useWebuiPortSlice } from "../../bindings/port-slices-context.js";
 import {
+  useWebuiSettingsWorkflows,
+  useWebuiSettingsWorkflowsState,
+} from "../../bindings/use-query-state.js";
+import { type WebuiPermissionMode } from "../../features/settings/contracts/settings-port.js";
+import {
   useWebuiGoalOwner,
   useWebuiGoalReaction,
 } from "../../features/goal/bindings/goal-owner.js";
@@ -205,7 +210,12 @@ type ComposerMentionChoice =
   | { readonly kind: "local-folder"; readonly label: string; readonly section: string }
   | { readonly kind: "agent"; readonly session: WebuiClientSession; readonly label: string; readonly section: string };
 
-type WebuiComposerPermissionMode = "default" | "auto" | "bypassPermissions";
+/**
+ * The permission preference's closed set is published by the settings business,
+ * which owns the preference (T12): the composer renders the control, it does not
+ * define what the control can say.
+ */
+type WebuiComposerPermissionMode = WebuiPermissionMode;
 
 const PERMISSION_MODE_ORDER = ["default", "auto", "bypassPermissions"] as const;
 
@@ -251,17 +261,6 @@ const PERMISSION_MODE_OPTION: Readonly<Record<WebuiComposerPermissionMode, Webui
 function PermissionModeIcon({ mode }: { readonly mode: WebuiComposerPermissionMode }): ReactElement {
   const { Icon } = PERMISSION_MODE_OPTION[mode];
   return <Icon className="webui-composer-permission-icon" />;
-}
-
-function readPermissionMode(value: unknown): WebuiComposerPermissionMode | undefined {
-  const mode = typeof value === "string"
-    ? value
-    : value && typeof value === "object" && "mode" in value
-      ? (value as { mode?: unknown }).mode
-      : undefined;
-  return mode === "default" || mode === "auto" || mode === "bypassPermissions"
-    ? mode
-    : undefined;
 }
 
 function flattenWorkspaceFiles(files: readonly WebuiWorkspaceFile[]): readonly { readonly path: string; readonly name: string; readonly type?: string }[] {
@@ -342,8 +341,6 @@ export function WebuiComposer({
   listWorkspaceFileTree,
   browseWorkspaceDirs,
   pluginCatalogue,
-  getPermissionMode,
-  setPermissionMode,
   sessions = [],
   workspaceDir,
   onSelectSession,
@@ -424,8 +421,6 @@ export function WebuiComposer({
    *   now asks a question and receives rows it already recognises.
    */
   readonly pluginCatalogue?: WebuiComposerPluginCatalogue;
-  readonly getPermissionMode?: WebuiTransport["getPermissionMode"];
-  readonly setPermissionMode?: WebuiTransport["setPermissionMode"];
   readonly sessions?: readonly WebuiClientSession[];
   readonly workspaceDir?: string;
   readonly onSelectSession?: (sessionId: string) => void;
@@ -590,7 +585,11 @@ export function WebuiComposer({
   const mentionRange = composerSnapshot.mentionRange;
   const setMentionRange = composerStore.setMentionRange;
   const [mentionIndex, setMentionIndex] = useState(0);
-  const [permissionMode, setPermissionModeValue] = useState<WebuiComposerPermissionMode>();
+  // The mode is the settings owner's answer, read through its snapshot (T12);
+  // only the menu's open/busy/unavailable presentation state is local.
+  const settingsWorkflows = useWebuiSettingsWorkflows();
+  const settingsSnapshot = useWebuiSettingsWorkflowsState();
+  const permissionMode = settingsSnapshot.permissionMode.value;
   const [permissionMenuOpen, setPermissionMenuOpen] = useState(false);
   const [permissionBusy, setPermissionBusy] = useState(false);
   const [permissionUnavailable, setPermissionUnavailable] = useState(false);
@@ -748,16 +747,23 @@ export function WebuiComposer({
 
   useEffect(() => {
     let cancelled = false;
-    if (!getPermissionMode || !setPermissionMode) {
+    if (!settingsWorkflows) return undefined;
+    if (!settingsWorkflows.canReadPermissionMode) {
       setPermissionUnavailable(true);
       return undefined;
     }
-    getPermissionMode()
-      .then((value) => {
+    // The owner caches the answer; an unsupported payload is its error, and the
+    // surface reports that error rather than rendering an empty switch.
+    settingsWorkflows
+      .loadPermissionMode()
+      .then(() => {
         if (cancelled) return;
-        const mode = readPermissionMode(value);
-        if (!mode) throw new Error("运行时返回了不支持的授权模式");
-        setPermissionModeValue(mode);
+        const query = settingsWorkflows.getSnapshot().permissionMode;
+        if (query.status === "error") {
+          setPermissionUnavailable(true);
+          setInteractionError(query.error ?? "加载授权模式失败");
+          return;
+        }
         setPermissionUnavailable(false);
       })
       .catch((error: unknown) => {
@@ -766,7 +772,7 @@ export function WebuiComposer({
         setInteractionError(error instanceof Error ? error.message : String(error));
       });
     return () => { cancelled = true; };
-  }, [getPermissionMode, setPermissionMode]);
+  }, [settingsWorkflows]);
 
   useEffect(() => {
     if (composerMenu !== "plugins" && !mentionRange) return;
@@ -1316,14 +1322,14 @@ export function WebuiComposer({
     onSelectSession(choice.session.sessionId);
   };
   const changePermissionMode = async (mode: WebuiComposerPermissionMode) => {
-    if (!setPermissionMode || !getPermissionMode) return;
+    if (!settingsWorkflows?.canWritePermissionMode) return;
     setPermissionBusy(true);
     setInteractionError(undefined);
     try {
-      await setPermissionMode({ mode });
-      const refreshed = readPermissionMode(await getPermissionMode());
+      // The owner writes and answers with the mode the runtime settled on, so a
+      // runtime that accepted something else is caught here, as before.
+      const refreshed = await settingsWorkflows.savePermissionMode(mode);
       if (refreshed !== mode) throw new Error("授权模式未能保存，请重试");
-      setPermissionModeValue(refreshed);
       setPermissionUnavailable(false);
       setPermissionMenuOpen(false);
     } catch (error) {

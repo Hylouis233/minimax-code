@@ -13,7 +13,7 @@ import { useCallback, useEffect, useState, type ReactElement } from "react";
 import type {
   WebuiUserProfileFields,
   WebuiUserProfileView,
-} from "../../../shared/contracts/personalization.js";
+} from "../../../../shared/contracts/personalization.js";
 import { PERSONALIZATION_SECTION_HINTS, SectionHeader } from "./settings-atoms.js";
 
 const PROFILE_PLACEHOLDER = "告诉 Agent 你的背景和长期偏好……";

@@ -1,6 +1,6 @@
 import { useMemo, type ReactElement } from "react";
-import type { WebuiAgentMemoryView, WebuiGlobalInstructionsView, WebuiMemorySettingsView, WebuiUserProfileFields, WebuiUserProfileView } from "../../../shared/contracts/personalization.js";
-import { useWebuiSettingsWorkflows, useWebuiSettingsWorkflowsState } from "../../bindings/use-query-state.js";
+import type { WebuiAgentMemoryView, WebuiGlobalInstructionsView, WebuiMemorySettingsView, WebuiUserProfileFields, WebuiUserProfileView } from "../../../../shared/contracts/personalization.js";
+import { useWebuiSettingsWorkflows, useWebuiSettingsWorkflowsState } from "../../../bindings/use-query-state.js";
 import type { MemoryHandoff } from "./MemoryManagerDialog.js";
 import { GlobalInstructionsSection } from "./GlobalInstructionsSection.js";
 import { UserProfileSection } from "./UserProfileSection.js";

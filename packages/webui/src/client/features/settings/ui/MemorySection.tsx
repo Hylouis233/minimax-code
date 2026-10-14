@@ -7,8 +7,8 @@
 // so the dialog must not import the section.
 
 import { useCallback, useEffect, useState, type ReactElement, type ReactNode } from "react";
-import type { WebuiAgentMemoryView, WebuiMemorySettingsView } from "../../../shared/contracts/personalization.js";
-import { ToggleSwitch } from "../shared/ToggleSwitch.js";
+import type { WebuiAgentMemoryView, WebuiMemorySettingsView } from "../../../../shared/contracts/personalization.js";
+import { ToggleSwitch } from "../../../components/shared/ToggleSwitch.js";
 import { PERSONALIZATION_SECTION_HINTS, SectionHeader } from "./settings-atoms.js";
 import { MemoryManagerDialog, formatMemoryTimestamp, isMemorySaveable, type MemoryHandoff } from "./MemoryManagerDialog.js";
 

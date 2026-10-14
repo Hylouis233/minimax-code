@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { GENERIC_FILE_ROW_ORDER, GENERIC_RADIO_CONTRACT, GENERIC_SECTION_TEST_IDS, SETTINGS_GROUPS, SETTINGS_ICON_PATHS } from "../../src/client/components/settings/SettingsModal.js";
-import { DESKTOP_SETTINGS_TABS, filterSettingsTabs, resolveThemePreference } from "../../src/client/projection/settings/settings-view.js";
-import { DisabledBillingActions, UsageModelSettings } from "../../src/client/components/settings/UsageModelSettings.js";
+import { GENERIC_FILE_ROW_ORDER, GENERIC_RADIO_CONTRACT, GENERIC_SECTION_TEST_IDS, SETTINGS_GROUPS, SETTINGS_ICON_PATHS } from "../../src/client/features/settings/ui/SettingsModal.js";
+import { DESKTOP_SETTINGS_TABS, filterSettingsTabs, resolveThemePreference } from "../../src/client/features/settings/projection/settings-view.js";
+import { DisabledBillingActions, UsageModelSettings } from "../../src/client/features/settings/ui/UsageModelSettings.js";
 import { reorderModelIds } from "../../src/client/features/models/projection/model-reorder.js";
 import { formatResetLabel, getActiveSourceBadge, projectProviderHeaders } from "../../src/client/features/models/projection/usage-settings.js";
 import { createWebuiBrowserDom } from "../../src/client/infrastructure/browser-dom.js";

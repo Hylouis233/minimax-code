@@ -27,20 +27,20 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import {
   PersonalizationSettings,
-} from "../../src/client/components/settings/PersonalizationSettings.js";
-import { PERSONALIZATION_SECTION_HINTS } from "../../src/client/components/settings/settings-atoms.js";
+} from "../../src/client/features/settings/ui/PersonalizationSettings.js";
+import { PERSONALIZATION_SECTION_HINTS } from "../../src/client/features/settings/ui/settings-atoms.js";
 import {
   MEMORY_DELETE_CONFIRM,
   MEMORY_HANDOFF_PROMPT,
   MemoryManagerDialog,
   formatMemoryTimestamp,
   isMemorySaveable,
-} from "../../src/client/components/settings/MemoryManagerDialog.js";
-import { resolveEditorSeed } from "../../src/client/components/settings/GlobalInstructionsSection.js";
-import { isProfileSaveable } from "../../src/client/components/settings/UserProfileSection.js";
+} from "../../src/client/features/settings/ui/MemoryManagerDialog.js";
+import { resolveEditorSeed } from "../../src/client/features/settings/ui/GlobalInstructionsSection.js";
+import { isProfileSaveable } from "../../src/client/features/settings/ui/UserProfileSection.js";
 
 import { useMemo } from "react";
-import { createWebuiSettingsWorkflows } from "../../src/client/application/settings/settings-workflows.js";
+import { createWebuiSettingsWorkflows } from "../../src/client/features/settings/application/settings-workflows.js";
 import { WebuiSettingsWorkflowsProvider } from "../../src/client/bindings/use-query-state.js";
 
 type PanelCaps = {
@@ -96,7 +96,7 @@ describe("记忆摘要 save button states", () => {
     // the stylesheet test.
     const source = readFileSync(
       new URL(
-        "../../src/client/components/settings/MemoryManagerDialog.tsx",
+        "../../src/client/features/settings/ui/MemoryManagerDialog.tsx",
         import.meta.url,
       ),
       "utf8",

@@ -24,21 +24,24 @@
 // This module is framework-free — no React, no DOM, no storage — so it can be
 // unit-tested against a scripted port.
 
-import type { WebuiIdentityEpochs } from "../identity-epochs.js";
+import type { WebuiIdentityEpochs } from "../../../application/identity-epochs.js";
 import {
   createWebuiQueryStore,
   idleWebuiQueryState,
   type WebuiQueryState,
-} from "../query-store.js";
-import type { SettingsPort } from "../../contracts/settings/settings-port.js";
-import type { WebuiVersionInfo } from "../../../shared/contracts/version.js";
+} from "../../../application/query-store.js";
+import {
+  type SettingsPort,
+  type WebuiPermissionMode,
+} from "../contracts/settings-port.js";
+import type { WebuiVersionInfo } from "../../../../shared/contracts/version.js";
 import type {
   WebuiAgentMemoryView,
   WebuiGlobalInstructionsView,
   WebuiMemorySettingsView,
   WebuiUserProfileFields,
   WebuiUserProfileView,
-} from "../../../shared/contracts/personalization.js";
+} from "../../../../shared/contracts/personalization.js";
 
 /**
  * The settings half of the port re-file (plan §9, ticket #59). The provider half
@@ -62,10 +65,30 @@ export type WebuiSettingsPortSlice = Pick<
   | "setMiniMaxModelSource"
   | "startCodexOAuthLogin"
   | "cancelCodexOAuthLogin"
+  | "getPermissionMode"
+  | "setPermissionMode"
   | "version"
 >;
 
 export type WebuiModelSource = "token_plan" | "minimax_api_key";
+
+/**
+ * The preference a runtime answer carries, or `undefined` when it carries none
+ * this client can act on. The wire answer may be the bare mode or an object with
+ * a `mode` field — `getPermissionMode` returns `unknown`, so the coercion has to
+ * happen somewhere, and it happens at the owner rather than in the surface that
+ * renders the switch.
+ */
+export function readWebuiPermissionMode(value: unknown): WebuiPermissionMode | undefined {
+  const mode = typeof value === "string"
+    ? value
+    : value && typeof value === "object" && "mode" in value
+      ? (value as { mode?: unknown }).mode
+      : undefined;
+  return mode === "default" || mode === "auto" || mode === "bypassPermissions"
+    ? mode
+    : undefined;
+}
 
 export interface WebuiSettingsWorkflowsState {
   /** Bumps after any successful settings write, so a reader can refresh. */
@@ -83,6 +106,14 @@ export interface WebuiSettingsWorkflowsState {
    * feeds read `runtimeVersion.value` from the snapshot.
    */
   readonly runtimeVersion: WebuiQueryState<WebuiVersionInfo>;
+  /**
+   * The permission preference, read from the runtime.
+   *
+   * It is a cached read like the others, and the surface that renders the switch
+   * reads `permissionMode.value` / `.error` off the snapshot instead of holding
+   * a copy: one owner, one answer.
+   */
+  readonly permissionMode: WebuiQueryState<WebuiPermissionMode>;
 }
 
 export const initialWebuiSettingsWorkflowsState: WebuiSettingsWorkflowsState = {
@@ -93,6 +124,7 @@ export const initialWebuiSettingsWorkflowsState: WebuiSettingsWorkflowsState = {
   memorySettings: idleWebuiQueryState(),
   modelSource: idleWebuiQueryState(),
   runtimeVersion: idleWebuiQueryState(),
+  permissionMode: idleWebuiQueryState(),
 };
 
 export interface WebuiSettingsWorkflows {
@@ -111,6 +143,17 @@ export interface WebuiSettingsWorkflows {
   readonly canReadModelSource: boolean;
   readonly canSetModelSource: boolean;
   readonly canReadVersion: boolean;
+  readonly canReadPermissionMode: boolean;
+  readonly canWritePermissionMode: boolean;
+
+  /**
+   * Read the permission preference. A superseded answer is dropped, and an
+   * answer this client cannot act on is reported as an error rather than as a
+   * silent absence.
+   */
+  readonly loadPermissionMode: () => Promise<void>;
+  /** Write; returns the mode the runtime answered with, or fails. */
+  readonly savePermissionMode: (mode: WebuiPermissionMode) => Promise<WebuiPermissionMode>;
 
   /**
    * Read the runtime handshake fact. A superseded answer is dropped, exactly
@@ -289,6 +332,44 @@ export function createWebuiSettingsWorkflows(deps: {
     await readInto("runtimeVersion", "runtimeVersion", () => read());
   };
 
+  /**
+   * Read the permission preference.
+   *
+   * The preference is a runtime setting, so the answer is a runtime answer this
+   * owner caches — and an answer no client can act on is an error, not an
+   * absence: the surface must be able to say "the runtime returned a mode this
+   * build does not know" rather than render an empty switch.
+   *
+   * The write does not advance the configuration epoch. It was a raw port call
+   * from the composer before T12, so advancing it here would add an invalidation
+   * the delivered behaviour does not have; whether a permission-preference change
+   * should retire cached answers is a separate decision with its own evidence.
+   */
+  const loadPermissionMode = async (): Promise<void> => {
+    const read = port.getPermissionMode;
+    if (!read) {
+      unavailable("permissionMode", "当前运行时不支持授权模式读写。");
+      return;
+    }
+    await readInto("permissionMode", "permissionMode", async () => {
+      const mode = readWebuiPermissionMode(await read());
+      if (!mode) throw new Error("运行时返回了不支持的授权模式");
+      return mode;
+    });
+  };
+
+  const savePermissionMode = async (mode: WebuiPermissionMode): Promise<WebuiPermissionMode> => {
+    if (!port.setPermissionMode) throw new Error("当前运行时不支持授权模式读写。");
+    const answer = readWebuiPermissionMode(await port.setPermissionMode({ mode }));
+    if (!answer) throw new Error("运行时返回了不支持的授权模式");
+    set((current) => ({
+      ...current,
+      permissionMode: { status: "ready", value: answer },
+      revision: current.revision + 1,
+    }));
+    return answer;
+  };
+
   return {
     getSnapshot,
     subscribe,
@@ -304,6 +385,8 @@ export function createWebuiSettingsWorkflows(deps: {
     canReadModelSource: port.getMiniMaxModelSource !== undefined,
     canSetModelSource: port.setMiniMaxModelSource !== undefined,
     canReadVersion: port.version !== undefined,
+    canReadPermissionMode: port.getPermissionMode !== undefined,
+    canWritePermissionMode: port.setPermissionMode !== undefined,
     loadInstructions,
     saveInstructions,
     loadProfile,
@@ -316,6 +399,8 @@ export function createWebuiSettingsWorkflows(deps: {
     cancelCodexOAuth,
     loadModelSource,
     setModelSource,
+    loadPermissionMode,
+    savePermissionMode,
     loadVersion,
   };
 }

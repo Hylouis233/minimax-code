@@ -5,7 +5,7 @@
 // | Declaration | Wire purpose | Producer | Consumers |
 // | --- | --- | --- | --- |
 // | `WebuiSessionListRequest` | Session list query (name, paging, filters). | Browser `client/infrastructure/transport.ts` (`listSessions`). | runtime `listSessions`; `server/operation/session.ts`. |
-// | `WebuiSessionListItem` | One session in a list/tree page. | Runtime `listSessions`/`getSessionTree` (`runtime/harness/sessions.ts`; CliService). | `client/components/settings/SettingsModal.tsx`; `server/index.ts` (barrel). |
+// | `WebuiSessionListItem` | One session in a list/tree page. | Runtime `listSessions`/`getSessionTree` (`runtime/harness/sessions.ts`; CliService). | `client/features/settings/ui/SettingsModal.tsx`; `server/index.ts` (barrel). |
 // | `WebuiSessionPage` | A page of session-list results. | Runtime `listSessions`. | `client/contracts/sessions/session-port.ts`; `server/operation/session.ts`. |
 // | `WebuiProjectRecord` | One visible project (rail grouping). | Runtime `listVisibleProjects` (`runtime/harness/sessions.ts`). | `client/contracts/sessions/session-view.ts` (`WebuiClientProject`); `server/operation/session.ts`. |
 // | `WebuiSessionTreeRequest` | Session tree query (name, paging, filters). | Browser `client/infrastructure/transport.ts` (`getSessionTree`). | runtime `getSessionTree`; `server/operation/session.ts`. |

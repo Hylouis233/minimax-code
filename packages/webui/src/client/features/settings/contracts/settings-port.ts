@@ -14,13 +14,21 @@
 //
 // Every method stays optional — `undefined` means "the operation is not wired".
 
-import type { WebuiVersionInfo } from "../../../shared/contracts/version.js";
-import type { WebuiAgentMemoryView, WebuiGlobalInstructionsView, WebuiMemorySettingsView, WebuiUserProfileView } from "../../../shared/contracts/personalization.js";
+import type { WebuiVersionInfo } from "../../../../shared/contracts/version.js";
+import type { WebuiAgentMemoryView, WebuiGlobalInstructionsView, WebuiMemorySettingsView, WebuiUserProfileView } from "../../../../shared/contracts/personalization.js";
+
+/**
+ * The permission preference's closed set — what the runtime asks the user for
+ * before it acts. It is published here, with the port, because both sides need
+ * it: this business's owner reads and writes the preference, and the composer's
+ * control renders it. Naming it once is what stops the two from drifting.
+ */
+export type WebuiPermissionMode = "default" | "auto" | "bypassPermissions";
 
 export interface SettingsPort {
   readonly version?: () => Promise<WebuiVersionInfo>;
   readonly getPermissionMode?: () => Promise<unknown>;
-  readonly setPermissionMode?: (request: { readonly mode: "default" | "auto" | "bypassPermissions" }) => Promise<unknown>;
+  readonly setPermissionMode?: (request: { readonly mode: WebuiPermissionMode }) => Promise<unknown>;
   /**
    * Profile-wide `AGENTS.md`. The server owns the file, the 32KiB cap and the
    * atomic write, so the panel only echoes `maxBytes` instead of re-declaring
