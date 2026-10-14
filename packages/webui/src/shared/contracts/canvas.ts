@@ -17,10 +17,10 @@
 //
 // | Declaration | Wire purpose | Producer | Consumers |
 // | --- | --- | --- | --- |
-// | `CanvasNodeLayout` | One node's x/y/width/height/zIndex inside a canvas mutation. | Browser `client/components/workspace/WorkspaceCanvas.tsx` (gesture handling). | `client/contracts/workspace/workspace-port.ts`; runtime `applyCanvas` (`runtime/harness/workspace.ts`). |
-// | `CanvasMutation` | A single add_file / update_layout / remove_node canvas gesture. | Browser `client/components/workspace/WorkspaceCanvas.tsx`. | `client/contracts/workspace/workspace-port.ts`; runtime `applyCanvas`. |
-// | `CanvasOperation` | A batch of mutations plus schemaVersion/operationId sent to the canvas authority. | Browser `client/components/workspace/WorkspaceCanvas.tsx`. | `client/contracts/workspace/workspace-port.ts`; `client/components/workspace/WorkspacePanels.tsx`; runtime `applyCanvas`. |
-// | `WebuiCanvasDocument` | The canvas document (nodes, changeSeq) returned by read/apply. | Runtime `readCanvas` / `applyCanvas` (`runtime/harness/workspace.ts`; runtime canvas authority). | `client/contracts/workspace/workspace-port.ts`; `client/components/workspace/WorkspaceCanvas.tsx`; `client/components/workspace/WorkspacePanels.tsx`. |
+// | `CanvasNodeLayout` | One node's x/y/width/height/zIndex inside a canvas mutation. | Browser `client/features/workspace/ui/WorkspaceCanvas.tsx` (gesture handling). | `client/features/workspace/contracts/workspace-port.ts`; runtime `applyCanvas` (`runtime/harness/workspace.ts`). |
+// | `CanvasMutation` | A single add_file / update_layout / remove_node canvas gesture. | Browser `client/features/workspace/ui/WorkspaceCanvas.tsx`. | `client/features/workspace/contracts/workspace-port.ts`; runtime `applyCanvas`. |
+// | `CanvasOperation` | A batch of mutations plus schemaVersion/operationId sent to the canvas authority. | Browser `client/features/workspace/ui/WorkspaceCanvas.tsx`. | `client/features/workspace/contracts/workspace-port.ts`; `client/features/workspace/ui/WorkspacePanels.tsx`; runtime `applyCanvas`. |
+// | `WebuiCanvasDocument` | The canvas document (nodes, changeSeq) returned by read/apply. | Runtime `readCanvas` / `applyCanvas` (`runtime/harness/workspace.ts`; runtime canvas authority). | `client/features/workspace/contracts/workspace-port.ts`; `client/features/workspace/ui/WorkspaceCanvas.tsx`; `client/features/workspace/ui/WorkspacePanels.tsx`. |
 export interface CanvasNodeLayout {
   readonly x: number;
   readonly y: number;

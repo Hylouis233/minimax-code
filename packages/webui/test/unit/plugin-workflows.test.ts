@@ -96,7 +96,7 @@ describe("a plugin mutation invalidates exactly what it affects", () => {
     expect(workflows.getSnapshot().listing.rows).toHaveLength(0);
     const before = workflows.getSnapshot().revision;
 
-    await workflows.installPlugin({ name: "p" });
+    await workflows.installPlugin({ pluginName: "p" });
     expect(workflows.getSnapshot().revision).toBe(before + 1);
     expect(workflows.getSnapshot().listing.rows).toHaveLength(1);
     expect(reloads.length).toBeGreaterThanOrEqual(2);
@@ -114,7 +114,7 @@ describe("a plugin mutation invalidates exactly what it affects", () => {
     });
 
     await workflows.loadListing({ ...initialWebuiPluginSelection, view: "personal" });
-    await workflows.setSkillEnabled({ name: "s", enabled: false });
+    await workflows.setSkillEnabled({ skillName: "s", enabled: false });
     expect(actions).toContain("setSkillEnabled");
   });
 

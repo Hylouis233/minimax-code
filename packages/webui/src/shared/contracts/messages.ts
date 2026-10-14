@@ -5,9 +5,9 @@
 // | Declaration | Wire purpose | Producer | Consumers |
 // | --- | --- | --- | --- |
 // | `WebuiMessage` | One transcript message as it travels on the wire. | Runtime `getMessages` (`runtime/harness/sessions.ts`; CliService). | `server/index.ts` (public barrel re-export); no other in-tree reader. |
-// | `WebuiMessagesRequest` | A paginated transcript read (id, limit, before, attachment URLs). | Browser `client/infrastructure/transport.ts` / `client/contracts/transcript/message-view.ts` (`getMessages`). | `runtime/port.ts`; `server/operation/messages.ts`. |
+// | `WebuiMessagesRequest` | A paginated transcript read (id, limit, before, attachment URLs). | Browser `client/infrastructure/transport.ts` / `client/features/transcript/contracts/message-view.ts` (`getMessages`). | `runtime/port.ts`; `server/operation/messages.ts`. |
 // | `WebuiMessagesResult` | A page of transcript messages plus todos/usage/context enrichment. | Runtime `getMessages`; enriched by `server/operation/handlers/messages.ts` `getMessages`. | `runtime/port.ts`; `server/operation/messages.ts`. |
-// | `WebuiAttachmentInput` | One attachment descriptor (meta + local asset/URL) on a send/enqueue request. | Browser `client/components/composer/WebuiComposer.tsx`, assembled in `client/application/composer/composer-workflows.ts`, `client/application/turn/queue-command.ts` and `client/application/turn/turn-commands.ts`. | `client/contracts/turn/execution-port.ts`; `client/mechanisms/stream-loop.ts`; `shared/contracts/queue.ts`; `shared/contracts/stream.ts`; `server/operation/interaction.ts`. |
+// | `WebuiAttachmentInput` | One attachment descriptor (meta + local asset/URL) on a send/enqueue request. | Browser `client/features/composer/ui/WebuiComposer.tsx`, assembled in `client/features/composer/application/composer-workflows.ts`, `client/application/turn/queue-command.ts` and `client/application/turn/turn-commands.ts`. | `client/contracts/turn/execution-port.ts`; `client/mechanisms/stream-loop.ts`; `shared/contracts/queue.ts`; `shared/contracts/stream.ts`; `server/operation/interaction.ts`. |
 export interface WebuiMessage {
   readonly msgId: string;
   readonly parentMsgId?: string;

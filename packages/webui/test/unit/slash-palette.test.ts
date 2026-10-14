@@ -6,7 +6,7 @@ import {
   WEBUI_BUILTIN_COMMANDS,
   WEBUI_PLUGIN_REGISTRY,
   WEBUI_SKILL_FIXTURES,
-} from "../../src/client/components/composer/slash-palette.js";
+} from "../../src/client/features/composer/ui/slash-palette.js";
 import { WEBUI_COMMAND_DESCRIPTORS } from "../../src/runtime/commands/descriptors.js";
 import {
   applyWebuiSlashLiteMode,
@@ -14,7 +14,7 @@ import {
   rankWebuiSlashPalette,
   sectionWebuiSlashPalette,
   WEBUI_RUN_COMMAND_NAMES,
-} from "../../src/client/contracts/composer/slash-command.js";
+} from "../../src/client/features/composer/contracts/slash-command.js";
 
 // These tests cover sectioning, four-rank filtering, lite-mode filtering,
 // and the `isWebuiRunnableCommand` narrowing.

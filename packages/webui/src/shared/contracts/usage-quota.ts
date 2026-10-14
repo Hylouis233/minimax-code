@@ -4,10 +4,10 @@
 //
 // | Declaration | Wire purpose | Producer | Consumers |
 // | --- | --- | --- | --- |
-// | `WebuiUsageQuotaWindowView` | One percentage window (5-hour / weekly) of the token-plan quota. | Runtime `UsageQuotaClient` (`runtime/usage-quota.ts`). | `client/components/account/UserMenuUsage.tsx` (via `WebuiUsageQuotaResult`). |
-// | `WebuiUsageQuotaVideoView` | The count-based video quota. | Runtime `UsageQuotaClient`. | `client/components/account/UserMenuUsage.tsx`. |
-// | `WebuiUsageQuotaView` | The token-plan quota view (fiveHour, weekly, video). | Runtime `UsageQuotaClient`. | `client/contracts/account-port.ts` (via `WebuiUsageQuotaResult`). |
-// | `WebuiUsageQuotaResult` | The account quota answer (signed-out, or plan/credit fields plus quota). | Runtime `getUsageQuota` (`runtime/harness/account.ts`; `runtime/usage-quota.ts`). | `client/contracts/account-port.ts`; `client/components/account/UserMenuUsage.tsx`; `client/features/settings/ui/UsageModelSettings.tsx`; `client/components/composer/WebuiComposer.tsx`. |
+// | `WebuiUsageQuotaWindowView` | One percentage window (5-hour / weekly) of the token-plan quota. | Runtime `UsageQuotaClient` (`runtime/usage-quota.ts`). | `client/features/account/ui/UserMenuUsage.tsx` (via `WebuiUsageQuotaResult`). |
+// | `WebuiUsageQuotaVideoView` | The count-based video quota. | Runtime `UsageQuotaClient`. | `client/features/account/ui/UserMenuUsage.tsx`. |
+// | `WebuiUsageQuotaView` | The token-plan quota view (fiveHour, weekly, video). | Runtime `UsageQuotaClient`. | `client/features/account/contracts/account-port.ts` (via `WebuiUsageQuotaResult`). |
+// | `WebuiUsageQuotaResult` | The account quota answer (signed-out, or plan/credit fields plus quota). | Runtime `getUsageQuota` (`runtime/harness/account.ts`; `runtime/usage-quota.ts`). | `client/features/account/contracts/account-port.ts`; `client/features/account/ui/UserMenuUsage.tsx`; `client/features/settings/ui/UsageModelSettings.tsx`; `client/features/composer/ui/WebuiComposer.tsx`. |
 /** One percentage window (5-hour / weekly) of the token-plan quota. */
 export interface WebuiUsageQuotaWindowView {
   /** Used percent, 0-100, already rounded; absent when unlimited or unknown. */

@@ -4,14 +4,14 @@ import {
   WEBUI_BUILTIN_COMMANDS,
   WEBUI_SKILL_FIXTURES,
   type SlashCommandEntry,
-} from "../../src/client/components/composer/slash-palette.js";
+} from "../../src/client/features/composer/ui/slash-palette.js";
 import {
   WEBUI_RUN_COMMAND_NAMES,
   classifyWebuiSlashCommand,
   isWebuiRunnableCommand,
   sectionWebuiSlashPalette,
-} from "../../src/client/contracts/composer/slash-command.js";
-import { resolveWebuiSubmissionIntent } from "../../src/client/projection/composer/composer-state.js";
+} from "../../src/client/features/composer/contracts/slash-command.js";
+import { resolveWebuiSubmissionIntent } from "../../src/client/features/composer/projection/composer-state.js";
 
 /**
  * Pure tests for the slash palette decision layer.

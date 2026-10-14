@@ -1,9 +1,10 @@
 // Turn execution capability port (plan §9; ticket #59).
 //
-// The substrate's four execution members. §9 splits the former monolithic
-// `client/contracts/execution-port.ts` three ways: these four stay with `turn`,
-// `runCommand` and the queue members go to `composer/` (`ComposerPort`), and the
-// process-event watcher goes to `shell/` (`ShellEventPort`).
+// The substrate's four execution members. §9 splits the execution port three
+// ways: these four are `turn`'s (`client/contracts/turn/execution-port.ts`),
+// `runCommand` and the queue members are the composer's
+// (`client/features/composer/contracts/command-port.ts`), and the process-event
+// watcher is the shell's (`client/contracts/shell/watch-port.ts`).
 //
 // `sendMessage` and `resumeSession` are the two members §9 names for the
 // substrate. `abortSession` and `getActiveTurn` are assigned here too, because

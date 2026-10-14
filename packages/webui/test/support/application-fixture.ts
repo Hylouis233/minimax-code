@@ -19,7 +19,7 @@ import type {
   WebuiApplication,
   WebuiApplicationStart,
 } from "../../src/client/application/create-application.js";
-import type { WebuiEventEffects } from "../../src/client/application/turn/event-coordinator.js";
+import type { WebuiPortSlices } from "../../src/client/application/port-slices.js";
 import type { WebuiSessionStore } from "../../src/client/application/session-store.js";
 
 /** A channel that accepts one listener and never emits: SSR-shaped hosts. */
@@ -27,12 +27,17 @@ export const inertEventChannel = () => ({ subscribe: () => () => undefined });
 
 export interface ApplicationFixtureOptions {
   readonly store?: WebuiSessionStore;
-  readonly effects?: WebuiEventEffects;
   readonly unreadStorage?: {
     readonly read?: () => Readonly<Record<string, number>>;
     readonly write?: (counts: Readonly<Record<string, number>>) => void;
   };
   readonly loadMessages?: (args: { readonly sessionId: string }) => Promise<unknown>;
+  /**
+   * The per-business port slices the assembly hands its owners. A fixture that
+   * supplies a transport-shaped bag must cut them and pass them here: the shell
+   * builds no fallback of its own (plan §4.1).
+   */
+  readonly slices?: WebuiPortSlices;
 }
 
 /** Builds a dormant application for a host that renders the shell. */
@@ -42,8 +47,8 @@ export function createWebuiApplicationFixture(
   return createWebuiApplication({
     openEventChannel: inertEventChannel,
     ...(options.store ? { store: options.store } : {}),
-    ...(options.effects ? { effects: options.effects } : {}),
     ...(options.unreadStorage ? { unreadStorage: options.unreadStorage } : {}),
+    ...(options.slices ? { slices: options.slices } : {}),
     turns: { resumeSession: async () => {} },
   });
 }

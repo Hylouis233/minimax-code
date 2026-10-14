@@ -55,7 +55,8 @@ describe("goal owners are keyed by session", () => {
     const owners = createWebuiGoalSessionOwners({
       store,
       port: {
-        getGoal: ({ sessionId }) => (sessionId === "A" ? pendingA.promise : pendingB.promise),
+        getGoal: ({ sessionId }: { readonly sessionId: string }) =>
+          sessionId === "A" ? pendingA.promise : pendingB.promise,
       } as never,
     });
 

@@ -1,7 +1,7 @@
 // Client-side stream state contracts. These shapes are shared by the stream
 // mechanism (`client/mechanisms/stream-loop.ts`, layer `mechanisms`) and the
 // projections that reduce frames into them (`client/projection/turn/stream-state.ts`
-// and `client/projection/workspace/workspace-progress.ts`). A mechanism may import only
+// and `client/features/workspace/projection/workspace-progress.ts`). A mechanism may import only
 // `contracts` and `shared` (plan §7.2), so the state types live here instead of
 // in the projection that reduces them: the loop operates on these types and
 // must not reach into `view` to name them.

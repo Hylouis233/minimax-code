@@ -7,6 +7,8 @@
 
 import { describe, expect, it } from "vitest";
 
+import type { WebuiWorkspaceArchiveListing } from "../../src/shared/contracts/workspace.js";
+
 import { createWebuiWorkspaceQueries } from "../../src/client/features/workspace/application/workspace-queries.js";
 import type { WebuiWorkspaceFileContent } from "../../src/shared/contracts/workspace.js";
 import type { WebuiWorkspaceReviewSummary } from "../../src/shared/contracts/review.js";
@@ -165,9 +167,10 @@ describe("a closed tab releases its file slot", () => {
 });
 
 describe("the archive owner drops a listing nobody is looking at", () => {
-  const listing = (archivePath: string, prefix: string) => ({
+  // The listing payload carries no prefix: the read's identity lives on the
+  // owner's state as `key`, which is what a superseded read is judged against.
+  const listing = (archivePath: string) => ({
     archivePath,
-    prefix,
     entries: [],
     totalEntries: 0,
     truncated: false,
@@ -190,22 +193,22 @@ describe("the archive owner drops a listing nobody is looking at", () => {
     queries.readArchive({ workspaceDir: "/w", path: "a.zip" });
     queries.readArchive({ workspaceDir: "/w", path: "a.zip", prefix: "src" });
 
-    second.resolve(listing("a.zip", "src"));
+    second.resolve(listing("a.zip"));
     await flush();
-    first.resolve(listing("a.zip", ""));
+    first.resolve(listing("a.zip"));
     await flush();
 
     // The reader moved into `src`; the root listing that answered afterwards has
     // no reader and must not replace what is shown (T11 acceptance 4).
     const state = queries.getSnapshot().archive;
     expect(state.listing.status).toBe("ready");
-    expect(state.listing.status === "ready" && state.listing.listing.prefix).toBe("src");
+    expect(state.key).toBe("/w\u0000a.zip\u0000src");
   });
 
   it("records an extract outcome the owner holds, not the view", async () => {
     const queries = createWebuiWorkspaceQueries({
       port: {
-        readWorkspaceArchive: async () => listing("a.zip", ""),
+        readWorkspaceArchive: async () => listing("a.zip"),
         extractWorkspaceArchive: async () => ({ extracted: ["a.txt"] }) as never,
       },
     });

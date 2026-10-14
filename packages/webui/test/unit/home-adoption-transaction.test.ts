@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest";
 import { createWebuiApplication } from "../../src/client/application/create-application.js";
 import { WEBUI_HOME_SESSION_KEY } from "../../src/client/application/state.js";
 import { WEBUI_COMPOSER_HOME_KEY } from "../../src/client/features/composer/application/composer-history.js";
-import type { WebuiApplicationSnapshot } from "../../src/client/application/state.js";
+import type { WebuiApplicationState } from "../../src/client/application/state.js";
 import type { WebuiClientSessionResumer } from "../../src/client/contracts/turn/execution-port.js";
 
 function application() {
@@ -28,7 +28,7 @@ function application() {
 
 /** Every snapshot a subscriber was told about, in order. */
 function observe(app: ReturnType<typeof application>) {
-  const seen: WebuiApplicationSnapshot[] = [];
+  const seen: WebuiApplicationState[] = [];
   const detach = app.subscribe(() => {
     seen.push(app.getSnapshot());
   });

@@ -21,12 +21,12 @@ import {
   resolveThinkingVerdict,
   thinkingControlShape,
 } from "../../src/client/features/models/projection/thinking-control.js";
-import { ThinkingTrigger } from "../../src/client/components/composer/ThinkingTrigger.js";
+import { ThinkingTrigger } from "../../src/client/features/composer/ui/ThinkingTrigger.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const componentPath = path.resolve(
   here,
-  "../../src/client/components/composer/ThinkingTrigger.tsx",
+  "../../src/client/features/composer/ui/ThinkingTrigger.tsx",
 );
 
 const BINARY = ["off", "on"];

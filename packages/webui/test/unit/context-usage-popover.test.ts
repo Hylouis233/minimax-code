@@ -167,7 +167,13 @@ describe("context-usage panel — placed from the ring, not from CSS offsets", (
 });
 
 describe("context-usage panel — the shape the source has to keep", () => {
-  const css = readClient("features/transcript/ui/transcript.css");
+  // Two files since T20: the panel's own rules live with the transcript, while
+  // the composer overlay it has to clear belongs to the composer. The case below
+  // compares across them on purpose, so both are in the subject.
+  const css = [
+    readClient("features/transcript/ui/transcript.css"),
+    readClient("features/composer/ui/composer.css"),
+  ].join("\n");
   // The panel moved to its own module (ticket #77); the composer keeps the call site.
   const indicator = readClient("features/sessions/ui/ContextUsageIndicator.tsx");
   // The panel's OWN declaration block and nothing after it. Slicing to the end of

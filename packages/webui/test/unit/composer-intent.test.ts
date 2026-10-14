@@ -5,9 +5,9 @@ import {
   resolveWebuiComposerEnterAction,
   resolveWebuiSubmissionIntent,
   type WebuiSubmissionIntent,
-} from "../../src/client/projection/composer/composer-state.js";
+} from "../../src/client/features/composer/projection/composer-state.js";
 import { isTurnLive } from "../../src/client/contracts/turn/stream-state.js";
-import type { SlashCommandEntry } from "../../src/client/components/composer/slash-palette.js";
+import type { SlashCommandEntry } from "../../src/client/features/composer/ui/slash-palette.js";
 import {
   findWebuiMentionRange,
   findWebuiSlashRange,
@@ -16,7 +16,7 @@ import {
   replaceWebuiSlashToken,
   webuiAttachmentLimitError,
   webuiTextAttachmentDataUrl,
-} from "../../src/client/projection/composer/composer-interactions.js";
+} from "../../src/client/features/composer/projection/composer-interactions.js";
 import { sendMessageOperation, enqueueMessageOperation } from "../../src/server/operation/operations.js";
 import { setPermissionModeOperation } from "../../src/server/operation/permission-mode.js";
 

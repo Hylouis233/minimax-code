@@ -18,18 +18,18 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const CLIENT = new URL("../../src/client/components/", import.meta.url);
+const CLIENT = new URL("../../src/client/features/", import.meta.url);
 const read = (relative: string): string =>
   readFileSync(fileURLToPath(new URL(relative, CLIENT)), "utf8");
 
-const parent = read("settings/UsageModelSettings.tsx");
+const parent = read("settings/ui/UsageModelSettings.tsx");
 const accountOwner = readFileSync(
   fileURLToPath(
     new URL("../../src/client/features/account/application/account-workflows.ts", import.meta.url),
   ),
   "utf8",
 );
-const panel = read("models/ProviderFormPanel.tsx");
+const panel = read("models/ui/ProviderFormPanel.tsx");
 
 /** The slice from one marker to the next, so an assertion cannot be satisfied from elsewhere. */
 const between = (text: string, from: string, to: string): string =>

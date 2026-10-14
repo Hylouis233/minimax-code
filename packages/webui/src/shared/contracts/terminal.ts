@@ -4,7 +4,7 @@
 //
 // | Declaration | Wire purpose | Producer | Consumers |
 // | --- | --- | --- | --- |
-// | `WebuiTerminalFrame` | One terminal output frame (terminalId, data, exited). | Runtime `WebuiTerminalManager.watch` (`runtime/terminal.ts`, via the `watchTerminal` handler). | `client/contracts/terminal-port.ts`; `client/infrastructure/transport.ts`. |
+// | `WebuiTerminalFrame` | One terminal output frame (terminalId, data, exited). | Runtime `WebuiTerminalManager.watch` (`runtime/terminal.ts`, via the `watchTerminal` handler). | `client/features/terminal/contracts/terminal-port.ts`; `client/infrastructure/transport.ts`. |
 // | `WebuiRunCommandRequest` | A slash-command run request (command, input, session/agent/workspace). | Browser `client/infrastructure/transport.ts` (`runCommand`). | `runtime/commands/runner.ts`; `runtime/port.ts`. |
 // | `WebuiRunCommandResult` | The command outcome (handled output/data). | Runtime `runWebuiCommand` (`runtime/commands/runner.ts`). | `server/operation/handlers/commands.ts` `runCommand`; `server/operation/provider.ts`. |
 export interface WebuiTerminalFrame {

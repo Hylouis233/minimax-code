@@ -35,7 +35,7 @@ import { createWebuiSessionScopeManager } from "../../src/client/conversation/se
 import {
   createWebuiSessionWorkflows,
 } from "../../src/client/features/sessions/application/session-workflows.js";
-import { createWebuiComposerStore } from "../../src/client/application/composer/composer-store.js";
+import { createWebuiComposerStore } from "../../src/client/features/composer/application/composer-store.js";
 import {
   createWebuiInteractionCommands,
   createWebuiTurnLifecycleCommands,

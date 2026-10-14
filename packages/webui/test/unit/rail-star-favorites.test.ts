@@ -394,7 +394,7 @@ describe("the star on a rail row", () => {
     // only from internal `useState` that no prop seeds, and this suite has no
     // DOM to click the disclosure with. The browser spec covers the real thing.
     const source = readFileSync(
-      new URL("../../src/client/features/sessions/ui/SessionRail.tsx", import.meta.url),
+      new URL("../../src/client/features/sessions/ui/project-expansion.tsx", import.meta.url),
       "utf8",
     );
     const anchor = source.indexOf("session={child}");

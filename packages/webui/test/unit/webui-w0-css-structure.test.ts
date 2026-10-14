@@ -147,14 +147,27 @@ function declarationsFor(selector: string, rules: CssRule[] = shellRules): strin
 
 beforeAll(() => {
   indexCss = readFileSync(path.join(stylesDir, "index.css"), "utf8");
-  // The rules under test are the ones the browser actually gets (T20). The
-  // feature rules moved out of `shell.css` into their own business files, so
-  // reading that file alone would now assert over the shared population only;
-  // the sources are therefore taken from the entry's own import list, in import
-  // order, which is also what keeps this in step with the next move.
+  // The rules under test are the shell's own population (T20): the feature
+  // rules moved out of `shell.css` into their own business files, so reading
+  // that file alone would now assert over the shared remainder only. The
+  // sources are that file plus the business files carved out of it — taken from
+  // the entry's import list so this stays in step with the next move — and
+  // deliberately *not* the two files that were already independent of it
+  // (`tokens.css`, the single token authority and the pre-existing
+  // `transcript-widgets.css` / `plan-mode.css`), which would add rules the
+  // assertions below never counted.
+  const carved = new Set([
+    "tokens.css",
+    "transcript-widgets.css",
+    "plan-mode.css",
+  ]);
   const sources = [...indexCss.matchAll(/@import\s+"([^"]+\.css)"/gu)]
     .map((match) => match[1])
-    .filter((specifier) => !specifier.startsWith("katex/"))
+    .filter(
+      (specifier) =>
+        !specifier.startsWith("katex/") &&
+        !carved.has(specifier.replace(/^.*\//u, "")),
+    )
     .map((specifier) => path.resolve(stylesDir, specifier));
   shellCss = sources.map((source) => readFileSync(source, "utf8")).join("\n");
   transcriptCss = readFileSync(
@@ -420,9 +433,22 @@ describe("W0 · stylesheet composition", () => {
     const imports = [...indexCss.matchAll(/@import\s+"([^"]+)"/gu)].map(
       (match) => match[1],
     );
+    // T20 split the shell's rules into per-business files; the composition
+    // order below is the documented one, and the layered order is what makes
+    // the split harmless (every file wraps its rules in `@layer components`).
     expect(imports).toEqual([
       "./tokens.css",
       "./shell.css",
+      "../features/plugins/ui/plugins.css",
+      "../features/settings/ui/settings.css",
+      "../features/models/ui/models.css",
+      "../features/interactions/ui/interactions.css",
+      "../features/composer/ui/composer.css",
+      "../features/transcript/ui/transcript.css",
+      "../features/sessions/ui/sessions.css",
+      "../features/workspace/ui/workspace.css",
+      "../features/goal/ui/goal.css",
+      "../features/account/ui/account.css",
       "../features/transcript/ui/transcript-widgets.css",
       "../features/interactions/ui/plan-mode.css",
       "katex/dist/katex.min.css",

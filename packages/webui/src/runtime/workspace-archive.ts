@@ -171,7 +171,7 @@ const WORKSPACE_ARCHIVE_MAX_LISTED_ENTRIES = 500;
 
 /**
  * The extensions the client routes to the archive preview, mirrored from
- * `WORKSPACE_ARCHIVE_EXTENSIONS` in `src/client/components/workspace/WorkspacePanels.tsx`.
+ * `WORKSPACE_ARCHIVE_EXTENSIONS` in `src/client/features/workspace/ui/WorkspacePanels.tsx`.
  *
  * Mirrored rather than imported because that module is browser-side and this is
  * the server, but the two lists must not drift: a format this module cannot

@@ -35,9 +35,12 @@ describe("the shell forwards zero transport members", () => {
     }
   });
 
-  it("builds the port slices once, taking the transport only as the fallback", () => {
-    expect(shell).toContain("createWebuiPortSlices(transport ?? {})");
-    expect(shell.match(/createWebuiPortSlices\(/gu) ?? []).toHaveLength(1);
+  it("cuts no port slices of its own: the composition root cuts them once", () => {
+    // T19 moved the cut out of the shell entirely. The seam this case guards is
+    // unchanged — the shell forwards zero transport members — so a second cut
+    // inside it, or the fallback coming back, turns the case red.
+    expect(shell.match(/createWebuiPortSlices\(/gu) ?? []).toHaveLength(0);
+    expect(main.match(/createWebuiPortSlices\(/gu) ?? []).toHaveLength(1);
   });
 });
 

@@ -10,6 +10,8 @@
 
 import { describe, expect, it, vi } from "vitest";
 
+import type { WebuiModelEntry } from "../../src/shared/contracts/models.js";
+
 import { createWebuiModelsWorkflows } from "../../src/client/features/models/application/models-workflows.js";
 
 const noStatusRefresh = async (): Promise<void> => {};
@@ -48,7 +50,7 @@ describe("an optimistic provider patch stays the owner's", () => {
     const workflows = build({
       listUserModelProviders: async () => providers,
       updateUserModelProvider: async (body) => {
-        providers = [{ providerId: "a", models: body.models as readonly Record<string, unknown>[] }];
+        providers = [{ providerId: "a", models: body.models as readonly WebuiModelEntry[] }];
         return { ok: true };
       },
     });
@@ -56,7 +58,7 @@ describe("an optimistic provider patch stays the owner's", () => {
     await workflows.loadProviders();
     workflows.patchProviderModels("a", [{ modelId: "m1", enabled: false }]);
     expect(
-      (workflows.getSnapshot().providers.value?.[0]?.models as readonly Record<string, unknown>[])[0]
+      (workflows.getSnapshot().providers.value?.[0]?.models as readonly WebuiModelEntry[])[0]
         ?.enabled,
     ).toBe(false);
   });
@@ -73,7 +75,7 @@ describe("an optimistic provider patch stays the owner's", () => {
     workflows.patchProviderModels("a", [{ modelId: "m1", enabled: false }]);
     await expect(workflows.updateProvider({ providerId: "a" })).rejects.toThrow("nope");
     expect(
-      (workflows.getSnapshot().providers.value?.[0]?.models as readonly Record<string, unknown>[])[0]
+      (workflows.getSnapshot().providers.value?.[0]?.models as readonly WebuiModelEntry[])[0]
         ?.enabled,
     ).toBe(true);
   });
@@ -125,11 +127,11 @@ describe("writing a provider key", () => {
 // two reads in flight, resolved out of order — because that is the shape the old
 // destination field failed.
 describe("the catalogue is keyed, not one destination", () => {
-  const model = (modelId: string) => ({ modelId });
+  const model = (modelId: string) => ({ modelId }) as unknown as WebuiModelEntry;
 
   it("keeps a late answer for another session out of the shown catalogue", async () => {
-    let resolveA!: (value: readonly Record<string, unknown>[]) => void;
-    const slowA = new Promise<readonly Record<string, unknown>[]>((resolve) => {
+    let resolveA!: (value: readonly WebuiModelEntry[]) => void;
+    const slowA = new Promise<readonly WebuiModelEntry[]>((resolve) => {
       resolveA = resolve;
     });
     const workflows = build({
@@ -150,8 +152,8 @@ describe("the catalogue is keyed, not one destination", () => {
   });
 
   it("refuses a catalogue answer that was in flight when a provider write retired it", async () => {
-    let resolveRead!: (value: readonly Record<string, unknown>[]) => void;
-    const slow = new Promise<readonly Record<string, unknown>[]>((resolve) => {
+    let resolveRead!: (value: readonly WebuiModelEntry[]) => void;
+    const slow = new Promise<readonly WebuiModelEntry[]>((resolve) => {
       resolveRead = resolve;
     });
     const workflows = build({
@@ -173,8 +175,8 @@ describe("the catalogue is keyed, not one destination", () => {
   });
 
   it("accepts nothing after disposal", async () => {
-    let resolveRead!: (value: readonly Record<string, unknown>[]) => void;
-    const slow = new Promise<readonly Record<string, unknown>[]>((resolve) => {
+    let resolveRead!: (value: readonly WebuiModelEntry[]) => void;
+    const slow = new Promise<readonly WebuiModelEntry[]>((resolve) => {
       resolveRead = resolve;
     });
     const workflows = build({ listModels: () => slow });

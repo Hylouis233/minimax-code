@@ -5,10 +5,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  chunkWebuiWorkspaceReviewFileIds,
-  createWebuiWorkspaceReviewOwner,
-} from "../../src/client/features/review/application/workspace-review-owner.js";
+import { createWebuiWorkspaceReviewOwner } from "../../src/client/features/review/application/workspace-review-owner.js";
 import {
   chunkWebuiWorkspaceReviewFileIds,
 } from "../../src/client/features/review/contracts/workspace-review.js";

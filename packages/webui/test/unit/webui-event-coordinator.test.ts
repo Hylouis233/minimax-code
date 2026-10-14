@@ -35,6 +35,9 @@ function coordinator() {
       refreshGoal: (sessionId) => goals.owner(sessionId).refreshGoal(),
       invalidatePending: () => undefined,
       refreshPending: () => undefined,
+      attachStream: () => undefined,
+      channelReady: () => undefined,
+      workspaceGitChanged: () => undefined,
     },
   });
   return { store, events, goals };

@@ -636,11 +636,11 @@ describe("workspace archive view", () => {
                 new Promise<WebuiWorkspaceArchiveListing>(() => undefined),
             },
           }),
+          children: createElement(WorkspaceArchiveView, {
+            workspaceDir: "/repo",
+            path: "dist/bundle.zip",
+          }),
         },
-        createElement(WorkspaceArchiveView, {
-          workspaceDir: "/repo",
-          path: "dist/bundle.zip",
-        }),
       ),
     );
     expect(markup).toContain('role="status"');

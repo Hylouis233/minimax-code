@@ -23,6 +23,7 @@ import { WebuiAssistantBody } from "../../src/client/features/transcript/ui/Assi
 import { WebuiClientFoundationApp } from "../../src/client/components/shell/WebuiClientFoundationApp.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 import { WebuiApplicationProvider } from "../../src/client/bindings/application-context.js";
+import { createWebuiPortSlices } from "../../src/client/application/port-slices.js";
 import { createWebuiApplicationFixture } from "../support/application-fixture.js";
 import { projectMessageParts } from "../../src/client/features/transcript/projection/message-parts.js";
 import type { WebuiClientMessage } from "../../src/client/features/transcript/contracts/message-view.js";
@@ -316,8 +317,15 @@ describe("C-4.3 image and text in one assistant message render together, in orde
     // case wants; no prior turn can bleed in. The application is constructed
     // dormant (no ingress) because this fixture renders markup, not a session.
     const sessionStore = createWebuiSessionStore();
+    // The shell cuts no port slices of its own (plan §4.1), so the bag the
+    // props name is handed to the assembly instead.
+    const transport = {
+      loadMessages: async () => ({ messages, hasMore: false }),
+      watchEvents: () => () => undefined,
+    };
     const application = createWebuiApplicationFixture({
       store: sessionStore,
+      slices: createWebuiPortSlices(transport),
     });
 
     const html = renderToStaticMarkup(
@@ -339,10 +347,7 @@ describe("C-4.3 image and text in one assistant message render together, in orde
           hasMore: false,
         },
           initialMessages: { messages, hasMore: false },
-          transport: {
-            loadMessages: async () => ({ messages, hasMore: false }),
-            watchEvents: () => () => undefined,
-          },
+          transport,
         } as React.ComponentProps<typeof WebuiClientFoundationApp>),
       }),
     );

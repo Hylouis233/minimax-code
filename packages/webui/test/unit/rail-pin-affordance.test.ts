@@ -283,7 +283,7 @@ describe("the persistent pin marker", () => {
     // prop list, so this can fail: revert the child call site to the
     // three-prop form and the flag is outside the window.
     const source = readFileSync(
-      new URL("../../src/client/features/sessions/ui/SessionRail.tsx", import.meta.url),
+      new URL("../../src/client/features/sessions/ui/project-expansion.tsx", import.meta.url),
       "utf8",
     );
     const anchor = source.indexOf("session={child}");

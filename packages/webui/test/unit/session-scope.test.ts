@@ -32,7 +32,7 @@ describe("session scope — selection is one lease among several", () => {
     scope.select("B");
 
     expect(scope.selected()).toBe("B");
-    expect(scope.kinds("A").sort()).toEqual(["delivery", "settlement"]);
+    expect([...scope.kinds("A")].sort()).toEqual(["delivery", "settlement"]);
     expect(scope.isInterested("A")).toBe(true);
     expect(scope.kinds("B")).toEqual(["selected-view"]);
   });

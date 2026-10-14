@@ -57,7 +57,7 @@ describe("the conversation turn commands", () => {
 
   it("reaches the port with the session and writes the attempt to the session's record", async () => {
     const store = createWebuiSessionStore();
-    const sendMessage = vi.fn(async () => openStream());
+    const sendMessage = vi.fn(async (_request: unknown) => openStream());
     const commands = createWebuiConversationTurnCommands({
       store,
       sessionId: "s1",

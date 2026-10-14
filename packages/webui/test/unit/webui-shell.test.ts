@@ -975,7 +975,7 @@ describe("WebUI shell — desktop anatomy", () => {
 
   it("keeps the rail scrollable without showing a scrollbar", () => {
     const styles = readFileSync(
-      new URL("../../src/client/features/sessions/ui/sessions.css", import.meta.url),
+      new URL("../../src/client/styles/shell.css", import.meta.url),
       "utf8",
     );
     const railScrollRule = styles.match(

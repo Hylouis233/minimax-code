@@ -58,7 +58,7 @@ function buildAccount(
 describe("account commands move the credential generation", () => {
   it("advances on a successful sign-out", async () => {
     const { identityEpochs, workflows } = buildAccount({
-      signOut: async () => ({ ok: true }),
+      signOut: async () => ({ success: true }),
       getAccountStatus: async () => ({ signedIn: false }),
       getUsageQuota: async () => ({ signedIn: false }),
     });
@@ -109,7 +109,7 @@ describe("account commands move the credential generation", () => {
     await workflows.beginLogin();
     // The poll is timer-driven; the same transition is reachable through the
     // owner's own status read, which is what the login flow calls.
-    await workflows.pollLoginStatus?.();
+    await workflows.loadAccount();
     expect(identityEpochs.credentials().generation).toBeGreaterThanOrEqual(0);
   });
 });
@@ -151,8 +151,18 @@ describe("models commands move the configuration generation", () => {
 describe("settings commands move the configuration generation", () => {
   it("advances after an instruction write lands", async () => {
     const { identityEpochs, workflows } = buildSettings({
-      getGlobalInstructions: async () => ({ content: "" }),
-      setGlobalInstructions: async ({ content }) => ({ content }),
+      getGlobalInstructions: async () => ({
+        content: "",
+        exists: true,
+        path: "/tmp/AGENTS.md",
+        maxBytes: 4096,
+      }),
+      setGlobalInstructions: async ({ content }) => ({
+        content,
+        exists: true,
+        path: "/tmp/AGENTS.md",
+        maxBytes: 4096,
+      }),
     });
     await workflows.saveInstructions("be brief");
     expect(identityEpochs.configuration().generation).toBe(1);
@@ -172,9 +182,21 @@ describe("settings commands move the configuration generation", () => {
 
   it("advances after a memory or profile write lands", async () => {
     const { identityEpochs, workflows } = buildSettings({
-      setUserProfile: async (fields) => fields,
-      setAgentMemory: async ({ content }) => ({ content }),
-      setMiniMaxModelSource: async () => undefined,
+      setUserProfile: async (fields) => ({
+        ...fields,
+        exists: true,
+        malformed: false,
+        path: "/tmp/user.md",
+        sizeBytes: 0,
+        maxChars: 4096,
+      }),
+      setAgentMemory: async ({ content }) => ({
+        agentName: "main",
+        path: "/tmp/memory.md",
+        exists: true,
+        sizeBytes: content.length,
+      }),
+      setMiniMaxModelSource: async (source) => source,
     });
     await workflows.saveProfile({ name: "tester" } as never);
     await workflows.saveAgentMemory("remember this");

@@ -312,7 +312,13 @@ export interface GraphEvaluation {
   readonly cycles: readonly GraphViolation[];
 }
 
-export function evaluateGraph(graph: DependencyGraph): GraphEvaluation;
+export function evaluateGraph(
+  graph: DependencyGraph,
+  options?: {
+    /** A fixture graph states its own approved peers; omitted reads the repo's list. */
+    readonly approvedPeerImports?: readonly ApprovedPeerImport[];
+  },
+): GraphEvaluation;
 
 export function detectCycles(edges: readonly GraphEdge[]): string[][];
 
