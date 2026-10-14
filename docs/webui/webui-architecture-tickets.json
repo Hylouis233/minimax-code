@@ -1098,14 +1098,14 @@
     "tickets": {
       "T01": "implemented locally, acceptance evidence recorded on #127",
       "T02": "implemented locally, acceptance evidence recorded on #128",
-      "T03": "implemented locally, acceptance evidence recorded on #129",
+      "T03": "reopened 2026-10-14 - criterion 5 half unmet: the model grouping/key/focus rules moved to projection/models/, but the picker UI (components/models/ModelPicker.tsx, ModelSettingsFlyout.tsx, ProviderFormPanel.tsx) is still in the retired global home and features/models/ does not exist",
       "T04": "implemented locally, acceptance evidence recorded on #130",
-      "T05": "closed 2026-10-13, acceptance evidence recorded on #131",
-      "T06": "closed 2026-10-14, acceptance evidence recorded on #132",
-      "T10": "closed 2026-10-14 (issue #136, comment 6156644369): both review families have their own owners and both consumers are browser-verified",
+      "T05": "reopened 2026-10-14 - criterion 6 half unmet: the composer no longer constructs the owners, but components/{goal,interactions}/*, application/{goal,interactions}/* and bindings/{goal-owner,interaction-owner}.ts remain in the retired global homes",
+      "T06": "reopened 2026-10-14 - criterion 5 half unmet: contracts/projections/UI are in features/transcript/, but the scroll binding is still client/bindings/use-transcript-scroll.ts",
+      "T10": "reopened 2026-10-14 - criterion 5 half unmet: the review owner, contracts, projections and UI are in features/review/, but the binding is still client/bindings/use-turn-review.ts",
       "T14": "closed 2026-10-14 (issue #140, comment 6156919983): the host assembles the registry and the terminal-process port; the service binds what it was handed",
-      "T07": "closed 2026-10-14 (issue #133, comment 6157401861): one Sessions owner holds the catalogue, the rail overlays and the lifecycle commands, with the delete failure/interest evidence and the rail/archive/import/export browser entry paths",
-      "T09": "closed 2026-10-14 (issue #135, comment 6157618298): one Account owner holds the status/login/check-in/quota lifetime, the credential reads left Settings, and its timers end with its disposal",
+      "T07": "reopened 2026-10-14 - criterion 5 unmet: the rail's pure grouping/filtering is still in features/sessions/ui/SessionRail.tsx (lines 58-218); the close comment claimed it had moved to features/sessions/projection/",
+      "T09": "reopened 2026-10-14 - criterion 6 half unmet: account contracts/projection/UI moved, but the account bindings are still in client/bindings/use-query-state.tsx",
       "T11": "in progress: five owners behind one composer, closed-tab interest release, archive/canvas/directory-browse outcomes and freshness, and the panel/tab state moved out of the shell into WebuiWorkspacePanelOwner (d2567749, browser-verified); the preview half and the criterion-6 audit remain"
     },
     "frontier": [
@@ -1126,7 +1126,21 @@
       "T11 remaining: acceptance 4's last halves (preview and directory-browser outcome/freshness), acceptance 3's panel-state ownership (still the shell's useState; T19's composition), and acceptance 6's evidence audit (stale tab/file responses, supersession, workspace aliases, invalidation bursts, HTTP range/content/path, browser panel scenarios).",
       "T11 slice 9 (71cd9f8b): the directory picker's listing, loading and failure moved into the files owner with a browse sequence (fast navigation can no longer show the wrong directory); the component keeps the typed path draft. The tripwire that pins the picker's five behaviours now scans both halves with its claims unchanged.",
       "T11 remaining: acceptance 4's preview half (the media/HTML preview restrictions are already pinned by their own suites; what is left is naming the outcome/freshness owner for them), acceptance 3's panel-state ownership (the shell's useState; T19's composition) and acceptance 6's evidence audit."
-    ]
+    ],
+    "audit": {
+      "asOf": "2026-10-14",
+      "scope": "every closed ticket (#127-#133, #135, #136, #140) re-checked against the tree",
+      "finding": "T01, T02, T04 and T14 hold. T03, T05, T06, T07, T09 and T10 each carry a target-home clause that was only partly delivered; the behavioural criteria in those tickets are done and verified. Six issues were reopened with the unmet item named.",
+      "corrections": [
+        "https://github.com/mcode-webui/minimax-code/issues/129#issuecomment-6158777868",
+        "https://github.com/mcode-webui/minimax-code/issues/131#issuecomment-6158782414",
+        "https://github.com/mcode-webui/minimax-code/issues/132#issuecomment-6158778254",
+        "https://github.com/mcode-webui/minimax-code/issues/133#issuecomment-6158777560",
+        "https://github.com/mcode-webui/minimax-code/issues/135#issuecomment-6158782726",
+        "https://github.com/mcode-webui/minimax-code/issues/136#issuecomment-6158783154"
+      ],
+      "whyItWasMissed": "The dependency gate classifies roles by directory name and reports unknown paths rather than constraining them, so a business file left in a retired global directory stays green; and no acceptance criterion is machine-checked, so the target-home clauses were closed on intent rather than on the file."
+    }
   },
   "publicationVerification": {
     "status": "PASS",
