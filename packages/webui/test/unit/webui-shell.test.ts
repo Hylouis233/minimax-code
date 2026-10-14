@@ -60,7 +60,7 @@ import {
   subscribeToSessionHash,
 } from "../../src/client/components/shell/WebuiClientFoundationApp.js";
 import { shellElement } from "../support/shell-fixture.js";
-import type {WebuiClientMessageEnqueuer} from "../../src/client/contracts/composer/command-port.js";
+import type {WebuiClientMessageEnqueuer} from "../../src/client/features/composer/contracts/command-port.js";
 import type {WebuiClientMessageSender, WebuiClientSessionResumer} from "../../src/client/contracts/turn/execution-port.js";
 import type { WebuiClientMessageLoader } from "../../src/client/features/transcript/contracts/message-view.js";
 import type { WebuiTranscriptItem } from "../../src/client/features/transcript/contracts/transcript-view.js";
@@ -75,7 +75,7 @@ import {
   submitWebuiGoal,
   submitWebuiComposerTurn,
   type WebuiComposerSubmitHandlers,
-} from "../../src/client/application/composer/composer-workflows.js";
+} from "../../src/client/features/composer/application/composer-workflows.js";
 import { createWebuiTurnLifecycleCommands } from "../../src/client/features/sessions/application/session-commands.js";
 import { projectWebuiMessage } from "../../src/client/features/transcript/projection/message-projection.js";
 import { projectLiveTurnView } from "../../src/client/features/transcript/projection/transcript-shape.js";
@@ -1258,7 +1258,7 @@ describe("WebUI shell — desktop anatomy", () => {
 
   it("does not render a usage summary in the session composer", () => {
     const source = readFileSync(
-      new URL("../../src/client/components/composer/WebuiComposer.tsx", import.meta.url),
+      new URL("../../src/client/features/composer/ui/WebuiComposer.tsx", import.meta.url),
       "utf8",
     );
     expect(source).not.toContain('data-webui-session-usage="true"');
@@ -1333,7 +1333,7 @@ describe("WebUI rail row click wiring", () => {
 
 // Behaviour-level coverage of the composer's send/resume loop. The test
 // drives the same `runWebuiStreamLoop` the composer in
-// `components/composer/WebuiComposer.tsx` calls
+// `features/composer/ui/WebuiComposer.tsx` calls
 // from its submit handler, with a WebSocket double (the mocked
 // `sendMessage` / `resumeSession` close over the `onFrame` callback the
 // transport would otherwise hand to a real socket). The assertions

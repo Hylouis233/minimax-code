@@ -74,7 +74,7 @@ describe("the session state source is single", () => {
   });
 
   it("reads the context-window consumption from the store and writes it back there", () => {
-    const composer = flat(read("components/composer/WebuiComposer.tsx"));
+    const composer = flat(read("features/composer/ui/WebuiComposer.tsx"));
     // Read: the stream slice the application store owns.
     expect(composer).toContain("stream.contextUsage");
     // Write: the one lifecycle command, so the store stays the single writable copy.

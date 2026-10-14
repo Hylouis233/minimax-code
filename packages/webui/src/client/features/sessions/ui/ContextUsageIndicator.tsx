@@ -8,13 +8,13 @@
 import type { WebuiModelEntry } from "../../../../shared/contracts/models.js";
 import type { WebuiUsageQuotaResult } from "../../../../shared/contracts/usage-quota.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
-import { breakdownSegmentPercent, breakdownShareLabel, breakdownSwatchStyle, contextBreakdownRows, drawableBreakdownRows } from "../../../projection/composer/context-breakdown.js";
+import { breakdownSegmentPercent, breakdownShareLabel, breakdownSwatchStyle, contextBreakdownRows, drawableBreakdownRows } from "../../../features/composer/projection/context-breakdown.js";
 import {
   contextUsagePopoverStyle,
   positionContextUsagePopover,
   sameContextUsagePlacement,
   type ContextUsagePlacement,
-} from "../../../projection/composer/context-usage-popover.js";
+} from "../../../features/composer/projection/context-usage-popover.js";
 import { readUsageNumber } from "../../transcript/projection/message-projection.js";
 import { isTokenPlanModel } from "../../models/projection/token-plan-model.js";
 import { formatUsageResetLabel } from "../../account/projection/usage.js";
@@ -133,7 +133,7 @@ export function ContextUsageIndicator({ usage, usageQuota, planModel }: {
   const circumference = 2 * Math.PI * 7;
   const label = `${percent}% · ${formatContextTokens(used)} / ${formatContextTokens(limit)} tokens`;
   // Always all six categories, in the reference's fixed order, with a dash for
-  // whatever the engine did not report. See `projection/composer/context-breakdown.ts`
+  // whatever the engine did not report. See `features/composer/projection/context-breakdown.ts`
   // for why a missing category is a dash and not `0.0%`.
   const breakdownRows = contextBreakdownRows(usage.components, used);
   const drawableRows = drawableBreakdownRows(breakdownRows);

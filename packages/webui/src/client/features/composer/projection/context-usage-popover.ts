@@ -37,7 +37,7 @@
 import {
   overlayAxisStart,
   type OverlayRect,
-} from "../common/overlay-geometry.js";
+} from "../../../projection/common/overlay-geometry.js";
 
 /**
  * A rectangle in viewport space, the same shape the fly-out anchor reports.

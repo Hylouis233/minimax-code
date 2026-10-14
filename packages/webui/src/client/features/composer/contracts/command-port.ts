@@ -12,7 +12,7 @@ import type {
   WebuiEnqueueMessageRequest,
   WebuiEnqueueMessageResult,
   WebuiQueueItem,
-} from "../../../shared/contracts/queue.js";
+} from "../../../../shared/contracts/queue.js";
 
 export type WebuiClientMessageEnqueuer = (
   request: WebuiEnqueueMessageRequest,

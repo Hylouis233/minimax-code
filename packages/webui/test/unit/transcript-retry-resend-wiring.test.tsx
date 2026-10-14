@@ -74,13 +74,13 @@ vi.mock("react/jsx-runtime", async (importOriginal) => {
 
 import {
   WebuiComposer,
-} from "../../src/client/components/composer/WebuiComposer.js";
-import { planWebuiRetryResend, resendRecordedWebuiTurn } from "../../src/client/application/composer/turn-retry.js";
+} from "../../src/client/features/composer/ui/WebuiComposer.js";
+import { planWebuiRetryResend, resendRecordedWebuiTurn } from "../../src/client/features/composer/application/turn-retry.js";
 import { OutputError } from "../../src/client/features/transcript/ui/OutputError.js";
 import {
   buildWebuiComposerHandlers,
   submitWebuiComposerTurn,
-} from "../../src/client/application/composer/composer-workflows.js";
+} from "../../src/client/features/composer/application/composer-workflows.js";
 import { createWebuiSessionStore, type WebuiSessionStore } from "../../src/client/application/session-store.js";
 import {
   WebuiApplicationProvider,

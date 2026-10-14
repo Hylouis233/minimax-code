@@ -19,8 +19,8 @@ import {
   type ReactElement,
 } from "react";
 import { ArchonShell } from "./ArchonShell.js";
-import { WEBUI_COMPOSER_HOME_KEY } from "../../application/composer/composer-history.js";
-import { Composer } from "../composer/Composer.js";
+import { WEBUI_COMPOSER_HOME_KEY } from "../../features/composer/application/composer-history.js";
+import { Composer } from "../../features/composer/ui/Composer.js";
 import { GreetingSkeleton } from "../../features/transcript/ui/TranscriptSkeletons.js";
 import { LeftRail } from "../../features/sessions/ui/LeftRail.js";
 import {
@@ -57,7 +57,7 @@ import {
 } from "../../projection/shell/shell-surface.js";
 import { ConversationUsageBanner } from "../../features/account/ui/ConversationUsageBanner.js";
 import { PluginCatalogue } from "../../features/plugins/ui/PluginCatalogue.js";
-import { WebuiComposer } from "../composer/WebuiComposer.js";
+import { WebuiComposer } from "../../features/composer/ui/WebuiComposer.js";
 import { WebuiSessionTranscript } from "../../features/transcript/ui/SessionTranscript.js";
 import { WebuiProjectList } from "../../features/sessions/ui/SessionRail.js";
 import {
@@ -90,7 +90,7 @@ import type {
   WebuiWorkspaceSubagent,
 } from "../../features/workspace/projection/workspace-progress.js";
 import type { WebuiProjectGroup } from "../../features/sessions/projection/rail-groups.js";
-import { createWebuiCommandWorkflows } from "../../application/composer/command-workflows.js";
+import { createWebuiCommandWorkflows } from "../../features/composer/application/command-workflows.js";
 import {
   selectWebuiCatalogFlatPage,
   selectWebuiCatalogTreePage,
@@ -139,7 +139,7 @@ import { createWebuiPlanReviewWorkflow } from "../../features/interactions/appli
 import type { WebuiWorkspaceGitChangedSignal } from "../../features/workspace/projection/workspace-panel-state.js";
 import { ConnectionStatus } from "./ConnectionStatus.js";
 import { deriveConversationUsageNotice } from "../../features/transcript/projection/message-projection.js";
-import { deriveRecentWorkspaceDirs } from "../../projection/composer/composer-state.js";
+import { deriveRecentWorkspaceDirs } from "../../features/composer/projection/composer-state.js";
 import { normalizeFavoriteModelIds } from "../../features/models/projection/model-favorites.js";
 
 // The hash plumbing moved to `client/bindings/navigation.ts` (plan §7.2). Both

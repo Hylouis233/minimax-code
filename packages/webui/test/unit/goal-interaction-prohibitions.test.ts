@@ -94,7 +94,7 @@ describe("prohibition 2 — a rule may not be filed under a module that does not
   it("interactions: the answers→phase rule lives with the flow that knows the outcome", () => {
     // The composer's wiring computed this; the transition's policy is the
     // interaction flow's, so both moved into the owner in this carve.
-    const composer = flat(read("components/composer/WebuiComposer.tsx"));
+    const composer = flat(read("features/composer/ui/WebuiComposer.tsx"));
     expect(composer).not.toContain("webuiAnswersEndTurn");
     expect(flat(read("features/interactions/application/interaction-coordinator.ts"))).toContain(
       "webuiAnswersEndTurn(answers)",
@@ -105,7 +105,7 @@ describe("prohibition 2 — a rule may not be filed under a module that does not
     // §4.2 field 6: the composer owns neither fence. The cell has to outlive a
     // render, so the application creates the instance and the business reads the
     // one it is handed.
-    const composer = flat(read("components/composer/WebuiComposer.tsx"));
+    const composer = flat(read("features/composer/ui/WebuiComposer.tsx"));
     // T05 moved both fences into the session-keyed owners: the component reads
     // neither cell and holds no counter of its own.
     expect(composer).not.toContain("useWebuiVersionCells()");
@@ -130,7 +130,7 @@ describe("prohibition 2 — a rule may not be filed under a module that does not
     // The composer used to keep a second copy of the capture/compare guard while
     // the owner held the same logic. Neither the fence nor the read may be filed
     // in a component again.
-    const composer = flat(read("components/composer/WebuiComposer.tsx"));
+    const composer = flat(read("features/composer/ui/WebuiComposer.tsx"));
     expect(composer).not.toContain("goalVersionRef.current ==");
     expect(composer).not.toContain("goalVersionRef.current +=");
     expect(composer).not.toContain("getGoal({ sessionId })");
@@ -217,7 +217,7 @@ describe("prohibition 4 — a rule shared across businesses gets one owner every
     // is un-drivable in a unit test (it needs a mounted React tree), so it is
     // pinned as a source tripwire — the same shape this suite already uses for
     // wiring a render cannot observe.
-    const composer = flat(read("components/composer/WebuiComposer.tsx"));
+    const composer = flat(read("features/composer/ui/WebuiComposer.tsx"));
     const at = composer.indexOf("void goalCoordinator.refreshGoal().then(");
     expect(at).toBeGreaterThan(-1);
     // The window is the selection effect: the mode reset, the re-read, and

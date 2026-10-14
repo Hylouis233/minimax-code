@@ -23,41 +23,41 @@ import {
   type FormEvent,
   type ReactElement,
 } from "react";
-import type {WebuiClientMessageEnqueuer} from "../../contracts/composer/command-port.js";
-import type {WebuiClientMessageSender} from "../../contracts/turn/execution-port.js";
-import { WebuiWorkspaceDirectoryBrowser } from "../../features/workspace/ui/WebuiWorkspaceDirectoryBrowser.js";
-import type { WebuiClientMessageLoader } from "../../features/transcript/contracts/message-view.js";
-import type { WebuiModelSelectionRequest } from "../../features/models/contracts/model-view.js";
-import type { WebuiClientSessionCreator } from "../../contracts/sessions/session-port.js";
-import type { WebuiClientSessionPage, WebuiClientSession } from "../../contracts/sessions/session-view.js";
-import type { WebuiTransport } from "../../contracts/transport.js";
+import type {WebuiClientMessageEnqueuer} from "../contracts/command-port.js";
+import type {WebuiClientMessageSender} from "../../../contracts/turn/execution-port.js";
+import { WebuiWorkspaceDirectoryBrowser } from "../../../features/workspace/ui/WebuiWorkspaceDirectoryBrowser.js";
+import type { WebuiClientMessageLoader } from "../../../features/transcript/contracts/message-view.js";
+import type { WebuiModelSelectionRequest } from "../../../features/models/contracts/model-view.js";
+import type { WebuiClientSessionCreator } from "../../../contracts/sessions/session-port.js";
+import type { WebuiClientSessionPage, WebuiClientSession } from "../../../contracts/sessions/session-view.js";
+import type { WebuiTransport } from "../../../contracts/transport.js";
 import type {
   WebuiComposerPluginCatalogue,
   WebuiComposerPluginSummary,
-} from "../../features/plugins/application/composer-catalogue.js";
-import { projectWebuiMessageToStreamMessage, readUsageNumber } from "../../features/transcript/projection/message-projection.js";
+} from "../../../features/plugins/application/composer-catalogue.js";
+import { projectWebuiMessageToStreamMessage, readUsageNumber } from "../../../features/transcript/projection/message-projection.js";
 import {
   createWebuiInteractionCoordinator,
-} from "../../features/interactions/application/interaction-coordinator.js";
-import { latestContextUsage, readContextUsageSnapshot } from "../../projection/composer/context-usage.js";
+} from "../../../features/interactions/application/interaction-coordinator.js";
+import { latestContextUsage, readContextUsageSnapshot } from "../projection/context-usage.js";
 import {
   contextUsagePopoverStyle,
   positionContextUsagePopover,
   sameContextUsagePlacement,
   type ContextUsagePlacement,
-} from "../../projection/composer/context-usage-popover.js";
+} from "../projection/context-usage-popover.js";
 import {
   breakdownSegmentPercent,
   breakdownShareLabel,
   breakdownSwatchStyle,
   contextBreakdownRows,
   drawableBreakdownRows,
-} from "../../projection/composer/context-breakdown.js";
-import { isTokenPlanModel } from "../../features/models/projection/token-plan-model.js";
+} from "../projection/context-breakdown.js";
+import { isTokenPlanModel } from "../../../features/models/projection/token-plan-model.js";
 import type {
   WebuiComposerAttachment,
   WebuiComposerUrlReference,
-} from "../../projection/composer/composer-interactions.js";
+} from "../projection/composer-interactions.js";
 import {
   useWebuiSessionCommands,
   useWebuiSessionGoal,
@@ -65,25 +65,25 @@ import {
   useWebuiSessionQuestionnaire,
   useWebuiSessionState,
   useWebuiTranscriptHistoryOwner,
-} from "../../bindings/use-session-state.js";
-import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
-import { ContextUsageIndicator } from "../../features/sessions/ui/ContextUsageIndicator.js";
-import { useWebuiPortSlice } from "../../bindings/port-slices-context.js";
+} from "../../../bindings/use-session-state.js";
+import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
+import { ContextUsageIndicator } from "../../../features/sessions/ui/ContextUsageIndicator.js";
+import { useWebuiPortSlice } from "../../../bindings/port-slices-context.js";
 import {
   useWebuiSettingsWorkflows,
   useWebuiSettingsWorkflowsState,
-} from "../../bindings/use-query-state.js";
-import { type WebuiPermissionMode } from "../../features/settings/contracts/settings-port.js";
+} from "../../../bindings/use-query-state.js";
+import { type WebuiPermissionMode } from "../../../features/settings/contracts/settings-port.js";
 import {
   useWebuiGoalOwner,
   useWebuiGoalReaction,
-} from "../../features/goal/bindings/goal-owner.js";
+} from "../../../features/goal/bindings/goal-owner.js";
 import {
   useWebuiInteractionAgentNameReader,
   useWebuiInteractionOwner,
-} from "../../features/interactions/bindings/interaction-owner.js";
-import { useWebuiComposerStore } from "../../bindings/composer-store.js";
-import { webuiSessionStatusType } from "../../projection/turn/stream-state.js";
+} from "../../../features/interactions/bindings/interaction-owner.js";
+import { useWebuiComposerStore } from "../../../bindings/composer-store.js";
+import { webuiSessionStatusType } from "../../../projection/turn/stream-state.js";
 
 /** Capability subset the session composer consumes. Single source of truth
  *  lives in `WebuiTransport`; this alias keeps the prop block free of
@@ -104,38 +104,38 @@ import type {
   WebuiGoalCreateRequest,
   WebuiGoalEnabledResult,
   WebuiGoalSessionRequest,
-} from "../../../shared/contracts/goal.js";
+} from "../../../../shared/contracts/goal.js";
 import type {
   WebuiActiveTurnRequest,
   WebuiActiveTurnResult,
-} from "../../../shared/contracts/session.js";
+} from "../../../../shared/contracts/session.js";
 import type {
   WebuiInteractionReplyResult,
   WebuiPendingPermission,
   WebuiQuestionnaireAnswer,
   WebuiQuestionnaireRequest,
-} from "../../../shared/contracts/interactions.js";
-import type { WebuiModelEntry } from "../../../shared/contracts/models.js";
-import type { WebuiQueueItem } from "../../../shared/contracts/queue.js";
+} from "../../../../shared/contracts/interactions.js";
+import type { WebuiModelEntry } from "../../../../shared/contracts/models.js";
+import type { WebuiQueueItem } from "../../../../shared/contracts/queue.js";
 import type {
   WebuiWorkspaceDirectoryListing,
   WebuiWorkspaceFile,
-} from "../../../shared/contracts/workspace.js";
-import type { WebuiUsageQuotaResult } from "../../../shared/contracts/usage-quota.js";
-import { formatUsageResetLabel } from "../../features/account/projection/usage.js";
-import { WebuiGoalBanner } from "../../features/goal/ui/GoalBanner.js";
-import { WebuiInteractionPanel } from "../../features/interactions/ui/InteractionPanel.js";
+} from "../../../../shared/contracts/workspace.js";
+import type { WebuiUsageQuotaResult } from "../../../../shared/contracts/usage-quota.js";
+import { formatUsageResetLabel } from "../../../features/account/projection/usage.js";
+import { WebuiGoalBanner } from "../../../features/goal/ui/GoalBanner.js";
+import { WebuiInteractionPanel } from "../../../features/interactions/ui/InteractionPanel.js";
 import { WebuiQueuePanel } from "./QueuePanel.js";
 import {
   WebuiModelPicker,
   type WebuiModelPickerDraft,
-} from "../../features/models/ui/ModelPicker.js";
+} from "../../../features/models/ui/ModelPicker.js";
 import { ThinkingTrigger } from "./ThinkingTrigger.js";
 import {
   chipLevelLabel,
   resolveEffortOptions,
   thinkingDraftPatch,
-} from "../../features/models/projection/thinking-control.js";
+} from "../../../features/models/projection/thinking-control.js";
 import {
   WebuiIconAttach,
   WebuiIconCheck,
@@ -150,21 +150,21 @@ import {
   WebuiIconSend,
   WebuiIconSkillGeneric,
   type WebuiIconProps,
-} from "../shell/icons.js";
-import { OutputError } from "../../features/transcript/ui/OutputError.js";
+} from "../../../components/shell/icons.js";
+import { OutputError } from "../../../features/transcript/ui/OutputError.js";
 import {
   resolveWebuiSubmissionIntent,
   resolveWebuiComposerEnterAction,
-} from "../../projection/composer/composer-state.js";
-import { isTurnLive } from "../../contracts/turn/stream-state.js";
+} from "../projection/composer-state.js";
+import { isTurnLive } from "../../../contracts/turn/stream-state.js";
 import {
   submitWebuiGoal,
-} from "../../application/composer/composer-workflows.js";
-import { evaluateComposerDismiss, evaluateOutsideClose } from "../../projection/common/outside-close.js";
+} from "../application/composer-workflows.js";
+import { evaluateComposerDismiss, evaluateOutsideClose } from "../../../projection/common/outside-close.js";
 import {
   buildWebuiModelSelectionRequest,
-} from "../../features/sessions/projection/action-requests.js";
-import { workspaceProjectName } from "../../features/workspace/projection/workspace-name.js";
+} from "../../../features/sessions/projection/action-requests.js";
+import { workspaceProjectName } from "../../../features/workspace/projection/workspace-name.js";
 import {
   findWebuiMentionRange,
   findWebuiSlashRange,
@@ -173,13 +173,13 @@ import {
   replaceWebuiSlashToken,
   webuiAttachmentLimitError,
   webuiTextAttachmentDataUrl,
-} from "../../projection/composer/composer-interactions.js";
+} from "../projection/composer-interactions.js";
 import {
   shouldRecallWebuiHistory,
   startWebuiHistoryBrowse,
   stepWebuiHistoryBrowse,
   type WebuiHistoryBrowse,
-} from "../../application/composer/composer-history.js";
+} from "../application/composer-history.js";
 import {
   slashSkillSummaryToEntry,
   WEBUI_BUILTIN_COMMANDS,
@@ -191,8 +191,8 @@ import {
   rankWebuiSlashPalette,
   sectionWebuiSlashPalette,
   type WebuiRunCommandName,
-} from "../../contracts/composer/slash-command.js";
-import { planWebuiRetryResend, resendRecordedWebuiTurn } from "../../application/composer/turn-retry.js";
+} from "../contracts/slash-command.js";
+import { planWebuiRetryResend, resendRecordedWebuiTurn } from "../application/turn-retry.js";
 
 const WEBUI_SLASH_FALLBACK_SECTIONED: SlashCommandEntry[] = await (async () => {
   const { resolveWebuiSlashSkills } = await import("./slash-palette.js");

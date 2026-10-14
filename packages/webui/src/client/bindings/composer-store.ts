@@ -10,8 +10,8 @@
 
 import { useMemo } from "react";
 
-import type { WebuiComposerStore } from "../application/composer/composer-store.js";
-import { createWebuiComposerStore } from "../application/composer/composer-store.js";
+import type { WebuiComposerStore } from "../features/composer/application/composer-store.js";
+import { createWebuiComposerStore } from "../features/composer/application/composer-store.js";
 import { useWebuiApplicationOptional } from "./application-context.js";
 
 export function useWebuiComposerStore(): WebuiComposerStore {

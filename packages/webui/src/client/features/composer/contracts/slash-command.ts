@@ -5,7 +5,7 @@
 import {
   WEBUI_RUN_COMMAND_NAMES,
   type WebuiRunCommandName,
-} from "../../../shared/contracts/commands.js";
+} from "../../../../shared/contracts/commands.js";
 
 export { WEBUI_RUN_COMMAND_NAMES, type WebuiRunCommandName };
 export type WebuiCommandClassification =

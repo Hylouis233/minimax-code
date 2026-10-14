@@ -66,7 +66,7 @@ import {
 import {
   createWebuiComposerStore,
   type WebuiComposerStore,
-} from "./composer/composer-store.js";
+} from "../features/composer/application/composer-store.js";
 import { createWebuiVersionCells, type WebuiVersionCells } from "./version-cell.js";
 import {
   createWebuiIdentityEpochs,

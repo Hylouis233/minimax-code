@@ -23,7 +23,7 @@ import {
   getWebuiBrowserStorage,
 } from "./infrastructure/storage.js";
 import { createWebuiApplication } from "./application/create-application.js";
-import { createWebuiComposerStore } from "./application/composer/composer-store.js";
+import { createWebuiComposerStore } from "./features/composer/application/composer-store.js";
 import { createWebuiPortSlices } from "./application/port-slices.js";
 import { createWebuiOpenEventChannel } from "./bindings/event-channel-adapter.js";
 import { WebuiApplicationProvider } from "./bindings/application-context.js";

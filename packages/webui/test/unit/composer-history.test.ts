@@ -9,9 +9,9 @@ import {
   shouldRecallWebuiHistory,
   startWebuiHistoryBrowse,
   stepWebuiHistoryBrowse,
-} from "../../src/client/application/composer/composer-history.js";
-import type { WebuiComposerPersisted } from "../../src/client/application/composer/composer-history.js";
-import { createWebuiComposerStore } from "../../src/client/application/composer/composer-store.js";
+} from "../../src/client/features/composer/application/composer-history.js";
+import type { WebuiComposerPersisted } from "../../src/client/features/composer/application/composer-history.js";
+import { createWebuiComposerStore } from "../../src/client/features/composer/application/composer-store.js";
 import { createWebuiBrowserStorage } from "../../src/client/infrastructure/storage.js";
 
 /**

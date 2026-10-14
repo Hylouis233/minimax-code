@@ -24,13 +24,13 @@ import {
   type WebuiComposerPersisted,
 } from "./composer-history.js";
 
-import type { WebuiQueueItem } from "../../../shared/contracts/queue.js";
+import type { WebuiQueueItem } from "../../../../shared/contracts/queue.js";
 import type {
   WebuiComposerAttachment,
   WebuiComposerUrlReference,
   WebuiMentionRange,
-} from "../../projection/composer/composer-interactions.js";
-import type { WebuiRecordedTurn } from "../../projection/composer/composer-state.js";
+} from "../projection/composer-interactions.js";
+import type { WebuiRecordedTurn } from "../projection/composer-state.js";
 
 export interface WebuiComposerPersistence {
   readonly loadComposer: <T>(parse: (raw: string | null | undefined) => T) => T;

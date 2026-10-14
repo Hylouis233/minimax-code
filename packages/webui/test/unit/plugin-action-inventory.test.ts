@@ -132,7 +132,7 @@ describe("each action's business is the one the inventory records", () => {
     // plugins for the `@` menu — but it no longer names a wire verb to get them.
     // Naming one is the defect this ticket removed, so both halves are asserted:
     // the menu is still wired, and the verb is gone from the composer.
-    const composer = codeOf(new URL("components/composer/WebuiComposer.tsx", CLIENT));
+    const composer = codeOf(new URL("features/composer/ui/WebuiComposer.tsx", CLIENT));
     expect(composer).toContain("pluginCatalogue");
     expect(composer).not.toMatch(/listInstalledPlugins/u);
     // The port's own name must not survive in code. A mention in a comment is

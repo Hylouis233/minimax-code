@@ -32,7 +32,7 @@ import {
   contextUsagePopoverStyle,
   positionContextUsagePopover,
   sameContextUsagePlacement,
-} from "../../src/client/projection/composer/context-usage-popover.js";
+} from "../../src/client/features/composer/projection/context-usage-popover.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const clientDir = path.resolve(here, "../../src/client");

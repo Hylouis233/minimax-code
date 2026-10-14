@@ -13,7 +13,7 @@
 // checks against.
 
 import { projectWebuiMessageToStreamMessage } from "../../features/transcript/projection/message-projection.js";
-import { latestContextUsage, readContextUsageSnapshot } from "../composer/context-usage.js";
+import { latestContextUsage, readContextUsageSnapshot } from "../../features/composer/projection/context-usage.js";
 
 /** The default bundle: the existing pure projection functions, injected. */
 export const streamRecoveryProjection = {

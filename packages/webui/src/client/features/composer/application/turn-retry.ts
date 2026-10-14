@@ -8,7 +8,7 @@
 // The text below is the declaration as it stood in the source module — no
 // behaviour change.
 
-import type { WebuiRecordedTurn } from "../../projection/composer/composer-state.js";
+import type { WebuiRecordedTurn } from "../projection/composer-state.js";
 
 export type WebuiRetryResendPlan =
   | { readonly kind: "resend"; readonly message: string }

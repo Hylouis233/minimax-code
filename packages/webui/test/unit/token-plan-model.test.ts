@@ -34,7 +34,7 @@ const indicatorPath = path.resolve(
   here,
   "../../src/client/features/sessions/ui/ContextUsageIndicator.tsx",
 );
-const composerPath = path.resolve(here, "../../src/client/components/composer/WebuiComposer.tsx");
+const composerPath = path.resolve(here, "../../src/client/features/composer/ui/WebuiComposer.tsx");
 
 describe("token plan model — the mirrored provider ids", () => {
   it("still equals the ones @mavis/config exports", () => {

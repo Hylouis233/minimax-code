@@ -1,14 +1,14 @@
-import type {WebuiClientMessageEnqueuer} from "../../contracts/composer/command-port.js";
-import type { WebuiClientCreateSessionResult, WebuiClientSessionCreator } from "../../contracts/sessions/session-port.js";
-import type { WebuiGoal, WebuiGoalCreateRequest, WebuiGoalPatchRequest } from "../../../shared/contracts/goal.js";
-import type { WebuiAttachmentInput } from "../../../shared/contracts/messages.js";
-import { formatWebuiError } from "../../contracts/value-readers.js";
-import { looksLikeAbsoluteWorkspacePath } from "../../projection/common/paths.js";
-import { queueWebuiTurn } from "../turn/queue-command.js";
-import { ownsWebuiStreamGeneration, type WebuiStreamState } from "../../projection/turn/stream-state.js";
-import { runWebuiStreamLoop, type WebuiStreamLoopDeps, type WebuiStreamLoopSink } from "../../mechanisms/stream-loop.js";
-import { streamRecoveryProjection } from "../../projection/turn/stream-recovery.js";
-import { streamStateBundle } from "../turn/stream-state-bundle.js";
+import type {WebuiClientMessageEnqueuer} from "../contracts/command-port.js";
+import type { WebuiClientCreateSessionResult, WebuiClientSessionCreator } from "../../../contracts/sessions/session-port.js";
+import type { WebuiGoal, WebuiGoalCreateRequest, WebuiGoalPatchRequest } from "../../../../shared/contracts/goal.js";
+import type { WebuiAttachmentInput } from "../../../../shared/contracts/messages.js";
+import { formatWebuiError } from "../../../contracts/value-readers.js";
+import { looksLikeAbsoluteWorkspacePath } from "../../../projection/common/paths.js";
+import { queueWebuiTurn } from "../../../application/turn/queue-command.js";
+import { ownsWebuiStreamGeneration, type WebuiStreamState } from "../../../projection/turn/stream-state.js";
+import { runWebuiStreamLoop, type WebuiStreamLoopDeps, type WebuiStreamLoopSink } from "../../../mechanisms/stream-loop.js";
+import { streamRecoveryProjection } from "../../../projection/turn/stream-recovery.js";
+import { streamStateBundle } from "../../../application/turn/stream-state-bundle.js";
 
 export interface WebuiComposerSubmitArgs {
   readonly sessionId?: string;

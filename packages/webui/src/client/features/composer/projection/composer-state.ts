@@ -1,8 +1,8 @@
 import type {
   WebuiRunCommandName,
   WebuiSlashCommandFields,
-} from "../../contracts/composer/slash-command.js";
-import { classifyWebuiSlashCommand } from "../../contracts/composer/slash-command.js";
+} from "../contracts/slash-command.js";
+import { classifyWebuiSlashCommand } from "../contracts/slash-command.js";
 export type WebuiSubmissionIntent =
   | { readonly kind: "activate-goal-mode" }
   | { readonly kind: "activate-plan-mode" }

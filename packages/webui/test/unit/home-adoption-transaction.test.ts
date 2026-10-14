@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 
 import { createWebuiApplication } from "../../src/client/application/create-application.js";
 import { WEBUI_HOME_SESSION_KEY } from "../../src/client/application/state.js";
-import { WEBUI_COMPOSER_HOME_KEY } from "../../src/client/application/composer/composer-history.js";
+import { WEBUI_COMPOSER_HOME_KEY } from "../../src/client/features/composer/application/composer-history.js";
 import type { WebuiApplicationSnapshot } from "../../src/client/application/state.js";
 import type { WebuiClientSessionResumer } from "../../src/client/contracts/turn/execution-port.js";
 

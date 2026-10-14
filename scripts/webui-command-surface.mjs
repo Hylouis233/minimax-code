@@ -83,11 +83,12 @@ const BUSINESSES = [
   },
   {
     business: "composer",
-    // §5.6's composer row: the owner module is `application/composer/composer-store.ts`, and
-    // its published commands are what B3's session delete invokes (`purgeSlot`).
-    // Recorded by ticket #68, which consumes that command.
+    // §5.6's composer row: the owner module is the composer store, and its
+    // published commands are what B3's session delete invokes (`purgeSlot`).
+    // Recorded by ticket #68, which consumes that command; T13 moved the owner
+    // into the composer's feature home.
     declarations: [
-      { module: "application/composer/composer-store.ts", name: "WebuiComposerStore" },
+      { module: "features/composer/application/composer-store.ts", name: "WebuiComposerStore" },
     ],
   },
   {

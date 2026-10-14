@@ -28,17 +28,17 @@
     },
     {
       "from": "client/features/sessions/application/session-workflows.ts",
-      "to": "client/application/composer/composer-store.ts",
-      "reason": "Archiving or deleting a session clears that session's Composer draft, so the workflow calls the composer store's own clear. Both sat in the application layer before the sessions owner moved; the entry goes when composer publishes a public clear command (T13 owns that surface)."
+      "to": "client/features/composer/application/composer-store.ts",
+      "reason": "Archiving or deleting a session clears that session's Composer draft, so the workflow calls the composer store's own clear. Repointed when T13 moved the composer owner into its feature home; the entry goes when composer publishes a public clear command."
     },
     {
       "from": "client/features/sessions/ui/ContextUsageIndicator.tsx",
-      "to": "client/projection/composer/context-breakdown.ts",
+      "to": "client/features/composer/projection/context-breakdown.ts",
       "reason": "The rail's context chip renders the Composer's context breakdown. It is a Sessions rail overlay reading another business's projection; the entry goes when the Composer publishes that read as a public contract (T13 owns the composer surface)."
     },
     {
       "from": "client/features/sessions/ui/ContextUsageIndicator.tsx",
-      "to": "client/projection/composer/context-usage-popover.ts",
+      "to": "client/features/composer/projection/context-usage-popover.ts",
       "reason": "The chip's popover is the Composer's context-usage projection. Reviewed peer edge until the Composer publishes it."
     },
     {
@@ -170,6 +170,116 @@
       "from": "client/features/interactions/ui/PlanModeCards.tsx",
       "to": "client/features/transcript/ui/markdown.tsx",
       "reason": "The plan decision card renders the plan text through the transcript's markdown renderer, the same shared rendering the workspace panel uses. Reviewed peer edge until the transcript publishes markdown as a shared rendering contract."
+    },
+    {
+      "from": "client/features/composer/application/composer-workflows.ts",
+      "to": "client/application/turn/queue-command.ts",
+      "reason": "The composer's submit workflow enqueues through the turn business's queue command. Both sat in the application layer before T13 moved the composer owner; reviewed peer edge until turn publishes the queue command as a public contract."
+    },
+    {
+      "from": "client/features/composer/application/composer-workflows.ts",
+      "to": "client/projection/turn/stream-state.ts",
+      "reason": "The submit workflow reads the turn stream state to decide whether a send is a send or an enqueue. Reviewed peer edge until turn publishes that read from its contracts."
+    },
+    {
+      "from": "client/features/composer/application/composer-workflows.ts",
+      "to": "client/projection/turn/stream-recovery.ts",
+      "reason": "The same workflow composes the turn business's recovery policy when a send resumes after a stream error. Reviewed peer edge until turn publishes the recovery contract."
+    },
+    {
+      "from": "client/features/composer/application/composer-workflows.ts",
+      "to": "client/application/turn/stream-state-bundle.ts",
+      "reason": "The workflow consumes the turn bundle the stream loop takes, the same bundle the session commands read. Reviewed peer edge until turn publishes it."
+    },
+    {
+      "from": "client/features/composer/ui/ThinkingTrigger.tsx",
+      "to": "client/features/models/projection/thinking-control.ts",
+      "reason": "The composer's thinking trigger renders the models business's thinking-control projection (the control's vocabulary is Models', plan 5.2's models row). Reviewed peer edge until Models publishes that read."
+    },
+    {
+      "from": "client/features/composer/ui/WebuiComposer.tsx",
+      "to": "client/features/workspace/ui/WebuiWorkspaceDirectoryBrowser.tsx",
+      "reason": "The composer hosts the workspace business's directory browser for the project picker. Reviewed peer edge: the surface is Workspace's and the composer only places it; it goes when Workspace publishes the picker."
+    },
+    {
+      "from": "client/features/composer/ui/WebuiComposer.tsx",
+      "to": "client/features/plugins/application/composer-catalogue.ts",
+      "reason": "The composer reads the plugins business's Composer-facing catalogue (installed plugins and runtime skills) through the read model T08 published. Reviewed peer edge until Plugins publishes it from its contracts."
+    },
+    {
+      "from": "client/features/composer/ui/WebuiComposer.tsx",
+      "to": "client/features/transcript/projection/message-projection.ts",
+      "reason": "The composer reads the transcript's message projection to build the pending-user/stream handoff shapes. Reviewed peer edge until the transcript publishes that read."
+    },
+    {
+      "from": "client/features/composer/ui/WebuiComposer.tsx",
+      "to": "client/features/interactions/application/interaction-coordinator.ts",
+      "reason": "The composer types its sink against the interaction coordinator, the interaction view of the turn writer surface. Reviewed peer edge until interactions publishes the coordinator as a public contract."
+    },
+    {
+      "from": "client/features/composer/ui/WebuiComposer.tsx",
+      "to": "client/features/models/projection/token-plan-model.ts",
+      "reason": "The composer asks whether the selected model is a token-plan model, the same read the rail's chip makes. Reviewed peer edge until Models publishes the plan read."
+    },
+    {
+      "from": "client/features/composer/ui/WebuiComposer.tsx",
+      "to": "client/features/sessions/ui/ContextUsageIndicator.tsx",
+      "reason": "The composer places the sessions business's context-usage chip beside its toolbar. Reviewed peer edge: the chip is Sessions' surface; it goes when Sessions publishes it."
+    },
+    {
+      "from": "client/features/composer/ui/WebuiComposer.tsx",
+      "to": "client/features/goal/bindings/goal-owner.ts",
+      "reason": "The composer mounts the goal business's binding to reach its owner, because goal mode is entered from the composer while the owner is Goal's. Reviewed peer edge until Goal publishes a binding the shell can mount."
+    },
+    {
+      "from": "client/features/composer/ui/WebuiComposer.tsx",
+      "to": "client/features/interactions/bindings/interaction-owner.ts",
+      "reason": "The composer mounts the interactions business's binding for the same reason as the goal one. Reviewed peer edge until interactions publishes a binding the shell can mount."
+    },
+    {
+      "from": "client/features/composer/ui/WebuiComposer.tsx",
+      "to": "client/projection/turn/stream-state.ts",
+      "reason": "The composer reads the turn stream state for its live-column phase decisions. Reviewed peer edge until turn publishes the state as a public contract."
+    },
+    {
+      "from": "client/features/composer/ui/WebuiComposer.tsx",
+      "to": "client/features/account/projection/usage.ts",
+      "reason": "The composer renders the account usage label in its context chip; the label derivation is Account's. Reviewed peer edge until Account publishes that projection."
+    },
+    {
+      "from": "client/features/composer/ui/WebuiComposer.tsx",
+      "to": "client/features/goal/ui/GoalBanner.tsx",
+      "reason": "The composer places the goal business's banner above its own field. Reviewed peer edge: the banner is Goal's surface; it goes when Goal publishes it."
+    },
+    {
+      "from": "client/features/composer/ui/WebuiComposer.tsx",
+      "to": "client/features/interactions/ui/InteractionPanel.tsx",
+      "reason": "The composer places the interactions business's permission/questionnaire panel. Reviewed peer edge until interactions publishes the panel as a public surface."
+    },
+    {
+      "from": "client/features/composer/ui/WebuiComposer.tsx",
+      "to": "client/features/models/ui/ModelPicker.tsx",
+      "reason": "The composer mounts the models business's picker: model choice is Models' owner and Models' surface. Reviewed peer edge until Models publishes the picker."
+    },
+    {
+      "from": "client/features/composer/ui/WebuiComposer.tsx",
+      "to": "client/features/models/projection/thinking-control.ts",
+      "reason": "The composer reads the models business's thinking-control rules for its toolbar control. Reviewed peer edge until Models publishes them."
+    },
+    {
+      "from": "client/features/composer/ui/WebuiComposer.tsx",
+      "to": "client/features/transcript/ui/OutputError.tsx",
+      "reason": "The composer renders the transcript's output-error surface under its field. Reviewed peer edge until the transcript publishes it as a shared surface."
+    },
+    {
+      "from": "client/features/composer/ui/WebuiComposer.tsx",
+      "to": "client/features/sessions/projection/action-requests.ts",
+      "reason": "The composer builds session commands (fork / edit / rewind) with the sessions business's builders, the same ones the transcript's message actions use. Reviewed peer edge until Sessions publishes the command shape."
+    },
+    {
+      "from": "client/features/composer/ui/WebuiComposer.tsx",
+      "to": "client/features/workspace/projection/workspace-name.ts",
+      "reason": "The composer labels the workspace it composes into with the workspace business's name derivation. Reviewed peer edge until Workspace publishes the name projection."
     }
   ]
 }

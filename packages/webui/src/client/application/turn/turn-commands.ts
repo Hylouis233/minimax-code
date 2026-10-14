@@ -17,7 +17,7 @@
 // preserved verbatim. Nothing here opens a channel: the process-event ingress
 // stays exactly where it is.
 
-import type {WebuiClientMessageEnqueuer} from "../../contracts/composer/command-port.js";
+import type {WebuiClientMessageEnqueuer} from "../../features/composer/contracts/command-port.js";
 import type {WebuiClientSessionResumer} from "../../contracts/turn/execution-port.js";
 import type { WebuiClientMessageLoader } from "../../features/transcript/contracts/message-view.js";
 import type { WebuiClientSessionCreator } from "../../contracts/sessions/session-port.js";
@@ -28,7 +28,7 @@ import {
   submitWebuiComposerTurn,
   type WebuiComposerSubmitHandlers,
   type WebuiComposerTurnCallbacks,
-} from "../composer/composer-workflows.js";
+} from "../../features/composer/application/composer-workflows.js";
 import { isWebuiSubscriptionProbeCurrent, ownsWebuiStreamGeneration, resolveWebuiSubscriptionRecheck, type WebuiStreamState } from "../../projection/turn/stream-state.js";
 import { streamRecoveryProjection } from "../../projection/turn/stream-recovery.js";
 import {
