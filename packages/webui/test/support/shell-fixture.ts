@@ -36,6 +36,10 @@ export function shellElement(
       ...options,
       ...(store ? { store } : {}),
       slices,
+      // The same bag drives the substrate's capability slice, which §5.6
+      // derives from the port: wiring the slices alone told the substrate that
+      // no host capability existed at all.
+      turnCapabilities: options.turnCapabilities ?? transport ?? {},
     }),
     children: createElement(WebuiClientFoundationApp, rest as never),
   });

@@ -20,6 +20,7 @@ import type {
   WebuiApplicationStart,
 } from "../../src/client/application/create-application.js";
 import type { WebuiPortSlices } from "../../src/client/application/port-slices.js";
+import type { WebuiTurnCapabilityPort } from "../../src/client/application/turn/turn-capabilities.js";
 import type { WebuiSessionStore } from "../../src/client/application/session-store.js";
 
 /** A channel that accepts one listener and never emits: SSR-shaped hosts. */
@@ -38,6 +39,14 @@ export interface ApplicationFixtureOptions {
    * builds no fallback of its own (plan §4.1).
    */
   readonly slices?: WebuiPortSlices;
+  /**
+   * The turn capability port. The substrate publishes its capability slice by
+   * cutting this port (plan §5.6), so it is derived from the same bag the port
+   * slices are cut from rather than shared with them: a fixture that wires only
+   * the slices leaves the substrate reporting no send and no enqueue, which a
+   * reader sees as "this host cannot send".
+   */
+  readonly turnCapabilities?: WebuiTurnCapabilityPort;
 }
 
 /** Builds a dormant application for a host that renders the shell. */
@@ -49,6 +58,7 @@ export function createWebuiApplicationFixture(
     ...(options.store ? { store: options.store } : {}),
     ...(options.unreadStorage ? { unreadStorage: options.unreadStorage } : {}),
     ...(options.slices ? { slices: options.slices } : {}),
+    ...(options.turnCapabilities ? { turnCapabilities: options.turnCapabilities } : {}),
     turns: { resumeSession: async () => {} },
   });
 }
