@@ -28,7 +28,7 @@ import { readFileSync } from "node:fs";
 import { describeWebuiMcpServerStatus } from "../../src/client/features/plugins/projection/mcp-status.js";
 
 const SOURCE = readFileSync(
-  new URL("../../src/client/components/plugins/PluginCatalogue.tsx", import.meta.url),
+  new URL("../../src/client/features/plugins/ui/PluginCatalogue.tsx", import.meta.url),
   "utf8",
 );
 

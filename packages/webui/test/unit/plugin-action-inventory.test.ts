@@ -20,6 +20,24 @@ const SRC = new URL("../../src/", import.meta.url);
 const CLIENT = new URL("client/", SRC);
 const read = (url: URL): string => readFileSync(fileURLToPath(url), "utf8");
 
+/**
+ * The source with its comments removed.
+ *
+ * These cases read source as text, and a file that explains what it stopped
+ * doing will name that shape in a comment — the adapter quotes the `as never`
+ * dispatch it replaced, and the composer says which props it used to hold. Those
+ * are prose, not code, and a scan that counted them would fail on an accurate
+ * explanation. Only the code is a constraint.
+ */
+const stripComments = (source: string): string =>
+  source
+    .replace(/\/\*[\s\S]*?\*\//gu, "")
+    .split("\n")
+    .map((line) => (line.includes("://") ? line : line.replace(/\/\/.*$/u, "")))
+    .join("\n");
+
+const codeOf = (url: URL): string => stripComments(read(url));
+
 const inventory = read(new URL("docs/webui/plugin-action-inventory.md", REPO));
 
 /** The inventory table's action column: one row per action, numbered. */
@@ -99,7 +117,7 @@ describe("each action's business is the one the inventory records", () => {
     const reach = [..."application contracts infrastructure components bindings projection".split(" ")]
       .flatMap((layer) => {
         const dir = fileURLToPath(new URL(layer + "/", CLIENT));
-        return listFiles(dir).filter((file) => /pluginManagement/u.test(readSafe(file)));
+        return listFiles(dir).filter((file) => /pluginManagement/u.test(stripComments(readSafe(file))));
       });
     expect(reach.length).toBeGreaterThan(0);
     const base = fileURLToPath(CLIENT).replace(/\/$/u, "") + "/";
@@ -114,10 +132,12 @@ describe("each action's business is the one the inventory records", () => {
     // plugins for the `@` menu — but it no longer names a wire verb to get them.
     // Naming one is the defect this ticket removed, so both halves are asserted:
     // the menu is still wired, and the verb is gone from the composer.
-    const composer = read(new URL("components/composer/WebuiComposer.tsx", CLIENT));
+    const composer = codeOf(new URL("components/composer/WebuiComposer.tsx", CLIENT));
     expect(composer).toContain("pluginCatalogue");
     expect(composer).not.toMatch(/listInstalledPlugins/u);
-    expect(composer).not.toMatch(/pluginManagement\s*[({]/u);
+    // The port's own name must not survive in code. A mention in a comment is
+    // allowed — that comment is what explains the change.
+    expect(composer).not.toMatch(/pluginManagement/u);
   });
 });
 
@@ -186,7 +206,7 @@ describe("the action populations are exhaustive and non-duplicated", () => {
     // The adapter is allowed exactly one cast, and it is the input widening on
     // the open wire envelope — never on the action name. A cast on the action
     // would reinstate the defect this file exists to catch.
-    const adapterSrc = read(new URL("features/plugins/contracts/plugin-actions.ts", CLIENT));
+    const adapterSrc = codeOf(new URL("features/plugins/contracts/plugin-actions.ts", CLIENT));
     const casts = [...adapterSrc.matchAll(/\bas\s+[A-Za-z<>[\]\s{},;"'|.]+\bnever\b/gmu)];
     expect(casts.map((m) => m[0])).toEqual([]);
     expect(adapterSrc).not.toMatch(/action\s+as\b/u);

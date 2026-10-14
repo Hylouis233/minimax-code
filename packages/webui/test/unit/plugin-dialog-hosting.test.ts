@@ -22,12 +22,14 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const COMPONENTS = new URL("../../src/client/components/", import.meta.url);
-const read = (relative: string): string => readFileSync(fileURLToPath(new URL(relative, COMPONENTS)), "utf8");
+// The plugin UI lives in its business home now (T08), so these three read from
+// `features/plugins/ui/` rather than the retired `components/` tree.
+const PLUGIN_UI = new URL("../../src/client/features/plugins/ui/", import.meta.url);
+const read = (relative: string): string => readFileSync(fileURLToPath(new URL(relative, PLUGIN_UI)), "utf8");
 
-const catalogue = read("plugins/PluginCatalogue.tsx");
-const itemDialog = read("plugins/PluginItemDialog.tsx");
-const importDialog = read("plugins/PluginImportDialog.tsx");
+const catalogue = read("PluginCatalogue.tsx");
+const itemDialog = read("PluginItemDialog.tsx");
+const importDialog = read("PluginImportDialog.tsx");
 
 const slice = (text: string, from: string, to: string): string =>
   text.slice(text.indexOf(from), text.indexOf(to));
@@ -46,14 +48,20 @@ describe("the catalogue hosts both dialogs as it did", () => {
     }
   });
 
-  it("saves through the same three paths, chosen by the open dialog", () => {
-    // The submit handler picks by `dialog`: the MCP form, the skill form, the agent form. Sliced
-    // from the first of the three to the end, because every other marker in this file (an
-    // `aria-label`, a branch) occurs earlier and would make an empty window.
-    const submit = itemDialog.slice(itemDialog.indexOf("? saveMcp()"));
-    expect(submit).toContain("? saveMcp()");
-    expect(submit).toContain("? saveSkill()");
-    expect(submit).toContain(": saveAgent()");
+  it("routes to the form the open dialog names, and each form saves through one path", () => {
+    // The dialog is now a chooser, not a form: it picks one of three units by
+    // `dialog`, and each unit runs its own save (T08). The invariant is the same
+    // one this case always guarded — one dialog, three paths, chosen by what is
+    // open — it just moved from a chain of ternaries to three form units.
+    expect(itemDialog).toContain("dialog === \"mcp\"");
+    expect(itemDialog).toContain("<McpServerForm");
+    expect(itemDialog).toContain(": dialog === \"agent\"");
+    expect(itemDialog).toContain("<AgentForm");
+    expect(itemDialog).toContain("<SkillForm");
+    // Each form unit commits through the typed intent surface, not a wire verb.
+    expect(read("McpServerForm.tsx")).toContain("onSubmit({ kind: \"updateMcpServer\"");
+    expect(read("AgentForm.tsx")).toContain('kind: "createAgent"');
+    expect(read("SkillForm.tsx")).toContain('kind: "createSkill"');
   });
 });
 
@@ -62,8 +70,10 @@ describe("a failed operation leaves the user where they were", () => {
     // Closing and clearing live INSIDE the success branch: a rejection runs neither, so the dialog
     // stays open on the preview the user was reading.
     const body = slice(catalogue, "const importPlugin = async () => {", "// Switching the marketplace catalogue");
-    expect(body).toContain('if (await mutate("importGithubPlugin"');
-    const afterSuccess = body.slice(body.indexOf('if (await mutate("importGithubPlugin"'));
+    // The import now dispatches a typed intent rather than a wire verb (T08); the
+    // invariant below is unchanged — the dialog only closes after a success.
+    expect(body).toContain("kind: \"importGithubPlugin\"");
+    const afterSuccess = body.slice(body.indexOf("kind: \"importGithubPlugin\""));
     expect(afterSuccess.indexOf("setPluginImportDialog(false)")).toBeGreaterThan(-1);
     expect(afterSuccess.indexOf("setPluginImportDialog(false)")).toBeLessThan(afterSuccess.indexOf("\n  };"));
     // And nothing in the wrapper closes before the mutation is awaited.
