@@ -197,14 +197,29 @@
       "reason": "The composer's thinking trigger renders the models business's thinking-control projection (the control's vocabulary is Models', plan 5.2's models row). Reviewed peer edge until Models publishes that read."
     },
     {
-      "from": "client/features/composer/ui/WebuiComposer.tsx",
+      "from": "client/features/composer/ui/ComposerProjectRow.tsx",
       "to": "client/features/workspace/ui/WebuiWorkspaceDirectoryBrowser.tsx",
-      "reason": "The composer hosts the workspace business's directory browser for the project picker. Reviewed peer edge: the surface is Workspace's and the composer only places it; it goes when Workspace publishes the picker."
+      "reason": "The composer's project row hosts the workspace business's directory browser for the picker; T13 moved that row out of WebuiComposer into its own unit and the edge moved with it. Reviewed peer edge: the surface is Workspace's and the row only places it; it goes when Workspace publishes the picker."
     },
     {
       "from": "client/features/composer/ui/WebuiComposer.tsx",
       "to": "client/features/plugins/application/composer-catalogue.ts",
-      "reason": "The composer reads the plugins business's Composer-facing catalogue (installed plugins and runtime skills) through the read model T08 published. Reviewed peer edge until Plugins publishes it from its contracts."
+      "reason": "The composer types its own plugin props (the catalogue object it reads from the owner and the installed-plugin list it holds) with the plugins business's Composer-facing shapes. Reviewed peer edge until Plugins publishes them from its contracts."
+    },
+    {
+      "from": "client/features/composer/ui/ComposerMenus.tsx",
+      "to": "client/features/plugins/application/composer-catalogue.ts",
+      "reason": "The composer's `+` menu lists the plugins business's Composer-facing catalogue (installed plugins and runtime skills) through the read model T08 published; T13 moved the menu out of WebuiComposer into its own unit and the edge moved with it. Reviewed peer edge until Plugins publishes it from its contracts."
+    },
+    {
+      "from": "client/features/composer/ui/WebuiComposer.tsx",
+      "to": "client/features/sessions/application/session-catalog.ts",
+      "reason": "The composer lists the child sessions of the session it composes for by resolving the sessions business's catalogue through its own selector; before T13 that list arrived as a page prop. Reviewed peer edge until Sessions publishes the catalogue read from its contracts."
+    },
+    {
+      "from": "client/features/composer/ui/WebuiComposer.tsx",
+      "to": "client/features/account/bindings/use-account-workflows.tsx",
+      "reason": "The composer reads the account business's live status to guard its own model scope against another session's value; before T13 that status arrived as an RPC prop the shell relayed. Reviewed peer edge until Account publishes a binding the shell can mount."
     },
     {
       "from": "client/features/composer/ui/WebuiComposer.tsx",
@@ -277,9 +292,9 @@
       "reason": "The composer builds session commands (fork / edit / rewind) with the sessions business's builders, the same ones the transcript's message actions use. Reviewed peer edge until Sessions publishes the command shape."
     },
     {
-      "from": "client/features/composer/ui/WebuiComposer.tsx",
+      "from": "client/features/composer/ui/ComposerProjectRow.tsx",
       "to": "client/features/workspace/projection/workspace-name.ts",
-      "reason": "The composer labels the workspace it composes into with the workspace business's name derivation. Reviewed peer edge until Workspace publishes the name projection."
+      "reason": "The composer's project row labels the workspace with the workspace business's name derivation; T13 moved that row out of WebuiComposer into its own unit and the edge moved with it. Reviewed peer edge until Workspace publishes the name projection."
     }
   ]
 }
