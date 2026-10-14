@@ -62,6 +62,11 @@
       "reason": "The rail labels a project by its workspace name, which the Workspace business derives. Reviewed peer edge until Workspace publishes the name projection."
     },
     {
+      "from": "client/features/sessions/projection/rail-groups.ts",
+      "to": "client/features/workspace/projection/workspace-name.ts",
+      "reason": "Same read as the rail's, now from the grouping rule itself: T07 moved the project grouping into the sessions projection, so the name derivation is called where the group is built instead of in the surface that renders it. Reviewed peer edge until Workspace publishes the name projection; it then replaces the rail's entry too, since both readers take the published form."
+    },
+    {
       "from": "client/features/account/ui/UserMenu.tsx",
       "to": "client/components/settings/MemoryManagerDialog.tsx",
       "reason": "The user menu opens the settings business's memory dialog. It is an Account surface opening a Settings surface; the entry goes when Settings publishes that dialog as a public contract (T12 owns the settings composition)."

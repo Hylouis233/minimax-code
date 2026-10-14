@@ -24,13 +24,15 @@ import { readFileSync } from "node:fs";
 import type { WebuiClientProject, WebuiClientSession } from "../../src/client/contracts/sessions/session-view.js";
 import {
   WebuiProjectList,
+} from "../../src/client/features/sessions/ui/SessionRail.js";
+import {
   filterWebuiProjectsByQuery,
   filterWebuiSessionsByQuery,
   matchesWebuiProjectQuery,
   matchesWebuiSessionQuery,
   sessionLabel,
   type WebuiProjectGroup,
-} from "../../src/client/features/sessions/ui/SessionRail.js";
+} from "../../src/client/features/sessions/projection/rail-groups.js";
 
 const session = (over: Partial<WebuiClientSession> & { sessionId: string }): WebuiClientSession => ({
   agentName: "main",

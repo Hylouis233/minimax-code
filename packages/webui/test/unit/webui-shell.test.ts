@@ -29,11 +29,13 @@ import { WebuiInteractionPanel } from "../../src/client/features/interactions/ui
 import {
   WebuiProjectList,
   WebuiSessionList,
+} from "../../src/client/features/sessions/ui/SessionRail.js";
+import {
   groupWebuiSessionsByWorkspace,
   resolveDefaultExpandedProjectKey,
-  sessionHash,
   sortWebuiProjectSessionIds,
-} from "../../src/client/features/sessions/ui/SessionRail.js";
+} from "../../src/client/features/sessions/projection/rail-groups.js";
+import { sessionHash } from "../../src/client/projection/common/router.js";
 import { WebuiSessionTranscript as BaseWebuiSessionTranscript } from "../../src/client/features/transcript/ui/SessionTranscript.js";
 import { WebuiWorkspaceDirectoryBrowser } from "../../src/client/features/workspace/ui/WebuiWorkspaceDirectoryBrowser.js";
 import {

@@ -59,12 +59,12 @@ import { ConversationUsageBanner } from "../../features/account/ui/ConversationU
 import { PluginCatalogue } from "../../features/plugins/ui/PluginCatalogue.js";
 import { WebuiComposer } from "../composer/WebuiComposer.js";
 import { WebuiSessionTranscript } from "../../features/transcript/ui/SessionTranscript.js";
+import { WebuiProjectList } from "../../features/sessions/ui/SessionRail.js";
 import {
-  WebuiProjectList,
   filterWebuiSessionsByQuery,
-  sessionHash,
   sessionLabel,
-} from "../../features/sessions/ui/SessionRail.js";
+} from "../../features/sessions/projection/rail-groups.js";
+import { sessionHash } from "../../projection/common/router.js";
 import { RailRow } from "../../features/sessions/ui/RailRow.js";
 import {
   WebuiIconBrand,
@@ -89,7 +89,7 @@ import type {
   WebuiWorkspaceProgressState,
   WebuiWorkspaceSubagent,
 } from "../../features/workspace/projection/workspace-progress.js";
-import type { WebuiProjectGroup } from "../../features/sessions/ui/SessionRail.js";
+import type { WebuiProjectGroup } from "../../features/sessions/projection/rail-groups.js";
 import { createWebuiCommandWorkflows } from "../../application/composer/command-workflows.js";
 import {
   selectWebuiCatalogFlatPage,
