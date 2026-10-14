@@ -880,7 +880,7 @@ describe("host wiring", () => {
     // call lives in `use-shell-activity-wiring.ts` (A-005); the frame hands it
     // the application's own function.
     expect(appSource).toMatch(/select\(\s*selectedSessionId\s*\)\s*;/u);
-    expect(appSource).toMatch(/select:\s*\(id\)\s*=>\s*application\.select\(id\)/u);
+    expect(appSource).toMatch(/select:\s*\(id[^)]*\)\s*=>\s*applicationRef\.current\.select\(id\)/u);
   });
 
   it("clears the count when the user opens a session", () => {
@@ -888,7 +888,7 @@ describe("host wiring", () => {
       /markRead\(\s*selectedSessionId\s*\)/u,
     );
     expect(appSource).toMatch(
-      /markRead:\s*\(id\)\s*=>\s*application\.unread\.markRead\(id\)/u,
+      /markRead:\s*\(id[^)]*\)\s*=>\s*applicationRef\.current\.unread\.markRead\(id\)/u,
     );
     expect(unreadSource).toMatch(
       /markWebuiSessionRead\(current, sessionId\)/u,
@@ -915,7 +915,7 @@ describe("host wiring", () => {
     const block = effect("hydrate(selectedSessionId)");
     expect(block).toMatch(/hydrate\(\s*selectedSessionId\s*\)/u);
     expect(appSource).toMatch(
-      /hydrate:\s*\(id\)\s*=>\s*application\.unread\.hydrate\(id\)/u,
+      /hydrate:\s*\(id[^)]*\)\s*=>\s*applicationRef\.current\.unread\.hydrate\(id\)/u,
     );
     expect(unreadSource).toMatch(/applyWebuiUnreadCounts/u);
   });

@@ -824,30 +824,50 @@ export function WebuiClientFoundationApp(
   // hydration ordering (ticket #49 criterion 4).
   // The activity slice, the reconnect nonce and every reaction that keeps them
   // current live in `./use-shell-activity-wiring.js`.
+  // The wiring's capabilities are stable for the component's whole life: they
+  // read the application through a ref, so the hook's effects run when the
+  // session, the rail page or the reconnect nonce changes — not on every render.
+  // A fresh closure per render made the unread restore re-run on every render,
+  // which the browser caught as `Maximum update depth exceeded` from the store's
+  // own notification (the `session-activity` probes exist for the same reason).
+  const applicationRef = useRef(application);
+  applicationRef.current = application;
+  const activityWiring = useMemo(
+    () => ({
+      onWorkspaceGitChanged: (
+        listener: Parameters<typeof application.onWorkspaceGitChanged>[0],
+      ) => applicationRef.current.onWorkspaceGitChanged(listener),
+      onChannelReady: (listener: () => void) =>
+        applicationRef.current.onChannelReady(listener),
+      select: (id: string | undefined) => applicationRef.current.select(id),
+      markRead: (id: string) => applicationRef.current.unread.markRead(id),
+      seed: (sessions: Parameters<typeof application.unread.seed>[0]) =>
+        applicationRef.current.unread.seed(sessions),
+      hydrate: (id: string | undefined) => applicationRef.current.unread.hydrate(id),
+      probeActiveTurns: (
+        sessions: Parameters<typeof application.unread.probeActiveTurns>[0]["sessions"],
+      ) => {
+        const probe = applicationRef.current.activeTurnProbe;
+        // No probe, no re-probe: the assembly builds one only when the host can
+        // answer it.
+        if (!probe) return () => undefined;
+        return applicationRef.current.unread.probeActiveTurns({
+          sessions,
+          probe,
+          now: () => Date.now(),
+        });
+      },
+      subscribeTurnReviewMutations: (listener: () => void) =>
+        applicationRef.current.turnReview?.subscribeMutations(listener) ?? (() => undefined),
+    }),
+    [],
+  );
   const { sessionActivity, activityNow, activityProbeNonce } = useShellActivityWiring({
     sessionStore,
     workspaceQueries,
     railPage,
     selectedSessionId,
-    onWorkspaceGitChanged: application.onWorkspaceGitChanged,
-    onChannelReady: application.onChannelReady,
-    select: (id) => application.select(id),
-    markRead: (id) => application.unread.markRead(id),
-    seed: (sessions) => application.unread.seed(sessions),
-    hydrate: (id) => application.unread.hydrate(id),
-    probeActiveTurns: (sessions) => {
-      const probe = application.activeTurnProbe;
-      // No probe, no re-probe: the assembly builds one only when the host can
-      // answer it.
-      if (!probe) return () => undefined;
-      return application.unread.probeActiveTurns({
-        sessions,
-        probe,
-        now: () => Date.now(),
-      });
-    },
-    subscribeTurnReviewMutations: (listener) =>
-      application.turnReview?.subscribeMutations(listener) ?? (() => undefined),
+    ...activityWiring,
   });
 
   // The application-wide effects the coordinator runs. It composes the
