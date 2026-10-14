@@ -81,7 +81,6 @@ import type {
   WebuiClientMessage,
   WebuiClientMessagePage,
 } from "../../features/transcript/contracts/message-view.js";
-import type { WebuiTransport } from "../../contracts/transport.js";
 import type { WebuiTodo } from "../../features/workspace/projection/panel-projection.js";
 import type { WebuiUsageQuotaResult } from "../../../shared/contracts/usage-quota.js";
 import type { WebuiVersionInfo } from "../../../shared/contracts/version.js";
@@ -90,25 +89,18 @@ import type {
   WebuiWorkspaceSubagent,
 } from "../../features/workspace/projection/workspace-progress.js";
 import type { WebuiProjectGroup } from "../../features/sessions/projection/rail-groups.js";
-import { createWebuiCommandWorkflows } from "../../features/composer/application/command-workflows.js";
 import {
   selectWebuiCatalogFlatPage,
   selectWebuiCatalogTreePage,
 } from "../../features/sessions/application/session-catalog.js";
-import { createWebuiSessionWorkflows } from "../../features/sessions/application/session-workflows.js";
 import {
   selectWebuiSessionStream,
   selectWebuiSessionTranscriptPage,
 } from "../../application/selectors.js";
 import { WEBUI_HOME_SESSION_KEY } from "../../application/state.js";
-import {
-  WebuiPortSlicesProvider,
-  useWebuiPortSlicesOptional,
-} from "../../bindings/port-slices-context.js";
-import { createWebuiPortSlices } from "../../application/port-slices.js";
+import { WebuiPortSlicesProvider } from "../../bindings/port-slices-context.js";
 import { WebuiApplicationProvider } from "../../bindings/application-context.js";
 import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
-import { createWebuiTerminalOwner } from "../../features/terminal/application/terminal-owner.js";
 import { useWebuiApplicationOptional } from "../../bindings/application-context.js";
 import {
   WebuiPluginWorkflowsProvider,
@@ -118,16 +110,7 @@ import {
   WebuiWorkspaceQueriesProvider,
 } from "../../bindings/use-query-state.js";
 import { WebuiAccountWorkflowsProvider } from "../../features/account/bindings/use-account-workflows.js";
-import { createWebuiWorkspaceQueries } from "../../features/workspace/application/workspace-queries.js";
-import { createWebuiAccountWorkflows } from "../../features/account/application/account-workflows.js";
-import { createWebuiModelsWorkflows } from "../../features/models/application/models-workflows.js";
-import { createWebuiSettingsWorkflows } from "../../features/settings/application/settings-workflows.js";
-import { createWebuiPluginWorkflows } from "../../features/plugins/application/plugin-workflows.js";
-import { createWebuiComposerPluginCatalogue } from "../../features/plugins/application/composer-catalogue.js";
-import { createWebuiPluginActions } from "../../features/plugins/contracts/plugin-actions.js";
-import { webuiActiveTurnProbeFor } from "../../application/turn/active-turn-probe.js";
 import { startWebuiSessionTransferDownload } from "../../infrastructure/session-transfer-download.js";
-import { importWebuiSessionFile } from "../../infrastructure/session-import.js";
 import type { TeamModeSessionChoices } from "../../infrastructure/team-mode.js";
 import {
   initialWebuiWorkspaceProgress,
@@ -136,7 +119,6 @@ import {
   webuiWorkspaceSubagentStatus,
 } from "../../features/workspace/projection/workspace-progress.js";
 import type { WebuiApplication } from "../../application/create-application.js";
-import { createWebuiPlanReviewWorkflow } from "../../features/interactions/application/interaction-coordinator.js";
 import type { WebuiWorkspaceGitChangedSignal } from "../../features/workspace/projection/workspace-panel-state.js";
 import { ConnectionStatus } from "./ConnectionStatus.js";
 import { deriveConversationUsageNotice } from "../../features/transcript/projection/message-projection.js";
@@ -181,15 +163,6 @@ export interface WebuiClientFoundationAppProps {
    * the scope it actually runs in. `main.tsx` passes the page's host.
    */
   readonly hostLabel?: string;
-  /**
-   * W2.5 transport object — the single bag of methods the foundation app
-   * consumes. `main.tsx` constructs it ONCE at module scope so the React
-   * effect dependency identity is stable across renders. Passing a fresh
-   * object every render would re-subscribe the watcher / fetcher effects
-   * on every keystroke. Optional fields stay optional: `transport.X`
-   * is `undefined` iff the operation is not wired.
-   */
-  readonly transport?: WebuiTransport;
 }
 
 /**
@@ -247,7 +220,6 @@ export function WebuiClientFoundationApp(
     locationHash,
     dataDir,
     hostLabel,
-    transport,
   } = props;
   // The per-business port slices (plan §8 Phase 2, A4-s3). A business reads its
   // own slice instead of reaching into the composed transport, so what it *can*
@@ -255,25 +227,20 @@ export function WebuiClientFoundationApp(
   // provides them the shell uses those instances; otherwise it cuts its own from
   // the transport prop, so the prop-driven hosts (SSR, unit tests) get the same
   // narrowed shape instead of a fallback to the whole transport.
-  const providedSlices = useWebuiPortSlicesOptional();
-  const portSlices = useMemo(
-    () => providedSlices ?? createWebuiPortSlices(transport ?? {}),
-    [providedSlices, transport],
-  );
+  // The assembly's slices (T19): cut once by the application, published on it and
+  // provided to the screens below. The shell holds no capability to cut its own
+  // and no transport to fall back to.
+  const portSlices = application.portSlices;
   const sessionsPort = portSlices.sessions;
   const getSessionForkOptions = sessionsPort.getSessionForkOptions;
   const forkSession = sessionsPort.forkSession;
   const transcriptPort = portSlices.transcript;
   const composerPort = portSlices.composer;
-      const workspacePort = portSlices.workspace;
-      // The browser Terminal owner (T15). It is created from the slice the shell
-      // already holds rather than through `useWebuiPortSlice`, because this
-      // component renders the provider that hook reads (line ~1191) and would
-      // therefore see nothing inside its own body.
-      const terminalOwner = createWebuiTerminalOwner(workspacePort);
-  const pluginsPort = portSlices.plugins;
-  const settingsPort = portSlices.settings;
-  const modelsPort = portSlices.models;
+  const workspacePort = portSlices.workspace;
+  // The browser Terminal owner (T15), built by the assembly for the same reason
+  // as the rest: this component renders the provider that `useWebuiPortSlice`
+  // reads (see the provider below), so it cannot read through it itself.
+  const terminalOwner = application.terminalOwner;
   const accountPort = portSlices.account;
   const turnPort = portSlices.turn;
   // The one application store, taken from the assembled application. There is no
@@ -317,21 +284,7 @@ export function WebuiClientFoundationApp(
   // The session workflows: the loads and mutations the shell used to call
   // through `transport` and then patch onto two structures by hand. The shell
   // submits a workflow and holds no transport call for session entities.
-  const sessionWorkflows = useMemo(
-    () =>
-      createWebuiSessionWorkflows({
-        store: sessionStore,
-        // The composer store clears a slot's draft and history on delete so
-        // a fresh session does not inherit the deleted session's text.
-        composer: composerStore,
-        port: sessionsPort,
-        importSession: importWebuiSessionFile,
-        // A delete is an accepted mutation: it holds a settlement lease and
-        // revokes the deleted session's interests (plan §4.3).
-        scope: application.sessionScope,
-      }),
-    [sessionStore, composerStore, sessionsPort],
-  );
+  const sessionWorkflows = application.sessionWorkflows;
   const [projectRecords, setProjectRecords] = useState<readonly WebuiClientProject[] | undefined>();
   useEffect(() => {
     // The project list is a session business request, so it goes through the
@@ -348,53 +301,28 @@ export function WebuiClientFoundationApp(
   }, [sessionWorkflows]);
   // The slash-command runner the composer submits through (ticket #49
   // criterion 8): the component holds no transport call, it calls the workflow.
-  const commandWorkflows = useMemo(
-    () => createWebuiCommandWorkflows({ port: composerPort }),
-    [composerPort],
-  );
+  const commandWorkflows = application.commandWorkflows;
   // The one workspace query owner (ticket #51): it caches the workspace file
   // tree, file contents, the working-tree review and the git environment, and
   // discards a late response from a superseded request. Provided to the two
   // workspace panels, which submit query commands and read its snapshot.
-  const workspaceQueries = useMemo(
-    () => createWebuiWorkspaceQueries({ port: workspacePort }),
-    [workspacePort],
-  );
+  const workspaceQueries = application.workspaceQueries;
   // The account, settings and plugin owners (ticket #52). One of each per
   // mount, provided to the user menu, the settings dialog and the plugin
   // manager; those components submit commands and read the snapshot instead of
   // holding their own copies of the answers.
-  const accountWorkflows = useMemo(
-    () => createWebuiAccountWorkflows({
-      port: accountPort,
-      identityEpochs: application.identityEpochs,
-    }),
-    [accountPort],
-  );
-  // The account owner runs timers (the login poll and the OAuth status poll), so
-  // its mount owns their end (T09).
-  useEffect(() => () => accountWorkflows.dispose(), [accountWorkflows]);
-  const settingsWorkflows = useMemo(
-    () => createWebuiSettingsWorkflows({
-      port: settingsPort,
-      identityEpochs: application.identityEpochs,
-    }),
-    [settingsPort],
-  );
+  const accountWorkflows = application.accountWorkflows;
+  // The account owner's timers (the login poll and the OAuth status poll) end
+  // with the application rather than with this component's mount (T09, T19).
+  const settingsWorkflows = application.settingsWorkflows;
   // `models` owns the catalogue, the selection and the provider list (plan §5.6),
   // so it is its own owner with its own snapshot. The one call that crosses the
   // boundary is `upsertApiKey`'s: it refreshes `settings`' api-key *status* read
   // through that owner's published command rather than copying the read.
-  const modelsWorkflows = useMemo(
-    () => createWebuiModelsWorkflows({
-      port: modelsPort,
-      // The credential-status read belongs to the Account lifetime (T09), so a
-      // provider mutation refreshes it through that owner's published command.
-      refreshApiKeyStatus: () => accountWorkflows.loadApiKeyStatus(),
-      identityEpochs: application.identityEpochs,
-    }),
-    [modelsPort, accountWorkflows, application.identityEpochs],
-  );
+  // `models` owns the catalogue, the selection and the provider list (plan §5.6);
+  // the one cross-business call it makes — refreshing the api-key status read —
+  // is wired inside the assembly, through that owner's published command.
+  const modelsWorkflows = application.modelsWorkflows;
   // The runtime handshake fact is a `SettingsPort` method, so it is read through
   // the settings owner like every other settings read rather than invoked here.
   // The `version` seed prop still wins, so a server-rendered first paint is not
@@ -409,22 +337,12 @@ export function WebuiClientFoundationApp(
     if (runtimeVersion || !settingsWorkflows.canReadVersion) return;
     void settingsWorkflows.loadVersion();
   }, [runtimeVersion, settingsWorkflows]);
-  const pluginWorkflows = useMemo(
-    () => createWebuiPluginWorkflows({ port: pluginsPort }),
-    [pluginsPort],
-  );
+  const pluginWorkflows = application.pluginWorkflows;
   // The composer's view of what is installed and what the agent can run. It is a
   // separate read model from `pluginWorkflows` on purpose: the `@` menu and the
   // plugin manager are two readers with two identities, so neither overwrites the
   // other when one of them reloads (T08).
-  const composerPluginCatalogue = useMemo(
-    () =>
-      createWebuiComposerPluginCatalogue({
-        actions: createWebuiPluginActions(pluginsPort),
-        ...(pluginsPort.listSkills ? { listSkills: pluginsPort.listSkills } : {}),
-      }),
-    [pluginsPort],
-  );
+  const composerPluginCatalogue = application.composerPluginCatalogue;
   // The usage quota is an `AccountPort` method, so it is read through the
   // account owner that already caches it for the user menu and the settings
   // dialog. The shell used to hold its own copy, fetched independently, with
@@ -456,24 +374,11 @@ export function WebuiClientFoundationApp(
   );
   const [selectedSessionId, setSelectedSessionId] =
     useSelectedSessionId(locationHash);
-  // The plan-review reply needs the session's agent name, which is derived from
-  // the session list further down; the ref carries it to the call.
-  const agentNameRef = useRef<string | undefined>(undefined);
-  const planReviewWorkflow = useMemo(
-    () =>
-      createWebuiPlanReviewWorkflow({
-        // The reply goes to the session's interaction owner, not through a
-        // registry lookup that only works while the composer is mounted there
-        // (T05).
-        answerQuestionnaire: (request, answers) =>
-          selectedSessionId
-            ? application.interactions
-                .owner(selectedSessionId)
-                .answerQuestionnaire(request, answers, agentNameRef.current)
-            : Promise.resolve({ ok: false, error: "Questionnaire replies are unavailable" }),
-      }),
-    [application, selectedSessionId],
-  );
+  // The plan-review reply workflow lives with the assembly (T19): it reads the
+  // selection and the session's agent name when the reply is submitted, so a card
+  // left open across a selection change replies to the session it belongs to
+  // instead of to whichever session the shell had selected when it mounted.
+  const planReviewWorkflow = application.planReviewWorkflow;
   // Rail session links are plain `#session=<id>` anchors, so the navigation runs
   // through the hash subscription inside `useSelectedSessionId` rather than
   // through the setter this shell holds. Watching the resolved id is the one
@@ -600,7 +505,8 @@ export function WebuiClientFoundationApp(
    */
   const selectedAgentNameRef = useRef(selectedAgentName);
   selectedAgentNameRef.current = selectedAgentName;
-  agentNameRef.current = selectedAgentName;
+  // The plan-review workflow reads the session's agent name from the assembly,
+  // so nothing here has to carry it.
   useEffect(() => {
     application.interactions.setAgentNameReader(() => selectedAgentNameRef.current);
   }, [application]);
@@ -1015,14 +921,10 @@ export function WebuiClientFoundationApp(
   // started were missed while the stream was down, and the stream cannot
   // replay them. `SessionComposer` closes the same gap the same way.
   const [activityProbeNonce, setActivityProbeNonce] = useState(0);
-  const getActiveTurn = turnPort.activeTurn;
-  // One shared, deduplicated probe for the transport (plan §7.1 slice): the
-  // rail and the composer ask the same `getActiveTurn`, so a same-session probe
-  // racing between them collapses to one round trip.
-  const activeTurnProbe = useMemo(
-    () => webuiActiveTurnProbeFor(getActiveTurn),
-    [getActiveTurn],
-  );
+  // One shared, deduplicated probe (plan §7.1 slice): the rail and the composer
+  // ask the same question, so it is built once by the assembly (T19) and read
+  // from there rather than constructed here.
+  const activeTurnProbe = application.activeTurnProbe;
 
   // The application-wide effects the coordinator runs. It composes the
   // per-session registry the composer registers into with the shell's own

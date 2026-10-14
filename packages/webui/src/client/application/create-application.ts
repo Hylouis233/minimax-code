@@ -14,6 +14,19 @@
 // ingress while the composer still opened its own connection would make the
 // migration itself a source of duplicated state.
 
+import { createWebuiPortSlices, type WebuiPortSlices } from "./port-slices.js";
+import { createWebuiSessionWorkflows } from "../features/sessions/application/session-workflows.js";
+import { createWebuiCommandWorkflows } from "../features/composer/application/command-workflows.js";
+import { createWebuiTerminalOwner } from "../features/terminal/application/terminal-owner.js";
+import { createWebuiWorkspaceQueries } from "../features/workspace/application/workspace-queries.js";
+import { createWebuiAccountWorkflows } from "../features/account/application/account-workflows.js";
+import { createWebuiModelsWorkflows } from "../features/models/application/models-workflows.js";
+import { createWebuiSettingsWorkflows } from "../features/settings/application/settings-workflows.js";
+import { createWebuiPluginWorkflows } from "../features/plugins/application/plugin-workflows.js";
+import { createWebuiComposerPluginCatalogue } from "../features/plugins/application/composer-catalogue.js";
+import { createWebuiPluginActions } from "../features/plugins/contracts/plugin-actions.js";
+import { createWebuiPlanReviewWorkflow } from "../features/interactions/application/interaction-coordinator.js";
+import { webuiActiveTurnProbeFor } from "./turn/active-turn-probe.js";
 import {
   createWebuiEventCoordinator,
   type WebuiWorkspaceGitChangedPayload,
@@ -148,6 +161,20 @@ export interface WebuiApplicationDeps {
    * answer for that session, which is where the shell reads it too.
    */
   readonly readAgentName?: (sessionId: string) => string;
+  /**
+   * The per-business port slices (T19). The composition root cuts them once and
+   * hands them in; the application builds every business owner from them, so no
+   * view builds an owner to reach a capability (plan §8 Phase 2, §6 W6). Absent
+   * on a host with nothing wired: the slices then cut from the turn capability,
+   * which is the same degradation the shell used to perform.
+   */
+  readonly slices?: WebuiPortSlices;
+  /**
+   * The session-file import the session workflows submit through. Injected for
+   * the same reason as `unreadStorage`: the application layer may not import
+   * `infrastructure/`.
+   */
+  readonly sessionImport?: Parameters<typeof createWebuiSessionWorkflows>[0]["importSession"];
 }
 
 export type WebuiApplicationLifecycleState = "constructed" | "started" | "disposed";
@@ -218,6 +245,38 @@ export interface WebuiApplication {
   readonly unread: WebuiUnreadController;
   /** The one owner of composer drafts and input history (plan §7.6). */
   readonly composer: WebuiComposerStore;
+  /**
+   * The port slices the assembly cut (§6 W6). Published so a surface reads the
+   * narrowed slice rather than the composed transport: the shell provides these
+   * to its descendants and reads none of them itself.
+   */
+  readonly portSlices: WebuiPortSlices;
+  /** The browser terminal owner (T15). */
+  readonly terminalOwner: ReturnType<typeof createWebuiTerminalOwner>;
+  /** The session business's loads and mutations, one per assembly (T19). */
+  readonly sessionWorkflows: ReturnType<typeof createWebuiSessionWorkflows>;
+  /** The composer business's slash-command runner. */
+  readonly commandWorkflows: ReturnType<typeof createWebuiCommandWorkflows>;
+  /** The workspace file/environment/review query owner (T19). */
+  readonly workspaceQueries: ReturnType<typeof createWebuiWorkspaceQueries>;
+  /** The account owner: sign-in, api-key status and usage (T19). */
+  readonly accountWorkflows: ReturnType<typeof createWebuiAccountWorkflows>;
+  /** The settings owner: instructions, memory, profile and display (T19). */
+  readonly settingsWorkflows: ReturnType<typeof createWebuiSettingsWorkflows>;
+  /** The models owner: catalogue, selection and provider CRUD (T19). */
+  readonly modelsWorkflows: ReturnType<typeof createWebuiModelsWorkflows>;
+  /** The plugin manager's owner (T19). */
+  readonly pluginWorkflows: ReturnType<typeof createWebuiPluginWorkflows>;
+  /** The composer's plugin/skill read model, separate from the manager's (T08). */
+  readonly composerPluginCatalogue: ReturnType<typeof createWebuiComposerPluginCatalogue>;
+  /** The plan-review reply workflow (T19). */
+  readonly planReviewWorkflow: ReturnType<typeof createWebuiPlanReviewWorkflow>;
+  /**
+   * The one active-turn probe (plan §7.1): a same-session probe from two views
+   * collapses to one round trip, and absent means the host predates the
+   * operation — the rail's own condition, not a second probe.
+   */
+  readonly activeTurnProbe: ReturnType<typeof webuiActiveTurnProbeFor>;
   /**
    * The two version cells, one per fence (§4.2 field 6). The application owns the
    * instance; the business owns the policy and reads the cell it is given.
@@ -303,10 +362,11 @@ export function createWebuiApplication(
     }
     return "main";
   };
+  const readAgentName = deps.readAgentName ?? catalogueAgentName;
   const interactions = createWebuiInteractionSessionOwners({
     store,
     ...(deps.interactionsPort ? { port: deps.interactionsPort } : {}),
-    readAgentName: deps.readAgentName ?? catalogueAgentName,
+    readAgentName,
   });
   /**
    * The one selection command. Selecting activates the new session's scope and
@@ -453,6 +513,71 @@ export function createWebuiApplication(
     transcript: createWebuiTranscriptHistoryWriter(store),
     loadMessages: deps.loadMessages,
   });
+  // The business owners, built by the assembly rather than by the mounted view
+  // (T19; plan §6 W6, the shell's own treatment). A view composes screens and
+  // reads these; it neither builds one nor holds the capability to build one, so
+  // "which business can reach which port" is decided here rather than by which
+  // port a component happened to be handed.
+  const slices = deps.slices ?? createWebuiPortSlices(deps.turnCapabilities ?? {});
+  const terminalOwner = createWebuiTerminalOwner(slices.workspace);
+  const sessionWorkflows = createWebuiSessionWorkflows({
+    store,
+    // A delete clears the composer slot's draft and history, so a fresh session
+    // does not inherit the deleted session's text.
+    composer,
+    port: slices.sessions,
+    ...(deps.sessionImport ? { importSession: deps.sessionImport } : {}),
+    // A delete is an accepted mutation: it holds a settlement lease and revokes
+    // the deleted session's interests (plan §4.3).
+    scope: sessionScope,
+  });
+  const commandWorkflows = createWebuiCommandWorkflows({ port: slices.composer });
+  const workspaceQueries = createWebuiWorkspaceQueries({ port: slices.workspace });
+  const accountWorkflows = createWebuiAccountWorkflows({
+    port: slices.account,
+    identityEpochs,
+  });
+  const settingsWorkflows = createWebuiSettingsWorkflows({
+    port: slices.settings,
+    identityEpochs,
+  });
+  // `models` owns the catalogue, the selection and the provider list (plan
+  // §5.6). The one call that crosses the boundary is the api-key upsert's: it
+  // refreshes `settings`' status read through that owner's published command
+  // rather than copying the read.
+  const modelsWorkflows = createWebuiModelsWorkflows({
+    port: slices.models,
+    refreshApiKeyStatus: () => accountWorkflows.loadApiKeyStatus(),
+    identityEpochs,
+  });
+  const pluginWorkflows = createWebuiPluginWorkflows({ port: slices.plugins });
+  // The composer's view of what is installed and what the agent can run: a
+  // separate read model from `pluginWorkflows` on purpose, so neither
+  // overwrites the other when one reloads (T08).
+  const composerPluginCatalogue = createWebuiComposerPluginCatalogue({
+    actions: createWebuiPluginActions(slices.plugins),
+    ...(slices.plugins.listSkills ? { listSkills: slices.plugins.listSkills } : {}),
+  });
+  // The plan-review reply goes to the session's interaction owner (T05). The
+  // selection and the agent name are read when the reply is submitted rather
+  // than captured by the view that renders the card, so a card left open across
+  // a selection change replies to the session it belongs to.
+  // One shared, deduplicated active-turn probe (plan §7.1). The rail and the
+  // composer ask the same question, so a probe racing between two views for one
+  // session collapses to one round trip; the probe is built by the assembly so a
+  // second consumer cannot build a second one (T19).
+  const activeTurnProbe = webuiActiveTurnProbeFor(slices.turn.activeTurn);
+  const planReviewWorkflow = createWebuiPlanReviewWorkflow({
+    answerQuestionnaire: (request, answers) => {
+      const target = readActiveSessionId();
+      if (!target) {
+        return Promise.resolve({ ok: false, error: "Questionnaire replies are unavailable" });
+      }
+      return interactions
+        .owner(target)
+        .answerQuestionnaire(request, answers, readAgentName(target));
+    },
+  });
   // The ingress handle: nothing is opened at construction. `start` opens exactly
   // one channel and attaches the coordinator to it; `dispose` detaches, disposes
   // the store that fences late commits, and closes the channel.
@@ -496,6 +621,18 @@ export function createWebuiApplication(
     transcriptHistory,
     unread,
     composer,
+    portSlices: slices,
+    terminalOwner,
+    sessionWorkflows,
+    commandWorkflows,
+    workspaceQueries,
+    accountWorkflows,
+    settingsWorkflows,
+    modelsWorkflows,
+    pluginWorkflows,
+    composerPluginCatalogue,
+    activeTurnProbe,
+    planReviewWorkflow,
     versionCells,
     identityEpochs,
     reconcile: (sessionId) => {
@@ -534,6 +671,9 @@ export function createWebuiApplication(
       sessionScope.dispose();
       goals.dispose();
       interactions.dispose();
+      // The account owner runs the login and OAuth-status polls, so its end is
+      // the application's end rather than a component unmount (T09, T19).
+      accountWorkflows.dispose();
       workspaceGitListeners.clear();
       channelReadyListeners.clear();
       dirtyResources.clear();

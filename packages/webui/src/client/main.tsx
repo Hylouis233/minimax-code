@@ -11,6 +11,7 @@ export {
 } from "./components/shell/WebuiClientFoundationApp.js";
 export { subscribeToSessionHash } from "./bindings/navigation.js";
 import { createWebuiTransport } from "./infrastructure/transport.js";
+import { importWebuiSessionFile } from "./infrastructure/session-import.js";
 import { route } from "./projection/common/router.js";
 import { NotFound } from "./components/shell/NotFound.js";
 import { ArchonPage } from "./components/shell/ArchonPage.js";
@@ -101,6 +102,13 @@ function WebuiClientRoot({
           read: storage.readUnreadCounts,
           write: storage.writeUnreadCounts,
         },
+        // The port slices this root cut above (T19). The assembly builds every
+        // business owner from them, so the shell composes screens instead of
+        // constructing owners.
+        slices,
+        // The session-file import the session workflows submit through: the
+        // application layer may not reach into `infrastructure/` itself.
+        sessionImport: importWebuiSessionFile,
         turns: {
           resumeSession: transport.resumeSession ?? (async () => {}),
           ...(transport.loadMessages
@@ -142,7 +150,6 @@ function WebuiClientRoot({
             label="webui-foundation"
             hostLabel={location.host}
             dataDir={dataDir}
-            transport={transport}
           />
         </WebuiPortSlicesProvider>
       </WebuiApplicationProvider>
