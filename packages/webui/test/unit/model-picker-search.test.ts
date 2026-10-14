@@ -16,25 +16,25 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 
-import { WebuiModelMenuList } from "../../src/client/components/models/ModelPicker.js";
+import { WebuiModelMenuList } from "../../src/client/features/models/ui/ModelPicker.js";
 import {
   groupModelsByProvider,
   modelKey,
   projectModelPickerSections,
-} from "../../src/client/projection/models/model-picker-rows.js";
+} from "../../src/client/features/models/projection/model-picker-rows.js";
 import {
   filterModelGroups,
   fuzzyMatches,
   isSearchEmpty,
-} from "../../src/client/projection/models/model-picker-search.js";
+} from "../../src/client/features/models/projection/model-picker-search.js";
 import {
   FAVORITES_SECTION_ID,
   normalizeFavoriteModelIds,
   orderModelGroups,
   toggleFavoriteId,
-} from "../../src/client/projection/models/model-favorites.js";
+} from "../../src/client/features/models/projection/model-favorites.js";
 import { createWebuiBrowserStorage } from "../../src/client/infrastructure/storage.js";
-import type { WebuiModelPickerEntry } from "../../src/client/contracts/models/model-view.js";
+import type { WebuiModelPickerEntry } from "../../src/client/features/models/contracts/model-view.js";
 
 function entry(
   providerId: string,

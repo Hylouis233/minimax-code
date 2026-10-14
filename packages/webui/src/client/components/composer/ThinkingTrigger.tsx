@@ -35,7 +35,7 @@ import {
   resolveThinkingVerdict,
   thinkingControlShape,
   type BrainTone,
-} from "../../projection/models/thinking-control.js";
+} from "../../features/models/projection/thinking-control.js";
 
 /**
  * A brain glyph.

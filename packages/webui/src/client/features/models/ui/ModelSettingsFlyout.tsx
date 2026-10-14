@@ -38,14 +38,14 @@ import {
   type RefObject,
 } from "react";
 
-import { ToggleSwitch } from "../shared/ToggleSwitch.js";
+import { ToggleSwitch } from "../../../components/shared/ToggleSwitch.js";
 import {
   flyoutStyle,
   positionFlyout,
   type FlyoutRect,
-} from "../../projection/common/flyout-position.js";
-import { resolveThinkingVerdict } from "../../projection/models/thinking-control.js";
-import type { WebuiModelPickerDraft, WebuiModelPickerEntry } from "../../contracts/models/model-view.js";
+} from "../../../projection/common/flyout-position.js";
+import { resolveThinkingVerdict } from "../projection/thinking-control.js";
+import type { WebuiModelPickerDraft, WebuiModelPickerEntry } from "../contracts/model-view.js";
 
 function formatContextWindow(value: number): string {
   if (value >= 1_000_000) return `${value / 1_000_000}M`;

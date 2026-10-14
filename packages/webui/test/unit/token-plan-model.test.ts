@@ -17,7 +17,7 @@ import {
   MANAGED_MINIMAX_PROVIDER_ID,
   MINIMAX_API_PROVIDER_ID,
   isTokenPlanModel,
-} from "../../src/client/projection/models/token-plan-model.js";
+} from "../../src/client/features/models/projection/token-plan-model.js";
 
 // The client imports no `@mavis/*` module and the package boundary check keeps
 // it that way, so these three are mirrored rather than imported. A mirror with

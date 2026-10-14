@@ -15,8 +15,8 @@ import {
   resolveEffortOptions,
   thinkingDraftPatch,
   variantForEffort,
-} from "../../src/client/projection/models/thinking-control.js";
-import type { WebuiModelPickerEntry } from "../../src/client/contracts/models/model-view.js";
+} from "../../src/client/features/models/projection/thinking-control.js";
+import type { WebuiModelPickerEntry } from "../../src/client/features/models/contracts/model-view.js";
 import type { WebuiModelEntry } from "../../src/shared/contracts/models.js";
 
 function entry(over: Partial<WebuiModelPickerEntry> = {}): WebuiModelPickerEntry {
@@ -77,7 +77,7 @@ describe("effort options — the binary case", () => {
 const FLYOUT_SOURCE = readFileSync(
   path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
-    "../../src/client/components/models/ModelSettingsFlyout.tsx",
+    "../../src/client/features/models/ui/ModelSettingsFlyout.tsx",
   ),
   "utf8",
 );

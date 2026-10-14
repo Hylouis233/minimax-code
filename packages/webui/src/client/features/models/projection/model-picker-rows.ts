@@ -8,7 +8,7 @@
 // cluster, the draft fly-out and the keyboard/focus/preview transaction
 // behaviour, and reads these rules from its owner.
 
-import type { WebuiModelPickerEntry, WebuiModelProviderGroup } from "../../contracts/models/model-view.js";
+import type { WebuiModelPickerEntry, WebuiModelProviderGroup } from "../contracts/model-view.js";
 import { orderModelGroups } from "./model-favorites.js";
 import { filterModelGroups } from "./model-picker-search.js";
 

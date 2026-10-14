@@ -31,45 +31,45 @@ import {
   type ReactElement,
 } from "react";
 
-import { WebuiIconChevronDown } from "../shell/icons.js";
-import { ToggleSwitch } from "../shared/ToggleSwitch.js";
+import { WebuiIconChevronDown } from "../../../components/shell/icons.js";
+import { ToggleSwitch } from "../../../components/shared/ToggleSwitch.js";
 import type {
   WebuiModelPickerDraft,
   WebuiModelPickerEntry,
   WebuiModelProviderGroup,
-} from "../../contracts/models/model-view.js";
-import { evaluateOutsideClose } from "../../projection/common/outside-close.js";
-import { resolveEffortOptions } from "../../projection/models/thinking-control.js";
+} from "../contracts/model-view.js";
+import { evaluateOutsideClose } from "../../../projection/common/outside-close.js";
+import { resolveEffortOptions } from "../projection/thinking-control.js";
 import {
   applyModelDraftResolution,
   resolveModelDraftSelection,
   type ModelDraftChange,
-} from "../../projection/models/model-draft.js";
+} from "../projection/model-draft.js";
 import {
   modelKey,
   projectModelPickerSections,
   reconcileFocusedRow,
   rowIdOf,
   type FocusedRow,
-} from "../../projection/models/model-picker-rows.js";
-import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
-import { isSearchEmpty } from "../../projection/models/model-picker-search.js";
-import { toggleFavoriteId } from "../../projection/models/model-favorites.js";
+} from "../projection/model-picker-rows.js";
+import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
+import { isSearchEmpty } from "../projection/model-picker-search.js";
+import { toggleFavoriteId } from "../projection/model-favorites.js";
 import {
   isPreview,
   rowHasFlyout,
   type CascadeTier,
-} from "../../projection/models/model-picker-cascade.js";
+} from "../projection/model-picker-cascade.js";
 import {
   MODEL_FLYOUT_HOVER_DELAY_MS,
   hoverArrival,
-} from "../../projection/models/model-picker-hover.js";
+} from "../projection/model-picker-hover.js";
 import {
   ModelSettingsFlyout,
   type ModelSettingsFlyoutProps,
   type FlyoutAnchor,
 } from "./ModelSettingsFlyout.js";
-import type { FlyoutRect } from "../../projection/common/flyout-position.js";
+import type { FlyoutRect } from "../../../projection/common/flyout-position.js";
 
 // Re-export so existing importers keep their import path stable.
 export type {

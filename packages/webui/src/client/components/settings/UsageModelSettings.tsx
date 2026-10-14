@@ -2,9 +2,9 @@ import { useEffect, useState, type ReactElement } from "react";
 import { formatWebuiCredits, recordOf, textOf } from "../../contracts/value-readers.js";
 import { useWebuiAccountWorkflows, useWebuiAccountWorkflowsState, useWebuiModelsWorkflows, useWebuiModelsWorkflowsState, useWebuiSettingsWorkflows, useWebuiSettingsWorkflowsState } from "../../bindings/use-query-state.js";
 import { ToggleSwitch } from "../shared/ToggleSwitch.js";
-import { formatResetLabel, getActiveSourceBadge, type ProviderHeaderDraft } from "../../projection/models/usage-settings.js";
+import { formatResetLabel, getActiveSourceBadge, type ProviderHeaderDraft } from "../../features/models/projection/usage-settings.js";
 import { IconButton, RefreshIcon } from "./settings-atoms.js";
-import { ProviderFormPanel, type WebuiProviderFormCommands } from "../models/ProviderFormPanel.js";
+import { ProviderFormPanel, type WebuiProviderFormCommands } from "../../features/models/ui/ProviderFormPanel.js";
 
 type Props = {
   readonly sessionId?: string;

@@ -27,7 +27,7 @@ import type {WebuiClientMessageEnqueuer} from "../../contracts/composer/command-
 import type {WebuiClientMessageSender} from "../../contracts/turn/execution-port.js";
 import { WebuiWorkspaceDirectoryBrowser } from "../../features/workspace/ui/WebuiWorkspaceDirectoryBrowser.js";
 import type { WebuiClientMessageLoader } from "../../features/transcript/contracts/message-view.js";
-import type { WebuiModelSelectionRequest } from "../../contracts/models/model-view.js";
+import type { WebuiModelSelectionRequest } from "../../features/models/contracts/model-view.js";
 import type { WebuiClientSessionCreator } from "../../contracts/sessions/session-port.js";
 import type { WebuiClientSessionPage, WebuiClientSession } from "../../contracts/sessions/session-view.js";
 import type { WebuiTransport } from "../../contracts/transport.js";
@@ -53,7 +53,7 @@ import {
   contextBreakdownRows,
   drawableBreakdownRows,
 } from "../../projection/composer/context-breakdown.js";
-import { isTokenPlanModel } from "../../projection/models/token-plan-model.js";
+import { isTokenPlanModel } from "../../features/models/projection/token-plan-model.js";
 import type {
   WebuiComposerAttachment,
   WebuiComposerUrlReference,
@@ -124,13 +124,13 @@ import { WebuiQueuePanel } from "./QueuePanel.js";
 import {
   WebuiModelPicker,
   type WebuiModelPickerDraft,
-} from "../models/ModelPicker.js";
+} from "../../features/models/ui/ModelPicker.js";
 import { ThinkingTrigger } from "./ThinkingTrigger.js";
 import {
   chipLevelLabel,
   resolveEffortOptions,
   thinkingDraftPatch,
-} from "../../projection/models/thinking-control.js";
+} from "../../features/models/projection/thinking-control.js";
 import {
   WebuiIconAttach,
   WebuiIconCheck,

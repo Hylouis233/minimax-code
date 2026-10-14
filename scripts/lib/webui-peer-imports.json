@@ -48,8 +48,8 @@
     },
     {
       "from": "client/features/sessions/ui/ContextUsageIndicator.tsx",
-      "to": "client/projection/models/token-plan-model.ts",
-      "reason": "The chip shows the token plan, which Models owns. Reviewed peer edge until Models publishes the plan read."
+      "to": "client/features/models/projection/token-plan-model.ts",
+      "reason": "The chip shows the token plan, which Models owns. Reviewed peer edge until Models publishes the plan read (the path was re-pointed when the models business moved into features/models/ in T03; the edge itself is unchanged)."
     },
     {
       "from": "client/features/sessions/ui/ContextUsageIndicator.tsx",
@@ -105,6 +105,11 @@
       "from": "client/features/transcript/ui/AssistantBody.tsx",
       "to": "client/features/review/bindings/use-turn-review.ts",
       "reason": "The same binding, asked only whether the runtime offers turn diffs at all, so the card can be hidden rather than rendered empty. Same edge and same retirement as the DiffCard entry: review publishes the capability read as a public contract and this goes with it (T10)."
+    },
+    {
+      "from": "client/features/models/ui/ProviderFormPanel.tsx",
+      "to": "client/components/settings/settings-atoms.tsx",
+      "reason": "The provider form is built from the settings surfaces' presentation atoms (IconButton, the close and refresh glyphs). Before T03 the form sat in `client/components/models/`, a current home the peer rule does not judge; moving it into the models feature home makes the edge measurable. Reviewed peer edge while those atoms are filed under the settings business: they carry no settings policy, so the entry goes when T18 relocates the reusable presentation mechanics to `client/ui/`, or when settings publishes them."
     }
   ]
 }

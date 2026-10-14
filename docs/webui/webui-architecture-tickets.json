@@ -1104,7 +1104,7 @@
     "tickets": {
       "T01": "implemented locally, acceptance evidence recorded on #127",
       "T02": "implemented locally, acceptance evidence recorded on #128",
-      "T03": "reopened 2026-10-14 - criterion 5 half unmet: the model grouping/key/focus rules moved to projection/models/, but the picker UI (components/models/ModelPicker.tsx, ModelSettingsFlyout.tsx, ProviderFormPanel.tsx) is still in the retired global home and features/models/ does not exist",
+      "T03": "moved 2026-10-14 (this commit): criterion 5's outstanding half is done — the 16 models files (contracts, projection, application, ui) are in features/models/ and the four old directories are empty; the two peer entries are re-pointed/recorded and the three path-reading suites follow the home. typecheck:webui 0. Not closed: behavioural gates deferred to T21.",
       "T04": "implemented locally, acceptance evidence recorded on #130",
       "T05": "reopened 2026-10-14 - criterion 6 half unmet: the composer no longer constructs the owners, but components/{goal,interactions}/*, application/{goal,interactions}/* and bindings/{goal-owner,interaction-owner}.ts remain in the retired global homes",
       "T06": "closed 2026-10-14 (issue #132): the scroll binding and the projection it owns are in features/transcript/{bindings,projection}/; nothing in the policy, viewport or pin changed. Evidence: test:webui 2484 pass, typecheck 0, lint 0, dependency/boundary/commands/navigation/source gates PASS, and after build:webui test:webui-browser 112 pass including transcript-scroll.spec.mjs, the spec that drives this policy in a browser.",

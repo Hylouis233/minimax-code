@@ -28,17 +28,17 @@ import {
   modelHasSettings,
   rowHasFlyout,
   thinkingCommitOutcome,
-} from "../../src/client/projection/models/model-picker-cascade.js";
-import { resolveModelDraftSelection } from "../../src/client/projection/models/model-draft.js";
+} from "../../src/client/features/models/projection/model-picker-cascade.js";
+import { resolveModelDraftSelection } from "../../src/client/features/models/projection/model-draft.js";
 import {
   FLYOUT_ANCHOR_GAP,
   flyoutStyle,
   positionFlyout,
 } from "../../src/client/projection/common/flyout-position.js";
-import type { WebuiModelPickerEntry } from "../../src/client/contracts/models/model-view.js";
+import type { WebuiModelPickerEntry } from "../../src/client/features/models/contracts/model-view.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const componentDir = path.resolve(here, "../../src/client/components/models");
+const componentDir = path.resolve(here, "../../src/client/features/models/ui");
 
 function readComponent(file: string): string {
   return readFileSync(path.join(componentDir, file), "utf8");

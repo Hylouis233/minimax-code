@@ -7,8 +7,8 @@
 //
 // Every method stays optional — `undefined` means "the operation is not wired".
 
-import type { WebuiModelEntry } from "../../../shared/contracts/models.js";
-import type { WebuiModelSelectionRequest } from ".././models/model-view.js";
+import type { WebuiModelEntry } from "../../../../shared/contracts/models.js";
+import type { WebuiModelSelectionRequest } from "./model-view.js";
 
 export interface ModelsPort {
   readonly listModels?: (request?: {

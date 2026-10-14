@@ -30,7 +30,7 @@
  * "close" is a name the next reader will trust.
  */
 import { resolveEffortOptions } from "./thinking-control.js";
-import type { WebuiModelPickerEntry } from "../../contracts/models/model-view.js";
+import type { WebuiModelPickerEntry } from "../contracts/model-view.js";
 
 /** Which tier of the cascade is showing. */
 export type CascadeTier = "list" | "settings";

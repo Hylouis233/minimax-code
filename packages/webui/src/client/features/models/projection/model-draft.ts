@@ -11,7 +11,7 @@
 import type {
   WebuiModelPickerDraft,
   WebuiModelPickerEntry,
-} from "../../contracts/models/model-view.js";
+} from "../contracts/model-view.js";
 import { thinkingDraftPatch } from "./thinking-control.js";
 
 /**

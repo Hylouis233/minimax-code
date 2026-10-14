@@ -22,7 +22,7 @@ import type { InteractionPort } from "./interactions/interaction-port.js";
 import type { GoalPort } from "./goal/goal-port.js";
 import type { WorkspacePort } from "../features/workspace/contracts/workspace-port.js";
 import type { SettingsPort } from "./settings/settings-port.js";
-import type { ModelsPort } from "./models/provider-port.js";
+import type { ModelsPort } from "../features/models/contracts/provider-port.js";
 import type { TranscriptPort } from "../features/transcript/contracts/session-read-port.js";
 import type { AccountPort } from "../features/account/contracts/account-port.js";
 import type { PluginPort } from "../features/plugins/contracts/plugin-port.js";

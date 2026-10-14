@@ -10,7 +10,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { createWebuiModelsWorkflows } from "../../src/client/application/models/models-workflows.js";
+import { createWebuiModelsWorkflows } from "../../src/client/features/models/application/models-workflows.js";
 
 const noStatusRefresh = async (): Promise<void> => {};
 

@@ -50,7 +50,7 @@ import type { AccountPort } from "../features/account/contracts/account-port.js"
 import type { ComposerPort } from "../contracts/composer/command-port.js";
 import type { GoalPort } from "../contracts/goal/goal-port.js";
 import type { InteractionPort } from "../contracts/interactions/interaction-port.js";
-import type { ModelsPort } from "../contracts/models/provider-port.js";
+import type { ModelsPort } from "../features/models/contracts/provider-port.js";
 import type { PluginPort } from "../features/plugins/contracts/plugin-port.js";
 import type { SessionPort } from "../contracts/sessions/session-port.js";
 import type { SettingsPort } from "../contracts/settings/settings-port.js";

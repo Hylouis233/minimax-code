@@ -21,18 +21,18 @@
 //
 // Framework-free: no React, no DOM, no storage.
 
-import type { WebuiIdentityEpochs } from "../identity-epochs.js";
+import type { WebuiIdentityEpochs } from "../../../application/identity-epochs.js";
 import {
   createWebuiKeyedResource,
   type WebuiResourceKey,
-} from "../../conversation/request-freshness.js";
-import type { ModelsPort } from "../../contracts/models/provider-port.js";
-import type { WebuiModelEntry } from "../../../shared/contracts/models.js";
+} from "../../../conversation/request-freshness.js";
+import type { ModelsPort } from "../contracts/provider-port.js";
+import type { WebuiModelEntry } from "../../../../shared/contracts/models.js";
 import {
   createWebuiQueryStore,
   idleWebuiQueryState,
   type WebuiQueryState,
-} from "../query-store.js";
+} from "../../../application/query-store.js";
 
 /** The provider half of the port re-file (plan §9, ticket #59). */
 export type WebuiModelsPortSlice = Pick<

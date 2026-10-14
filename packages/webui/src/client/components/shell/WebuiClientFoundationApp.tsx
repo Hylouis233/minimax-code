@@ -119,7 +119,7 @@ import {
 } from "../../bindings/use-query-state.js";
 import { createWebuiWorkspaceQueries } from "../../features/workspace/application/workspace-queries.js";
 import { createWebuiAccountWorkflows } from "../../features/account/application/account-workflows.js";
-import { createWebuiModelsWorkflows } from "../../application/models/models-workflows.js";
+import { createWebuiModelsWorkflows } from "../../features/models/application/models-workflows.js";
 import { createWebuiSettingsWorkflows } from "../../application/settings/settings-workflows.js";
 import { createWebuiPluginWorkflows } from "../../features/plugins/application/plugin-workflows.js";
 import { createWebuiComposerPluginCatalogue } from "../../features/plugins/application/composer-catalogue.js";
@@ -140,7 +140,7 @@ import type { WebuiWorkspaceGitChangedSignal } from "../../features/workspace/pr
 import { ConnectionStatus } from "./ConnectionStatus.js";
 import { deriveConversationUsageNotice } from "../../features/transcript/projection/message-projection.js";
 import { deriveRecentWorkspaceDirs } from "../../projection/composer/composer-state.js";
-import { normalizeFavoriteModelIds } from "../../projection/models/model-favorites.js";
+import { normalizeFavoriteModelIds } from "../../features/models/projection/model-favorites.js";
 
 // The hash plumbing moved to `client/bindings/navigation.ts` (plan §7.2). Both
 // symbols stay re-exported here: `main.tsx` re-exports `subscribeToSessionHash`

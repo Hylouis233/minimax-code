@@ -2,7 +2,7 @@
 //
 // Two halves, split for the same reason `model-picker-cascade.test.ts` splits.
 //
-// The RULES are pure functions in `projection/models/model-picker-hover.ts` and are
+// The RULES are pure functions in `features/models/projection/model-picker-hover.ts` and are
 // driven directly below: what the pointer arriving on a row does to a fly-out
 // that may already be open, and how long a pointer has to rest. Those are the
 // decisions that decide whether the panel chases the cursor, so they are pinned
@@ -24,10 +24,10 @@ import { describe, expect, it } from "vitest";
 import {
   MODEL_FLYOUT_HOVER_DELAY_MS,
   hoverArrival,
-} from "../../src/client/projection/models/model-picker-hover.js";
+} from "../../src/client/features/models/projection/model-picker-hover.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const componentDir = path.resolve(here, "../../src/client/components/models");
+const componentDir = path.resolve(here, "../../src/client/features/models/ui");
 const picker = readFileSync(
   path.join(componentDir, "ModelPicker.tsx"),
   "utf8",
@@ -36,7 +36,7 @@ const picker = readFileSync(
 // picker reads them from there. Read both, so "the rule exists" and "the picker
 // uses the rule" are separate assertions.
 const rows = readFileSync(
-  path.resolve(here, "../../src/client/projection/models/model-picker-rows.ts"),
+  path.resolve(here, "../../src/client/features/models/projection/model-picker-rows.ts"),
   "utf8",
 );
 

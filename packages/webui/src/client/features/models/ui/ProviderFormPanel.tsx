@@ -21,12 +21,12 @@ import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, us
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
-import { reorderModelIds } from "../../projection/models/model-reorder.js";
-import { projectProviderHeaders, type ProviderHeaderDraft } from "../../projection/models/usage-settings.js";
-import { recordOf, textOf } from "../../contracts/value-readers.js";
-import { ToggleSwitch } from "../shared/ToggleSwitch.js";
-import { CloseIcon, IconButton, RefreshIcon } from "../settings/settings-atoms.js";
+import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
+import { reorderModelIds } from "../projection/model-reorder.js";
+import { projectProviderHeaders, type ProviderHeaderDraft } from "../projection/usage-settings.js";
+import { recordOf, textOf } from "../../../contracts/value-readers.js";
+import { ToggleSwitch } from "../../../components/shared/ToggleSwitch.js";
+import { CloseIcon, IconButton, RefreshIcon } from "../../../components/settings/settings-atoms.js";
 
 /**
  * The provider commands this panel invokes. §5.6 files them under `models` rather than
