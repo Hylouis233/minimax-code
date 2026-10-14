@@ -10,7 +10,11 @@
 // The mixed owner composes this slice with the other two on read, so the panels
 // keep reading one snapshot.
 
-import type { WebuiWorkspaceFile, WebuiWorkspaceFileContent } from "../../../../shared/contracts/workspace.js";
+import type {
+  WebuiWorkspaceDirectoryListing,
+  WebuiWorkspaceFile,
+  WebuiWorkspaceFileContent,
+} from "../../../../shared/contracts/workspace.js";
 import { mergeWorkspaceFileChildren } from "../projection/workspace-file-tree.js";
 
 /** The transport methods this owner drives. Absent means "not wired". */
@@ -20,6 +24,9 @@ export interface WebuiWorkspaceFilesPort {
     /** A directory to list; absent means the tree's root. */
     readonly path?: string;
   }) => Promise<readonly WebuiWorkspaceFile[]>;
+  readonly browseWorkspaceDirs?: (request: {
+    readonly dir?: string;
+  }) => Promise<WebuiWorkspaceDirectoryListing>;
   readonly readWorkspaceFile?: (request: {
     readonly workspaceDir: string;
     readonly path: string;
@@ -46,8 +53,17 @@ export interface WebuiWorkspaceFileTreeState {
 }
 
 /** The git-environment query for one workspace. */
+/** The directory picker's listing: one answer, its freshness, its failure. */
+export type WebuiDirectoryBrowseState =
+  | { readonly status: "idle" }
+  | { readonly status: "loading" }
+  | { readonly status: "ready"; readonly listing: WebuiWorkspaceDirectoryListing }
+  | { readonly status: "error"; readonly error: string };
+
 export interface WebuiWorkspaceFilesState {
   readonly fileTree: WebuiWorkspaceFileTreeState;
+  /** The directory browser's listing (T11: the view renders, the owner reads). */
+  readonly directoryBrowse: WebuiDirectoryBrowseState;
   /** File read results, keyed by the caller's tab id. */
   readonly files: ReadonlyMap<string, WebuiWorkspaceFileContentState>;
 }
@@ -74,6 +90,7 @@ type WebuiWorkspaceLocalState = Omit<
 export const initialWebuiWorkspaceFilesState: WebuiWorkspaceFilesState = {
   fileTree: initialWebuiWorkspaceFileTreeState,
   files: new Map(),
+  directoryBrowse: { status: "idle" },
 };
 
 function message(reason: unknown): string {
@@ -109,6 +126,13 @@ export interface WebuiWorkspaceFilesOwner {
    * already carries belong to anything (T11; plan §4.5).
    */
   readonly discardTab: (tabId: string) => void;
+  readonly canBrowseDirectories: boolean;
+  /**
+   * List one directory (absent means the runtime's default root). A browse that
+   * answers after a newer one is dropped, so fast navigation cannot show the
+   * wrong directory.
+   */
+  readonly browse: (dir?: string) => void;
   readonly reportDirectoryError: (workspaceDir: string, path: string, error: string) => void;
   readonly dispose: () => void;
 }
@@ -329,6 +353,32 @@ export function createWebuiWorkspaceFilesOwner(deps: {
     });
   };
 
+  let browseSeq = 0;
+  const browse = (dir?: string): void => {
+    const browseDirs = port.browseWorkspaceDirs;
+    const mine = ++browseSeq;
+    if (!browseDirs) {
+      set((current) => ({
+        ...current,
+        directoryBrowse: { status: "error", error: "当前运行时不支持浏览目录。" },
+      }));
+      return;
+    }
+    set((current) => ({ ...current, directoryBrowse: { status: "loading" } }));
+    void browseDirs(dir ? { dir } : {})
+      .then((listing) => {
+        if (mine !== browseSeq) return;
+        set((current) => ({ ...current, directoryBrowse: { status: "ready", listing } }));
+      })
+      .catch((reason: unknown) => {
+        if (mine !== browseSeq) return;
+        set((current) => ({
+          ...current,
+          directoryBrowse: { status: "error", error: message(reason) },
+        }));
+      });
+  };
+
   const discardTab = (tabId: string): void => {
     bump(`file:${tabId}`);
     set((current) => {
@@ -373,6 +423,8 @@ export function createWebuiWorkspaceFilesOwner(deps: {
     readFile,
     setInlineFile,
     discardTab,
+    canBrowseDirectories: port.browseWorkspaceDirs !== undefined,
+    browse,
     reportDirectoryError,
     dispose: () => {
       listeners.clear();

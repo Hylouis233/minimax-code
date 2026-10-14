@@ -10,6 +10,10 @@ import type { WebuiTransport } from "../../../contracts/transport.js";
 import type { WebuiWorkspaceDirectoryListing } from "../../../../shared/contracts/workspace.js";
 import { looksLikeAbsoluteWorkspacePath } from "../../../projection/common/paths.js";
 import { useCallback, useEffect, useState, type ReactElement } from "react";
+import {
+  useWebuiWorkspaceQueries,
+  useWebuiWorkspaceQueriesState,
+} from "../../../bindings/use-query-state.js";
 
 export function WebuiWorkspaceDirectoryBrowser({
   browseWorkspaceDirs,
@@ -22,43 +26,41 @@ export function WebuiWorkspaceDirectoryBrowser({
   readonly onSelect: (dir: string) => void;
   readonly onCancel: () => void;
 }): ReactElement {
-  const [listing, setListing] = useState<WebuiWorkspaceDirectoryListing>();
-  const [error, setError] = useState<string>();
-  const [loading, setLoading] = useState(false);
+  // The listing, its freshness and its failure belong to the files owner (T11):
+  // a browse that answers after a newer one is dropped there, so fast navigation
+  // cannot show the wrong directory. This component keeps the typed draft and the
+  // geometry.
+  const queries = useWebuiWorkspaceQueries();
+  const browseState = useWebuiWorkspaceQueriesState().directoryBrowse;
+  const listing = browseState.status === "ready" ? browseState.listing : undefined;
+  const loading = browseState.status === "loading";
+  const [localError, setLocalError] = useState<string>();
+  const error = browseState.status === "error" ? browseState.error : localError;
   const [manualPath, setManualPath] = useState(initialDir ?? "");
 
   const browse = useCallback(
     (dir?: string) => {
-      if (!browseWorkspaceDirs) return;
-      setLoading(true);
-      setError(undefined);
-      void browseWorkspaceDirs(dir ? { dir } : {})
-        .then((next) => {
-          setListing(next);
-          setManualPath(next.dir);
-        })
-        .catch((reason: unknown) => {
-          setError(
-            reason instanceof Error ? reason.message : String(reason),
-          );
-        })
-        .finally(() => setLoading(false));
+      queries?.browseWorkspaceDirs(dir);
     },
-    [browseWorkspaceDirs],
+    [queries],
   );
 
   useEffect(() => {
     browse(initialDir);
   }, [browse, initialDir]);
+  // A listing that lands seeds the typed path, so the field shows where the user is.
+  useEffect(() => {
+    if (listing) setManualPath(listing.dir);
+  }, [listing]);
 
   const submitManualPath = useCallback(() => {
     const value = manualPath.trim();
     if (!value) {
-      setError("请输入项目目录的绝对路径");
+      setLocalError("请输入项目目录的绝对路径");
       return;
     }
     if (!looksLikeAbsoluteWorkspacePath(value)) {
-      setError("需要绝对路径，例如 /home/you/projects/my-project");
+      setLocalError("需要绝对路径，例如 /home/you/projects/my-project");
       return;
     }
     onSelect(value);
@@ -75,7 +77,7 @@ export function WebuiWorkspaceDirectoryBrowser({
             placeholder="/home/you/projects/my-project"
             onChange={(event) => {
               setManualPath(event.target.value);
-              setError(undefined);
+              setLocalError(undefined);
             }}
             onKeyDown={(event) => {
               if (event.key !== "Enter") return;

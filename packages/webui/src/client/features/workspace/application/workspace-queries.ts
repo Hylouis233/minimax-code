@@ -72,6 +72,8 @@ export interface WebuiWorkspaceQueriesState {
   readonly environmentRevision: number;
   readonly environment: import("./workspace-environment-owner.js").WebuiWorkspaceEnvironmentState;
   readonly files: ReadonlyMap<string, import("./workspace-files-owner.js").WebuiWorkspaceFileContentState>;
+  /** The directory picker's listing (the files owner's slice, T11). */
+  readonly directoryBrowse: import("./workspace-files-owner.js").WebuiDirectoryBrowseState;
   /** The archive owner's slice: one listing and one extract outcome (T11). */
   readonly archive: WebuiWorkspaceArchiveState;
   /** The canvas owner's slice: the session's document and the last outcome. */
@@ -98,6 +100,9 @@ export interface WebuiWorkspaceQueries {
   readonly setInlineFile: (tabId: string, content: string, resolvedPath: string) => void;
   /** Release a closed tab's file slot and its read commit rights. */
   readonly discardFileTab: (tabId: string) => void;
+  /** List one directory for the workspace picker (superseded browses dropped). */
+  readonly browseWorkspaceDirs: (dir?: string) => void;
+  readonly canBrowseWorkspaceDirs: boolean;
   readonly loadReviewSummary: (
     tabId: string,
     workspaceDir: string,
@@ -228,6 +233,8 @@ export function createWebuiWorkspaceQueries(deps: {
     readFile: files.readFile,
     setInlineFile: files.setInlineFile,
     discardFileTab: files.discardTab,
+    browseWorkspaceDirs: files.browse,
+    canBrowseWorkspaceDirs: files.canBrowseDirectories,
     invalidateReview: review.invalidate,
     loadReviewSummary: review.loadSummary,
     loadReviewDiffs: review.loadDiffs,
