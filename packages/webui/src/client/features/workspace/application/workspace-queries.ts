@@ -30,6 +30,10 @@ import {
 } from "./workspace-environment-owner.js";
 import { createWebuiWorkspaceReviewOwner } from "../../review/application/workspace-review-owner.js";
 import {
+  createWebuiWorkspacePanelOwner,
+  type WebuiWorkspacePanelOwner,
+} from "./workspace-panel-owner.js";
+import {
   createWebuiWorkspaceCanvasOwner,
   initialWebuiWorkspaceCanvasState,
   type WebuiWorkspaceCanvasOwner,
@@ -103,6 +107,11 @@ export interface WebuiWorkspaceQueries {
   /** List one directory for the workspace picker (superseded browses dropped). */
   readonly browseWorkspaceDirs: (dir?: string) => void;
   readonly canBrowseWorkspaceDirs: boolean;
+  /**
+   * The panel/tab owner. Its state is keyed by session and is not part of the
+   * composed snapshot: a surface subscribes to the session it shows (T11).
+   */
+  readonly panel: WebuiWorkspacePanelOwner;
   readonly loadReviewSummary: (
     tabId: string,
     workspaceDir: string,
@@ -164,6 +173,7 @@ export function createWebuiWorkspaceQueries(deps: {
   const review = createWebuiWorkspaceReviewOwner({ port });
   const archive = createWebuiWorkspaceArchiveOwner({ port });
   const canvas = createWebuiWorkspaceCanvasOwner({ port });
+  const panel = createWebuiWorkspacePanelOwner();
   const environment: WebuiWorkspaceEnvironmentOwner =
     createWebuiWorkspaceEnvironmentOwner({
       port,
@@ -235,6 +245,7 @@ export function createWebuiWorkspaceQueries(deps: {
     discardFileTab: files.discardTab,
     browseWorkspaceDirs: files.browse,
     canBrowseWorkspaceDirs: files.canBrowseDirectories,
+    panel,
     invalidateReview: review.invalidate,
     loadReviewSummary: review.loadSummary,
     loadReviewDiffs: review.loadDiffs,
@@ -255,6 +266,7 @@ export function createWebuiWorkspaceQueries(deps: {
       files.dispose();
       archive.dispose();
       canvas.dispose();
+      panel.dispose();
       environment.dispose();
       listeners.clear();
     },

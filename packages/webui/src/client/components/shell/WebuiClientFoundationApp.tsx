@@ -966,7 +966,9 @@ export function WebuiClientFoundationApp(
   const openPluginManagement = useCallback((area: WebuiPluginManagementArea) => {
     dispatchShellSurface({ type: "open-plugin-management", area });
   }, [dispatchShellSurface]);
-  const [workspacePanelStates, setWorkspacePanelStates] = useState<WorkspacePanelSessionStates>(() => new Map());
+  // The panel/tab state belongs to the workspace business (T11): the shell reads
+  // the slice for the session it shows and dispatches; it owns neither.
+  const workspacePanelOwner = workspaceQueries.panel;
   // ---- Rail activity: which sessions are running, and when each last moved.
   //
   // The runtime runs sessions in parallel -- `queue.dispatcher.ts` keeps one
@@ -1120,14 +1122,25 @@ export function WebuiClientFoundationApp(
     });
   }, [application, activeTurnProbe, railPage, activityProbeNonce]);
 
-  const sessionPanelState = selectedSessionId
-    ? getWorkspacePanelSessionState(workspacePanelStates, selectedSessionId)
-    : initialWorkspacePanelSessionState;
+  // Subscribed, not read once: the owner notifies and the shell re-renders for the
+  // session it shows. `stateFor` returns the same object while that session is
+  // unchanged, which is what the comparison needs.
+  const sessionPanelState = useSyncExternalStore(
+    workspacePanelOwner.subscribe,
+    () =>
+      selectedSessionId
+        ? workspacePanelOwner.stateFor(selectedSessionId)
+        : initialWorkspacePanelSessionState,
+    () =>
+      selectedSessionId
+        ? workspacePanelOwner.stateFor(selectedSessionId)
+        : initialWorkspacePanelSessionState,
+  );
   const workspacePanel = sessionPanelState.workspacePanel;
   const progressPanelOpen = Boolean(selectedSessionId) && sessionPanelState.progressPanelOpen;
   const dispatchWorkspacePanel = useCallback((command: WorkspacePanelCommand) => {
     if (!selectedSessionId) return;
-    setWorkspacePanelStates((states) => reduceWorkspacePanelSessionState(states, selectedSessionId, command));
+    workspacePanelOwner.dispatch(selectedSessionId, command);
     // A closed tab has no reader: its file slot goes with it, and any read still
     // in flight for it can no longer commit (T11). Other tabs' reads are keyed
     // separately, so this stops nothing else.
@@ -1135,11 +1148,9 @@ export function WebuiClientFoundationApp(
   }, [selectedSessionId, workspaceQueries]);
   const setProgressPanelOpen = (update: boolean | ((open: boolean) => boolean)) => {
     if (!selectedSessionId) return;
-    setWorkspacePanelStates((states) => {
-      const current = getWorkspacePanelSessionState(states, selectedSessionId);
-      const open = typeof update === "function" ? update(current.progressPanelOpen) : update;
-      return setWorkspaceSessionProgressPanelOpen(states, selectedSessionId, open);
-    });
+    const current = workspacePanelOwner.stateFor(selectedSessionId);
+    const open = typeof update === "function" ? update(current.progressPanelOpen) : update;
+    workspacePanelOwner.setProgressPanelOpen(selectedSessionId, open);
   };
   const [workspaceEnvironmentCollapsed, setWorkspaceEnvironmentCollapsed] = useState(false);
   const [workspaceProgressCollapsed, setWorkspaceProgressCollapsed] = useState(false);

@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import {
+  createWebuiWorkspacePanelOwner,
+} from "../../src/client/features/workspace/application/workspace-panel-owner.js";
 import { parseWebuiMessageFileReference } from "../../src/client/features/transcript/projection/message-file-reference.js";
 import { WebuiMarkdown } from "../../src/client/features/transcript/ui/markdown.js";
 import { mergeWorkspaceFileChildren, WebuiFilePreview } from "../../src/client/features/workspace/ui/WorkspacePanels.js";
@@ -229,5 +232,45 @@ describe("right workspace panel navigation", () => {
       ["focus", { preventScroll: true }],
     ]);
     expect(webuiFileLineTargetId("preview-tab", 42)).toBe("webui-file-line-preview-tab-42");
+  });
+});
+
+describe("the panel owner holds the panel state per session", () => {
+  it("keeps each session's slice, and notifies on a change", () => {
+    const owner = createWebuiWorkspacePanelOwner();
+    let notifications = 0;
+    owner.subscribe(() => {
+      notifications += 1;
+    });
+
+    owner.dispatch("A", { type: "open-tab", kind: "files", workspaceDir: "/w" });
+    expect(owner.stateFor("A").workspacePanel.open).toBe(true);
+    // The session that was not touched still shows its own state.
+    expect(owner.stateFor("B").workspacePanel.open).toBe(false);
+    expect(notifications).toBe(1);
+
+    // Closing it again leaves the panel closed; whether the reducer hands back the
+    // same object is its own business, so the claim here is the state, not identity.
+    owner.dispatch("A", { type: "close-panel" });
+    owner.dispatch("A", { type: "close-panel" });
+    expect(owner.stateFor("A").workspacePanel.open).toBe(false);
+  });
+
+  it("gives an unknown session the initial slice", () => {
+    const owner = createWebuiWorkspacePanelOwner();
+    expect(owner.stateFor("never-seen")).toEqual(initialWorkspacePanelSessionState);
+    expect(owner.stateFor("")).toEqual(initialWorkspacePanelSessionState);
+  });
+
+  it("keeps the two right-side panels from being open together", () => {
+    const owner = createWebuiWorkspacePanelOwner();
+    owner.dispatch("A", { type: "open-tab", kind: "files", workspaceDir: "/w" });
+    owner.setProgressPanelOpen("A", true);
+    // Opening the progress panel while the workspace panel is open is refused, the
+    // same invariant the reducer keeps.
+    expect(owner.stateFor("A").progressPanelOpen).toBe(false);
+    owner.dispatch("A", { type: "close-panel" });
+    owner.setProgressPanelOpen("A", true);
+    expect(owner.stateFor("A").progressPanelOpen).toBe(true);
   });
 });
