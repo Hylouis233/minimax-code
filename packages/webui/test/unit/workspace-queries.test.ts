@@ -155,3 +155,55 @@ describe("a closed tab releases its file slot", () => {
     expect(queries.getSnapshot().files.get("b")?.content?.content).toBe("B");
   });
 });
+
+describe("the archive owner drops a listing nobody is looking at", () => {
+  const listing = (archivePath: string, prefix: string) => ({
+    archivePath,
+    prefix,
+    entries: [],
+    totalEntries: 0,
+    truncated: false,
+  });
+
+  it("keeps the newest listing when an older prefix answers later", async () => {
+    const first = deferred<WebuiWorkspaceArchiveListing>();
+    const second = deferred<WebuiWorkspaceArchiveListing>();
+    let call = 0;
+    const queries = createWebuiWorkspaceQueries({
+      port: {
+        readWorkspaceArchive: () => {
+          const pending = call === 0 ? first : second;
+          call += 1;
+          return pending.promise;
+        },
+      },
+    });
+
+    queries.readArchive({ workspaceDir: "/w", path: "a.zip" });
+    queries.readArchive({ workspaceDir: "/w", path: "a.zip", prefix: "src" });
+
+    second.resolve(listing("a.zip", "src"));
+    await flush();
+    first.resolve(listing("a.zip", ""));
+    await flush();
+
+    // The reader moved into `src`; the root listing that answered afterwards has
+    // no reader and must not replace what is shown (T11 acceptance 4).
+    const state = queries.getSnapshot().archive;
+    expect(state.listing.status).toBe("ready");
+    expect(state.listing.status === "ready" && state.listing.listing.prefix).toBe("src");
+  });
+
+  it("records an extract outcome the owner holds, not the view", async () => {
+    const queries = createWebuiWorkspaceQueries({
+      port: {
+        readWorkspaceArchive: async () => listing("a.zip", ""),
+        extractWorkspaceArchive: async () => ({ extracted: ["a.txt"] }) as never,
+      },
+    });
+
+    await queries.extractArchive({ workspaceDir: "/w", path: "a.zip", destination: "/out" });
+
+    expect(queries.getSnapshot().archive.extract.status).toBe("done");
+  });
+});

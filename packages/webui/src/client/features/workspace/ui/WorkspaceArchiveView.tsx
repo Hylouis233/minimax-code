@@ -4,6 +4,10 @@
 // what `readWorkspaceArchive` is willing to name and never invents a path.
 
 import { useCallback, useEffect, useState, type ReactElement } from "react";
+import {
+  useWebuiWorkspaceQueries,
+  useWebuiWorkspaceQueriesState,
+} from "../../../bindings/use-query-state.js";
 import type {
   WebuiArchiveEntry,
   WebuiWorkspaceArchiveExtractResult,
@@ -22,9 +26,7 @@ export type WorkspaceArchiveViewProps = {
    * renders only what this call is willing to name. `prefix` walks deeper
    * levels; absent, the listing is the archive root.
    */
-  readonly readWorkspaceArchive?: (request: { readonly workspaceDir: string; readonly path: string; readonly prefix?: string }) => Promise<WebuiWorkspaceArchiveListing>;
   /** Writes selected entries out of the archive into `destination`. */
-  readonly extractWorkspaceArchive?: (request: { readonly workspaceDir: string; readonly path: string; readonly destination: string; readonly prefix?: string }) => Promise<WebuiWorkspaceArchiveExtractResult>;
   /**
    * The directory extraction is allowed to write into. A browser cannot ask
    * for an arbitrary path, so the view picks one from the workspace and
@@ -190,29 +192,34 @@ export function WorkspaceArchiveNotice({
  * the whole archive.
  */
 export function WorkspaceArchiveView(props: WorkspaceArchiveViewProps): ReactElement {
-  const { workspaceDir, path, destination, readWorkspaceArchive, extractWorkspaceArchive } = props;
+  const { workspaceDir, path, destination } = props;
+  const queries = useWebuiWorkspaceQueries();
+  const archive = useWebuiWorkspaceQueriesState().archive;
   const [prefix, setPrefix] = useState("");
-  const [load, setLoad] = useState<ArchiveLoadState>({ status: "loading" });
-  const [extract, setExtract] = useState<ArchiveExtractState>({ status: "idle" });
   const target = destination ?? archiveDestinationFor(path);
 
+  // The listing belongs to the archive owner: this view states what it wants read
+  // and renders what came back. A read for a prefix the user has left is superseded
+  // by the owner's version key rather than by a per-render flag, and the extract
+  // outcome is the owner's too (T11; the parser is T16's).
   useEffect(() => {
-    if (!readWorkspaceArchive) return;
-    let stale = false;
-    setLoad({ status: "loading" });
-    readWorkspaceArchive({ workspaceDir, path, ...(prefix ? { prefix } : {}) })
-      .then((listing) => {
-        if (stale) return;
-        setLoad({ status: "ready", listing });
-      })
-      .catch((error: unknown) => {
-        if (stale) return;
-        setLoad({ status: "error", error: describeError(error) });
-      });
-    return () => {
-      stale = true;
-    };
-  }, [workspaceDir, path, prefix, readWorkspaceArchive]);
+    queries?.readArchive({ workspaceDir, path, ...(prefix ? { prefix } : {}) });
+  }, [queries, workspaceDir, path, prefix]);
+
+  const load: ArchiveLoadState =
+    archive.listing.status === "ready"
+      ? { status: "ready", listing: archive.listing.listing }
+      : archive.listing.status === "error"
+        ? { status: "error", error: archive.listing.error }
+        : { status: "loading" };
+  const extract: ArchiveExtractState =
+    archive.extract.status === "extracting"
+      ? { status: "running" }
+      : archive.extract.status === "done"
+        ? { status: "done", result: archive.extract.result }
+        : archive.extract.status === "error"
+          ? { status: "error", error: archive.extract.error }
+          : { status: "idle" };
 
   const enterDirectory = useCallback((name: string) => {
     setPrefix((current) => (current ? `${current}/${name}` : name));
@@ -224,14 +231,11 @@ export function WorkspaceArchiveView(props: WorkspaceArchiveViewProps): ReactEle
     });
   }, []);
   const extractHere = useCallback(() => {
-    if (!extractWorkspaceArchive || !target) return;
-    setExtract({ status: "running" });
-    extractWorkspaceArchive({ workspaceDir, path, destination: target, ...(prefix ? { prefix } : {}) })
-      .then((result) => setExtract({ status: "done", result }))
-      .catch((error: unknown) => setExtract({ status: "error", error: describeError(error) }));
-  }, [extractWorkspaceArchive, workspaceDir, path, prefix, target]);
+    if (!queries?.canExtractArchive || !target) return;
+    void queries.extractArchive({ workspaceDir, path, destination: target, ...(prefix ? { prefix } : {}) });
+  }, [queries, workspaceDir, path, prefix, target]);
 
-  if (!readWorkspaceArchive) {
+  if (!queries?.canReadArchive) {
     return <WorkspaceArchiveNotice reason="当前服务没有提供压缩包浏览能力。" />;
   }
   if (load.status === "loading") return <WorkspaceArchiveNotice reason="正在读取压缩包…" />;
@@ -247,7 +251,7 @@ export function WorkspaceArchiveView(props: WorkspaceArchiveViewProps): ReactEle
       extractState={extract}
       onEnterDirectory={enterDirectory}
       onGoUp={prefix ? goUp : undefined}
-      onExtract={extractWorkspaceArchive && target ? extractHere : undefined}
+      onExtract={queries?.canExtractArchive && target ? extractHere : undefined}
     />
   );
 }

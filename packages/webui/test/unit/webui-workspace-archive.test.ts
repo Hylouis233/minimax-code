@@ -41,6 +41,8 @@ import {
   WorkspaceArchiveView,
 } from "../../src/client/features/workspace/ui/WorkspaceArchiveView.js";
 import { archiveDestinationFor, formatArchiveSize } from "../../src/client/features/workspace/projection/archive-projection.js";
+import { createWebuiWorkspaceQueries } from "../../src/client/features/workspace/application/workspace-queries.js";
+import { WebuiWorkspaceQueriesProvider } from "../../src/client/bindings/use-query-state.js";
 
 /** Fixtures live in the OS temp dir; nothing is written into the repo tree. */
 let workspace = "";
@@ -620,14 +622,26 @@ function renderListing(overrides: Record<string, unknown> = {}): string {
 
 describe("workspace archive view", () => {
   it("paints the loading state on first render, before any effect has run", () => {
+    // The listing is the archive owner's resource now (T11), so the view is
+    // rendered inside the provider the shell installs. Static rendering does not
+    // run the effect, so this is the state a reader actually sees first: the
+    // owner has not read anything yet and the view paints the loading notice.
     const markup = renderToStaticMarkup(
-      createElement(WorkspaceArchiveView, {
-        workspaceDir: "/repo",
-        path: "dist/bundle.zip",
-        // A listing that never settles. Static rendering does not run the
-        // effect, so this is the state a reader actually sees first.
-        readWorkspaceArchive: () => new Promise<WebuiWorkspaceArchiveListing>(() => undefined),
-      }),
+      createElement(
+        WebuiWorkspaceQueriesProvider,
+        {
+          queries: createWebuiWorkspaceQueries({
+            port: {
+              readWorkspaceArchive: () =>
+                new Promise<WebuiWorkspaceArchiveListing>(() => undefined),
+            },
+          }),
+        },
+        createElement(WorkspaceArchiveView, {
+          workspaceDir: "/repo",
+          path: "dist/bundle.zip",
+        }),
+      ),
     );
     expect(markup).toContain('role="status"');
     expect(markup).toContain("正在读取压缩包");

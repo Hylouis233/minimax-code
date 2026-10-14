@@ -288,7 +288,7 @@ export function WebuiProgressOverviewPanel({ workspaceDir, isDefaultWorkspace = 
   </div>;
 }
 
-export function WebuiFilePreview({ tab, result, codeMode, workspaceFileUrl, readWorkspaceArchive, extractWorkspaceArchive }: {
+export function WebuiFilePreview({ tab, result, codeMode, workspaceFileUrl, }: {
   readonly tab: Extract<WorkspacePanelTab, { readonly kind: "file-preview" }>;
   readonly result?: { readonly loading: boolean; readonly content?: WebuiWorkspaceFileContent; readonly error?: string };
   readonly codeMode: boolean;
@@ -304,7 +304,7 @@ export function WebuiFilePreview({ tab, result, codeMode, workspaceFileUrl, read
   // string the panel holds. Waiting on `readWorkspaceFile` first would either
   // flash a binary error or buffer a document nobody will read.
   const archive = isWorkspaceArchivePath(tab.path)
-    ? <WorkspaceArchiveView workspaceDir={tab.workspaceDir} path={tab.path} readWorkspaceArchive={readWorkspaceArchive} extractWorkspaceArchive={extractWorkspaceArchive} />
+    ? <WorkspaceArchiveView workspaceDir={tab.workspaceDir} path={tab.path} />
     : undefined;
   const html = !archive && isWorkspaceHtmlPath(tab.path) && workspaceFileUrl
     ? <WorkspaceHtmlPreview path={tab.path} fileUrl={workspaceFileUrl({ workspaceDir: tab.workspaceDir, path: tab.path })} content={result?.content} />

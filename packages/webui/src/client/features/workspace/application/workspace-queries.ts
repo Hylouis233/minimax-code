@@ -30,6 +30,13 @@ import {
 } from "./workspace-environment-owner.js";
 import { createWebuiWorkspaceReviewOwner } from "../../review/application/workspace-review-owner.js";
 import {
+  createWebuiWorkspaceArchiveOwner,
+  initialWebuiWorkspaceArchiveState,
+  type WebuiWorkspaceArchiveOwner,
+  type WebuiWorkspaceArchivePort,
+  type WebuiWorkspaceArchiveState,
+} from "./workspace-archive-owner.js";
+import {
   initialWebuiWorkspaceReviewState,
   type WebuiWorkspaceReviewPort,
   type WebuiWorkspaceReviewSummaryState,
@@ -48,6 +55,7 @@ export type { WebuiWorkspaceReviewPort };
 export interface WebuiWorkspaceQueryPort
   extends WebuiWorkspaceFilesPort,
     WebuiWorkspaceEnvironmentPort,
+    WebuiWorkspaceArchivePort,
     WebuiWorkspaceReviewPort {}
 
 export interface WebuiWorkspaceQueriesState {
@@ -56,6 +64,8 @@ export interface WebuiWorkspaceQueriesState {
   readonly environmentRevision: number;
   readonly environment: import("./workspace-environment-owner.js").WebuiWorkspaceEnvironmentState;
   readonly files: ReadonlyMap<string, import("./workspace-files-owner.js").WebuiWorkspaceFileContentState>;
+  /** The archive owner's slice: one listing and one extract outcome (T11). */
+  readonly archive: WebuiWorkspaceArchiveState;
   readonly reviewSummary: WebuiWorkspaceReviewSummaryState;
   readonly reviewDiffs: import("../../review/contracts/workspace-review.js").WebuiWorkspaceReviewDiffState;
   readonly reviewSearch: import("../../review/contracts/workspace-review.js").WebuiWorkspaceReviewSearchState;
@@ -94,6 +104,12 @@ export interface WebuiWorkspaceQueries {
     readonly snapshotId: string;
     readonly query: string;
   }) => Promise<void>;
+  /** Read one archive listing (superseded reads are dropped). */
+  readonly readArchive: WebuiWorkspaceArchiveOwner["read"];
+  /** Extract one archive; the outcome is the owner's, not a component's. */
+  readonly extractArchive: WebuiWorkspaceArchiveOwner["extract"];
+  readonly canReadArchive: boolean;
+  readonly canExtractArchive: boolean;
   readonly loadEnvironment: (workspaceDir: string) => void;
   readonly mutateGit: (
     request: WebuiWorkspaceGitMutationRequest,
@@ -115,6 +131,7 @@ export const initialWebuiWorkspaceQueriesState: WebuiWorkspaceQueriesState = {
   ...initialWebuiWorkspaceReviewState,
   environment: initialWebuiWorkspaceEnvironmentState,
   environmentRevision: 0,
+  archive: initialWebuiWorkspaceArchiveState,
 };
 
 export function createWebuiWorkspaceQueries(deps: {
@@ -123,6 +140,7 @@ export function createWebuiWorkspaceQueries(deps: {
   const { port } = deps;
   const files = createWebuiWorkspaceFilesOwner({ port });
   const review = createWebuiWorkspaceReviewOwner({ port });
+  const archive = createWebuiWorkspaceArchiveOwner({ port });
   const environment: WebuiWorkspaceEnvironmentOwner =
     createWebuiWorkspaceEnvironmentOwner({
       port,
@@ -136,6 +154,7 @@ export function createWebuiWorkspaceQueries(deps: {
       ...review.read(),
       environment: environment.state(),
       environmentRevision: environment.revision(),
+      archive: archive.state(),
     };
   };
   let snapshot: WebuiWorkspaceQueriesState = {
@@ -143,6 +162,7 @@ export function createWebuiWorkspaceQueries(deps: {
     ...review.read(),
     environment: environment.state(),
     environmentRevision: environment.revision(),
+    archive: archive.state(),
   };
   const notify = (): void => {
     compose();
@@ -151,6 +171,7 @@ export function createWebuiWorkspaceQueries(deps: {
   files.subscribe(notify);
   review.subscribe(notify);
   environment.subscribe(notify);
+  archive.subscribe(notify);
 
   const invalidateWorkspaceGit = (signal: {
     readonly workspace?: string;
@@ -190,12 +211,17 @@ export function createWebuiWorkspaceQueries(deps: {
     loadReviewSummary: review.loadSummary,
     loadReviewDiffs: review.loadDiffs,
     searchReviewDiffs: review.search,
+    readArchive: archive.read,
+    extractArchive: archive.extract,
+    canReadArchive: archive.canRead,
+    canExtractArchive: archive.canExtract,
     loadEnvironment: environment.load,
     mutateGit: environment.mutateGit,
     reportDirectoryError: files.reportDirectoryError,
     invalidateWorkspaceGit,
     dispose: () => {
       files.dispose();
+      archive.dispose();
       environment.dispose();
       listeners.clear();
     },
