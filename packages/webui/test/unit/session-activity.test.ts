@@ -746,28 +746,21 @@ describe("host wiring", () => {
   // literal here, which is what makes that safe.
   const strip = (source: string): string =>
     source.replace(/\/\*[\s\S]*?\*\//gu, "").replace(/\/\/[^\n]*/gu, "");
-  // A-005 moved the shell's own behaviours into sibling modules. The probes
-  // below ask where the wiring is, not which file it sits in, so they read the
-  // frame together with those modules: a guarantee that moved is still asserted
-  // at its new home, and one that disappears from all of them still goes red.
-  const shellModuleDirectory = path.join(
-    import.meta.dirname,
-    "..",
-    "..",
-    "src",
-    "client",
-    "components",
-    "shell",
+  const appSource = strip(
+    readFileSync(
+      path.join(
+        import.meta.dirname,
+        "..",
+        "..",
+        "src",
+        "client",
+        "components",
+        "shell",
+        "WebuiClientFoundationApp.tsx",
+      ),
+      "utf8",
+    ),
   );
-  const appSource = [
-    "WebuiClientFoundationApp.tsx",
-    "use-selected-session.ts",
-    "use-workspace-panel-session.ts",
-    "use-new-task-workspace.ts",
-    "use-shell-activity-wiring.ts",
-  ]
-    .map((name) => strip(readFileSync(path.join(shellModuleDirectory, name), "utf8")))
-    .join("\n");
   // The activity/unread slice now lives in the application layer. Its half of
   // each guarantee is asserted alongside the shell's delegation, so neither
   // side can be emptied — the shell stops calling in, or the module stops doing

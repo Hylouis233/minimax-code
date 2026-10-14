@@ -41,8 +41,10 @@ import {
 } from "../../features/workspace/ui/WorkspacePanels.js";
 import {
   getWorkspacePanelSessionState,
+  initialWorkspacePanelSessionState,
   reduceWorkspacePanelSessionState,
   setWorkspaceSessionProgressPanelOpen,
+  type WorkspacePanelCommand,
   type WorkspacePanelSessionStates,
 } from "../../features/workspace/projection/workspace-panel-state.js";
 import {
@@ -120,6 +122,7 @@ import type { WebuiApplication } from "../../application/create-application.js";
 import type { WebuiWorkspaceGitChangedSignal } from "../../features/workspace/projection/workspace-panel-state.js";
 import { ConnectionStatus } from "./ConnectionStatus.js";
 import { deriveConversationUsageNotice } from "../../features/transcript/projection/message-projection.js";
+import { deriveRecentWorkspaceDirs } from "../../features/composer/projection/composer-state.js";
 import { normalizeFavoriteModelIds } from "../../features/models/projection/model-favorites.js";
 
 // The hash plumbing moved to `client/bindings/navigation.ts` (plan §7.2). Both
@@ -130,13 +133,6 @@ import {
   subscribeToSessionHash,
 } from "../../bindings/navigation.js";
 export { readSessionIdFromHash, subscribeToSessionHash };
-
-// A-005: the shell's own responsibilities now have their own modules; the frame
-// keeps layout, owner acquisition and public business composition.
-import { useSelectedSessionId } from "./use-selected-session.js";
-import { useWorkspacePanelSession } from "./use-workspace-panel-session.js";
-import { useNewTaskWorkspace } from "./use-new-task-workspace.js";
-import { useShellActivityWiring } from "./use-shell-activity-wiring.js";
 
 export interface WebuiClientFoundationAppProps {
   // Non-method props (seed / UI / SSR). The 78 method props that used to
@@ -188,6 +184,22 @@ function requireApplication(
     );
   }
   return application;
+}
+
+function useSelectedSessionId(
+  locationHash?: string,
+): [string | undefined, (id: string | undefined) => void] {
+  const read = () =>
+    readSessionIdFromHash(
+      locationHash ??
+        (typeof window === "undefined" ? "" : window.location.hash),
+    );
+  const [selected, setSelected] = useState(read);
+  useEffect(() => {
+    if (locationHash !== undefined || typeof window === "undefined") return;
+    return subscribeToSessionHash((id) => setSelected(id));
+  }, [locationHash]);
+  return [selected, setSelected];
 }
 
 export function WebuiClientFoundationApp(
@@ -682,27 +694,100 @@ export function WebuiClientFoundationApp(
   const selectedSession = flatSessionsWithChildren.find(
     (session) => session.sessionId === selectedSessionId,
   );
-  const {
-    newTaskWorkspaceDir,
-    workspaceMenuOpen,
-    setWorkspaceMenuOpen,
-    recentWorkspaceDirs,
-    handleWorkspaceChange,
-    handleSessionCreated,
-    startNewTask,
-  } = useNewTaskWorkspace({
-    storage: browserStorage,
-    workflows: sessionWorkflows,
-    selectedSession,
-    flatSessionsWithChildren,
-    setDraft,
-    dispatchShellSurface,
-    setSelectedSessionId,
-    adoptHomeSession: (id) => application.adoptHomeSession(id),
-    teamModeOff,
-    setTeamModeChoice: (id, off) =>
-      setTeamModeChoices((current) => ({ ...current, [id]: off })),
-  });
+  const [newTaskWorkspaceDir, setNewTaskWorkspaceDir] = useState<string | undefined>(
+    () => {
+      // Honour an explicit "no project" choice from localStorage so the
+      // auto-fill below doesn't immediately pull a workspace back.
+      if (browserStorage.readNoProjectFlag()) return undefined;
+      return (
+        selectedSession?.workspaceDir ??
+        flatSessionsWithChildren.find((session) => session.workspaceDir)?.workspaceDir
+      );
+    },
+  );
+  const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
+  // The `最近` group in the workspace picker. Derived from the sessions the
+  // client already holds rather than a new operation — see
+  // `deriveRecentWorkspaceDirs` for why there is nothing to call instead.
+  const recentWorkspaceDirs = useMemo(
+    () => deriveRecentWorkspaceDirs(flatSessionsWithChildren),
+    [flatSessionsWithChildren],
+  );
+  // Tracks whether the user has explicitly cleared the workspace in *this*
+  // session; the effect below checks both this and the persisted flag.
+  const userClearedWorkspaceRef = useRef(browserStorage.readNoProjectFlag());
+  useEffect(() => {
+    if (userClearedWorkspaceRef.current) return;
+    if (selectedSession?.workspaceDir) {
+      setNewTaskWorkspaceDir(selectedSession.workspaceDir);
+    } else if (!newTaskWorkspaceDir) {
+      const workspaceDir = flatSessionsWithChildren.find(
+        (session) => session.workspaceDir,
+      )?.workspaceDir;
+      if (workspaceDir) setNewTaskWorkspaceDir(workspaceDir);
+    }
+  }, [newTaskWorkspaceDir, flatSessionsWithChildren, selectedSession?.workspaceDir]);
+  // Single workspace-change entry point the composer calls. It records the
+  // user's intent (cleared vs picked) so the auto-fill effect above stops
+  // fighting us, and folds the no-project flag into localStorage.
+  const handleWorkspaceChange = useCallback(
+    (workspaceDir?: string) => {
+      if (workspaceDir === undefined) {
+        userClearedWorkspaceRef.current = true;
+        browserStorage.writeNoProjectFlag(true);
+      } else {
+        userClearedWorkspaceRef.current = false;
+        browserStorage.writeNoProjectFlag(false);
+      }
+      setNewTaskWorkspaceDir(workspaceDir);
+      setWorkspaceMenuOpen(false);
+    },
+    [],
+  );
+  const handleSessionCreated = (id: string) => {
+    // Home→session adoption is one committed transition (ticket #49 criterion
+    // 5): the application carries the home turn's live record onto the created
+    // session, moves the composer's home slot onto it and selects it — no
+    // separate migration + composer migration + selection.
+    application.adoptHomeSession(id);
+    setSelectedSessionId(id);
+    browserStorage.writeTeamModeSessionChoice(id, teamModeOff);
+    setTeamModeChoices((current) => ({ ...current, [id]: teamModeOff }));
+    // Refresh the rail projection after the first message creates a session —
+    // the flat list (its failure is reported) and the tree (best effort),
+    // matching the shell's original two independent loads.
+    if (sessionWorkflows.canLoadFlat) void sessionWorkflows.loadFlat();
+    if (sessionWorkflows.canLoadTree) void sessionWorkflows.loadTree();
+    if (typeof window !== "undefined")
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}${window.location.search}${sessionHash(id)}`,
+      );
+  };
+  const startNewTask = (workspaceDir?: string) => {
+    // A project row's plus action opens a fresh home composer preselected to
+    // that workspace; the global new-task action still clears the workspace.
+    const clearedWorkspace = workspaceDir === undefined;
+    userClearedWorkspaceRef.current = clearedWorkspace;
+    browserStorage.writeNoProjectFlag(clearedWorkspace);
+    setNewTaskWorkspaceDir(workspaceDir);
+    setWorkspaceMenuOpen(false);
+    setDraft("");
+    // 「新建任务」 is the one navigation that does not change the selected
+    // session when the shell is already on the home surface, so the effect that
+    // watches the session id cannot see it. Close the marketplace here too, or
+    // the row looks dead exactly as it did before.
+    dispatchShellSurface({ type: "show-conversation" });
+    setSelectedSessionId(undefined);
+    if (typeof window !== "undefined") {
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}${window.location.search}`,
+      );
+    }
+  };
 
   /**
    * 「在会话中创建」 on 记忆摘要: land on the home composer with the memory
@@ -822,41 +907,69 @@ export function WebuiClientFoundationApp(
   // state (plan §7.6 "Unread"; ticket #45 prerequisite 3). The shell subscribes
   // to the slice; the application unread controller owns the writes and the
   // hydration ordering (ticket #49 criterion 4).
-  // The activity slice, the reconnect nonce and every reaction that keeps them
-  // current live in `./use-shell-activity-wiring.js`.
-  const { sessionActivity, activityNow, activityProbeNonce } = useShellActivityWiring({
-    sessionStore,
-    workspaceQueries,
-    railPage,
-    selectedSessionId,
-    onWorkspaceGitChanged: application.onWorkspaceGitChanged,
-    onChannelReady: application.onChannelReady,
-    select: (id) => application.select(id),
-    markRead: (id) => application.unread.markRead(id),
-    seed: (sessions) => application.unread.seed(sessions),
-    hydrate: (id) => application.unread.hydrate(id),
-    probeActiveTurns: (sessions) => {
-      const probe = application.activeTurnProbe;
-      // No probe, no re-probe: the assembly builds one only when the host can
-      // answer it.
-      if (!probe) return () => undefined;
-      return application.unread.probeActiveTurns({
-        sessions,
-        probe,
-        now: () => Date.now(),
-      });
-    },
-    subscribeTurnReviewMutations: (listener) =>
-      application.turnReview?.subscribeMutations(listener) ?? (() => undefined),
-  });
+  const sessionActivity = useSyncExternalStore(
+    sessionStore.subscribe,
+    () => sessionStore.getSnapshot().activity,
+    () => sessionStore.getSnapshot().activity,
+  );
+  const [activityNow, setActivityNow] = useState(() => Date.now());
+  // Bumped on reconnect to re-probe: the events that would have told us a turn
+  // started were missed while the stream was down, and the stream cannot
+  // replay them. `SessionComposer` closes the same gap the same way.
+  const [activityProbeNonce, setActivityProbeNonce] = useState(0);
+  // One shared, deduplicated probe (plan §7.1 slice): the rail and the composer
+  // ask the same question, so it is built once by the assembly (T19) and read
+  // from there rather than constructed here.
+  const activeTurnProbe = application.activeTurnProbe;
 
   // The application-wide effects the coordinator runs. It composes the
   // per-session registry the composer registers into with the shell's own
   // reach: the channel-accepted signal re-probes the rail (a reconnect can miss
   // a `session.start`), and a workspace-git event invalidates the panel
   // git/review queries through the same coordinator.
+  /**
+   * A `workspace.git.changed` signal invalidates exactly the views it affects: the
+   * owner matches the signal against the review and environment views it currently
+   * holds and refreshes only those, coalescing the environment reload into its
+   * window (ticket #51). The route reaches the owner through this subscription —
+   * no shell state and no revision counter in between (T11); the subscription
+   * exists because the workspace owners are still built by this mount, which the
+   * shell composition (T19) moves.
+   */
+  useEffect(
+    () =>
+      application.onWorkspaceGitChanged((payload) =>
+        workspaceQueries.invalidateWorkspaceGit(payload),
+      ),
+    [application, workspaceQueries],
+  );
+  /**
+   * The shell's remaining reaction, subscribed rather than installed as a
+   * replaceable set (T05): it runs after the application's own routes have run and
+   * cannot displace one. Temporary adapter until the reconnect reconciliation has
+   * an owner (T12).
+   */
+  useEffect(
+    () =>
+      application.onChannelReady(() => {
+        setActivityNow(Date.now());
+        setActivityProbeNonce((nonce) => nonce + 1);
+      }),
+    [application],
+  );
   // The shell never disposes the application: its lifetime belongs to the
   // composition root that built it (plan §4.1).
+
+  // A settled turn mutation (revert / reapply) changed the working tree, so the
+  // review views for it are stale. The turn owner announces the settlement and
+  // this is where the affected family is invalidated (plan §4.5: a mutation
+  // commits once, then invokes the affected owners' explicit invalidation
+  // commands) — no panel keeps a refresh token for it.
+  useEffect(() => {
+    const turnReview = application?.turnReview;
+    if (!turnReview) return undefined;
+    return turnReview.subscribeMutations(() => workspaceQueries.invalidateReview());
+  }, [application, workspaceQueries]);
 
   // The manual arm of the stream loop's recovery. Undefined on the home screen
   // (no session to resume) and on hosts without a `resumeSession` transport: no
@@ -869,23 +982,94 @@ export function WebuiClientFoundationApp(
         }
       : undefined;
 
-  // The application's selection, the unread controller's reactions and the
-  // clock tick live in `./use-shell-activity-wiring.js`.
+  // The application's selection follows the route the shell resolved. The
+  // coordinator and the unread controller judge events against the selected
+  // session, so the store's selection is the one record of it — the shell does
+  // not keep a second copy to hand over (plan §4.2, §4.3).
+  useEffect(() => {
+    application.select(selectedSessionId);
+  }, [application, selectedSessionId]);
 
-  // The panel's per-session state and its writers live in
-  // `./use-workspace-panel-session.js`; the shell passes the owner and the
-  // queries it already holds and gets back what the JSX binds.
-  const {
-    sessionPanelState,
-    workspacePanel,
-    progressPanelOpen,
-    dispatchWorkspacePanel,
-    setProgressPanelOpen,
-  } = useWorkspacePanelSession({
-    owner: workspacePanelOwner,
-    queries: workspaceQueries,
-    selectedSessionId,
-  });
+  // Persistence is the unread controller's job now (ticket #49 criterion 4):
+  // it subscribes to the activity slice and writes the positive counts after
+  // hydration, so the shell holds no `ready` flag and no persist effect. The
+  // ordering guarantee — restore before the first write — lives in one place.
+
+  // Opening a session is what marks it read. Keyed on the id rather than run on
+  // mount, so arriving *at* a session from a link does not clear the badge the
+  // user was about to see on the row they came from.
+  useEffect(() => {
+    if (!selectedSessionId) return;
+    application.unread.markRead(selectedSessionId);
+  }, [application, selectedSessionId]);
+
+  // The age labels are a function of the clock, not of the data. Without a tick
+  // they would freeze at whatever they read when the last event arrived, and
+  // every row would agree on how long ago "now" was.
+  useEffect(() => {
+    const timer = setInterval(() => setActivityNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Seeding needs the page; the restore does not, which is why they are two
+  // effects. `railPage` is a fresh object on every refresh and on every search
+  // keystroke, so folding the restore into this one would re-read storage and
+  // re-apply it over the live counts on every keystroke.
+  useEffect(() => {
+    application.unread.seed(railPage.sessions);
+  }, [application, railPage]);
+
+  // Re-hydrate when the open session changes: the active session is excluded
+  // from the restore, so arriving at a different one must not inherit the badge
+  // the previous one cleared. The controller marks itself hydrated on the first
+  // call (the composition root hydrates before the channel opens), and this
+  // later call only re-applies the floor.
+  useEffect(() => {
+    application.unread.hydrate(selectedSessionId);
+  }, [application, selectedSessionId]);
+
+  useEffect(() => {
+    if (!activeTurnProbe) return;
+    // Once per list change, for every visible row. Not once per event: the
+    // stream already answers for turns it saw, and the reconnect nonce is the
+    // only other moment a re-probe is warranted.
+    return application.unread.probeActiveTurns({
+      sessions: railPage.sessions,
+      probe: activeTurnProbe,
+      now: () => Date.now(),
+    });
+  }, [application, activeTurnProbe, railPage, activityProbeNonce]);
+
+  // Subscribed, not read once: the owner notifies and the shell re-renders for the
+  // session it shows. `stateFor` returns the same object while that session is
+  // unchanged, which is what the comparison needs.
+  const sessionPanelState = useSyncExternalStore(
+    workspacePanelOwner.subscribe,
+    () =>
+      selectedSessionId
+        ? workspacePanelOwner.stateFor(selectedSessionId)
+        : initialWorkspacePanelSessionState,
+    () =>
+      selectedSessionId
+        ? workspacePanelOwner.stateFor(selectedSessionId)
+        : initialWorkspacePanelSessionState,
+  );
+  const workspacePanel = sessionPanelState.workspacePanel;
+  const progressPanelOpen = Boolean(selectedSessionId) && sessionPanelState.progressPanelOpen;
+  const dispatchWorkspacePanel = useCallback((command: WorkspacePanelCommand) => {
+    if (!selectedSessionId) return;
+    workspacePanelOwner.dispatch(selectedSessionId, command);
+    // A closed tab has no reader: its file slot goes with it, and any read still
+    // in flight for it can no longer commit (T11). Other tabs' reads are keyed
+    // separately, so this stops nothing else.
+    if (command.type === "close-tab") workspaceQueries.discardFileTab(command.tabId);
+  }, [selectedSessionId, workspaceQueries]);
+  const setProgressPanelOpen = (update: boolean | ((open: boolean) => boolean)) => {
+    if (!selectedSessionId) return;
+    const current = workspacePanelOwner.stateFor(selectedSessionId);
+    const open = typeof update === "function" ? update(current.progressPanelOpen) : update;
+    workspacePanelOwner.setProgressPanelOpen(selectedSessionId, open);
+  };
   const [workspaceEnvironmentCollapsed, setWorkspaceEnvironmentCollapsed] = useState(false);
   const [workspaceProgressCollapsed, setWorkspaceProgressCollapsed] = useState(false);
   const [workspaceSubagentsCollapsed, setWorkspaceSubagentsCollapsed] = useState(false);

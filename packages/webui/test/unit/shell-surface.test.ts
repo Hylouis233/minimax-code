@@ -75,12 +75,6 @@ describe("shell surface wiring", () => {
     new URL("../../src/client/components/shell/WebuiClientFoundationApp.tsx", import.meta.url),
     "utf8",
   );
-  // A-005 moved the new-task workspace behaviour out of the frame; the probe
-  // below follows the responsibility, not the file it used to sit in.
-  const newTaskWorkspace = readFileSync(
-    new URL("../../src/client/components/shell/use-new-task-workspace.ts", import.meta.url),
-    "utf8",
-  );
 
   it("returns to the conversation when the selected session changes", () => {
     // Rail session rows are `#session=<id>` anchors: the click resolves through
@@ -92,7 +86,7 @@ describe("shell surface wiring", () => {
   });
 
   it("returns to the conversation from 新建任务, which may not change the session", () => {
-    const startNewTask = newTaskWorkspace.slice(newTaskWorkspace.indexOf("const startNewTask ="));
+    const startNewTask = shell.slice(shell.indexOf("const startNewTask ="), shell.indexOf("const handleWorkspaceSubagentClick"));
     expect(startNewTask).toContain('dispatchShellSurface({ type: "show-conversation" })');
   });
 
