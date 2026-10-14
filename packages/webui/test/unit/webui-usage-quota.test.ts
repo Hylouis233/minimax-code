@@ -14,9 +14,13 @@ import { describe, expect, it } from "vitest";
 import {
   UsageQuotaAuthError,
   UsageQuotaClient,
+} from "../../src/runtime/usage-quota.js";
+// The pure projection half, split out by T17; the suite drives it from its own
+// module rather than through a re-export.
+import {
   readQuotaWindow,
   readVideoQuota,
-} from "../../src/runtime/usage-quota.js";
+} from "../../src/runtime/usage-quota-projection.js";
 import { getUsageQuotaOperation } from "../../src/server/operation/operations.js";
 import {
   UsagePanel,

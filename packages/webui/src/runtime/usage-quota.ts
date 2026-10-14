@@ -32,6 +32,18 @@ import type {
   WebuiUsageQuotaView,
   WebuiUsageQuotaWindowView,
 } from "../shared/contracts/usage-quota.js";
+import {
+  asRecord,
+  finiteNumber,
+  isVideoRow,
+  mergeMembership,
+  projectMembership,
+  projectPersonalWorkspace,
+  readQuotaWindow,
+  readString,
+  readVideoQuota,
+  type ProjectedMembership,
+} from "./usage-quota-projection.js";
 
 const MATRIX_ORIGINS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   cn: {
@@ -123,6 +135,18 @@ interface CacheEntry<V> {
   readonly value: V;
 }
 
+/**
+ * The one owner of the quota request and its cache.
+ *
+ * T17's keep decision, recorded here because the absence of a split is as much a
+ * decision as a split is. This class stays in one piece: the identity keys, the
+ * two TTLs, the in-flight sharing, the force-refresh path, the signing headers,
+ * the auth rejection and the credits-only degradation are one policy, and they
+ * share one cache — a reader that spread them over per-endpoint modules would
+ * have to hand the cache and the clock between them, which is exactly the
+ * complexity the split would have been meant to remove. What left is the pure
+ * projection in `usage-quota-projection.ts`.
+ */
 export class UsageQuotaClient {
   private readonly fetchImpl: typeof fetch;
   private readonly timeoutMs: number;
@@ -558,213 +582,6 @@ function assertSuccessfulResponse(body: Record<string, unknown>, operation: stri
   }
 }
 
-interface ProjectedMembership {
-  readonly hasTokenPlan?: boolean;
-  readonly opGroupId?: string;
-  readonly creditBalance?: string;
-  readonly tokenPlanTier?: string;
-  readonly tokenPlanExpiresAt?: number;
-  readonly upgradeAction?: string;
-  readonly willRenewal?: boolean;
-  readonly purchasedCredits?: string;
-  readonly freeCredits?: string;
-}
-
-/** Reads the fields the desktop popover derives `hasTokenPlan`/credits from. */
-function projectMembership(body: Record<string, unknown>): ProjectedMembership {
-  const data = asRecord(body.data);
-  const hasTokenPlan = readBoolean(body, data, "has_token_plan");
-  const opGroupId = readString(body, data, "op_group_id");
-  const creditSummary = asRecord(body.op_credit_summary) ?? asRecord(data?.op_credit_summary);
-  const creditBalance =
-    readString(creditSummary, undefined, "total_remaining_amount") ??
-    readNumberishString(body, data, "opcredit_balance");
-  const tokenPlanTier = readString(body, data, "token_plan_tier");
-  const tokenPlanExpiresAt = finiteNumber(body.token_plan_expires_at ?? data?.token_plan_expires_at);
-  const upgradeAction = readString(body, data, "upgrade_action");
-  const willRenewalValue = body.will_renewal ?? data?.will_renewal;
-  const willRenewal = typeof willRenewalValue === "boolean" ? willRenewalValue : undefined;
-  const purchasedCredits = readString(creditSummary, undefined, "purchased_remaining_amount");
-  const freeCredits = readString(creditSummary, undefined, "free_remaining_amount");
-  return {
-    ...(hasTokenPlan !== undefined ? { hasTokenPlan } : {}),
-    ...(opGroupId ? { opGroupId } : {}),
-    ...(creditBalance !== undefined ? { creditBalance } : {}),
-    ...(tokenPlanTier ? { tokenPlanTier } : {}),
-    ...(tokenPlanExpiresAt !== undefined ? { tokenPlanExpiresAt } : {}),
-    ...(upgradeAction ? { upgradeAction } : {}),
-    ...(willRenewal !== undefined ? { willRenewal } : {}),
-    ...(purchasedCredits !== undefined ? { purchasedCredits } : {}),
-    ...(freeCredits !== undefined ? { freeCredits } : {}),
-  };
-}
-
-function projectPersonalWorkspace(
-  body: Record<string, unknown>,
-):
-  | {
-      workspaceId: number | string;
-      opGroupId?: string;
-      hasTokenPlan?: boolean;
-      creditBalance?: string;
-      tokenPlanTier?: string;
-      tokenPlanExpiresAt?: number;
-      upgradeAction?: string;
-      willRenewal?: boolean;
-      purchasedCredits?: string;
-      freeCredits?: string;
-    }
-  | undefined {
-  const data = asRecord(body.data);
-  const workspaces = Array.isArray(body.workspaces)
-    ? body.workspaces
-    : Array.isArray(data?.workspaces)
-      ? data.workspaces
-      : [];
-  for (const value of workspaces) {
-    const workspace = asRecord(value);
-    if (!workspace || finiteNumber(workspace.workspace_type) !== 0) continue;
-    const workspaceId = readWorkspaceId(workspace.workspace_id);
-    if (workspaceId === undefined) continue;
-    const membership = projectMembership(workspace);
-    return {
-      workspaceId,
-      ...(membership.opGroupId ? { opGroupId: membership.opGroupId } : {}),
-      ...(membership.hasTokenPlan !== undefined
-        ? { hasTokenPlan: membership.hasTokenPlan }
-        : {}),
-      ...(membership.creditBalance !== undefined
-        ? { creditBalance: membership.creditBalance }
-        : {}),
-      ...(membership.tokenPlanTier ? { tokenPlanTier: membership.tokenPlanTier } : {}),
-      ...(membership.tokenPlanExpiresAt !== undefined ? { tokenPlanExpiresAt: membership.tokenPlanExpiresAt } : {}),
-      ...(membership.upgradeAction ? { upgradeAction: membership.upgradeAction } : {}),
-      ...(membership.willRenewal !== undefined ? { willRenewal: membership.willRenewal } : {}),
-      ...(membership.purchasedCredits !== undefined ? { purchasedCredits: membership.purchasedCredits } : {}),
-      ...(membership.freeCredits !== undefined ? { freeCredits: membership.freeCredits } : {}),
-    };
-  }
-  return undefined;
-}
-
-function mergeMembership(
-  personal: ProjectedMembership,
-  scoped: ProjectedMembership,
-): ProjectedMembership {
-  const hasTokenPlan =
-    personal.hasTokenPlan === true || scoped.hasTokenPlan === true
-      ? true
-      : personal.hasTokenPlan === false || scoped.hasTokenPlan === false
-        ? false
-        : undefined;
-  const creditBalance = scoped.creditBalance ?? personal.creditBalance;
-  const opGroupId = personal.opGroupId ?? scoped.opGroupId;
-  const tokenPlanTier = scoped.tokenPlanTier ?? personal.tokenPlanTier;
-  const tokenPlanExpiresAt = scoped.tokenPlanExpiresAt ?? personal.tokenPlanExpiresAt;
-  const upgradeAction = scoped.upgradeAction ?? personal.upgradeAction;
-  const willRenewal = scoped.willRenewal ?? personal.willRenewal;
-  const purchasedCredits = scoped.purchasedCredits ?? personal.purchasedCredits;
-  const freeCredits = scoped.freeCredits ?? personal.freeCredits;
-  return {
-    ...(hasTokenPlan !== undefined ? { hasTokenPlan } : {}),
-    ...(opGroupId ? { opGroupId } : {}),
-    ...(creditBalance !== undefined ? { creditBalance } : {}),
-    ...(tokenPlanTier ? { tokenPlanTier } : {}),
-    ...(tokenPlanExpiresAt !== undefined ? { tokenPlanExpiresAt } : {}),
-    ...(upgradeAction ? { upgradeAction } : {}),
-    ...(willRenewal !== undefined ? { willRenewal } : {}),
-    ...(purchasedCredits !== undefined ? { purchasedCredits } : {}),
-    ...(freeCredits !== undefined ? { freeCredits } : {}),
-  };
-}
-
-function isVideoRow(row: Record<string, unknown>): boolean {
-  return /video/iu.test(readString(row, undefined, "model_name") ?? "");
-}
-
-/**
- * Normalizes one percentage window (5-hour / weekly) from the
- * `remains_percent` response: `current_interval_used_percent` is the USED
- * percent as a `"96%"` string (probe-verified 2026-09-22 — the same response
- * the desktop popover renders as 已用 96%). `resetAtMs` comes from
- * `end_time` / `weekly_end_time`, which the API sends in seconds below 1e12
- * or milliseconds above; normalize to ms.
- */
-export function readQuotaWindow(
-  value: Record<string, unknown>,
-  kind: "interval" | "weekly",
-): WebuiUsageQuotaWindowView {
-  const prefix = kind === "interval" ? "current_interval" : "current_weekly";
-  const status = finiteNumber(value[`${prefix}_status`]);
-  const unlimited = status === 3;
-  const usedPercent = readPercent(value[`${prefix}_used_percent`]);
-  const totalPercent = readPercent(value[`${prefix}_total_percent`]);
-  const resetAtMs = normalizeEpochMs(
-    finiteNumber(value[kind === "interval" ? "end_time" : "weekly_end_time"]),
-  );
-  return {
-    ...(unlimited || usedPercent === undefined ? {} : { usedPercent }),
-    ...(unlimited || totalPercent === undefined ? {} : { totalPercent }),
-    ...(resetAtMs !== undefined ? { resetAtMs } : {}),
-    unlimited,
-  };
-}
-
-/** Video quotas are count-based: the panel renders `used/total` (`0/3`). */
-export function readVideoQuota(value: Record<string, unknown>): WebuiUsageQuotaVideoView {
-  const status = finiteNumber(value.current_interval_status);
-  const usedCount = finiteNumber(value.current_interval_used_count);
-  const totalCount = finiteNumber(value.current_interval_total_count);
-  const resetAtMs = normalizeEpochMs(finiteNumber(value.end_time));
-  return {
-    ...(usedCount === undefined ? {} : { usedCount: Math.max(0, usedCount) }),
-    ...(totalCount === undefined ? {} : { totalCount: Math.max(0, totalCount) }),
-    ...(resetAtMs !== undefined ? { resetAtMs } : {}),
-    unlimited: status === 3,
-  };
-}
-
-/** Parses `"96%"` / `96` / `null` into 0-100; non-finite input → undefined. */
-function readPercent(value: unknown): number | undefined {
-  const numeric =
-    typeof value === "string"
-      ? Number(value.trim().replace(/%$/u, ""))
-      : typeof value === "number"
-        ? value
-        : undefined;
-  if (numeric === undefined || !Number.isFinite(numeric)) return undefined;
-  return Math.round(Math.min(100, Math.max(0, numeric)));
-}
-
-function normalizeEpochMs(value: number | undefined): number | undefined {
-  if (value === undefined || value <= 0) return undefined;
-  return value < 1e12 ? value * 1_000 : value;
-}
-
-function readWorkspaceId(value: unknown): number | string | undefined {
-  if (typeof value === "number" && Number.isFinite(value) && value >= 0) return value;
-  if (typeof value === "string" && value.trim()) return value.trim();
-  return undefined;
-}
-
-function readBoolean(
-  primary: Record<string, unknown> | undefined,
-  fallback: Record<string, unknown> | undefined,
-  key: string,
-): boolean | undefined {
-  const value = primary?.[key] ?? fallback?.[key];
-  return typeof value === "boolean" ? value : undefined;
-}
-
-function readString(
-  primary: Record<string, unknown> | undefined,
-  fallback: Record<string, unknown> | undefined,
-  key: string,
-): string | undefined {
-  const value = primary?.[key] ?? fallback?.[key];
-  return typeof value === "string" && value.trim() ? value.trim() : undefined;
-}
-
 function optionalIdentityField(
   source: Record<string, unknown> | undefined,
   outputKey: "userEmail" | "userName" | "subUserName",
@@ -779,27 +596,6 @@ function optionalIdentityField(
   return {};
 }
 
-function readNumberishString(
-  primary: Record<string, unknown> | undefined,
-  fallback: Record<string, unknown> | undefined,
-  key: string,
-): string | undefined {
-  const value = primary?.[key] ?? fallback?.[key];
-  return typeof value === "string" || typeof value === "number"
-    ? String(value).trim()
-    : undefined;
-}
-
-function finiteNumber(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
 function normalizeCacheTtl(value: number | undefined, fallback: number): number {
   return value !== undefined && Number.isFinite(value) && value >= 0 ? value : fallback;
-}
-
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
 }

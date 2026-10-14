@@ -3840,6 +3840,7 @@
     "packages/webui/src/runtime/runtime-environment.ts",
     "packages/webui/src/runtime/session-transfer.ts",
     "packages/webui/src/runtime/signing.ts",
+    "packages/webui/src/runtime/usage-quota-projection.ts",
     "packages/webui/src/runtime/usage-quota.ts",
     "packages/webui/src/runtime/workspace-archive.ts",
     "packages/webui/src/server/access-policy.ts",
