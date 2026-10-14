@@ -32,9 +32,10 @@
 //     projection that names a scope whose directory is empty falls
 //     through, exactly the rule the credential reader applies. This is
 //     the one-decision / two-consumers rule (`auth-context.ts`).
-//   * Values are validated against the same allow-list the harness
-//     applies (`config.ts:120-151`), so a malformed store or an
-//     operator-supplied typo cannot poison the runtime.
+//   * Values are validated against the runtime's own allow-list
+//     (`isValidRuntimeRegion` / `isValidRuntimeBuildEnv` from
+//     `@mavis/config`), so a malformed store or an operator-supplied typo
+//     cannot poison the runtime.
 //   * When nothing resolves and nothing is explicit the resolver does
 //     not guess: it leaves the environment untouched and returns
 //     undefined, so a WebUI start without a client-side login still
@@ -51,12 +52,15 @@
 // record.
 
 import {
+  isValidRuntimeBuildEnv,
+  isValidRuntimeRegion,
+} from "@mavis/config";
+
+import {
   projectedScope,
   resolveAuthScope,
 } from "./auth-context.js";
 
-const REGIONS = new Set(["cn", "en"]);
-const BUILD_ENVS = new Set(["dev", "test", "staging", "prod"]);
 const MANAGED_FLAG_VALUES = new Set(["0", "1"]);
 
 export type WebuiRuntimeScopeSource = "env" | "projection" | "directory";
@@ -77,22 +81,6 @@ export interface ConfigureWebuiRuntimeEnvironmentOptions {
    * writes without polluting the test process's environment.
    */
   readonly target?: Record<string, string | undefined>;
-}
-
-/**
- * Tells whether `value` is one of the regions `getRuntimeRegion()` would
- * accept (`packages/config/src/config.ts:120-131`).
- */
-function isValidRegion(value: string | undefined): value is string {
-  return value !== undefined && REGIONS.has(value);
-}
-
-/**
- * Tells whether `value` is one of the build envs `getRuntimeBuildEnv()`
- * would accept (`packages/config/src/config.ts:133-151`).
- */
-function isValidBuildEnv(value: string | undefined): value is string {
-  return value !== undefined && BUILD_ENVS.has(value);
 }
 
 function optionalString(value: string | undefined): string | undefined {
@@ -122,10 +110,10 @@ export function configureWebuiRuntimeEnvironment(
 ): WebuiRuntimeScope | undefined {
   const target = options.target ?? process.env;
 
-  const explicitRegion = isValidRegion(optionalString(target.MAVIS_REGION))
+  const explicitRegion = isValidRuntimeRegion(optionalString(target.MAVIS_REGION))
     ? optionalString(target.MAVIS_REGION)
     : undefined;
-  const explicitBuildEnv = isValidBuildEnv(
+  const explicitBuildEnv = isValidRuntimeBuildEnv(
     optionalString(target.MAVIS_BUILD_ENV),
   )
     ? optionalString(target.MAVIS_BUILD_ENV)

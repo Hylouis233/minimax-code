@@ -103,11 +103,20 @@ const ELECTRON_BUILD_ENV_TO_RUNTIME: Readonly<Record<string, MavisBuildEnv>> = {
   prod: "prod",
 };
 
-function isValidRuntimeRegion(value: string | undefined): value is MavisRegion {
+/**
+ * Whether `value` is one of the regions the runtime resolves (`cn`, `en`).
+ *
+ * Exported because the region's allow-list is a runtime fact with more than one
+ * consumer: the WebUI resolves a scope out of the installed client's projection
+ * and validates it against this same list, and a second copy of the list would
+ * drift the moment a region is added.
+ */
+export function isValidRuntimeRegion(value: string | undefined): value is MavisRegion {
   return value === "cn" || value === "en";
 }
 
-function isValidRuntimeBuildEnv(
+/** Whether `value` is one of the build environments the runtime resolves. */
+export function isValidRuntimeBuildEnv(
   value: string | undefined,
 ): value is MavisBuildEnv {
   return (

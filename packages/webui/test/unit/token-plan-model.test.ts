@@ -12,22 +12,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import {
-  CUSTOM_PROVIDER_ID_PREFIX,
-  MANAGED_MINIMAX_PROVIDER_ID,
-  MINIMAX_API_PROVIDER_ID,
-  isTokenPlanModel,
-} from "../../src/client/features/models/projection/token-plan-model.js";
-
-// The client imports no `@mavis/*` module and the package boundary check keeps
-// it that way, so these three are mirrored rather than imported. A mirror with
-// no tripwire is a copy that rots silently, so it is compared against the real
-// exports here — a node-side test may import the package freely.
-import {
-  CUSTOM_PROVIDER_ID_PREFIX as CONFIGURED_CUSTOM_PREFIX,
-  MANAGED_MINIMAX_PROVIDER_ID as CONFIGURED_MANAGED_ID,
-  MINIMAX_API_PROVIDER_ID as CONFIGURED_API_KEY_ID,
-} from "@mavis/config";
+import { isTokenPlanModel } from "../../src/client/features/models/projection/token-plan-model.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const indicatorPath = path.resolve(
@@ -35,16 +20,6 @@ const indicatorPath = path.resolve(
   "../../src/client/features/sessions/ui/ContextUsageIndicator.tsx",
 );
 const composerPath = path.resolve(here, "../../src/client/features/composer/ui/WebuiComposer.tsx");
-
-describe("token plan model — the mirrored provider ids", () => {
-  it("still equals the ones @mavis/config exports", () => {
-    // If the runtime renames a reserved provider id, this goes red instead of
-    // the panel quietly deciding that no model is ever plan-metered.
-    expect(MANAGED_MINIMAX_PROVIDER_ID).toBe(CONFIGURED_MANAGED_ID);
-    expect(MINIMAX_API_PROVIDER_ID).toBe(CONFIGURED_API_KEY_ID);
-    expect(CUSTOM_PROVIDER_ID_PREFIX).toBe(CONFIGURED_CUSTOM_PREFIX);
-  });
-});
 
 describe("token plan model — whose usage the plan pays for", () => {
   it("claims a first-party MiniMax model", () => {

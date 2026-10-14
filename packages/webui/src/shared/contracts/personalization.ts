@@ -25,6 +25,8 @@
 // | `WebuiUserProfileView` | The 关于你 region of `user.md` (three fields plus exists/malformed/path/caps). | Runtime `getUserProfile` (`runtime/harness/settings.ts`; `runtime/profile-files.ts` `readUserProfile`). | `client/features/settings/contracts/settings-port.ts`; `client/features/settings/ui/PersonalizationSettings.tsx`. |
 // | `WebuiMemorySettingsView` | The two long-term-memory switches (enabled/proactive). | Runtime `getMemorySettings` (`runtime/harness/settings.ts`). | `client/features/settings/contracts/settings-port.ts`; `client/features/settings/ui/PersonalizationSettings.tsx`; `runtime/harness/requirements.ts`. |
 
+import { MINIMAX_CODE_DEFAULT_AGENT_NAME } from "@mavis/shared/agent-defaults";
+
 /**
  * Profile-wide `AGENTS.md`.
  *
@@ -115,6 +117,9 @@ export interface WebuiMemorySettingsView {
  *
  * It is a wire-level default — the server operation and the runtime adapter must
  * agree on it — so it lives with the shared contracts rather than with the
- * runtime implementation. The runtime re-exports it for its own consumers.
+ * runtime implementation. The value is the product default the terminal client
+ * also uses (`@mavis/shared/agent-defaults`); the name stays local because it is
+ * this package's wire vocabulary, and there is only one definition of the value.
  */
-export const WEBUI_DEFAULT_AGENT_NAME = "mavis";
+export const WEBUI_DEFAULT_AGENT_NAME = MINIMAX_CODE_DEFAULT_AGENT_NAME;
+

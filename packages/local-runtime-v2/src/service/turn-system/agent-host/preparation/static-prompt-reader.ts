@@ -6,10 +6,12 @@ import {
   resolveAgentCapabilities,
   type ResolvedAgentCapabilities,
 } from '@mavis/config';
+import {
+  GLOBAL_INSTRUCTIONS_MAX_BYTES,
+  PROJECT_INSTRUCTIONS_MAX_BYTES,
+} from '@mavis/shared/instruction-limits';
 
 const LEGACY_AGENT_INSTRUCTIONS_FILE = '\x43\x4c\x41\x55\x44\x45.md';
-const PROJECT_INSTRUCTIONS_MAX_BYTES = 32 * 1024;
-const GLOBAL_INSTRUCTIONS_MAX_BYTES = 32 * 1024;
 
 interface StaticPromptReaderLogger {
   warn(fields: Readonly<Record<string, unknown>>, message: string): void;

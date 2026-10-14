@@ -21,10 +21,7 @@ import {
   type ClaimSigninData,
   type SigninPanel,
 } from "@mavis/shared/daily-signin";
-
-/** Mirrors `@mavis/config`'s unions without adding a dependency. */
-type MavisRegion = "cn" | "en";
-type MavisBuildEnv = "dev" | "test" | "staging" | "prod";
+import type { MavisBuildEnv, MavisRegion } from "@mavis/config";
 
 const STATUS_PATH = "/minimax-cloud/api/v1/signin/status";
 const CLAIM_PATH = "/minimax-cloud/api/v1/signin/claim";

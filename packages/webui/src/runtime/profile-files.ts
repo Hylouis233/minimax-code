@@ -48,6 +48,7 @@
 // that actually touches the filesystem cannot live on the client side of the
 // seam.
 
+import { GLOBAL_INSTRUCTIONS_MAX_BYTES } from "@mavis/shared/instruction-limits";
 import { MEMORY_TAIL_INJECTION_CAP_CHARS } from "@mavis/shared/memory-limits";
 import { randomBytes } from "node:crypto";
 import { mkdir, open, readFile, rename, stat, unlink } from "node:fs/promises";
@@ -56,21 +57,17 @@ import { dirname, join, resolve } from "node:path";
 import type { WebuiAgentMemoryView, WebuiGlobalInstructionsView, WebuiUserProfileFields, WebuiUserProfileView } from "../shared/contracts/personalization.js";
 
 /**
- * Mirrors `MINIMAX_CODE_DEFAULT_AGENT_NAME` in
- * `packages/tui/src/product-context.ts`. Duplicated rather than imported
- * because the constant lives in the TUI product layer, which pulls UI concerns
- * into a server module; a test pins both to the same literal so the two cannot
- * drift silently.
+ * Re-exported for this module's consumers; the value is the product default
+ * (`@mavis/shared/agent-defaults`) that the terminal client also uses.
  */
 export { WEBUI_DEFAULT_AGENT_NAME } from "../shared/contracts/personalization.js";
 
 /**
- * Mirrors `GLOBAL_INSTRUCTIONS_MAX_BYTES` in
- * `local-runtime-v2/.../persistence/global-instructions.ts`. The UI mirrors it
- * too, so the read reports it rather than the client hardcoding 32KiB and
- * disagreeing with the server after a runtime-side change.
+ * The read cap comes from `@mavis/shared/instruction-limits`, the same number
+ * the runtime's global-instructions reader enforces; the UI reports it rather
+ * than hardcoding 32KiB and disagreeing with the server after a change.
  */
-export const GLOBAL_INSTRUCTIONS_MAX_BYTES = 32 * 1024;
+export { GLOBAL_INSTRUCTIONS_MAX_BYTES };
 
 const MAIN_MEMORY_FILE = "MEMORY.md";
 const GLOBAL_INSTRUCTIONS_FILE = "AGENTS.md";

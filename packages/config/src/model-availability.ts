@@ -11,14 +11,25 @@
 // Do not use a resolver's generic limit fallback as a validity signal — an
 // unknown model resolving to default limits is exactly the bug this replaces.
 
+import {
+  CUSTOM_PROVIDER_ID_PREFIX,
+  MANAGED_MINIMAX_PROVIDER_ID,
+  MINIMAX_API_PROVIDER_ID,
+} from '@mavis/shared/provider-ids';
 import { MINIMAX_MODELS } from './minimax-model-catalog.js';
 import type { PresetKey } from './config.js';
 import { resolveProviderAuthMode } from './provider-auth-mode.js';
 
-/** Reserved provider ids, mirrored by the local-runtime model-key parsers. */
-export const MANAGED_MINIMAX_PROVIDER_ID = 'minimax';
-export const MINIMAX_API_PROVIDER_ID = 'minimax_api';
-export const CUSTOM_PROVIDER_ID_PREFIX = 'custom_provider:';
+/**
+ * The provider-id vocabulary comes from `@mavis/shared/provider-ids`: this
+ * package, the local-runtime model-key parsers and the WebUI all read the same
+ * definitions there, so a new reserved id cannot be added to only one of them.
+ */
+export {
+  CUSTOM_PROVIDER_ID_PREFIX,
+  MANAGED_MINIMAX_PROVIDER_ID,
+  MINIMAX_API_PROVIDER_ID,
+};
 
 /** Which upstream a selected model would actually be called through. */
 export type ModelCallRoute =

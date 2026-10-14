@@ -33,6 +33,10 @@
       "types": "./src/service/turn-system/index.ts",
       "import": "./dist/service/turn-system/index.js"
     },
+    "./canvas-wire": {
+      "types": "./src/service/canvas/wire.ts",
+      "import": "./dist/service/canvas/wire.js"
+    },
     "./agent": {
       "types": "./src/service/agent/public.ts",
       "import": "./dist/service/agent/public.js"

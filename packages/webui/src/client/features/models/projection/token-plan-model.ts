@@ -23,19 +23,23 @@
  *                          coding plan entirely; its limits are metered by that
  *                          vendor against that subscription.
  *
- * The provider ids are mirrored from `@mavis/config` rather than imported: this
- * client imports no `@mavis/*` module, and the package boundary check enforces
- * that. `token-plan-model.test.ts` asserts the mirror still equals the exported
- * constants, so the copy cannot drift without a test going red.
+ * The provider ids come from `@mavis/shared/provider-ids`, the same definitions
+ * `@mavis/config` re-exports: a browser-side module imports that package
+ * directly (as it already does for `@mavis/shared/daily-signin`), so the client
+ * reads the real constants instead of a mirror that can rot.
  */
 
-/** Mirrors `MANAGED_MINIMAX_PROVIDER_ID` in `@mavis/config`. */
-export const MANAGED_MINIMAX_PROVIDER_ID = "minimax";
-/** Mirrors `MINIMAX_API_PROVIDER_ID` in `@mavis/config`. */
-export const MINIMAX_API_PROVIDER_ID = "minimax_api";
-/** Mirrors `CUSTOM_PROVIDER_ID_PREFIX` in `@mavis/config`. */
-export const CUSTOM_PROVIDER_ID_PREFIX = "custom_provider:";
+import {
+  CUSTOM_PROVIDER_ID_PREFIX,
+  MANAGED_MINIMAX_PROVIDER_ID,
+  MINIMAX_API_PROVIDER_ID,
+} from "@mavis/shared/provider-ids";
 
+export {
+  CUSTOM_PROVIDER_ID_PREFIX,
+  MANAGED_MINIMAX_PROVIDER_ID,
+  MINIMAX_API_PROVIDER_ID,
+};
 /** The parts of a model entry this decision reads. */
 export interface TokenPlanModelIdentity {
   readonly providerId?: string;

@@ -2,7 +2,13 @@ import { randomBytes } from 'node:crypto';
 import { mkdir, open, readFile, rename, stat, unlink } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
-export const GLOBAL_INSTRUCTIONS_MAX_BYTES = 32 * 1024;
+import { GLOBAL_INSTRUCTIONS_MAX_BYTES } from '@mavis/shared/instruction-limits';
+
+/**
+ * The read cap comes from `@mavis/shared/instruction-limits`: the prompt reader
+ * and the clients that report the cap in their UI read the same number.
+ */
+export { GLOBAL_INSTRUCTIONS_MAX_BYTES };
 
 export type GlobalInstructionsErrorCode =
   | 'GLOBAL_INSTRUCTIONS_READ_FAILED'

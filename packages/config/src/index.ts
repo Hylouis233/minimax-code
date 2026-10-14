@@ -22,6 +22,8 @@ export {
   RUNTIME_ENV_PREFIX,
   getRuntimeRegion,
   getRuntimeBuildEnv,
+  isValidRuntimeRegion,
+  isValidRuntimeBuildEnv,
   allowsManagedMinimaxProviderOverride,
   isBetaFeatureProdReady,
   resolveBetaFeature,

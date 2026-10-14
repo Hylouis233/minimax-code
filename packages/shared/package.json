@@ -199,6 +199,18 @@
     "./memory-limits": {
       "types": "./src/memory-limits.ts",
       "import": "./dist/memory-limits.js"
+    },
+    "./instruction-limits": {
+      "types": "./src/instruction-limits.ts",
+      "import": "./dist/instruction-limits.js"
+    },
+    "./provider-ids": {
+      "types": "./src/provider-ids.ts",
+      "import": "./dist/provider-ids.js"
+    },
+    "./agent-defaults": {
+      "types": "./src/agent-defaults.ts",
+      "import": "./dist/agent-defaults.js"
     }
   },
   "types": "./src/index.ts",

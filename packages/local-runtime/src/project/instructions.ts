@@ -2,8 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { logger } from '../common/logger.js';
+import { PROJECT_INSTRUCTIONS_MAX_BYTES } from '@mavis/shared/instruction-limits';
 
-export const PROJECT_INSTRUCTIONS_MAX_BYTES = 32 * 1024;
+/**
+ * The read cap comes from `@mavis/shared/instruction-limits`; the truncation
+ * notice below quotes the same number the reader enforces.
+ */
+export { PROJECT_INSTRUCTIONS_MAX_BYTES };
 
 const PROJECT_INSTRUCTIONS_FILENAME = 'AGENTS.md';
 const TRUNCATION_NOTICE = [
