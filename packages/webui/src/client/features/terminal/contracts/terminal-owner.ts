@@ -54,7 +54,7 @@ export interface WebuiTerminalOwner {
   /** Release every watch (a view going away). Processes stay alive. */
   readonly detachAll: () => void;
   /** End every watch and every process; the application calls this on disposal. */
-  readonly disposeAll: () => void;
+  readonly disposeAll: () => Promise<void>;
 }
 
 /** The resize request the owner forwards, named here so peers need one import. */

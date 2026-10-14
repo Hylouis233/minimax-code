@@ -674,6 +674,11 @@ export function createWebuiApplication(
       // The account owner runs the login and OAuth-status polls, so its end is
       // the application's end rather than a component unmount (T09, T19).
       accountWorkflows.dispose();
+      // The terminal owner's disposer is the client's own end: its watches stop
+      // and the PTYs it created are killed here rather than left running for a
+      // page that is going away (T15 criterion 3). Fire-and-forget because this
+      // disposal is synchronous; the requests are already on their way.
+      void terminalOwner.disposeAll();
       workspaceGitListeners.clear();
       channelReadyListeners.clear();
       dirtyResources.clear();

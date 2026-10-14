@@ -49,10 +49,25 @@ export class WebuiTerminalManager implements WebuiTerminalProcessPort {
     const terminal = this.get(terminalId);
     const queue: string[] = [...terminal.output];
     let wake: (() => void) | undefined;
+    let cancelled = signal?.aborted ?? false;
+    // A parked iterator has nothing to wake it when the terminal is quiet, so
+    // the abort signal has to wake it itself: without this, cancelling a watch
+    // on a silent terminal parked the consumer for good (T15 criterion 4).
+    const onAbort = () => { cancelled = true; wake?.(); };
+    signal?.addEventListener("abort", onAbort, { once: true });
     const listener = (data: string) => { queue.push(data); wake?.(); };
     terminal.listeners.add(listener);
-    try { while (!signal?.aborted && (!terminal.exited || queue.length)) { if (!queue.length) await new Promise<void>((resolve) => { wake = resolve; }); else { const data = queue.shift() ?? ""; yield { terminalId, data, exited: terminal.exited }; } } }
-    finally { terminal.listeners.delete(listener); }
+    try {
+      while (!cancelled && (!terminal.exited || queue.length)) {
+        if (!queue.length) await new Promise<void>((resolve) => { wake = resolve; });
+        else { const data = queue.shift() ?? ""; yield { terminalId, data, exited: terminal.exited }; }
+      }
+    } finally {
+      // Exactly once, on every exit path: the listener leaves the terminal's set
+      // and the signal stops holding a wake-up it can no longer use.
+      terminal.listeners.delete(listener);
+      signal?.removeEventListener("abort", onAbort);
+    }
   }
   disposeBySession() { for (const terminal of this.terminals.values()) terminal.pty.kill(); this.terminals.clear(); }
   private get(id: string) { const terminal = this.terminals.get(id); if (!terminal) throw new Error("终端不存在"); return terminal; }

@@ -102,8 +102,13 @@ export function createWebuiTerminalOwner(
     watches.get(terminalId)?.();
     const release = watch({ terminalId }, onFrame);
     watches.set(terminalId, release);
+    let released = false;
     return () => {
-      // Only clear the registry when this disposer is still the live one.
+      // Cancellation finalizes the watch exactly once: a second call is a
+      // no-op rather than a second release against a stream that is already
+      // gone, and a superseded disposer never clears its successor's entry.
+      if (released) return;
+      released = true;
       if (watches.get(terminalId) === release) watches.delete(terminalId);
       release();
     };
@@ -114,8 +119,14 @@ export function createWebuiTerminalOwner(
     watches.clear();
   };
 
-  const disposeAll = (): void => {
+  const disposeAll = async (): Promise<void> => {
+    // End every watch AND every process, which is what the contract says this
+    // is for: a view going away calls `detachAll` and leaves the PTYs running,
+    // while disposal ends the client's processes too (T15 criterion 3).
     detachAll();
+    const known = snapshot.terminals.map((terminal) => terminal.terminalId);
+    for (const terminalId of known) await port.disposeTerminal?.({ terminalId });
+    if (known.length > 0) await refresh();
   };
 
   return {
