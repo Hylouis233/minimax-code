@@ -21,7 +21,7 @@
 // isolated path reached the host, so a run can never fall back to the operator's
 // own `~/.minimax` without failing.
 import { once } from "node:events";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -36,6 +36,15 @@ import { WebuiService, createOperationRegistry } from "../../src/server/index.js
 import { WEBUI_PROTOCOL_VERSION } from "../../src/shared/envelope.js";
 
 const CREDENTIAL_TOKEN = "real-host-loopback-token";
+
+/**
+ * The isolated data directory's config file, written before boot so the harness
+ * does not copy the developer's own config in (see `bootRealHost`). Its content is
+ * asserted after boot, so "the operator's config was not read" is a checked
+ * property of the run rather than a comment.
+ */
+const CONFIG_MARKER_TEXT =
+  "# webui real-host-loopback fixture — no provider entry, no credential.\n";
 
 interface Booted {
   readonly service: WebuiService;
@@ -63,6 +72,14 @@ async function bootRealHost(): Promise<Booted> {
   const dataDir = await mkdtemp(join(tmpdir(), "webui-real-host-"));
   const workspaceDir = join(dataDir, "workspace");
   await mkdir(workspaceDir, { recursive: true });
+  // Write the config file before the host boots. `ensureConfigFile()`
+  // (`packages/config/src/config.ts:1799-1805`) copies the developer's own
+  // `<home>/.minimax/config.yaml` into a derived data directory that has none —
+  // deliberately, so a worktree daemon inherits the developer's keys — which is
+  // the one path that would pull an operator's provider entries and api key into
+  // this run. A file that already exists skips the copy, and the assertion in the
+  // first case checks the file is still this one.
+  await writeFile(join(dataDir, "config.yaml"), CONFIG_MARKER_TEXT, { mode: 0o600 });
 
   const assembled = await createWebuiRuntimeHost({
     dataDir,
@@ -158,6 +175,14 @@ describe("real host over the loopback service", () => {
         version: "real-host-loopback",
         dataDir: host.dataDir,
       });
+
+      // The config file the host booted with is still this file: the harness did
+      // not copy the developer's own `<home>/.minimax/config.yaml` into the
+      // isolated directory (which is what would bring an operator's providers and
+      // api key into the run).
+      expect(await readFile(join(host.dataDir, "config.yaml"), "utf8")).toBe(
+        CONFIG_MARKER_TEXT,
+      );
 
       const created = await client.call("createSession", {
         name: "main",
