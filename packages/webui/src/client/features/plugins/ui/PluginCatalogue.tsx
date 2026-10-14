@@ -3,17 +3,20 @@ import {
   InstalledPluginSource,
   MarketplaceCategory,
 } from "@mavis/protocol/local";
-import type { WebuiPluginManagementAction } from "../../../shared/plugin-management.js";
 import {
   useWebuiPluginWorkflows,
   useWebuiPluginWorkflowsState,
-} from "../../bindings/use-query-state.js";
-import { WebuiIconAgent } from "../shell/icons.js";
-import { ToggleSwitch } from "../shared/ToggleSwitch.js";
-import { readWebuiPluginRow as read, type WebuiPluginRow as Row } from "../../contracts/plugins/plugin-rows.js";
+} from "../../../bindings/use-query-state.js";
+import { WebuiIconAgent } from "../../../components/shell/icons.js";
+import { ToggleSwitch } from "../../../components/shared/ToggleSwitch.js";
+import { readWebuiPluginRow as read, type WebuiPluginRow as Row } from "../contracts/plugin-rows.js";
 import { PluginImportDialog } from "./PluginImportDialog.js";
 import { PluginItemDialog } from "./PluginItemDialog.js";
-import { describeWebuiMcpServerStatus } from "../../projection/plugins/mcp-status.js";
+import { describeWebuiMcpServerStatus } from "../projection/mcp-status.js";
+import type {
+  WebuiPluginGithubSource,
+  WebuiPluginIntent,
+} from "../contracts/plugin-actions.js";
 
 type Area = "plugins" | "skills" | "apps" | "mcp" | "agents";
 type PluginCatalogueSelection = {
@@ -107,31 +110,6 @@ export function PluginCatalogue({
   const [selectedAgent, setSelectedAgent] = useState<Row | undefined>();
   const selectedAgentRef = useRef<Row | undefined>();
   selectedAgentRef.current = selectedAgent;
-  const [mcpName, setMcpName] = useState("");
-  const [mcpTransport, setMcpTransport] = useState("stdio");
-  const [mcpCommand, setMcpCommand] = useState("");
-  const [mcpArgs, setMcpArgs] = useState("");
-  const [mcpUrl, setMcpUrl] = useState("");
-  const [mcpDescription, setMcpDescription] = useState("");
-  const [mcpEnabled, setMcpEnabled] = useState(true);
-  const [mcpAdvancedOpen, setMcpAdvancedOpen] = useState(false);
-  const [mcpEnv, setMcpEnv] = useState("{}");
-  const [mcpHeaders, setMcpHeaders] = useState("{}");
-  const [mcpTimeoutMs, setMcpTimeoutMs] = useState("");
-  const [mcpJsonMode, setMcpJsonMode] = useState(false);
-  const [mcpJson, setMcpJson] = useState(() =>
-    JSON.stringify(
-      { "my-mcp-server": { transport: "stdio", command: "", enabled: true } },
-      null,
-      2,
-    ),
-  );
-  const [agentName, setAgentName] = useState("");
-  const [agentDescription, setAgentDescription] = useState("");
-  const [agentPrompt, setAgentPrompt] = useState("");
-  const [agentModel, setAgentModel] = useState("");
-  const [skillDescription, setSkillDescription] = useState("");
-  const [skillContent, setSkillContent] = useState("");
   const [pluginUrl, setPluginUrl] = useState("");
   const [pluginPreview, setPluginPreview] = useState<Row | undefined>();
   const [pluginImportDialog, setPluginImportDialog] = useState(false);
@@ -183,54 +161,52 @@ export function PluginCatalogue({
   // page itself overflows the preview, so the control is never gated on a
   // number this response could not supply.
   const visibleMarketTotal = marketTotal ?? filtered.length;
-  /** One UI action → the owner's named command. The component's own action
-   *  vocabulary is the wire's; the owner exposes named intents. */
-  const runAction = async (
-    action: WebuiPluginManagementAction,
-    input: Row,
-  ): Promise<unknown> => {
+  /**
+   * The narrow set of intents this component can express.
+   *
+   * It used to take any of the 29 wire actions plus an untyped row, and switch on
+   * the verb at runtime. Typing the parameter as the whole union is what that
+   * shape cost: `mutate("installPlugin", someRow)` compiled even though a row has
+   * no `pluginName`, and nothing said so until the server rejected it. Each
+   * intent carries the fields its own command declares, so the compiler checks
+   * the payload against the command it will actually reach (T08).
+   */
+  const runIntent = async (intent: WebuiPluginIntent): Promise<unknown> => {
     if (!workflows)
       throw new Error("Plugin management is not connected to the runtime");
-    switch (action) {
-      case "installPlugin": return workflows.installPlugin(input);
-      case "uninstallPlugin": return workflows.uninstallPlugin(input);
-      case "enablePlugin": return workflows.enablePlugin(input);
-      case "disablePlugin": return workflows.disablePlugin(input);
-      case "importGithubPlugin": return workflows.importGithubPlugin(input);
-      case "installSkill": return workflows.installSkill(input);
-      case "createSkill": return workflows.createSkill(input);
-      case "setSkillEnabled": return workflows.setSkillEnabled(input);
-      case "deleteSkill": return workflows.deleteSkill(input);
-      case "createMcpServer": return workflows.createMcpServer(input);
-      case "updateMcpServer": return workflows.updateMcpServer(input);
-      case "deleteMcpServer": return workflows.deleteMcpServer(input);
-      case "setMcpServerEnabled": return workflows.setMcpServerEnabled(input);
-      case "testMcpServer": return workflows.testMcpServer(input);
-      case "createAgent": return workflows.createAgent(input);
-      case "updateAgent": return workflows.updateAgent(input);
-      case "deleteAgent": return workflows.deleteAgent(input);
-      default: throw new Error(`未支持的操作：${action}`);
+    switch (intent.kind) {
+      case "installPlugin": return workflows.installPlugin({ pluginName: intent.pluginName, ...(intent.source === undefined ? {} : { source: intent.source }) });
+      case "uninstallPlugin": return workflows.uninstallPlugin({ pluginName: intent.pluginName, ...(intent.source === undefined ? {} : { source: intent.source }) });
+      case "enablePlugin": return workflows.enablePlugin({ pluginName: intent.pluginName, ...(intent.source === undefined ? {} : { source: intent.source }) });
+      case "disablePlugin": return workflows.disablePlugin({ pluginName: intent.pluginName, ...(intent.source === undefined ? {} : { source: intent.source }) });
+      case "importGithubPlugin": return workflows.importGithubPlugin({ source: intent.source });
+      case "installSkill": return workflows.installSkill({ url: intent.url });
+      case "createSkill": return workflows.createSkill({ name: intent.name, description: intent.description, content: intent.content });
+      case "setSkillEnabled": return workflows.setSkillEnabled({ skillName: intent.skillName, enabled: intent.enabled, ...(intent.locationUri === undefined ? {} : { locationUri: intent.locationUri }) });
+      case "deleteSkill": return workflows.deleteSkill({ skillName: intent.skillName, ...(intent.locationUri === undefined ? {} : { locationUri: intent.locationUri }) });
+      case "createMcpServer": return workflows.createMcpServer({ name: intent.name, config: intent.config, ...(intent.enabled === undefined ? {} : { enabled: intent.enabled }) });
+      case "updateMcpServer": return workflows.updateMcpServer({ name: intent.name, config: intent.config });
+      case "deleteMcpServer": return workflows.deleteMcpServer({ name: intent.name });
+      case "setMcpServerEnabled": return workflows.setMcpServerEnabled({ name: intent.name, enabled: intent.enabled });
+      case "testMcpServer": return workflows.testMcpServer({ name: intent.name });
+      case "createAgent": return workflows.createAgent({ name: intent.name, ...(intent.displayName === undefined ? {} : { displayName: intent.displayName }), ...(intent.description === undefined ? {} : { description: intent.description }), ...(intent.systemPrompt === undefined ? {} : { systemPrompt: intent.systemPrompt }), ...(intent.initialDefinition === undefined ? {} : { initialDefinition: intent.initialDefinition }) });
+      case "updateAgent": return workflows.updateAgent({ name: intent.name, ...(intent.displayName === undefined ? {} : { displayName: intent.displayName }), ...(intent.description === undefined ? {} : { description: intent.description }), ...(intent.systemPrompt === undefined ? {} : { systemPrompt: intent.systemPrompt }) });
+      case "deleteAgent": return workflows.deleteAgent({ name: intent.name });
+      default: throw new Error(`未支持的操作：${(intent as { readonly kind: string }).kind}`);
     }
   };
-  const mutate = async (
-    action: WebuiPluginManagementAction,
-    input: Row,
-  ): Promise<boolean> => {
+  const mutate = async (intent: WebuiPluginIntent): Promise<boolean> => {
     try {
-      await runAction(action, input);
+      await runIntent(intent);
       return true;
     } catch {
       // The owner records the failure and reloads; this only reports it.
       return false;
     }
   };
-  const confirmMutation = (
-    label: string,
-    action: WebuiPluginManagementAction,
-    input: Row,
-  ) => {
+  const confirmMutation = (label: string, intent: WebuiPluginIntent) => {
     if (window.confirm(`确定${label}？此操作会立即影响本地配置。`))
-      void mutate(action, input);
+      void mutate(intent);
   };
   const nameOf = (item: Row) =>
     read(
@@ -242,6 +218,16 @@ export function PluginCatalogue({
       "displayName",
       "display_name",
     );
+  /** The structured creator info, if the row carries any, as a record. */
+  const creatorInfoOf = (item: Row): Record<string, unknown> | undefined => {
+    const found = item.creatorInfo ?? item.creator_info;
+    return found && typeof found === "object" && !Array.isArray(found)
+      ? (found as Record<string, unknown>)
+      : undefined;
+  };
+  /** A row's `locationUri`, narrowed: the rows are untyped and the command is not. */
+  const locationUriOf = (item: Row): string | undefined =>
+    typeof item.locationUri === "string" ? item.locationUri : undefined;
   const pluginSource = (item: Row) =>
     typeof item.source === "number" ? item.source : undefined;
   const enabled = (item: Row) =>
@@ -267,297 +253,31 @@ export function PluginCatalogue({
               : "未知状态";
   };
 
-  const beginMcp = (item?: Row) => {
-    setEditing(item);
-    setMcpName(nameOf(item ?? {}));
-    const config = (
-      item?.config && typeof item.config === "object" ? item.config : {}
-    ) as Row;
-    setMcpDescription(
-      read(config, "description") || read(item ?? {}, "description"),
-    );
-    const method = read(config, "transport", "type") || "stdio";
-    setMcpTransport(method);
-    setMcpCommand(read(config, "command"));
-    setMcpArgs(Array.isArray(config.args) ? config.args.join(" ") : "");
-    setMcpUrl(read(config, "url"));
-    setMcpEnabled(item?.enabled !== false);
-    setMcpAdvancedOpen(false);
-    setMcpEnv(JSON.stringify(config.env ?? {}, null, 2));
-    setMcpHeaders(JSON.stringify(config.headers ?? {}, null, 2));
-    setMcpTimeoutMs(typeof config.timeoutMs === "number" ? String(config.timeoutMs) : "");
-    setMcpJson(
-      JSON.stringify(
-        {
-          [nameOf(item ?? {}) || "my-mcp-server"]: {
-            ...config,
-            enabled: item?.enabled !== false,
-          },
-        },
-        null,
-        2,
-      ),
-    );
-    setMcpJsonMode(false);
-    setDialog("mcp");
-  };
-  const prepareMcp = async (item?: Row) => {
-    if (!item) {
-      beginMcp();
-      return;
+  const chatWithAgent = async (agent: Row) => {
+    if (!onChatWithAgent) return;
+    try {
+      await onChatWithAgent(nameOf(agent));
+    } catch (cause) {
+      setLocalError(cause instanceof Error ? cause.message : String(cause));
     }
+  };
+  /**
+   * Open the MCP form for one server.
+   *
+   * The row's list entry carries a summary; the form needs the server's full
+   * config, so a detail read runs first. A failed read is reported and the form
+   * stays closed — showing a half-populated form would look like the server has
+   * no command or url.
+   */
+  const prepareMcp = async (item: Row) => {
     try {
       const detail = await workflows?.getMcpServer(nameOf(item));
-      beginMcp((detail && typeof detail === "object" ? detail : item) as Row);
+      setEditing((detail && typeof detail === "object" ? detail : item) as Row);
     } catch (cause) {
       setLocalError(cause instanceof Error ? cause.message : String(cause));
+      return;
     }
-  };
-  const saveMcp = async () => {
-    const parseJsonDraft = (
-      source: string,
-    ): { name: string; enabled: boolean; config: Row } => {
-      const parsed: unknown = JSON.parse(source);
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
-        throw new Error("JSON 配置必须是对象");
-      const root = parsed as Row;
-      const servers =
-        root.mcpServers && typeof root.mcpServers === "object" && !Array.isArray(root.mcpServers)
-          ? (root.mcpServers as Row)
-          : root;
-      let name = mcpName.trim();
-      let rawConfig: Row;
-      if (typeof servers.transport === "string") {
-        if (typeof servers.name === "string") name = servers.name;
-        rawConfig = servers;
-      } else {
-        const entries = Object.entries(servers);
-        const entry = entries[0];
-        if (
-          entries.length !== 1 ||
-          !entry ||
-          !entry[1] ||
-          typeof entry[1] !== "object" ||
-          Array.isArray(entry[1])
-        )
-          throw new Error("请提供单个 server 配置，或只包含一个 server 的 mcpServers 对象");
-        name = entry[0];
-        rawConfig = entry[1] as Row;
-      }
-      if (!name) throw new Error("请填写 Server 名称");
-      const { enabled, ...configWithName } = rawConfig;
-      const config = { ...configWithName };
-      delete config.name;
-      return {
-        name,
-        enabled: typeof enabled === "boolean" ? enabled : mcpEnabled,
-        config,
-      };
-    };
-    const parseRecord = (value: string, label: string): Row | undefined => {
-      if (!value.trim()) return undefined;
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(value);
-      } catch {
-        throw new Error(`${label}必须是有效 JSON`);
-      }
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) ||
-        Object.values(parsed).some((entry) => typeof entry !== "string"))
-        throw new Error(`${label}必须是字符串键值对象`);
-      return parsed as Row;
-    };
-    let config: Row;
-    let name = mcpName.trim();
-    let enabled = mcpEnabled;
-    if (mcpJsonMode) {
-      try {
-        const draft = parseJsonDraft(mcpJson);
-        name = draft.name;
-        enabled = draft.enabled;
-        config = draft.config;
-      } catch (cause) {
-        setLocalError(cause instanceof Error ? cause.message : String(cause));
-        return;
-      }
-    } else {
-      try {
-        const env = mcpTransport === "stdio" ? parseRecord(mcpEnv, "环境变量") : undefined;
-        const headers = mcpTransport === "stdio" ? undefined : parseRecord(mcpHeaders, "请求头");
-        const timeoutMs = mcpTimeoutMs.trim() ? Number(mcpTimeoutMs) : undefined;
-        if (timeoutMs !== undefined && (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0))
-          throw new Error("超时必须是正整数（毫秒）");
-        config = {
-          transport: mcpTransport,
-          description: mcpDescription,
-          ...(timeoutMs ? { timeoutMs } : {}),
-          ...(mcpTransport === "stdio"
-            ? {
-                command: mcpCommand,
-                args: mcpArgs.split(/\s+/u).filter(Boolean),
-                ...(env ? { env } : {}),
-              }
-            : { url: mcpUrl, ...(headers ? { headers } : {}) }),
-        };
-      } catch (cause) {
-        setLocalError(cause instanceof Error ? cause.message : String(cause));
-        return;
-      }
-    }
-    const saved = await mutate(editing ? "updateMcpServer" : "createMcpServer", {
-        name,
-        config,
-        enabled,
-      });
-    if (!saved) return;
-    if (editing && editing.enabled !== enabled) {
-      if (!(await mutate("setMcpServerEnabled", { name, enabled }))) return;
-    }
-    setDialog(null);
-  };
-  const switchMcpToForm = () => {
-    try {
-      const parsed: unknown = JSON.parse(mcpJson);
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
-        throw new Error("JSON 配置必须是对象");
-      const root = parsed as Row;
-      const servers =
-        root.mcpServers && typeof root.mcpServers === "object" && !Array.isArray(root.mcpServers)
-          ? (root.mcpServers as Row)
-          : root;
-      let name = mcpName.trim();
-      let config: Row;
-      if (typeof servers.transport === "string") {
-        config = servers;
-        if (typeof servers.name === "string") name = servers.name;
-      }
-      else {
-        const entries = Object.entries(servers);
-        const entry = entries[0];
-        if (
-          entries.length !== 1 ||
-          !entry ||
-          !entry[1] ||
-          typeof entry[1] !== "object" ||
-          Array.isArray(entry[1])
-        )
-          throw new Error("表单模式一次只能编辑一个 server");
-        name = entry[0];
-        config = entry[1] as Row;
-      }
-      setMcpName(name);
-      setMcpTransport(read(config, "transport", "type") || "stdio");
-      setMcpCommand(read(config, "command"));
-      setMcpArgs(Array.isArray(config.args) ? config.args.join(" ") : "");
-      setMcpUrl(read(config, "url"));
-      setMcpDescription(read(config, "description"));
-      setMcpEnabled(config.enabled !== false);
-      setMcpEnv(JSON.stringify(config.env ?? {}, null, 2));
-      setMcpHeaders(JSON.stringify(config.headers ?? {}, null, 2));
-      setMcpTimeoutMs(typeof config.timeoutMs === "number" ? String(config.timeoutMs) : "");
-      setMcpJsonMode(false);
-      setLocalError("");
-    } catch (cause) {
-      setLocalError(cause instanceof Error ? cause.message : String(cause));
-    }
-  };
-  const switchMcpToJson = () => {
-    try {
-      const timeoutMs = mcpTimeoutMs.trim() ? Number(mcpTimeoutMs) : undefined;
-      if (timeoutMs !== undefined && (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0))
-        throw new Error("超时必须是正整数（毫秒）");
-      const config: Row = {
-        transport: mcpTransport,
-        ...(mcpTransport === "stdio"
-          ? {
-              command: mcpCommand,
-              ...(mcpArgs.trim()
-                ? { args: mcpArgs.split(/\s+/u).filter(Boolean) }
-                : {}),
-            }
-          : { url: mcpUrl }),
-        ...(mcpDescription.trim() ? { description: mcpDescription.trim() } : {}),
-        ...(timeoutMs ? { timeoutMs } : {}),
-      };
-      const record = (value: string, label: string): Row | undefined => {
-        if (!value.trim()) return undefined;
-        const parsed: unknown = JSON.parse(value);
-        if (
-          !parsed ||
-          typeof parsed !== "object" ||
-          Array.isArray(parsed) ||
-          Object.values(parsed).some((entry) => typeof entry !== "string")
-        )
-          throw new Error(`${label}必须是字符串键值对象`);
-        return parsed as Row;
-      };
-      const env = mcpTransport === "stdio" ? record(mcpEnv, "环境变量") : undefined;
-      const headers = mcpTransport === "stdio" ? undefined : record(mcpHeaders, "请求头");
-      if (env && Object.keys(env).length > 0) config.env = env;
-      if (headers && Object.keys(headers).length > 0) config.headers = headers;
-      config.enabled = mcpEnabled;
-      setMcpJson(
-        JSON.stringify(
-          { [mcpName.trim() || "my-mcp-server"]: config },
-          null,
-          2,
-        ),
-      );
-      setMcpJsonMode(true);
-      setLocalError("");
-    } catch (cause) {
-      setLocalError(cause instanceof Error ? cause.message : String(cause));
-    }
-  };
-  const beginAgent = (item?: Row) => {
-    setEditing(item);
-    setSelectedAgent(item);
-    setAgentName(read(item ?? {}, "name", "displayName", "display_name"));
-    setAgentDescription(read(item ?? {}, "description"));
-    setAgentPrompt(read(item ?? {}, "systemPrompt", "system_prompt"));
-    setAgentModel(read(item ?? {}, "model"));
-  };
-  const saveAgent = async () => {
-    const input = editing
-      ? {
-          name: nameOf(editing),
-          displayName: agentName.trim(),
-          description: agentDescription.trim(),
-          systemPrompt: agentPrompt,
-        }
-      : {
-          name: agentName.trim(),
-          displayName: agentName.trim(),
-          description: agentDescription.trim(),
-          systemPrompt: agentPrompt,
-          initialDefinition: {
-            name: agentName.trim(),
-            description: agentDescription.trim(),
-            ...(agentModel.trim() ? { model: agentModel.trim() } : {}),
-            systemPrompt: agentPrompt,
-          },
-        };
-    await mutate(editing ? "updateAgent" : "createAgent", input);
-  };
-  const chatWithAgent = async () => {
-    if (!editing || !onChatWithAgent) return;
-    try {
-      await onChatWithAgent(nameOf(editing));
-    } catch (cause) {
-      setLocalError(cause instanceof Error ? cause.message : String(cause));
-    }
-  };
-  const saveSkill = async () => {
-    if (
-      await mutate("createSkill", {
-        name: agentName.trim(),
-        description: skillDescription.trim(),
-        content: skillContent,
-      })
-    ) {
-      setAgentName("");
-      setDialog(null);
-    }
+    setDialog("mcp");
   };
   const previewPlugin = async () => {
     try {
@@ -573,7 +293,7 @@ export function PluginCatalogue({
   const importPlugin = async () => {
     const source = pluginPreview?.source;
     if (!source || typeof source !== "object") return;
-    if (await mutate("importGithubPlugin", { source: source as Row })) {
+    if (await mutate({ kind: "importGithubPlugin", source: source as WebuiPluginGithubSource })) {
       setPluginImportDialog(false);
       setPluginPreview(undefined);
     }
@@ -594,15 +314,11 @@ export function PluginCatalogue({
     setView("personal");
     setManagementOpen(true);
     setCreateMenuOpen(false);
-    if (target === "mcp") beginMcp();
-    else if (target === "agents") beginAgent();
-    else {
-      setEditing(undefined);
-      setAgentName("");
-      setSkillDescription("");
-      setSkillContent("");
-      setDialog("skill");
-    }
+    // Opening a form is now just: no item, show this form. The drafts seed
+    // themselves from `editing`, so there is nothing to clear here beyond the
+    // item the previous form may have been editing.
+    setEditing(undefined);
+    setDialog(target === "mcp" ? "mcp" : target === "agents" ? "agent" : "skill");
   };
 
   return (
@@ -802,7 +518,7 @@ export function PluginCatalogue({
               <button
                 key={nameOf(item)}
                 aria-pressed={selectedAgent === item}
-                onClick={() => beginAgent(item)}
+                onClick={() => { setEditing(item); setSelectedAgent(item); setDialog("agent"); }}
               >
                 <span className="webui-agent-avatar webui-agent-avatar--small">
                   {read(item, "avatarDataUrl").startsWith("data:image/") ? (
@@ -817,11 +533,18 @@ export function PluginCatalogue({
             <button
               className="webui-agent-create"
               type="button"
-              onClick={() => beginAgent()}
+              onClick={() => { setEditing(undefined); setDialog("agent"); }}
             >
               <span aria-hidden="true">＋</span> 创建 Agent
             </button>
           </div>
+          {/*
+            The agent detail is a view, not a second editor. It used to carry
+            its own name/model/prompt fields — a second copy of the same draft
+            the dialog owns — and the two could disagree, because saving one left
+            the other showing stale values. What it shows now it reads from the
+            row; the draft lives in `AgentForm`, once (T08).
+          */}
           <div className="webui-agent-detail">
             <div className="webui-agent-fields">
               <label className="webui-agent-avatar-field">
@@ -836,66 +559,65 @@ export function PluginCatalogue({
               </label>
               <label>
                 名称
-                <input
-                  value={agentName}
-                  onChange={(event) => setAgentName(event.currentTarget.value)}
-                  placeholder="Agent 名称"
-                />
+                <span data-testid="webui-agent-detail-name">
+                  {read(selectedAgent ?? {}, "name", "displayName", "display_name")}
+                </span>
               </label>
               <label className="webui-agent-model-field">
                 模型
-                <input
-                  value={agentModel}
-                  onChange={(event) => setAgentModel(event.currentTarget.value)}
-                  placeholder="provider/model-name"
-                  readOnly={Boolean(editing)}
-                  aria-readonly={editing ? "true" : undefined}
-                  title={editing ? "当前运行时只支持在创建时设置模型" : undefined}
-                />
+                <span data-testid="webui-agent-detail-model">
+                  {read(selectedAgent ?? {}, "model") || "—"}
+                </span>
               </label>
-              <label className="webui-agent-prompt-field">
+              <label>
+                描述
+                <span data-testid="webui-agent-detail-description">
+                  {read(selectedAgent ?? {}, "description") || "—"}
+                </span>
+              </label>
+              <label>
                 系统提示词
-                <textarea
-                  className="webui-agent-prompt"
-                  value={agentPrompt}
-                  onChange={(event) => setAgentPrompt(event.currentTarget.value)}
-                  placeholder="输入系统提示词"
-                  spellCheck={false}
-                />
+                <span data-testid="webui-agent-detail-prompt">
+                  {read(selectedAgent ?? {}, "systemPrompt", "system_prompt")}
+                </span>
               </label>
-            </div>
-            <div className="webui-agent-form-actions">
-              {editing ? (
-                <button
-                  className="webui-agent-delete"
-                  type="button"
-                  onClick={() =>
-                    confirmMutation("删除 Agent", "deleteAgent", {
-                      name: nameOf(editing),
-                    })
-                  }
-                >
-                  删除
-                </button>
-              ) : <span />}
-              <button
-                type="button"
-                className="webui-agent-save"
-                disabled={busy || !agentName.trim()}
-                onClick={() => void saveAgent()}
-              >
-                保存
-              </button>
-              {editing && onChatWithAgent ? (
+              <div className="webui-agent-actions">
+                {selectedAgent ? (
+                  <button
+                    type="button"
+                    className="webui-agent-delete"
+                    onClick={() =>
+                      confirmMutation("删除 Agent", {
+                        kind: "deleteAgent",
+                        name: nameOf(selectedAgent),
+                      })
+                    }
+                  >
+                    删除
+                  </button>
+                ) : <span />}
                 <button
                   type="button"
-                  className="webui-agent-chat"
-                  disabled={busy}
-                  onClick={() => void chatWithAgent()}
+                  className="webui-agent-save"
+                  disabled={busy || !selectedAgent}
+                  onClick={() => {
+                    setEditing(selectedAgent);
+                    setDialog("agent");
+                  }}
                 >
-                  和他对话
+                  编辑
                 </button>
-              ) : null}
+                {selectedAgent && onChatWithAgent ? (
+                  <button
+                    type="button"
+                    className="webui-agent-chat"
+                    disabled={busy}
+                    onClick={() => void chatWithAgent(selectedAgent)}
+                  >
+                    和他对话
+                  </button>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>
@@ -916,18 +638,15 @@ export function PluginCatalogue({
             // read is side-effect-free, and narrowing `area` inside the JSX
             // below cannot narrow this binding.
             const mcpStatus = describeWebuiMcpServerStatus(item);
-            const action =
-              area === "plugins"
-                ? view === "market"
-                  ? "installPlugin"
-                  : isOn
-                    ? "disablePlugin"
-                    : "enablePlugin"
-                : area === "skills"
-                  ? view === "market"
-                    ? "installSkill"
-                    : "setSkillEnabled"
-                  : "setMcpServerEnabled";
+            // The button's intent, built with the fields its own command
+            // declares. It used to be a bare verb here and a payload at the call
+            // site three hundred lines away, so the two could disagree about
+            // which command ran (T08).
+            const pluginIntent = (kind: "installPlugin" | "enablePlugin" | "disablePlugin"): WebuiPluginIntent => ({
+              kind,
+              pluginName: name,
+              ...(pluginSource(item) === undefined ? {} : { source: pluginSource(item) }),
+            });
             const iconUrl = read(item, "iconUrl", "icon_url");
             return (
               <article className="webui-plugin-row" key={`${area}-${name}`}>
@@ -973,10 +692,9 @@ export function PluginCatalogue({
                     type="button"
                     disabled={item.installed === true}
                     onClick={() =>
-                      void mutate(action, {
-                        pluginName: name,
-                        source: pluginSource(item),
-                      })
+                      void mutate(
+                        pluginIntent(view === "market" ? "installPlugin" : isOn ? "disablePlugin" : "enablePlugin"),
+                      )
                     }
                   >
                     {item.installed === true ? "已安装" : "安装"}
@@ -996,7 +714,8 @@ export function PluginCatalogue({
                       )
                     }
                     onClick={() =>
-                      void mutate("installSkill", {
+                      void mutate({
+                        kind: "installSkill",
                         url:
                           read(item, "url", "sourceUrl", "source_url") ||
                           read(item, "gitUrl", "git_url"),
@@ -1011,13 +730,10 @@ export function PluginCatalogue({
                               : undefined,
                         isFromGit:
                           item.isFromGit === true || item.is_from_git === true,
-                        ...(item.creatorInfo &&
-                        typeof item.creatorInfo === "object"
-                          ? { creatorInfo: item.creatorInfo }
-                          : item.creator_info &&
-                              typeof item.creator_info === "object"
-                            ? { creatorInfo: item.creator_info }
-                            : {}),
+                        // Narrowed to a record, not merely "an object": the
+                        // command declares a structured `creatorInfo`, and the
+                        // row is untyped, so the check has to be the real one.
+                        ...(creatorInfoOf(item) ? { creatorInfo: creatorInfoOf(item) } : {}),
                       })
                     }
                   >
@@ -1055,7 +771,8 @@ export function PluginCatalogue({
                     <button onClick={() => void prepareMcp(item)}>编辑</button>
                     <button
                       onClick={() =>
-                        confirmMutation("删除 MCP server", "deleteMcpServer", {
+                        confirmMutation("删除 MCP server", {
+                          kind: "deleteMcpServer",
                           name,
                         })
                       }
@@ -1066,7 +783,7 @@ export function PluginCatalogue({
                       checked={isOn}
                       label={`启用 ${name}`}
                       onChange={() =>
-                        void mutate(action, { name, enabled: !isOn })
+                        void mutate({ kind: "setMcpServerEnabled", name, enabled: !isOn })
                       }
                     />
                   </div>
@@ -1078,15 +795,13 @@ export function PluginCatalogue({
                       label={`启用 ${name}`}
                       onChange={() =>
                         void mutate(
-                          action,
                           area === "plugins"
-                            ? { pluginName: name, source: pluginSource(item) }
+                            ? pluginIntent(view === "market" ? "installPlugin" : isOn ? "disablePlugin" : "enablePlugin")
                             : {
+                                kind: "setSkillEnabled",
                                 skillName: name,
                                 enabled: !isOn,
-                                ...(item.locationUri
-                                  ? { locationUri: item.locationUri }
-                                  : {}),
+                                ...(locationUriOf(item) ? { locationUri: locationUriOf(item) } : {}),
                               },
                         )
                       }
@@ -1094,9 +809,12 @@ export function PluginCatalogue({
                     {area === "plugins" ? (
                       <button
                         onClick={() =>
-                          confirmMutation("卸载插件", "uninstallPlugin", {
+                          confirmMutation("卸载插件", {
+                            kind: "uninstallPlugin",
                             pluginName: name,
-                            source: pluginSource(item),
+                            ...(pluginSource(item) === undefined
+                              ? {}
+                              : { source: pluginSource(item) }),
                           })
                         }
                       >
@@ -1105,10 +823,11 @@ export function PluginCatalogue({
                     ) : area === "skills" ? (
                       <button
                         onClick={() =>
-                          confirmMutation("删除技能", "deleteSkill", {
+                          confirmMutation("删除技能", {
+                            kind: "deleteSkill",
                             skillName: name,
-                            ...(item.locationUri
-                              ? { locationUri: item.locationUri }
+                            ...(locationUriOf(item)
+                              ? { locationUri: locationUriOf(item) }
                               : {}),
                           })
                         }
@@ -1138,54 +857,11 @@ export function PluginCatalogue({
       ) : null}
       {dialog ? (
         <PluginItemDialog
-          busy={busy}
           dialog={dialog}
           editing={editing}
-          enabled={enabled}
-          agentDescription={agentDescription}
-          agentModel={agentModel}
-          agentName={agentName}
-          agentPrompt={agentPrompt}
-          mcpArgs={mcpArgs}
-          mcpCommand={mcpCommand}
-          mcpDescription={mcpDescription}
-          mcpEnabled={mcpEnabled}
-          mcpEnv={mcpEnv}
-          mcpHeaders={mcpHeaders}
-          mcpJson={mcpJson}
-          mcpJsonMode={mcpJsonMode}
-          mcpName={mcpName}
-          mcpTimeoutMs={mcpTimeoutMs}
-          mcpTransport={mcpTransport}
-          mcpUrl={mcpUrl}
-          skillContent={skillContent}
-          skillDescription={skillDescription}
-          mcpAdvancedOpen={mcpAdvancedOpen}
-          setAgentDescription={setAgentDescription}
-          setAgentModel={setAgentModel}
-          setAgentName={setAgentName}
-          setAgentPrompt={setAgentPrompt}
-          setMcpArgs={setMcpArgs}
-          setMcpCommand={setMcpCommand}
-          setMcpDescription={setMcpDescription}
-          setMcpEnabled={setMcpEnabled}
-          setMcpEnv={setMcpEnv}
-          setMcpHeaders={setMcpHeaders}
-          setMcpJson={setMcpJson}
-          setMcpJsonMode={setMcpJsonMode}
-          setMcpName={setMcpName}
-          setMcpTimeoutMs={setMcpTimeoutMs}
-          setMcpTransport={setMcpTransport}
-          setMcpUrl={setMcpUrl}
-          setSkillContent={setSkillContent}
-          setSkillDescription={setSkillDescription}
-          setMcpAdvancedOpen={setMcpAdvancedOpen}
-          setDialog={setDialog}
-          saveMcp={saveMcp}
-          saveAgent={saveAgent}
-          saveSkill={saveSkill}
-          switchMcpToForm={switchMcpToForm}
-          switchMcpToJson={switchMcpToJson}
+          onSubmit={mutate}
+          {...(onChatWithAgent ? { onChatWithAgent } : {})}
+          onClose={() => setDialog(null)}
         />
       ) : null}
       {pluginImportDialog ? (

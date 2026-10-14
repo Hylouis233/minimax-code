@@ -20,7 +20,7 @@ import {
 } from "../../src/client/features/transcript/ui/MessageActions.js";
 import { copyWebuiMessageText, scheduleWebuiCopiedReset, toggleWebuiFeedback } from "../../src/client/features/transcript/application/message-feedback.js";
 import { MessageItem } from "../../src/client/features/transcript/ui/MessageItem.js";
-import { PluginCatalogue } from "../../src/client/components/plugins/PluginCatalogue.js";
+import { PluginCatalogue } from "../../src/client/features/plugins/ui/PluginCatalogue.js";
 import {
   buildWebuiEditRequest,
   buildWebuiForkRequest,

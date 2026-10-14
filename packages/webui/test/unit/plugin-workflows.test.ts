@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createWebuiPluginWorkflows,
   initialWebuiPluginSelection,
-} from "../../src/client/application/plugins/plugin-workflows.js";
+} from "../../src/client/features/plugins/application/plugin-workflows.js";
 
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 

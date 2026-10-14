@@ -15,7 +15,7 @@
 // (`docs/webui/plugin-action-inventory.md`), which is the figure this port's
 // business scope is measured by rather than its member count.
 
-import type { WebuiPluginManagementRequest } from "../../../shared/plugin-management.js";
+import type { WebuiPluginManagementRequest } from "../../../../shared/plugin-management.js";
 
 export interface PluginPort {
   readonly pluginManagement?: (request: WebuiPluginManagementRequest) => Promise<unknown>;

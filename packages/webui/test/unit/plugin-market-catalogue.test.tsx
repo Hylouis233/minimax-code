@@ -26,7 +26,7 @@ import { readWebuiSource, squashWhitespace } from "./support/source-text.js";
 import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { PluginCatalogue } from "../../src/client/components/plugins/PluginCatalogue.js";
+import { PluginCatalogue } from "../../src/client/features/plugins/ui/PluginCatalogue.js";
 const marketplace = (initialArea: "plugins" | "skills"): string =>
   renderToStaticMarkup(
     createElement(PluginCatalogue, {

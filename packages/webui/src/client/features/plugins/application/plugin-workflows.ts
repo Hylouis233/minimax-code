@@ -23,7 +23,14 @@
 // This module is framework-free — no React, no DOM — so it can be unit-tested
 // against a scripted port.
 
-import type { PluginPort } from "../../contracts/plugins/plugin-port.js";
+import type { PluginPort } from "../contracts/plugin-port.js";
+import {
+  createWebuiPluginActions,
+  webuiPluginRows,
+  type WebuiPluginActions,
+  type WebuiPluginActionInputs,
+} from "../contracts/plugin-actions.js";
+import type { WebuiPluginManagementAction } from "../../../../shared/plugin-management.js";
 import {
   InstalledPluginSource,
   MarketplaceCategory,
@@ -116,20 +123,6 @@ function rowValue(row: Record<string, unknown>, ...keys: string[]): string {
   return "";
 }
 
-function rowList(value: unknown, key: string): Record<string, unknown>[] {
-  if (!value || typeof value !== "object") return [];
-  if (Array.isArray(value)) {
-    return value.filter(
-      (item): item is Record<string, unknown> => !!item && typeof item === "object",
-    );
-  }
-  const found = (value as Record<string, unknown>)[key];
-  return Array.isArray(found)
-    ? found.filter(
-        (item): item is Record<string, unknown> => !!item && typeof item === "object",
-      )
-    : [];
-}
 
 export interface WebuiPluginWorkflows {
   readonly getSnapshot: () => WebuiPluginWorkflowsState;
@@ -145,28 +138,32 @@ export interface WebuiPluginWorkflows {
   readonly getMcpServer: (name: string) => Promise<Record<string, unknown>>;
   readonly getAgent: (name: string) => Promise<Record<string, unknown>>;
   readonly readAgentAvatar: (name: string) => Promise<Record<string, unknown>>;
-  readonly previewGithubPlugin: (input: Record<string, unknown>) => Promise<unknown>;
+  readonly previewGithubPlugin: (
+    input: WebuiPluginActionInputs["previewGithubPlugin"],
+  ) => Promise<unknown>;
 
-  readonly installPlugin: (input: Record<string, unknown>) => Promise<unknown>;
-  readonly uninstallPlugin: (input: Record<string, unknown>) => Promise<unknown>;
-  readonly enablePlugin: (input: Record<string, unknown>) => Promise<unknown>;
-  readonly disablePlugin: (input: Record<string, unknown>) => Promise<unknown>;
-  readonly importGithubPlugin: (input: Record<string, unknown>) => Promise<unknown>;
+  readonly installPlugin: (input: WebuiPluginActionInputs["installPlugin"]) => Promise<unknown>;
+  readonly uninstallPlugin: (input: WebuiPluginActionInputs["uninstallPlugin"]) => Promise<unknown>;
+  readonly enablePlugin: (input: WebuiPluginActionInputs["enablePlugin"]) => Promise<unknown>;
+  readonly disablePlugin: (input: WebuiPluginActionInputs["disablePlugin"]) => Promise<unknown>;
+  readonly importGithubPlugin: (
+    input: WebuiPluginActionInputs["importGithubPlugin"],
+  ) => Promise<unknown>;
 
-  readonly installSkill: (input: Record<string, unknown>) => Promise<unknown>;
-  readonly createSkill: (input: Record<string, unknown>) => Promise<unknown>;
-  readonly setSkillEnabled: (input: Record<string, unknown>) => Promise<unknown>;
-  readonly deleteSkill: (input: Record<string, unknown>) => Promise<unknown>;
+  readonly installSkill: (input: WebuiPluginActionInputs["installSkill"]) => Promise<unknown>;
+  readonly createSkill: (input: WebuiPluginActionInputs["createSkill"]) => Promise<unknown>;
+  readonly setSkillEnabled: (input: WebuiPluginActionInputs["setSkillEnabled"]) => Promise<unknown>;
+  readonly deleteSkill: (input: WebuiPluginActionInputs["deleteSkill"]) => Promise<unknown>;
 
-  readonly createMcpServer: (input: Record<string, unknown>) => Promise<unknown>;
-  readonly updateMcpServer: (input: Record<string, unknown>) => Promise<unknown>;
-  readonly deleteMcpServer: (input: Record<string, unknown>) => Promise<unknown>;
-  readonly setMcpServerEnabled: (input: Record<string, unknown>) => Promise<unknown>;
-  readonly testMcpServer: (input: Record<string, unknown>) => Promise<unknown>;
+  readonly createMcpServer: (input: WebuiPluginActionInputs["createMcpServer"]) => Promise<unknown>;
+  readonly updateMcpServer: (input: WebuiPluginActionInputs["updateMcpServer"]) => Promise<unknown>;
+  readonly deleteMcpServer: (input: WebuiPluginActionInputs["deleteMcpServer"]) => Promise<unknown>;
+  readonly setMcpServerEnabled: (input: WebuiPluginActionInputs["setMcpServerEnabled"]) => Promise<unknown>;
+  readonly testMcpServer: (input: WebuiPluginActionInputs["testMcpServer"]) => Promise<unknown>;
 
-  readonly createAgent: (input: Record<string, unknown>) => Promise<unknown>;
-  readonly updateAgent: (input: Record<string, unknown>) => Promise<unknown>;
-  readonly deleteAgent: (input: Record<string, unknown>) => Promise<unknown>;
+  readonly createAgent: (input: WebuiPluginActionInputs["createAgent"]) => Promise<unknown>;
+  readonly updateAgent: (input: WebuiPluginActionInputs["updateAgent"]) => Promise<unknown>;
+  readonly deleteAgent: (input: WebuiPluginActionInputs["deleteAgent"]) => Promise<unknown>;
 }
 
 export function createWebuiPluginWorkflows(deps: {
@@ -193,12 +190,20 @@ export function createWebuiPluginWorkflows(deps: {
     for (const listener of listeners) listener();
   };
 
-  const call = (action: string, input?: Record<string, unknown>): Promise<unknown> => {
-    if (!port.pluginManagement) {
-      return Promise.reject(new Error("Plugin management is not connected to the runtime"));
-    }
-    return port.pluginManagement({ action: action as never, ...(input ? { input } : {}) });
-  };
+  const actions: WebuiPluginActions = createWebuiPluginActions(port);
+
+  /**
+   * One typed dispatch.
+   *
+   * `K extends WebuiPluginManagementAction` is what makes this a contract rather
+   * than a convention: a misspelled action, or a field the validator does not
+   * declare for that action, fails to compile here instead of failing as a
+   * rejected request in the browser.
+   */
+  const call = <K extends WebuiPluginManagementAction>(
+    action: K,
+    input?: WebuiPluginActionInputs[K],
+  ): Promise<unknown> => actions.invoke(action, input);
 
   const sameSelection = (
     left: WebuiPluginSelection,
@@ -266,11 +271,11 @@ export function createWebuiPluginWorkflows(deps: {
         call("listInstalledPlugins", { limit: 200 }),
       ]);
       const installedNames = new Set(
-        rowList(installed, "plugins")
+        webuiPluginRows(installed, "plugins")
           .filter((item) => item.source === InstalledPluginSource.OFFICIAL)
           .map((item) => rowValue(item, "name", "pluginName", "plugin_name", "pluginId").toLowerCase()),
       );
-      const rows = rowList(market, "plugins").map((item) => ({
+      const rows = webuiPluginRows(market, "plugins").map((item) => ({
         ...item,
         installed:
           item.installed === true ||
@@ -288,7 +293,7 @@ export function createWebuiPluginWorkflows(deps: {
         call("listMarketplacePlugins", { limit: 100 }),
       ]);
       const icons = new Map<string, string>();
-      for (const item of rowList(marketplace, "plugins")) {
+      for (const item of webuiPluginRows(marketplace, "plugins")) {
         const icon = rowValue(item, "iconUrl", "icon_url");
         for (const name of [
           rowValue(item, "name", "pluginName", "plugin_name", "pluginId").toLocaleLowerCase(),
@@ -297,7 +302,7 @@ export function createWebuiPluginWorkflows(deps: {
           if (name) icons.set(name, icon);
         }
       }
-      const rows = rowList(installed, "plugins").map((item) => ({
+      const rows = webuiPluginRows(installed, "plugins").map((item) => ({
         ...item,
         iconUrl:
           icons.get(rowValue(item, "name", "pluginName", "plugin_name", "pluginId").toLocaleLowerCase()) ||
@@ -307,11 +312,11 @@ export function createWebuiPluginWorkflows(deps: {
       return { rows };
     }
     if (area === "plugins") {
-      return { rows: rowList(await call("listInstalledPlugins", { limit: 100, keyword: query || undefined }), "plugins") };
+      return { rows: webuiPluginRows(await call("listInstalledPlugins", { limit: 100, keyword: query || undefined }), "plugins") };
     }
     if (area === "skills" && view === "market") {
       const result = await call("listSkillHub", { limit: 100, keyword: query || undefined });
-      const listed = rowList(result, "skills");
+      const listed = webuiPluginRows(result, "skills");
       const hasMore = Boolean(result && typeof result === "object" && (result as Record<string, unknown>).hasMore === true);
       return { rows: listed, skillTotal: hasMore ? null : listed.length };
     }
@@ -327,7 +332,7 @@ export function createWebuiPluginWorkflows(deps: {
           excludeBuiltin: true,
           cursor,
         });
-        skills.push(...rowList(page, "skills"));
+        skills.push(...webuiPluginRows(page, "skills"));
         const nextCursor =
           page && typeof page === "object" && typeof (page as Record<string, unknown>).nextCursor === "string"
             ? ((page as Record<string, unknown>).nextCursor as string)
@@ -345,17 +350,17 @@ export function createWebuiPluginWorkflows(deps: {
       return { rows: skills, skillTotal: null };
     }
     if (area === "apps") {
-      return { rows: rowList(await call("listApps"), "miniApps") };
+      return { rows: webuiPluginRows(await call("listApps"), "miniApps") };
     }
     if (area === "mcp") {
-      return { rows: rowList(await call("listMcpServers", { keyword: query || undefined }), "servers") };
+      return { rows: webuiPluginRows(await call("listMcpServers", { keyword: query || undefined }), "servers") };
     }
     const result = await call("listAgents", {
       limit: 100,
       search: query || undefined,
       include: "identity,persona,system_prompt",
     });
-    const base = rowList(result, "agents");
+    const base = webuiPluginRows(result, "agents");
     const rows = await Promise.all(
       base.map(async (item) => {
         if (!rowValue(item, "avatar")) return item;
@@ -379,7 +384,10 @@ export function createWebuiPluginWorkflows(deps: {
    * below are explicit intents; this is the shared implementation, not the
    * interface.
    */
-  const mutate = async (action: string, input: Record<string, unknown>): Promise<unknown> => {
+  const mutate = async <K extends WebuiPluginManagementAction>(
+    action: K,
+    input: WebuiPluginActionInputs[K],
+  ): Promise<unknown> => {
     set((current) => {
       const next: WebuiPluginWorkflowsState = { ...current, mutating: true };
       if (next.mutationError !== undefined) delete (next as { mutationError?: string }).mutationError;

@@ -35,7 +35,7 @@ const union = [...unionSrc.matchAll(/^\s*\|\s*"(\w+)"/gmu)].map((m) => m[1]!);
 const serverSrc = read(new URL("server/operation/plugin-management.ts", SRC));
 const serverActions = [...serverSrc.matchAll(/^\s*"(\w+)",?$/gmu)].map((m) => m[1]!);
 
-const workflowSrc = read(new URL("application/plugins/plugin-workflows.ts", CLIENT));
+const workflowSrc = read(new URL("features/plugins/application/plugin-workflows.ts", CLIENT));
 
 const sorted = (values: readonly string[]): string[] => [...values].sort();
 
@@ -58,7 +58,7 @@ describe("the inventory is the population the carve covers", () => {
     // catalogue under `plugins`). The point of this case is that neither member's COUNT is the
     // size of the business — 2 members, 29 actions — so a carve driven by the member list
     // under-scopes by an order of magnitude (§15.3).
-    const port = read(new URL("contracts/plugins/plugin-port.ts", CLIENT));
+    const port = read(new URL("features/plugins/contracts/plugin-port.ts", CLIENT));
     const members = [...port.matchAll(/^  readonly (\w+)\??:/gmu)].map((m) => m[1]!);
     expect(members).toEqual(["pluginManagement", "listSkills"]);
     expect(members).toHaveLength(2);
@@ -81,16 +81,20 @@ describe("each action's business is the one the inventory records", () => {
     expect(sorted(callerless)).toEqual(["listRuntimeSkills"]);
   });
 
-  it("is reached from no client module outside the plugin business, bar the declared reader", () => {
+  it("is reached from no client module outside the plugin business", () => {
     // The allowance is per module and each entry states its reason; a new module reaching this port
-    // fails the case rather than passing a count.
+    // fails the case rather than passing a count. The composer is NOT on it any more: it used to be
+    // the declared reader of `listInstalledPlugins`, dispatching that wire verb from its own effect.
+    // It now asks the composer catalogue for installed plugins (T08), so it no longer touches the
+    // port at all — the next case says so.
     const allowed = [
-      "application/plugins/plugin-workflows.ts", // the owner
+      "features/plugins/application/plugin-workflows.ts", // the owner
+      "features/plugins/application/composer-catalogue.ts", // the composer-facing read model
+      "features/plugins/contracts/plugin-actions.ts", // the typed action adapter
       "application/port-slices.ts", // the slice's cut
-      "contracts/plugins/plugin-port.ts", // the declaration
+      "features/plugins/contracts/plugin-port.ts", // the declaration
       "infrastructure/transport.ts", // the wire
       "components/shell/WebuiClientFoundationApp.tsx", // the composition root that builds the slice
-      "components/composer/WebuiComposer.tsx", // the declared reader of `listInstalledPlugins` (§4.2, §4.8)
     ];
     const reach = [..."application contracts infrastructure components bindings projection".split(" ")]
       .flatMap((layer) => {
@@ -105,9 +109,15 @@ describe("each action's business is the one the inventory records", () => {
     }
   });
 
-  it("keeps the composer's read of listInstalledPlugins as the inventory declares it", () => {
+  it("keeps the composer's read of installed plugins, but through the read model", () => {
+    // The composer still gets exactly what §4.2/§4.8 promised it — the installed
+    // plugins for the `@` menu — but it no longer names a wire verb to get them.
+    // Naming one is the defect this ticket removed, so both halves are asserted:
+    // the menu is still wired, and the verb is gone from the composer.
     const composer = read(new URL("components/composer/WebuiComposer.tsx", CLIENT));
-    expect(composer).toContain("listInstalledPlugins");
+    expect(composer).toContain("pluginCatalogue");
+    expect(composer).not.toMatch(/listInstalledPlugins/u);
+    expect(composer).not.toMatch(/pluginManagement\s*[({]/u);
   });
 });
 
@@ -133,3 +143,164 @@ function readSafe(path: string): string {
     return "";
   }
 }
+
+// T08 acceptance 6: the three authoritative action populations, and the typed
+// adapter that consumed them, proved to agree exhaustively and without
+// duplicates. The ticket counts them as three; the adapter is the fourth witness
+// added here, because a fourth carrier that disagreed would be the defect this
+// ticket exists to remove.
+describe("the action populations are exhaustive and non-duplicated", () => {
+  /** The server's accepted-action set, parsed on its own, not merged with the shapes. */
+  const acceptedActions = [...serverSrc.matchAll(/^\s{2}"(\w+)",$/gmu)].map((m) => m[1]!);
+  /** The server's per-action input shapes, parsed on their own. */
+  const inputShapeKeys = [
+    ...serverSrc
+      .slice(serverSrc.indexOf("const INPUT_SHAPES"))
+      .matchAll(/^\s{4}(\w+):\s*\{/gmu),
+  ].map((m) => m[1]!);
+  /** The adapter's typed input map — one entry per action, the new carrier. */
+  const adapterKeys = [
+    ...read(new URL("features/plugins/contracts/plugin-actions.ts", CLIENT)).matchAll(
+      /^ {2}(\w+):\s*(?:undefined|\{)/gmu,
+    ),
+  ].map((m) => m[1]!);
+
+  it("names the same 29 in every carrier, with no duplicates in any of them", () => {
+    for (const [name, population] of [
+      ["the shared union", union],
+      ["the accepted-action set", acceptedActions],
+      ["the input-shape map", inputShapeKeys],
+      ["the typed adapter", adapterKeys],
+    ] as const) {
+      expect(population, `${name} size`).toHaveLength(29);
+      // A duplicate would make the count pass while covering fewer actions, and
+      // a missing one would hide behind a name the other carriers still have.
+      expect(new Set(population).size, `${name} has duplicates`).toBe(29);
+      expect(sorted(population), `${name} disagrees with the inventory`).toEqual(
+        sorted(actions),
+      );
+    }
+  });
+
+  it("keeps the adapter's only-cast claim honest: one widening cast, on the input", () => {
+    // The adapter is allowed exactly one cast, and it is the input widening on
+    // the open wire envelope — never on the action name. A cast on the action
+    // would reinstate the defect this file exists to catch.
+    const adapterSrc = read(new URL("features/plugins/contracts/plugin-actions.ts", CLIENT));
+    const casts = [...adapterSrc.matchAll(/\bas\s+[A-Za-z<>[\]\s{},;"'|.]+\bnever\b/gmu)];
+    expect(casts.map((m) => m[0])).toEqual([]);
+    expect(adapterSrc).not.toMatch(/action\s+as\b/u);
+    expect(adapterSrc).toContain("K extends WebuiPluginManagementAction");
+  });
+
+  it("dispatches from the owner through a typed call, not a bare string", () => {
+    // `call` and `mutate` keep their literal call sites — the inventory case
+    // above reads them — but the helper itself is constrained to the union, so a
+    // misspelled action cannot compile.
+    expect(workflowSrc).toMatch(
+      /const call = <K extends WebuiPluginManagementAction>\(/u,
+    );
+    expect(workflowSrc).toMatch(
+      /const mutate = async <K extends WebuiPluginManagementAction>\(/u,
+    );
+    expect(workflowSrc).not.toMatch(/action as never/u);
+  });
+});
+
+describe("the typed adapter's inputs are the validator's inputs, field for field", () => {
+  /**
+   * Brace-counted readers, not a regex over the whole file: an action's shape
+   * spans several lines and contains nested `{}`, so a lazy match across the
+   * block silently pairs one action's name with the next action's fields. That
+   * failure mode was hit while writing this and produced seven phantom
+   * mismatches, which is why the fields are read by walking the braces.
+   */
+  const adapterSrc = read(new URL("features/plugins/contracts/plugin-actions.ts", CLIENT));
+
+  /** The `{ actionName: { … } }` entries of one source block, by brace counting. */
+  function entriesOf(text: string, indent: number): Record<string, string> {
+    const out: Record<string, string> = {};
+    const re = new RegExp(`^ {${indent}}(\\w+):\\s*\\{`, "gmu");
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(text)) !== null) {
+      const open = text.indexOf("{", match.index);
+      let depth = 0;
+      let index = open;
+      for (; index < text.length; index += 1) {
+        if (text[index] === "{") depth += 1;
+        else if (text[index] === "}") {
+          depth -= 1;
+          if (depth === 0) break;
+        }
+      }
+      out[match[1]!] = text.slice(open + 1, index);
+      re.lastIndex = index + 1;
+    }
+    return out;
+  }
+
+  const queryFieldsBlock = serverSrc.slice(
+    serverSrc.indexOf("const queryFields"),
+    serverSrc.indexOf("const INPUT_SHAPES"),
+  );
+  const queryFields = [...queryFieldsBlock.matchAll(/^\s{2}(\w+):\s*"(\w+)",$/gmu)].map(
+    (m) => [m[1]!, m[2]!] as const,
+  );
+
+  const shapeBlock = serverSrc.slice(
+    serverSrc.indexOf("const INPUT_SHAPES"),
+    serverSrc.indexOf("function matchesField"),
+  );
+  const validatorFields: Record<string, string[]> = {};
+  for (const [action, body] of Object.entries(entriesOf(shapeBlock, 4))) {
+    const fields = new Set<string>();
+    // `optional: queryFields` is a shorthand for the three paging fields, and a
+    // reader that missed it would report a false mismatch on three actions.
+    if (/optional:\s*queryFields/u.test(body)) for (const [key] of queryFields) fields.add(key);
+    for (const group of body.matchAll(/(required|optional):\s*\{([\s\S]*?)\}/gu)) {
+      for (const field of group[2]!.matchAll(/(\w+):\s*"(\w+)"/gu)) fields.add(field[1]!);
+      if (group[2]!.includes("...queryFields")) for (const [key] of queryFields) fields.add(key);
+    }
+    validatorFields[action] = [...fields];
+  }
+
+  const typedBlock = adapterSrc.slice(
+    adapterSrc.indexOf("export interface WebuiPluginActionInputs"),
+    adapterSrc.indexOf("export type WebuiPluginActionInput"),
+  );
+  const typedFields: Record<string, string[]> = {};
+  const re = /^ {2}(\w+):\s*(undefined|\{)/gmu;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(typedBlock)) !== null) {
+    if (match[2] === "undefined") {
+      typedFields[match[1]!] = [];
+      continue;
+    }
+    const open = typedBlock.indexOf("{", re.lastIndex - 1);
+    let depth = 0;
+    let index = open;
+    for (; index < typedBlock.length; index += 1) {
+      if (typedBlock[index] === "{") depth += 1;
+      else if (typedBlock[index] === "}") {
+        depth -= 1;
+        if (depth === 0) break;
+      }
+    }
+    // Not anchored to a line start: several actions declare their fields on one
+    // line, and anchoring there silently reported them as absent.
+    typedFields[match[1]!] = [
+      ...new Set([...typedBlock.slice(open + 1, index).matchAll(/readonly (\w+)\??:/gu)].map((m) => m[1]!)),
+    ];
+    re.lastIndex = index + 1;
+  }
+
+  it("names exactly the fields the validator accepts, for all 29 actions", () => {
+    expect(Object.keys(validatorFields)).toHaveLength(29);
+    expect(Object.keys(typedFields)).toHaveLength(29);
+    for (const action of Object.keys(validatorFields)) {
+      expect(sorted(typedFields[action] ?? []), `${action} fields`).toEqual(
+        sorted(validatorFields[action]!),
+      );
+    }
+  });
+});

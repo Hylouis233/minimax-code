@@ -1,0 +1,106 @@
+// The agent form unit (T08; produced target `plugin-catalogue-form-cuts`).
+//
+// Its four draft fields used to be four `useState` calls in `PluginCatalogue`,
+// seeded by `beginAgent` there and handed to the dialog as values and setters.
+// The draft now belongs to the form; what leaves it is one typed intent.
+
+import { useState, type ReactElement } from "react";
+
+import {
+  readWebuiPluginRow as read,
+  type WebuiPluginRow as Row,
+} from "../contracts/plugin-rows.js";
+import type { WebuiPluginIntent } from "../contracts/plugin-actions.js";
+
+export interface AgentFormProps {
+  readonly editing: Row | undefined;
+  readonly onSubmit: (intent: WebuiPluginIntent) => Promise<boolean>;
+  /** Present only when the runtime exposes agent chat. */
+  readonly onChatWithAgent?: (name: string) => Promise<void>;
+  readonly onClose: () => void;
+}
+
+export function AgentForm({
+  editing,
+  onSubmit,
+  onChatWithAgent,
+  onClose,
+}: AgentFormProps): ReactElement {
+  const [name, setName] = useState(
+    read(editing ?? {}, "name", "displayName", "display_name"),
+  );
+  const [description, setDescription] = useState(read(editing ?? {}, "description"));
+  const [prompt, setPrompt] = useState(read(editing ?? {}, "systemPrompt", "system_prompt"));
+  const [model, setModel] = useState(read(editing ?? {}, "model"));
+
+  const save = async () => {
+    const trimmed = name.trim();
+    await onSubmit(
+      editing
+        ? {
+            kind: "updateAgent",
+            // The agent's name is its identity on the server, so an update
+            // addresses the stored name. Editing the field does not rename it —
+            // a rename is a different intent, and silently folding it into the
+            // update would target whichever agent matched the new name.
+            name: read(editing, "name", "pluginName", "plugin_name", "pluginId", "displayName", "display_name"),
+            displayName: trimmed,
+            description: description.trim(),
+            systemPrompt: prompt,
+          }
+        : {
+            kind: "createAgent",
+            name: trimmed,
+            displayName: trimmed,
+            description: description.trim(),
+            systemPrompt: prompt,
+            // The chosen model travels in the definition, not in the agent's
+            // own fields — an edit never carries one, so this is create-only.
+            initialDefinition: {
+              name: trimmed,
+              description: description.trim(),
+              systemPrompt: prompt,
+              ...(model.trim() ? { model: model.trim() } : {}),
+            },
+          },
+    );
+  };
+
+  return (
+    <div className="webui-agent-form">
+      <label>
+        <span>名称</span>
+        <input value={name} onChange={(event) => setName(event.currentTarget.value)} />
+      </label>
+      <label>
+        <span>描述</span>
+        <input value={description} onChange={(event) => setDescription(event.currentTarget.value)} />
+      </label>
+      <label>
+        <span>系统提示词</span>
+        <textarea value={prompt} onChange={(event) => setPrompt(event.currentTarget.value)} />
+      </label>
+      {/* The model belongs to the initial definition, which only a new agent
+          sends; an edit updates the agent's fields and leaves it alone. */}
+      {editing ? null : (
+        <label>
+          <span>模型</span>
+          <input value={model} onChange={(event) => setModel(event.currentTarget.value)} />
+        </label>
+      )}
+      <div className="webui-agent-form-actions">
+        {editing && onChatWithAgent ? (
+          <button type="button" onClick={() => void onChatWithAgent(name)}>
+            对话
+          </button>
+        ) : null}
+        <button type="button" onClick={onClose}>
+          取消
+        </button>
+        <button type="button" onClick={() => void save()}>
+          保存
+        </button>
+      </div>
+    </div>
+  );
+}

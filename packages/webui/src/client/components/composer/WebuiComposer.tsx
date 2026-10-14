@@ -31,6 +31,10 @@ import type { WebuiModelSelectionRequest } from "../../contracts/models/model-vi
 import type { WebuiClientSessionCreator } from "../../contracts/sessions/session-port.js";
 import type { WebuiClientSessionPage, WebuiClientSession } from "../../contracts/sessions/session-view.js";
 import type { WebuiTransport } from "../../contracts/transport.js";
+import type {
+  WebuiComposerPluginCatalogue,
+  WebuiComposerPluginSummary,
+} from "../../features/plugins/application/composer-catalogue.js";
 import { projectWebuiMessageToStreamMessage, readUsageNumber } from "../../features/transcript/projection/message-projection.js";
 import {
   createWebuiInteractionCoordinator,
@@ -194,12 +198,6 @@ const WEBUI_SLASH_FALLBACK_SECTIONED: SlashCommandEntry[] = await (async () => {
 // Desktop keeps the viewport pinned through the short hand-off window where
 // the live turn is replaced by the refreshed historical transcript.
 
-interface ComposerCatalogEntry {
-  readonly name: string;
-  readonly displayName: string;
-  readonly description?: string;
-}
-
 type ComposerMentionChoice =
   | { readonly kind: "plugin"; readonly name: string; readonly label: string; readonly detail?: string; readonly section: string }
   | { readonly kind: "file"; readonly path: string; readonly label: string; readonly section: string }
@@ -264,14 +262,6 @@ function readPermissionMode(value: unknown): WebuiComposerPermissionMode | undef
   return mode === "default" || mode === "auto" || mode === "bypassPermissions"
     ? mode
     : undefined;
-}
-
-function composerRows(value: unknown): readonly Record<string, unknown>[] {
-  if (Array.isArray(value)) return value.filter((item): item is Record<string, unknown> => !!item && typeof item === "object");
-  if (!value || typeof value !== "object") return [];
-  const row = value as Record<string, unknown>;
-  const items = Array.isArray(row.plugins) ? row.plugins : Array.isArray(row.items) ? row.items : [];
-  return items.filter((item): item is Record<string, unknown> => !!item && typeof item === "object");
 }
 
 function flattenWorkspaceFiles(files: readonly WebuiWorkspaceFile[]): readonly { readonly path: string; readonly name: string; readonly type?: string }[] {
@@ -339,7 +329,6 @@ export function WebuiComposer({
   listQueueMessages,
   deleteQueueItem,
   listModels,
-  listSkills,
   selectModel,
   getAccountStatus,
   draft,
@@ -352,7 +341,7 @@ export function WebuiComposer({
   teamModeOff,
   listWorkspaceFileTree,
   browseWorkspaceDirs,
-  pluginManagement,
+  pluginCatalogue,
   getPermissionMode,
   setPermissionMode,
   sessions = [],
@@ -389,7 +378,6 @@ export function WebuiComposer({
   readonly listQueueMessages?: (request: { readonly id: string }) => Promise<{ readonly items?: readonly WebuiQueueItem[]; readonly paused?: boolean; readonly pendingCount?: number }>;
   readonly deleteQueueItem?: (request: { readonly id: string; readonly itemId: string }) => Promise<{ readonly item?: WebuiQueueItem }>;
   readonly listModels?: (request?: { readonly sessionId?: string }) => Promise<readonly WebuiModelEntry[]>;
-  readonly listSkills?: (request?: { readonly agentName?: string }) => Promise<{ readonly skills: readonly { readonly name: string; readonly displayName?: string; readonly description?: string }[] }>;
   readonly selectModel?: (request: WebuiModelSelectionRequest) => Promise<{ readonly success?: boolean }>;
   readonly getAccountStatus?: (request?: { readonly sessionId?: string }) => Promise<Record<string, unknown>>;
   /** The draft lives on the shell so it survives silent first-session creation. */
@@ -429,7 +417,13 @@ export function WebuiComposer({
   };
   readonly listWorkspaceFileTree?: WebuiTransport["listWorkspaceFileTree"];
   readonly browseWorkspaceDirs?: WebuiTransport["browseWorkspaceDirs"];
-  readonly pluginManagement?: WebuiTransport["pluginManagement"];
+  /**
+   * What is installed, and what the agent can run, answered by the plugins
+   * business (T08). The composer used to hold `pluginManagement` and
+   *   `listSkills` itself and dispatch a raw wire verb from an effect; it
+   *   now asks a question and receives rows it already recognises.
+   */
+  readonly pluginCatalogue?: WebuiComposerPluginCatalogue;
   readonly getPermissionMode?: WebuiTransport["getPermissionMode"];
   readonly setPermissionMode?: WebuiTransport["setPermissionMode"];
   readonly sessions?: readonly WebuiClientSession[];
@@ -584,7 +578,7 @@ export function WebuiComposer({
     [composerStore],
   );
   const [composerMenu, setComposerMenu] = useState<"root" | "skills" | "plugins">();
-  const [installedPlugins, setInstalledPlugins] = useState<readonly ComposerCatalogEntry[]>([]);
+  const [installedPlugins, setInstalledPlugins] = useState<readonly WebuiComposerPluginSummary[]>([]);
   const [pluginsLoading, setPluginsLoading] = useState(false);
   const [pluginsError, setPluginsError] = useState<string>();
   const [skillsMenuLoading, setSkillsMenuLoading] = useState(false);
@@ -776,59 +770,42 @@ export function WebuiComposer({
 
   useEffect(() => {
     if (composerMenu !== "plugins" && !mentionRange) return;
-    if (!pluginManagement) {
+    if (!pluginCatalogue?.available) {
       setInstalledPlugins([]);
       return;
     }
     let cancelled = false;
     setPluginsLoading(true);
     setPluginsError(undefined);
-    pluginManagement({ action: "listInstalledPlugins", input: { limit: 200 } })
-      .then((result) => {
-        if (cancelled) return;
-        setInstalledPlugins(composerRows(result).map((row) => {
-          const name = typeof row.name === "string" ? row.name : typeof row.pluginName === "string" ? row.pluginName : "";
-          const displayName = typeof row.displayName === "string" ? row.displayName : name;
-          return { name, displayName, ...(typeof row.description === "string" ? { description: row.description } : {}) };
-        }).filter((plugin) => plugin.name));
-      })
+    // The rows are already the shape this menu renders, so there is no local
+    // copy of the runtime's naming rules here any more (T08).
+    pluginCatalogue.installedPlugins()
+      .then((plugins) => { if (!cancelled) setInstalledPlugins(plugins); })
       .catch((error: unknown) => {
         if (!cancelled) setPluginsError(error instanceof Error ? error.message : String(error));
       })
       .finally(() => { if (!cancelled) setPluginsLoading(false); });
     return () => { cancelled = true; };
-  }, [composerMenu, mentionRange !== undefined, pluginManagement]);
+  }, [composerMenu, mentionRange !== undefined, pluginCatalogue]);
 
   // The skills submenu and the slash palette render the same pool, so they read
-  // it through one loader. A second reader joins the request the first one
-  // started instead of fetching again and replacing the pool underneath it.
+  // it through one loader. The request cache is the catalogue's, keyed by agent,
+  // rather than a ref in this component: a second reader joins the request the
+  // first one started instead of replacing the pool underneath it, and the
+  // composer no longer owns that lifetime (T08).
   const [slashSkills, setSlashSkills] = useState<readonly WebuiSlashSkillSummary[]>(
     [],
   );
-  const slashSkillsRequestRef = useRef<
-    | {
-        readonly key: string;
-        readonly promise: Promise<readonly WebuiSlashSkillSummary[]>;
-      }
-    | undefined
-  >(undefined);
   const readSlashSkills = useCallback((): Promise<
     readonly WebuiSlashSkillSummary[]
   > => {
-    if (!listSkills) return Promise.reject(new Error("技能目录暂不可用"));
-    const key = agentName ?? "";
-    if (slashSkillsRequestRef.current?.key !== key) {
-      slashSkillsRequestRef.current = {
-        key,
-        promise: listSkills({ agentName }).then((result) => result.skills),
-      };
-    }
-    return slashSkillsRequestRef.current.promise;
-  }, [listSkills, agentName]);
+    if (!pluginCatalogue) return Promise.reject(new Error("技能目录暂不可用"));
+    return pluginCatalogue.runtimeSkills(agentName);
+  }, [pluginCatalogue, agentName]);
 
   useEffect(() => {
     if (composerMenu !== "skills") return;
-    if (!listSkills) {
+    if (!pluginCatalogue) {
       setSkillsMenuError("技能目录暂不可用");
       return;
     }
@@ -840,7 +817,7 @@ export function WebuiComposer({
       .catch((error: unknown) => { if (!cancelled) setSkillsMenuError(error instanceof Error ? error.message : String(error)); })
       .finally(() => { if (!cancelled) setSkillsMenuLoading(false); });
     return () => { cancelled = true; };
-  }, [composerMenu, listSkills, readSlashSkills]);
+  }, [composerMenu, pluginCatalogue, readSlashSkills]);
 
   useEffect(() => {
     if (!mentionRange || !workspaceDir || !listWorkspaceFileTree) {
@@ -1045,14 +1022,14 @@ export function WebuiComposer({
   // trims to "/name" and matches again.
   const commandRange = findWebuiSlashRange(draft, composerCaret);
   const commandQuery = commandRange?.query ?? "";
-  // Pull a fresh skill pool from the harness when `listSkills` is wired up.
+  // Pull a fresh skill pool from the harness when the catalogue is wired up.
   // The fallback (fixtures resolved at module init) keeps the popover
   // functional even if the RPC is unavailable or rejects; once the live
   // registry returns, fetched entries replace the fixtures in the sectioning
   // pass.
   const slashSkillsLoadedRef = useRef(false);
   useEffect(() => {
-    if (!listSkills) return;
+    if (!pluginCatalogue) return;
     if (slashSkillsLoadedRef.current) return;
     let cancelled = false;
     slashSkillsLoadedRef.current = true;
@@ -1072,7 +1049,7 @@ export function WebuiComposer({
     return () => {
       cancelled = true;
     };
-  }, [listSkills, readSlashSkills]);
+  }, [pluginCatalogue, readSlashSkills]);
   const slashSectioned = slashSkills.length
     ? sectionWebuiSlashPalette(
         WEBUI_BUILTIN_COMMANDS,
@@ -2108,7 +2085,7 @@ export function WebuiComposer({
               </div>
             ) : composerMenu === "plugins" ? (
               <div className="webui-composer-menu" role="menu" aria-label="插件" data-webui-composer-menu="plugins" data-webui-composer-submenu="plugins">
-                {pluginsLoading ? <div className="webui-composer-menu-empty">正在加载插件…</div> : pluginsError ? <div className="webui-composer-menu-empty" role="alert">{pluginsError}</div> : installedPlugins.length ? installedPlugins.map((plugin) => <button key={plugin.name} type="button" role="menuitem" title={plugin.description} onClick={() => { setComposerMenu(undefined); insertAtCaret(`@${plugin.name}`); textareaRef.current?.focus(); }}>{plugin.displayName}</button>) : <div className="webui-composer-menu-empty">{pluginManagement ? "没有已安装的插件" : "插件目录暂不可用"}</div>}
+                {pluginsLoading ? <div className="webui-composer-menu-empty">正在加载插件…</div> : pluginsError ? <div className="webui-composer-menu-empty" role="alert">{pluginsError}</div> : installedPlugins.length ? installedPlugins.map((plugin) => <button key={plugin.name} type="button" role="menuitem" title={plugin.description} onClick={() => { setComposerMenu(undefined); insertAtCaret(`@${plugin.name}`); textareaRef.current?.focus(); }}>{plugin.displayName}</button>) : <div className="webui-composer-menu-empty">{pluginCatalogue?.available ? "没有已安装的插件" : "插件目录暂不可用"}</div>}
                 <div role="separator" />
                 <button type="button" role="menuitem" onClick={() => { setComposerMenu(undefined); onOpenPluginManagement?.("plugins"); }}>添加插件</button>
               </div>

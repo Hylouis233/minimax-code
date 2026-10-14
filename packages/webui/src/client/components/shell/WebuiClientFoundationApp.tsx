@@ -56,7 +56,7 @@ import {
   type WebuiShellSurfaceCommand,
 } from "../../projection/shell/shell-surface.js";
 import { ConversationUsageBanner } from "../../features/account/ui/ConversationUsageBanner.js";
-import { PluginCatalogue } from "../plugins/PluginCatalogue.js";
+import { PluginCatalogue } from "../../features/plugins/ui/PluginCatalogue.js";
 import { WebuiComposer } from "../composer/WebuiComposer.js";
 import { WebuiSessionTranscript } from "../../features/transcript/ui/SessionTranscript.js";
 import {
@@ -121,7 +121,9 @@ import { createWebuiWorkspaceQueries } from "../../features/workspace/applicatio
 import { createWebuiAccountWorkflows } from "../../features/account/application/account-workflows.js";
 import { createWebuiModelsWorkflows } from "../../application/models/models-workflows.js";
 import { createWebuiSettingsWorkflows } from "../../application/settings/settings-workflows.js";
-import { createWebuiPluginWorkflows } from "../../application/plugins/plugin-workflows.js";
+import { createWebuiPluginWorkflows } from "../../features/plugins/application/plugin-workflows.js";
+import { createWebuiComposerPluginCatalogue } from "../../features/plugins/application/composer-catalogue.js";
+import { createWebuiPluginActions } from "../../features/plugins/contracts/plugin-actions.js";
 import { webuiActiveTurnProbeFor } from "../../application/turn/active-turn-probe.js";
 import { startWebuiSessionTransferDownload } from "../../infrastructure/session-transfer-download.js";
 import { importWebuiSessionFile } from "../../infrastructure/session-import.js";
@@ -403,6 +405,18 @@ export function WebuiClientFoundationApp(
   }, [runtimeVersion, settingsWorkflows]);
   const pluginWorkflows = useMemo(
     () => createWebuiPluginWorkflows({ port: pluginsPort }),
+    [pluginsPort],
+  );
+  // The composer's view of what is installed and what the agent can run. It is a
+  // separate read model from `pluginWorkflows` on purpose: the `@` menu and the
+  // plugin manager are two readers with two identities, so neither overwrites the
+  // other when one of them reloads (T08).
+  const composerPluginCatalogue = useMemo(
+    () =>
+      createWebuiComposerPluginCatalogue({
+        actions: createWebuiPluginActions(pluginsPort),
+        ...(pluginsPort.listSkills ? { listSkills: pluginsPort.listSkills } : {}),
+      }),
     [pluginsPort],
   );
   // The usage quota is an `AccountPort` method, so it is read through the
@@ -1503,8 +1517,7 @@ export function WebuiClientFoundationApp(
                     deleteQueueItem={composerPort.deleteQueueItem}
                     listModels={modelsPort.listModels}
                     selectModel={modelsPort.selectModel}
-                    listSkills={pluginsPort.listSkills}
-                    pluginManagement={pluginsPort.pluginManagement}
+                    pluginCatalogue={composerPluginCatalogue}
                     listWorkspaceFileTree={workspacePort.listWorkspaceFileTree}
                     browseWorkspaceDirs={workspacePort.browseWorkspaceDirs}
                     getPermissionMode={settingsPort.getPermissionMode}

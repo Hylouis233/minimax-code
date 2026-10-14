@@ -8,7 +8,7 @@
 // The text below is the declaration as it stood in the source module — no
 // behaviour change.
 
-import { readWebuiPluginRow as read, type WebuiPluginRow as Row } from "../../contracts/plugins/plugin-rows.js";
+import { readWebuiPluginRow as read, type WebuiPluginRow as Row } from "../contracts/plugin-rows.js";
 
 /**
  * One MCP server's connection state, as the row shows it.

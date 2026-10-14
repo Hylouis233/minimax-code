@@ -25,7 +25,7 @@ import type { SettingsPort } from "./settings/settings-port.js";
 import type { ModelsPort } from "./models/provider-port.js";
 import type { TranscriptPort } from "../features/transcript/contracts/session-read-port.js";
 import type { AccountPort } from "../features/account/contracts/account-port.js";
-import type { PluginPort } from "./plugins/plugin-port.js";
+import type { PluginPort } from "../features/plugins/contracts/plugin-port.js";
 import type { TerminalPort } from "../features/terminal/contracts/terminal-port.js";
 
 export interface WebuiTransport
