@@ -28,21 +28,25 @@
 // This module is framework-free — no React, no DOM, no storage — so it can be
 // unit-tested against a scripted port.
 
-import type { WorkspacePort } from "../../contracts/workspace/workspace-port.js";
+import type { WorkspacePort } from "../../../contracts/workspace/workspace-port.js";
 import type {
   WebuiWorkspaceEnvironment,
   WebuiWorkspaceFile,
   WebuiWorkspaceFileContent,
   WebuiWorkspaceGitMutationRequest,
-} from "../../../shared/contracts/workspace.js";
-import { mergeWorkspaceFileChildren } from "../../projection/workspace/workspace-file-tree.js";
-import { createWebuiWorkspaceReviewOwner } from "../../features/review/application/workspace-review-owner.js";
-import { initialWebuiWorkspaceReviewState } from "../../features/review/contracts/workspace-review.js";
+} from "../../../../shared/contracts/workspace.js";
+import { mergeWorkspaceFileChildren } from "../../../projection/workspace/workspace-file-tree.js";
+import { createWebuiWorkspaceReviewOwner } from "../../review/application/workspace-review-owner.js";
+import {
+  createWebuiWorkspaceEnvironmentOwner,
+  initialWebuiWorkspaceEnvironmentState,
+} from "./workspace-environment-owner.js";
+import { initialWebuiWorkspaceReviewState } from "../../review/contracts/workspace-review.js";
 import type {
   WebuiWorkspaceReviewDiffState,
   WebuiWorkspaceReviewSearchState,
   WebuiWorkspaceReviewSummaryState,
-} from "../../features/review/contracts/workspace-review.js";
+} from "../../review/contracts/workspace-review.js";
 
 /** The transport methods this owner drives. Absent means "not wired". */
 export type WebuiWorkspaceQueryPort = Pick<
@@ -95,12 +99,13 @@ export interface WebuiWorkspaceEnvironmentState {
 export interface WebuiWorkspaceQueriesState {
   /** The review owner's revision, re-exposed for the views that reload on it. */
   readonly reviewRevision: number;
+  readonly fileTree: WebuiWorkspaceFileTreeState;
+  /** The environment owner's slice, merged in on read (T11). */
+  readonly environment: WebuiWorkspaceEnvironmentState;
   /** Bumps when the environment query for the active workspace is invalidated. */
   readonly environmentRevision: number;
-  readonly fileTree: WebuiWorkspaceFileTreeState;
   /** File read results, keyed by the caller's tab id. */
   readonly files: ReadonlyMap<string, WebuiWorkspaceFileContentState>;
-  readonly environment: WebuiWorkspaceEnvironmentState;
   readonly reviewSummary: WebuiWorkspaceReviewSummaryState;
   readonly reviewDiffs: WebuiWorkspaceReviewDiffState;
   readonly reviewSearch: WebuiWorkspaceReviewSearchState;
@@ -114,20 +119,20 @@ export const initialWebuiWorkspaceFileTreeState: WebuiWorkspaceFileTreeState = {
   directoryErrors: {},
 };
 
-export const initialWebuiWorkspaceEnvironmentState: WebuiWorkspaceEnvironmentState =
-  { loading: false };
-
 /** The slice this module owns; the review slice is merged in from its owner. */
 type WebuiWorkspaceLocalState = Omit<
   WebuiWorkspaceQueriesState,
-  "reviewRevision" | "reviewSummary" | "reviewDiffs" | "reviewSearch"
+  | "reviewRevision"
+  | "reviewSummary"
+  | "reviewDiffs"
+  | "reviewSearch"
+  | "environment"
+  | "environmentRevision"
 >;
 
 export const initialWebuiWorkspaceLocalState: WebuiWorkspaceLocalState = {
-  environmentRevision: 0,
   fileTree: initialWebuiWorkspaceFileTreeState,
   files: new Map(),
-  environment: initialWebuiWorkspaceEnvironmentState,
 };
 
 
@@ -136,6 +141,8 @@ export const initialWebuiWorkspaceLocalState: WebuiWorkspaceLocalState = {
 export const initialWebuiWorkspaceQueriesState: WebuiWorkspaceQueriesState = {
   ...initialWebuiWorkspaceLocalState,
   ...initialWebuiWorkspaceReviewState,
+  environment: initialWebuiWorkspaceEnvironmentState,
+  environmentRevision: 0,
 };
 
 function message(reason: unknown): string {
@@ -248,6 +255,12 @@ export function createWebuiWorkspaceQueries(deps: {
   // keeps T11's slice and forwards the review members, so the panels that read one
   // composed snapshot keep their shape while the review truth has one home.
   const review = createWebuiWorkspaceReviewOwner({ port });
+  // The environment half: its own identity (the workspace directory), its own
+  // invalidation and its own coalescing window (T11).
+  const environment = createWebuiWorkspaceEnvironmentOwner({
+    port,
+    invalidateReview: () => review.invalidate(),
+  });
   const listeners = new Set<() => void>();
   // One monotonic counter per request key: a completion applies only while its
   // version is the live one for that key (ticket #51 "late response discarded").
@@ -266,9 +279,19 @@ export function createWebuiWorkspaceQueries(deps: {
    * a fresh object per call is an infinite render loop, which is exactly what a
    * plain `{ ...state, ...review.read() }` in `getSnapshot` produced.
    */
-  let snapshot: WebuiWorkspaceQueriesState = { ...state, ...review.read() };
+  let snapshot: WebuiWorkspaceQueriesState = {
+    ...state,
+    ...review.read(),
+    environment: environment.state(),
+    environmentRevision: environment.revision(),
+  };
   const compose = (): void => {
-    snapshot = { ...state, ...review.read() };
+    snapshot = {
+      ...state,
+      ...review.read(),
+      environment: environment.state(),
+      environmentRevision: environment.revision(),
+    };
   };
 
   const set = (
@@ -294,7 +317,7 @@ export function createWebuiWorkspaceQueries(deps: {
 
   // The environment reload is coalesced: a burst of git-changed signals for one
   // workspace collapses to one reload, exactly as the panel's 350 ms timer did.
-  let environmentTimer: ReturnType<typeof setTimeout> | undefined;
+
   const selectWorkspace = (workspaceDir: string | undefined): void => {
     set((current) =>
       current.fileTree.workspaceDir === workspaceDir
@@ -473,66 +496,6 @@ export function createWebuiWorkspaceQueries(deps: {
     });
   };
 
-  const loadEnvironment = (workspaceDir: string): void => {
-    const key = `environment:${workspaceDir}`;
-    const version = bump(key);
-    if (!port.getWorkspaceEnvironment) return;
-    const getEnvironment = port.getWorkspaceEnvironment;
-    set((current) =>
-      current.environment.workspaceDir === workspaceDir
-        ? { ...current, environment: { ...current.environment, loading: true } }
-        : { ...current, environment: { workspaceDir, loading: true } },
-    );
-    void getEnvironment({ workspaceDir })
-      .then((environment) => {
-        if (!isCurrent(key, version)) return;
-        set((current) =>
-          current.environment.workspaceDir === workspaceDir
-            ? { ...current, environment: { workspaceDir, environment, loading: false } }
-            : current,
-        );
-      })
-      .catch((reason: unknown) => {
-        if (!isCurrent(key, version)) return;
-        set((current) =>
-          current.environment.workspaceDir === workspaceDir
-            ? { ...current, environment: { workspaceDir, loading: false, error: message(reason) } }
-            : current,
-        );
-      });
-  };
-
-  const invalidateEnvironment = (workspaceDir: string, debounceMs: number): void => {
-    // Bump the revision only: the environment panel's effect performs the one
-    // reload, keyed on the revision, so a coalesced signal is one fetch rather
-    // than a fetch beside the effect's own.
-    const fire = (): void => {
-      set((current) =>
-        current.environment.workspaceDir === workspaceDir
-          ? { ...current, environmentRevision: current.environmentRevision + 1 }
-          : current,
-      );
-    };
-    if (environmentTimer !== undefined) clearTimeout(environmentTimer);
-    if (debounceMs <= 0) {
-      fire();
-      return;
-    }
-    environmentTimer = setTimeout(fire, debounceMs);
-  };
-
-  const mutateGit = async (
-    request: WebuiWorkspaceGitMutationRequest,
-  ): Promise<Record<string, unknown>> => {
-    if (!port.mutateWorkspaceGit) return {};
-    const result = await port.mutateWorkspaceGit(request);
-    // Exactly the views this mutation affects: the git environment and the
-    // review of the workspace it ran in. Nothing else reloads.
-    invalidateEnvironment(request.workspaceDir, 0);
-    review.invalidate();
-    return result;
-  };
-
   const reportDirectoryError = (
     workspaceDir: string,
     path: string,
@@ -567,8 +530,8 @@ export function createWebuiWorkspaceQueries(deps: {
     // Review views for the workspace the signal names, at once.
     review.invalidateForWorkspace(signal);
     // The environment reload is coalesced into the previous 350 ms window.
-    if (matches(state.environment.workspaceDir)) {
-      invalidateEnvironment(state.environment.workspaceDir!, 350);
+    if (matches(environment.state().workspaceDir)) {
+      environment.invalidate(environment.state().workspaceDir!, 350);
     }
   };
 
@@ -582,8 +545,8 @@ export function createWebuiWorkspaceQueries(deps: {
     },
     canListFileTree: port.listWorkspaceFileTree !== undefined,
     canReadFile: port.readWorkspaceFile !== undefined,
-    canReadEnvironment: port.getWorkspaceEnvironment !== undefined,
-    canMutateGit: port.mutateWorkspaceGit !== undefined,
+    canReadEnvironment: environment.canReadEnvironment,
+    canMutateGit: environment.canMutateGit,
     canReview: review.canReview,
     canSearchReviewDiffs: review.canSearchDiffs,
     selectWorkspace,
@@ -597,8 +560,8 @@ export function createWebuiWorkspaceQueries(deps: {
     loadReviewSummary: review.loadSummary,
     loadReviewDiffs: review.loadDiffs,
     searchReviewDiffs: review.search,
-    loadEnvironment,
-    mutateGit,
+    loadEnvironment: environment.load,
+    mutateGit: environment.mutateGit,
     reportDirectoryError,
     invalidateWorkspaceGit,
   };

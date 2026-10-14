@@ -57,7 +57,7 @@ import { WorkspaceCanvas } from "./WorkspaceCanvas.js";
 import type { CanvasOperation } from "./WorkspaceCanvas.js";
 import { WorkspaceArchiveView } from "./WorkspaceArchiveView.js";
 import { WorkspaceHtmlPreview } from "./WorkspaceHtmlPreview.js";
-import { type WebuiWorkspaceQueries } from "../../application/workspace/workspace-queries.js";
+import { type WebuiWorkspaceQueries } from "../../features/workspace/application/workspace-queries.js";
 import {
   WEBUI_WORKSPACE_REVIEW_DIFF_BATCH_SIZE,
   chunkWebuiWorkspaceReviewFileIds,

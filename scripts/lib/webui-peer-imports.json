@@ -70,6 +70,11 @@
       "from": "client/features/account/ui/UserMenu.tsx",
       "to": "client/components/settings/SettingsModal.tsx",
       "reason": "The user menu opens the settings modal. It is an Account surface opening the settings composition; the entry goes when Settings publishes the open command as a public contract (T12)."
+    },
+    {
+      "from": "client/features/workspace/application/workspace-queries.ts",
+      "to": "client/features/review/application/workspace-review-owner.ts",
+      "reason": "The workspace composer composes the review owner: the panels read one snapshot, and the review half is a peer business's owner. T11's acceptance says compose T10's review APIs rather than reimplementing review policy, and the owner factory is what there is to compose; the entry goes when review publishes a composition contract."
     }
   ]
 }

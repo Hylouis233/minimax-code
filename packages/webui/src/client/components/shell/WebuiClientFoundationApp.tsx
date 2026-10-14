@@ -117,7 +117,7 @@ import {
   WebuiSettingsWorkflowsProvider,
   WebuiWorkspaceQueriesProvider,
 } from "../../bindings/use-query-state.js";
-import { createWebuiWorkspaceQueries } from "../../application/workspace/workspace-queries.js";
+import { createWebuiWorkspaceQueries } from "../../features/workspace/application/workspace-queries.js";
 import { createWebuiAccountWorkflows } from "../../features/account/application/account-workflows.js";
 import { createWebuiModelsWorkflows } from "../../application/models/models-workflows.js";
 import { createWebuiSettingsWorkflows } from "../../application/settings/settings-workflows.js";
