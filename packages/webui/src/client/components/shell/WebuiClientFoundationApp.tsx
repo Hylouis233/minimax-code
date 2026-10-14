@@ -1007,24 +1007,28 @@ export function WebuiClientFoundationApp(
   // reach: the channel-accepted signal re-probes the rail (a reconnect can miss
   // a `session.start`), and a workspace-git event invalidates the panel
   // git/review queries through the same coordinator.
-  const [workspaceGitChanged, setWorkspaceGitChanged] =
-    useState<WebuiWorkspaceGitChangedSignal>();
   /**
-   * The shell's two reactions, subscribed rather than installed as a replaceable
-   * set (T05): they run after the application's own routes have run, and they
-   * cannot displace one. Temporary adapters until the workspace business owns
-   * its invalidation (T11) and the reconnect reconciliation (T12).
+   * A `workspace.git.changed` signal invalidates exactly the views it affects: the
+   * owner matches the signal against the review and environment views it currently
+   * holds and refreshes only those, coalescing the environment reload into its
+   * window (ticket #51). The route reaches the owner through this subscription —
+   * no shell state and no revision counter in between (T11); the subscription
+   * exists because the workspace owners are still built by this mount, which the
+   * shell composition (T19) moves.
    */
   useEffect(
     () =>
       application.onWorkspaceGitChanged((payload) =>
-        setWorkspaceGitChanged((previous) => ({
-          revision: (previous?.revision ?? 0) + 1,
-          ...payload,
-        })),
+        workspaceQueries.invalidateWorkspaceGit(payload),
       ),
-    [application],
+    [application, workspaceQueries],
   );
+  /**
+   * The shell's remaining reaction, subscribed rather than installed as a
+   * replaceable set (T05): it runs after the application's own routes have run and
+   * cannot displace one. Temporary adapter until the reconnect reconciliation has
+   * an owner (T12).
+   */
   useEffect(
     () =>
       application.onChannelReady(() => {
@@ -1035,15 +1039,6 @@ export function WebuiClientFoundationApp(
   );
   // The shell never disposes the application: its lifetime belongs to the
   // composition root that built it (plan §4.1).
-
-  // A `workspace.git.changed` signal invalidates exactly the views it affects:
-  // the owner matches the signal against the review and environment views it
-  // currently holds and refreshes only those (ticket #51). No panel owns a
-  // refresh token for this any more.
-  useEffect(() => {
-    if (!workspaceGitChanged) return;
-    workspaceQueries.invalidateWorkspaceGit(workspaceGitChanged);
-  }, [workspaceGitChanged, workspaceQueries]);
 
   // A settled turn mutation (revert / reapply) changed the working tree, so the
   // review views for it are stale. The turn owner announces the settlement and
