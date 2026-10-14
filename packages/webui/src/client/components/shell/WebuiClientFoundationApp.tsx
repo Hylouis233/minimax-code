@@ -1128,7 +1128,11 @@ export function WebuiClientFoundationApp(
   const dispatchWorkspacePanel = useCallback((command: WorkspacePanelCommand) => {
     if (!selectedSessionId) return;
     setWorkspacePanelStates((states) => reduceWorkspacePanelSessionState(states, selectedSessionId, command));
-  }, [selectedSessionId]);
+    // A closed tab has no reader: its file slot goes with it, and any read still
+    // in flight for it can no longer commit (T11). Other tabs' reads are keyed
+    // separately, so this stops nothing else.
+    if (command.type === "close-tab") workspaceQueries.discardFileTab(command.tabId);
+  }, [selectedSessionId, workspaceQueries]);
   const setProgressPanelOpen = (update: boolean | ((open: boolean) => boolean)) => {
     if (!selectedSessionId) return;
     setWorkspacePanelStates((states) => {

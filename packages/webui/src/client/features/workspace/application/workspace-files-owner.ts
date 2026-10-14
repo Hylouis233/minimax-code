@@ -103,6 +103,12 @@ export interface WebuiWorkspaceFilesOwner {
   readonly loadDirectory: (workspaceDir: string, path: string) => Promise<WebuiWorkspaceDirLoad>;
   readonly readFile: (tabId: string, workspaceDir: string, path: string) => void;
   readonly setInlineFile: (tabId: string, content: string, resolvedPath: string) => void;
+  /**
+   * Release one tab: supersede its in-flight read and drop the content it held.
+   * A closed tab has no reader left, so neither a late answer nor the bytes it
+   * already carries belong to anything (T11; plan §4.5).
+   */
+  readonly discardTab: (tabId: string) => void;
   readonly reportDirectoryError: (workspaceDir: string, path: string, error: string) => void;
   readonly dispose: () => void;
 }
@@ -323,6 +329,16 @@ export function createWebuiWorkspaceFilesOwner(deps: {
     });
   };
 
+  const discardTab = (tabId: string): void => {
+    bump(`file:${tabId}`);
+    set((current) => {
+      if (!current.files.has(tabId)) return current;
+      const files = new Map(current.files);
+      files.delete(tabId);
+      return { ...current, files };
+    });
+  };
+
   const reportDirectoryError = (
     workspaceDir: string,
     path: string,
@@ -356,6 +372,7 @@ export function createWebuiWorkspaceFilesOwner(deps: {
     loadDirectory,
     readFile,
     setInlineFile,
+    discardTab,
     reportDirectoryError,
     dispose: () => {
       listeners.clear();

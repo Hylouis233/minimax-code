@@ -111,3 +111,47 @@ describe("the workspace query owner invalidates exactly what a mutation affects"
     expect(queries.getSnapshot().reviewRevision).toBe(before + 1);
   });
 });
+
+describe("a closed tab releases its file slot", () => {
+  it("drops the content and refuses the read that was still in flight", async () => {
+    const pending = deferred<WebuiWorkspaceFileContent>();
+    const queries = createWebuiWorkspaceQueries({
+      port: { readWorkspaceFile: () => pending.promise },
+    });
+
+    queries.readFile("tab", "/w", "a.ts");
+    queries.discardFileTab("tab");
+    // The read the closed tab was waiting for answers late: it has no reader, so
+    // it must not commit into a slot nobody shows.
+    pending.resolve({ type: "text", content: "A", resolvedPath: "a.ts" });
+    await flush();
+
+    expect(queries.getSnapshot().files.has("tab")).toBe(false);
+  });
+
+  it("leaves another tab's read alone", async () => {
+    const first = deferred<WebuiWorkspaceFileContent>();
+    const second = deferred<WebuiWorkspaceFileContent>();
+    let call = 0;
+    const queries = createWebuiWorkspaceQueries({
+      port: {
+        readWorkspaceFile: () => {
+          const pending = call === 0 ? first : second;
+          call += 1;
+          return pending.promise;
+        },
+      },
+    });
+
+    queries.readFile("a", "/w", "a.ts");
+    queries.readFile("b", "/w", "b.ts");
+    queries.discardFileTab("a");
+    first.resolve({ type: "text", content: "A", resolvedPath: "a.ts" });
+    second.resolve({ type: "text", content: "B", resolvedPath: "b.ts" });
+    await flush();
+
+    // Closing one tab stops nothing the other tab accepted.
+    expect(queries.getSnapshot().files.has("a")).toBe(false);
+    expect(queries.getSnapshot().files.get("b")?.content?.content).toBe("B");
+  });
+});

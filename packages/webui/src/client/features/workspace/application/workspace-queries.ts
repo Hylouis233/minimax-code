@@ -76,6 +76,8 @@ export interface WebuiWorkspaceQueries {
   readonly loadDirectory: (workspaceDir: string, path: string) => Promise<WebuiWorkspaceDirLoad>;
   readonly readFile: (tabId: string, workspaceDir: string, path: string) => void;
   readonly setInlineFile: (tabId: string, content: string, resolvedPath: string) => void;
+  /** Release a closed tab's file slot and its read commit rights. */
+  readonly discardFileTab: (tabId: string) => void;
   readonly loadReviewSummary: (
     tabId: string,
     workspaceDir: string,
@@ -183,6 +185,7 @@ export function createWebuiWorkspaceQueries(deps: {
     loadDirectory: files.loadDirectory,
     readFile: files.readFile,
     setInlineFile: files.setInlineFile,
+    discardFileTab: files.discardTab,
     invalidateReview: review.invalidate,
     loadReviewSummary: review.loadSummary,
     loadReviewDiffs: review.loadDiffs,
