@@ -1118,7 +1118,7 @@
       "status": "PASS",
       "date": "2026-10-14",
       "branch": "feat/webui-t01-conformance-gates",
-      "commit": "f4099efaf5a0ec6917f13ce38dd73d63b3692039",
+      "commit": "77abd4f1f1975771a3aff40b8c9f0c11fa16fa76",
       "remote": "origin (mcode-webui/minimax-code) - read back with git ls-remote, which reports the same commit",
       "verifier": "pnpm verify on the committed clean tree: 23 gates on linux, exit 0 (skipped: test:windows and test:sandbox as not applicable on this platform, test:release-package as requiring an npm release archive)",
       "closedIssues": [
@@ -1133,7 +1133,8 @@
         144,
         145,
         147,
-        146
+        146,
+        141
       ],
       "openIssues": [
         {
@@ -1145,15 +1146,6 @@
             "3 (queue-destination fence)",
             "5 (large-component cut)",
             "6-7 (evidence)"
-          ]
-        },
-        {
-          "number": 141,
-          "ticket": "T15",
-          "unmet": [
-            "4 (cancellation cases)",
-            "5 (resize-coalescing and count-limit audit)",
-            "6 (resize/detach/dispose of a real PTY; create/write/watch are evidenced)"
           ]
         }
       ],
@@ -1199,7 +1191,8 @@
       "T21 (2026-10-14): check:webui-business-navigation was NOT registered in the verifier; it is now a step in scripts/verify.mjs beside check:webui-commands, which is what criterion 4's 'plus generated business navigation' requires.",
       "T21 (2026-10-14): the real loopback run against the real service and the real runtime host answered all twelve named behaviours; the built-browser parity run passed 112/112 and recorded 112 screenshots. Evidence record: minimax-code-webui-work/evidence/t21/ACCEPTANCE-T21.md (kept outside the repository, as AGENTS.md requires of verification reports).",
       "2026-10-14 publication: the branch is pushed to origin and read back with git ls-remote (same commit). pnpm verify passed on the committed clean tree: 23 gates on linux, exit 0. Eleven issues are closed with their per-criterion evidence comments (#129, #131, #133, #135, #136, #138, #142, #143, #144, #145, #147); three stay open with the unmet criteria named in their own comments (#139 T13, #141 T15, #146 T20) rather than closed on intent.",
-      "2026-10-14 T20 closed: its criterion 4 (computed styles) and criterion 5 (browser interactions) are verified. The resolved-declaration diff flagged one pair that the engine disproved as a difference - text order is not the cascade once layers are involved, so the certifying check for this criterion is the engine-level comparison (CDP matched-rules order plus computed values across the rendered surfaces). The edit made in response to the false flag was reverted; the T20 delivery is unchanged."
+      "2026-10-14 T20 closed: its criterion 4 (computed styles) and criterion 5 (browser interactions) are verified. The resolved-declaration diff flagged one pair that the engine disproved as a difference - text order is not the cascade once layers are involved, so the certifying check for this criterion is the engine-level comparison (CDP matched-rules order plus computed values across the rendered surfaces). The edit made in response to the false flag was reverted; the T20 delivery is unchanged.",
+      "2026-10-14 T15 closed: the two findings its criteria existed for (an abort that could not wake a parked iterator; a disposeAll that ended watches but left PTYs running) are fixed, and the real loopback run now covers create/write/watch/resize/detach/dispose. T13 remains open with its unmet criteria named."
     ],
     "audit": {
       "asOf": "2026-10-14",
