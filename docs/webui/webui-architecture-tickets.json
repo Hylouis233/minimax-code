@@ -1087,7 +1087,8 @@
       "78f85092",
       "8d7dafe0",
       "0eebfd46",
-      "fd8e4c49"
+      "fd8e4c49",
+      "b0cc51db"
     ],
     "published": false,
     "tickets": {
@@ -1101,7 +1102,7 @@
       "T14": "closed 2026-10-14 (issue #140, comment 6156919983): the host assembles the registry and the terminal-process port; the service binds what it was handed",
       "T07": "closed 2026-10-14 (issue #133, comment 6157401861): one Sessions owner holds the catalogue, the rail overlays and the lifecycle commands, with the delete failure/interest evidence and the rail/archive/import/export browser entry paths",
       "T09": "closed 2026-10-14 (issue #135, comment 6157618298): one Account owner holds the status/login/check-in/quota lifetime, the credential reads left Settings, and its timers end with its disposal",
-      "T11": "in progress: the workspace business has its homes (contracts/projection/ui plus its three owners); acceptance 3 (panel/tab interest release), 4 (canvas/archive/preview outcome ownership) and 6 (the browser/HTTP evidence audit) remain"
+      "T11": "in progress: the workspace business owns its homes and three owners, a git-changed signal reaches them directly, and a closed tab releases its file slot and read rights; canvas/archive/preview outcome ownership and the browser/HTTP evidence audit remain"
     },
     "frontier": [
       "T08",
@@ -1112,7 +1113,9 @@
     "notes": [
       "T11 slice 4 (0eebfd46): acceptance 2's relay removal. The signal used to land in the shell as React state with a counter and an effect that read it back; it now reaches the workspace owner through its subscription - one call, no state, no counter. The subscription stays because the workspace owners are still built by the shell mount; moving them is T19's shell composition, and the code comment says that.",
       "T11 acceptance status: (1) delivered - files/tree/content and environment identities extracted, review composed from T10. (2) delivered for the relay; the unrelated-workspace isolation and coalescing live in the owners. (3) panel/tab state ownership with interest release on close - not started. (4) canvas/archive/preview/directory-browser outcome and freshness ownership - not started. (5) homes: the application module moved to features/workspace/application; contracts/projections/bindings/UI still to move. (6) stale tab/file responses, supersession, aliases, invalidation bursts, HTTP range/content/path and browser panel scenarios - partly covered by the existing suites, not yet audited against the list.",
-      "T11 slice 5 (fd8e4c49): workspace contracts/projections/UI moved into features/workspace/; the review settings page moved to features/review/ui/; terminal-port.ts and terminal-size.ts moved to features/terminal/ because the gate reported two live owners for one role. The review diff-batch helper moved from the review owner to the review contracts so the panel reads a declaration, not an implementation."
+      "T11 slice 5 (fd8e4c49): workspace contracts/projections/UI moved into features/workspace/; the review settings page moved to features/review/ui/; terminal-port.ts and terminal-size.ts moved to features/terminal/ because the gate reported two live owners for one role. The review diff-batch helper moved from the review owner to the review contracts so the panel reads a declaration, not an implementation.",
+      "T11 slice 6 (b0cc51db): a closed panel tab now releases its file slot and its read commit rights - the files owner's discardTab bumps the tab's version (the same mechanism its own re-reads use) and drops the slot, and the shell calls it from the single place a tab closes. Other tabs are keyed separately, so nothing else they accepted stops; both halves are pinned by unit cases.",
+      "T11 remaining: acceptance 3's panel-state ownership (the per-session panel state still lives in the shell's useState, which the shell composition T19 moves), acceptance 4 (canvas/archive/preview/directory-browser outcome and freshness ownership; the archive parser is T16's), and acceptance 6's evidence audit (stale tab/file responses, supersession, workspace aliases, invalidation bursts, HTTP range/content/path and the browser panel scenarios)."
     ]
   },
   "publicationVerification": {
