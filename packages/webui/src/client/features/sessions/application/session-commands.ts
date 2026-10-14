@@ -42,14 +42,14 @@ import type {
 import {
   initialWebuiStreamState,
   settleAbortedStream,
-} from "../../../projection/turn/stream-state.js";
-import type { WebuiStreamState } from "../../../projection/turn/stream-state.js";
+} from "../../turn/projection/stream-state.js";
+import type { WebuiStreamState } from "../../turn/projection/stream-state.js";
 import { releaseWebuiSubscription } from "../../../mechanisms/stream-lease.js";
 import {
   buildWebuiStreamLoopSink,
   type WebuiStreamLoopSink,
 } from "../../../mechanisms/stream-loop.js";
-import { streamStateBundle } from "../../../application/turn/stream-state-bundle.js";
+import { streamStateBundle } from "../../turn/application/stream-state-bundle.js";
 
 /** The phases the stream slice can be moved to by name. */
 export type WebuiStreamPhase = WebuiStreamState["phase"];

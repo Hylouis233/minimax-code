@@ -17,9 +17,9 @@ import {
   isWebuiLeaseGenerationCurrent,
   nextWebuiLeaseGeneration,
 } from "../../src/client/mechanisms/stream-lease.js";
-import { streamStateBundle } from "../../src/client/application/turn/stream-state-bundle.js";
-import { initialWebuiStreamState } from "../../src/client/projection/turn/stream-state.js";
-import type { WebuiStreamState } from "../../src/client/contracts/turn/stream-state.js";
+import { streamStateBundle } from "../../src/client/features/turn/application/stream-state-bundle.js";
+import { initialWebuiStreamState } from "../../src/client/features/turn/projection/stream-state.js";
+import type { WebuiStreamState } from "../../src/client/features/turn/contracts/stream-state.js";
 
 /** What the loop sink's `claimSubscription` does, without a React store. */
 function claimFromLoop(state: WebuiStreamState): {

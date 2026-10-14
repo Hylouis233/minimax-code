@@ -4,7 +4,7 @@
 //
 // | Declaration | Wire purpose | Producer | Consumers |
 // | --- | --- | --- | --- |
-// | `WebuiPendingPermission` | One pending tool-permission request. | Runtime `listPendingPermissions` (`runtime/harness/interactions.ts`; CliService). | `client/features/interactions/contracts/interaction-port.ts`; `client/application/turn/effect-reducer.ts`; `client/features/interactions/ui/InteractionPanel.tsx`. |
+// | `WebuiPendingPermission` | One pending tool-permission request. | Runtime `listPendingPermissions` (`runtime/harness/interactions.ts`; CliService). | `client/features/interactions/contracts/interaction-port.ts`; `client/features/turn/application/effect-reducer.ts`; `client/features/interactions/ui/InteractionPanel.tsx`. |
 // | `WebuiQuestionnaireOption` | One selectable option in a questionnaire step. | Runtime `getPendingQuestionnaire` (`runtime/harness/interactions.ts`). | `client/features/interactions/projection/questionnaire-state.ts`. |
 // | `WebuiQuestionnaireStep` | One question/step of a questionnaire. | Runtime `getPendingQuestionnaire`. | `client/features/interactions/projection/questionnaire-state.ts`. |
 // | `WebuiQuestionnaireRequest` | The pending questionnaire (steps, presentation, plan-review payload). | Runtime `getPendingQuestionnaire`. | `client/features/interactions/contracts/interaction-port.ts`; `client/features/interactions/projection/questionnaire-state.ts`; `client/features/interactions/ui/InteractionPanel.tsx`; `server/operation/questionnaire.ts`. |

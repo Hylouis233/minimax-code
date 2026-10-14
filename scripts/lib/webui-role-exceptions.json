@@ -44,55 +44,55 @@
       "exitCondition": "The shared menu takes its projection as an injected contract instead of reaching into the shell's projection."
     },
     {
-      "from": "client/application/turn/effect-reducer.ts",
+      "from": "client/features/turn/application/effect-reducer.ts",
       "to": "client/features/interactions/projection/event-parsers.ts",
       "owner": "T21 (退役迁移形式)",
       "exitCondition": "The turn substrate moves to client/features/turn/application/ and consumes interactions' published contracts."
     },
     {
-      "from": "client/application/turn/effect-reducer.ts",
+      "from": "client/features/turn/application/effect-reducer.ts",
       "to": "client/features/workspace/projection/workspace-progress.ts",
       "owner": "T21 (退役迁移形式)",
       "exitCondition": "The turn substrate moves to client/features/turn/application/ and consumes workspace's published contracts."
     },
     {
-      "from": "client/application/turn/effect-reducer.ts",
+      "from": "client/features/turn/application/effect-reducer.ts",
       "to": "client/features/goal/projection/goal-state.ts",
       "owner": "T21 (退役迁移形式)",
       "exitCondition": "The turn substrate moves to client/features/turn/application/ and consumes goal's published contracts."
     },
     {
-      "from": "client/application/turn/event-coordinator.ts",
+      "from": "client/features/turn/application/event-coordinator.ts",
       "to": "client/features/interactions/projection/event-parsers.ts",
       "owner": "T21 (退役迁移形式)",
       "exitCondition": "The turn substrate moves to client/features/turn/application/ and consumes interactions' published contracts."
     },
     {
-      "from": "client/application/turn/turn-commands.ts",
+      "from": "client/features/turn/application/turn-commands.ts",
       "to": "client/features/sessions/application/session-commands.ts",
       "owner": "T21 (退役迁移形式)",
       "exitCondition": "The turn substrate moves to client/features/turn/application/ and consumes sessions' published contracts."
     },
     {
-      "from": "client/application/turn/turn-commands.ts",
+      "from": "client/features/turn/application/turn-commands.ts",
       "to": "client/features/composer/application/composer-workflows.ts",
       "owner": "T21 (退役迁移形式)",
       "exitCondition": "The turn substrate moves to client/features/turn/application/ and consumes composer's published contracts."
     },
     {
-      "from": "client/projection/turn/stream-recovery.ts",
+      "from": "client/features/turn/projection/stream-recovery.ts",
       "to": "client/features/transcript/projection/message-projection.ts",
       "owner": "T21 (退役迁移形式)",
       "exitCondition": "The turn substrate moves to client/features/turn/projection/ and consumes transcript's published contracts."
     },
     {
-      "from": "client/projection/turn/stream-recovery.ts",
+      "from": "client/features/turn/projection/stream-recovery.ts",
       "to": "client/features/composer/projection/context-usage.ts",
       "owner": "T21 (退役迁移形式)",
       "exitCondition": "The turn substrate moves to client/features/turn/projection/ and consumes composer's published contracts."
     },
     {
-      "from": "client/projection/turn/stream-state.ts",
+      "from": "client/features/turn/projection/stream-state.ts",
       "to": "client/features/workspace/projection/workspace-progress.ts",
       "owner": "T21 (退役迁移形式)",
       "exitCondition": "The turn substrate moves to client/features/turn/projection/ and consumes workspace's published contracts."

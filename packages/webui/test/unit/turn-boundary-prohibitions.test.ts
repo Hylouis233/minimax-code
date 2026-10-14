@@ -39,12 +39,12 @@ function read(relativePath: string): string {
 
 /** The modules `turn` owns: its capability slice, commands, loop and lease. */
 const TURN_MODULES = [
-  "application/turn/turn-capabilities.ts",
-  "application/turn/turn-commands.ts",
-  "application/turn/turn-coordinator.ts",
+  "features/turn/application/turn-capabilities.ts",
+  "features/turn/application/turn-commands.ts",
+  "features/turn/application/turn-coordinator.ts",
   "features/sessions/application/session-commands.ts",
-  "application/turn/stream-state-bundle.ts",
-  "application/turn/stream-lease-controller.ts",
+  "features/turn/application/stream-state-bundle.ts",
+  "features/turn/application/stream-lease-controller.ts",
   "mechanisms/stream-loop.ts",
   "mechanisms/stream-lease.ts",
 ];
@@ -68,7 +68,7 @@ describe("prohibition 1 — turn holds no writer for another business's state", 
       // turn module: the lease controller, which patches the `stream` field and
       // nothing else.
       if (members.includes("updateSession")) {
-        expect(modulePath).toBe("application/turn/stream-lease-controller.ts");
+        expect(modulePath).toBe("features/turn/application/stream-lease-controller.ts");
         const calls = source.split("store.updateSession(").slice(1);
         expect(calls).toHaveLength(2);
         for (const call of calls) {
@@ -124,7 +124,7 @@ describe("prohibition 2 — turn's rules are filed inside turn", () => {
 describe("prohibition 3 — the stream-phase value set is enumerated exactly once", () => {
   const PHASES = ["idle", "streaming", "waiting", "reconnecting", "refused", "done"];
 
-  it("keeps the union in contracts/turn/stream-state.ts and nowhere else", () => {
+  it("keeps the union in features/turn/contracts/stream-state.ts and nowhere else", () => {
     const enumerations = clientModules().filter((modulePath) => {
       const source = read(modulePath);
       return PHASES.every((phase) => new RegExp(`"${phase}"`, "u").test(source));
@@ -132,7 +132,7 @@ describe("prohibition 3 — the stream-phase value set is enumerated exactly onc
     // `WebuiConnectionState` also says "reconnecting", which is a *different*
     // closed set — a connection state, not a stream phase. Only the stream
     // phase's six values together identify the one enumeration.
-    expect(enumerations).toEqual(["contracts/turn/stream-state.ts"]);
+    expect(enumerations).toEqual(["features/turn/contracts/stream-state.ts"]);
   });
 
   it("derives the phase type from the union instead of re-listing it", () => {

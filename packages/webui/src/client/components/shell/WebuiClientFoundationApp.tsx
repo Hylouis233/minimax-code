@@ -236,7 +236,7 @@ export function WebuiClientFoundationApp(
   // store it passes to the assembly; the shell does not build one to seed.
   const sessionStore = application.store;
   // The one per-session effects registry for this mount (plan §7.1
-  // `application/turn/event-coordinator.ts`; ticket #45). The shell holds it and
+  // `features/turn/application/event-coordinator.ts`; ticket #45). The shell holds it and
   // provides it; the composer registers its session's effect handlers here and
   // `asWebuiEventEffects()` is what the application coordinator consumes over
   // the single process-event channel.

@@ -42,7 +42,7 @@ import {
   initialWebuiApplicationSessionState,
   WEBUI_HOME_SESSION_KEY,
 } from "../application/state.js";
-import type { WebuiStreamState } from "../projection/turn/stream-state.js";
+import type { WebuiStreamState } from "../features/turn/projection/stream-state.js";
 import {
   createWebuiInteractionCommands,
   createWebuiStreamPhaseCommands,
@@ -52,7 +52,7 @@ import {
   type WebuiStreamPhaseCommands,
   type WebuiTurnLifecycleCommands,
 } from "../features/sessions/application/session-commands.js";
-import { createWebuiConversationTurnCommands } from "../application/turn/turn-commands.js";
+import { createWebuiConversationTurnCommands } from "../features/turn/application/turn-commands.js";
 import {
   useWebuiApplicationOptional,
   useWebuiSessionStoreContext,

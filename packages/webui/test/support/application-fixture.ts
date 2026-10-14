@@ -20,7 +20,7 @@ import type {
   WebuiApplicationStart,
 } from "../../src/client/application/create-application.js";
 import type { WebuiPortSlices } from "../../src/client/application/port-slices.js";
-import type { WebuiTurnCapabilityPort } from "../../src/client/application/turn/turn-capabilities.js";
+import type { WebuiTurnCapabilityPort } from "../../src/client/features/turn/application/turn-capabilities.js";
 import type { WebuiSessionStore } from "../../src/client/application/session-store.js";
 
 /** A channel that accepts one listener and never emits: SSR-shaped hosts. */

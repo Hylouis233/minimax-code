@@ -1,4 +1,4 @@
-// The turn coordinator (plan §7.1 `application/turn/turn-coordinator.ts`).
+// The turn coordinator (plan §7.1 `features/turn/application/turn-coordinator.ts`).
 //
 // Stage 4 of this slice brings over one owning command: the **manual retry**,
 // the arm the connection banner's "重试连接" button runs. It replaces
@@ -19,18 +19,18 @@
 // fences its own writes and releases on terminal, error or cancellation, so the
 // retry cannot strand a "thinking" indicator or let a superseded attempt write.
 
-import type {WebuiClientSessionResumer} from "../../contracts/turn/execution-port.js";
-import type { WebuiClientMessageLoader } from "../../features/transcript/contracts/message-view.js";
-import { streamRecoveryProjection } from "../../projection/turn/stream-recovery.js";
-import type { WebuiStreamState } from "../../projection/turn/stream-state.js";
-import { reduceWebuiStreamFrame } from "../../projection/turn/stream-state.js";
-import { fenceWebuiLeaseStream } from "../../mechanisms/stream-lease.js";
+import type {WebuiClientSessionResumer} from "../contracts/execution-port.js";
+import type { WebuiClientMessageLoader } from "../../transcript/contracts/message-view.js";
+import { streamRecoveryProjection } from "../projection/stream-recovery.js";
+import type { WebuiStreamState } from "../projection/stream-state.js";
+import { reduceWebuiStreamFrame } from "../projection/stream-state.js";
+import { fenceWebuiLeaseStream } from "../../../mechanisms/stream-lease.js";
 import {
   applyWebuiStreamLoopExtra,
   runWebuiStreamLoop,
   type WebuiStreamLoopSink,
-} from "../../mechanisms/stream-loop.js";
-import type { WebuiSessionStore, WebuiSessionWriter } from "../session-store.js";
+} from "../../../mechanisms/stream-loop.js";
+import type { WebuiSessionStore, WebuiSessionWriter } from "../../../application/session-store.js";
 import type { WebuiStreamLeaseController } from "./stream-lease-controller.js";
 import { streamStateBundle } from "./stream-state-bundle.js";
 

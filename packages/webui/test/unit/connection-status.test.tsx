@@ -15,7 +15,7 @@ import {
 } from "../../src/client/components/shell/ConnectionStatus.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 import { WebuiSessionStoreProvider } from "../../src/client/bindings/application-context.js";
-import type { WebuiStreamState } from "../../src/client/projection/turn/stream-state.js";
+import type { WebuiStreamState } from "../../src/client/features/turn/projection/stream-state.js";
 
 /**
  * One application store for this suite. It replaces the module-level runtime

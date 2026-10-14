@@ -17,7 +17,7 @@ import {
 } from "../../../contracts/value-readers.js";
 import type { WebuiClientMessage, WebuiMessageAttachment } from "../contracts/message-view.js";
 import type { WebuiTranscriptItem } from "../contracts/transcript-view.js";
-import type { WebuiStreamMessage } from "../../../contracts/turn/stream-state.js";
+import type { WebuiStreamMessage } from "../../turn/contracts/stream-state.js";
 import type {
   WebuiFileDiffInfoView,
   WebuiTurnDiffView,

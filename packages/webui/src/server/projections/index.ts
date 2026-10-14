@@ -5,6 +5,6 @@
 // wrap `sendMessage` / `resumeSession` frames is gone: it attached a
 // per-session permission/compaction snapshot to every frame, and nothing on the
 // client ever read it — the browser builds the permission and questionnaire
-// state the panels render in `client/application/turn/effect-reducer.ts`.
+// state the panels render in `client/features/turn/application/effect-reducer.ts`.
 export { projectContextSnapshot } from "./context-snapshot.js";
 export { isTurnCompactionMessage, projectUsage } from "./usage.js";

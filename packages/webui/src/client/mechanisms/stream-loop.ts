@@ -13,7 +13,7 @@
 // the React shell's `try/finally` shape at `app.tsx`, which does not
 // catch and would otherwise lose a sink-originated rejection.
 
-import type {WebuiClientMessageSender, WebuiClientSessionResumer} from "../contracts/turn/execution-port.js";
+import type {WebuiClientMessageSender, WebuiClientSessionResumer} from "../features/turn/contracts/execution-port.js";
 import type {
   WebuiClientMessage,
   WebuiClientMessageLoader,
@@ -25,7 +25,7 @@ import type {
   WebuiStreamState,
   WebuiStreamSubscription,
   WebuiSubscriptionReleaseScope,
-} from "../contracts/turn/stream-state.js";
+} from "../features/turn/contracts/stream-state.js";
 import type { WebuiStreamFrame } from "../../shared/contracts/stream.js";
 import type { WebuiAttachmentInput } from "../../shared/contracts/messages.js";
 import { isWebuiLeaseGenerationCurrent } from "./stream-lease.js";
@@ -48,7 +48,7 @@ export interface WebuiStreamLoopDeps {
   /**
    * The stream-state transforms the loop applies to frames, injected by the
    * caller for the same reason as `projection` (plan §7.2): these are the
-   * existing pure functions from `projection/turn/stream-state.ts`, re-used, not
+   * existing pure functions from `features/turn/projection/stream-state.ts`, re-used, not
    * re-implemented.
    *
    * Required on purpose, like `projection`: forgetting it is a compile error

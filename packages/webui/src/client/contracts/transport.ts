@@ -15,7 +15,7 @@
 // boundaries.
 
 import type { SessionPort } from "./sessions/session-port.js";
-import type { TurnExecutionPort } from "./turn/execution-port.js";
+import type { TurnExecutionPort } from "../features/turn/contracts/execution-port.js";
 import type { ComposerPort } from "../features/composer/contracts/command-port.js";
 import type { ShellEventPort } from "./shell/watch-port.js";
 import type { InteractionPort } from "../features/interactions/contracts/interaction-port.js";

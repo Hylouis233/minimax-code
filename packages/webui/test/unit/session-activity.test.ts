@@ -801,8 +801,9 @@ describe("host wiring", () => {
         "..",
         "src",
         "client",
-        "application",
+        "features",
         "turn",
+        "application",
         "event-coordinator.ts",
       ),
       "utf8",
@@ -875,15 +876,19 @@ describe("host wiring", () => {
 
     // And the selection is the store's, kept current from the route the shell
     // resolved, so the single subscription always judges the turn against the
-    // session the user has open without the shell holding a second copy.
-    expect(appSource).toMatch(
-      /application\.select\(\s*selectedSessionId\s*\)\s*;/u,
-    );
+    // session the user has open without the shell holding a second copy. The
+    // call lives in `use-shell-activity-wiring.ts` (A-005); the frame hands it
+    // the application's own function.
+    expect(appSource).toMatch(/select\(\s*selectedSessionId\s*\)\s*;/u);
+    expect(appSource).toMatch(/select:\s*\(id\)\s*=>\s*application\.select\(id\)/u);
   });
 
   it("clears the count when the user opens a session", () => {
-    expect(effect("application.unread.markRead(")).toMatch(
-      /application\.unread\.markRead\(\s*selectedSessionId\s*\)/u,
+    expect(effect("markRead(selectedSessionId)")).toMatch(
+      /markRead\(\s*selectedSessionId\s*\)/u,
+    );
+    expect(appSource).toMatch(
+      /markRead:\s*\(id\)\s*=>\s*application\.unread\.markRead\(id\)/u,
     );
     expect(unreadSource).toMatch(
       /markWebuiSessionRead\(current, sessionId\)/u,
@@ -907,8 +912,11 @@ describe("host wiring", () => {
     // The active session is excluded from the restore, so the restore has to
     // run again when the user moves: opening a session marks it read, and
     // arriving at a different one must not inherit that.
-    const block = effect("application.unread.hydrate(");
-    expect(block).toMatch(/application\.unread\.hydrate\(\s*selectedSessionId\s*\)/u);
+    const block = effect("hydrate(selectedSessionId)");
+    expect(block).toMatch(/hydrate\(\s*selectedSessionId\s*\)/u);
+    expect(appSource).toMatch(
+      /hydrate:\s*\(id\)\s*=>\s*application\.unread\.hydrate\(id\)/u,
+    );
     expect(unreadSource).toMatch(/applyWebuiUnreadCounts/u);
   });
 
@@ -923,10 +931,10 @@ describe("host wiring", () => {
     // The re-read is still needed, so the assertion is that the trigger is the
     // session and not the list. Seeding the list is a separate effect that does
     // depend on `railPage`, and is asserted to still exist.
-    const block = effect("application.unread.hydrate(");
-    expect(block).toMatch(/\}\s*,\s*\[\s*application\s*,\s*selectedSessionId\s*,?\s*\]\s*\)\s*;?\s*$/u);
+    const block = effect("hydrate(selectedSessionId)");
+    expect(block).toMatch(/\}\s*,\s*\[\s*hydrate\s*,\s*selectedSessionId\s*,?\s*\]\s*\)\s*;?\s*$/u);
     expect(block).not.toMatch(/railPage/u);
-    expect(effect("application.unread.seed(")).toMatch(/railPage/u);
+    expect(effect("seed(railPage.sessions)")).toMatch(/railPage/u);
     expect(unreadSource).toMatch(/seedWebuiSessionActivity/u);
   });
 

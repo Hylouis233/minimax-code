@@ -19,7 +19,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 import { WEBUI_HOME_SESSION_KEY as HOME_KEY } from "../../src/client/application/state.js";
-import { initialWebuiStreamState } from "../../src/client/projection/turn/stream-state.js";
+import { initialWebuiStreamState } from "../../src/client/features/turn/projection/stream-state.js";
 
 const SESSION_KEY = "w0-session";
 

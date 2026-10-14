@@ -18,7 +18,7 @@
 import type {
   WebuiActiveTurnRequest,
   WebuiActiveTurnResult,
-} from "../../../shared/contracts/session.js";
+} from "../../../../shared/contracts/session.js";
 
 export type WebuiActiveTurnProbeFn = (
   request: WebuiActiveTurnRequest,

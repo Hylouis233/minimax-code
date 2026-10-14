@@ -26,19 +26,19 @@ import { createWebuiPluginWorkflows } from "../features/plugins/application/plug
 import { createWebuiComposerPluginCatalogue } from "../features/plugins/application/composer-catalogue.js";
 import { createWebuiPluginActions } from "../features/plugins/contracts/plugin-actions.js";
 import { createWebuiPlanReviewWorkflow } from "../features/interactions/application/interaction-coordinator.js";
-import { webuiActiveTurnProbeFor } from "./turn/active-turn-probe.js";
+import { webuiActiveTurnProbeFor } from "../features/turn/application/active-turn-probe.js";
 import {
   createWebuiEventCoordinator,
   type WebuiWorkspaceGitChangedPayload,
   type WebuiEventCoordinator,
-} from "./turn/event-coordinator.js";
-import type { WebuiOpenEventChannel, WebuiProcessEventChannel } from "./turn/event-channel.js";
+} from "../features/turn/application/event-coordinator.js";
+import type { WebuiOpenEventChannel, WebuiProcessEventChannel } from "../features/turn/application/event-channel.js";
 import { createWebuiSessionStore, createWebuiTranscriptHistoryWriter } from "./session-store.js";
 import type { WebuiSessionStore } from "./session-store.js";
 import {
   createWebuiStreamLeaseController,
   type WebuiStreamLeaseController,
-} from "./turn/stream-lease-controller.js";
+} from "../features/turn/application/stream-lease-controller.js";
 import {
   createWebuiSessionScopeManager,
   type WebuiSessionScopeManager,
@@ -46,11 +46,11 @@ import {
 import {
   createWebuiDeliveryDisposers,
   type WebuiDeliveryDisposers,
-} from "./turn/delivery-disposers.js";
+} from "../features/turn/application/delivery-disposers.js";
 import {
   createWebuiConversationTurnCommands,
   type WebuiConversationTurnCommands,
-} from "./turn/turn-commands.js";
+} from "../features/turn/application/turn-commands.js";
 import {
   createWebuiGoalSessionOwners,
   type WebuiGoalSessionOwners,
@@ -70,8 +70,8 @@ import { WEBUI_HOME_SESSION_KEY } from "./state.js";
 import {
   createWebuiTurnCoordinator,
   type WebuiTurnCoordinator,
-} from "./turn/turn-coordinator.js";
-import type { WebuiTurnCoordinatorDeps } from "./turn/turn-coordinator.js";
+} from "../features/turn/application/turn-coordinator.js";
+import type { WebuiTurnCoordinatorDeps } from "../features/turn/application/turn-coordinator.js";
 import {
   createWebuiUnreadController,
   type WebuiUnreadController,
@@ -92,8 +92,8 @@ import {
 import type {
   WebuiTurnCapabilityPort,
   WebuiTurnCapabilitySlice,
-} from "./turn/turn-capabilities.js";
-import { createWebuiTurnCapabilitySlice } from "./turn/turn-capabilities.js";
+} from "../features/turn/application/turn-capabilities.js";
+import { createWebuiTurnCapabilitySlice } from "../features/turn/application/turn-capabilities.js";
 import {
   createWebuiTurnReviewOwner,
   type WebuiTurnReviewOwner,

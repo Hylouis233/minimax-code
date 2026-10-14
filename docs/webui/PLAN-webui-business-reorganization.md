@@ -630,7 +630,7 @@ tells the executor which files each row moves.
 | `settings` | `application/settings/settings-workflows.ts` | instruction / memory / profile settings and the persisted display preferences. The dialog's active tab, query and wrap toggle are the **component's** view state | `setGlobalInstructions`, `setAgentMemory`, `setUserProfile`, `setMemorySettings` | — (its own) | the archived-sessions state leaves `settings` for `sessions`; model/provider CRUD is `models`'; **api-key status, model source and Codex OAuth status (`:112-113`) are `settings`'**, and the usage/model-source screen is **three surfaces** (quota, provider form, oauth) whose provider-form commands leave for `models` before the surfaces separate; **the model-source panel belongs to `settings` and files under `components/settings/ModelSourcePanel.tsx`**, while the provider list, draft and CRUD (`:280-380`) are `models`' and file under `components/models/` |
 | `account` | `application/account/account-workflows.ts` | sign-in phase and login state, **account-level** quota/credits snapshots and formatting | `signOut`, `beginAccountLogin` / `cancelAccountLogin`, `claimSignin`, `forceRefresh` | — (its own) | per-session usage leaves `account` for `sessions`; the quota panel's `loadUsage` is invoked from `settings/UsageModelSettings.tsx:108` as a **read**, and **the quota panel belongs to `account`** — it files under `components/account/UsageQuotaPanel.tsx`. **What stands from the earlier wording: `UsageModelSettings` as a whole must not become an account surface**, because it also renders `settings`' model source and `models`' provider CRUD. The file is split into three and each part files under the business that owns its commands; the quota failure path keeps today's error-plus-retry behaviour; the stale-marking proposal is **out of scope** (§14.5) |
 | `shell` | `client/main.tsx` (composition root), `components/shell/` | mount, the provider graph, routing and selection, **which business the main column shows**, the error boundary, the connection badge, the layout | none of its own beyond switching business; it invokes every business's published commands | — | **last carve.** It stops constructing owners and forwarding 47 transport members (§8 Phase 2); `shell-surface.ts` moves to `projection/shell/` |
-| `turn` | `application/turn/` | the store's stream/sending slice, the lease and generation, the stream loop, the turn capability slice | the stream-phase group, the turn-lifecycle group, the turn capability slice | — (it *is* the shared substrate) | Phase 1 widens the intents; `stream-state.ts` and `stream-recovery.ts` move to `projection/turn/` |
+| `turn` | `features/turn/application/` | the store's stream/sending slice, the lease and generation, the stream loop, the turn capability slice | the stream-phase group, the turn-lifecycle group, the turn capability slice | — (it *is* the shared substrate) | Phase 1 widens the intents; `stream-state.ts` and `stream-recovery.ts` move to `features/turn/projection/` |
 
 **"May write" means state that must outlive the component.** Local view state — open/closed, expanded,
 active tab, query text, hover, focus, an input that no other layer needs — stays in the component and is not
@@ -985,7 +985,7 @@ classification-neutral moves. A batch that would need a baseline entry stops and
 **§7.2 is not in Phase 4b.** `composer-history` and `effect-reducer` sit in `projection/`, the gate already
 classifies them `application`, and they are classification-neutral moves already present in §15.1's table.
 **They execute in the Phase 4 C instances owning `client/application/composer/` and
-`client/application/turn/`, and nowhere else.**
+`client/features/turn/application/`, and nowhere else.**
 
 **Why Phase 4 does not cover §7.1.** Phase 4 is the mechanical consequence of Phase 3: move the now-correct
 modules into `client/<layer>/<business>/`, pure moves plus import repointing. §7.1's declarations move **out
@@ -1062,13 +1062,13 @@ violated *through the seam* rather than around it.
 | --- | --- | --- | --- |
 | S1 | rail context-menu item on an existing capability | 4 files across `projection/` and `components/`; rules were duplicated across builders and render branches | `projection/sessions/rail-menu.ts` + `components/sessions/SessionRail.tsx` (2 files across the two owning layers) |
 | S2 | permission prompt gains a field (with protocol) | 4+ files / 4 dirs | **unchanged** — inherent protocol cost; kept as the control row that calibrates what the carve cannot touch |
-| S3 | change the reconnect recovery policy | design-baseline count: 8 files / 4 dirs | final decision/transition: `application/turn/turn-commands.ts`, `application/turn/active-turn-probe.ts`, `application/turn/event-effects-registry.ts`, `application/turn/effect-reducer.ts`, `projection/turn/stream-state.ts`; session activity remains in `projection/sessions/session-activity.ts`; event subscription is coordinated by `application/turn/event-channel.ts`; composition wiring stays at the shell/application boundary |
+| S3 | change the reconnect recovery policy | design-baseline count: 8 files / 4 dirs | final decision/transition: `features/turn/application/turn-commands.ts`, `features/turn/application/active-turn-probe.ts`, `features/turn/application/event-effects-registry.ts`, `features/turn/application/effect-reducer.ts`, `features/turn/projection/stream-state.ts`; session activity remains in `projection/sessions/session-activity.ts`; event subscription is coordinated by `features/turn/application/event-channel.ts`; composition wiring stays at the shell/application boundary |
 | S4 | new right-column tab kind | baseline had kinds enumerated in 3 places | final discriminant and shape registry: `projection/workspace/workspace-panel-state.ts`; host rendering: `components/workspace/WorkspacePanels.tsx` |
 | S5 | new composer toolbar control | baseline: 2 files, one a 2088-line function | presentation host `components/composer/WebuiComposer.tsx` (2460 lines); extension placement must be rechecked against the target component split, so the file-count reduction is not claimed |
 | S6 | a second business shows the same session | no independent consumer was added by this reorganization; the scenario remains a design acceptance constraint | the new business should consume `sessions`' read model and the turn substrate with zero imports from `components/`; this is architectural guidance, not a measured before/after result |
 | S7 | new wire operation end to end | 13-step baseline in `packages/webui/AGENTS.md` | unchanged — protocol cost, retained as a control row; this filing work did not add a wire operation |
 | S8 | a business is added to the client | design baseline: no navigation guide; `goal` had to be spread by hand across 47 files in 12 directories | `packages/webui/AGENTS.md` now provides the business × layer index; port and registration work remains governed by the existing application assembly contracts |
-| S9 | new stream frame / tool-result kind | baseline: 7 files / 4 dirs / 3 layers | `projection/common/event-kinds.ts` centralizes goal/interaction event classification; parser and render consumers use it, while stateful event effects remain in `application/turn/effect-reducer.ts` |
+| S9 | new stream frame / tool-result kind | baseline: 7 files / 4 dirs / 3 layers | `projection/common/event-kinds.ts` centralizes goal/interaction event classification; parser and render consumers use it, while stateful event effects remain in `features/turn/application/effect-reducer.ts` |
 | S10 | goal status gains a value | baseline: 47 files across 12 dirs; goal shared interaction coordination | goal state projects in `projection/goal/goal-state.ts`; orchestration lives in `application/goal/goal-coordinator.ts`; shared event classification is in `projection/common/event-kinds.ts` |
 | S11 | = S8, stated as the on-boarding cost | — | — |
 | **S12** | **a capability port gains a member** | design baseline: 216 nested-inclusive members in 8 ports | final: 100 direct top-level members in 13 business port files, with unique member names; `pluginManagement` separately retains its 29-action inventory |
@@ -1555,26 +1555,26 @@ add to the total. The `lines` values were regenerated from the final files under
 | --- | --- | ---: |
 | `client/ConnectionStatus.tsx` | `client/components/shell/ConnectionStatus.tsx` | 152 |
 | `client/application/account-workflows.ts` | `client/application/account/account-workflows.ts` | 438 |
-| `client/application/active-turn-probe.ts` | `client/application/turn/active-turn-probe.ts` | 68 |
+| `client/application/active-turn-probe.ts` | `client/features/turn/application/active-turn-probe.ts` | 68 |
 | `client/application/command-workflows.ts` | `client/application/composer/command-workflows.ts` | 43 |
 | `client/application/composer-store.ts` | `client/application/composer/composer-store.ts` | 351 |
 | `client/application/composer-workflows.ts` | `client/application/composer/composer-workflows.ts` | 178 |
-| `client/application/event-channel.ts` | `client/application/turn/event-channel.ts` | 35 |
-| `client/application/event-coordinator.ts` | `client/application/turn/event-coordinator.ts` | 301 |
-| `client/application/event-effects-registry.ts` | `client/application/turn/event-effects-registry.ts` | 87 |
+| `client/application/event-channel.ts` | `client/features/turn/application/event-channel.ts` | 35 |
+| `client/application/event-coordinator.ts` | `client/features/turn/application/event-coordinator.ts` | 301 |
+| `client/application/event-effects-registry.ts` | `client/features/turn/application/event-effects-registry.ts` | 87 |
 | `client/application/interaction-coordinator.ts` | `client/application/interactions/interaction-coordinator.ts` | 257 |
 | `client/application/plugin-workflows.ts` | `client/application/plugins/plugin-workflows.ts` | 457 |
-| `client/application/queue-command.ts` | `client/application/turn/queue-command.ts` | 53 |
+| `client/application/queue-command.ts` | `client/features/turn/application/queue-command.ts` | 53 |
 | `client/application/session-catalog.ts` | `client/application/sessions/session-catalog.ts` | 323 |
 | `client/application/session-commands.ts` | `client/application/sessions/session-commands.ts` | 261 |
 | `client/application/session-workflows.ts` | `client/application/sessions/session-workflows.ts` | 451 |
 | `client/application/settings-workflows.ts` | `client/application/settings/settings-workflows.ts` | 333 |
-| `client/application/stream-lease-controller.ts` | `client/application/turn/stream-lease-controller.ts` | 62 |
-| `client/application/stream-state-bundle.ts` | `client/application/turn/stream-state-bundle.ts` | 27 |
+| `client/application/stream-lease-controller.ts` | `client/features/turn/application/stream-lease-controller.ts` | 62 |
+| `client/application/stream-state-bundle.ts` | `client/features/turn/application/stream-state-bundle.ts` | 27 |
 | `client/application/transcript-history.ts` | `client/application/transcript/transcript-history.ts` | 125 |
 | `client/application/transcript-request-ownership.ts` | `client/application/transcript/transcript-request-ownership.ts` | 68 |
-| `client/application/turn-commands.ts` | `client/application/turn/turn-commands.ts` | 265 |
-| `client/application/turn-coordinator.ts` | `client/application/turn/turn-coordinator.ts` | 164 |
+| `client/application/turn-commands.ts` | `client/features/turn/application/turn-commands.ts` | 265 |
+| `client/application/turn-coordinator.ts` | `client/features/turn/application/turn-coordinator.ts` | 164 |
 | `client/application/unread.ts` | `client/application/sessions/unread.ts` | 198 |
 | `client/application/workspace-queries.ts` | `client/application/workspace/workspace-queries.ts` | 828 |
 | `client/components/AccountLoginDialog.tsx` | `client/components/account/AccountLoginDialog.tsx` | 223 |
@@ -1630,7 +1630,7 @@ add to the total. The `lines` values were regenerated from the final files under
 | `client/projection/context-breakdown.ts` | `client/projection/composer/context-breakdown.ts` | 201 |
 | `client/projection/context-usage-popover.ts` | `client/projection/composer/context-usage-popover.ts` | 153 |
 | `client/projection/context-usage.ts` | `client/projection/composer/context-usage.ts` | 29 |
-| `client/projection/effect-reducer.ts` | `client/application/turn/effect-reducer.ts` | 465 |
+| `client/projection/effect-reducer.ts` | `client/features/turn/application/effect-reducer.ts` | 465 |
 | `client/projection/event-parsers.ts` | `client/projection/interactions/event-parsers.ts` | 117 |
 | `client/projection/flyout-position.ts` | `client/projection/common/flyout-position.ts` | 128 |
 | `client/projection/goal-state.ts` | `client/projection/goal/goal-state.ts` | 108 |
@@ -1649,8 +1649,8 @@ add to the total. The `lines` values were regenerated from the final files under
 | `client/projection/review-state.ts` | `client/projection/transcript/review-state.ts` | 434 |
 | `client/projection/session-activity.ts` | `client/projection/sessions/session-activity.ts` | 324 |
 | `client/projection/shell-surface.ts` | `client/projection/shell/shell-surface.ts` | 65 |
-| `client/projection/stream-recovery.ts` | `client/projection/turn/stream-recovery.ts` | 23 |
-| `client/projection/stream-state.ts` | `client/projection/turn/stream-state.ts` | 540 |
+| `client/projection/stream-recovery.ts` | `client/features/turn/projection/stream-recovery.ts` | 23 |
+| `client/projection/stream-state.ts` | `client/features/turn/projection/stream-state.ts` | 540 |
 | `client/projection/terminal-size.ts` | `client/projection/workspace/terminal-size.ts` | 75 |
 | `client/projection/thinking-control.ts` | `client/projection/models/thinking-control.ts` | 254 |
 | `client/projection/token-plan-model.ts` | `client/projection/models/token-plan-model.ts` | 67 |
@@ -1716,7 +1716,7 @@ Every one follows from §9's own enumeration, quoted here so each row carries it
 
 | from | to | lines | §9's sentence |
 |---|---|---:|---|
-| `client/contracts/execution-port.ts` | `client/contracts/turn/execution-port.ts` | 57 | "…`execution-port` splits three ways (`sendMessage`/`resumeSession` → the substrate, `runCommand` → `composer`, `watchEvents` → `shell`/`turn`)" |
+| `client/contracts/execution-port.ts` | `client/features/turn/contracts/execution-port.ts` | 57 | "…`execution-port` splits three ways (`sendMessage`/`resumeSession` → the substrate, `runCommand` → `composer`, `watchEvents` → `shell`/`turn`)" |
 | " | `client/contracts/composer/command-port.ts` | 41 | same |
 | " | `client/contracts/shell/watch-port.ts` | 29 | same |
 | `client/contracts/settings-port.ts` | `client/contracts/models/provider-port.ts` | 47 | "`settings-port`'s 53 members divide mechanically (models + providers → `models`; …)" |
@@ -1755,7 +1755,7 @@ explain destinations already included in the 155-row, 155-target count above; th
 | --- | --- | ---: | --- |
 | `client/application/models-workflows.ts` | `client/application/models/models-workflows.ts` | 310 | the `models` duty carve: §5.6 gives that business the catalogue, the selection and the provider list |
 | `client/application/goal-coordinator.ts` | `client/application/goal/goal-coordinator.ts` | 178 | B1, separating the goal duty from the interaction coordinator (§5.6 `goal`) |
-| `client/application/turn-capabilities.ts` | `client/application/turn/turn-capabilities.ts` | 79 | §8 Phase 1 step 1; §5.6's `turn` row names the turn capability slice as `turn`'s |
+| `client/application/turn-capabilities.ts` | `client/features/turn/application/turn-capabilities.ts` | 79 | §8 Phase 1 step 1; §5.6's `turn` row names the turn capability slice as `turn`'s |
 | `client/projection/event-kinds.ts` | `client/projection/common/event-kinds.ts` | 156 | B1's S9 registry — the one enumeration of the goal and interaction event families, shared by two businesses, so it files at the non-business home (§6.1) rather than under either |
 | `client/projection/rail-menu.ts` | `client/projection/sessions/rail-menu.ts` | 119 | B3's S1 — the rail is a place the user works and the menu is the rail's rule (§4.1) |
 | `client/projection/workspace-name.ts` | `client/projection/workspace/workspace-name.ts` | 23 | B3, moving the rule off `SessionRail.tsx` (§5.6 `workspace`) |
@@ -1831,7 +1831,7 @@ and the honest floor for it. The list is what §12.5 leaves abstract.
 | --- | --- | --- | --- |
 | The generation fence | `test/unit/stream-lease.test.ts` plus `ownsWebuiStreamGeneration` (`application/turn-commands.ts:101`) | machine | 1 |
 | Request attribution | `application/transcript-request-ownership.ts`, asserted through `test/unit/transcript-shape.test.ts` and `test/unit/webui-application-commands.test.ts` — **there is no test file named after that module**, so its coverage is indirect and must be read rather than assumed | machine + reading | 3 (`transcript`) |
-| **Absent optional capability** | `application/turn/turn-commands.ts` guards the path; registered `test/unit/turn-substrate-fences.test.ts:212` asserts the absent-capability exit releases the raw sink exactly once | machine + reading | 1 |
+| **Absent optional capability** | `features/turn/application/turn-commands.ts` guards the path; registered `test/unit/turn-substrate-fences.test.ts:212` asserts the absent-capability exit releases the raw sink exactly once | machine + reading | 1 |
 | Mount and release | `test/unit/webui-shell.test.ts`, `test/unit/connection-health.test.ts` for construction; "exactly one channel per mount" is not machine-checkable today | machine + reading | 2 |
 | Refresh | `test/unit/session-stream-retry.test.ts` | machine | 2 |
 | Reconnect | `test/unit/session-stream-retry.test.ts` | machine | 2 |
@@ -1850,7 +1850,7 @@ says so, and nothing later may imply otherwise.
 
 | file | line | disposition | target | why |
 | --- | ---: | --- | --- | --- |
-| `stream-state.ts` | 182 | **move** | `client/contracts/turn/stream-state.ts` | declares `WebuiStreamState`, `WebuiStreamSubscription`, `WebuiStreamMessage`; its importers are `mechanisms/stream-loop.ts`, `mechanisms/stream-lease.ts` and `projection/stream-state.ts`, all `turn`'s. **Not** the same-named file under `projection/` that §15.3 assigns to `turn` |
+| `stream-state.ts` | 182 | **move** | `client/features/turn/contracts/stream-state.ts` | declares `WebuiStreamState`, `WebuiStreamSubscription`, `WebuiStreamMessage`; its importers are `mechanisms/stream-loop.ts`, `mechanisms/stream-lease.ts` and `projection/stream-state.ts`, all `turn`'s. **Not** the same-named file under `projection/` that §15.3 assigns to `turn` |
 | `slash-command.ts` | 111 | **move** | `client/contracts/composer/slash-command.ts` | declares the palette's vocabulary (`SlashComposerMode`, `SlashPaletteSection`, `classifyWebuiSlashCommand`); importers are `projection/composer-state.ts`, `slash-palette.ts`, `SessionComposer.tsx` |
 | `transcript-view.ts` | 105 | **move** | `client/contracts/transcript/transcript-view.ts` | declares the transcript's render shapes (`WebuiTranscriptItem`, `WebuiTranscriptProcessSegment`); importers are `projection/transcript-*` and `components/transcript/*` |
 | `message-view.ts` | 89 | **move** | `client/contracts/transcript/message-view.ts` | declares the message entity, page and loader — §9's "session-port's message half", which §15.2 assigns to `transcript` |

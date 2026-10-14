@@ -6,7 +6,7 @@ import {
   resolveWebuiSubmissionIntent,
   type WebuiSubmissionIntent,
 } from "../../src/client/features/composer/projection/composer-state.js";
-import { isTurnLive } from "../../src/client/contracts/turn/stream-state.js";
+import { isTurnLive } from "../../src/client/features/turn/contracts/stream-state.js";
 import type { SlashCommandEntry } from "../../src/client/features/composer/ui/slash-palette.js";
 import {
   findWebuiMentionRange,

@@ -138,7 +138,7 @@ describe("layer matrix", () => {
     // test-only instrumentation take it by injection instead of importing it.
     // `client/projection/` classifies by basename, so the `turn/` sub-directory
     // does not change the verdict.
-    expect(classifyLayers("client/projection/turn/stream-state.ts")).toEqual(["view"]);
+    expect(classifyLayers("client/features/turn/projection/stream-state.ts")).toEqual(["view"]);
     // The migrated modules are decided by their directory now, so no
     // provenance entry is needed for them.
     expect(classifyLayers("client/mechanisms/stream-loop.ts")).toEqual(["mechanisms"]);
@@ -206,7 +206,7 @@ describe("layer matrix", () => {
     // (plan §7.2). They moved under `client/application/`, so the prefix rule now
     // carries that verdict and `PROJECTION_SPLIT` is gone.
     expect(classifyLayers("client/application/composer/composer-history.ts")).toEqual(["application"]);
-    expect(classifyLayers("client/application/turn/effect-reducer.ts")).toEqual(["application"]);
+    expect(classifyLayers("client/features/turn/application/effect-reducer.ts")).toEqual(["application"]);
     expect(classifyLayers("client/application/transcript/transcript-request-ownership.ts")).toEqual(["application"]);
   });
 
@@ -246,7 +246,7 @@ describe("layer matrix", () => {
     expect(KNOWN_AMBIGUOUS_FILES).not.toContain("server/service.ts");
     // Entries removed earlier stay removed.
     expect(KNOWN_AMBIGUOUS_FILES).not.toContain(
-      "client/projection/turn/stream-state.ts",
+      "client/features/turn/projection/stream-state.ts",
     );
     expect(KNOWN_AMBIGUOUS_FILES).not.toContain("client/stream.ts");
     expect(KNOWN_AMBIGUOUS_FILES).not.toContain("client/contracts.ts");
@@ -373,7 +373,7 @@ describe("provisional judgements for plan section 7.5 mixed files", () => {
     // The blind spot this fixes: the removed `stream-state.ts` entry would have
     // made every one of its edges look provisional. It is a plain `view` file
     // now, so its violations (if any) are ordinary judgements.
-    expect(touchesAmbiguousFile("client/projection/turn/stream-state.ts", "client/y.ts"))
+    expect(touchesAmbiguousFile("client/features/turn/projection/stream-state.ts", "client/y.ts"))
       .toBe(false);
     // Same for the four entries resolved by this refactor: with the real list
     // empty, none of them makes an edge provisional.

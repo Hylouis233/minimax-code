@@ -16,7 +16,7 @@ import { MessageItem } from "./MessageItem.js";
 import { formatWebuiMessageTimestamp } from "../projection/message-timestamp.js";
 import type { WebuiMessageActionCapabilities } from "../contracts/transcript-view.js";
 import { useWebuiSessionQuestionnaire, useWebuiSessionState, useWebuiSessionStream, useWebuiTranscriptHistoryOwner } from "../../../bindings/use-session-state.js";
-import { isTurnLive } from "../../../contracts/turn/stream-state.js";
+import { isTurnLive } from "../../turn/contracts/stream-state.js";
 import { isWebuiPlanReviewRequest } from "../../interactions/contracts/plan-mode.js";
 import { WebuiTranscriptPlanDelivery } from "./PlanDelivery.js";
 import { WebuiQuestionnaireResponse } from "./QuestionnaireResponse.js";

@@ -58,11 +58,11 @@ const BUSINESSES = [
     // the third view of the same writer surface and belongs to `interactions`;
     // the groups themselves are the two interfaces `session-commands.ts` draws.
     declarations: [
-      { module: "application/turn/turn-capabilities.ts", name: "WebuiTurnCapabilitySlice" },
+      { module: "features/turn/application/turn-capabilities.ts", name: "WebuiTurnCapabilitySlice" },
       { module: "features/sessions/application/session-commands.ts", name: "WebuiStreamPhaseCommands" },
       { module: "features/sessions/application/session-commands.ts", name: "WebuiTurnLifecycleCommands" },
       { module: "features/sessions/application/session-commands.ts", name: "WebuiTurnCommandWriter" },
-      { module: "application/turn/turn-coordinator.ts", name: "WebuiTurnCoordinator" },
+      { module: "features/turn/application/turn-coordinator.ts", name: "WebuiTurnCoordinator" },
     ],
   },
   {

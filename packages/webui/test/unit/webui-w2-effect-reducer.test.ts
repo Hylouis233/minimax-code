@@ -24,19 +24,19 @@ import {
   reduceWebuiEffect,
   type WebuiEffectCommand,
   type WebuiEffectState,
-} from "../../src/client/application/turn/effect-reducer.js";
+} from "../../src/client/features/turn/application/effect-reducer.js";
 import {
   applyWebuiEffectCommands,
   applyWebuiEventToSession,
   type WebuiEffectHandlers,
-} from "../../src/client/application/turn/event-coordinator.js";
+} from "../../src/client/features/turn/application/event-coordinator.js";
 import {
   initialWebuiStreamState,
   isWebuiSubscriptionProbeCurrent,
   reduceWebuiStreamFrame,
   resolveWebuiSubscriptionRecheck,
   type WebuiStreamState,
-} from "../../src/client/projection/turn/stream-state.js";
+} from "../../src/client/features/turn/projection/stream-state.js";
 import {
   initialWebuiWorkspaceProgress,
   reduceWebuiWorkspaceProgressEvent,

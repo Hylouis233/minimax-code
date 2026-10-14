@@ -159,7 +159,7 @@ describe("prohibition 3 — the set of valid values is enumerated in exactly one
   it("goal: no module but the registry and the reducer names a goal kind", () => {
     const naming = clientModules().filter((file) => {
       if (file === "projection/common/event-kinds.ts") return false;
-      if (file === "application/turn/effect-reducer.ts") return false; // §10 S9 keeps the reducer's switch
+      if (file === "features/turn/application/effect-reducer.ts") return false; // §10 S9 keeps the reducer's switch
       if (file === MESSAGE_BLOCK_KINDS) return false; // message-block kinds, not event kinds
       return literal.test(flat(read(file)));
     });
@@ -173,7 +173,7 @@ describe("prohibition 3 — the set of valid values is enumerated in exactly one
     const naming = clientModules().filter(
       (file) =>
         file !== "projection/common/event-kinds.ts" &&
-        file !== "application/turn/effect-reducer.ts" &&
+        file !== "features/turn/application/effect-reducer.ts" &&
         file !== MESSAGE_BLOCK_KINDS &&
         /"(?:permission|questionnaire)\.[a-z_.]+"/u.test(flat(read(file))),
     );

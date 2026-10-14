@@ -1,7 +1,7 @@
 // Turn execution capability port (plan §9; ticket #59).
 //
 // The substrate's four execution members. §9 splits the execution port three
-// ways: these four are `turn`'s (`client/contracts/turn/execution-port.ts`),
+// ways: these four are `turn`'s (`client/features/turn/contracts/execution-port.ts`),
 // `runCommand` and the queue members are the composer's
 // (`client/features/composer/contracts/command-port.ts`), and the process-event
 // watcher is the shell's (`client/contracts/shell/watch-port.ts`).
@@ -14,12 +14,12 @@
 //
 // Every method stays optional — `undefined` means "the operation is not wired".
 
-import type { WebuiAttachmentInput } from "../../../shared/contracts/messages.js";
+import type { WebuiAttachmentInput } from "../../../../shared/contracts/messages.js";
 import type {
   WebuiActiveTurnRequest,
   WebuiActiveTurnResult,
-} from "../../../shared/contracts/session.js";
-import type { WebuiStreamFrame } from "../../../shared/contracts/stream.js";
+} from "../../../../shared/contracts/session.js";
+import type { WebuiStreamFrame } from "../../../../shared/contracts/stream.js";
 
 /**
  * The client's half of an accepted delivery (plan §4.3, §4.3 disposal row).

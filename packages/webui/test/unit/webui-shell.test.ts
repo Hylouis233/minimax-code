@@ -61,7 +61,7 @@ import {
 } from "../../src/client/components/shell/WebuiClientFoundationApp.js";
 import { shellElement } from "../support/shell-fixture.js";
 import type {WebuiClientMessageEnqueuer} from "../../src/client/features/composer/contracts/command-port.js";
-import type {WebuiClientMessageSender, WebuiClientSessionResumer} from "../../src/client/contracts/turn/execution-port.js";
+import type {WebuiClientMessageSender, WebuiClientSessionResumer} from "../../src/client/features/turn/contracts/execution-port.js";
 import type { WebuiClientMessageLoader } from "../../src/client/features/transcript/contracts/message-view.js";
 import type { WebuiTranscriptItem } from "../../src/client/features/transcript/contracts/transcript-view.js";
 import {
@@ -100,7 +100,7 @@ import {
   type WebuiStreamLoopDeps,
   type WebuiStreamLoopSink,
 } from "../../src/client/mechanisms/stream-loop.js";
-import { streamRecoveryProjection } from "../../src/client/projection/turn/stream-recovery.js";
+import { streamRecoveryProjection } from "../../src/client/features/turn/projection/stream-recovery.js";
 
 /**
  * The three writes `buildWebuiComposerHandlers` needs, taken from the **real**
@@ -142,20 +142,20 @@ const loopWithProjection = (
     sink,
   );
 import { createSessionOperation } from "../../src/server/operation/operations.js";
-import { stopWebuiTurn } from "../../src/client/application/turn/turn-coordinator.js";
+import { stopWebuiTurn } from "../../src/client/features/turn/application/turn-coordinator.js";
 import {
   initialWebuiStreamState,
   ownsWebuiStreamGeneration,
   reduceWebuiStreamFrame,
   settleAbortedStream,
   type WebuiStreamState,
-} from "../../src/client/projection/turn/stream-state.js";
+} from "../../src/client/features/turn/projection/stream-state.js";
 import { WebuiProgressOverviewPanel, WebuiProgressPanel, WebuiSubagentsPanel, WebuiWorkspacePanel, WebuiWorkspacePanelControls } from "../../src/client/features/workspace/ui/WorkspacePanels.js";
 import { projectWebuiTodos } from "../../src/client/features/workspace/projection/panel-projection.js";
 import { initialWorkspacePanelState, reduceWorkspacePanelState } from "../../src/client/features/workspace/projection/workspace-panel-state.js";
 import type { WebuiStreamFrame } from "../../src/shared/contracts/stream.js";
 import type { WebuiWorkspaceEnvironment } from "../../src/shared/contracts/workspace.js";
-import { streamStateBundle } from "../../src/client/application/turn/stream-state-bundle.js";
+import { streamStateBundle } from "../../src/client/features/turn/application/stream-state-bundle.js";
 
 function renderShell(label = "webui-foundation"): string {
   return renderToStaticMarkup(

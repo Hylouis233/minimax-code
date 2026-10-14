@@ -28,7 +28,7 @@ import type {
 import { initialWebuiSessionActivity } from "../features/sessions/projection/session-activity.js";
 import type { WebuiSessionCatalogState } from "../features/sessions/application/session-catalog.js";
 import { initialWebuiSessionCatalogState } from "../features/sessions/application/session-catalog.js";
-import type { WebuiStreamState } from "../projection/turn/stream-state.js";
+import type { WebuiStreamState } from "../features/turn/projection/stream-state.js";
 import type { WebuiGoal } from "../../shared/contracts/goal.js";
 import type { WebuiTranscriptHistoryWriter } from "../conversation/transcript-history.js";
 import type {

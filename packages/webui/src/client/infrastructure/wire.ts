@@ -13,7 +13,7 @@
 // `client/infrastructure/transport.ts`. Wire lifecycle mechanics here, domain
 // method tables there is the whole split.
 
-import type { WebuiDeliveryHandle } from "../contracts/turn/execution-port.js";
+import type { WebuiDeliveryHandle } from "../features/turn/contracts/execution-port.js";
 import type { WebuiStreamFrame } from "../../shared/contracts/stream.js";
 import type { WebuiTerminalFrame } from "../../shared/contracts/terminal.js";
 import {

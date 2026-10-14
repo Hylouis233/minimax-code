@@ -10,18 +10,18 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { createWebuiActiveTurnProbe, webuiActiveTurnProbeFor } from "../../src/client/application/turn/active-turn-probe.js";
+import { createWebuiActiveTurnProbe, webuiActiveTurnProbeFor } from "../../src/client/features/turn/application/active-turn-probe.js";
 import {
   createWebuiUnreadController,
   type WebuiUnreadStore,
 } from "../../src/client/features/sessions/application/unread.js";
-import { queueWebuiTurn } from "../../src/client/application/turn/queue-command.js";
+import { queueWebuiTurn } from "../../src/client/features/turn/application/queue-command.js";
 import {
   recoverMissedWebuiTurn,
   recheckWebuiSubscription,
   sendWebuiTurn,
-} from "../../src/client/application/turn/turn-commands.js";
-import { initialWebuiStreamState } from "../../src/client/projection/turn/stream-state.js";
+} from "../../src/client/features/turn/application/turn-commands.js";
+import { initialWebuiStreamState } from "../../src/client/features/turn/projection/stream-state.js";
 import {
   createWebuiSessionStore,
   createWebuiTranscriptHistoryWriter,

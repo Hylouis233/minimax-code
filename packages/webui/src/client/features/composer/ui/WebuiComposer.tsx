@@ -108,7 +108,7 @@ import {
   useWebuiAccountWorkflows,
   useWebuiAccountWorkflowsState,
 } from "../../../features/account/bindings/use-account-workflows.js";
-import { webuiSessionStatusType } from "../../../projection/turn/stream-state.js";
+import { webuiSessionStatusType } from "../../turn/projection/stream-state.js";
 
 import type {
   WebuiGoal,
@@ -150,7 +150,7 @@ import {
   resolveWebuiSubmissionIntent,
   resolveWebuiComposerEnterAction,
 } from "../projection/composer-state.js";
-import { isTurnLive } from "../../../contracts/turn/stream-state.js";
+import { isTurnLive } from "../../turn/contracts/stream-state.js";
 import {
   submitWebuiGoal,
 } from "../application/composer-workflows.js";
@@ -607,7 +607,7 @@ export function WebuiComposer({
         );
     });
     // The attach/recheck/gap-recovery commands live in the application layer
-    // (`application/turn/turn-commands.ts`), behind the binding: the probe, the
+    // (`features/turn/application/turn-commands.ts`), behind the binding: the probe, the
     // store writer, the attempt's sink and the record key are all chosen there.
     // This component submits intents and holds no factory of its own (T04).
     const attachToTurn = (turnId: string | undefined) => {

@@ -35,14 +35,14 @@ import {
   runWebuiStreamLoop,
   type WebuiStreamLoopSink,
 } from "../../src/client/mechanisms/stream-loop.js";
-import { streamStateBundle } from "../../src/client/application/turn/stream-state-bundle.js";
-import { streamRecoveryProjection } from "../../src/client/projection/turn/stream-recovery.js";
+import { streamStateBundle } from "../../src/client/features/turn/application/stream-state-bundle.js";
+import { streamRecoveryProjection } from "../../src/client/features/turn/projection/stream-recovery.js";
 import {
   createWebuiSessionStore,
   type WebuiSessionStore,
 } from "../../src/client/application/session-store.js";
-import type {WebuiClientMessageSender} from "../../src/client/contracts/turn/execution-port.js";
-import type {WebuiClientSessionResumer} from "../../src/client/contracts/turn/execution-port.js";
+import type {WebuiClientMessageSender} from "../../src/client/features/turn/contracts/execution-port.js";
+import type {WebuiClientSessionResumer} from "../../src/client/features/turn/contracts/execution-port.js";
 import type { WebuiClientMessageLoader } from "../../src/client/features/transcript/contracts/message-view.js";
 import type { WebuiStreamFrame } from "../../src/shared/contracts/stream.js";
 

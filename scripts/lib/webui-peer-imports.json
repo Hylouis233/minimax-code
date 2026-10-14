@@ -13,17 +13,17 @@
     },
     {
       "from": "client/features/sessions/application/unread.ts",
-      "to": "client/application/turn/active-turn-probe.ts",
+      "to": "client/features/turn/application/active-turn-probe.ts",
       "reason": "The unread controller decides whether a session is still working by asking the turn business for its active-turn probe; before the sessions owner moved into features/sessions/ both files sat in the application layer, so the edge was intra-layer. The probe is a turn read that turn has not published as a public contract yet; the entry goes when it does."
     },
     {
       "from": "client/features/sessions/application/session-commands.ts",
-      "to": "client/projection/turn/stream-state.ts",
+      "to": "client/features/turn/projection/stream-state.ts",
       "reason": "Session commands read the turn stream state to decide whether a session is mid-turn before they submit a lifecycle command. Both files were in the application/projection layers before the sessions owner moved, so the edge was intra-layer; it becomes a reviewed peer edge until turn publishes that read."
     },
     {
       "from": "client/features/sessions/application/session-commands.ts",
-      "to": "client/application/turn/stream-state-bundle.ts",
+      "to": "client/features/turn/application/stream-state-bundle.ts",
       "reason": "The same mid-turn decision reads the turn bundle. Reviewed peer edge until turn publishes its contracts."
     },
     {
@@ -153,7 +153,7 @@
     },
     {
       "from": "client/features/goal/projection/goal-state.ts",
-      "to": "client/projection/turn/stream-state.ts",
+      "to": "client/features/turn/projection/stream-state.ts",
       "reason": "The goal projection reads the turn business's stream-message shape to recognise an already-recorded goal inside a streamed reply. Both files sat in the `projection/` layer before T05 moved goal into its feature home, so the edge was intra-layer; it becomes a reviewed peer edge until turn publishes that view type from its contracts."
     },
     {
@@ -173,22 +173,22 @@
     },
     {
       "from": "client/features/composer/application/composer-workflows.ts",
-      "to": "client/application/turn/queue-command.ts",
+      "to": "client/features/turn/application/queue-command.ts",
       "reason": "The composer's submit workflow enqueues through the turn business's queue command. Both sat in the application layer before T13 moved the composer owner; reviewed peer edge until turn publishes the queue command as a public contract."
     },
     {
       "from": "client/features/composer/application/composer-workflows.ts",
-      "to": "client/projection/turn/stream-state.ts",
+      "to": "client/features/turn/projection/stream-state.ts",
       "reason": "The submit workflow reads the turn stream state to decide whether a send is a send or an enqueue. Reviewed peer edge until turn publishes that read from its contracts."
     },
     {
       "from": "client/features/composer/application/composer-workflows.ts",
-      "to": "client/projection/turn/stream-recovery.ts",
+      "to": "client/features/turn/projection/stream-recovery.ts",
       "reason": "The same workflow composes the turn business's recovery policy when a send resumes after a stream error. Reviewed peer edge until turn publishes the recovery contract."
     },
     {
       "from": "client/features/composer/application/composer-workflows.ts",
-      "to": "client/application/turn/stream-state-bundle.ts",
+      "to": "client/features/turn/application/stream-state-bundle.ts",
       "reason": "The workflow consumes the turn bundle the stream loop takes, the same bundle the session commands read. Reviewed peer edge until turn publishes it."
     },
     {
@@ -253,7 +253,7 @@
     },
     {
       "from": "client/features/composer/ui/WebuiComposer.tsx",
-      "to": "client/projection/turn/stream-state.ts",
+      "to": "client/features/turn/projection/stream-state.ts",
       "reason": "The composer reads the turn stream state for its live-column phase decisions. Reviewed peer edge until turn publishes the state as a public contract."
     },
     {

@@ -1,5 +1,5 @@
 // The turn commands the composer runs through the application layer
-// (plan §7.1 `application/turn/turn-coordinator.ts`: "owns send/queue/stop/retry").
+// (plan §7.1 `features/turn/application/turn-coordinator.ts`: "owns send/queue/stop/retry").
 //
 // The stop command already lives in `turn-coordinator.ts`. This module moves
 // the rest of the composer's owned execution out of the 3000-line component and
@@ -17,41 +17,41 @@
 // preserved verbatim. Nothing here opens a channel: the process-event ingress
 // stays exactly where it is.
 
-import type {WebuiClientMessageEnqueuer} from "../../features/composer/contracts/command-port.js";
-import type {WebuiClientSessionResumer} from "../../contracts/turn/execution-port.js";
-import type { WebuiClientMessageLoader } from "../../features/transcript/contracts/message-view.js";
-import type { WebuiClientSessionCreator } from "../../contracts/sessions/session-port.js";
-import type { WebuiAttachmentInput } from "../../../shared/contracts/messages.js";
-import type { WebuiTurnCommandWriter } from "../../features/sessions/application/session-commands.js";
+import type {WebuiClientMessageEnqueuer} from "../../composer/contracts/command-port.js";
+import type {WebuiClientSessionResumer} from "../contracts/execution-port.js";
+import type { WebuiClientMessageLoader } from "../../transcript/contracts/message-view.js";
+import type { WebuiClientSessionCreator } from "../../../contracts/sessions/session-port.js";
+import type { WebuiAttachmentInput } from "../../../../shared/contracts/messages.js";
+import type { WebuiTurnCommandWriter } from "../../sessions/application/session-commands.js";
 import {
   buildWebuiComposerHandlers,
   submitWebuiComposerTurn,
   type WebuiComposerSubmitHandlers,
   type WebuiComposerTurnCallbacks,
-} from "../../features/composer/application/composer-workflows.js";
-import { isWebuiSubscriptionProbeCurrent, ownsWebuiStreamGeneration, resolveWebuiSubscriptionRecheck, type WebuiStreamState } from "../../projection/turn/stream-state.js";
-import { streamRecoveryProjection } from "../../projection/turn/stream-recovery.js";
+} from "../../composer/application/composer-workflows.js";
+import { isWebuiSubscriptionProbeCurrent, ownsWebuiStreamGeneration, resolveWebuiSubscriptionRecheck, type WebuiStreamState } from "../projection/stream-state.js";
+import { streamRecoveryProjection } from "../projection/stream-recovery.js";
 import {
   runWebuiStreamLoop,
   type WebuiStreamLoopDeps,
   type WebuiStreamLoopSink,
-} from "../../mechanisms/stream-loop.js";
+} from "../../../mechanisms/stream-loop.js";
 import {
   webuiActiveTurnProbeFor,
   type WebuiActiveTurnProbe,
   type WebuiActiveTurnProbeFn,
 } from "./active-turn-probe.js";
 import { streamStateBundle } from "./stream-state-bundle.js";
-import type { WebuiSessionStore } from "../session-store.js";
-import { WEBUI_HOME_SESSION_KEY } from "../state.js";
+import type { WebuiSessionStore } from "../../../application/session-store.js";
+import { WEBUI_HOME_SESSION_KEY } from "../../../application/state.js";
 import {
   createWebuiStreamPhaseCommands,
   createWebuiTurnCommands,
   createWebuiTurnLifecycleCommands,
-} from "../../features/sessions/application/session-commands.js";
+} from "../../sessions/application/session-commands.js";
 import type { WebuiTurnCapabilitySlice } from "./turn-capabilities.js";
 import type { WebuiDeliveryDisposers } from "./delivery-disposers.js";
-import type { WebuiSessionScopeManager } from "../../conversation/session-scope.js";
+import type { WebuiSessionScopeManager } from "../../../conversation/session-scope.js";
 import { stopWebuiTurn } from "./turn-coordinator.js";
 
 export interface WebuiAttachTurnDeps {

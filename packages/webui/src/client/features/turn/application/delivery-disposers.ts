@@ -12,7 +12,7 @@
 // host mutation — cancelling those stays an explicit command (`stop`), because a
 // detached observer and a cancelled turn are different things (ADR 0017).
 
-import type { WebuiDeliveryHandle } from "../../contracts/turn/execution-port.js";
+import type { WebuiDeliveryHandle } from "../contracts/execution-port.js";
 
 export interface WebuiDeliveryDisposers {
   /**

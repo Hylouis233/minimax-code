@@ -21,8 +21,8 @@ import type { WebuiSessionActivityMap } from "../features/sessions/projection/se
 import { initialWebuiSessionActivity } from "../features/sessions/projection/session-activity.js";
 import type { WebuiSessionCatalogState } from "../features/sessions/application/session-catalog.js";
 import { initialWebuiSessionCatalogState } from "../features/sessions/application/session-catalog.js";
-import { initialWebuiStreamState } from "../projection/turn/stream-state.js";
-import type { WebuiStreamState } from "../projection/turn/stream-state.js";
+import { initialWebuiStreamState } from "../features/turn/projection/stream-state.js";
+import type { WebuiStreamState } from "../features/turn/projection/stream-state.js";
 import type { WebuiClientMessagePage } from "../features/transcript/contracts/message-view.js";
 
 export interface WebuiApplicationTranscriptState {

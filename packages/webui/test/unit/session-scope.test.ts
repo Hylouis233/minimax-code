@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import { createWebuiSessionScopeManager } from "../../src/client/conversation/session-scope.js";
 import { createWebuiApplication } from "../../src/client/application/create-application.js";
-import type { WebuiClientSessionResumer } from "../../src/client/contracts/turn/execution-port.js";
+import type { WebuiClientSessionResumer } from "../../src/client/features/turn/contracts/execution-port.js";
 
 describe("session scope — selection is one lease among several", () => {
   it("activates the selected session's scope", () => {

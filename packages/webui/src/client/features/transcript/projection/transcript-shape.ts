@@ -34,7 +34,7 @@
 import type { WebuiClientMessage, WebuiMessageAttachment } from "../contracts/message-view.js";
 import type { WebuiTranscriptItem, WebuiTranscriptProcessSegment, WebuiTranscriptActivityPart } from "../contracts/transcript-view.js";
 import type { WebuiTransport } from "../../../contracts/transport.js";
-import type { WebuiStreamMessage } from "../../../contracts/turn/stream-state.js";
+import type { WebuiStreamMessage } from "../../turn/contracts/stream-state.js";
 import type { WebuiTurnDiffView } from "../../../../shared/contracts/session.js";
 import type { WebuiMessageActionCapabilities } from "../contracts/transcript-view.js";
 import {

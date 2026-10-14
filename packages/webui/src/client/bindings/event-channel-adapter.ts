@@ -2,7 +2,7 @@
 // bridge).
 //
 // The application event coordinator consumes a `WebuiProcessEventChannel`
-// (`application/turn/event-channel.ts`); the only concrete source of that stream is
+// (`features/turn/application/event-channel.ts`); the only concrete source of that stream is
 // the transport's `watchEvents` socket. This module is the adapter between the
 // two: it turns the transport's event frames into the application channel shape
 // the coordinator subscribes to.
@@ -23,7 +23,7 @@
 import type {
   WebuiOpenEventChannel,
   WebuiProcessEventChannel,
-} from "../application/turn/event-channel.js";
+} from "../features/turn/application/event-channel.js";
 import type {WebuiClientEventWatcher} from "../contracts/shell/watch-port.js";
 
 /**

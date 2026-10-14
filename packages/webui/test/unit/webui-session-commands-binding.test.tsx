@@ -36,7 +36,7 @@ import {
   createWebuiSessionStore,
   type WebuiSessionStore,
 } from "../../src/client/application/session-store.js";
-import type { WebuiTurnCapabilityPort } from "../../src/client/application/turn/turn-capabilities.js";
+import type { WebuiTurnCapabilityPort } from "../../src/client/features/turn/application/turn-capabilities.js";
 import type { WebuiStreamFrame } from "../../src/shared/contracts/stream.js";
 
 const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));

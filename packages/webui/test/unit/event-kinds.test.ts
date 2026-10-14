@@ -82,7 +82,7 @@ describe("the registry answers for the kinds it owns", () => {
 
 /** Every goal or interaction label the effect reducer switches on. */
 function reducerKindLabels(): readonly string[] {
-  const source = squashWhitespace(readWebuiSource("application/turn/effect-reducer.ts"));
+  const source = squashWhitespace(readWebuiSource("features/turn/application/effect-reducer.ts"));
   const labels = source.match(
     /case "(?:thread_goal|permission|questionnaire)\.[a-z_.]+":/gu,
   );

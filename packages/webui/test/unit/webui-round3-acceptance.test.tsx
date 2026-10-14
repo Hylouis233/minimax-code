@@ -42,7 +42,7 @@ import {
   DEFAULT_THINKING_PHRASE_ROTATION_INTERVAL_MS,
 } from "../../src/client/features/transcript/ui/ActivityIndicator.js";
 import { computeThinkingPhraseStartDelay, pickWeightedPhrase, shouldPlayActivityIndicator, bucketPhrases, type ThinkingPhraseSet } from "../../src/client/ui/activity-phrase.js";
-import { initialWebuiStreamState, reduceWebuiStreamFrame } from "../../src/client/projection/turn/stream-state.js";
+import { initialWebuiStreamState, reduceWebuiStreamFrame } from "../../src/client/features/turn/projection/stream-state.js";
 import {
   getSessionDiffOperation,
   getTurnDiffOperation,

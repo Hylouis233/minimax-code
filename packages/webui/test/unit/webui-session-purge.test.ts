@@ -45,10 +45,10 @@ import { WEBUI_HOME_SESSION_KEY } from "../../src/client/application/state.js";
 import {
   initialWebuiStreamState,
   type WebuiStreamState,
-} from "../../src/client/projection/turn/stream-state.js";
+} from "../../src/client/features/turn/projection/stream-state.js";
 import type { WebuiStreamLoopExtra } from "../../src/client/mechanisms/stream-loop.js";
 import { buildWebuiStreamLoopSink } from "../../src/client/mechanisms/stream-loop.js";
-import { streamStateBundle } from "../../src/client/application/turn/stream-state-bundle.js";
+import { streamStateBundle } from "../../src/client/features/turn/application/stream-state-bundle.js";
 import type { WebuiSessionActivityMap } from "../../src/client/features/sessions/projection/session-activity.js";
 import type { WebuiClientSession } from "../../src/client/contracts/sessions/session-view.js";
 import type { WebuiSessionListItem } from "../../src/shared/contracts/session.js";

@@ -10,14 +10,14 @@ import type {
   WebuiWorkspaceSubagentStatus,
   WebuiWorkspaceSubagent,
   WebuiWorkspaceProgressState,
-} from "../../../contracts/turn/stream-state.js";
+} from "../../turn/contracts/stream-state.js";
 export type {
   WebuiWorkspaceTodoStatus,
   WebuiWorkspaceTodo,
   WebuiWorkspaceSubagentStatus,
   WebuiWorkspaceSubagent,
   WebuiWorkspaceProgressState,
-} from "../../../contracts/turn/stream-state.js";
+} from "../../turn/contracts/stream-state.js";
 
 export const initialWebuiWorkspaceProgress: WebuiWorkspaceProgressState = {
   todos: [],

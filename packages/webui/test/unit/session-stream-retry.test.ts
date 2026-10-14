@@ -1,5 +1,5 @@
 // Unit tests for the turn coordinator's manual retry — the manual arm of the
-// stream loop's recovery, now owned by `application/turn/turn-coordinator.ts`
+// stream loop's recovery, now owned by `features/turn/application/turn-coordinator.ts`
 // (ticket #45, the atomic ingress flip).
 //
 // This suite used to drive `client/session-stream-retry.ts`. That module is
@@ -21,9 +21,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createWebuiApplication } from "../../src/client/application/create-application.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
-import type { WebuiProcessEventChannel } from "../../src/client/application/turn/event-channel.js";
-import type {WebuiClientSessionResumer} from "../../src/client/contracts/turn/execution-port.js";
-import type { WebuiStreamState } from "../../src/client/projection/turn/stream-state.js";
+import type { WebuiProcessEventChannel } from "../../src/client/features/turn/application/event-channel.js";
+import type {WebuiClientSessionResumer} from "../../src/client/features/turn/contracts/execution-port.js";
+import type { WebuiStreamState } from "../../src/client/features/turn/projection/stream-state.js";
 
 type ResumeRequest = Parameters<WebuiClientSessionResumer>[0];
 

@@ -56,13 +56,13 @@ import type { SessionPort } from "../contracts/sessions/session-port.js";
 import type { SettingsPort } from "../features/settings/contracts/settings-port.js";
 import type { ShellEventPort } from "../contracts/shell/watch-port.js";
 import type { TranscriptPort } from "../features/transcript/contracts/session-read-port.js";
-import type { TurnExecutionPort } from "../contracts/turn/execution-port.js";
+import type { TurnExecutionPort } from "../features/turn/contracts/execution-port.js";
 import type { TerminalPort } from "../features/terminal/contracts/terminal-port.js";
 import type { WorkspacePort } from "../features/workspace/contracts/workspace-port.js";
 import {
   createWebuiTurnCapabilitySlice,
   type WebuiTurnCapabilitySlice,
-} from "./turn/turn-capabilities.js";
+} from "../features/turn/application/turn-capabilities.js";
 
 /**
  * The port object the slices are cut from. `WebuiTransport` satisfies it

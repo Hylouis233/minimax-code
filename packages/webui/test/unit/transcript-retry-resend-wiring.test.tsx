@@ -87,7 +87,7 @@ import {
   WebuiSessionStoreProvider,
 } from "../../src/client/bindings/application-context.js";
 import { createWebuiApplication } from "../../src/client/application/create-application.js";
-import { initialWebuiStreamState } from "../../src/client/projection/turn/stream-state.js";
+import { initialWebuiStreamState } from "../../src/client/features/turn/projection/stream-state.js";
 import type { WebuiStreamLoopSink } from "../../src/client/mechanisms/stream-loop.js";
 
 /**

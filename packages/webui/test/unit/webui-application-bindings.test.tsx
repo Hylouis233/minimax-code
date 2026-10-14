@@ -11,9 +11,9 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { createWebuiApplication } from "../../src/client/application/create-application.js";
-import type { WebuiProcessEventChannel } from "../../src/client/application/turn/event-channel.js";
+import type { WebuiProcessEventChannel } from "../../src/client/features/turn/application/event-channel.js";
 import type { WebuiRuntimeEvent } from "../../src/shared/contracts/stream.js";
-import type {WebuiClientSessionResumer} from "../../src/client/contracts/turn/execution-port.js";
+import type {WebuiClientSessionResumer} from "../../src/client/features/turn/contracts/execution-port.js";
 import {
   WebuiApplicationProvider,
   useWebuiSessionStoreSnapshot,

@@ -8,10 +8,10 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { createWebuiDeliveryDisposers } from "../../src/client/application/turn/delivery-disposers.js";
-import { createWebuiConversationTurnCommands } from "../../src/client/application/turn/turn-commands.js";
+import { createWebuiDeliveryDisposers } from "../../src/client/features/turn/application/delivery-disposers.js";
+import { createWebuiConversationTurnCommands } from "../../src/client/features/turn/application/turn-commands.js";
 import { createWebuiApplication } from "../../src/client/application/create-application.js";
-import type { WebuiClientSessionResumer } from "../../src/client/contracts/turn/execution-port.js";
+import type { WebuiClientSessionResumer } from "../../src/client/features/turn/contracts/execution-port.js";
 
 function handle() {
   const closed = vi.fn();

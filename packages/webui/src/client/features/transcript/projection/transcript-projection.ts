@@ -3,7 +3,7 @@
 
 import type { WebuiClientMessage, WebuiClientMessagePage, WebuiQueryCollapseView } from "../contracts/message-view.js";
 import type { WebuiTranscriptItem, WebuiTranscriptActivityPart, WebuiTranscriptProcessSegment } from "../contracts/transcript-view.js";
-import type { WebuiStreamMessage } from "../../../contracts/turn/stream-state.js";
+import type { WebuiStreamMessage } from "../../turn/contracts/stream-state.js";
 import { readUsageNumber } from "./message-projection.js";
 
 /** A render block: one user bubble, or one assistant turn. The transcript

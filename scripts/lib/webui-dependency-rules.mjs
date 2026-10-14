@@ -184,10 +184,10 @@ export const ALLOWED_EDGES = Object.freeze({
  * genuinely two-layer file appears, add it here *and* implement symbol-level
  * ownership — the list alone only surfaces the violation, it does not decide it.
  *
- * `client/projection/turn/stream-state.ts` used to be listed here. It has since
+ * `client/features/turn/projection/stream-state.ts` used to be listed here. It has since
  * become a pure `view` projection: `classifyLayers` gives it exactly `view`,
  * its only imports are shared contracts, the leaf
- * `client/contracts/turn/stream-state.ts` declarations and the `workspace-progress`
+ * `client/features/turn/contracts/stream-state.ts` declarations and the `workspace-progress`
  * projection, and no mechanism reaches into it any more. Listing it
  * contradicted that classification, so the entry was removed rather than left
  * asserting a mixture that no longer exists.

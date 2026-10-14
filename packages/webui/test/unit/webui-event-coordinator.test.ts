@@ -12,9 +12,9 @@
 
 import { describe, expect, it } from "vitest";
 
-import { createWebuiEventCoordinator } from "../../src/client/application/turn/event-coordinator.js";
+import { createWebuiEventCoordinator } from "../../src/client/features/turn/application/event-coordinator.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
-import { createWebuiStreamLeaseController } from "../../src/client/application/turn/stream-lease-controller.js";
+import { createWebuiStreamLeaseController } from "../../src/client/features/turn/application/stream-lease-controller.js";
 import { createWebuiUnreadController } from "../../src/client/features/sessions/application/unread.js";
 import { createWebuiGoalSessionOwners } from "../../src/client/features/goal/application/goal-session-owners.js";
 

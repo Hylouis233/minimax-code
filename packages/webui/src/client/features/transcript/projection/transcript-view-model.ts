@@ -19,7 +19,7 @@
 //   `推理中…` indicator renders exactly once and always trails the transcript.
 
 import type { WebuiClientMessagePage } from "../contracts/message-view.js";
-import { isTurnLive } from "../../../contracts/turn/stream-state.js";
+import { isTurnLive } from "../../turn/contracts/stream-state.js";
 import { projectWebuiTranscriptMessage } from "./message-projection.js";
 import {
   groupWebuiTranscriptItems,
