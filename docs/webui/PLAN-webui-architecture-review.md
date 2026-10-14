@@ -460,7 +460,7 @@ W1–W3 replace the event lifecycle as a coherent unit: never operate old view r
 
 ### 9.1 Required verification boundaries
 
-Use repository-declared `test/vitest-suites.json` registrations and `scripts/verify.mjs`. Relevant existing seams include `query-store.test.ts`, `goal-coordinator.test.ts`, `turn-substrate-fences.test.ts`, `webui-event-effects-registry.test.ts`, `webui-application-event-effects.test.ts`, `workspace-queries.test.ts`, `models-workflows.test.ts`, `webui-operation-wire-compatibility.test.ts`, `webui-host-shape-invariant.test.ts`, `integration/loopback-harness-path.test.ts` and `test/webui-browser/`.
+Use repository-declared `test/vitest-suites.json` registrations and `scripts/verify.mjs`. Relevant existing seams include `query-store.test.ts`, `goal-coordinator.test.ts`, `turn-substrate-fences.test.ts`, `webui-event-effects-registry.test.ts`, `webui-application-event-effects.test.ts`, `workspace-queries.test.ts`, `models-workflows.test.ts`, `webui-host-shape-invariant.test.ts`, `integration/loopback-harness-path.test.ts` and `test/webui-browser/`.
 
 Tests must use the assembled application's public commands/ingress and real imported owners where they claim ownership behavior. A mock channel proves application routing only; a fake socket proves frame semantics only. Add adversarial scheduling and positive event counts so empty traces cannot pass. Run the old failure scenario before the correction. Never create a second hand-written expected implementation.
 

@@ -282,15 +282,12 @@ Edit in this order so each layer compiles against the previous one:
     the dev launcher rebuilds the port from `createHarnessPortFromHost(assembled.host)` while unit
     tests use `assembled.harnessPort`, so enriching only the inner port keeps every gate green and
     breaks the live server with `runtime host does not expose the <method> client`.
-13. `test/unit/webui-operation-wire-compatibility.test.ts` — the roster counts. `BASELINE_OPERATION_NAMES`
-    comes from the frozen registry, but the numbers that pin it are expectations in this file:
-    `expect(BASELINE_OPERATION_NAMES).toHaveLength(99)`, its set size, and the production split
-    (`Object.keys(WEBUI_OPERATION_BINDINGS)` 86 + `DEDICATED_OPERATION_NAMES` 13 = 99). A new
-    operation breaks all of them, with messages that read as frozen-baseline drift rather than as
-    "you added an operation", so bump them in the same change — after checking that the roster really
+13. `test/unit/webui-operation-binding.test.ts` — the roster counts:
+    `expect(Object.keys(WEBUI_OPERATION_BINDINGS)).toHaveLength(86)`,
+    `expect(DEDICATED_OPERATION_NAMES).toHaveLength(13)` and the union's size 99. A new operation
+    breaks all of them, so bump them in the same change — after checking that the roster really
     grew. When the operation keeps a binding, bump `expect(createBindingEntries(port).size)` in
-    `test/unit/webui-host-shape-invariant.test.ts` too. Never edit the frozen registry itself; see
-    `test/unit/legacy-protocol/README.md`.
+    `test/unit/webui-host-shape-invariant.test.ts` too.
 
 ### Splitting or moving a module
 

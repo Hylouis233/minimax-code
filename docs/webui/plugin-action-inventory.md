@@ -143,10 +143,9 @@ member. The slash-palette read is a different one and is not among the 29 (first
 source says otherwise:
 
 - `"listRuntimeSkills"` occurs **nowhere** in `packages/webui/src/client/`, `server/service.ts` or the
-  runtime adapters except as a union value, a validator entry and the frozen legacy copies under
-  `test/unit/legacy-protocol/`. Measured over `packages/`, `test/` and `scripts/`: every other occurrence
-  is in another package's own skill service (`packages/local-runtime`, `packages/local-runtime-v2`,
-  `packages/tui`), not on WebUI's wire.
+  runtime adapters except as a union value and a validator entry. Measured over `packages/`, `test/`
+  and `scripts/`: every other occurrence is in another package's own skill service
+  (`packages/local-runtime`, `packages/local-runtime-v2`, `packages/tui`), not on WebUI's wire.
 - The palette's two reads are `listSkills` (`settings-port.ts:57`, operation `listSkills`,
   `shared/operation-names.ts:67`, called at `SessionComposer.tsx:1057`) and `listInstalledPlugins`
   (`:1020`).

@@ -45,7 +45,7 @@ One row per authoritative resource, read from the source at the pinned baseline.
 
 | Surface | Size | Record |
 | --- | --- | --- |
-| Wire operations | 99 (86 binding entries + 13 dedicated handlers) | `shared/operation-names.ts`; pinned by `test/unit/webui-operation-wire-compatibility.test.ts` and `test/unit/webui-host-shape-invariant.test.ts` |
+| Wire operations | 99 (86 binding entries + 13 dedicated handlers) | `shared/operation-names.ts`; pinned by `test/unit/webui-operation-binding.test.ts` and `test/unit/webui-host-shape-invariant.test.ts` |
 | Browser capability ports | 13, joined by `client/contracts/transport.ts` (every method optional) | one directory per business under `client/contracts/` |
 | Published command declarations | 73 member rows across 4 businesses (turn, interactions, composer, goal) | generated `docs/webui/command-surface.md` |
 
