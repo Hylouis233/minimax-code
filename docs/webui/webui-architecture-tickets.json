@@ -1092,7 +1092,9 @@
       "6b12d0c0",
       "53b5dd5c",
       "71cd9f8b",
-      "d2567749"
+      "d2567749",
+      "5bf31c63",
+      "1e7b38e4"
     ],
     "published": false,
     "tickets": {
@@ -1106,7 +1108,7 @@
       "T14": "closed 2026-10-14 (issue #140, comment 6156919983): the host assembles the registry and the terminal-process port; the service binds what it was handed",
       "T07": "reopened 2026-10-14 - criterion 5 unmet: the rail's pure grouping/filtering is still in features/sessions/ui/SessionRail.tsx (lines 58-218); the close comment claimed it had moved to features/sessions/projection/",
       "T09": "reopened 2026-10-14 - criterion 6 half unmet: account contracts/projection/UI moved, but the account bindings are still in client/bindings/use-query-state.tsx",
-      "T11": "in progress: five owners behind one composer, closed-tab interest release, archive/canvas/directory-browse outcomes and freshness, and the panel/tab state moved out of the shell into WebuiWorkspacePanelOwner (d2567749, browser-verified); the preview half and the criterion-6 audit remain"
+      "T11": "closed 2026-10-14 (local; issue #137 evidence pending publication): five owners behind one composer, closed-tab interest release, archive/canvas/directory-browse outcomes and freshness, the panel/tab state owned by WebuiWorkspacePanelOwner, the archive/canvas ports off the panel's props, and the criterion-6 evidence: inline supersession, workspace aliases, invalidation bursts and the public panel actions in the built client"
     },
     "frontier": [
       "T08",
