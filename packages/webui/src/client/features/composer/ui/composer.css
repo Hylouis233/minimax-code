@@ -456,8 +456,15 @@
     cursor: pointer;
   }
 
-  .webui-model-selector,
-  .webui-workspace-menu {
+  /* Only the model selector needs a positioning context here. The workspace
+   * menu is `position: absolute` in the composer shell, and it was in that
+   * original order too: this grouped rule sat *before* the absolute one, so the
+   * relative declaration never applied to the workspace menu. After the split
+   * the two rules ended up in different files and the bundle put this one last,
+   * which made `relative` win and pushed the panel into the document flow —
+   * the home composer grew by the panel's height. Dropping the selector keeps
+   * the effective result the split was supposed to preserve. */
+  .webui-model-selector {
     position: relative;
   }
   /* The thinking trigger. Three tones, and the third is the one that matters:
