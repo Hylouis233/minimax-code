@@ -14,7 +14,14 @@ export function createInteractionsAdapter(
 ): Pick<WebuiHarnessPort, "listPendingPermissions" | "getPendingQuestionnaire" | "replyPermission" | "replyQuestionnaire" | "dismissQuestionnaire"> {
   return {
     async listPendingPermissions() {
-      return requireCliService(host).listPendingPermissions();
+      // The runtime's result makes `requests` optional
+      // (`ListPendingPermissionsResult.requests?`) and omits it when nothing is
+      // pending, while the port promises an array. Normalise here rather than in
+      // every reader — the client already defends with `?? []`
+      // (`interaction-coordinator.ts:183`). The runtime's own input type is an
+      // empty record, so the absent argument is not a dropped request field.
+      const result = await requireCliService(host).listPendingPermissions();
+      return { requests: result.requests ?? [] };
     },
 
     async getPendingQuestionnaire(request) {

@@ -488,6 +488,48 @@ describe("WebUI host-shape invariant (batch C seam)", () => {
     await expect(failingPort.getWorkspaceReviewSummary({ workspaceDir: "/repo" })).rejects.toThrow("summary unavailable");
   });
 
+  // The runtime's own shapes against the WebUI's declared ones, at the adapter
+  // boundary. These pin the two conversions where forwarding the runtime value
+  // raw produced a wire payload the client could not read as declared:
+  // `selectModel` (the runtime answers with a boolean, the wire declares
+  // `{ success }`, so the client's `answer?.success === false` refusal check
+  // could not fire) and `listPendingPermissions` (the runtime omits `requests`,
+  // the port promises an array).
+  it("maps the runtime's boolean model-selection verdict to the wire result", async () => {
+    for (const verdict of [true, false]) {
+      const port = createHarnessPortFromHost({
+        cliService: { selectModel: async () => verdict },
+      } as never);
+      await expect(
+        port.selectModel({ providerId: "p1", modelId: "m1" }),
+      ).resolves.toEqual({ success: verdict });
+    }
+  });
+
+  it("reports an empty pending-permission list when the runtime omits it", async () => {
+    const port = createHarnessPortFromHost({
+      cliService: { listPendingPermissions: async () => ({}) },
+    } as never);
+    await expect(port.listPendingPermissions()).resolves.toEqual({ requests: [] });
+
+    const item = {
+      requestId: "r1",
+      sessionId: "s1",
+      agentName: "main",
+      toolName: "bash",
+      ruleContents: [],
+      reason: "needs approval",
+      allowAlwaysSupported: true,
+      createdAt: 1,
+    };
+    const populated = createHarnessPortFromHost({
+      cliService: { listPendingPermissions: async () => ({ requests: [item] }) },
+    } as never);
+    await expect(populated.listPendingPermissions()).resolves.toEqual({
+      requests: [item],
+    });
+  });
+
   // The 18 operations whose registration used to depend on a host capability
   // gate. After batch C every one of them is in the registry — see `operations.ts`,
   // where the six `if (port.<x> && port.<y>)` capability gates were deleted.

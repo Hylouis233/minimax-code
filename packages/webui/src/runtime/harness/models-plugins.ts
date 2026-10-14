@@ -15,7 +15,14 @@ export function createModelsPluginsAdapter(
     },
 
     async selectModel(request) {
-      return requireCliService(host).selectModel(request);
+      // The runtime's verdict is a boolean: the application contract is
+      // `models.select(input): Promise<boolean>` (`process-local-application-contract.ts:293`).
+      // The wire declares `{ success?: boolean }` and the client reads
+      // `answer?.success === false` to tell a refused selection from one that
+      // landed (`models-workflows.ts:258`), so forwarding the boolean raw left
+      // that guard unable to fire — it compares `undefined` to `false`.
+      const success = await requireCliService(host).selectModel(request);
+      return { success };
     },
 
     async listSkills(request) {

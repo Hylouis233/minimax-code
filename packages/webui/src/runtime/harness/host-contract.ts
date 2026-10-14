@@ -84,6 +84,7 @@ import type {
   WebuiGoalPatchRequest,
 } from "../../shared/contracts/goal.js";
 import type { WebuiMemorySettingsView } from "../../shared/contracts/personalization.js";
+import type { CliService } from "@mavis/local-runtime-v2/cli-service";
 
 /**
  * The members the WebUI forwards to the runtime `cliService`. The runtime
@@ -215,6 +216,15 @@ export interface WebuiRuntimeCliService {
     context?: { readonly signal?: AbortSignal },
   ): Promise<WebuiStreamResult>;
   watchEvents(signal?: AbortSignal): AsyncIterable<WebuiRuntimeEvent>;
+  /**
+   * The runtime's result makes `requests` optional (`ListPendingPermissionsResult.requests?`)
+   * and its own input type is an empty record, so the adapter passes `{}`-shaped
+   * calls and normalises a missing list to `[]` — see the comment in
+   * `harness/interactions.ts`. The declaration stays hand-written for now: its
+   * element type (`PendingPermissionItem`, every field optional) does not satisfy
+   * `WebuiPendingPermission` (every field required), which is a wire-shape
+   * decision the derivation pass has to make member by member.
+   */
   listPendingPermissions(): Promise<{
     readonly requests: readonly WebuiPendingPermission[];
   }>;
@@ -283,14 +293,15 @@ export interface WebuiRuntimeCliService {
     readonly enabled?: boolean;
     readonly proactive?: boolean;
   }): Promise<WebuiMemorySettingsView>;
-  selectModel(request: {
-    readonly providerId: string;
-    readonly modelId: string;
-    readonly variant?: string;
-    readonly contextLimit?: number;
-    readonly thinking?: { readonly effort?: string } | null;
-    readonly sessionId?: string;
-  }): Promise<{ readonly success?: boolean }>;
+  /**
+   * Derived from the runtime's own service: the application contract is
+   * `models.select(input): Promise<boolean>`, so the adapter maps that verdict to
+   * the wire's `{ success }` instead of forwarding it. Declaring
+   * `Promise<{ success?: boolean }>` here (as this mirror did) is exactly what
+   * made the raw forward look correct while the client's refusal check could not
+   * fire.
+   */
+  selectModel: CliService["selectModel"];
   getSessionUsage(request: {
     readonly id: string;
   }): Promise<Record<string, unknown>>;
