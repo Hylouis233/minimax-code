@@ -1,13 +1,19 @@
 // The workspace panel owner (T11; produced target `workspace-panel-state`).
 //
-// Which panel is open, which tab is active, which project is expanded and which
-// search box holds what: the panel's own state, keyed by session and kept for the
-// life of the application so switching sessions does not lose where the user was.
-// It lived in the shell's component state, which made the shell the owner of a
+// Which panel is open, which tab is active, and whether the right-side progress
+// panel is showing: the panel's own state, keyed by session and kept for the life
+// of the application so switching sessions does not lose where the user was. It
+// lived in the shell's component state, which made the shell the owner of a
 // business's state and made the panel's behaviour depend on where it was mounted.
 //
+// The file browser's own view state — the search box, whether the tree is showing,
+// which directories are expanded, preview versus code — deliberately stays where
+// it was, as component state on the panel. Those never survived a session switch
+// before this change either, and giving them that behaviour now would be a new
+// promise rather than a preserved one.
+//
 // The transition rules stay where they were — the pure reducers in
-// `projection/workspace/workspace-panel-state.ts` — and this owner holds the map and
+// `projection/workspace-panel-state.ts` — and this owner holds the map and
 // notifies. The shell reads a session's slice and dispatches; it owns neither.
 
 import {

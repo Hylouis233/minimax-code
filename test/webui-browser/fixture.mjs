@@ -164,6 +164,16 @@ export function installFixtureTransport() {
         { path: "a.ts", name: "a.ts", type: "file", size: 120, modifiedAt: 1_700_000_000_000 },
         { path: "src", name: "src", type: "directory", children: [] },
       ];
+    // The bytes behind a tree row. Same reason as the tree above: the panel
+    // renders this on open, and a preview that can only ever say the read is
+    // unavailable cannot tell a working file panel from a broken one.
+    if (operation === "readWorkspaceFile")
+      return {
+        type: "text",
+        content: "export const answer = 42;\n",
+        resolvedPath: body?.path ?? "a.ts",
+        mimeType: "text/plain; charset=utf-8",
+      };
     if (operation === "getPendingQuestionnaire") return questionnaire ? { request: questionnaire } : {};
     if (operation === "beginAccountLogin") {
       accountLoginState = {
