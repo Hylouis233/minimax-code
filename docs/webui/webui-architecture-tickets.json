@@ -1089,7 +1089,8 @@
       "0eebfd46",
       "fd8e4c49",
       "b0cc51db",
-      "6b12d0c0"
+      "6b12d0c0",
+      "53b5dd5c"
     ],
     "published": false,
     "tickets": {
@@ -1103,7 +1104,7 @@
       "T14": "closed 2026-10-14 (issue #140, comment 6156919983): the host assembles the registry and the terminal-process port; the service binds what it was handed",
       "T07": "closed 2026-10-14 (issue #133, comment 6157401861): one Sessions owner holds the catalogue, the rail overlays and the lifecycle commands, with the delete failure/interest evidence and the rail/archive/import/export browser entry paths",
       "T09": "closed 2026-10-14 (issue #135, comment 6157618298): one Account owner holds the status/login/check-in/quota lifetime, the credential reads left Settings, and its timers end with its disposal",
-      "T11": "in progress: the workspace business owns its homes, four owners (files/environment/review/archive) and a composer, releases a closed tab's slot and read rights, and gives the archive commands outcomes and freshness; canvas/preview/directory-browser ownership and the evidence audit remain"
+      "T11": "in progress: five owners (files/environment/review/archive/canvas) behind one composer, a closed tab releases its slot and read rights, and the archive and canvas commands own their outcomes and freshness; preview/directory-browser ownership and the evidence audit remain"
     },
     "frontier": [
       "T08",
@@ -1118,7 +1119,9 @@
       "T11 slice 6 (b0cc51db): a closed panel tab now releases its file slot and its read commit rights - the files owner's discardTab bumps the tab's version (the same mechanism its own re-reads use) and drops the slot, and the shell calls it from the single place a tab closes. Other tabs are keyed separately, so nothing else they accepted stops; both halves are pinned by unit cases.",
       "T11 remaining: acceptance 3's panel-state ownership (the per-session panel state still lives in the shell's useState, which the shell composition T19 moves), acceptance 4 (canvas/archive/preview/directory-browser outcome and freshness ownership; the archive parser is T16's), and acceptance 6's evidence audit (stale tab/file responses, supersession, workspace aliases, invalidation bursts, HTTP range/content/path and the browser panel scenarios).",
       "T11 slice 7 (6b12d0c0): the archive commands have an owner (features/workspace/application/workspace-archive-owner.ts) with both outcomes and the listing's freshness keyed by workspace+path+prefix; the view no longer holds load/extract state and the shell no longer passes the raw port methods through. The archive parser stays T16's.",
-      "T11 remaining: acceptance 4's other halves (canvas, preview and directory-browser outcomes/freshness), acceptance 3's panel-state ownership (still the shell's useState; T19's composition), and acceptance 6's evidence audit."
+      "T11 remaining: acceptance 4's other halves (canvas, preview and directory-browser outcomes/freshness), acceptance 3's panel-state ownership (still the shell's useState; T19's composition), and acceptance 6's evidence audit.",
+      "T11 slice 8 (53b5dd5c): the canvas document and its operation outcomes have an owner with read/apply sequences (an answer for a session already left cannot commit); the view keeps pan/zoom/preview/gesture and merges its own validation error with the owner's.",
+      "T11 remaining: acceptance 4's last halves (preview and directory-browser outcome/freshness), acceptance 3's panel-state ownership (still the shell's useState; T19's composition), and acceptance 6's evidence audit (stale tab/file responses, supersession, workspace aliases, invalidation bursts, HTTP range/content/path, browser panel scenarios)."
     ]
   },
   "publicationVerification": {
