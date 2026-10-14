@@ -3791,6 +3791,7 @@
     "packages/webui/src/client/infrastructure/storage.ts",
     "packages/webui/src/client/infrastructure/team-mode.ts",
     "packages/webui/src/client/infrastructure/transport.ts",
+    "packages/webui/src/client/infrastructure/wire.ts",
     "packages/webui/src/client/main.tsx",
     "packages/webui/src/client/mechanisms/stream-instrumentation.ts",
     "packages/webui/src/client/mechanisms/stream-lease.ts",

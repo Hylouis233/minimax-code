@@ -1,100 +1,131 @@
-import type {WebuiClientMessageSender, WebuiClientSessionResumer} from "../contracts/turn/execution-port.js";
-import type { WebuiClientMessageLoader, WebuiClientMessagePage } from "../features/transcript/contracts/message-view.js";
-import type { WebuiClientCreateSessionRequest, WebuiClientCreateSessionResult, WebuiClientSessionLoader, WebuiClientSessionTreeLoader } from "../contracts/sessions/session-port.js";
-import type { WebuiClientSessionPage, WebuiClientSessionTreePage, WebuiClientProject } from "../contracts/sessions/session-view.js";
+// The domain method table: every capability the browser client can ask the host
+// for, joined to the wire (T18; plan §6, W7).
+//
+// The wire lifecycle mechanics — one socket per request, the unary deadline,
+// the stream's `[DONE]` settlement, the terminal watch, the events socket —
+// live in `./wire.js` and take the operation as a parameter. What stays here is
+// the mapping from a capability method to the operation it travels as, and every
+// one of those names comes from the canonical identifiers in
+// `../../shared/operation-names.js` rather than a string literal: the server
+// names its handlers from that same table, so a rename on the wire side cannot
+// leave a method pointing at an operation that no longer exists while every gate
+// stays green.
+
+import type { WebuiClientMessagePage } from "../features/transcript/contracts/message-view.js";
+import type {
+  WebuiClientSessionPage,
+  WebuiClientSessionTreePage,
+  WebuiClientProject,
+} from "../contracts/sessions/session-view.js";
 import type { WebuiTransport } from "../contracts/transport.js";
-import type {
-  WebuiInteractionReplyResult,
-  WebuiPendingPermission,
-  WebuiQuestionnaireAnswer,
-  WebuiQuestionnaireRequest,
-} from "../../shared/contracts/interactions.js";
-import type {
-  WebuiQueueItem,
-  WebuiEnqueueMessageRequest,
-  WebuiEnqueueMessageResult,
-} from "../../shared/contracts/queue.js";
-import type { WebuiModelEntry } from "../../shared/contracts/models.js";
-import type { WebuiDeliveryHandle } from "../contracts/turn/execution-port.js";
-import type {
-  WebuiRuntimeEvent,
-  WebuiStreamFrame,
-} from "../../shared/contracts/stream.js";
 import type { WebuiVersionInfo } from "../../shared/contracts/version.js";
-import type { WebuiTerminalFrame } from "../../shared/contracts/terminal.js";
-import type {
-  WebuiGetSessionDiffRequest,
-  WebuiGetSessionDiffResult,
-  WebuiGetTurnDiffRequest,
-  WebuiGetTurnDiffResult,
-  WebuiRevertTurnDiffRequest,
-  WebuiRevertTurnDiffResult,
-  WebuiReapplyTurnDiffRequest,
-  WebuiReapplyTurnDiffResult,
-  WebuiGetSessionForkOptionsRequest,
-  WebuiGetSessionForkOptionsResult,
-  WebuiForkSessionRequest,
-  WebuiForkSessionResult,
-  WebuiGetSessionRewindPreviewRequest,
-  WebuiGetSessionRewindPreviewResult,
-  WebuiRewindSessionRequest,
-  WebuiRewindSessionResult,
-  WebuiEditSessionMessageRequest,
-  WebuiEditSessionMessageResult,
-} from "../../shared/contracts/session.js";
-import type {
-  WebuiGoal,
-  WebuiGoalCreateRequest,
-  WebuiGoalPatchRequest,
-  WebuiGoalEnabledResult,
-} from "../../shared/contracts/goal.js";
 import {
-  createWebuiEventChannel,
-  type WebuiClientEventWatcher,
-  type WebuiClientRuntimeEvent,
-  type WebuiSocket,
-  type WireFrame,
-} from "./event-channel.js";
-export type { WebuiClientEventWatcher, WebuiClientRuntimeEvent, WebuiSocket };
+  ABORT_SESSION_OPERATION_NAME,
+  APPLY_CANVAS_OPERATION_NAME,
+  ARCHIVE_SESSION_OPERATION_NAME,
+  BEGIN_ACCOUNT_LOGIN_OPERATION_NAME,
+  BROWSE_WORKSPACE_DIRS_OPERATION_NAME,
+  CANCEL_ACCOUNT_LOGIN_OPERATION_NAME,
+  CANCEL_CODEX_OAUTH_LOGIN_OPERATION_NAME,
+  CLAIM_SIGNIN_OPERATION_NAME,
+  CLEAR_GOAL_OPERATION_NAME,
+  CREATE_GOAL_OPERATION_NAME,
+  CREATE_SESSION_OPERATION_NAME,
+  CREATE_TERMINAL_OPERATION_NAME,
+  CREATE_USER_MODEL_PROVIDER_OPERATION_NAME,
+  DELETE_QUEUE_ITEM_OPERATION_NAME,
+  DELETE_SESSION_OPERATION_NAME,
+  DELETE_USER_MODEL_PROVIDER_OPERATION_NAME,
+  DISMISS_QUESTIONNAIRE_OPERATION_NAME,
+  DISCOVER_USER_MODELS_CANDIDATE_OPERATION_NAME,
+  DISPOSE_TERMINAL_OPERATION_NAME,
+  EDIT_SESSION_MESSAGE_OPERATION_NAME,
+  ENQUEUE_MESSAGE_OPERATION_NAME,
+  EXTRACT_WORKSPACE_ARCHIVE_OPERATION_NAME,
+  FORK_SESSION_OPERATION_NAME,
+  GET_ACCOUNT_LOGIN_STATUS_OPERATION_NAME,
+  GET_ACCOUNT_STATUS_OPERATION_NAME,
+  GET_ACTIVE_TURN_OPERATION_NAME,
+  GET_AGENT_MEMORY_OPERATION_NAME,
+  GET_CODEX_OAUTH_STATUS_OPERATION_NAME,
+  GET_GLOBAL_INSTRUCTIONS_OPERATION_NAME,
+  GET_GOAL_OPERATION_NAME,
+  GET_MEMORY_SETTINGS_OPERATION_NAME,
+  GET_MESSAGES_OPERATION_NAME,
+  GET_MINIMAX_API_KEY_STATUS_OPERATION_NAME,
+  GET_MINIMAX_MODEL_SOURCE_OPERATION_NAME,
+  GET_PENDING_QUESTIONNAIRE_OPERATION_NAME,
+  GET_PERMISSION_MODE_OPERATION_NAME,
+  GET_SESSION_DIFF_OPERATION_NAME,
+  GET_SESSION_FORK_OPTIONS_OPERATION_NAME,
+  GET_SESSION_REWIND_PREVIEW_OPERATION_NAME,
+  GET_SESSION_TREE_OPERATION_NAME,
+  GET_SESSION_USAGE_OPERATION_NAME,
+  GET_SIGNIN_PANEL_OPERATION_NAME,
+  GET_TURN_DIFF_OPERATION_NAME,
+  GET_USAGE_QUOTA_OPERATION_NAME,
+  GET_USER_PROFILE_OPERATION_NAME,
+  GET_WORKSPACE_ENVIRONMENT_OPERATION_NAME,
+  GET_WORKSPACE_REVIEW_FILE_CONTENT_OPERATION_NAME,
+  GET_WORKSPACE_REVIEW_SUMMARY_OPERATION_NAME,
+  IS_GOAL_ENABLED_OPERATION_NAME,
+  LIST_MODELS_OPERATION_NAME,
+  LIST_PENDING_PERMISSIONS_OPERATION_NAME,
+  LIST_PROVIDER_PRESETS_OPERATION_NAME,
+  LIST_QUEUE_MESSAGES_OPERATION_NAME,
+  LIST_SESSIONS_OPERATION_NAME,
+  LIST_SKILLS_OPERATION_NAME,
+  LIST_TERMINALS_OPERATION_NAME,
+  LIST_USER_MODEL_PROVIDERS_OPERATION_NAME,
+  LIST_VISIBLE_PROJECTS_OPERATION_NAME,
+  LIST_WORKSPACE_FILE_TREE_OPERATION_NAME,
+  LIST_WORKSPACE_REVIEW_FILE_DIFFS_OPERATION_NAME,
+  MUTATE_WORKSPACE_GIT_OPERATION_NAME,
+  PATCH_GOAL_OPERATION_NAME,
+  PLUGIN_MANAGEMENT_OPERATION_NAME,
+  READ_CANVAS_OPERATION_NAME,
+  READ_WORKSPACE_ARCHIVE_OPERATION_NAME,
+  READ_WORKSPACE_FILE_OPERATION_NAME,
+  REAPPLY_TURN_DIFF_OPERATION_NAME,
+  REFRESH_MODELS_OPERATION_NAME,
+  REPLY_PERMISSION_OPERATION_NAME,
+  REPLY_QUESTIONNAIRE_OPERATION_NAME,
+  RESIZE_TERMINAL_OPERATION_NAME,
+  RESUME_SESSION_OPERATION_NAME,
+  REVEAL_MODEL_PROVIDER_API_KEY_OPERATION_NAME,
+  REVERT_TURN_DIFF_OPERATION_NAME,
+  REWIND_SESSION_OPERATION_NAME,
+  RUN_COMMAND_OPERATION_NAME,
+  SAVE_USER_MODEL_PROVIDER_CANDIDATE_OPERATION_NAME,
+  SEARCH_WORKSPACE_REVIEW_DIFFS_OPERATION_NAME,
+  SELECT_MODEL_OPERATION_NAME,
+  SEND_MESSAGE_OPERATION_NAME,
+  SET_AGENT_MEMORY_OPERATION_NAME,
+  SET_GLOBAL_INSTRUCTIONS_OPERATION_NAME,
+  SET_MEMORY_SETTINGS_OPERATION_NAME,
+  SET_MINIMAX_MODEL_SOURCE_OPERATION_NAME,
+  SET_PERMISSION_MODE_OPERATION_NAME,
+  SET_USER_PROFILE_OPERATION_NAME,
+  SIGN_OUT_OPERATION_NAME,
+  START_CODEX_OAUTH_LOGIN_OPERATION_NAME,
+  TEST_USER_MODEL_CANDIDATE_OPERATION_NAME,
+  TEST_USER_MODEL_OPERATION_NAME,
+  TEST_USER_MODEL_PROVIDER_OPERATION_NAME,
+  UPDATE_SESSION_OPERATION_NAME,
+  UPDATE_USER_MODEL_PROVIDER_OPERATION_NAME,
+  UPSERT_MINIMAX_API_KEY_OPERATION_NAME,
+  VERSION_OPERATION_NAME,
+  WATCH_TERMINAL_OPERATION_NAME,
+  WRITE_TERMINAL_OPERATION_NAME,
+} from "../../shared/operation-names.js";
+import { createWebuiWire, type WebuiWireOptions } from "./wire.js";
 
-export interface WebuiTransportOptions {
-  readonly websocketUrl: string;
-  readonly token: string;
-  readonly webSocket?: new (url: string) => WebuiSocket;
-  /** Deadline for unary operations that otherwise could remain pending on a half-open socket. */
-  readonly requestTimeoutMs?: number;
-}
+export type { WebuiClientEventWatcher, WebuiClientRuntimeEvent, WebuiSocket } from "./event-channel.js";
 
-const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+/** The wire's options are this transport's options: there is one socket contract. */
+export type WebuiTransportOptions = WebuiWireOptions;
 
-/** A socket carrying one request, and the only way to settle it. */
-interface WebuiWireSession {
-  readonly close: () => void;
-}
-
-/**
- * What a caller does with the frames of its own request. Everything but
- * `frame` is optional, because the three operations below disagree about what a
- * parse failure, a close or a socket error means — `watchTerminal` ignores all
- * three, a unary request rejects on all three.
- */
-interface WebuiWireHandlers {
-  readonly frame: (session: WebuiWireSession, frame: WireFrame) => void;
-  readonly invalidFrame?: (session: WebuiWireSession) => void;
-  readonly closed?: (session: WebuiWireSession) => void;
-  readonly failed?: (session: WebuiWireSession) => void;
-}
-
-function defaultWebSocket(): new (url: string) => WebuiSocket {
-  return WebSocket as unknown as new (url: string) => WebuiSocket;
-}
-
-export function createWebuiTransport({
-  websocketUrl: baseWebsocketUrl,
-  token,
-  webSocket = defaultWebSocket(),
-  requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
-}: WebuiTransportOptions): Required<WebuiTransport> {
+export function createWebuiTransport(options: WebuiTransportOptions): Required<WebuiTransport> {
   /* The `Required<WebuiTransport>` return type together with the
    * `satisfies Required<WebuiTransport>` clause on the literal below forces
    * the wire contract and the implementation to stay in lock-step: a
@@ -102,299 +133,135 @@ export function createWebuiTransport({
    * breaks the build. The `Required` qualifier is scoped to this
    * implementation boundary; the `WebuiTransport` capability contract
    * consumed by components keeps its optional semantics. */
-
-  const websocketUrl = () =>
-    `${baseWebsocketUrl.replace(/\/$/u, "")}/?token=${encodeURIComponent(token)}`;
-
-  /**
-   * One socket, one request frame, one requestId.
-   *
-   * Every operation below opens a socket, writes the same envelope once the
-   * socket opens, and then has to tell its own answer apart from whatever else
-   * arrives on that socket. That part is shared. What a frame *means* is not,
-   * so the handler decides: a unary response resolves, an `event` frame is
-   * forwarded until `[DONE]`, a terminal frame is forwarded until the caller
-   * stops. The session is passed back to each handler because settling means
-   * closing this socket, and a handler that reached for it by closure would be
-   * reading a `const` that does not exist yet when the socket opens
-   * synchronously.
-   */
-  function openWireSession(
-    operation: string,
-    body: unknown,
-    handlers: WebuiWireHandlers,
-  ): WebuiWireSession {
-    const ws = new webSocket(websocketUrl());
-    const requestId = crypto.randomUUID();
-    const session: WebuiWireSession = { close: () => ws.close() };
-    ws.addEventListener("open", () =>
-      ws.send(
-        JSON.stringify({
-          protocolVersion: 1,
-          kind: "request",
-          requestId,
-          operation,
-          body,
-        }),
-      ),
-    );
-    ws.addEventListener("message", (event) => {
-      let frame: WireFrame;
-      try {
-        frame = JSON.parse(String(event.data)) as WireFrame;
-      } catch {
-        handlers.invalidFrame?.(session);
-        return;
-      }
-      if (frame.requestId !== requestId) return;
-      handlers.frame(session, frame);
-    });
-    ws.addEventListener("close", () => handlers.closed?.(session));
-    ws.addEventListener("error", () => handlers.failed?.(session));
-    return session;
-  }
-
-  function request<T>(operation: string, body: unknown): Promise<T> {
-    return new Promise((resolve, reject) => {
-      let settled = false;
-      let timeout: ReturnType<typeof setTimeout>;
-      const fail = (session: WebuiWireSession, error: Error) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timeout);
-        session.close();
-        reject(error);
-      };
-      const session = openWireSession(operation, body, {
-        frame: (session, frame) => {
-          if (frame.kind === "error") {
-            fail(session, new Error(frame.message ?? "WebUI request refused"));
-            return;
-          }
-          if (frame.kind !== "response") return;
-          settled = true;
-          clearTimeout(timeout);
-          session.close();
-          resolve(frame.body as T);
-        },
-        invalidFrame: (session) => fail(session, new Error("WebUI returned invalid JSON")),
-        closed: (session) =>
-          fail(session, new Error("WebUI connection closed before the response")),
-        failed: (session) => fail(session, new Error("WebUI connection failed")),
-      });
-      timeout = setTimeout(
-        () =>
-          fail(
-            session,
-            new Error(`WebUI request timed out after ${requestTimeoutMs}ms (${operation})`),
-          ),
-        requestTimeoutMs,
-      );
-    });
-  }
-
-  // `sendMessage` and `resumeSession` share the same wire shape: the
-  // operation returns an `event`-framed iterable that ends with a
-  // `[DONE]` payload (see `session-stream-delivery.ts` and the brief's
-  // "two facts that make this ticket small"). One helper keeps the
-  // close/error race in lockstep across both operations.
-  function stream(
-    operation: string,
-    body: unknown,
-    onFrame: (frame: WebuiStreamFrame) => void,
-    onDelivery?: (handle: WebuiDeliveryHandle) => void,
-  ): Promise<void> {
-    return new Promise((resolve, reject) => {
-      let settled = false;
-      // A detached delivery must not deliver, and `close()` is not a promise that
-      // the socket stops emitting — the same rule `watchTerminal` follows.
-      let detached = false;
-      const fail = (session: WebuiWireSession, error: Error) => {
-        if (settled) return;
-        settled = true;
-        session.close();
-        reject(error);
-      };
-      const session = openWireSession(operation, body, {
-        frame: (session, frame) => {
-          if (detached) return;
-          if (frame.kind === "error") {
-            fail(session, new Error(frame.message ?? `${operation} refused`));
-            return;
-          }
-          if (frame.kind !== "event") return;
-          const streamFrame = frame.body as WebuiStreamFrame;
-          onFrame(streamFrame);
-          if (streamFrame.dataJson === "[DONE]") {
-            settled = true;
-            session.close();
-            resolve();
-          }
-        },
-        invalidFrame: (session) => fail(session, new Error("WebUI returned invalid JSON")),
-        closed: (session) => fail(session, new Error("WebUI connection closed before [DONE]")),
-        failed: (session) => fail(session, new Error("WebUI connection failed")),
-      });
-      onDelivery?.({
-        close: () => {
-          if (settled) return;
-          // Detaching SETTLES the operation rather than failing it: the host
-          // accepted this request long ago, so there is no error to report and no
-          // recovery to attempt — the client simply stops watching. Failing here
-          // would hand the loop a transport error and make a deliberate detach
-          // look like a dropped connection.
-          detached = true;
-          settled = true;
-          session.close();
-          resolve();
-        },
-      });
-    });
-  }
-
-  function watchTerminal(
-    requestBody: { readonly terminalId: string },
-    onFrame: (frame: WebuiTerminalFrame) => void,
-  ): () => void {
-    let stopped = false;
-    const session = openWireSession("watchTerminal", requestBody, {
-      frame: (_session, frame) => {
-        // A stopped watch must not deliver, and `close()` is not a promise that
-        // the socket stops emitting: the caller's flag is what guarantees it.
-        if (stopped) return;
-        if (frame.kind !== "event" || !frame.body || typeof frame.body !== "object") return;
-        onFrame(frame.body as WebuiTerminalFrame);
-      },
-    });
-    return () => {
-      stopped = true;
-      session.close();
-    };
-  }
+  const { request, stream, watchTerminal, workspaceFileUrl, watchEvents } = createWebuiWire(options);
 
   return {
-    version: () => request<WebuiVersionInfo>("version", undefined),
-    loadProjects: () => request<readonly WebuiClientProject[]>("listVisibleProjects", { limit: 100 }),
+    version: () => request<WebuiVersionInfo>(VERSION_OPERATION_NAME, undefined),
+    loadProjects: () =>
+      request<readonly WebuiClientProject[]>(LIST_VISIBLE_PROJECTS_OPERATION_NAME, { limit: 100 }),
     loadSessions: (cursor) =>
-      request<WebuiClientSessionPage>("listSessions", {
+      request<WebuiClientSessionPage>(LIST_SESSIONS_OPERATION_NAME, {
         name: "main",
         limit: 500,
         ...(cursor ? { cursor } : {}),
       }),
     loadSessionTree: (cursor) =>
-      request<WebuiClientSessionTreePage>("getSessionTree", {
+      request<WebuiClientSessionTreePage>(GET_SESSION_TREE_OPERATION_NAME, {
         name: "main",
         limit: 500,
         ...(cursor ? { cursor } : {}),
       }),
-    listArchivedSessions: () => request<WebuiClientSessionPage>("listSessions", { name: "main", includeArchived: true, onlyArchived: true }),
-    archiveSession: (body) => request("archiveSession", body),
-    deleteSession: (body) => request("deleteSession", body),
-    updateSession: (body) => request("updateSession", body),
-    getSessionForkOptions: (body) => request("getSessionForkOptions", body),
-    forkSession: (body) => request("forkSession", body),
+    listArchivedSessions: () =>
+      request<WebuiClientSessionPage>(LIST_SESSIONS_OPERATION_NAME, {
+        name: "main",
+        includeArchived: true,
+        onlyArchived: true,
+      }),
+    archiveSession: (body) => request(ARCHIVE_SESSION_OPERATION_NAME, body),
+    deleteSession: (body) => request(DELETE_SESSION_OPERATION_NAME, body),
+    updateSession: (body) => request(UPDATE_SESSION_OPERATION_NAME, body),
+    getSessionForkOptions: (body) => request(GET_SESSION_FORK_OPTIONS_OPERATION_NAME, body),
+    forkSession: (body) => request(FORK_SESSION_OPERATION_NAME, body),
     loadMessages: ({ id, before }) =>
-      request<WebuiClientMessagePage>("getMessages", {
+      request<WebuiClientMessagePage>(GET_MESSAGES_OPERATION_NAME, {
         id,
         ...(before ? { before } : {}),
       }),
-    getSessionDiff: (body) => request("getSessionDiff", body),
-    getTurnDiff: (body) => request("getTurnDiff", body),
-    revertTurnDiff: (body) => request("revertTurnDiff", body),
-    reapplyTurnDiff: (body) => request("reapplyTurnDiff", body),
-    getSessionRewindPreview: (body) => request("getSessionRewindPreview", body),
-    rewindSession: (body) => request("rewindSession", body),
-    editSessionMessage: (body) => request("editSessionMessage", body),
-    isGoalEnabled: () => request("isGoalEnabled", undefined),
-    getActiveTurn: (body) => request("getActiveTurn", body),
-    getGoal: (body) => request("getGoal", body),
-    createGoal: (body) => request("createGoal", body),
-    patchGoal: (body) => request("patchGoal", body),
-    clearGoal: (body) => request("clearGoal", body),
-    listWorkspaceFileTree: (body) => request("listWorkspaceFileTree", body),
-    browseWorkspaceDirs: (body) => request("browseWorkspaceDirs", body),
-    readWorkspaceFile: (body) => request("readWorkspaceFile", body),
-    getWorkspaceEnvironment: (body) => request("getWorkspaceEnvironment", body),
-    mutateWorkspaceGit: (body) => request("mutateWorkspaceGit", body),
-    getWorkspaceReviewSummary: (body) => request("getWorkspaceReviewSummary", body),
-    listWorkspaceReviewFileDiffs: (body) => request("listWorkspaceReviewFileDiffs", body),
-    getWorkspaceReviewFileContent: (body) => request("getWorkspaceReviewFileContent", body),
-    searchWorkspaceReviewDiffs: (body) => request("searchWorkspaceReviewDiffs", body),
-    readCanvas: (body) => request("readCanvas", body),
-    applyCanvas: (body) => request("applyCanvas", body),
-    workspaceFileUrl: ({ workspaceDir, path: filePath }) => {
-      // `ws:`/`wss:` share the `ws` prefix, so one substitution lands on
-      // `http:`/`https:` respectively, and it must happen before the token is
-      // appended — the server checks the token on this route like any other.
-      const base = baseWebsocketUrl.replace(/\/$/u, "").replace(/^ws/iu, "http");
-      const query = new URLSearchParams({ dir: workspaceDir, path: filePath, token });
-      return `${base}/workspace-file?${query.toString()}`;
-    },
-    readWorkspaceArchive: (body) => request("readWorkspaceArchive", body),
-    extractWorkspaceArchive: (body) => request("extractWorkspaceArchive", body),
-    createTerminal: (body) => request("createTerminal", body),
-    listTerminals: () => request("listTerminals", {}),
-    writeTerminal: (body) => request("writeTerminal", body),
-    resizeTerminal: (body) => request("resizeTerminal", body),
-    disposeTerminal: (body) => request("disposeTerminal", body),
-    watchTerminal,
-    createSession: (body) => request("createSession", body),
+    getSessionDiff: (body) => request(GET_SESSION_DIFF_OPERATION_NAME, body),
+    getTurnDiff: (body) => request(GET_TURN_DIFF_OPERATION_NAME, body),
+    revertTurnDiff: (body) => request(REVERT_TURN_DIFF_OPERATION_NAME, body),
+    reapplyTurnDiff: (body) => request(REAPPLY_TURN_DIFF_OPERATION_NAME, body),
+    getSessionRewindPreview: (body) => request(GET_SESSION_REWIND_PREVIEW_OPERATION_NAME, body),
+    rewindSession: (body) => request(REWIND_SESSION_OPERATION_NAME, body),
+    editSessionMessage: (body) => request(EDIT_SESSION_MESSAGE_OPERATION_NAME, body),
+    isGoalEnabled: () => request(IS_GOAL_ENABLED_OPERATION_NAME, undefined),
+    getActiveTurn: (body) => request(GET_ACTIVE_TURN_OPERATION_NAME, body),
+    getGoal: (body) => request(GET_GOAL_OPERATION_NAME, body),
+    createGoal: (body) => request(CREATE_GOAL_OPERATION_NAME, body),
+    patchGoal: (body) => request(PATCH_GOAL_OPERATION_NAME, body),
+    clearGoal: (body) => request(CLEAR_GOAL_OPERATION_NAME, body),
+    listWorkspaceFileTree: (body) => request(LIST_WORKSPACE_FILE_TREE_OPERATION_NAME, body),
+    browseWorkspaceDirs: (body) => request(BROWSE_WORKSPACE_DIRS_OPERATION_NAME, body),
+    readWorkspaceFile: (body) => request(READ_WORKSPACE_FILE_OPERATION_NAME, body),
+    getWorkspaceEnvironment: (body) => request(GET_WORKSPACE_ENVIRONMENT_OPERATION_NAME, body),
+    mutateWorkspaceGit: (body) => request(MUTATE_WORKSPACE_GIT_OPERATION_NAME, body),
+    getWorkspaceReviewSummary: (body) => request(GET_WORKSPACE_REVIEW_SUMMARY_OPERATION_NAME, body),
+    listWorkspaceReviewFileDiffs: (body) =>
+      request(LIST_WORKSPACE_REVIEW_FILE_DIFFS_OPERATION_NAME, body),
+    getWorkspaceReviewFileContent: (body) =>
+      request(GET_WORKSPACE_REVIEW_FILE_CONTENT_OPERATION_NAME, body),
+    searchWorkspaceReviewDiffs: (body) => request(SEARCH_WORKSPACE_REVIEW_DIFFS_OPERATION_NAME, body),
+    readCanvas: (body) => request(READ_CANVAS_OPERATION_NAME, body),
+    applyCanvas: (body) => request(APPLY_CANVAS_OPERATION_NAME, body),
+    workspaceFileUrl,
+    readWorkspaceArchive: (body) => request(READ_WORKSPACE_ARCHIVE_OPERATION_NAME, body),
+    extractWorkspaceArchive: (body) => request(EXTRACT_WORKSPACE_ARCHIVE_OPERATION_NAME, body),
+    createTerminal: (body) => request(CREATE_TERMINAL_OPERATION_NAME, body),
+    listTerminals: () => request(LIST_TERMINALS_OPERATION_NAME, {}),
+    writeTerminal: (body) => request(WRITE_TERMINAL_OPERATION_NAME, body),
+    resizeTerminal: (body) => request(RESIZE_TERMINAL_OPERATION_NAME, body),
+    disposeTerminal: (body) => request(DISPOSE_TERMINAL_OPERATION_NAME, body),
+    watchTerminal: (body, onFrame) => watchTerminal(WATCH_TERMINAL_OPERATION_NAME, body, onFrame),
+    createSession: (body) => request(CREATE_SESSION_OPERATION_NAME, body),
     sendMessage: (body, onFrame, onDelivery) =>
-      stream("sendMessage", body, onFrame, onDelivery),
-    enqueueMessage: (body) => request("enqueueMessage", body),
+      stream(SEND_MESSAGE_OPERATION_NAME, body, onFrame, onDelivery),
+    enqueueMessage: (body) => request(ENQUEUE_MESSAGE_OPERATION_NAME, body),
     resumeSession: (body, onFrame, onDelivery) =>
-      stream("resumeSession", body, onFrame, onDelivery),
-    watchEvents: createWebuiEventChannel({ websocketUrl, webSocket }),
-    listPendingPermissions: () => request("listPendingPermissions", {}),
-    getPendingQuestionnaire: (body) => request("getPendingQuestionnaire", body),
-    replyPermission: (body) => request("replyPermission", body),
-    replyQuestionnaire: (body) => request("replyQuestionnaire", body),
-    dismissQuestionnaire: (body) => request("dismissQuestionnaire", body),
-    abortSession: (body) => request("abortSession", body),
-    listQueueMessages: (body) => request("listQueueMessages", body),
-    deleteQueueItem: (body) => request("deleteQueueItem", body),
-    listModels: (body) => request("listModels", body ?? {}),
-    listSkills: (body) => request("listSkills", body ?? {}),
-    pluginManagement: (body) => request("pluginManagement", body),
-    getPermissionMode: () => request("getPermissionMode", {}),
-    setPermissionMode: (body) => request("setPermissionMode", body),
-    getGlobalInstructions: () => request("getGlobalInstructions", {}),
-    setGlobalInstructions: (body) => request("setGlobalInstructions", body),
-    getAgentMemory: (body) => request("getAgentMemory", body ?? {}),
-    setAgentMemory: (body) => request("setAgentMemory", body),
-    getUserProfile: () => request("getUserProfile", {}),
-    setUserProfile: (body) => request("setUserProfile", body),
-    getMemorySettings: () => request("getMemorySettings", {}),
-    setMemorySettings: (body) => request("setMemorySettings", body),
-    selectModel: (body) => request("selectModel", body),
-    getSessionUsage: (body) => request("getSessionUsage", body),
-    getUsageQuota: (body) => request("getUsageQuota", body ?? {}),
-    getSigninPanel: () => request("getSigninPanel", {}),
-    claimSignin: () => request("claimSignin", {}),
-    getAccountStatus: (body) => request("getAccountStatus", body ?? {}),
-    listUserModelProviders: () => request("listUserModelProviders", undefined),
-    createUserModelProvider: (body) => request("createUserModelProvider", body),
-    updateUserModelProvider: (body) => request("updateUserModelProvider", body),
-    deleteUserModelProvider: (providerId) => request("deleteUserModelProvider", { providerId }),
-    testUserModelProvider: (body) => request("testUserModelProvider", body),
-    testUserModel: (body) => request("testUserModel", body),
-    discoverUserModelsCandidate: (body) => request("discoverUserModelsCandidate", body),
-    saveUserModelProviderCandidate: (body) => request("saveUserModelProviderCandidate", body),
-    listProviderPresets: () => request("listProviderPresets", undefined),
-    getMiniMaxApiKeyStatus: () => request("getMiniMaxApiKeyStatus", undefined),
-    upsertMiniMaxApiKey: (body) => request("upsertMiniMaxApiKey", body),
-    getCodexOAuthStatus: () => request("getCodexOAuthStatus", undefined),
-    getMiniMaxModelSource: () => request("getMiniMaxModelSource", undefined),
-    setMiniMaxModelSource: (source) => request("setMiniMaxModelSource", { source }),
-    testUserModelCandidate: (body) => request("testUserModelCandidate", body),
-    revealModelProviderApiKey: (body) => request("revealModelProviderApiKey", body),
-    startCodexOAuthLogin: (body) => request("startCodexOAuthLogin", body ?? {}),
-    cancelCodexOAuthLogin: (body) => request("cancelCodexOAuthLogin", body),
-    refreshModels: () => request("refreshModels", undefined),
-    signOut: () => request("signOut", {}),
-    beginAccountLogin: () => request("beginAccountLogin", {}),
-    getAccountLoginStatus: () => request("getAccountLoginStatus", {}),
-    cancelAccountLogin: () => request("cancelAccountLogin", {}),
-    runCommand: (body) => request("runCommand", body),
+      stream(RESUME_SESSION_OPERATION_NAME, body, onFrame, onDelivery),
+    watchEvents,
+    listPendingPermissions: () => request(LIST_PENDING_PERMISSIONS_OPERATION_NAME, {}),
+    getPendingQuestionnaire: (body) => request(GET_PENDING_QUESTIONNAIRE_OPERATION_NAME, body),
+    replyPermission: (body) => request(REPLY_PERMISSION_OPERATION_NAME, body),
+    replyQuestionnaire: (body) => request(REPLY_QUESTIONNAIRE_OPERATION_NAME, body),
+    dismissQuestionnaire: (body) => request(DISMISS_QUESTIONNAIRE_OPERATION_NAME, body),
+    abortSession: (body) => request(ABORT_SESSION_OPERATION_NAME, body),
+    listQueueMessages: (body) => request(LIST_QUEUE_MESSAGES_OPERATION_NAME, body),
+    deleteQueueItem: (body) => request(DELETE_QUEUE_ITEM_OPERATION_NAME, body),
+    listModels: (body) => request(LIST_MODELS_OPERATION_NAME, body ?? {}),
+    listSkills: (body) => request(LIST_SKILLS_OPERATION_NAME, body ?? {}),
+    pluginManagement: (body) => request(PLUGIN_MANAGEMENT_OPERATION_NAME, body),
+    getPermissionMode: () => request(GET_PERMISSION_MODE_OPERATION_NAME, {}),
+    setPermissionMode: (body) => request(SET_PERMISSION_MODE_OPERATION_NAME, body),
+    getGlobalInstructions: () => request(GET_GLOBAL_INSTRUCTIONS_OPERATION_NAME, {}),
+    setGlobalInstructions: (body) => request(SET_GLOBAL_INSTRUCTIONS_OPERATION_NAME, body),
+    getAgentMemory: (body) => request(GET_AGENT_MEMORY_OPERATION_NAME, body ?? {}),
+    setAgentMemory: (body) => request(SET_AGENT_MEMORY_OPERATION_NAME, body),
+    getUserProfile: () => request(GET_USER_PROFILE_OPERATION_NAME, {}),
+    setUserProfile: (body) => request(SET_USER_PROFILE_OPERATION_NAME, body),
+    getMemorySettings: () => request(GET_MEMORY_SETTINGS_OPERATION_NAME, {}),
+    setMemorySettings: (body) => request(SET_MEMORY_SETTINGS_OPERATION_NAME, body),
+    selectModel: (body) => request(SELECT_MODEL_OPERATION_NAME, body),
+    getSessionUsage: (body) => request(GET_SESSION_USAGE_OPERATION_NAME, body),
+    getUsageQuota: (body) => request(GET_USAGE_QUOTA_OPERATION_NAME, body ?? {}),
+    getSigninPanel: () => request(GET_SIGNIN_PANEL_OPERATION_NAME, {}),
+    claimSignin: () => request(CLAIM_SIGNIN_OPERATION_NAME, {}),
+    getAccountStatus: (body) => request(GET_ACCOUNT_STATUS_OPERATION_NAME, body ?? {}),
+    listUserModelProviders: () => request(LIST_USER_MODEL_PROVIDERS_OPERATION_NAME, undefined),
+    createUserModelProvider: (body) => request(CREATE_USER_MODEL_PROVIDER_OPERATION_NAME, body),
+    updateUserModelProvider: (body) => request(UPDATE_USER_MODEL_PROVIDER_OPERATION_NAME, body),
+    deleteUserModelProvider: (providerId) =>
+      request(DELETE_USER_MODEL_PROVIDER_OPERATION_NAME, { providerId }),
+    testUserModelProvider: (body) => request(TEST_USER_MODEL_PROVIDER_OPERATION_NAME, body),
+    testUserModel: (body) => request(TEST_USER_MODEL_OPERATION_NAME, body),
+    discoverUserModelsCandidate: (body) =>
+      request(DISCOVER_USER_MODELS_CANDIDATE_OPERATION_NAME, body),
+    saveUserModelProviderCandidate: (body) =>
+      request(SAVE_USER_MODEL_PROVIDER_CANDIDATE_OPERATION_NAME, body),
+    listProviderPresets: () => request(LIST_PROVIDER_PRESETS_OPERATION_NAME, undefined),
+    getMiniMaxApiKeyStatus: () => request(GET_MINIMAX_API_KEY_STATUS_OPERATION_NAME, undefined),
+    upsertMiniMaxApiKey: (body) => request(UPSERT_MINIMAX_API_KEY_OPERATION_NAME, body),
+    getCodexOAuthStatus: () => request(GET_CODEX_OAUTH_STATUS_OPERATION_NAME, undefined),
+    getMiniMaxModelSource: () => request(GET_MINIMAX_MODEL_SOURCE_OPERATION_NAME, undefined),
+    setMiniMaxModelSource: (source) => request(SET_MINIMAX_MODEL_SOURCE_OPERATION_NAME, { source }),
+    testUserModelCandidate: (body) => request(TEST_USER_MODEL_CANDIDATE_OPERATION_NAME, body),
+    revealModelProviderApiKey: (body) => request(REVEAL_MODEL_PROVIDER_API_KEY_OPERATION_NAME, body),
+    startCodexOAuthLogin: (body) => request(START_CODEX_OAUTH_LOGIN_OPERATION_NAME, body ?? {}),
+    cancelCodexOAuthLogin: (body) => request(CANCEL_CODEX_OAUTH_LOGIN_OPERATION_NAME, body),
+    refreshModels: () => request(REFRESH_MODELS_OPERATION_NAME, undefined),
+    signOut: () => request(SIGN_OUT_OPERATION_NAME, {}),
+    beginAccountLogin: () => request(BEGIN_ACCOUNT_LOGIN_OPERATION_NAME, {}),
+    getAccountLoginStatus: () => request(GET_ACCOUNT_LOGIN_STATUS_OPERATION_NAME, {}),
+    cancelAccountLogin: () => request(CANCEL_ACCOUNT_LOGIN_OPERATION_NAME, {}),
+    runCommand: (body) => request(RUN_COMMAND_OPERATION_NAME, body),
   } satisfies Required<WebuiTransport>;
 }
