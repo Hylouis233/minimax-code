@@ -30,11 +30,6 @@ export {
   type WebuiOperationRegistration,
   type WebuiOperationResult,
 } from "./operation/operations.js";
-// The terminal-process port and the manager that implements it today. The host
-// assembles the registry, so it owns both the registry and the port it was built
-// with (T14); T15 moves the implementation behind the port.
-export { WebuiTerminalManager } from "./terminal.js";
-export type { WebuiTerminalProcessPort } from "./terminal-port.js";
 export {
   createWebuiCredential,
   credentialMatches,

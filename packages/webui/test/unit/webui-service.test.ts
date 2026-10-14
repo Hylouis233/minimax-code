@@ -69,7 +69,7 @@ import type {
   WebuiGoalPatchRequest,
 } from "../../src/shared/contracts/goal.js";
 import { createWebuiTransport } from "../../src/client/infrastructure/transport.js";
-import { WebuiTerminalManager } from "../../src/server/terminal.js";
+import { WebuiTerminalManager } from "../../src/runtime/terminal.js";
 import { getWorkspaceReviewSummaryOperation, listWorkspaceReviewFileDiffsOperation, getWorkspaceReviewFileContentOperation, searchWorkspaceReviewDiffsOperation } from "../../src/server/operation/workspace.js";
 
 type CloseEvent = [number, Buffer];

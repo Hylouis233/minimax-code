@@ -27,7 +27,7 @@ import {
 } from "./credentials.js";
 import { WEBUI_PROTOCOL_VERSION } from "../shared/envelope.js";
 import type { WebuiHarnessPort } from "../runtime/port.js";
-import type { WebuiTerminalProcessPort } from "./terminal-port.js";
+import type { WebuiTerminalProcessPort } from "../runtime/port.js";
 import { isLoopbackBindAddress } from "./access-policy.js";
 import {
   createHttpListener,

@@ -6,7 +6,7 @@
 // supplied by the service, and when it is absent these operations stay
 // unregistered (see `operations.ts`) rather than becoming registered operations
 // that fail with a missing-capability error.
-import type { WebuiTerminalProcessPort } from "../../terminal-port.js";
+import type { WebuiTerminalProcessPort } from "../../../runtime/port.js";
 import {
   createTerminalOperation,
   listTerminalsOperation,

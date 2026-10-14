@@ -386,3 +386,45 @@ export interface WebuiHarnessPort {
    */
   close(): Promise<void>;
 }
+
+/**
+ * The narrow terminal-process port (T14's produced target; T15 moved it here
+ * with the implementation behind it).
+ *
+ * The six terminal operations consume this port, not a concrete manager: the
+ * registry must not depend on the class that happens to implement it. It lives
+ * in this module — the runtime's port surface — because the layer matrix lets
+ * `server` reach `runtime-port` and nothing else under `runtime/`, and the
+ * service both receives the port and calls `disposeBySession` on shutdown.
+ *
+ * Every member is synchronous except `watch`, which is the delivery stream: the
+ * operation handler drives it and the WebSocket server frames what it yields.
+ */
+export interface WebuiTerminalProcessPort {
+  create(workspaceDir: string): {
+    readonly terminalId: string;
+    readonly status: "running";
+  };
+  list(): readonly {
+    readonly terminalId: string;
+    readonly status: "running" | "exited";
+    readonly output: string;
+  }[];
+  write(terminalId: string, data: string): { readonly success: true };
+  resize(
+    terminalId: string,
+    cols: number,
+    rows: number,
+  ): { readonly success: true };
+  dispose(terminalId: string): { readonly success: true };
+  watch(
+    terminalId: string,
+    signal?: AbortSignal,
+  ): AsyncIterable<{
+    readonly terminalId: string;
+    readonly data: string;
+    readonly exited: boolean;
+  }>;
+  /** Ends every terminal this port owns. The service calls it on shutdown. */
+  disposeBySession(): void;
+}

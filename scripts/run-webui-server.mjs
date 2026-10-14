@@ -27,10 +27,10 @@ if (!process.env.WEBUI_SERVER_TSX) {
 } else {
   const os = await import("node:os");
   const path = await import("node:path");
-  const { createWebuiRuntimeHost, createHarnessPortFromHost } = await import(
+  const { createWebuiRuntimeHost, createHarnessPortFromHost, WebuiTerminalManager } = await import(
     "../packages/webui/src/runtime/index.ts"
   );
-  const { WebuiService, WebuiTerminalManager, createOperationRegistry } =
+  const { WebuiService, createOperationRegistry } =
     await import("../packages/webui/src/server/index.ts");
   const dataDir =
     process.env.MINIMAX_DATA_DIR?.trim() || path.join(os.homedir(), ".minimax");
@@ -45,7 +45,9 @@ if (!process.env.WEBUI_SERVER_TSX) {
   });
   const port = createHarnessPortFromHost(assembled.host);
   // The registry and the terminal port are assembled here, by the host, and the
-  // network service binds what it was handed (T14).
+  // network service binds what it was handed (T14). The manager itself belongs to
+  // this service's resource scope — one per service, not a host-wide singleton
+  // (T15) — and the service ends every PTY it owns in `close()`.
   const terminal = new WebuiTerminalManager();
   const service = new WebuiService({
     port,

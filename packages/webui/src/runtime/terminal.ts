@@ -2,7 +2,7 @@ import os from "node:os";
 import process from "node:process";
 import { createRequire } from "node:module";
 
-import type { WebuiTerminalProcessPort } from "./terminal-port.js";
+import type { WebuiTerminalProcessPort } from "./port.js";
 
 type Pty = { readonly pid: number; write(data: string): void; resize(cols: number, rows: number): void; kill(): void; onData(listener: (data: string) => void): void; onExit(listener: () => void): void };
 type PtyModule = { spawn(shell: string, args: string[], options: Record<string, unknown>): Pty };

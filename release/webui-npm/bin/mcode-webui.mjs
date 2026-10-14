@@ -6,10 +6,10 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import {
   WebuiService,
-  WebuiTerminalManager,
   createOperationRegistry,
 } from "../server/server.js";
 import {
+  WebuiTerminalManager,
   createHarnessPortFromHost,
   createWebuiRuntimeHost,
 } from "../server/runtime.js";

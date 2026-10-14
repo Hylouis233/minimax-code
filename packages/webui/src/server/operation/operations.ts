@@ -31,7 +31,7 @@ import type {
   WebuiOperationRegistryEntry,
   WebuiOperationRegistration,
 } from "./operation-contract.js";
-import type { WebuiTerminalProcessPort } from "../terminal-port.js";
+import type { WebuiTerminalProcessPort } from "../../runtime/port.js";
 export {
   getSigninPanelOperation,
   claimSigninOperation,
