@@ -19,15 +19,12 @@ import toml from "highlight.js/lib/languages/ini";
 import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
 import { WebuiMarkdown } from "../../transcript/ui/markdown.js";
-import type { WebuiCanvasDocument } from "../../../../shared/contracts/canvas.js";
 import type { WebuiFileDiffInfoView } from "../../../../shared/contracts/session.js";
 import type {
   WebuiWorkspaceEnvironment,
   WebuiWorkspaceFile,
   WebuiWorkspaceFileContent,
   WebuiWorkspaceGitMutationRequest,
-  WebuiWorkspaceArchiveListing,
-  WebuiWorkspaceArchiveExtractResult,
 } from "../../../../shared/contracts/workspace.js";
 import type {
   WebuiWorkspaceReviewSearchResult,
@@ -54,7 +51,6 @@ import { FileTree, filterWorkspaceFiles, findWorkspaceFile, getWorkspaceFilePare
 import { WorkspaceMediaPreview } from "./WorkspaceMediaPreview.js";
 import { isMediaContent } from "../projection/media-preview.js";
 import { WorkspaceCanvas } from "./WorkspaceCanvas.js";
-import type { CanvasOperation } from "./WorkspaceCanvas.js";
 import { WorkspaceArchiveView } from "./WorkspaceArchiveView.js";
 import { WorkspaceHtmlPreview } from "./WorkspaceHtmlPreview.js";
 import { type WebuiWorkspaceQueries } from "../application/workspace-queries.js";
@@ -293,8 +289,6 @@ export function WebuiFilePreview({ tab, result, codeMode, workspaceFileUrl, }: {
   readonly result?: { readonly loading: boolean; readonly content?: WebuiWorkspaceFileContent; readonly error?: string };
   readonly codeMode: boolean;
   readonly workspaceFileUrl?: (request: { readonly workspaceDir: string; readonly path: string }) => string;
-  readonly readWorkspaceArchive?: (request: { readonly workspaceDir: string; readonly path: string; readonly prefix?: string }) => Promise<WebuiWorkspaceArchiveListing>;
-  readonly extractWorkspaceArchive?: (request: { readonly workspaceDir: string; readonly path: string; readonly destination: string; readonly prefix?: string }) => Promise<WebuiWorkspaceArchiveExtractResult>;
 }): ReactElement {
   const previewMarkdown = /\.md$/iu.test(tab.path) && !codeMode;
   const content = result?.content?.content ?? "";
@@ -325,18 +319,11 @@ export function WebuiFilePreview({ tab, result, codeMode, workspaceFileUrl, }: {
   </div>;
 }
 
-export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, workspaceFileUrl, readWorkspaceArchive, extractWorkspaceArchive, readCanvas, applyCanvas, createTerminal, listTerminals, writeTerminal, resizeTerminal, disposeTerminal, watchTerminal, onClose }: {
+export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, workspaceFileUrl, createTerminal, listTerminals, writeTerminal, resizeTerminal, disposeTerminal, watchTerminal, onClose }: {
   readonly state: WorkspacePanelState;
   readonly dispatch: (command: WorkspacePanelCommand) => void;
   readonly sessionId?: string; readonly workspaceDir?: string;
   readonly workspaceFileUrl?: (request: { readonly workspaceDir: string; readonly path: string }) => string;
-  readonly readWorkspaceArchive?: (request: { readonly workspaceDir: string; readonly path: string; readonly prefix?: string }) => Promise<WebuiWorkspaceArchiveListing>;
-  readonly extractWorkspaceArchive?: (request: { readonly workspaceDir: string; readonly path: string; readonly destination: string; readonly prefix?: string }) => Promise<WebuiWorkspaceArchiveExtractResult>;
-  readonly readCanvas?: (request: { sessionId: string }) => Promise<WebuiCanvasDocument>;
-  // The canvas builds its own operation objects, so the panel adopts the
-  // component's operation type rather than restating it: one definition, and
-  // a drift between the two would only surface as a call the runtime rejects.
-  readonly applyCanvas?: (request: { sessionId: string; operation: CanvasOperation }) => Promise<{ readonly operationId: string; readonly document: WebuiCanvasDocument }>;
   readonly createTerminal?: (request: { workspaceDir: string }) => Promise<{ terminalId: string; status: string }>;
   readonly listTerminals?: () => Promise<readonly Record<string, unknown>[]>;
   readonly writeTerminal?: (request: { terminalId: string; data: string }) => Promise<unknown>;
@@ -639,7 +626,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     <div className="webui-workspace-panel-body">
       <div className="webui-workspace-view">
     {tab === "files" ? <div className="webui-workspace-files-empty" data-testid="workspace-files-empty"><WebuiIconFolder className="size-8" /><strong>查看文件</strong><p>从工作区目录树中选择文件</p></div> : null}
-    {tab === "file-preview" && activeTab?.kind === "file-preview" ? <WebuiFilePreview tab={activeTab} result={fileResults.get(activeTab.id)} codeMode={fileCodeMode} workspaceFileUrl={workspaceFileUrl} readWorkspaceArchive={readWorkspaceArchive} extractWorkspaceArchive={extractWorkspaceArchive} /> : null}
+    {tab === "file-preview" && activeTab?.kind === "file-preview" ? <WebuiFilePreview tab={activeTab} result={fileResults.get(activeTab.id)} codeMode={fileCodeMode} workspaceFileUrl={workspaceFileUrl} /> : null}
     {tab === "review" && activeTab?.kind === "review" && activeTab.source === "workspace" ? <div className="webui-turn-review" data-testid="workspace-review">
       {reviewSummary?.tabId !== activeTab.id || reviewSummary.loading && !reviewSummary.summary ? <p className="webui-turn-review-empty" role="status">正在收集变更…</p> : reviewSummary.error && !reviewSummary.summary ? <p className="webui-turn-review-empty" role="alert">{reviewSummary.error}</p> : reviewSummary.summary ? <>
         <div className="webui-turn-review-summary"><span>{reviewSummary.summary.totals.files} 个文件</span><span className="webui-diff-header-stats"><span className="webui-diff-add">+{reviewSummary.summary.totals.additions}</span>{reviewSummary.summary.totals.deletions ? <span className="webui-diff-del">-{reviewSummary.summary.totals.deletions}</span> : null}</span></div>

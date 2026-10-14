@@ -11,10 +11,18 @@ import { createWebuiWorkspaceQueries } from "../../src/client/features/workspace
 import type { WebuiWorkspaceFileContent } from "../../src/shared/contracts/workspace.js";
 import type { WebuiWorkspaceReviewSummary } from "../../src/shared/contracts/review.js";
 
-function deferred<T>(): { readonly promise: Promise<T>; readonly resolve: (value: T) => void } {
+function deferred<T>(): {
+  readonly promise: Promise<T>;
+  readonly resolve: (value: T) => void;
+  readonly reject: (reason: unknown) => void;
+} {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((r) => { resolve = r; });
-  return { promise, resolve };
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
 }
 
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
@@ -254,5 +262,156 @@ describe("the canvas owner keeps one document per session", () => {
     expect(landed).toBe(false);
     expect(state.error).toBe("refused");
     expect(state.busy).toBe(false);
+  });
+});
+
+// T11 acceptance 6: the response cases that decide whether a panel shows the
+// bytes it asked for. Each of these was a real behaviour with no test naming it,
+// so a regression would have been invisible.
+
+describe("inline content supersedes a read that is still in flight", () => {
+  it("keeps the inline bytes when the earlier read answers late", async () => {
+    const pending = deferred<WebuiWorkspaceFileContent>();
+    const queries = createWebuiWorkspaceQueries({
+      port: { readWorkspaceFile: () => pending.promise },
+    });
+
+    // The panel starts a read, and then the transcript hands the same tab the
+    // document inline (the session's plan file, which lives outside the
+    // workspace root and would be rejected by a read anyway).
+    queries.readFile("tab", "/w", "plan.md");
+    queries.setInlineFile("tab", "# plan", "plan.md");
+
+    // The read answers afterwards. It was accepted before the inline content
+    // arrived, but it must not land on top of what the tab now shows.
+    pending.resolve({ type: "text", content: "STALE", resolvedPath: "plan.md" });
+    await flush();
+
+    const slot = queries.getSnapshot().files.get("tab");
+    expect(slot?.content?.content).toBe("# plan");
+    expect(slot?.loading).toBe(false);
+    expect(slot?.error).toBeUndefined();
+  });
+
+  it("still reports a read failure that arrived before the inline content", async () => {
+    const pending = deferred<WebuiWorkspaceFileContent>();
+    const queries = createWebuiWorkspaceQueries({
+      port: { readWorkspaceFile: () => pending.promise },
+    });
+
+    queries.readFile("tab", "/w", "plan.md");
+    pending.reject(new Error("读取失败"));
+    await flush();
+    expect(queries.getSnapshot().files.get("tab")?.error).toBe("读取失败");
+
+    // The inline content replaces the slot outright, error included: the tab is
+    // no longer showing a read that failed.
+    queries.setInlineFile("tab", "# plan", "plan.md");
+    const slot = queries.getSnapshot().files.get("tab");
+    expect(slot?.content?.content).toBe("# plan");
+    expect(slot?.error).toBeUndefined();
+  });
+});
+
+describe("a git signal matches a workspace by its alias too", () => {
+  it("invalidates the environment and review held under the alias path", async () => {
+    const queries = createWebuiWorkspaceQueries({
+      port: {
+        getWorkspaceEnvironment: async () => ({
+          isGitRepo: true, changedFiles: 0, insertions: 0, deletions: 0, lineStatsStatus: "ready",
+        }),
+        getWorkspaceReviewSummary: async () => summary("snap-1"),
+      },
+    });
+
+    // The runtime reports the repository under a name that is not the path the
+    // panel holds — a worktree or a symlink target. Both views were loaded for
+    // "/w", so a signal naming only "/w-alias" is still about them.
+    queries.loadEnvironment("/w");
+    await queries.loadReviewSummary("tab", "/w");
+    await flush();
+
+    const before = queries.getSnapshot();
+    queries.invalidateWorkspaceGit({ workspace: "/repo", aliases: ["/w"] });
+
+    const after = queries.getSnapshot();
+    expect(after.environmentRevision).toBe(before.environmentRevision);
+    // The environment coalesces into its 350 ms window, so its revision has not
+    // moved yet; the review is invalidated per signal and has.
+    expect(after.reviewRevision).toBe(before.reviewRevision + 1);
+  });
+
+  it("invalidates the review when the alias is the one the panel holds", async () => {
+    const queries = createWebuiWorkspaceQueries({
+      port: { getWorkspaceReviewSummary: async () => summary("snap-1") },
+    });
+
+    await queries.loadReviewSummary("tab", "/w-alias");
+    const before = queries.getSnapshot().reviewRevision;
+
+    queries.invalidateWorkspaceGit({ workspace: "/repo", aliases: ["/w"] });
+    expect(queries.getSnapshot().reviewRevision).toBe(before);
+  });
+});
+
+describe("a burst of git signals", () => {
+  it("invalidates the review once per signal and the environment once", async () => {
+    const queries = createWebuiWorkspaceQueries({
+      port: {
+        getWorkspaceEnvironment: async () => ({
+          isGitRepo: true, changedFiles: 0, insertions: 0, deletions: 0, lineStatsStatus: "ready",
+        }),
+        getWorkspaceReviewSummary: async () => summary("snap-1"),
+      },
+    });
+
+    queries.loadEnvironment("/w");
+    await queries.loadReviewSummary("tab", "/w");
+    await flush();
+
+    const before = queries.getSnapshot();
+    for (let index = 0; index < 5; index += 1) {
+      queries.invalidateWorkspaceGit({ workspace: "/w" });
+    }
+
+    // Every signal is a real change the review has to re-read, so its revision
+    // moves every time.
+    expect(queries.getSnapshot().reviewRevision).toBe(before.reviewRevision + 5);
+    // The environment is the expensive one, and its window is still open.
+    expect(queries.getSnapshot().environmentRevision).toBe(before.environmentRevision);
+
+    await new Promise((resolve) => setTimeout(resolve, 420));
+    // Five signals inside one window are one invalidation, not five: the panel
+    // sees one new revision and reloads once.
+    expect(queries.getSnapshot().environmentRevision).toBe(before.environmentRevision + 1);
+  });
+
+  it("leaves a workspace the burst did not name alone", async () => {
+    let otherReloads = 0;
+    const queries = createWebuiWorkspaceQueries({
+      port: {
+        getWorkspaceEnvironment: async () => {
+          otherReloads += 1;
+          return { isGitRepo: true, changedFiles: 0, insertions: 0, deletions: 0, lineStatsStatus: "ready" };
+        },
+        getWorkspaceReviewSummary: async () => summary("snap-1"),
+      },
+    });
+
+    queries.loadEnvironment("/other");
+    await queries.loadReviewSummary("tab", "/other");
+    await flush();
+    const before = queries.getSnapshot();
+
+    for (let index = 0; index < 3; index += 1) {
+      queries.invalidateWorkspaceGit({ workspace: "/w" });
+    }
+
+    expect(queries.getSnapshot().reviewRevision).toBe(before.reviewRevision);
+    await new Promise((resolve) => setTimeout(resolve, 420));
+    // Neither view was touched, and the owner did not go to the runtime at all:
+    // it has nothing to say about a workspace no signal named.
+    expect(otherReloads).toBe(1);
+    expect(queries.getSnapshot().environmentRevision).toBe(before.environmentRevision);
   });
 });

@@ -1565,7 +1565,7 @@ export function WebuiClientFoundationApp(
                 </aside>
               </div>
             ) : null}
-            {!homeMode && workspacePanel.open ? <WebuiWorkspacePanel state={workspacePanel} dispatch={dispatchWorkspacePanel} sessionId={selectedSessionId} workspaceDir={selectedSession?.workspaceDir} workspaceFileUrl={workspacePort.workspaceFileUrl} readWorkspaceArchive={workspacePort.readWorkspaceArchive} extractWorkspaceArchive={workspacePort.extractWorkspaceArchive} readCanvas={workspacePort.readCanvas} applyCanvas={workspacePort.applyCanvas} createTerminal={workspacePort.createTerminal} listTerminals={workspacePort.listTerminals} writeTerminal={workspacePort.writeTerminal} resizeTerminal={workspacePort.resizeTerminal} disposeTerminal={workspacePort.disposeTerminal} watchTerminal={workspacePort.watchTerminal} onClose={() => dispatchWorkspacePanel({ type: "close-panel" })} /> : null}
+            {!homeMode && workspacePanel.open ? <WebuiWorkspacePanel state={workspacePanel} dispatch={dispatchWorkspacePanel} sessionId={selectedSessionId} workspaceDir={selectedSession?.workspaceDir} workspaceFileUrl={workspacePort.workspaceFileUrl} createTerminal={workspacePort.createTerminal} listTerminals={workspacePort.listTerminals} writeTerminal={workspacePort.writeTerminal} resizeTerminal={workspacePort.resizeTerminal} disposeTerminal={workspacePort.disposeTerminal} watchTerminal={workspacePort.watchTerminal} onClose={() => dispatchWorkspacePanel({ type: "close-panel" })} /> : null}
             </>}
           </main>
         </div>
