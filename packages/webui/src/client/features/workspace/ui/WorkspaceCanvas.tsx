@@ -31,7 +31,7 @@ import {
   type ReactElement,
   type WheelEvent as ReactWheelEvent,
 } from "react";
-import type { WebuiCanvasDocument } from "../../../shared/contracts/canvas.js";
+import type { WebuiCanvasDocument } from "../../../../shared/contracts/canvas.js";
 
 /** Backing box for the stage; nodes are placed inside it in canvas units. */
 const CANVAS_WORLD_SIZE = 4000;
@@ -40,10 +40,10 @@ const CANVAS_PAN_KEY_SCALE = 4;
 // Re-exported so the canvas keeps a single import site for everything a
 // caller or a test needs, while the definitions themselves live in
 // `shared/contracts/canvas.ts` — the wire contract they mirror.
-export type { CanvasMutation, CanvasNodeLayout, CanvasOperation } from "../../../shared/contracts/canvas.js";
-import type { CanvasMutation, CanvasNodeLayout, CanvasOperation } from "../../../shared/contracts/canvas.js";
-import { DESKTOP_COPY, resolveCanvasPointerGesture, stepCanvasZoom, canvasPointerMoveLayout, canvasPointerResizeLayout, canvasArrowDirection, canvasKeyStep, nudgeCanvasLayout, resizeCanvasLayoutBy, canvasLayoutsEqual, buildCanvasUpdateLayoutMutation, buildCanvasAddFileMutation, buildCanvasRemoveNodeMutation, createCanvasOperationId, createCanvasNodeId, buildCanvasOperation, nextCanvasNodeLayout, describeCanvasError, parseCanvasNodes, applyCanvasLayoutPreview } from "../../projection/workspace/canvas-projection.js";
-import type { CanvasNodeView, CanvasPointerGesture, CanvasLayoutPreview } from "../../projection/workspace/canvas-projection.js";
+export type { CanvasMutation, CanvasNodeLayout, CanvasOperation } from "../../../../shared/contracts/canvas.js";
+import type { CanvasMutation, CanvasNodeLayout, CanvasOperation } from "../../../../shared/contracts/canvas.js";
+import { DESKTOP_COPY, resolveCanvasPointerGesture, stepCanvasZoom, canvasPointerMoveLayout, canvasPointerResizeLayout, canvasArrowDirection, canvasKeyStep, nudgeCanvasLayout, resizeCanvasLayoutBy, canvasLayoutsEqual, buildCanvasUpdateLayoutMutation, buildCanvasAddFileMutation, buildCanvasRemoveNodeMutation, createCanvasOperationId, createCanvasNodeId, buildCanvasOperation, nextCanvasNodeLayout, describeCanvasError, parseCanvasNodes, applyCanvasLayoutPreview } from "../projection/canvas-projection.js";
+import type { CanvasNodeView, CanvasPointerGesture, CanvasLayoutPreview } from "../projection/canvas-projection.js";
 
 export interface CanvasPan {
   readonly x: number;

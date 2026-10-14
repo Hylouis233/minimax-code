@@ -20,13 +20,13 @@ import type { ComposerPort } from "./composer/command-port.js";
 import type { ShellEventPort } from "./shell/watch-port.js";
 import type { InteractionPort } from "./interactions/interaction-port.js";
 import type { GoalPort } from "./goal/goal-port.js";
-import type { WorkspacePort } from "./workspace/workspace-port.js";
+import type { WorkspacePort } from "../features/workspace/contracts/workspace-port.js";
 import type { SettingsPort } from "./settings/settings-port.js";
 import type { ModelsPort } from "./models/provider-port.js";
 import type { TranscriptPort } from "../features/transcript/contracts/session-read-port.js";
 import type { AccountPort } from "../features/account/contracts/account-port.js";
 import type { PluginPort } from "./plugins/plugin-port.js";
-import type { TerminalPort } from "./workspace/terminal-port.js";
+import type { TerminalPort } from "../features/terminal/contracts/terminal-port.js";
 
 export interface WebuiTransport
   extends SessionPort,

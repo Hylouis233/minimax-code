@@ -3,9 +3,9 @@
 // container in `WorkspacePanels.tsx` only imports from it.
 
 import type { ReactElement } from "react";
-import type { WebuiWorkspaceFile } from "../../../shared/contracts/workspace.js";
-import { WebuiIconChevronLeft, WebuiIconFile } from "../shell/icons.js";
-import { formatWorkspaceFileSize, formatWorkspaceFileModifiedAt } from "../../projection/workspace/workspace-file-tree.js";
+import type { WebuiWorkspaceFile } from "../../../../shared/contracts/workspace.js";
+import { WebuiIconChevronLeft, WebuiIconFile } from "../../../components/shell/icons.js";
+import { formatWorkspaceFileSize, formatWorkspaceFileModifiedAt } from "../projection/workspace-file-tree.js";
 
 // The pure tree helpers moved to `projection/workspace/workspace-file-tree.ts` so the
 // tree query owner merges with the same function the component walks with
@@ -15,7 +15,7 @@ export {
   mergeWorkspaceFileChildren,
   findWorkspaceFile,
   getWorkspaceFileParentPaths,
-} from "../../projection/workspace/workspace-file-tree.js";
+} from "../projection/workspace-file-tree.js";
 
 /**
  * The file-metadata column. `size` and `modifiedAt` are optional by contract:

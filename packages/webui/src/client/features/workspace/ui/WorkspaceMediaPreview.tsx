@@ -3,9 +3,9 @@
 // `WorkspacePanels.tsx` only imports the components from it.
 
 import { useState, type ReactElement } from "react";
-import type { WebuiWorkspaceFileContent } from "../../../shared/contracts/workspace.js";
-import { basenamePath } from "../../projection/common/paths.js";
-import { mediaKind, isMediaContent } from "../../projection/workspace/media-preview.js";
+import type { WebuiWorkspaceFileContent } from "../../../../shared/contracts/workspace.js";
+import { basenamePath } from "../../../projection/common/paths.js";
+import { mediaKind, isMediaContent } from "../projection/media-preview.js";
 
 export type WorkspaceMediaPreviewProps = {
   /** The file path the preview tab was opened with, used for `alt` text. */

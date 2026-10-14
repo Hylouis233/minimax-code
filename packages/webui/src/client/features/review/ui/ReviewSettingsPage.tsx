@@ -26,16 +26,16 @@ import {
   webuiReviewLineTarget,
   type WebuiReviewFile,
   type WebuiReviewState,
-} from "../../features/review/projection/review-state.js";
+} from "../projection/review-state.js";
 import {
   groupWebuiWorktreeWorkspaces,
   type WebuiWorktreeSourceSession,
   type WebuiWorktreeWorkspace,
-} from "../../features/sessions/projection/worktree-state.js";
-import { selectWebuiCatalogFlatPage } from "../../features/sessions/application/session-catalog.js";
-import { useWebuiSessionStoreContext } from "../../bindings/application-context.js";
-import { useWebuiWorkspaceQueries } from "../../bindings/use-query-state.js";
-import { FolderIcon, SearchIcon } from "../shared/settings-glyphs.js";
+} from "../../sessions/projection/worktree-state.js";
+import { selectWebuiCatalogFlatPage } from "../../sessions/application/session-catalog.js";
+import { useWebuiSessionStoreContext } from "../../../bindings/application-context.js";
+import { useWebuiWorkspaceQueries } from "../../../bindings/use-query-state.js";
+import { FolderIcon, SearchIcon } from "../../../components/shared/settings-glyphs.js";
 
 type WebuiReviewStateAction = Parameters<typeof reduceWebuiReviewState>[1];
 

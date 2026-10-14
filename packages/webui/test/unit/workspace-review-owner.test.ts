@@ -9,6 +9,9 @@ import {
   chunkWebuiWorkspaceReviewFileIds,
   createWebuiWorkspaceReviewOwner,
 } from "../../src/client/features/review/application/workspace-review-owner.js";
+import {
+  chunkWebuiWorkspaceReviewFileIds,
+} from "../../src/client/features/review/contracts/workspace-review.js";
 
 describe("the workspace-review owner", () => {
   it("refuses a diff batch whose snapshot is not the one it asked for", async () => {

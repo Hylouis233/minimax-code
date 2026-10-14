@@ -99,3 +99,20 @@ export interface WebuiWorkspaceReviewPort {
     readonly includeUntrackedFiles: boolean;
   }) => Promise<WebuiWorkspaceReviewSearchResult>;
 }
+
+/**
+ * The diff-batch size and its chunking helper. They are declarations the surfaces
+ * and the owner both use, so they live with the contract rather than inside the
+ * owner's implementation (T11: a peer surface reads the contract, not the owner).
+ */
+export const WEBUI_WORKSPACE_REVIEW_DIFF_BATCH_SIZE = 5;
+
+export function chunkWebuiWorkspaceReviewFileIds(
+  fileIds: readonly string[],
+): string[][] {
+  const batches: string[][] = [];
+  for (let index = 0; index < fileIds.length; index += WEBUI_WORKSPACE_REVIEW_DIFF_BATCH_SIZE) {
+    batches.push(fileIds.slice(index, index + WEBUI_WORKSPACE_REVIEW_DIFF_BATCH_SIZE));
+  }
+  return batches;
+}

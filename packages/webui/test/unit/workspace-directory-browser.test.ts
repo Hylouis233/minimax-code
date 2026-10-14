@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const PATH = "../../src/client/components/workspace/WebuiWorkspaceDirectoryBrowser.tsx";
+const PATH = "../../src/client/features/workspace/ui/WebuiWorkspaceDirectoryBrowser.tsx";
 const source = readFileSync(fileURLToPath(new URL(PATH, import.meta.url)), "utf8");
 
 describe("the directory browser keeps its five behaviours", () => {

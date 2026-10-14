@@ -30,9 +30,9 @@
 // sharper when the read result shows a relative reference.
 
 import { useEffect, useState, type ReactElement } from "react";
-import type { WebuiWorkspaceFileContent } from "../../../shared/contracts/workspace.js";
-import { basenamePath } from "../../projection/common/paths.js";
-import { hasRelativeDocumentReference } from "../../projection/workspace/html-preview.js";
+import type { WebuiWorkspaceFileContent } from "../../../../shared/contracts/workspace.js";
+import { basenamePath } from "../../../projection/common/paths.js";
+import { hasRelativeDocumentReference } from "../projection/html-preview.js";
 
 export type WorkspaceHtmlPreviewProps = {
   /** The file path the preview tab was opened with. */

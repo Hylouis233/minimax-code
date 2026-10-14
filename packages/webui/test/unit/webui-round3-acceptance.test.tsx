@@ -11,8 +11,8 @@ import {
 import { WebuiDiffCard } from "../../src/client/features/transcript/ui/DiffCard.js";
 import { WebuiGoalBanner } from "../../src/client/components/goal/GoalBanner.js";
 import { WebuiInteractionPanel } from "../../src/client/components/interactions/InteractionPanel.js";
-import { chunkWebuiWorkspaceReviewFileIds, WebuiDiffFileSection } from "../../src/client/components/workspace/WorkspacePanels.js";
-import { projectWebuiUnifiedDiffLines } from "../../src/client/projection/workspace/panel-projection.js";
+import { chunkWebuiWorkspaceReviewFileIds, WebuiDiffFileSection } from "../../src/client/features/workspace/ui/WorkspacePanels.js";
+import { projectWebuiUnifiedDiffLines } from "../../src/client/features/workspace/projection/panel-projection.js";
 import {
   WebuiFeedbackActions,
   WebuiMessageActions,

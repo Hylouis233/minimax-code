@@ -22,8 +22,8 @@ import {
   WorkspaceMediaNotice,
   WorkspaceMediaPreview,
   WorkspaceVideoPreview,
-} from "../../src/client/components/workspace/WorkspaceMediaPreview.js";
-import { isMediaContent } from "../../src/client/projection/workspace/media-preview.js";
+} from "../../src/client/features/workspace/ui/WorkspaceMediaPreview.js";
+import { isMediaContent } from "../../src/client/features/workspace/projection/media-preview.js";
 
 const FILE_URL = "http://127.0.0.1:8787/workspace-file?token=t";
 const DATA_URL = "data:image/png;base64,iVBORw0KGgo=";

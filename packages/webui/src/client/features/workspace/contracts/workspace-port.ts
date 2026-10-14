@@ -8,7 +8,7 @@
 import type {
   CanvasOperation,
   WebuiCanvasDocument,
-} from "../../../shared/contracts/canvas.js";
+} from "../../../../shared/contracts/canvas.js";
 import type {
   WebuiWorkspaceArchiveExtractResult,
   WebuiWorkspaceArchiveListing,
@@ -17,13 +17,13 @@ import type {
   WebuiWorkspaceFile,
   WebuiWorkspaceFileContent,
   WebuiWorkspaceGitMutationRequest,
-} from "../../../shared/contracts/workspace.js";
+} from "../../../../shared/contracts/workspace.js";
 import type {
   WebuiWorkspaceReviewDiffs,
   WebuiWorkspaceReviewFileContent,
   WebuiWorkspaceReviewSearchResult,
   WebuiWorkspaceReviewSummary,
-} from "../../../shared/contracts/review.js";
+} from "../../../../shared/contracts/review.js";
 
 export interface WorkspacePort {
   readonly listWorkspaceFileTree?: (request: {

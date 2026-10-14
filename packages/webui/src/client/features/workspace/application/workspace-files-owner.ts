@@ -11,7 +11,7 @@
 // keep reading one snapshot.
 
 import type { WebuiWorkspaceFile, WebuiWorkspaceFileContent } from "../../../../shared/contracts/workspace.js";
-import { mergeWorkspaceFileChildren } from "../../../projection/workspace/workspace-file-tree.js";
+import { mergeWorkspaceFileChildren } from "../projection/workspace-file-tree.js";
 
 /** The transport methods this owner drives. Absent means "not wired". */
 export interface WebuiWorkspaceFilesPort {

@@ -1,5 +1,5 @@
-import type { WebuiTurnDiffView } from "../../../shared/contracts/session.js";
-import { basenamePath } from "../common/paths.js";
+import type { WebuiTurnDiffView } from "../../../../shared/contracts/session.js";
+import { basenamePath } from "../../../projection/common/paths.js";
 
 // ---------------------------------------------------------------------------
 // The tab-kind registry (plan §4.4: "the single tab-kind registry"; §5.6's
@@ -206,7 +206,7 @@ import type {
   WebuiWorkspaceAddMenuOpen,
   WebuiWorkspaceMenuTabKind,
   WorkspacePanelCommand,
-} from "../../contracts/workspace/panel-command.js";
+} from "../contracts/panel-command.js";
 
 export type { WorkspacePanelCommand };
 

@@ -58,7 +58,7 @@
     },
     {
       "from": "client/features/sessions/ui/SessionRail.tsx",
-      "to": "client/projection/workspace/workspace-name.ts",
+      "to": "client/features/workspace/projection/workspace-name.ts",
       "reason": "The rail labels a project by its workspace name, which the Workspace business derives. Reviewed peer edge until Workspace publishes the name projection."
     },
     {
@@ -75,6 +75,26 @@
       "from": "client/features/workspace/application/workspace-queries.ts",
       "to": "client/features/review/application/workspace-review-owner.ts",
       "reason": "The workspace composer composes the review owner: the panels read one snapshot, and the review half is a peer business's owner. T11's acceptance says compose T10's review APIs rather than reimplementing review policy, and the owner factory is what there is to compose; the entry goes when review publishes a composition contract."
+    },
+    {
+      "from": "client/features/review/ui/ReviewSettingsPage.tsx",
+      "to": "client/features/sessions/application/session-catalog.ts",
+      "reason": "The review settings page lists the sessions it can review, reading the sessions catalogue. Reviewed peer edge until Sessions publishes that read as a public contract (its owner moved into features/sessions in T07)."
+    },
+    {
+      "from": "client/features/workspace/ui/WorkspacePanels.tsx",
+      "to": "client/features/transcript/ui/markdown.tsx",
+      "reason": "The panel renders file and diff content through the transcript's markdown renderer. Reviewed peer edge until the transcript publishes it as a shared rendering contract."
+    },
+    {
+      "from": "client/features/review/ui/ReviewSettingsPage.tsx",
+      "to": "client/features/sessions/projection/worktree-state.ts",
+      "reason": "The review settings page renders the worktree surface's grouping for the sessions it reviews. Reviewed peer edge until Sessions publishes that projection as a public contract."
+    },
+    {
+      "from": "client/features/workspace/ui/WorkspacePanels.tsx",
+      "to": "client/features/terminal/projection/terminal-size.ts",
+      "reason": "The workspace panel hosts the terminal tab, so it measures the terminal grid. The plan keeps the terminal presented inside the workspace; the entry goes when T15 gives the terminal its own presentation attachment."
     }
   ]
 }

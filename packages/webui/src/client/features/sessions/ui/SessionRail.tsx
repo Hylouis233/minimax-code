@@ -53,7 +53,7 @@ import {
 } from "../projection/rail-buckets.js";
 import { formatWebuiUnreadBadge } from "../../../projection/common/unread-badge.js";
 import type { WebuiClientSession, WebuiClientSessionPage, WebuiClientSessionTreePage, WebuiClientProject } from "../../../contracts/sessions/session-view.js";
-import { workspaceProjectName } from "../../../projection/workspace/workspace-name.js";
+import { workspaceProjectName } from "../../workspace/projection/workspace-name.js";
 
 const PROJECT_SESSION_BATCH_SIZE = 6;
 

@@ -9,8 +9,8 @@
 
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { WorkspaceHtmlPreview } from "../../src/client/components/workspace/WorkspaceHtmlPreview.js";
-import { hasRelativeDocumentReference } from "../../src/client/projection/workspace/html-preview.js";
+import { WorkspaceHtmlPreview } from "../../src/client/features/workspace/ui/WorkspaceHtmlPreview.js";
+import { hasRelativeDocumentReference } from "../../src/client/features/workspace/projection/html-preview.js";
 
 const FILE_URL = "http://127.0.0.1:8787/workspace-file?dir=%2Frepo&path=index.html&token=t0ken";
 

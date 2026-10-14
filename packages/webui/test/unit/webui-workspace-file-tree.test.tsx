@@ -12,8 +12,8 @@ import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { FileTree } from "../../src/client/components/workspace/WorkspaceFileTree.js";
-import { formatWorkspaceFileModifiedAt, formatWorkspaceFileSize } from "../../src/client/projection/workspace/workspace-file-tree.js";
+import { FileTree } from "../../src/client/features/workspace/ui/WorkspaceFileTree.js";
+import { formatWorkspaceFileModifiedAt, formatWorkspaceFileSize } from "../../src/client/features/workspace/projection/workspace-file-tree.js";
 import type { WebuiWorkspaceFile } from "../../src/shared/contracts/workspace.js";
 
 const MODIFIED_AT = Date.UTC(2026, 9, 4, 8, 51);

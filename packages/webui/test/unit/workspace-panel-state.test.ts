@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { parseWebuiMessageFileReference } from "../../src/client/features/transcript/projection/message-file-reference.js";
 import { WebuiMarkdown } from "../../src/client/features/transcript/ui/markdown.js";
-import { mergeWorkspaceFileChildren, WebuiFilePreview } from "../../src/client/components/workspace/WorkspacePanels.js";
-import { webuiFileLanguage } from "../../src/client/projection/workspace/panel-projection.js";
+import { mergeWorkspaceFileChildren, WebuiFilePreview } from "../../src/client/features/workspace/ui/WorkspacePanels.js";
+import { webuiFileLanguage } from "../../src/client/features/workspace/projection/panel-projection.js";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
@@ -13,7 +13,7 @@ import {
   reduceWorkspacePanelState,
   setWorkspaceSessionProgressPanelOpen,
   type WorkspacePanelSessionStates,
-} from "../../src/client/projection/workspace/workspace-panel-state.js";
+} from "../../src/client/features/workspace/projection/workspace-panel-state.js";
 import { focusWebuiFileLine, webuiFileLineTargetId } from "../../src/client/bindings/browser-effects.js";
 
 describe("right workspace panel navigation", () => {

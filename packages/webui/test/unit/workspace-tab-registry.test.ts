@@ -24,7 +24,7 @@ import {
   webuiWorkspaceTabLabel,
   type WebuiWorkspaceTabKind,
   type WorkspacePanelTab,
-} from "../../src/client/projection/workspace/workspace-panel-state.js";
+} from "../../src/client/features/workspace/projection/workspace-panel-state.js";
 
 const CLIENT = new URL("../../src/client/", import.meta.url);
 const read = (relative: string): string => readFileSync(new URL(relative, CLIENT), "utf8");
@@ -48,16 +48,16 @@ describe("the kinds are declared once", () => {
   it("keeps the kind union literal out of every other module", () => {
     // The shape of the old third enumeration. Its absence is what "one registry"
     // means for the type half.
-    expect(flat(read("components/workspace/WorkspacePanels.tsx"))).not.toContain(
+    expect(flat(read("features/workspace/ui/WorkspacePanels.tsx"))).not.toContain(
       '"files" | "canvas" | "terminal"',
     );
-    expect(flat(read("projection/workspace/workspace-panel-state.ts"))).toContain(
+    expect(flat(read("features/workspace/projection/workspace-panel-state.ts"))).toContain(
       "export interface WebuiWorkspaceTabShapes",
     );
   });
 
   it("carries every kind the host can open, and no label of its own", () => {
-    const component = flat(read("components/workspace/WorkspacePanels.tsx"));
+    const component = flat(read("features/workspace/ui/WorkspacePanels.tsx"));
     // The label map is gone; the words come from the registry.
     expect(component).not.toContain('{ files: "查看文件"');
     expect(component).toContain("webuiWorkspaceTabLabel(item)");

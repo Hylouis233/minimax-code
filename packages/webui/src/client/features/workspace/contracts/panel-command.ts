@@ -5,7 +5,7 @@
 // owns the panel. A consumer reads the type from the owner's contract rather than
 // from the projection that happens to reduce it.
 
-import type { WebuiTurnDiffView } from "../../../shared/contracts/session.js";
+import type { WebuiTurnDiffView } from "../../../../shared/contracts/session.js";
 
 export type WorkspacePanelCommand =
   | { readonly type: "open-file"; readonly sessionId: string; readonly workspaceDir: string; readonly path: string; readonly lineStart?: number; readonly lineEnd?: number }

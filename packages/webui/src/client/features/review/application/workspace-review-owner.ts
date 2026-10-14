@@ -14,6 +14,9 @@
 // - that refresh is attempted once per (tab, snapshot), so a stale loop cannot
 //   spin.
 
+import {
+  chunkWebuiWorkspaceReviewFileIds,
+} from "../contracts/workspace-review.js";
 import type {
   WebuiWorkspaceReviewDiffs,
   WebuiWorkspaceReviewSummary,
@@ -25,18 +28,6 @@ import {
   type WebuiWorkspaceReviewState,
 } from "../contracts/workspace-review.js";
 
-/** The batch size the review diff loader uses, preserved from the panel. */
-export const WEBUI_WORKSPACE_REVIEW_DIFF_BATCH_SIZE = 5;
-
-export function chunkWebuiWorkspaceReviewFileIds(
-  fileIds: readonly string[],
-): string[][] {
-  const batches: string[][] = [];
-  for (let index = 0; index < fileIds.length; index += WEBUI_WORKSPACE_REVIEW_DIFF_BATCH_SIZE) {
-    batches.push(fileIds.slice(index, index + WEBUI_WORKSPACE_REVIEW_DIFF_BATCH_SIZE));
-  }
-  return batches;
-}
 
 function message(reason: unknown): string {
   return reason instanceof Error ? reason.message : String(reason);

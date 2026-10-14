@@ -35,7 +35,7 @@ import {
   sortWebuiProjectSessionIds,
 } from "../../src/client/features/sessions/ui/SessionRail.js";
 import { WebuiSessionTranscript as BaseWebuiSessionTranscript } from "../../src/client/features/transcript/ui/SessionTranscript.js";
-import { WebuiWorkspaceDirectoryBrowser } from "../../src/client/components/workspace/WebuiWorkspaceDirectoryBrowser.js";
+import { WebuiWorkspaceDirectoryBrowser } from "../../src/client/features/workspace/ui/WebuiWorkspaceDirectoryBrowser.js";
 import {
   WebuiIconContextArchive,
   WebuiIconContextCopy,
@@ -148,9 +148,9 @@ import {
   settleAbortedStream,
   type WebuiStreamState,
 } from "../../src/client/projection/turn/stream-state.js";
-import { WebuiProgressOverviewPanel, WebuiProgressPanel, WebuiSubagentsPanel, WebuiWorkspacePanel, WebuiWorkspacePanelControls } from "../../src/client/components/workspace/WorkspacePanels.js";
-import { projectWebuiTodos } from "../../src/client/projection/workspace/panel-projection.js";
-import { initialWorkspacePanelState, reduceWorkspacePanelState } from "../../src/client/projection/workspace/workspace-panel-state.js";
+import { WebuiProgressOverviewPanel, WebuiProgressPanel, WebuiSubagentsPanel, WebuiWorkspacePanel, WebuiWorkspacePanelControls } from "../../src/client/features/workspace/ui/WorkspacePanels.js";
+import { projectWebuiTodos } from "../../src/client/features/workspace/projection/panel-projection.js";
+import { initialWorkspacePanelState, reduceWorkspacePanelState } from "../../src/client/features/workspace/projection/workspace-panel-state.js";
 import type { WebuiStreamFrame } from "../../src/shared/contracts/stream.js";
 import type { WebuiWorkspaceEnvironment } from "../../src/shared/contracts/workspace.js";
 import { streamStateBundle } from "../../src/client/application/turn/stream-state-bundle.js";

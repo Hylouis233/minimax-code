@@ -5,10 +5,10 @@
 // error state; the composer owns the open/closed flag and the value, and passes the browse command in.
 
 
-import { WebuiIconFolder } from "../shell/icons.js";
-import type { WebuiTransport } from "../../contracts/transport.js";
-import type { WebuiWorkspaceDirectoryListing } from "../../../shared/contracts/workspace.js";
-import { looksLikeAbsoluteWorkspacePath } from "../../projection/common/paths.js";
+import { WebuiIconFolder } from "../../../components/shell/icons.js";
+import type { WebuiTransport } from "../../../contracts/transport.js";
+import type { WebuiWorkspaceDirectoryListing } from "../../../../shared/contracts/workspace.js";
+import { looksLikeAbsoluteWorkspacePath } from "../../../projection/common/paths.js";
 import { useCallback, useEffect, useState, type ReactElement } from "react";
 
 export function WebuiWorkspaceDirectoryBrowser({

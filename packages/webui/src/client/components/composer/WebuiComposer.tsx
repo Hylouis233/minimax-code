@@ -25,7 +25,7 @@ import {
 } from "react";
 import type {WebuiClientMessageEnqueuer} from "../../contracts/composer/command-port.js";
 import type {WebuiClientMessageSender} from "../../contracts/turn/execution-port.js";
-import { WebuiWorkspaceDirectoryBrowser } from "../workspace/WebuiWorkspaceDirectoryBrowser.js";
+import { WebuiWorkspaceDirectoryBrowser } from "../../features/workspace/ui/WebuiWorkspaceDirectoryBrowser.js";
 import type { WebuiClientMessageLoader } from "../../features/transcript/contracts/message-view.js";
 import type { WebuiModelSelectionRequest } from "../../contracts/models/model-view.js";
 import type { WebuiClientSessionCreator } from "../../contracts/sessions/session-port.js";
@@ -155,7 +155,7 @@ import { evaluateComposerDismiss, evaluateOutsideClose } from "../../projection/
 import {
   buildWebuiModelSelectionRequest,
 } from "../../features/sessions/projection/action-requests.js";
-import { workspaceProjectName } from "../../projection/workspace/workspace-name.js";
+import { workspaceProjectName } from "../../features/workspace/projection/workspace-name.js";
 import {
   findWebuiMentionRange,
   findWebuiSlashRange,

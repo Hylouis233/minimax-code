@@ -57,8 +57,8 @@ import type { SettingsPort } from "../contracts/settings/settings-port.js";
 import type { ShellEventPort } from "../contracts/shell/watch-port.js";
 import type { TranscriptPort } from "../features/transcript/contracts/session-read-port.js";
 import type { TurnExecutionPort } from "../contracts/turn/execution-port.js";
-import type { TerminalPort } from "../contracts/workspace/terminal-port.js";
-import type { WorkspacePort } from "../contracts/workspace/workspace-port.js";
+import type { TerminalPort } from "../features/terminal/contracts/terminal-port.js";
+import type { WorkspacePort } from "../features/workspace/contracts/workspace-port.js";
 import {
   createWebuiTurnCapabilitySlice,
   type WebuiTurnCapabilitySlice,

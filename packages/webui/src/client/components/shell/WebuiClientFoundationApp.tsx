@@ -38,7 +38,7 @@ import {
   WebuiWorkspacePanel,
   WebuiProgressOverviewPanel,
   WebuiWorkspacePanelControls,
-} from "../workspace/WorkspacePanels.js";
+} from "../../features/workspace/ui/WorkspacePanels.js";
 import {
   getWorkspacePanelSessionState,
   initialWorkspacePanelSessionState,
@@ -46,7 +46,7 @@ import {
   setWorkspaceSessionProgressPanelOpen,
   type WorkspacePanelCommand,
   type WorkspacePanelSessionStates,
-} from "../../projection/workspace/workspace-panel-state.js";
+} from "../../features/workspace/projection/workspace-panel-state.js";
 import {
   initialWebuiShellSurface,
   isPluginManagementSurface,
@@ -82,13 +82,13 @@ import type {
   WebuiClientMessagePage,
 } from "../../features/transcript/contracts/message-view.js";
 import type { WebuiTransport } from "../../contracts/transport.js";
-import type { WebuiTodo } from "../../projection/workspace/panel-projection.js";
+import type { WebuiTodo } from "../../features/workspace/projection/panel-projection.js";
 import type { WebuiUsageQuotaResult } from "../../../shared/contracts/usage-quota.js";
 import type { WebuiVersionInfo } from "../../../shared/contracts/version.js";
 import type {
   WebuiWorkspaceProgressState,
   WebuiWorkspaceSubagent,
-} from "../../projection/workspace/workspace-progress.js";
+} from "../../features/workspace/projection/workspace-progress.js";
 import type { WebuiProjectGroup } from "../../features/sessions/ui/SessionRail.js";
 import { createWebuiCommandWorkflows } from "../../application/composer/command-workflows.js";
 import {
@@ -131,10 +131,10 @@ import {
   projectWebuiWorkspaceHistory,
   selectWebuiWorkspaceProgress,
   webuiWorkspaceSubagentStatus,
-} from "../../projection/workspace/workspace-progress.js";
+} from "../../features/workspace/projection/workspace-progress.js";
 import type { WebuiApplication } from "../../application/create-application.js";
 import { createWebuiPlanReviewWorkflow } from "../../application/interactions/interaction-coordinator.js";
-import type { WebuiWorkspaceGitChangedSignal } from "../../projection/workspace/workspace-panel-state.js";
+import type { WebuiWorkspaceGitChangedSignal } from "../../features/workspace/projection/workspace-panel-state.js";
 import { ConnectionStatus } from "./ConnectionStatus.js";
 import { deriveConversationUsageNotice } from "../../features/transcript/projection/message-projection.js";
 import { deriveRecentWorkspaceDirs } from "../../projection/composer/composer-state.js";

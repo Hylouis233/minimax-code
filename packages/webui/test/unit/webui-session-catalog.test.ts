@@ -22,7 +22,7 @@ import {
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 import { createWebuiSessionWorkflows } from "../../src/client/features/sessions/application/session-workflows.js";
 import { createWebuiSessionScopeManager } from "../../src/client/conversation/session-scope.js";
-import { selectWebuiWorkspaceProgress } from "../../src/client/projection/workspace/workspace-progress.js";
+import { selectWebuiWorkspaceProgress } from "../../src/client/features/workspace/projection/workspace-progress.js";
 import type { WebuiClientSession } from "../../src/client/contracts/sessions/session-view.js";
 
 /**
@@ -230,8 +230,8 @@ describe("session workflows", () => {
 
 describe("workspace progress selector", () => {
   const state = (
-    over: Partial<import("../../src/client/projection/workspace/workspace-progress.js").WebuiWorkspaceProgressState>,
-  ): import("../../src/client/projection/workspace/workspace-progress.js").WebuiWorkspaceProgressState => ({
+    over: Partial<import("../../src/client/features/workspace/projection/workspace-progress.js").WebuiWorkspaceProgressState>,
+  ): import("../../src/client/features/workspace/projection/workspace-progress.js").WebuiWorkspaceProgressState => ({
     todos: [],
     subagents: [],
     hasTodoSnapshot: false,

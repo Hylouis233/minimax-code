@@ -85,7 +85,7 @@ describe("the diff machine has one owner", () => {
 describe("the two readers share it", () => {
   it("is read by the turn-review owner and by the review page, and by nothing else", () => {
     // Scanned rather than listed: the review page moved to
-    // `components/workspace/` in ticket #70, so a hardcoded path went stale
+    // `features/workspace/ui/` in ticket #70, so a hardcoded path went stale
     // while the acceptance ("one owner, two readers") still held. Scanning the
     // tree makes a third reader fail here and a relocation a no-op.
     // The transcript's card now lives in the feature home and reads the owner by a
@@ -100,8 +100,8 @@ describe("the two readers share it", () => {
       .filter((file) => /from "[^"]*\breview-state\.js"/u.test(read(file)))
       .sort();
     expect(readers).toEqual([
-      "components/workspace/ReviewSettingsPage.tsx",
       "features/review/application/turn-review-owner.ts",
+      "features/review/ui/ReviewSettingsPage.tsx",
     ]);
   });
 

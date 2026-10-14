@@ -39,8 +39,8 @@ import {
   WorkspaceArchiveListing,
   WorkspaceArchiveNotice,
   WorkspaceArchiveView,
-} from "../../src/client/components/workspace/WorkspaceArchiveView.js";
-import { archiveDestinationFor, formatArchiveSize } from "../../src/client/projection/workspace/archive-projection.js";
+} from "../../src/client/features/workspace/ui/WorkspaceArchiveView.js";
+import { archiveDestinationFor, formatArchiveSize } from "../../src/client/features/workspace/projection/archive-projection.js";
 
 /** Fixtures live in the OS temp dir; nothing is written into the repo tree. */
 let workspace = "";

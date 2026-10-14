@@ -8,7 +8,7 @@
 // The text below is the declaration as it stood in the source module — no
 // behaviour change.
 
-import type { WebuiWorkspaceFileContent } from "../../../shared/contracts/workspace.js";
+import type { WebuiWorkspaceFileContent } from "../../../../shared/contracts/workspace.js";
 
 /**
  * Extension fallbacks for the read results that carry no `mimeType` (the text

@@ -8,8 +8,8 @@
 // The text below is the declaration as it stood in the source module — no
 // behaviour change.
 
-import type { CanvasMutation, CanvasNodeLayout, CanvasOperation } from "../../../shared/contracts/canvas.js";
-import type { WebuiCanvasDocument } from "../../../shared/contracts/canvas.js";
+import type { CanvasMutation, CanvasNodeLayout, CanvasOperation } from "../../../../shared/contracts/canvas.js";
+import type { WebuiCanvasDocument } from "../../../../shared/contracts/canvas.js";
 
 export const DESKTOP_COPY = {
   canvasEmptyTitle: "把文件放到画布上",

@@ -11,7 +11,7 @@ import {
 } from "../../features/sessions/projection/worktree-state.js";
 import { ToggleSwitch as Switch } from "../shared/ToggleSwitch.js";
 import { FolderIcon, SearchIcon } from "../shared/settings-glyphs.js";
-import { ReviewSettingsPage } from "../workspace/ReviewSettingsPage.js";
+import { ReviewSettingsPage } from "../../features/review/ui/ReviewSettingsPage.js";
 import { UsageModelSettings } from "./UsageModelSettings.js";
 import { PersonalizationSettings } from "./PersonalizationSettings.js";
 import type { MemoryHandoff } from "./MemoryManagerDialog.js";
