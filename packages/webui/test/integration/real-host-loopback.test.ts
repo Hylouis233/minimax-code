@@ -56,9 +56,12 @@ interface Booted {
 }
 
 const booted: Booted[] = [];
+const previousDataDir = process.env.MINIMAX_DATA_DIR;
 
 afterEach(async () => {
   for (const entry of booted.splice(0)) await entry.close();
+  if (previousDataDir === undefined) delete process.env.MINIMAX_DATA_DIR;
+  else process.env.MINIMAX_DATA_DIR = previousDataDir;
 });
 
 /**
@@ -80,15 +83,22 @@ async function bootRealHost(): Promise<Booted> {
   // this run. A file that already exists skips the copy, and the assertion in the
   // first case checks the file is still this one.
   await writeFile(join(dataDir, "config.yaml"), CONFIG_MARKER_TEXT, { mode: 0o600 });
+  // Point the config resolution at this directory too — `MINIMAX_DATA_DIR` is what
+  // `getDataDir()`/`getConfigPath()` read, and `@mavis/config` caches its snapshot
+  // per process, so it has to be reset for each case.
+  process.env.MINIMAX_DATA_DIR = dataDir;
+  (await import("@mavis/config")).resetConfig();
 
   const assembled = await createWebuiRuntimeHost({
     dataDir,
     appVersion: "real-host-loopback",
     mcodeTools: {
       prepare: async () => ({
+        requested: false,
         ready: false,
-        dispose: async () => undefined,
+        category: "disabled" as const,
         ensureCommandPath: () => undefined,
+        dispose: async () => undefined,
       }),
     },
   });

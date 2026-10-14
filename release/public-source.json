@@ -3929,6 +3929,7 @@
     "packages/webui/test-results/.last-run.json",
     "packages/webui/test/integration/loopback-harness-path.test.ts",
     "packages/webui/test/integration/real-host-loopback.test.ts",
+    "packages/webui/test/integration/real-host-model-turn.test.ts",
     "packages/webui/test/support/application-fixture.ts",
     "packages/webui/test/support/shell-fixture.ts",
     "packages/webui/test/unit/account-login.test.ts",
