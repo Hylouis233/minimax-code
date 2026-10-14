@@ -4061,6 +4061,7 @@
     "packages/webui/test/unit/webui-error-boundary.test.tsx",
     "packages/webui/test/unit/webui-event-coordinator.test.ts",
     "packages/webui/test/unit/webui-event-corpus.test.ts",
+    "packages/webui/test/unit/webui-host-contract-derivation.test.ts",
     "packages/webui/test/unit/webui-host-shape-invariant.test.ts",
     "packages/webui/test/unit/webui-identity-epoch-wiring.test.ts",
     "packages/webui/test/unit/webui-operation-binding.test.ts",
