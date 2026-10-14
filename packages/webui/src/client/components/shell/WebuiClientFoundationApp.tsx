@@ -23,14 +23,6 @@ import { WEBUI_COMPOSER_HOME_KEY } from "../../features/composer/application/com
 import { Composer } from "../../features/composer/ui/Composer.js";
 import { GreetingSkeleton } from "../../features/transcript/ui/TranscriptSkeletons.js";
 import { LeftRail } from "../../features/sessions/ui/LeftRail.js";
-import {
-  readProjectNames,
-  readProjectPins,
-  readSessionOverlay,
-  toggleProjectPin,
-  toggleSessionOverlay,
-  writeProjectName,
-} from "../../infrastructure/storage.js";
 import { Transcript } from "../../features/transcript/ui/Transcript.js";
 import { UserMenu } from "../../features/account/ui/UserMenu.js";
 import { MEMORY_HANDOFF_PROMPT, type MemoryHandoff } from "../../features/settings/ui/MemoryManagerDialog.js";
@@ -108,7 +100,6 @@ import {
   WebuiWorkspaceQueriesProvider,
 } from "../../bindings/use-query-state.js";
 import { WebuiAccountWorkflowsProvider } from "../../features/account/bindings/use-account-workflows.js";
-import { startWebuiSessionTransferDownload } from "../../infrastructure/session-transfer-download.js";
 import type { TeamModeSessionChoices } from "../../infrastructure/team-mode.js";
 import {
   initialWebuiWorkspaceProgress,
@@ -137,6 +128,7 @@ import { useSelectedSessionId } from "./use-selected-session.js";
 import { useWorkspacePanelSession } from "./use-workspace-panel-session.js";
 import { useNewTaskWorkspace } from "./use-new-task-workspace.js";
 import { useShellActivityWiring } from "./use-shell-activity-wiring.js";
+import { useSessionRailActions } from "./use-session-rail-actions.js";
 
 export interface WebuiClientFoundationAppProps {
   // Non-method props (seed / UI / SSR). The 78 method props that used to
@@ -408,18 +400,9 @@ export function WebuiClientFoundationApp(
   const [dismissedUsageNoticeKey, setDismissedUsageNoticeKey] = useState<
     string | undefined
   >();
-  const [pinnedSessions, setPinnedSessions] = useState<Record<string, boolean>>(
-    () => readSessionOverlay("pins", browserStorage),
-  );
-  const [starredSessions, setStarredSessions] = useState<Record<string, boolean>>(
-    () => readSessionOverlay("stars", browserStorage),
-  );
-  const [pinnedProjects, setPinnedProjects] = useState<Record<string, boolean>>(
-    () => readProjectPins(browserStorage),
-  );
-  const [projectNames, setProjectNames] = useState<Record<string, string>>(
-    () => readProjectNames(browserStorage),
-  );
+  // The rail's own state (collapse, search, pins/stars/project names) and its
+  // row actions live in `./use-session-rail-actions.js`; it is called below,
+  // once the session it acts on is resolved.
   // The selected session's live stream slice, read off the application store
   // through the selector (plan §7.6; ticket #45 prerequisite 5). Subscribing to
   // the store's snapshot keeps the shell reactive exactly as the old module
@@ -551,116 +534,6 @@ export function WebuiClientFoundationApp(
   const refreshRail = async () => {
     await sessionWorkflows.refresh();
   };
-  const handleRenameProject = (project: WebuiProjectGroup) => {
-    if (typeof window === "undefined") return;
-    const next = window.prompt("重命名项目", projectNames[project.key] ?? project.name)?.trim();
-    if (next) setProjectNames(writeProjectName(project.key, next, browserStorage));
-  };
-  const handleToggleProjectPin = (project: WebuiProjectGroup) => {
-    setPinnedProjects(toggleProjectPin(project.key, browserStorage));
-  };
-  const handleRenameSession = (session: WebuiClientSession) => {
-    if (!sessionWorkflows.canMutate || typeof window === "undefined") return;
-    const next = window.prompt("重命名", sessionLabel(session))?.trim();
-    if (!next || next === sessionLabel(session)) return;
-    void sessionWorkflows
-      .rename(session.sessionId, next)
-      .then(() => refreshRail())
-      .catch((reason: unknown) => setPageError(reason instanceof Error ? reason.message : String(reason)));
-  };
-  const handleToggleSessionPin = (session: WebuiClientSession) => {
-    setPinnedSessions(toggleSessionOverlay("pins", session.sessionId, browserStorage));
-  };
-  const handleToggleSessionStar = (session: WebuiClientSession) => {
-    setStarredSessions(toggleSessionOverlay("stars", session.sessionId, browserStorage));
-  };
-  const handleArchiveSession = (session: WebuiClientSession) => {
-    void sessionWorkflows
-      .archive(session.sessionId)
-      .catch((reason: unknown) => setPageError(reason instanceof Error ? reason.message : String(reason)));
-  };
-  const handleArchiveProject = (project: WebuiProjectGroup) => {
-    const ids = new Set(project.sessionIds);
-    for (const node of treePage.sessions) {
-      if (!project.sessionIds.includes(node.session.sessionId)) continue;
-      for (const child of node.childSessions) ids.add(child.sessionId);
-    }
-    void sessionWorkflows
-      .archiveMany([...ids])
-      .catch((reason: unknown) => setPageError(reason instanceof Error ? reason.message : String(reason)));
-  };
-  const handleForkSession = (session: WebuiClientSession, createIsolatedWorktree: boolean) => {
-    if (!sessionWorkflows.canFork) return;
-    void sessionWorkflows
-      .fork(session.sessionId, createIsolatedWorktree)
-      .then((forked) => {
-        const id = forked?.sessionId;
-        if (id) {
-          setSelectedSessionId(id);
-          if (typeof window !== "undefined")
-            window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${sessionHash(id)}`);
-        }
-      })
-      .catch((reason: unknown) => setPageError(reason instanceof Error ? reason.message : String(reason)));
-  };
-  const handleCopySession = (session: WebuiClientSession, value: "workspaceDir" | "sessionId") => {
-    const text = value === "workspaceDir" ? session.workspaceDir : session.sessionId;
-    if (!text || typeof navigator === "undefined" || !navigator.clipboard) return;
-    void navigator.clipboard.writeText(text);
-  };
-  const handleExportSession = (session: WebuiClientSession) => {
-    // The file comes from `GET /session-transfer`, not from walking the
-    // message pages here: that route is the one `POST /session-import` accepts,
-    // and a browser-assembled file carries the display layer only. See
-    // `session-transfer-download.ts` for why this is a navigation.
-    try {
-      startWebuiSessionTransferDownload(session.sessionId);
-    } catch (reason: unknown) {
-      setPageError(reason instanceof Error ? reason.message : String(reason));
-    }
-  };
-  const handleSessionImportPicked = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    // Reset first: picking the same file twice has to fire `change` again, and
-    // the element keeps its value otherwise.
-    event.target.value = "";
-    if (!file) return;
-    setSessionImportBusy(true);
-    void (async () => {
-      try {
-        const result = await sessionWorkflows.importSession(file, {
-          // The caller's context, never the file's session block: a downloaded
-          // file must not be able to name the working directory.
-          agentName: "main",
-          workspaceDir: selectedSession?.workspaceDir,
-        });
-        await refreshRail();
-        setSelectedSessionId(result.sessionId);
-        if (typeof window !== "undefined") {
-          window.history.replaceState(
-            null,
-            "",
-            `${window.location.pathname}${window.location.search}${sessionHash(result.sessionId)}`,
-          );
-        }
-      } catch (reason: unknown) {
-        setPageError(reason instanceof Error ? reason.message : String(reason));
-      } finally {
-        setSessionImportBusy(false);
-      }
-    })();
-  };
-  const handleDeleteSession = (session: WebuiClientSession) => {
-    void sessionWorkflows
-      .remove(session.sessionId)
-      .then(() => {
-        if (selectedSessionId === session.sessionId) {
-          setSelectedSessionId(undefined);
-          if (typeof window !== "undefined") window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
-        }
-      })
-      .catch((reason: unknown) => setPageError(reason instanceof Error ? reason.message : String(reason)));
-  };
   const homeMode = !selectedSessionId;
   const usageNotice = useMemo(
     () => deriveConversationUsageNotice(usageQuota),
@@ -755,49 +628,45 @@ export function WebuiClientFoundationApp(
   const composerTeamModeOff = selectedSessionId
     ? teamModeChoices[selectedSessionId] ?? teamModeOff
     : teamModeOff;
-  const [railCollapsed, setRailCollapsed] = useState(false);
-  // Rail session search. `railSearchOpen` mirrors whether the input is
-  // showing; `railSearchQuery` is the live filter. The query filters only the
-  // rail's rendered list — lookups such as the selected-session resolution and
-  // the composer's session switcher keep reading the unfiltered page, so a
-  // session selected before the search can still be resolved and reopened.
-  const [railSearchOpen, setRailSearchOpen] = useState(false);
-  const [railSearchQuery, setRailSearchQuery] = useState("");
-  const railSearchInputRef = useRef<HTMLInputElement | null>(null);
-  const sessionImportInputRef = useRef<HTMLInputElement | null>(null);
-  const [sessionImportBusy, setSessionImportBusy] = useState(false);
-  const openRailSearch = useCallback(() => {
-    setRailSearchOpen(true);
-    // The input mounts in the same commit as the state flip, so focus has to
-    // wait a frame for the ref to resolve.
-    requestAnimationFrame(() => railSearchInputRef.current?.focus());
-  }, []);
-  const closeRailSearch = useCallback(() => {
-    setRailSearchOpen(false);
-    setRailSearchQuery("");
-  }, []);
-  const railPage = useMemo(
-    () =>
-      railSearchQuery.trim()
-        ? { ...page, sessions: filterWebuiSessionsByQuery(page.sessions, railSearchQuery) }
-        : page,
-    [page, railSearchQuery],
-  );
-  // Child sessions live on the tree page rather than the flat page, so the
-  // query has to be applied there too or a match on a child would not show.
-  // A node whose children are all filtered out is dropped, and a tree that
-  // loses every node falls back to the flat list rather than rendering empty.
-  const railTreePage = useMemo(() => {
-    if (treePage.sessions.length === 0) return undefined;
-    if (!railSearchQuery.trim()) return treePage;
-    const nodes = treePage.sessions
-      .map((node) => ({
-        ...node,
-        childSessions: filterWebuiSessionsByQuery(node.childSessions, railSearchQuery),
-      }))
-      .filter((node) => node.childSessions.length > 0);
-    return nodes.length > 0 ? { ...treePage, sessions: nodes } : undefined;
-  }, [treePage, railSearchQuery]);
+  const {
+    railCollapsed,
+    setRailCollapsed,
+    railSearchOpen,
+    railSearchQuery,
+    setRailSearchQuery,
+    railSearchInputRef,
+    sessionImportInputRef,
+    sessionImportBusy,
+    openRailSearch,
+    closeRailSearch,
+    railPage,
+    railTreePage,
+    pinnedSessions,
+    starredSessions,
+    pinnedProjects,
+    projectNames,
+    onRenameProject: handleRenameProject,
+    onToggleProjectPin: handleToggleProjectPin,
+    onArchiveProject: handleArchiveProject,
+    onRenameSession: handleRenameSession,
+    onToggleSessionPin: handleToggleSessionPin,
+    onToggleSessionStar: handleToggleSessionStar,
+    onArchiveSession: handleArchiveSession,
+    onForkSession: handleForkSession,
+    onCopySession: handleCopySession,
+    onExportSession: handleExportSession,
+    onDeleteSession: handleDeleteSession,
+    onSessionImportPicked: handleSessionImportPicked,
+  } = useSessionRailActions({
+    page,
+    treePage,
+    storage: browserStorage,
+    workflows: sessionWorkflows,
+    selectedSessionId,
+    selectedSession,
+    setSelectedSessionId,
+    setPageError,
+  });
   const pluginManagementArea = webuiPluginManagementArea(shellSurface);
   const pluginManagementOpen = isPluginManagementSurface(shellSurface);
   const openPluginManagement = useCallback((area: WebuiPluginManagementArea) => {

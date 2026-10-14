@@ -992,19 +992,19 @@
     }
   ],
   "largeFileCarriers": {
-    "client/components/composer/WebuiComposer.tsx": [
+    "client/features/composer/ui/WebuiComposer.tsx": [
       "T13"
     ],
     "client/components/shell/WebuiClientFoundationApp.tsx": [
       "T19"
     ],
-    "client/components/sessions/SessionRail.tsx": [
+    "client/features/sessions/ui/SessionRail.tsx": [
       "T07"
     ],
-    "client/components/plugins/PluginCatalogue.tsx": [
+    "client/features/plugins/ui/PluginCatalogue.tsx": [
       "T08"
     ],
-    "client/components/models/ModelPicker.tsx": [
+    "client/features/models/ui/ModelPicker.tsx": [
       "T03"
     ],
     "server/operation/bind-handlers.ts": [
@@ -1013,11 +1013,11 @@
     "runtime/workspace-archive.ts": [
       "T16"
     ],
-    "client/application/workspace/workspace-queries.ts": [
+    "client/features/workspace/application/workspace-queries.ts": [
       "T10",
       "T11"
     ],
-    "client/components/transcript/SessionTranscript.tsx": [
+    "client/features/transcript/ui/SessionTranscript.tsx": [
       "T06"
     ],
     "client/styles/shell.css": [

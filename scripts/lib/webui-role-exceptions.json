@@ -2,13 +2,13 @@
   "comment": "Role-rule exceptions the role check accepts while A-004's migration is unfinished. The role rules judge every home, so an edge that used to escape judgement by sitting in an old home now needs an explicit entry here: module pair, owner, and the condition that ends the exception. Each entry names both files, so a reviewer sees the exact dependency. An entry that no longer matches a measured edge fails the check (see `roleRule`), so the list shrinks as the modules move instead of accumulating.",
   "entries": [
     {
-      "from": "client/components/shell/WebuiClientFoundationApp.tsx",
+      "from": "client/components/shell/use-session-rail-actions.ts",
       "to": "client/infrastructure/storage.ts",
       "owner": "T19 (shell 收尾)",
       "exitCondition": "The shell stops reading platform storage directly and takes it through the feature port that owns the state; the import goes with the last direct read."
     },
     {
-      "from": "client/components/shell/WebuiClientFoundationApp.tsx",
+      "from": "client/components/shell/use-session-rail-actions.ts",
       "to": "client/infrastructure/session-transfer-download.ts",
       "owner": "T19 (shell 收尾)",
       "exitCondition": "Session transfer download moves behind the sessions feature's published surface; the shell calls that instead."

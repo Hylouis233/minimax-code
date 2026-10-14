@@ -113,15 +113,15 @@ Counting unit is a produced responsibility, not each file edited. Several carrie
 
 | Current source file | Baseline lines | Carrier / partition |
 | --- | --- | --- |
-| `client/components/composer/WebuiComposer.tsx` | 2460 | T13 |
+| `client/features/composer/ui/WebuiComposer.tsx` | 2460 | T13 |
 | `client/components/shell/WebuiClientFoundationApp.tsx` | 1644 | T19 |
-| `client/components/sessions/SessionRail.tsx` | 1342 | T07 |
-| `client/components/plugins/PluginCatalogue.tsx` | 1208 | T08 |
-| `client/components/models/ModelPicker.tsx` | 1126 | T03 |
+| `client/features/sessions/ui/SessionRail.tsx` | 1342 | T07 |
+| `client/features/plugins/ui/PluginCatalogue.tsx` | 1208 | T08 |
+| `client/features/models/ui/ModelPicker.tsx` | 1126 | T03 |
 | `server/operation/bind-handlers.ts` | 1064 | T14 |
 | `runtime/workspace-archive.ts` | 974 | T16 |
-| `client/application/workspace/workspace-queries.ts` | 828 | T10, T11: review only in T10; files/environment only in T11 |
-| `client/components/transcript/SessionTranscript.tsx` | 814 | T06 |
+| `client/features/workspace/application/workspace-queries.ts` | 828 | T10, T11: review only in T10; files/environment only in T11 |
+| `client/features/transcript/ui/SessionTranscript.tsx` | 814 | T06 |
 | `client/styles/shell.css` | 6455 | T20 |
 | `client/styles/tokens.css` | 846 | T20 |
 | `runtime/usage-quota.ts` | 805 | T17 |

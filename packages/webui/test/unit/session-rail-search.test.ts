@@ -366,24 +366,29 @@ describe("WebuiProjectList under a search query", () => {
 // source and pins the bindings. It is weaker than a render and is named as
 // such: it proves the query reaches both consumers, not that the screen looks
 // right. The screen was checked by hand against a real rail.
+//
+// A-005 split the rail's state out of the frame: the query and the two filters
+// live in `use-session-rail-actions.ts`, and the frame still renders the input
+// and the list. The probes read both files, so neither side can be emptied.
 describe("rail search wiring in WebuiClientFoundationApp", () => {
-  const source = readFileSync(
-    new URL("../../src/client/components/shell/WebuiClientFoundationApp.tsx", import.meta.url),
-    "utf8",
-  );
+  const read = (name: string) =>
+    readFileSync(new URL(`../../src/client/components/shell/${name}`, import.meta.url), "utf8");
+  const hook = read("use-session-rail-actions.ts");
+  const frame = read("WebuiClientFoundationApp.tsx");
+  const source = `${hook}\n${frame}`;
 
   it("holds the query in one state and feeds it to the input", () => {
-    expect(source).toMatch(/const \[railSearchQuery, setRailSearchQuery\] = useState\(""\)/u);
-    expect(source).toMatch(/value=\{railSearchQuery\}/u);
+    expect(hook).toMatch(/const \[railSearchQuery, setRailSearchQuery\] = useState\(""\)/u);
+    expect(frame).toMatch(/value=\{railSearchQuery\}/u);
   });
 
   it("filters the session page the rail renders with that same query", () => {
     // Without this the projects come from the unfiltered page and the whole
     // feature is inert while every test stays green.
-    expect(source).toMatch(
+    expect(hook).toMatch(
       /filterWebuiSessionsByQuery\(page\.sessions, railSearchQuery\)/u,
     );
-    expect(source).toMatch(/filterWebuiSessionsByQuery\(node\.childSessions, railSearchQuery\)/u);
+    expect(hook).toMatch(/filterWebuiSessionsByQuery\(node\.childSessions, railSearchQuery\)/u);
   });
 
   it("passes the query into the project list it renders", () => {

@@ -130,10 +130,18 @@ describe("the rail's export button", () => {
   // change too, while the actual defect was that the rail never asked the
   // route for it. The gap is the wire between the button and the URL, and
   // that wire is only visible in the source.
-  const shell = readFileSync(
-    new URL("../../src/client/components/shell/WebuiClientFoundationApp.tsx", import.meta.url),
-    "utf8",
-  );
+  // A-005 moved the row actions into the rail hook; the wire is read from both
+  // files so the button and its route cannot drift apart unnoticed.
+  const shell = [
+    readFileSync(
+      new URL("../../src/client/components/shell/WebuiClientFoundationApp.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFileSync(
+      new URL("../../src/client/components/shell/use-session-rail-actions.ts", import.meta.url),
+      "utf8",
+    ),
+  ].join("\n");
 
   it("routes the export through the transfer download", () => {
     expect(shell).toContain("startWebuiSessionTransferDownload(session.sessionId)");
