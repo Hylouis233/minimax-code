@@ -3630,6 +3630,7 @@
     "packages/webui/src/client/features/composer/application/composer-store.ts",
     "packages/webui/src/client/features/composer/application/composer-workflows.ts",
     "packages/webui/src/client/features/composer/application/turn-retry.ts",
+    "packages/webui/src/client/features/composer/bindings/use-composer-attachments.ts",
     "packages/webui/src/client/features/composer/contracts/command-port.ts",
     "packages/webui/src/client/features/composer/contracts/slash-command.ts",
     "packages/webui/src/client/features/composer/projection/composer-goal-outcome.ts",

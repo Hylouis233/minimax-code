@@ -45,7 +45,6 @@ import { latestContextUsage, readContextUsageSnapshot } from "../projection/cont
 import { readWebuiComposerSubmitGate } from "../projection/submission-gate.js";
 import { readWebuiComposerGoalModeAfterSubmit } from "../projection/composer-goal-outcome.js";
 import {
-  readWebuiSeedApplication,
   type WebuiComposerSeed,
 } from "../projection/seed-application.js";
 import {
@@ -63,7 +62,6 @@ import {
 } from "../projection/context-breakdown.js";
 import { isTokenPlanModel } from "../../../features/models/projection/token-plan-model.js";
 import type {
-  WebuiComposerAttachment,
   WebuiComposerUrlReference,
 } from "../projection/composer-interactions.js";
 import {
@@ -100,6 +98,7 @@ import {
   useWebuiInteractionOwner,
 } from "../../../features/interactions/bindings/interaction-owner.js";
 import { useWebuiComposerStore } from "../../../bindings/composer-store.js";
+import { useComposerAttachments } from "../bindings/use-composer-attachments.js";
 import {
   useWebuiApplicationOptional,
   useWebuiSessionStoreSnapshot,
@@ -165,7 +164,6 @@ import {
   insertWebuiMention,
   removeWebuiSlashToken,
   replaceWebuiSlashToken,
-  webuiAttachmentLimitError,
   webuiTextAttachmentDataUrl,
 } from "../projection/composer-interactions.js";
 import {
@@ -214,17 +212,6 @@ function flattenWorkspaceFiles(files: readonly WebuiWorkspaceFile[]): readonly {
   };
   visit(files);
   return flattened;
-}
-
-function readBrowserFile(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(reader.error ?? new Error(`无法读取文件：${file.name}`));
-    reader.onload = () => typeof reader.result === "string"
-      ? resolve(reader.result)
-      : reject(new Error(`无法读取文件：${file.name}`));
-    reader.readAsDataURL(file);
-  });
 }
 
 /**
@@ -490,18 +477,6 @@ export function WebuiComposer({
   const attachments = composerSnapshot.staging.attachments;
   const urlReferences = composerSnapshot.staging.urlReferences;
   const attachmentBusy = composerSnapshot.staging.busy;
-  const setAttachments = useCallback(
-    (
-      next:
-        | readonly WebuiComposerAttachment[]
-        | ((current: readonly WebuiComposerAttachment[]) => readonly WebuiComposerAttachment[]),
-    ) => {
-      composerStore.setStaging((current) => ({
-        attachments: typeof next === "function" ? next(current.attachments) : next,
-      }));
-    },
-    [composerStore],
-  );
   const setUrlReferences = useCallback(
     (
       next:
@@ -511,12 +486,6 @@ export function WebuiComposer({
       composerStore.setStaging((current) => ({
         urlReferences: typeof next === "function" ? next(current.urlReferences) : next,
       }));
-    },
-    [composerStore],
-  );
-  const setAttachmentBusy = useCallback(
-    (next: boolean) => {
-      composerStore.setStaging({ busy: next });
     },
     [composerStore],
   );
@@ -1148,63 +1117,15 @@ export function WebuiComposer({
     };
     return dom.listenForPointerDown(onPointerDown);
   }, [dom, slashPanelOpen, onDraftChange]);
-  const addFiles = async (filesLike: FileList | readonly File[] | null) => {
-    const files = filesLike ? Array.from(filesLike) : [];
-    if (files.length === 0) return;
-    const limitError = webuiAttachmentLimitError(attachments, files.map((file) => ({ sizeBytes: file.size })));
-    if (limitError) {
-      setInteractionError(limitError);
-      return;
-    }
-    setAttachmentBusy(true);
-    setInteractionError(undefined);
-    try {
-      const additions = await Promise.all(files.map(async (file): Promise<WebuiComposerAttachment> => {
-        const dataUrl = await readBrowserFile(file);
-        const fileName = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
-        return {
-          id: crypto.randomUUID(),
-          fileName,
-          mimeType: file.type || "application/octet-stream",
-          sizeBytes: file.size,
-          dataUrl,
-          kind: file.type.startsWith("image/") ? "image" : "file",
-        };
-      }));
-      setAttachments((current) => [...current, ...additions]);
-    } catch (error) {
-      setInteractionError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setAttachmentBusy(false);
-    }
-  };
-    const seededToken = composerSnapshot.staging.seedToken;
-  useEffect(() => {
-    const decision = readWebuiSeedApplication({
-      seed: seedAttachment,
-      consumedToken: seededToken,
-      attachments,
-    });
-    if (decision.kind === "none") return;
-    // Mark it consumed before anything that can bail. A seed the composer
-    // refuses has to stay refused; retrying on every attachment change would
-    // pin the error in place.
-    composerStore.setStaging({ seedToken: decision.token });
-    if (decision.kind === "refused") {
-      setInteractionError(decision.error);
-      return;
-    }
-    setAttachments((current) => [...current, decision.attachment]);
-  }, [attachments, seedAttachment]);
-  const attachmentWire = attachments.map((attachment) => ({
-    meta: {
-      attachmentType: attachment.kind,
-      fileName: attachment.fileName,
-      mimeType: attachment.mimeType,
-      sizeBytes: attachment.sizeBytes,
-    },
-    local: { dataUrl: attachment.dataUrl },
-  }));
+  // Attachment acquisition, the seed decision and the wire projection are one
+  // responsibility; the store owns the staged state, this binding owns the flow.
+  const { addFiles, clearAttachments, removeAttachment, attachmentWire } = useComposerAttachments({
+    store: composerStore,
+    attachments,
+    seedToken: composerSnapshot.staging.seedToken,
+    ...(seedAttachment ? { seedAttachment } : {}),
+    setInteractionError,
+  });
   const replaceMention = (insertion: string) => {
     if (!mentionRange) return;
     const result = insertWebuiMention(draft, mentionRange, insertion);
@@ -1419,7 +1340,7 @@ export function WebuiComposer({
       planMode,
       attachments: attachmentWire,
       onAttachmentsSubmitted: () => {
-        setAttachments([]);
+        clearAttachments();
         setUrlReferences([]);
       },
       sending,
@@ -1876,7 +1797,7 @@ export function WebuiComposer({
                   urlReferences={urlReferences}
                   attachmentBusy={attachmentBusy}
                   onRemoveAttachment={(id) =>
-                    setAttachments((current) => current.filter((item) => item.id !== id))
+                    removeAttachment(id)
                   }
                   onChangeReference={(id, url) =>
                     setUrlReferences((current) =>
