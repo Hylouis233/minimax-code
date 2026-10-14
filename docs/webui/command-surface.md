@@ -13,6 +13,8 @@ yet, not that it publishes nothing.
 | Business | Declaration | Member | Declared in |
 | --- | --- | --- | --- |
 | composer | `WebuiComposerStore` | `adoptHome` | `features/composer/application/composer-store.ts` |
+| composer | `WebuiComposerStore` | `applyQueueRead` | `features/composer/application/composer-store.ts` |
+| composer | `WebuiComposerStore` | `claimQueueDestination` | `features/composer/application/composer-store.ts` |
 | composer | `WebuiComposerStore` | `getSnapshot` | `features/composer/application/composer-store.ts` |
 | composer | `WebuiComposerStore` | `purgeSlot` | `features/composer/application/composer-store.ts` |
 | composer | `WebuiComposerStore` | `readDraft` | `features/composer/application/composer-store.ts` |
@@ -20,6 +22,7 @@ yet, not that it publishes nothing.
 | composer | `WebuiComposerStore` | `readMentionRange` | `features/composer/application/composer-store.ts` |
 | composer | `WebuiComposerStore` | `readModes` | `features/composer/application/composer-store.ts` |
 | composer | `WebuiComposerStore` | `readQueue` | `features/composer/application/composer-store.ts` |
+| composer | `WebuiComposerStore` | `readQueueDestination` | `features/composer/application/composer-store.ts` |
 | composer | `WebuiComposerStore` | `readRetry` | `features/composer/application/composer-store.ts` |
 | composer | `WebuiComposerStore` | `readStaging` | `features/composer/application/composer-store.ts` |
 | composer | `WebuiComposerStore` | `recordInput` | `features/composer/application/composer-store.ts` |
