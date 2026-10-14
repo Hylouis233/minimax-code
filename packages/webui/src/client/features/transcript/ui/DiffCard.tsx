@@ -16,7 +16,7 @@ import { useState, type ReactElement } from "react";
 import { WebuiIconDiffFile, WebuiIconDiffSummary } from "../../../components/shell/icons.js";
 import type { WebuiTurnDiffView } from "../../../../shared/contracts/session.js";
 import type { WebuiDiffState } from "../../review/contracts/review-view.js";
-import { useWebuiTurnReview } from "../../../bindings/use-turn-review.js";
+import { useWebuiTurnReview } from "../../review/bindings/use-turn-review.js";
 
 export function WebuiDiffCard({
   sessionId,

@@ -1,5 +1,5 @@
 {
-  "comment": "Cross-business imports the WebUI role check accepts deliberately. Plan \u00a75.3.2 lets a feature import another feature's *approved public* interface; a feature's contracts are its published surface and need no entry, but any other cross-business edge does. Each entry names both files so a reviewer sees the exact dependency, and a `reason` so the next migration can judge whether it should survive. An entry that no longer matches a measured edge fails the check (see `roleRule`), so the list shrinks as ownership transfers instead of accumulating.",
+  "comment": "Cross-business imports the WebUI role check accepts deliberately. Plan §5.3.2 lets a feature import another feature's *approved public* interface; a feature's contracts are its published surface and need no entry, but any other cross-business edge does. Each entry names both files so a reviewer sees the exact dependency, and a `reason` so the next migration can judge whether it should survive. An entry that no longer matches a measured edge fails the check (see `roleRule`), so the list shrinks as ownership transfers instead of accumulating.",
   "entries": [
     {
       "from": "client/features/transcript/ui/PlanDelivery.tsx",
@@ -95,6 +95,16 @@
       "from": "client/features/workspace/ui/WorkspacePanels.tsx",
       "to": "client/features/terminal/projection/terminal-size.ts",
       "reason": "The workspace panel hosts the terminal tab, so it measures the terminal grid. The plan keeps the terminal presented inside the workspace; the entry goes when T15 gives the terminal its own presentation attachment."
+    },
+    {
+      "from": "client/features/transcript/ui/DiffCard.tsx",
+      "to": "client/features/review/bindings/use-turn-review.ts",
+      "reason": "The transcript's diff card mounts the review business's turn-review binding to read a turn's diff. Before T10 the binding sat in `client/bindings/`, which the role rules classify as a home with no business, so the edge was not cross-business; moving it into the review business's own `bindings/` makes it one. Reviewed peer edge: the card renders review state, it does not own it, and the entry goes when review publishes the turn-diff read as a public contract the transcript can consume without its binding (T10)."
+    },
+    {
+      "from": "client/features/transcript/ui/AssistantBody.tsx",
+      "to": "client/features/review/bindings/use-turn-review.ts",
+      "reason": "The same binding, asked only whether the runtime offers turn diffs at all, so the card can be hidden rather than rendered empty. Same edge and same retirement as the DiffCard entry: review publishes the capability read as a public contract and this goes with it (T10)."
     }
   ]
 }

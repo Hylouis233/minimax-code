@@ -16,7 +16,7 @@ import type { WebuiTurnDiffView } from "../../../../shared/contracts/session.js"
 import type { WebuiTranscriptProcessSegment, WebuiTranscriptActivityPart } from "../contracts/transcript-view.js";
 
 import { WebuiDiffCard } from "./DiffCard.js";
-import { useWebuiTurnReviewAvailable } from "../../../bindings/use-turn-review.js";
+import { useWebuiTurnReviewAvailable } from "../../review/bindings/use-turn-review.js";
 import {
   WebuiActivityGroup,
   type WebuiActivityGroupItem,

@@ -9,9 +9,9 @@ import { useCallback, useEffect, useState } from "react";
 import {
   initialWebuiDiffState,
   type WebuiDiffState,
-} from "../features/review/contracts/review-view.js";
-import type { WebuiTurnReviewKey } from "../features/review/contracts/turn-review.js";
-import { useWebuiApplicationOptional } from "./application-context.js";
+} from "../contracts/review-view.js";
+import type { WebuiTurnReviewKey } from "../contracts/turn-review.js";
+import { useWebuiApplicationOptional } from "../../../bindings/application-context.js";
 
 export function useWebuiTurnReview(key: WebuiTurnReviewKey | undefined): {
   readonly state: WebuiDiffState;
