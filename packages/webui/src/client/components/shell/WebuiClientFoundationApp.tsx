@@ -108,6 +108,7 @@ import {
 import { createWebuiPortSlices } from "../../application/port-slices.js";
 import { WebuiApplicationProvider } from "../../bindings/application-context.js";
 import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
+import { createWebuiTerminalOwner } from "../../features/terminal/application/terminal-owner.js";
 import { useWebuiApplicationOptional } from "../../bindings/application-context.js";
 import {
   WebuiPluginWorkflowsProvider,
@@ -265,6 +266,11 @@ export function WebuiClientFoundationApp(
   const transcriptPort = portSlices.transcript;
   const composerPort = portSlices.composer;
       const workspacePort = portSlices.workspace;
+      // The browser Terminal owner (T15). It is created from the slice the shell
+      // already holds rather than through `useWebuiPortSlice`, because this
+      // component renders the provider that hook reads (line ~1191) and would
+      // therefore see nothing inside its own body.
+      const terminalOwner = createWebuiTerminalOwner(workspacePort);
   const pluginsPort = portSlices.plugins;
   const settingsPort = portSlices.settings;
   const modelsPort = portSlices.models;
@@ -1576,7 +1582,7 @@ export function WebuiClientFoundationApp(
                 </aside>
               </div>
             ) : null}
-            {!homeMode && workspacePanel.open ? <WebuiWorkspacePanel state={workspacePanel} dispatch={dispatchWorkspacePanel} sessionId={selectedSessionId} workspaceDir={selectedSession?.workspaceDir} workspaceFileUrl={workspacePort.workspaceFileUrl} createTerminal={workspacePort.createTerminal} listTerminals={workspacePort.listTerminals} writeTerminal={workspacePort.writeTerminal} resizeTerminal={workspacePort.resizeTerminal} disposeTerminal={workspacePort.disposeTerminal} watchTerminal={workspacePort.watchTerminal} onClose={() => dispatchWorkspacePanel({ type: "close-panel" })} /> : null}
+            {!homeMode && workspacePanel.open ? <WebuiWorkspacePanel state={workspacePanel} dispatch={dispatchWorkspacePanel} sessionId={selectedSessionId} workspaceDir={selectedSession?.workspaceDir} workspaceFileUrl={workspacePort.workspaceFileUrl} terminal={terminalOwner} onClose={() => dispatchWorkspacePanel({ type: "close-panel" })} /> : null}
             </>}
           </main>
         </div>

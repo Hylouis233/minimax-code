@@ -46,6 +46,7 @@ import {
   terminalResizeRequest,
 } from "../../terminal/projection/terminal-size.js";
 import type { WebuiTerminalSize } from "../../terminal/contracts/terminal-port.js";
+import type { WebuiTerminalOwner } from "../../terminal/contracts/terminal-owner.js";
 import { WebuiIconAgent, WebuiIconCheck, WebuiIconChevronDown, WebuiIconClose, WebuiIconDiffFile, WebuiIconFile, WebuiIconFolder, WebuiIconRunLocation, WebuiIconSearch, WebuiIconSidebarToggle, WebuiIconWorkspaceCanvas, WebuiIconWorkspaceExpand, WebuiIconWorkspaceReview, WebuiIconWorkspaceTerminal } from "../../../components/shell/icons.js";
 import { FileTree, filterWorkspaceFiles, findWorkspaceFile, getWorkspaceFileParentPaths, mergeWorkspaceFileChildren } from "./WorkspaceFileTree.js";
 import { WorkspaceMediaPreview } from "./WorkspaceMediaPreview.js";
@@ -319,17 +320,18 @@ export function WebuiFilePreview({ tab, result, codeMode, workspaceFileUrl, }: {
   </div>;
 }
 
-export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, workspaceFileUrl, createTerminal, listTerminals, writeTerminal, resizeTerminal, disposeTerminal, watchTerminal, onClose }: {
+export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, workspaceFileUrl, terminal: terminalOwner, onClose }: {
   readonly state: WorkspacePanelState;
   readonly dispatch: (command: WorkspacePanelCommand) => void;
   readonly sessionId?: string; readonly workspaceDir?: string;
   readonly workspaceFileUrl?: (request: { readonly workspaceDir: string; readonly path: string }) => string;
-  readonly createTerminal?: (request: { workspaceDir: string }) => Promise<{ terminalId: string; status: string }>;
-  readonly listTerminals?: () => Promise<readonly Record<string, unknown>[]>;
-  readonly writeTerminal?: (request: { terminalId: string; data: string }) => Promise<unknown>;
-  readonly resizeTerminal?: (request: WebuiTerminalSize) => Promise<unknown>;
-  readonly disposeTerminal?: (request: { terminalId: string }) => Promise<unknown>;
-  readonly watchTerminal?: (request: { terminalId: string }, onFrame: (frame: { terminalId: string; data: string; exited: boolean }) => void) => () => void;
+  /**
+   * The Terminal business's published owner (T15). The panel used to take six
+   * raw capability methods and keep the catalogue and the watch handle itself;
+   * it now renders the owner's catalogue and drives the owner's commands, while
+   * the xterm instance, the fit observer and the caret stay local.
+   */
+  readonly terminal?: WebuiTerminalOwner;
   readonly onClose?: () => void;
 }): ReactElement {
   const { dom } = useWebuiBrowserCapabilities();
@@ -361,6 +363,10 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
    */
   const setTerminals = (answer: unknown): void => {
     setTerminalsState(Array.isArray(answer) ? (answer as readonly Record<string, unknown>[]) : []);
+  };
+  /** Mirror the owner's catalogue into the local render list. */
+  const syncTerminalsFromOwner = (owner: WebuiTerminalOwner | undefined): void => {
+    setTerminals(owner?.getSnapshot().terminals ?? []);
   };
   const [activeTerminalId, setActiveTerminalId] = useState<string>();
   const [terminalError, setTerminalError] = useState<string>();
@@ -510,11 +516,16 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   }, [selectedFilePath, selectedReviewPath, expandedDirectories, visibleFiles]);
   const activeSessionId = activeTab && "sessionId" in activeTab ? activeTab.sessionId : sessionId;
   useEffect(() => {
-    if (!listTerminals) return undefined;
-    let cancelled = false;
-    void listTerminals().then((next) => { if (!cancelled) setTerminals(next); }).catch(() => { if (!cancelled) setTerminals([]); });
-    return () => { cancelled = true; };
-  }, [listTerminals, activeTab?.id, activeWorkspace]);
+    if (!terminalOwner) {
+      setTerminals([]);
+      return undefined;
+    }
+    void terminalOwner.refresh().then(() => syncTerminalsFromOwner(terminalOwner));
+    return undefined;
+  }, [terminalOwner, activeTab?.id, activeWorkspace]);
+  // A view going away releases its watch and its xterm; it never kills a PTY
+  // (plan §5.2's terminal row, criterion 3 of T15). Process death is the panel's
+  // explicit dispose button or the application's disposal.
   useEffect(() => () => { terminalStop.current?.(); terminalInstance.current?.dispose(); }, []);
   useEffect(() => {
     const active = terminals.find((candidate) => String(candidate.terminalId) === activeTerminalId) ?? terminals[0];
@@ -527,7 +538,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     terminal.open(terminalHost.current);
     fit.fit();
     terminalInstance.current = terminal;
-    terminalStop.current = watchTerminal?.({ terminalId }, (frame) => { terminal.write(frame.data); if (frame.exited) terminal.options.disableStdin = true; });
+    terminalStop.current = terminalOwner?.attach(terminalId, (frame) => { terminal.write(frame.data); if (frame.exited) terminal.options.disableStdin = true; });
     // The fit moves the browser's viewport; this is what tells the runtime. The
     // size is read at send time, so a drag that ends in one place reports that
     // place once instead of replaying every frame of the drag.
@@ -535,25 +546,24 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
       const request = terminalResizeRequest({ terminalId, cols: terminal.cols, rows: terminal.rows, reported: reportedTerminalSize.current });
       if (!request) return;
       reportedTerminalSize.current = request;
-      if (resizeTerminal) void resizeTerminal(request);
+      if (terminalOwner?.canResize) void terminalOwner.resize(request);
     };
     let resizeTimer: ReturnType<typeof setTimeout> | undefined;
     const onResize = () => {
       fit.fit();
-      if (!resizeTerminal) return;
+      if (!terminalOwner?.canResize) return;
       if (resizeTimer !== undefined) clearTimeout(resizeTimer);
       resizeTimer = setTimeout(reportTerminalSize, TERMINAL_RESIZE_DEBOUNCE_MS);
     };
     const observer = new ResizeObserver(onResize);
     observer.observe(terminalHost.current);
-    const input = terminal.onData((data) => { if (writeTerminal) void writeTerminal({ terminalId, data }); });
+    const input = terminal.onData((data) => { if (terminalOwner?.canWrite) void terminalOwner.write(terminalId, data); });
     return () => { input.dispose(); observer.disconnect(); if (resizeTimer !== undefined) clearTimeout(resizeTimer); terminalStop.current?.(); terminalStop.current = undefined; terminal.dispose(); terminalInstance.current = undefined; };
-    // `resizeTerminal` takes its place beside its neighbours rather than being
-    // read through a ref: every port method here comes off the transport the
-    // entry builds once at module scope (`main.tsx`), so their identities do not
-    // change between renders and a panel drag cannot re-run this effect and
+    // `terminalOwner` takes its place beside its neighbours rather than being
+    // read through a ref: the owner is created once per mount by the binding and
+    // its commands are stable, so a panel drag cannot re-run this effect and
     // rebuild a shell that is running.
-  }, [activeTerminalId, resizeTerminal, terminals, watchTerminal, writeTerminal]);
+  }, [activeTerminalId, terminalOwner, terminals]);
   // The label rule lives in the registry (plan §4.4, §10 S4); the icon below is the
   // host render branch the registry is allowed to have.
   const tabLabel = (item: WorkspacePanelTab): string => webuiWorkspaceTabLabel(item);
@@ -648,7 +658,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
       {turnReviewFiles.length ? <div className="webui-turn-review-files">{turnReviewFiles.map((file) => <WebuiDiffFileSection key={file.file} file={file} selected={selectedReviewPath === file.file} />)}</div> : <p className="webui-turn-review-empty">本轮没有可审查的文件差异。</p>}
     </div> : null}
     {tab === "canvas" ? <WorkspaceCanvas sessionId={activeSessionId} /> : null}
-    {tab === "terminal" ? <div className="webui-terminal-empty">{terminals.length === 0 ? <><strong>{DESKTOP_COPY.terminalEmptyTitle}</strong><p>{DESKTOP_COPY.terminalEmptyDescription}</p></> : <><div className="webui-terminal-tabs">{terminals.map((terminal, index) => <button type="button" key={String(terminal.terminalId)} className={`file-tab group/tab-close h-8 w-40 min-w-20 ${String(terminal.terminalId) === (activeTerminalId ?? String(terminals[0]?.terminalId)) ? "bg-bg_interaction_tertiary_selected" : ""}`} onClick={() => setActiveTerminalId(String(terminal.terminalId))}><span>#{index + 1}</span>{terminal.status === "exited" ? DESKTOP_COPY.terminalExited : DESKTOP_COPY.terminalLabel}<span className="file-tab-close opacity-0 group-hover/tab-close:opacity-100"><WebuiIconClose className="size-[14px]" /></span></button>)}</div><div ref={terminalHost} className="webui-xterm-host" />{terminalError ? <p role="alert">{terminalError}</p> : null}<div className="webui-terminal-actions"><button type="button" onClick={() => { if (!activeWorkspace || !createTerminal) return; void createTerminal({ workspaceDir: activeWorkspace }).then((created) => { setActiveTerminalId(created.terminalId); return listTerminals?.().then(setTerminals); }).catch((error: unknown) => setTerminalError(error instanceof Error ? error.message : String(error))); }}>{DESKTOP_COPY.newTerminal}</button><button type="button" onClick={() => { const active = terminals.find((candidate) => String(candidate.terminalId) === (activeTerminalId ?? String(terminals[0]?.terminalId))); if (active && disposeTerminal) void disposeTerminal({ terminalId: String(active.terminalId) }).then(() => listTerminals?.().then(setTerminals)); }}>{DESKTOP_COPY.fileClose}</button></div></> }{terminals.length === 0 ? <button type="button" onClick={() => { if (!activeWorkspace || !createTerminal) return; void createTerminal({ workspaceDir: activeWorkspace }).then((created) => { setActiveTerminalId(created.terminalId); return listTerminals?.().then(setTerminals); }).catch((error: unknown) => setTerminalError(error instanceof Error ? error.message : String(error))); }}>{DESKTOP_COPY.newTerminal}</button> : null}</div> : null}
+    {tab === "terminal" ? <div className="webui-terminal-empty">{terminals.length === 0 ? <><strong>{DESKTOP_COPY.terminalEmptyTitle}</strong><p>{DESKTOP_COPY.terminalEmptyDescription}</p></> : <><div className="webui-terminal-tabs">{terminals.map((terminal, index) => <button type="button" key={String(terminal.terminalId)} className={`file-tab group/tab-close h-8 w-40 min-w-20 ${String(terminal.terminalId) === (activeTerminalId ?? String(terminals[0]?.terminalId)) ? "bg-bg_interaction_tertiary_selected" : ""}`} onClick={() => setActiveTerminalId(String(terminal.terminalId))}><span>#{index + 1}</span>{terminal.status === "exited" ? DESKTOP_COPY.terminalExited : DESKTOP_COPY.terminalLabel}<span className="file-tab-close opacity-0 group-hover/tab-close:opacity-100"><WebuiIconClose className="size-[14px]" /></span></button>)}</div><div ref={terminalHost} className="webui-xterm-host" />{terminalError ? <p role="alert">{terminalError}</p> : null}<div className="webui-terminal-actions"><button type="button" onClick={() => { if (!activeWorkspace || !terminalOwner?.canCreate) return; void terminalOwner.create(activeWorkspace).then((created) => { if (created) setActiveTerminalId(created.terminalId); syncTerminalsFromOwner(terminalOwner); }).catch((error: unknown) => setTerminalError(error instanceof Error ? error.message : String(error))); }}>{DESKTOP_COPY.newTerminal}</button><button type="button" onClick={() => { const active = terminals.find((candidate) => String(candidate.terminalId) === (activeTerminalId ?? String(terminals[0]?.terminalId))); if (active && terminalOwner?.canDispose) void terminalOwner.disposeProcess(String(active.terminalId)).then(() => syncTerminalsFromOwner(terminalOwner)); }}>{DESKTOP_COPY.fileClose}</button></div></> }{terminals.length === 0 ? <button type="button" onClick={() => { if (!activeWorkspace || !terminalOwner?.canCreate) return; void terminalOwner.create(activeWorkspace).then((created) => { if (created) setActiveTerminalId(created.terminalId); syncTerminalsFromOwner(terminalOwner); }).catch((error: unknown) => setTerminalError(error instanceof Error ? error.message : String(error))); }}>{DESKTOP_COPY.newTerminal}</button> : null}</div> : null}
       </div>
       {hasFileWorkspace && fileTreeOpen ? <aside className="webui-workspace-file-tree-panel" aria-label="工作区文件树">
         <label className="webui-workspace-file-search"><WebuiIconSearch className="size-4" /><input aria-label="搜索文件" placeholder="搜索" value={fileSearch} onChange={(event) => setFileSearch(event.currentTarget.value)} /></label>

@@ -3722,6 +3722,8 @@
     "packages/webui/src/client/features/settings/ui/UsageModelSettings.tsx",
     "packages/webui/src/client/features/settings/ui/UserProfileSection.tsx",
     "packages/webui/src/client/features/settings/ui/settings-atoms.tsx",
+    "packages/webui/src/client/features/terminal/application/terminal-owner.ts",
+    "packages/webui/src/client/features/terminal/contracts/terminal-owner.ts",
     "packages/webui/src/client/features/terminal/contracts/terminal-port.ts",
     "packages/webui/src/client/features/terminal/projection/terminal-size.ts",
     "packages/webui/src/client/features/transcript/application/message-feedback.ts",
