@@ -74,22 +74,37 @@ describe("a failed operation leaves the user where they were", () => {
     // invariant below is unchanged — the dialog only closes after a success.
     expect(body).toContain("kind: \"importGithubPlugin\"");
     const afterSuccess = body.slice(body.indexOf("kind: \"importGithubPlugin\""));
-    expect(afterSuccess.indexOf("setPluginImportDialog(false)")).toBeGreaterThan(-1);
-    expect(afterSuccess.indexOf("setPluginImportDialog(false)")).toBeLessThan(afterSuccess.indexOf("\n  };"));
+    expect(afterSuccess.indexOf("detachPluginImportDialog()")).toBeGreaterThan(-1);
+    expect(afterSuccess.indexOf("detachPluginImportDialog()")).toBeLessThan(afterSuccess.indexOf("\n  };"));
     // And nothing in the wrapper closes before the mutation is awaited.
-    expect(body.indexOf("setPluginImportDialog(false)")).toBeGreaterThan(body.indexOf("await mutate("));
+    expect(body.indexOf("detachPluginImportDialog()")).toBeGreaterThan(body.indexOf("await mutate("));
+    expect(body).toContain("attachment !== dialogAttachmentRef.current");
   });
 
   it("preview failure preserves browse state", () => {
     const body = slice(catalogue, "const previewPlugin = async () => {", "const importPlugin = async () => {");
-    // The preview is written on success...
-    expect(body).toContain("setPluginPreview(result as Row)");
-    // ...and the catch only records the message: the URL, the previous preview and the listing stay.
+    expect(body).toContain('kind: "github-import-preview"');
+    expect(body).toContain("url: pluginUrl.trim()");
+    expect(body).toContain("identity.request === pluginPreviewRequestRef.current");
+    // The preview is written only while its exact dialog/request/URL identity remains attached.
+    expect(body).toContain("if (!isAttached()) return;\n      setPluginPreview(result as Row)");
+    // The catch only reports an error while attached; stale results leave replacement state alone.
     const cat = body.slice(body.indexOf("catch (cause)"));
+    expect(cat).toContain("if (isAttached())");
     expect(cat).toContain("setLocalError(");
-    expect(cat).not.toContain("setPluginPreview");
     expect(cat).not.toContain("setPluginUrl");
     expect(cat).not.toContain("setArea");
     expect(cat).not.toContain("setView");
+  });
+
+  it("attaches an MCP detail only to the same selection and item dialog generation", () => {
+    const body = slice(catalogue, "const prepareMcp = async (item: Row) => {", "const previewPlugin = async () => {");
+    expect(body).toContain('kind: "mcp-server"');
+    expect(body).toContain("name: nameOf(item)");
+    expect(body).toContain("selection: selectionRef.current");
+    expect(body).toContain("sameSelection(identity.selection, selectionRef.current)");
+    expect(body).toContain("identity.attachment === dialogAttachmentRef.current");
+    expect(body).toContain("workflows?.getMcpServer(identity.name)");
+    expect(body).toContain("if (!isAttached()) return;");
   });
 });

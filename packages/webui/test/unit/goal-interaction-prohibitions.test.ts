@@ -211,19 +211,13 @@ describe("prohibition 4 — a rule shared across businesses gets one owner every
     }
   });
   it("a session switch resets the goal VIEW without clearing the retained goal", () => {
-    // T01 ledger C4: the selection effect called `applyGoal(undefined)` before
-    // the re-read, which wrote `goal: undefined` into the record of the session
-    // being opened and destroyed truth that session already had. The correction
-    // is un-drivable in a unit test (it needs a mounted React tree), so it is
-    // pinned as a source tripwire — the same shape this suite already uses for
-    // wiring a render cannot observe.
-    const composer = flat(read("features/composer/ui/WebuiComposer.tsx"));
-    const at = composer.indexOf("void goalCoordinator.refreshGoal().then(");
+    // The application controller resets only the view mode when selection
+    // changes. Goal data stays owned by the target session's goal owner.
+    const controller = flat(read("features/composer/application/composer-controller.ts"));
+    const at = controller.indexOf("selectSession: (sessionId) =>");
     expect(at).toBeGreaterThan(-1);
-    // The window is the selection effect: the mode reset, the re-read, and
-    // nothing that clears the canonical goal.
-    const effect = composer.slice(Math.max(0, at - 500), at + 200);
-    expect(effect).toContain("setGoalMode(false);");
-    expect(effect).not.toContain("applyGoal(undefined)");
+    const selection = controller.slice(at, at + 220);
+    expect(selection).toContain("setModes({ goal: false })");
+    expect(selection).not.toContain("applyGoal(undefined)");
   });
 });

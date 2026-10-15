@@ -96,7 +96,4 @@ export function deriveRecentWorkspaceDirs(
  * lives here because the composer's owner keeps the record (§4.2 field 1) and an
  * application module may not import a component.
  */
-export interface WebuiRecordedTurn {
-  readonly session: string | undefined;
-  readonly message: string;
-}
+export type { WebuiRecordedTurn } from "../contracts/composer-turn.js";

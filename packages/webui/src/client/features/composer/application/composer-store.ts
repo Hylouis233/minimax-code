@@ -24,13 +24,14 @@ import {
   type WebuiComposerPersisted,
 } from "./composer-history.js";
 
-import type { WebuiQueueItem } from "../../../../shared/contracts/queue.js";
 import type {
   WebuiComposerAttachment,
   WebuiComposerUrlReference,
-  WebuiMentionRange,
-} from "../projection/composer-interactions.js";
-import type { WebuiRecordedTurn } from "../projection/composer-state.js";
+} from "../contracts/composer-interactions.js";
+import type { WebuiMentionRange } from "../contracts/composer-interactions.js";
+import type { WebuiRecordedTurn } from "../contracts/composer-turn.js";
+import type { WebuiComposerModes, WebuiComposerQueueState, WebuiComposerSnapshot, WebuiComposerStagingState } from "../contracts/composer-state.js";
+export type { WebuiComposerModes, WebuiComposerQueueState, WebuiComposerSnapshot, WebuiComposerStagingState } from "../contracts/composer-state.js";
 
 export interface WebuiComposerPersistence {
   readonly loadComposer: <T>(parse: (raw: string | null | undefined) => T) => T;
@@ -45,11 +46,6 @@ export interface WebuiComposerPersistence {
  * by session would make switching back resurrect a stale list, which is a behaviour
  * change, not a reorganisation.
  */
-export interface WebuiComposerQueueState {
-  readonly items: readonly WebuiQueueItem[];
-  readonly paused: boolean;
-}
-
 export const WEBUI_COMPOSER_EMPTY_QUEUE: WebuiComposerQueueState = {
   items: [],
   paused: false,
@@ -65,23 +61,11 @@ export const WEBUI_COMPOSER_EMPTY_QUEUE: WebuiComposerQueueState = {
  * did — including surviving a session switch, which today's component state also
  * does because nothing remounts it.
  */
-export interface WebuiComposerStagingState {
-  readonly attachments: readonly WebuiComposerAttachment[];
-  readonly urlReferences: readonly WebuiComposerUrlReference[];
-  readonly busy: boolean;
-  readonly seedToken?: string;
-}
-
 /**
  * The composer's input modes (§4.2 field 1 lists them with the owned state; §5.6's
  * may-write cell calls the pair "toolbar state"). Live, like the queue and the
  * staging.
  */
-export interface WebuiComposerModes {
-  readonly goal: boolean;
-  readonly plan: boolean;
-}
-
 export const WEBUI_COMPOSER_EMPTY_MODES: WebuiComposerModes = {
   goal: false,
   plan: false,
@@ -98,23 +82,6 @@ export const WEBUI_COMPOSER_EMPTY_STAGING: WebuiComposerStagingState = {
  * subscription — the queue rides the snapshot rather than getting a second channel,
  * because two subscriptions to one owner is the arrangement this programme forbids.
  */
-export interface WebuiComposerSnapshot extends WebuiComposerPersisted {
-  readonly queue: WebuiComposerQueueState;
-  readonly staging: WebuiComposerStagingState;
-  readonly modes: WebuiComposerModes;
-  /**
-   * The last submitted turn, so the retry affordance can re-send it without
-   * asking the server what was asked (§4.2 field 1: the retry record).
-   */
-  readonly retry: WebuiRecordedTurn | undefined;
-  /**
-   * The `@` mention range the menu is anchored to (§5.6: mention/slash ranges).
-   * The slash range is *not* here, because it is not state: `commandRange` is
-   * derived from the draft and the caret on every render.
-   */
-  readonly mentionRange: WebuiMentionRange | undefined;
-}
-
 export interface WebuiComposerStore {
   /**
    * The current state; stable until something changes, so it is safe as a
@@ -191,6 +158,8 @@ export interface WebuiComposerStore {
    * still targets the selection that issued it.
    */
   readonly readQueueDestination: () => string | undefined;
+  /** Check whether a destination and generation still own the one live mirror. */
+  readonly queueClaimIsCurrent: (key: string, generation: number) => boolean;
   /**
    * Claim the mirror for one destination and return the generation to check back
    * with. Every claim — including a reselection of the same key — issues a new
@@ -379,6 +348,7 @@ export function createWebuiComposerStore(options?: {
       });
     },
     readQueueDestination: () => queueDestination,
+    queueClaimIsCurrent: (key, generation) => queueDestination === key && queueGeneration === generation,
     claimQueueDestination: (key) => {
       queueDestination = key;
       queueGeneration += 1;

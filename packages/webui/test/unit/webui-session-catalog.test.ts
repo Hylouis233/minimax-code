@@ -24,6 +24,7 @@ import { createWebuiSessionWorkflows } from "../../src/client/features/sessions/
 import { createWebuiSessionScopeManager } from "../../src/client/conversation/session-scope.js";
 import { selectWebuiWorkspaceProgress } from "../../src/client/features/workspace/projection/workspace-progress.js";
 import type { WebuiClientSession } from "../../src/client/contracts/sessions/session-view.js";
+import { selectWebuiSessionAgentName, selectWebuiSessionLookups } from "../../src/client/features/sessions/projection/session-lookups.js";
 
 /**
  * The composer purger the workflows now require (§5.6: `purgeSlot` is a published
@@ -225,6 +226,75 @@ describe("session workflows", () => {
     await expect(workflows.fork("a", false)).rejects.toThrow(
       "当前会话不可复制：no boundary",
     );
+  });
+
+  it("fences late project reads and retains the newest committed answer", async () => {
+    let resolveFirst: (projects: readonly { name: string; workspaceDir: string }[]) => void = () => {};
+    let resolveSecond: (projects: readonly { name: string; workspaceDir: string }[]) => void = () => {};
+    let call = 0;
+    const workflows = createWebuiSessionWorkflows({
+      store: createWebuiSessionStore(),
+      composer: purger(),
+      port: {
+        loadProjects: () => new Promise((resolve) => {
+          call += 1;
+          if (call === 1) resolveFirst = resolve;
+          else resolveSecond = resolve;
+        }),
+      } as unknown as Parameters<typeof createWebuiSessionWorkflows>[0]["port"],
+    });
+    const first = workflows.loadProjects();
+    const second = workflows.loadProjects();
+    const current = [{ name: "current", workspaceDir: "/current" }];
+    resolveSecond(current);
+    await second;
+    resolveFirst([{ name: "stale", workspaceDir: "/stale" }]);
+    await first;
+
+    expect(workflows.getProjectsSnapshot()).toEqual({ loading: false, projects: current });
+    workflows.dispose();
+  });
+
+  it("fences project answers that arrive after workflow disposal", async () => {
+    let resolve: (projects: readonly { name: string; workspaceDir: string }[]) => void = () => {};
+    const workflows = createWebuiSessionWorkflows({
+      store: createWebuiSessionStore(),
+      composer: purger(),
+      port: {
+        loadProjects: () => new Promise((done) => { resolve = done; }),
+      } as unknown as Parameters<typeof createWebuiSessionWorkflows>[0]["port"],
+    });
+    const pending = workflows.loadProjects();
+    workflows.dispose();
+    resolve([{ name: "late", workspaceDir: "/late" }]);
+    await pending;
+    expect(workflows.getProjectsSnapshot()).toEqual({ loading: false });
+  });
+
+  it("retains project-list failure detail while the session-derived rail remains available", async () => {
+    const workflows = createWebuiSessionWorkflows({
+      store: createWebuiSessionStore(),
+      composer: purger(),
+      port: { loadProjects: async () => { throw new Error("project service unavailable"); } } as unknown as Parameters<typeof createWebuiSessionWorkflows>[0]["port"],
+    });
+    await expect(workflows.loadProjects()).rejects.toThrow("project service unavailable");
+    expect(workflows.getProjectsSnapshot()).toEqual({ loading: false, error: "project service unavailable" });
+    workflows.dispose();
+  });
+});
+
+describe("session lookup projection", () => {
+  it("merges child records once and resolves agent names by target session", () => {
+    const flat = { sessions: [session({ sessionId: "root", agentName: "root-agent" })], hasMore: false };
+    const tree = { sessions: [{
+      session: flat.sessions[0]!,
+      childSessions: [session({ sessionId: "child", parentSessionId: "root", agentName: "child-agent" })],
+    }], hasMore: false };
+    const lookups = selectWebuiSessionLookups(flat, tree);
+    expect(lookups.map((entry) => entry.sessionId)).toEqual(["root", "child"]);
+    expect(selectWebuiSessionAgentName(lookups, "root")).toBe("root-agent");
+    expect(selectWebuiSessionAgentName(lookups, "child")).toBe("child-agent");
+    expect(selectWebuiSessionAgentName(lookups, "missing")).toBe("main");
   });
 });
 

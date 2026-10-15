@@ -101,6 +101,12 @@ export interface WebuiArchivedSessionsState {
   readonly error?: string;
 }
 
+export interface WebuiProjectsState {
+  readonly loading: boolean;
+  readonly projects?: readonly WebuiClientProject[];
+  readonly error?: string;
+}
+
 export const initialWebuiArchivedSessionsState: WebuiArchivedSessionsState = {
   status: "idle",
   sessions: [],
@@ -167,8 +173,12 @@ export interface WebuiSessionWorkflows {
   ) => Promise<{ readonly sessionId: string }>;
   /** Whether the rail's project list is wired. */
   readonly canLoadProjects: boolean;
+  readonly getProjectsSnapshot: () => WebuiProjectsState;
+  readonly subscribeProjects: (listener: () => void) => () => void;
   /** Load the visible project list the rail reads (best effort). */
   readonly loadProjects: () => Promise<readonly WebuiClientProject[]>;
+  /** Fence project reads when the owning application is disposed. */
+  readonly dispose: () => void;
 }
 
 export function createWebuiSessionWorkflows(deps: {
@@ -198,6 +208,14 @@ export function createWebuiSessionWorkflows(deps: {
   // The archived-sessions read keeps its own small state: it is not part of the
   // catalog the rail resolves from, and nothing else writes it.
   let archived: WebuiArchivedSessionsState = initialWebuiArchivedSessionsState;
+  let projects: WebuiProjectsState = { loading: false };
+  let projectRequestVersion = 0;
+  let disposed = false;
+  const projectListeners = new Set<() => void>();
+  const setProjects = (next: WebuiProjectsState): void => {
+    projects = next;
+    for (const listener of [...projectListeners]) listener();
+  };
   const archivedListeners = new Set<() => void>();
   const setArchived = (next: WebuiArchivedSessionsState): void => {
     archived = next;
@@ -474,6 +492,38 @@ export function createWebuiSessionWorkflows(deps: {
       return importSession(file, context);
     },
     canLoadProjects: port.loadProjects !== undefined,
-    loadProjects: async () => port.loadProjects?.() ?? [],
+    getProjectsSnapshot: () => projects,
+    subscribeProjects: (listener) => {
+      projectListeners.add(listener);
+      return () => projectListeners.delete(listener);
+    },
+    loadProjects: async () => {
+      if (!port.loadProjects) return [];
+      if (disposed) return projects.projects ?? [];
+      const version = ++projectRequestVersion;
+      setProjects({ ...projects, loading: true, error: undefined });
+      try {
+        const result = await port.loadProjects();
+        if (disposed || version !== projectRequestVersion) return result;
+        setProjects({ loading: false, projects: result });
+        return result;
+      } catch (error) {
+        if (!disposed && version === projectRequestVersion) {
+          setProjects({ loading: false, ...(projects.projects ? { projects: projects.projects } : {}), error: message(error) });
+        }
+        throw error;
+      } finally {
+        if (!disposed && version === projectRequestVersion && projects.loading) {
+          setProjects({ ...projects, loading: false });
+        }
+      }
+    },
+    dispose: () => {
+      if (disposed) return;
+      disposed = true;
+      projectRequestVersion += 1;
+      if (projects.loading) setProjects({ ...projects, loading: false });
+      projectListeners.clear();
+    },
   };
 }

@@ -1,12 +1,11 @@
 // The composer's field transition matrix (T13 criterion 2).
 //
-// The criterion asks for one application-owned controller holding the complete
-// field transition matrix. The controller is the composer store: it owns every
-// field the composer presents (draft, history, staging, queue mirror, modes,
-// retry record, mention range) and it is where the component's writes go. What
-// this file establishes is the *matrix* — what each named transition does to
-// those fields — checked through the store's own public surface rather than by
-// reading the component's effects.
+// The criterion asks for one application-owned controller to coordinate the
+// existing store's complete field transition matrix. The store owns the
+// canonical fields (draft, history, staging, queue mirror, modes, retry record,
+// mention range); the controller owns named transition behavior. This file
+// establishes store persistence and generation invariants. Assembled controller
+// transitions are exercised in `webui-application-commands.test.ts`.
 //
 // Every case is named after the event the criterion names: selection, home
 // adoption, hide/remount, an accepted submit, a successful submit, a failed
@@ -117,7 +116,7 @@ describe("the composer's field transition matrix", () => {
     expect(store.readDraft(OTHER)).toBe("stays");
   });
 
-  it("live fields: a partial write keeps the half it did not name", () => {
+  it("live fields: a store patch keeps the half it did not name", () => {
     const store = createWebuiComposerStore();
     store.setStaging({ attachments: [{ token: "a1" } as never] });
     store.setStaging({ busy: true });
@@ -131,6 +130,8 @@ describe("the composer's field transition matrix", () => {
 
     store.setModes({ plan: true });
     store.setModes({ goal: true });
+    // The store preserves unnamed fields; the application controller's named
+    // setGoalMode command enforces mutual exclusion.
     expect(store.readModes()).toMatchObject({ plan: true, goal: true });
 
     store.setMentionRange({ start: 1, end: 4 } as never);

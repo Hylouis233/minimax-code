@@ -79,8 +79,10 @@ detects stale paths or contract rows. `none` means the business consumes no sess
 `application/create-application.ts`, `application/port-slices.ts`, `application/query-store.ts`,
 `application/selectors.ts`, `application/session-store.ts`, `application/state.ts`, and
 `application/version-cell.ts` are shared application modules, not additional businesses. The
-composer is implemented at `components/composer/WebuiComposer.tsx`; its queue panel is
-`components/composer/QueuePanel.tsx`. The settings dialog is `components/settings/SettingsModal.tsx`.
+Composer surface is `client/features/composer/ui/WebuiComposer.tsx`; its queue panel is
+`client/features/composer/ui/QueuePanel.tsx`. Composer submission workflows and persisted history
+live in `client/features/composer/application/`. The settings dialog is
+`client/features/settings/ui/SettingsModal.tsx`.
 `components/shared/settings-glyphs.tsx` contains glyph presentation shared by settings and review pages.
 
 ### Client modules
@@ -93,11 +95,11 @@ composer is implemented at `components/composer/WebuiComposer.tsx`; its queue pa
 | `client/infrastructure/storage.ts` | Browser storage IO for unread, favorites, no-project, team-mode, composer history and the rail's overlay flags (session stars/pins/archives, project pins/names). | Application composition injects the storage adapter; preserve normalization and pruning rules as pure functions. |
 | `client/mechanisms/stream-lease.ts`, `client/mechanisms/stream-loop.ts` | Lease algorithm and stream frame IO/control. Stream history/context transforms are injected; application turn coordination owns recovery policy. | Called by the turn coordinator, not by components. |
 | `client/bindings/` | React subscriptions, application context, browser navigation, focus, scroll and other DOM effects. | Components use bindings for snapshots and named commands; a session binding mints the turn's generation-fenced stream sink inside `attachTurn` / `sendTurn`, so it hands out neither a store writer nor a sink factory. |
-| `client/application/` | Business workflows, the canonical session store, the turn/event/interaction/goal coordinators (one version cell per fence, `version-cell.ts`), catalogs and request ownership — one directory per business, mirroring `client/contracts/`. Composer submit workflows live in `composer/composer-workflows.ts`, and composer history normalization/pruning (browser storage through the injected infrastructure adapter) in `composer/composer-history.ts`; pure event-effect reduction and command generation live in `turn/effect-reducer.ts`, with execution and refresh scheduling belonging to the application event coordinator. The model catalogue, the selection and the provider list are the `models` owner's in `models-workflows.ts`, and every caching owner reads through `query-store.ts`. | Composition root wires transport, storage and the store. Named commands are the only component-facing write surface. |
+| `client/application/` and `client/features/*/application/` | Shared application coordination and business workflows, with one directory per business. The canonical session store and turn/event/interaction/goal coordinators remain under `client/application/`; Composer submit workflows and history live in `client/features/composer/application/`, pure event-effect reduction in `client/features/turn/application/effect-reducer.ts`, model workflows in `client/features/models/application/models-workflows.ts`, and every caching owner reads through `client/application/query-store.ts`. | Composition root wires transport, storage and the store. UI consumes published reads/bindings and named commands; composition owns application construction. |
 | `client/application/session-store.ts` + `client/bindings/use-session-state.ts` | The framework-free canonical session/interaction store (`createWebuiSessionStore`, the writer and home-adoption types) and its React read binding (`useWebuiSessionStore`, `useWebuiSessionState`, `useWebuiSessionStream`, `useWebuiSessionSending`, `useWebuiSessionActivity`, `useWebuiSessionPermissions`). One map and one listener registry; there is no second complete session-store map. | Importing the binding from a component. The binding exposes named commands plus the `attachTurn` / `sendTurn` turn intents; the store writer and the attempt's sink never leave it. |
 | `client/features/turn/projection/stream-state.ts`, `client/mechanisms/stream-loop.ts` | Stream frame reduction (`reduceWebuiStreamFrame`) and send/resume loop (`runWebuiStreamLoop`, `buildWebuiStreamLoopSink`). The loop receives history/context and stream-state transforms as injected bundles (`WebuiStreamLoopDeps.projection`, `.streamState`). | Through application turn coordination; tests drive the pure reducer and loop directly. |
 | `client/projection/common/router.ts`, `client/bindings/navigation.ts` | `route(pathname)` maps paths; `navigation.ts:16` implements `readSessionIdFromHash` and the browser hash subscription. | Import route rules from `projection/common/router.ts` and navigation state from its binding. |
-| `client/components/composer/slash-palette.ts`, `client/contracts/value-readers.ts`, `client/infrastructure/team-mode.ts`, `client/components/transcript/markdown.tsx`, `client/components/shell/icons.tsx` | Slash-command UI palette, defensive readers for untrusted payload fields, team-mode helpers, markdown and icon renderers. Command field types belong in contracts, not this icon-bearing UI module. | Importing UI helpers directly; application/projection code must not use the palette for command types or classification. |
+| `client/features/composer/ui/slash-palette.ts`, `client/contracts/value-readers.ts`, `client/infrastructure/team-mode.ts`, `client/components/transcript/markdown.tsx`, `client/components/shell/icons.tsx` | Slash-command UI palette, defensive readers for untrusted payload fields, team-mode helpers, markdown and icon renderers. Command field types belong in contracts, not this icon-bearing UI module. | Importing UI helpers directly; application/projection code must not use the palette for command types or classification. |
 
 ### Client / projection
 
@@ -111,7 +113,7 @@ the modules no single business owns.
 | `message-projection.ts`, `message-parts.ts` | Message → renderable parts (text, tool rows, attachments). |
 | `transcript-projection.ts`, `tool-projection.ts` | Transcript grouping and tool-result shaping. |
 | `questionnaire-state.ts`, `goal-state.ts`, `workspace-progress.ts` | Interaction, goal and workspace-progress derivations. |
-| `composer-state.ts` | Pure composer intent, enter-key, path and recent-workspace state rules. Submission workflows and session ID extraction live in `application/composer/composer-workflows.ts`. |
+| `composer-state.ts` | Pure composer intent, enter-key, path and recent-workspace state rules. Submission workflows and session ID extraction live in `features/composer/application/composer-workflows.ts`. |
 | `action-requests.ts` | Request builders for actions (model selection and friends). |
 | `workspace/canvas-projection.ts`, `workspace/panel-projection.ts` | The canvas geometry (pointer gestures, zoom, nudges, the mutations they build) and what a workspace panel renders (a diff, a todo list, a preview). |
 | `workspace/workspace-file-tree.ts`, `workspace/archive-projection.ts`, `workspace/html-preview.ts`, `workspace/media-preview.ts` | How a file's size and time read, where an archive entry unpacks, and whether a preview is media or reaches outside its own directory. |
@@ -125,7 +127,7 @@ derivation is testable without a DOM and the component holds only what it draws.
 
 `composer-history.ts` and `effect-reducer.ts` are **not** listed here: both are classified
 `application` by the dependency check and now live at
-`client/application/composer/composer-history.ts` and
+`client/features/composer/application/composer-history.ts` and
 `client/features/turn/application/effect-reducer.ts`. `projection/` classifies by basename, so their
 former `PROJECTION_SPLIT` entries existed only to correct the directory; the entries are deleted.
 

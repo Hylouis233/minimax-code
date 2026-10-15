@@ -1,8 +1,5 @@
-export interface WebuiMentionRange {
-  readonly start: number;
-  readonly end: number;
-  readonly query: string;
-}
+import type { WebuiMentionRange } from "../contracts/composer-interactions.js";
+export type { WebuiMentionRange, WebuiComposerAttachment, WebuiComposerUrlReference } from "../contracts/composer-interactions.js";
 
 export interface WebuiSlashRange {
   readonly start: number;
@@ -93,20 +90,6 @@ export const WEBUI_MAX_ATTACHMENT_COUNT = 10;
  * component because the composer's owner module keeps them, and an application
  * module may not import a component.
  */
-export interface WebuiComposerAttachment {
-  readonly id: string;
-  readonly fileName: string;
-  readonly mimeType: string;
-  readonly sizeBytes: number;
-  readonly dataUrl: string;
-  readonly kind: "image" | "file";
-}
-
-export interface WebuiComposerUrlReference {
-  readonly id: string;
-  readonly url: string;
-}
-
 export const WEBUI_MAX_ATTACHMENT_TOTAL_BYTES = 70 * 1024 * 1024;
 
 export function webuiAttachmentLimitError(

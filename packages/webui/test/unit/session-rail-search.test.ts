@@ -371,15 +371,16 @@ describe("WebuiProjectList under a search query", () => {
 // live in `use-session-rail-actions.ts`, and the frame still renders the input
 // and the list. The probes read both files, so neither side can be emptied.
 describe("rail search wiring in WebuiClientFoundationApp", () => {
-  const read = (name: string) =>
-    readFileSync(new URL(`../../src/client/components/shell/${name}`, import.meta.url), "utf8");
-  const hook = read("use-session-rail-actions.ts");
-  const frame = read("WebuiClientFoundationApp.tsx");
-  const source = `${hook}\n${frame}`;
+  const read = (path: string) =>
+    readFileSync(new URL(`../../src/client/${path}`, import.meta.url), "utf8");
+  const hook = read("components/shell/use-session-rail-actions.ts");
+  const frame = read("components/shell/WebuiClientFoundationApp.tsx");
+  const region = read("features/sessions/ui/SessionRailRegion.tsx");
+  const source = `${hook}\n${frame}\n${region}`;
 
   it("holds the query in one state and feeds it to the input", () => {
     expect(hook).toMatch(/const \[railSearchQuery, setRailSearchQuery\] = useState\(""\)/u);
-    expect(frame).toMatch(/value=\{railSearchQuery\}/u);
+    expect(region).toMatch(/value=\{props\.searchQuery\}/u);
   });
 
   it("filters the session page the rail renders with that same query", () => {
@@ -392,14 +393,15 @@ describe("rail search wiring in WebuiClientFoundationApp", () => {
   });
 
   it("passes the query into the project list it renders", () => {
-    // Scoped to the `<WebuiProjectList .../>` element itself: a `railSearchQuery`
-    // elsewhere in the file would otherwise satisfy a bare substring check.
-    const start = source.indexOf("<WebuiProjectList");
+    // The shell passes its one query to the region's project-list model, and
+    // the region hands that model to the existing list composition.
+    const start = source.indexOf("projectList={{");
     expect(start).toBeGreaterThan(-1);
-    const end = source.indexOf("/>", start);
+    const end = source.indexOf("}}", start);
     expect(end).toBeGreaterThan(start);
     const element = source.slice(start, end);
-    expect(element).toMatch(/query=\{railSearchQuery\}/u);
-    expect(element).toMatch(/page=\{railPage\}/u);
+    expect(element).toMatch(/query: railSearchQuery/u);
+    expect(element).toMatch(/page: railPage/u);
+    expect(region).toMatch(/<WebuiProjectList \{\.\.\.props\.projectList\}/u);
   });
 });

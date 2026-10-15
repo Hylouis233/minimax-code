@@ -1,18 +1,25 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
-import {
-  InstalledPluginSource,
-  MarketplaceCategory,
-} from "@mavis/protocol/local";
+import { InstalledPluginSource } from "@mavis/protocol/local";
 import {
   useWebuiPluginWorkflows,
   useWebuiPluginWorkflowsState,
 } from "../../../bindings/use-query-state.js";
 import { WebuiIconAgent } from "../../../components/shell/icons.js";
-import { ToggleSwitch } from "../../../components/shared/ToggleSwitch.js";
-import { readWebuiPluginRow as read, type WebuiPluginRow as Row } from "../contracts/plugin-rows.js";
+import {
+  readWebuiPluginRow as read,
+  type WebuiPluginRow as Row,
+} from "../contracts/plugin-rows.js";
 import { PluginImportDialog } from "./PluginImportDialog.js";
 import { PluginItemDialog } from "./PluginItemDialog.js";
-import { describeWebuiMcpServerStatus } from "../projection/mcp-status.js";
+import { projectWebuiPluginCatalogue } from "../projection/catalogue-view.js";
+import {
+  PluginMarketplace,
+  PluginMarketplaceFilters,
+} from "./PluginMarketplace.js";
+import {
+  PluginManagementFilters,
+  PluginManagementList,
+} from "./PluginManagementList.js";
 import type {
   WebuiPluginGithubSource,
   WebuiPluginIntent,
@@ -25,6 +32,18 @@ type PluginCatalogueSelection = {
   readonly query: string;
   readonly category: string;
 };
+type PluginDetailIdentity = {
+  readonly kind: "mcp-server";
+  readonly name: string;
+  readonly selection: PluginCatalogueSelection;
+  readonly attachment: number;
+};
+type PluginPreviewIdentity = {
+  readonly kind: "github-import-preview";
+  readonly url: string;
+  readonly attachment: number;
+  readonly request: number;
+};
 const sameSelection = (
   left: PluginCatalogueSelection,
   right: PluginCatalogueSelection,
@@ -33,52 +52,6 @@ const sameSelection = (
   left.view === right.view &&
   left.query === right.query &&
   left.category === right.category;
-
-const CATEGORIES: readonly { id: Area; label: string }[] = [
-  { id: "plugins", label: "插件" },
-  { id: "skills", label: "技能" },
-  { id: "apps", label: "应用" },
-  { id: "mcp", label: "MCP" },
-  { id: "agents", label: "Agents" },
-];
-const categories: readonly { id: string; label: string }[] = [
-  { id: "", label: "全部" },
-  { id: "office", label: "办公" },
-  { id: "creative", label: "创作" },
-  { id: "design_and_sites", label: "设计与网站" },
-  { id: "code", label: "代码" },
-  { id: "business", label: "商业" },
-  { id: "sales", label: "销售" },
-  { id: "productivity", label: "效率" },
-  { id: "science_and_healthcare", label: "科学与医疗" },
-  { id: "education", label: "教育" },
-  { id: "other", label: "其他" },
-];
-/** Number of cards shown after the user explicitly collapses a catalogue. */
-const MARKET_PREVIEW_COUNT = 8;
-const MARKETPLACE_CATEGORY: Readonly<Record<string, number>> = {
-  other: MarketplaceCategory.OTHER,
-  office: MarketplaceCategory.OFFICE,
-  creative: MarketplaceCategory.STUDIO,
-  design_and_sites: MarketplaceCategory.DESIGN_AND_SITES,
-  code: MarketplaceCategory.CODE,
-  business: MarketplaceCategory.BUSINESS,
-  sales: MarketplaceCategory.SALES,
-  productivity: MarketplaceCategory.PRODUCTIVITY,
-  science_and_healthcare: MarketplaceCategory.SCIENCE_AND_HEALTHCARE,
-  education: MarketplaceCategory.EDUCATION,
-};
-const rows = (value: unknown, key: string): Row[] => {
-  if (!value || typeof value !== "object") return [];
-  if (Array.isArray(value))
-    return value.filter(
-      (item): item is Row => !!item && typeof item === "object",
-    );
-  const found = (value as Row)[key];
-  return Array.isArray(found)
-    ? found.filter((item): item is Row => !!item && typeof item === "object")
-    : [];
-};
 
 export function PluginCatalogue({
   initialArea = "plugins",
@@ -100,7 +73,8 @@ export function PluginCatalogue({
     category,
   });
   selectionRef.current = { area, view, query, category };
-  const reloadRequestRef = useRef(0);
+  const dialogAttachmentRef = useRef(0);
+  const pluginPreviewRequestRef = useRef(0);
   const [showAllCatalogue, setShowAllCatalogue] = useState(true);
   /* Local form-level messages only. A load or mutation failure belongs to the
    * application plugin owner (ticket #52) and is read from its snapshot. */
@@ -108,16 +82,33 @@ export function PluginCatalogue({
   const [dialog, setDialog] = useState<"mcp" | "agent" | "skill" | null>(null);
   const [editing, setEditing] = useState<Row | undefined>();
   const [selectedAgent, setSelectedAgent] = useState<Row | undefined>();
-  const selectedAgentRef = useRef<Row | undefined>();
-  selectedAgentRef.current = selectedAgent;
   const [pluginUrl, setPluginUrl] = useState("");
   const [pluginPreview, setPluginPreview] = useState<Row | undefined>();
   const [pluginImportDialog, setPluginImportDialog] = useState(false);
 
+  const attachItemDialog = (): number => {
+    dialogAttachmentRef.current += 1;
+    return dialogAttachmentRef.current;
+  };
+  const detachItemDialog = (): void => {
+    dialogAttachmentRef.current += 1;
+    setDialog(null);
+  };
+  const attachPluginImportDialog = (): number => {
+    dialogAttachmentRef.current += 1;
+    pluginPreviewRequestRef.current += 1;
+    return dialogAttachmentRef.current;
+  };
+  const detachPluginImportDialog = (): void => {
+    dialogAttachmentRef.current += 1;
+    pluginPreviewRequestRef.current += 1;
+    setPluginImportDialog(false);
+  };
+
   // The plugin manager's listings and mutations belong to the application
-  // plugin owner (ticket #52). This component submits commands and reads the
-  // snapshot; it holds no transport method and no request-generation counter —
-  // the owner drops an answer for a selection it has left.
+  // plugin owner (ticket #52). This component submits named intents and reads
+  // the snapshot; only detail/preview attachment identities stay local so a
+  // late answer cannot populate a replacement dialog.
   const workflows = useWebuiPluginWorkflows();
   const snapshot = useWebuiPluginWorkflowsState();
   const listing = snapshot.listing;
@@ -136,68 +127,37 @@ export function PluginCatalogue({
   useEffect(() => {
     void workflows?.loadListing({ area, view, query, category });
   }, [area, view, query, category, workflows]);
-  const filtered = useMemo(
+  const catalogueView = useMemo(
     () =>
-      data.filter(
-        (item) =>
-          !query ||
-          `${read(item, "name", "displayName", "display_name")} ${read(item, "description")}`
-            .toLocaleLowerCase()
-            .includes(query.toLocaleLowerCase()),
-      ),
-    [data, query],
+      projectWebuiPluginCatalogue({
+        data,
+        query,
+        area,
+        view,
+        pluginTotal: marketPluginTotal,
+        skillTotal: marketSkillTotal,
+      }),
+    [area, data, marketPluginTotal, marketSkillTotal, query, view],
+  );
+  const filtered = useMemo(
+    () => catalogueView.rows.map((row) => row.source),
+    [catalogueView.rows],
   );
   /* Plugins and skills are two catalogues rendered by one page, so they share
    * every layout decision. `isMarketCatalogue` is the single condition that
    * says "this is the marketplace page rather than a management list" — the
    * two-column card grid, the shared 768px measure and the 「查看全部」 preview
    * are all keyed off it, which is what keeps 技能 laid out exactly like 插件. */
-  const isMarketCatalogue =
-    (area === "plugins" || area === "skills") && view === "market";
-  const marketNoun = area === "skills" ? "技能" : "插件";
-  const marketTotal =
-    area === "skills" ? marketSkillTotal : marketPluginTotal;
+  const { isMarketCatalogue, marketNoun, marketTotal } = catalogueView;
   // When the total is unknown the affordance is still offered once the fetched
   // page itself overflows the preview, so the control is never gated on a
   // number this response could not supply.
-  const visibleMarketTotal = marketTotal ?? filtered.length;
-  /**
-   * The narrow set of intents this component can express.
-   *
-   * It used to take any of the 29 wire actions plus an untyped row, and switch on
-   * the verb at runtime. Typing the parameter as the whole union is what that
-   * shape cost: `mutate("installPlugin", someRow)` compiled even though a row has
-   * no `pluginName`, and nothing said so until the server rejected it. Each
-   * intent carries the fields its own command declares, so the compiler checks
-   * the payload against the command it will actually reach (T08).
-   */
-  const runIntent = async (intent: WebuiPluginIntent): Promise<unknown> => {
-    if (!workflows)
-      throw new Error("Plugin management is not connected to the runtime");
-    switch (intent.kind) {
-      case "installPlugin": return workflows.installPlugin({ pluginName: intent.pluginName, ...(intent.source === undefined ? {} : { source: intent.source }) });
-      case "uninstallPlugin": return workflows.uninstallPlugin({ pluginName: intent.pluginName, ...(intent.source === undefined ? {} : { source: intent.source }) });
-      case "enablePlugin": return workflows.enablePlugin({ pluginName: intent.pluginName, ...(intent.source === undefined ? {} : { source: intent.source }) });
-      case "disablePlugin": return workflows.disablePlugin({ pluginName: intent.pluginName, ...(intent.source === undefined ? {} : { source: intent.source }) });
-      case "importGithubPlugin": return workflows.importGithubPlugin({ source: intent.source });
-      case "installSkill": return workflows.installSkill({ url: intent.url });
-      case "createSkill": return workflows.createSkill({ name: intent.name, description: intent.description, content: intent.content });
-      case "setSkillEnabled": return workflows.setSkillEnabled({ skillName: intent.skillName, enabled: intent.enabled, ...(intent.locationUri === undefined ? {} : { locationUri: intent.locationUri }) });
-      case "deleteSkill": return workflows.deleteSkill({ skillName: intent.skillName, ...(intent.locationUri === undefined ? {} : { locationUri: intent.locationUri }) });
-      case "createMcpServer": return workflows.createMcpServer({ name: intent.name, config: intent.config, ...(intent.enabled === undefined ? {} : { enabled: intent.enabled }) });
-      case "updateMcpServer": return workflows.updateMcpServer({ name: intent.name, config: intent.config });
-      case "deleteMcpServer": return workflows.deleteMcpServer({ name: intent.name });
-      case "setMcpServerEnabled": return workflows.setMcpServerEnabled({ name: intent.name, enabled: intent.enabled });
-      case "testMcpServer": return workflows.testMcpServer({ name: intent.name });
-      case "createAgent": return workflows.createAgent({ name: intent.name, ...(intent.displayName === undefined ? {} : { displayName: intent.displayName }), ...(intent.description === undefined ? {} : { description: intent.description }), ...(intent.systemPrompt === undefined ? {} : { systemPrompt: intent.systemPrompt }), ...(intent.initialDefinition === undefined ? {} : { initialDefinition: intent.initialDefinition }) });
-      case "updateAgent": return workflows.updateAgent({ name: intent.name, ...(intent.displayName === undefined ? {} : { displayName: intent.displayName }), ...(intent.description === undefined ? {} : { description: intent.description }), ...(intent.systemPrompt === undefined ? {} : { systemPrompt: intent.systemPrompt }) });
-      case "deleteAgent": return workflows.deleteAgent({ name: intent.name });
-      default: throw new Error(`未支持的操作：${(intent as { readonly kind: string }).kind}`);
-    }
-  };
+  const visibleMarketTotal = catalogueView.visibleMarketTotal;
   const mutate = async (intent: WebuiPluginIntent): Promise<boolean> => {
     try {
-      await runIntent(intent);
+      if (!workflows)
+        throw new Error("Plugin management is not connected to the runtime");
+      await workflows.runIntent(intent);
       return true;
     } catch {
       // The owner records the failure and reloads; this only reports it.
@@ -218,41 +178,6 @@ export function PluginCatalogue({
       "displayName",
       "display_name",
     );
-  /** The structured creator info, if the row carries any, as a record. */
-  const creatorInfoOf = (item: Row): Record<string, unknown> | undefined => {
-    const found = item.creatorInfo ?? item.creator_info;
-    return found && typeof found === "object" && !Array.isArray(found)
-      ? (found as Record<string, unknown>)
-      : undefined;
-  };
-  /** A row's `locationUri`, narrowed: the rows are untyped and the command is not. */
-  const locationUriOf = (item: Row): string | undefined =>
-    typeof item.locationUri === "string" ? item.locationUri : undefined;
-  const pluginSource = (item: Row) =>
-    typeof item.source === "number" ? item.source : undefined;
-  const enabled = (item: Row) =>
-    item.enabled === true ||
-    item.isEnabled === true ||
-    item.is_enabled === true;
-  const appStatus = (item: Row) => {
-    const runtime =
-      item.runtime && typeof item.runtime === "object"
-        ? (item.runtime as Row)
-        : {};
-    const status = read(runtime, "status");
-    return status === "running"
-      ? "运行中"
-      : status === "starting"
-        ? "启动中"
-        : status === "stopping"
-          ? "停止中"
-          : status === "failed"
-            ? "启动失败"
-            : status === "stopped"
-              ? "已停止"
-              : "未知状态";
-  };
-
   const chatWithAgent = async (agent: Row) => {
     if (!onChatWithAgent) return;
     try {
@@ -270,31 +195,64 @@ export function PluginCatalogue({
    * no command or url.
    */
   const prepareMcp = async (item: Row) => {
+    const identity: PluginDetailIdentity = {
+      kind: "mcp-server",
+      name: nameOf(item),
+      selection: selectionRef.current,
+      attachment: attachItemDialog(),
+    };
+    const isAttached = (): boolean =>
+      identity.kind === "mcp-server" &&
+      identity.attachment === dialogAttachmentRef.current &&
+      sameSelection(identity.selection, selectionRef.current);
     try {
-      const detail = await workflows?.getMcpServer(nameOf(item));
+      const detail = await workflows?.getMcpServer(identity.name);
+      if (!isAttached()) return;
       setEditing((detail && typeof detail === "object" ? detail : item) as Row);
     } catch (cause) {
-      setLocalError(cause instanceof Error ? cause.message : String(cause));
+      if (isAttached())
+        setLocalError(cause instanceof Error ? cause.message : String(cause));
       return;
     }
-    setDialog("mcp");
+    if (isAttached()) setDialog("mcp");
   };
   const previewPlugin = async () => {
+    const identity: PluginPreviewIdentity = {
+      kind: "github-import-preview",
+      url: pluginUrl.trim(),
+      attachment: dialogAttachmentRef.current,
+      request: ++pluginPreviewRequestRef.current,
+    };
+    const isAttached = (): boolean =>
+      identity.kind === "github-import-preview" &&
+      identity.attachment === dialogAttachmentRef.current &&
+      identity.request === pluginPreviewRequestRef.current &&
+      pluginUrl.trim() === identity.url &&
+      pluginImportDialog;
     try {
       setLocalError("");
       const result = await workflows?.previewGithubPlugin({
-        url: pluginUrl.trim(),
+        url: identity.url,
       });
+      if (!isAttached()) return;
       setPluginPreview(result as Row);
     } catch (cause) {
-      setLocalError(cause instanceof Error ? cause.message : String(cause));
+      if (isAttached())
+        setLocalError(cause instanceof Error ? cause.message : String(cause));
     }
   };
   const importPlugin = async () => {
     const source = pluginPreview?.source;
     if (!source || typeof source !== "object") return;
-    if (await mutate({ kind: "importGithubPlugin", source: source as WebuiPluginGithubSource })) {
-      setPluginImportDialog(false);
+    const attachment = dialogAttachmentRef.current;
+    if (
+      await mutate({
+        kind: "importGithubPlugin",
+        source: source as WebuiPluginGithubSource,
+      })
+    ) {
+      if (attachment !== dialogAttachmentRef.current) return;
+      detachPluginImportDialog();
       setPluginPreview(undefined);
     }
   };
@@ -310,6 +268,7 @@ export function PluginCatalogue({
   };
 
   const openCreate = (target: Area) => {
+    attachItemDialog();
     setArea(target);
     setView("personal");
     setManagementOpen(true);
@@ -318,7 +277,9 @@ export function PluginCatalogue({
     // themselves from `editing`, so there is nothing to clear here beyond the
     // item the previous form may have been editing.
     setEditing(undefined);
-    setDialog(target === "mcp" ? "mcp" : target === "agents" ? "agent" : "skill");
+    setDialog(
+      target === "mcp" ? "mcp" : target === "agents" ? "agent" : "skill",
+    );
   };
 
   return (
@@ -345,154 +306,114 @@ export function PluginCatalogue({
           </button>
         ) : null}
         <div className="webui-plugin-header-inner">
-        {managementOpen ? (
-          <>
-            <h1>管理</h1>
-            <div className="webui-plugin-create-anchor webui-plugin-management-create-anchor">
-              <button
-                type="button"
-                className="webui-plugin-create-trigger"
-                aria-expanded={createMenuOpen}
-                onClick={() => setCreateMenuOpen((open) => !open)}
-              >
-                ＋ 创建
-              </button>
-              {createMenuOpen ? (
-                <div className="webui-plugin-create-menu">
-                  <button
-                    onClick={() => {
-                      setPluginImportDialog(true);
-                      setCreateMenuOpen(false);
-                      setPluginUrl("");
-                      setPluginPreview(undefined);
-                    }}
-                  >
-                    从 Git 仓库导入插件
-                  </button>
-                  <button onClick={() => openCreate("skills")}>录入技能</button>
-                  <button onClick={() => openCreate("mcp")}>
-                    添加 MCP server
-                  </button>
-                  <button onClick={() => openCreate("agents")}>
-                    创建 Agent
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          </>
-        ) : (
-          <>
-            {/* The marketplace is a catalogue of two kinds of thing, so the
-             * header picks one: plugins, or skills. They used to share a single
-             * page with the skills appended below the plugin grid, which meant
-             * one list to scroll and one search box claiming to cover both.
-             * What is installed is no longer the 个人 half of a 市场/个人 pair —
-             * that pair is gone. The 管理 button in the same button group opens
-             * the management view, which is where installed plugins live. */}
-            <div className="webui-plugin-header-tabs" aria-label="插件与技能">
-              <button
-                aria-pressed={area === "plugins"}
-                onClick={() => selectMarketCatalog("plugins")}
-              >
-                插件
-              </button>
-              <button
-                aria-pressed={area === "skills"}
-                onClick={() => selectMarketCatalog("skills")}
-              >
-                技能
-              </button>
-            </div>
-            <div className="webui-plugin-create-anchor">
-              <button
-                type="button"
-                aria-label="刷新插件市场"
-                onClick={() => void reload()}
-              >
-                ⟳
-              </button>
-              <button
-                type="button"
-                className="webui-plugin-manage-trigger"
-                onClick={() => {
-                  setManagementOpen(true);
-                  setView("personal");
-                }}
-              >
-                <svg viewBox="0 0 20 20" aria-hidden="true">
-                  <path d="M7.1 2.8h5.8l4.3 4.3v5.8l-4.3 4.3H7.1l-4.3-4.3V7.1z" />
-                  <circle cx="10" cy="10" r="2.2" />
-                </svg>
-                管理
-              </button>
-            </div>
-          </>
-        )}
-        </div>
-        {isMarketCatalogue ? (
-          <div className="webui-plugin-market-discovery">
-            {/* Plugin categories do not apply to the skill hub, so the nav is
-             * the plugin catalogue's alone. The search box is shared. */}
-            {area === "plugins" ? (
-              <nav className="webui-plugin-category-filter" aria-label="市场分类">
-                {categories.map((item) => (
-                  <button
-                    key={item.id}
-                    aria-pressed={category === item.id}
-                    onClick={() => setCategory(item.id)}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </nav>
-            ) : null}
-            <label className="webui-plugin-market-search">
-              <svg viewBox="0 0 20 20" aria-hidden="true">
-                <circle cx="8.8" cy="8.8" r="5.8" />
-                <path d="m13.2 13.2 4 4" />
-              </svg>
-              <input
-                aria-label={area === "skills" ? "搜索技能" : "搜索插件"}
-                placeholder={area === "skills" ? "搜索技能..." : "搜索插件..."}
-                value={query}
-                onChange={(event) => setQuery(event.currentTarget.value)}
-              />
-            </label>
-          </div>
-        ) : null}
-        {managementOpen ? (
-          <div className="webui-plugin-market-discovery webui-plugin-management-discovery">
-            <nav className="webui-plugin-category-filter" aria-label="插件管理分类">
-              {CATEGORIES.map((item) => (
+          {managementOpen ? (
+            <>
+              <h1>管理</h1>
+              <div className="webui-plugin-create-anchor webui-plugin-management-create-anchor">
                 <button
-                  key={item.id}
-                  aria-pressed={area === item.id}
+                  type="button"
+                  className="webui-plugin-create-trigger"
+                  aria-expanded={createMenuOpen}
+                  onClick={() => setCreateMenuOpen((open) => !open)}
+                >
+                  ＋ 创建
+                </button>
+                {createMenuOpen ? (
+                  <div className="webui-plugin-create-menu">
+                    <button
+                      onClick={() => {
+                        attachPluginImportDialog();
+                        setPluginImportDialog(true);
+                        setCreateMenuOpen(false);
+                        setPluginUrl("");
+                        setPluginPreview(undefined);
+                      }}
+                    >
+                      从 Git 仓库导入插件
+                    </button>
+                    <button onClick={() => openCreate("skills")}>
+                      录入技能
+                    </button>
+                    <button onClick={() => openCreate("mcp")}>
+                      添加 MCP server
+                    </button>
+                    <button onClick={() => openCreate("agents")}>
+                      创建 Agent
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </>
+          ) : (
+            <>
+              {/* The marketplace is a catalogue of two kinds of thing, so the
+               * header picks one: plugins, or skills. They used to share a single
+               * page with the skills appended below the plugin grid, which meant
+               * one list to scroll and one search box claiming to cover both.
+               * What is installed is no longer the 个人 half of a 市场/个人 pair —
+               * that pair is gone. The 管理 button in the same button group opens
+               * the management view, which is where installed plugins live. */}
+              <div className="webui-plugin-header-tabs" aria-label="插件与技能">
+                <button
+                  aria-pressed={area === "plugins"}
+                  onClick={() => selectMarketCatalog("plugins")}
+                >
+                  插件
+                </button>
+                <button
+                  aria-pressed={area === "skills"}
+                  onClick={() => selectMarketCatalog("skills")}
+                >
+                  技能
+                </button>
+              </div>
+              <div className="webui-plugin-create-anchor">
+                <button
+                  type="button"
+                  aria-label="刷新插件市场"
+                  onClick={() => void reload()}
+                >
+                  ⟳
+                </button>
+                <button
+                  type="button"
+                  className="webui-plugin-manage-trigger"
                   onClick={() => {
-                    setLocalError("");
-                    setArea(item.id);
+                    setManagementOpen(true);
                     setView("personal");
                   }}
                 >
-                  <span>{item.label}</span>
-                  {area === item.id ? (
-                    <span className="webui-plugin-count">{data.length}</span>
-                  ) : null}
+                  <svg viewBox="0 0 20 20" aria-hidden="true">
+                    <path d="M7.1 2.8h5.8l4.3 4.3v5.8l-4.3 4.3H7.1l-4.3-4.3V7.1z" />
+                    <circle cx="10" cy="10" r="2.2" />
+                  </svg>
+                  管理
                 </button>
-              ))}
-            </nav>
-            <label className="webui-plugin-market-search">
-              <svg viewBox="0 0 20 20" aria-hidden="true">
-                <circle cx="8.8" cy="8.8" r="5.8" />
-                <path d="m13.2 13.2 4 4" />
-              </svg>
-              <input
-                aria-label={`搜索${area === "mcp" ? "MCP" : area === "skills" ? "技能" : area === "agents" ? "Agent" : area === "apps" ? "应用" : "插件"}`}
-                placeholder={`搜索${area === "mcp" ? "MCP" : area === "skills" ? "技能" : area === "agents" ? "Agent" : area === "apps" ? "应用" : "插件"}...`}
-                value={query}
-                onChange={(event) => setQuery(event.currentTarget.value)}
-              />
-            </label>
-          </div>
+              </div>
+            </>
+          )}
+        </div>
+        {isMarketCatalogue && (area === "plugins" || area === "skills") ? (
+          <PluginMarketplaceFilters
+            area={area}
+            query={query}
+            category={category}
+            onQueryChange={setQuery}
+            onCategoryChange={setCategory}
+          />
+        ) : null}
+        {managementOpen ? (
+          <PluginManagementFilters
+            area={area}
+            query={query}
+            rowCount={data.length}
+            onAreaChange={(nextArea) => {
+              setLocalError("");
+              setArea(nextArea);
+              setView("personal");
+            }}
+            onQueryChange={setQuery}
+          />
         ) : null}
       </header>
       {isMarketCatalogue ? (
@@ -518,7 +439,12 @@ export function PluginCatalogue({
               <button
                 key={nameOf(item)}
                 aria-pressed={selectedAgent === item}
-                onClick={() => { setEditing(item); setSelectedAgent(item); setDialog("agent"); }}
+                onClick={() => {
+                  attachItemDialog();
+                  setEditing(item);
+                  setSelectedAgent(item);
+                  setDialog("agent");
+                }}
               >
                 <span className="webui-agent-avatar webui-agent-avatar--small">
                   {read(item, "avatarDataUrl").startsWith("data:image/") ? (
@@ -527,13 +453,19 @@ export function PluginCatalogue({
                     <WebuiIconAgent className="webui-agent-avatar-icon webui-agent-avatar-icon--small" />
                   )}
                 </span>
-                <span>{read(item, "displayName", "display_name") || nameOf(item)}</span>
+                <span>
+                  {read(item, "displayName", "display_name") || nameOf(item)}
+                </span>
               </button>
             ))}
             <button
               className="webui-agent-create"
               type="button"
-              onClick={() => { setEditing(undefined); setDialog("agent"); }}
+              onClick={() => {
+                attachItemDialog();
+                setEditing(undefined);
+                setDialog("agent");
+              }}
             >
               <span aria-hidden="true">＋</span> 创建 Agent
             </button>
@@ -550,8 +482,13 @@ export function PluginCatalogue({
               <label className="webui-agent-avatar-field">
                 头像
                 <span className="webui-agent-avatar webui-agent-avatar--large">
-                  {read(selectedAgent ?? {}, "avatarDataUrl").startsWith("data:image/") ? (
-                    <img src={read(selectedAgent ?? {}, "avatarDataUrl")} alt="Agent 头像" />
+                  {read(selectedAgent ?? {}, "avatarDataUrl").startsWith(
+                    "data:image/",
+                  ) ? (
+                    <img
+                      src={read(selectedAgent ?? {}, "avatarDataUrl")}
+                      alt="Agent 头像"
+                    />
                   ) : (
                     <WebuiIconAgent className="webui-agent-avatar-icon webui-agent-avatar-icon--large" />
                   )}
@@ -560,7 +497,12 @@ export function PluginCatalogue({
               <label>
                 名称
                 <span data-testid="webui-agent-detail-name">
-                  {read(selectedAgent ?? {}, "name", "displayName", "display_name")}
+                  {read(
+                    selectedAgent ?? {},
+                    "name",
+                    "displayName",
+                    "display_name",
+                  )}
                 </span>
               </label>
               <label className="webui-agent-model-field">
@@ -595,12 +537,15 @@ export function PluginCatalogue({
                   >
                     删除
                   </button>
-                ) : <span />}
+                ) : (
+                  <span />
+                )}
                 <button
                   type="button"
                   className="webui-agent-save"
                   disabled={busy || !selectedAgent}
                   onClick={() => {
+                    attachItemDialog();
                     setEditing(selectedAgent);
                     setDialog("agent");
                   }}
@@ -621,253 +566,39 @@ export function PluginCatalogue({
             </div>
           </div>
         </div>
-      ) : filtered.length === 0 ? (
-        <p className="webui-plugin-empty">暂无内容</p>
+      ) : isMarketCatalogue && (area === "plugins" || area === "skills") ? (
+        <PluginMarketplace
+          area={area}
+          rows={catalogueView.rows}
+          marketTotal={marketTotal}
+          visibleMarketTotal={visibleMarketTotal}
+          showAll={showAllCatalogue}
+          onToggleAll={() => setShowAllCatalogue((value) => !value)}
+          onIntent={(intent) => void mutate(intent)}
+        />
       ) : (
-        <div
-          className={`webui-plugin-list ${isMarketCatalogue ? "webui-plugin-grid" : ""}`}
-        >
-          {(isMarketCatalogue && !showAllCatalogue
-            ? filtered.slice(0, MARKET_PREVIEW_COUNT)
-            : filtered
-          ).map((item, index) => {
-            const name = nameOf(item) || `item-${index}`;
-            const isOn = enabled(item);
-            const description = read(item, "description", "summary");
-            // Computed for every row, read only in the mcp branch: the loose
-            // read is side-effect-free, and narrowing `area` inside the JSX
-            // below cannot narrow this binding.
-            const mcpStatus = describeWebuiMcpServerStatus(item);
-            // The button's intent, built with the fields its own command
-            // declares. It used to be a bare verb here and a payload at the call
-            // site three hundred lines away, so the two could disagree about
-            // which command ran (T08).
-            const pluginIntent = (kind: "installPlugin" | "enablePlugin" | "disablePlugin"): WebuiPluginIntent => ({
-              kind,
-              pluginName: name,
-              ...(pluginSource(item) === undefined ? {} : { source: pluginSource(item) }),
-            });
-            const iconUrl = read(item, "iconUrl", "icon_url");
-            return (
-              <article className="webui-plugin-row" key={`${area}-${name}`}>
-                <div
-                  className={`webui-plugin-icon${area === "skills" ? " webui-plugin-icon--skill" : ""}`}
-                  aria-hidden="true"
-                >
-                  {area === "skills" ? (
-                    <span className="webui-plugin-skill-icon-tile">
-                      <svg viewBox="0 0 24 24" focusable="false">
-                        <path d="M9 4.25h7.25L19.5 7.5v11.25A1.75 1.75 0 0 1 17.75 20.5H9A2 2 0 0 1 7 18.5v-12.25a2 2 0 0 1 2-2Z" />
-                        <path d="M16 4.5v3.25h3.25M11 11h5.5M11 14h5.5M11 17h3.25" />
-                        <path d="M7 7H5.75A1.75 1.75 0 0 0 4 8.75v9.5A1.75 1.75 0 0 0 5.75 20H9" />
-                      </svg>
-                    </span>
-                  ) : iconUrl ? (
-                    <>
-                      <img
-                        src={iconUrl}
-                        alt=""
-                        loading="lazy"
-                        onError={(event) => {
-                          event.currentTarget.hidden = true;
-                          event.currentTarget.nextElementSibling?.removeAttribute(
-                            "hidden",
-                          );
-                        }}
-                      />
-                      <span hidden>▦</span>
-                    </>
-                  ) : area === "plugins" ? (
-                    "▦"
-                  ) : (
-                    "◇"
-                  )}
-                </div>
-                <div className="webui-plugin-copy">
-                  <h2>{read(item, "displayName", "display_name") || name}</h2>
-                  <p>{description || read(item, "transport")}</p>
-                </div>
-                {area === "plugins" && view === "market" ? (
-                  <button
-                    type="button"
-                    disabled={item.installed === true}
-                    onClick={() =>
-                      void mutate(
-                        pluginIntent(view === "market" ? "installPlugin" : isOn ? "disablePlugin" : "enablePlugin"),
-                      )
-                    }
-                  >
-                    {item.installed === true ? "已安装" : "安装"}
-                  </button>
-                ) : area === "skills" && view === "market" ? (
-                  <button
-                    type="button"
-                    disabled={
-                      item.added === true ||
-                      !read(
-                        item,
-                        "url",
-                        "sourceUrl",
-                        "source_url",
-                        "gitUrl",
-                        "git_url",
-                      )
-                    }
-                    onClick={() =>
-                      void mutate({
-                        kind: "installSkill",
-                        url:
-                          read(item, "url", "sourceUrl", "source_url") ||
-                          read(item, "gitUrl", "git_url"),
-                        displayName:
-                          read(item, "displayName", "display_name") ||
-                          undefined,
-                        publisherSourceType:
-                          typeof item.publisherSourceType === "number"
-                            ? item.publisherSourceType
-                            : typeof item.source_type === "number"
-                              ? item.source_type
-                              : undefined,
-                        isFromGit:
-                          item.isFromGit === true || item.is_from_git === true,
-                        // Narrowed to a record, not merely "an object": the
-                        // command declares a structured `creatorInfo`, and the
-                        // row is untyped, so the check has to be the real one.
-                        ...(creatorInfoOf(item) ? { creatorInfo: creatorInfoOf(item) } : {}),
-                      })
-                    }
-                  >
-                    {item.added === true ? "已添加" : "添加"}
-                  </button>
-                ) : area === "apps" ? (
-                  <span className="text-text_default_tertiary">
-                    {appStatus(item)}
-                  </span>
-                ) : area === "mcp" ? (
-                  <>
-                    {/* The status the runtime already knows, on the row
-                     * itself: a server that cannot connect is labelled
-                     * 连接失败 with its own reason inline — visible text, not
-                     * a tooltip, because nobody hovers a row they believe
-                     * is healthy. Mirrors the apps area's status slot. */}
-                    <div className="webui-plugin-mcp-status">
-                      <span
-                        className={`text-size_12 ${mcpStatus.tone}`}
-                        data-webui-mcp-status={mcpStatus.key}
-                      >
-                        {mcpStatus.label}
-                      </span>
-                      {mcpStatus.reason ? (
-                        <small
-                          className="text-size_12 text-text_default_tertiary"
-                          data-webui-mcp-status-reason={mcpStatus.key}
-                          title={mcpStatus.reason}
-                        >
-                          {mcpStatus.reason}
-                        </small>
-                      ) : null}
-                    </div>
-                    <div className="webui-plugin-actions">
-                    <button onClick={() => void prepareMcp(item)}>编辑</button>
-                    <button
-                      onClick={() =>
-                        confirmMutation("删除 MCP server", {
-                          kind: "deleteMcpServer",
-                          name,
-                        })
-                      }
-                    >
-                      删除
-                    </button>
-                    <ToggleSwitch
-                      checked={isOn}
-                      label={`启用 ${name}`}
-                      onChange={() =>
-                        void mutate({ kind: "setMcpServerEnabled", name, enabled: !isOn })
-                      }
-                    />
-                  </div>
-                  </>
-                ) : (
-                  <div className="webui-plugin-actions">
-                    <ToggleSwitch
-                      checked={isOn}
-                      label={`启用 ${name}`}
-                      onChange={() =>
-                        void mutate(
-                          area === "plugins"
-                            ? pluginIntent(view === "market" ? "installPlugin" : isOn ? "disablePlugin" : "enablePlugin")
-                            : {
-                                kind: "setSkillEnabled",
-                                skillName: name,
-                                enabled: !isOn,
-                                ...(locationUriOf(item) ? { locationUri: locationUriOf(item) } : {}),
-                              },
-                        )
-                      }
-                    />
-                    {area === "plugins" ? (
-                      <button
-                        onClick={() =>
-                          confirmMutation("卸载插件", {
-                            kind: "uninstallPlugin",
-                            pluginName: name,
-                            ...(pluginSource(item) === undefined
-                              ? {}
-                              : { source: pluginSource(item) }),
-                          })
-                        }
-                      >
-                        卸载
-                      </button>
-                    ) : area === "skills" ? (
-                      <button
-                        onClick={() =>
-                          confirmMutation("删除技能", {
-                            kind: "deleteSkill",
-                            skillName: name,
-                            ...(locationUriOf(item)
-                              ? { locationUri: locationUriOf(item) }
-                              : {}),
-                          })
-                        }
-                      >
-                        删除
-                      </button>
-                    ) : null}
-                  </div>
-                )}
-              </article>
-            );
-          })}
-        </div>
+        <PluginManagementList
+          area={area}
+          rows={catalogueView.rows}
+          onMutate={(intent) => void mutate(intent)}
+          onConfirmMutation={confirmMutation}
+          onPrepareMcp={(item) => void prepareMcp(item)}
+        />
       )}
-      {!busy && isMarketCatalogue && visibleMarketTotal > MARKET_PREVIEW_COUNT ? (
-        <button
-          type="button"
-          className="webui-plugin-show-all"
-          onClick={() => setShowAllCatalogue((value) => !value)}
-        >
-          {showAllCatalogue
-            ? `收起${marketNoun}`
-            : marketTotal === null
-              ? `查看全部${marketNoun}`
-              : `查看全部 ${marketTotal} 个`}
-        </button>
-      ) : null}
       {dialog ? (
         <PluginItemDialog
           dialog={dialog}
           editing={editing}
           onSubmit={mutate}
           {...(onChatWithAgent ? { onChatWithAgent } : {})}
-          onClose={() => setDialog(null)}
+          onClose={detachItemDialog}
         />
       ) : null}
       {pluginImportDialog ? (
         <PluginImportDialog
           url={pluginUrl}
           onUrlChange={(value) => {
+            attachPluginImportDialog();
             setPluginUrl(value);
             setPluginPreview(undefined);
           }}
@@ -876,7 +607,7 @@ export function PluginCatalogue({
           busy={busy}
           onPreview={() => void previewPlugin()}
           onImport={() => void importPlugin()}
-          onClose={() => setPluginImportDialog(false)}
+          onClose={detachPluginImportDialog}
         />
       ) : null}
     </section>

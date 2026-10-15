@@ -17,6 +17,7 @@ yet, not that it publishes nothing.
 | composer | `WebuiComposerStore` | `claimQueueDestination` | `features/composer/application/composer-store.ts` |
 | composer | `WebuiComposerStore` | `getSnapshot` | `features/composer/application/composer-store.ts` |
 | composer | `WebuiComposerStore` | `purgeSlot` | `features/composer/application/composer-store.ts` |
+| composer | `WebuiComposerStore` | `queueClaimIsCurrent` | `features/composer/application/composer-store.ts` |
 | composer | `WebuiComposerStore` | `readDraft` | `features/composer/application/composer-store.ts` |
 | composer | `WebuiComposerStore` | `readHistory` | `features/composer/application/composer-store.ts` |
 | composer | `WebuiComposerStore` | `readMentionRange` | `features/composer/application/composer-store.ts` |

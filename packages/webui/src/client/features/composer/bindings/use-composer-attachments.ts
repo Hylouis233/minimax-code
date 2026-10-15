@@ -24,9 +24,6 @@ import {
   readWebuiSeedApplication,
   type WebuiComposerSeed,
 } from "../projection/seed-application.js";
-import { useWebuiComposerStore } from "../../../bindings/composer-store.js";
-
-type WebuiComposerStore = ReturnType<typeof useWebuiComposerStore>;
 
 /** One staged attachment projected onto the submission wire shape. */
 export interface WebuiComposerAttachmentWire {
@@ -40,7 +37,9 @@ export interface WebuiComposerAttachmentWire {
 }
 
 export interface UseComposerAttachmentsOptions {
-  readonly store: WebuiComposerStore;
+  readonly setStagedAttachments: (update: (current: readonly WebuiComposerAttachment[]) => readonly WebuiComposerAttachment[]) => void;
+  readonly setAttachmentBusy: (busy: boolean) => void;
+  readonly consumeSeed: (token: string) => void;
   /** The staged attachments, read from the store snapshot by the component. */
   readonly attachments: readonly WebuiComposerAttachment[];
   /** The token of the seed this composer already consumed, if any. */
@@ -74,27 +73,9 @@ function readBrowserFile(file: File): Promise<string> {
 export function useComposerAttachments(
   options: UseComposerAttachmentsOptions,
 ): ComposerAttachments {
-  const { store, attachments, seedToken, seedAttachment, setInteractionError } = options;
+  const { setStagedAttachments, setAttachmentBusy, consumeSeed, attachments, seedToken, seedAttachment, setInteractionError } = options;
 
-  const setAttachments = useCallback(
-    (
-      next:
-        | readonly WebuiComposerAttachment[]
-        | ((current: readonly WebuiComposerAttachment[]) => readonly WebuiComposerAttachment[]),
-    ) => {
-      store.setStaging((current) => ({
-        attachments: typeof next === "function" ? next(current.attachments) : next,
-      }));
-    },
-    [store],
-  );
-
-  const setAttachmentBusy = useCallback(
-    (next: boolean) => {
-      store.setStaging({ busy: next });
-    },
-    [store],
-  );
+  const setAttachments = useCallback(setStagedAttachments, [setStagedAttachments]);
 
   const addFiles = async (filesLike: FileList | readonly File[] | null) => {
     const files = filesLike ? Array.from(filesLike) : [];
@@ -141,14 +122,14 @@ export function useComposerAttachments(
     // Mark it consumed before anything that can bail. A seed the composer
     // refuses has to stay refused; retrying on every attachment change would
     // pin the error in place.
-    store.setStaging({ seedToken: decision.token });
+    consumeSeed(decision.token);
     if (decision.kind === "refused") {
       setInteractionError(decision.error);
       return;
     }
     setAttachments((current) => [...current, decision.attachment]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attachments, seedAttachment]);
+  }, [attachments, consumeSeed, seedAttachment]);
 
   const attachmentWire = attachments.map((attachment) => ({
     meta: {
@@ -162,7 +143,7 @@ export function useComposerAttachments(
 
   return {
     addFiles,
-    clearAttachments: () => setAttachments([]),
+    clearAttachments: () => setAttachments(() => []),
     removeAttachment: (id: string) => setAttachments((current) => current.filter((item) => item.id !== id)),
     attachmentWire,
   };

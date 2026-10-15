@@ -27,18 +27,32 @@ import { readFileSync } from "node:fs";
 
 import { describeWebuiMcpServerStatus } from "../../src/client/features/plugins/projection/mcp-status.js";
 
-const SOURCE = readFileSync(
-  new URL("../../src/client/features/plugins/ui/PluginCatalogue.tsx", import.meta.url),
+const MANAGEMENT_SOURCE = readFileSync(
+  new URL(
+    "../../src/client/features/plugins/ui/PluginManagementList.tsx",
+    import.meta.url,
+  ),
+  "utf8",
+);
+const VIEW_SOURCE = readFileSync(
+  new URL(
+    "../../src/client/features/plugins/projection/catalogue-view.ts",
+    import.meta.url,
+  ),
   "utf8",
 );
 
 describe("describeWebuiMcpServerStatus", () => {
   it("labels each runtime state a user can act on", () => {
-    expect(describeWebuiMcpServerStatus({ status: "available" })).toMatchObject({
-      key: "available",
-      label: "已连接",
-    });
-    expect(describeWebuiMcpServerStatus({ status: "configured" })).toMatchObject({
+    expect(describeWebuiMcpServerStatus({ status: "available" })).toMatchObject(
+      {
+        key: "available",
+        label: "已连接",
+      },
+    );
+    expect(
+      describeWebuiMcpServerStatus({ status: "configured" }),
+    ).toMatchObject({
       key: "configured",
       label: "未连接",
     });
@@ -50,7 +64,9 @@ describe("describeWebuiMcpServerStatus", () => {
       key: "error",
       label: "连接失败",
     });
-    expect(describeWebuiMcpServerStatus({ status: "unavailable" })).toMatchObject({
+    expect(
+      describeWebuiMcpServerStatus({ status: "unavailable" }),
+    ).toMatchObject({
       key: "unavailable",
       label: "不可用",
     });
@@ -81,8 +97,12 @@ describe("describeWebuiMcpServerStatus", () => {
     expect(describeWebuiMcpServerStatus({ status: "configured" }).tone).toBe(
       describeWebuiMcpServerStatus({ status: "disabled" }).tone,
     );
-    expect(describeWebuiMcpServerStatus({ status: "error" }).tone).not.toBe(neutral);
-    expect(describeWebuiMcpServerStatus({ status: "unavailable" }).tone).not.toBe(neutral);
+    expect(describeWebuiMcpServerStatus({ status: "error" }).tone).not.toBe(
+      neutral,
+    );
+    expect(
+      describeWebuiMcpServerStatus({ status: "unavailable" }).tone,
+    ).not.toBe(neutral);
   });
 
   it("treats a missing or unrecognized status as unknown, without inventing a reason", () => {
@@ -93,7 +113,9 @@ describe("describeWebuiMcpServerStatus", () => {
     // An unknown status with an error string still shows no reason: the
     // label 未知状态 claims nothing, and a reason under it would claim
     // something the reader cannot verify.
-    expect(describeWebuiMcpServerStatus({ status: 7, error: "x" }).reason).toBeUndefined();
+    expect(
+      describeWebuiMcpServerStatus({ status: 7, error: "x" }).reason,
+    ).toBeUndefined();
   });
 });
 
@@ -119,21 +141,32 @@ describe("the MCP row wiring", () => {
   });
 
   it("renders the status view on the row, reason included", () => {
-    const statusAt = SOURCE.indexOf('data-webui-mcp-status={mcpStatus.key}');
-    expect(statusAt, "the mcp row no longer renders the status chip").toBeGreaterThanOrEqual(0);
-    const row = SOURCE.slice(statusAt - 600, statusAt + 900);
-    expect(row).toContain('{mcpStatus.label}');
-    expect(row).toContain('{mcpStatus.reason}');
-    expect(row).toContain('data-webui-mcp-status-reason={mcpStatus.key}');
+    const statusAt = MANAGEMENT_SOURCE.indexOf(
+      "data-webui-mcp-status={row.mcpStatus.key}",
+    );
+    expect(
+      statusAt,
+      "the mcp row no longer renders the status chip",
+    ).toBeGreaterThanOrEqual(0);
+    const row = MANAGEMENT_SOURCE.slice(statusAt - 600, statusAt + 900);
+    expect(row).toContain("{row.mcpStatus.label}");
+    expect(row).toContain("{row.mcpStatus.reason}");
+    expect(row).toContain(
+      "data-webui-mcp-status-reason={row.mcpStatus.key}",
+    );
   });
 
   it("derives the view from the row item the list loads", () => {
-    const deriveAt = SOURCE.indexOf("describeWebuiMcpServerStatus(item)");
+    const deriveAt = VIEW_SOURCE.indexOf(
+      "mcpStatus: describeWebuiMcpServerStatus(source)",
+    );
     expect(deriveAt).toBeGreaterThanOrEqual(0);
-    // …and inside the row map, not somewhere orphaned from rendering.
-    const mapAt = SOURCE.indexOf(".map((item, index) => {");
+    // It is projected for the rows the catalogue receives, then consumed by the rendered row.
+    const mapAt = VIEW_SOURCE.indexOf(
+      ".map((source): WebuiPluginCatalogueRow => {",
+    );
     expect(mapAt).toBeGreaterThan(0);
     expect(deriveAt).toBeGreaterThan(mapAt);
-    expect(deriveAt - mapAt).toBeLessThan(2_000);
+    expect(MANAGEMENT_SOURCE).toContain("row.mcpStatus");
   });
 });

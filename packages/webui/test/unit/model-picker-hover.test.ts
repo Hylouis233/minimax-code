@@ -32,6 +32,11 @@ const picker = readFileSync(
   path.join(componentDir, "ModelPicker.tsx"),
   "utf8",
 );
+const interaction = readFileSync(
+  path.resolve(here, "../../src/client/features/models/bindings/use-model-picker-interaction.ts"),
+  "utf8",
+);
+const menu = readFileSync(path.join(componentDir, "ModelMenu.tsx"), "utf8");
 // The row rules' home is the Models projection (T03's responsibility cut); the
 // picker reads them from there. Read both, so "the rule exists" and "the picker
 // uses the rule" are separate assertions.
@@ -162,10 +167,10 @@ describe("model picker — the hover wiring", () => {
     // One timer, because two would be two answers to "is a panel pending". The
     // cleanup is what stops a hover paid out after the menu is gone from
     // opening a panel on a picker that is no longer on screen.
-    expect(picker).toContain("hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)");
-    expect(picker).toContain("const clearPendingHover = () => {");
-    expect(picker).toContain("clearTimeout(hoverTimer.current)");
-    expect(picker).toMatch(/useEffect\(\(\) => clearPendingHover, \[\]\)/u);
+    expect(interaction).toContain("hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)");
+    expect(interaction).toContain("const clearPendingHover = useCallback(() => {");
+    expect(interaction).toContain("clearTimeout(hoverTimer.current)");
+    expect(interaction).toMatch(/useEffect\(\(\) => clearPendingHover, \[clearPendingHover\]\)/u);
   });
 
   it("opens a panel only through the delayed arrival or the keyboard", () => {
@@ -174,18 +179,18 @@ describe("model picker — the hover wiring", () => {
     // whole list: the timer's callback, and the arrow keys — arrowing into a
     // row is a decision, not a pass over it, so it does not pay the delay. The
     // definition is `handleHoverRow = (` and so is not one of these.
-    expect(picker.match(/handleHoverRow\(/gu) ?? []).toHaveLength(2);
-    const delay = picker.slice(
-      picker.indexOf("hoverTimer.current = setTimeout("),
-      picker.indexOf("}, MODEL_FLYOUT_HOVER_DELAY_MS);"),
+    expect(interaction.match(/activateRow\(/gu) ?? []).toHaveLength(2);
+    const delay = interaction.slice(
+      interaction.indexOf("hoverTimer.current = setTimeout("),
+      interaction.indexOf("}, MODEL_FLYOUT_HOVER_DELAY_MS);"),
     );
-    expect(delay).toContain("handleHoverRow(key, rowId);");
-    const arrows = picker.slice(
-      picker.indexOf("const moveFocusedRow = (delta: number) => {"),
-      picker.indexOf("const searchIsEmpty ="),
+    expect(delay).toContain("activateRow(key, rowId);");
+    const arrows = interaction.slice(
+      interaction.indexOf("const moveFocusedRow = useCallback("),
+      interaction.indexOf("const onEscape ="),
     );
-    expect(arrows).toContain("handleHoverRow(row.key, row.rowId);");
-    expect(picker).toContain("}, MODEL_FLYOUT_HOVER_DELAY_MS);");
+    expect(arrows).toContain("activateRow(row.key, row.rowId);");
+    expect(interaction).toContain("}, MODEL_FLYOUT_HOVER_DELAY_MS);");
   });
 
   it("resolves a delayed row against the CURRENT catalogue, not the arrival's", () => {
@@ -193,10 +198,10 @@ describe("model picker — the hover wiring", () => {
     // callback closing over `models` would look the row up in a snapshot up to
     // one delay old — and open a panel for a model the catalogue has since
     // dropped.
-    expect(picker).toContain("const modelsRef = useRef(models);");
-    expect(picker).toContain("modelsRef.current = models;");
+    expect(interaction).toContain("const modelsRef = useRef(models);");
+    expect(interaction).toContain("modelsRef.current = models;");
     expect(
-      (picker.match(/modelsRef\.current\.find\(\(entry\) => modelKey\(entry\) === key\)/gu) ?? []),
+      (interaction.match(/modelsRef\.current\.find\(\(entry\) => modelKey\(entry\) === key\)/gu) ?? []),
     ).toHaveLength(2);
   });
 
@@ -206,17 +211,17 @@ describe("model picker — the hover wiring", () => {
     // to read. Both routes into the box retract — focusing it, and typing into
     // it, since a keystroke can unmount the very row the panel is anchored to
     // and leave it describing a model that is no longer in the list.
-    expect(picker).toContain("const retractFlyout = () => {");
+    expect(interaction).toContain("const retract = useCallback(() => {");
     // Since the cut (ticket #71) the field lives in `WebuiModelMenuCluster` and retracts through
     // the picker's own seams. Both routes are asserted ACROSS that boundary — the field asks
     // (`onFocus={onSearchFocus}`, and the keystroke's `onQueryChange`), and the picker's seam
     // performs the retraction. A no-op seam would leave the old form green while the panel
     // stopped going away, which is the defect this case exists for.
-    expect(picker).toContain("onFocus={onSearchFocus}");
-    expect(picker).toContain("onQueryChange(event.currentTarget.value);");
-    expect(picker).toContain("const handleSearchFocus = () => retractFlyout();");
-    expect(picker).toContain("const handleSearchChange = (value: string) => {");
-    expect(picker.slice(picker.indexOf("const handleSearchChange"), picker.indexOf("const handleSearchFocus"))).toContain("retractFlyout();");
+    expect(picker).toContain("onSearchFocus={interaction.retract}");
+    expect(picker).toContain("onQueryChange={(value) => {");
+    expect(picker).toContain("interaction.retract();");
+    expect(menu).toContain("onFocus={onSearchFocus}");
+    expect(menu).toContain("onQueryChange(event.currentTarget.value);");
   });
 
   it("keeps the row's highlight instant and its panel delayed", () => {
@@ -224,12 +229,12 @@ describe("model picker — the hover wiring", () => {
     // "where is the pointer" and is expected to be immediate; the panel is the
     // list making a claim about that row, and claims wait. Folding them back
     // into one handler is the regression this split exists to prevent.
-    expect(picker).toContain("onHoverIntent?: (key: string, rowId: string) => void;");
-    expect(picker).toContain("onHoverLeave?: (rowId: string) => void;");
-    expect(picker).toMatch(
+    expect(menu).toContain("onHoverIntent?: (key: string, rowId: string) => void;");
+    expect(menu).toContain("onHoverLeave?: (rowId: string) => void;");
+    expect(menu).toMatch(
       /onMouseEnter=\{\(\) => \{\s*\n\s*onHoverIntent\?\.\(key, rowId\);\s*\n\s*onFocus\(key, rowId\);/u,
     );
-    expect(picker).toContain("onMouseLeave={() => onHoverLeave?.(rowId)}");
+    expect(menu).toContain("onMouseLeave={() => onHoverLeave?.(rowId)}");
   });
 
   it("anchors the panel to the ROW, which a model key cannot name", () => {
@@ -238,13 +243,13 @@ describe("model picker — the hover wiring", () => {
     // Hovering the shortlist's line then opened the panel beside a different
     // line entirely, at the other end of the list.
     expect(rows).toContain("export function rowIdOf(groupId: string, key: string): string {");
-    expect(picker).toContain("const rowId = rowIdOf(group.id, key);");
-    expect(picker).toContain("rowElements.current.get(focused.rowId)");
+    expect(menu).toContain("const rowId = rowIdOf(group.id, key);");
+    expect(interaction).toContain("rowElements.current.get(focused.rowId)");
     // The keyboard walks rows for the same reason: a walk keyed by model would
     // step onto the shortlist's M3 and then the provider's M3, two presses for
     // one model.
-    expect(picker).toContain("rowId: rowIdOf(group.id, key)");
-    expect(picker).toContain("rows.findIndex((row) => row.rowId === focused.rowId)");
+    expect(interaction).toContain("rowId: rowIdOf(group.id, key)");
+    expect(interaction).toContain("rows.findIndex((row) => row.rowId === focused.rowId)");
   });
 
   it("cancels a pending hover when the pointer leaves a row, without retracting", () => {
@@ -252,9 +257,9 @@ describe("model picker — the hover wiring", () => {
     // departure may only call off a panel that has not opened yet. A
     // `setTier` in here is the regression: the panel would close under the
     // pointer and could not be clicked at all.
-    const leave = picker.slice(picker.indexOf("const handleHoverLeave = () => {"));
-    expect(leave.slice(0, leave.indexOf("};"))).toContain("clearPendingHover()");
-    expect(leave.slice(0, leave.indexOf("};"))).not.toContain("setTier");
+    const leave = interaction.slice(interaction.indexOf("const onHoverLeave = useCallback("));
+    expect(leave.slice(0, leave.indexOf("[clearPendingHover]"))).toContain("clearPendingHover()");
+    expect(leave.slice(0, leave.indexOf("[clearPendingHover]"))).not.toContain("setTier");
   });
 
   it("does not let the highlight cancel the hover it was queued with", () => {
@@ -263,12 +268,12 @@ describe("model picker — the hover wiring", () => {
     // handler that also called off the pending hover cancelled the panel the
     // pointer had just asked for, and the list silently stopped opening one at
     // all. The highlight moves; the timer belongs to the pointer.
-    const focus = picker.slice(
-      picker.indexOf("const handleRowFocus = (key: string, rowId: string) => {"),
+    const focus = interaction.slice(
+      interaction.indexOf("const focusRow = useCallback("),
+      interaction.indexOf("const activateRow ="),
     );
-    const body = focus.slice(0, focus.indexOf("};"));
-    expect(body).toContain("setFocusedRow({ key, rowId })");
-    expect(body).not.toContain("clearPendingHover");
-    expect(body).not.toContain("setTier");
+    expect(focus).toContain("setFocusedRow({ key, rowId })");
+    expect(focus).not.toContain("clearPendingHover");
+    expect(focus).not.toContain("setTier");
   });
 });
