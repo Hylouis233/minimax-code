@@ -386,6 +386,7 @@
       "packages/webui/test/unit/webui-stream.test.ts",
       "packages/webui/test/unit/webui-transcript-widgets-integration.test.ts",
       "packages/webui/test/unit/webui-transport-wire.test.ts",
+      "packages/webui/test/unit/webui-submission-admission.test.ts",
       "packages/webui/test/unit/webui-unary-operation-typing.test.ts",
       "packages/webui/test/unit/webui-usage-quota.test.ts",
       "packages/webui/test/unit/webui-w0-css-structure.test.ts",
