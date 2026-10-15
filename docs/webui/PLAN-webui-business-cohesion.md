@@ -346,7 +346,7 @@ one effective owner, a coherent import graph, and the applicable checks passing.
 | P02 | not started | | |
 | P03 | done | (this commit) | `test/unit/webui-unary-operation-typing.test.ts`; report under `…/business-cohesion-20261015/p03/evidence.md` |
 | P04 | done — D04 and D05 landed | (this commit) | `test/unit/model-provider-projection.test.ts`, `test/unit/webui-candidate-wire-compatibility.test.ts`; reports under `…/business-cohesion-20261015/p04/` and `…/p04b/` |
-| P05 | in progress — slice 1 landed (the Models editor policy module, not yet wired); Settings plumbing and browser evidence open | (this commit) | `test/unit/provider-editor.test.ts`; report under `…/business-cohesion-20261015/p05/` |
+| P05 | **done** — the editor is the Models policy, the Usage screen hosts one instance per visit above its custom-tab branch, and the provider form renders that editor's snapshot | `b1c2366c`, `8d2ed010`, `c4220980` | `test/unit/provider-editor.test.ts` (15), `test/unit/provider-form-panel.test.ts` (rewritten for the new home), `test/webui-browser/provider-form.spec.mjs` (4, whole browser suite 124 green); reports under `…/business-cohesion-20261015/p05/` |
 | P06 | not started | | |
 | P07 | not started | | |
 
