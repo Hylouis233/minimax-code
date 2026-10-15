@@ -36,7 +36,7 @@ describe("a provider change", () => {
     expect(workflows.getSnapshot().providers.value).toHaveLength(1);
     const before = workflows.getSnapshot().modelsRevision;
 
-    await workflows.createProvider({ providerId: "b" });
+    await workflows.createProvider({ baseUrl: "https://example.test", apiKey: "sk-test" });
     expect(workflows.getSnapshot().providers.value).toHaveLength(2);
     expect(workflows.getSnapshot().modelsRevision).toBe(before + 1);
   });
@@ -165,7 +165,7 @@ describe("the catalogue is keyed, not one destination", () => {
     const pending = workflows.loadModels();
     expect(workflows.getSnapshot().models.status).toBe("loading");
 
-    await workflows.createProvider({ providerId: "b" });
+    await workflows.createProvider({ baseUrl: "https://example.test", apiKey: "sk-test" });
     resolveRead([model("stale")]);
     await pending;
 

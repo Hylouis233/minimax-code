@@ -410,7 +410,7 @@ class FullPort implements WebuiHarnessPort {
 }
 
 describe("WebUI host-shape invariant (batch C seam)", () => {
-  it("keeps candidate-test record validation and converts fields only in the runtime adapter", async () => {
+  it("requires the candidate and the model id at ingress and forwards the checked body", async () => {
     const calls: unknown[] = [];
     const port = createHarnessPortFromHost({
       cliService: {
@@ -421,29 +421,33 @@ describe("WebUI host-shape invariant (batch C seam)", () => {
       },
     } as never);
 
-    for (const raw of [{ candidate: { id: "candidate" } }, { modelId: "model-1" }, { candidate: null, modelId: "model-2" }]) {
+    // The validator requires both halves of the request; a body missing either
+    // one never reaches the adapter (D05).
+    for (const raw of [{ candidate: { baseUrl: "https://example.test" } }, { modelId: "model-1" }]) {
       const validation = testUserModelCandidateOperation.validate(raw);
-      expect(validation).toEqual({ ok: true, body: raw });
-      if (validation.ok) await port.testUserModelCandidate(validation.body);
+      expect(validation).toMatchObject({ ok: false, code: "invalid_body" });
     }
-    expect(calls).toEqual([
-      { candidate: { id: "candidate" }, modelId: undefined },
-      { candidate: undefined, modelId: "model-1" },
-      { candidate: null, modelId: "model-2" },
-    ]);
-
-    const legacyRecordValidation = (body: unknown) =>
-      body !== null && typeof body === "object" && !Array.isArray(body)
-        ? { ok: true, body: body as Record<string, unknown> }
-        : { ok: false, code: "invalid_body", message: "testUserModelCandidate body must be an object" };
     for (const invalid of [null, undefined, [], "candidate"]) {
-      expect(testUserModelCandidateOperation.validate(invalid)).toEqual(legacyRecordValidation(invalid));
+      expect(testUserModelCandidateOperation.validate(invalid)).toMatchObject({
+        ok: false,
+        code: "invalid_body",
+      });
     }
-    expect(testUserModelCandidateOperation.validate(null)).toEqual({
-      ok: false,
-      code: "invalid_body",
-      message: "testUserModelCandidate body must be an object",
-    });
+
+    // A checked body is forwarded unchanged, extensions included: the adapter
+    // converts nothing the ingress already accepted.
+    const candidate = {
+      providerId: "p1",
+      baseUrl: "https://example.test/v1",
+      apiKey: "sk-test",
+      apiFormat: "openai",
+      models: [{ modelId: "m1" }],
+      futureField: { nested: [1] },
+    };
+    const validation = testUserModelCandidateOperation.validate({ candidate, modelId: "model-1" });
+    expect(validation).toEqual({ ok: true, body: { candidate, modelId: "model-1" } });
+    if (validation.ok) await port.testUserModelCandidate(validation.body);
+    expect(calls).toEqual([{ candidate, modelId: "model-1" }]);
   });
 
   it("forwards workspace review requests and snapshot ids through the runtime host", async () => {

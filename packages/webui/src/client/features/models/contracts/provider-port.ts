@@ -7,7 +7,14 @@
 //
 // Every method stays optional — `undefined` means "the operation is not wired".
 
-import type { WebuiModelEntry } from "../../../../shared/contracts/models.js";
+import type {
+  WebuiCreateUserModelProviderRequest,
+  WebuiDiscoverUserModelsCandidateRequest,
+  WebuiModelEntry,
+  WebuiSaveUserModelProviderCandidateRequest,
+  WebuiTestUserModelCandidateRequest,
+  WebuiUpdateUserModelProviderRequest,
+} from "../../../../shared/contracts/models.js";
 import type { WebuiModelSelectionRequest } from "./model-view.js";
 
 export interface ModelsPort {
@@ -19,10 +26,10 @@ export interface ModelsPort {
   ) => Promise<{ readonly success?: boolean }>;
   readonly listUserModelProviders?: () => Promise<readonly Record<string, unknown>[]>;
   readonly createUserModelProvider?: (
-    request: Record<string, unknown>,
+    request: WebuiCreateUserModelProviderRequest,
   ) => Promise<unknown>;
   readonly updateUserModelProvider?: (
-    request: Record<string, unknown>,
+    request: WebuiUpdateUserModelProviderRequest,
   ) => Promise<unknown>;
   readonly deleteUserModelProvider?: (providerId: string) => Promise<unknown>;
   readonly testUserModelProvider?: (request: { readonly providerId: string; readonly apiKey?: string }) => Promise<unknown>;
@@ -31,17 +38,19 @@ export interface ModelsPort {
     readonly modelId: string;
   }) => Promise<unknown>;
   readonly discoverUserModelsCandidate?: (
-    request: Record<string, unknown>,
+    request: WebuiDiscoverUserModelsCandidateRequest,
   ) => Promise<unknown>;
   readonly saveUserModelProviderCandidate?: (
-    request: Record<string, unknown>,
+    request: WebuiSaveUserModelProviderCandidateRequest,
   ) => Promise<unknown>;
   readonly listProviderPresets?: () => Promise<readonly Record<string, unknown>[]>;
   readonly upsertMiniMaxApiKey?: (request: {
     readonly apiKey: string;
     readonly saveAndUse?: boolean;
   }) => Promise<unknown>;
-  readonly testUserModelCandidate?: (request: { readonly candidate: Record<string, unknown>; readonly modelId: string }) => Promise<unknown>;
+  readonly testUserModelCandidate?: (
+    request: WebuiTestUserModelCandidateRequest,
+  ) => Promise<unknown>;
   readonly revealModelProviderApiKey?: (request: { readonly providerId: string }) => Promise<string>;
   readonly refreshModels?: () => Promise<unknown>;
 }

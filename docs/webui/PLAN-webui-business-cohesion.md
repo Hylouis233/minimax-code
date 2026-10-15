@@ -345,7 +345,7 @@ one effective owner, a coherent import graph, and the applicable checks passing.
 | P01 | in progress — slice 1 landed (creation use case + store guards, no production switch) | (this commit) | `test/unit/task-session-workflows.test.ts`; report under `…/business-cohesion-20261015/p01/slice-1-evidence.md` |
 | P02 | not started | | |
 | P03 | done | (this commit) | `test/unit/webui-unary-operation-typing.test.ts`; report under `…/business-cohesion-20261015/p03/evidence.md` |
-| P04 | not started | | |
+| P04 | in progress — D05 landed (five provider write bodies validated at ingress); D04 not started | (this commit) | `test/unit/webui-candidate-wire-compatibility.test.ts`; report under `…/business-cohesion-20261015/p04/` |
 | P05 | not started | | |
 | P06 | not started | | |
 | P07 | not started | | |

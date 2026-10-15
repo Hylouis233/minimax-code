@@ -120,7 +120,7 @@ describe("models commands move the configuration generation", () => {
       listUserModelProviders: async () => [],
       createUserModelProvider: async () => ({ ok: true }),
     });
-    await workflows.createProvider({ providerId: "b" });
+    await workflows.createProvider({ baseUrl: "https://example.test", apiKey: "sk-test" });
     expect(identityEpochs.configuration().generation).toBe(1);
     expect(identityEpochs.credentials().generation).toBe(0);
   });
@@ -132,7 +132,7 @@ describe("models commands move the configuration generation", () => {
         throw new Error("runtime refused");
       },
     });
-    await expect(workflows.createProvider({ providerId: "b" })).rejects.toThrow(
+    await expect(workflows.createProvider({ baseUrl: "https://example.test", apiKey: "sk-test" })).rejects.toThrow(
       "runtime refused",
     );
     expect(identityEpochs.configuration().generation).toBe(0);

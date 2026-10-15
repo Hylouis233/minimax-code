@@ -188,7 +188,15 @@ import type {
   WebuiWorkspaceReviewSummary,
 } from "./contracts/review.js";
 import type { WebuiCanvasDocument } from "./contracts/canvas.js";
-import type { WebuiModelEntry, WebuiSkillEntry } from "./contracts/models.js";
+import type {
+  WebuiCreateUserModelProviderRequest,
+  WebuiDiscoverUserModelsCandidateRequest,
+  WebuiModelEntry,
+  WebuiSaveUserModelProviderCandidateRequest,
+  WebuiSkillEntry,
+  WebuiTestUserModelCandidateRequest,
+  WebuiUpdateUserModelProviderRequest,
+} from "./contracts/models.js";
 import type { WebuiVersionInfo } from "./contracts/version.js";
 import type { WebuiUsageQuotaResult } from "./contracts/usage-quota.js";
 import type {
@@ -215,10 +223,9 @@ import type { WebuiPluginManagementRequest } from "./plugin-management.js";
  *
  * `request` is the *validated* body — what the operation's validator hands to
  * the handler, not the raw frame. Where a validator only checks that the frame
- * is a record and forwards it (for example `testUserModelCandidate`), the
- * request type says so honestly (`Record<string, unknown>`) rather than
- * pretending a narrower shape was verified; the runtime adapter keeps the
- * conversion.
+ * is a record and forwards it (for example `writeTerminal`), the request type
+ * says so honestly (`Record<string, unknown>`) rather than pretending a narrower
+ * shape was verified; the runtime adapter keeps the conversion.
  *
  * `response` is the body the handler sends back, i.e. the unwrapped
  * `WebuiOperationResult.body`, never the frame envelope.
@@ -492,8 +499,8 @@ export interface OperationSpec {
     request: undefined;
     response: readonly Record<string, unknown>[];
   };
-  createUserModelProvider: { request: Record<string, unknown>; response: unknown };
-  updateUserModelProvider: { request: Record<string, unknown>; response: unknown };
+  createUserModelProvider: { request: WebuiCreateUserModelProviderRequest; response: unknown };
+  updateUserModelProvider: { request: WebuiUpdateUserModelProviderRequest; response: unknown };
   deleteUserModelProvider: { request: { readonly providerId: string }; response: unknown };
   testUserModelProvider: {
     request: { readonly providerId: string; readonly apiKey?: string };
@@ -503,8 +510,14 @@ export interface OperationSpec {
     request: { readonly providerId: string; readonly modelId: string };
     response: unknown;
   };
-  discoverUserModelsCandidate: { request: Record<string, unknown>; response: unknown };
-  saveUserModelProviderCandidate: { request: Record<string, unknown>; response: unknown };
+  discoverUserModelsCandidate: {
+    request: WebuiDiscoverUserModelsCandidateRequest;
+    response: unknown;
+  };
+  saveUserModelProviderCandidate: {
+    request: WebuiSaveUserModelProviderCandidateRequest;
+    response: unknown;
+  };
   listProviderPresets: { request: undefined; response: readonly Record<string, unknown>[] };
   getMiniMaxApiKeyStatus: { request: undefined; response: Record<string, unknown> };
   upsertMiniMaxApiKey: {
@@ -520,7 +533,7 @@ export interface OperationSpec {
     request: { readonly source: "token_plan" | "minimax_api_key" };
     response: "token_plan" | "minimax_api_key";
   };
-  testUserModelCandidate: { request: Record<string, unknown>; response: unknown };
+  testUserModelCandidate: { request: WebuiTestUserModelCandidateRequest; response: unknown };
   revealModelProviderApiKey: { request: { readonly providerId: string }; response: string };
   startCodexOAuthLogin: { request: Record<string, unknown>; response: unknown };
   cancelCodexOAuthLogin: { request: { readonly loginId: string }; response: unknown };

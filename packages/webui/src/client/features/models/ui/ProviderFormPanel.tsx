@@ -24,6 +24,13 @@ import { CSS } from "@dnd-kit/utilities";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { reorderModelIds } from "../projection/model-reorder.js";
 import { projectProviderHeaders, type ProviderHeaderDraft } from "../projection/usage-settings.js";
+import type {
+  WebuiDiscoverUserModelsCandidateRequest,
+  WebuiSaveUserModelProviderCandidateRequest,
+  WebuiTestUserModelCandidateRequest,
+  WebuiUpdateUserModelProviderRequest,
+  WebuiUserModelInput,
+} from "../../../../shared/contracts/models.js";
 import { recordOf, textOf } from "../../../contracts/value-readers.js";
 import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
 import { CloseIcon, IconButton, RefreshIcon } from "../../settings/ui/settings-atoms.js";
@@ -39,11 +46,17 @@ export interface WebuiProviderFormCommands {
   readonly loadPresets: () => Promise<void>;
   readonly revealApiKey: (providerId: string) => Promise<string>;
   readonly testModel: (body: { readonly providerId: string; readonly modelId: string }) => Promise<unknown>;
-  readonly discoverCandidate: (body: Record<string, unknown>) => Promise<unknown>;
-  readonly testCandidate: (body: { readonly candidate: Record<string, unknown>; readonly modelId: string }) => Promise<unknown>;
-  readonly saveCandidate: (body: Record<string, unknown>) => Promise<unknown>;
+  readonly discoverCandidate: (
+    body: WebuiDiscoverUserModelsCandidateRequest,
+  ) => Promise<unknown>;
+  readonly testCandidate: (body: WebuiTestUserModelCandidateRequest) => Promise<unknown>;
+  readonly saveCandidate: (
+    body: WebuiSaveUserModelProviderCandidateRequest,
+  ) => Promise<unknown>;
   readonly deleteProvider: (providerId: string) => Promise<unknown>;
-  readonly updateProvider: (body: Record<string, unknown>) => Promise<unknown>;
+  readonly updateProvider: (
+    body: WebuiUpdateUserModelProviderRequest,
+  ) => Promise<unknown>;
   readonly patchProviderModels: (providerId: string, models: readonly Record<string, unknown>[]) => void;
 }
 
@@ -79,6 +92,18 @@ export interface WebuiProviderFormPanelProps {
 
 function providerModels(provider: Record<string, unknown>): Record<string, unknown>[] {
   return Array.isArray(provider.models) ? provider.models.filter((item): item is Record<string, unknown> => item !== null && typeof item === "object") : [];
+}
+
+/**
+ * The provider rows the catalogue read hands back are open records; a model
+ * reorder or toggle writes them back as declared model inputs. The id is read
+ * out explicitly because it is the one field a model input requires and the row
+ * is not yet typed at this boundary.
+ */
+function toModelInputs(
+  rows: readonly Record<string, unknown>[],
+): readonly WebuiUserModelInput[] {
+  return rows.map((row) => ({ ...row, modelId: textOf(row.modelId) }));
 }
 
 function ProviderPresetPicker({ presets, selected, selectedName, onSelect }: { readonly presets: readonly Record<string, unknown>[]; readonly selected: string; readonly selectedName: string; readonly onSelect: (preset?: Record<string, unknown>) => void }): ReactElement {
@@ -183,7 +208,7 @@ export function ProviderFormPanel({
       // Show the toggle immediately; the owner reloads the truth after the write
       // and rolls the patch back if the write fails.
       commands.patchProviderModels(providerId, nextModels);
-      try { await commands.updateProvider({ providerId, models: nextModels }); }
+      try { await commands.updateProvider({ providerId, models: toModelInputs(nextModels) }); }
       catch (error) { setProviderActionError(error instanceof Error ? error.message : String(error)); }
     };
   return <>
@@ -207,7 +232,7 @@ export function ProviderFormPanel({
             // Optimistic like the toggle: the row moves at once, the write
             // follows, and a failure reloads the truth.
             commands.patchProviderModels(id, nextModels);
-            await commands.updateProvider({ providerId: id, models: nextModels });
+            await commands.updateProvider({ providerId: id, models: toModelInputs(nextModels) });
           }}><SortableContext items={ids} strategy={verticalListSortingStrategy}><div className="w-full rounded-[16px] bg-bg_grouped_tertiary p-1">{models.map((model, index) => <SortableModelRow key={ids[index]} id={ids[index]!} model={model} onTest={() => void commands.testModel({ providerId: id, modelId: textOf(model.modelId) })} onToggle={(enabled) => void toggleModel(id, model, enabled)} />)}</div></SortableContext></DndContext> : null}
         </div>;
       })}

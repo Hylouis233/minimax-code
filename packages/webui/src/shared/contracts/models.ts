@@ -68,3 +68,125 @@ export interface WebuiSkillEntry {
   readonly displayName?: string;
   readonly description?: string;
 }
+
+/* ------------------------------------------------------------------ *
+ * Provider write requests (P04 / D05).
+ *
+ * These mirror the runtime's real provider inputs
+ * (`packages/local-runtime-v2/src/application/session/process-local-application-contract.ts`,
+ * `modelProviders`), field for field. They are **request** types, so their
+ * extension data stays open: the runtime forwards fields it does not know, and a
+ * validator that rebuilt a lossy whitelist would drop them. The read DTOs are
+ * closed instead — a known read must not carry an index signature.
+ * ------------------------------------------------------------------ */
+
+/**
+ * One model entry submitted with a provider create, update or candidate. Mirrors
+ * the runtime's `UserModelInputView`.
+ */
+export interface WebuiUserModelInput {
+  readonly modelId: string;
+  readonly displayName?: string;
+  readonly configurationSource?: string;
+  readonly enabled?: boolean;
+  readonly attachment?: boolean;
+  readonly reasoning?: boolean;
+  readonly toolCall?: boolean;
+  readonly temperature?: boolean;
+  readonly capabilities?: Record<string, unknown>;
+  readonly modalities?: {
+    readonly input?: readonly string[];
+    readonly output?: readonly string[];
+  };
+  readonly limit?: { readonly context?: number; readonly output?: number };
+  readonly thinkingConfig?: { readonly mode?: string; readonly defaultValue?: string };
+  readonly effortOptions?: readonly string[];
+  /** Extensions the runtime supports today or grows later; forwarded unchanged. */
+  readonly [extension: string]: unknown;
+}
+
+/**
+ * The candidate a discovery, save or test call carries. `baseUrl` is the one
+ * field every call requires; the saved-provider branch adds
+ * `providerId` + `expectedRevision`, the new-provider branch adds
+ * `name` + `apiKey` + `apiFormat` (see the discovery request below).
+ */
+export interface WebuiModelProviderCandidateInput {
+  readonly providerId?: string;
+  readonly expectedRevision?: string;
+  readonly name?: string;
+  readonly baseUrl: string;
+  readonly apiKey?: string;
+  readonly apiFormat?: string;
+  readonly headers?: Readonly<Record<string, string>>;
+  readonly removeHeaders?: readonly string[];
+  readonly models?: readonly WebuiUserModelInput[];
+  readonly [extension: string]: unknown;
+}
+
+/** `createUserModelProvider`: a new provider needs its endpoint and its key. */
+export interface WebuiCreateUserModelProviderRequest {
+  readonly name?: string;
+  readonly baseUrl: string;
+  readonly apiKey: string;
+  readonly apiFormat?: string;
+  readonly headers?: Readonly<Record<string, string>>;
+  readonly models?: readonly WebuiUserModelInput[];
+  readonly saveAndUse?: boolean;
+  readonly [extension: string]: unknown;
+}
+
+/**
+ * `updateUserModelProvider`: every patch field is optional, and an empty
+ * `apiKey` is meaningful — it clears the stored key, where omitting it keeps it.
+  * That three-way distinction is the runtime's (`normalizeApiKeyUpdate`).
+ */
+export interface WebuiUpdateUserModelProviderRequest {
+  readonly providerId: string;
+  readonly name?: string;
+  readonly baseUrl?: string;
+  readonly apiKey?: string;
+  readonly apiFormat?: string;
+  readonly headers?: Readonly<Record<string, string>>;
+  readonly removeHeaders?: readonly string[];
+  readonly enabled?: boolean;
+  readonly models?: readonly WebuiUserModelInput[];
+  readonly saveAndUse?: boolean;
+  readonly [extension: string]: unknown;
+}
+
+/**
+ * `discoverUserModelsCandidate`: exactly one of the runtime's two branches, both
+ * carrying the endpoint. A half-filled branch is a rejection, not a defaulted
+ * request — the runtime's input type is a union and never an optional bag.
+ */
+export type WebuiDiscoverUserModelsCandidateRequest = {
+  readonly baseUrl: string;
+  readonly [extension: string]: unknown;
+} & (
+  | { readonly providerId: string; readonly expectedRevision: string }
+  | { readonly name: string; readonly apiKey: string; readonly apiFormat: string }
+);
+
+/** `saveUserModelProviderCandidate`: the nested candidate plus the outer save options. */
+export interface WebuiSaveUserModelProviderCandidateRequest {
+  readonly candidate: WebuiModelProviderCandidateInput;
+  /** Optional: the panel submits the first typed model id, which may be blank. */
+  readonly modelId?: string;
+  readonly saveAndUse?: boolean;
+  readonly skipConnectionTest?: boolean;
+  readonly [extension: string]: unknown;
+}
+
+/** `testUserModelCandidate`: the nested candidate and the model to probe. */
+export interface WebuiTestUserModelCandidateRequest {
+  readonly candidate: WebuiModelProviderCandidateInput;
+  readonly modelId: string;
+  readonly [extension: string]: unknown;
+}
+
+/** One discovered model, as discovery answers it. */
+export interface WebuiDiscoveredModel {
+  readonly modelId: string;
+  readonly displayName?: string;
+}

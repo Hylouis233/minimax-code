@@ -27,7 +27,14 @@ import {
   type WebuiResourceKey,
 } from "../../../conversation/request-freshness.js";
 import type { ModelsPort } from "../contracts/provider-port.js";
-import type { WebuiModelEntry } from "../../../../shared/contracts/models.js";
+import type {
+  WebuiCreateUserModelProviderRequest,
+  WebuiDiscoverUserModelsCandidateRequest,
+  WebuiModelEntry,
+  WebuiSaveUserModelProviderCandidateRequest,
+  WebuiTestUserModelCandidateRequest,
+  WebuiUpdateUserModelProviderRequest,
+} from "../../../../shared/contracts/models.js";
 import {
   createWebuiQueryStore,
   idleWebuiQueryState,
@@ -97,8 +104,12 @@ export interface WebuiModelsWorkflows {
     providerId: string,
     models: readonly Record<string, unknown>[],
   ) => void;
-  readonly createProvider: (body: Record<string, unknown>) => Promise<unknown>;
-  readonly updateProvider: (body: Record<string, unknown>) => Promise<unknown>;
+  readonly createProvider: (
+    body: WebuiCreateUserModelProviderRequest,
+  ) => Promise<unknown>;
+  readonly updateProvider: (
+    body: WebuiUpdateUserModelProviderRequest,
+  ) => Promise<unknown>;
   readonly deleteProvider: (providerId: string) => Promise<unknown>;
   readonly testProvider: (body: {
     readonly providerId: string;
@@ -108,12 +119,15 @@ export interface WebuiModelsWorkflows {
     readonly providerId: string;
     readonly modelId: string;
   }) => Promise<unknown>;
-  readonly discoverCandidate: (body: Record<string, unknown>) => Promise<unknown>;
-  readonly saveCandidate: (body: Record<string, unknown>) => Promise<unknown>;
-  readonly testCandidate: (body: {
-    readonly candidate: Record<string, unknown>;
-    readonly modelId: string;
-  }) => Promise<unknown>;
+  readonly discoverCandidate: (
+    body: WebuiDiscoverUserModelsCandidateRequest,
+  ) => Promise<unknown>;
+  readonly saveCandidate: (
+    body: WebuiSaveUserModelProviderCandidateRequest,
+  ) => Promise<unknown>;
+  readonly testCandidate: (
+    body: WebuiTestUserModelCandidateRequest,
+  ) => Promise<unknown>;
   readonly revealApiKey: (providerId: string) => Promise<string>;
   readonly loadPresets: () => Promise<void>;
   readonly upsertApiKey: (body: {
@@ -297,14 +311,14 @@ export function createWebuiModelsWorkflows(deps: {
     });
   };
 
-  const createProvider = async (body: Record<string, unknown>): Promise<unknown> => {
+  const createProvider = async (body: WebuiCreateUserModelProviderRequest): Promise<unknown> => {
     if (!port.createUserModelProvider) throw new Error("当前运行时不支持自定义提供商。");
     const result = await port.createUserModelProvider(body);
     await afterProviderMutation();
     return result;
   };
 
-  const updateProvider = async (body: Record<string, unknown>): Promise<unknown> => {
+  const updateProvider = async (body: WebuiUpdateUserModelProviderRequest): Promise<unknown> => {
     if (!port.updateUserModelProvider) throw new Error("当前运行时不支持自定义提供商。");
     try {
       const result = await port.updateUserModelProvider(body);
@@ -340,22 +354,19 @@ export function createWebuiModelsWorkflows(deps: {
     return port.testUserModel(body);
   };
 
-  const discoverCandidate = async (body: Record<string, unknown>): Promise<unknown> => {
+  const discoverCandidate = async (body: WebuiDiscoverUserModelsCandidateRequest): Promise<unknown> => {
     if (!port.discoverUserModelsCandidate) throw new Error("当前运行时不支持模型发现。");
     return port.discoverUserModelsCandidate(body);
   };
 
-  const saveCandidate = async (body: Record<string, unknown>): Promise<unknown> => {
+  const saveCandidate = async (body: WebuiSaveUserModelProviderCandidateRequest): Promise<unknown> => {
     if (!port.saveUserModelProviderCandidate) throw new Error("当前运行时不支持保存提供商。");
     const result = await port.saveUserModelProviderCandidate(body);
     await afterProviderMutation();
     return result;
   };
 
-  const testCandidate = async (body: {
-    readonly candidate: Record<string, unknown>;
-    readonly modelId: string;
-  }): Promise<unknown> => {
+  const testCandidate = async (body: WebuiTestUserModelCandidateRequest): Promise<unknown> => {
     if (!port.testUserModelCandidate) throw new Error("当前运行时不支持模型测试。");
     return port.testUserModelCandidate(body);
   };
