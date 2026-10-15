@@ -81,7 +81,7 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
     readonly planMode?: boolean;
     readonly createSessionWorkspaceDir?: string;
     readonly teamModeOff?: boolean;
-  }, clearStaging: () => void, settlement: { queued: boolean; needsSession: boolean; sessionId?: string; queueGeneration?: number }, onSessionCreated?: (sessionId: string) => void): Promise<WebuiSubmissionOperation | undefined> => deps.turnCommandsFor(sessionId).send({
+  }, clearStaging: () => void, settlement: { needsSession: boolean; sessionId?: string; queueGeneration?: number }, onSessionCreated?: (sessionId: string) => void): Promise<WebuiSubmissionOperation | undefined> => deps.turnCommandsFor(sessionId).send({
     message: turn.message,
     ...(turn.clientIntent ? { clientIntent: turn.clientIntent } : {}),
     ...(turn.planMode ? { planMode: true } : {}),
@@ -92,18 +92,14 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
     onAttachmentsSubmitted: clearStaging,
     callbacks: {
       onDraftChange: setDraft,
-      onNeedsSession: () => { settlement.needsSession = true; },
+
       onSessionCreated: (createdSessionId) => {
         settlement.sessionId = createdSessionId;
         deps.adoptHomeSession(createdSessionId);
         onSessionCreated?.(createdSessionId);
         if (turn.sending) settlement.queueGeneration = queueCommands.captureDestination(createdSessionId);
       },
-      onQueued: () => {
-        settlement.queued = true;
-        const destination = settlement.sessionId ?? sessionId;
-        if (destination) refreshQueue(destination, settlement.queueGeneration);
-      },
+
     },
   });
 
@@ -215,11 +211,15 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
       if (resolved.clientIntent === "plan-entry") deps.store.setModes({ goal: false, plan: true });
       const message = (resolved.message ?? input.draft).trim();
       deps.store.setRetry({ session: sessionId, message });
-      const settlement: { queued: boolean; needsSession: boolean; sessionId?: string; queueGeneration?: number } = { queued: false, needsSession: false };
+      const settlement: { needsSession: boolean; sessionId?: string; queueGeneration?: number } = { needsSession: false };
       const clearStaging = (): void => deps.store.setStaging({ attachments: [], urlReferences: [] });
       if (input.sending && sessionId) settlement.queueGeneration = queueCommands.captureDestination(sessionId);
       if (!sessionId && input.sending && !deps.canEnqueue) return { kind: "ignored" };
-      await queueView(sessionId, {
+      // The submission reports what it decided; the settle flags it used to write back through
+      // callbacks are read off that transition instead (plan §5.5 P02 step 4). What could not move is
+      // the mid-flight half — clearing the draft and adopting the created session — because the
+      // writer's home→session migration depends on that ordering, so those stay callbacks.
+      const operation = await queueView(sessionId, {
         message,
         ...(resolved.clientIntent ? { clientIntent: resolved.clientIntent } : {}),
         attachments: input.attachments,
@@ -228,8 +228,13 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
         ...(input.createSessionWorkspaceDir ? { createSessionWorkspaceDir: input.createSessionWorkspaceDir } : {}),
         ...(input.teamModeOff ? { teamModeOff: true } : {}),
       }, clearStaging, settlement, input.onSessionCreated);
-      if (settlement.needsSession) return { kind: "needs-session", draft: input.draft };
-      if (settlement.queued) return { kind: "queued", sessionId: settlement.sessionId ?? sessionId!, ...(settlement.sessionId && !sessionId ? { createdSessionId: settlement.sessionId } : {}) };
+      if (operation?.completion.kind === "needs-session")
+        return { kind: "needs-session", draft: input.draft };
+      if (operation?.completion.kind === "queued") {
+        const destination = settlement.sessionId ?? sessionId;
+        if (destination) refreshQueue(destination, settlement.queueGeneration);
+        return { kind: "queued", sessionId: settlement.sessionId ?? sessionId!, ...(settlement.sessionId && !sessionId ? { createdSessionId: settlement.sessionId } : {}) };
+      }
       return { kind: "submitted", ...((settlement.sessionId ?? sessionId) ? { sessionId: settlement.sessionId ?? sessionId } : {}), ...(settlement.sessionId && !sessionId ? { createdSessionId: settlement.sessionId } : {}) };
     },
     retry: async ({ refusal, sessionId, ...input }) => {

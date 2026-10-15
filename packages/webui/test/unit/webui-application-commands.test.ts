@@ -434,6 +434,30 @@ describe("the assembled composer controller", () => {
     app.dispose();
   });
 
+  it("reports a submission that needs a session, keeping the draft it could not send", async () => {
+    const app = createWebuiApplication({
+      openEventChannel: () => ({ subscribe: () => () => undefined, close: () => undefined }),
+      turns: { resumeSession: vi.fn(async () => undefined) },
+      turnCapabilities: { sendMessage: vi.fn(async () => undefined) as never },
+      slices: createWebuiPortSlices({} as never),
+    });
+    app.start();
+
+    // No selected session and no `createSession` capability: the submission cannot open a turn, and
+    // the outcome says so rather than leaving the caller to infer it from a missing callback. The
+    // draft stays where the user left it. (P02 step 4: this used to be read off a settle flag that
+    // the submission wrote back through `onNeedsSession`.)
+    await expect(
+      app.composerController.submit({
+        draft: "needs a session",
+        sending: false,
+        goalEnabled: false,
+        agentName: "main",
+      }),
+    ).resolves.toEqual({ kind: "needs-session", draft: "needs a session" });
+    app.dispose();
+  });
+
   it("routes enqueue, goal and slash command through the assembled owners", async () => {
     const enqueueMessage = vi.fn(async () => ({}));
     const listQueueMessages = vi.fn(async () => ({ items: [{ itemId: "q1", content: "queued" }] }));
