@@ -1,5 +1,5 @@
 import type { WebuiAttachmentInput } from "../../../../shared/contracts/messages.js";
-import type { WebuiClientSessionCreator } from "../../sessions/contracts/session-port.js";
+import type { WebuiTaskSessionSubmitter } from "../../turn/contracts/submission.js";
 import type {
   WebuiStreamLoopSink,
   WebuiStreamLoopTransports,
@@ -27,7 +27,14 @@ export interface WebuiComposerSubmitArgs {
    */
   readonly deps: WebuiStreamLoopTransports;
   readonly enqueueMessage?: WebuiClientMessageEnqueuer;
-  readonly createSession?: WebuiClientSessionCreator;
+  /**
+   * The task use case the submission creates through (P01 step 4). It replaced a raw
+   * `createSession`: creation is single-flight per home incarnation, it transfers the home record
+   * under the destination-wins and purge guards, and it is what reports whether the created session
+   * may be selected. Absent means the host cannot create, which the submission reports as
+   * `unsupported`.
+   */
+  readonly submitTask?: WebuiTaskSessionSubmitter;
   readonly createSessionWorkspaceDir?: string;
   readonly teamModeOff?: boolean;
 }
@@ -41,12 +48,17 @@ export interface WebuiComposerSubmitHandlers {
   readonly createSink: () => WebuiStreamLoopSink;
   /** Reset the stream slice for a turn that is about to open. */
   readonly resetStreamForTurn: () => void;
+  /**
+   * The session a first message created, with the use case's selection decision: `selected` is false
+   * when the navigation claim that started the creation is no longer current, so the caller must not
+   * select a session the user has already navigated away from (rule 7).
+   */
+  readonly onSessionCreated?: (sessionId: string, selected: boolean) => void;
   /** Record (or clear) the refusal the transcript banner renders. */
   readonly setRefusal: (refusal: string | undefined) => void;
   readonly readStream?: () => WebuiStreamState;
   readonly setSending: (sending: boolean) => void;
   readonly onDraftChange: (next: string) => void;
   readonly onNeedsSession?: (draft: string) => void;
-  readonly onSessionCreated?: (sessionId: string) => void;
   readonly onQueued?: () => void;
 }

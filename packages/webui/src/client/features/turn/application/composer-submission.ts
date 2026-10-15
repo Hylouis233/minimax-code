@@ -110,29 +110,49 @@ export async function submitWebuiComposerTurn(
     // not a way to deliver a message.
     return record({ kind: "unsupported", missing: "transport" });
   }
+
   let sessionId = args.sessionId;
   let created = false;
   if (!sessionId) {
-    if (!args.createSession) {
+    const submitTask = args.submitTask;
+    if (!submitTask) {
       handlers.onNeedsSession?.(args.draft);
       return record({ kind: "needs-session" });
     }
+    let workspaceDir: string | undefined;
     try {
-      const result = await args.createSession({
-        name: "main",
-        ...createSessionWorkspaceField(args.createSessionWorkspaceDir),
-        teamModeOff: args.teamModeOff,
-      });
-      sessionId = createdWebuiSessionId(result);
-      if (!sessionId) throw new Error("createSession response did not include a session id");
-      created = true;
-      handlers.resetStreamForTurn();
-      handlers.onSessionCreated?.(sessionId);
+      // The validated field, then the raw value the use case takes.
+      workspaceDir = createSessionWorkspaceField(args.createSessionWorkspaceDir).workspaceDir;
     } catch (error) {
       const message = formatWebuiError(error);
       handlers.setRefusal(message);
       return record({ kind: "creation-failed", error: message });
     }
+    // The creation is the task use case's (P01): it is single-flight per home incarnation (D01), it
+    // transfers the home record onto the created session under the destination-wins and purge guards,
+    // it moves the composer's home slot and it refreshes the catalogue. Nothing here resets the
+    // stream after a create — that reset is what made an adopted destination unsafe, and the
+    // transferred record is the destination's now.
+    const outcome = await submitTask.submit({
+      name: "main",
+      ...(workspaceDir === undefined ? {} : { workspaceDir }),
+      ...(args.teamModeOff === undefined ? {} : { teamModeOff: args.teamModeOff }),
+    });
+    if (outcome.kind === "unsupported") {
+      // The host cannot create at all, which is the baseline's `onNeedsSession`: the user is asked for
+      // a session rather than told a capability is missing. (A missing *transport* is the other
+      // refusal, and it is checked before this branch.)
+      handlers.onNeedsSession?.(args.draft);
+      return record({ kind: "needs-session" });
+    }
+    if (outcome.kind === "busy") return record({ kind: "busy", reason: "creating" });
+    if (outcome.kind === "creation-failed") {
+      handlers.setRefusal(outcome.error);
+      return record({ kind: "creation-failed", error: outcome.error });
+    }
+    sessionId = outcome.sessionId;
+    created = true;
+    handlers.onSessionCreated?.(sessionId, outcome.selected);
   }
   if (args.sending) {
     if (!args.enqueueMessage) {

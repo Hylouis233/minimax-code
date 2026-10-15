@@ -15,7 +15,17 @@ import { shouldRecordWebuiComposerSubmission } from "../projection/composer-stat
 export interface WebuiComposerControllerDeps {
   readonly store: WebuiComposerStore;
   readonly readSelectedSessionId: () => string | undefined;
+  /**
+   * The full home→session adoption, still the goal path's (it creates through its own workflow until
+   * P01 step 4 moves that path to Goal).
+   */
   readonly adoptHomeSession: (sessionId: string) => void;
+  /**
+   * Select the session a *send* created. The send's transfer and composer adoption are the task use
+   * case's (P01 step 4), so all that is left for the caller is the selection — and only when the use
+   * case says the navigation claim that started the creation is still current.
+   */
+  readonly selectCreatedSession: (sessionId: string) => void;
   readonly turnCommandsFor: (sessionId: string | undefined) => WebuiConversationTurnCommands;
   readonly commandWorkflows: WebuiCommandWorkflows;
   readonly canEnqueue: boolean;
@@ -93,9 +103,12 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
     callbacks: {
       onDraftChange: setDraft,
 
-      onSessionCreated: (createdSessionId) => {
+      onSessionCreated: (createdSessionId, selected) => {
         settlement.sessionId = createdSessionId;
-        deps.adoptHomeSession(createdSessionId);
+        // The transfer and the composer's slot move are the task use case's now (P01 step 4), and
+        // they happened before this handler ran; what is left is the selection, and only while the
+        // navigation claim that started the creation is still current (rule 7).
+        if (selected) deps.selectCreatedSession(createdSessionId);
         onSessionCreated?.(createdSessionId);
         if (turn.sending) settlement.queueGeneration = queueCommands.captureDestination(createdSessionId);
       },

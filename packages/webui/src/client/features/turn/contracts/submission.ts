@@ -70,6 +70,28 @@ export type WebuiSubmissionCompletion =
   | { readonly kind: "queued"; readonly sessionId: string }
   | WebuiSubmissionRefusal;
 
+/**
+ * The task/session use case, as the submission needs it (P01 step 4). Declared structurally because
+ * the use case is the application's own module: what crosses is the capability, not the assembly.
+ *
+ * `busy` is D01: one creation per home incarnation, decided before any wire IO, with the input left
+ * alone. `selected` is rule 7: the created session is selected only while the navigation claim that
+ * started the creation is still current.
+ */
+export interface WebuiTaskSessionSubmitter {
+  readonly submit: (input: {
+    readonly name?: string;
+    readonly workspaceDir?: string;
+    readonly teamModeOff?: boolean;
+    readonly inputRevision?: number;
+  }) => Promise<
+    | { readonly kind: "created"; readonly sessionId: string; readonly selected: boolean }
+    | { readonly kind: "busy" }
+    | { readonly kind: "unsupported" }
+    | { readonly kind: "creation-failed"; readonly error: string }
+  >;
+}
+
 /** One submission's record: the decision that classified it and the completion that closed it. */
 export interface WebuiSubmissionOperation {
   readonly id: number;

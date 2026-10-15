@@ -1961,9 +1961,10 @@ describe("WebUI composer app-to-helper seam", () => {
 
   it("creates the first task silently and sends the original draft", async () => {
     const { handlerWrites, getState } = makeRecording();
-    const createSession = vi.fn(async (request) => ({
-      sessionId: request.workspaceDir === "/work/minimax-code" ? "created" : undefined,
-    }));
+    // Creation is the task use case's now (P01 step 4): the submission hands it the validated
+    // request and reads its answer. What this seam still owns is the workspace field it validates and
+    // the order of what follows.
+    const submit = vi.fn(async () => ({ kind: "created" as const, sessionId: "created", selected: true }));
     const sendMessage: WebuiClientMessageSender = vi.fn(
       async (request, onFrame) => {
         expect(request).toEqual({ id: "created", content: "start working" });
@@ -1977,7 +1978,7 @@ describe("WebUI composer app-to-helper seam", () => {
         draft: "start working",
         sending: false,
         deps: { sendMessage },
-        createSession,
+        submitTask: { submit },
         createSessionWorkspaceDir: "/work/minimax-code",
         teamModeOff: true,
       },
@@ -1989,12 +1990,12 @@ describe("WebUI composer app-to-helper seam", () => {
       }),
     );
 
-    expect(createSession).toHaveBeenCalledWith({
+    expect(submit).toHaveBeenCalledWith({
       name: "main",
       workspaceDir: "/work/minimax-code",
       teamModeOff: true,
     });
-    expect(onSessionCreated).toHaveBeenCalledWith("created");
+    expect(onSessionCreated).toHaveBeenCalledWith("created", true);
     expect(getState().phase).toBe("done");
   });
 
@@ -2004,9 +2005,9 @@ describe("WebUI composer app-to-helper seam", () => {
     // finished. The switch must happen between createSession and sendMessage.
     const { handlerWrites, getState } = makeRecording();
     const events: string[] = [];
-    const createSession = vi.fn(async () => {
+    const submit = vi.fn(async () => {
       events.push("create");
-      return { sessionId: "created" };
+      return { kind: "created" as const, sessionId: "created", selected: true };
     });
     const sendMessage: WebuiClientMessageSender = vi.fn(async (_request, onFrame) => {
       events.push("send");
@@ -2021,7 +2022,7 @@ describe("WebUI composer app-to-helper seam", () => {
         draft: "hi",
         sending: false,
         deps: { sendMessage },
-        createSession,
+        submitTask: { submit },
         createSessionWorkspaceDir: "/work/minimax-code",
         teamModeOff: false,
       },
@@ -2034,7 +2035,7 @@ describe("WebUI composer app-to-helper seam", () => {
     );
 
     expect(events).toEqual(["create", "session-created", "send"]);
-    expect(onSessionCreated).toHaveBeenCalledWith("created");
+    expect(onSessionCreated).toHaveBeenCalledWith("created", true);
     expect(getState().phase).toBe("done");
   });
 
@@ -2044,9 +2045,9 @@ describe("WebUI composer app-to-helper seam", () => {
     // default workspace, so an absent workspaceDir must flow through.
     const { handlerWrites, getState } = makeRecording();
     const requests: unknown[] = [];
-    const createSession = vi.fn(async (request) => {
+    const submit = vi.fn(async (request) => {
       requests.push(request);
-      return { sessionId: "created" };
+      return { kind: "created" as const, sessionId: "created", selected: true };
     });
     const sendMessage: WebuiClientMessageSender = vi.fn(async (_request, onFrame) => {
       onFrame({ dataJson: "[DONE]" });
@@ -2058,7 +2059,7 @@ describe("WebUI composer app-to-helper seam", () => {
         draft: "你好",
         sending: false,
         deps: { sendMessage },
-        createSession,
+        submitTask: { submit },
         // No createSessionWorkspaceDir — the folder pill is unset.
         teamModeOff: false,
       },
@@ -2070,12 +2071,10 @@ describe("WebUI composer app-to-helper seam", () => {
       }),
     );
 
-    expect(createSession).toHaveBeenCalledTimes(1);
-    expect(requests).toEqual([
-      { name: "main", workspaceDir: undefined, teamModeOff: false },
-    ]);
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(requests).toEqual([{ name: "main", teamModeOff: false }]);
     expect(sendMessage).toHaveBeenCalledTimes(1);
-    expect(onSessionCreated).toHaveBeenCalledWith("created");
+    expect(onSessionCreated).toHaveBeenCalledWith("created", true);
     expect(getState().phase).toBe("done");
   });
 
@@ -2112,7 +2111,7 @@ describe("WebUI composer app-to-helper seam", () => {
     // `workspaceDir must be an absolute path`. The submit path now fails with
     // a message that names the cause, without calling createSession.
     const { handlerWrites, getState } = makeRecording();
-    const createSession = vi.fn(async () => ({ sessionId: "created" }));
+    const submit = vi.fn(async () => ({ kind: "created" as const, sessionId: "created", selected: true }));
     const sendMessage: WebuiClientMessageSender = vi.fn(async () => undefined);
 
     await submitWebuiComposerTurn(
@@ -2120,7 +2119,7 @@ describe("WebUI composer app-to-helper seam", () => {
         draft: "hi",
         sending: false,
         deps: { sendMessage },
-        createSession,
+        submitTask: { submit },
         createSessionWorkspaceDir: "my-project",
         teamModeOff: false,
       },
@@ -2131,7 +2130,7 @@ describe("WebUI composer app-to-helper seam", () => {
       }),
     );
 
-    expect(createSession).not.toHaveBeenCalled();
+    expect(submit).not.toHaveBeenCalled();
     expect(sendMessage).not.toHaveBeenCalled();
     expect(getState().refusal).toContain("绝对路径");
   });
@@ -2139,9 +2138,9 @@ describe("WebUI composer app-to-helper seam", () => {
   it("passes an absolute workspace folder straight through to createSession", async () => {
     const { handlerWrites, getState } = makeRecording();
     const requests: unknown[] = [];
-    const createSession = vi.fn(async (request) => {
+    const submit = vi.fn(async (request) => {
       requests.push(request);
-      return { sessionId: "created" };
+      return { kind: "created" as const, sessionId: "created", selected: true };
     });
     const sendMessage: WebuiClientMessageSender = vi.fn(async (_request, onFrame) => {
       onFrame({ dataJson: "[DONE]" });
@@ -2152,7 +2151,7 @@ describe("WebUI composer app-to-helper seam", () => {
         draft: "hi",
         sending: false,
         deps: { sendMessage },
-        createSession,
+        submitTask: { submit },
         createSessionWorkspaceDir: "/work/minimax-code",
         teamModeOff: false,
       },

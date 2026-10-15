@@ -37,7 +37,10 @@ import {
   buildWebuiComposerHandlers,
   submitWebuiComposerTurn,
 } from "./composer-submission.js";
-import type { WebuiSubmissionOperation } from "../contracts/submission.js";
+import type {
+  WebuiSubmissionOperation,
+  WebuiTaskSessionSubmitter,
+} from "../contracts/submission.js";
 import { isWebuiSubscriptionProbeCurrent, ownsWebuiStreamGeneration, resolveWebuiSubscriptionRecheck, type WebuiStreamState } from "../projection/stream-state.js";
 import { streamRecoveryProjection } from "../projection/stream-recovery.js";
 import { runWebuiStreamLoop, type WebuiStreamLoopDeps } from "../../../conversation/stream-loop.js";
@@ -182,6 +185,11 @@ export function recoverMissedWebuiTurn(deps: WebuiRecoverMissedTurnDeps): void {
 export interface WebuiSendTurnArgs {
   readonly sessionId: string | undefined;
   readonly message: string;
+  /**
+   * The task use case, so a first message's creation goes through the one owner (P01 step 4).
+   * Absent on a host that cannot create, which the submission reports as `unsupported`.
+   */
+  readonly taskSessions?: WebuiTaskSessionSubmitter;
   readonly clientIntent?: string;
   readonly planMode?: boolean;
   readonly attachments?: readonly WebuiAttachmentInput[];
@@ -197,7 +205,6 @@ export interface WebuiSendTurnArgs {
   readonly readStream?: () => WebuiStreamState;
   readonly deps: Omit<WebuiStreamLoopDeps, "projection" | "streamState">;
   readonly enqueueMessage?: WebuiClientMessageEnqueuer;
-  readonly createSession?: WebuiClientSessionCreator;
   readonly createSessionWorkspaceDir?: string;
   readonly teamModeOff?: boolean;
   /**
@@ -230,8 +237,10 @@ export async function sendWebuiTurn(
     onDraftChange: args.callbacks.onDraftChange,
     ...(args.callbacks.onNeedsSession ? { onNeedsSession: args.callbacks.onNeedsSession } : {}),
     ...(args.callbacks.onQueued ? { onQueued: args.callbacks.onQueued } : {}),
-    onSessionCreated: (createdSessionId) => {
-      args.callbacks.onSessionCreated?.(createdSessionId);
+    onSessionCreated: (createdSessionId, selected) => {
+      args.callbacks.onSessionCreated?.(createdSessionId, selected);
+      // The writer moves whatever the use case decided about selection: the attempt's frames belong to
+      // the session it created, whether or not the view follows the user there.
       if (writer.kind === "home" && writer.migrateToSession) {
         writer = writer.migrateToSession(createdSessionId);
       }
@@ -255,7 +264,7 @@ export async function sendWebuiTurn(
       sending: args.sending,
       deps: args.deps,
       enqueueMessage: args.enqueueMessage,
-      createSession: args.createSession,
+      ...(args.taskSessions ? { submitTask: args.taskSessions } : {}),
       createSessionWorkspaceDir: args.createSessionWorkspaceDir,
       teamModeOff: args.teamModeOff,
     },
@@ -284,6 +293,8 @@ export interface WebuiTurnCommandContext {
    * owes a turn — and the lease ends when the attempt does, not when the view does.
    */
   readonly scope?: WebuiSessionScopeManager;
+  /** The task use case the substrate creates through (P01 step 4). */
+  readonly taskSessions?: WebuiTaskSessionSubmitter;
 }
 
 /** What a surface supplies to send: intent and data, never a writer or a sink. */
@@ -305,7 +316,7 @@ export interface WebuiTurnCommandContext {
 export function createWebuiConversationTurnCommands(
   context: WebuiTurnCommandContext,
 ): WebuiConversationTurnCommands {
-  const { store, sessionId, capabilities } = context;
+  const { store, sessionId, capabilities, taskSessions } = context;
 
   /**
    * The record writer for this turn: the session's, or the home slot's before a
@@ -426,6 +437,7 @@ export function createWebuiConversationTurnCommands(
       const hold = holdDelivery();
       return await sendWebuiTurn({
         sessionId,
+        ...(taskSessions ? { taskSessions } : {}),
         message: intent.message,
         ...(intent.clientIntent ? { clientIntent: intent.clientIntent } : {}),
         ...(intent.planMode ? { planMode: intent.planMode } : {}),
@@ -436,7 +448,6 @@ export function createWebuiConversationTurnCommands(
         readStream,
         deps: loopDeps(hold),
         ...(capabilities?.enqueue ? { enqueueMessage: capabilities.enqueue } : {}),
-        ...(capabilities?.createSession ? { createSession: capabilities.createSession } : {}),
         ...(intent.createSessionWorkspaceDir
           ? { createSessionWorkspaceDir: intent.createSessionWorkspaceDir }
           : {}),

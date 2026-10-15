@@ -515,6 +515,10 @@ export function createWebuiApplication(
       ...(deps.turnCapabilities ? { capabilities: turnCapabilities } : {}),
       deliveries,
       scope: sessionScope,
+      // The one creation owner (P01 step 4): a first message's session is created by the task use
+      // case, which reserves the admission, transfers the home record under its guards and answers
+      // whether the created session may be selected. Declared below, and read here per send.
+      taskSessions: taskSessionWorkflows,
     });
     turnCommands.set(key, commands);
     return commands;
@@ -621,6 +625,9 @@ export function createWebuiApplication(
       composer.adoptHome(sessionId);
       selectSession(sessionId);
     },
+    // A send's creation is the task use case's, so the composer controller is left with the
+    // selection — gated on the use case's own answer (rule 7).
+    selectCreatedSession: selectSession,
     turnCommandsFor,
     commandWorkflows,
     canEnqueue: turnCapabilities.enqueue !== undefined,
@@ -707,6 +714,9 @@ export function createWebuiApplication(
   const taskSessionWorkflows = createWebuiTaskSessionWorkflows({
     store,
     composer,
+    // Creation goes to the runtime through the turn capability the host wired; nothing else may
+    // create, which is what makes the reservation single-flight.
+    ...(turnCapabilities.createSession ? { createSession: turnCapabilities.createSession } : {}),
     storage: {
       readNoProjectFlag: () => deps.workspacePreference?.readNoProjectFlag?.() ?? false,
       writeNoProjectFlag: (value) => deps.workspacePreference?.writeNoProjectFlag?.(value),

@@ -51,17 +51,31 @@ describe("the transition a submission reports", () => {
   });
 
   it("names the missing transport and creates nothing", async () => {
-    // A creator alone is not a way to deliver a message, so the create must not be reached.
-    const createSession = vi.fn();
+    // A creator alone is not a way to deliver a message, so the use case must not be reached.
+    const submit = vi.fn(async () => ({ kind: "created" as const, sessionId: "created", selected: true }));
     const result = await submitWebuiComposerTurn(
-      { draft: "hello", sending: false, deps: {}, createSession },
+      { draft: "hello", sending: false, deps: {}, submitTask: { submit } },
       handlers(),
     );
     expect(result).toMatchObject({
       decision: "unsupported",
       completion: { kind: "unsupported", missing: "transport" },
     });
-    expect(createSession).not.toHaveBeenCalled();
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  it("reports D01's reservation: one creation per home incarnation, input untouched", async () => {
+    // The use case refuses the second submission before any wire IO; the transition names it, and the
+    // refusals the first one would produce (a creation failure, a dispatch) never happen.
+    const submit = vi.fn(async () => ({ kind: "busy" as const }));
+    const h = handlers();
+    const result = await submitWebuiComposerTurn(
+      { draft: "hello", sending: false, deps: { sendMessage }, submitTask: { submit } },
+      h,
+    );
+    expect(result).toMatchObject({ decision: "busy", completion: { kind: "busy", reason: "creating" } });
+    expect(h.setSending).not.toHaveBeenCalled();
+    expect(h.onDraftChange).not.toHaveBeenCalled();
   });
 
   it("asks for a session through the handler it always called", async () => {
@@ -81,8 +95,8 @@ describe("the transition a submission reports", () => {
         draft: "hello",
         sending: false,
         deps: { sendMessage },
-        createSession: async () => {
-          throw new Error("synthetic creation failure");
+        submitTask: {
+          submit: async () => ({ kind: "creation-failed", error: "synthetic creation failure" }),
         },
       },
       h,
