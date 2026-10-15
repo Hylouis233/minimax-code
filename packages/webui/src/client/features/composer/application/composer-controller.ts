@@ -80,7 +80,7 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
     readonly planMode?: boolean;
     readonly createSessionWorkspaceDir?: string;
     readonly teamModeOff?: boolean;
-  }, clearStaging: () => void, settlement: { queued: boolean; needsSession: boolean; sessionId?: string; queueGeneration?: number }): Promise<void> => submitWebuiComposerTurnCommand(
+  }, clearStaging: () => void, settlement: { queued: boolean; needsSession: boolean; sessionId?: string; queueGeneration?: number }, onSessionCreated?: (sessionId: string) => void): Promise<void> => submitWebuiComposerTurnCommand(
     { turnCommandsFor: deps.turnCommandsFor },
     sessionId,
     {
@@ -98,6 +98,7 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
       onSessionCreated: (createdSessionId) => {
         settlement.sessionId = createdSessionId;
         deps.adoptHomeSession(createdSessionId);
+        onSessionCreated?.(createdSessionId);
         if (turn.sending) settlement.queueGeneration = queueCommands.captureDestination(createdSessionId);
       },
       onQueued: () => {
@@ -170,6 +171,7 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
           }, (createdId) => {
             createdSessionId = createdId;
             deps.adoptHomeSession(createdId);
+            input.onSessionCreated?.(createdId);
           });
           deps.store.setModes({ goal: readWebuiComposerGoalModeAfterSubmit(result.goal) });
           setDraft("");
@@ -227,7 +229,7 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
         ...(input.planMode ? { planMode: true } : {}),
         ...(input.createSessionWorkspaceDir ? { createSessionWorkspaceDir: input.createSessionWorkspaceDir } : {}),
         ...(input.teamModeOff ? { teamModeOff: true } : {}),
-      }, clearStaging, settlement);
+      }, clearStaging, settlement, input.onSessionCreated);
       if (settlement.needsSession) return { kind: "needs-session", draft: input.draft };
       if (settlement.queued) return { kind: "queued", sessionId: settlement.sessionId ?? sessionId!, ...(settlement.sessionId && !sessionId ? { createdSessionId: settlement.sessionId } : {}) };
       return { kind: "submitted", ...((settlement.sessionId ?? sessionId) ? { sessionId: settlement.sessionId ?? sessionId } : {}), ...(settlement.sessionId && !sessionId ? { createdSessionId: settlement.sessionId } : {}) };

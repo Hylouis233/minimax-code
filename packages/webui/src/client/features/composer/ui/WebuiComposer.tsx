@@ -1043,6 +1043,9 @@ export function WebuiComposer({
       agentName,
       ...(createSessionWorkspaceDir ? { createSessionWorkspaceDir } : {}),
       ...(teamModeOff ? { teamModeOff: true } : {}),
+      onSessionCreated: (createdSessionId) => {
+        if (isAttachedTo(sessionId)) onSessionCreated?.(createdSessionId);
+      },
     });
   };
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -1069,13 +1072,12 @@ export function WebuiComposer({
       agentName,
       ...(createSessionWorkspaceDir ? { createSessionWorkspaceDir } : {}),
       ...(teamModeOff ? { teamModeOff: true } : {}),
+      onSessionCreated: (createdSessionId) => {
+        if (isAttachedTo(sessionId)) onSessionCreated?.(createdSessionId);
+      },
     });
     if (outcome.kind !== "ignored" && outcome.kind !== "mode-activated") setHistoryBrowse(undefined);
     if (outcome.kind === "needs-session" && isAttachedTo(sessionId)) onNeedsSession?.(outcome.draft);
-    const createdSessionId = outcome.kind === "submitted" || outcome.kind === "queued" || outcome.kind === "goal-updated"
-      ? outcome.createdSessionId
-      : undefined;
-    if (createdSessionId && isAttachedTo(createdSessionId)) onSessionCreated?.(createdSessionId);
     if (outcome.kind === "goal-updated") editingGoalDraftRef.current = false;
   };
   const clearLocalGoal = () => {

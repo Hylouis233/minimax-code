@@ -15,6 +15,7 @@ export interface WebuiComposerSubmitIntent {
   readonly createSessionWorkspaceDir?: string;
   readonly teamModeOff?: boolean;
   readonly forceTurn?: boolean;
+  readonly onSessionCreated?: (sessionId: string) => void;
 }
 
 export type WebuiComposerSubmitOutcome =
