@@ -1,4 +1,5 @@
 import type { WebuiAttachmentInput } from "../../../../shared/contracts/messages.js";
+import type { WebuiSubmissionOperation } from "./submission.js";
 
 export interface WebuiComposerTurnCallbacks {
   readonly onDraftChange: (next: string) => void;
@@ -21,7 +22,12 @@ export interface WebuiTurnSendIntent {
 
 /** Commands exposed to a conversation surface by application composition. */
 export interface WebuiConversationTurnCommands {
-  readonly send: (intent: WebuiTurnSendIntent) => Promise<void>;
+  /**
+   * The submission's semantic transition, or `undefined` when the intent carried nothing to submit.
+   * A refusal is a value rather than a rejection (plan §5.5 P02 step 4), so the caller can report it
+   * and keep going.
+   */
+  readonly send: (intent: WebuiTurnSendIntent) => Promise<WebuiSubmissionOperation | undefined>;
   readonly attach: (turnId: string | undefined) => void;
   readonly recheck: (turnId: string | undefined) => void;
   readonly recover: () => void;

@@ -92,6 +92,18 @@ export function deriveRecentWorkspaceDirs(
 
 
 /**
+ * Whether intent resolution records this input before its command settles
+ * (plan §5.5 P02 step 5: it used to sit in a forwarding module the submission no
+ * longer needs). It belongs beside the resolution it qualifies, because what it
+ * answers is a property of the resolved intent.
+ */
+export function shouldRecordWebuiComposerSubmission(
+  intent: WebuiSubmissionIntent | undefined,
+): boolean {
+  return intent?.kind === "submit-turn" || intent?.kind === "submit-goal" || intent?.kind === "run-command";
+}
+
+/**
  * The input of the last turn a composer submitted, and the session it was in. It
  * lives here because the composer's owner keeps the record (§4.2 field 1) and an
  * application module may not import a component.

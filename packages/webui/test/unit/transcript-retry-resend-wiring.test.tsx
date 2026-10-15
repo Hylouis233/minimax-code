@@ -81,6 +81,7 @@ import {
   buildWebuiComposerHandlers,
   submitWebuiComposerTurn,
 } from "../../src/client/features/turn/application/composer-submission.js";
+import type { WebuiSubmissionOperation } from "../../src/client/features/turn/contracts/submission.js";
 import { createWebuiSessionStore, type WebuiSessionStore } from "../../src/client/application/session-store.js";
 import {
   WebuiApplicationProvider,
@@ -250,7 +251,7 @@ describe("retry re-sends the recorded input and never aborts", () => {
     const sent: { id: string; content: string }[] = [];
     const abortSession = vi.fn(async () => ({ success: true }));
     // The real turn sender, assembled the way the composer assembles it.
-    let inFlight: Promise<void> | undefined;
+    let inFlight: Promise<WebuiSubmissionOperation | undefined> | undefined;
     const sendTurn = (turn: { message: string }) => {
       inFlight = submitWebuiComposerTurn(
         {

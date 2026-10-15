@@ -55,6 +55,7 @@ import type {
   WebuiTurnLifecycleCommands,
 } from "../features/turn/contracts/turn-command-views.js";
 import { createWebuiConversationTurnCommands } from "../features/turn/application/turn-commands.js";
+import type { WebuiSubmissionOperation } from "../features/turn/contracts/submission.js";
 import {
   useWebuiApplicationOptional,
   useWebuiSessionStoreContext,
@@ -180,7 +181,9 @@ export function useWebuiSessionCommands(sessionId: string | undefined): {
   readonly lifecycle: WebuiTurnLifecycleCommands;
   readonly readStream: () => WebuiStreamState;
   readonly attachTurn: (input: WebuiTurnAttachIntent) => void;
-  readonly sendTurn: (input: WebuiTurnSendIntent) => Promise<void>;
+  readonly sendTurn: (
+    input: WebuiTurnSendIntent,
+  ) => Promise<WebuiSubmissionOperation | undefined>;
   /** Recheck a lease a `session.start` no longer matches (T04). */
   readonly recheckTurn: (turnId: string | undefined) => void;
   /** Gap recovery for a `session.start` missed before the subscription was live. */

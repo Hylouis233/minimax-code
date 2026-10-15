@@ -37,6 +37,7 @@ import {
   buildWebuiComposerHandlers,
   submitWebuiComposerTurn,
 } from "./composer-submission.js";
+import type { WebuiSubmissionOperation } from "../contracts/submission.js";
 import { isWebuiSubscriptionProbeCurrent, ownsWebuiStreamGeneration, resolveWebuiSubscriptionRecheck, type WebuiStreamState } from "../projection/stream-state.js";
 import { streamRecoveryProjection } from "../projection/stream-recovery.js";
 import { runWebuiStreamLoop, type WebuiStreamLoopDeps } from "../../../conversation/stream-loop.js";
@@ -213,7 +214,9 @@ export interface WebuiSendTurnArgs {
  * obeys — including the "a turn is already in flight ⇒ enqueue" branch inside
  * `submitWebuiComposerTurn`.
  */
-export async function sendWebuiTurn(args: WebuiSendTurnArgs): Promise<void> {
+export async function sendWebuiTurn(
+  args: WebuiSendTurnArgs,
+): Promise<WebuiSubmissionOperation | undefined> {
   let writer = args.createWriter();
   // The bundle is woven here, from the writer this command owns: `createSink`
   // reads the *current* writer, so a turn whose first message created the
@@ -234,7 +237,7 @@ export async function sendWebuiTurn(args: WebuiSendTurnArgs): Promise<void> {
       }
     },
   });
-  await submitWebuiComposerTurn(
+  return await submitWebuiComposerTurn(
     {
       sessionId: args.sessionId,
       // `submitWebuiComposerTurn` reads `message ?? draft` and trims it, so
@@ -421,7 +424,7 @@ export function createWebuiConversationTurnCommands(
     send: async (intent) => {
       const writer = writerFor();
       const hold = holdDelivery();
-      await sendWebuiTurn({
+      return await sendWebuiTurn({
         sessionId,
         message: intent.message,
         ...(intent.clientIntent ? { clientIntent: intent.clientIntent } : {}),

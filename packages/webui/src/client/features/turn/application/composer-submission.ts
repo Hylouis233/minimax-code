@@ -1,14 +1,15 @@
 // The composer's submission, executed (plan §5.5 P02 step 3: "`submitWebuiComposerTurn`,
-// `buildWebuiComposerHandlers` leave" Composer).
+// `buildWebuiComposerHandlers` leave" Composer; step 4: the caller consumes the semantic transition).
 //
 // It lives here because execution does: the substrate that dispatches a turn is Turn's, and it may not
 // reach back into Composer's application modules to do it. Composer keeps what is Composer's — slash,
 // goal and plan intent, the draft and history, attachment staging, the queue presentation, resend
 // eligibility — and the intent it hands over arrives as `WebuiComposerSubmitArgs`.
 //
-// The admission rule this path applies is `submission-admission.ts`, and what it reads is
-// `execution-target.ts`. Until the owner integrates them, the order below is the order this function
-// had while it was Composer's, so the move changes no behaviour.
+// The submission now *reports* what it decided. Every callback it already called fires exactly as
+// before, so this is additive to the callers that still read them; the returned operation is what the
+// Composer will consume instead (step 4), and it is the honest classification of what happened rather
+// than a prediction: the branch produces the completion and the decision is derived from it.
 
 import type {
   WebuiComposerSubmitArgs,
@@ -19,6 +20,11 @@ import {
 } from "../../sessions/contracts/session-port.js";
 import { formatWebuiError } from "../../../contracts/value-readers.js";
 import { looksLikeAbsoluteWorkspacePath } from "../../../projection/common/paths.js";
+import type {
+  WebuiSubmissionCompletion,
+  WebuiSubmissionDecision,
+  WebuiSubmissionOperation,
+} from "../contracts/submission.js";
 import { queueWebuiTurn } from "./queue-command.js";
 import { ownsWebuiStreamGeneration } from "../projection/stream-state.js";
 import { runWebuiStreamLoop } from "../../../conversation/stream-loop.js";
@@ -55,18 +61,61 @@ export function createSessionWorkspaceField(workspaceDir?: string): { readonly w
   return { workspaceDir: value };
 }
 
+/** Operation ids are process-local and monotonic: they correlate a submission with its transition. */
+let nextSubmissionId = 0;
+
+/**
+ * The decision a completion *is*, so the two can never disagree. `dispatching` and `queued` describe an
+ * operation on its way; the rest describe one that did not happen, and the completion carries why.
+ *
+ * A completion that is not listed here cannot be produced by this module, and the case is exhaustive on
+ * purpose: adding a completion kind without classifying it stops compiling.
+ */
+function decideFor(completion: WebuiSubmissionCompletion): WebuiSubmissionDecision {
+  switch (completion.kind) {
+    case "dispatched":
+      return "dispatching";
+    case "queued":
+      return "queued";
+    case "needs-session":
+      return "needs-session";
+    case "creation-failed":
+      return "creation-failed";
+    case "failed":
+      return "failed";
+    case "busy":
+      return "busy";
+    case "unsupported":
+      return "unsupported";
+  }
+}
+
 export async function submitWebuiComposerTurn(
   args: WebuiComposerSubmitArgs,
   handlers: WebuiComposerSubmitHandlers,
-): Promise<void> {
+): Promise<WebuiSubmissionOperation | undefined> {
   const message = (args.message ?? args.draft).trim();
   const attachments = args.attachments ?? [];
-  if ((!message && attachments.length === 0) || (!args.deps.sendMessage && !args.enqueueMessage)) return;
+  // Nothing to submit is not a refusal, so it is not an operation: the vocabulary in
+  // `contracts/submission.ts` covers what a submission *decided*, and an empty intent never reached a
+  // decision. The caller's guard produced exactly this no-op before.
+  if (!message && attachments.length === 0) return undefined;
+  const record = (completion: WebuiSubmissionCompletion): WebuiSubmissionOperation => ({
+    id: ++nextSubmissionId,
+    decision: decideFor(completion),
+    completion,
+  });
+  if (!args.deps.sendMessage && !args.enqueueMessage) {
+    // The baseline returned silently here, before it would have created anything: a creator alone is
+    // not a way to deliver a message.
+    return record({ kind: "unsupported", missing: "transport" });
+  }
   let sessionId = args.sessionId;
+  let created = false;
   if (!sessionId) {
     if (!args.createSession) {
       handlers.onNeedsSession?.(args.draft);
-      return;
+      return record({ kind: "needs-session" });
     }
     try {
       const result = await args.createSession({
@@ -76,15 +125,24 @@ export async function submitWebuiComposerTurn(
       });
       sessionId = createdWebuiSessionId(result);
       if (!sessionId) throw new Error("createSession response did not include a session id");
+      created = true;
       handlers.resetStreamForTurn();
       handlers.onSessionCreated?.(sessionId);
     } catch (error) {
-      handlers.setRefusal(formatWebuiError(error));
-      return;
+      const message = formatWebuiError(error);
+      handlers.setRefusal(message);
+      return record({ kind: "creation-failed", error: message });
     }
   }
   if (args.sending) {
-    if (!args.enqueueMessage) return;
+    if (!args.enqueueMessage) {
+      // A live turn with nowhere to queue: the submission is refused, and the caller may keep the
+      // input. The baseline dropped it in silence.
+      return record({ kind: "busy", reason: "turn-live" });
+    }
+    // The enqueue reports its own failure through a refusal; capturing it is what lets the operation
+    // say `failed` instead of `queued` for a write that never landed.
+    let refusal: string | undefined;
     await queueWebuiTurn({
       sessionId,
       message,
@@ -94,11 +152,16 @@ export async function submitWebuiComposerTurn(
       onDraftChange: handlers.onDraftChange,
       onAttachmentsSubmitted: args.onAttachmentsSubmitted,
       onQueued: handlers.onQueued,
-      setRefusal: (refusal) => handlers.setRefusal(refusal),
+      setRefusal: (next) => {
+        refusal = next;
+        handlers.setRefusal(next);
+      },
     });
-    return;
+    return refusal === undefined
+      ? record({ kind: "queued", sessionId })
+      : record({ kind: "failed", error: refusal });
   }
-  if (!args.deps.sendMessage) return;
+  if (!args.deps.sendMessage) return record({ kind: "unsupported", missing: "transport" });
   handlers.setSending(true);
   handlers.onDraftChange("");
   args.onAttachmentsSubmitted?.();
@@ -114,4 +177,7 @@ export async function submitWebuiComposerTurn(
     const current = handlers.readStream?.();
     if (current === undefined || ownsWebuiStreamGeneration(current, claimed)) handlers.setSending(false);
   }
+  // A dispatch that rejects still rejects: the loop's own error path is the caller's today, and the
+  // owner makes it a `failed` completion when it takes the callbacks over (P02 step 1).
+  return record({ kind: "dispatched", sessionId, created });
 }

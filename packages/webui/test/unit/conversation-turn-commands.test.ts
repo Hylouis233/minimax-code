@@ -92,14 +92,18 @@ describe("the conversation turn commands", () => {
     });
 
     // The loop's own absent-capability guard decides; what this seam owes the
-    // caller is that no attempt is started and nothing is reported as running.
+    // caller is that no attempt is started, nothing is reported as running, and
+    // the transition says why rather than leaving it to be inferred.
     await expect(
       commands.send({
         message: "hello",
         sending: false,
         callbacks: { onDraftChange: () => undefined },
       }),
-    ).resolves.toBeUndefined();
+    ).resolves.toMatchObject({
+      decision: "unsupported",
+      completion: { kind: "unsupported", missing: "transport" },
+    });
     expect(store.readSession("s1").sending).toBe(false);
     expect(store.readSession("s1").stream.phase).not.toBe("streaming");
   });

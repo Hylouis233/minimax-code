@@ -4,12 +4,13 @@ import type { WebuiComposerStore } from "./composer-store.js";
 import type { WebuiComposerSubmitIntent } from "../contracts/composer-controller.js";
 import type { WebuiRunCommandRequest, WebuiCommandWorkflows } from "./command-workflows.js";
 import type { WebuiConversationTurnCommands } from "../../turn/contracts/turn-commands.js";
+import type { WebuiSubmissionOperation } from "../../turn/contracts/submission.js";
 import { resolveWebuiSubmissionIntent } from "../projection/composer-state.js";
 import { readWebuiComposerGoalModeAfterSubmit } from "../projection/composer-goal-outcome.js";
 import { planWebuiRetryResend } from "./turn-retry.js";
 import { formatWebuiError } from "../../../contracts/value-readers.js";
 import { createWebuiComposerQueueCommands } from "./composer-queue.js";
-import { shouldRecordWebuiComposerSubmission, submitWebuiComposerTurnCommand } from "./composer-submission.js";
+import { shouldRecordWebuiComposerSubmission } from "../projection/composer-state.js";
 
 export interface WebuiComposerControllerDeps {
   readonly store: WebuiComposerStore;
@@ -80,10 +81,7 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
     readonly planMode?: boolean;
     readonly createSessionWorkspaceDir?: string;
     readonly teamModeOff?: boolean;
-  }, clearStaging: () => void, settlement: { queued: boolean; needsSession: boolean; sessionId?: string; queueGeneration?: number }, onSessionCreated?: (sessionId: string) => void): Promise<void> => submitWebuiComposerTurnCommand(
-    { turnCommandsFor: deps.turnCommandsFor },
-    sessionId,
-    {
+  }, clearStaging: () => void, settlement: { queued: boolean; needsSession: boolean; sessionId?: string; queueGeneration?: number }, onSessionCreated?: (sessionId: string) => void): Promise<WebuiSubmissionOperation | undefined> => deps.turnCommandsFor(sessionId).send({
     message: turn.message,
     ...(turn.clientIntent ? { clientIntent: turn.clientIntent } : {}),
     ...(turn.planMode ? { planMode: true } : {}),
