@@ -69,7 +69,7 @@ import {
   webuiModelOptionValue,
 } from "../../src/client/features/sessions/projection/action-requests.js";
 import { looksLikeAbsoluteWorkspacePath } from "../../src/client/projection/common/paths.js";
-import { submitWebuiGoal } from "../../src/client/features/composer/application/composer-workflows.js";
+import { submitWebuiGoal } from "../../src/client/features/goal/application/goal-submission.js";
 import {
   buildWebuiComposerHandlers,
   submitWebuiComposerTurn,
@@ -1850,19 +1850,28 @@ describe("WebUI composer app-to-helper seam", () => {
     const createGoal = vi.fn(async (request: { sessionId: string; objective: string }) =>
       nextGoal(request.sessionId, request.objective),
     );
-    const createSession = vi.fn(async () => ({ sessionId: "new-session" }));
+    // Creation is the task use case's now (P01 step 4): the goal path hands it the objective's
+    // session request and reads its answer, exactly as the send path does.
+    const submit = vi.fn(async () => ({ kind: "created" as const, sessionId: "new-session", selected: true }));
     const onSessionCreated = vi.fn();
+    const applyGoal = vi.fn();
     await submitWebuiGoal(
       {
         objective: "  ship the feature  ",
-        createGoal,
-        createSession,
+        // The capability is read *after* the creation, so it is the created session's
+        // own (empty) goal that makes this objective a create rather than a patch.
+        capabilityFor: (sessionId) => {
+          expect(sessionId).toBe("new-session");
+          return { createGoal };
+        },
+        submitTask: { submit },
         createSessionWorkspaceDir: "/workspace",
         teamModeOff: true,
+        applyGoal,
       },
       onSessionCreated,
     );
-    expect(createSession).toHaveBeenCalledWith({
+    expect(submit).toHaveBeenCalledWith({
       name: "main",
       workspaceDir: "/workspace",
       teamModeOff: true,
@@ -1871,7 +1880,13 @@ describe("WebUI composer app-to-helper seam", () => {
       sessionId: "new-session",
       objective: "ship the feature",
     });
-    expect(onSessionCreated).toHaveBeenCalledWith("new-session");
+    expect(onSessionCreated).toHaveBeenCalledWith("new-session", true);
+    // A goal this submission *created* is committed onto the created session's own
+    // owner; the submission does not leave it for the caller to apply.
+    expect(applyGoal).toHaveBeenCalledWith(
+      "new-session",
+      expect.objectContaining({ objective: "ship the feature" }),
+    );
 
     // The mock takes the real request type: `objective` is optional on
     // `WebuiGoalPatchRequest` (a patch may carry only a status or a budget),
@@ -1881,17 +1896,24 @@ describe("WebUI composer app-to-helper seam", () => {
       nextGoal(request.sessionId, request.objective ?? ""),
     );
     const currentGoal = nextGoal("existing-session", "old");
+    const patchApply = vi.fn();
     await submitWebuiGoal({
       sessionId: "existing-session",
       objective: "new objective",
-      currentGoal,
-      createGoal,
-      patchGoal,
+      // An existing goal whose owner can patch it takes the patch branch: the
+      // create-or-patch decision is this module's, not the caller's.
+      capabilityFor: () => ({ currentGoal, createGoal, patchGoal }),
+      applyGoal: patchApply,
     });
     expect(patchGoal).toHaveBeenCalledWith({
       sessionId: "existing-session",
       objective: "new objective",
     });
+    // A patch went through the owner already, so nothing is applied again, and no
+    // second session was created.
+    expect(patchApply).not.toHaveBeenCalled();
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(createGoal).toHaveBeenCalledTimes(1);
   });
 
   it("buildWebuiComposerHandlers passes every field through unchanged", () => {

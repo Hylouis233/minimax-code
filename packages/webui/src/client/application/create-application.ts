@@ -18,7 +18,10 @@ import { createWebuiPortSlices, type WebuiPortSlices } from "./port-slices.js";
 import { createWebuiSessionWorkflows } from "../features/sessions/application/session-workflows.js";
 import { createWebuiCommandWorkflows } from "../features/composer/application/command-workflows.js";
 import { createWebuiComposerController } from "../features/composer/application/composer-controller.js";
-import { submitWebuiGoal } from "../features/composer/application/composer-workflows.js";
+import {
+  submitWebuiGoal,
+  type WebuiGoalOwnerCapability,
+} from "../features/goal/application/goal-submission.js";
 import type { WebuiComposerController } from "../features/composer/contracts/composer-controller.js";
 import { WEBUI_COMPOSER_HOME_KEY } from "../features/composer/application/composer-history.js";
 import { createWebuiTurnLifecycleCommands } from "../features/turn/application/turn-lifecycle-commands.js";
@@ -367,13 +370,6 @@ export interface WebuiApplication {
    */
   readonly reconcile: (sessionId?: string) => void;
   /**
-   * Commit home→session adoption as one transition: carry the home turn's live
-   * record onto the created session, move the home composer slot onto it and
-   * select it. Both store writes are no-notify; the caller writes the hash and
-   * the React selection once.
-   */
-  readonly adoptHomeSession: (sessionId: string) => void;
-  /**
    * Subscribe to a domain event that carries no session id (a workspace-git
    * change). A reaction, not a route: it runs after the coordinator has routed
    * the event to the owners, and it cannot displace anything (plan §4.4).
@@ -617,58 +613,54 @@ export function createWebuiApplication(
     scope: sessionScope,
   });
   const commandWorkflows = createWebuiCommandWorkflows({ port: slices.composer });
+  /**
+   * The goal capability one target session offers, read when the submission asks
+   * for it rather than captured up front: a session this submission just created
+   * holds no goal, and that is what makes its objective a create rather than a
+   * patch. It was the assembly's inline `usesPatch`/`resolveGoal` pair before
+   * (plan §5.3: "Remove `usesPatch`/create-or-patch business decisions from
+   * `create-application.ts`").
+   */
+  const goalCapabilityFor = (sessionId: string): WebuiGoalOwnerCapability => {
+    const owner = goals.owner(sessionId);
+    const currentGoal = store.readSession(sessionId).goal;
+    return {
+      ...(currentGoal === undefined ? {} : { currentGoal }),
+      ...(owner.createGoal ? { createGoal: owner.createGoal } : {}),
+      ...(owner.patchGoal ? { patchGoal: owner.patchGoal } : {}),
+    };
+  };
   composerController = createWebuiComposerController({
     store: composer,
     readSelectedSessionId: readActiveSessionId,
-    adoptHomeSession: (sessionId) => {
-      store.migrateSession(WEBUI_HOME_SESSION_KEY, sessionId);
-      composer.adoptHome(sessionId);
-      selectSession(sessionId);
-    },
-    // A send's creation is the task use case's, so the composer controller is left with the
-    // selection — gated on the use case's own answer (rule 7).
+    // Every creation the composer drives is the task use case's (P01 step 4), so the controller is
+    // left with the selection — gated on the use case's own answer (rule 7).
     selectCreatedSession: selectSession,
     turnCommandsFor,
     commandWorkflows,
     canEnqueue: turnCapabilities.enqueue !== undefined,
     canSend: turnCapabilities.send !== undefined,
     readGoal: (sessionId) => store.readSession(sessionId).goal,
-    createOrPatchGoal: async (input, onSessionCreated) => {
-      const originalSessionId = input.sessionId;
-      const recordKey = originalSessionId ?? WEBUI_HOME_SESSION_KEY;
-      const initialOwner = goals.owner(recordKey);
-      let targetSessionId = originalSessionId;
-      let usesPatch = Boolean(store.readSession(recordKey).goal && initialOwner.patchGoal);
-      let createdSessionId: string | undefined;
-      const goal = await submitWebuiGoal({
-        sessionId: originalSessionId,
-        objective: input.objective,
-        currentGoal: store.readSession(recordKey).goal,
-        createGoal: initialOwner.createGoal ?? (async () => { throw new Error("当前运行时不支持创建目标"); }),
-        ...(initialOwner.patchGoal ? { patchGoal: initialOwner.patchGoal } : {}),
-        resolveGoal: (sessionId) => {
-          targetSessionId = sessionId;
-          const owner = goals.owner(sessionId);
-          const currentGoal = store.readSession(sessionId).goal;
-          usesPatch = Boolean(currentGoal && owner.patchGoal);
-          return {
-            currentGoal,
-            createGoal: owner.createGoal ?? (async () => { throw new Error("当前运行时不支持创建目标"); }),
-            ...(owner.patchGoal ? { patchGoal: owner.patchGoal } : {}),
-          };
+    // The goal submission command is Goal's (plan §5.3): the create-or-patch
+    // decision, and which owner answers it, live in that module. What the
+    // assembly supplies is the capability to read a target session's goal state
+    // and the commit that lands a created goal on its owner.
+    submitGoal: (input, onSessionCreated) =>
+      submitWebuiGoal(
+        {
+          sessionId: input.sessionId,
+          objective: input.objective,
+          capabilityFor: goalCapabilityFor,
+          // The goal path creates through the same use case the send path does
+          // (P01 step 4), so the admission reservation, the guarded transfer and
+          // the composer's slot move happen once.
+          submitTask: taskSessionWorkflows,
+          applyGoal: (sessionId, goal) => goals.owner(sessionId).applyGoal(goal),
+          ...(input.createSessionWorkspaceDir ? { createSessionWorkspaceDir: input.createSessionWorkspaceDir } : {}),
+          ...(input.teamModeOff ? { teamModeOff: true } : {}),
         },
-        ...(sessionWorkflows.createSession ? { createSession: sessionWorkflows.createSession } : {}),
-        ...(input.createSessionWorkspaceDir ? { createSessionWorkspaceDir: input.createSessionWorkspaceDir } : {}),
-        ...(input.teamModeOff ? { teamModeOff: true } : {}),
-      }, (sessionId) => {
-        createdSessionId = sessionId;
-        onSessionCreated(sessionId);
-      });
-      const sessionId = targetSessionId ?? createdSessionId;
-      if (!sessionId) throw new Error("创建目标会话未返回会话 ID");
-      if (!usesPatch) goals.owner(sessionId).applyGoal(goal);
-      return { goal, sessionId };
-    },
+        onSessionCreated,
+      ),
     refreshPending: (sessionId) => interactions.owner(sessionId).refresh(),
     refreshGoal: async (sessionId) => { await goals.owner(sessionId).refreshGoal(); },
     recoverTurn: (sessionId) => turnCommandsFor(sessionId).recover(),
@@ -716,7 +708,10 @@ export function createWebuiApplication(
     composer,
     // Creation goes to the runtime through the turn capability the host wired; nothing else may
     // create, which is what makes the reservation single-flight.
-    ...(turnCapabilities.createSession ? { createSession: turnCapabilities.createSession } : {}),
+    // Creating a session is the sessions capability's (`port-slices.ts`'s table), which is where the
+    // goal path read it before this became the one owner. `WebuiTransport` satisfies both slices, so
+    // production has one source; a host that wires only one of them still creates here.
+    ...(slices.sessions.createSession ? { createSession: slices.sessions.createSession } : {}),
     storage: {
       readNoProjectFlag: () => deps.workspacePreference?.readNoProjectFlag?.() ?? false,
       writeNoProjectFlag: (value) => deps.workspacePreference?.writeNoProjectFlag?.(value),
@@ -827,15 +822,6 @@ export function createWebuiApplication(
       const target = sessionId ?? readActiveSessionId();
       if (!target) return;
       reconcileSession(target);
-    },
-    adoptHomeSession: (sessionId) => {
-      // One committed transition: the home turn's live record moves onto the
-      // created session, the composer's home slot moves onto it, and the
-      // session is selected. Migration is no-notify (the view switching keys
-      // re-reads the target in its own effect); selection notifies once.
-      store.migrateSession(WEBUI_HOME_SESSION_KEY, sessionId);
-      composer.adoptHome(sessionId);
-      selectSession(sessionId);
     },
     onWorkspaceGitChanged: (listener) => {
       workspaceGitListeners.add(listener);

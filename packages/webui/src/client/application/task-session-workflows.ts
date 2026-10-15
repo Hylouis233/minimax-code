@@ -136,7 +136,7 @@ export interface WebuiTaskSessionWorkflows {
   };
   /**
    * Note that the application navigated. Returns the epoch now live. Duplicate
-   * route or binding notifications do not advance it, and returning home after
+   * route or binding notifications do not advance it, returning home after
    * visiting another session does not recreate the old claim.
    */
   readonly noteNavigation: (sessionId: string | undefined) => number;
@@ -252,11 +252,11 @@ export function createWebuiTaskSessionWorkflows(
       const transfer = store.transferSession(WEBUI_HOME_SESSION_KEY, sessionId, {
         expectSourceIncarnation: homeIncarnation,
       });
-      if (transfer.outcome === "transferred") {
-        // Only a real move takes the composer slot with it. A stale source or an
-        // occupied destination must not clear the draft the user is typing into,
-        // and the revision guard inside the store refuses a move whose source
-        // slot has changed since this submission captured it.
+      // The composer slot moves whenever the record did not refuse the move. A stale source, an
+      // occupied destination and a purged destination are the three refusals, and each of them means
+      // the draft belongs where it is; `no-source` is not one of them — there was no home record to
+      // protect, and the text the user typed is still theirs to keep with the session it created.
+      if (transfer.outcome === "transferred" || transfer.outcome === "no-source") {
         composer.adoptHome(sessionId, {
           ...(inputRevision !== undefined ? { expectSourceRevision: inputRevision } : {}),
         });

@@ -19,7 +19,7 @@ import {
   createdWebuiSessionId,
 } from "../../sessions/contracts/session-port.js";
 import { formatWebuiError } from "../../../contracts/value-readers.js";
-import { looksLikeAbsoluteWorkspacePath } from "../../../projection/common/paths.js";
+import { readWorkspaceDirField } from "../../../projection/common/paths.js";
 import type {
   WebuiSubmissionCompletion,
   WebuiSubmissionDecision,
@@ -45,20 +45,6 @@ export function buildWebuiComposerHandlers(
     onSessionCreated: args.onSessionCreated,
     onQueued: args.onQueued,
   };
-}
-
-/**
- * The `workspaceDir` a creation carries, validated. It lives with the submission rather than with the
- * Composer because Turn may not depend on Composer's application modules, and the goal path that also
- * needs it (until P01 step 4 moves that path to Goal) imports it from here.
- */
-export function createSessionWorkspaceField(workspaceDir?: string): { readonly workspaceDir?: string } {
-  if (workspaceDir === undefined) return {};
-  const value = workspaceDir.trim();
-  if (!value) throw new Error("项目目录不能为空，请重新选择项目目录");
-  if (!looksLikeAbsoluteWorkspacePath(value))
-    throw new Error(`项目目录需要绝对路径，收到的是「${value}」。请重新选择项目目录`);
-  return { workspaceDir: value };
 }
 
 /** Operation ids are process-local and monotonic: they correlate a submission with its transition. */
@@ -121,8 +107,7 @@ export async function submitWebuiComposerTurn(
     }
     let workspaceDir: string | undefined;
     try {
-      // The validated field, then the raw value the use case takes.
-      workspaceDir = createSessionWorkspaceField(args.createSessionWorkspaceDir).workspaceDir;
+      workspaceDir = readWorkspaceDirField(args.createSessionWorkspaceDir);
     } catch (error) {
       const message = formatWebuiError(error);
       handlers.setRefusal(message);

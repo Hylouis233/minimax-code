@@ -515,7 +515,6 @@ export function WebuiClientFoundationApp(
     setWorkspaceMenuOpen,
     recentWorkspaceDirs,
     handleWorkspaceChange,
-    handleSessionCreated,
     handleSessionCreatedViewEffect,
     startNewTask,
   } = useNewTaskWorkspace({
@@ -523,15 +522,21 @@ export function WebuiClientFoundationApp(
     // step 3): the shell still owns the picker, the recent list and the
     // navigation effects, and it asks for the decision instead of holding it.
     taskSessions: application.taskSessions,
-    workflows: sessionWorkflows,
     selectedSession,
     flatSessionsWithChildren,
     setDraft,
     dispatchShellSurface,
     setSelectedSessionId,
-    adoptHomeSession: (id) => application.adoptHomeSession(id),
     recordSessionTeamMode,
   });
+  // The navigation claim the creation use case measures its completions against
+  // (plan §5.3 rules 2 and 7): every selection the shell makes — a rail click, the
+  // boot route, 「新建任务」 — is a navigation, and a duplicate notification of the
+  // same destination is not. Without this the claim would never advance and a late
+  // creation could not tell that the user had already moved.
+  useEffect(() => {
+    application.taskSessions.noteNavigation(selectedSessionId);
+  }, [application.taskSessions, selectedSessionId]);
 
   /**
    * 「在会话中创建」 on 记忆摘要: land on the home composer with the memory
@@ -855,12 +860,19 @@ export function WebuiClientFoundationApp(
             className="relative flex min-h-0 min-w-0 flex-1 flex-row"
           >
             {pluginManagementArea ? <PluginCatalogue initialArea={pluginManagementArea} onChatWithAgent={async (name) => {
-              const creator = sessionWorkflows.createSession;
-              if (!creator) throw new Error("当前 WebUI 未连接会话创建服务");
-              const created = await creator({ name });
-              const sessionId = created.sessionId ?? created.session?.sessionId;
-              if (!sessionId) throw new Error("创建 Agent 会话失败");
-              handleSessionCreated(sessionId);
+              // Plugin-chat creation is the same completion policy as the composer's
+              // and the goal path's (plan §5.3): it goes through the task use case, so
+              // the admission reservation (D01), the guarded transfer (D03) and the
+              // catalogue refresh happen once, here, with nothing mounted.
+              const outcome = await application.taskSessions.submit({ name });
+              if (outcome.kind === "unsupported")
+                throw new Error("当前 WebUI 未连接会话创建服务");
+              if (outcome.kind === "busy") throw new Error("会话正在创建中，请稍后再试。");
+              if (outcome.kind === "creation-failed") throw new Error(outcome.error);
+              // Rule 7: the rail's chat action opens what it created only while the
+              // claim that started the creation is still current.
+              if (outcome.selected) application.select(outcome.sessionId);
+              handleSessionCreatedViewEffect(outcome.sessionId, outcome.selected, teamModeOff);
             }} /> : <>
             <ConversationSurface
               home={homeMode}

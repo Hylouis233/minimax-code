@@ -41,18 +41,9 @@ export interface NewTaskWorkspacePolicy {
   readonly chooseWorkspaceDir: (workspaceDir: string | undefined) => string | undefined;
 }
 
-/** The session commands the rail refresh needs, as the shell holds them. */
-export interface NewTaskWorkspaceWorkflows {
-  readonly canLoadFlat: boolean;
-  readonly canLoadTree: boolean;
-  readonly loadFlat: () => Promise<void>;
-  readonly loadTree: () => Promise<void>;
-}
-
 export interface UseNewTaskWorkspaceOptions {
   /** The task/session use case: workspace policy, home identity, creation. */
   readonly taskSessions: NewTaskWorkspacePolicy;
-  readonly workflows: NewTaskWorkspaceWorkflows;
   /** The session the shell currently shows, if any. */
   readonly selectedSession: WebuiClientSession | undefined;
   /** Every session visible to lookups (flat page plus tree children). */
@@ -60,14 +51,12 @@ export interface UseNewTaskWorkspaceOptions {
   readonly setDraft: (draft: string) => void;
   readonly dispatchShellSurface: (command: WebuiShellSurfaceCommand) => void;
   readonly setSelectedSessionId: (id: string | undefined) => void;
-  /** Carries the home turn's live record onto the session a first message created. */
-  readonly adoptHomeSession: (id: string) => void;
   /**
    * Records the Agent Team choice the created session was started with. Sessions
    * owns that choice (T19), so this hook asks for the record rather than
    * reaching the storage adapter itself.
    */
-  readonly recordSessionTeamMode: (sessionId: string) => void;
+  readonly recordSessionTeamMode: (sessionId: string, teamModeOff: boolean) => void;
 }
 
 export interface NewTaskWorkspace {
@@ -76,21 +65,22 @@ export interface NewTaskWorkspace {
   readonly setWorkspaceMenuOpen: (open: boolean) => void;
   readonly recentWorkspaceDirs: readonly string[];
   readonly handleWorkspaceChange: (workspaceDir?: string) => void;
-  readonly handleSessionCreated: (id: string) => void;
-  readonly handleSessionCreatedViewEffect: (id: string) => void;
+  readonly handleSessionCreatedViewEffect: (
+    id: string,
+    selected: boolean,
+    teamModeOff: boolean,
+  ) => void;
   readonly startNewTask: (workspaceDir?: string) => void;
 }
 
 export function useNewTaskWorkspace(options: UseNewTaskWorkspaceOptions): NewTaskWorkspace {
   const {
     taskSessions,
-    workflows,
     selectedSession,
     flatSessionsWithChildren,
     setDraft,
     dispatchShellSurface,
     setSelectedSessionId,
-    adoptHomeSession,
     recordSessionTeamMode,
   } = options;
 
@@ -134,25 +124,28 @@ export function useNewTaskWorkspace(options: UseNewTaskWorkspaceOptions): NewTas
     },
     [taskSessions],
   );
-  const handleSessionCreatedViewEffect = (id: string) => {
+  const handleSessionCreatedViewEffect = (
+    id: string,
+    selected: boolean,
+    teamModeOff: boolean,
+  ) => {
+    // The choice the session was created with is recorded whichever surface
+    // committed the creation: it is not a navigation effect, and a late
+    // completion still records its legitimate state.
+    recordSessionTeamMode(id, teamModeOff);
+    // Rules 7-8: the browser effect consumes the committed result and checks the
+    // navigation claim again. A user navigation between the business commit and
+    // this effect wins, so a late background completion changes no selection and
+    // no URL. The catalogue reads are not repeated here: creation completion
+    // refreshes them in the use case, which is the one owner of that rule.
+    if (!selected) return;
     setSelectedSessionId(id);
-    recordSessionTeamMode(id);
-    if (workflows.canLoadFlat) void workflows.loadFlat();
-    if (workflows.canLoadTree) void workflows.loadTree();
     if (typeof window !== "undefined")
       window.history.replaceState(
         null,
         "",
         `${window.location.pathname}${window.location.search}${sessionHash(id)}`,
       );
-  };
-  const handleSessionCreated = (id: string) => {
-    // Home→session adoption is one committed transition (ticket #49 criterion
-    // 5): the application carries the home turn's live record onto the created
-    // session, moves the composer's home slot onto it and selects it — no
-    // separate migration + composer migration + selection.
-    adoptHomeSession(id);
-    handleSessionCreatedViewEffect(id);
   };
   const startNewTask = (workspaceDir?: string) => {
     // A project row's plus action opens a fresh home composer preselected to
@@ -190,7 +183,6 @@ export function useNewTaskWorkspace(options: UseNewTaskWorkspaceOptions): NewTas
     setWorkspaceMenuOpen,
     recentWorkspaceDirs,
     handleWorkspaceChange,
-    handleSessionCreated,
     handleSessionCreatedViewEffect,
     startNewTask,
   };

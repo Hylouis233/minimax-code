@@ -124,7 +124,7 @@ the modules no single business owns.
 | `message-projection.ts`, `message-parts.ts` | Message → renderable parts (text, tool rows, attachments). |
 | `transcript-projection.ts`, `tool-projection.ts` | Transcript grouping and tool-result shaping. |
 | `questionnaire-state.ts`, `goal-state.ts`, `workspace-progress.ts` | Interaction, goal and workspace-progress derivations. |
-| `composer-state.ts` | Pure composer intent, enter-key, path and recent-workspace state rules. Submission workflows and session ID extraction live in `features/composer/application/composer-workflows.ts`. |
+| `composer-state.ts` | Pure composer intent, enter-key, path and recent-workspace state rules. The turn submission lives in `features/turn/application/composer-submission.ts` and the goal submission in `features/goal/application/goal-submission.ts`; the composer keeps input policy. |
 | `action-requests.ts` | Request builders for actions (model selection and friends). |
 | `workspace/canvas-projection.ts`, `workspace/panel-projection.ts` | The canvas geometry (pointer gestures, zoom, nudges, the mutations they build) and what a workspace panel renders (a diff, a todo list, a preview). |
 | `workspace/workspace-file-tree.ts`, `workspace/archive-projection.ts`, `workspace/html-preview.ts`, `workspace/media-preview.ts` | How a file's size and time read, where an archive entry unpacks, and whether a preview is media or reaches outside its own directory. |

@@ -32,3 +32,24 @@ export function looksLikeAbsoluteWorkspacePath(value: string): boolean {
     /^[a-zA-Z]:[\\/]/.test(value)
   );
 }
+
+/**
+ * The workspace directory a creation request carries, validated.
+ *
+ * It is a guard rather than a transform: the trimmed value comes back, or the
+ * caller is told why the request cannot be made — an empty field is a mistake and
+ * a relative one would create a session somewhere the user did not choose.
+ *
+ * It sits with the path helpers because three creation origins need the same
+ * rule (the ordinary send, the goal submission and the plugin-chat creation) and
+ * no single business owns it: the goal path reading it out of the Composer's
+ * module was the last reason for a Composer↔Turn application import.
+ */
+export function readWorkspaceDirField(workspaceDir?: string): string | undefined {
+  if (workspaceDir === undefined) return undefined;
+  const value = workspaceDir.trim();
+  if (!value) throw new Error("项目目录不能为空，请重新选择项目目录");
+  if (!looksLikeAbsoluteWorkspacePath(value))
+    throw new Error(`项目目录需要绝对路径，收到的是「${value}」。请重新选择项目目录`);
+  return value;
+}

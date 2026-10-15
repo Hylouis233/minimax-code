@@ -21,6 +21,7 @@ import type {
 } from "../../src/client/application/create-application.js";
 import type { WebuiPortSlices } from "../../src/client/application/port-slices.js";
 import type { WebuiTurnCapabilityPort } from "../../src/client/features/turn/application/turn-capabilities.js";
+import type { GoalPort } from "../../src/client/features/goal/contracts/goal-port.js";
 import type { WebuiSessionStore } from "../../src/client/application/session-store.js";
 
 /** A channel that accepts one listener and never emits: SSR-shaped hosts. */
@@ -47,6 +48,12 @@ export interface ApplicationFixtureOptions {
    * reader sees as "this host cannot send".
    */
   readonly turnCapabilities?: WebuiTurnCapabilityPort;
+  /**
+   * The goal capability port. A fixture that drives a goal submission needs it:
+   * the submission asks the created session's owner, and the owner answers from
+   * this port (P01's goal path).
+   */
+  readonly goalPort?: GoalPort;
 }
 
 /** Builds a dormant application for a host that renders the shell. */
@@ -59,6 +66,7 @@ export function createWebuiApplicationFixture(
     ...(options.unreadStorage ? { unreadStorage: options.unreadStorage } : {}),
     ...(options.slices ? { slices: options.slices } : {}),
     ...(options.turnCapabilities ? { turnCapabilities: options.turnCapabilities } : {}),
+    ...(options.goalPort ? { goalPort: options.goalPort } : {}),
     turns: { resumeSession: async () => {} },
   });
 }

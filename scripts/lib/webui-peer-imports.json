@@ -157,11 +157,6 @@
       "reason": "The plan decision card renders the plan text through the transcript's markdown renderer, the same shared rendering the workspace panel uses. Reviewed peer edge until the transcript publishes markdown as a shared rendering contract."
     },
     {
-      "from": "client/features/composer/application/composer-workflows.ts",
-      "to": "client/features/turn/application/composer-submission.ts",
-      "reason": "What is left of the composer's workflows is the goal submission, which until P01 step 4 moves it to Goal's own application module still shapes a creation request and so shares the validated workspace field. Reviewed peer edge with a named removal condition: it goes when that goal path leaves this module."
-    },
-    {
       "from": "client/features/composer/ui/ThinkingTrigger.tsx",
       "to": "client/features/models/projection/thinking-control.ts",
       "reason": "The composer's thinking trigger renders the models business's thinking-control projection (the control's vocabulary is Models', plan 5.2's models row). Reviewed peer edge until Models publishes that read."

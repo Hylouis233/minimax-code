@@ -276,7 +276,13 @@ export function WebuiComposer({
   /** Records one committed submission into the shell's history store. */
   readonly onInputSubmitted?: (text: string) => void;
   readonly onNeedsSession?: (draft: string) => void;
-  readonly onSessionCreated?: (sessionId: string) => void;
+  /**
+   * The created session, whether the navigation claim that started the creation is
+   * still current, and the Agent Team choice the request was submitted with. The
+   * third value is the captured one, not the default reached at completion, so a
+   * default changed while the creation was in flight does not rewrite it (D02).
+   */
+  readonly onSessionCreated?: (sessionId: string, selected: boolean, teamModeOff: boolean) => void;
   readonly teamModeOff: boolean;
   readonly favoritesStorage: {
     readonly read: () => string[];
@@ -1043,8 +1049,8 @@ export function WebuiComposer({
       agentName,
       ...(createSessionWorkspaceDir ? { createSessionWorkspaceDir } : {}),
       ...(teamModeOff ? { teamModeOff: true } : {}),
-      onSessionCreated: (createdSessionId) => {
-        if (isAttachedTo(sessionId)) onSessionCreated?.(createdSessionId);
+      onSessionCreated: (createdSessionId, selected) => {
+        if (isAttachedTo(sessionId)) onSessionCreated?.(createdSessionId, selected, teamModeOff);
       },
     });
   };
@@ -1072,8 +1078,8 @@ export function WebuiComposer({
       agentName,
       ...(createSessionWorkspaceDir ? { createSessionWorkspaceDir } : {}),
       ...(teamModeOff ? { teamModeOff: true } : {}),
-      onSessionCreated: (createdSessionId) => {
-        if (isAttachedTo(sessionId)) onSessionCreated?.(createdSessionId);
+      onSessionCreated: (createdSessionId, selected) => {
+        if (isAttachedTo(sessionId)) onSessionCreated?.(createdSessionId, selected, teamModeOff);
       },
     });
     if (outcome.kind !== "ignored" && outcome.kind !== "mode-activated") setHistoryBrowse(undefined);

@@ -7,7 +7,7 @@
 // owns the catalogue (plan §5.2) and the read belongs behind its own surface
 // (plan §5.3); the adapter arrives as the injected capability. The transitions
 // are unchanged, including the write-back of the default on every change.
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 /** `sessionId → team-mode-off`, as persisted for the sessions the user chose. */
 export type WebuiTeamModeChoices = Readonly<Record<string, boolean>>;
@@ -29,11 +29,13 @@ export interface SessionTeamMode {
   /** The choice in force for one slot: the session's own, else the default. */
   readonly teamModeOffFor: (sessionId: string | undefined) => boolean;
   /**
-   * Record the choice for the session a first message just created: storage
-   * first, then the state the rail renders from, exactly as the shell's create
-   * effect did in that order.
+   * Record the choice a creation was submitted with. The value is the request's
+   * captured one rather than the default read at completion: changing the default
+   * while a creation is in flight must not rewrite what the session was created
+   * with (D02). Storage first, then the state the rail renders from, exactly as
+   * the shell's create effect did in that order.
    */
-  readonly recordSessionTeamMode: (sessionId: string) => void;
+  readonly recordSessionTeamMode: (sessionId: string, teamModeOff: boolean) => void;
 }
 
 export function useSessionTeamMode(storage: WebuiTeamModeStorage): SessionTeamMode {
@@ -41,10 +43,6 @@ export function useSessionTeamMode(storage: WebuiTeamModeStorage): SessionTeamMo
   const [choices, setChoices] = useState<WebuiTeamModeChoices>(
     storage.readTeamModeSessionChoices,
   );
-  // The create effect reads the default at the moment the session appears, not
-  // the value captured when the hook first ran.
-  const teamModeOffRef = useRef(teamModeOff);
-  teamModeOffRef.current = teamModeOff;
   useEffect(() => {
     storage.writeTeamModeOff(teamModeOff);
   }, [storage, teamModeOff]);
@@ -54,8 +52,7 @@ export function useSessionTeamMode(storage: WebuiTeamModeStorage): SessionTeamMo
     [choices, teamModeOff],
   );
   const recordSessionTeamMode = useCallback(
-    (sessionId: string) => {
-      const off = teamModeOffRef.current;
+    (sessionId: string, off: boolean) => {
       storage.writeTeamModeSessionChoice(sessionId, off);
       setChoices((current) => ({ ...current, [sessionId]: off }));
     },
