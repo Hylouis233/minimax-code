@@ -54,7 +54,6 @@ import type {
   WebuiStreamPhaseCommands,
   WebuiTurnLifecycleCommands,
 } from "../features/turn/contracts/turn-command-views.js";
-import { createWebuiTurnCommandCollaborators } from "../application/turn-command-wiring.js";
 import { createWebuiConversationTurnCommands } from "../features/turn/application/turn-commands.js";
 import {
   useWebuiApplicationOptional,
@@ -211,7 +210,6 @@ export function useWebuiSessionCommands(sessionId: string | undefined): {
     const turnCommands = createWebuiConversationTurnCommands({
       store,
       sessionId,
-      collaborators: createWebuiTurnCommandCollaborators(),
       ...(capabilities ? { capabilities } : {}),
       ...(deliveries ? { deliveries } : {}),
       ...(scope ? { scope } : {}),

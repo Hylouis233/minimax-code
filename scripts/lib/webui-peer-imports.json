@@ -158,23 +158,8 @@
     },
     {
       "from": "client/features/composer/application/composer-workflows.ts",
-      "to": "client/features/turn/application/queue-command.ts",
-      "reason": "The composer's submit workflow enqueues through the turn business's queue command. Both sat in the application layer before T13 moved the composer owner; reviewed peer edge until turn publishes the queue command as a public contract."
-    },
-    {
-      "from": "client/features/composer/application/composer-workflows.ts",
-      "to": "client/features/turn/projection/stream-state.ts",
-      "reason": "The submit workflow reads the turn stream state to decide whether a send is a send or an enqueue. Reviewed peer edge until turn publishes that read from its contracts."
-    },
-    {
-      "from": "client/features/composer/application/composer-workflows.ts",
-      "to": "client/features/turn/projection/stream-recovery.ts",
-      "reason": "The same workflow composes the turn business's recovery policy when a send resumes after a stream error. Reviewed peer edge until turn publishes the recovery contract."
-    },
-    {
-      "from": "client/features/composer/application/composer-workflows.ts",
-      "to": "client/features/turn/application/stream-state-bundle.ts",
-      "reason": "The workflow consumes the turn bundle the stream loop takes, the same bundle the session commands read. Reviewed peer edge until turn publishes it."
+      "to": "client/features/turn/application/composer-submission.ts",
+      "reason": "What is left of the composer's workflows is the goal submission, which until P01 step 4 moves it to Goal's own application module still shapes a creation request and so shares the validated workspace field. Reviewed peer edge with a named removal condition: it goes when that goal path leaves this module."
     },
     {
       "from": "client/features/composer/ui/ThinkingTrigger.tsx",

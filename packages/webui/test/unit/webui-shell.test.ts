@@ -69,11 +69,11 @@ import {
   webuiModelOptionValue,
 } from "../../src/client/features/sessions/projection/action-requests.js";
 import { looksLikeAbsoluteWorkspacePath } from "../../src/client/projection/common/paths.js";
+import { submitWebuiGoal } from "../../src/client/features/composer/application/composer-workflows.js";
 import {
   buildWebuiComposerHandlers,
-  submitWebuiGoal,
   submitWebuiComposerTurn,
-} from "../../src/client/features/composer/application/composer-workflows.js";
+} from "../../src/client/features/turn/application/composer-submission.js";
 import { createdWebuiSessionId } from "../../src/client/features/sessions/contracts/session-port.js";
 import type { WebuiComposerSubmitHandlers } from "../../src/client/features/composer/contracts/composer-turn.js";
 import { createWebuiTurnLifecycleCommands } from "../../src/client/features/turn/application/turn-lifecycle-commands.js";

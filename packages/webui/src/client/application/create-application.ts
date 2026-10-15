@@ -57,7 +57,6 @@ import {
   createWebuiConversationTurnCommands,
   type WebuiConversationTurnCommands,
 } from "../features/turn/application/turn-commands.js";
-import { createWebuiTurnCommandCollaborators } from "./turn-command-wiring.js";
 import {
   createWebuiGoalSessionOwners,
   type WebuiGoalSessionOwners,
@@ -506,7 +505,6 @@ export function createWebuiApplication(
    * rule 2). Built once: the substrate's port is the same object for every
    * session, so constructing it per session would only add wiring sites.
    */
-  const turnCommandCollaborators = createWebuiTurnCommandCollaborators();
   const turnCommandsFor = (sessionId: string | undefined): WebuiConversationTurnCommands => {
     const key = sessionId ?? WEBUI_HOME_SESSION_KEY;
     const existing = turnCommands.get(key);
@@ -514,7 +512,6 @@ export function createWebuiApplication(
     const commands = createWebuiConversationTurnCommands({
       store,
       sessionId,
-      collaborators: turnCommandCollaborators,
       ...(deps.turnCapabilities ? { capabilities: turnCapabilities } : {}),
       deliveries,
       scope: sessionScope,

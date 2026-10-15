@@ -33,7 +33,10 @@ import { createWebuiStreamPhaseCommands } from "./stream-phase-commands.js";
 import { createWebuiTurnLifecycleCommands } from "./turn-lifecycle-commands.js";
 import { createWebuiTurnCommands } from "./turn-command-writer.js";
 import type { WebuiComposerSubmitHandlers } from "../../composer/contracts/composer-turn.js";
-import type { WebuiTurnCommandCollaborators } from "./turn-command-port.js";
+import {
+  buildWebuiComposerHandlers,
+  submitWebuiComposerTurn,
+} from "./composer-submission.js";
 import { isWebuiSubscriptionProbeCurrent, ownsWebuiStreamGeneration, resolveWebuiSubscriptionRecheck, type WebuiStreamState } from "../projection/stream-state.js";
 import { streamRecoveryProjection } from "../projection/stream-recovery.js";
 import { runWebuiStreamLoop, type WebuiStreamLoopDeps } from "../../../conversation/stream-loop.js";
@@ -177,11 +180,6 @@ export function recoverMissedWebuiTurn(deps: WebuiRecoverMissedTurnDeps): void {
 
 export interface WebuiSendTurnArgs {
   readonly sessionId: string | undefined;
-  /**
-   * The peer command factories this send drives, supplied by composition
-   * (plan §5.3 rule 2) — the same object the command set holds.
-   */
-  readonly collaborators: WebuiTurnCommandCollaborators;
   readonly message: string;
   readonly clientIntent?: string;
   readonly planMode?: boolean;
@@ -220,7 +218,7 @@ export async function sendWebuiTurn(args: WebuiSendTurnArgs): Promise<void> {
   // The bundle is woven here, from the writer this command owns: `createSink`
   // reads the *current* writer, so a turn whose first message created the
   // session mints its lease against the migrated key rather than the home slot.
-  const turnHandlers: WebuiComposerSubmitHandlers = args.collaborators.buildComposerHandlers({
+  const turnHandlers: WebuiComposerSubmitHandlers = buildWebuiComposerHandlers({
     createSink: () => writer.createSink(),
     resetStreamForTurn: () => writer.resetStreamForTurn(),
     setRefusal: (refusal) => writer.setStreamRefusal(refusal),
@@ -236,7 +234,7 @@ export async function sendWebuiTurn(args: WebuiSendTurnArgs): Promise<void> {
       }
     },
   });
-  await args.collaborators.submitComposerTurn(
+  await submitWebuiComposerTurn(
     {
       sessionId: args.sessionId,
       // `submitWebuiComposerTurn` reads `message ?? draft` and trims it, so
@@ -283,13 +281,6 @@ export interface WebuiTurnCommandContext {
    * owes a turn — and the lease ends when the attempt does, not when the view does.
    */
   readonly scope?: WebuiSessionScopeManager;
-  /**
-   * The peer command factories this substrate drives, supplied by composition
-   * (plan §5.3 rule 2). Required on purpose: a host that cannot supply them
-   * cannot run a turn, so an unwired one is an assembly error rather than a
-   * silently missing command.
-   */
-  readonly collaborators: WebuiTurnCommandCollaborators;
 }
 
 /** What a surface supplies to send: intent and data, never a writer or a sink. */
@@ -311,7 +302,7 @@ export interface WebuiTurnCommandContext {
 export function createWebuiConversationTurnCommands(
   context: WebuiTurnCommandContext,
 ): WebuiConversationTurnCommands {
-  const { store, sessionId, capabilities, collaborators } = context;
+  const { store, sessionId, capabilities } = context;
 
   /**
    * The record writer for this turn: the session's, or the home slot's before a
@@ -432,7 +423,6 @@ export function createWebuiConversationTurnCommands(
       const hold = holdDelivery();
       await sendWebuiTurn({
         sessionId,
-        collaborators,
         message: intent.message,
         ...(intent.clientIntent ? { clientIntent: intent.clientIntent } : {}),
         ...(intent.planMode ? { planMode: intent.planMode } : {}),

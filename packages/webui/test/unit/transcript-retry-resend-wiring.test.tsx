@@ -80,7 +80,7 @@ import { OutputError } from "../../src/client/features/transcript/ui/OutputError
 import {
   buildWebuiComposerHandlers,
   submitWebuiComposerTurn,
-} from "../../src/client/features/composer/application/composer-workflows.js";
+} from "../../src/client/features/turn/application/composer-submission.js";
 import { createWebuiSessionStore, type WebuiSessionStore } from "../../src/client/application/session-store.js";
 import {
   WebuiApplicationProvider,

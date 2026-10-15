@@ -10,7 +10,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createWebuiDeliveryDisposers } from "../../src/client/features/turn/application/delivery-disposers.js";
 import { createWebuiConversationTurnCommands } from "../../src/client/features/turn/application/turn-commands.js";
-import { createWebuiTurnCommandCollaborators } from "../../src/client/application/turn-command-wiring.js";
 import { createWebuiApplication } from "../../src/client/application/create-application.js";
 import type { WebuiClientSessionResumer } from "../../src/client/features/turn/contracts/execution-port.js";
 
@@ -113,7 +112,6 @@ describe("an attempt the client started is closable by the application", () => {
     const commands = createWebuiConversationTurnCommands({
       store: app.store,
       sessionId: "s1",
-      collaborators: createWebuiTurnCommandCollaborators(),
       capabilities: { send: send as never, stop: abort as never },
       deliveries: app.deliveries,
     });

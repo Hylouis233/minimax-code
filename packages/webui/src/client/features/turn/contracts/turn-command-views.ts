@@ -4,13 +4,12 @@
 // `WebuiStreamPhaseCommands` / `WebuiTurnLifecycleCommands` contracts move to
 // Turn").
 //
-// Sessions' `session-commands.ts` builds these views — each factory needs the
-// stream loop mechanism or the stream-state transforms, so it stays an
-// implementation — and the substrate drives them by these names. Publishing them
-// here is what lets the substrate name its own dependencies instead of having
-// composition hand them in (`turn-command-port.ts` is the injection this
-// replaces), and it keeps the phase/lifecycle vocabulary in one home rather than
-// two.
+// The substrate both builds and drives these views now: their factories are
+// `turn/application/stream-phase-commands.ts`, `turn-lifecycle-commands.ts` and
+// `turn-command-writer.ts`, each of which needs the stream loop mechanism or the
+// stream-state transforms and so stays an implementation. Publishing the shapes
+// here keeps the phase/lifecycle vocabulary in one home rather than two, and it
+// is what the sessions business reads when it builds a view for a record it owns.
 
 import type { WebuiStreamLoopSink } from "./stream-loop.js";
 import type { WebuiStreamState } from "./stream-state.js";
