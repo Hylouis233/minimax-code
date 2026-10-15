@@ -7,8 +7,9 @@ Enabling one never implicitly enables another or expands tool permissions.
 ## Ultra
 
 Select the bundled `ultra` skill for an explicit Ultra request. For Ultra-workflow,
-it uses the already installed `@mcode-dynamic-workflows` skill, its current tools,
-and its topology-review/start gate. It does not install a replacement engine,
+it uses the already installed `dynamic-workflow` skill from the
+`mcode-dynamic-workflows` plugin, its current tools and its topology-review/start
+gate. It does not install a replacement engine,
 start an unapproved DAG, or claim a run when the plugin is missing. A local bounded
 Ultra plan is identified separately from a dynamic-workflow execution.
 

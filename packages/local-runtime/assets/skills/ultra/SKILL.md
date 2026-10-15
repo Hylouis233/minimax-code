@@ -2,7 +2,7 @@
 name: ultra
 description: |
   Use an explicit Ultra or Ultra-workflow request to plan, execute and verify a
-  bounded task using the installed dynamic-workflows skill when available. This
+  bounded task using the installed dynamic-workflow skill when available. This
   is client-side orchestration, not a model name, reasoning effort or permission
   grant. Do not activate for an ordinary request containing only "fast", or for
   a provider's native effort setting without an orchestration request.
@@ -30,8 +30,9 @@ selected. Do not invent a number of workers or a spending budget as an approval.
 ## Use the existing dynamic workflow implementation
 
 When the user requests Ultra-workflow, or explicitly chooses the installed
-`@mcode-dynamic-workflows` skill for the plan, discover that installed skill and
-read its current instructions and tool schemas before invoking it. Reuse its
+`dynamic-workflow` skill from the `mcode-dynamic-workflows` plugin for the plan,
+discover that installed skill and read its current instructions and tool schemas
+before invoking it. Reuse its
 actual planner, validator, lifecycle and result tooling; do not implement a
 parallel scheduler or fabricate a workflow run.
 
