@@ -21,108 +21,26 @@
 //     repopulate a disposed editor.
 
 import type {
-  WebuiCreateUserModelProviderRequest,
-  WebuiDiscoverUserModelsCandidateRequest,
   WebuiModelProviderCandidateInput,
   WebuiModelProviderView,
-  WebuiSaveUserModelProviderCandidateRequest,
-  WebuiTestUserModelCandidateRequest,
-  WebuiUpdateUserModelProviderRequest,
   WebuiUserModelInput,
 } from "../../../../shared/contracts/models.js";
 import { formatWebuiError } from "../../../contracts/value-readers.js";
-import {
-  projectProviderHeaders,
-  type ProviderHeaderDraft,
-} from "../projection/usage-settings.js";
+import { projectProviderHeaders } from "../projection/usage-settings.js";
+import type { ProviderHeaderDraft } from "../contracts/provider-editor.js";
+import type {
+  WebuiProviderEditor,
+  WebuiProviderEditorCommands,
+  WebuiProviderEditorOptions,
+  WebuiProviderEditorSnapshot,
+} from "../contracts/provider-editor.js";
 
-/** The Models commands the editor drives. Structurally the panel's own set. */
-export interface WebuiProviderEditorCommands {
-  readonly canManageProviders: boolean;
-  readonly revealApiKey: (providerId: string) => Promise<string>;
-  readonly createProvider: (
-    body: WebuiCreateUserModelProviderRequest,
-  ) => Promise<unknown>;
-  readonly updateProvider: (
-    body: WebuiUpdateUserModelProviderRequest,
-  ) => Promise<unknown>;
-  readonly deleteProvider: (providerId: string) => Promise<unknown>;
-  readonly discoverCandidate: (
-    body: WebuiDiscoverUserModelsCandidateRequest,
-  ) => Promise<unknown>;
-  readonly saveCandidate: (
-    body: WebuiSaveUserModelProviderCandidateRequest,
-  ) => Promise<unknown>;
-  readonly testCandidate: (
-    body: WebuiTestUserModelCandidateRequest,
-  ) => Promise<unknown>;
-}
-
-export interface WebuiProviderEditorSnapshot {
-  readonly open: boolean;
-  readonly editingProviderId?: string;
-  readonly name: string;
-  readonly baseUrl: string;
-  readonly apiKey: string;
-  readonly apiFormat: string;
-  /** The model ids as typed, one per line. */
-  readonly modelIdText: string;
-  readonly headers: readonly ProviderHeaderDraft[];
-  readonly skipConnectionTest: boolean;
-  /** True while an operation is in flight; the form disables its controls on it. */
-  readonly busy: boolean;
-  readonly pending?: "test" | "discover" | "save" | "delete" | "open";
-  readonly error?: string;
-  /** Whether the *current* draft passed a connection test. */
-  readonly tested: boolean;
-  readonly canManageProviders: boolean;
-  /** Whether the saved provider's revision is known, so discovery can be offered. */
-  readonly canDiscover: boolean;
-  /** The revision a write must carry; absent for a new provider. */
-  readonly configRevision?: string;
-}
-
-export interface WebuiProviderEditorOptions {
-  readonly commands: WebuiProviderEditorCommands;
-  /** Called with the error the panel shows beside the form; absent swallows nothing. */
-  readonly onError?: (message: string | undefined) => void;
-}
-
-export interface WebuiProviderEditor {
-  readonly getSnapshot: () => WebuiProviderEditorSnapshot;
-  readonly subscribe: (listener: () => void) => () => void;
-  /** Start a new provider: a blank draft, no identity, no revision. */
-  readonly openNew: () => void;
-  /**
-   * Edit a saved provider. The draft starts from the view, the engine field
-   * carries the revision the write must present, and the connection test state
-   * starts unproven — a saved provider has not been tested *in this draft*.
-   */
-  readonly openExisting: (provider: WebuiModelProviderView) => Promise<void>;
-  readonly changeField: (
-    field: "name" | "baseUrl" | "apiKey" | "apiFormat" | "modelIdText",
-    value: string,
-  ) => void;
-  readonly setHeaders: (rows: readonly ProviderHeaderDraft[]) => void;
-  readonly addHeader: () => void;
-  readonly removeHeader: (id: string) => void;
-  readonly setSkipConnectionTest: (skip: boolean) => void;
-  readonly test: () => Promise<void>;
-  readonly discover: () => Promise<void>;
-  readonly save: () => Promise<void>;
-  readonly remove: () => Promise<void>;
-  /**
-   * End the form view. The draft is kept (the parent's tab-switch behaviour),
-   * transient operation feedback is reset, and late completions are fenced.
-   */
-  readonly close: () => void;
-  /**
-   * Dispose the editor (leaving the Usage category or closing Settings). The
-   * credential-bearing fields are cleared and every late completion is fenced; a
-   * mutation already on its way still settles, in the workflow that owns it.
-   */
-  readonly dispose: () => void;
-}
+export type {
+  WebuiProviderEditor,
+  WebuiProviderEditorCommands,
+  WebuiProviderEditorOptions,
+  WebuiProviderEditorSnapshot,
+} from "../contracts/provider-editor.js";
 
 const EMPTY_DRAFT = {
   name: "",
@@ -473,6 +391,12 @@ export function createWebuiProviderEditor(
       open = false;
       pending = undefined;
       operationGeneration += 1;
+      setError(undefined);
+      publish();
+    },
+
+    clearError: () => {
+      if (disposed) return;
       setError(undefined);
       publish();
     },

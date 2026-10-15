@@ -3,17 +3,20 @@
 // `UsageModelSettings.tsx → models/ProviderFormPanel.tsx` row, ticket #71).
 //
 // **What the parent keeps, and why it is not a preference.** `UsageModelSettings` stays the
-// parent and stays mounted, so the provider drafts are *its* state (§5.7 LC-4): they are passed
-// in here and written back through the setters, which is what keeps them alive across a sub-tab
-// switch exactly as today. The panel is rendered inside the same `sourceTab === "custom"`
-// conditional it occupied before, so its own mount and unmount boundary is unchanged (§5.7
-// LC-1) — which is also why `ProviderPresetPicker`'s `open`/`query` still reset when the form's
-// subtree goes away. The session-keyed preload and both intervals stay in the parent (LC-2,
-// LC-3); the OAuth surface stays there too, because §5.6 files it under `settings`.
+// parent and stays mounted, so it hosts the Models provider editor *above* the
+// `sourceTab === "custom"` conditional (§5.7 LC-4). The draft, the tested flag and the operation
+// state live in that editor, which is what keeps them alive across a sub-tab switch and what makes
+// a connection test belong to the draft it tested rather than to whatever the fields hold later.
+// The panel is rendered inside the same `sourceTab === "custom"` conditional it occupied before, so
+// its own mount and unmount boundary is unchanged (§5.7 LC-1) — which is also why
+// `ProviderPresetPicker`'s `open`/`query` still reset when the form's subtree goes away. The
+// session-keyed preload and both intervals stay in the parent (LC-2, LC-3); the OAuth surface stays
+// there too, because §5.6 files it under `settings`.
 //
-// This is a **controlled region** in §16.5's sense: it renders from state its owner holds and
-// forks no owner of its own. The commands it invokes arrive as props — per §5.6 the provider
-// CRUD is `models`' duty, not `settings`'.
+// This is a **controlled region** in §16.5's sense: it renders one editor's snapshot and forks no
+// state of its own beyond the preset picker's open flag, so nothing here can disagree with what a
+// write will actually send. The editor and its commands arrive as props — per §5.6 the provider CRUD
+// is `models`' duty, not `settings`'.
 
 import { useState, type Dispatch, type ReactElement, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
@@ -23,7 +26,6 @@ import { CSS } from "@dnd-kit/utilities";
 
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { reorderModelIds } from "../projection/model-reorder.js";
-import { projectProviderHeaders, type ProviderHeaderDraft } from "../projection/usage-settings.js";
 import type {
   WebuiDiscoverUserModelsCandidateRequest,
   WebuiModelProviderModelEntry,
@@ -33,7 +35,11 @@ import type {
   WebuiUpdateUserModelProviderRequest,
   WebuiUserModelInput,
 } from "../../../../shared/contracts/models.js";
-import { recordOf, textOf } from "../../../contracts/value-readers.js";
+import type {
+  WebuiProviderEditor,
+  WebuiProviderEditorSnapshot,
+} from "../contracts/provider-editor.js";
+import { textOf } from "../../../contracts/value-readers.js";
 import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
 import { CloseIcon, IconButton, RefreshIcon } from "../../settings/ui/settings-atoms.js";
 
@@ -66,8 +72,10 @@ export interface WebuiProviderFormCommands {
 }
 
 /**
- * The drafts, held by the parent so a sub-tab switch does not lose them (§5.7 LC-4). The panel
- * reads them and writes each field back through its setter.
+ * The drafts, the tested flag and the operation state belong to the Models editor (§5.5), which
+ * the parent hosts above the custom-tab conditional so a sub-tab switch does not lose them (§5.7
+ * LC-4). The panel is a view over that editor's snapshot and calls its commands; the delete
+ * *confirmation* stays here, because asking before deleting is the list's question.
  */
 export interface WebuiProviderFormPanelProps {
   readonly providers: readonly WebuiModelProviderView[];
@@ -75,22 +83,8 @@ export interface WebuiProviderFormPanelProps {
   readonly commands: WebuiProviderFormCommands;
   /** The list-level error channel the parent owns, so a failed write lands where its retry is. */
   readonly setProviderActionError: (message?: string) => void;
-  readonly draftName: string;
-  readonly setDraftName: Dispatch<SetStateAction<string>>;
-  readonly draftBaseUrl: string;
-  readonly setDraftBaseUrl: Dispatch<SetStateAction<string>>;
-  readonly draftApiKey: string;
-  readonly setDraftApiKey: Dispatch<SetStateAction<string>>;
-  readonly draftModelId: string;
-  readonly setDraftModelId: Dispatch<SetStateAction<string>>;
-  readonly draftApiFormat: string;
-  readonly setDraftApiFormat: Dispatch<SetStateAction<string>>;
-  readonly draftHeaders: readonly ProviderHeaderDraft[];
-  readonly setDraftHeaders: Dispatch<SetStateAction<readonly ProviderHeaderDraft[]>>;
-  readonly draftTested: boolean;
-  readonly setDraftTested: Dispatch<SetStateAction<boolean>>;
-  readonly skipTest: boolean;
-  readonly setSkipTest: Dispatch<SetStateAction<boolean>>;
+  readonly editor: WebuiProviderEditor;
+  readonly snapshot: WebuiProviderEditorSnapshot;
   readonly providerPendingDelete?: WebuiModelProviderView;
   readonly setProviderPendingDelete: Dispatch<SetStateAction<WebuiModelProviderView | undefined>>;
 }
@@ -134,79 +128,40 @@ function ProviderPresetPicker({ presets, selected, selectedName, onSelect }: { r
 
 export function ProviderFormPanel({
   providers, presets, commands, setProviderActionError,
-  draftName, setDraftName, draftBaseUrl, setDraftBaseUrl, draftApiKey, setDraftApiKey,
-  draftModelId, setDraftModelId, draftApiFormat, setDraftApiFormat,
-  draftHeaders, setDraftHeaders, draftTested, setDraftTested, skipTest, setSkipTest,
+  editor, snapshot,
   providerPendingDelete, setProviderPendingDelete,
 }: WebuiProviderFormPanelProps): ReactElement {
   const { dom } = useWebuiBrowserCapabilities();
   const portalTarget = dom.portalTarget();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
-  // The form's own lifetime: these reset when the panel unmounts, which is today's behaviour for
-  // every one of them — the drafts, the only state that had to survive, live in the parent.
-  const [showProviderForm, setShowProviderForm] = useState(false);
-  const [editingProvider, setEditingProvider] = useState<string>();
+  // The markup below reads the editor's snapshot under the names it always used, so this stays a
+  // view: every draft, the tested flag, the busy flag and the error come from the editor, and each
+  // control calls one of its commands.
+  const {
+    open: showProviderForm, editingProviderId: editingProvider,
+    name: draftName, baseUrl: draftBaseUrl, apiKey: draftApiKey,
+    modelIdText: draftModelId, apiFormat: draftApiFormat,
+    headers: draftHeaders, tested: draftTested, skipConnectionTest: skipTest,
+    busy: formBusy, error: formError,
+  } = snapshot;
   const [selectedPresetId, setSelectedPresetId] = useState<string>();
-  const [originalHeaderNames, setOriginalHeaderNames] = useState<readonly string[]>([]);
-  const [formBusy, setFormBusy] = useState(false);
-  const [formError, setFormError] = useState<string>();
 
+    // Opening is the editor's: it seeds the draft from the view (including the
+    // header rows, which start blank over their persisted names because the read
+    // carries names only) and reveals a saved key. The preset list is the list's,
+    // so it is loaded here and its failure is reported on the list channel.
     const openProviderForm = async (provider?: WebuiModelProviderView) => {
-      setFormError(undefined); setDraftTested(false); setSkipTest(false);
-      setEditingProvider(provider ? textOf(provider.providerId) : undefined);
       setSelectedPresetId(undefined);
-      setDraftName(textOf(provider?.name)); setDraftBaseUrl(textOf(provider?.baseUrl));
-      setDraftApiFormat(textOf(provider?.apiFormat) || "openai-completions"); setDraftModelId(providerModels(provider).map((model) => textOf(model.modelId)).filter(Boolean).join("\n"));
-      // The read carries header **names** only — the runtime never sends saved
-      // values — so a saved row starts blank and keeps whatever is stored unless
-      // its row is renamed or removed (`projectProviderHeaders`).
-      const headerNames = provider?.headerNames ?? [];
-      setOriginalHeaderNames(headerNames);
-      setDraftHeaders(headerNames.map((name, index) => ({ id: `${textOf(provider?.providerId) || "new"}-${index}`, name, value: "", persistedName: name })));
-      setDraftApiKey(""); setShowProviderForm(true);
+      if (provider) await editor.openExisting(provider);
+      else editor.openNew();
       try { await commands.loadPresets(); }
-      catch (error) { setFormError(error instanceof Error ? error.message : String(error)); }
-      if (provider) {
-        try { setDraftApiKey(await commands.revealApiKey(textOf(provider.providerId))); }
-        catch (error) { setFormError(error instanceof Error ? error.message : String(error)); }
-      }
+      catch (error) { setProviderActionError(error instanceof Error ? error.message : String(error)); }
     };
-    const draftCandidate = () => {
-      const headerProjection = projectProviderHeaders(draftHeaders, originalHeaderNames);
-      return {
-        ...(editingProvider ? { providerId: editingProvider } : {}),
-        ...(editingProvider && providers.find((provider) => provider.providerId === editingProvider)?.configRevision ? { expectedRevision: textOf(providers.find((provider) => provider.providerId === editingProvider)?.configRevision) } : {}),
-        name: draftName.trim(), baseUrl: draftBaseUrl.trim(), apiKey: draftApiKey,
-        apiFormat: draftApiFormat,
-        ...headerProjection,
-        models: draftModelId.split("\n").map((modelId) => modelId.trim()).filter(Boolean).map((modelId) => ({ modelId })),
-      };
-    };
-    const runCandidateTest = async () => {
-      if (!draftModelId.trim()) return;
-      const headers = projectProviderHeaders(draftHeaders, originalHeaderNames);
-      if (headers.error) { setFormError(headers.error === "duplicate-name" ? "Header 名称不能重复" : "新增 Header 必须填写值"); return; }
-      setFormBusy(true); setFormError(undefined); setDraftTested(false);
-      try { const result = recordOf(await commands.testCandidate({ candidate: draftCandidate(), modelId: draftModelId.split("\n")[0]!.trim() })); if (result.ok !== true && result.success !== true) throw new Error(textOf(recordOf(result.status).lastErrorMessage) || "连接失败"); setDraftTested(true); }
-      catch (error) { setFormError(error instanceof Error ? error.message : String(error)); }
-      finally { setFormBusy(false); }
-    };
-    const saveProvider = async () => {
-      if (!draftTested && !skipTest) return;
-      const headers = projectProviderHeaders(draftHeaders, originalHeaderNames);
-      if (headers.error) { setFormError(headers.error === "duplicate-name" ? "Header 名称不能重复" : "新增 Header 必须填写值"); return; }
-      setFormBusy(true); setFormError(undefined);
-      try { const result = recordOf(await commands.saveCandidate({ candidate: draftCandidate(), modelId: draftModelId.split("\n")[0]?.trim(), saveAndUse: false, skipConnectionTest: skipTest })); if (result.success !== true) throw new Error("保存失败"); setShowProviderForm(false); }
-      catch (error) { setFormError(error instanceof Error ? error.message : String(error)); }
-      finally { setFormBusy(false); }
-    };
+    // The dialog closes only on a successful delete; a refusal stays beside it,
+    // in the editor's error channel.
     const confirmDeleteProvider = async () => {
-      const id = textOf(providerPendingDelete?.providerId);
-      if (!id) return;
-      setFormBusy(true);
-      try { await commands.deleteProvider(id); setProviderPendingDelete(undefined); }
-      catch (error) { setFormError(error instanceof Error ? error.message : String(error)); }
-      finally { setFormBusy(false); }
+      await editor.remove();
+      if (!editor.getSnapshot().error) setProviderPendingDelete(undefined);
     };
     const toggleModel = async (providerId: string, model: WebuiModelProviderModelEntry, enabled: boolean) => {
       const nextModels = providerModels(providers.find((provider) => provider.providerId === providerId)).map((candidate) =>
@@ -228,7 +183,7 @@ export function ProviderFormPanel({
             <div className="flex min-w-0 items-center gap-2"><span className="truncate text-[14px] font-medium leading-5 text-text_default_primary">{textOf(provider.name) || id}</span>{provider.kind === "oauth" ? <span className="rounded-[6px] bg-bg_interaction_tertiary_press px-1 text-[12px]">OAuth</span> : null}</div>
             <div className="flex items-center gap-2">
               <IconButton label="编辑提供商" onClick={() => void openProviderForm(provider)}><path d="M9.47052 2.9037C10.4714 1.9029 12.0945 1.90312 13.0955 2.9037C14.0963 3.9047 14.0964 5.52775 13.0955 6.5287L6.76935 12.8559C6.37727 13.2479 5.86805 13.5029 5.31915 13.5814L3.54767 13.8344C2.74184 13.9495 2.05079 13.2583 2.16583 12.4525L2.41876 10.681C2.49721 10.132 2.7522 9.623 3.14435 9.23085L9.47052 2.9037ZM3.92169 10.0092C3.69798 10.2329 3.55245 10.5231 3.50763 10.8363L3.2547 12.6078C3.24339 12.6875 3.31173 12.7566 3.39142 12.7455L5.1629 12.4926C5.47619 12.4478 5.76722 12.3023 5.99103 12.0785L10.9813 7.0873L8.91193 5.01796L3.92169 10.0092ZM12.3182 3.68202C11.7468 3.11062 10.8203 3.11066 10.2488 3.68202L9.68927 4.24062L11.7586 6.30995L12.3182 5.75136C12.8895 5.18001 12.8893 4.25345 12.3182 3.68202Z" /></IconButton>
-              <IconButton label="删除" disabled={!commands.canManageProviders} onClick={() => { setFormError(undefined); setProviderPendingDelete(provider); }}><path d="M9.80273 1.80527C10.605 1.80541 11.2549 2.45615 11.2549 3.2584V4.35606H14.666C14.9422 4.35606 15.166 4.57991 15.166 4.85606C15.1658 5.132 14.942 5.35606 14.666 5.35606H12.8096L12.7861 5.68027L12.3281 11.9645C12.2362 13.2214 11.1891 14.1948 9.92871 14.1949H5.99414C4.72231 14.1949 3.67 13.2045 3.59277 11.9352L3.21387 5.67442L3.19434 5.35606H1.33301C1.05715 5.3559 0.833241 5.1319 0.833008 4.85606C0.833008 4.58001 1.057 4.35622 1.33301 4.35606H4.74512V3.2584C4.74512 2.45607 5.39591 1.80527 6.19824 1.80527H9.80273ZM4.21191 5.61387L4.59082 11.8746C4.63603 12.6162 5.25109 13.1949 5.99414 13.1949H9.92871C10.6649 13.1948 11.2761 12.6263 11.3301 11.8922L11.7891 5.60801L11.8076 5.35606H4.19629L4.21191 5.61387ZM6.19824 2.80527C5.9482 2.80527 5.74512 3.00835 5.74512 3.2584V4.35606H10.2549V3.2584C10.2549 3.00844 10.0527 2.80541 9.80273 2.80527H6.19824Z" /></IconButton>
+              <IconButton label="删除" disabled={!commands.canManageProviders} onClick={() => { editor.clearError(); setProviderPendingDelete(provider); }}><path d="M9.80273 1.80527C10.605 1.80541 11.2549 2.45615 11.2549 3.2584V4.35606H14.666C14.9422 4.35606 15.166 4.57991 15.166 4.85606C15.1658 5.132 14.942 5.35606 14.666 5.35606H12.8096L12.7861 5.68027L12.3281 11.9645C12.2362 13.2214 11.1891 14.1948 9.92871 14.1949H5.99414C4.72231 14.1949 3.67 13.2045 3.59277 11.9352L3.21387 5.67442L3.19434 5.35606H1.33301C1.05715 5.3559 0.833241 5.1319 0.833008 4.85606C0.833008 4.58001 1.057 4.35622 1.33301 4.35606H4.74512V3.2584C4.74512 2.45607 5.39591 1.80527 6.19824 1.80527H9.80273ZM4.21191 5.61387L4.59082 11.8746C4.63603 12.6162 5.25109 13.1949 5.99414 13.1949H9.92871C10.6649 13.1948 11.2761 12.6263 11.3301 11.8922L11.7891 5.60801L11.8076 5.35606H4.19629L4.21191 5.61387ZM6.19824 2.80527C5.9482 2.80527 5.74512 3.00835 5.74512 3.2584V4.35606H10.2549V3.2584C10.2549 3.00844 10.0527 2.80541 9.80273 2.80527H6.19824Z" /></IconButton>
             </div>
           </div>
           {models.length ? <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={async (event: DragEndEvent) => {
@@ -244,18 +199,18 @@ export function ProviderFormPanel({
         </div>;
       })}
       <button type="button" disabled={!commands.canManageProviders} className="h-9 w-fit rounded-[8px] px-3" onClick={() => void openProviderForm()}>添加模型</button>
-      {showProviderForm && portalTarget ? createPortal(<div role="dialog" aria-modal="true" aria-label={editingProvider ? "编辑提供商" : "添加模型"} className="webui-provider-dialog-backdrop"><form className="webui-provider-form" onSubmit={(event) => { event.preventDefault(); void saveProvider(); }}>
-        <header className="webui-provider-form-header"><h3>{editingProvider ? "编辑提供商" : "添加模型"}</h3><button type="button" aria-label="关闭" onClick={() => setShowProviderForm(false)}><CloseIcon /></button></header>
+      {showProviderForm && portalTarget ? createPortal(<div role="dialog" aria-modal="true" aria-label={editingProvider ? "编辑提供商" : "添加模型"} className="webui-provider-dialog-backdrop"><form className="webui-provider-form" onSubmit={(event) => { event.preventDefault(); void editor.save(); }}>
+        <header className="webui-provider-form-header"><h3>{editingProvider ? "编辑提供商" : "添加模型"}</h3><button type="button" aria-label="关闭" onClick={() => editor.close()}><CloseIcon /></button></header>
         <div className="webui-provider-form-body">
-          {!editingProvider ? <div className="webui-provider-form-provider-grid"><label className="webui-provider-form-field">提供商<ProviderPresetPicker presets={presets} selected={selectedPresetId ?? ""} selectedName={selectedPresetId && selectedPresetId !== "__other__" ? draftName : ""} onSelect={(preset) => { if (!preset) { setSelectedPresetId("__other__"); setDraftName(""); setDraftBaseUrl(""); setDraftApiFormat("openai-completions"); setDraftModelId(""); return; } setSelectedPresetId(textOf(preset.providerId)); setDraftName(textOf(preset.name)); setDraftBaseUrl(textOf(preset.baseUrl)); setDraftApiFormat(textOf(preset.apiFormat)); setDraftModelId(""); }} /></label>{selectedPresetId === "__other__" ? <label className="webui-provider-form-field">提供商名称<input aria-label="提供商名称" value={draftName} onChange={(event) => setDraftName(event.target.value)} required /></label> : null}</div> : null}
-          {editingProvider ? <label className="webui-provider-form-field">提供商名称<input value={draftName} onChange={(event) => setDraftName(event.target.value)} required /></label> : null}
-          <div className="webui-provider-form-provider-grid"><label className="webui-provider-form-field">API 格式<input value={draftApiFormat} onChange={(event) => setDraftApiFormat(event.target.value)} /></label><label className="webui-provider-form-field">接口地址<input value={draftBaseUrl} onChange={(event) => setDraftBaseUrl(event.target.value)} required />{editingProvider && providers.find((provider) => provider.providerId === editingProvider)?.configRevision ? <button type="button" disabled={!commands.canManageProviders || formBusy} onClick={async () => { const provider = providers.find((item) => item.providerId === editingProvider); try { const result = await commands.discoverCandidate({ providerId: editingProvider, expectedRevision: textOf(provider?.configRevision), baseUrl: draftBaseUrl }); if (Array.isArray(result) && result.length) setDraftModelId(result.map((item) => textOf(recordOf(item).modelId)).filter(Boolean).join("\n")); } catch (error) { setFormError(error instanceof Error ? error.message : String(error)); } }}>自动获取</button> : null}</label></div>
-          <label className="webui-provider-form-field">API Key<input type="password" value={draftApiKey} onChange={(event) => { setDraftApiKey(event.target.value); setDraftTested(false); }} placeholder={editingProvider ? "留空保留原值" : ""} required={!editingProvider} /></label>
-          <label className="webui-provider-form-field">模型名称<textarea value={draftModelId} onChange={(event) => { setDraftModelId(event.target.value); setDraftTested(false); }} required /></label>
-          <div className="webui-provider-form-headers"><div className="text-[13px] font-medium leading-5 text-text_default_primary">自定义 Headers</div>{draftHeaders.map((header) => <div key={header.id} className="webui-provider-form-header-row"><input aria-label="Header 名称" placeholder="Header 名称" value={header.name} onChange={(event) => setDraftHeaders((items) => items.map((item) => item.id === header.id ? { ...item, name: event.target.value } : item))} /><input aria-label="Header 值" placeholder={header.persistedName ? "留空保留原值" : "Header 值"} value={header.value} onChange={(event) => setDraftHeaders((items) => items.map((item) => item.id === header.id ? { ...item, value: event.target.value } : item))} /><IconButton label="移除 Header" onClick={() => setDraftHeaders((items) => items.filter((item) => item.id !== header.id))}><path d="M9.80273 1.80527C10.605 1.80541 11.2549 2.45615 11.2549 3.2584V4.35606H14.666C14.9422 4.35606 15.166 4.57991 15.166 4.85606C15.1658 5.132 14.942 5.35606 14.666 5.35606H12.8096L12.7861 5.68027L12.3281 11.9645C12.2362 13.2214 11.1891 14.1948 9.92871 14.1949H5.99414C4.72231 14.1949 3.67 13.2045 3.59277 11.9352L3.21387 5.67442L3.19434 5.35606H1.33301C1.05715 5.3559 0.833241 5.1319 0.833008 4.85606C0.833008 4.58001 1.057 4.35622 1.33301 4.35606H4.74512V3.2584C4.74512 2.45607 5.39591 1.80527 6.19824 1.80527H9.80273ZM4.21191 5.61387L4.59082 11.8746C4.63603 12.6162 5.25109 13.1949 5.99414 13.1949H9.92871C10.6649 13.1948 11.2761 12.6263 11.3301 11.8922L11.7891 5.60801L11.8076 5.35606H4.19629L4.21191 5.61387ZM6.19824 2.80527C5.9482 2.80527 5.74512 3.00835 5.74512 3.2584V4.35606H10.2549V3.2584C10.2549 3.00844 10.0527 2.80541 9.80273 2.80527H6.19824Z" /></IconButton></div>)}<button type="button" className="webui-provider-form-add-header" onClick={() => setDraftHeaders((items) => [...items, { id: `new-${Date.now()}-${items.length}`, name: "", value: "" }])}>＋ 添加 Header</button></div>
+          {!editingProvider ? <div className="webui-provider-form-provider-grid"><label className="webui-provider-form-field">提供商<ProviderPresetPicker presets={presets} selected={selectedPresetId ?? ""} selectedName={selectedPresetId && selectedPresetId !== "__other__" ? draftName : ""} onSelect={(preset) => { if (!preset) { setSelectedPresetId("__other__"); editor.changeField("name", ""); editor.changeField("baseUrl", ""); editor.changeField("apiFormat", "openai-completions"); editor.changeField("modelIdText", ""); return; } setSelectedPresetId(textOf(preset.providerId)); editor.changeField("name", textOf(preset.name)); editor.changeField("baseUrl", textOf(preset.baseUrl)); editor.changeField("apiFormat", textOf(preset.apiFormat)); editor.changeField("modelIdText", ""); }} /></label>{selectedPresetId === "__other__" ? <label className="webui-provider-form-field">提供商名称<input aria-label="提供商名称" value={draftName} onChange={(event) => editor.changeField("name", event.target.value)} required /></label> : null}</div> : null}
+          {editingProvider ? <label className="webui-provider-form-field">提供商名称<input value={draftName} onChange={(event) => editor.changeField("name", event.target.value)} required /></label> : null}
+          <div className="webui-provider-form-provider-grid"><label className="webui-provider-form-field">API 格式<input value={draftApiFormat} onChange={(event) => editor.changeField("apiFormat", event.target.value)} /></label><label className="webui-provider-form-field">接口地址<input value={draftBaseUrl} onChange={(event) => editor.changeField("baseUrl", event.target.value)} required />{editingProvider && providers.find((provider) => provider.providerId === editingProvider)?.configRevision ? <button type="button" disabled={!snapshot.canDiscover || formBusy} onClick={() => void editor.discover()}>自动获取</button> : null}</label></div>
+          <label className="webui-provider-form-field">API Key<input type="password" value={draftApiKey} onChange={(event) => editor.changeField("apiKey", event.target.value)} placeholder={editingProvider ? "留空保留原值" : ""} required={!editingProvider} /></label>
+          <label className="webui-provider-form-field">模型名称<textarea value={draftModelId} onChange={(event) => editor.changeField("modelIdText", event.target.value)} required /></label>
+          <div className="webui-provider-form-headers"><div className="text-[13px] font-medium leading-5 text-text_default_primary">自定义 Headers</div>{draftHeaders.map((header) => <div key={header.id} className="webui-provider-form-header-row"><input aria-label="Header 名称" placeholder="Header 名称" value={header.name} onChange={(event) => editor.setHeaders(draftHeaders.map((item) => item.id === header.id ? { ...item, name: event.target.value } : item))} /><input aria-label="Header 值" placeholder={header.persistedName ? "留空保留原值" : "Header 值"} value={header.value} onChange={(event) => editor.setHeaders(draftHeaders.map((item) => item.id === header.id ? { ...item, value: event.target.value } : item))} /><IconButton label="移除 Header" onClick={() => editor.removeHeader(header.id)}><path d="M9.80273 1.80527C10.605 1.80541 11.2549 2.45615 11.2549 3.2584V4.35606H14.666C14.9422 4.35606 15.166 4.57991 15.166 4.85606C15.1658 5.132 14.942 5.35606 14.666 5.35606H12.8096L12.7861 5.68027L12.3281 11.9645C12.2362 13.2214 11.1891 14.1948 9.92871 14.1949H5.99414C4.72231 14.1949 3.67 13.2045 3.59277 11.9352L3.21387 5.67442L3.19434 5.35606H1.33301C1.05715 5.3559 0.833241 5.1319 0.833008 4.85606C0.833008 4.58001 1.057 4.35622 1.33301 4.35606H4.74512V3.2584C4.74512 2.45607 5.39591 1.80527 6.19824 1.80527H9.80273ZM4.21191 5.61387L4.59082 11.8746C4.63603 12.6162 5.25109 13.1949 5.99414 13.1949H9.92871C10.6649 13.1948 11.2761 12.6263 11.3301 11.8922L11.7891 5.60801L11.8076 5.35606H4.19629L4.21191 5.61387ZM6.19824 2.80527C5.9482 2.80527 5.74512 3.00835 5.74512 3.2584V4.35606H10.2549V3.2584C10.2549 3.00844 10.0527 2.80541 9.80273 2.80527H6.19824Z" /></IconButton></div>)}<button type="button" className="webui-provider-form-add-header" onClick={() => editor.addHeader()}>＋ 添加 Header</button></div>
           {formError ? <p role="alert" className="webui-provider-form-error">{formError}</p> : null}
         </div>
-        <footer className="webui-provider-form-actions"><label><input type="checkbox" checked={skipTest} onChange={(event) => setSkipTest(event.target.checked)} />跳过连通检测</label><span /><button type="button" disabled={formBusy || !draftModelId.trim()} onClick={() => void runCandidateTest()}>连通检测</button><button type="button" disabled={formBusy} onClick={() => setShowProviderForm(false)}>取消</button><button type="submit" disabled={formBusy || (!draftTested && !skipTest)}>{formBusy ? "加载中…" : "保存"}</button></footer>
+        <footer className="webui-provider-form-actions"><label><input type="checkbox" checked={skipTest} onChange={(event) => editor.setSkipConnectionTest(event.target.checked)} />跳过连通检测</label><span /><button type="button" disabled={formBusy || !draftModelId.trim()} onClick={() => void editor.test()}>连通检测</button><button type="button" disabled={formBusy} onClick={() => editor.close()}>取消</button><button type="submit" disabled={formBusy || (!draftTested && !skipTest)}>{formBusy ? "加载中…" : "保存"}</button></footer>
       </form></div>, portalTarget) : null}
       {providerPendingDelete ? <div role="dialog" aria-modal="true" aria-label={`删除供应商${textOf(providerPendingDelete.name)}`} className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(0,0,0,0.25)]"><div className="w-[480px] overflow-clip rounded-[20px] bg-bg_grouped_secondary p-6" style={{ boxShadow: "0 4px 10px 0 rgba(0,0,0,0.04)" }}><div className="flex flex-col gap-6"><div className="flex flex-col gap-4"><div className="flex items-center justify-between"><h3 className="text-[18px] font-medium leading-[26px] text-text_default_primary">删除供应商"{textOf(providerPendingDelete.name)}"吗？</h3><button type="button" aria-label="关闭" className="flex size-[22px] items-center justify-center text-icon_default_tertiary hover:text-icon_default_secondary" onClick={() => setProviderPendingDelete(undefined)}><CloseIcon /></button></div><p className="text-[14px] leading-5 text-text_default_secondary">删除后将移除该供应商下的所有模型选项。</p></div>{formError ? <p role="alert">{formError}</p> : null}<div className="flex justify-end gap-4"><button type="button" disabled={formBusy} className="h-9 min-w-[68px] rounded-[8px] px-4" onClick={() => setProviderPendingDelete(undefined)}>取消</button><button type="button" disabled={formBusy} className="h-9 min-w-[68px] rounded-[8px] bg-bg_status_error px-4" onClick={() => void confirmDeleteProvider()}>{formBusy ? "删除中…" : "删除"}</button></div></div></div></div> : null}
   </>;

@@ -1,9 +1,6 @@
-export interface ProviderHeaderDraft {
-  readonly id: string;
-  readonly name: string;
-  readonly value: string;
-  readonly persistedName?: string;
-}
+import type { ProviderHeaderDraft } from "../contracts/provider-editor.js";
+
+export type { ProviderHeaderDraft };
 
 export interface ProviderHeadersProjection {
   readonly headers?: Readonly<Record<string, string>>;

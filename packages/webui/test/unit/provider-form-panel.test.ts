@@ -9,7 +9,8 @@
 //   LC-2  the session-keyed preload effect stays in the parent, still keyed on `[sessionId]`
 //   LC-3  the parent keeps its quota clock, and the Codex OAuth poll is the Account
 //         owner's (T09): the surface acquires an interest, the owner owns the timer
-//   LC-4  the provider drafts are parent state
+//   LC-4  the provider drafts survive a sub-tab switch — since §5.5 they live in the Models
+//         provider editor, which the parent hosts above the `sourceTab === "custom"` conditional
 //   LC-6  `ProviderPresetPicker` still resets on unmount (it lives inside the form's conditional)
 //
 // The drafts editor's counterpart (the picker's two regions) is pinned by the picker's own suites.
@@ -63,18 +64,20 @@ describe("the parent keeps the lifetime", () => {
     expect(panel).not.toContain("setInterval(");
   });
 
-  it("LC-4 keeps the provider drafts as parent state", () => {
-    for (const declaration of [
-      'useState("")', // draftName / draftBaseUrl / draftApiKey / draftModelId
-      'useState("openai-completions")', // draftApiFormat
-      "useState<readonly ProviderHeaderDraft[]>([])",
-      "useState(false)", // draftTested / skipTest
-    ]) {
-      expect(parent).toContain(declaration);
-    }
-    expect(parent).toContain("setDraftName={setDraftName}");
-    expect(parent).toContain("setDraftHeaders={setDraftHeaders}");
-    // The panel reads them and writes them back; it never declares them.
+  it("LC-4 keeps the drafts alive across a sub-tab switch, in the editor the parent hosts", () => {
+    // §5.5 supersedes the §5.7 wording. The drafts are still not the panel's, and they still
+    // survive a sub-tab switch — but they are the Models editor's now, and what makes them survive
+    // is that the parent hosts the *instance* above the conditional. Hoisting the hook below it,
+    // or calling it twice, turns this red.
+    // Anchored on the branch's own testid, not on the quoted conditional: the hook's own
+    // comment names that conditional, so a slice from its first occurrence would stop above it.
+    expect(parent.indexOf("useWebuiProviderEditor(")).toBeLessThan(
+      parent.indexOf('data-testid="settings-custom-models-panel"'),
+    );
+    expect(parent.match(/useWebuiProviderEditor\(/gu) ?? []).toHaveLength(1);
+    expect(parent).toContain("editor={editor}");
+    expect(parent).toContain("snapshot={providerEditorSnapshot}");
+    // Neither module declares a draft field: the panel reads the snapshot and the parent hosts it.
     expect(panel).not.toMatch(/const \[draft[A-Z]/u);
   });
 
@@ -107,7 +110,14 @@ describe("the panel keeps the reset boundary", () => {
   it("invokes the provider commands it is handed, and owns none of them", () => {
     expect(panel).toContain("commands.patchProviderModels(");
     expect(panel).toContain("commands.updateProvider(");
-    expect(panel).toContain("commands.saveCandidate(");
+    // The draft's write/test/delete commands are the editor's (§5.5), so the panel no longer
+    // names them: it calls the editor, and the editor is what sends them.
+    expect(panel).not.toContain("commands.saveCandidate(");
+    expect(panel).not.toContain("commands.testCandidate(");
+    expect(panel).not.toContain("commands.deleteProvider(");
+    expect(panel).toContain("editor.save()");
+    expect(panel).toContain("editor.test()");
+    expect(panel).toContain("editor.remove()");
     expect(panel).not.toContain("useWebuiSettingsWorkflows");
     expect(panel).not.toContain("application/");
   });

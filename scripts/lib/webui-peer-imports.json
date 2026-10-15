@@ -147,6 +147,11 @@
       "reason": "The screen embeds the models business's provider form (provider CRUD is Models' duty, plan §5.6's models row, which this page renders rather than owns). Reviewed peer edge until Models publishes the form as a public surface."
     },
     {
+      "from": "client/features/settings/ui/UsageModelSettings.tsx",
+      "to": "client/features/models/bindings/use-provider-editor.ts",
+      "reason": "The screen hosts the Models provider editor above its custom-tab branch, which is what keeps a draft and its tested flag alive across a source-tab switch (plan §5.5, §5.7 LC-4). The editor's policy stays Models': the screen only holds the instance and renders its snapshot. Reviewed peer edge until Models publishes the editor handle as a public binding surface."
+    },
+    {
       "from": "client/features/interactions/application/interaction-session-owners.ts",
       "to": "client/features/sessions/application/session-commands.ts",
       "reason": "The session-keyed interaction owner applies the same session-scoped stream-phase commands after a questionnaire settles, for the same reason as the coordinator entry above. Reviewed peer edge until sessions publishes the command view as a public contract."

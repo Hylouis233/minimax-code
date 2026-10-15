@@ -6,6 +6,8 @@ import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
 import { formatResetLabel, getActiveSourceBadge, type ProviderHeaderDraft } from "../../../features/models/projection/usage-settings.js";
 import { IconButton, RefreshIcon } from "./settings-atoms.js";
 import { ProviderFormPanel, type WebuiProviderFormCommands } from "../../../features/models/ui/ProviderFormPanel.js";
+import { useWebuiProviderEditor } from "../../../features/models/bindings/use-provider-editor.js";
+import type { WebuiProviderEditorCommands } from "../../../features/models/contracts/provider-editor.js";
 import type { WebuiModelProviderView } from "../../../../shared/contracts/models.js";
 
 type Props = {
@@ -15,6 +17,19 @@ type Props = {
 /** The provider form's commands when the owner is not wired yet. It disables what `models?.` used
  * to make unavailable and does nothing where `settings?.X()` used to call nothing, so the panel's
  * own code needs no optional-chaining of its own. */
+// The editor's fallback: the same "not wired" answers, for the members the editor
+// needs that the panel's bundle does not carry (`createProvider`).
+const NO_PROVIDER_EDITOR_COMMANDS: WebuiProviderEditorCommands = {
+  canManageProviders: false,
+  revealApiKey: async () => "",
+  createProvider: async () => undefined,
+  updateProvider: async () => undefined,
+  deleteProvider: async () => undefined,
+  discoverCandidate: async () => undefined,
+  saveCandidate: async () => undefined,
+  testCandidate: async () => undefined,
+};
+
 const NO_PROVIDER_COMMANDS: WebuiProviderFormCommands = {
   canManageProviders: false,
   loadProviders: async () => {},
@@ -46,6 +61,13 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
   // and its snapshot come from that owner, not from the settings one.
   const models = useWebuiModelsWorkflows();
   const modelsState = useWebuiModelsWorkflowsState();
+  // The provider editor is hosted *here*, above the custom-tab branch rendered
+  // below, so a source-tab switch neither loses a draft nor forgets that the
+  // draft was tested (plan §5.5, §5.7 LC-4). Its lifetime is this component's,
+  // which is leaving the Usage category or closing Settings.
+  const { editor, snapshot: providerEditorSnapshot } = useWebuiProviderEditor(
+    models ?? NO_PROVIDER_EDITOR_COMMANDS,
+  );
   const account = useWebuiAccountWorkflows();
   const accountState = useWebuiAccountWorkflowsState();
   const [sourceTab, setSourceTab] = useState<"token-plan" | "minimax-api" | "custom">("token-plan");
@@ -59,14 +81,6 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
   const [oauthError, setOauthError] = useState<string>();
   const [oauthLoginId, setOauthLoginId] = useState<string>();
   const [providerPendingDelete, setProviderPendingDelete] = useState<WebuiModelProviderView>();
-  const [draftName, setDraftName] = useState("");
-  const [draftBaseUrl, setDraftBaseUrl] = useState("");
-  const [draftApiKey, setDraftApiKey] = useState("");
-  const [draftModelId, setDraftModelId] = useState("");
-  const [draftApiFormat, setDraftApiFormat] = useState("openai-completions");
-  const [draftHeaders, setDraftHeaders] = useState<readonly ProviderHeaderDraft[]>([]);
-  const [draftTested, setDraftTested] = useState(false);
-  const [skipTest, setSkipTest] = useState(false);
 
   // Committed read state, derived from the owner snapshots.
   const quota = accountState.usage.result;
@@ -199,22 +213,8 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
           presets={presets}
           commands={models ?? NO_PROVIDER_COMMANDS}
           setProviderActionError={setProviderActionError}
-          draftName={draftName}
-          setDraftName={setDraftName}
-          draftBaseUrl={draftBaseUrl}
-          setDraftBaseUrl={setDraftBaseUrl}
-          draftApiKey={draftApiKey}
-          setDraftApiKey={setDraftApiKey}
-          draftModelId={draftModelId}
-          setDraftModelId={setDraftModelId}
-          draftApiFormat={draftApiFormat}
-          setDraftApiFormat={setDraftApiFormat}
-          draftHeaders={draftHeaders}
-          setDraftHeaders={setDraftHeaders}
-          draftTested={draftTested}
-          setDraftTested={setDraftTested}
-          skipTest={skipTest}
-          setSkipTest={setSkipTest}
+          editor={editor}
+          snapshot={providerEditorSnapshot}
           providerPendingDelete={providerPendingDelete}
           setProviderPendingDelete={setProviderPendingDelete}
         />
