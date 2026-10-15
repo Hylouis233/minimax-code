@@ -10,6 +10,18 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createWebuiInteractionSessionOwners } from "../../src/client/features/interactions/application/interaction-session-owners.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
+import { createWebuiInteractionPhaseIntents } from "../../src/client/features/turn/contracts/interaction-phase-intents.js";
+
+/**
+ * The phase intents the composition supplies. They are turn's published contract
+ * built over this store's session writer (plan §5.5 P02 step 3), so the owner is
+ * handed them rather than importing turn's factory.
+ */
+const phaseIntentsFor =
+  (store: ReturnType<typeof createWebuiSessionStore>) => (sessionId: string) =>
+    createWebuiInteractionPhaseIntents({
+      setStream: store.createSessionWriter({ kind: "session", sessionId }).setStream,
+    });
 
 const permission = (sessionId: string, requestId: string) =>
   ({ sessionId, requestId, toolName: "read", agentName: "main" }) as never;
@@ -25,7 +37,7 @@ function deferred<T>() {
 describe("interaction owners are keyed by session", () => {
   it("creates one owner per session and keeps it", () => {
     const store = createWebuiSessionStore();
-    const owners = createWebuiInteractionSessionOwners({ store });
+    const owners = createWebuiInteractionSessionOwners({ store, readPhaseIntents: phaseIntentsFor(store) });
 
     const a = owners.owner("A");
     expect(owners.owner("A")).toBe(a);
@@ -37,6 +49,7 @@ describe("interaction owners are keyed by session", () => {
     const store = createWebuiSessionStore();
     const owners = createWebuiInteractionSessionOwners({
       store,
+      readPhaseIntents: phaseIntentsFor(store),
       port: {
         listPendingPermissions: async () => ({
           requests: [permission("A", "r1"), permission("B", "r2")],
@@ -64,6 +77,7 @@ describe("interaction owners are keyed by session", () => {
     const store = createWebuiSessionStore();
     const owners = createWebuiInteractionSessionOwners({
       store,
+      readPhaseIntents: phaseIntentsFor(store),
       port: {
         listPendingPermissions: () => slowA.promise,
         replyPermission: async () => ({ ok: true }),
@@ -84,6 +98,7 @@ describe("interaction owners are keyed by session", () => {
     const store = createWebuiSessionStore();
     const owners = createWebuiInteractionSessionOwners({
       store,
+      readPhaseIntents: phaseIntentsFor(store),
       port: {
         // The answer still names r1: if it landed it would install a request the
         // invalidation just retired.
@@ -106,6 +121,7 @@ describe("interaction owners are keyed by session", () => {
     const getPendingQuestionnaire = vi.fn(async () => ({ request: undefined }));
     const owners = createWebuiInteractionSessionOwners({
       store,
+      readPhaseIntents: phaseIntentsFor(store),
       port: { getPendingQuestionnaire } as never,
       readAgentName: (sessionId) => (sessionId === "A" ? "reviewer" : "main"),
     });
@@ -119,6 +135,7 @@ describe("interaction owners are keyed by session", () => {
     const store = createWebuiSessionStore();
     const owners = createWebuiInteractionSessionOwners({
       store,
+      readPhaseIntents: phaseIntentsFor(store),
       port: { listPendingPermissions: async () => ({ requests: [] }) } as never,
     });
     const first = owners.owner("A");

@@ -85,7 +85,7 @@ describe("prohibition 1 — a business may not hold a writer for another busines
     // holds that command view — `prohibition 1` in `interaction-coordinator.test.ts`
     // asserts the runtime half.
     expect(flat(read("features/interactions/application/interaction-coordinator.ts"))).toContain(
-      "readonly streams: WebuiStreamPhaseCommands;",
+      "readonly streams: WebuiInteractionPhaseIntents;",
     );
   });
 });

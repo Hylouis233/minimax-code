@@ -70,6 +70,7 @@ import {
   type WebuiInteractionSessionOwners,
 } from "../features/interactions/application/interaction-session-owners.js";
 import type { WebuiInteractionPortSlice } from "../features/interactions/application/interaction-coordinator.js";
+import { createWebuiInteractionPhaseIntents } from "../features/turn/contracts/interaction-phase-intents.js";
 import {
   selectWebuiCatalogFlatPage,
   selectWebuiCatalogTreePage,
@@ -425,6 +426,12 @@ export function createWebuiApplication(
   const readAgentName = deps.readAgentName ?? catalogueAgentName;
   const interactions = createWebuiInteractionSessionOwners({
     store,
+    // The assembly builds the intents because it is what holds the store; the
+    // owner itself consumes turn's published contract (plan §5.5 P02 step 3).
+    readPhaseIntents: (sessionId) =>
+      createWebuiInteractionPhaseIntents({
+        setStream: store.createSessionWriter({ kind: "session", sessionId }).setStream,
+      }),
     ...(deps.interactionsPort ? { port: deps.interactionsPort } : {}),
     readAgentName,
   });

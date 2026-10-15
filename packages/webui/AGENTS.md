@@ -205,6 +205,11 @@ Within a layer, feature implementation is private by default. A feature may use 
 public `contracts/`; other peer edges require an explicit reviewed entry in
 `scripts/lib/webui-peer-imports.json`.
 
+A business that decides *when* another business's state moves is handed that business's published
+narrow contract, and the composition that holds the writer builds it. The interaction flow is the
+worked example: it drives `WebuiInteractionPhaseIntents` (published from `features/turn/contracts/`)
+and never sees Turn's stream state or the factory that needs Turn's transforms.
+
 `shared/` imports neither execution side, and the browser never imports `server/` or `runtime/`.
 `pnpm check:webui-dependency` enforces this direction over the source (including `import type` edges).
 

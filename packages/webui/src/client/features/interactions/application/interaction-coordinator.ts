@@ -34,7 +34,7 @@ import type {
 } from "../../../../shared/contracts/interactions.js";
 import { buildWebuiPlanApproveAnswers } from "../projection/plan-mode.js";
 import { webuiAnswersEndTurn } from "../projection/questionnaire-state.js";
-import type { WebuiStreamPhaseCommands } from "../../turn/contracts/turn-command-views.js";
+import type { WebuiInteractionPhaseIntents } from "../../turn/contracts/interaction-phase-intents.js";
 import type { WebuiVersionCell } from "../../../application/version-cell.js";
 
 /** The transport methods this owner drives. Absent means "not wired". */
@@ -98,7 +98,7 @@ export interface WebuiInteractionCoordinatorOptions {
   readonly port: WebuiInteractionPortSlice;
   readonly sink: WebuiInteractionSink;
   /**
-   * `turn`'s published stream-phase commands, invoked through their names.
+   * `turn`'s published phase intents, invoked through their names.
    *
    * Prohibition 1 is about **writers**, not about calling: this owner may invoke
    * another business's published command, and may not be handed that business's
@@ -109,8 +109,11 @@ export interface WebuiInteractionCoordinatorOptions {
    * stream-phase writers…"). They are turn's state and turn's commands, so the
    * flow calls them here and the outcome→transition policy stays with the flow
    * that knows it.
+   *
+   * The narrow intents rather than the full view: this flow never settles an
+   * aborted slice, so it is not handed the member that does (plan §5.5 P02 step 3).
    */
-  readonly streams: WebuiStreamPhaseCommands;
+  readonly streams: WebuiInteractionPhaseIntents;
   /** Persists request/mutation order across render-scoped coordinator objects. */
   readonly pendingVersionRef: WebuiVersionCell;
   /** The session these flows belong to. Absent means nothing to refresh. */

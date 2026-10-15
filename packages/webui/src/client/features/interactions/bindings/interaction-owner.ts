@@ -13,6 +13,7 @@ import { useEffect, useMemo, useRef } from "react";
 
 import type { WebuiInteractionCoordinator } from "../application/interaction-coordinator.js";
 import { createWebuiInteractionSessionOwners } from "../application/interaction-session-owners.js";
+import { createWebuiInteractionPhaseIntents } from "../../turn/contracts/interaction-phase-intents.js";
 import { WEBUI_HOME_SESSION_KEY } from "../../../application/state.js";
 import { useWebuiApplicationOptional, useWebuiSessionStoreContext } from "../../../bindings/application-context.js";
 
@@ -26,7 +27,17 @@ export function useWebuiInteractionOwner(
 ): WebuiInteractionCoordinator {
   const application = useWebuiApplicationOptional();
   const store = useWebuiSessionStoreContext();
-  const fallback = useMemo(() => createWebuiInteractionSessionOwners({ store }), [store]);
+  const fallback = useMemo(
+    () =>
+      createWebuiInteractionSessionOwners({
+        store,
+        readPhaseIntents: (sessionId) =>
+          createWebuiInteractionPhaseIntents({
+            setStream: store.createSessionWriter({ kind: "session", sessionId }).setStream,
+          }),
+      }),
+    [store],
+  );
   const owners = application?.interactions ?? fallback;
   return owners.owner(webuiInteractionRecordKey(sessionId));
 }

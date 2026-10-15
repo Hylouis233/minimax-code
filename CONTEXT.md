@@ -132,6 +132,21 @@ tools, is chosen explicitly when the session is created, and cannot be changed
 afterwards.
 _Avoid_: cwd, project path, root
 
+**Creation origin**:
+One of the four places a session can be created from: an ordinary send, a goal, an
+installed plugin, or the session rail. Every origin reaches the same task use case,
+so the workspace rule, the created identity, the guarded adoption and the committed
+navigation are decided once rather than per surface.
+_Avoid_: entry point, creation path, trigger
+
+**Submission**:
+Committing input to a session — creating it, starting a turn, or queueing behind one
+already running. Its outcome names the target and whether the caller should select
+it, so the caller never decides creation or navigation itself. A submission while the
+same home is already creating is refused as busy, and input it refuses is left
+untouched.
+_Avoid_: send, dispatch, enqueue (each names one origin or one wire step)
+
 **Stream frame**:
 The unit the harness pushes to a client while a turn runs. One frame may carry a
 whole message, a text chunk, a runtime event, an action delta, a status change or a

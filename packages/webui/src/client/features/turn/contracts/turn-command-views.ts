@@ -11,25 +11,21 @@
 // here keeps the phase/lifecycle vocabulary in one home rather than two, and it
 // is what the sessions business reads when it builds a view for a record it owns.
 
+import type { WebuiInteractionPhaseIntents, WebuiStreamPhase } from "./interaction-phase-intents.js";
 import type { WebuiStreamLoopSink } from "./stream-loop.js";
-import type { WebuiStreamState } from "./stream-state.js";
 
-/** The phases the stream slice can be moved to by name. */
-export type WebuiStreamPhase = WebuiStreamState["phase"];
+export type { WebuiStreamPhase };
 
 /**
  * The **stream-phase** view: every member moves or settles the `phase` field and
  * writes nothing else.
+ *
+ * The four transitions an interaction flow drives are published separately, as
+ * `WebuiInteractionPhaseIntents`, because that flow decides *when* the phase moves
+ * and needs no mechanism to say so. This view adds the one member that does need
+ * one — `settleStoppedStream`, which settles an aborted slice.
  */
-export interface WebuiStreamPhaseCommands {
-  /** Move the stream's phase without touching any other field. */
-  readonly markStreamPhase: (phase: WebuiStreamPhase) => void;
-  /** A turn is live: it is streaming. */
-  readonly startStreaming: () => void;
-  /** The turn ends locally. */
-  readonly endStreaming: () => void;
-  /** A pending interaction gates the turn. */
-  readonly awaitInteraction: () => void;
+export interface WebuiStreamPhaseCommands extends WebuiInteractionPhaseIntents {
   /**
    * The user stopped the turn: settle the slice to `done`/`aborted` and drop
    * the claim marker so the loop it silenced cannot write again.

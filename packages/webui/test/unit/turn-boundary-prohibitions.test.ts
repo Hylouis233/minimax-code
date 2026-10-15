@@ -142,9 +142,13 @@ describe("prohibition 3 — the stream-phase value set is enumerated exactly onc
   });
 
   it("derives the phase type from the union instead of re-listing it", () => {
-    expect(read("features/turn/contracts/turn-command-views.ts")).toContain(
+    // The derivation lives with the narrow intents, which declare the phase
+    // vocabulary first; the full view re-exports it rather than deriving it a
+    // second time.
+    expect(read("features/turn/contracts/interaction-phase-intents.ts")).toContain(
       'WebuiStreamState["phase"]',
     );
+    expect(read("features/turn/contracts/turn-command-views.ts")).not.toContain("WebuiStreamState");
   });
 });
 

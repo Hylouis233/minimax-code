@@ -147,11 +147,6 @@
       "reason": "The session-keyed interaction owner applies the same session-scoped interaction commands after a questionnaire settles, for the same reason as the coordinator entry above. Reviewed peer edge until sessions publishes the command view as a public contract."
     },
     {
-      "from": "client/features/interactions/application/interaction-session-owners.ts",
-      "to": "client/features/turn/application/stream-phase-commands.ts",
-      "reason": "The same session-keyed owner also applies the stream-phase commands after a questionnaire settles. This is the edge that used to name sessions' command module, carried to the phase commands' new home when P02 step 2 moved them into turn: the view is published (turn/contracts/turn-command-views.ts), the factory is an implementation and cannot be. Reviewed peer edge until P02 step 3 gives interactions the narrow phase intents it needs instead of the view."
-    },
-    {
       "from": "client/features/interactions/ui/PlanModeCards.tsx",
       "to": "client/features/transcript/ui/markdown.tsx",
       "reason": "The plan decision card renders the plan text through the transcript's markdown renderer, the same shared rendering the workspace panel uses. Reviewed peer edge until the transcript publishes markdown as a shared rendering contract."

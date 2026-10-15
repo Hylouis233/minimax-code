@@ -21,7 +21,7 @@
 
 import type { WebuiSessionStore } from "../../../application/session-store.js";
 import { createWebuiInteractionCommands } from "../../sessions/application/session-commands.js";
-import { createWebuiStreamPhaseCommands } from "../../turn/application/stream-phase-commands.js";
+import type { WebuiInteractionPhaseIntents } from "../../turn/contracts/interaction-phase-intents.js";
 import {
   createWebuiInteractionCoordinator,
   type WebuiInteractionCoordinator,
@@ -48,6 +48,14 @@ export interface WebuiInteractionSessionOwners {
 
 export function createWebuiInteractionSessionOwners(deps: {
   readonly store: WebuiSessionStore;
+  /**
+   * The phase intents this owner drives, per session. Injected rather than built
+   * here: the intents are turn's published contract (plan §5.5 P02 step 3), and
+   * the composition that knows the store builds them for the session it is
+   * creating the owner for. Required, so no caller silently loses the phase writes
+   * a pending interaction implies.
+   */
+  readonly readPhaseIntents: (sessionId: string) => WebuiInteractionPhaseIntents;
   /** The interaction capability. Absent on a host with nothing wired. */
   readonly port?: WebuiInteractionPortSlice;
   /**
@@ -70,9 +78,7 @@ export function createWebuiInteractionSessionOwners(deps: {
       const commands = createWebuiInteractionCommands(
         deps.store.createInteractionWriter({ kind: "session", sessionId }),
       );
-      const streams = createWebuiStreamPhaseCommands({
-        setStream: deps.store.createSessionWriter({ kind: "session", sessionId }).setStream,
-      });
+      const streams = deps.readPhaseIntents(sessionId);
       // The fence is this session's: a reply for this session cannot fence
       // another session's pending read, and the converse holds too.
       const pendingVersionRef: WebuiVersionCell = { current: 0 };
