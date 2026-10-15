@@ -2,9 +2,9 @@
 // commands and the unread controller, both now application-owned, plus the
 // deduplicated active-turn probe they share.
 //
-// The suite drives the application modules directly (the webui suite has no DOM
-// and the layer is not yet wired into the live process-event ingress), pinning
-// the properties the moves had to preserve: one probe per concurrent
+// The suite drives application commands directly and also exercises the app's
+// event ingress in the assembled lifecycle suite, pinning the properties the
+// moves had to preserve: one probe per concurrent
 // same-session request, the queue branch's draft-clear/refusal behaviour, the
 // attach/recheck/gap-recovery decisions, and the unread persistence shape.
 
@@ -29,6 +29,10 @@ import {
 import { createWebuiTranscriptHistoryOwner } from "../../src/client/conversation/transcript-history.js";
 import { selectWebuiSessionTranscriptPage } from "../../src/client/application/selectors.js";
 import { createWebuiAccountWorkflows } from "../../src/client/features/account/application/account-workflows.js";
+import { createWebuiApplication } from "../../src/client/application/create-application.js";
+import { WEBUI_HOME_SESSION_KEY } from "../../src/client/application/state.js";
+import { createWebuiPortSlices } from "../../src/client/application/port-slices.js";
+import { createWebuiSessionCatalogFromPage, reduceWebuiCatalogTreeLoaded } from "../../src/client/features/sessions/application/session-catalog.js";
 import { createWebuiSettingsWorkflows } from "../../src/client/features/settings/application/settings-workflows.js";
 import type { WebuiClientMessagePage } from "../../src/client/features/transcript/contracts/message-view.js";
 import type { WebuiUsageQuotaResult } from "../../src/shared/contracts/usage-quota.js";
@@ -394,6 +398,265 @@ describe("the queue command", () => {
     const onDraftChange = vi.fn();
     await queueWebuiTurn({ sessionId: "s1", message: "x", onDraftChange, setRefusal: vi.fn() });
     expect(onDraftChange).not.toHaveBeenCalled();
+  });
+});
+
+describe("the assembled composer controller", () => {
+  it("keeps an accepted send and its state settlement alive after view interest detaches", async () => {
+    let resolveSend: (() => void) | undefined;
+    const sendMessage = vi.fn(async (_message: { readonly id: string; readonly content: string }) => new Promise<void>((resolve) => { resolveSend = resolve; }));
+    const app = createWebuiApplication({
+      openEventChannel: () => ({ subscribe: () => () => undefined, close: () => undefined }),
+      turns: { resumeSession: vi.fn(async () => undefined) },
+      turnCapabilities: { sendMessage: sendMessage as never },
+    });
+    app.start({ initialSessionId: "s1" });
+    const detach = app.composerController.attachView("s1");
+    const accepted = app.composerController.submit({
+      draft: "accepted message",
+      sending: false,
+      goalEnabled: true,
+      agentName: "main",
+    });
+    detach();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage.mock.calls[0]?.[0]).toMatchObject({ id: "s1", content: "accepted message" });
+    expect(app.composer.readHistory("s1")).toEqual(["accepted message"]);
+    expect(app.composer.readRetry()).toEqual({ session: "s1", message: "accepted message" });
+    expect(app.store.readSession("s1").sending).toBe(true);
+
+    resolveSend?.();
+    await expect(accepted).resolves.toEqual({ kind: "submitted", sessionId: "s1" });
+    expect(app.store.readSession("s1").sending).toBe(false);
+
+    app.dispose();
+  });
+
+  it("routes enqueue, goal and slash command through the assembled owners", async () => {
+    const enqueueMessage = vi.fn(async () => ({}));
+    const listQueueMessages = vi.fn(async () => ({ items: [{ itemId: "q1", content: "queued" }] }));
+    const runCommand = vi.fn(async () => ({ output: "status output" }));
+    const createGoal = vi.fn(async ({ sessionId, objective }: { sessionId: string; objective: string }) => ({
+      goalId: "g1", sessionId, objective, status: "active", createdAt: 1, updatedAt: 1,
+      tokensUsed: 0, turnsUsed: 0, timeUsedSeconds: 0, tokenBudget: null, statusReason: null,
+    }));
+    const slices = createWebuiPortSlices({
+      runCommand,
+      listQueueMessages,
+      deleteQueueItem: vi.fn(),
+    } as never);
+    const app = createWebuiApplication({
+      openEventChannel: () => ({ subscribe: () => () => undefined, close: () => undefined }),
+      turns: { resumeSession: vi.fn(async () => undefined) },
+      turnCapabilities: { enqueueMessage: enqueueMessage as never },
+      goalPort: { createGoal: createGoal as never },
+      slices,
+    });
+    app.start({ initialSessionId: "s1" });
+
+    await expect(app.composerController.submit({
+      draft: "queued text",
+      sending: true,
+      goalEnabled: true,
+      agentName: "main",
+    })).resolves.toMatchObject({ kind: "queued", sessionId: "s1" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(enqueueMessage).toHaveBeenCalledWith({ id: "s1", content: "queued text" });
+    expect(app.composer.readDraft("s1")).toBe("");
+    expect(app.composer.readQueue().items).toEqual([{ itemId: "q1", content: "queued" }]);
+
+    await expect(app.composerController.submit({
+      draft: "status now",
+      commandMatch: { name: "status", supported: true },
+      commandInvocationInput: "now",
+      sending: false,
+      goalEnabled: true,
+      agentName: "target-agent",
+    })).resolves.toEqual({ kind: "command-completed", output: "status output" });
+    expect(runCommand).toHaveBeenCalledWith({ command: "status", input: "now", sessionId: "s1", agentName: "target-agent" });
+
+    app.composerController.setGoalMode(true);
+    await expect(app.composerController.submit({
+      draft: "finish this task",
+      sending: false,
+      goalEnabled: true,
+      agentName: "main",
+    })).resolves.toMatchObject({ kind: "goal-updated", sessionId: "s1" });
+    expect(createGoal).toHaveBeenCalledWith({ sessionId: "s1", objective: "finish this task" });
+    app.dispose();
+  });
+
+  it("writes a home goal through the created session's goal owner after adoption", async () => {
+    const homeGoal = {
+      goalId: "home-goal", sessionId: WEBUI_HOME_SESSION_KEY, objective: "old objective",
+      status: "active" as const, createdAt: 1, updatedAt: 1, tokensUsed: 0, turnsUsed: 0,
+      timeUsedSeconds: 0, tokenBudget: null, statusReason: null,
+    };
+    const patchedGoal = { ...homeGoal, sessionId: "created-session", objective: "new objective", updatedAt: 2 };
+    const store = createWebuiSessionStore();
+    store.updateSession(homeGoal.sessionId, (current) => ({ ...current, goal: homeGoal }));
+    const patchGoal = vi.fn(async () => patchedGoal);
+    const app = createWebuiApplication({
+      openEventChannel: () => ({ subscribe: () => () => undefined, close: () => undefined }),
+      turns: { resumeSession: vi.fn(async () => undefined) },
+      store,
+      goalPort: { patchGoal: patchGoal as never },
+      slices: createWebuiPortSlices({
+        createSession: vi.fn(async () => ({ sessionId: "created-session" })),
+      } as never),
+    });
+    app.start();
+    app.composerController.setGoalMode(true);
+
+    const outcome = await app.composerController.submit({
+      draft: "new objective",
+      sending: false,
+      goalEnabled: true,
+      agentName: "main",
+    });
+    expect(outcome).toMatchObject({ kind: "goal-updated", sessionId: "created-session" });
+
+    expect(patchGoal).toHaveBeenCalledWith({ sessionId: "created-session", objective: "new objective" });
+    expect(app.store.readSession("created-session").goal).toEqual(patchedGoal);
+    expect(app.store.readSession(homeGoal.sessionId).goal).toBeUndefined();
+    app.dispose();
+  });
+
+  it("does not let a delayed enqueue refresh reclaim the queue mirror after selection changes", async () => {
+    let resolveEnqueue: (() => void) | undefined;
+    const enqueueMessage = vi.fn(() => new Promise<void>((resolve) => { resolveEnqueue = resolve; }));
+    const app = createWebuiApplication({
+      openEventChannel: () => ({ subscribe: () => () => undefined, close: () => undefined }),
+      turns: { resumeSession: vi.fn(async () => undefined) },
+      turnCapabilities: { enqueueMessage: enqueueMessage as never },
+      slices: createWebuiPortSlices({
+        listQueueMessages: vi.fn(async ({ id }: { id: string }) => ({ items: [{ itemId: id, content: id }] })),
+      } as never),
+    });
+    app.start();
+    app.select("s1");
+    await flush();
+    const accepted = app.composerController.submit({
+      draft: "queued while selected",
+      sending: true,
+      goalEnabled: true,
+      agentName: "main",
+    });
+    await flush();
+    app.select("s2");
+    await flush();
+    resolveEnqueue?.();
+    await expect(accepted).resolves.toMatchObject({ kind: "queued", sessionId: "s1" });
+    await flush();
+
+    expect(app.composer.readQueue()).toEqual({ items: [{ itemId: "s2", content: "s2" }], paused: false });
+    app.dispose();
+  });
+
+  it("preserves Composer fields on selection and goal/command branches, then clears submitted staging", async () => {
+    const attachment = {
+      id: "a1", fileName: "notes.txt", mimeType: "text/plain", sizeBytes: 5,
+      dataUrl: "data:text/plain;base64,aGVsbG8=", kind: "file" as const,
+    };
+    const attachmentWire = {
+      meta: { attachmentType: "file", fileName: attachment.fileName, mimeType: attachment.mimeType, sizeBytes: attachment.sizeBytes },
+      local: { dataUrl: attachment.dataUrl },
+    };
+    const urlReference = { id: "u1", url: "https://example.test/" };
+    const createGoal = vi.fn(async ({ sessionId, objective }: { sessionId: string; objective: string }) => ({
+      goalId: "g1", sessionId, objective, status: "active" as const, createdAt: 1, updatedAt: 1,
+      tokensUsed: 0, turnsUsed: 0, timeUsedSeconds: 0, tokenBudget: null, statusReason: null,
+    }));
+    const runCommand = vi.fn(async () => ({ output: "command output" }));
+    const sendMessage = vi.fn(async () => undefined);
+    const enqueueMessage = vi.fn(async () => undefined);
+    const app = createWebuiApplication({
+      openEventChannel: () => ({ subscribe: () => () => undefined, close: () => undefined }),
+      turns: { resumeSession: vi.fn(async () => undefined) },
+      turnCapabilities: { sendMessage: sendMessage as never, enqueueMessage: enqueueMessage as never },
+      goalPort: { createGoal: createGoal as never },
+      slices: createWebuiPortSlices({ runCommand } as never),
+    });
+    app.start({ initialSessionId: "s1" });
+    const stage = () => {
+      app.composerController.setStagedAttachments(() => [attachment]);
+      app.composerController.setUrlReferences(() => [urlReference]);
+      app.composerController.setAttachmentBusy(true);
+      app.composerController.consumeSeed("seed-1");
+    };
+
+    app.composerController.setDraft("session one draft", "s1");
+    app.composerController.recordInput("earlier input", "s1");
+    stage();
+    app.composerController.setPlanMode(true);
+    app.select("s2");
+    expect(app.composer.getSnapshot().modes).toEqual({ goal: false, plan: true });
+    expect(app.composer.readDraft("s1")).toBe("session one draft");
+    expect(app.composer.readHistory("s1")).toEqual(["earlier input"]);
+    expect(app.composer.readStaging()).toEqual({
+      attachments: [attachment], urlReferences: [urlReference], busy: true, seedToken: "seed-1",
+    });
+    app.composerController.setGoalMode(true);
+    expect(app.composer.getSnapshot().modes).toEqual({ goal: true, plan: false });
+    app.select("s1");
+    expect(app.composer.getSnapshot().modes).toEqual({ goal: false, plan: false });
+
+    app.composerController.setGoalMode(true);
+    await expect(app.composerController.submit({ draft: "goal objective", sending: false, goalEnabled: true, agentName: "main" }))
+      .resolves.toMatchObject({ kind: "goal-updated", sessionId: "s1" });
+    expect(app.composer.readStaging().attachments).toEqual([attachment]);
+    expect(app.composer.readStaging().urlReferences).toEqual([urlReference]);
+
+    app.composerController.setGoalMode(false);
+    await expect(app.composerController.submit({
+      draft: "status now", commandMatch: { name: "status", supported: true }, commandInvocationInput: "now",
+      sending: false, goalEnabled: true, agentName: "main",
+    })).resolves.toMatchObject({ kind: "command-completed" });
+    expect(app.composer.readStaging().attachments).toEqual([attachment]);
+    expect(app.composer.readStaging().urlReferences).toEqual([urlReference]);
+
+    await expect(app.composerController.submit({
+      draft: "send with attachment", attachments: [attachmentWire], sending: false, goalEnabled: true, agentName: "main",
+    })).resolves.toMatchObject({ kind: "submitted", sessionId: "s1" });
+    expect(app.composer.readStaging().attachments).toEqual([]);
+    expect(app.composer.readStaging().urlReferences).toEqual([]);
+
+    stage();
+    await expect(app.composerController.submit({
+      draft: "enqueue attachment", attachments: [attachmentWire], sending: true, goalEnabled: true, agentName: "main",
+    })).resolves.toMatchObject({ kind: "queued", sessionId: "s1" });
+    expect(app.composer.readStaging().attachments).toEqual([]);
+    expect(app.composer.readStaging().urlReferences).toEqual([]);
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(enqueueMessage).toHaveBeenCalledTimes(1);
+    app.dispose();
+  });
+
+  it("resolves a questionnaire requester from its target child session", async () => {
+    const catalog = reduceWebuiCatalogTreeLoaded(
+      createWebuiSessionCatalogFromPage({ sessions: [], hasMore: false }),
+      { sessions: [{
+        session: { sessionId: "root", agentName: "root-agent", createdAt: 1, updatedAt: 1 },
+        childSessions: [{ sessionId: "child", parentSessionId: "root", agentName: "child-agent", createdAt: 1, updatedAt: 1 }],
+      }], hasMore: false },
+    );
+    const store = createWebuiSessionStore({ catalog });
+    const replyQuestionnaire = vi.fn(async () => ({ ok: true }));
+    const app = createWebuiApplication({
+      openEventChannel: () => ({ subscribe: () => () => undefined, close: () => undefined }),
+      turns: { resumeSession: vi.fn(async () => undefined) },
+      store,
+      interactionsPort: { replyQuestionnaire: replyQuestionnaire as never },
+    });
+
+    await app.interactions.owner("child").answerQuestionnaire({ id: "q1", schemaVersion: 3 } as never, []);
+
+    expect(replyQuestionnaire).toHaveBeenCalledWith({
+      name: "child-agent", requestId: "q1", schemaVersion: 3, answers: [],
+    });
+    app.dispose();
   });
 });
 

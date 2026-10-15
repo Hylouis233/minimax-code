@@ -57,6 +57,7 @@ export interface NewTaskWorkspace {
   readonly recentWorkspaceDirs: readonly string[];
   readonly handleWorkspaceChange: (workspaceDir?: string) => void;
   readonly handleSessionCreated: (id: string) => void;
+  readonly handleSessionCreatedViewEffect: (id: string) => void;
   readonly startNewTask: (workspaceDir?: string) => void;
 }
 
@@ -124,18 +125,10 @@ export function useNewTaskWorkspace(options: UseNewTaskWorkspaceOptions): NewTas
     },
     [],
   );
-  const handleSessionCreated = (id: string) => {
-    // Home→session adoption is one committed transition (ticket #49 criterion
-    // 5): the application carries the home turn's live record onto the created
-    // session, moves the composer's home slot onto it and selects it — no
-    // separate migration + composer migration + selection.
-    adoptHomeSession(id);
+  const handleSessionCreatedViewEffect = (id: string) => {
     setSelectedSessionId(id);
     storage.writeTeamModeSessionChoice(id, teamModeOff);
     setTeamModeChoice(id, teamModeOff);
-    // Refresh the rail projection after the first message creates a session —
-    // the flat list (its failure is reported) and the tree (best effort),
-    // matching the shell's original two independent loads.
     if (workflows.canLoadFlat) void workflows.loadFlat();
     if (workflows.canLoadTree) void workflows.loadTree();
     if (typeof window !== "undefined")
@@ -144,6 +137,14 @@ export function useNewTaskWorkspace(options: UseNewTaskWorkspaceOptions): NewTas
         "",
         `${window.location.pathname}${window.location.search}${sessionHash(id)}`,
       );
+  };
+  const handleSessionCreated = (id: string) => {
+    // Home→session adoption is one committed transition (ticket #49 criterion
+    // 5): the application carries the home turn's live record onto the created
+    // session, moves the composer's home slot onto it and selects it — no
+    // separate migration + composer migration + selection.
+    adoptHomeSession(id);
+    handleSessionCreatedViewEffect(id);
   };
   const startNewTask = (workspaceDir?: string) => {
     // A project row's plus action opens a fresh home composer preselected to
@@ -176,6 +177,7 @@ export function useNewTaskWorkspace(options: UseNewTaskWorkspaceOptions): NewTas
     recentWorkspaceDirs,
     handleWorkspaceChange,
     handleSessionCreated,
+    handleSessionCreatedViewEffect,
     startNewTask,
   };
 }

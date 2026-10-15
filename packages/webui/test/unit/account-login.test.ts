@@ -19,6 +19,7 @@
 //     the session does not report it as a failure.
 
 import { describe, expect, it, vi } from "vitest";
+import type { AuthStatusSnapshot } from "@mavis/oauth-core";
 
 import { createWebuiAccountLoginSession } from "../../src/runtime/account-login.js";
 import { deriveWebuiAccountLoginPhase } from "../../src/client/features/account/application/login-phase.js";
@@ -64,7 +65,11 @@ function fakeCore() {
     cancelLogin: vi.fn(async () => {
       deferred.reject(new Error("MCode OAuth device authorization was cancelled."));
     }),
-    getStatus: vi.fn(async () => ({ status: "anonymous", generation: 0, scopes: [] })),
+    getStatus: vi.fn(async (): Promise<AuthStatusSnapshot> => ({
+      status: "anonymous",
+      generation: 0,
+      scopes: [],
+    })),
     emitPrompt() {
       authorize?.({
         userCode: "ABCD-1234",

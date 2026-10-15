@@ -17,6 +17,11 @@
 import { createWebuiPortSlices, type WebuiPortSlices } from "./port-slices.js";
 import { createWebuiSessionWorkflows } from "../features/sessions/application/session-workflows.js";
 import { createWebuiCommandWorkflows } from "../features/composer/application/command-workflows.js";
+import { createWebuiComposerController } from "../features/composer/application/composer-controller.js";
+import { submitWebuiGoal } from "../features/composer/application/composer-workflows.js";
+import type { WebuiComposerController } from "../features/composer/contracts/composer-controller.js";
+import { WEBUI_COMPOSER_HOME_KEY } from "../features/composer/application/composer-history.js";
+import { createWebuiTurnLifecycleCommands } from "../features/sessions/application/session-commands.js";
 import { createWebuiTerminalOwner } from "../features/terminal/application/terminal-owner.js";
 import { createWebuiWorkspaceQueries } from "../features/workspace/application/workspace-queries.js";
 import { createWebuiAccountWorkflows } from "../features/account/application/account-workflows.js";
@@ -65,6 +70,7 @@ import {
   selectWebuiCatalogFlatPage,
   selectWebuiCatalogTreePage,
 } from "../features/sessions/application/session-catalog.js";
+import { selectWebuiSessionAgentName, selectWebuiSessionLookups } from "../features/sessions/projection/session-lookups.js";
 import type { WebuiApplicationState } from "./state.js";
 import { WEBUI_HOME_SESSION_KEY } from "./state.js";
 import {
@@ -245,6 +251,7 @@ export interface WebuiApplication {
   readonly unread: WebuiUnreadController;
   /** The one owner of composer drafts and input history (plan §7.6). */
   readonly composer: WebuiComposerStore;
+  readonly composerController: WebuiComposerController;
   /**
    * The port slices the assembly cut (§6 W6). Published so a surface reads the
    * narrowed slice rather than the composed transport: the shell provides these
@@ -353,14 +360,9 @@ export function createWebuiApplication(
    */
   const catalogueAgentName = (sessionId: string): string => {
     const catalog = store.getSnapshot().catalog;
-    const flat = selectWebuiCatalogFlatPage(catalog).sessions.find(
-      (session) => session.sessionId === sessionId,
-    );
-    if (flat) return flat.agentName;
-    for (const node of selectWebuiCatalogTreePage(catalog).sessions) {
-      if (node.session.sessionId === sessionId) return node.session.agentName;
-    }
-    return "main";
+    const flat = selectWebuiCatalogFlatPage(catalog);
+    const tree = selectWebuiCatalogTreePage(catalog);
+    return selectWebuiSessionAgentName(selectWebuiSessionLookups(flat, tree), sessionId);
   };
   const readAgentName = deps.readAgentName ?? catalogueAgentName;
   const interactions = createWebuiInteractionSessionOwners({
@@ -376,6 +378,7 @@ export function createWebuiApplication(
   const selectSession = (sessionId: string | undefined): void => {
     sessionScope.select(sessionId);
     store.select(sessionId);
+    composerController?.selectSession(sessionId);
     // Selecting is where a retained dirty marker pays out: the session was
     // marked while nothing needed it, and now something does (plan §4.3).
     if (sessionId !== undefined && dirtyResources.has(sessionId)) {
@@ -433,6 +436,7 @@ export function createWebuiApplication(
    * whether or not a composer is mounted (T05).
    */
   const turnCommands = new Map<string, WebuiConversationTurnCommands>();
+  let composerController: WebuiComposerController | undefined;
   /**
    * The one reconciliation entry point (plan §4.4): the same owner routes the
    * event path uses, so selection and reconnect do not run a second one.
@@ -443,8 +447,9 @@ export function createWebuiApplication(
     void interactions.owner(sessionId).refresh();
     void goals.owner(sessionId).refreshGoal();
   };
-  const turnCommandsFor = (sessionId: string): WebuiConversationTurnCommands => {
-    const existing = turnCommands.get(sessionId);
+  const turnCommandsFor = (sessionId: string | undefined): WebuiConversationTurnCommands => {
+    const key = sessionId ?? WEBUI_HOME_SESSION_KEY;
+    const existing = turnCommands.get(key);
     if (existing) return existing;
     const commands = createWebuiConversationTurnCommands({
       store,
@@ -453,7 +458,7 @@ export function createWebuiApplication(
       deliveries,
       scope: sessionScope,
     });
-    turnCommands.set(sessionId, commands);
+    turnCommands.set(key, commands);
     return commands;
   };
   const events = createWebuiEventCoordinator({
@@ -532,6 +537,68 @@ export function createWebuiApplication(
     scope: sessionScope,
   });
   const commandWorkflows = createWebuiCommandWorkflows({ port: slices.composer });
+  composerController = createWebuiComposerController({
+    store: composer,
+    readSelectedSessionId: readActiveSessionId,
+    adoptHomeSession: (sessionId) => {
+      store.migrateSession(WEBUI_HOME_SESSION_KEY, sessionId);
+      composer.adoptHome(sessionId);
+      selectSession(sessionId);
+    },
+    turnCommandsFor,
+    commandWorkflows,
+    canEnqueue: turnCapabilities.enqueue !== undefined,
+    canSend: turnCapabilities.send !== undefined,
+    readGoal: (sessionId) => store.readSession(sessionId).goal,
+    createOrPatchGoal: async (input, onSessionCreated) => {
+      const originalSessionId = input.sessionId;
+      const recordKey = originalSessionId ?? WEBUI_HOME_SESSION_KEY;
+      const initialOwner = goals.owner(recordKey);
+      let targetSessionId = originalSessionId;
+      let usesPatch = Boolean(store.readSession(recordKey).goal && initialOwner.patchGoal);
+      let createdSessionId: string | undefined;
+      const goal = await submitWebuiGoal({
+        sessionId: originalSessionId,
+        objective: input.objective,
+        currentGoal: store.readSession(recordKey).goal,
+        createGoal: initialOwner.createGoal ?? (async () => { throw new Error("当前运行时不支持创建目标"); }),
+        ...(initialOwner.patchGoal ? { patchGoal: initialOwner.patchGoal } : {}),
+        resolveGoal: (sessionId) => {
+          targetSessionId = sessionId;
+          const owner = goals.owner(sessionId);
+          const currentGoal = store.readSession(sessionId).goal;
+          usesPatch = Boolean(currentGoal && owner.patchGoal);
+          return {
+            currentGoal,
+            createGoal: owner.createGoal ?? (async () => { throw new Error("当前运行时不支持创建目标"); }),
+            ...(owner.patchGoal ? { patchGoal: owner.patchGoal } : {}),
+          };
+        },
+        ...(sessionWorkflows.createSession ? { createSession: sessionWorkflows.createSession } : {}),
+        ...(input.createSessionWorkspaceDir ? { createSessionWorkspaceDir: input.createSessionWorkspaceDir } : {}),
+        ...(input.teamModeOff ? { teamModeOff: true } : {}),
+      }, (sessionId) => {
+        createdSessionId = sessionId;
+        onSessionCreated(sessionId);
+      });
+      const sessionId = targetSessionId ?? createdSessionId;
+      if (!sessionId) throw new Error("创建目标会话未返回会话 ID");
+      if (!usesPatch) goals.owner(sessionId).applyGoal(goal);
+      return { goal, sessionId };
+    },
+    refreshPending: (sessionId) => interactions.owner(sessionId).refresh(),
+    refreshGoal: async (sessionId) => { await goals.owner(sessionId).refreshGoal(); },
+    recoverTurn: (sessionId) => turnCommandsFor(sessionId).recover(),
+    refreshInspection: async (sessionId) => {
+      await Promise.all([modelsWorkflows.loadModels(sessionId), accountWorkflows.loadAccount(sessionId)]);
+    },
+    clearHomeTurn: () => {
+      const writer = store.createSessionWriter({ kind: "home" });
+      const lifecycle = createWebuiTurnLifecycleCommands({ setStream: writer.setStream, setSending: writer.setSending });
+      lifecycle.clearStream();
+      lifecycle.setTurnSending(false);
+    },
+  });
   const workspaceQueries = createWebuiWorkspaceQueries({ port: slices.workspace });
   const accountWorkflows = createWebuiAccountWorkflows({
     port: slices.account,
@@ -621,6 +688,7 @@ export function createWebuiApplication(
     transcriptHistory,
     unread,
     composer,
+    composerController,
     portSlices: slices,
     terminalOwner,
     sessionWorkflows,
@@ -674,6 +742,7 @@ export function createWebuiApplication(
       // The account owner runs the login and OAuth-status polls, so its end is
       // the application's end rather than a component unmount (T09, T19).
       accountWorkflows.dispose();
+      sessionWorkflows.dispose();
       // The terminal owner's disposer is the client's own end: its watches stop
       // and the PTYs it created are killed here rather than left running for a
       // page that is going away (T15 criterion 3). Fire-and-forget because this
@@ -683,6 +752,7 @@ export function createWebuiApplication(
       channelReadyListeners.clear();
       dirtyResources.clear();
       turnCommands.clear();
+      composerController?.dispose();
       store.dispose();
       channel?.close?.();
       channel = undefined;

@@ -109,13 +109,10 @@ describe("cascade — a model's own settings decide whether its row is worth des
     // `setTier("settings")` would forbid exactly the behaviour that replaced the
     // removed one.
     const picker = readComponent("ModelPicker.tsx");
-    const handler = picker.slice(
-      picker.indexOf("const handleSelectModel"),
-      picker.indexOf("const handleHoverRow"),
-    );
+    const handler = picker.slice(picker.indexOf("const handleSelectModel"));
     // The close is the workflow's decision (`closes: true` for a selection),
     // performed through the picker's one close seam.
-    expect(handler).toContain("close: handleCloseFlyout");
+    expect(handler).toContain("close: interaction.close");
     expect(handler).not.toContain("setTier");
   });
 });
@@ -146,7 +143,7 @@ describe("cascade — the thinking switch does not finish the visit", () => {
     expect(resolution.closes).toBe(false);
     expect(resolution.draft.thinkingEffort).toBe("max");
 
-    const picker = readComponent("ModelPicker.tsx");
+    const picker = readComponent("ModelDraftEditor.tsx");
     const handler = picker.slice(
       picker.indexOf("const handleThinkingChange"),
       picker.indexOf("const handleContextChange"),
@@ -154,7 +151,7 @@ describe("cascade — the thinking switch does not finish the visit", () => {
     // The handler routes the level through the one workflow; the selection it
     // performs reaches the picker's `onSelect`.
     expect(handler).toContain('commitChange({ kind: "thinking", option })');
-    expect(picker).toContain("onSelect={onSelect}");
+    expect(picker).toContain("select: (next) => onSelect(model, next)");
     // And no premature close: the level is a mid-visit edit.
     expect(handler).not.toContain("setOpen(false)");
     expect(handler).not.toContain("onCloseMenu()");
@@ -174,7 +171,7 @@ describe("cascade — a click inside the fly-out finishes the selection", () => 
     expect(resolution.closes).toBe(true);
     expect(resolution.draft.contextLimit).toBe(1_000_000);
 
-    const picker = readComponent("ModelPicker.tsx");
+    const picker = readComponent("ModelDraftEditor.tsx");
     const handler = picker.slice(
       picker.indexOf("const handleContextChange"),
       picker.indexOf("return (", picker.indexOf("const handleContextChange")),
@@ -184,9 +181,9 @@ describe("cascade — a click inside the fly-out finishes the selection", () => 
     // workflow asks for the close and the picker's `handleCloseFlyout` performs
     // it.
     expect(picker).toContain("close: onCloseMenu");
-    expect(picker).toContain("onCloseMenu={handleCloseFlyout}");
-    expect(picker).toContain("const handleCloseFlyout = () => {");
-    expect(picker).toContain("setOpen(false);");
+    const composition = readComponent("ModelPicker.tsx");
+    expect(composition).toContain("onCloseMenu={interaction.close}");
+    expect(composition).toContain("close,");
   });
 
   it("leaves NOTHING in the fly-out disabled while previewing", () => {
@@ -315,6 +312,10 @@ describe("fly-out placement — one engine, so the tiers cannot disagree", () =>
 
 describe("fly-out placement — the anchor is asked, not remembered", () => {
   const picker = readComponent("ModelPicker.tsx");
+  const interaction = readFileSync(
+    path.resolve(here, "../../src/client/features/models/bindings/use-model-picker-interaction.ts"),
+    "utf8",
+  );
   const flyout = readComponent("ModelSettingsFlyout.tsx");
 
   it("resolves the row inside the resolver, not when the anchor is built", () => {
@@ -323,10 +324,10 @@ describe("fly-out placement — the anchor is asked, not remembered", () => {
     // finds nothing in the gap and the panel loses `position: fixed` and lands
     // wherever the flow puts it — the drift, seen as a panel sitting far below
     // the row it describes.
-    expect(picker).toContain("rowElements.current.get(focused.rowId)");
-    expect(picker).toMatch(/const flyoutAnchor: FlyoutAnchor = useCallback\(/);
+    expect(interaction).toContain("rowElements.current.get(focused.rowId)");
+    expect(interaction).toMatch(/const flyoutAnchor: FlyoutAnchor = useCallback\(/);
     // The lookup lives INSIDE the callback, not in the props it produces.
-    expect(picker).not.toMatch(/flyoutAnchor =[\s\S]{0,200}rowElements\.current\.get/);
+    expect(interaction).not.toMatch(/flyoutAnchor =[\s\S]{0,200}rowElements\.current\.get/);
   });
 
   it("reads the anchor at measure time rather than off a captured element", () => {
@@ -356,19 +357,19 @@ describe("fly-out placement — the anchor is asked, not remembered", () => {
     // own control and the lookup resolves nothing at all. Derived during
     // render — not in an effect — because the fly-out measures in a LAYOUT
     // effect, so a correction made after paint would still show the drift.
-    expect(picker).toMatch(
-      /const focused = useMemo\(\s*\(\) => reconcileFocusedRow\(focusedRow, groupedModels\)/,
+    expect(interaction).toMatch(
+      /const focused = useMemo\(\s*\(\) => reconcileFocusedRow\(focusedRow, groups\)/,
     );
-    expect(picker).toContain("rowElements.current.get(focused.rowId)");
-    // The rows have to be grouped before the reconciliation can read them.
-    expect(picker.indexOf("const groupedModels = useMemo(")).toBeLessThan(
-      picker.indexOf("reconcileFocusedRow(focusedRow, groupedModels)"),
-    );
+    expect(interaction).toContain("rowElements.current.get(focused.rowId)");
+    // The picker derives groups before injecting them into the binding that
+    // reconciles the focused row against the current projection.
+    expect(picker).toContain("groups: groupedModels");
   });
 });
 
 describe("cascade — the shape the source has to keep", () => {
   const picker = readComponent("ModelPicker.tsx");
+  const menu = readComponent("ModelMenu.tsx");
   const flyout = readComponent("ModelSettingsFlyout.tsx");
 
   it("has no permanent settings column left in the menu", () => {
@@ -384,7 +385,7 @@ describe("cascade — the shape the source has to keep", () => {
   });
 
   it("mounts the fly-out instead of an in-menu panel", () => {
-    expect(picker).toContain("ModelSettingsFlyout");
+    expect(readComponent("ModelDraftEditor.tsx")).toContain("ModelSettingsFlyout");
   });
 
   it("drives its one surface through the one placement hook", () => {
@@ -431,7 +432,7 @@ describe("cascade — the shape the source has to keep", () => {
     // The list is rendered from one place, and since the cut (ticket #71) that one place is the
     // menu cluster — which is itself rendered once. Counting render sites rather than mentions:
     // the cluster's props type names `WebuiModelMenuList` too.
-    expect(picker.match(/<WebuiModelMenuList/g) ?? []).toHaveLength(1);
+    expect(menu.match(/<WebuiModelMenuList/g) ?? []).toHaveLength(1);
     expect(picker.match(/<WebuiModelMenuCluster/g) ?? []).toHaveLength(1);
   });
 });

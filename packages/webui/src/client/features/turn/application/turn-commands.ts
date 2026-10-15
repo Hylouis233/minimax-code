@@ -22,6 +22,8 @@ import type {WebuiClientSessionResumer} from "../contracts/execution-port.js";
 import type { WebuiClientMessageLoader } from "../../transcript/contracts/message-view.js";
 import type { WebuiClientSessionCreator } from "../../../contracts/sessions/session-port.js";
 import type { WebuiAttachmentInput } from "../../../../shared/contracts/messages.js";
+import type { WebuiConversationTurnCommands, WebuiTurnSendIntent } from "../contracts/turn-commands.js";
+export type { WebuiConversationTurnCommands, WebuiTurnSendIntent } from "../contracts/turn-commands.js";
 import type { WebuiTurnCommandWriter } from "../../sessions/application/session-commands.js";
 import {
   buildWebuiComposerHandlers,
@@ -284,18 +286,6 @@ export interface WebuiTurnCommandContext {
 }
 
 /** What a surface supplies to send: intent and data, never a writer or a sink. */
-export interface WebuiTurnSendIntent {
-  readonly message: string;
-  readonly clientIntent?: string;
-  readonly planMode?: boolean;
-  readonly attachments?: readonly WebuiAttachmentInput[];
-  readonly onAttachmentsSubmitted?: () => void;
-  readonly sending: boolean;
-  readonly callbacks: WebuiComposerTurnCallbacks;
-  readonly createSessionWorkspaceDir?: string;
-  readonly teamModeOff?: boolean;
-}
-
 /**
  * The turn commands a surface invokes, with the application's own construction
  * behind them.
@@ -311,23 +301,6 @@ export interface WebuiTurnSendIntent {
  * create the session it is sent to, and the writer's own `migrateToSession`
  * carries the attempt from the home slot to that session.
  */
-export interface WebuiConversationTurnCommands {
-  readonly send: (intent: WebuiTurnSendIntent) => Promise<void>;
-  readonly attach: (turnId: string | undefined) => void;
-  /**
-   * `session.start` named a turn we do not hold while holding another: ask the
-   * authoritative active turn whether the held lease is stale or concurrent.
-   */
-  readonly recheck: (turnId: string | undefined) => void;
-  /**
-   * Gap recovery: a `session.start` can arrive before this client subscribed, or
-   * be missed while the event channel reconnects, and the session list cannot
-   * answer the question. Ask the server instead.
-   */
-  readonly recover: () => void;
-  readonly stop: () => Promise<void>;
-}
-
 export function createWebuiConversationTurnCommands(
   context: WebuiTurnCommandContext,
 ): WebuiConversationTurnCommands {

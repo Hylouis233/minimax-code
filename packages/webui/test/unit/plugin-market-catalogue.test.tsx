@@ -27,6 +27,8 @@ import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { PluginCatalogue } from "../../src/client/features/plugins/ui/PluginCatalogue.js";
+import { projectWebuiPluginCatalogue } from "../../src/client/features/plugins/projection/catalogue-view.js";
+import type { WebuiPluginRow } from "../../src/client/features/plugins/contracts/plugin-rows.js";
 const marketplace = (initialArea: "plugins" | "skills"): string =>
   renderToStaticMarkup(
     createElement(PluginCatalogue, {
@@ -34,11 +36,21 @@ const marketplace = (initialArea: "plugins" | "skills"): string =>
     }),
   );
 
-const component = squashWhitespace(readWebuiSource("features/plugins/ui/PluginCatalogue.tsx"));
+const component = squashWhitespace(
+  readWebuiSource("features/plugins/ui/PluginCatalogue.tsx"),
+);
+const marketplaceSource = squashWhitespace(
+  readWebuiSource("features/plugins/ui/PluginMarketplace.tsx"),
+);
+const catalogueView = squashWhitespace(
+  readWebuiSource("features/plugins/projection/catalogue-view.ts"),
+);
 // The listing composition — the skill-hub paging and its unknowable total —
 // moved into the application plugin owner (ticket #52). The two assertions
 // below pin that behaviour where it now lives, with the same intent.
-const owner = squashWhitespace(readWebuiSource("features/plugins/application/plugin-workflows.ts"));
+const owner = squashWhitespace(
+  readWebuiSource("features/plugins/application/plugin-workflows.ts"),
+);
 
 describe("plugin marketplace catalogue", () => {
   it("offers 插件 and 技能 instead of 市场 and 个人", () => {
@@ -92,34 +104,32 @@ describe("marketplace page layout parity", () => {
     // The regression in one assertion: re-gating the grid on the plugin area
     // would put 技能 back into the divided list while this file still passes
     // every other check.
-    expect(component).toMatch(
+    expect(catalogueView).toMatch(
       /const isMarketCatalogue\s*=\s*\(area === "plugins" \|\| area === "skills"\) && view === "market";/,
     );
-    expect(component).toContain(
-      'className={`webui-plugin-list ${isMarketCatalogue ? "webui-plugin-grid" : ""}`}',
+    expect(marketplaceSource).toContain(
+      'className="webui-plugin-list webui-plugin-grid"',
     );
   });
 
   it("previews the same number of cards on both pages", () => {
-    expect(component).toContain("const MARKET_PREVIEW_COUNT = 8;");
-    expect(component).toMatch(
-      /isMarketCatalogue && !showAllCatalogue\s*\?\s*filtered\.slice\(0, MARKET_PREVIEW_COUNT\)/,
+    expect(marketplaceSource).toContain("const MARKET_PREVIEW_COUNT = 8;");
+    expect(marketplaceSource).toMatch(
+      /showAll \? rows : rows\.slice\(0, MARKET_PREVIEW_COUNT\)/,
     );
   });
 
   it("offers the same expand affordance on both pages", () => {
     // SSR cannot reach this control: no effect runs, so there is no data and no
     // total. The wiring is pinned by reading the component, as above.
-    expect(component).toContain(
-      "!busy && isMarketCatalogue && visibleMarketTotal > MARKET_PREVIEW_COUNT",
+    expect(marketplaceSource).toContain(
+      "visibleMarketTotal > MARKET_PREVIEW_COUNT",
     );
     // The label names the catalogue rather than being hard-coded to plugins,
     // so 技能 reads 「查看全部技能」 / 「收起技能」 instead of 「收起插件」.
-    expect(component).toContain("`收起${marketNoun}`");
-    expect(component).toContain(
-      'const marketNoun = area === "skills" ? "技能" : "插件";',
-    );
-    expect(component).toContain("`查看全部 ${marketTotal} 个`");
+    expect(marketplaceSource).toContain("`收起${noun}`");
+    expect(marketplaceSource).toContain('const noun = area === "skills" ? "技能" : "插件";');
+    expect(marketplaceSource).toContain("`查看全部 ${marketTotal} 个`");
   });
 
   it("does not state a skill count the hub cannot supply", () => {
@@ -127,13 +137,17 @@ describe("marketplace page layout parity", () => {
     // `pluginTotal` equivalent. When the page came back truncated the total is
     // unknowable, so the label drops the number rather than claiming "查看全部
     // 100 个" for an arbitrarily capped fetch.
-    expect(owner).toContain("(result as Record<string, unknown>).hasMore === true");
-    expect(component).toMatch(
-      /marketTotal === null\s*\?\s*`查看全部\$\{marketNoun\}`/,
+    expect(owner).toContain(
+      "(result as Record<string, unknown>).hasMore === true",
+    );
+    expect(marketplaceSource).toMatch(
+      /marketTotal === null\s*\?\s*`查看全部\$\{noun\}`/,
     );
     // …and the control is still offered on the strength of what is in hand, so
     // a truncated listing is not silently stuck at the preview.
-    expect(component).toContain("const visibleMarketTotal = marketTotal ?? filtered.length;");
+    expect(catalogueView).toContain(
+      "visibleMarketTotal: marketTotal ?? rows.length",
+    );
   });
 
   it("restores the full catalogue when the selected catalogue changes", () => {
@@ -148,6 +162,60 @@ describe("marketplace page layout parity", () => {
     expect(component).toMatch(
       /const selectMarketCatalog = \(catalog: "plugins" \| "skills"\) => \{[^}]*setShowAllCatalogue\(true\);/,
     );
+  });
+});
+
+describe("plugin catalogue pure view projection", () => {
+  it("filters by the catalogue query and derives an honest unknown skill total", () => {
+    const result = projectWebuiPluginCatalogue({
+      data: [
+        { name: "Writer", description: "Documents" },
+        { name: "Painter", description: "Images" },
+      ] as WebuiPluginRow[],
+      query: "doc",
+      area: "skills",
+      view: "market",
+      pluginTotal: 20,
+      skillTotal: null,
+    });
+    expect(result.rows.map((row) => row.name)).toEqual(["Writer"]);
+    expect(result).toMatchObject({
+      isMarketCatalogue: true,
+      marketNoun: "技能",
+      marketTotal: null,
+      visibleMarketTotal: 1,
+    });
+  });
+
+  it("projects management status and stable source fields from the existing row contract", () => {
+    const result = projectWebuiPluginCatalogue({
+      data: [
+        {
+          name: "Local app",
+          enabled: true,
+          source: 2,
+          runtime: { status: "running" },
+          status: "available",
+          locationUri: "file:///skill.md",
+          creatorInfo: { name: "Publisher" },
+        },
+      ],
+      query: "",
+      area: "apps",
+      view: "personal",
+      pluginTotal: 0,
+      skillTotal: null,
+    });
+    expect(result.rows[0]).toMatchObject({
+      name: "Local app",
+      enabled: true,
+      pluginSource: 2,
+      locationUri: "file:///skill.md",
+      creatorInfo: { name: "Publisher" },
+      appStatus: "运行中",
+      mcpStatus: { key: "available", label: "已连接" },
+    });
+    expect(result.isMarketCatalogue).toBe(false);
   });
 });
 
@@ -189,7 +257,7 @@ describe("plugin marketplace data paths", () => {
       '<div className="webui-plugin-header-inner">',
     );
     const marketplaceContentStart = component.indexOf(
-      'className="webui-plugin-market-discovery"',
+      "<PluginMarketplaceFilters",
       headerStart,
     );
     expect(headerStart).toBeGreaterThanOrEqual(0);
@@ -199,8 +267,12 @@ describe("plugin marketplace data paths", () => {
       marketplaceContentStart,
     );
     // The marketplace branch in the same span is the catalogue pair.
-    expect(managingHeader).toContain('onClick={() => selectMarketCatalog("plugins")}');
-    expect(managingHeader).toContain('onClick={() => selectMarketCatalog("skills")}');
+    expect(managingHeader).toContain(
+      'onClick={() => selectMarketCatalog("plugins")}',
+    );
+    expect(managingHeader).toContain(
+      'onClick={() => selectMarketCatalog("skills")}',
+    );
     // The 管理 entry is what actually opens the installed view.
     expect(managingHeader).toMatch(/>\s*管理\s*<\/button>/);
     expect(managingHeader).toContain("setManagementOpen(true)");

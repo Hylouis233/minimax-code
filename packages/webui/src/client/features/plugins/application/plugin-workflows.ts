@@ -29,6 +29,7 @@ import {
   webuiPluginRows,
   type WebuiPluginActions,
   type WebuiPluginActionInputs,
+  type WebuiPluginIntent,
 } from "../contracts/plugin-actions.js";
 import type { WebuiPluginManagementAction } from "../../../../shared/plugin-management.js";
 import {
@@ -133,6 +134,8 @@ export interface WebuiPluginWorkflows {
   readonly loadListing: (selection: WebuiPluginSelection) => Promise<void>;
   /** Re-load the most recent selection (used after a mutation). */
   readonly reload: () => Promise<void>;
+  /** Submit one UI intent through the matching named owner command. */
+  readonly runIntent: (intent: WebuiPluginIntent) => Promise<unknown>;
 
   /** Read a single MCP server / agent / avatar; returns the raw answer. */
   readonly getMcpServer: (name: string) => Promise<Record<string, unknown>>;
@@ -164,6 +167,128 @@ export interface WebuiPluginWorkflows {
   readonly createAgent: (input: WebuiPluginActionInputs["createAgent"]) => Promise<unknown>;
   readonly updateAgent: (input: WebuiPluginActionInputs["updateAgent"]) => Promise<unknown>;
   readonly deleteAgent: (input: WebuiPluginActionInputs["deleteAgent"]) => Promise<unknown>;
+}
+
+function runWebuiPluginIntent(
+  workflows: Omit<WebuiPluginWorkflows, "runIntent">,
+  intent: WebuiPluginIntent,
+): Promise<unknown> {
+  switch (intent.kind) {
+    case "installPlugin":
+      return workflows.installPlugin({
+        pluginName: intent.pluginName,
+        ...(intent.source === undefined ? {} : { source: intent.source }),
+      });
+    case "uninstallPlugin":
+      return workflows.uninstallPlugin({
+        pluginName: intent.pluginName,
+        ...(intent.source === undefined ? {} : { source: intent.source }),
+      });
+    case "enablePlugin":
+      return workflows.enablePlugin({
+        pluginName: intent.pluginName,
+        ...(intent.source === undefined ? {} : { source: intent.source }),
+      });
+    case "disablePlugin":
+      return workflows.disablePlugin({
+        pluginName: intent.pluginName,
+        ...(intent.source === undefined ? {} : { source: intent.source }),
+      });
+    case "importGithubPlugin":
+      return workflows.importGithubPlugin({ source: intent.source });
+    case "installSkill":
+      return workflows.installSkill({
+        url: intent.url,
+        ...(intent.displayName === undefined
+          ? {}
+          : { displayName: intent.displayName }),
+        ...(intent.publisherSourceType === undefined
+          ? {}
+          : { publisherSourceType: intent.publisherSourceType }),
+        ...(intent.isFromGit === undefined
+          ? {}
+          : { isFromGit: intent.isFromGit }),
+        ...(intent.creatorInfo === undefined
+          ? {}
+          : { creatorInfo: intent.creatorInfo }),
+      });
+    case "createSkill":
+      return workflows.createSkill({
+        name: intent.name,
+        description: intent.description,
+        content: intent.content,
+      });
+    case "setSkillEnabled":
+      return workflows.setSkillEnabled({
+        skillName: intent.skillName,
+        enabled: intent.enabled,
+        ...(intent.locationUri === undefined
+          ? {}
+          : { locationUri: intent.locationUri }),
+      });
+    case "deleteSkill":
+      return workflows.deleteSkill({
+        skillName: intent.skillName,
+        ...(intent.locationUri === undefined
+          ? {}
+          : { locationUri: intent.locationUri }),
+      });
+    case "createMcpServer":
+      return workflows.createMcpServer({
+        name: intent.name,
+        config: intent.config,
+        ...(intent.enabled === undefined ? {} : { enabled: intent.enabled }),
+      });
+    case "updateMcpServer":
+      return workflows.updateMcpServer({
+        name: intent.name,
+        config: intent.config,
+      });
+    case "deleteMcpServer":
+      return workflows.deleteMcpServer({ name: intent.name });
+    case "setMcpServerEnabled":
+      return workflows.setMcpServerEnabled({
+        name: intent.name,
+        enabled: intent.enabled,
+      });
+    case "testMcpServer":
+      return workflows.testMcpServer({ name: intent.name });
+    case "createAgent":
+      return workflows.createAgent({
+        name: intent.name,
+        ...(intent.displayName === undefined
+          ? {}
+          : { displayName: intent.displayName }),
+        ...(intent.description === undefined
+          ? {}
+          : { description: intent.description }),
+        ...(intent.systemPrompt === undefined
+          ? {}
+          : { systemPrompt: intent.systemPrompt }),
+        ...(intent.initialDefinition === undefined
+          ? {}
+          : { initialDefinition: intent.initialDefinition }),
+      });
+    case "updateAgent":
+      return workflows.updateAgent({
+        name: intent.name,
+        ...(intent.displayName === undefined
+          ? {}
+          : { displayName: intent.displayName }),
+        ...(intent.description === undefined
+          ? {}
+          : { description: intent.description }),
+        ...(intent.systemPrompt === undefined
+          ? {}
+          : { systemPrompt: intent.systemPrompt }),
+      });
+    case "deleteAgent":
+      return workflows.deleteAgent({ name: intent.name });
+    default:
+      throw new Error(
+        `未支持的操作：${(intent as { readonly kind: string }).kind}`,
+      );
+  }
 }
 
 export function createWebuiPluginWorkflows(deps: {
@@ -405,7 +530,7 @@ export function createWebuiPluginWorkflows(deps: {
     }
   };
 
-  return {
+  const owner: Omit<WebuiPluginWorkflows, "runIntent"> = {
     getSnapshot: () => state,
     subscribe: (listener) => {
       listeners.add(listener);
@@ -446,6 +571,10 @@ export function createWebuiPluginWorkflows(deps: {
     createAgent: (input) => mutate("createAgent", input),
     updateAgent: (input) => mutate("updateAgent", input),
     deleteAgent: (input) => mutate("deleteAgent", input),
+  };
+  return {
+    ...owner,
+    runIntent: (intent) => runWebuiPluginIntent(owner, intent),
   };
 }
 

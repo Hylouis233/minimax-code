@@ -30,6 +30,10 @@ const SOURCE = readFileSync(
   new URL("../../src/client/features/sessions/ui/SessionRail.tsx", import.meta.url),
   "utf8",
 );
+const SESSION_LIST = readFileSync(
+  new URL("../../src/client/features/sessions/ui/SessionList.tsx", import.meta.url),
+  "utf8",
+);
 
 /** Everything from `anchor` onwards, failing loudly when the anchor moves. */
 function sourceFrom(anchor: string): string {
@@ -52,11 +56,11 @@ describe("the flat views' context menu wiring", () => {
     // The flat list has its own <a>; the projects view's binding cannot reach
     // it. Anchor inside `WebuiSessionList` so the projects row's (already
     // covered) binding cannot satisfy this by coincidence.
-    const list = sourceFrom("export function WebuiSessionList");
+    const list = SESSION_LIST;
     const anchorAt = list.indexOf('title={session.workspaceDir ?? undefined}');
     expect(anchorAt, "the flat row's title attribute moved").toBeGreaterThanOrEqual(0);
     const row = list.slice(anchorAt, anchorAt + 400);
-    expect(row).toContain("onContextMenu={(event) => onSessionContextMenu?.(event, session)}");
+    expect(row).toMatch(/onContextMenu=\{\(event\) =>\s+onSessionContextMenu\?\.\(event, session\)\s+\}/u);
   });
 
   it("hands the flat rows the same menu builder the projects rows use", () => {
@@ -80,7 +84,7 @@ describe("the flat views' context menu wiring", () => {
     // `WebuiSessionList` renders outside the app too (SSR fixtures); there the
     // prop is absent and the optional call must not become a preventDefault
     // that swallows the native context menu with nothing replacing it.
-    const list = sourceFrom("export function WebuiSessionList");
+    const list = SESSION_LIST;
     expect(list).toContain("onSessionContextMenu?:");
     expect(list).not.toContain("onSessionContextMenu!");
   });

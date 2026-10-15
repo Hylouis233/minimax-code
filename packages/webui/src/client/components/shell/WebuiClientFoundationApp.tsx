@@ -19,9 +19,9 @@ import {
   type ReactElement,
 } from "react";
 import { ArchonShell } from "./ArchonShell.js";
+import { ConversationSurface } from "./ConversationSurface.js";
 import { WEBUI_COMPOSER_HOME_KEY } from "../../features/composer/application/composer-history.js";
 import { Composer } from "../../features/composer/ui/Composer.js";
-import { GreetingSkeleton } from "../../features/transcript/ui/TranscriptSkeletons.js";
 import { LeftRail } from "../../features/sessions/ui/LeftRail.js";
 import { Transcript } from "../../features/transcript/ui/Transcript.js";
 import { UserMenu } from "../../features/account/ui/UserMenu.js";
@@ -29,7 +29,6 @@ import { MEMORY_HANDOFF_PROMPT, type MemoryHandoff } from "../../features/settin
 import {
   WebuiWorkspacePanel,
   WebuiProgressOverviewPanel,
-  WebuiWorkspacePanelControls,
 } from "../../features/workspace/ui/WorkspacePanels.js";
 import {
   getWorkspacePanelSessionState,
@@ -49,24 +48,19 @@ import { ConversationUsageBanner } from "../../features/account/ui/ConversationU
 import { PluginCatalogue } from "../../features/plugins/ui/PluginCatalogue.js";
 import { WebuiComposer } from "../../features/composer/ui/WebuiComposer.js";
 import { WebuiSessionTranscript } from "../../features/transcript/ui/SessionTranscript.js";
-import { WebuiProjectList } from "../../features/sessions/ui/SessionRail.js";
+import { SessionRailRegion } from "../../features/sessions/ui/SessionRailRegion.js";
+import { useSessionRailState } from "../../features/sessions/bindings/use-session-rail-state.js";
+import { selectWebuiSessionAgentName, selectWebuiSessionLookups } from "../../features/sessions/projection/session-lookups.js";
 import {
   filterWebuiSessionsByQuery,
   sessionLabel,
 } from "../../features/sessions/projection/rail-groups.js";
 import { sessionHash } from "../../projection/common/router.js";
-import { RailRow } from "../../features/sessions/ui/RailRow.js";
 import {
-  WebuiIconBrand,
-  WebuiIconContextExport,
-  WebuiIconNewTask,
-  WebuiIconPlugins,
-  WebuiIconRemote,
   WebuiIconSearch,
   WebuiIconSidebarToggle,
-  WebuiIconSites,
 } from "./icons.js";
-import type { WebuiClientSession, WebuiClientSessionPage, WebuiClientProject } from "../../contracts/sessions/session-view.js";
+import type { WebuiClientSession, WebuiClientSessionPage } from "../../contracts/sessions/session-view.js";
 import type {
   WebuiClientMessage,
   WebuiClientMessagePage,
@@ -263,20 +257,8 @@ export function WebuiClientFoundationApp(
   // through `transport` and then patch onto two structures by hand. The shell
   // submits a workflow and holds no transport call for session entities.
   const sessionWorkflows = application.sessionWorkflows;
-  const [projectRecords, setProjectRecords] = useState<readonly WebuiClientProject[] | undefined>();
-  useEffect(() => {
-    // The project list is a session business request, so it goes through the
-    // workflow rather than the transport from the shell.
-    if (!sessionWorkflows.canLoadProjects) return;
-    let cancelled = false;
-    void sessionWorkflows.loadProjects().then((projects) => {
-      if (!cancelled) setProjectRecords(projects);
-    }).catch(() => {
-      // Keep the session-derived view available when a runtime predates the
-      // project-list operation.
-    });
-    return () => { cancelled = true; };
-  }, [sessionWorkflows]);
+  const projectState = useSessionRailState(sessionWorkflows);
+  const projectRecords = projectState.projects;
   // The slash-command runner the composer submits through (ticket #49
   // criterion 8): the component holds no transport call, it calls the workflow.
   // The one workspace query owner (ticket #51): it caches the workspace file
@@ -448,35 +430,11 @@ export function WebuiClientFoundationApp(
   // Sessions visible to lookups: roots from the flat page plus any child
   // sessions surfaced through the tree projection. Without the tree the
   // flat list is the only source, matching the original behaviour.
-  const flatSessionsWithChildren = useMemo(() => {
-    if (treePage.sessions.length === 0) return page.sessions;
-    const seen = new Set(page.sessions.map((session) => session.sessionId));
-    const extras: WebuiClientSession[] = [];
-    for (const node of treePage.sessions) {
-      for (const child of node.childSessions) {
-        if (!seen.has(child.sessionId)) {
-          seen.add(child.sessionId);
-          extras.push(child);
-        }
-      }
-    }
-    return [...page.sessions, ...extras];
-  }, [page.sessions, treePage.sessions]);
-  const selectedAgentName =
-    flatSessionsWithChildren.find((session) => session.sessionId === selectedSessionId)
-      ?.agentName ?? "main";
-  /**
-   * The interaction owners compose their fallback requester name from the same
-   * session list this surface renders (T05). The list loads after the
-   * application exists, so the reader is installed rather than passed.
-   */
-  const selectedAgentNameRef = useRef(selectedAgentName);
-  selectedAgentNameRef.current = selectedAgentName;
-  // The plan-review workflow reads the session's agent name from the assembly,
-  // so nothing here has to carry it.
-  useEffect(() => {
-    application.interactions.setAgentNameReader(() => selectedAgentNameRef.current);
-  }, [application]);
+  const flatSessionsWithChildren = useMemo(
+    () => selectWebuiSessionLookups(page, treePage),
+    [page, treePage],
+  );
+  const selectedAgentName = selectWebuiSessionAgentName(flatSessionsWithChildren, selectedSessionId);
   useEffect(() => {
     browserStorage.writeTeamModeOff(teamModeOff);
   }, [browserStorage, teamModeOff]);
@@ -562,6 +520,7 @@ export function WebuiClientFoundationApp(
     recentWorkspaceDirs,
     handleWorkspaceChange,
     handleSessionCreated,
+    handleSessionCreatedViewEffect,
     startNewTask,
   } = useNewTaskWorkspace({
     storage: browserStorage,
@@ -636,6 +595,7 @@ export function WebuiClientFoundationApp(
     setRailSearchQuery,
     railSearchInputRef,
     sessionImportInputRef,
+    openSessionImportPicker,
     sessionImportBusy,
     openRailSearch,
     closeRailSearch,
@@ -840,156 +800,48 @@ export function WebuiClientFoundationApp(
           {/* -------------------------------------------------------------- rail */}
           <div className="relative h-full min-h-0 flex-shrink-0">
             <LeftRail>
-            <aside
-              aria-label="Primary navigation"
-              data-webui-shell-region="rail"
-              data-webui-rail-width={railCollapsed ? "64" : "240"}
-              className={`webui-rail relative z-50 flex h-full select-none flex-col overflow-visible ${railCollapsed ? "w-[64px] bg-transparent" : "w-[240px] bg-bg_default_scrim"}`}
-            >
-              <div className="h-[50px] flex-shrink-0" aria-hidden="true" />
-              {!railCollapsed ? (
-                <>
-                  <div
-                    className="flex-shrink-0 px-4 pb-px"
-                    data-webui-rail-fixed-row="true"
-                  >
-                    <RailRow
-                      label="新建任务"
-                      icon={<WebuiIconNewTask className="flex-shrink-0" />}
-                      active={homeMode && !pluginManagementOpen}
-                      onSelect={startNewTask}
-                    />
-                    {/*
-                      Import is a rail-level action, not a per-session one: it
-                      reads a file and creates the session from it, so there is
-                      no session to hang the menu off yet. The picker is a
-                      hidden input driven from here so the row stays a button.
-                    */}
-                    <input
-                      ref={sessionImportInputRef}
-                      type="file"
-                      accept=".json,application/json"
-                      data-webui-session-import-input="true"
-                      aria-label="导入会话文件"
-                      // The same visually-hidden treatment the composer's
-                      // attachment inputs use. `hidden` would remove the
-                      // element from the accessibility tree and make the
-                      // picker unreachable to anything driving the DOM.
-                      className="webui-composer-hidden-file-input"
-                      onChange={handleSessionImportPicked}
-                    />
-                    <RailRow
-                      label="导入会话"
-                      icon={<WebuiIconContextExport className="flex-shrink-0" />}
-                      active={false}
-                      inert={sessionImportBusy}
-                      onSelect={() => {
-                        sessionImportInputRef.current?.click();
-                      }}
-                    />
-                  </div>
-
-                  {railSearchOpen ? (
-                    <div
-                      className="flex-shrink-0 px-4 pb-px pt-1"
-                      data-webui-rail-fixed-row="true"
-                    >
-                      <input
-                        id="webui-rail-search"
-                        ref={railSearchInputRef}
-                        type="text"
-                        role="searchbox"
-                        data-webui-rail-search-input="true"
-                        aria-label="搜索会话"
-                        placeholder="搜索会话"
-                        value={railSearchQuery}
-                        onChange={(event) => setRailSearchQuery(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key !== "Escape") return;
-                          event.preventDefault();
-                          closeRailSearch();
-                        }}
-                        className="w-full rounded-[8px] border border-stroke_default bg-bg_default_primary px-2 py-1 text-sm text-text_default_primary outline-none placeholder:text-text_default_tertiary focus:border-stroke_strong"
-                      />
-                    </div>
-                  ) : null}
-
-                  <div className="relative min-h-0 flex-1">
-                    <div className="webui-rail-scroll h-full overflow-x-hidden overflow-y-auto px-4">
-                      <div className="space-y-px pb-2">
-                        <RailRow label="插件" icon={<WebuiIconPlugins />} active={pluginManagementOpen} onSelect={() => openPluginManagement("plugins")} />
-                        <RailRow label="网站" icon={<WebuiIconSites />} inert />
-                        <RailRow label="远程" icon={<WebuiIconRemote />} inert />
-                      </div>
-
-                      <WebuiProjectList
-                      teamModeLabel={props.teamModeLabel}
-                        page={railPage}
-                        treePage={railTreePage}
-                        projectRecords={projectRecords}
-                        query={railSearchQuery}
-                        loading={loading}
-                        onLoadMore={loadMore}
-                        selectedSessionId={selectedSessionId}
-                        activity={sessionActivity}
-                        now={activityNow}
-                        onCreateTaskInProject={(project) => startNewTask(project.workspaceDir)}
-                        error={pageError}
-                        pinnedSessions={pinnedSessions}
-                        starredSessions={starredSessions}
-                        pinnedProjects={pinnedProjects}
-                        projectNames={projectNames}
-                        onRenameProject={handleRenameProject}
-                        onToggleProjectPin={handleToggleProjectPin}
-                        onArchiveProject={handleArchiveProject}
-                        onRenameSession={handleRenameSession}
-                        onToggleSessionPin={handleToggleSessionPin}
-                        onToggleSessionStar={handleToggleSessionStar}
-                        onArchiveSession={handleArchiveSession}
-                        onForkSession={handleForkSession}
-                        onCopySession={handleCopySession}
-                        onExportSession={handleExportSession}
-                        onDeleteSession={handleDeleteSession}
-                      />
-
-                      {railSearchQuery.trim() && railPage.sessions.length === 0 ? (
-                        <p
-                          data-webui-rail-search-empty="true"
-                          className="px-2 py-3 text-sm text-text_default_tertiary"
-                        >
-                          没有匹配的会话
-                        </p>
-                      ) : null}
-                    </div>
-                    <div
-                      className="webui-scroll-fade pointer-events-none absolute inset-x-0 bottom-0 z-10 h-6"
-                      aria-hidden="true"
-                      data-webui-scroll-fade="true"
-                    />
-                  </div>
-
-                </>
-              ) : null}
-              {!railCollapsed ? <div className="relative flex-shrink-0 border-t-[0.5px] border-border_default">
+            <SessionRailRegion
+              collapsed={railCollapsed}
+              homeMode={homeMode}
+              pluginManagementOpen={pluginManagementOpen}
+              startNewTask={startNewTask}
+              importInputRef={sessionImportInputRef}
+              openImportPicker={openSessionImportPicker}
+              importBusy={sessionImportBusy}
+              onImportPicked={handleSessionImportPicked}
+              searchOpen={railSearchOpen}
+              searchQuery={railSearchQuery}
+              searchInputRef={railSearchInputRef}
+              setSearchQuery={setRailSearchQuery}
+              closeSearch={closeRailSearch}
+              openPlugins={() => openPluginManagement("plugins")}
+              hasSearchResults={railPage.sessions.length > 0}
+              projectList={{
+                teamModeLabel: props.teamModeLabel, page: railPage, treePage: railTreePage,
+                projectRecords, projectLoadError: projectState.error, query: railSearchQuery,
+                loading, onLoadMore: loadMore, selectedSessionId, activity: sessionActivity,
+                now: activityNow, onCreateTaskInProject: (project) => startNewTask(project.workspaceDir),
+                error: pageError, pinnedSessions, starredSessions, pinnedProjects, projectNames,
+                onRenameProject: handleRenameProject, onToggleProjectPin: handleToggleProjectPin,
+                onArchiveProject: handleArchiveProject, onRenameSession: handleRenameSession,
+                onToggleSessionPin: handleToggleSessionPin, onToggleSessionStar: handleToggleSessionStar,
+                onArchiveSession: handleArchiveSession, onForkSession: handleForkSession,
+                onCopySession: handleCopySession, onExportSession: handleExportSession,
+                onDeleteSession: handleDeleteSession,
+              }}
+              footer={!railCollapsed ? <div className="relative flex-shrink-0 border-t-[0.5px] border-border_default">
                 <UserMenu
-                  collapsed={railCollapsed}
-                  hostLabel={hostLabel}
-                  dataDir={dataDir}
-                  version={runtimeVersion}
-                  sessionId={selectedSessionId}
+                  collapsed={railCollapsed} hostLabel={hostLabel} dataDir={dataDir}
+                  version={runtimeVersion} sessionId={selectedSessionId}
                   workspaceDir={selectedSession?.workspaceDir}
                   onOpenFileLine={(path, line) => {
-                    // The open-file command needs a concrete session and
-                    // workspace; the review page is only reachable from a
-                    // selected session, so both are present in practice, but
-                    // a jump must never fire a command with holes in it.
                     if (!selectedSessionId || !selectedSession?.workspaceDir) return;
                     dispatchWorkspacePanel({ type: "open-file", sessionId: selectedSessionId, workspaceDir: selectedSession.workspaceDir, path, lineStart: line, lineEnd: line });
                   }}
                   onCreateMemorySession={createMemorySession}
                 />
               </div> : null}
-            </aside>
+            />
             </LeftRail>
           </div>
 
@@ -1015,155 +867,72 @@ export function WebuiClientFoundationApp(
               if (!sessionId) throw new Error("创建 Agent 会话失败");
               handleSessionCreated(sessionId);
             }} /> : <>
-            {!homeMode && !workspacePanel.open ? <WebuiWorkspacePanelControls filePanelOpen={false} progressPanelOpen={progressPanelOpen} onOpenFiles={() => { setProgressPanelOpen(false); dispatchWorkspacePanel({ type: "open-primary-view", kind: "files", sessionId: selectedSessionId, workspaceDir: selectedSession?.workspaceDir }); }} onToggleProgressPanel={() => setProgressPanelOpen((open) => !open)} /> : null}
-            <div className="relative flex h-full min-w-0 flex-1 flex-col">
-              <div
-                className="pointer-events-none absolute inset-x-0 top-6 z-[60] flex justify-center"
-                data-webui-busy-banner-slot="true"
-              />
-              <div
-                className={
-                  homeMode
-                    ? "flex h-full min-h-0 w-full flex-col items-center relative overflow-hidden"
-                    : `flex h-full min-h-0 w-full flex-col items-center relative overflow-hidden pt-spacing_24 ${progressPanelOpen ? "webui-session-has-progress-panel" : ""}`
-                }
-                data-webui-home-content={homeMode ? "true" : "false"}
-                data-webui-session-layout={!homeMode ? "true" : undefined}
-              >
-                {homeMode ? <div aria-hidden="true" className="h-[clamp(96px,24vh,240px)] w-full shrink" /> : null}
-                <div
-                  className={homeMode
-                    ? "flex w-full max-w-[743px] shrink-0 flex-col items-center gap-2 px-4"
-                    : "webui-session-layout relative flex h-full min-h-0 w-full flex-col items-center gap-2"}
-                >
-                  {homeMode ? (
-                    homeGreetingPending ? (
-                      <GreetingSkeleton />
-                    ) : (
-                    <div className="flex flex-col items-center gap-2 text-center [@media(max-height:300px)]:hidden">
-                      <div className="group/avatar relative size-16 flex-shrink-0">
-                        <div className="webui-hero-avatar relative h-full w-full overflow-visible rounded-full bg-bg_grouped_tertiary">
-                          <span className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-full">
-                            <WebuiIconBrand className="h-full w-full" />
-                          </span>
-                        </div>
-                      </div>
-                      <h1 className="text-[28px] font-medium leading-tight text-text_default_primary">
-                        MiniMax Code，让工作更简单。
-                      </h1>
-                    </div>
-                    )
-                  ) : (
-                    <div
-                      className="webui-session-title-row flex w-full items-center gap-2"
-                      data-webui-rail-collapsed={railCollapsed || undefined}
-                    >
-                      <span className="webui-session-title" data-webui-session-title="true">
-                        {selectedSession?.title ?? ""}
-                      </span>
-                    </div>
-                  )}
-                  {visibleUsageNotice ? (
-                    <ConversationUsageBanner
-                      notice={visibleUsageNotice}
-                      messageText={
-                        visibleUsageNotice.kind === "weekly"
-                          ? "本周配额接近上限。"
-                          : visibleUsageNotice.kind === "five_hour"
-                            ? "五小时配额接近上限。"
-                            : "本周期视频配额已用尽。"
-                      }
-                      onDismiss={() => setDismissedUsageNoticeKey(usageNoticeKey)}
-                    />
-                  ) : null}
-                  {/* The connection region earns its pixels only when
-                   * something needs the reader: `hideWhenConnected` keeps
-                   * 已连接 off the page, so the banner appears for
-                   * 正在重连 and 连接失败 only. Same slot as the usage
-                   * banner so the two never stack surprises in different
-                   * places. */}
-                  <ConnectionStatus
-                    sessionId={selectedSessionId}
-                    hideWhenConnected
-                    onRetry={retrySessionStream}
-                    className="w-full max-w-[743px] justify-center rounded-lg border border-border_default bg-bg_default_secondary px-spacing_8 py-spacing_4"
-                  />
-
-                  <div
-                    className={
-                      homeMode
-                        ? "contents"
-                        : "webui-session-scroll-viewport flex min-h-0 w-full flex-1 flex-col items-center gap-2 overflow-y-auto overflow-x-hidden"
-                    }
-                    data-webui-session-scroll={homeMode ? undefined : "true"}
-                  >
-                    <Composer>
-                    <WebuiComposer
-                    sessionId={selectedSessionId}
-                    sessionStatus={selectedSession?.status}
-                    sessionLayout={!homeMode}
-                    usageQuota={usageQuota}
-                    agentName={selectedAgentName}
-                    createSessionWorkspaceDir={newTaskWorkspaceDir}
-                    onWorkspaceChange={handleWorkspaceChange}
-                    workspaceMenuOpen={workspaceMenuOpen}
-                    setWorkspaceMenuOpen={setWorkspaceMenuOpen}
-                    recentWorkspaceDirs={recentWorkspaceDirs}
-                    draft={draft}
-                    onDraftChange={setDraft}
-                    seedAttachment={memoryHandoff}
-                    inputHistory={composerState.history[composerKey] ?? []}
-                    onInputSubmitted={recordComposerInput}
-                    teamModeOff={composerTeamModeOff}
-                    favoritesStorage={favoriteStorage}
-                    workspaceDir={selectedSession?.workspaceDir ?? newTaskWorkspaceDir}
-                    onSelectSession={handleSelectComposerSession}
-                    onOpenPluginManagement={openPluginManagement}
-                    onSessionCreated={handleSessionCreated}
-                    />
-                    </Composer>
-
-                    {selectedSessionId && loadMessages ? (
-                      <Transcript>
-                      <WebuiSessionTranscript
-                        sessionId={selectedSessionId}
-                        workspaceDir={selectedSession?.workspaceDir}
-                        onOpenFile={({ sessionId, workspaceDir, reference }) => dispatchWorkspacePanel({ type: "open-file", sessionId, workspaceDir, path: reference.path, ...(reference.lineStart !== undefined ? { lineStart: reference.lineStart } : {}), ...(reference.lineEnd !== undefined ? { lineEnd: reference.lineEnd } : {}) })}
-                        onOpenTurnReview={(command) => dispatchWorkspacePanel(command)}
-                        {...(initialMessages ? { initialMessages } : {})}
-                        getSessionForkOptions={getSessionForkOptions}
-                        forkSession={forkSession}
-                        getSessionRewindPreview={transcriptPort.getSessionRewindPreview}
-                        rewindSession={transcriptPort.rewindSession}
-                        editSessionMessage={transcriptPort.editSessionMessage}
-                        answerPlanBuild={planReviewWorkflow.answerPlanBuild}
-                        onOpenPlanFile={({ sessionId: planSessionId, path, content }) => dispatchWorkspacePanel({ type: "open-plan-file", sessionId: planSessionId, workspaceDir: selectedSession?.workspaceDir ?? "", path, content })}
-                      />
-                      </Transcript>
-                    ) : null}
-                    {!homeMode ? (
-                      <div
-                        className="webui-session-bottom-padding w-full shrink-0"
-                        data-testid="message-bottom-padding"
-                        data-webui-session-bottom-padding="true"
-                      />
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            </div>
-            {!homeMode ? (
-              <div
-                className={`webui-progress-panel-motion${progressPanelOpen ? " is-open" : ""}`}
-                aria-hidden={!progressPanelOpen}
-                ref={(element) => element?.toggleAttribute("inert", !progressPanelOpen)}
-              >
-                <aside className="webui-progress-overview-panel" data-testid="progress-overview-panel" aria-label="环境信息与进度">
-                  {progressPanelContent}
-                </aside>
-              </div>
-            ) : null}
-            {!homeMode && workspacePanel.open ? <WebuiWorkspacePanel state={workspacePanel} dispatch={dispatchWorkspacePanel} sessionId={selectedSessionId} workspaceDir={selectedSession?.workspaceDir} workspaceFileUrl={workspacePort.workspaceFileUrl} terminal={terminalOwner} onClose={() => dispatchWorkspacePanel({ type: "close-panel" })} /> : null}
+            <ConversationSurface
+              home={homeMode}
+              title={selectedSession?.title}
+              greetingPending={homeGreetingPending}
+              railCollapsed={railCollapsed}
+              progressOpen={progressPanelOpen}
+              onOpenFiles={() => {
+                setProgressPanelOpen(false);
+                dispatchWorkspacePanel({ type: "open-primary-view", kind: "files", sessionId: selectedSessionId, workspaceDir: selectedSession?.workspaceDir });
+              }}
+              onToggleProgress={() => setProgressPanelOpen((open) => !open)}
+              usageBanner={visibleUsageNotice ? <ConversationUsageBanner
+                notice={visibleUsageNotice}
+                messageText={visibleUsageNotice.kind === "weekly" ? "本周配额接近上限。" : visibleUsageNotice.kind === "five_hour" ? "五小时配额接近上限。" : "本周期视频配额已用尽。"}
+                onDismiss={() => setDismissedUsageNoticeKey(usageNoticeKey)}
+              /> : null}
+              connectionStatus={<ConnectionStatus
+                sessionId={selectedSessionId} hideWhenConnected onRetry={retrySessionStream}
+                className="w-full max-w-[743px] justify-center rounded-lg border border-border_default bg-bg_default_secondary px-spacing_8 py-spacing_4"
+              />}
+              composerAndTranscript={<>
+                <Composer><WebuiComposer
+                  sessionId={selectedSessionId}
+                  sessionStatus={selectedSession?.status}
+                  sessionLayout={!homeMode}
+                  usageQuota={usageQuota}
+                  agentName={selectedAgentName}
+                  createSessionWorkspaceDir={newTaskWorkspaceDir}
+                  onWorkspaceChange={handleWorkspaceChange}
+                  workspaceMenuOpen={workspaceMenuOpen}
+                  setWorkspaceMenuOpen={setWorkspaceMenuOpen}
+                  recentWorkspaceDirs={recentWorkspaceDirs}
+                  draft={draft}
+                  onDraftChange={setDraft}
+                  seedAttachment={memoryHandoff}
+                  inputHistory={composerState.history[composerKey] ?? []}
+                  onInputSubmitted={recordComposerInput}
+                  teamModeOff={composerTeamModeOff}
+                  favoritesStorage={favoriteStorage}
+                  workspaceDir={selectedSession?.workspaceDir ?? newTaskWorkspaceDir}
+                  onSelectSession={handleSelectComposerSession}
+                  onOpenPluginManagement={openPluginManagement}
+                  onSessionCreated={handleSessionCreatedViewEffect}
+                /></Composer>
+                {selectedSessionId && loadMessages ? <Transcript><WebuiSessionTranscript
+                  sessionId={selectedSessionId}
+                  workspaceDir={selectedSession?.workspaceDir}
+                  onOpenFile={({ sessionId, workspaceDir, reference }) => dispatchWorkspacePanel({ type: "open-file", sessionId, workspaceDir, path: reference.path, ...(reference.lineStart !== undefined ? { lineStart: reference.lineStart } : {}), ...(reference.lineEnd !== undefined ? { lineEnd: reference.lineEnd } : {}) })}
+                  onOpenTurnReview={(command) => dispatchWorkspacePanel(command)}
+                  {...(initialMessages ? { initialMessages } : {})}
+                  getSessionForkOptions={getSessionForkOptions}
+                  forkSession={forkSession}
+                  getSessionRewindPreview={transcriptPort.getSessionRewindPreview}
+                  rewindSession={transcriptPort.rewindSession}
+                  editSessionMessage={transcriptPort.editSessionMessage}
+                  answerPlanBuild={planReviewWorkflow.answerPlanBuild}
+                  onOpenPlanFile={({ sessionId: planSessionId, path, content }) => dispatchWorkspacePanel({ type: "open-plan-file", sessionId: planSessionId, workspaceDir: selectedSession?.workspaceDir ?? "", path, content })}
+                /></Transcript> : null}
+              </>}
+              progressPanel={progressPanelContent}
+              workspacePanel={workspacePanel.open ? <WebuiWorkspacePanel
+                state={workspacePanel} dispatch={dispatchWorkspacePanel} sessionId={selectedSessionId}
+                workspaceDir={selectedSession?.workspaceDir} workspaceFileUrl={workspacePort.workspaceFileUrl}
+                terminal={terminalOwner} onClose={() => dispatchWorkspacePanel({ type: "close-panel" })}
+              /> : undefined}
+            />
             </>}
           </main>
         </div>

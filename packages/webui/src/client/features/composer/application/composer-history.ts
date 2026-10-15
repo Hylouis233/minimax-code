@@ -8,11 +8,8 @@
 // the draft as it was before the browse started. All decisions live here so
 // the React wiring in `SessionComposer` stays a thin adapter.
 
-/** Per-session input history + drafts, persisted under one storage key. */
-export interface WebuiComposerPersisted {
-  readonly drafts: Readonly<Record<string, string>>;
-  readonly history: Readonly<Record<string, readonly string[]>>;
-}
+import type { WebuiComposerPersisted } from "../contracts/composer-state.js";
+export type { WebuiComposerPersisted } from "../contracts/composer-state.js";
 
 export const WEBUI_COMPOSER_STATE_KEY = "webui.composer.state.v1";
 

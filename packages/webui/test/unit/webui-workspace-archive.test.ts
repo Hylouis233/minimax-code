@@ -25,13 +25,26 @@
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { deflateRawSync, gzipSync } from "node:zlib";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { extractWorkspaceArchiveDirectory, readWorkspaceArchiveListing } from "../../src/runtime/workspace-archive.js";
+import {
+  extractWorkspaceArchiveDirectory,
+  readWorkspaceArchiveListing,
+} from "../../src/runtime/workspace-archive.js";
 import { createHarnessPortFromHost } from "../../src/runtime/harness/adapter.js";
 import type { WebuiRuntimeCliService } from "../../src/runtime/harness/host-contract.js";
 import type { WebuiWorkspaceArchiveListing } from "../../src/shared/contracts/workspace.js";
@@ -40,7 +53,10 @@ import {
   WorkspaceArchiveNotice,
   WorkspaceArchiveView,
 } from "../../src/client/features/workspace/ui/WorkspaceArchiveView.js";
-import { archiveDestinationFor, formatArchiveSize } from "../../src/client/features/workspace/projection/archive-projection.js";
+import {
+  archiveDestinationFor,
+  formatArchiveSize,
+} from "../../src/client/features/workspace/projection/archive-projection.js";
 import { createWebuiWorkspaceQueries } from "../../src/client/features/workspace/application/workspace-queries.js";
 import { WebuiWorkspaceQueriesProvider } from "../../src/client/bindings/use-query-state.js";
 
@@ -72,7 +88,9 @@ function writtenFiles(root: string): string[] {
   try {
     return readdirSync(root, { recursive: true, withFileTypes: true })
       .filter((entry) => entry.isFile())
-      .map((entry) => path.relative(root, path.join(entry.parentPath, entry.name)))
+      .map((entry) =>
+        path.relative(root, path.join(entry.parentPath, entry.name)),
+      )
       .sort();
   } catch {
     return [];
@@ -114,7 +132,10 @@ function canRun(command: string): boolean {
 const HAS_ZIP = canRun("zip");
 const HAS_TAR = canRun("tar");
 
-function writeTree(name: string, members: Readonly<Record<string, string>>): string {
+function writeTree(
+  name: string,
+  members: Readonly<Record<string, string>>,
+): string {
   const source = artifactPath(name);
   mkdirSync(source, { recursive: true });
   for (const [member, content] of Object.entries(members)) {
@@ -133,16 +154,27 @@ function writeTree(name: string, members: Readonly<Record<string, string>>): str
 const FIXTURE_ENV = { ...process.env, COPYFILE_DISABLE: "1" };
 
 /** A real zip, built by the `zip` CLI. */
-function realZip(name: string, members: Readonly<Record<string, string>>): string {
+function realZip(
+  name: string,
+  members: Readonly<Record<string, string>>,
+): string {
   const source = writeTree(`${name}-src`, members);
-  execFileSync("zip", ["-q", "-r", artifactPath(name), "."], { cwd: source, env: FIXTURE_ENV });
+  execFileSync("zip", ["-q", "-r", artifactPath(name), "."], {
+    cwd: source,
+    env: FIXTURE_ENV,
+  });
   return artifactPath(name);
 }
 
 /** A real tar, or a gzipped one when the name ends in `.tgz`. */
-function realTar(name: string, members: Readonly<Record<string, string>>): string {
+function realTar(
+  name: string,
+  members: Readonly<Record<string, string>>,
+): string {
   const source = writeTree(`${name}-src`, members);
-  const args = name.endsWith(".tgz") ? ["czf", artifactPath(name)] : ["cf", artifactPath(name)];
+  const args = name.endsWith(".tgz")
+    ? ["czf", artifactPath(name)]
+    : ["cf", artifactPath(name)];
   execFileSync("tar", [...args, "."], { cwd: source, env: FIXTURE_ENV });
   return artifactPath(name);
 }
@@ -173,7 +205,9 @@ function craftZip(entries: readonly CraftedZipEntry[]): Buffer {
   let offset = 0;
   for (const entry of entries) {
     const name = Buffer.from(entry.name, "utf8");
-    const raw = Buffer.isBuffer(entry.content) ? entry.content : Buffer.from(entry.content ?? "", "utf8");
+    const raw = Buffer.isBuffer(entry.content)
+      ? entry.content
+      : Buffer.from(entry.content ?? "", "utf8");
     const method = entry.method ?? 8;
     const data = method === 0 ? raw : deflateRawSync(raw);
     const mode = entry.mode ?? (entry.name.endsWith("/") ? 0o040755 : 0o100644);
@@ -243,82 +277,137 @@ function craftTar(name: string, content: string, typeflag = "0"): Buffer {
 // ---------------------------------------------------------------------------
 
 describe("workspace archive listing", () => {
-  it.skipIf(!HAS_ZIP)("lists one level of a real zip and synthesises its directories", async () => {
-    realZip("plain.zip", { "inner.txt": "hello", "sub/deep.txt": "deeper" });
-    const listing = await readWorkspaceArchiveListing({ workspaceDir: workspace, path: "plain.zip" });
-    expect(listing.archivePath).toBe("plain.zip");
-    // `sub` is implied by `sub/deep.txt`; a listing that reported only what is
-    // literally present would show an empty level for a directory full of files.
-    expect(listing.entries.map((entry) => [entry.name, entry.isDirectory, entry.size])).toEqual([
-      ["sub", true, undefined],
-      ["inner.txt", false, 5],
-    ]);
-    expect(listing.totalEntries).toBe(3);
-    expect(listing.truncated).toBe(false);
-  });
-
-  it.skipIf(!HAS_ZIP)("walks into a directory by re-listing with a prefix", async () => {
-    realZip("nested.zip", { "inner.txt": "hello", "sub/deep.txt": "deeper", "sub/other/x.txt": "x" });
-    const listing = await readWorkspaceArchiveListing({ workspaceDir: workspace, path: "nested.zip", prefix: "sub" });
-    expect(listing.entries.map((entry) => [entry.name, entry.isDirectory])).toEqual([
-      ["other", true],
-      ["deep.txt", false],
-    ]);
-    expect(listing.truncated).toBe(false);
-  });
-
-  it.skipIf(!HAS_TAR)("reads a path longer than the 100-byte name field", async () => {
-    // Longer than the tar name field, so it arrives in the ustar prefix field or
-    // a pax `path=` record depending on the archiver. Either way the listing has
-    // to name the real path: dropping the prefix would rename every member under
-    // a deep directory, silently.
-    const directory = "d".repeat(90);
-    const file = `${"n".repeat(60)}.txt`;
-    realTar("long.tar", { [`${directory}/${file}`]: "deep" });
-    const root = await readWorkspaceArchiveListing({ workspaceDir: workspace, path: "long.tar" });
-    expect(root.entries.map((entry) => entry.name)).toEqual([directory]);
-    const nested = await readWorkspaceArchiveListing({
-      workspaceDir: workspace,
-      path: "long.tar",
-      prefix: directory,
-    });
-    expect(nested.entries.map((entry) => entry.name)).toEqual([file]);
-    expect(nested.truncated).toBe(false);
-  });
-
-  it.skipIf(!HAS_TAR)("reads a real tar and a gzipped tar the same way", async () => {
-    realTar("plain.tar", { "inner.txt": "hello", "sub/deep.txt": "deeper" });
-    realTar("plain.tgz", { "inner.txt": "hello", "sub/deep.txt": "deeper" });
-    for (const archive of ["plain.tar", "plain.tgz"]) {
-      const listing = await readWorkspaceArchiveListing({ workspaceDir: workspace, path: archive });
-      expect(listing.entries.map((entry) => entry.name)).toEqual(["sub", "inner.txt"]);
+  it.skipIf(!HAS_ZIP)(
+    "lists one level of a real zip and synthesises its directories",
+    async () => {
+      realZip("plain.zip", { "inner.txt": "hello", "sub/deep.txt": "deeper" });
+      const listing = await readWorkspaceArchiveListing({
+        workspaceDir: workspace,
+        path: "plain.zip",
+      });
+      expect(listing.archivePath).toBe("plain.zip");
+      // `sub` is implied by `sub/deep.txt`; a listing that reported only what is
+      // literally present would show an empty level for a directory full of files.
+      expect(
+        listing.entries.map((entry) => [
+          entry.name,
+          entry.isDirectory,
+          entry.size,
+        ]),
+      ).toEqual([
+        ["sub", true, undefined],
+        ["inner.txt", false, 5],
+      ]);
+      expect(listing.totalEntries).toBe(3);
       expect(listing.truncated).toBe(false);
-    }
-  });
+    },
+  );
+
+  it.skipIf(!HAS_ZIP)(
+    "walks into a directory by re-listing with a prefix",
+    async () => {
+      realZip("nested.zip", {
+        "inner.txt": "hello",
+        "sub/deep.txt": "deeper",
+        "sub/other/x.txt": "x",
+      });
+      const listing = await readWorkspaceArchiveListing({
+        workspaceDir: workspace,
+        path: "nested.zip",
+        prefix: "sub",
+      });
+      expect(
+        listing.entries.map((entry) => [entry.name, entry.isDirectory]),
+      ).toEqual([
+        ["other", true],
+        ["deep.txt", false],
+      ]);
+      expect(listing.truncated).toBe(false);
+    },
+  );
+
+  it.skipIf(!HAS_TAR)(
+    "reads a path longer than the 100-byte name field",
+    async () => {
+      // Longer than the tar name field, so it arrives in the ustar prefix field or
+      // a pax `path=` record depending on the archiver. Either way the listing has
+      // to name the real path: dropping the prefix would rename every member under
+      // a deep directory, silently.
+      const directory = "d".repeat(90);
+      const file = `${"n".repeat(60)}.txt`;
+      realTar("long.tar", { [`${directory}/${file}`]: "deep" });
+      const root = await readWorkspaceArchiveListing({
+        workspaceDir: workspace,
+        path: "long.tar",
+      });
+      expect(root.entries.map((entry) => entry.name)).toEqual([directory]);
+      const nested = await readWorkspaceArchiveListing({
+        workspaceDir: workspace,
+        path: "long.tar",
+        prefix: directory,
+      });
+      expect(nested.entries.map((entry) => entry.name)).toEqual([file]);
+      expect(nested.truncated).toBe(false);
+    },
+  );
+
+  it.skipIf(!HAS_TAR)(
+    "reads a real tar and a gzipped tar the same way",
+    async () => {
+      realTar("plain.tar", { "inner.txt": "hello", "sub/deep.txt": "deeper" });
+      realTar("plain.tgz", { "inner.txt": "hello", "sub/deep.txt": "deeper" });
+      for (const archive of ["plain.tar", "plain.tgz"]) {
+        const listing = await readWorkspaceArchiveListing({
+          workspaceDir: workspace,
+          path: archive,
+        });
+        expect(listing.entries.map((entry) => entry.name)).toEqual([
+          "sub",
+          "inner.txt",
+        ]);
+        expect(listing.truncated).toBe(false);
+      }
+    },
+  );
 
   it("refuses a file that is not an archive, and names the formats it can read", async () => {
     writeArtifact("notes.zip", "this is not a zip at all\n");
-    await expect(readWorkspaceArchiveListing({ workspaceDir: workspace, path: "notes.zip" })).rejects.toThrow(
-      /不是可识别的 ZIP/,
-    );
+    await expect(
+      readWorkspaceArchiveListing({
+        workspaceDir: workspace,
+        path: "notes.zip",
+      }),
+    ).rejects.toThrow(/不是可识别的 ZIP/);
     writeArtifact("bundle.rar", "Rar!\x1a\x07\x00");
-    await expect(readWorkspaceArchiveListing({ workspaceDir: workspace, path: "bundle.rar" })).rejects.toThrow(
-      /不支持的压缩包格式/,
-    );
+    await expect(
+      readWorkspaceArchiveListing({
+        workspaceDir: workspace,
+        path: "bundle.rar",
+      }),
+    ).rejects.toThrow(/不支持的压缩包格式/);
     writeArtifact("plain.gz", gzipSync(Buffer.from("hello")));
     // A bare `.gz` is one compressed stream with no directory structure, so it
     // is refused by name rather than guessed at as a tar.
-    await expect(readWorkspaceArchiveListing({ workspaceDir: workspace, path: "plain.gz" })).rejects.toThrow(
-      /\.tar\.gz/,
-    );
+    await expect(
+      readWorkspaceArchiveListing({
+        workspaceDir: workspace,
+        path: "plain.gz",
+      }),
+    ).rejects.toThrow(/\.tar\.gz/);
     writeArtifact("bundle.7z", "7z\xbc\xaf\x27\x1c");
-    await expect(readWorkspaceArchiveListing({ workspaceDir: workspace, path: "bundle.7z" })).rejects.toThrow(
-      /不支持的压缩包格式/,
-    );
+    await expect(
+      readWorkspaceArchiveListing({
+        workspaceDir: workspace,
+        path: "bundle.7z",
+      }),
+    ).rejects.toThrow(/不支持的压缩包格式/);
     writeArtifact("notes.txt", "plain text");
-    await expect(readWorkspaceArchiveListing({ workspaceDir: workspace, path: "notes.txt" })).rejects.toThrow(
-      /只有 .zip/,
-    );
+    await expect(
+      readWorkspaceArchiveListing({
+        workspaceDir: workspace,
+        path: "notes.txt",
+      }),
+    ).rejects.toThrow(/只有 .zip/);
   });
 
   it("reports a truncated zip instead of reading past the end of the file", async () => {
@@ -326,27 +415,48 @@ describe("workspace archive listing", () => {
     // Drop the end-of-central-directory record, which is exactly what a partial
     // download or a full disk leaves behind.
     writeArtifact("truncated.zip", complete.subarray(0, complete.length - 12));
-    await expect(readWorkspaceArchiveListing({ workspaceDir: workspace, path: "truncated.zip" })).rejects.toThrow(
-      /不是可识别的 ZIP/,
+    await expect(
+      readWorkspaceArchiveListing({
+        workspaceDir: workspace,
+        path: "truncated.zip",
+      }),
+    ).rejects.toThrow(/不是可识别的 ZIP/);
+    writeArtifact(
+      "half.zip",
+      craftZip([{ name: "a.txt", content: "hello" }]).subarray(0, 20),
     );
-    writeArtifact("half.zip", craftZip([{ name: "a.txt", content: "hello" }]).subarray(0, 20));
-    await expect(readWorkspaceArchiveListing({ workspaceDir: workspace, path: "half.zip" })).rejects.toThrow(/ZIP/);
+    await expect(
+      readWorkspaceArchiveListing({
+        workspaceDir: workspace,
+        path: "half.zip",
+      }),
+    ).rejects.toThrow(/ZIP/);
   });
 
   it("reports a truncated or corrupt tar rather than trusting a garbage header", async () => {
     const complete = craftTar("a.txt", "hello");
     writeArtifact("cut.tar", complete.subarray(0, 700));
-    await expect(readWorkspaceArchiveListing({ workspaceDir: workspace, path: "cut.tar" })).rejects.toThrow(/tar/);
+    await expect(
+      readWorkspaceArchiveListing({ workspaceDir: workspace, path: "cut.tar" }),
+    ).rejects.toThrow(/tar/);
 
     const corrupt = Buffer.from(complete);
     corrupt[124] = 0xff;
     writeArtifact("corrupt.tar", corrupt);
-    await expect(readWorkspaceArchiveListing({ workspaceDir: workspace, path: "corrupt.tar" })).rejects.toThrow(
-      /校验和|大小字段/,
-    );
+    await expect(
+      readWorkspaceArchiveListing({
+        workspaceDir: workspace,
+        path: "corrupt.tar",
+      }),
+    ).rejects.toThrow(/校验和|大小字段/);
 
     writeArtifact("tiny.tar", Buffer.alloc(200));
-    await expect(readWorkspaceArchiveListing({ workspaceDir: workspace, path: "tiny.tar" })).rejects.toThrow(/太短或已截断/);
+    await expect(
+      readWorkspaceArchiveListing({
+        workspaceDir: workspace,
+        path: "tiny.tar",
+      }),
+    ).rejects.toThrow(/太短或已截断/);
   });
 
   it("stops at the entry ceiling before a huge entry count can exhaust memory", async () => {
@@ -362,10 +472,34 @@ describe("workspace archive listing", () => {
         })),
       ),
     );
-    const listing = await readWorkspaceArchiveListing({ workspaceDir: workspace, path: "many.zip" });
+    const listing = await readWorkspaceArchiveListing({
+      workspaceDir: workspace,
+      path: "many.zip",
+    });
     expect(listing.entries).toHaveLength(1);
     expect(listing.totalEntries).toBe(10_001);
     expect(listing.truncated).toBe(true);
+  });
+
+  it("keeps the listing complete at 500 rows and marks the 501st as truncated", async () => {
+    for (const count of [500, 501]) {
+      writeArtifact(
+        `listed-${count}.zip`,
+        craftZip(
+          Array.from({ length: count }, (_, index) => ({
+            name: `file-${String(index).padStart(3, "0")}.txt`,
+            content: "",
+          })),
+        ),
+      );
+      const listing = await readWorkspaceArchiveListing({
+        workspaceDir: workspace,
+        path: `listed-${count}.zip`,
+      });
+      expect(listing.entries).toHaveLength(500);
+      expect(listing.totalEntries).toBe(count);
+      expect(listing.truncated).toBe(count === 501);
+    }
   });
 });
 
@@ -374,27 +508,46 @@ describe("workspace archive listing", () => {
 // ---------------------------------------------------------------------------
 
 describe("workspace archive extraction", () => {
-  it.skipIf(!HAS_ZIP)("writes the current directory into a destination beside the archive", async () => {
-    realZip("bundle.zip", { "inner.txt": "hello", "sub/deep.txt": "deeper", "sub/other/x.txt": "x" });
-    const result = await extractWorkspaceArchiveDirectory({
-      workspaceDir: workspace,
-      path: "bundle.zip",
-      destination: "unpacked",
-      prefix: "sub",
-    });
-    // The prefix is stripped, so extracting `sub` writes `deep.txt`, not
-    // `sub/deep.txt`.
-    expect(result).toMatchObject({ archivePath: "bundle.zip", destination: "unpacked", writtenFiles: 2 });
-    expect(readArtifact("unpacked/deep.txt")).toBe("deeper");
-    expect(readArtifact("unpacked/other/x.txt")).toBe("x");
-    expect(exists(artifactPath("unpacked/inner.txt"))).toBe(false);
-  });
+  it.skipIf(!HAS_ZIP)(
+    "writes the current directory into a destination beside the archive",
+    async () => {
+      realZip("bundle.zip", {
+        "inner.txt": "hello",
+        "sub/deep.txt": "deeper",
+        "sub/other/x.txt": "x",
+      });
+      const result = await extractWorkspaceArchiveDirectory({
+        workspaceDir: workspace,
+        path: "bundle.zip",
+        destination: "unpacked",
+        prefix: "sub",
+      });
+      // The prefix is stripped, so extracting `sub` writes `deep.txt`, not
+      // `sub/deep.txt`.
+      expect(result).toMatchObject({
+        archivePath: "bundle.zip",
+        destination: "unpacked",
+        writtenFiles: 2,
+      });
+      expect(readArtifact("unpacked/deep.txt")).toBe("deeper");
+      expect(readArtifact("unpacked/other/x.txt")).toBe("x");
+      expect(exists(artifactPath("unpacked/inner.txt"))).toBe(false);
+    },
+  );
 
   it("refuses an entry that escapes the destination and writes nothing", async () => {
-    for (const name of ["../escaped.txt", "a/../../escaped.txt", "..\\escaped.txt"]) {
+    for (const name of [
+      "../escaped.txt",
+      "a/../../escaped.txt",
+      "..\\escaped.txt",
+    ]) {
       writeArtifact("slip.zip", craftZip([{ name, content: "pwned" }]));
       await expect(
-        extractWorkspaceArchiveDirectory({ workspaceDir: workspace, path: "slip.zip", destination: "out" }),
+        extractWorkspaceArchiveDirectory({
+          workspaceDir: workspace,
+          path: "slip.zip",
+          destination: "out",
+        }),
       ).rejects.toThrow(/不安全|越界/);
     }
     // Two phases: validation happens before the first byte is written, so a
@@ -437,7 +590,11 @@ describe("workspace archive extraction", () => {
     for (const [name, message] of Object.entries(cases)) {
       writeArtifact("absolute.zip", craftZip([{ name, content: "pwned" }]));
       await expect(
-        extractWorkspaceArchiveDirectory({ workspaceDir: workspace, path: "absolute.zip", destination: "out" }),
+        extractWorkspaceArchiveDirectory({
+          workspaceDir: workspace,
+          path: "absolute.zip",
+          destination: "out",
+        }),
       ).rejects.toThrow(message);
     }
     expect(exists(artifactPath("out"))).toBe(false);
@@ -450,21 +607,38 @@ describe("workspace archive extraction", () => {
     symlinkSync("inner.txt", path.join(source, "link.txt"));
     if (HAS_ZIP) {
       // `-y` stores the link itself rather than the file it points at.
-      execFileSync("zip", ["-q", "-y", artifactPath("linky.zip"), "link.txt"], { cwd: source });
+      execFileSync("zip", ["-q", "-y", artifactPath("linky.zip"), "link.txt"], {
+        cwd: source,
+      });
       await expect(
-        extractWorkspaceArchiveDirectory({ workspaceDir: workspace, path: "linky.zip", destination: "out" }),
+        extractWorkspaceArchiveDirectory({
+          workspaceDir: workspace,
+          path: "linky.zip",
+          destination: "out",
+        }),
       ).rejects.toThrow(/符号链接/);
     }
     if (HAS_TAR) {
       realTarLink("linky.tar", source, "link.txt");
       await expect(
-        extractWorkspaceArchiveDirectory({ workspaceDir: workspace, path: "linky.tar", destination: "out" }),
+        extractWorkspaceArchiveDirectory({
+          workspaceDir: workspace,
+          path: "linky.tar",
+          destination: "out",
+        }),
       ).rejects.toThrow(/符号链接/);
     }
     // And against a hand-built zip, so the refusal does not depend on a CLI.
-    writeArtifact("craft-link.zip", craftZip([{ name: "link.txt", content: "/etc/passwd", mode: 0o120777 }]));
+    writeArtifact(
+      "craft-link.zip",
+      craftZip([{ name: "link.txt", content: "/etc/passwd", mode: 0o120777 }]),
+    );
     await expect(
-      extractWorkspaceArchiveDirectory({ workspaceDir: workspace, path: "craft-link.zip", destination: "out" }),
+      extractWorkspaceArchiveDirectory({
+        workspaceDir: workspace,
+        path: "craft-link.zip",
+        destination: "out",
+      }),
     ).rejects.toThrow(/符号链接/);
     expect(exists(artifactPath("out"))).toBe(false);
   });
@@ -474,10 +648,20 @@ describe("workspace archive extraction", () => {
     // pre-flight sums the declared sizes, so nothing is inflated at all.
     writeArtifact(
       "lie-total.zip",
-      craftZip([{ name: "a.txt", content: "hi", declaredUncompressedSize: 1024 * 1024 * 1024 }]),
+      craftZip([
+        {
+          name: "a.txt",
+          content: "hi",
+          declaredUncompressedSize: 1024 * 1024 * 1024,
+        },
+      ]),
     );
     await expect(
-      extractWorkspaceArchiveDirectory({ workspaceDir: workspace, path: "lie-total.zip", destination: "out" }),
+      extractWorkspaceArchiveDirectory({
+        workspaceDir: workspace,
+        path: "lie-total.zip",
+        destination: "out",
+      }),
     ).rejects.toThrow(/声明的展开后体积过大/);
 
     // Here the declared total is 1 byte while the real payload is a megabyte,
@@ -491,11 +675,20 @@ describe("workspace archive extraction", () => {
     writeArtifact(
       "lie-ratio.zip",
       craftZip([
-        { name: "bomb.bin", content: Buffer.alloc(1024 * 1024), declaredUncompressedSize: 1, declaredCompressedSize: 1 },
+        {
+          name: "bomb.bin",
+          content: Buffer.alloc(1024 * 1024),
+          declaredUncompressedSize: 1,
+          declaredCompressedSize: 1,
+        },
       ]),
     );
     await expect(
-      extractWorkspaceArchiveDirectory({ workspaceDir: workspace, path: "lie-ratio.zip", destination: "out" }),
+      extractWorkspaceArchiveDirectory({
+        workspaceDir: workspace,
+        path: "lie-ratio.zip",
+        destination: "out",
+      }),
     ).rejects.toThrow(/异常膨胀|ZIP 条目已损坏/);
     // Names and the declared total are refused before the destination is even
     // created; a byte-level failure (a corrupt stream, an expansion blow-up, a
@@ -507,42 +700,63 @@ describe("workspace archive extraction", () => {
   it("refuses a destination outside the workspace, and creates nothing", async () => {
     writeArtifact("small.zip", craftZip([{ name: "a.txt", content: "hello" }]));
     await expect(
-      extractWorkspaceArchiveDirectory({ workspaceDir: workspace, path: "small.zip", destination: "../escape" }),
+      extractWorkspaceArchiveDirectory({
+        workspaceDir: workspace,
+        path: "small.zip",
+        destination: "../escape",
+      }),
     ).rejects.toThrow(/越界/);
     await expect(
-      extractWorkspaceArchiveDirectory({ workspaceDir: workspace, path: "small.zip", destination: "/tmp/webui-escape" }),
+      extractWorkspaceArchiveDirectory({
+        workspaceDir: workspace,
+        path: "small.zip",
+        destination: "/tmp/webui-escape",
+      }),
     ).rejects.toThrow(/越界/);
     expect(exists(path.join(workspace, "..", "escape"))).toBe(false);
   });
 
   it("refuses to overwrite a file that is already in the destination", async () => {
-    writeArtifact("clash.zip", craftZip([{ name: "a.txt", content: "from archive" }]));
+    writeArtifact(
+      "clash.zip",
+      craftZip([{ name: "a.txt", content: "from archive" }]),
+    );
     mkdirSync(artifactPath("clash-out"), { recursive: true });
     writeArtifact("clash-out/a.txt", "already mine");
     // An archive the user did not write must never be able to overwrite a file
     // already in their workspace.
     await expect(
-      extractWorkspaceArchiveDirectory({ workspaceDir: workspace, path: "clash.zip", destination: "clash-out" }),
+      extractWorkspaceArchiveDirectory({
+        workspaceDir: workspace,
+        path: "clash.zip",
+        destination: "clash-out",
+      }),
     ).rejects.toThrow(/EEXIST|file already exists/iu);
     expect(readArtifact("clash-out/a.txt")).toBe("already mine");
   });
 
-  it.skipIf(!HAS_ZIP)("extracts a whole archive when no prefix is given", async () => {
-    realZip("whole.zip", { "one.txt": "1", "two/deep.txt": "2" });
-    const result = await extractWorkspaceArchiveDirectory({
-      workspaceDir: workspace,
-      path: "whole.zip",
-      destination: "whole-out",
-    });
-    expect(result.writtenFiles).toBe(2);
-    expect(readArtifact("whole-out/one.txt")).toBe("1");
-    expect(readArtifact("whole-out/two/deep.txt")).toBe("2");
-  });
+  it.skipIf(!HAS_ZIP)(
+    "extracts a whole archive when no prefix is given",
+    async () => {
+      realZip("whole.zip", { "one.txt": "1", "two/deep.txt": "2" });
+      const result = await extractWorkspaceArchiveDirectory({
+        workspaceDir: workspace,
+        path: "whole.zip",
+        destination: "whole-out",
+      });
+      expect(result.writtenFiles).toBe(2);
+      expect(readArtifact("whole-out/one.txt")).toBe("1");
+      expect(readArtifact("whole-out/two/deep.txt")).toBe("2");
+    },
+  );
 });
 
 /** A tar containing a symlink, via the CLI (`tar` records typeflag `2`). */
 function realTarLink(name: string, source: string, member: string): string {
-  execFileSync("tar", ["cf", artifactPath(name), member], { cwd: source, env: FIXTURE_ENV });
+  execFileSync("tar", ["cf", artifactPath(name), member], {
+    cwd: source,
+    env: FIXTURE_ENV,
+  });
   return artifactPath(name);
 }
 
@@ -552,7 +766,10 @@ function realTarLink(name: string, source: string, member: string): string {
 
 describe("harness port archive members", () => {
   it("serves both operations from this package when the runtime has neither", async () => {
-    writeArtifact("port.zip", craftZip([{ name: "a/b.txt", content: "hello" }]));
+    writeArtifact(
+      "port.zip",
+      craftZip([{ name: "a/b.txt", content: "hello" }]),
+    );
     // A host whose cliService predates the archive capability. Before this
     // change the two port members threw "压缩包浏览能力尚未接入。" right here.
     const port = createHarnessPortFromHost({
@@ -563,7 +780,10 @@ describe("harness port archive members", () => {
       apiHost: { close: async () => undefined },
       cliService: {} as unknown as WebuiRuntimeCliService,
     });
-    const listing = await port.readWorkspaceArchive({ workspaceDir: workspace, path: "port.zip" });
+    const listing = await port.readWorkspaceArchive({
+      workspaceDir: workspace,
+      path: "port.zip",
+    });
     expect(listing.entries.map((entry) => entry.name)).toEqual(["a"]);
     const result = await port.extractWorkspaceArchive({
       workspaceDir: workspace,
@@ -581,11 +801,19 @@ describe("harness port archive members", () => {
       apiHost: { close: async () => undefined },
       cliService: {
         async readWorkspaceArchive() {
-          return { archivePath: "from-runtime.zip", entries: [], totalEntries: 0, truncated: false };
+          return {
+            archivePath: "from-runtime.zip",
+            entries: [],
+            totalEntries: 0,
+            truncated: false,
+          };
         },
       } as unknown as WebuiRuntimeCliService,
     });
-    const listing = await port.readWorkspaceArchive({ workspaceDir: workspace, path: "port.zip" });
+    const listing = await port.readWorkspaceArchive({
+      workspaceDir: workspace,
+      path: "port.zip",
+    });
     expect(listing.archivePath).toBe("from-runtime.zip");
   });
 });
@@ -627,21 +855,18 @@ describe("workspace archive view", () => {
     // run the effect, so this is the state a reader actually sees first: the
     // owner has not read anything yet and the view paints the loading notice.
     const markup = renderToStaticMarkup(
-      createElement(
-        WebuiWorkspaceQueriesProvider,
-        {
-          queries: createWebuiWorkspaceQueries({
-            port: {
-              readWorkspaceArchive: () =>
-                new Promise<WebuiWorkspaceArchiveListing>(() => undefined),
-            },
-          }),
-          children: createElement(WorkspaceArchiveView, {
-            workspaceDir: "/repo",
-            path: "dist/bundle.zip",
-          }),
-        },
-      ),
+      createElement(WebuiWorkspaceQueriesProvider, {
+        queries: createWebuiWorkspaceQueries({
+          port: {
+            readWorkspaceArchive: () =>
+              new Promise<WebuiWorkspaceArchiveListing>(() => undefined),
+          },
+        }),
+        children: createElement(WorkspaceArchiveView, {
+          workspaceDir: "/repo",
+          path: "dist/bundle.zip",
+        }),
+      }),
     );
     expect(markup).toContain('role="status"');
     expect(markup).toContain("正在读取压缩包");
@@ -649,7 +874,10 @@ describe("workspace archive view", () => {
 
   it("says so when the service exposes no archive capability", () => {
     const markup = renderToStaticMarkup(
-      createElement(WorkspaceArchiveView, { workspaceDir: "/repo", path: "dist/bundle.zip" }),
+      createElement(WorkspaceArchiveView, {
+        workspaceDir: "/repo",
+        path: "dist/bundle.zip",
+      }),
     );
     expect(markup).toContain("没有提供压缩包浏览能力");
   });
@@ -705,7 +933,11 @@ describe("workspace archive view", () => {
     const done = renderListing({
       extractState: {
         status: "done",
-        result: { archivePath: "dist/bundle.zip", destination: "dist/bundle", writtenFiles: 3 },
+        result: {
+          archivePath: "dist/bundle.zip",
+          destination: "dist/bundle",
+          writtenFiles: 3,
+        },
       },
     });
     expect(done).toContain('data-testid="workspace-archive-extract-result"');
@@ -714,12 +946,19 @@ describe("workspace archive view", () => {
     const partial = renderListing({
       extractState: {
         status: "done",
-        result: { archivePath: "dist/bundle.zip", destination: "dist/bundle", writtenFiles: 3, truncated: true },
+        result: {
+          archivePath: "dist/bundle.zip",
+          destination: "dist/bundle",
+          writtenFiles: 3,
+          truncated: true,
+        },
       },
     });
     expect(partial).toContain("仅解压了前一部分");
 
-    const failed = renderListing({ extractState: { status: "error", error: "压缩包中存在不安全的条目" } });
+    const failed = renderListing({
+      extractState: { status: "error", error: "压缩包中存在不安全的条目" },
+    });
     expect(failed).toContain('role="alert"');
     expect(failed).toContain("不安全");
 
@@ -729,11 +968,16 @@ describe("workspace archive view", () => {
   });
 
   it("separates a failure from a state that was never available", () => {
-    const notice = renderToStaticMarkup(createElement(WorkspaceArchiveNotice, { reason: "正在读取压缩包…" }));
+    const notice = renderToStaticMarkup(
+      createElement(WorkspaceArchiveNotice, { reason: "正在读取压缩包…" }),
+    );
     expect(notice).toContain('role="status"');
     expect(notice).not.toContain('role="alert"');
     const failure = renderToStaticMarkup(
-      createElement(WorkspaceArchiveNotice, { reason: "这不是可识别的 ZIP 压缩包", role: "alert" }),
+      createElement(WorkspaceArchiveNotice, {
+        reason: "这不是可识别的 ZIP 压缩包",
+        role: "alert",
+      }),
     );
     expect(failure).toContain('role="alert"');
   });

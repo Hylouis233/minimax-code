@@ -93,3 +93,136 @@ test("the calm states are labelled too, so trouble has honest neighbours", async
   // And no row invents a reason where the runtime gave none.
   await expect(page.locator("[data-webui-mcp-status-reason]")).toHaveCount(0);
 });
+
+test("a late MCP detail cannot attach to a different management selection", async ({ page }) => {
+  await stageMcpServers(page, [
+    { name: "delayed-server", transport: "stdio", enabled: true, status: "configured" },
+  ]);
+  await page.addInitScript(() => {
+    window.__WEBUI_FIXTURE_SETUP__ ??= [];
+    window.__WEBUI_FIXTURE_SETUP__.push(() =>
+      window.__fixture.delayNext("pluginManagement", { action: "getMcpServer" }),
+    );
+  });
+  await openApp(page, "#session=A");
+  await openMcpArea(page);
+  await rowOf(page, "delayed-server").getByRole("button", { name: "编辑" }).click();
+  await expect.poll(() => page.evaluate(() =>
+    window.__fixture.requests.some((request) =>
+      request.operation === "pluginManagement" && request.body.action === "getMcpServer",
+    ),
+  )).toBe(true);
+
+  await page.locator('.webui-plugin-category-filter button', { hasText: "Agents" }).click();
+  const released = await page.evaluate(() =>
+    window.__fixture.resolveAllPending(
+      "pluginManagement",
+      { action: "getMcpServer" },
+      { name: "delayed-server", command: "synthetic" },
+    ),
+  );
+  expect(released).toBe(1);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.locator(".webui-agent-editor")).toBeVisible();
+});
+
+test("a late Git preview cannot populate a replacement import dialog", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__WEBUI_FIXTURE_SETUP__ ??= [];
+    window.__WEBUI_FIXTURE_SETUP__.push(() =>
+      window.__fixture.delayNext("pluginManagement", { action: "previewGithubPlugin" }),
+    );
+  });
+  await openApp(page, "#session=A");
+  await page.getByRole("button", { name: "插件" }).first().click();
+  await page.locator(".webui-plugin-manage-trigger").click();
+  await page.locator(".webui-plugin-create-trigger").click();
+  await page.getByRole("button", { name: "从 Git 仓库导入插件" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("textbox", { name: "仓库 URL" }).fill("https://github.com/old/repository");
+  await dialog.getByRole("button", { name: "预览" }).click();
+  await expect.poll(() => page.evaluate(() =>
+    window.__fixture.requests.some((request) =>
+      request.operation === "pluginManagement" && request.body.action === "previewGithubPlugin",
+    ),
+  )).toBe(true);
+
+  await dialog.getByRole("button", { name: "关闭" }).click();
+  await page.locator(".webui-plugin-create-trigger").click();
+  await page.getByRole("button", { name: "从 Git 仓库导入插件" }).click();
+  const replacement = page.getByRole("dialog");
+  await replacement.getByRole("textbox", { name: "仓库 URL" }).fill("https://github.com/new/repository");
+  const released = await page.evaluate(() =>
+    window.__fixture.resolveAllPending(
+      "pluginManagement",
+      { action: "previewGithubPlugin" },
+      {
+        canImport: true,
+        plugin: { summary: { name: "stale-plugin", displayName: "Stale preview" } },
+      },
+    ),
+  );
+  expect(released).toBe(1);
+  await expect(replacement.getByRole("textbox", { name: "仓库 URL" })).toHaveValue(
+    "https://github.com/new/repository",
+  );
+  await expect(replacement.getByRole("button", { name: "预览" })).toBeVisible();
+  await expect(replacement.getByText("Stale preview")).toHaveCount(0);
+});
+
+test("closing an import dialog does not cancel an accepted mutation settlement", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__WEBUI_FIXTURE_SETUP__ ??= [];
+    window.__WEBUI_FIXTURE_SETUP__.push(() => {
+      window.__fixture.setPluginManagementResult("previewGithubPlugin", {
+        canImport: true,
+        source: {
+          repositoryUrl: "https://github.com/owner/repository",
+          commitSha: "abc123",
+        },
+        plugin: { summary: { name: "imported", displayName: "Importable" } },
+      });
+      window.__fixture.delayNext("pluginManagement", { action: "importGithubPlugin" });
+    });
+  });
+  await openApp(page, "#session=A");
+  await page.getByRole("button", { name: "插件" }).first().click();
+  await page.locator(".webui-plugin-manage-trigger").click();
+  await page.locator(".webui-plugin-create-trigger").click();
+  await page.getByRole("button", { name: "从 Git 仓库导入插件" }).click();
+  const initial = page.getByRole("dialog");
+  await initial.getByRole("textbox", { name: "仓库 URL" }).fill("https://github.com/owner/repository");
+  await initial.getByRole("button", { name: "预览" }).click();
+  await expect(initial.getByText("Importable")).toBeVisible();
+  await initial.getByRole("button", { name: "导入插件" }).click();
+  await expect.poll(() => page.evaluate(() =>
+    window.__fixture.requests.some((request) =>
+      request.operation === "pluginManagement" && request.body.action === "importGithubPlugin",
+    ),
+  )).toBe(true);
+
+  const listCountBeforeSettle = await page.evaluate(() =>
+    window.__fixture.requests.filter((request) =>
+      request.operation === "pluginManagement" && request.body.action === "listInstalledPlugins",
+    ).length,
+  );
+  await initial.getByRole("button", { name: "关闭" }).click();
+  await page.locator(".webui-plugin-create-trigger").click();
+  await page.getByRole("button", { name: "从 Git 仓库导入插件" }).click();
+  const replacement = page.getByRole("dialog");
+
+  const released = await page.evaluate(() =>
+    window.__fixture.resolveAllPending(
+      "pluginManagement",
+      { action: "importGithubPlugin" },
+      { ok: true },
+    ),
+  );
+  expect(released).toBe(1);
+  await expect(replacement).toBeVisible();
+  await expect.poll(() => page.evaluate(() =>
+    window.__fixture.requests.filter((request) =>
+      request.operation === "pluginManagement" && request.body.action === "listInstalledPlugins",
+    ).length,
+  )).toBeGreaterThan(listCountBeforeSettle);
+});

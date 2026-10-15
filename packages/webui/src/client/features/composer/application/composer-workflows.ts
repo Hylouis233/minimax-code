@@ -79,6 +79,8 @@ export interface WebuiGoalSubmitArgs {
   readonly createSession?: WebuiClientSessionCreator;
   readonly createSessionWorkspaceDir?: string;
   readonly teamModeOff?: boolean;
+  /** Resolve the target session owner after a home submission creates it. */
+  readonly resolveGoal?: (sessionId: string) => Pick<WebuiGoalSubmitArgs, "currentGoal" | "createGoal" | "patchGoal">;
 }
 
 function createSessionWorkspaceField(workspaceDir?: string): { readonly workspaceDir?: string } {
@@ -112,8 +114,9 @@ export async function submitWebuiGoal(
     if (!sessionId) throw new Error("创建目标会话未返回会话 ID");
     onSessionCreated?.(sessionId);
   }
-  if (args.currentGoal && args.patchGoal) return args.patchGoal({ sessionId, objective });
-  return args.createGoal({ sessionId, objective });
+  const resolved = args.resolveGoal?.(sessionId) ?? args;
+  if (resolved.currentGoal && resolved.patchGoal) return resolved.patchGoal({ sessionId, objective });
+  return resolved.createGoal({ sessionId, objective });
 }
 
 export async function submitWebuiComposerTurn(

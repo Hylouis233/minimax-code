@@ -81,6 +81,7 @@ export interface SessionRailActions {
   readonly setRailSearchQuery: React.Dispatch<React.SetStateAction<string>>;
   readonly railSearchInputRef: { current: HTMLInputElement | null };
   readonly sessionImportInputRef: { current: HTMLInputElement | null };
+  readonly openSessionImportPicker: () => void;
   readonly sessionImportBusy: boolean;
   readonly openRailSearch: () => void;
   readonly closeRailSearch: () => void;
@@ -294,6 +295,7 @@ export function useSessionRailActions({
     setRailSearchQuery,
     railSearchInputRef,
     sessionImportInputRef,
+    openSessionImportPicker: () => sessionImportInputRef.current?.click(),
     sessionImportBusy,
     openRailSearch,
     closeRailSearch,

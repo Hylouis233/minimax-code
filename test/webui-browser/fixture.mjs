@@ -83,6 +83,7 @@ export function installFixtureTransport() {
   // block (`{}` — the default — has no signedIn field and reads as signed
   // in but quota-less, not as signed out).
   let usageQuotaResult = {};
+  let models = [];
   let activeTurn;
   // Archived session ids. `archiveSession` is one operation for both directions
   // (`{id}` archives, `{id, archived: false}` takes it back), and the archived
@@ -199,8 +200,10 @@ export function installFixtureTransport() {
     if (operation === "dismissQuestionnaire") return { ok: true };
     if (operation === "replyQuestionnaire") return { ok: true };
     if (operation === "listQueueMessages") return { items: [] };
-    if (operation === "listModels" || operation === "loadProjects") return [];
+    if (operation === "listModels") return clone(models);
+    if (operation === "loadProjects") return [];
     if (operation === "getUsageQuota") return clone(usageQuotaResult);
+    if (operation === "getGoal") return undefined;
     if (operation === "isGoalEnabled") return false;
     if (operation === "getPermissionMode") return { mode: "default" };
     if (operation === "getSessionUsage") return {};
@@ -325,6 +328,7 @@ export function installFixtureTransport() {
     // blocking — the transcript's own request is the second of the three.
     delayEvery(operation, condition) { held.push({ operation, condition }); },
     setPage(sessionId, page) { pages[sessionId] = clone(page); },
+    setModels(next) { models = clone(next); },
     /** Which sessions the fixture currently holds as archived. */
     setArchived(ids) { archivedIds = [...ids]; },
     archived() { return [...archivedIds]; },

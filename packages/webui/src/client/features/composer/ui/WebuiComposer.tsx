@@ -18,7 +18,6 @@ import {
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
   type FormEvent,
   type ReactElement,
 } from "react";
@@ -43,7 +42,6 @@ import {
 } from "../../../features/interactions/application/interaction-coordinator.js";
 import { latestContextUsage, readContextUsageSnapshot } from "../projection/context-usage.js";
 import { readWebuiComposerSubmitGate } from "../projection/submission-gate.js";
-import { readWebuiComposerGoalModeAfterSubmit } from "../projection/composer-goal-outcome.js";
 import {
   type WebuiComposerSeed,
 } from "../projection/seed-application.js";
@@ -74,7 +72,6 @@ import {
 } from "../../../bindings/use-session-state.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { ContextUsageIndicator } from "../../../features/sessions/ui/ContextUsageIndicator.js";
-import { useWebuiPortSlice } from "../../../bindings/port-slices-context.js";
 import {
   useWebuiModelsWorkflows,
   useWebuiModelsWorkflowsState,
@@ -87,7 +84,6 @@ import {
   useWebuiWorkspaceQueries,
   useWebuiWorkspaceQueriesState,
 } from "../../../bindings/use-query-state.js";
-import { useWebuiSessionWorkflows } from "../../../bindings/use-query-state.js";
 import { type WebuiPermissionMode } from "../../../features/settings/contracts/settings-port.js";
 import {
   useWebuiGoalOwner,
@@ -97,17 +93,16 @@ import {
   useWebuiInteractionAgentNameReader,
   useWebuiInteractionOwner,
 } from "../../../features/interactions/bindings/interaction-owner.js";
-import { useWebuiComposerStore } from "../../../bindings/composer-store.js";
+import { useComposerController } from "../bindings/use-composer-controller.js";
+import { useComposerLayout } from "../bindings/use-composer-layout.js";
+import { useComposerInput, useComposerSlashDismiss } from "../bindings/use-composer-input.js";
 import { useComposerAttachments } from "../bindings/use-composer-attachments.js";
 import {
   useWebuiApplicationOptional,
   useWebuiSessionStoreSnapshot,
 } from "../../../bindings/application-context.js";
 import { selectWebuiCatalogFlatPage } from "../../../features/sessions/application/session-catalog.js";
-import {
-  useWebuiAccountWorkflows,
-  useWebuiAccountWorkflowsState,
-} from "../../../features/account/bindings/use-account-workflows.js";
+import { useWebuiAccountWorkflowsState } from "../../../features/account/bindings/use-account-workflows.js";
 import { webuiSessionStatusType } from "../../turn/projection/stream-state.js";
 
 import type {
@@ -146,15 +141,8 @@ import {
   WebuiIconAttach,
 } from "../../../components/shell/icons.js";
 import { OutputError } from "../../../features/transcript/ui/OutputError.js";
-import {
-  resolveWebuiSubmissionIntent,
-  resolveWebuiComposerEnterAction,
-} from "../projection/composer-state.js";
 import { isTurnLive } from "../../turn/contracts/stream-state.js";
-import {
-  submitWebuiGoal,
-} from "../application/composer-workflows.js";
-import { evaluateComposerDismiss, evaluateOutsideClose } from "../../../projection/common/outside-close.js";
+import { evaluateComposerDismiss } from "../../../projection/common/outside-close.js";
 import {
   buildWebuiModelSelectionRequest,
 } from "../../../features/sessions/projection/action-requests.js";
@@ -162,16 +150,9 @@ import {
   findWebuiMentionRange,
   findWebuiSlashRange,
   insertWebuiMention,
-  removeWebuiSlashToken,
   replaceWebuiSlashToken,
   webuiTextAttachmentDataUrl,
 } from "../projection/composer-interactions.js";
-import {
-  shouldRecallWebuiHistory,
-  startWebuiHistoryBrowse,
-  stepWebuiHistoryBrowse,
-  type WebuiHistoryBrowse,
-} from "../application/composer-history.js";
 import {
   slashSkillSummaryToEntry,
   WEBUI_BUILTIN_COMMANDS,
@@ -183,7 +164,7 @@ import {
   rankWebuiSlashPalette,
   sectionWebuiSlashPalette,
 } from "../contracts/slash-command.js";
-import { planWebuiRetryResend, resendRecordedWebuiTurn } from "../application/turn-retry.js";
+import { planWebuiRetryResend } from "../application/turn-retry.js";
 
 const WEBUI_SLASH_FALLBACK_SECTIONED: SlashCommandEntry[] = await (async () => {
   const { resolveWebuiSlashSkills } = await import("./slash-palette.js");
@@ -244,7 +225,6 @@ export function WebuiComposer({
   draft,
   onDraftChange,
   inputHistory = [],
-  onInputSubmitted,
   onNeedsSession,
   onSessionCreated,
   teamModeOff,
@@ -313,30 +293,10 @@ export function WebuiComposer({
   readonly onOpenPluginManagement?: (area: "plugins" | "skills") => void;
 }): ReactElement {
 
-  // The two slices this carve owns (plan §8 Phase 3 B1, ticket #66). The composer
-  // reads them and hands each to the owner that drives it; the calls themselves
-  // happen in `goal-coordinator.ts` and `interaction-coordinator.ts`, which are
-  // application modules. What the presentation invokes is therefore the owners'
-  // published command surface and nothing else — which is why these businesses'
-  // findings clear at this carve and could not clear in Phase 2: the capability
-  // needed an owner to move into first.
-  const interactionsPort = useWebuiPortSlice("interactions");
-  // The two interaction members this component still names directly, for the
-  // registration effect's dependencies (below). A host with no provider has no
-  // slice, hence the optional read: the dependency is `undefined` there, which is
-  // the same "not wired" value the props carried.
-  const getPendingQuestionnaire = interactionsPort?.getPendingQuestionnaire;
-  const listPendingPermissions = interactionsPort?.listPendingPermissions;
-
   const { dom } = useWebuiBrowserCapabilities();
   const { stream, sending } = useWebuiSessionState(sessionId);
   const {
-    phase,
     lifecycle,
-    attachTurn,
-    recheckTurn,
-    recoverTurn,
-    sendTurn: submitTurn,
     stopTurn,
   } = useWebuiSessionCommands(sessionId);
   // The per-session effects registry the shell provides (ticket #45). The
@@ -387,16 +347,16 @@ export function WebuiComposer({
   // The composer's owner, read once for everything this component keeps in it
   // (§4.2 field 1: the input modes, the retry record, the queue; §5.6's may-write
   // cell for the staging). One store, one subscription.
-  const composerStore = useWebuiComposerStore();
+  const { controller: composerController, snapshot: controllerSnapshot, isAttachedTo } = useComposerController(sessionId);
+  if (!composerController || !controllerSnapshot) {
+    throw new Error("WebuiComposer requires the application-owned composer controller");
+  }
   // Sessions' published create command, read from its owner rather than relayed
   // through a prop (plan 4.2 field 4, 4.2 field 8).
-  const sessionWorkflows = useWebuiSessionWorkflows();
   // The composer's own command workflows and the substrate's capability slice.
   // Both are published by the assembly; holding them as props was the relay
   // 4.2 field 8 rules out.
   const application = useWebuiApplicationOptional();
-  const commandWorkflows = application?.commandWorkflows;
-  const turnCapabilities = application?.turnCapabilities;
   // Published by the plugins/composer owner; a read model the composer consumes
   // rather than a prop the shell relays (plan 4.2 field 4).
   const pluginCatalogue = application?.composerPluginCatalogue;
@@ -410,28 +370,19 @@ export function WebuiComposer({
   );
   const workspaceQueries = useWebuiWorkspaceQueries();
   const workspaceFileTree = useWebuiWorkspaceQueriesState().fileTree;
-  const composerSnapshot = useSyncExternalStore(
-    composerStore.subscribe,
-    composerStore.getSnapshot,
-    composerStore.getSnapshot,
-  );
+  const composerSnapshot = controllerSnapshot.composer;
   // The input modes are the composer's own state (§4.2 field 1), kept by its owner.
   const goalMode = composerSnapshot.modes.goal;
   const planMode = composerSnapshot.modes.plan;
-  const setGoalMode = useCallback(
-    (next: boolean) => {
-      composerStore.setModes({ goal: next });
-    },
-    [composerStore],
-  );
-  const setPlanMode = useCallback(
-    (next: boolean) => {
-      composerStore.setModes({ plan: next });
-    },
-    [composerStore],
-  );
-  const [goalSubmitting, setGoalSubmitting] = useState(false);
-  const [interactionError, setInteractionError] = useState<string>();
+  const setGoalMode = composerController.setGoalMode;
+  const setPlanMode = composerController.setPlanMode;
+  const goalSubmitting = controllerSnapshot.goalSubmitting;
+  const [localInteractionError, setLocalInteractionError] = useState<string>();
+  const interactionError = controllerSnapshot.interactionError ?? localInteractionError;
+  const setInteractionError = useCallback((error: string | undefined) => {
+    setLocalInteractionError(error);
+    if (error === undefined) composerController.clearError();
+  }, [composerController]);
   // The queue mirror is the composer's own state, and its owner is the composer
   // store (§4.2 field 1: "the queue's state (`queueItems`, `queuePaused` —
   // component-local today)"; §5.6's composer row names the owner module). It is
@@ -440,12 +391,6 @@ export function WebuiComposer({
   const queueState = composerSnapshot.queue;
   const queueItems = queueState.items;
   const queuePaused = queueState.paused;
-  const setQueueItems = composerStore.setQueue;
-  // The queue mirror's fence: claim the destination before the read, apply the
-  // answer only while that claim is still live (plan 5.6, queue-mirror row).
-  const claimQueueDestination = composerStore.claimQueueDestination;
-  const applyQueueRead = composerStore.applyQueueRead;
-  const readQueueDestination = composerStore.readQueueDestination;
   // The model catalogue is the models owner's cached read (T13 criterion 1):
   // the composer used to hold a second copy fed by its own 2s poll of the raw
   // `listModels` port method.
@@ -459,19 +404,18 @@ export function WebuiComposer({
    * the owner's cached read is rendered only while it answers for the session
    * on screen.
    */
-  const [modelsScope, setModelsScope] = useState<string | undefined>(undefined);
+  const modelsScope = controllerSnapshot.inspectionSessionId;
   const models: readonly WebuiModelEntry[] =
     modelsScope === sessionId ? (modelsSnapshot.models.value ?? []) : [];
   // The account status is the account owner's answer, not this component's copy
   // of an RPC result (plan 4.2 field 4, 5.6). The owner drops a superseded read.
-  const accountWorkflows = useWebuiAccountWorkflows();
   const accountSnapshot = useWebuiAccountWorkflowsState();
   // Same scope guard the catalogue read uses: an answer the owner holds for
   // another session must not bleed into this one, and on home nothing shows.
   const accountStatus =
     modelsScope === sessionId ? accountSnapshot.account.value : undefined;
-  const [commandOutput, setCommandOutput] = useState<string>();
-  const [commandRunning, setCommandRunning] = useState(false);
+  const commandOutput = controllerSnapshot.commandOutput;
+  const commandRunning = controllerSnapshot.commandRunning;
   // The staged attachments and URL references are the composer's own state, kept
   // by its owner module (§5.6) and read from the same snapshot as the queue.
   const attachments = composerSnapshot.staging.attachments;
@@ -483,11 +427,9 @@ export function WebuiComposer({
         | readonly WebuiComposerUrlReference[]
         | ((current: readonly WebuiComposerUrlReference[]) => readonly WebuiComposerUrlReference[]),
     ) => {
-      composerStore.setStaging((current) => ({
-        urlReferences: typeof next === "function" ? next(current.urlReferences) : next,
-      }));
+      composerController.setUrlReferences((current) => typeof next === "function" ? next(current) : next);
     },
-    [composerStore],
+    [composerController],
   );
   const [composerMenu, setComposerMenu] = useState<"root" | "skills" | "plugins">();
   const [installedPlugins, setInstalledPlugins] = useState<readonly WebuiComposerPluginSummary[]>([]);
@@ -499,8 +441,9 @@ export function WebuiComposer({
   // The mention range is the composer's own state (§5.6: mention/slash ranges); the
   // slash range is derived (`commandRange` below), so only this half is state.
   const mentionRange = composerSnapshot.mentionRange;
-  const setMentionRange = composerStore.setMentionRange;
-  const [mentionIndex, setMentionIndex] = useState(0);
+  const setMentionRange = composerController.setMentionRange;
+  const composerInput = useComposerInput(draft, sessionId);
+  const { mentionIndex, setMentionIndex, commandIndex, setCommandIndex, historyBrowse, setHistoryBrowse } = composerInput;
   // The mode is the settings owner's answer, read through its snapshot (T12);
   // only the menu's open/busy/unavailable presentation state is local.
   const settingsWorkflows = useWebuiSettingsWorkflows();
@@ -511,35 +454,12 @@ export function WebuiComposer({
   const [permissionUnavailable, setPermissionUnavailable] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const folderInputRef = useRef<HTMLInputElement | null>(null);
-  const mentionCaretRef = useRef<number>();
-  const pendingMentionCaretRef = useRef<number>();
   // The slash palette follows the caret, so its position is state rather than a
   // ref: a click or an arrow key that only moves the caret still has to
   // re-derive whether a slash token is under it.
-  const [composerCaret, setComposerCaret] = useState(0);
-  // ↑ recall browse state (roadmap Module B). `undefined` = not browsing.
-  // While set, ↑/↓ walk `inputHistory` and any manual edit exits (the
-  // textarea's onChange only fires for real user edits — a programmatic
-  // recall swap never ends its own browse); stepping past the newest
-  // restores the stashed pre-browse draft.
-  const [historyBrowse, setHistoryBrowse] = useState<WebuiHistoryBrowse>();
-  useEffect(() => {
-    // Switching sessions swaps the history list under the browse cursor;
-    // restart clean rather than trusting the index still means anything.
-    setHistoryBrowse(undefined);
-  }, [sessionId]);
-  const applyHistoryDraft = (next: string) => {
-    handleDraftChange(next);
-    setComposerCaret(next.length);
-    // The DOM caret lags the controlled value swap by a render; pin it to
-    // the end once the new value is on screen, the way a terminal leaves the
-    // cursor after a recall.
-    requestAnimationFrame(() => {
-      textareaRef.current?.setSelectionRange(next.length, next.length);
-    });
-  };
+  const composerCaret = composerInput.caret;
   const editingGoalDraftRef = useRef(false);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const textareaRef = composerInput.textareaRef;
   const composerRegionRef = useRef<HTMLDivElement | null>(null);
   // The permission popover's own container: the trigger button plus the popover
   // body. Distinct from `composerRegionRef` on purpose — the popover is a
@@ -572,93 +492,6 @@ export function WebuiComposer({
     }).catch(() => undefined);
     return () => { cancelled = true; };
   }, [sessionId, sessionStatus, transcriptHistory]);
-
-  useEffect(() => {
-    if (!sessionId) {
-      // Inspection data belongs to a session. On home the account answer is
-      // cleared and the catalogue read is re-scoped below, so the previous
-      // session's state cannot bleed into the composer (T13).
-      setModelsScope(undefined);
-      // The live turn bleeds the same way: the module-level runtime map kept
-      // the previous turn's stream under the welcome hero on every 新建任务.
-      lifecycle.clearStream();
-      lifecycle.setTurnSending(false);
-      return undefined;
-    }
-    let cancelled = false;
-    const refreshPending = async () => {
-      const outcome = await interactionCoordinator.refresh();
-      if (cancelled) return;
-      if (!outcome.ok) setInteractionError(outcome.error);
-      const generation = claimQueueDestination(sessionId);
-      const queue = await commandWorkflows?.refreshQueue?.(sessionId);
-      if (cancelled) return;
-      if (queue) {
-        applyQueueRead(sessionId, generation, {
-          items: queue.items ?? [],
-          paused: queue.paused === true,
-        });
-      }
-    };
-    void refreshPending().catch((error: unknown) => {
-      if (!cancelled)
-        setInteractionError(
-          error instanceof Error ? error.message : String(error),
-        );
-    });
-    // The attach/recheck/gap-recovery commands live in the application layer
-    // (`features/turn/application/turn-commands.ts`), behind the binding: the probe, the
-    // store writer, the attempt's sink and the record key are all chosen there.
-    // This component submits intents and holds no factory of its own (T04).
-    const attachToTurn = (turnId: string | undefined) => {
-      attachTurn({ turnId });
-    };
-
-    /** `session.start` named a turn we do not hold while holding another. */
-    const recheckSubscription = (turnId: string | undefined) => {
-      recheckTurn(turnId);
-    };
-
-    /**
-     * Gap recovery. A `session.start` can arrive before this client finished
-     * subscribing, or be missed entirely while `watchEvents` reconnects, and
-     * the session list cannot answer the question — its `status` carries no
-     * turn id and never refreshes on those events. Ask the server instead.
-     */
-    const recoverMissedTurn = () => {
-      recoverTurn();
-    };
-
-    // Goal steering events announce that the objective moved without carrying
-    // the new goal, so the banner is re-read rather than patched. The read is
-    // eventually consistent, so a late answer must not undo a newer goal that
-    // arrived while it was in flight: the version guard makes that decision,
-    // and it has one implementation here, shared by the event callback and the
-    // registered effects.
-    const refreshGoal = () => goalCoordinator.refreshGoal();
-
-    // The mount probe. A turn that started before this client read the server
-    // is still running, so `getActiveTurn` returns it; a turn that starts after
-    // announces itself on the single process-event channel, which the
-    // application event coordinator owns. The composer no longer opens its own
-    // `watchEvents` subscription — the coordinator is the channel's sole
-    // consumer, reduces each event, and runs this session's registered effects
-    // below (ticket #45, the atomic ingress flip).
-    recoverMissedTurn();
-    // Nothing is registered here any more: the application's permanent routes
-    // own every domain fact (T05), so this view holds no effect set to install.
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    agentName,
-    // These two come from the interactions slice now (the coordinator reads it);
-    // the members are stable for the mount, so the registration does not churn.
-    getPendingQuestionnaire,
-    listPendingPermissions,
-    commandWorkflows,
-    sessionId,
-  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -765,18 +598,6 @@ export function WebuiComposer({
     setWorkspaceFiles(flattenWorkspaceFiles(workspaceFileTree.files).slice(0, 100));
   }, [mentionRange !== undefined, workspaceDir, workspaceFileTree]);
 
-  useLayoutEffect(() => {
-    const caret = pendingMentionCaretRef.current;
-    const textarea = textareaRef.current;
-    if (caret === undefined || !textarea) return;
-    textarea.focus();
-    textarea.setSelectionRange(caret, caret);
-    pendingMentionCaretRef.current = undefined;
-    // The slash palette derives its state from `composerCaret`, so a caret the
-    // composer moved itself has to be mirrored there — no input event follows.
-    setComposerCaret(caret);
-  }, [draft]);
-
   /**
    * The view's half of a steering re-read: after one lands, the composer's goal
    * mode follows the goal it returned. A subscription rather than a replaceable
@@ -803,49 +624,6 @@ export function WebuiComposer({
       .catch(() => { if (!cancelled) setGoalEnabled(false); });
     return () => { cancelled = true; };
   }, [goalEnabledProbe]);
-
-  useEffect(() => {
-    // Reset the VIEW on every session switch, then read through the owner. The
-    // canonical goal is not cleared: it belongs to the session's record, and
-    // clearing it here destroyed the retained goal of the session being opened
-    // before the re-read could answer (the T01 ledger's C4). What resets is the
-    // presentation, which is this component's own state.
-    setGoalMode(false);
-    if (!sessionId || !goalEnabled) return undefined;
-    let cancelled = false;
-    void goalCoordinator.refreshGoal().then((outcome) => {
-      if (!cancelled && !outcome.ok) setGoalEnabled(false);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [goalEnabled, sessionId]);
-
-  useEffect(() => {
-    if (!modelsWorkflows && !accountWorkflows?.loadAccount) return undefined;
-    let cancelled = false;
-    const refreshInspection = async () => {
-      await Promise.all([
-        modelsWorkflows?.loadModels(sessionId),
-        accountWorkflows?.loadAccount(sessionId),
-      ]);
-      if (cancelled) return;
-      setModelsScope(sessionId);
-    };
-    void refreshInspection().catch((error: unknown) => {
-      if (!cancelled)
-        setInteractionError(
-          error instanceof Error ? error.message : String(error),
-        );
-    });
-    const timer = setInterval(() => {
-      void refreshInspection().catch(() => undefined);
-    }, 2_000);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [accountWorkflows, modelsWorkflows, sessionId]);
 
   const handlePermission = async (
     permission: WebuiPendingPermission,
@@ -897,23 +675,9 @@ export function WebuiComposer({
   };
 
   const handleDeleteQueueItem = async (item: WebuiQueueItem) => {
-    if (!commandWorkflows?.canRemoveQueued || !sessionId) return;
+    if (!sessionId) return;
     setInteractionError(undefined);
-    try {
-      await commandWorkflows.removeQueued({ sessionId, itemId: item.itemId });
-      // The mirror belongs to whichever destination is live now: a removal
-      // answered for an earlier selection must not edit the current slot's queue.
-      if (readQueueDestination() !== sessionId) return;
-      setQueueItems((current) => ({
-        items: current.items.filter(
-          (candidate) => candidate.itemId !== item.itemId,
-        ),
-      }));
-    } catch (error) {
-      setInteractionError(
-        error instanceof Error ? error.message : String(error),
-      );
-    }
+    await composerController.removeQueued({ sessionId, itemId: item.itemId });
   };
 
   const handleSelectModel = async (
@@ -1006,7 +770,6 @@ export function WebuiComposer({
           .map((session) => ({ kind: "agent" as const, session, label: session.title ?? session.agentName, section: "子 Agent" })),
       ]
     : [];
-  const [commandIndex, setCommandIndex] = useState(0);
   useEffect(() => {
     setMentionIndex((current) => mentionSuggestions.length === 0 ? 0 : Math.min(current, mentionSuggestions.length - 1));
   }, [mentionRange?.query, mentionSuggestions.length]);
@@ -1024,13 +787,15 @@ export function WebuiComposer({
   // composer until the user types a space or deletes the "/" by hand. We keep
   // refs to `draft` and the current range so the listener always sees the
   // latest values without re-attaching on every keystroke.
-  const slashDraftRef = useRef(draft);
-  const slashRangeRef = useRef(commandRange);
-  useEffect(() => {
-    slashDraftRef.current = draft;
-    slashRangeRef.current = commandRange;
-  });
   const slashPanelOpen = commandRange !== undefined;
+  useComposerSlashDismiss({
+    listenForPointerDown: dom.listenForPointerDown,
+    regionRef: composerRegionRef,
+    draft,
+    range: commandRange,
+    enabled: slashPanelOpen && Boolean(composerMenu || permissionMenuOpen || mentionRange),
+    onDraftChange,
+  });
   useEffect(() => {
     if (!composerMenu && !permissionMenuOpen && !mentionRange) return undefined;
     const onPointerDown = (event: PointerEvent) => {
@@ -1088,39 +853,12 @@ export function WebuiComposer({
       window.removeEventListener("resize", measure);
     };
   }, [slashPanelOpen, slashSkills.length]);
-  useEffect(() => {
-    if (!slashPanelOpen) return;
-    const region = composerRegionRef.current;
-    if (!region) return;
-    const onPointerDown = (event: PointerEvent) => {
-      const range = slashRangeRef.current;
-      if (!range) return;
-      if (!(event.target instanceof Node)) return;
-      const insideContainer = region.contains(event.target);
-      // Slash popover's per-surface variant subscribes to `pointerdown`
-      // only (no Escape handler — the composer input change handler is
-      // the only path). Routing through `evaluateOutsideClose` keeps the
-      // four call sites consistent without changing the original close
-      // semantics.
-      if (
-        evaluateOutsideClose({
-          surface: "slashPopover",
-          kind: "pointerdown",
-          insideContainer,
-        }) !== "close"
-      ) {
-        return;
-      }
-      // Same clear-and-close as Escape: drop the "/xxx" token so the
-      // palette no longer has a token under the caret and disappears.
-      onDraftChange(removeWebuiSlashToken(slashDraftRef.current, range));
-    };
-    return dom.listenForPointerDown(onPointerDown);
-  }, [dom, slashPanelOpen, onDraftChange]);
   // Attachment acquisition, the seed decision and the wire projection are one
   // responsibility; the store owns the staged state, this binding owns the flow.
-  const { addFiles, clearAttachments, removeAttachment, attachmentWire } = useComposerAttachments({
-    store: composerStore,
+  const { addFiles, removeAttachment, attachmentWire } = useComposerAttachments({
+    setStagedAttachments: composerController.setStagedAttachments,
+    setAttachmentBusy: composerController.setAttachmentBusy,
+    consumeSeed: composerController.consumeSeed,
     attachments,
     seedToken: composerSnapshot.staging.seedToken,
     ...(seedAttachment ? { seedAttachment } : {}),
@@ -1129,7 +867,7 @@ export function WebuiComposer({
   const replaceMention = (insertion: string) => {
     if (!mentionRange) return;
     const result = insertWebuiMention(draft, mentionRange, insertion);
-    pendingMentionCaretRef.current = result.caret;
+    composerInput.setPendingCaret(result.caret);
     onDraftChange(result.value);
     setMentionRange(undefined);
   };
@@ -1138,7 +876,7 @@ export function WebuiComposer({
     const before = draft.slice(0, caret);
     const prefix = before.length > 0 && !/\s$/u.test(before) ? " " : "";
     const inserted = `${prefix}${insertion} `;
-    pendingMentionCaretRef.current = before.length + inserted.length;
+    composerInput.setPendingCaret(before.length + inserted.length);
     onDraftChange(`${before}${inserted}${draft.slice(caret)}`);
   };
   const chooseMention = (choice: WebuiComposerMentionChoice) => {
@@ -1242,7 +980,7 @@ export function WebuiComposer({
     // earlier "/skill" the user picked; replacing the whole draft wiped it.
     if (!commandRange) {
       onDraftChange(insertion);
-      pendingMentionCaretRef.current = insertion.length;
+      composerInput.setPendingCaret(insertion.length);
       textareaRef.current?.focus();
       return;
     }
@@ -1251,7 +989,7 @@ export function WebuiComposer({
     // The caret has to land after the trailing space: the palette is open for
     // any token under the caret, so leaving it inside "/command" would pop the
     // panel straight back open.
-    pendingMentionCaretRef.current = result.caret;
+    composerInput.setPendingCaret(result.caret);
     textareaRef.current?.focus();
   };
   const commandInvocation = /^\/([^\s/]+)(?:\s+([\s\S]*))?$/u.exec(
@@ -1265,8 +1003,8 @@ export function WebuiComposer({
         : undefined;
   // Typing is always available: composing a message does not need a target yet.
   // The first send creates the target session silently, using the selected project.
-  const canCompose = Boolean(turnCapabilities?.send);
-  const canQueue = Boolean(turnCapabilities?.enqueue && sessionId);
+  const canCompose = controllerSnapshot.canCompose;
+  const canQueue = controllerSnapshot.canQueue;
   // Turn phase remains part of session runtime state; the transcript owns all
   // visible messages for both the live and settled phases.
   // `isTurnLive` is the single source of truth for the three-value phase
@@ -1274,36 +1012,7 @@ export function WebuiComposer({
   // `sending` as a separate submit-lifecycle boolean the reducer deliberately
   // does NOT merge with `phase` — `submitWebuiComposerTurn` relies on the two
   // staying distinct.
-  useLayoutEffect(() => {
-    if (!sessionLayout) return undefined;
-    const region = composerRegionRef.current;
-    const layout = region?.closest<HTMLElement>(
-      '[data-webui-session-layout="true"]',
-    );
-    if (!region || !layout) return undefined;
-    const updateReservedHeight = () => {
-      // Desktop reserves the measured composer inset plus a small base tail
-      // inside its single message viewport. Keep the same contract here so a
-      // taller slash/permission/composer state cannot cover the live tail.
-      const height = Math.ceil(region.getBoundingClientRect().height);
-      layout.style.setProperty(
-        "--webui-composer-bottom-padding",
-        `${height + 16}px`,
-      );
-    };
-    updateReservedHeight();
-    const observer =
-      typeof ResizeObserver === "undefined"
-        ? undefined
-        : new ResizeObserver(updateReservedHeight);
-    observer?.observe(region);
-    window.addEventListener("resize", updateReservedHeight);
-    return () => {
-      observer?.disconnect();
-      window.removeEventListener("resize", updateReservedHeight);
-      layout.style.removeProperty("--webui-composer-bottom-padding");
-    };
-  }, [sessionLayout]);
+  useComposerLayout(sessionLayout, composerRegionRef);
   const messageDraft = [draft.trim(), ...urlReferences.map((reference) => reference.url.trim()).filter(Boolean)].filter(Boolean).join("\n");
   // The button and Enter read one gate (T13 criterion 6); its rule and its
   // matrix live in the projection.
@@ -1315,68 +1024,7 @@ export function WebuiComposer({
     commandRunning,
     goalSubmitting,
   });
-  /**
-   * The one way a turn reaches the wire. `submit` calls it after resolving an
-   * intent; the retry affordance calls it with the input recorded at submit
-   * time. Retry deliberately re-enters THIS path rather than a second send of
-   * its own, so it inherits the rules an ordinary send obeys — including the
-   * "a turn is already in flight ⇒ enqueue" branch inside
-   * `submitWebuiComposerTurn`, which is what keeps a retry from racing a
-   * running turn.
-   *
-   * The turn's sink is minted inside `submitTurn` (the binding owns the store
-   * writer and the writer it builds), so this component holds no factory and
-   * names no session key: it submits the intent and the callbacks it owns. The
-   * assembly of the handler bundle now happens inside `sendWebuiTurn`, where the
-   * writer — and with it the sink — is in scope.
-   */
-  const sendTurn = async (turn: {
-    readonly message: string;
-    readonly clientIntent?: string;
-  }) => {
-    await submitTurn({
-      message: turn.message,
-      ...(turn.clientIntent ? { clientIntent: turn.clientIntent } : {}),
-      planMode,
-      attachments: attachmentWire,
-      onAttachmentsSubmitted: () => {
-        clearAttachments();
-        setUrlReferences([]);
-      },
-      sending,
-      createSessionWorkspaceDir,
-      teamModeOff,
-      onDraftChange,
-      onNeedsSession,
-      onSessionCreated,
-      onQueued: () => {
-        if (!sessionId || !commandWorkflows?.canRefreshQueue) return;
-        const generation = claimQueueDestination(sessionId);
-        void commandWorkflows
-          .refreshQueue(sessionId)
-          .then((queue) => {
-            if (!queue) return;
-            applyQueueRead(sessionId, generation, {
-              items: queue.items ?? [],
-              paused: queue.paused === true,
-            });
-          })
-          .catch((error: unknown) => {
-            setInteractionError(
-              error instanceof Error ? error.message : String(error),
-            );
-          });
-      },
-    });
-  };
-  // The input of the last turn this composer submitted, kept locally so retry
-  // can re-send it without asking the server what was asked. One holder: the
-  // owner's, which the handler reads synchronously and the render subscribes to,
-  // so there is no second copy to fall out of step.
   const recordedTurn = composerSnapshot.retry;
-  const recordSubmittedTurn = (message: string) => {
-    composerStore.setRetry({ session: sessionId, message });
-  };
   const retryPlan = planWebuiRetryResend({
     refusal: stream.refusal,
     recordedSession: recordedTurn?.session,
@@ -1384,13 +1032,20 @@ export function WebuiComposer({
     lastSubmittedText: recordedTurn?.message,
   });
   const handleRetryResend = () => {
-    resendRecordedWebuiTurn({
+    void composerController.retry({
       refusal: stream.refusal,
-      // Read from the owner: the handler needs the value current *now*, not the
-      // one the render that installed it saw.
-      recordedTurn: composerStore.readRetry(),
-      session: sessionId,
-      sendTurn,
+      sessionId,
+      draft: recordedTurn?.message ?? "",
+      attachments: attachmentWire,
+      sending,
+      planMode,
+      goalEnabled,
+      agentName,
+      ...(createSessionWorkspaceDir ? { createSessionWorkspaceDir } : {}),
+      ...(teamModeOff ? { teamModeOff: true } : {}),
+      onSessionCreated: (createdSessionId) => {
+        if (isAttachedTo(sessionId)) onSessionCreated?.(createdSessionId);
+      },
     });
   };
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -1405,123 +1060,25 @@ export function WebuiComposer({
     // splits into send+resume vs queue). All side effects (state updates,
     // draft clearing, auto-follow lock, error rendering) stay in this
     // function so the resolver itself can be tested without React.
-    const intent = resolveWebuiSubmissionIntent({
+    setInteractionError(undefined);
+    const outcome = await composerController.submit({
       draft: messageDraft,
-      commandMatch: command,
-      ...(commandInvocation?.[2] !== undefined
-        ? { commandInvocationInput: commandInvocation[2] }
-        : {}),
-      goalMode,
+      ...(command ? { commandMatch: command } : {}),
+      ...(commandInvocation?.[2] !== undefined ? { commandInvocationInput: commandInvocation[2] } : {}),
+      attachments: attachmentWire,
+      sending,
       planMode,
+      goalEnabled,
+      agentName,
+      ...(createSessionWorkspaceDir ? { createSessionWorkspaceDir } : {}),
+      ...(teamModeOff ? { teamModeOff: true } : {}),
+      onSessionCreated: (createdSessionId) => {
+        if (isAttachedTo(sessionId)) onSessionCreated?.(createdSessionId);
+      },
     });
-    const resolvedIntent = intent ?? (attachments.length > 0 ? { kind: "submit-turn" as const } : undefined);
-    if (!resolvedIntent) return;
-    // Record the sendable text for ↑ recall on every committed intent —
-    // send/queue turns, goal objectives, and runnable commands all start as
-    // user-typed composer text. Recording at commit time (not transport
-    // success) keeps a refused send from silently eating the user's input,
-    // and mode activations (`/goal`, `/plan` bare) record nothing.
-    if (
-      resolvedIntent.kind === "submit-turn" ||
-      resolvedIntent.kind === "submit-goal" ||
-      resolvedIntent.kind === "run-command"
-    ) {
-      onInputSubmitted?.(messageDraft);
-      setHistoryBrowse(undefined);
-    }
-    if (resolvedIntent.kind === "activate-goal-mode") {
-      activateGoalMode();
-      return;
-    }
-    if (resolvedIntent.kind === "activate-plan-mode") {
-      activatePlanMode();
-      return;
-    }
-    if (resolvedIntent.kind === "submit-goal") {
-      const { objective } = resolvedIntent;
-      if (!goalCoordinator.createGoal || !goalEnabled) return;
-      setGoalSubmitting(true);
-      setInteractionError(undefined);
-      try {
-        const nextGoal = await submitWebuiGoal(
-          {
-            sessionId,
-            objective,
-            currentGoal: goal,
-            createGoal: goalCoordinator.createGoal,
-            patchGoal: goalCoordinator.patchGoal,
-            createSession: sessionWorkflows?.createSession,
-            createSessionWorkspaceDir,
-            teamModeOff,
-          },
-          onSessionCreated,
-        );
-        applyGoal(nextGoal);
-        // A finished goal ends goal mode; every other status keeps it (see
-        // composer-goal-outcome).
-        setGoalMode(readWebuiComposerGoalModeAfterSubmit(nextGoal));
-        onDraftChange("");
-        editingGoalDraftRef.current = false;
-      } catch (error) {
-        setInteractionError(
-          error instanceof Error ? error.message : String(error),
-        );
-      } finally {
-        setGoalSubmitting(false);
-      }
-      return;
-    }
-    if (resolvedIntent.kind === "run-command") {
-      const { command: matchedCommand, input } = resolvedIntent;
-      // The original gate (`runCommand && command && isWebuiRunnableCommand`)
-      // collapsed into the intent, but the `runCommand` runtime check stays
-      // here — the resolver is the source of truth for *which* path, the
-      // component is still the source of truth for *whether the host wired
-      // the capability* (a disabled host must not reach the run-path).
-      if (!commandWorkflows?.canRunCommand) return;
-      setCommandRunning(true);
-      setInteractionError(undefined);
-      try {
-        const result = await commandWorkflows.runCommand({
-          command: matchedCommand.name,
-          ...(input ? { input } : {}),
-          ...(sessionId ? { sessionId } : {}),
-          agentName,
-          ...(createSessionWorkspaceDir
-            ? { workspaceDir: createSessionWorkspaceDir }
-            : {}),
-        });
-        const output =
-          typeof result.output === "string"
-            ? result.output
-            : JSON.stringify(result.data ?? result, null, 2);
-        setCommandOutput(output);
-        onDraftChange("");
-      } catch (error) {
-        setInteractionError(
-          error instanceof Error ? error.message : String(error),
-        );
-      } finally {
-        setCommandRunning(false);
-      }
-      return;
-    }
-    // intent.kind === "submit-turn"
-    if (resolvedIntent.clientIntent === "plan-entry") {
-      setGoalMode(false);
-      setPlanMode(true);
-    }
-    // The exact value `submitWebuiComposerTurn` puts on the wire: it reads
-    // `message ?? draft` and trims it, so recording the effective text here is
-    // what lets a later retry reproduce this send byte for byte.
-    const effectiveMessage = resolvedIntent.message ?? draft;
-    recordSubmittedTurn(effectiveMessage);
-    await sendTurn({
-      message: effectiveMessage,
-      ...(resolvedIntent.clientIntent
-        ? { clientIntent: resolvedIntent.clientIntent }
-        : {}),
-    });
+    if (outcome.kind !== "ignored" && outcome.kind !== "mode-activated") setHistoryBrowse(undefined);
+    if (outcome.kind === "needs-session" && isAttachedTo(sessionId)) onNeedsSession?.(outcome.draft);
+    if (outcome.kind === "goal-updated") editingGoalDraftRef.current = false;
   };
   const clearLocalGoal = () => {
     applyGoal(undefined);
@@ -1633,20 +1190,15 @@ export function WebuiComposer({
                   rows={2}
                   value={draft}
                   onChange={(event) => {
-                    const next = event.target.value;
-                    handleDraftChange(next);
-                    // A real user edit ends any active history browse (see
-                    // the browse state comment above).
-                    setHistoryBrowse(undefined);
-                    const caret = event.target.selectionStart;
-                    mentionCaretRef.current = caret;
-                    setComposerCaret(caret);
-                    const nextMentionRange = findWebuiMentionRange(next, caret);
-                    if (nextMentionRange) {
-                      setComposerMenu(undefined);
-                      setPermissionMenuOpen(false);
-                    }
-                    setMentionRange(nextMentionRange);
+                    composerInput.edit({
+                      value: event.target.value,
+                      caret: event.target.selectionStart,
+                      changeDraft: handleDraftChange,
+                      mentionRange,
+                      setMentionRange,
+                      setComposerMenu,
+                      setPermissionMenuOpen,
+                    });
                   }}
                   onPaste={(event) => {
                     const pastedFiles = Array.from(event.clipboardData.items).flatMap((item) => item.kind === "file" ? [item.getAsFile()].filter((file): file is File => file !== null) : []);
@@ -1656,14 +1208,15 @@ export function WebuiComposer({
                       event.preventDefault();
                       const start = event.currentTarget.selectionStart;
                       const end = event.currentTarget.selectionEnd;
-                      pendingMentionCaretRef.current = start;
+                      composerInput.setPendingCaret(start);
                       onDraftChange(`${draft.slice(0, start)}${draft.slice(end)}`);
                       setUrlReferences((current) => [...current, { id: crypto.randomUUID(), url: pastedText }]);
                     }
                   }}
                   onClick={(event) => {
-                    setComposerCaret(event.currentTarget.selectionStart);
-                    const nextMentionRange = findWebuiMentionRange(event.currentTarget.value, event.currentTarget.selectionStart);
+                    const caret = event.currentTarget.selectionStart;
+                    composerInput.updateCaret(event.currentTarget.value, caret, mentionRange, setMentionRange);
+                    const nextMentionRange = findWebuiMentionRange(event.currentTarget.value, caret);
                     if (nextMentionRange) {
                       setComposerMenu(undefined);
                       setPermissionMenuOpen(false);
@@ -1672,121 +1225,30 @@ export function WebuiComposer({
                   }}
                   onKeyUp={(event) => {
                     if (["ArrowDown", "ArrowUp", "Enter", "Escape"].includes(event.key)) return;
-                    setComposerCaret(event.currentTarget.selectionStart);
-                    setMentionRange(findWebuiMentionRange(event.currentTarget.value, event.currentTarget.selectionStart));
+                    composerInput.updateCaret(event.currentTarget.value, event.currentTarget.selectionStart, mentionRange, setMentionRange);
                   }}
-                  onKeyDown={(event) => {
-                    if (mentionRange && mentionSuggestions.length > 0) {
-                      if (event.key === "Escape") { event.preventDefault(); setMentionRange(undefined); return; }
-                      if (event.key === "ArrowDown") { event.preventDefault(); setMentionIndex((current) => (current + 1) % mentionSuggestions.length); return; }
-                      if (event.key === "ArrowUp") { event.preventDefault(); setMentionIndex((current) => (current - 1 + mentionSuggestions.length) % mentionSuggestions.length); return; }
-                      if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); const choice = mentionSuggestions[mentionIndex]; if (choice) chooseMention(choice); return; }
-                    }
-                    if (event.key === "Escape" && composerMenu) { event.preventDefault(); setComposerMenu(undefined); return; }
-                    if (event.key === "Escape" && permissionMenuOpen) { event.preventDefault(); setPermissionMenuOpen(false); return; }
-                    if (event.key === "Escape" && (goalMode || planMode)) {
-                      event.preventDefault();
-                      if (goalMode) cancelGoalMode();
-                      else cancelPlanMode();
-                      return;
-                    }
-                    if (event.key === "Escape" && commandRange) {
-                      // Mirrors the desktop Escape handling: drop the "/xxx"
-                      // token under the caret so the palette closes. Text
-                      // before it survives — the user may have typed a
-                      // prefix word — which is what cancels this invocation.
-                      event.preventDefault();
-                      const next = removeWebuiSlashToken(draft, commandRange);
-                      onDraftChange(next);
-                      setComposerCaret(next.length);
-                      return;
-                    }
-                    if (event.key === "Escape" && historyBrowse) {
-                      // Escape during a history browse restores the draft as
-                      // it was before ↑ first recalled. Sits after the slash
-                      // palette's own Escape so a recalled "/…" closes the
-                      // palette first and exits the browse on the second tap.
-                      event.preventDefault();
-                      const stashed = historyBrowse.draft;
-                      setHistoryBrowse(undefined);
-                      applyHistoryDraft(stashed);
-                      return;
-                    }
-                    // History recall claims ↑/↓ only when nothing else has:
-                    // the mention menu (above) and the slash popover (below,
-                    // behind the `commandSuggestions.length === 0` guard) own
-                    // the arrows while they are open.
-                    if (
-                      commandSuggestions.length === 0 &&
-                      (event.key === "ArrowUp" || event.key === "ArrowDown")
-                    ) {
-                      const caret = event.currentTarget.selectionStart ?? 0;
-                      if (event.key === "ArrowUp") {
-                        const next = historyBrowse
-                          ? stepWebuiHistoryBrowse(historyBrowse, "prev", inputHistory)
-                          : shouldRecallWebuiHistory(draft, caret)
-                            ? startWebuiHistoryBrowse(inputHistory, draft)
-                            : undefined;
-                        if (next) {
-                          event.preventDefault();
-                          setHistoryBrowse(next);
-                          applyHistoryDraft(inputHistory[next.index] ?? "");
-                          return;
-                        }
-                      } else if (historyBrowse) {
-                        const next = stepWebuiHistoryBrowse(historyBrowse, "next", inputHistory);
-                        event.preventDefault();
-                        setHistoryBrowse(next);
-                        // Stepping past the newest exits and restores the
-                        // stashed pre-browse draft.
-                        applyHistoryDraft(next ? inputHistory[next.index] ?? "" : historyBrowse.draft);
-                        return;
-                      }
-                    }
-                    // Enter is claimed above by an open mention menu, and below by
-                    // an open slash popover. This MUST sit before the
-                    // `commandSuggestions.length === 0` guard: that guard
-                    // returns for EVERY key, so a branch placed after it never
-                    // runs in the common case of an ordinary message — which is
-                    // exactly how a first attempt at this silently did nothing.
-                    if (event.key === "Enter" && commandSuggestions.length === 0) {
-                      const action = resolveWebuiComposerEnterAction({
-                        shiftKey: event.shiftKey,
-                        altKey: event.altKey,
-                        ctrlKey: event.ctrlKey,
-                        metaKey: event.metaKey,
-                        isComposing: event.nativeEvent.isComposing,
-                        submitBlocked,
-                      });
-                      if (action === "submit") {
-                        event.preventDefault();
-                        // `requestSubmit` raises the form's submit event rather
-                        // than bypassing it, so the keyboard lands on the same
-                        // `onSubmit` the send button reaches.
-                        event.currentTarget.form?.requestSubmit();
-                        return;
-                      }
-                    }
-                    if (commandSuggestions.length === 0) return;
-                    if (event.key === "ArrowDown") {
-                      event.preventDefault();
-                      setCommandIndex(
-                        (current) =>
-                          (current + 1) % commandSuggestions.length,
-                      );
-                    } else if (event.key === "ArrowUp") {
-                      event.preventDefault();
-                      setCommandIndex(
-                        (current) =>
-                          (current - 1 + commandSuggestions.length) %
-                          commandSuggestions.length,
-                      );
-                    } else if (event.key === "Enter" && !event.shiftKey) {
-                      event.preventDefault();
-                      const command = commandSuggestions[commandIndex];
-                      if (command) chooseCommand(command.name);
-                    }
-                  }}
+                  onKeyDown={(event) => composerInput.handleKeyDown(event, {
+                    draft,
+                    history: inputHistory,
+                    mentionRange,
+                    mentionCount: mentionSuggestions.length,
+                    commandRange,
+                    commandCount: commandSuggestions.length,
+                    composerMenu,
+                    permissionMenuOpen,
+                    goalMode,
+                    planMode,
+                    submitBlocked,
+                    setMentionRange,
+                    setComposerMenu,
+                    setPermissionMenuOpen,
+                    onDraftChange,
+                    onHistoryDraftChange: handleDraftChange,
+                    onCancelGoal: cancelGoalMode,
+                    onCancelPlan: cancelPlanMode,
+                    chooseMention: (index) => { const choice = mentionSuggestions[index]; if (choice) chooseMention(choice); },
+                    chooseCommand: (index) => { const command = commandSuggestions[index]; if (command) chooseCommand(command.name); },
+                  })}
                   disabled={!canCompose && !canQueue}
                   placeholder={goalMode ? "描述你想完成的目标" : planMode ? "描述需要规划的任务..." : "输入消息…（输入 / 唤起命令）"}
                   className="webui-textarea webui-composer-input text-text_default_primary"

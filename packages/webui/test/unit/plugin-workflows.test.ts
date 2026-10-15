@@ -11,6 +11,7 @@ import {
   createWebuiPluginWorkflows,
   initialWebuiPluginSelection,
 } from "../../src/client/features/plugins/application/plugin-workflows.js";
+import type { WebuiPluginIntent } from "../../src/client/features/plugins/contracts/plugin-actions.js";
 
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -118,6 +119,73 @@ describe("a plugin mutation invalidates exactly what it affects", () => {
     expect(actions).toContain("setSkillEnabled");
   });
 
+  it("forwards every supported UI intent to its named command with the declared fields", async () => {
+    const requests: { action: string; input?: Record<string, unknown> }[] = [];
+    const workflows = createWebuiPluginWorkflows({
+      port: {
+        pluginManagement: (request) => {
+          requests.push(request);
+          return Promise.resolve({});
+        },
+      },
+    });
+    const intents: readonly WebuiPluginIntent[] = [
+      { kind: "installPlugin", pluginName: "p", source: 1 },
+      { kind: "uninstallPlugin", pluginName: "p", source: 2 },
+      { kind: "enablePlugin", pluginName: "p", source: 3 },
+      { kind: "disablePlugin", pluginName: "p", source: 4 },
+      {
+        kind: "importGithubPlugin",
+        source: { repositoryUrl: "https://github.com/o/r", commitSha: "abc" },
+      },
+      {
+        kind: "installSkill",
+        url: "https://example.invalid/skill",
+        displayName: "Skill",
+        publisherSourceType: 7,
+        isFromGit: true,
+        creatorInfo: { name: "Publisher" },
+      },
+      { kind: "createSkill", name: "s", description: "d", content: "c" },
+      { kind: "setSkillEnabled", skillName: "s", enabled: false, locationUri: "file:///s" },
+      { kind: "deleteSkill", skillName: "s", locationUri: "file:///s" },
+      { kind: "createMcpServer", name: "m", config: { command: "run" }, enabled: false },
+      { kind: "updateMcpServer", name: "m", config: { command: "run2" } },
+      { kind: "deleteMcpServer", name: "m" },
+      { kind: "setMcpServerEnabled", name: "m", enabled: true },
+      { kind: "testMcpServer", name: "m" },
+      { kind: "createAgent", name: "a", displayName: "Agent", initialDefinition: { name: "a", description: "d", systemPrompt: "p" } },
+      { kind: "updateAgent", name: "a", systemPrompt: "updated" },
+      { kind: "deleteAgent", name: "a" },
+    ];
+
+    for (const intent of intents) await workflows.runIntent(intent);
+
+    expect(
+      requests
+        .filter((request) => !request.action.startsWith("list"))
+        .map(({ action, input }) => ({ action, input })),
+    ).toEqual([
+      { action: "installPlugin", input: { pluginName: "p", source: 1 } },
+      { action: "uninstallPlugin", input: { pluginName: "p", source: 2 } },
+      { action: "enablePlugin", input: { pluginName: "p", source: 3 } },
+      { action: "disablePlugin", input: { pluginName: "p", source: 4 } },
+      { action: "importGithubPlugin", input: { source: { repositoryUrl: "https://github.com/o/r", commitSha: "abc" } } },
+      { action: "installSkill", input: { url: "https://example.invalid/skill", displayName: "Skill", publisherSourceType: 7, isFromGit: true, creatorInfo: { name: "Publisher" } } },
+      { action: "createSkill", input: { name: "s", description: "d", content: "c" } },
+      { action: "setSkillEnabled", input: { skillName: "s", enabled: false, locationUri: "file:///s" } },
+      { action: "deleteSkill", input: { skillName: "s", locationUri: "file:///s" } },
+      { action: "createMcpServer", input: { name: "m", config: { command: "run" }, enabled: false } },
+      { action: "updateMcpServer", input: { name: "m", config: { command: "run2" } } },
+      { action: "deleteMcpServer", input: { name: "m" } },
+      { action: "setMcpServerEnabled", input: { name: "m", enabled: true } },
+      { action: "testMcpServer", input: { name: "m" } },
+      { action: "createAgent", input: { name: "a", displayName: "Agent", initialDefinition: { name: "a", description: "d", systemPrompt: "p" } } },
+      { action: "updateAgent", input: { name: "a", systemPrompt: "updated" } },
+      { action: "deleteAgent", input: { name: "a" } },
+    ]);
+  });
+
   it("surfaces a mutation failure to the caller without a phantom reload", async () => {
     const reload = vi.fn(() => Promise.resolve({}));
     const workflows = createWebuiPluginWorkflows({
@@ -130,7 +198,7 @@ describe("a plugin mutation invalidates exactly what it affects", () => {
     });
 
     await workflows.loadListing(initialWebuiPluginSelection);
-    await expect(workflows.deleteAgent({ name: "a" })).rejects.toThrow("in use");
+    await expect(workflows.runIntent({ kind: "deleteAgent", name: "a" })).rejects.toThrow("in use");
     // One owner records the failure, so no call site keeps its own copy.
     expect(workflows.getSnapshot().mutationError).toBe("in use");
     expect(workflows.getSnapshot().mutating).toBe(false);
