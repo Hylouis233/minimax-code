@@ -136,23 +136,23 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
   const { request, stream, watchTerminal, workspaceFileUrl, watchEvents } = createWebuiWire(options);
 
   return {
-    version: () => request<WebuiVersionInfo>(VERSION_OPERATION_NAME, undefined),
+    version: () => request(VERSION_OPERATION_NAME, undefined),
     loadProjects: () =>
-      request<readonly WebuiClientProject[]>(LIST_VISIBLE_PROJECTS_OPERATION_NAME, { limit: 100 }),
+      request(LIST_VISIBLE_PROJECTS_OPERATION_NAME, { limit: 100 }),
     loadSessions: (cursor) =>
-      request<WebuiClientSessionPage>(LIST_SESSIONS_OPERATION_NAME, {
+      request(LIST_SESSIONS_OPERATION_NAME, {
         name: "main",
         limit: 500,
         ...(cursor ? { cursor } : {}),
       }),
     loadSessionTree: (cursor) =>
-      request<WebuiClientSessionTreePage>(GET_SESSION_TREE_OPERATION_NAME, {
+      request(GET_SESSION_TREE_OPERATION_NAME, {
         name: "main",
         limit: 500,
         ...(cursor ? { cursor } : {}),
       }),
     listArchivedSessions: () =>
-      request<WebuiClientSessionPage>(LIST_SESSIONS_OPERATION_NAME, {
+      request(LIST_SESSIONS_OPERATION_NAME, {
         name: "main",
         includeArchived: true,
         onlyArchived: true,
@@ -163,7 +163,7 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
     getSessionForkOptions: (body) => request(GET_SESSION_FORK_OPTIONS_OPERATION_NAME, body),
     forkSession: (body) => request(FORK_SESSION_OPERATION_NAME, body),
     loadMessages: ({ id, before }) =>
-      request<WebuiClientMessagePage>(GET_MESSAGES_OPERATION_NAME, {
+      request(GET_MESSAGES_OPERATION_NAME, {
         id,
         ...(before ? { before } : {}),
       }),
@@ -192,14 +192,24 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
       request(GET_WORKSPACE_REVIEW_FILE_CONTENT_OPERATION_NAME, body),
     searchWorkspaceReviewDiffs: (body) => request(SEARCH_WORKSPACE_REVIEW_DIFFS_OPERATION_NAME, body),
     readCanvas: (body) => request(READ_CANVAS_OPERATION_NAME, body),
-    applyCanvas: (body) => request(APPLY_CANVAS_OPERATION_NAME, body),
+    // The operation's declared request is its validator's output
+    // (`Record<string, unknown>`), while the client holds the concrete
+    // `CanvasOperation`. The boundary restates the pair as the plain records
+    // the wire actually carries rather than casting the concrete type away.
+    applyCanvas: (body) =>
+      request(APPLY_CANVAS_OPERATION_NAME, {
+        sessionId: body.sessionId,
+        operation: {...body.operation},
+      }),
     workspaceFileUrl,
     readWorkspaceArchive: (body) => request(READ_WORKSPACE_ARCHIVE_OPERATION_NAME, body),
     extractWorkspaceArchive: (body) => request(EXTRACT_WORKSPACE_ARCHIVE_OPERATION_NAME, body),
     createTerminal: (body) => request(CREATE_TERMINAL_OPERATION_NAME, body),
     listTerminals: () => request(LIST_TERMINALS_OPERATION_NAME, {}),
     writeTerminal: (body) => request(WRITE_TERMINAL_OPERATION_NAME, body),
-    resizeTerminal: (body) => request(RESIZE_TERMINAL_OPERATION_NAME, body),
+    // Same reason as `applyCanvas`: the declared request is the validator's
+    // `Record<string, unknown>` and the terminal size is a flat record.
+    resizeTerminal: (body) => request(RESIZE_TERMINAL_OPERATION_NAME, {...body}),
     disposeTerminal: (body) => request(DISPOSE_TERMINAL_OPERATION_NAME, body),
     watchTerminal: (body, onFrame) => watchTerminal(WATCH_TERMINAL_OPERATION_NAME, body, onFrame),
     createSession: (body) => request(CREATE_SESSION_OPERATION_NAME, body),
@@ -226,9 +236,9 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
     setGlobalInstructions: (body) => request(SET_GLOBAL_INSTRUCTIONS_OPERATION_NAME, body),
     getAgentMemory: (body) => request(GET_AGENT_MEMORY_OPERATION_NAME, body ?? {}),
     setAgentMemory: (body) => request(SET_AGENT_MEMORY_OPERATION_NAME, body),
-    getUserProfile: () => request(GET_USER_PROFILE_OPERATION_NAME, {}),
+    getUserProfile: () => request(GET_USER_PROFILE_OPERATION_NAME, undefined),
     setUserProfile: (body) => request(SET_USER_PROFILE_OPERATION_NAME, body),
-    getMemorySettings: () => request(GET_MEMORY_SETTINGS_OPERATION_NAME, {}),
+    getMemorySettings: () => request(GET_MEMORY_SETTINGS_OPERATION_NAME, undefined),
     setMemorySettings: (body) => request(SET_MEMORY_SETTINGS_OPERATION_NAME, body),
     selectModel: (body) => request(SELECT_MODEL_OPERATION_NAME, body),
     getSessionUsage: (body) => request(GET_SESSION_USAGE_OPERATION_NAME, body),

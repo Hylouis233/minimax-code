@@ -557,6 +557,40 @@ export interface OperationSpec {
   };
 }
 
+/**
+ * The operations whose result is a **stream**, not a unary body.
+ *
+ * Declared once, in the shared contract, so exactly one place decides what the
+ * browser's unary request interface may carry and a Node test can check the set
+ * against the server's registered stream descriptors. A stream has its own
+ * lifecycle — the `[DONE]` settlement and the detach handle in
+ * `client/platform/wire.ts`, the attach/resume loops on top of them — so routing
+ * one through the unary interface is a mistake rather than a variation, and the
+ * type system should say so.
+ */
+export const WEBUI_STREAM_OPERATION_NAMES = [
+  SEND_MESSAGE_OPERATION_NAME,
+  RESUME_SESSION_OPERATION_NAME,
+  WATCH_EVENTS_OPERATION_NAME,
+  WATCH_TERMINAL_OPERATION_NAME,
+] as const;
+
+export type WebuiStreamOperationName = (typeof WEBUI_STREAM_OPERATION_NAMES)[number];
+
+/**
+ * Every operation a unary request can carry: the `OperationSpec` keys minus the
+ * streams. `wire.request` is generic over this set, so a caller cannot name an
+ * unrelated result type and cannot pass a stream operation at all.
+ */
+export type WebuiUnaryOperationName = Exclude<keyof OperationSpec, WebuiStreamOperationName>;
+
+/** Narrow a wire operation name to the shared stream family. */
+export function isWebuiStreamOperationName(
+  name: string,
+): name is WebuiStreamOperationName {
+  return (WEBUI_STREAM_OPERATION_NAMES as readonly string[]).includes(name);
+}
+
 /** The `{ stream }` envelope for the terminal watcher stream. */
 export interface WebuiTerminalStreamEnvelope {
   readonly stream: {

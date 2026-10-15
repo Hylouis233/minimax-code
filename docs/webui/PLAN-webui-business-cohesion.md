@@ -344,7 +344,7 @@ one effective owner, a coherent import graph, and the applicable checks passing.
 | P00 | done | (work material, not a source change) | baseline gate run, caller/import map, field/lifetime matrix, broad-contract inventory, before-change scenario ledger — all under `~/my_data/project/my_project/minimax-code-webui-work/business-cohesion-20261015/p00/` |
 | P01 | not started | | |
 | P02 | not started | | |
-| P03 | not started | | |
+| P03 | done | (this commit) | `test/unit/webui-unary-operation-typing.test.ts`; report under `…/business-cohesion-20261015/p03/evidence.md` |
 | P04 | not started | | |
 | P05 | not started | | |
 | P06 | not started | | |

@@ -16,6 +16,10 @@
 import type { WebuiDeliveryHandle } from "../features/turn/contracts/execution-port.js";
 import type { WebuiStreamFrame } from "../../shared/contracts/stream.js";
 import type { WebuiTerminalFrame } from "../../shared/contracts/terminal.js";
+import type {
+  OperationSpec,
+  WebuiUnaryOperationName,
+} from "../../shared/operation-names.js";
 import {
   createWebuiEventChannel,
   type WebuiClientEventWatcher,
@@ -59,7 +63,17 @@ function defaultWebSocket(): new (url: string) => WebuiSocket {
 
 /** The three request shapes the domain method table drives. */
 export interface WebuiWire {
-  request<T>(operation: string, body: unknown): Promise<T>;
+  /**
+   * A unary request. The operation name decides both the body and the result:
+   * `K` is one of `WebuiUnaryOperationName`, the body must be that operation's
+   * declared request, and the promise resolves with its declared response. A
+   * caller therefore cannot pick an unrelated result type, and a stream
+   * operation is not nameable here at all — it has its own entry points below.
+   */
+  request<K extends WebuiUnaryOperationName>(
+    operation: K,
+    body: OperationSpec[K]["request"],
+  ): Promise<OperationSpec[K]["response"]>;
   stream(
     operation: string,
     body: unknown,
@@ -137,7 +151,10 @@ export function createWebuiWire({
     return session;
   }
 
-  function request<T>(operation: string, body: unknown): Promise<T> {
+  function request<K extends WebuiUnaryOperationName>(
+    operation: K,
+    body: OperationSpec[K]["request"],
+  ): Promise<OperationSpec[K]["response"]> {
     return new Promise((resolve, reject) => {
       let settled = false;
       let timeout: ReturnType<typeof setTimeout>;
@@ -158,7 +175,7 @@ export function createWebuiWire({
           settled = true;
           clearTimeout(timeout);
           session.close();
-          resolve(frame.body as T);
+          resolve(frame.body as OperationSpec[K]["response"]);
         },
         invalidFrame: (session) => fail(session, new Error("WebUI returned invalid JSON")),
         closed: (session) =>

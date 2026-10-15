@@ -73,15 +73,14 @@ export interface WebuiClientMessagePage {
   readonly hasMore?: boolean;
 }
 
-export interface WebuiQueryCollapseView {
-  readonly queryKey: string;
-  readonly currentTurnId: string;
-  /** Runtime reconciliation can require details to stay open, which removes
-   *  the outer disclosure control in Desktop. */
-  readonly forceExpanded?: boolean;
-  readonly processingStartedAtMs: number;
-  readonly processingFinishedAtMs?: number;
-}
+/**
+ * One query's collapse state. Declared once, on the wire contract, because the
+ * server forwards the runtime's `QueryCollapseView` unchanged: the browser's
+ * previous copy of this interface was a second declaration of the same wire
+ * object, and nothing compared the two.
+ */
+import type { WebuiQueryCollapseView } from "../../../../shared/contracts/messages.js";
+export type { WebuiQueryCollapseView };
 
 export type WebuiClientMessageLoader = (request: {
   readonly id: string;

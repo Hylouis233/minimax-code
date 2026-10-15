@@ -36,10 +36,29 @@ export interface WebuiMessagesResult {
   readonly lastMsgId?: string;
   readonly hasMore?: boolean;
   readonly todosJson?: string;
-  readonly queryCollapseViews?: readonly Record<string, unknown>[];
+  readonly queryCollapseViews?: readonly WebuiQueryCollapseView[];
   readonly turnResults?: readonly Record<string, unknown>[];
   readonly contextSnapshot?: Record<string, unknown>;
   readonly usage?: Record<string, unknown>;
+}
+
+/**
+ * One query's collapse state inside a transcript page.
+ *
+ * The server forwards the runtime's `QueryCollapseView`
+ * (`packages/protocol/src/local.ts`) verbatim, so this is the reader's
+ * declaration of that same object. It used to be `Record<string, unknown>[]`
+ * here while the browser declared the real fields, which left the two
+ * declarations disagreeing about one wire object and nothing comparing them.
+ * `forceExpanded` is optional because a reader must tolerate its absence; the
+ * runtime always sends it.
+ */
+export interface WebuiQueryCollapseView {
+  readonly queryKey: string;
+  readonly currentTurnId: string;
+  readonly forceExpanded?: boolean;
+  readonly processingStartedAtMs: number;
+  readonly processingFinishedAtMs?: number;
 }
 
 export interface WebuiAttachmentInput {
