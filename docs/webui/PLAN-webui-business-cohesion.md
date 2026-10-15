@@ -1,9 +1,14 @@
 # WebUI business cohesion and execution plan
 
-Status: proposed for human review. No implementation is authorized by this document's existence.
+Status: accepted and under execution on branch `feat/webui-business-cohesion`. The decisions below were
+converged through four numbered decision rounds plus a concrete draft audit and a revised-artifact
+audit, and the operator accepted the plan; §7.0 records carrier progress.
 
-Source baseline: `5de4b876d0499468153111c91b3a437b4fd143ef`, inspected on 2026-10-15.
-The baseline worktree was clean. Revalidate the checkout and affected symbols before execution.
+Design baseline: `5de4b876d0499468153111c91b3a437b4fd143ef`, inspected on 2026-10-15. It is the
+comparison point for the source this plan was written against and is **not** advanced by execution;
+delivered revisions are recorded in §7.0. Implementation starts from the verified local `webui`
+revision `4fce25f2cd870a0f3e1c727c4c89c9937a0fc8f5`, which is ahead of `origin/webui` (`b9a7e207`) by
+eleven commits.
 Ticket IDs below are local plan identifiers, not GitHub issue numbers or completed work.
 
 ## 1. Outcome and scope
@@ -331,6 +336,19 @@ send/queue clearing boundaries through named transitions and keep terminal clean
 All carriers start as NOT STARTED. Their exit criteria are future execution requirements.
 One carrier may need several reviewable commits; every committed intermediate state must have
 one effective owner, a coherent import graph, and the applicable checks passing.
+
+### 7.0 Programme position
+
+| Carrier | Status | Revision | Evidence |
+| --- | --- | --- | --- |
+| P00 | done | (work material, not a source change) | baseline gate run, caller/import map, field/lifetime matrix, broad-contract inventory, before-change scenario ledger — all under `~/my_data/project/my_project/minimax-code-webui-work/business-cohesion-20261015/p00/` |
+| P01 | not started | | |
+| P02 | not started | | |
+| P03 | not started | | |
+| P04 | not started | | |
+| P05 | not started | | |
+| P06 | not started | | |
+| P07 | not started | | |
 
 ```mermaid
 flowchart LR
