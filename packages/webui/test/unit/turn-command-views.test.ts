@@ -21,11 +21,9 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  createWebuiInteractionCommands,
-  createWebuiStreamPhaseCommands,
-  createWebuiTurnLifecycleCommands,
-} from "../../src/client/features/sessions/application/session-commands.js";
+import { createWebuiInteractionCommands } from "../../src/client/features/sessions/application/session-commands.js";
+import { createWebuiStreamPhaseCommands } from "../../src/client/features/turn/application/stream-phase-commands.js";
+import { createWebuiTurnLifecycleCommands } from "../../src/client/features/turn/application/turn-lifecycle-commands.js";
 import { initialWebuiStreamState } from "../../src/client/features/turn/projection/stream-state.js";
 import type { WebuiStreamState } from "../../src/client/features/turn/projection/stream-state.js";
 

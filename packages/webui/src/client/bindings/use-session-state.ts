@@ -45,11 +45,11 @@ import {
 import type { WebuiStreamState } from "../features/turn/projection/stream-state.js";
 import {
   createWebuiInteractionCommands,
-  createWebuiStreamPhaseCommands,
-  createWebuiTurnCommands,
-  createWebuiTurnLifecycleCommands,
   type WebuiInteractionCommands,
 } from "../features/sessions/application/session-commands.js";
+import { createWebuiStreamPhaseCommands } from "../features/turn/application/stream-phase-commands.js";
+import { createWebuiTurnCommands } from "../features/turn/application/turn-command-writer.js";
+import { createWebuiTurnLifecycleCommands } from "../features/turn/application/turn-lifecycle-commands.js";
 import type {
   WebuiStreamPhaseCommands,
   WebuiTurnLifecycleCommands,

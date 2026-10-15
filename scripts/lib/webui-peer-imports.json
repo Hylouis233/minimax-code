@@ -17,16 +17,6 @@
       "reason": "The unread controller decides whether a session is still working by asking the turn business for its active-turn probe; before the sessions owner moved into features/sessions/ both files sat in the application layer, so the edge was intra-layer. The probe is a turn read that turn has not published as a public contract yet; the entry goes when it does."
     },
     {
-      "from": "client/features/sessions/application/session-commands.ts",
-      "to": "client/features/turn/projection/stream-state.ts",
-      "reason": "Session commands read the turn stream state to decide whether a session is mid-turn before they submit a lifecycle command. Both files were in the application/projection layers before the sessions owner moved, so the edge was intra-layer; it becomes a reviewed peer edge until turn publishes that read."
-    },
-    {
-      "from": "client/features/sessions/application/session-commands.ts",
-      "to": "client/features/turn/application/stream-state-bundle.ts",
-      "reason": "The same mid-turn decision reads the turn bundle. Reviewed peer edge until turn publishes its contracts."
-    },
-    {
       "from": "client/features/sessions/application/session-workflows.ts",
       "to": "client/features/composer/application/composer-store.ts",
       "reason": "Archiving or deleting a session clears that session's Composer draft, so the workflow calls the composer store's own clear. Repointed when T13 moved the composer owner into its feature home; the entry goes when composer publishes a public clear command."
@@ -154,7 +144,12 @@
     {
       "from": "client/features/interactions/application/interaction-session-owners.ts",
       "to": "client/features/sessions/application/session-commands.ts",
-      "reason": "The session-keyed interaction owner applies the same session-scoped stream-phase commands after a questionnaire settles, for the same reason as the coordinator entry above. Reviewed peer edge until sessions publishes the command view as a public contract."
+      "reason": "The session-keyed interaction owner applies the same session-scoped interaction commands after a questionnaire settles, for the same reason as the coordinator entry above. Reviewed peer edge until sessions publishes the command view as a public contract."
+    },
+    {
+      "from": "client/features/interactions/application/interaction-session-owners.ts",
+      "to": "client/features/turn/application/stream-phase-commands.ts",
+      "reason": "The same session-keyed owner also applies the stream-phase commands after a questionnaire settles. This is the edge that used to name sessions' command module, carried to the phase commands' new home when P02 step 2 moved them into turn: the view is published (turn/contracts/turn-command-views.ts), the factory is an implementation and cannot be. Reviewed peer edge until P02 step 3 gives interactions the narrow phase intents it needs instead of the view."
     },
     {
       "from": "client/features/interactions/ui/PlanModeCards.tsx",

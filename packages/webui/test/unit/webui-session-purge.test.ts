@@ -36,11 +36,9 @@ import {
   createWebuiSessionWorkflows,
 } from "../../src/client/features/sessions/application/session-workflows.js";
 import { createWebuiComposerStore } from "../../src/client/features/composer/application/composer-store.js";
-import {
-  createWebuiInteractionCommands,
-  createWebuiTurnLifecycleCommands,
-  createWebuiTurnCommands,
-} from "../../src/client/features/sessions/application/session-commands.js";
+import { createWebuiInteractionCommands } from "../../src/client/features/sessions/application/session-commands.js";
+import { createWebuiTurnCommands } from "../../src/client/features/turn/application/turn-command-writer.js";
+import { createWebuiTurnLifecycleCommands } from "../../src/client/features/turn/application/turn-lifecycle-commands.js";
 import { WEBUI_HOME_SESSION_KEY } from "../../src/client/application/state.js";
 import {
   initialWebuiStreamState,

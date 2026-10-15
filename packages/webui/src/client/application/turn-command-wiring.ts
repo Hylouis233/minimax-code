@@ -12,11 +12,6 @@ import {
   buildWebuiComposerHandlers,
   submitWebuiComposerTurn,
 } from "../features/composer/application/composer-workflows.js";
-import {
-  createWebuiStreamPhaseCommands,
-  createWebuiTurnCommands,
-  createWebuiTurnLifecycleCommands,
-} from "../features/sessions/application/session-commands.js";
 import type { WebuiTurnCommandCollaborators } from "../features/turn/application/turn-command-port.js";
 
 /**
@@ -26,9 +21,6 @@ import type { WebuiTurnCommandCollaborators } from "../features/turn/application
  */
 export function createWebuiTurnCommandCollaborators(): WebuiTurnCommandCollaborators {
   return {
-    createTurnCommands: createWebuiTurnCommands,
-    createLifecycleCommands: createWebuiTurnLifecycleCommands,
-    createStreamPhaseCommands: createWebuiStreamPhaseCommands,
     buildComposerHandlers: buildWebuiComposerHandlers,
     submitComposerTurn: submitWebuiComposerTurn,
   };

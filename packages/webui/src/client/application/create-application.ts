@@ -21,7 +21,7 @@ import { createWebuiComposerController } from "../features/composer/application/
 import { submitWebuiGoal } from "../features/composer/application/composer-workflows.js";
 import type { WebuiComposerController } from "../features/composer/contracts/composer-controller.js";
 import { WEBUI_COMPOSER_HOME_KEY } from "../features/composer/application/composer-history.js";
-import { createWebuiTurnLifecycleCommands } from "../features/sessions/application/session-commands.js";
+import { createWebuiTurnLifecycleCommands } from "../features/turn/application/turn-lifecycle-commands.js";
 import { createWebuiTerminalOwner } from "../features/terminal/application/terminal-owner.js";
 import { createWebuiWorkspaceQueries } from "../features/workspace/application/workspace-queries.js";
 import { createWebuiAccountWorkflows } from "../features/account/application/account-workflows.js";

@@ -20,10 +20,8 @@
 // exists.
 
 import type { WebuiSessionStore } from "../../../application/session-store.js";
-import {
-  createWebuiInteractionCommands,
-  createWebuiStreamPhaseCommands,
-} from "../../sessions/application/session-commands.js";
+import { createWebuiInteractionCommands } from "../../sessions/application/session-commands.js";
+import { createWebuiStreamPhaseCommands } from "../../turn/application/stream-phase-commands.js";
 import {
   createWebuiInteractionCoordinator,
   type WebuiInteractionCoordinator,

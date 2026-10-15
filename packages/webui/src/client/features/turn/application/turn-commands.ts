@@ -29,6 +29,9 @@ import type {
 } from "../contracts/turn-commands.js";
 export type { WebuiConversationTurnCommands, WebuiTurnSendIntent } from "../contracts/turn-commands.js";
 import type { WebuiTurnCommandWriter } from "../contracts/turn-command-views.js";
+import { createWebuiStreamPhaseCommands } from "./stream-phase-commands.js";
+import { createWebuiTurnLifecycleCommands } from "./turn-lifecycle-commands.js";
+import { createWebuiTurnCommands } from "./turn-command-writer.js";
 import type { WebuiComposerSubmitHandlers } from "../../composer/contracts/composer-turn.js";
 import type { WebuiTurnCommandCollaborators } from "./turn-command-port.js";
 import { isWebuiSubscriptionProbeCurrent, ownsWebuiStreamGeneration, resolveWebuiSubscriptionRecheck, type WebuiStreamState } from "../projection/stream-state.js";
@@ -320,7 +323,7 @@ export function createWebuiConversationTurnCommands(
     sessionId
       ? store.createSessionWriter({ kind: "session", sessionId })
       : store.createSessionWriter({ kind: "home" });
-  const writerFor = (): WebuiTurnCommandWriter => collaborators.createTurnCommands(storeWriterFor());
+  const writerFor = (): WebuiTurnCommandWriter => createWebuiTurnCommands(storeWriterFor());
 
   /** The live slice. The home→session migration changes which key this reads. */
   const readStream = (): WebuiStreamState =>
@@ -380,7 +383,7 @@ export function createWebuiConversationTurnCommands(
   /** Drop the lease only if it still carries the generation the probe decided is stale. */
   const releaseSubscription = (generation: number): void => {
     const writer = storeWriterFor();
-    collaborators.createLifecycleCommands({
+    createWebuiTurnLifecycleCommands({
       setStream: writer.setStream,
       setSending: writer.setSending,
     }).releaseStreamSubscription(generation);
@@ -456,11 +459,11 @@ export function createWebuiConversationTurnCommands(
     stop: async () => {
       if (!sessionId || !capabilities?.stop) return;
       const writer = storeWriterFor();
-      const lifecycle = collaborators.createLifecycleCommands({
+      const lifecycle = createWebuiTurnLifecycleCommands({
         setStream: writer.setStream,
         setSending: writer.setSending,
       });
-      const phase = collaborators.createStreamPhaseCommands({ setStream: writer.setStream });
+      const phase = createWebuiStreamPhaseCommands({ setStream: writer.setStream });
       await stopWebuiTurn({
         abortSession: capabilities.stop,
         sessionId,

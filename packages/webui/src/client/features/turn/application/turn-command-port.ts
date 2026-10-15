@@ -10,36 +10,17 @@
 // application modules either. Composition builds the object once
 // (`client/application/turn-command-wiring.ts`) and hands it to the commands.
 //
-// Only the members `turn-commands.ts` calls appear here. The shapes are the
-// published ones: the views come from `features/turn/contracts/turn-command-views.ts`
-// and the submit objects from `composer/contracts/composer-turn.ts`.
+// What is left is the **Composer** pair only. The stream-phase, turn-lifecycle
+// and writer factories moved into this business, so the substrate imports them
+// directly; the submit workflow is still Composer's until P02 step 3 moves it,
+// and that move is what retires this file.
 
-import type { WebuiSessionWriter, WebuiHomeSessionWriter } from "../../../application/session-store.js";
 import type {
   WebuiComposerSubmitArgs,
   WebuiComposerSubmitHandlers,
 } from "../../composer/contracts/composer-turn.js";
-import type {
-  WebuiStreamPhaseCommands,
-  WebuiTurnCommandWriter,
-  WebuiTurnLifecycleCommands,
-} from "../contracts/turn-command-views.js";
-
-/** The store writer a turn's command adapter is built over. */
-type WebuiTurnWriterTarget = WebuiSessionWriter | WebuiHomeSessionWriter;
 
 export interface WebuiTurnCommandCollaborators {
-  /** sessions' `createWebuiTurnCommands`: the writer a turn's sink is built from. */
-  readonly createTurnCommands: (writer: WebuiTurnWriterTarget) => WebuiTurnCommandWriter;
-  /** sessions' `createWebuiTurnLifecycleCommands`: opening, recording and closing a turn's stream. */
-  readonly createLifecycleCommands: (targets: {
-    readonly setStream: WebuiTurnWriterTarget["setStream"];
-    readonly setSending: WebuiTurnWriterTarget["setSending"];
-  }) => WebuiTurnLifecycleCommands;
-  /** sessions' `createWebuiStreamPhaseCommands`: the phase writes, and nothing else. */
-  readonly createStreamPhaseCommands: (targets: {
-    readonly setStream: WebuiTurnWriterTarget["setStream"];
-  }) => WebuiStreamPhaseCommands;
   /** composer's `buildWebuiComposerHandlers`: the handler bundle one submit holds. */
   readonly buildComposerHandlers: (
     handlers: WebuiComposerSubmitHandlers,

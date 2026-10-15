@@ -76,7 +76,7 @@ import {
 } from "../../src/client/features/composer/application/composer-workflows.js";
 import { createdWebuiSessionId } from "../../src/client/features/sessions/contracts/session-port.js";
 import type { WebuiComposerSubmitHandlers } from "../../src/client/features/composer/contracts/composer-turn.js";
-import { createWebuiTurnLifecycleCommands } from "../../src/client/features/sessions/application/session-commands.js";
+import { createWebuiTurnLifecycleCommands } from "../../src/client/features/turn/application/turn-lifecycle-commands.js";
 import { projectWebuiMessage } from "../../src/client/features/transcript/projection/message-projection.js";
 import { projectLiveTurnView } from "../../src/client/features/transcript/projection/transcript-shape.js";
 import { buildWebuiQuestionnaireAnswers } from "../../src/client/features/interactions/projection/questionnaire-state.js";

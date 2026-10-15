@@ -41,7 +41,7 @@ import { streamRecoveryProjection } from "../../src/client/features/turn/project
 import type {WebuiClientMessageSender} from "../../src/client/features/turn/contracts/execution-port.js";
 import type { WebuiStreamFrame } from "../../src/shared/contracts/stream.js";
 import { streamStateBundle } from "../../src/client/features/turn/application/stream-state-bundle.js";
-import { createWebuiStreamPhaseCommands } from "../../src/client/features/sessions/application/session-commands.js";
+import { createWebuiStreamPhaseCommands } from "../../src/client/features/turn/application/stream-phase-commands.js";
 
 const SESSION_ID = "session-under-test";
 
