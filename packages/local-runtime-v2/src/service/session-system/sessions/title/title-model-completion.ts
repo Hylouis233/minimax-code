@@ -7,6 +7,7 @@ export interface TitleResolvedModel<TModel> {
   readonly apiKey?: string;
   readonly headers?: Readonly<Record<string, string>>;
   readonly thinkingLevel?: ModelThinkingLevel;
+  readonly payloadTransform?: SimpleStreamOptions['onPayload'];
   readonly stream?: TitleModelStream<TModel>;
 }
 
@@ -38,6 +39,7 @@ export type TitleModelStream<TModel> = (
     readonly apiKey?: string;
     readonly headers?: Readonly<Record<string, string>>;
     readonly reasoning?: SimpleStreamOptions['reasoning'];
+    readonly onPayload?: SimpleStreamOptions['onPayload'];
     readonly maxTokens: number;
     readonly timeoutMs: number;
     readonly signal: AbortSignal;
@@ -105,6 +107,7 @@ export async function completeTitleModelResponse<TAgentConfig, TModel>(
     {
       ...(resolved.apiKey ? { apiKey: resolved.apiKey } : {}),
       ...(resolved.headers ? { headers: resolved.headers } : {}),
+      ...(resolved.payloadTransform ? { onPayload: resolved.payloadTransform } : {}),
       ...(resolved.thinkingLevel && resolved.thinkingLevel !== 'off'
         ? { reasoning: resolved.thinkingLevel }
         : {}),

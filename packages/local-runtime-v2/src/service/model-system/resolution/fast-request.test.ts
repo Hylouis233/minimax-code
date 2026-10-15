@@ -8,6 +8,12 @@ import { buildLocalRequestPayloadTransform } from "../../turn-system/agent-host/
 import { LocalModelResolver } from "./local-model-resolver.js";
 import { modelRefForModel } from "./model-ref.js";
 import { resolveFastRequestOptions } from "./fast-request.js";
+import {
+  createProductionRootArchiveTitleModel,
+  createProductionSessionTitleModel,
+  type ProductionAgentPreparation,
+} from "../../turn-system/production-composition.js";
+import type { SessionRecord } from "../../session-system/sessions/repo/contract.js";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -118,11 +124,12 @@ async function resolveFixture(
   mode: NonNullable<LocalModelConfig["fast"]>["mode"],
   effort: string,
   modelId = "synthetic-model",
+  enabled = true,
 ) {
   const modelConfig: LocalModelConfig = {
     reasoning: true,
     thinking: { effortOptions: ["low", "high", "max", "ultra"] },
-    fast: { enabled: true, mode },
+    fast: { enabled, mode },
     limit: { context: 120_000, output: 12_000 },
   };
   const agentConfig: IAgentConfig = {
@@ -245,6 +252,122 @@ describe("Fast reaches the prepared request without replacing native reasoning",
   );
 });
 
+describe("Fast reaches production title requests", () => {
+  it.each([
+    ["openai-responses", "openai-priority"],
+    ["openai-completions", "openai-fast"],
+    ["anthropic-messages", "anthropic-fast"],
+  ] as const)(
+    "preserves Fast and high effort for both titles over %s",
+    async (api, mode) => {
+      for (const enabled of [true, false]) {
+        const { agentConfig, llm } = await resolveFixture(
+          api,
+          mode,
+          "high",
+          undefined,
+          enabled,
+        );
+        const captured: Array<{
+          body: Record<string, unknown>;
+          headers: Headers;
+        }> = [];
+        const fetchImpl: typeof fetch = async (_url, init) => {
+          captured.push({
+            body: JSON.parse(String(init?.body)),
+            headers: new Headers(init?.headers),
+          });
+          return new Response(
+            JSON.stringify({
+              error: { message: "Synthetic capture complete" },
+            }),
+            {
+              status: 400,
+              headers: { "content-type": "application/json" },
+            },
+          );
+        };
+        const unexpectedNetwork = vi.fn(() => {
+          throw new Error("Unexpected live request");
+        });
+        vi.stubGlobal("fetch", unexpectedNetwork);
+        const product = {
+          agents: {
+            getExecutionSnapshot: async () => ({
+              agentName: "fixture",
+              systemPrompt: "Synthetic",
+            }),
+          },
+          preparation: {
+            buildAgentConfig: async () => agentConfig,
+            resolveModel: async () => ({
+              ...llm,
+              streamFn: (model, context, options) =>
+                streamSimple(model, context, {
+                  ...options,
+                  fetch: fetchImpl,
+                  maxRetries: 0,
+                }),
+            }),
+          } as ProductionAgentPreparation,
+          safety: { review: async () => ({ pass: true }) },
+        };
+        const session: SessionRecord = {
+          sessionId: "synthetic-session",
+          agentName: "fixture",
+          workspaceDir: "/synthetic",
+          runtime: "pi-agent",
+          sessionType: "root",
+          sessionKind: "conversation",
+          status: "idle",
+          archived: false,
+          createdAtMs: 1,
+          updatedAtMs: 1,
+        };
+        const input = {
+          session,
+          systemPrompt: "Synthetic title",
+          userPrompt: "Synthetic input",
+          maxTokens: 100,
+          timeoutMs: 1000,
+        };
+        for (const adapter of [
+          createProductionSessionTitleModel(product),
+          createProductionRootArchiveTitleModel(product),
+        ]) {
+          await expect(adapter.summarize(input)).rejects.toThrow(
+            "Synthetic capture complete",
+          );
+        }
+        expect(captured).toHaveLength(2);
+        expect(unexpectedNetwork).not.toHaveBeenCalled();
+        for (const { body, headers } of captured) {
+          if (api === "anthropic-messages") {
+            expect(body.output_config).toMatchObject({ effort: "high" });
+            expect(body.speed).toBe(enabled ? "fast" : undefined);
+            expect(
+              headers.get("anthropic-beta")?.includes("fast-mode-2026-02-01"),
+            ).toBe(enabled);
+          } else {
+            expect(
+              api === "openai-responses"
+                ? (body.reasoning as Record<string, unknown>).effort
+                : body.reasoning_effort,
+            ).toBe("high");
+            expect(body.service_tier).toBe(
+              enabled
+                ? mode === "openai-fast"
+                  ? "fast"
+                  : "priority"
+                : undefined,
+            );
+          }
+        }
+      }
+    },
+  );
+});
+
 describe("Anthropic Fast final SDK request headers", () => {
   it.each([
     { label: "API key", apiKey: "synthetic-key", oauth: false },
@@ -352,8 +475,7 @@ async function captureAnthropicFastRequest(apiKey: string, enabled: boolean) {
     ],
   };
   let captured:
-    | { headers: Headers; payload: Record<string, unknown> }
-    | undefined;
+    { headers: Headers; payload: Record<string, unknown> } | undefined;
   const fetchImpl = vi.fn(
     async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
       const request = new Request(input, init);

@@ -392,6 +392,8 @@ export interface ModelConnectionTestTarget {
   modelId: string;
   headers?: Record<string, string>;
   effort?: string;
+  /** Same explicit per-model preference as ordinary turns; validated before probing. */
+  fast?: LocalModelFastConfig;
   minimaxM3ThinkingMode?: MiniMaxM3ThinkingMode;
   /**
    * Output budget the probe requests, taken from the model's configured output

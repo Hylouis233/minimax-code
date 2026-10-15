@@ -1,4 +1,5 @@
 import { createProductionRunawayGuardExtension } from './runaway-guard/extension.js';
+import { buildLocalTurnPayloadTransform } from './agent-host/assembly/local-turn-payload-transform.js';
 import { streamSimple, type Api, type Context, type Model, type Tool } from '@earendil-works/pi-ai';
 import type {
   AgentExtension,
@@ -265,6 +266,11 @@ export function createProductionSessionTitleModel<
         ...(resolved.apiKey ? { apiKey: resolved.apiKey } : {}),
         ...(resolved.headers ? { headers: resolved.headers } : {}),
         ...(resolved.thinkingLevel ? { thinkingLevel: resolved.thinkingLevel } : {}),
+        payloadTransform: buildLocalTurnPayloadTransform({ model: input.agentConfig.model }, {
+          thinkingLevel: resolved.thinkingLevel,
+          thinkingRequestPatch: resolved.thinkingRequestPatch,
+          managedProvider: resolved.managedProvider === true,
+        }),
         ...(resolvedStream
           ? {
               stream: (model, context, options) =>
@@ -306,6 +312,11 @@ export function createProductionRootArchiveTitleModel<
         ...(resolved.apiKey ? { apiKey: resolved.apiKey } : {}),
         ...(resolved.headers ? { headers: resolved.headers } : {}),
         ...(resolved.thinkingLevel ? { thinkingLevel: resolved.thinkingLevel } : {}),
+        payloadTransform: buildLocalTurnPayloadTransform({ model: input.agentConfig.model }, {
+          thinkingLevel: resolved.thinkingLevel,
+          thinkingRequestPatch: resolved.thinkingRequestPatch,
+          managedProvider: resolved.managedProvider === true,
+        }),
         ...(resolvedStream
           ? {
               stream: (model, context, options) =>

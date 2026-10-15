@@ -54,8 +54,8 @@ configuration and does not contact an endpoint.
 Omit `fast` or set `enabled: false` to retain the existing route behavior. Enabled
 malformed or incompatible configurations fail before a provider request instead
 of silently changing providers, lowering effort or dropping the preference.
-Anthropic beta tokens are merged case-insensitively without replacing credentials
-or unrelated headers. OpenAI service-tier values are not sent as Anthropic tiers.
+Anthropic beta header names are merged case-insensitively, preserving tokens,
+credentials and unrelated headers. OpenAI service-tier values are not sent as Anthropic tiers.
 OAuth Codex transport is not claimed to support these native Fast flags.
 
 Fast can cost more and may depend on model, account and gateway capabilities.
