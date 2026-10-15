@@ -87,7 +87,7 @@ function evaluateFixture(
   });
   // A fixture graph states its own approved peers: the repository's list names
   // files the fixture does not contain, which the rule would report as stale.
-  return { graph, result: evaluateGraph(graph, { approvedPeerImports: approved, roleExceptions: [] }) };
+  return { graph, result: evaluateGraph(graph, { approvedPeerImports: approved }) };
 }
 
 function runCli(args: string[]) {
