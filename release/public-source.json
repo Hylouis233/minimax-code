@@ -95,6 +95,7 @@
     "docs/tui-capabilities.md",
     "docs/verification.md",
     "docs/webui/PLAN-webui-architecture-review.md",
+    "docs/webui/PLAN-webui-business-cohesion.md",
     "docs/webui/PLAN-webui-business-reorganization.md",
     "docs/webui/SPEC-webui-architecture-redesign.md",
     "docs/webui/command-surface.md",
