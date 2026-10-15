@@ -74,11 +74,12 @@ export interface RoleException {
 }
 
 export function loadRoleExceptions(): readonly RoleException[];
+export function validateExceptionLedger(entries: unknown, required: readonly string[]): void;
 
 /** One role-rule finding. `rule` names which role judgement produced it. */
 export interface RoleViolation {
   readonly kind: "role";
-  readonly rule: "duplicate-owner" | "role-import" | "private-peer-import" | "stale-peer-approval";
+  readonly rule: "duplicate-owner" | "role-import" | "private-peer-import" | "stale-peer-approval" | "stale-role-exception";
   readonly file: string;
   readonly from: string;
   readonly to: string;
@@ -178,6 +179,7 @@ export function collectModuleReferences(
   fileName: string,
   sourceText: string,
 ): CollectedReferences;
+export function sourceFingerprint(fileName: string, sourceText: string): string;
 
 export interface GraphEdge {
   readonly from: string;
@@ -197,6 +199,8 @@ export interface GraphUnresolved {
 export interface GraphNonLiteral {
   readonly file: string;
   readonly line: number;
+  readonly expression?: string;
+  readonly sourceFingerprint?: string;
 }
 
 export interface GraphHostImport {
@@ -206,6 +210,7 @@ export interface GraphHostImport {
   readonly kind: string;
   /** Present when the specifier resolved outside the package (a package entry). */
   readonly target?: string;
+  readonly workspacePath?: string;
 }
 
 export interface GraphBrowserGlobalUse {
@@ -273,6 +278,8 @@ export interface DirectionViolation {
 
 export interface GraphViolation {
   readonly kind: string;
+  readonly expression?: string;
+  readonly sourceFingerprint?: string;
   readonly file?: string;
   readonly line?: number;
   readonly global?: string;

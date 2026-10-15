@@ -26,6 +26,7 @@ import {
   compareBaseline,
   evaluateGraph,
   pairKey,
+  sourceFingerprint,
   WEBUI_SOURCE_DIRECTORY,
 } from "./lib/webui-dependency-rules.mjs";
 
@@ -92,8 +93,8 @@ const { newViolations, staleEntries } = compareBaseline(
   baseline.entries ?? [],
 );
 
-function structuralKey(kind, file, line) {
-  return `${kind}:${file}:${line}`;
+function structuralKey(kind, file, line, expression, fingerprint) {
+  return `${kind}:${file}:${expression ? sourceFingerprint(file, expression) : line}:${fingerprint ?? ""}`;
 }
 const measuredStructural = [
   ...result.unresolved.map((entry) => ({
@@ -107,22 +108,24 @@ const measuredStructural = [
     file: entry.file,
     line: entry.line,
     detail: entry.detail,
+    expression: entry.expression,
+    sourceFingerprint: entry.sourceFingerprint,
   })),
 ];
 const allowedStructural = new Map(
   (baseline.allowances ?? []).map((entry) => [
-    structuralKey(entry.kind, entry.file, entry.line),
+    structuralKey(entry.kind, entry.file, entry.line, entry.expression, entry.sourceFingerprint),
     entry,
   ]),
 );
 const measuredStructuralKeys = new Set(
-  measuredStructural.map((entry) => structuralKey(entry.kind, entry.file, entry.line)),
+  measuredStructural.map((entry) => structuralKey(entry.kind, entry.file, entry.line, entry.expression, entry.sourceFingerprint)),
 );
 const newStructural = measuredStructural.filter(
-  (entry) => !allowedStructural.has(structuralKey(entry.kind, entry.file, entry.line)),
+  (entry) => !allowedStructural.has(structuralKey(entry.kind, entry.file, entry.line, entry.expression, entry.sourceFingerprint)),
 );
 const staleAllowances = (baseline.allowances ?? []).filter(
-  (entry) => !measuredStructuralKeys.has(structuralKey(entry.kind, entry.file, entry.line)),
+  (entry) => !measuredStructuralKeys.has(structuralKey(entry.kind, entry.file, entry.line, entry.expression, entry.sourceFingerprint)),
 );
 
 const baselineCycles = new Map(
@@ -145,6 +148,7 @@ const violatingPairs = new Set(
 const provisionalJudgements = collectProvisionalJudgements(result.direction);
 
 const failed =
+  result.violations.some((v) => v.kind === "unclassified" || v.kind === "workspace-host") ||
   newViolations.length > 0 ||
   staleEntries.length > 0 ||
   newCycles.length > 0 ||
@@ -179,12 +183,15 @@ const summary = {
   newStructural,
   staleAllowances,
   provisionalJudgements,
+  unclassified: result.violations.filter((v) => v.kind === "unclassified"),
+  workspaceHost: result.violations.filter((v) => v.kind === "workspace-host"),
 };
 
 if (values.json) {
   process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
 } else {
   const lines = [];
+  for (const violation of result.violations.filter((v) => v.kind === "unclassified" || v.kind === "workspace-host")) lines.push(violation.detail);
   lines.push("WebUI internal dependency check");
   lines.push(
     `  scanned ${graph.files.length} source files, ${graph.references.length} in-package references`,

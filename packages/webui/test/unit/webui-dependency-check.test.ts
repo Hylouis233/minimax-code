@@ -101,6 +101,44 @@ const widget =
   "export interface Widget { readonly id: string }\nexport const widget = 1;\n";
 const leaf = "export const leaf = 1;\n";
 
+describe("architecture gate completeness", () => {
+  it("rejects raw writer invocation from presentation", () => {
+    const { result } = evaluateFixture({
+      "client/contracts/writer.ts": "export interface WebuiSessionWriter { setStream(): void }",
+      "client/features/models/ui/Probe.ts": 'import type { WebuiSessionWriter } from "../../../contracts/writer.js"; export function render(writer: WebuiSessionWriter) { writer.setStream(); }',
+    });
+    expect(result.forbiddenCalls).toHaveLength(1);
+  });
+  it("rejects an isolated unclassified module", () => {
+    const { result } = evaluateFixture({ "client/features/models/mystery.ts": leaf });
+    expect(result.pass).toBe(false);
+  });
+  it("collects import-equals and rejects computed require", () => {
+    const refs = collectModuleReferences("probe.ts", 'import fs = require("node:fs"); const value = require(name);');
+    expect(refs.references.map((r) => r.specifier)).toEqual(["node:fs"]);
+    expect(refs.nonLiteralDynamic).toHaveLength(1);
+  });
+  it("rejects constructing a business owner in presentation", () => {
+    const { result } = evaluateFixture({
+      "client/features/models/application/owner.ts": "export function createModelsOwner() { return { dispose() {} }; }",
+      "client/features/models/ui/Probe.ts": 'import { createModelsOwner } from "../application/owner.js"; export function render() { return createModelsOwner(); }',
+    });
+    expect(result.pass).toBe(false);
+  });
+  it("rejects type-only runtime workspace imports while allowing shared contracts", () => {
+    const files = {
+      "client/features/models/projection/Probe.ts": 'import type { Value } from "@mavis/local-runtime-v2"; export type Result = Value;',
+      "../outside/runtime.ts": "export interface Value { id: string }",
+    };
+    const options = { ...compilerOptions, paths: { "@mavis/local-runtime-v2": ["../outside/runtime.ts"] } };
+    const blocked = evaluateFixture(files, options);
+    expect(blocked.graph.hostImports).toHaveLength(1);
+    expect(blocked.result.pass).toBe(false);
+    const allowed = evaluateFixture({ "../../shared/src/index.ts": "export interface Value { id: string }", "client/features/models/projection/Probe.ts": 'import type { Value } from "@mavis/shared"; export type Result = Value;' }, { ...compilerOptions, paths: { "@mavis/shared": ["../../shared/src/index.ts"] } });
+    expect(allowed.result.pass).toBe(true);
+  });
+});
+
 describe("layer matrix", () => {
   it("allows application to import its client contracts", () => {
     expect(isAllowedEdge(["application"], ["contracts"])).toBe(true);

@@ -73,6 +73,7 @@ const steps = [
   { name: "check:webui-business-navigation", script: "check:webui-business-navigation", docs: true, windows: true },
   { name: "build:webui", script: "build:webui" },
   { name: "check:webui-boundary", script: "check:webui-boundary" },
+  { name: "test:webui-package", script: "test:webui-package", platforms: ["linux", "darwin"] },
   { name: "test:webui", script: "test:webui" },
   { name: "test:webui-browser", script: "test:webui-browser", platforms: ["linux"] },
   { name: "test:artifact", script: "test:artifact", windows: true },

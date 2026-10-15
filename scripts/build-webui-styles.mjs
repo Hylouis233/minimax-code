@@ -22,7 +22,9 @@ import { WEBUI_DIST_DIRECTORY } from "./lib/webui-boundary-constants.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const packageDir = path.join(root, "packages/webui");
-const outdir = path.join(root, WEBUI_DIST_DIRECTORY, "client");
+const outputIndex = process.argv.indexOf("--outdir");
+if (outputIndex !== -1 && !process.argv[outputIndex + 1]) throw new Error("--outdir requires a directory");
+const outdir = outputIndex === -1 ? path.join(root, WEBUI_DIST_DIRECTORY, "client") : path.resolve(process.argv[outputIndex + 1]);
 mkdirSync(outdir, { recursive: true });
 
 const inputCss = path.join(packageDir, "src/client/styles/index.css");

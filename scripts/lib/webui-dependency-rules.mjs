@@ -17,6 +17,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { builtinModules } from "node:module";
 import path from "node:path";
+import { createHash } from "node:crypto";
 
 // Registered Node builtin module names. Used by the node-builtin rule to
 // detect `import "fs"`-style specifiers in client / shared code that the
@@ -564,6 +565,7 @@ const CURRENT_HOME_ROLES = Object.freeze([
  */
 export function classifyRole(relative) {
   const normalized = relative.split(path.sep).join("/");
+  if (normalized === "client/global.d.ts") return { role: "entry", business: null, home: "current" };
 
   if (normalized.startsWith("client/features/")) {
     const [business, ...tail] = normalized.slice("client/features/".length).split("/");
@@ -814,19 +816,23 @@ export function collectModuleReferences(fileName, sourceText) {
       node.arguments.length > 0
     ) {
       const argument = node.arguments[0];
-      if (ts.isStringLiteral(argument)) {
+      if (ts.isStringLiteral(argument) || ts.isNoSubstitutionTemplateLiteral(argument)) {
         references.push({ specifier: argument.text, line: lineOf(node), kind: "dynamic" });
       } else {
-        nonLiteralDynamic.push({ line: lineOf(node) });
+        nonLiteralDynamic.push({ line: lineOf(node), expression: node.getText(sourceFile) });
       }
     } else if (
       ts.isCallExpression(node) &&
       ts.isIdentifier(node.expression) &&
       node.expression.text === "require" &&
       node.arguments.length > 0 &&
-      ts.isStringLiteral(node.arguments[0])
+      (ts.isStringLiteral(node.arguments[0]) || ts.isNoSubstitutionTemplateLiteral(node.arguments[0]))
     ) {
       references.push({ specifier: node.arguments[0].text, line: lineOf(node), kind: "require" });
+    } else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference) && node.moduleReference.expression && ts.isStringLiteral(node.moduleReference.expression)) {
+      references.push({ specifier: node.moduleReference.expression.text, line: lineOf(node), kind: "import-equals" });
+    } else if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "require") {
+      nonLiteralDynamic.push({ line: lineOf(node), expression: node.getText(sourceFile) });
     } else if (
       ts.isImportTypeNode(node) &&
       node.argument &&
@@ -862,6 +868,14 @@ export function collectModuleReferences(fileName, sourceText) {
   };
   visit(sourceFile);
   return { references, nonLiteralDynamic, browserGlobalCandidates, callCandidates };
+}
+
+// 冻结实际 loader 模块的 tokens；注释和空行不影响批准，URL 或接线变化会失效。
+export function sourceFingerprint(fileName, sourceText) {
+  const scanner = ts.createScanner(ts.ScriptTarget.Latest, true, ts.LanguageVariant.Standard, sourceText);
+  const tokens = [];
+  for (let kind = scanner.scan(); kind !== ts.SyntaxKind.EndOfFileToken; kind = scanner.scan()) tokens.push([kind, scanner.getTokenText()]);
+  return createHash("sha256").update(JSON.stringify(tokens)).digest("hex");
 }
 
 /**
@@ -1159,12 +1173,7 @@ export function buildDependencyGraph(options) {
   for (const absoluteFile of sourceFiles) {
     const from = normaliseSourcePath(repositoryRoot, absoluteFile);
     if (from === null) continue;
-    let text;
-    try {
-      text = readFileSync(absoluteFile, "utf8");
-    } catch {
-      continue;
-    }
+    const text = readFileSync(absoluteFile, "utf8");
     const {
       references: fileReferences,
       nonLiteralDynamic: nonLiteral,
@@ -1178,7 +1187,7 @@ export function buildDependencyGraph(options) {
       callCandidates.push({ file: from, absoluteFile, ...entry });
     }
     for (const entry of nonLiteral)
-      nonLiteralDynamic.push({ file: from, line: entry.line });
+      nonLiteralDynamic.push({ file: from, ...entry, sourceFingerprint: sourceFingerprint(absoluteFile, text) });
     for (const reference of fileReferences) {
       const compilerOptions = optionsFor(from);
       const resolved = ts.resolveModuleName(
@@ -1206,7 +1215,10 @@ export function buildDependencyGraph(options) {
         // Resolved package imports are still host dependencies. Resolution is
         // useful for following source aliases, but must not make a React or
         // Node capability disappear from the host-import rules.
-        hostImports.push({ from, specifier: reference.specifier, line: reference.line, kind: reference.kind, target });
+        const repositoryRelative = path.relative(repositoryRoot, target).replaceAll("\\", "/");
+        hostImports.push({ from, specifier: reference.specifier, line: reference.line, kind: reference.kind, target,
+          ...(repositoryRelative.startsWith("packages/") ? { workspacePath: repositoryRelative } : {}),
+        });
         continue;
       }
       references.push({
@@ -1450,23 +1462,14 @@ function resolveAmbientFacts(sourceFiles, repositoryRoot, optionsFor, globalCand
   const callSites = [];
 
   for (const { options, files: rootNames } of groups.values()) {
-    let program;
-    try {
-      program = ts.createProgram({
-        rootNames,
-        options: { ...options, noEmit: true, skipLibCheck: true },
-      });
-    } catch {
-      // Program construction can fail on edge fixtures (e.g. fixtures with no
-      // real source set). Treat the candidates as unresolvable rather than
-      // crash the gate — the candidates that did resolve still drive the
-      // judgements that matter.
-      continue;
-    }
+    const program = ts.createProgram({
+      rootNames,
+      options: { ...options, noEmit: true, skipLibCheck: true },
+    });
     const checker = program.getTypeChecker();
     for (const absoluteFile of rootNames) {
       const sourceFile = program.getSourceFile(absoluteFile);
-      if (!sourceFile) continue;
+      if (!sourceFile) throw new Error(`Dependency analysis did not load ${absoluteFile}`);
       const relative = normaliseSourcePath(repositoryRoot, absoluteFile) ?? absoluteFile.replaceAll("\\", "/");
       const findNodeAt = (position) => {
         let match;
@@ -1548,6 +1551,18 @@ function resolveAmbientFacts(sourceFiles, repositoryRoot, optionsFor, globalCand
         };
         const call = findCallExpression();
         if (!call) continue;
+        // 用声明身份识别直接调用与 import 别名，避免工厂绕开方法规则。
+        let direct = checker.getSymbolAtLocation(call.expression);
+        if (direct?.flags & ts.SymbolFlags.Alias) direct = checker.getAliasedSymbol(direct);
+        const directDeclaration = direct?.valueDeclaration ?? direct?.declarations?.[0];
+        const directType = directDeclaration ? checker.getTypeOfSymbolAtLocation(direct, directDeclaration) : undefined;
+        const ownsLifetime = directType?.getCallSignatures().some((signature) => {
+          const returned = checker.getReturnTypeOfSignature(signature);
+          return /(?:Owner|Coordinator|Store|Application)$/u.test(returned.aliasSymbol?.name ?? returned.getSymbol()?.name ?? "") || returned.getProperties().some((property) => property.name === "dispose");
+        });
+        if (directDeclaration && (ts.isFunctionDeclaration(directDeclaration) || ts.isVariableDeclaration(directDeclaration)) && (/^(?:create.*(?:Owner|Coordinator|Application|Store|Writer|Workflow)|register.*(?:Writer|Reconciler|Handler))$/u.test(direct.name) || ownsLifetime) && /\/client\/(?:features\/[^/]+\/)?application\//u.test(directDeclaration.getSourceFile().fileName.replaceAll("\\", "/"))) {
+          callSites.push({ file: relative, line: sourceFile.getLineAndCharacterOfPosition(call.getStart(sourceFile)).line + 1, method: direct.name, receiver: "WebuiOwnerFactory", declaringInterface: "WebuiOwnerFactory", methodSource: directDeclaration.getSourceFile().fileName });
+        }
         const invoked = invokedMemberOf(call.expression, checker);
         if (!invoked) continue;
         const methodDeclaration = invoked.symbol?.valueDeclaration ?? invoked.symbol?.declarations?.[0];
@@ -1639,6 +1654,8 @@ function nonLiteralDynamicRule(graph) {
     kind: "non-literal-dynamic",
     file: entry.file,
     line: entry.line,
+    expression: entry.expression,
+    sourceFingerprint: entry.sourceFingerprint,
     detail: `${entry.file}:${entry.line}: non-literal dynamic import cannot be checked`,
   }));
   return { pass: violations.length === 0, violations };
@@ -1750,6 +1767,10 @@ function forbiddenNodeBuiltinRule(graph) {
  * that belongs inside the application.
  */
 const FORBIDDEN_RECEIVER_INTERFACES = new Map([
+  ["WebuiSessionWriter", null],
+  ["WebuiHomeSessionWriter", null],
+  ["WebuiInteractionWriter", null],
+  ["WebuiOwnerFactory", null],
   // [declaredReceiverName, forbiddenMethodNames]
   ["WebuiSessionStore", new Set(["createSessionWriter", "createInteractionWriter"])],
   ["WebuiTransport", null], // any method call is a business RPC; null = wildcard
@@ -1903,8 +1924,9 @@ export function loadApprovedPeerImports() {
     approvedPeerImportsCache = Object.freeze(
       JSON.parse(
         readFileSync(new URL("./webui-peer-imports.json", import.meta.url), "utf8"),
-      ).entries ?? [],
+      ).entries,
     );
+    validateExceptionLedger(approvedPeerImportsCache, ["reason"]);
   }
   return approvedPeerImportsCache;
 }
@@ -1923,14 +1945,28 @@ export function loadRoleExceptions() {
     roleExceptionsCache = Object.freeze(
       JSON.parse(
         readFileSync(new URL("./webui-role-exceptions.json", import.meta.url), "utf8"),
-      ).entries ?? [],
+      ).entries,
     );
+    validateExceptionLedger(roleExceptionsCache, ["owner", "exitCondition"]);
   }
   return roleExceptionsCache;
 }
 
 /** @type {ReadonlyArray<{from: string, to: string, owner?: string, exitCondition?: string}> | null} */
 let roleExceptionsCache = null;
+
+export function validateExceptionLedger(entries, required) {
+  if (!Array.isArray(entries)) throw new Error("WebUI exception ledger must contain an entries array");
+  const seen = new Set();
+  for (const entry of entries) {
+    for (const field of ["from", "to", ...required]) {
+      if (typeof entry[field] !== "string" || !entry[field].trim()) throw new Error(`WebUI exception requires ${field}`);
+    }
+    const key = pairKey(entry.from, entry.to);
+    if (seen.has(key)) throw new Error(`Duplicate WebUI exception: ${key}`);
+    seen.add(key);
+  }
+}
 
 /**
  * The role rules: who may reach whom, judged by role rather than by directory.
@@ -1949,12 +1985,8 @@ let roleExceptionsCache = null;
  * 3. **Unapproved peer import.** A feature reaching another business's private
  *    role. Contracts need no approval; everything else does.
  *
- * Judgements 2 and 3 are limited to files that have already moved to a target
- * home. The current homes cannot satisfy them yet — shell and Composer construct
- * owners today, and that is T02–T19's work — so enforcing them there would
- * report the migration's *starting state* as a defect. Judgement 1 is the
- * migration gate that holds in the meantime, and no rule is relaxed once a file
- * moves.
+ * All three judgements apply in every home. Remaining migration edges require
+ * an owned exception with an explicit exit condition.
  *
  * @param {object} graph
  * @param {readonly Array<{from: string, to: string, reason?: string}>} approved
@@ -2224,6 +2256,17 @@ export function evaluateGraph(graph, options = {}) {
     ...nonLiteralDynamic,
     ...cycles,
   ];
+  for (const file of graph.files ?? []) {
+    if (!classifyLayers(file).includes("unknown") && classifyRole(file).role !== "unknown") continue;
+    violations.push({ kind: "unclassified", file, detail: `Unclassified WebUI source: ${file}` });
+  }
+  for (const entry of graph.hostImports ?? []) {
+    if (!entry.from.startsWith("client/") && !entry.from.startsWith("shared/")) continue;
+    // 浏览器只消费可跨边界的 shared/protocol workspace 契约。
+    if (!entry.workspacePath && !/^@mavis\//u.test(entry.specifier)) continue;
+    if (entry.workspacePath ? /^packages\/(?:shared|protocol)\//u.test(entry.workspacePath) : /^@mavis\/(?:shared|protocol)(?:\/|$)/u.test(entry.specifier)) continue;
+    violations.push({ kind: "workspace-host", file: entry.from, line: entry.line, detail: `${entry.from}:${entry.line}: browser/shared source may not depend on runtime workspace module ${entry.specifier}` });
+  }
   return {
     pass: violations.length === 0,
     violations,

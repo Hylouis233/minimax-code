@@ -29,6 +29,7 @@ import { fileURLToPath } from "node:url";
 import { readExtraction } from "./lib/release-metadata.mjs";
 import { createWorkspaceSourcesPlugin } from "./lib/workspace-sources-plugin.mjs";
 import { copyMcodeToolsArtifact } from "./lib/mcode-tools-artifact.mjs";
+import { recordBuildIntegrity } from "./lib/webui-build-integrity.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const packageDir = path.join(root, "packages/webui");
@@ -77,6 +78,7 @@ const server = await build({
   absWorkingDir: packageDir,
   entryPoints: {
     server: "src/server/index.ts",
+    runtime: "src/runtime/index.ts",
     "mcode-tools": "src/runtime/mcode-tools-entry.ts",
   },
   bundle: true,
@@ -129,11 +131,6 @@ const merged = {
   outputs: { ...server.metafile.outputs, ...client.metafile.outputs },
 };
 
-writeFileSync(
-  path.join(outdir, "metafile.json"),
-  JSON.stringify(merged, null, 2) + "\n",
-);
-
 const htmlSource = path.join(packageDir, "src/client/index.html");
 if (existsSync(htmlSource))
   cpSync(htmlSource, path.join(outdir, "client/index.html"));
@@ -162,6 +159,9 @@ cpSync(
 );
 chmodSync(path.join(outdir, "server/mcode-tools.js"), 0o755);
 chmodSync(path.join(outdir, "server/internal-bin/mcode-tools"), 0o755);
+merged.artifactRoot = path.relative(root, outdir);
+merged.integrity = recordBuildIntegrity(root, merged);
+writeFileSync(path.join(outdir, "metafile.json"), JSON.stringify(merged, null, 2) + "\n");
 
 console.log(
   `Built WebUI foundation. ` +

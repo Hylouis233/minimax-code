@@ -1,5 +1,4 @@
 import { build } from "esbuild";
-import { builtinModules } from "node:module";
 import {
   cpSync,
   mkdirSync,
@@ -13,6 +12,8 @@ import { copyLocalRuntimeAssets } from "./lib/local-runtime-assets.mjs";
 import { copyMcodeToolsArtifact } from "./lib/mcode-tools-artifact.mjs";
 import { readExtraction } from "./lib/release-metadata.mjs";
 import { createWorkspaceSourcesPlugin } from "./lib/workspace-sources-plugin.mjs";
+import { recordBuildIntegrity } from "./lib/webui-build-integrity.mjs";
+import { checkWebuiBuild } from "./lib/webui-build-check.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const args = process.argv.slice(2);
@@ -44,12 +45,10 @@ mkdirSync(path.join(outdir, "server"), { recursive: true });
 
 const styles = await import("node:child_process").then(({ spawnSync }) =>
   spawnSync(
-    path.join(root, "node_modules/.bin/tailwindcss"),
+    process.execPath,
     [
-      "build",
-      "--input", path.join(webuiDir, "src/client/styles/index.css"),
-      "--output", path.join(outdir, "client/styles.css"),
-      "--config", path.join(webuiDir, "tailwind.config.cjs"),
+      path.join(root, "scripts/build-webui-styles.mjs"),
+      "--outdir", path.join(outdir, "client"),
     ],
     { stdio: "inherit", cwd: webuiDir },
   ),
@@ -96,30 +95,6 @@ const client = await build({
   logLevel: "info",
 });
 
-const coreModules = new Set(builtinModules.flatMap((entry) => [entry, `node:${entry}`]));
-const externalImports = [...new Set(Object.values(server.metafile.outputs)
-  .flatMap((output) => output.imports ?? [])
-  .filter((entry) => entry.external)
-  .map((entry) => entry.path)
-  .filter((specifier) => !coreModules.has(specifier)))].sort();
-const allowedExternalImports = new Set([
-  "better-sqlite3",
-  "bufferutil",
-  "node-pty",
-  "utf-8-validate",
-]);
-const undeclaredExternalImports = externalImports.filter((specifier) => !allowedExternalImports.has(specifier));
-if (undeclaredExternalImports.length > 0) {
-  throw new Error(`Add runtime dependencies or bundle these server imports: ${undeclaredExternalImports.join(", ")}`);
-}
-
-const unresolvedWorkspaceImports = Object.keys(server.metafile.outputs)
-  .flatMap((output) => server.metafile.outputs[output].imports ?? [])
-  .filter((entry) => entry.path.startsWith("@mavis/"));
-if (unresolvedWorkspaceImports.length > 0) {
-  throw new Error(`Unbundled workspace imports remain: ${unresolvedWorkspaceImports.map((entry) => entry.path).join(", ")}`);
-}
-
 cpSync(path.join(webuiDir, "src/client/index.html"), path.join(outdir, "client/index.html"));
 cpSync(path.join(webuiDir, "src/client/assets/img"), path.join(outdir, "client/assets/img"), { recursive: true });
 cpSync(path.join(webuiDir, "src/client/assets/fonts/katex"), path.join(outdir, "client/fonts"), { recursive: true });
@@ -143,4 +118,8 @@ packageJson.version = version;
 writeFileSync(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`);
 
 writeFileSync(path.join(outdir, "server/package-info.json"), `${JSON.stringify({ version }, null, 2)}\n`);
+const metafile = { inputs: { ...server.metafile.inputs, ...client.metafile.inputs }, outputs: { ...server.metafile.outputs, ...client.metafile.outputs } };
+metafile.artifactRoot = path.relative(root, outdir);
+metafile.integrity = recordBuildIntegrity(root, metafile);
+checkWebuiBuild(root, metafile, { packaged: true });
 console.log(`Packed ${packageJson.name}@${version} at ${outdir}`);

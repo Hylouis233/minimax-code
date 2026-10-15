@@ -236,6 +236,17 @@ describe("webui boundary rules", () => {
 });
 
 describe("rewriteInputs", () => {
+  it("normalizes Windows paths on any host", () => {
+    const inputs = rewriteInputs({ "src/client/main.tsx": {}, "../tui/src/tui/render.ts": {} }, { rootDir: "C:\\repo" });
+    expect(Object.keys(inputs)).toEqual(["packages/webui/src/client/main.tsx", "packages/tui/src/tui/render.ts"]);
+    expect(terminalRendererAbsent(inputs).pass).toBe(false);
+  });
+  it("requires the exact WebUI entries", () => {
+    expect(serverAndClientEntriesPresent({ "other/server/index.ts": {}, "other/client/main.tsx": {} }).pass).toBe(false);
+  });
+  it("fails when an input cannot be read", () => {
+    expect(forbiddenInternalReferences({ "packages/webui/src/missing.ts": {} }, { rootDir: fixtureDir }).pass).toBe(false);
+  });
   it("flattens pnpm-symlink form into a repository-relative key", () => {
     const inputs = rewriteInputs({
       "../../node_modules/@mavis/tui/src/tui/mod.js": { bytesInOutput: 0 },

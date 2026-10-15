@@ -35,6 +35,11 @@ jobs:
           registry-url: "https://registry.npmjs.org"
           scope: "@fectivnfy112358"
       - run: pnpm install --frozen-lockfile
+      - name: Verify the source revision before packaging
+        run: pnpm verify
+        env:
+          MCODE_VERIFY_REPORT_DIR: ${{ runner.temp }}/verification
+          MCODE_WEBUI_VERIFY_DIR: ${{ runner.temp }}/webui-installed-check
       - name: Resolve next preview version
         id: release
         shell: bash
@@ -80,6 +85,10 @@ jobs:
         run: node scripts/package-webui-npm.mjs --version "${{ steps.release.outputs.version }}" --outdir "$RUNNER_TEMP/webui-package"
       - name: Inspect package contents
         run: npm pack --dry-run --json "$RUNNER_TEMP/webui-package"
+      - name: Verify installation of the exact preview package
+        run: node scripts/verify-webui-package.mjs --package-dir "$RUNNER_TEMP/webui-package"
+        env:
+          MCODE_WEBUI_VERIFY_DIR: ${{ runner.temp }}/webui-preview-check
       - name: Publish preview to the npm registry
         # This repository carries no Actions secrets, so the publish fails with
         # ENEEDAUTH and takes the job red on every push to `webui`. That buries

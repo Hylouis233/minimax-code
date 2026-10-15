@@ -47,55 +47,55 @@
       "from": "client/features/turn/application/effect-reducer.ts",
       "to": "client/features/interactions/projection/event-parsers.ts",
       "owner": "T21 (退役迁移形式)",
-      "exitCondition": "The turn substrate moves to client/features/turn/application/ and consumes interactions' published contracts."
+      "exitCondition": "The turn substrate consumes interactions' published contracts instead of its private projection implementation."
     },
     {
       "from": "client/features/turn/application/effect-reducer.ts",
       "to": "client/features/workspace/projection/workspace-progress.ts",
       "owner": "T21 (退役迁移形式)",
-      "exitCondition": "The turn substrate moves to client/features/turn/application/ and consumes workspace's published contracts."
+      "exitCondition": "The turn substrate consumes workspace's published contracts instead of its private projection implementation."
     },
     {
       "from": "client/features/turn/application/effect-reducer.ts",
       "to": "client/features/goal/projection/goal-state.ts",
       "owner": "T21 (退役迁移形式)",
-      "exitCondition": "The turn substrate moves to client/features/turn/application/ and consumes goal's published contracts."
+      "exitCondition": "The turn substrate consumes goal's published contracts instead of its private projection implementation."
     },
     {
       "from": "client/features/turn/application/event-coordinator.ts",
       "to": "client/features/interactions/projection/event-parsers.ts",
       "owner": "T21 (退役迁移形式)",
-      "exitCondition": "The turn substrate moves to client/features/turn/application/ and consumes interactions' published contracts."
+      "exitCondition": "The turn substrate consumes interactions' published contracts instead of its private projection implementation."
     },
     {
       "from": "client/features/turn/application/turn-commands.ts",
       "to": "client/features/sessions/application/session-commands.ts",
       "owner": "T21 (退役迁移形式)",
-      "exitCondition": "The turn substrate moves to client/features/turn/application/ and consumes sessions' published contracts."
+      "exitCondition": "The turn substrate consumes sessions' published contracts instead of its private command implementation."
     },
     {
       "from": "client/features/turn/application/turn-commands.ts",
       "to": "client/features/composer/application/composer-workflows.ts",
       "owner": "T21 (退役迁移形式)",
-      "exitCondition": "The turn substrate moves to client/features/turn/application/ and consumes composer's published contracts."
+      "exitCondition": "The turn substrate consumes composer's published contracts instead of its private workflow implementation."
     },
     {
       "from": "client/features/turn/projection/stream-recovery.ts",
       "to": "client/features/transcript/projection/message-projection.ts",
       "owner": "T21 (退役迁移形式)",
-      "exitCondition": "The turn substrate moves to client/features/turn/projection/ and consumes transcript's published contracts."
+      "exitCondition": "The turn substrate consumes transcript's published contracts instead of its private projection implementation."
     },
     {
       "from": "client/features/turn/projection/stream-recovery.ts",
       "to": "client/features/composer/projection/context-usage.ts",
       "owner": "T21 (退役迁移形式)",
-      "exitCondition": "The turn substrate moves to client/features/turn/projection/ and consumes composer's published contracts."
+      "exitCondition": "The turn substrate consumes composer's published contracts instead of its private projection implementation."
     },
     {
       "from": "client/features/turn/projection/stream-state.ts",
       "to": "client/features/workspace/projection/workspace-progress.ts",
       "owner": "T21 (退役迁移形式)",
-      "exitCondition": "The turn substrate moves to client/features/turn/projection/ and consumes workspace's published contracts."
+      "exitCondition": "The turn substrate consumes workspace's published contracts instead of its private projection implementation."
     }
   ]
 }

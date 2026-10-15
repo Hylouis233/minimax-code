@@ -23,7 +23,6 @@ import {
 } from "./webui-boundary-constants.mjs";
 
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
-const webuiPackagePath = path.join(repositoryRoot, WEBUI_PACKAGE_DIRECTORY);
 
 export const TERMINAL_RENDERER_RE = /^packages\/tui\/src\/tui\//u;
 
@@ -36,33 +35,21 @@ export function rewriteInputs(rawInputs, { rootDir = repositoryRoot } = {}) {
 }
 
 function resolveKey(key, rootDir) {
-  if (path.isAbsolute(key)) {
-    const relative = path.relative(rootDir, key);
-    return relative.startsWith("..") ? key : relative || key;
-  }
-  if (
-    key === WEBUI_PACKAGE_DIRECTORY ||
-    key.startsWith(`${WEBUI_PACKAGE_DIRECTORY}/`)
-  ) {
-    return key;
-  }
-  // esbuild records every key relative to `absWorkingDir`
-  // (`packages/webui/`). Resolve `../...` and `../../node_modules/...` against
-  // the package directory so the trailing segments match the literal prefixes
-  // declared by the boundary rules below.
-  const joined = path.join(webuiPackagePath, key);
-  const relative = path.relative(rootDir, joined);
-  if (!relative.startsWith("..") && !path.isAbsolute(relative))
-    return relative;
-  return key;
+  const paths = /^[A-Za-z]:[\\/]/u.test(rootDir) ? path.win32 : path;
+  const posix = (value) => value.replaceAll("\\", "/");
+  const normalized = posix(key);
+  if (normalized === WEBUI_PACKAGE_DIRECTORY || normalized.startsWith(`${WEBUI_PACKAGE_DIRECTORY}/`)) return normalized;
+  const absolute = paths.isAbsolute(key) ? key : paths.resolve(rootDir, WEBUI_PACKAGE_DIRECTORY, key);
+  const relative = paths.relative(rootDir, absolute);
+  return posix(relative.startsWith("..") || paths.isAbsolute(relative) ? absolute : relative);
 }
 
 export function serverAndClientEntriesPresent(inputs) {
   const sources = Object.keys(inputs);
   const violations = [];
-  if (!sources.some((source) => source.endsWith("/server/index.ts")))
+  if (!sources.includes(`${WEBUI_PACKAGE_DIRECTORY}/src/server/index.ts`))
     violations.push("server entry packages/webui/src/server/index.ts missing");
-  if (!sources.some((source) => source.endsWith("/client/main.tsx")))
+  if (!sources.includes(`${WEBUI_PACKAGE_DIRECTORY}/src/client/main.tsx`))
     violations.push("client entry packages/webui/src/client/main.tsx missing");
   return { pass: violations.length === 0, violations };
 }
@@ -96,11 +83,15 @@ export function forbiddenInternalReferences(
   for (const input of Object.keys(inputs)) {
     if (input.startsWith("node_modules/")) continue;
     const absolute = path.join(rootDir, input);
-    if (!existsSync(absolute)) continue;
+    if (!existsSync(absolute)) {
+      violations.push(`${input}: build input is missing`);
+      continue;
+    }
     let text;
     try {
       text = readFileSync(absolute, "utf8");
-    } catch {
+    } catch (error) {
+      violations.push(`${input}: cannot read build input (${error.code ?? error.message})`);
       continue;
     }
     if (INTERNAL_HOST_RE.test(text)) {
@@ -137,6 +128,7 @@ export function onlyAllowedPublicEntries(inputs, packageExports) {
     if (input.startsWith("node_modules/")) continue;
     if (input.startsWith(`${WEBUI_PACKAGE_DIRECTORY}/`)) continue;
     if (allowed.has(input)) continue;
+    if ([...allowed].some((entry) => entry.endsWith("/") && input.startsWith(entry))) continue;
     violations.push(`${input}: not an allowed WebUI build entry`);
   }
   return { pass: violations.length === 0, violations };

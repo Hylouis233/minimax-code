@@ -21,6 +21,68 @@ import { compareVersions, releaseCli } from '../scripts/release-cli.mjs';
 import { compareRuns, exitCodeForStatus, renderReport, spread, validateRun, validateRequest, validateToolOutput, median, selectScenarios } from '../scripts/perf/report.mjs';
 import { copyMcodeToolsArtifact, downloadMcodeToolsArtifact, MCODE_TOOLS_ARTIFACT } from '../scripts/lib/mcode-tools-artifact.mjs';
 import { checkWindowsSourceLocation, runWindowsSourceLocationCheck } from '../scripts/check-windows-source-location.mjs';
+import { renderNavigation, renderCommandSurface } from '../scripts/lib/webui-source-index.mjs';
+import { recordBuildIntegrity, verifyBuildIntegrity } from '../scripts/lib/webui-build-integrity.mjs';
+import { validateExceptionLedger, sourceFingerprint } from '../scripts/lib/webui-dependency-rules.mjs';
+
+test('permanent loader approval follows tokens rather than line numbers', () => {
+  const loader = 'const entry = new URL("./embedded/cli.mjs", import.meta.url); await import(entry.href);';
+  assert.equal(sourceFingerprint('loader.ts', loader), sourceFingerprint('loader.ts', `// comment\n\n${loader}`));
+  assert.notEqual(sourceFingerprint('loader.ts', loader), sourceFingerprint('loader.ts', loader.replace('./embedded/cli.mjs', './other/cli.mjs')));
+});
+
+test('WebUI artifact integrity rejects changed sources, changed output and absent records', t => {
+  const root = mkdtempSync(path.join(tmpdir(), 'webui-integrity-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const source = path.join(root, 'packages/webui/src/client/main.tsx');
+  const output = path.join(root, 'dist-webui/client/client.js');
+  mkdirSync(path.dirname(source), { recursive: true });
+  mkdirSync(path.dirname(output), { recursive: true });
+  writeFileSync(source, 'export const value = 1');
+  writeFileSync(output, 'const value = 1');
+  const metafile = { inputs: { 'src/client/main.tsx': {} }, outputs: { '../../dist-webui/client/client.js': {} } };
+  assert.throws(() => verifyBuildIntegrity(root, metafile), /record missing/);
+  metafile.integrity = recordBuildIntegrity(root, metafile);
+  verifyBuildIntegrity(root, metafile);
+  writeFileSync(source, 'export const value = 2');
+  assert.throws(() => verifyBuildIntegrity(root, metafile), /Stale or modified/);
+  writeFileSync(source, 'export const value = 1');
+  writeFileSync(output, 'const value = 2');
+  assert.throws(() => verifyBuildIntegrity(root, metafile), /Stale or modified/);
+});
+
+test('WebUI exception ledgers require rationale, ownership and unique edges', () => {
+  assert.throws(() => validateExceptionLedger([{ from: 'a', to: 'b' }], ['reason']), /reason/);
+  assert.throws(() => validateExceptionLedger([{ from: 'a', to: 'b', owner: 'T01' }], ['owner', 'exitCondition']), /exitCondition/);
+  const entry = { from: 'a', to: 'b', reason: 'Reviewed contract' };
+  assert.throws(() => validateExceptionLedger([entry, entry], ['reason']), /Duplicate/);
+  validateExceptionLedger([entry], ['reason']);
+});
+
+test('WebUI source index discovers new modules, ignores empty homes and retains both populated homes', t => {
+  const root = mkdtempSync(path.join(tmpdir(), 'webui-index-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const put = (name, body) => { mkdirSync(path.dirname(path.join(root, name)), { recursive: true }); writeFileSync(path.join(root, name), body); };
+  mkdirSync(path.join(root, 'contracts/new-business'), { recursive: true });
+  put('features/new-business/contracts/commands.ts', 'export interface Base { send(id: string): void }; export interface Commands extends Base { stop(): void }');
+  put('features/new-business/application/owner.ts', 'export interface Owner { start(): void }; export const run = (id: string) => id;');
+  put('features/new-business/contracts/public.ts', 'export { Commands as PublicCommands } from "./commands";');
+  put('application/new-business/other.ts', 'export interface Other { read(): number }');
+  const navigation = renderNavigation(root);
+  assert.match(navigation, /new-business/);
+  assert.match(navigation, /client\/features\/new-business\/contracts\//);
+  assert.doesNotMatch(navigation, /`client\/contracts\/new-business\//);
+  assert.match(navigation, /client\/application\/new-business\//);
+  assert.match(navigation, /client\/features\/new-business\/application\//);
+  const before = renderCommandSurface(root, {});
+  assert.match(before, /Commands.send/);
+  assert.match(before, /PublicCommands.send/);
+  assert.match(before, /owner.ts.*run.*string/);
+  put('features/new-business/contracts/commands.ts', 'export interface Base { send(id: number): Promise<boolean> }; export interface Commands extends Base { stop(): void }');
+  const after = renderCommandSurface(root, {});
+  assert.notEqual(after, before);
+  assert.match(after, /Commands.send.*number/);
+});
 
 test('Windows source preflight accepts local NTFS without parsing fsutil display text', () => {
   for (const fsutilOutput of ['E: - Fixed Drive\r\n', 'E: - Festplatte\r\n', new Error('Error 5: Access is denied')]) {
