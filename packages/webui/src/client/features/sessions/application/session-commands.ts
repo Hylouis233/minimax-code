@@ -52,7 +52,7 @@ import type {
   WebuiStreamPhaseCommands,
   WebuiTurnCommandWriter,
   WebuiTurnLifecycleCommands,
-} from "../contracts/turn-command-views.js";
+} from "../../turn/contracts/turn-command-views.js";
 
 export function createWebuiStreamPhaseCommands(
   targets: WebuiStreamPhaseTargets,

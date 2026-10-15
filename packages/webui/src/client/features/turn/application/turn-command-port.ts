@@ -11,7 +11,7 @@
 // (`client/application/turn-command-wiring.ts`) and hands it to the commands.
 //
 // Only the members `turn-commands.ts` calls appear here. The shapes are the
-// published ones: the views come from `features/sessions/contracts/turn-command-views.ts`
+// published ones: the views come from `features/turn/contracts/turn-command-views.ts`
 // and the submit objects from `composer/contracts/composer-turn.ts`.
 
 import type { WebuiSessionWriter, WebuiHomeSessionWriter } from "../../../application/session-store.js";
@@ -23,7 +23,7 @@ import type {
   WebuiStreamPhaseCommands,
   WebuiTurnCommandWriter,
   WebuiTurnLifecycleCommands,
-} from "../../sessions/contracts/turn-command-views.js";
+} from "../contracts/turn-command-views.js";
 
 /** The store writer a turn's command adapter is built over. */
 type WebuiTurnWriterTarget = WebuiSessionWriter | WebuiHomeSessionWriter;

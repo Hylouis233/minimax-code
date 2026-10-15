@@ -1,17 +1,19 @@
-// The command views a session's record writer is bound to, published so a caller
-// outside the sessions business can name them (plan §5.3 rule 2: composition
-// supplies a peer command dependency where a direct import would form a business
-// implementation cycle).
+// The command views a session's record writer is bound to, published from Turn
+// because the execution substrate is what drives them (plan §5.5 P02 step 2:
+// "the stream-phase and turn-lifecycle implementations and their
+// `WebuiStreamPhaseCommands` / `WebuiTurnLifecycleCommands` contracts move to
+// Turn").
 //
-// The factories that build these views stay in
-// `features/sessions/application/session-commands.ts`: each needs the stream loop
-// mechanism or the stream-state transforms, so no contracts module can hold them.
-// The turn substrate drives them without importing the sessions business's
-// implementation — composition injects the factories, and these are the shapes it
-// and the interactions coordinator name.
+// Sessions' `session-commands.ts` builds these views — each factory needs the
+// stream loop mechanism or the stream-state transforms, so it stays an
+// implementation — and the substrate drives them by these names. Publishing them
+// here is what lets the substrate name its own dependencies instead of having
+// composition hand them in (`turn-command-port.ts` is the injection this
+// replaces), and it keeps the phase/lifecycle vocabulary in one home rather than
+// two.
 
-import type { WebuiStreamLoopSink } from "../../turn/contracts/stream-loop.js";
-import type { WebuiStreamState } from "../../turn/contracts/stream-state.js";
+import type { WebuiStreamLoopSink } from "./stream-loop.js";
+import type { WebuiStreamState } from "./stream-state.js";
 
 /** The phases the stream slice can be moved to by name. */
 export type WebuiStreamPhase = WebuiStreamState["phase"];

@@ -28,7 +28,7 @@ import type {
   WebuiTurnSendIntent,
 } from "../contracts/turn-commands.js";
 export type { WebuiConversationTurnCommands, WebuiTurnSendIntent } from "../contracts/turn-commands.js";
-import type { WebuiTurnCommandWriter } from "../../sessions/contracts/turn-command-views.js";
+import type { WebuiTurnCommandWriter } from "../contracts/turn-command-views.js";
 import type { WebuiComposerSubmitHandlers } from "../../composer/contracts/composer-turn.js";
 import type { WebuiTurnCommandCollaborators } from "./turn-command-port.js";
 import { isWebuiSubscriptionProbeCurrent, ownsWebuiStreamGeneration, resolveWebuiSubscriptionRecheck, type WebuiStreamState } from "../projection/stream-state.js";
