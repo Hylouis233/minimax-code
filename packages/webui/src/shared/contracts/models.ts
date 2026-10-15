@@ -190,3 +190,84 @@ export interface WebuiDiscoveredModel {
   readonly modelId: string;
   readonly displayName?: string;
 }
+
+/* ------------------------------------------------------------------ *
+ * Provider reads (P04b / D04).
+ *
+ * Closed on purpose: these describe a payload the runtime actually sends
+ * (`ModelProviderView` in `local-runtime-v2`'s model-system contracts), so an
+ * index signature here would make `provider.revision` and `provider.headers`
+ * typecheck when the real fields are `configRevision` and `headerNames` — the
+ * two misspellings this DTO exists to stop.
+ * ------------------------------------------------------------------ */
+
+/** The cached status of one provider or model, as the runtime reports it. */
+export interface WebuiModelCacheStatus {
+  readonly state: string;
+  readonly lastTestedAt?: number;
+  readonly lastErrorCode?: string;
+  readonly lastErrorMessage?: string;
+}
+
+/**
+ * One model under a provider. `providerId`/`modelConfigId` and the capability
+ * flags are the runtime's; the model pickers read `displayName`, `enabled`,
+ * `selected` and `thinking`.
+ */
+export interface WebuiModelProviderModelEntry {
+  readonly providerId: string;
+  readonly modelId: string;
+  readonly modelConfigId: string;
+  readonly displayName: string;
+  readonly configurationSource?: "manual" | "discovered";
+  readonly enabled: boolean;
+  readonly selected: boolean;
+  readonly contextLimit?: number;
+  readonly defaultContextLimit?: number;
+  readonly thinking?: { readonly effort?: string };
+  readonly contextWindowOptions?: readonly number[];
+  readonly contextWindowOptionHints?: Readonly<Record<string, "higher_usage">>;
+  readonly maxOutputTokens?: number;
+  readonly effortOptions?: readonly string[];
+  readonly defaultEffort?: string;
+  readonly supportedVariants?: readonly string[];
+  readonly thinkingConfig?: {
+    readonly mode: "switchable" | "forced_on" | "forced_off" | "hidden";
+    readonly default_value?: "true" | "false";
+  };
+  readonly variant?: string;
+  readonly providerSource?: string;
+  readonly providerKind?: string;
+  readonly providerName?: string;
+  readonly apiFormat?: string;
+  readonly modalities?: {
+    readonly input?: readonly string[];
+    readonly output?: readonly string[];
+  };
+  readonly status?: WebuiModelCacheStatus;
+}
+
+/**
+ * One configured provider.
+ *
+ * `headerNames` is **names only** and `maskedApiKey` is masked: raw saved
+ * credential values are deliberately never sent, so the editor reconstructs a
+ * saved header row from its name and keeps the stored value unless the row is
+ * renamed or removed.
+ */
+export interface WebuiModelProviderView {
+  readonly providerId: string;
+  readonly name: string;
+  readonly source: string;
+  readonly kind: string;
+  readonly enabled: boolean;
+  readonly baseUrl?: string;
+  readonly apiFormat?: string;
+  readonly hasApiKey: boolean;
+  readonly maskedApiKey?: string;
+  readonly headerNames?: readonly string[];
+  /** The revision a candidate write must carry to be accepted. */
+  readonly configRevision?: string;
+  readonly models: readonly WebuiModelProviderModelEntry[];
+  readonly status?: WebuiModelCacheStatus;
+}

@@ -12,6 +12,7 @@ import type {
 import type {
   WebuiCreateUserModelProviderRequest,
   WebuiDiscoverUserModelsCandidateRequest,
+  WebuiModelProviderView,
   WebuiSaveUserModelProviderCandidateRequest,
   WebuiTestUserModelCandidateRequest,
   WebuiUpdateUserModelProviderRequest,
@@ -27,7 +28,7 @@ function validateProviderId(name: string, body: unknown): WebuiOperationValidati
 }
 function providerRecordOperation(name: string): WebuiOperation<Record<string, unknown>, unknown> { return { name, validate: (body) => validateProviderRecord(name, body) }; }
 
-export const listUserModelProvidersOperation: WebuiOperation<undefined, readonly Record<string, unknown>[]> = { name: LIST_USER_MODEL_PROVIDERS_OPERATION_NAME, validate: (body) => body === undefined ? { ok: true, body: undefined } : { ok: false, code: WebuiErrorCode.invalidBody, message: `${LIST_USER_MODEL_PROVIDERS_OPERATION_NAME} does not accept a body` } };
+export const listUserModelProvidersOperation: WebuiOperation<undefined, readonly WebuiModelProviderView[]> = { name: LIST_USER_MODEL_PROVIDERS_OPERATION_NAME, validate: (body) => body === undefined ? { ok: true, body: undefined } : { ok: false, code: WebuiErrorCode.invalidBody, message: `${LIST_USER_MODEL_PROVIDERS_OPERATION_NAME} does not accept a body` } };
 export const createUserModelProviderOperation: WebuiOperation<WebuiCreateUserModelProviderRequest, unknown> = {
   name: CREATE_USER_MODEL_PROVIDER_OPERATION_NAME,
   validate: createUserModelProviderValidator,

@@ -10,7 +10,11 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import type { WebuiModelEntry } from "../../src/shared/contracts/models.js";
+import type {
+  WebuiModelEntry,
+  WebuiModelProviderModelEntry,
+  WebuiModelProviderView,
+} from "../../src/shared/contracts/models.js";
 
 import { createWebuiModelsWorkflows } from "../../src/client/features/models/application/models-workflows.js";
 
@@ -21,13 +25,35 @@ const build = (
   refreshApiKeyStatus = noStatusRefresh,
 ) => createWebuiModelsWorkflows({ port, refreshApiKeyStatus });
 
+/** A provider row shaped like the one the `listUserModelProviders` read returns. */
+const providerRow = (
+  overrides: Partial<WebuiModelProviderView> & { readonly providerId: string },
+): WebuiModelProviderView => ({
+  name: overrides.providerId,
+  source: "custom",
+  kind: "custom",
+  enabled: true,
+  hasApiKey: true,
+  models: [],
+  ...overrides,
+});
+
+const modelRow = (modelId: string, enabled: boolean): WebuiModelProviderModelEntry => ({
+  providerId: "a",
+  modelId,
+  modelConfigId: modelId,
+  displayName: modelId,
+  enabled,
+  selected: false,
+});
+
 describe("a provider change", () => {
   it("re-reads the provider list and marks the model list stale", async () => {
-    let providers: readonly Record<string, unknown>[] = [{ providerId: "a" }];
+    let providers: readonly WebuiModelProviderView[] = [providerRow({ providerId: "a" })];
     const workflows = build({
       listUserModelProviders: async () => providers,
       createUserModelProvider: async () => {
-        providers = [...providers, { providerId: "b" }];
+        providers = [...providers, providerRow({ providerId: "b" })];
         return { ok: true };
       },
     });
@@ -44,40 +70,39 @@ describe("a provider change", () => {
 
 describe("an optimistic provider patch stays the owner's", () => {
   it("shows the patched models at once and the reload is the truth", async () => {
-    let providers: readonly Record<string, unknown>[] = [
-      { providerId: "a", models: [{ modelId: "m1", enabled: true }] },
+    let providers: readonly WebuiModelProviderView[] = [
+      providerRow({ providerId: "a", models: [modelRow("m1", true)] }),
     ];
     const workflows = build({
       listUserModelProviders: async () => providers,
       updateUserModelProvider: async (body) => {
-        providers = [{ providerId: "a", models: body.models as readonly WebuiModelEntry[] }];
+        providers = [
+          providerRow({
+            providerId: "a",
+            models: (body.models ?? []).map((entry) => modelRow(entry.modelId, entry.enabled ?? true)),
+          }),
+        ];
         return { ok: true };
       },
     });
 
     await workflows.loadProviders();
-    workflows.patchProviderModels("a", [{ modelId: "m1", enabled: false }]);
-    expect(
-      (workflows.getSnapshot().providers.value?.[0]?.models as readonly WebuiModelEntry[])[0]
-        ?.enabled,
-    ).toBe(false);
+    workflows.patchProviderModels("a", [modelRow("m1", false)]);
+    expect(workflows.getSnapshot().providers.value?.[0]?.models[0]?.enabled).toBe(false);
   });
 
   it("reloads the truth when the write fails", async () => {
     const workflows = build({
       listUserModelProviders: async () => [
-        { providerId: "a", models: [{ modelId: "m1", enabled: true }] },
+        providerRow({ providerId: "a", models: [modelRow("m1", true)] }),
       ],
       updateUserModelProvider: async () => Promise.reject(new Error("nope")),
     });
 
     await workflows.loadProviders();
-    workflows.patchProviderModels("a", [{ modelId: "m1", enabled: false }]);
+    workflows.patchProviderModels("a", [modelRow("m1", false)]);
     await expect(workflows.updateProvider({ providerId: "a" })).rejects.toThrow("nope");
-    expect(
-      (workflows.getSnapshot().providers.value?.[0]?.models as readonly WebuiModelEntry[])[0]
-        ?.enabled,
-    ).toBe(true);
+    expect(workflows.getSnapshot().providers.value?.[0]?.models[0]?.enabled).toBe(true);
   });
 });
 

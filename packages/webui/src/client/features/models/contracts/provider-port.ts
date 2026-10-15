@@ -11,6 +11,7 @@ import type {
   WebuiCreateUserModelProviderRequest,
   WebuiDiscoverUserModelsCandidateRequest,
   WebuiModelEntry,
+  WebuiModelProviderView,
   WebuiSaveUserModelProviderCandidateRequest,
   WebuiTestUserModelCandidateRequest,
   WebuiUpdateUserModelProviderRequest,
@@ -24,7 +25,7 @@ export interface ModelsPort {
   readonly selectModel?: (
     request: WebuiModelSelectionRequest,
   ) => Promise<{ readonly success?: boolean }>;
-  readonly listUserModelProviders?: () => Promise<readonly Record<string, unknown>[]>;
+  readonly listUserModelProviders?: () => Promise<readonly WebuiModelProviderView[]>;
   readonly createUserModelProvider?: (
     request: WebuiCreateUserModelProviderRequest,
   ) => Promise<unknown>;

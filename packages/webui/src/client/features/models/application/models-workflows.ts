@@ -31,6 +31,8 @@ import type {
   WebuiCreateUserModelProviderRequest,
   WebuiDiscoverUserModelsCandidateRequest,
   WebuiModelEntry,
+  WebuiModelProviderModelEntry,
+  WebuiModelProviderView,
   WebuiSaveUserModelProviderCandidateRequest,
   WebuiTestUserModelCandidateRequest,
   WebuiUpdateUserModelProviderRequest,
@@ -65,7 +67,7 @@ export interface WebuiModelsWorkflowsState {
   /** Bumps when the model list must be re-read (a provider or a selection changed). */
   readonly modelsRevision: number;
   readonly models: WebuiQueryState<readonly WebuiModelEntry[]>;
-  readonly providers: WebuiQueryState<readonly Record<string, unknown>[]>;
+  readonly providers: WebuiQueryState<readonly WebuiModelProviderView[]>;
   readonly presets: WebuiQueryState<readonly Record<string, unknown>[]>;
 }
 
@@ -102,7 +104,7 @@ export interface WebuiModelsWorkflows {
    */
   readonly patchProviderModels: (
     providerId: string,
-    models: readonly Record<string, unknown>[],
+    models: readonly WebuiModelProviderModelEntry[],
   ) => void;
   readonly createProvider: (
     body: WebuiCreateUserModelProviderRequest,
@@ -172,7 +174,7 @@ export function createWebuiModelsWorkflows(deps: {
   //   * the provider list is keyed by the configuration generation;
   //   * the presets are global, so their key is empty.
   const catalogue = createWebuiKeyedResource<readonly WebuiModelEntry[]>();
-  const providerList = createWebuiKeyedResource<readonly Record<string, unknown>[]>();
+  const providerList = createWebuiKeyedResource<readonly WebuiModelProviderView[]>();
   const presetList = createWebuiKeyedResource<readonly Record<string, unknown>[]>();
   const PRESETS_KEY: WebuiResourceKey = {};
   // Which catalogue key the snapshot shows. Switching it is not a re-key of the
@@ -296,7 +298,7 @@ export function createWebuiModelsWorkflows(deps: {
 
   const patchProviderModels = (
     providerId: string,
-    models: readonly Record<string, unknown>[],
+    models: readonly WebuiModelProviderModelEntry[],
   ): void => {
     const entry = providerList.read(providerKey());
     const providers = entry?.value;
@@ -305,7 +307,7 @@ export function createWebuiModelsWorkflows(deps: {
     // is the truth and the patched value never becomes a second source.
     providerList.commit(providerList.capture(providerKey()), {
       status: "ready",
-      value: providers.map((provider: Record<string, unknown>) =>
+      value: providers.map((provider) =>
         provider.providerId === providerId ? { ...provider, models } : provider,
       ),
     });

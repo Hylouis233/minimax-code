@@ -26,6 +26,8 @@ import { reorderModelIds } from "../projection/model-reorder.js";
 import { projectProviderHeaders, type ProviderHeaderDraft } from "../projection/usage-settings.js";
 import type {
   WebuiDiscoverUserModelsCandidateRequest,
+  WebuiModelProviderModelEntry,
+  WebuiModelProviderView,
   WebuiSaveUserModelProviderCandidateRequest,
   WebuiTestUserModelCandidateRequest,
   WebuiUpdateUserModelProviderRequest,
@@ -57,7 +59,10 @@ export interface WebuiProviderFormCommands {
   readonly updateProvider: (
     body: WebuiUpdateUserModelProviderRequest,
   ) => Promise<unknown>;
-  readonly patchProviderModels: (providerId: string, models: readonly Record<string, unknown>[]) => void;
+  readonly patchProviderModels: (
+    providerId: string,
+    models: readonly WebuiModelProviderModelEntry[],
+  ) => void;
 }
 
 /**
@@ -65,7 +70,7 @@ export interface WebuiProviderFormCommands {
  * reads them and writes each field back through its setter.
  */
 export interface WebuiProviderFormPanelProps {
-  readonly providers: readonly Record<string, unknown>[];
+  readonly providers: readonly WebuiModelProviderView[];
   readonly presets: readonly Record<string, unknown>[];
   readonly commands: WebuiProviderFormCommands;
   /** The list-level error channel the parent owns, so a failed write lands where its retry is. */
@@ -86,24 +91,23 @@ export interface WebuiProviderFormPanelProps {
   readonly setDraftTested: Dispatch<SetStateAction<boolean>>;
   readonly skipTest: boolean;
   readonly setSkipTest: Dispatch<SetStateAction<boolean>>;
-  readonly providerPendingDelete?: Record<string, unknown>;
-  readonly setProviderPendingDelete: Dispatch<SetStateAction<Record<string, unknown> | undefined>>;
+  readonly providerPendingDelete?: WebuiModelProviderView;
+  readonly setProviderPendingDelete: Dispatch<SetStateAction<WebuiModelProviderView | undefined>>;
 }
 
-function providerModels(provider: Record<string, unknown>): Record<string, unknown>[] {
-  return Array.isArray(provider.models) ? provider.models.filter((item): item is Record<string, unknown> => item !== null && typeof item === "object") : [];
+function providerModels(provider?: WebuiModelProviderView): readonly WebuiModelProviderModelEntry[] {
+  return provider?.models ?? [];
 }
 
 /**
- * The provider rows the catalogue read hands back are open records; a model
- * reorder or toggle writes them back as declared model inputs. The id is read
- * out explicitly because it is the one field a model input requires and the row
- * is not yet typed at this boundary.
+ * A model reorder or toggle writes the rows it read back as model inputs. The
+ * spread keeps every field the runtime sent, so a write never erases a model's
+ * configuration on the way through the editor.
  */
 function toModelInputs(
-  rows: readonly Record<string, unknown>[],
+  rows: readonly WebuiModelProviderModelEntry[],
 ): readonly WebuiUserModelInput[] {
-  return rows.map((row) => ({ ...row, modelId: textOf(row.modelId) }));
+  return rows.map((row) => ({ ...row, modelId: row.modelId }));
 }
 
 function ProviderPresetPicker({ presets, selected, selectedName, onSelect }: { readonly presets: readonly Record<string, unknown>[]; readonly selected: string; readonly selectedName: string; readonly onSelect: (preset?: Record<string, unknown>) => void }): ReactElement {
@@ -147,15 +151,18 @@ export function ProviderFormPanel({
   const [formBusy, setFormBusy] = useState(false);
   const [formError, setFormError] = useState<string>();
 
-    const openProviderForm = async (provider?: Record<string, unknown>) => {
+    const openProviderForm = async (provider?: WebuiModelProviderView) => {
       setFormError(undefined); setDraftTested(false); setSkipTest(false);
       setEditingProvider(provider ? textOf(provider.providerId) : undefined);
       setSelectedPresetId(undefined);
       setDraftName(textOf(provider?.name)); setDraftBaseUrl(textOf(provider?.baseUrl));
-      setDraftApiFormat(textOf(provider?.apiFormat) || "openai-completions"); setDraftModelId(providerModels(provider ?? {}).map((model) => textOf(model.modelId)).filter(Boolean).join("\n"));
-      const entries = Object.entries(recordOf(provider?.headers));
-      setOriginalHeaderNames(entries.map(([name]) => name));
-      setDraftHeaders(entries.map(([name, value], index) => ({ id: `${textOf(provider?.providerId) || "new"}-${index}`, name, value: String(value), persistedName: name })));
+      setDraftApiFormat(textOf(provider?.apiFormat) || "openai-completions"); setDraftModelId(providerModels(provider).map((model) => textOf(model.modelId)).filter(Boolean).join("\n"));
+      // The read carries header **names** only — the runtime never sends saved
+      // values — so a saved row starts blank and keeps whatever is stored unless
+      // its row is renamed or removed (`projectProviderHeaders`).
+      const headerNames = provider?.headerNames ?? [];
+      setOriginalHeaderNames(headerNames);
+      setDraftHeaders(headerNames.map((name, index) => ({ id: `${textOf(provider?.providerId) || "new"}-${index}`, name, value: "", persistedName: name })));
       setDraftApiKey(""); setShowProviderForm(true);
       try { await commands.loadPresets(); }
       catch (error) { setFormError(error instanceof Error ? error.message : String(error)); }
@@ -168,7 +175,7 @@ export function ProviderFormPanel({
       const headerProjection = projectProviderHeaders(draftHeaders, originalHeaderNames);
       return {
         ...(editingProvider ? { providerId: editingProvider } : {}),
-        ...(editingProvider && typeof providers.find((provider) => provider.providerId === editingProvider)?.revision === "string" ? { expectedRevision: textOf(providers.find((provider) => provider.providerId === editingProvider)?.revision) } : {}),
+        ...(editingProvider && providers.find((provider) => provider.providerId === editingProvider)?.configRevision ? { expectedRevision: textOf(providers.find((provider) => provider.providerId === editingProvider)?.configRevision) } : {}),
         name: draftName.trim(), baseUrl: draftBaseUrl.trim(), apiKey: draftApiKey,
         apiFormat: draftApiFormat,
         ...headerProjection,
@@ -201,8 +208,8 @@ export function ProviderFormPanel({
       catch (error) { setFormError(error instanceof Error ? error.message : String(error)); }
       finally { setFormBusy(false); }
     };
-    const toggleModel = async (providerId: string, model: Record<string, unknown>, enabled: boolean) => {
-      const nextModels = providerModels(providers.find((provider) => provider.providerId === providerId) ?? {}).map((candidate) =>
+    const toggleModel = async (providerId: string, model: WebuiModelProviderModelEntry, enabled: boolean) => {
+      const nextModels = providerModels(providers.find((provider) => provider.providerId === providerId)).map((candidate) =>
         candidate.modelId === model.modelId ? { ...candidate, enabled } : candidate,
       );
       // Show the toggle immediately; the owner reloads the truth after the write
@@ -228,7 +235,7 @@ export function ProviderFormPanel({
             const over = event.over?.id; const active = event.active.id;
             if (!over || active === over) return;
             const orderedIds = reorderModelIds(ids, String(active), String(over));
-            const nextModels = orderedIds.map((modelId) => models[ids.indexOf(modelId)]).filter((model): model is Record<string, unknown> => model !== undefined);
+            const nextModels = orderedIds.map((modelId) => models[ids.indexOf(modelId)]).filter((model): model is WebuiModelProviderModelEntry => model !== undefined);
             // Optimistic like the toggle: the row moves at once, the write
             // follows, and a failure reloads the truth.
             commands.patchProviderModels(id, nextModels);
@@ -242,7 +249,7 @@ export function ProviderFormPanel({
         <div className="webui-provider-form-body">
           {!editingProvider ? <div className="webui-provider-form-provider-grid"><label className="webui-provider-form-field">提供商<ProviderPresetPicker presets={presets} selected={selectedPresetId ?? ""} selectedName={selectedPresetId && selectedPresetId !== "__other__" ? draftName : ""} onSelect={(preset) => { if (!preset) { setSelectedPresetId("__other__"); setDraftName(""); setDraftBaseUrl(""); setDraftApiFormat("openai-completions"); setDraftModelId(""); return; } setSelectedPresetId(textOf(preset.providerId)); setDraftName(textOf(preset.name)); setDraftBaseUrl(textOf(preset.baseUrl)); setDraftApiFormat(textOf(preset.apiFormat)); setDraftModelId(""); }} /></label>{selectedPresetId === "__other__" ? <label className="webui-provider-form-field">提供商名称<input aria-label="提供商名称" value={draftName} onChange={(event) => setDraftName(event.target.value)} required /></label> : null}</div> : null}
           {editingProvider ? <label className="webui-provider-form-field">提供商名称<input value={draftName} onChange={(event) => setDraftName(event.target.value)} required /></label> : null}
-          <div className="webui-provider-form-provider-grid"><label className="webui-provider-form-field">API 格式<input value={draftApiFormat} onChange={(event) => setDraftApiFormat(event.target.value)} /></label><label className="webui-provider-form-field">接口地址<input value={draftBaseUrl} onChange={(event) => setDraftBaseUrl(event.target.value)} required />{editingProvider && providers.find((provider) => provider.providerId === editingProvider)?.revision ? <button type="button" disabled={!commands.canManageProviders || formBusy} onClick={async () => { const provider = providers.find((item) => item.providerId === editingProvider); try { const result = await commands.discoverCandidate({ providerId: editingProvider, expectedRevision: textOf(provider?.revision), baseUrl: draftBaseUrl }); if (Array.isArray(result) && result.length) setDraftModelId(result.map((item) => textOf(recordOf(item).modelId)).filter(Boolean).join("\n")); } catch (error) { setFormError(error instanceof Error ? error.message : String(error)); } }}>自动获取</button> : null}</label></div>
+          <div className="webui-provider-form-provider-grid"><label className="webui-provider-form-field">API 格式<input value={draftApiFormat} onChange={(event) => setDraftApiFormat(event.target.value)} /></label><label className="webui-provider-form-field">接口地址<input value={draftBaseUrl} onChange={(event) => setDraftBaseUrl(event.target.value)} required />{editingProvider && providers.find((provider) => provider.providerId === editingProvider)?.configRevision ? <button type="button" disabled={!commands.canManageProviders || formBusy} onClick={async () => { const provider = providers.find((item) => item.providerId === editingProvider); try { const result = await commands.discoverCandidate({ providerId: editingProvider, expectedRevision: textOf(provider?.configRevision), baseUrl: draftBaseUrl }); if (Array.isArray(result) && result.length) setDraftModelId(result.map((item) => textOf(recordOf(item).modelId)).filter(Boolean).join("\n")); } catch (error) { setFormError(error instanceof Error ? error.message : String(error)); } }}>自动获取</button> : null}</label></div>
           <label className="webui-provider-form-field">API Key<input type="password" value={draftApiKey} onChange={(event) => { setDraftApiKey(event.target.value); setDraftTested(false); }} placeholder={editingProvider ? "留空保留原值" : ""} required={!editingProvider} /></label>
           <label className="webui-provider-form-field">模型名称<textarea value={draftModelId} onChange={(event) => { setDraftModelId(event.target.value); setDraftTested(false); }} required /></label>
           <div className="webui-provider-form-headers"><div className="text-[13px] font-medium leading-5 text-text_default_primary">自定义 Headers</div>{draftHeaders.map((header) => <div key={header.id} className="webui-provider-form-header-row"><input aria-label="Header 名称" placeholder="Header 名称" value={header.name} onChange={(event) => setDraftHeaders((items) => items.map((item) => item.id === header.id ? { ...item, name: event.target.value } : item))} /><input aria-label="Header 值" placeholder={header.persistedName ? "留空保留原值" : "Header 值"} value={header.value} onChange={(event) => setDraftHeaders((items) => items.map((item) => item.id === header.id ? { ...item, value: event.target.value } : item))} /><IconButton label="移除 Header" onClick={() => setDraftHeaders((items) => items.filter((item) => item.id !== header.id))}><path d="M9.80273 1.80527C10.605 1.80541 11.2549 2.45615 11.2549 3.2584V4.35606H14.666C14.9422 4.35606 15.166 4.57991 15.166 4.85606C15.1658 5.132 14.942 5.35606 14.666 5.35606H12.8096L12.7861 5.68027L12.3281 11.9645C12.2362 13.2214 11.1891 14.1948 9.92871 14.1949H5.99414C4.72231 14.1949 3.67 13.2045 3.59277 11.9352L3.21387 5.67442L3.19434 5.35606H1.33301C1.05715 5.3559 0.833241 5.1319 0.833008 4.85606C0.833008 4.58001 1.057 4.35622 1.33301 4.35606H4.74512V3.2584C4.74512 2.45607 5.39591 1.80527 6.19824 1.80527H9.80273ZM4.21191 5.61387L4.59082 11.8746C4.63603 12.6162 5.25109 13.1949 5.99414 13.1949H9.92871C10.6649 13.1948 11.2761 12.6263 11.3301 11.8922L11.7891 5.60801L11.8076 5.35606H4.19629L4.21191 5.61387ZM6.19824 2.80527C5.9482 2.80527 5.74512 3.00835 5.74512 3.2584V4.35606H10.2549V3.2584C10.2549 3.00844 10.0527 2.80541 9.80273 2.80527H6.19824Z" /></IconButton></div>)}<button type="button" className="webui-provider-form-add-header" onClick={() => setDraftHeaders((items) => [...items, { id: `new-${Date.now()}-${items.length}`, name: "", value: "" }])}>＋ 添加 Header</button></div>
@@ -254,7 +261,7 @@ export function ProviderFormPanel({
   </>;
 }
 
-function SortableModelRow({ id, model, onTest, onToggle }: { readonly id: string; readonly model: Record<string, unknown>; readonly onTest: () => void; readonly onToggle: (enabled: boolean) => void }): ReactElement {
+function SortableModelRow({ id, model, onTest, onToggle }: { readonly id: string; readonly model: WebuiModelProviderModelEntry; readonly onTest: () => void; readonly onToggle: (enabled: boolean) => void }): ReactElement {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const enabled = model.enabled !== false;
   return <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.55 : undefined, position: "relative", zIndex: isDragging ? 1 : undefined }} data-testid={`settings-custom-model-row-${textOf(model.modelId)}`}>

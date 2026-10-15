@@ -95,6 +95,7 @@ import {
   setMemorySettingsOperation,
 } from "./memory-settings.js";
 import { archiveSessionOperation, deleteSessionOperation, updateSessionOperation, getSessionForkOptionsOperation, forkSessionOperation } from "./session.js";
+import { toWebuiModelProviderViews } from "../projections/model-provider.js";
 import { listUserModelProvidersOperation, createUserModelProviderOperation, updateUserModelProviderOperation, deleteUserModelProviderOperation, testUserModelProviderOperation, testUserModelOperation, discoverUserModelsCandidateOperation, saveUserModelProviderCandidateOperation, listProviderPresetsOperation, getMiniMaxApiKeyStatusOperation, upsertMiniMaxApiKeyOperation, getCodexOAuthStatusOperation, getMiniMaxModelSourceOperation, setMiniMaxModelSourceOperation, testUserModelCandidateOperation, revealModelProviderApiKeyOperation, startCodexOAuthLoginOperation, cancelCodexOAuthLoginOperation, refreshModelsOperation } from "./provider.js";
 import {
   getSigninPanelOperation,
@@ -582,7 +583,9 @@ export const WEBUI_OPERATION_BINDINGS = {
   )({
     operation: listUserModelProvidersOperation,
     args: () => [],
-    result: identity,
+    // The runtime declares this read as untyped rows; the projection is what
+    // makes the wire contract's `WebuiModelProviderView` true (D04).
+    result: toWebuiModelProviderViews,
   }),
   createUserModelProvider: bind("providers")("createUserModelProvider")(
     "createUserModelProvider",

@@ -192,6 +192,7 @@ import type {
   WebuiCreateUserModelProviderRequest,
   WebuiDiscoverUserModelsCandidateRequest,
   WebuiModelEntry,
+  WebuiModelProviderView,
   WebuiSaveUserModelProviderCandidateRequest,
   WebuiSkillEntry,
   WebuiTestUserModelCandidateRequest,
@@ -497,7 +498,7 @@ export interface OperationSpec {
   forkSession: { request: WebuiForkSessionRequest; response: WebuiForkSessionResult };
   listUserModelProviders: {
     request: undefined;
-    response: readonly Record<string, unknown>[];
+    response: readonly WebuiModelProviderView[];
   };
   createUserModelProvider: { request: WebuiCreateUserModelProviderRequest; response: unknown };
   updateUserModelProvider: { request: WebuiUpdateUserModelProviderRequest; response: unknown };

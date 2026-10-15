@@ -6,6 +6,7 @@ import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
 import { formatResetLabel, getActiveSourceBadge, type ProviderHeaderDraft } from "../../../features/models/projection/usage-settings.js";
 import { IconButton, RefreshIcon } from "./settings-atoms.js";
 import { ProviderFormPanel, type WebuiProviderFormCommands } from "../../../features/models/ui/ProviderFormPanel.js";
+import type { WebuiModelProviderView } from "../../../../shared/contracts/models.js";
 
 type Props = {
   readonly sessionId?: string;
@@ -57,7 +58,7 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
   const [providerActionError, setProviderActionError] = useState<string>();
   const [oauthError, setOauthError] = useState<string>();
   const [oauthLoginId, setOauthLoginId] = useState<string>();
-  const [providerPendingDelete, setProviderPendingDelete] = useState<Record<string, unknown>>();
+  const [providerPendingDelete, setProviderPendingDelete] = useState<WebuiModelProviderView>();
   const [draftName, setDraftName] = useState("");
   const [draftBaseUrl, setDraftBaseUrl] = useState("");
   const [draftApiKey, setDraftApiKey] = useState("");
