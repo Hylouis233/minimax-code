@@ -121,7 +121,10 @@ describe("explicit Fast transport controls", () => {
 
 async function resolveFixture(
   api: Api,
-  mode: NonNullable<LocalModelConfig["fast"]>["mode"],
+  // `undefined` models the unconfigured case: no `fast` block on the model at
+  // all, which is the only state that reaches the resolver with nothing to
+  // resolve. Every other caller passes an explicit mode.
+  mode: NonNullable<LocalModelConfig["fast"]>["mode"] | undefined,
   effort: string,
   modelId = "synthetic-model",
   enabled = true,
@@ -129,7 +132,7 @@ async function resolveFixture(
   const modelConfig: LocalModelConfig = {
     reasoning: true,
     thinking: { effortOptions: ["low", "high", "max", "ultra"] },
-    fast: { enabled, mode },
+    ...(mode === undefined ? {} : { fast: { enabled, mode } }),
     limit: { context: 120_000, output: 12_000 },
   };
   const agentConfig: IAgentConfig = {
@@ -427,6 +430,35 @@ describe("Anthropic Fast final SDK request headers", () => {
   });
 });
 
+describe("Ultra capability does not route Fast", () => {
+  it("sends an ultra-capable model identically whether Fast is unset or explicitly disabled", async () => {
+    // Both captures resolve through `LocalModelResolver` and reach the wire
+    // through the real `pi-ai` `streamSimple` serializer, so a leak inside
+    // resolution reaches the payload instead of being re-derived here.
+    const unset = await captureResolvedAnthropicRequest(undefined, true);
+    const disabled = await captureResolvedAnthropicRequest("anthropic-fast", false);
+
+    for (const { headers, payload } of [unset, disabled]) {
+      expect(payload).not.toHaveProperty("speed");
+      expect(payload).not.toHaveProperty("service_tier");
+      expect(anthropicBetaTokens(headers)).not.toContain(
+        "fast-mode-2026-02-01",
+      );
+      expect(payload.output_config).toMatchObject({ effort: "ultra" });
+      expect(payload.model).toBe("synthetic-model");
+      // The pre-existing Fast assertions all sit in fixtures that enabled Fast
+      // explicitly; only these two states prove Ultra buys nothing on the wire.
+      expect(headers.get("Existing")).toBe("kept");
+    }
+
+    // Independence, stated exactly: native reasoning is byte-identical whether
+    // Fast was never configured or was explicitly turned off.
+    expect(JSON.stringify(unset.payload.output_config)).toBe(
+      JSON.stringify(disabled.payload.output_config),
+    );
+  });
+});
+
 async function captureAnthropicFastRequest(apiKey: string, enabled: boolean) {
   const { llm, agentConfig } = await resolveFixture(
     "anthropic-messages",
@@ -514,4 +546,91 @@ async function captureAnthropicFastRequest(apiKey: string, enabled: boolean) {
   expect(unexpectedNetwork).not.toHaveBeenCalled();
   expect(captured).toBeDefined();
   return captured!;
+}
+
+/**
+ * Capture the request `LocalModelResolver` itself prepares. Unlike
+ * `captureAnthropicFastRequest`, which feeds `resolveFastRequestOptions`
+ * directly into `streamSimple` to unit-test that parser, this helper takes both
+ * the headers and the prepared request patch from the resolver, so anything the
+ * resolver infers on its own reaches the serialized request.
+ */
+async function captureResolvedAnthropicRequest(
+  mode: NonNullable<LocalModelConfig["fast"]>["mode"] | undefined,
+  enabled: boolean,
+) {
+  const { llm, agentConfig } = await resolveFixture(
+    "anthropic-messages",
+    mode,
+    "ultra",
+    "synthetic-model",
+    enabled,
+  );
+  const transform = buildLocalRequestPayloadTransform(
+    {
+      agentConfig: { ...agentConfig },
+      llm,
+      sessionId: "synthetic-session",
+      signal: new AbortController().signal,
+    },
+    {},
+  );
+  const context: Context = {
+    messages: [{ role: "user", content: "Synthetic request", timestamp: 1 }],
+    tools: [
+      {
+        name: "read",
+        description: "Synthetic tool",
+        parameters: Type.Object({ path: Type.String() }),
+      },
+    ],
+  };
+  let captured:
+    | { headers: Headers; payload: Record<string, unknown> }
+    | undefined;
+  const fetchImpl = vi.fn(
+    async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+      const request = new Request(input, init);
+      captured = {
+        headers: request.headers,
+        payload: JSON.parse(await request.text()) as Record<string, unknown>,
+      };
+      // Same terminal response as the sibling capture: the real SDK has
+      // serialized the request, no live endpoint or token is involved.
+      return new Response(
+        JSON.stringify({
+          type: "error",
+          error: {
+            type: "invalid_request_error",
+            message: "Synthetic capture complete",
+          },
+        }),
+        { status: 400, headers: { "content-type": "application/json" } },
+      );
+    },
+  );
+  const unexpectedNetwork = vi.fn(() => {
+    throw new Error("Only the injected capture fetch is allowed");
+  });
+  vi.stubGlobal("fetch", unexpectedNetwork);
+  const result = await streamSimple(llm.model, context, {
+    apiKey: "synthetic-key",
+    headers: llm.headers,
+    fetch: fetchImpl,
+    maxRetries: 0,
+    reasoning: "ultra",
+    onPayload: transform,
+  }).result();
+  expect(result.stopReason).toBe("error");
+  expect(fetchImpl).toHaveBeenCalledTimes(1);
+  expect(unexpectedNetwork).not.toHaveBeenCalled();
+  expect(captured).toBeDefined();
+  return captured!;
+}
+
+function anthropicBetaTokens(headers: Headers): string[] {
+  return (headers.get("anthropic-beta") ?? "")
+    .split(",")
+    .map((token) => token.trim())
+    .filter(Boolean);
 }
