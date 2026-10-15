@@ -154,10 +154,10 @@ export interface WebuiApplicationDeps {
   /**
    * The port the turn capability slice is cut from — the composition root's
    * closure over the transport (plan §8 Phase 1 step 1). The slice is built
-   * here, not by the component that submits a turn intent, so `attachTurn` /
-   * `sendTurn` / `stopTurn` receive no capability from their caller. Absent on
-   * a host with nothing wired (SSR, unit tests), which is exactly the state
-   * the loop's absent-capability guards exist for.
+   * here, not by the component that invokes a turn command, so a submission
+   * receives no capability from its caller. Absent on a host with nothing wired
+   * (SSR, unit tests), which is exactly the state the loop's absent-capability
+   * guards exist for.
    */
   readonly turnCapabilities?: WebuiTurnCapabilityPort;
   /**
@@ -294,6 +294,15 @@ export interface WebuiApplication {
   readonly deliveries: WebuiDeliveryDisposers;
   readonly events: WebuiEventCoordinator;
   readonly turns: WebuiTurnCoordinator;
+  /**
+   * The conversation command set for one session (or the home slot), built by this
+   * application and shared by every surface that drives a turn: the event
+   * coordinator's attach and recheck routes, the composer controller's
+   * submissions, and the session binding that hands it to a component. It is the
+   * one construction, so a binding reads this instead of assembling a second one
+   * (plan §5.1, P02 step 8).
+   */
+  readonly turnCommandsFor: (sessionId: string | undefined) => WebuiConversationTurnCommands;
   /** The published turn capability slice (send / resume / load / stop). */
   readonly turnCapabilities: WebuiTurnCapabilitySlice;
   /** The one owner of a turn's diff query and revert/reapply (T10). */
@@ -479,13 +488,31 @@ export function createWebuiApplication(
   const notify = <T>(listeners: Set<(value: T) => void>, value: T): void => {
     for (const listener of [...listeners]) listener(value);
   };
-  /**
-   * The conversation command set for one session, built on demand: the attach
-   * and recheck routes are the application's, so a `session.start` is followed
-   * whether or not a composer is mounted (T05).
-   */
-  const turnCommands = new Map<string, WebuiConversationTurnCommands>();
   let composerController: WebuiComposerController | undefined;
+  /**
+   * The conversation command set for one session, built on demand and deliberately
+   * **not** cached (plan §5.1: "Stateless identity-bound facades may be returned
+   * without an unbounded per-session command map"). Each set is a closure over the
+   * store and the shared owners and holds no state of its own, so a map would only
+   * accumulate one entry per session this client ever commanded.
+   *
+   * The attach and recheck routes are the application's, so a `session.start` is
+   * followed whether or not a composer is mounted (T05); and because this is the
+   * application's one construction, a binding reads it instead of building a
+   * second one (P02 step 8).
+   */
+  const turnCommandsFor = (sessionId: string | undefined): WebuiConversationTurnCommands =>
+    createWebuiConversationTurnCommands({
+      store,
+      sessionId,
+      ...(deps.turnCapabilities ? { capabilities: turnCapabilities } : {}),
+      deliveries,
+      scope: sessionScope,
+      // The one creation owner (P01 step 4): a first message's session is created by the task use
+      // case, which reserves the admission, transfers the home record under its guards and answers
+      // whether the created session may be selected.
+      taskSessions: taskSessionWorkflows,
+    });
   /**
    * The one reconciliation entry point (plan §4.4): the same owner routes the
    * event path uses, so selection and reconnect do not run a second one.
@@ -495,29 +522,6 @@ export function createWebuiApplication(
     interactions.owner(sessionId).invalidatePendingReads();
     void interactions.owner(sessionId).refresh();
     void goals.owner(sessionId).refreshGoal();
-  };
-  /**
-   * The peer command factories every turn command set here drives (plan §5.3
-   * rule 2). Built once: the substrate's port is the same object for every
-   * session, so constructing it per session would only add wiring sites.
-   */
-  const turnCommandsFor = (sessionId: string | undefined): WebuiConversationTurnCommands => {
-    const key = sessionId ?? WEBUI_HOME_SESSION_KEY;
-    const existing = turnCommands.get(key);
-    if (existing) return existing;
-    const commands = createWebuiConversationTurnCommands({
-      store,
-      sessionId,
-      ...(deps.turnCapabilities ? { capabilities: turnCapabilities } : {}),
-      deliveries,
-      scope: sessionScope,
-      // The one creation owner (P01 step 4): a first message's session is created by the task use
-      // case, which reserves the admission, transfers the home record under its guards and answers
-      // whether the created session may be selected. Declared below, and read here per send.
-      taskSessions: taskSessionWorkflows,
-    });
-    turnCommands.set(key, commands);
-    return commands;
   };
   const events = createWebuiEventCoordinator({
     store,
@@ -564,8 +568,8 @@ export function createWebuiApplication(
     ...deps.turns,
   });
   // The slice is cut once, here, from the port the composition root holds. A
-  // caller of `attachTurn` / `sendTurn` / `stopTurn` never supplies a
-  // capability again (plan §8 Phase 1 step 1).
+  // caller of a conversation command never supplies a capability again
+  // (plan §8 Phase 1 step 1).
   const turnCapabilities = createWebuiTurnCapabilitySlice(
     deps.turnCapabilities ?? {},
   );
@@ -793,6 +797,7 @@ export function createWebuiApplication(
     interactions,
     events,
     turns,
+    turnCommandsFor,
     turnCapabilities,
     turnReview,
     transcriptHistory,
@@ -854,7 +859,6 @@ export function createWebuiApplication(
       workspaceGitListeners.clear();
       channelReadyListeners.clear();
       dirtyResources.clear();
-      turnCommands.clear();
       composerController?.dispose();
       store.dispose();
       channel?.close?.();

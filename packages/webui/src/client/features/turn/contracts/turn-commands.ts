@@ -1,5 +1,9 @@
 import type { WebuiAttachmentInput } from "../../../../shared/contracts/messages.js";
 import type { WebuiSubmissionOperation } from "./submission.js";
+import type {
+  WebuiStreamPhaseCommands,
+  WebuiTurnLifecycleCommands,
+} from "./turn-command-views.js";
 
 export interface WebuiComposerTurnCallbacks {
   readonly onDraftChange: (next: string) => void;
@@ -37,4 +41,13 @@ export interface WebuiConversationTurnCommands {
   readonly recheck: (turnId: string | undefined) => void;
   readonly recover: () => void;
   readonly stop: () => Promise<void>;
+  /**
+   * The stream-phase and turn-lifecycle views for this target (ticket #58), built
+   * from the owner's own record writer. A consumer handed one of them cannot reach
+   * the other's writes, and neither can reach the store directly — and because the
+   * owner builds them, a surface hands out no writer of its own and assembles no
+   * second command context (plan §5.1, P02 step 8).
+   */
+  readonly phase: WebuiStreamPhaseCommands;
+  readonly lifecycle: WebuiTurnLifecycleCommands;
 }

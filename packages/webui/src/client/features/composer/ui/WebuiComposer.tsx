@@ -301,10 +301,7 @@ export function WebuiComposer({
 
   const { dom } = useWebuiBrowserCapabilities();
   const { stream, sending } = useWebuiSessionState(sessionId);
-  const {
-    lifecycle,
-    stopTurn,
-  } = useWebuiSessionCommands(sessionId);
+  const turnCommands = useWebuiSessionCommands(sessionId);
   // The per-session effects registry the shell provides (ticket #45). The
   // composer registers this session's event handlers here so the application
   // event coordinator — the sole consumer of the process-event channel — runs
@@ -494,10 +491,10 @@ export function WebuiComposer({
       const snapshot = readContextUsageSnapshot(page.contextSnapshot);
       const fromMessages = latestContextUsage((page.messages ?? []).map(projectWebuiMessageToStreamMessage));
       const contextUsage = snapshot ?? fromMessages;
-      if (contextUsage) lifecycle.setContextUsage(contextUsage);
+      if (contextUsage) turnCommands?.lifecycle.setContextUsage(contextUsage);
     }).catch(() => undefined);
     return () => { cancelled = true; };
-  }, [sessionId, sessionStatus, transcriptHistory]);
+  }, [sessionId, sessionStatus, transcriptHistory, turnCommands]);
 
   useEffect(() => {
     let cancelled = false;
@@ -670,9 +667,9 @@ export function WebuiComposer({
     setInteractionError(undefined);
     try {
       // The stop capability comes from the application's turn capability
-      // slice, inside the binding; this component submits the intent only
-      // (ticket #57).
-      await stopTurn();
+      // slice, inside the owner; this component invokes the command only
+      // (ticket #57, P02 step 8).
+      await turnCommands?.stop();
     } catch (error) {
       setInteractionError(
         error instanceof Error ? error.message : String(error),

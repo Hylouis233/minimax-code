@@ -1,51 +1,48 @@
-// The binding's own contribution to the turn seam (U43; ticket #57).
+// The session binding's contribution to the turn seam (U43; ticket #57; P02 step 8).
 //
-// `webui-application-commands.test.ts` drives `sendWebuiTurn` and
-// `attachWebuiTurn` directly, and `webui-shell.test.ts` renders the shell — but
-// nothing crossed `useWebuiSessionCommands` itself, so the four things the hook
-// is responsible for went unverified: that `readStream` reads the *live* store
-// slice rather than a snapshot, that an attachment's sink is minted from the
-// store's writer (so its frames and its `sending` flag land in the store), that
-// the live slice is what refuses a second attachment to a session that is
-// already streaming, and that `undefined` routes to the home slot.
+// `webui-application-commands.test.ts` drives `sendWebuiTurn` and `attachWebuiTurn`
+// directly, and `webui-shell.test.ts` renders the shell. What is this file's own
+// subject is the binding: that `useWebuiSessionCommands` hands out the
+// *application's* one command set instead of assembling a second one, and that the
+// commands it hands out are the ones the application's own routes depend on — the
+// live stream read behind the attach guard, the store-backed sink, the
+// absent-capability refusals, and the home slot.
 //
-// Ticket #57 added a fifth: the hook now takes its capabilities from the
-// application's published turn capability slice, so an intent call site supplies
-// none. The tests below therefore hand capabilities to the *application*, never
-// to `attachTurn` / `sendTurn`, and pin the two consequences that matter — an
-// unwired resume refuses without starting a stream, an unwired send refuses
-// without setting `sending`, and a capability smuggled into an intent object at
-// runtime is ignored.
+// Before P02 step 8 the hook built its own context: it chose the record key, built
+// the store writer, cut the transports out of the capability slice and assembled the
+// two view objects. The behaviour cases below are kept, because the behaviour has to
+// survive the move; what changed is who constructs it, and the first two cases pin
+// that.
 //
-// The package has no DOM and no `react-test-renderer`, but it does not need
-// either: `useMemo` runs during SSR, so a probe component rendered inside the
-// providers hands the test the hook's return value.
+// The package has no DOM and no `react-test-renderer`, but it does not need either:
+// `useMemo` runs during SSR, so a probe component rendered inside the providers
+// hands the test the hook's return value.
 
 import { describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { WebuiApplicationProvider } from "../../src/client/bindings/application-context.js";
 import {
-  useWebuiSessionCommands,
-  type WebuiTurnAttachIntent,
-  type WebuiTurnSendIntent,
-} from "../../src/client/bindings/use-session-state.js";
+  WebuiApplicationProvider,
+  WebuiSessionStoreProvider,
+} from "../../src/client/bindings/application-context.js";
+import { useWebuiSessionCommands } from "../../src/client/bindings/use-session-state.js";
 import { createWebuiApplication } from "../../src/client/application/create-application.js";
 import {
   createWebuiSessionStore,
   type WebuiSessionStore,
 } from "../../src/client/application/session-store.js";
+import { WEBUI_HOME_SESSION_KEY } from "../../src/client/application/state.js";
 import type { WebuiTurnCapabilityPort } from "../../src/client/features/turn/application/turn-capabilities.js";
+import type { WebuiTurnSendIntent } from "../../src/client/features/turn/contracts/turn-commands.js";
 import type { WebuiStreamFrame } from "../../src/shared/contracts/stream.js";
 
 const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
 /**
  * Render the binding over a store and the application that owns it. The turn
- * capabilities arrive through `turnCapabilities` — the composition root's
- * slice — because an intent call site has no way to hand the hook one
- * (ticket #57).
+ * capabilities arrive through `turnCapabilities` — the composition root's slice —
+ * because a command call site has no way to hand one in (ticket #57).
  */
 function commandsFor(
   sessionId: string | undefined,
@@ -61,6 +58,9 @@ function commandsFor(
     turnCapabilities: capabilities,
   });
   application.start();
+  // The binding must read the application's owner rather than build one, so the
+  // accessor is observable here.
+  const accessor = vi.spyOn(application, "turnCommandsFor");
   let captured: ReturnType<typeof useWebuiSessionCommands> | undefined;
   function Probe() {
     captured = useWebuiSessionCommands(sessionId);
@@ -73,6 +73,25 @@ function commandsFor(
     }),
   );
   if (!captured) throw new Error("the probe did not render");
+  return { commands: captured, accessor };
+}
+
+/** The same probe with no application: a store-only render (SSR, a bare fixture). */
+function commandsWithoutApplication(sessionId: string | undefined, store: WebuiSessionStore) {
+  let captured: ReturnType<typeof useWebuiSessionCommands> | undefined;
+  let rendered = false;
+  function Probe() {
+    captured = useWebuiSessionCommands(sessionId);
+    rendered = true;
+    return null;
+  }
+  renderToStaticMarkup(
+    createElement(WebuiSessionStoreProvider, {
+      store,
+      children: createElement(Probe),
+    }),
+  );
+  if (!rendered) throw new Error("the probe did not render");
   return captured;
 }
 
@@ -92,39 +111,45 @@ function pendingResumer() {
   return { resumeSession, release: () => release() };
 }
 
-describe("readStream", () => {
-  it("reads the slice the store holds now, not the one it held at render", () => {
+describe("the binding's command set", () => {
+  it("reads the application's own command set rather than building one", () => {
     const store = createWebuiSessionStore();
-    const { readStream } = commandsFor("s1", store);
-    expect(readStream().phase).toBe("idle");
-    // A write from anywhere else — the transcript owner, a projection, another
-    // binding — has to be visible to this reader. A captured snapshot would
-    // still say "idle" here, and every guard built on it would be blind.
-    store.createSessionWriter({ kind: "session", sessionId: "s1" }).setStream((current) => ({
-      ...current,
-      phase: "streaming",
-    }));
-    expect(readStream().phase).toBe("streaming");
+    const { commands, accessor } = commandsFor("s1", store);
+    // The binding asked the application, for this session, exactly once — and what
+    // it hands out is what the application built (plan §5.1, P02 step 8).
+    expect(accessor).toHaveBeenCalledTimes(1);
+    expect(accessor).toHaveBeenCalledWith("s1");
+    expect(typeof commands.send).toBe("function");
+    expect(typeof commands.attach).toBe("function");
+    expect(typeof commands.stop).toBe("function");
+    // The two views come from the same owner, so a component holds no writer.
+    expect(typeof commands.phase.settleStoppedStream).toBe("function");
+    expect(typeof commands.lifecycle.setContextUsage).toBe("function");
+  });
+
+  it("hands out nothing at all when the host has no application", () => {
+    const store = createWebuiSessionStore();
+    // No application means no execution owner. The hook says so instead of
+    // assembling a second owner to keep a store-only fixture working.
+    expect(commandsWithoutApplication("s1", store)).toBeUndefined();
+    expect(commandsWithoutApplication(undefined, store)).toBeUndefined();
   });
 
   it("routes an undefined session to the home slot, not to a session key", () => {
     const store = createWebuiSessionStore();
-    const { readStream } = commandsFor(undefined, store);
-    store.createSessionWriter({ kind: "home" }).setStream((current) => ({
-      ...current,
-      phase: "streaming",
-    }));
-    expect(readStream().phase).toBe("streaming");
-    expect(store.readSession("s1").stream.phase).toBe("idle");
+    const { commands } = commandsFor(undefined, store);
+    commands.lifecycle.setTurnSending(true);
+    expect(store.readSession(WEBUI_HOME_SESSION_KEY).sending).toBe(true);
+    expect(store.readSession("s1").sending).toBe(false);
   });
 });
 
-describe("attachTurn", () => {
+describe("attach", () => {
   it("mints its sink from the store writer, so frames and sending land in the store", async () => {
     const store = createWebuiSessionStore();
     const { resumeSession } = pendingResumer();
-    const commands = commandsFor("s1", store, { resumeSession });
-    commands.attachTurn({ turnId: "t1" });
+    const { commands } = commandsFor("s1", store, { resumeSession });
+    commands.attach("t1");
     await flush();
     expect(resumeSession).toHaveBeenCalledTimes(1);
     // The resume body names the session. `turnId` is not part of it: the loop
@@ -142,10 +167,10 @@ describe("attachTurn", () => {
   it("refuses a second attachment while the first is live, because it reads the live slice", async () => {
     const store = createWebuiSessionStore();
     const { resumeSession } = pendingResumer();
-    const commands = commandsFor("s1", store, { resumeSession });
-    commands.attachTurn({ turnId: "t1" });
+    const { commands } = commandsFor("s1", store, { resumeSession });
+    commands.attach("t1");
     await flush();
-    commands.attachTurn({ turnId: "t2" });
+    commands.attach("t2");
     await flush();
     // `attachWebuiTurn` returns early when `readStream().subscription` is set.
     // That guard only works if the reader is live — a snapshot of the idle slice
@@ -156,27 +181,24 @@ describe("attachTurn", () => {
   it("refuses when the application wires no resume capability, without starting a stream", async () => {
     const store = createWebuiSessionStore();
     // The capability exists here, but it is NOT in the application's slice — so
-    // the intent has no way to reach it. That is the guard's whole point.
+    // the command has no way to reach it. That is the guard's whole point.
     const { resumeSession } = pendingResumer();
-    const commands = commandsFor("s1", store);
-    commands.attachTurn({ turnId: "t1" });
+    const { commands } = commandsFor("s1", store);
+    commands.attach("t1");
     await flush();
     expect(resumeSession).not.toHaveBeenCalled();
     expect(store.readSession("s1").sending).toBe(false);
     expect(store.readSession("s1").stream.phase).toBe("idle");
   });
 
-  it("ignores a capability smuggled into the intent object at runtime", async () => {
+  it("ignores a capability smuggled in where the turn id belongs", async () => {
     const store = createWebuiSessionStore();
     const { resumeSession } = pendingResumer();
-    const commands = commandsFor("s1", store);
-    // A cast defeats the type the way a plain-JavaScript caller would. The
-    // runtime path has to be as narrow as the type: the hook reads the slice,
-    // not the object it was handed.
-    commands.attachTurn({
-      turnId: "t1",
-      resumeSession,
-    } as unknown as WebuiTurnAttachIntent);
+    const { commands } = commandsFor("s1", store);
+    // A cast defeats the type the way a plain-JavaScript caller would. The runtime
+    // path has to be as narrow as the type: the owner reads the slice, not the
+    // object it was handed.
+    commands.attach({ turnId: "t1", resumeSession } as unknown as string);
     await flush();
     expect(resumeSession).not.toHaveBeenCalled();
     expect(store.readSession("s1").sending).toBe(false);
@@ -185,25 +207,25 @@ describe("attachTurn", () => {
   it("does nothing without a session", async () => {
     const store = createWebuiSessionStore();
     const { resumeSession } = pendingResumer();
-    const home = commandsFor(undefined, store, { resumeSession });
-    home.attachTurn({ turnId: "t1" });
+    const { commands } = commandsFor(undefined, store, { resumeSession });
+    commands.attach("t1");
     await flush();
     expect(resumeSession).not.toHaveBeenCalled();
   });
 });
 
-describe("sendTurn", () => {
+describe("send", () => {
   it("sends through the application's capability slice", async () => {
     const store = createWebuiSessionStore();
     const sendMessage = vi.fn(
       async (_request: { readonly id: string; readonly content: string }) =>
         undefined,
     );
-    const commands = commandsFor("s1", store, { sendMessage });
-    await commands.sendTurn({
+    const { commands } = commandsFor("s1", store, { sendMessage });
+    await commands.send({
       message: "你好",
       sending: false,
-      onDraftChange: () => undefined,
+      callbacks: { onDraftChange: () => undefined },
     });
     expect(sendMessage).toHaveBeenCalledTimes(1);
     expect(sendMessage.mock.calls[0]?.[0]).toEqual({ id: "s1", content: "你好" });
@@ -213,11 +235,11 @@ describe("sendTurn", () => {
     const store = createWebuiSessionStore();
     // Again the capability exists and the slice does not carry it.
     const sendMessage = vi.fn(async () => undefined);
-    const commands = commandsFor("s1", store);
-    await commands.sendTurn({
+    const { commands } = commandsFor("s1", store);
+    await commands.send({
       message: "你好",
       sending: false,
-      onDraftChange: () => undefined,
+      callbacks: { onDraftChange: () => undefined },
     });
     expect(sendMessage).not.toHaveBeenCalled();
     expect(store.readSession("s1").sending).toBe(false);
@@ -227,11 +249,11 @@ describe("sendTurn", () => {
   it("ignores a capability bag smuggled into the intent object at runtime", async () => {
     const store = createWebuiSessionStore();
     const sendMessage = vi.fn(async () => undefined);
-    const commands = commandsFor("s1", store);
-    await commands.sendTurn({
+    const { commands } = commandsFor("s1", store);
+    await commands.send({
       message: "你好",
       sending: false,
-      onDraftChange: () => undefined,
+      callbacks: { onDraftChange: () => undefined },
       deps: { sendMessage },
     } as unknown as WebuiTurnSendIntent);
     expect(sendMessage).not.toHaveBeenCalled();
@@ -239,13 +261,13 @@ describe("sendTurn", () => {
   });
 });
 
-describe("stopTurn", () => {
+describe("stop", () => {
   it("aborts through the slice and settles the local stream", async () => {
     const store = createWebuiSessionStore();
     const abortSession = vi.fn(async () => ({ success: true }));
-    const commands = commandsFor("s1", store, { abortSession });
+    const { commands } = commandsFor("s1", store, { abortSession });
     store.createSessionWriter({ kind: "session", sessionId: "s1" }).setSending(true);
-    await commands.stopTurn();
+    await commands.stop();
     expect(abortSession).toHaveBeenCalledWith({ id: "s1" });
     expect(store.readSession("s1").sending).toBe(false);
     expect(store.readSession("s1").stream.phase).toBe("done");
@@ -254,43 +276,36 @@ describe("stopTurn", () => {
   it("does nothing when the application wires no stop capability", async () => {
     const store = createWebuiSessionStore();
     const abortSession = vi.fn(async () => ({ success: true }));
-    const commands = commandsFor("s1", store);
-    await commands.stopTurn();
+    const { commands } = commandsFor("s1", store);
+    await commands.stop();
     expect(abortSession).not.toHaveBeenCalled();
   });
 });
 
 /**
- * The intent types, checked as types, and the checks are total rather than
+ * The published intent type, checked as a type, and the check is total rather than
  * "the literal I happened to write".
  *
- * `AttachIntentCapabilityFields` is `never` as long as neither intent declares
- * a capability field; if one is ever added, that type becomes that literal, the
- * `... extends never ? true : never` collapses to `never`, and the `const`
- * below stops compiling under `pnpm typecheck:webui-full`. `keyof` reads the
- * *declared* surface, so this holds for every caller rather than for the one
- * object literal a test might write.
+ * `SendIntentCapabilityFields` is `never` as long as the intent declares no
+ * capability field; if one is ever added, that type becomes that literal, the
+ * `... extends never ? true : never` collapses to `never`, and the `const` below
+ * stops compiling under `pnpm typecheck:webui-full`. `keyof` reads the *declared*
+ * surface, so this holds for every caller rather than for the one object literal a
+ * test might write. The attach command takes a bare turn id, which has no fields to
+ * check.
  */
-type AttachIntentCapabilityFields = Extract<
-  keyof WebuiTurnAttachIntent,
-  "resumeSession" | "loadMessages" | "sendMessage" | "deps" | "sink"
->;
 type SendIntentCapabilityFields = Extract<
   keyof WebuiTurnSendIntent,
   "resumeSession" | "loadMessages" | "sendMessage" | "deps" | "sink" | "createWriter"
 >;
 type OnlyTrue<T extends true> = T;
 
-const attachIntentRejectsCapabilities: OnlyTrue<
-  AttachIntentCapabilityFields extends never ? true : never
-> = true;
 const sendIntentRejectsCapabilities: OnlyTrue<
   SendIntentCapabilityFields extends never ? true : never
 > = true;
 
-describe("the published intent types", () => {
-  it("declare no capability field", () => {
-    expect(attachIntentRejectsCapabilities).toBe(true);
+describe("the published intent type", () => {
+  it("declares no capability field", () => {
     expect(sendIntentRejectsCapabilities).toBe(true);
   });
 });

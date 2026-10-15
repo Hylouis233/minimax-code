@@ -330,6 +330,19 @@ export function createWebuiConversationTurnCommands(
       : store.createSessionWriter({ kind: "home" });
   const writerFor = (): WebuiTurnCommandWriter => createWebuiTurnCommands(storeWriterFor());
 
+  /**
+   * The published views (ticket #58), bound to a writer of this owner's own. A
+   * surface used to build these — and the writer behind them — itself, which made
+   * every binding a second construction of the same two objects; they are built
+   * here instead and handed out through the contract.
+   */
+  const viewWriter = storeWriterFor();
+  const phase = createWebuiStreamPhaseCommands({ setStream: viewWriter.setStream });
+  const lifecycle = createWebuiTurnLifecycleCommands({
+    setStream: viewWriter.setStream,
+    setSending: viewWriter.setSending,
+  });
+
   /** The live slice. The home→session migration changes which key this reads. */
   const readStream = (): WebuiStreamState =>
     store.readSession(sessionId ?? WEBUI_HOME_SESSION_KEY).stream;
@@ -462,12 +475,6 @@ export function createWebuiConversationTurnCommands(
     },
     stop: async () => {
       if (!sessionId || !capabilities?.stop) return;
-      const writer = storeWriterFor();
-      const lifecycle = createWebuiTurnLifecycleCommands({
-        setStream: writer.setStream,
-        setSending: writer.setSending,
-      });
-      const phase = createWebuiStreamPhaseCommands({ setStream: writer.setStream });
       await stopWebuiTurn({
         abortSession: capabilities.stop,
         sessionId,
@@ -475,5 +482,7 @@ export function createWebuiConversationTurnCommands(
         settleStream: phase.settleStoppedStream,
       });
     },
+    phase,
+    lifecycle,
   };
 }
