@@ -4239,6 +4239,7 @@
     "test/webui-browser/model-picker-interactions.spec.mjs",
     "test/webui-browser/plugin-catalogue-layout.spec.mjs",
     "test/webui-browser/plugin-mcp-status.spec.mjs",
+    "test/webui-browser/provider-form.spec.mjs",
     "test/webui-browser/questionnaire.spec.mjs",
     "test/webui-browser/rail-archive.spec.mjs",
     "test/webui-browser/rail-context-menu.spec.mjs",

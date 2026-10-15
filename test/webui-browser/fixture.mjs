@@ -83,6 +83,16 @@ export function installFixtureTransport() {
   // block (`{}` — the default — has no signedIn field and reads as signed
   // in but quota-less, not as signed out).
   let usageQuotaResult = {};
+  // The custom-provider surface. `listUserModelProviders` answers the closed read
+  // view the models workflow consumes, so a spec seeds the providers it wants. The
+  // candidate operations answer synthetic success and are asserted through
+  // `requests`: after a write the workflow reloads the truth, so a fixture that
+  // mutated its own list would be asserting a server the client cannot have.
+  let modelProviders = [];
+  let providerPresets = [];
+  let candidateTestResult = { ok: true };
+  let candidateSaveResult = { success: true, providerId: "provider-synthetic" };
+  let discoveredModels = [];
   let models = [];
   let activeTurn;
   // Archived session ids. `archiveSession` is one operation for both directions
@@ -207,6 +217,15 @@ export function installFixtureTransport() {
     if (operation === "isGoalEnabled") return false;
     if (operation === "getPermissionMode") return { mode: "default" };
     if (operation === "getSessionUsage") return {};
+    if (operation === "listUserModelProviders") return clone(modelProviders);
+    if (operation === "listProviderPresets") return clone(providerPresets);
+    // Synthetic on purpose: the real server's answer is a credential, and the
+    // suite never needs a real one to see that reveal-on-open reaches the field.
+    if (operation === "revealModelProviderApiKey") return "synthetic-revealed-key";
+    if (operation === "testUserModelCandidate") return clone(candidateTestResult);
+    if (operation === "saveUserModelProviderCandidate") return clone(candidateSaveResult);
+    if (operation === "discoverUserModelsCandidate") return clone(discoveredModels);
+    if (["createUserModelProvider", "updateUserModelProvider", "deleteUserModelProvider"].includes(operation)) return { ok: true };
     return {};
   };
 
@@ -351,6 +370,11 @@ export function installFixtureTransport() {
     setQuestionnaire(request) { questionnaire = request ? clone(request) : undefined; },
     setAccountLoginState(state) { accountLoginState = clone(state); },
     setUsageQuotaResult(result) { usageQuotaResult = clone(result); },
+    setModelProviders(providers) { modelProviders = clone(providers); },
+    setProviderPresets(presets) { providerPresets = clone(presets); },
+    setCandidateTestResult(result) { candidateTestResult = clone(result); },
+    setCandidateSaveResult(result) { candidateSaveResult = clone(result); },
+    setDiscoveredModels(models) { discoveredModels = clone(models); },
     setPluginManagementResult(action, result) {
       pluginManagementResults[action] = result === undefined ? undefined : clone(result);
     },
