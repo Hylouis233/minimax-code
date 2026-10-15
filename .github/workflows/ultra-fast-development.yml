@@ -3,35 +3,131 @@ name: Ultra and Fast development
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-    paths:
-      - .github/workflows/ultra-fast-development.yml
-
 permissions:
   contents: read
-
+concurrency:
+  group: ultra-fast-development
+  cancel-in-progress: false
 jobs:
-  source:
+  validate:
     if: github.repository_id == '1399429101' && github.head_ref == 'feat/ultra-fast-independent-controls' && github.event.pull_request.head.repo.id == github.event.repository.id
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
-      - name: Export pinned public source without running application code
-        env:
-          SOURCE_SHA: c08148e647de22486fcde742bf6ef71128984e97
-          GIT_TERMINAL_PROMPT: '0'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+          cache: pnpm
+      - name: Apply reviewed integration edits
         run: |
-          set -euo pipefail
-          git init --bare "$RUNNER_TEMP/source.git"
-          git --git-dir="$RUNNER_TEMP/source.git" fetch --no-tags --no-recurse-submodules --depth=1 https://github.com/Hylouis233/minimax-code.git "$SOURCE_SHA"
-          test "$(git --git-dir="$RUNNER_TEMP/source.git" rev-parse FETCH_HEAD)" = "$SOURCE_SHA"
-          mkdir -p "$RUNNER_TEMP/source-evidence"
-          git --git-dir="$RUNNER_TEMP/source.git" archive --format=tar.gz "$SOURCE_SHA" > "$RUNNER_TEMP/source-evidence/source.tar.gz"
-          git --git-dir="$RUNNER_TEMP/source.git" ls-tree -rz --full-tree "$SOURCE_SHA" > "$RUNNER_TEMP/source-evidence/tree.bin"
-          printf '%s\n' "$SOURCE_SHA" > "$RUNNER_TEMP/source-evidence/commit.txt"
-          sha256sum "$RUNNER_TEMP/source-evidence/source.tar.gz" > "$RUNNER_TEMP/source-evidence/archive.sha256"
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          def patch(p, old, new):
+              f=Path(p); text=f.read_text()
+              if text.count(old)!=1: raise SystemExit('Integration anchor mismatch: '+p)
+              f.write_text(text.replace(old,new))
+          b='packages/local-runtime-v2/src/service/model-system/'
+          patch(b+'contracts.ts', "import type { ModelProviderApi, ModelProviderSource } from './identity.js';", "import type { ModelProviderApi, ModelProviderSource } from './identity.js';\nimport type { LocalModelFastConfig } from './resolution/fast-request.js';")
+          patch(b+'contracts.ts', '  compat?: LocalModelCompatOverrides;\n}', '  compat?: LocalModelCompatOverrides;\n  /** Explicit BYOK Fast preference; independent of reasoning and orchestration. */\n  fast?: LocalModelFastConfig;\n}')
+          patch(b+'resolution/model-resolver-byok.ts', "import { mergeProviderHeaders } from '../connectivity/provider-request.js';", "import { mergeProviderHeaders } from '../connectivity/provider-request.js';\nimport { resolveFastRequestOptions } from './fast-request.js';")
+          patch(b+'resolution/model-resolver-byok.ts', '  readonly modelCompat?: LocalModelCompatOverrides;\n}', '  readonly modelCompat?: LocalModelCompatOverrides;\n  readonly requestPatch?: Readonly<Record<string, unknown>>;\n}')
+          patch(b+'resolution/model-resolver-byok.ts', '  const modelCompat = readModelCompat(modelConfig.compat);\n  return {\n    provider: input.provider,\n    api: resolveCustomProviderApi(config.api),', '  const modelCompat = readModelCompat(modelConfig.compat);\n  const api = resolveCustomProviderApi(config.api);\n  const fast = resolveFastRequestOptions(api, modelConfig.fast, configHeaders);\n  return {\n    provider: input.provider,\n    api,')
+          patch(b+'resolution/model-resolver-byok.ts', '    ...(configHeaders ? { configHeaders } : {}),\n    ...(modelCompat ? { modelCompat } : {}),', '    ...(fast.headers ? { configHeaders: fast.headers } : {}),\n    ...(fast.requestPatch ? { requestPatch: fast.requestPatch } : {}),\n    ...(modelCompat ? { modelCompat } : {}),')
+          patch(b+'resolution/local-model-resolver.ts', '  readonly modelCompat?: LocalModelCompatOverrides;\n  readonly catalogModel?: Model<Api>;', '  readonly modelCompat?: LocalModelCompatOverrides;\n  readonly requestPatch?: Readonly<Record<string, unknown>>;\n  readonly catalogModel?: Model<Api>;')
+          patch(b+'resolution/local-model-resolver.ts', '    const thinking = resolveThinking(input, this.options.implicitCustomProviderThinking === true);\n    const baseUrl', '    const thinking = resolveThinking(input, this.options.implicitCustomProviderThinking === true);\n    // Keep the prepared-payload channel shared by turns and auxiliary callers.\n    // Fast only adds disjoint transport fields, never a replacement effort.\n    const requestPatch = thinking.requestPatch || input.requestPatch\n      ? { ...thinking.requestPatch, ...input.requestPatch }\n      : undefined;\n    const baseUrl')
+          patch(b+'resolution/local-model-resolver.ts', '      ...(thinking.requestPatch ? { thinkingRequestPatch: thinking.requestPatch } : {}),', '      ...(requestPatch ? { thinkingRequestPatch: requestPatch } : {}),')
+          p=Path('test/vitest-suites.json'); suites=json.loads(p.read_text())
+          for name in [b+'resolution/fast-request.test.ts','packages/config/test/byok-fast-persistence.test.ts']:
+              if name in suites['suites']['capability']: raise SystemExit('Test already registered')
+              suites['suites']['capability'].append(name)
+          p.write_text(json.dumps(suites,indent=2)+'\n')
+          Path('.github/workflows/ultra-fast-development.yml').unlink()
+          PY
+      - run: pnpm install --frozen-lockfile
+      - name: Format only the reviewed source and register its inventory
+        run: |
+          pnpm exec prettier --write docs/ultra-fast.md packages/config/test/byok-fast-persistence.test.ts packages/local-runtime/assets/skills/ultra/SKILL.md packages/local-runtime-v2/src/service/model-system/contracts.ts packages/local-runtime-v2/src/service/model-system/resolution/fast-request.ts packages/local-runtime-v2/src/service/model-system/resolution/fast-request.test.ts packages/local-runtime-v2/src/service/model-system/resolution/local-model-resolver.ts packages/local-runtime-v2/src/service/model-system/resolution/model-resolver-byok.ts test/vitest-suites.json
+          node scripts/source-inventory.mjs --write
+          node scripts/source-inventory.mjs
+          node scripts/gen-tsconfig-paths.mjs
+          git diff --check
+      - name: Offline protocol and resolver regressions
+        run: pnpm exec vitest run --config vitest.oss.config.mjs packages/config/test/byok-fast-persistence.test.ts packages/local-runtime-v2/src/service/model-system/resolution/fast-request.test.ts packages/local-runtime-v2/src/service/model-system/resolution/local-model-resolver.test.ts
+      - name: Full standalone type check
+        run: pnpm typecheck
+      - name: Build the standalone distribution
+        run: pnpm build
+      - name: Export reviewed files as data, not executable automation
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,os,pathlib,subprocess
+          paths=['docs/ultra-fast.md','packages/config/test/byok-fast-persistence.test.ts','packages/local-runtime/assets/skills/ultra/SKILL.md','packages/local-runtime-v2/src/service/model-system/contracts.ts','packages/local-runtime-v2/src/service/model-system/resolution/fast-request.ts','packages/local-runtime-v2/src/service/model-system/resolution/fast-request.test.ts','packages/local-runtime-v2/src/service/model-system/resolution/local-model-resolver.ts','packages/local-runtime-v2/src/service/model-system/resolution/model-resolver-byok.ts','test/vitest-suites.json','release/public-source.json']
+          removed='.github/workflows/ultra-fast-development.yml'
+          dirty=subprocess.check_output(['git','diff','--name-only','HEAD'],text=True).splitlines()
+          if set(dirty)-set(paths)-{removed}: raise SystemExit('Unexpected tracked changes')
+          items=[]
+          for name in paths:
+              p=pathlib.Path(name)
+              if p.is_symlink() or not p.is_file(): raise SystemExit('Invalid source file')
+              content=p.read_text(); items.append({'path':name,'content':content,'sha256':hashlib.sha256(content.encode()).hexdigest()})
+          out=pathlib.Path(os.environ['RUNNER_TEMP'])/'reviewed-candidate';out.mkdir()
+          (out/'files.json').write_text(json.dumps({'head':os.environ['EXPECTED_HEAD'],'files':items}))
+          PY
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: ultra-fast-source-${{ github.run_id }}
-          path: ${{ runner.temp }}/source-evidence/
-          if-no-files-found: error
+          name: ultra-fast-reviewed-${{ github.run_id }}
+          path: ${{ runner.temp }}/reviewed-candidate/
           retention-days: 7
+          if-no-files-found: error
+
+  objects:
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      # This job never checks out or executes the candidate's source. It only
+      # creates immutable Git data objects; it cannot move a branch or merge.
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: ultra-fast-reviewed-${{ github.run_id }}
+          path: ${{ runner.temp }}/reviewed-candidate
+      - name: Create candidate objects without updating refs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,os,pathlib,urllib.request
+          repo='Hylouis233/minimax-code'; root='https://api.github.com/repos/'+repo
+          expected=os.environ['EXPECTED_HEAD']
+          allowed={'docs/ultra-fast.md','packages/config/test/byok-fast-persistence.test.ts','packages/local-runtime/assets/skills/ultra/SKILL.md','packages/local-runtime-v2/src/service/model-system/contracts.ts','packages/local-runtime-v2/src/service/model-system/resolution/fast-request.ts','packages/local-runtime-v2/src/service/model-system/resolution/fast-request.test.ts','packages/local-runtime-v2/src/service/model-system/resolution/local-model-resolver.ts','packages/local-runtime-v2/src/service/model-system/resolution/model-resolver-byok.ts','test/vitest-suites.json','release/public-source.json'}
+          p=pathlib.Path(os.environ['RUNNER_TEMP'])/'reviewed-candidate/files.json'
+          if p.stat().st_size>2_000_000: raise SystemExit('Oversized manifest')
+          data=json.loads(p.read_text())
+          if data['head']!=expected or len(data['files'])!=len(allowed): raise SystemExit('Wrong candidate identity')
+          if {x['path'] for x in data['files']}!=allowed: raise SystemExit('Unexpected paths')
+          def api(path,body=None):
+              req=urllib.request.Request(root+path,data=None if body is None else json.dumps(body).encode(),headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28'})
+              with urllib.request.urlopen(req,timeout=45) as response:return json.load(response)
+          if api('/git/ref/heads/feat/ultra-fast-independent-controls')['object']['sha']!=expected: raise SystemExit('Branch moved; reconcile first')
+          parent=api('/git/commits/'+expected);entries=[]
+          for item in data['files']:
+              if hashlib.sha256(item['content'].encode()).hexdigest()!=item['sha256']: raise SystemExit('Digest mismatch')
+              entries.append({'path':item['path'],'mode':'100644','type':'blob','content':item['content']})
+          entries.append({'path':'.github/workflows/ultra-fast-development.yml','mode':'100644','type':'blob','sha':None})
+          tree=api('/git/trees',{'base_tree':parent['tree']['sha'],'tree':entries})['sha']
+          commit=api('/git/commits',{'message':'feat: integrate independent Fast routes and Ultra skill with offline regressions','tree':tree,'parents':[expected]})['sha']
+          print(json.dumps({'candidate_commit':commit,'candidate_tree':tree,'parent':expected,'branch_updated':False,'merged':False}))
+          PY
