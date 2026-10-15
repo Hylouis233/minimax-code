@@ -33,7 +33,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildWebuiStreamLoopSink,
   runWebuiStreamLoop,
-} from "../../src/client/mechanisms/stream-loop.js";
+} from "../../src/client/conversation/stream-loop.js";
 import type { WebuiStreamLoopSink } from "../../src/client/features/turn/contracts/stream-loop.js";
 import { streamStateBundle } from "../../src/client/features/turn/application/stream-state-bundle.js";
 import { streamRecoveryProjection } from "../../src/client/features/turn/projection/stream-recovery.js";

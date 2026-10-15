@@ -1,6 +1,6 @@
 // The single stream-lease implementation (plan §7.1 `application/`, §7.2
-// `mechanisms/stream-lease.ts`, ticket #45): claim, release and generation
-// fencing in one place.
+// stream lease; home `client/conversation/stream-lease.ts`, ticket #45): claim,
+// release and generation fencing in one place.
 //
 // The recovery policy the ticket calls "the highest-risk part" reduces to one
 // rule: a stream attempt owns a *generation*, and only the newest generation

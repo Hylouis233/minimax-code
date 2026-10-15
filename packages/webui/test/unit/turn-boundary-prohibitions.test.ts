@@ -45,8 +45,8 @@ const TURN_MODULES = [
   "features/sessions/application/session-commands.ts",
   "features/turn/application/stream-state-bundle.ts",
   "features/turn/application/stream-lease-controller.ts",
-  "mechanisms/stream-loop.ts",
-  "mechanisms/stream-lease.ts",
+  "conversation/stream-loop.ts",
+  "conversation/stream-lease.ts",
 ];
 
 describe("prohibition 1 — turn holds no writer for another business's state", () => {
@@ -97,13 +97,13 @@ describe("prohibition 1 — turn holds no writer for another business's state", 
 });
 
 describe("prohibition 2 — turn's rules are filed inside turn", () => {
-  it("declares the loop and the lease in mechanisms/, never in a component", () => {
+  it("declares the loop and the lease in conversation/, never in a component", () => {
     const declarations = [
-      { symbol: "function runWebuiStreamLoop", owner: "mechanisms/stream-loop.ts" },
-      { symbol: "function buildWebuiStreamLoopSink", owner: "mechanisms/stream-loop.ts" },
-      { symbol: "function nextWebuiLeaseGeneration", owner: "mechanisms/stream-lease.ts" },
-      { symbol: "function isWebuiLeaseGenerationCurrent", owner: "mechanisms/stream-lease.ts" },
-      { symbol: "function fenceWebuiLeaseStream", owner: "mechanisms/stream-lease.ts" },
+      { symbol: "function runWebuiStreamLoop", owner: "conversation/stream-loop.ts" },
+      { symbol: "function buildWebuiStreamLoopSink", owner: "conversation/stream-loop.ts" },
+      { symbol: "function nextWebuiLeaseGeneration", owner: "conversation/stream-lease.ts" },
+      { symbol: "function isWebuiLeaseGenerationCurrent", owner: "conversation/stream-lease.ts" },
+      { symbol: "function fenceWebuiLeaseStream", owner: "conversation/stream-lease.ts" },
     ];
     const modules = clientModules();
     for (const { symbol, owner } of declarations) {
@@ -116,7 +116,7 @@ describe("prohibition 2 — turn's rules are filed inside turn", () => {
     for (const modulePath of modules.filter((p) => p.startsWith("components/"))) {
       const source = read(modulePath);
       for (const { symbol } of declarations) expect(source).not.toContain(symbol);
-      expect(source).not.toMatch(/mechanisms\/stream-(loop|lease)\.js/u);
+      expect(source).not.toMatch(/(?:mechanisms|conversation)\/stream-(loop|lease)\.js/u);
     }
   });
 });
@@ -153,17 +153,17 @@ describe("prohibition 4 — turn's shared rules have exactly one owner", () => {
       const declaring = modules.filter((modulePath) =>
         new RegExp(`function ${symbol}\\b`, "u").test(read(modulePath)),
       );
-      expect(declaring).toEqual(["mechanisms/stream-lease.ts"]);
+      expect(declaring).toEqual(["conversation/stream-lease.ts"]);
 
       const users = modules.filter((modulePath) => read(modulePath).includes(symbol));
       for (const user of users) {
-        if (user === "mechanisms/stream-lease.ts") continue;
+        if (user === "conversation/stream-lease.ts") continue;
         // A second copy is what prohibition 4 forbids; a reader must import the
-        // owner's rule. Both specifier shapes count: the mechanism itself sits
+        // owner's rule. Both specifier shapes count: the module itself sits
         // beside `stream-lease.ts` (`./`), every other layer reaches it from one
-        // level (or more) below `mechanisms/`.
+        // level (or more) below the substrate's home.
         expect(read(user)).toMatch(
-          /from "(\.\/(?:\.\.\/)*|.*?\/mechanisms\/)stream-lease\.js"/u,
+          /from "(\.\/(?:\.\.\/)*|.*?\/conversation\/)stream-lease\.js"/u,
         );
       }
       expect(users.length).toBeGreaterThan(1);

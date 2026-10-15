@@ -33,7 +33,7 @@ import type { WebuiComposerSubmitHandlers } from "../../composer/contracts/compo
 import type { WebuiTurnCommandCollaborators } from "./turn-command-port.js";
 import { isWebuiSubscriptionProbeCurrent, ownsWebuiStreamGeneration, resolveWebuiSubscriptionRecheck, type WebuiStreamState } from "../projection/stream-state.js";
 import { streamRecoveryProjection } from "../projection/stream-recovery.js";
-import { runWebuiStreamLoop, type WebuiStreamLoopDeps } from "../../../mechanisms/stream-loop.js";
+import { runWebuiStreamLoop, type WebuiStreamLoopDeps } from "../../../conversation/stream-loop.js";
 import type { WebuiStreamLoopSink } from "../contracts/stream-loop.js";
 import {
   webuiActiveTurnProbeFor,

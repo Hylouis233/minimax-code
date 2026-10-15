@@ -7,9 +7,9 @@
 // the state they read means the mechanism imports them back instead of the
 // caller having to name a mechanism-declared type, and it lets a business
 // publish the command views it builds over them without reaching into
-// `mechanisms/`.
+// `conversation/`.
 //
-// The implementations stay in `client/mechanisms/stream-loop.ts`
+// The implementations stay in `client/conversation/stream-loop.ts`
 // (`runWebuiStreamLoop`, `buildWebuiStreamLoopSink`, `applyWebuiStreamLoopExtra`).
 
 import type { WebuiStreamFrame } from "../../../../shared/contracts/stream.js";
@@ -29,7 +29,7 @@ import type {
  * are the caller-facing half of the mechanism's `WebuiStreamLoopDeps`, which
  * adds the two injected transforms on top, so a caller that assembles its own
  * argument object — the composer's submit workflow does — can name the
- * transports without reaching into `mechanisms/`.
+ * transports without reaching into `conversation/`.
  */
 export interface WebuiStreamLoopTransports {
   readonly sendMessage?: WebuiClientMessageSender;

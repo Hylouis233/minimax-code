@@ -47,7 +47,7 @@ import {
   type WebuiStreamState,
 } from "../../src/client/features/turn/projection/stream-state.js";
 import type { WebuiStreamLoopExtra } from "../../src/client/features/turn/contracts/stream-loop.js";
-import { buildWebuiStreamLoopSink } from "../../src/client/mechanisms/stream-loop.js";
+import { buildWebuiStreamLoopSink } from "../../src/client/conversation/stream-loop.js";
 import { streamStateBundle } from "../../src/client/features/turn/application/stream-state-bundle.js";
 import type { WebuiSessionActivityMap } from "../../src/client/features/sessions/projection/session-activity.js";
 import type { WebuiClientSession } from "../../src/client/contracts/sessions/session-view.js";

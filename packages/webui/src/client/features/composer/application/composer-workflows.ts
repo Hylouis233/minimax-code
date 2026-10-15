@@ -10,7 +10,7 @@ import { formatWebuiError } from "../../../contracts/value-readers.js";
 import { looksLikeAbsoluteWorkspacePath } from "../../../projection/common/paths.js";
 import { queueWebuiTurn } from "../../turn/application/queue-command.js";
 import { ownsWebuiStreamGeneration, type WebuiStreamState } from "../../turn/projection/stream-state.js";
-import { runWebuiStreamLoop, type WebuiStreamLoopDeps } from "../../../mechanisms/stream-loop.js";
+import { runWebuiStreamLoop, type WebuiStreamLoopDeps } from "../../../conversation/stream-loop.js";
 import type { WebuiStreamLoopSink } from "../../turn/contracts/stream-loop.js";
 import { streamRecoveryProjection } from "../../turn/projection/stream-recovery.js";
 import { streamStateBundle } from "../../turn/application/stream-state-bundle.js";

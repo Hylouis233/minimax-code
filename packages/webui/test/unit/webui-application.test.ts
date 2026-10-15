@@ -14,7 +14,7 @@
 //   * a late completion after disposal writes nothing.
 //
 // Stream frames are not part of this surface. They reach the store through the
-// stream sink (`client/mechanisms/stream-loop.ts`), which owns the lease fence;
+// stream sink (`client/conversation/stream-loop.ts`), which owns the lease fence;
 // `webui-shell.test.ts` covers the superseded-generation and resume-overflow
 // behaviour on that path.
 import { describe, expect, it, vi } from "vitest";

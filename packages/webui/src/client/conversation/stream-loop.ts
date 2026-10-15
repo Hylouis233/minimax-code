@@ -277,7 +277,7 @@ export function buildWebuiStreamLoopSink(
   // Comparing against the lease instead would re-admit a superseded loop the
   // moment the newer turn's `[DONE]` cleared it.
   //
-  // The predicate is the lease mechanism's own (`mechanisms/stream-lease.ts`);
+  // The predicate is the lease mechanism's own (`conversation/stream-lease.ts`);
   // this sink only binds it to the generation it claimed.
   const mine = (current: WebuiStreamState): boolean =>
     isWebuiLeaseGenerationCurrent(current, generation);

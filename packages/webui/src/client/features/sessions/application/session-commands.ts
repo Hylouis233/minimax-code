@@ -44,8 +44,8 @@ import {
   settleAbortedStream,
 } from "../../turn/projection/stream-state.js";
 import type { WebuiStreamState } from "../../turn/projection/stream-state.js";
-import { releaseWebuiSubscription } from "../../../mechanisms/stream-lease.js";
-import { buildWebuiStreamLoopSink } from "../../../mechanisms/stream-loop.js";
+import { releaseWebuiSubscription } from "../../../conversation/stream-lease.js";
+import { buildWebuiStreamLoopSink } from "../../../conversation/stream-loop.js";
 import type { WebuiStreamLoopSink } from "../../turn/contracts/stream-loop.js";
 import { streamStateBundle } from "../../turn/application/stream-state-bundle.js";
 import type {

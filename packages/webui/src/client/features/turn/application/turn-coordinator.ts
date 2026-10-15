@@ -24,11 +24,11 @@ import type { WebuiClientMessageLoader } from "../../transcript/contracts/messag
 import { streamRecoveryProjection } from "../projection/stream-recovery.js";
 import type { WebuiStreamState } from "../projection/stream-state.js";
 import { reduceWebuiStreamFrame } from "../projection/stream-state.js";
-import { fenceWebuiLeaseStream } from "../../../mechanisms/stream-lease.js";
+import { fenceWebuiLeaseStream } from "../../../conversation/stream-lease.js";
 import {
   applyWebuiStreamLoopExtra,
   runWebuiStreamLoop,
-} from "../../../mechanisms/stream-loop.js";
+} from "../../../conversation/stream-loop.js";
 import type { WebuiStreamLoopSink } from "../contracts/stream-loop.js";
 import type { WebuiSessionStore, WebuiSessionWriter } from "../../../application/session-store.js";
 import type { WebuiStreamLeaseController } from "./stream-lease-controller.js";

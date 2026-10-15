@@ -12,7 +12,7 @@
 //     store's writers, so components no longer compute and apply business
 //     effects from a raw event callback;
 //   * live stream frames do not come through here at all. They arrive at the
-//     stream sink (`client/mechanisms/stream-loop.ts`), which owns the single
+//     stream sink (`client/conversation/stream-loop.ts`), which owns the single
 //     lease fence; this coordinator handles process events only.
 //
 // One channel, one coordinator: `attach` subscribes exactly once and `detach`

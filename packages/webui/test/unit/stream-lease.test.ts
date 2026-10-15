@@ -1,5 +1,5 @@
 // The stream lease's generation counter (plan §7.2
-// `client/mechanisms/stream-lease.ts`).
+// `client/conversation/stream-lease.ts`).
 //
 // These pin the property the module's own header states: there is exactly one
 // counter. Two claim paths stamp the same `lastClaimedGeneration` field — the
@@ -16,7 +16,7 @@ import {
   claimWebuiLease,
   isWebuiLeaseGenerationCurrent,
   nextWebuiLeaseGeneration,
-} from "../../src/client/mechanisms/stream-lease.js";
+} from "../../src/client/conversation/stream-lease.js";
 import { streamStateBundle } from "../../src/client/features/turn/application/stream-state-bundle.js";
 import { initialWebuiStreamState } from "../../src/client/features/turn/projection/stream-state.js";
 import type { WebuiStreamState } from "../../src/client/features/turn/contracts/stream-state.js";

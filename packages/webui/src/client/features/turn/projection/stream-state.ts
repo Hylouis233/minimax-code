@@ -93,7 +93,7 @@ export interface WebuiActiveTurnLike {
 export function settleAbortedStream(state: WebuiStreamState): WebuiStreamState {
   return {
     // The subscription is cleared in place. `releaseWebuiSubscription` moved to
-    // `client/mechanisms/stream-lease.ts`, and a `view` projection may not import
+    // `client/conversation/stream-lease.ts`, and a `view` projection may not import
     // a mechanism; this call never passed a scope, so the transition is identical.
     ...{ ...state, phase: "done", status: "aborted", subscription: undefined },
     // The turn is over, so no loop owns the stream any more. Clearing the
@@ -501,16 +501,17 @@ export function applyFrameCursor(
  * probe exposes is not observable from the reducer's return value — the
  * cursor and the data step apply disjoint fields, so a reducer that
  * swapped them still produces the same final state. The test-only module
- * `client/stream-instrumentation.ts` is the only caller that supplies one.
+ * `client/conversation/stream-instrumentation.ts` is the only caller that
+ * supplies one.
  */
 export type WebuiStreamReduceCheckpoint = "after-data" | "after-cursor";
 
 /**
  * The reducer's optional third argument. Production callers MUST NOT
  * supply it: the probe is a test-only surface, reached through
- * `client/stream-instrumentation.ts`. The shape is declared here, beside
- * the parameter that uses it, because this module is a `view` projection
- * and may not import the `mechanisms` module that drives the probe.
+ * `client/conversation/stream-instrumentation.ts`. The shape is declared here,
+ * beside the parameter that uses it, because this module is a `view`
+ * projection and may not import the `mechanisms` layer that drives the probe.
  */
 export interface WebuiStreamReduceOptions {
   readonly probe?: (
