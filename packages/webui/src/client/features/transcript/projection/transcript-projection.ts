@@ -4,7 +4,7 @@
 import type { WebuiClientMessage, WebuiClientMessagePage, WebuiQueryCollapseView } from "../contracts/message-view.js";
 import type { WebuiTranscriptItem, WebuiTranscriptActivityPart, WebuiTranscriptProcessSegment } from "../contracts/transcript-view.js";
 import type { WebuiStreamMessage } from "../../turn/contracts/stream-state.js";
-import { readUsageNumber } from "./message-projection.js";
+import { readUsageNumber } from "../contracts/message-stream.js";
 
 /** A render block: one user bubble, or one assistant turn. The transcript
  * renderer iterates these groups; per-block fields tell it how long the turn

@@ -23,7 +23,6 @@ import type { WebuiShellSurfaceCommand } from "../../projection/shell/shell-surf
 export interface NewTaskWorkspaceStorage {
   readonly readNoProjectFlag: () => boolean;
   readonly writeNoProjectFlag: (value: boolean) => void;
-  readonly writeTeamModeSessionChoice: (sessionId: string, off: boolean) => void;
 }
 
 /** The session commands the rail refresh needs, as the shell holds them. */
@@ -46,8 +45,12 @@ export interface UseNewTaskWorkspaceOptions {
   readonly setSelectedSessionId: (id: string | undefined) => void;
   /** Carries the home turn's live record onto the session a first message created. */
   readonly adoptHomeSession: (id: string) => void;
-  readonly teamModeOff: boolean;
-  readonly setTeamModeChoice: (id: string, off: boolean) => void;
+  /**
+   * Records the Agent Team choice the created session was started with. Sessions
+   * owns that choice (T19), so this hook asks for the record rather than
+   * reaching the storage adapter itself.
+   */
+  readonly recordSessionTeamMode: (sessionId: string) => void;
 }
 
 export interface NewTaskWorkspace {
@@ -71,8 +74,7 @@ export function useNewTaskWorkspace(options: UseNewTaskWorkspaceOptions): NewTas
     dispatchShellSurface,
     setSelectedSessionId,
     adoptHomeSession,
-    teamModeOff,
-    setTeamModeChoice,
+    recordSessionTeamMode,
   } = options;
 
   const [newTaskWorkspaceDir, setNewTaskWorkspaceDir] = useState<string | undefined>(
@@ -127,8 +129,7 @@ export function useNewTaskWorkspace(options: UseNewTaskWorkspaceOptions): NewTas
   );
   const handleSessionCreatedViewEffect = (id: string) => {
     setSelectedSessionId(id);
-    storage.writeTeamModeSessionChoice(id, teamModeOff);
-    setTeamModeChoice(id, teamModeOff);
+    recordSessionTeamMode(id);
     if (workflows.canLoadFlat) void workflows.loadFlat();
     if (workflows.canLoadTree) void workflows.loadTree();
     if (typeof window !== "undefined")

@@ -125,7 +125,7 @@ the modules no single business owns.
 | `workspace/workspace-file-tree.ts`, `workspace/archive-projection.ts`, `workspace/html-preview.ts`, `workspace/media-preview.ts` | How a file's size and time read, where an archive entry unpacks, and whether a preview is media or reaches outside its own directory. |
 | `turn/activity-phrase.ts` | Which phrase the activity indicator shows, and when it starts. |
 | `settings/settings-view.ts` | Which theme the app uses, and which settings tabs are shown. |
-| `account/usage.ts`, `plugins/mcp-status.ts`, `shell/context-menu.ts` | The usage-reset label, one MCP server's row status, where a context menu opens. |
+| `account/usage.ts`, `plugins/mcp-status.ts`, `common/context-menu.ts` | The usage-reset label, one MCP server's row status, where a context menu opens. |
 | `transcript/message-timestamp.ts` | How a message's timestamp reads. |
 
 Each of these was carved out of the component that rendered it (Phase 4b), so the

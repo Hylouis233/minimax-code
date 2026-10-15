@@ -56,17 +56,17 @@ import {
   pendingPermissionFromEvent,
   questionnaireFromEvent,
   replacePermission,
-} from "../../interactions/projection/event-parsers.js";
+} from "../../../projection/common/event-parsers.js";
 import {
   initialWebuiWorkspaceProgress,
   reduceWebuiWorkspaceProgressEvent,
-  type WebuiWorkspaceProgressState,
-} from "../../workspace/projection/workspace-progress.js";
+} from "../../workspace/contracts/progress.js";
+import type { WebuiWorkspaceProgressState } from "../contracts/stream-state.js";
 import { claimWebuiSubscriptionTurn, decideWebuiSessionStart, matchesWebuiTerminalTurn, type WebuiStreamState } from "../projection/stream-state.js";
 import {
   releaseWebuiSubscription,
 } from "../../../mechanisms/stream-lease.js";
-import { projectWebuiThreadGoalMessage } from "../../goal/projection/goal-state.js";
+import { projectWebuiThreadGoalMessage } from "../../../projection/common/goal-message.js";
 
 /** The slice of component state the reducer mutates. Workspace progress
  *  lives on the stream slice (where `app.tsx` puts it) — see the source

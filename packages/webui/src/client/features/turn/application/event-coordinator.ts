@@ -38,7 +38,7 @@ import type { WebuiStreamState } from "../projection/stream-state.js";
 // the nested-goal fallback for `thread_goal.*` events, whose payload declares
 // the id inside `goal` rather than at the top level. Reading the top level
 // only here dropped every such event before it could reach the reducer.
-import { eventSessionId } from "../../interactions/projection/event-parsers.js";
+import { eventSessionId } from "../../../projection/common/event-parsers.js";
 import type { WebuiProcessEventChannel } from "./event-channel.js";
 import type { WebuiSessionStore } from "../../../application/session-store.js";
 import type { WebuiStreamLeaseController } from "./stream-lease-controller.js";

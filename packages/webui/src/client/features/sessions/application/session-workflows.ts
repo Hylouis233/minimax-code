@@ -63,6 +63,16 @@ export type WebuiSessionImporter = (
   },
 ) => Promise<{ readonly sessionId: string }>;
 
+/**
+ * The session-export capability, injected for the same reason as the importer:
+ * the implementation is browser download IO
+ * (`infrastructure/session-transfer-download.ts`) and this module is the
+ * application layer. The composition root supplies
+ * `startWebuiSessionTransferDownload`; the rail submits `exportSession` and
+ * never navigates itself.
+ */
+export type WebuiSessionExporter = (sessionId: string) => void;
+
 type QueryPort = Pick<
   SessionPort,
   "loadSessions" | "loadSessionTree" | "loadProjects" | "listArchivedSessions"
@@ -171,6 +181,14 @@ export interface WebuiSessionWorkflows {
       readonly signal?: AbortSignal;
     },
   ) => Promise<{ readonly sessionId: string }>;
+  /** Whether a session-export capability is wired. */
+  readonly canExportSession: boolean;
+  /**
+   * Ask the browser to download one session as a transfer file. The decision
+   * that this session may be exported is this business's; the navigation is the
+   * injected adapter's.
+   */
+  readonly exportSession: (sessionId: string) => void;
   /** Whether the rail's project list is wired. */
   readonly canLoadProjects: boolean;
   readonly getProjectsSnapshot: () => WebuiProjectsState;
@@ -200,8 +218,10 @@ export function createWebuiSessionWorkflows(deps: {
   readonly port: QueryPort & MutationPort;
   /** Injected browser IO; absent means the import operation is not wired. */
   readonly importSession?: WebuiSessionImporter;
+  /** Injected browser IO; absent means the export operation is not wired. */
+  readonly exportSession?: WebuiSessionExporter;
 }): WebuiSessionWorkflows {
-  const { store, composer, port, importSession } = deps;
+  const { store, composer, port, importSession, exportSession } = deps;
   const message = (reason: unknown): string =>
     reason instanceof Error ? reason.message : String(reason);
 
@@ -490,6 +510,15 @@ export function createWebuiSessionWorkflows(deps: {
       if (!importSession)
         throw new Error("当前 WebUI 未连接会话导入服务");
       return importSession(file, context);
+    },
+    canExportSession: exportSession !== undefined,
+    exportSession: (sessionId) => {
+      // Synchronous, like the adapter: the browser either starts the download
+      // or the adapter raises the reason it cannot (no runtime, no address
+      // bar), and both callers report that through `setError`.
+      if (!exportSession)
+        throw new Error("当前 WebUI 未连接会话导出服务");
+      exportSession(sessionId);
     },
     canLoadProjects: port.loadProjects !== undefined,
     getProjectsSnapshot: () => projects,

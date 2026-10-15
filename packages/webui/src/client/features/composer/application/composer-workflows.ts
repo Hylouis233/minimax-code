@@ -1,4 +1,8 @@
 import type {WebuiClientMessageEnqueuer} from "../contracts/command-port.js";
+import type {
+  WebuiComposerSubmitArgs,
+  WebuiComposerSubmitHandlers,
+} from "../contracts/composer-turn.js";
 import type { WebuiClientCreateSessionResult, WebuiClientSessionCreator } from "../../../contracts/sessions/session-port.js";
 import type { WebuiGoal, WebuiGoalCreateRequest, WebuiGoalPatchRequest } from "../../../../shared/contracts/goal.js";
 import type { WebuiAttachmentInput } from "../../../../shared/contracts/messages.js";
@@ -6,55 +10,10 @@ import { formatWebuiError } from "../../../contracts/value-readers.js";
 import { looksLikeAbsoluteWorkspacePath } from "../../../projection/common/paths.js";
 import { queueWebuiTurn } from "../../turn/application/queue-command.js";
 import { ownsWebuiStreamGeneration, type WebuiStreamState } from "../../turn/projection/stream-state.js";
-import { runWebuiStreamLoop, type WebuiStreamLoopDeps, type WebuiStreamLoopSink } from "../../../mechanisms/stream-loop.js";
+import { runWebuiStreamLoop, type WebuiStreamLoopDeps } from "../../../mechanisms/stream-loop.js";
+import type { WebuiStreamLoopSink } from "../../turn/contracts/stream-loop.js";
 import { streamRecoveryProjection } from "../../turn/projection/stream-recovery.js";
 import { streamStateBundle } from "../../turn/application/stream-state-bundle.js";
-
-export interface WebuiComposerSubmitArgs {
-  readonly sessionId?: string;
-  readonly draft: string;
-  readonly message?: string;
-  readonly clientIntent?: string;
-  readonly attachments?: readonly WebuiAttachmentInput[];
-  readonly onAttachmentsSubmitted?: () => void;
-  readonly sending: boolean;
-  readonly deps: Omit<WebuiStreamLoopDeps, "projection" | "streamState">;
-  readonly enqueueMessage?: WebuiClientMessageEnqueuer;
-  readonly createSession?: WebuiClientSessionCreator;
-  readonly createSessionWorkspaceDir?: string;
-  readonly teamModeOff?: boolean;
-}
-
-export interface WebuiComposerSubmitHandlers {
-  /**
-   * A fresh, generation-fenced sink for this turn's stream loop. The caller
-   * never receives the stream writer itself, so no caller can write a slice
-   * field directly or skip the fence.
-   */
-  readonly createSink: () => WebuiStreamLoopSink;
-  /** Reset the stream slice for a turn that is about to open. */
-  readonly resetStreamForTurn: () => void;
-  /** Record (or clear) the refusal the transcript banner renders. */
-  readonly setRefusal: (refusal: string | undefined) => void;
-  readonly readStream?: () => WebuiStreamState;
-  readonly setSending: (sending: boolean) => void;
-  readonly onDraftChange: (next: string) => void;
-  readonly onNeedsSession?: (draft: string) => void;
-  readonly onSessionCreated?: (sessionId: string) => void;
-  readonly onQueued?: () => void;
-}
-
-/**
- * The callbacks a component owns for one turn. They are what a component
- * supplies to a send; the lease-bearing fields above are assembled from the
- * writer the send builds, so a component can neither pass in nor hold a sink.
- */
-export interface WebuiComposerTurnCallbacks {
-  readonly onDraftChange: (next: string) => void;
-  readonly onNeedsSession?: (draft: string) => void;
-  readonly onSessionCreated?: (sessionId: string) => void;
-  readonly onQueued?: () => void;
-}
 
 export function buildWebuiComposerHandlers(args: WebuiComposerSubmitHandlers): WebuiComposerSubmitHandlers {
   return {

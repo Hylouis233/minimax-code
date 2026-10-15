@@ -26,21 +26,13 @@ import type {
 } from "../../contracts/sessions/session-view.js";
 import type { selectWebuiCatalogTreePage } from "../../features/sessions/application/session-catalog.js";
 import { sessionHash } from "../../projection/common/router.js";
-import { startWebuiSessionTransferDownload } from "../../infrastructure/session-transfer-download.js";
 import {
-  readProjectNames,
-  readProjectPins,
-  readSessionOverlay,
-  toggleProjectPin,
-  toggleSessionOverlay,
-  writeProjectName,
-} from "../../infrastructure/storage.js";
+  useSessionRailOverlays,
+  type WebuiRailOverlayStorage,
+} from "../../features/sessions/bindings/use-session-rail-overlays.js";
 
 /** The tree page's shape, taken from the selector that builds it. */
 export type WebuiRailTreePage = ReturnType<typeof selectWebuiCatalogTreePage>;
-
-/** The browser-local overlay store, taken from the reader the rail uses. */
-type WebuiRailStorage = Parameters<typeof readSessionOverlay>[1];
 
 /**
  * The session mutations the rail's rows dispatch, stated as the surface used:
@@ -59,13 +51,20 @@ export interface WebuiRailWorkflows {
     file: File,
     context: { agentName: string; workspaceDir: string | undefined },
   ): Promise<{ sessionId: string }>;
+  /**
+   * Export one session as a transfer file. The rail submits the request and the
+   * sessions owner starts the download through the adapter the composition root
+   * injected (T19): navigating is platform IO, and a view may not hold it.
+   */
+  exportSession(sessionId: string): void;
   refresh(): Promise<unknown>;
 }
 
 export interface UseSessionRailActionsOptions {
   readonly page: WebuiClientSessionPage;
   readonly treePage: WebuiRailTreePage;
-  readonly storage: WebuiRailStorage;
+  /** The browser storage the overlays are read through, injected (T19). */
+  readonly storage: WebuiRailOverlayStorage;
   readonly workflows: WebuiRailWorkflows;
   readonly selectedSessionId: string | undefined;
   readonly selectedSession: WebuiClientSession | undefined;
@@ -115,7 +114,10 @@ export function useSessionRailActions({
   setSelectedSessionId,
   setPageError,
 }: UseSessionRailActionsOptions): SessionRailActions {
-  const browserStorage = storage;
+  // The overlay state itself belongs to Sessions (T19) and is read through that
+  // feature's own binding; this hook keeps the rail's UI state and actions.
+  const overlays = useSessionRailOverlays(storage);
+  const { pinnedSessions, starredSessions, pinnedProjects, projectNames } = overlays;
   const [railCollapsed, setRailCollapsed] = useState(false);
   // Rail session search. `railSearchOpen` mirrors whether the input is
   // showing; `railSearchQuery` is the live filter. The query filters only the
@@ -127,18 +129,6 @@ export function useSessionRailActions({
   const railSearchInputRef = useRef<HTMLInputElement | null>(null);
   const sessionImportInputRef = useRef<HTMLInputElement | null>(null);
   const [sessionImportBusy, setSessionImportBusy] = useState(false);
-  const [pinnedSessions, setPinnedSessions] = useState<Record<string, boolean>>(
-    () => readSessionOverlay("pins", browserStorage),
-  );
-  const [starredSessions, setStarredSessions] = useState<Record<string, boolean>>(
-    () => readSessionOverlay("stars", browserStorage),
-  );
-  const [pinnedProjects, setPinnedProjects] = useState<Record<string, boolean>>(
-    () => readProjectPins(browserStorage),
-  );
-  const [projectNames, setProjectNames] = useState<Record<string, string>>(
-    () => readProjectNames(browserStorage),
-  );
   const openRailSearch = useCallback(() => {
     setRailSearchOpen(true);
     // The input mounts in the same commit as the state flip, so focus has to
@@ -179,10 +169,10 @@ export function useSessionRailActions({
   const handleRenameProject = (project: WebuiProjectGroup) => {
     if (typeof window === "undefined") return;
     const next = window.prompt("重命名项目", projectNames[project.key] ?? project.name)?.trim();
-    if (next) setProjectNames(writeProjectName(project.key, next, browserStorage));
+    if (next) overlays.renameProject(project.key, next);
   };
   const handleToggleProjectPin = (project: WebuiProjectGroup) => {
-    setPinnedProjects(toggleProjectPin(project.key, browserStorage));
+    overlays.toggleProjectPin(project.key);
   };
   const handleRenameSession = (session: WebuiClientSession) => {
     if (!workflows.canMutate || typeof window === "undefined") return;
@@ -194,10 +184,10 @@ export function useSessionRailActions({
       .catch(fail);
   };
   const handleToggleSessionPin = (session: WebuiClientSession) => {
-    setPinnedSessions(toggleSessionOverlay("pins", session.sessionId, browserStorage));
+    overlays.toggleSessionOverlay("pins", session.sessionId);
   };
   const handleToggleSessionStar = (session: WebuiClientSession) => {
-    setStarredSessions(toggleSessionOverlay("stars", session.sessionId, browserStorage));
+    overlays.toggleSessionOverlay("stars", session.sessionId);
   };
   const handleArchiveSession = (session: WebuiClientSession) => {
     void workflows.archive(session.sessionId).catch(fail);
@@ -237,9 +227,11 @@ export function useSessionRailActions({
     // The file comes from `GET /session-transfer`, not from walking the
     // message pages here: that route is the one `POST /session-import` accepts,
     // and a browser-assembled file carries the display layer only. See
-    // `session-transfer-download.ts` for why this is a navigation.
+    // `session-transfer-download.ts` for why this is a navigation. The request
+    // goes through the sessions owner (T19) rather than this view reaching the
+    // platform adapter.
     try {
-      startWebuiSessionTransferDownload(session.sessionId);
+      workflows.exportSession(session.sessionId);
     } catch (reason: unknown) {
       fail(reason);
     }

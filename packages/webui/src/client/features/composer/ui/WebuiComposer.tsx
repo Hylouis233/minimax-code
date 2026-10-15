@@ -36,11 +36,11 @@ import type {
   WebuiComposerPluginCatalogue,
   WebuiComposerPluginSummary,
 } from "../../../features/plugins/application/composer-catalogue.js";
-import { projectWebuiMessageToStreamMessage, readUsageNumber } from "../../../features/transcript/projection/message-projection.js";
+import { projectWebuiMessageToStreamMessage, readUsageNumber } from "../../../features/transcript/contracts/message-stream.js";
 import {
   createWebuiInteractionCoordinator,
 } from "../../../features/interactions/application/interaction-coordinator.js";
-import { latestContextUsage, readContextUsageSnapshot } from "../projection/context-usage.js";
+import { latestContextUsage, readContextUsageSnapshot } from "../contracts/context-usage.js";
 import { readWebuiComposerSubmitGate } from "../projection/submission-gate.js";
 import {
   type WebuiComposerSeed,

@@ -77,11 +77,6 @@ import {
   selectWebuiCatalogFlatPage,
   selectWebuiCatalogTreePage,
 } from "../../features/sessions/application/session-catalog.js";
-import {
-  selectWebuiSessionStream,
-  selectWebuiSessionTranscriptPage,
-} from "../../application/selectors.js";
-import { WEBUI_HOME_SESSION_KEY } from "../../application/state.js";
 import { WebuiPortSlicesProvider } from "../../bindings/port-slices-context.js";
 import { WebuiApplicationProvider } from "../../bindings/application-context.js";
 import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
@@ -94,14 +89,15 @@ import {
   WebuiWorkspaceQueriesProvider,
 } from "../../bindings/use-query-state.js";
 import { WebuiAccountWorkflowsProvider } from "../../features/account/bindings/use-account-workflows.js";
-import type { TeamModeSessionChoices } from "../../infrastructure/team-mode.js";
+import { useSessionTeamMode } from "../../features/sessions/bindings/use-session-team-mode.js";
 import {
-  initialWebuiWorkspaceProgress,
   projectWebuiWorkspaceHistory,
   selectWebuiWorkspaceProgress,
-  webuiWorkspaceSubagentStatus,
 } from "../../features/workspace/projection/workspace-progress.js";
-import type { WebuiApplication } from "../../application/create-application.js";
+import {
+  initialWebuiWorkspaceProgress,
+  webuiWorkspaceSubagentStatus,
+} from "../../features/workspace/contracts/progress.js";
 import type { WebuiWorkspaceGitChangedSignal } from "../../features/workspace/projection/workspace-panel-state.js";
 import { ConnectionStatus } from "./ConnectionStatus.js";
 import { deriveConversationUsageNotice } from "../../features/transcript/projection/message-projection.js";
@@ -156,6 +152,16 @@ export interface WebuiClientFoundationAppProps {
 }
 
 /**
+ * The assembled application this shell renders, taken from the value the
+ * composition root provides rather than named by an import of the assembly's
+ * module: the shell's contract is the instance it is handed, and the binding
+ * that hands it is what types it (T19).
+ */
+type ShellApplication = NonNullable<
+  ReturnType<typeof useWebuiApplicationOptional>
+>;
+
+/**
  * The assembled application this shell renders, or a named failure.
  *
  * The shell composes what the assembly built; it does not build one (plan §4.1,
@@ -164,8 +170,8 @@ export interface WebuiClientFoundationAppProps {
  * silent second composition that behaves differently from production.
  */
 function requireApplication(
-  application: WebuiApplication | undefined,
-): WebuiApplication {
+  application: ShellApplication | undefined,
+): ShellApplication {
   if (!application) {
     throw new Error(
       "WebUI assembly error: WebuiClientFoundationApp was rendered without an application. " +
@@ -374,9 +380,11 @@ export function WebuiClientFoundationApp(
     },
     [composerStore],
   );
-  const [teamModeOff, setTeamModeOff] = useState(browserStorage.readTeamModeOff);
-  const [teamModeChoices, setTeamModeChoices] =
-    useState<TeamModeSessionChoices>(browserStorage.readTeamModeSessionChoices);
+  // The Agent Team choice belongs to Sessions (T19): the state, the storage read
+  // and the write-back live in that feature's binding, and the shell renders
+  // what it returns.
+  const { teamModeOff, teamModeOffFor, recordSessionTeamMode } =
+    useSessionTeamMode(browserStorage);
   const pageError = catalog.flat.error;
   const setPageError = sessionWorkflows.setError;
   const [dismissedUsageNoticeKey, setDismissedUsageNoticeKey] = useState<
@@ -385,37 +393,31 @@ export function WebuiClientFoundationApp(
   // The rail's own state (collapse, search, pins/stars/project names) and its
   // row actions live in `./use-session-rail-actions.js`; it is called below,
   // once the session it acts on is resolved.
-  // The selected session's live stream slice, read off the application store
-  // through the selector (plan §7.6; ticket #45 prerequisite 5). Subscribing to
-  // the store's snapshot keeps the shell reactive exactly as the old module
-  // hook did, with no second map.
+  // The selected slot's live stream, read through the application's published
+  // reads rather than by importing the assembly's selectors (plan §5.1; T19).
+  // Which slot "nothing selected" names — the home slot the first turn streams
+  // into — is the assembly's own mapping, so the shell asks for the selection
+  // and holds no sentinel. The subscription is the application's, which is the
+  // same store subscription the shell used to take directly.
   const selectedStream = useSyncExternalStore(
-    sessionStore.subscribe,
-    () =>
-      selectWebuiSessionStream(
-        sessionStore.getSnapshot(),
-        selectedSessionId ?? WEBUI_HOME_SESSION_KEY,
-      ),
-    () =>
-      selectWebuiSessionStream(
-        sessionStore.getSnapshot(),
-        selectedSessionId ?? WEBUI_HOME_SESSION_KEY,
-      ),
+    application.subscribe,
+    () => application.reads.stream(selectedSessionId),
+    () => application.reads.stream(selectedSessionId),
   );
   // The workspace-progress backfill, derived rather than fetched.
   //
   // The shell used to call `transport.loadMessages` itself and keep the answer
   // in local state, with its own `cancelled` flag — a second reader of an RPC
-  // the transcript history owner (`application/transcript/transcript-history.ts`) already
+  // the transcript history owner (`client/conversation/transcript-history.ts`) already
   // owns, fetches and commits into the session store. It now projects the
   // owner's committed page, so the RPC, its request fence and its error state
   // have one owner and one caller. `SessionTranscript` still drives the load
   // when the transcript is mounted; when it is not, there is no history to
   // project and the projection is the initial state.
   const transcriptPage = useSyncExternalStore(
-    sessionStore.subscribe,
-    () => selectWebuiSessionTranscriptPage(sessionStore.getSnapshot(), selectedSessionId),
-    () => selectWebuiSessionTranscriptPage(sessionStore.getSnapshot(), selectedSessionId),
+    application.subscribe,
+    () => application.reads.transcriptPage(selectedSessionId),
+    () => application.reads.transcriptPage(selectedSessionId),
   );
   const historyProgress = useMemo<WebuiWorkspaceProgressState>(
     () =>
@@ -435,9 +437,6 @@ export function WebuiClientFoundationApp(
     [page, treePage],
   );
   const selectedAgentName = selectWebuiSessionAgentName(flatSessionsWithChildren, selectedSessionId);
-  useEffect(() => {
-    browserStorage.writeTeamModeOff(teamModeOff);
-  }, [browserStorage, teamModeOff]);
   useEffect(() => {
     if (!sessionWorkflows.canLoadFlat || sessionPage) return;
     void sessionWorkflows.loadFlat();
@@ -531,9 +530,7 @@ export function WebuiClientFoundationApp(
     dispatchShellSurface,
     setSelectedSessionId,
     adoptHomeSession: (id) => application.adoptHomeSession(id),
-    teamModeOff,
-    setTeamModeChoice: (id, off) =>
-      setTeamModeChoices((current) => ({ ...current, [id]: off })),
+    recordSessionTeamMode,
   });
 
   /**
@@ -584,9 +581,7 @@ export function WebuiClientFoundationApp(
         (session) => session.parentSessionId === selectedSessionId,
       )
     : [];
-  const composerTeamModeOff = selectedSessionId
-    ? teamModeChoices[selectedSessionId] ?? teamModeOff
-    : teamModeOff;
+  const composerTeamModeOff = teamModeOffFor(selectedSessionId);
   const {
     railCollapsed,
     setRailCollapsed,

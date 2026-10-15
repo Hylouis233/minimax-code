@@ -53,6 +53,22 @@ export interface WebuiBrowserStorage {
   ) => void;
   readonly readUnreadCounts: () => Record<string, number>;
   readonly writeUnreadCounts: (counts: Readonly<Record<string, number>>) => void;
+  /**
+   * The rail's browser-local overlays (T19). Declared here as part of the
+   * adapter's own surface; the sessions feature states the subset it needs in
+   * `features/sessions/contracts/rail-overlays.ts` and this adapter satisfies
+   * it structurally, so a feature binding holds a contract rather than this
+   * module.
+   */
+  readonly readSessionOverlay: (kind: WebuiSessionOverlay) => Record<string, boolean>;
+  readonly toggleSessionOverlay: (
+    kind: WebuiSessionOverlay,
+    sessionId: string,
+  ) => Record<string, boolean>;
+  readonly readProjectPins: () => Record<string, boolean>;
+  readonly toggleProjectPin: (projectKey: string) => Record<string, boolean>;
+  readonly readProjectNames: () => Record<string, string>;
+  readonly writeProjectName: (projectKey: string, name: string) => Record<string, string>;
 }
 
 /** Browser persistence boundary. Pure parsing and pruning remain in projection/value modules. */
@@ -72,7 +88,7 @@ export function createWebuiBrowserStorage(
     if (!storage) return {};
     return parseTeamModeSessionChoices(storage.getItem(TEAM_MODE_SESSION_STORAGE_KEY));
   };
-  return {
+  const browserStorage: WebuiBrowserStorage = {
     getItem: (key) => {
       try { return storage?.getItem(key) ?? null; } catch { return null; }
     },
@@ -133,7 +149,21 @@ export function createWebuiBrowserStorage(
     },
     readUnreadCounts: () => readWebuiUnreadCounts(storage),
     writeUnreadCounts: (counts) => writeWebuiUnreadCounts(counts, storage),
+    // The rail's overlays (T19). The keys and the stored format stay in this
+    // module — the equivalence obligation (§8.1 "Browser overlays") is about
+    // exactly these — while the rail's binding reads them through
+    // `features/sessions/contracts/rail-overlays.ts`, which this adapter
+    // satisfies. Self-reference is safe: these run after construction.
+    readSessionOverlay: (kind) => readSessionOverlay(kind, browserStorage),
+    toggleSessionOverlay: (kind, sessionId) =>
+      toggleSessionOverlay(kind, sessionId, browserStorage),
+    readProjectPins: () => readProjectPins(browserStorage),
+    toggleProjectPin: (projectKey) => toggleProjectPin(projectKey, browserStorage),
+    readProjectNames: () => readProjectNames(browserStorage),
+    writeProjectName: (projectKey, name) =>
+      writeProjectName(projectKey, name, browserStorage),
   };
+  return browserStorage;
 }
 
 export function readWebuiUnreadCounts(

@@ -447,7 +447,7 @@ describe("the call-site rule follows the role, not the prefix", () => {
         "void port.submitTurn({});",
       ),
     });
-    const result = evaluateGraph(graph, { approvedPeerImports: [], roleExceptions: [] });
+    const result = evaluateGraph(graph, { approvedPeerImports: [] });
     expect(result.forbiddenCalls).toHaveLength(1);
     expect(result.forbiddenCalls[0]).toMatchObject({
       file: "client/features/composer/ui/ComposerPanel.tsx",
@@ -480,7 +480,7 @@ describe("the call-site rule follows the role, not the prefix", () => {
         ),
       });
       expect(
-        evaluateGraph(graph, { approvedPeerImports: [], roleExceptions: [] }).forbiddenCalls.map((violation) => violation.target),
+        evaluateGraph(graph, { approvedPeerImports: [] }).forbiddenCalls.map((violation) => violation.target),
         label,
       ).toEqual(["ComposerPort.submitTurn"]);
     }
@@ -495,8 +495,8 @@ describe("the call-site rule follows the role, not the prefix", () => {
         "export function use(onSubmit: (body: unknown) => Promise<void>): void {\n" +
         "  void onSubmit({});\n}\n",
     });
-    expect(evaluateGraph(graph, { approvedPeerImports: [], roleExceptions: [] }).forbiddenCalls).toEqual([]);
-    expect(evaluateGraph(graph, { approvedPeerImports: [], roleExceptions: [] }).pass).toBe(true);
+    expect(evaluateGraph(graph, { approvedPeerImports: [] }).forbiddenCalls).toEqual([]);
+    expect(evaluateGraph(graph, { approvedPeerImports: [] }).pass).toBe(true);
   });
 
   it("keeps a feature's bindings and application free to hold the capability", () => {
@@ -511,7 +511,7 @@ describe("the call-site rule follows the role, not the prefix", () => {
         "void port.submitTurn({});",
       ),
     });
-    expect(evaluateGraph(graph, { approvedPeerImports: [], roleExceptions: [] }).forbiddenCalls).toEqual([]);
+    expect(evaluateGraph(graph, { approvedPeerImports: [] }).forbiddenCalls).toEqual([]);
   });
 
   it("rejects a writer factory held by presentation, in either spelling", () => {
@@ -527,7 +527,7 @@ describe("the call-site rule follows the role, not the prefix", () => {
         'export function use(store: WebuiSessionStore): void {\n  store.createSessionWriter("session");\n}\n',
     });
     expect(
-      evaluateGraph(graph, { approvedPeerImports: [], roleExceptions: [] })
+      evaluateGraph(graph, { approvedPeerImports: [] })
         .forbiddenCalls.map((violation) => violation.file)
         .sort(),
     ).toEqual([
@@ -552,7 +552,7 @@ describe("the role rules feed the dependency gate", () => {
       "client/features/composer/application/submit.ts":
         'export { leaf } from "../../goal/application/goal-coordinator.js";\n',
     });
-    const result = evaluateGraph(graph, { approvedPeerImports: [], roleExceptions: [] });
+    const result = evaluateGraph(graph, { approvedPeerImports: [] });
     expect(result.roleViolations.map((violation) => violation.rule).sort()).toEqual([
       "private-peer-import",
       "role-import",
@@ -583,7 +583,7 @@ describe("the role rules judge every home, not only the target homes", () => {
       "client/components/shell/WebuiClientFoundationApp.tsx":
         'export { leaf } from "../../infrastructure/storage.js";\n',
     });
-    const { violations } = roleRule(graph, [], []);
+    const { violations } = roleRule(graph, []);
     expect(rulesOf(violations)).toEqual(["role-import"]);
     expect(violations[0]?.detail).toContain("shell may not import platform");
   });
@@ -594,53 +594,7 @@ describe("the role rules judge every home, not only the target homes", () => {
       "client/shell/WebuiClientFoundationApp.tsx":
         'export { leaf } from "../infrastructure/storage.js";\n',
     });
-    expect(rulesOf(roleRule(graph, [], []).violations)).toEqual(["role-import"]);
+    expect(rulesOf(roleRule(graph, []).violations)).toEqual(["role-import"]);
   });
 
-  it("carries an old-home edge as an explicit exception, with its owner and exit condition", () => {
-    const graph = buildFixture({
-      "client/infrastructure/storage.ts": leaf,
-      "client/components/shell/WebuiClientFoundationApp.tsx":
-        'export { leaf } from "../../infrastructure/storage.js";\n',
-    });
-    const exceptions = [
-      {
-        from: "client/components/shell/WebuiClientFoundationApp.tsx",
-        to: "client/infrastructure/storage.ts",
-        owner: "T19 (shell 收尾)",
-        exitCondition: "the shell stops reading platform storage directly",
-      },
-    ];
-    expect(roleRule(graph, [], exceptions).violations).toEqual([]);
-  });
-
-  it("fails an exception whose edge is no longer measured", () => {
-    const graph = buildFixture({ "client/infrastructure/storage.ts": leaf });
-    const exceptions = [
-      {
-        from: "client/components/shell/WebuiClientFoundationApp.tsx",
-        to: "client/infrastructure/storage.ts",
-        owner: "T19 (shell 收尾)",
-        exitCondition: "the shell stops reading platform storage directly",
-      },
-    ];
-    expect(rulesOf(roleRule(graph, [], exceptions).violations)).toEqual([
-      "stale-role-exception",
-    ]);
-  });
-
-  it("ships a ledger whose entries all carry an owner and an exit condition", () => {
-    // A bounded exception, not a standing allowance: A-004 item 4 requires both
-    // fields, and the entries have to name real files.
-    const ledger = JSON.parse(
-      readFileSync(path.resolve(repoRoot, "scripts/lib/webui-role-exceptions.json"), "utf8"),
-    );
-    expect(ledger.entries.length).toBeGreaterThan(0);
-    for (const entry of ledger.entries) {
-      expect(typeof entry.owner).toBe("string");
-      expect(entry.owner.length).toBeGreaterThan(0);
-      expect(typeof entry.exitCondition).toBe("string");
-      expect(entry.exitCondition.length).toBeGreaterThan(0);
-    }
-  });
 });

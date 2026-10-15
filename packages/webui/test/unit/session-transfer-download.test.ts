@@ -144,7 +144,24 @@ describe("the rail's export button", () => {
   ].join("\n");
 
   it("routes the export through the transfer download", () => {
-    expect(shell).toContain("startWebuiSessionTransferDownload(session.sessionId)");
+    // T19 moved the call one hop out of the view: the rail submits the sessions
+    // owner's command, that owner calls the adapter the composition root
+    // injected, and the composition root is where the adapter is the real
+    // download. All three links are read, so the button and its route cannot
+    // drift apart unnoticed — the same wire this case has always pinned, one
+    // hop longer.
+    const workflows = readFileSync(
+      new URL("../../src/client/features/sessions/application/session-workflows.ts", import.meta.url),
+      "utf8",
+    );
+    const compositionRoot = readFileSync(
+      new URL("../../src/client/main.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(shell).toContain("workflows.exportSession(session.sessionId)");
+    expect(workflows).toContain("exportSession: (sessionId) => {");
+    expect(workflows).toContain("exportSession(sessionId);");
+    expect(compositionRoot).toContain("sessionExport: startWebuiSessionTransferDownload");
   });
 
   it("does not assemble a file in the browser any more", () => {

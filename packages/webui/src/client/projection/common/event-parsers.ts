@@ -1,11 +1,22 @@
 // Runtime event payload 的解析函数。
+//
+// Moved here from `features/interactions/projection/` by T21, next to the kind
+// registry these parsers read (`./event-kinds.ts`). Two facts decided the home:
+// the module's only consumers are the conversation substrate's effect protocol
+// (`features/turn/application/effect-reducer.ts` and `event-coordinator.ts`),
+// which may not import another business's private projection; and what it does
+// is decode the *shared* wire contracts into the shared view models, not hold
+// any interaction policy — the fences, settlement and authoritative reads stay
+// in `features/interactions/`. Publishing it beside the registry keeps the two
+// halves of "what is this event" in one place, and lets both businesses read it
+// without one owning the other's decode.
 
 import type {
   WebuiPendingPermission,
   WebuiQuestionnaireRequest,
-} from "../../../../shared/contracts/interactions.js";
-import { isWebuiGoalEventKind } from "../../../projection/common/event-kinds.js";
-import type { WebuiRuntimeEvent } from "../../../../shared/contracts/stream.js";
+} from "../../../shared/contracts/interactions.js";
+import { isWebuiGoalEventKind } from "./event-kinds.js";
+import type { WebuiRuntimeEvent } from "../../../shared/contracts/stream.js";
 
 /**
  * Extract the session id a runtime event targets, accepting both camelCase

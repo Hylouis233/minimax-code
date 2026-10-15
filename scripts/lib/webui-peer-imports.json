@@ -43,11 +43,6 @@
     },
     {
       "from": "client/features/sessions/ui/ContextUsageIndicator.tsx",
-      "to": "client/features/transcript/projection/message-projection.ts",
-      "reason": "The chip counts the current session's messages, which the Transcript projects. Reviewed peer edge until the Transcript publishes that read."
-    },
-    {
-      "from": "client/features/sessions/ui/ContextUsageIndicator.tsx",
       "to": "client/features/models/projection/token-plan-model.ts",
       "reason": "The chip shows the token plan, which Models owns. Reviewed peer edge until Models publishes the plan read (the path was re-pointed when the models business moved into features/models/ in T03; the edge itself is unchanged)."
     },
@@ -152,16 +147,6 @@
       "reason": "The screen embeds the models business's provider form (provider CRUD is Models' duty, plan §5.6's models row, which this page renders rather than owns). Reviewed peer edge until Models publishes the form as a public surface."
     },
     {
-      "from": "client/features/goal/projection/goal-state.ts",
-      "to": "client/features/turn/projection/stream-state.ts",
-      "reason": "The goal projection reads the turn business's stream-message shape to recognise an already-recorded goal inside a streamed reply. Both files sat in the `projection/` layer before T05 moved goal into its feature home, so the edge was intra-layer; it becomes a reviewed peer edge until turn publishes that view type from its contracts."
-    },
-    {
-      "from": "client/features/interactions/application/interaction-coordinator.ts",
-      "to": "client/features/sessions/application/session-commands.ts",
-      "reason": "The interaction coordinator holds the turn stream-phase command view rather than a stream writer (plan 5.2 interactions row: the transitions are invoked as turn's published commands). Those commands are declared by the sessions business's command module, which both owners sat beside before T05 moved interactions into its feature home. Reviewed peer edge until sessions publishes the command view as a public contract."
-    },
-    {
       "from": "client/features/interactions/application/interaction-session-owners.ts",
       "to": "client/features/sessions/application/session-commands.ts",
       "reason": "The session-keyed interaction owner applies the same session-scoped stream-phase commands after a questionnaire settles, for the same reason as the coordinator entry above. Reviewed peer edge until sessions publishes the command view as a public contract."
@@ -220,11 +205,6 @@
       "from": "client/features/composer/ui/WebuiComposer.tsx",
       "to": "client/features/account/bindings/use-account-workflows.tsx",
       "reason": "The composer reads the account business's live status to guard its own model scope against another session's value; before T13 that status arrived as an RPC prop the shell relayed. Reviewed peer edge until Account publishes a binding the shell can mount."
-    },
-    {
-      "from": "client/features/composer/ui/WebuiComposer.tsx",
-      "to": "client/features/transcript/projection/message-projection.ts",
-      "reason": "The composer reads the transcript's message projection to build the pending-user/stream handoff shapes. Reviewed peer edge until the transcript publishes that read."
     },
     {
       "from": "client/features/composer/ui/WebuiComposer.tsx",

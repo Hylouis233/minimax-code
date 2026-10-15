@@ -24,7 +24,7 @@ import { readFileSync } from "node:fs";
 import {
   WebuiContextMenu,
 } from "../../src/client/components/shared/ContextMenu.js";
-import { placeWebuiContextMenu } from "../../src/client/projection/shell/context-menu.js";
+import { placeWebuiContextMenu } from "../../src/client/projection/common/context-menu.js";
 import { WebuiInteractionPanel } from "../../src/client/features/interactions/ui/InteractionPanel.js";
 import {
   WebuiProjectList,
@@ -74,8 +74,8 @@ import {
   createdSessionId,
   submitWebuiGoal,
   submitWebuiComposerTurn,
-  type WebuiComposerSubmitHandlers,
 } from "../../src/client/features/composer/application/composer-workflows.js";
+import type { WebuiComposerSubmitHandlers } from "../../src/client/features/composer/contracts/composer-turn.js";
 import { createWebuiTurnLifecycleCommands } from "../../src/client/features/sessions/application/session-commands.js";
 import { projectWebuiMessage } from "../../src/client/features/transcript/projection/message-projection.js";
 import { projectLiveTurnView } from "../../src/client/features/transcript/projection/transcript-shape.js";
@@ -98,8 +98,8 @@ import {
   runWebuiStreamLoop as runStreamLoop,
   type WebuiStreamLoopArgs,
   type WebuiStreamLoopDeps,
-  type WebuiStreamLoopSink,
 } from "../../src/client/mechanisms/stream-loop.js";
+import type { WebuiStreamLoopSink } from "../../src/client/features/turn/contracts/stream-loop.js";
 import { streamRecoveryProjection } from "../../src/client/features/turn/projection/stream-recovery.js";
 
 /**

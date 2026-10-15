@@ -11,6 +11,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createWebuiConversationTurnCommands } from "../../src/client/features/turn/application/turn-commands.js";
+import { createWebuiTurnCommandCollaborators } from "../../src/client/application/turn-command-wiring.js";
+
+/** The peer command factories the substrate drives, as composition supplies them. */
+const collaborators = createWebuiTurnCommandCollaborators();
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 import { createWebuiSessionScopeManager } from "../../src/client/conversation/session-scope.js";
 import { createWebuiDeliveryDisposers } from "../../src/client/features/turn/application/delivery-disposers.js";
@@ -23,6 +27,7 @@ describe("the conversation turn commands", () => {
   it("claims the session's lease from an attachment without being given a writer or a key", () => {
     const store = createWebuiSessionStore();
     const commands = createWebuiConversationTurnCommands({
+      collaborators,
       store,
       sessionId: "s1",
       capabilities: { resume: openStream as never },
@@ -44,6 +49,7 @@ describe("the conversation turn commands", () => {
     // session it is sent to, so nothing claims its lease here.
     const store = createWebuiSessionStore();
     const commands = createWebuiConversationTurnCommands({
+      collaborators,
       store,
       sessionId: undefined,
       capabilities: { resume: openStream as never },
@@ -59,6 +65,7 @@ describe("the conversation turn commands", () => {
     const store = createWebuiSessionStore();
     const sendMessage = vi.fn(async (_request: unknown) => openStream());
     const commands = createWebuiConversationTurnCommands({
+      collaborators,
       store,
       sessionId: "s1",
       capabilities: { send: sendMessage as never },
@@ -84,6 +91,7 @@ describe("the conversation turn commands", () => {
   it("does not pretend to run a send the slice cannot run", async () => {
     const store = createWebuiSessionStore();
     const commands = createWebuiConversationTurnCommands({
+      collaborators,
       store,
       sessionId: "s1",
       capabilities: {},
@@ -106,6 +114,7 @@ describe("the conversation turn commands", () => {
     const store = createWebuiSessionStore();
     const abortSession = vi.fn(async () => ({ success: true }));
     const commands = createWebuiConversationTurnCommands({
+      collaborators,
       store,
       sessionId: "s1",
       capabilities: { stop: abortSession as never },
@@ -121,6 +130,7 @@ describe("the conversation turn commands", () => {
   it("does nothing when the slice has no stop", async () => {
     const store = createWebuiSessionStore();
     const commands = createWebuiConversationTurnCommands({
+      collaborators,
       store,
       sessionId: "s1",
       capabilities: {},
@@ -133,7 +143,11 @@ describe("the conversation turn commands", () => {
   it("does not require a capability slice at all", () => {
     // A host with nothing wired: the commands still exist and still refuse.
     const store = createWebuiSessionStore();
-    const commands = createWebuiConversationTurnCommands({ store, sessionId: "s1" });
+    const commands = createWebuiConversationTurnCommands({
+      collaborators,
+      store,
+      sessionId: "s1",
+    });
     expect(() => commands.attach("t-1")).not.toThrow();
   });
 });
@@ -145,6 +159,7 @@ describe("recheck and gap recovery are the command set's, not the view's", () =>
   it("recovers a turn the client never saw, on the session's record", async () => {
     const store = createWebuiSessionStore();
     const commands = createWebuiConversationTurnCommands({
+      collaborators,
       store,
       sessionId: "s1",
       capabilities: { resume: openStream as never, activeTurn: (async () => busy) as never },
@@ -163,6 +178,7 @@ describe("recheck and gap recovery are the command set's, not the view's", () =>
     const store = createWebuiSessionStore();
     const getActiveTurn = vi.fn(async () => busy);
     const commands = createWebuiConversationTurnCommands({
+      collaborators,
       store,
       sessionId: "s1",
       capabilities: { resume: openStream as never, activeTurn: getActiveTurn as never },
@@ -180,6 +196,7 @@ describe("recheck and gap recovery are the command set's, not the view's", () =>
   it("retargets a lease a session.start no longer matches", async () => {
     const store = createWebuiSessionStore();
     const commands = createWebuiConversationTurnCommands({
+      collaborators,
       store,
       sessionId: "s1",
       capabilities: {
@@ -219,6 +236,7 @@ describe("an accepted attempt leases its session", () => {
       },
     );
     const commands = createWebuiConversationTurnCommands({
+      collaborators,
       store,
       sessionId: "s1",
       capabilities: { send: send as never },

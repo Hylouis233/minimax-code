@@ -108,7 +108,7 @@ describe("no second enumeration site can exist", () => {
     // event is a goal event, and the projector asks it which types carry an
     // objective.
     const literal = /"(?:thread_goal|permission|questionnaire)\.[a-z_.]+"/u;
-    for (const file of ["features/interactions/projection/event-parsers.ts", "features/goal/projection/goal-state.ts"]) {
+    for (const file of ["projection/common/event-parsers.ts", "features/goal/projection/goal-state.ts"]) {
       expect(squashWhitespace(readWebuiSource(file))).not.toMatch(literal);
     }
   });
@@ -120,7 +120,7 @@ describe("no second enumeration site can exist", () => {
     // not a runtime event kind, so it is excluded by matching only the three
     // event namespaces.
     const files = [
-      "features/interactions/projection/event-parsers.ts",
+      "projection/common/event-parsers.ts",
       "features/goal/projection/goal-state.ts",
       "features/interactions/projection/questionnaire-state.ts",
       "features/transcript/projection/message-projection.ts",

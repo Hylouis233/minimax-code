@@ -12,8 +12,8 @@
 // TypeScript's structural compatibility is what the caller's expected type
 // checks against.
 
-import { projectWebuiMessageToStreamMessage } from "../../transcript/projection/message-projection.js";
-import { latestContextUsage, readContextUsageSnapshot } from "../../composer/projection/context-usage.js";
+import { projectWebuiMessageToStreamMessage } from "../../transcript/contracts/message-stream.js";
+import { latestContextUsage, readContextUsageSnapshot } from "../../composer/contracts/context-usage.js";
 
 /** The default bundle: the existing pure projection functions, injected. */
 export const streamRecoveryProjection = {

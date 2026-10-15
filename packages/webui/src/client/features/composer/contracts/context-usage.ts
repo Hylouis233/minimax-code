@@ -1,10 +1,16 @@
 /**
- * Context-window usage reads, shared by the composer and the stream loop.
+ * Context-window usage reads, published by the composer.
  *
- * Both callers ask the same question — "what is the context usage for what
- * the user can see right now" — and both need the same answer when the
- * message page carries a server snapshot: prefer it, fall back to the newest
- * message that reported usage, and never invent a value when neither exists.
+ * Both callers ask the same question — "what is the context usage for what the
+ * user can see right now" — and both need the same answer when the message page
+ * carries a server snapshot: prefer it, fall back to the newest message that
+ * reported usage, and never invent a value when neither exists.
+ *
+ * Moved here from `projection/` by T21: the stream loop's recovery bundle is the
+ * second reader, and it belongs to the conversation substrate, which may not
+ * import another business's private projection. The functions are pure reads
+ * over a message page, so the composer's published surface is where the second
+ * reader is allowed to find them. The bodies are unchanged.
  */
 
 /** Newest message that carried a context usage, searching from the end. */

@@ -136,7 +136,7 @@ describe("prohibition 3 — the stream-phase value set is enumerated exactly onc
   });
 
   it("derives the phase type from the union instead of re-listing it", () => {
-    expect(read("features/sessions/application/session-commands.ts")).toContain(
+    expect(read("contracts/sessions/turn-command-views.ts")).toContain(
       'WebuiStreamState["phase"]',
     );
   });

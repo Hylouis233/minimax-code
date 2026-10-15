@@ -30,9 +30,13 @@ import {
 import {
   buildWebuiGoalEditPatch,
   buildWebuiGoalStatusPatch,
-  projectWebuiThreadGoalMessage,
   WEBUI_GOAL_STATUS_COPY,
 } from "../../src/client/features/goal/projection/goal-state.js";
+// The synthetic goal message projector lives in the common projection since
+// T21: its only production reader is the conversation substrate's effect
+// reducer, which may not import goal's private projection (see the module
+// header for why it is not goal's contract).
+import { projectWebuiThreadGoalMessage } from "../../src/client/projection/common/goal-message.js";
 import {
   canAdvanceWebuiQuestionnaireStep,
   sortWebuiQuestionnaireOptions,

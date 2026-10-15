@@ -12,14 +12,14 @@
 // constant, so a change on either side fails the test.
 
 import { describe, it, expect } from "vitest";
+import { projectWebuiWorkspaceHistory } from "../../src/client/features/workspace/projection/workspace-progress.js";
 import {
   initialWebuiWorkspaceProgress,
   PROGRESS_EVENT_TYPES,
-  projectWebuiWorkspaceHistory,
   reduceWebuiWorkspaceProgressEvent,
   webuiWorkspaceSubagentStatus,
-  type WebuiWorkspaceProgressState,
-} from "../../src/client/features/workspace/projection/workspace-progress.js";
+} from "../../src/client/features/workspace/contracts/progress.js";
+import type { WebuiWorkspaceProgressState } from "../../src/client/features/turn/contracts/stream-state.js";
 import type { WebuiClientMessage } from "../../src/client/features/transcript/contracts/message-view.js";
 
 function message(value: Record<string, unknown>): WebuiClientMessage {

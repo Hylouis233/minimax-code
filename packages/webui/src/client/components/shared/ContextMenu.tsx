@@ -12,7 +12,7 @@ import { createPortal } from "react-dom";
 import { WebuiIconContextChevron } from "../shell/icons.js";
 import { evaluateOutsideClose } from "../../projection/common/outside-close.js";
 import { useWebuiBrowserCapabilities } from "../../bindings/browser-capabilities.js";
-import { placeWebuiContextMenu } from "../../projection/shell/context-menu.js";
+import { placeWebuiContextMenu } from "../../projection/common/context-menu.js";
 
 export type WebuiContextMenuItem =
   | { readonly kind: "divider"; readonly key: string }

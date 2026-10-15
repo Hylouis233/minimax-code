@@ -40,8 +40,12 @@ import type { WebuiVersionInfo } from "../../src/shared/contracts/version.js";
 import type { WebuiSessionActivityMap } from "../../src/client/features/sessions/projection/session-activity.js";
 import type { WebuiActiveTurn } from "../../src/shared/contracts/session.js";
 import type { WebuiRuntimeEvent } from "../../src/shared/contracts/stream.js";
-import type { WebuiStreamLoopSink } from "../../src/client/mechanisms/stream-loop.js";
-import type { WebuiComposerSubmitHandlers } from "../../src/client/features/composer/application/composer-workflows.js";
+import type { WebuiStreamLoopSink } from "../../src/client/features/turn/contracts/stream-loop.js";
+import type { WebuiComposerSubmitHandlers } from "../../src/client/features/composer/contracts/composer-turn.js";
+import { createWebuiTurnCommandCollaborators } from "../../src/client/application/turn-command-wiring.js";
+
+/** The peer command factories the substrate drives, as composition supplies them. */
+const collaborators = createWebuiTurnCommandCollaborators();
 
 const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
@@ -673,6 +677,7 @@ describe("the send command", () => {
     };
     await sendWebuiTurn({
       sessionId: "s1",
+      collaborators,
       message: "queued",
       sending: true,
       callbacks: { onDraftChange },

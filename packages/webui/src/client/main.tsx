@@ -12,6 +12,7 @@ export {
 export { subscribeToSessionHash } from "./bindings/navigation.js";
 import { createWebuiTransport } from "./infrastructure/transport.js";
 import { importWebuiSessionFile } from "./infrastructure/session-import.js";
+import { startWebuiSessionTransferDownload } from "./infrastructure/session-transfer-download.js";
 import { route } from "./projection/common/router.js";
 import { NotFound } from "./components/shell/NotFound.js";
 import { ArchonPage } from "./components/shell/ArchonPage.js";
@@ -109,6 +110,10 @@ function WebuiClientRoot({
         // The session-file import the session workflows submit through: the
         // application layer may not reach into `infrastructure/` itself.
         sessionImport: importWebuiSessionFile,
+        // The session-file export the session workflows submit through: the
+        // navigation is platform IO, and the rail may not reach into
+        // `infrastructure/` itself (T19).
+        sessionExport: startWebuiSessionTransferDownload,
         turns: {
           resumeSession: transport.resumeSession ?? (async () => {}),
           ...(transport.loadMessages

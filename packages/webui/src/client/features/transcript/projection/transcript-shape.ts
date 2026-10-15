@@ -41,8 +41,8 @@ import {
   projectMessageAttachments,
   readMessageDiff,
   projectWebuiMessage,
-  readUsageNumber,
 } from "./message-projection.js";
+import { readUsageNumber } from "../contracts/message-stream.js";
 import { projectMessageParts } from "./message-parts.js";
 import { hasWebuiNonTextActivity } from "./transcript-projection.js";
 

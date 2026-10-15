@@ -4,8 +4,8 @@ import {
   initialWebuiWorkspaceProgress,
   reduceWebuiWorkspaceProgressEvent,
   reduceWebuiWorkspaceProgressMessage,
-  type WebuiWorkspaceProgressState,
-} from "../../workspace/projection/workspace-progress.js";
+} from "../../workspace/contracts/progress.js";
+import type { WebuiWorkspaceProgressState } from "../contracts/stream-state.js";
 import type {
   WebuiStreamMessage,
   WebuiStreamSubscription,

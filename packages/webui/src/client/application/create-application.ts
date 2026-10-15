@@ -56,6 +56,7 @@ import {
   createWebuiConversationTurnCommands,
   type WebuiConversationTurnCommands,
 } from "../features/turn/application/turn-commands.js";
+import { createWebuiTurnCommandCollaborators } from "./turn-command-wiring.js";
 import {
   createWebuiGoalSessionOwners,
   type WebuiGoalSessionOwners,
@@ -105,7 +106,31 @@ import {
   type WebuiTurnReviewOwner,
 } from "../features/review/application/turn-review-owner.js";
 import type { WebuiTurnReviewPort } from "../features/review/contracts/turn-review.js";
-import type { WebuiClientMessageLoader } from "../features/transcript/contracts/message-view.js";
+import type {
+  WebuiClientMessageLoader,
+  WebuiClientMessagePage,
+} from "../features/transcript/contracts/message-view.js";
+import type { WebuiStreamState } from "../features/turn/projection/stream-state.js";
+import {
+  selectWebuiSessionStream,
+  selectWebuiSessionTranscriptPage,
+} from "./selectors.js";
+
+/**
+ * The session reads the shell composes its screens from (plan §5.1: the shell
+ * may not import the assembly, and it renders the providers its descendants
+ * read through, so it cannot reach them through those bindings either).
+ * Published on the application instance — the composition root's own interface
+ * — because that instance is what the shell is handed. Both reads answer from
+ * the one store; `undefined` means "whatever is selected", and with no session
+ * selected that is the home slot the first turn streams into.
+ */
+export interface WebuiApplicationReads {
+  readonly stream: (sessionId: string | undefined) => WebuiStreamState;
+  readonly transcriptPage: (
+    sessionId: string | undefined,
+  ) => WebuiClientMessagePage;
+}
 
 export interface WebuiApplicationDeps {
   /** Opens the process-event channel. Called exactly once per instance. */
@@ -181,6 +206,12 @@ export interface WebuiApplicationDeps {
    * `infrastructure/`.
    */
   readonly sessionImport?: Parameters<typeof createWebuiSessionWorkflows>[0]["importSession"];
+  /**
+   * The session-file export the session workflows submit through. Injected for
+   * the same reason as `sessionImport`: the implementation is a browser
+   * navigation, so it belongs to the composition root's platform layer.
+   */
+  readonly sessionExport?: Parameters<typeof createWebuiSessionWorkflows>[0]["exportSession"];
 }
 
 export type WebuiApplicationLifecycleState = "constructed" | "started" | "disposed";
@@ -216,6 +247,13 @@ export interface WebuiApplication {
   readonly getSnapshot: () => WebuiApplicationState;
   /** Subscribe to snapshot changes. Returns a detach; never closes a channel. */
   readonly subscribe: (listener: () => void) => () => void;
+  /**
+   * The session reads a surface composes from without importing the assembly
+   * (T19). Same store, same subscription as `getSnapshot`; the mapping from
+   * "nothing selected" to the home slot stays inside the assembly, so a reader
+   * asks for the selected slot rather than naming the sentinel.
+   */
+  readonly reads: WebuiApplicationReads;
   readonly select: (sessionId: string | undefined) => void;
   readonly store: WebuiSessionStore;
   readonly leases: WebuiStreamLeaseController;
@@ -447,6 +485,12 @@ export function createWebuiApplication(
     void interactions.owner(sessionId).refresh();
     void goals.owner(sessionId).refreshGoal();
   };
+  /**
+   * The peer command factories every turn command set here drives (plan §5.3
+   * rule 2). Built once: the substrate's port is the same object for every
+   * session, so constructing it per session would only add wiring sites.
+   */
+  const turnCommandCollaborators = createWebuiTurnCommandCollaborators();
   const turnCommandsFor = (sessionId: string | undefined): WebuiConversationTurnCommands => {
     const key = sessionId ?? WEBUI_HOME_SESSION_KEY;
     const existing = turnCommands.get(key);
@@ -454,6 +498,7 @@ export function createWebuiApplication(
     const commands = createWebuiConversationTurnCommands({
       store,
       sessionId,
+      collaborators: turnCommandCollaborators,
       ...(deps.turnCapabilities ? { capabilities: turnCapabilities } : {}),
       deliveries,
       scope: sessionScope,
@@ -532,6 +577,7 @@ export function createWebuiApplication(
     composer,
     port: slices.sessions,
     ...(deps.sessionImport ? { importSession: deps.sessionImport } : {}),
+    ...(deps.sessionExport ? { exportSession: deps.sessionExport } : {}),
     // A delete is an accepted mutation: it holds a settlement lease and revokes
     // the deleted session's interests (plan §4.3).
     scope: sessionScope,
@@ -674,6 +720,18 @@ export function createWebuiApplication(
     },
     getSnapshot: store.getSnapshot,
     subscribe: store.subscribe,
+    // Read through the store's live snapshot, exactly as the selectors did at
+    // their call sites; `undefined` selects the home slot (plan §4.2 home
+    // adoption), which is the assembly's own identity for "no session yet".
+    reads: {
+      stream: (sessionId) =>
+        selectWebuiSessionStream(
+          store.getSnapshot(),
+          sessionId ?? WEBUI_HOME_SESSION_KEY,
+        ),
+      transcriptPage: (sessionId) =>
+        selectWebuiSessionTranscriptPage(store.getSnapshot(), sessionId),
+    },
     select: selectSession,
     store,
     leases,

@@ -3,36 +3,11 @@
 // that state into the wire requests and the small view-model pieces
 // (status copy, wait-reason copy, duration formatting, message upsert).
 
-import type { WebuiStreamMessage } from "../../turn/projection/stream-state.js";
 import type {
   WebuiGoal,
   WebuiGoalPatchRequest,
   WebuiGoalStatus,
 } from "../../../../shared/contracts/goal.js";
-import { WEBUI_GOAL_OBJECTIVE_EVENT_TYPES } from "../../../projection/common/event-kinds.js";
-
-/**
- * Build a synthetic transcript message for one of the
- * `thread_goal.{objective_updated,objective_steering,updated}` events. The
- * effect reducer upserts the result by id (`thread-goal-${goal.goalId}`) so
- * subsequent updates replace the bubble in place rather than appending.
- */
-export function projectWebuiThreadGoalMessage(
-  eventType: string,
-  goal: WebuiGoal,
-): WebuiStreamMessage | undefined {
-  // The kinds that carry an objective come from the registry (§15.4 S9); the
-  // three literals that used to live here were a second place to teach a verb.
-  if (!WEBUI_GOAL_OBJECTIVE_EVENT_TYPES.includes(eventType)) return undefined;
-  return {
-    id: `thread-goal-${goal.goalId}`,
-    answer: goal.objective,
-    thinking: "",
-    role: "user",
-    timestamp: goal.updatedAt,
-    isGoal: true,
-  };
-}
 
 /** Chinese copy for each `WebuiGoalStatus`. The banner paints a chip using
  *  this map; the `updated` key is the transient "saved" badge the banner

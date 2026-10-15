@@ -88,7 +88,7 @@ import {
 } from "../../src/client/bindings/application-context.js";
 import { createWebuiApplication } from "../../src/client/application/create-application.js";
 import { initialWebuiStreamState } from "../../src/client/features/turn/projection/stream-state.js";
-import type { WebuiStreamLoopSink } from "../../src/client/mechanisms/stream-loop.js";
+import type { WebuiStreamLoopSink } from "../../src/client/features/turn/contracts/stream-loop.js";
 
 /**
  * A sink that accepts every write. The retry path under test never opens a

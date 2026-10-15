@@ -22,22 +22,19 @@ import type {WebuiClientSessionResumer} from "../contracts/execution-port.js";
 import type { WebuiClientMessageLoader } from "../../transcript/contracts/message-view.js";
 import type { WebuiClientSessionCreator } from "../../../contracts/sessions/session-port.js";
 import type { WebuiAttachmentInput } from "../../../../shared/contracts/messages.js";
-import type { WebuiConversationTurnCommands, WebuiTurnSendIntent } from "../contracts/turn-commands.js";
+import type {
+  WebuiComposerTurnCallbacks,
+  WebuiConversationTurnCommands,
+  WebuiTurnSendIntent,
+} from "../contracts/turn-commands.js";
 export type { WebuiConversationTurnCommands, WebuiTurnSendIntent } from "../contracts/turn-commands.js";
-import type { WebuiTurnCommandWriter } from "../../sessions/application/session-commands.js";
-import {
-  buildWebuiComposerHandlers,
-  submitWebuiComposerTurn,
-  type WebuiComposerSubmitHandlers,
-  type WebuiComposerTurnCallbacks,
-} from "../../composer/application/composer-workflows.js";
+import type { WebuiTurnCommandWriter } from "../../../contracts/sessions/turn-command-views.js";
+import type { WebuiComposerSubmitHandlers } from "../../composer/contracts/composer-turn.js";
+import type { WebuiTurnCommandCollaborators } from "./turn-command-port.js";
 import { isWebuiSubscriptionProbeCurrent, ownsWebuiStreamGeneration, resolveWebuiSubscriptionRecheck, type WebuiStreamState } from "../projection/stream-state.js";
 import { streamRecoveryProjection } from "../projection/stream-recovery.js";
-import {
-  runWebuiStreamLoop,
-  type WebuiStreamLoopDeps,
-  type WebuiStreamLoopSink,
-} from "../../../mechanisms/stream-loop.js";
+import { runWebuiStreamLoop, type WebuiStreamLoopDeps } from "../../../mechanisms/stream-loop.js";
+import type { WebuiStreamLoopSink } from "../contracts/stream-loop.js";
 import {
   webuiActiveTurnProbeFor,
   type WebuiActiveTurnProbe,
@@ -46,11 +43,6 @@ import {
 import { streamStateBundle } from "./stream-state-bundle.js";
 import type { WebuiSessionStore } from "../../../application/session-store.js";
 import { WEBUI_HOME_SESSION_KEY } from "../../../application/state.js";
-import {
-  createWebuiStreamPhaseCommands,
-  createWebuiTurnCommands,
-  createWebuiTurnLifecycleCommands,
-} from "../../sessions/application/session-commands.js";
 import type { WebuiTurnCapabilitySlice } from "./turn-capabilities.js";
 import type { WebuiDeliveryDisposers } from "./delivery-disposers.js";
 import type { WebuiSessionScopeManager } from "../../../conversation/session-scope.js";
@@ -182,6 +174,11 @@ export function recoverMissedWebuiTurn(deps: WebuiRecoverMissedTurnDeps): void {
 
 export interface WebuiSendTurnArgs {
   readonly sessionId: string | undefined;
+  /**
+   * The peer command factories this send drives, supplied by composition
+   * (plan §5.3 rule 2) — the same object the command set holds.
+   */
+  readonly collaborators: WebuiTurnCommandCollaborators;
   readonly message: string;
   readonly clientIntent?: string;
   readonly planMode?: boolean;
@@ -220,7 +217,7 @@ export async function sendWebuiTurn(args: WebuiSendTurnArgs): Promise<void> {
   // The bundle is woven here, from the writer this command owns: `createSink`
   // reads the *current* writer, so a turn whose first message created the
   // session mints its lease against the migrated key rather than the home slot.
-  const turnHandlers: WebuiComposerSubmitHandlers = buildWebuiComposerHandlers({
+  const turnHandlers: WebuiComposerSubmitHandlers = args.collaborators.buildComposerHandlers({
     createSink: () => writer.createSink(),
     resetStreamForTurn: () => writer.resetStreamForTurn(),
     setRefusal: (refusal) => writer.setStreamRefusal(refusal),
@@ -236,7 +233,7 @@ export async function sendWebuiTurn(args: WebuiSendTurnArgs): Promise<void> {
       }
     },
   });
-  await submitWebuiComposerTurn(
+  await args.collaborators.submitComposerTurn(
     {
       sessionId: args.sessionId,
       // `submitWebuiComposerTurn` reads `message ?? draft` and trims it, so
@@ -283,6 +280,13 @@ export interface WebuiTurnCommandContext {
    * owes a turn — and the lease ends when the attempt does, not when the view does.
    */
   readonly scope?: WebuiSessionScopeManager;
+  /**
+   * The peer command factories this substrate drives, supplied by composition
+   * (plan §5.3 rule 2). Required on purpose: a host that cannot supply them
+   * cannot run a turn, so an unwired one is an assembly error rather than a
+   * silently missing command.
+   */
+  readonly collaborators: WebuiTurnCommandCollaborators;
 }
 
 /** What a surface supplies to send: intent and data, never a writer or a sink. */
@@ -304,7 +308,7 @@ export interface WebuiTurnCommandContext {
 export function createWebuiConversationTurnCommands(
   context: WebuiTurnCommandContext,
 ): WebuiConversationTurnCommands {
-  const { store, sessionId, capabilities } = context;
+  const { store, sessionId, capabilities, collaborators } = context;
 
   /**
    * The record writer for this turn: the session's, or the home slot's before a
@@ -316,7 +320,7 @@ export function createWebuiConversationTurnCommands(
     sessionId
       ? store.createSessionWriter({ kind: "session", sessionId })
       : store.createSessionWriter({ kind: "home" });
-  const writerFor = (): WebuiTurnCommandWriter => createWebuiTurnCommands(storeWriterFor());
+  const writerFor = (): WebuiTurnCommandWriter => collaborators.createTurnCommands(storeWriterFor());
 
   /** The live slice. The home→session migration changes which key this reads. */
   const readStream = (): WebuiStreamState =>
@@ -376,7 +380,7 @@ export function createWebuiConversationTurnCommands(
   /** Drop the lease only if it still carries the generation the probe decided is stale. */
   const releaseSubscription = (generation: number): void => {
     const writer = storeWriterFor();
-    createWebuiTurnLifecycleCommands({
+    collaborators.createLifecycleCommands({
       setStream: writer.setStream,
       setSending: writer.setSending,
     }).releaseStreamSubscription(generation);
@@ -425,6 +429,7 @@ export function createWebuiConversationTurnCommands(
       const hold = holdDelivery();
       await sendWebuiTurn({
         sessionId,
+        collaborators,
         message: intent.message,
         ...(intent.clientIntent ? { clientIntent: intent.clientIntent } : {}),
         ...(intent.planMode ? { planMode: intent.planMode } : {}),
@@ -451,11 +456,11 @@ export function createWebuiConversationTurnCommands(
     stop: async () => {
       if (!sessionId || !capabilities?.stop) return;
       const writer = storeWriterFor();
-      const lifecycle = createWebuiTurnLifecycleCommands({
+      const lifecycle = collaborators.createLifecycleCommands({
         setStream: writer.setStream,
         setSending: writer.setSending,
       });
-      const phase = createWebuiStreamPhaseCommands({ setStream: writer.setStream });
+      const phase = collaborators.createStreamPhaseCommands({ setStream: writer.setStream });
       await stopWebuiTurn({
         abortSession: capabilities.stop,
         sessionId,
