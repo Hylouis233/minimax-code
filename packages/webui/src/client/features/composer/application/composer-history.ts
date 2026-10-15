@@ -1,6 +1,6 @@
 // Composer input history + cross-session draft store (roadmap Module B:
 // 输入历史/草稿). Pure decision functions for persisted state; browser IO is
-// owned by `client/infrastructure/storage.ts`.
+// owned by `client/platform/storage.ts`.
 //
 // The recall semantics follow the terminal readline convention codex uses:
 // every committed submission lands in a per-session list (newest last), ↑

@@ -1,14 +1,14 @@
 import { createWebuiMemoryStorage } from "./support/memory-storage.js";
 import { beforeEach, describe, expect, it } from "vitest";
-import { readSessionOverlay, toggleSessionOverlay } from "../../src/client/infrastructure/storage.js";
+import { readSessionOverlay, toggleSessionOverlay } from "../../src/client/platform/storage.js";
 import {
   isTeamModeLocked,
-} from "../../src/client/infrastructure/team-mode.js";
+} from "../../src/client/platform/team-mode.js";
 import {
   createWebuiBrowserStorage,
   getWebuiBrowserStorage,
   readWebuiUnreadCounts,
-} from "../../src/client/infrastructure/storage.js";
+} from "../../src/client/platform/storage.js";
 
 beforeEach(() => {
   globalThis.localStorage = createWebuiMemoryStorage();

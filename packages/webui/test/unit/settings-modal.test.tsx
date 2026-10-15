@@ -5,7 +5,7 @@ import { DESKTOP_SETTINGS_TABS, filterSettingsTabs, resolveThemePreference } fro
 import { DisabledBillingActions, UsageModelSettings } from "../../src/client/features/settings/ui/UsageModelSettings.js";
 import { reorderModelIds } from "../../src/client/features/models/projection/model-reorder.js";
 import { formatResetLabel, getActiveSourceBadge, projectProviderHeaders } from "../../src/client/features/models/projection/usage-settings.js";
-import { createWebuiBrowserDom } from "../../src/client/infrastructure/browser-dom.js";
+import { createWebuiBrowserDom } from "../../src/client/platform/browser-dom.js";
 
 describe("desktop settings registry", () => {
   it("keeps the electron tab order, labels, and groups", () => {

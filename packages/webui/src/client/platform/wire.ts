@@ -10,7 +10,7 @@
 // This module names no operation of its own: `operation` arrives as a
 // parameter. The domain method table that supplies it — through the canonical
 // identifiers in `shared/operation-names.ts` — is
-// `client/infrastructure/transport.ts`. Wire lifecycle mechanics here, domain
+// `client/platform/transport.ts`. Wire lifecycle mechanics here, domain
 // method tables there is the whole split.
 
 import type { WebuiDeliveryHandle } from "../features/turn/contracts/execution-port.js";

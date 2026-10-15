@@ -7,7 +7,7 @@ import {
   markWebuiEventWatcherHealthy,
   registerWebuiEventWatcher,
   unregisterWebuiEventWatcher,
-} from "../../src/client/infrastructure/connection-health.js";
+} from "../../src/client/platform/connection-health.js";
 import {
   ConnectionStatus as BaseConnectionStatus,
   projectWebuiConnectionState,

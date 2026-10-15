@@ -9,7 +9,7 @@
 // `webui-service.test.ts`.
 import { describe, expect, it } from "vitest";
 
-import { createWebuiTransport } from "../../src/client/infrastructure/transport.js";
+import { createWebuiTransport } from "../../src/client/platform/transport.js";
 
 /** A socket that records what was sent and lets a test deliver frames. */
 class ControllableSocket {

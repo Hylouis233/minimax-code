@@ -1,6 +1,6 @@
 import { createContext, useContext, type ReactNode } from "react";
-import { EMPTY_WEBUI_BROWSER_DOM, type WebuiBrowserDom } from "../infrastructure/browser-dom.js";
-import { createWebuiBrowserStorage, type WebuiBrowserStorage } from "../infrastructure/storage.js";
+import { EMPTY_WEBUI_BROWSER_DOM, type WebuiBrowserDom } from "../platform/browser-dom.js";
+import { createWebuiBrowserStorage, type WebuiBrowserStorage } from "../platform/storage.js";
 
 export interface WebuiBrowserCapabilities {
   readonly dom: WebuiBrowserDom;

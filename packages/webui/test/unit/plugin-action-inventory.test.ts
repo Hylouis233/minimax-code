@@ -111,10 +111,10 @@ describe("each action's business is the one the inventory records", () => {
       "features/plugins/contracts/plugin-actions.ts", // the typed action adapter
       "application/port-slices.ts", // the slice's cut
       "features/plugins/contracts/plugin-port.ts", // the declaration
-      "infrastructure/transport.ts", // the wire
+      "platform/transport.ts", // the wire
       "components/shell/WebuiClientFoundationApp.tsx", // the composition root that builds the slice
     ];
-    const reach = [..."application contracts infrastructure components bindings projection".split(" ")]
+    const reach = [..."application contracts platform components bindings projection".split(" ")]
       .flatMap((layer) => {
         const dir = fileURLToPath(new URL(layer + "/", CLIENT));
         return listFiles(dir).filter((file) => /pluginManagement/u.test(stripComments(readSafe(file))));

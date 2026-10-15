@@ -1695,15 +1695,15 @@ const BROWSER_GLOBAL_POLICY = {
   },
   document: {
     layers: new Set(["root", "infrastructure"]),
-    files: new Set(["client/infrastructure/storage.ts"]),
+    files: new Set(["client/platform/storage.ts"]),
   },
   localStorage: {
     layers: new Set(["root", "infrastructure"]),
-    files: new Set(["client/infrastructure/storage.ts"]),
+    files: new Set(["client/platform/storage.ts"]),
   },
   sessionStorage: {
     layers: new Set(["root", "infrastructure"]),
-    files: new Set(["client/infrastructure/storage.ts"]),
+    files: new Set(["client/platform/storage.ts"]),
   },
 };
 

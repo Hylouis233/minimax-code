@@ -3,27 +3,27 @@ import { createRoot, type Root } from "react-dom/client";
 import { WebuiClientFoundationApp } from "./components/shell/WebuiClientFoundationApp.js";
 // The composition root may read the platform layer; the shell and the rail may
 // not (plan §5.3), so the label is resolved here and injected.
-import { teamModeCopy } from "./infrastructure/team-mode.js";
+import { teamModeCopy } from "./platform/team-mode.js";
 export { WebuiSessionList } from "./features/sessions/ui/SessionRail.js";
 export { WebuiSessionTranscript } from "./features/transcript/ui/SessionTranscript.js";
 export {
   WebuiClientFoundationApp,
 } from "./components/shell/WebuiClientFoundationApp.js";
 export { subscribeToSessionHash } from "./bindings/navigation.js";
-import { createWebuiTransport } from "./infrastructure/transport.js";
-import { importWebuiSessionFile } from "./infrastructure/session-import.js";
-import { startWebuiSessionTransferDownload } from "./infrastructure/session-transfer-download.js";
+import { createWebuiTransport } from "./platform/transport.js";
+import { importWebuiSessionFile } from "./platform/session-import.js";
+import { startWebuiSessionTransferDownload } from "./platform/session-transfer-download.js";
 import { route } from "./projection/common/router.js";
 import { NotFound } from "./components/shell/NotFound.js";
 import { ArchonPage } from "./components/shell/ArchonPage.js";
 import { WebuiErrorBoundary } from "./components/shell/WebuiErrorBoundary.js";
 import { WebuiStartupFallback } from "./components/shell/StartupFallback.js";
 import { WebuiBrowserCapabilitiesProvider } from "./bindings/browser-capabilities.js";
-import { createWebuiBrowserDom } from "./infrastructure/browser-dom.js";
+import { createWebuiBrowserDom } from "./platform/browser-dom.js";
 import {
   createWebuiBrowserStorage,
   getWebuiBrowserStorage,
-} from "./infrastructure/storage.js";
+} from "./platform/storage.js";
 import { createWebuiApplication } from "./application/create-application.js";
 import { createWebuiComposerStore } from "./features/composer/application/composer-store.js";
 import { createWebuiPortSlices } from "./application/port-slices.js";
@@ -108,11 +108,11 @@ function WebuiClientRoot({
         // constructing owners.
         slices,
         // The session-file import the session workflows submit through: the
-        // application layer may not reach into `infrastructure/` itself.
+        // application layer may not reach into `platform/` itself.
         sessionImport: importWebuiSessionFile,
         // The session-file export the session workflows submit through: the
         // navigation is platform IO, and the rail may not reach into
-        // `infrastructure/` itself (T19).
+        // `platform/` itself (T19).
         sessionExport: startWebuiSessionTransferDownload,
         turns: {
           resumeSession: transport.resumeSession ?? (async () => {}),

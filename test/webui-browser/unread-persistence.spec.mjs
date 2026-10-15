@@ -6,7 +6,7 @@
 // so a returning user's counts survive a reload and the session they open does
 // not come back with the badge they just read.
 //
-// The storage key and its format belong to `infrastructure/storage.ts`
+// The storage key and its format belong to `platform/storage.ts`
 // (`SESSION_UNREAD_STORAGE_KEY`, positive counts only), and the badge attribute
 // is what the rail publishes, so both are asserted as the real artifacts rather
 // than through a helper the app does not use.

@@ -4,7 +4,7 @@
 //
 // | Declaration | Wire purpose | Producer | Consumers |
 // | --- | --- | --- | --- |
-// | `WebuiVersionInfo` | The handshake fact: version, protocolVersion, dataDir. | Runtime `createHarnessPortFromHost` version const (`runtime/harness/adapter.ts`). | `client/features/settings/application/settings-workflows.ts`; `client/features/settings/contracts/settings-port.ts`; `client/infrastructure/transport.ts`; `client/features/account/ui/UserMenu.tsx`; `client/features/settings/ui/SettingsModal.tsx`; `client/components/shell/WebuiClientFoundationApp.tsx`. |
+// | `WebuiVersionInfo` | The handshake fact: version, protocolVersion, dataDir. | Runtime `createHarnessPortFromHost` version const (`runtime/harness/adapter.ts`). | `client/features/settings/application/settings-workflows.ts`; `client/features/settings/contracts/settings-port.ts`; `client/platform/transport.ts`; `client/features/account/ui/UserMenu.tsx`; `client/features/settings/ui/SettingsModal.tsx`; `client/components/shell/WebuiClientFoundationApp.tsx`. |
 export interface WebuiVersionInfo {
   readonly version: string;
   readonly protocolVersion: number;

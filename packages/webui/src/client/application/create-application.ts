@@ -165,7 +165,7 @@ export interface WebuiApplicationDeps {
   readonly turnReview?: WebuiTurnReviewPort;
   readonly loadMessages?: WebuiClientMessageLoader;
   /**
-   * The unread storage adapter (`infrastructure/storage.ts`), injected because
+   * The unread storage adapter (`platform/storage.ts`), injected because
    * the application layer may not import infrastructure. Absent degrades to a
    * no-op: hydration completes immediately against no stored counts, which is
    * the correct behaviour for SSR and unit tests.
@@ -203,7 +203,7 @@ export interface WebuiApplicationDeps {
   /**
    * The session-file import the session workflows submit through. Injected for
    * the same reason as `unreadStorage`: the application layer may not import
-   * `infrastructure/`.
+   * `platform/`.
    */
   readonly sessionImport?: Parameters<typeof createWebuiSessionWorkflows>[0]["importSession"];
   /**

@@ -99,7 +99,7 @@ describe("an attempt the client started is closable by the application", () => {
     const closed = vi.fn();
     const abort = vi.fn(async () => ({ success: true }));
     // A transport that opens a delivery and hands up its disposer, exactly as
-    // `infrastructure/transport.ts` does.
+    // `platform/transport.ts` does.
     const send = vi.fn(
       async (
         _body: unknown,

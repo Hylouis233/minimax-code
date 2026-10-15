@@ -30,7 +30,7 @@ import { importWebuiSessionTransfer } from "../../src/runtime/session-transfer.j
 import {
   assertWebuiTransferFile,
   WEBUI_LEGACY_CLIENT_EXPORT_FORMAT,
-} from "../../src/client/infrastructure/session-import.js";
+} from "../../src/client/platform/session-import.js";
 
 const token = "test-token";
 

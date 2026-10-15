@@ -4,7 +4,7 @@
 // coordinator is its *sole* consumer: components never subscribe to the raw
 // process-event stream, they subscribe to application snapshots. This module
 // declares only the shape; the concrete transport-backed channel and its
-// reconnection live in `client/infrastructure/` and are supplied at
+// reconnection live in `client/platform/` and are supplied at
 // composition time, which is what keeps `application` off the transport.
 
 import type { WebuiRuntimeEvent } from "../../../../shared/contracts/stream.js";

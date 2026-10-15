@@ -8,7 +8,7 @@
 // the injected capability the composition root supplies.
 //
 // The storage keys, the stored format and the normalization stay in the
-// platform adapter (`infrastructure/storage.ts`) — they are the persisted
+// platform adapter (`platform/storage.ts`) — they are the persisted
 // contract with earlier builds, not this feature's invention. What this module
 // states is the surface it needs, so neither it nor the shell names a platform
 // module. The behaviour is unchanged: a toggle writes through and returns the

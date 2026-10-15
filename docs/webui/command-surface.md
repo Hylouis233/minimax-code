@@ -186,7 +186,7 @@ Regenerate with `pnpm gen:webui-commands`.
 | application-shared | application/port-slices.ts | WebuiPortSliceSource.updateUserModelProvider | optional ((request: Record&lt;string, unknown&gt;) =&gt; Promise&lt;unknown&gt;) &#124; undefined |
 | application-shared | application/port-slices.ts | WebuiPortSliceSource.upsertMiniMaxApiKey | optional ((request: { readonly apiKey: string; readonly saveAndUse?: boolean; }) =&gt; Promise&lt;unknown&gt;) &#124; undefined |
 | application-shared | application/port-slices.ts | WebuiPortSliceSource.version | optional (() =&gt; Promise&lt;import("shared/contracts/version").WebuiVersionInfo&gt;) &#124; undefined |
-| application-shared | application/port-slices.ts | WebuiPortSliceSource.watchEvents | optional import("client/infrastructure/event-channel").WebuiClientEventWatcher &#124; undefined |
+| application-shared | application/port-slices.ts | WebuiPortSliceSource.watchEvents | optional import("client/platform/event-channel").WebuiClientEventWatcher &#124; undefined |
 | application-shared | application/port-slices.ts | WebuiPortSliceSource.watchTerminal | optional ((request: { readonly terminalId: string; }, onFrame: (frame: import("shared/contracts/terminal").WebuiTerminalFrame) =&gt; void) =&gt; () =&gt; void) &#124; undefined |
 | application-shared | application/port-slices.ts | WebuiPortSliceSource.workspaceFileUrl | optional ((request: { readonly workspaceDir: string; readonly path: string; }) =&gt; string) &#124; undefined |
 | application-shared | application/port-slices.ts | WebuiPortSliceSource.writeTerminal | optional ((request: { readonly terminalId: string; readonly data: string; }) =&gt; Promise&lt;unknown&gt;) &#124; undefined |
@@ -222,7 +222,7 @@ Regenerate with `pnpm gen:webui-commands`.
 | application-shared | application/port-slices.ts | WebuiSettingsSlice.startCodexOAuthLogin | optional ((request?: Record&lt;string, unknown&gt;) =&gt; Promise&lt;unknown&gt;) &#124; undefined |
 | application-shared | application/port-slices.ts | WebuiSettingsSlice.version | optional (() =&gt; Promise&lt;import("shared/contracts/version").WebuiVersionInfo&gt;) &#124; undefined |
 | application-shared | application/port-slices.ts | WebuiShellSlice | export type WebuiShellSlice = Pick&lt;ShellEventPort, (typeof SHELL_KEYS)[number]&gt;; |
-| application-shared | application/port-slices.ts | WebuiShellSlice.watchEvents | optional import("client/infrastructure/event-channel").WebuiClientEventWatcher &#124; undefined |
+| application-shared | application/port-slices.ts | WebuiShellSlice.watchEvents | optional import("client/platform/event-channel").WebuiClientEventWatcher &#124; undefined |
 | application-shared | application/port-slices.ts | WebuiTranscriptSlice | export type WebuiTranscriptSlice = Pick&lt;TranscriptPort, (typeof TRANSCRIPT_KEYS)[number]&gt;; |
 | application-shared | application/port-slices.ts | WebuiTranscriptSlice.editSessionMessage | optional ((request: import("shared/contracts/session").WebuiEditSessionMessageRequest) =&gt; Promise&lt;import("shared/contracts/session").WebuiEditSessionMessageResult&gt;) &#124; undefined |
 | application-shared | application/port-slices.ts | WebuiTranscriptSlice.getSessionDiff | optional ((request: import("shared/contracts/session").WebuiGetSessionDiffRequest) =&gt; Promise&lt;import("shared/contracts/session").WebuiGetSessionDiffResult&gt;) &#124; undefined |
@@ -386,7 +386,7 @@ Regenerate with `pnpm gen:webui-commands`.
 | application-shared | contracts/transport.ts | WebuiTransport.updateUserModelProvider | optional ((request: Record&lt;string, unknown&gt;) =&gt; Promise&lt;unknown&gt;) &#124; undefined |
 | application-shared | contracts/transport.ts | WebuiTransport.upsertMiniMaxApiKey | optional ((request: { readonly apiKey: string; readonly saveAndUse?: boolean; }) =&gt; Promise&lt;unknown&gt;) &#124; undefined |
 | application-shared | contracts/transport.ts | WebuiTransport.version | optional (() =&gt; Promise&lt;import("shared/contracts/version").WebuiVersionInfo&gt;) &#124; undefined |
-| application-shared | contracts/transport.ts | WebuiTransport.watchEvents | optional import("client/infrastructure/event-channel").WebuiClientEventWatcher &#124; undefined |
+| application-shared | contracts/transport.ts | WebuiTransport.watchEvents | optional import("client/platform/event-channel").WebuiClientEventWatcher &#124; undefined |
 | application-shared | contracts/transport.ts | WebuiTransport.watchTerminal | optional ((request: { readonly terminalId: string; }, onFrame: (frame: import("shared/contracts/terminal").WebuiTerminalFrame) =&gt; void) =&gt; () =&gt; void) &#124; undefined |
 | application-shared | contracts/transport.ts | WebuiTransport.workspaceFileUrl | optional ((request: { readonly workspaceDir: string; readonly path: string; }) =&gt; string) &#124; undefined |
 | application-shared | contracts/transport.ts | WebuiTransport.writeTerminal | optional ((request: { readonly terminalId: string; readonly data: string; }) =&gt; Promise&lt;unknown&gt;) &#124; undefined |

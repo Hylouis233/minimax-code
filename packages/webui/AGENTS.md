@@ -21,7 +21,7 @@ src/
   client/             browser shell: entry, transport, contracts, runtime store, router
     components/       React components (the shell and every panel it renders)
     contracts/        one directory per business: its capability port and its view types; transport.ts joins them
-    infrastructure/   browser transport, event channel, storage and browser IO
+    platform/         browser transport, event channel, storage and browser IO
     mechanisms/       stream lease and stream-loop algorithms without application policy
     bindings/          React subscriptions, application context, navigation and browser effects
     application/       business workflows, state owners and query/request coordination
@@ -96,15 +96,15 @@ live in `client/features/composer/application/`. The settings dialog is
 | --- | --- | --- |
 | `client/main.tsx` | Build entry. Mounts the shell into `#webui-root` and constructs the transport **once** at module scope. | Importing nothing from it — it runs for side effects. |
 | `client/contracts/` | The client-facing contracts, filed by business: one directory per business (`sessions/`, `composer/`, `transcript/`, `turn/`, `goal/`, `interactions/`, `models/`, `plugins/`, `settings/`, `account/`, `shell/`, `workspace/`) holding that business's capability port and view types, joined by `contracts/transport.ts` into the `WebuiTransport` interface (every method optional — `undefined` means "this operation is not wired"). `contracts/transport.ts` declares no method of its own. | Importing a type from the business directory that owns it, rather than from a component or the shell. |
-| `client/infrastructure/transport.ts`, `client/infrastructure/event-channel.ts` | Request/response and independent-stream WebSocket IO; the application-owned `watchEvents` channel and reconnection. Components do not subscribe directly. | Constructed and owned by the application composition root. |
-| `client/infrastructure/storage.ts` | Browser storage IO for unread, favorites, no-project, team-mode, composer history and the rail's overlay flags (session stars/pins/archives, project pins/names). | Application composition injects the storage adapter; preserve normalization and pruning rules as pure functions. |
+| `client/platform/transport.ts`, `client/platform/event-channel.ts` | Request/response and independent-stream WebSocket IO; the application-owned `watchEvents` channel and reconnection. Components do not subscribe directly. | Constructed and owned by the application composition root. |
+| `client/platform/storage.ts` | Browser storage IO for unread, favorites, no-project, team-mode, composer history and the rail's overlay flags (session stars/pins/archives, project pins/names). | Application composition injects the storage adapter; preserve normalization and pruning rules as pure functions. |
 | `client/mechanisms/stream-lease.ts`, `client/mechanisms/stream-loop.ts` | Lease algorithm and stream frame IO/control. Stream history/context transforms are injected; application turn coordination owns recovery policy. | Called by the turn coordinator, not by components. |
 | `client/bindings/` | React subscriptions, application context, browser navigation, focus, scroll and other DOM effects. | Components use bindings for snapshots and named commands; a session binding mints the turn's generation-fenced stream sink inside `attachTurn` / `sendTurn`, so it hands out neither a store writer nor a sink factory. |
 | `client/application/` and `client/features/*/application/` | Shared application coordination and business workflows, with one directory per business. The canonical session store and turn/event/interaction/goal coordinators remain under `client/application/`; Composer submit workflows and history live in `client/features/composer/application/`, pure event-effect reduction in `client/features/turn/application/effect-reducer.ts`, model workflows in `client/features/models/application/models-workflows.ts`, and every caching owner reads through `client/application/query-store.ts`. | Composition root wires transport, storage and the store. UI consumes published reads/bindings and named commands; composition owns application construction. |
 | `client/application/session-store.ts` + `client/bindings/use-session-state.ts` | The framework-free canonical session/interaction store (`createWebuiSessionStore`, the writer and home-adoption types) and its React read binding (`useWebuiSessionStore`, `useWebuiSessionState`, `useWebuiSessionStream`, `useWebuiSessionSending`, `useWebuiSessionActivity`, `useWebuiSessionPermissions`). One map and one listener registry; there is no second complete session-store map. | Importing the binding from a component. The binding exposes named commands plus the `attachTurn` / `sendTurn` turn intents; the store writer and the attempt's sink never leave it. |
 | `client/features/turn/projection/stream-state.ts`, `client/mechanisms/stream-loop.ts` | Stream frame reduction (`reduceWebuiStreamFrame`) and send/resume loop (`runWebuiStreamLoop`, `buildWebuiStreamLoopSink`). The loop receives history/context and stream-state transforms as injected bundles (`WebuiStreamLoopDeps.projection`, `.streamState`). | Through application turn coordination; tests drive the pure reducer and loop directly. |
 | `client/projection/common/router.ts`, `client/bindings/navigation.ts` | `route(pathname)` maps paths; `navigation.ts:16` implements `readSessionIdFromHash` and the browser hash subscription. | Import route rules from `projection/common/router.ts` and navigation state from its binding. |
-| `client/features/composer/ui/slash-palette.ts`, `client/contracts/value-readers.ts`, `client/infrastructure/team-mode.ts`, `client/components/transcript/markdown.tsx`, `client/components/shell/icons.tsx` | Slash-command UI palette, defensive readers for untrusted payload fields, team-mode helpers, markdown and icon renderers. Command field types belong in contracts, not this icon-bearing UI module. | Importing UI helpers directly; application/projection code must not use the palette for command types or classification. |
+| `client/features/composer/ui/slash-palette.ts`, `client/contracts/value-readers.ts`, `client/platform/team-mode.ts`, `client/components/transcript/markdown.tsx`, `client/components/shell/icons.tsx` | Slash-command UI palette, defensive readers for untrusted payload fields, team-mode helpers, markdown and icon renderers. Command field types belong in contracts, not this icon-bearing UI module. | Importing UI helpers directly; application/projection code must not use the palette for command types or classification. |
 
 ### Client / projection
 
@@ -166,7 +166,7 @@ The registry is one module per concern. Add code in the layer it belongs to, not
 ## How a request travels
 
 1. The browser calls a `WebuiTransport` method (the interface in `client/contracts/transport.ts`,
-   implemented in `client/infrastructure/transport.ts`), which frames
+   implemented in `client/platform/transport.ts`), which frames
    `{protocolVersion, kind: "request", requestId, operation, body}`.
 2. `WebuiService` validates the frame and hands it to `dispatchWebuiFrame`.
 3. The dispatcher looks the operation up in the registry; an unregistered name or a failed
@@ -198,7 +198,7 @@ server/      →  runtime/port.ts  ↔  runtime/  →  shared/
   moves: repoint every importer (including relative `../` specifiers, which a naive grep misses) and
   delete the shim.
 - Application modules own business RPCs and writable state. Components must not call transport methods for business workflows or receive a generic store writer.
-- Storage and DOM access belong in `client/infrastructure/` or `client/bindings/`; application and projection modules receive capabilities or values instead of reading browser globals.
+- Storage and DOM access belong in `client/platform/` or `client/bindings/`; application and projection modules receive capabilities or values instead of reading browser globals.
 - No new module may import the shell, and no two modules may own the same Map/state.
 
 **Roles are enforced as well as layers.** `classifyRole` reads the role a file owns (assembly,
@@ -278,7 +278,7 @@ Edit in this order so each layer compiles against the previous one:
 8. `server/operation/operations.ts` — the `registerOperation` call, in the position the order needs.
 9. `client/contracts/<capability>-port.ts` — the method on the right capability port (optional, like
    its neighbours); it reaches `WebuiTransport` through `client/contracts/transport.ts`.
-10. `client/infrastructure/transport.ts` — the implementation, then wire it through the application owner to the binding or workflow that needs it.
+10. `client/platform/transport.ts` — the implementation, then wire it through the application owner to the binding or workflow that needs it.
 11. `test/unit/webui-service.test.ts` — extend `ScriptedHarnessPort`. Since batch A,
     `pnpm typecheck:webui` includes `tsconfig.test.json`, so a missing or
     wrongly-typed stub surfaces as a `Type ... is missing the following properties from type 'WebuiHarnessPort'`

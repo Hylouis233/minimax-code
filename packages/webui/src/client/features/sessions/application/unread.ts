@@ -20,12 +20,12 @@
 //     race.
 //   * **One persistence writer.** `persist` writes the current positive counts
 //     through the injected storage adapter — the same key, the same
-//     positive-integer validation on the way in (`infrastructure/storage.ts`),
+//     positive-integer validation on the way in (`platform/storage.ts`),
 //     the same positive-count filter on the way out. A store subscription calls
 //     it on every activity change *after* hydration, which is the ordering the
 //     shell's two effects used to encode by hand.
 //
-// The persistence format is untouched: `infrastructure/storage.ts` owns the
+// The persistence format is untouched: `platform/storage.ts` owns the
 // key, the validation and the shape, and it is *injected* here (this module is
 // the application layer and may not import infrastructure), so the byte layout
 // on disk is exactly what it always was.

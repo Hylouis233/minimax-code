@@ -12,7 +12,7 @@ import {
 } from "../../src/client/features/composer/application/composer-history.js";
 import type { WebuiComposerPersisted } from "../../src/client/features/composer/application/composer-history.js";
 import { createWebuiComposerStore } from "../../src/client/features/composer/application/composer-store.js";
-import { createWebuiBrowserStorage } from "../../src/client/infrastructure/storage.js";
+import { createWebuiBrowserStorage } from "../../src/client/platform/storage.js";
 
 /**
  * Pure-function tests for the composer input history + cross-session draft

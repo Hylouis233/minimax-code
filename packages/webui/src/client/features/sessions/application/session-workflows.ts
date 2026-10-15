@@ -49,7 +49,7 @@ export interface WebuiSessionCatalogStore {
 
 /**
  * The session-import capability, injected because the implementation is
- * browser IO (`infrastructure/session-import.ts`) and this module is the
+ * browser IO (`platform/session-import.ts`) and this module is the
  * application layer. The composition root supplies
  * `importWebuiSessionFile`; the shell submits `importSession` and never calls
  * the importer itself.
@@ -66,7 +66,7 @@ export type WebuiSessionImporter = (
 /**
  * The session-export capability, injected for the same reason as the importer:
  * the implementation is browser download IO
- * (`infrastructure/session-transfer-download.ts`) and this module is the
+ * (`platform/session-transfer-download.ts`) and this module is the
  * application layer. The composition root supplies
  * `startWebuiSessionTransferDownload`; the rail submits `exportSession` and
  * never navigates itself.
