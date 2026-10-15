@@ -279,17 +279,24 @@ describe("discoverUserModelsCandidate refuses malformed bodies at ingress", () =
       refusesAtIngress("discoverUserModelsCandidate", body));
   }
 
-  it("forwards each branch of a valid body unchanged", async () => {
-    const saved = { providerId: "p1", expectedRevision: "rev-1", baseUrl: BASE_URL };
-    const fresh = { name: "mine", apiKey: "sk-test", apiFormat: "openai", baseUrl: BASE_URL };
-    for (const body of [saved, fresh]) {
-      const { calls, registry } = recordingTarget("discoverUserModelsCandidate");
-      const frame = await dispatch("discoverUserModelsCandidate", body, registry);
+  it("forwards a saved-provider branch of a valid body unchanged", async () => {
+    const body = { providerId: "p1", expectedRevision: "rev-1", baseUrl: BASE_URL };
+    const { calls, registry } = recordingTarget("discoverUserModelsCandidate");
+    const frame = await dispatch("discoverUserModelsCandidate", body, registry);
 
-      assert.equal(frame.kind, "response");
-      assert.equal(calls.length, 1);
-      assert.deepEqual(calls[0], body);
-    }
+    assert.equal(frame.kind, "response");
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0], body);
+  });
+
+  it("forwards a new-provider branch of a valid body unchanged", async () => {
+    const body = { name: "mine", apiKey: "sk-test", apiFormat: "openai", baseUrl: BASE_URL };
+    const { calls, registry } = recordingTarget("discoverUserModelsCandidate");
+    const frame = await dispatch("discoverUserModelsCandidate", body, registry);
+
+    assert.equal(frame.kind, "response");
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0], body);
   });
 });
 

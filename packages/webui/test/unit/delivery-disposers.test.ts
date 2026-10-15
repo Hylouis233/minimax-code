@@ -134,11 +134,48 @@ describe("an attempt the client started is closable by the application", () => {
     expect(abort).not.toHaveBeenCalled();
   });
 
-  it("leaves the attempt's completion unsettled when the observer detaches", async () => {
+  it("settles the attempt and clears its sending flag when the host finishes", async () => {
+    // The control for the case below. Without it, "the attempt is still pending
+    // after a detach" would be guaranteed by the transport that never settles
+    // rather than by the detach: this is what completion actually looks like.
+    const app = createWebuiApplication({
+      openEventChannel: () => ({ subscribe: () => () => undefined, close: () => undefined }),
+      turns: { resumeSession: (async () => undefined) as unknown as WebuiClientSessionResumer },
+    });
+    app.start({ initialSessionId: "s1" });
+
+    const abort = vi.fn(async () => ({ success: true }));
+    const send = vi.fn(async (_body: unknown, onFrame: (frame: { dataJson: string }) => void) => {
+      onFrame({ dataJson: '{"type":2,"agent_message":{"msg_id":"m1","msg_content":"hello"}}' });
+      onFrame({ dataJson: "[DONE]" });
+    });
+    const commands = createWebuiConversationTurnCommands({
+      store: app.store,
+      sessionId: "s1",
+      capabilities: { send: send as never, stop: abort as never },
+      deliveries: app.deliveries,
+    });
+
+    const outcome = await commands.send({
+      message: "hello",
+      sending: false,
+      callbacks: { onDraftChange: () => undefined },
+    });
+
+    expect(outcome).toMatchObject({ completion: { kind: "dispatched" } });
+    // The submit-lifecycle flag came back down and the delivery was released by
+    // the attempt itself.
+    expect(app.store.readSession("s1").sending).toBe(false);
+    expect(app.deliveries.count("s1")).toBe(0);
+    app.dispose();
+  });
+
+  it("leaves the attempt unsettled and still owed when the observer detaches", async () => {
     // P02's exit item: "a detached observer is not evidence that host execution
-    // completed". Detaching closes this client's half of the delivery, and that is
-    // the whole of it — the operation it started has not finished, so nothing may
-    // report the turn as done, and the host is still producing frames.
+    // completed". Detaching closes this client's half of the delivery and does
+    // nothing else — so against the control above, the attempt must still be owed:
+    // no completion, and the sending flag the loop clears on a real finish is
+    // still set. A dispose path that marked the attempt complete would fail here.
     const app = createWebuiApplication({
       openEventChannel: () => ({ subscribe: () => () => undefined, close: () => undefined }),
       turns: { resumeSession: (async () => undefined) as unknown as WebuiClientSessionResumer },
@@ -176,13 +213,18 @@ describe("an attempt the client started is closable by the application", () => {
       });
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(app.deliveries.count("s1")).toBe(1);
+    expect(app.store.readSession("s1").sending).toBe(true);
 
     app.dispose();
     await new Promise((resolve) => setTimeout(resolve, 0));
 
+    // The client stopped observing…
     expect(closed).toHaveBeenCalledTimes(1);
-    // Still in flight: detaching is neither a completion nor a cancellation.
+    expect(app.deliveries.count("s1")).toBe(0);
+    // …and that is all it did: the attempt is still owed, so nothing may report
+    // the turn as finished, and the host was never cancelled.
     expect(outcome).toBe("pending");
+    expect(app.store.readSession("s1").sending).toBe(true);
     expect(abort).not.toHaveBeenCalled();
   });
 });
