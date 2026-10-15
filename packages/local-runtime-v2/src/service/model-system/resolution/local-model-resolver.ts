@@ -4,17 +4,27 @@ import {
   type Api,
   type Model,
   type ThinkingLevelMap,
-} from '@earendil-works/pi-ai';
-import type { StreamFn, ThinkingLevel as PiThinkingLevel } from '@earendil-works/pi-agent-core';
+} from "@earendil-works/pi-ai";
+import type {
+  StreamFn,
+  ThinkingLevel as PiThinkingLevel,
+} from "@earendil-works/pi-agent-core";
 import {
   isFirstPartyMinimaxMessagesRoute,
   resolveProviderAuthMode,
   type ProviderAuthMode,
   type ProviderAuthModeSource,
-} from '@mavis/config';
-import { ThinkingLevel, type IAgentConfig, type IModelRef } from '@mavis/protocol';
-import type { ManagedBackendRoutingContext } from '@mavis/agent-tools/desktop';
-import { withOpenCodeGoHeaders, withOpenRouterAttributionHeaders } from '@mavis/shared';
+} from "@mavis/config";
+import {
+  ThinkingLevel,
+  type IAgentConfig,
+  type IModelRef,
+} from "@mavis/protocol";
+import type { ManagedBackendRoutingContext } from "@mavis/agent-tools/desktop";
+import {
+  withOpenCodeGoHeaders,
+  withOpenRouterAttributionHeaders,
+} from "@mavis/shared";
 
 import type {
   LocalModelCompatOverrides,
@@ -26,14 +36,14 @@ import type {
   LocalModelsConfig,
   LocalProviderOptions,
   LocalRuntimeAuthContext,
-} from '../contracts.js';
-import { normalizeProviderBaseUrl } from '../connectivity/provider-request.js';
+} from "../contracts.js";
+import { normalizeProviderBaseUrl } from "../connectivity/provider-request.js";
 import {
   isModelProviderApi,
   MANAGED_MINIMAX_PROVIDER_ID,
   OPENAI_CODEX_PROVIDER_ID,
-} from '../identity.js';
-import { parseProviderId } from './model-key.js';
+} from "../identity.js";
+import { parseProviderId } from "./model-key.js";
 import {
   isMiniMaxM3ModelId,
   isMiniMaxM3ThinkingMode,
@@ -43,40 +53,40 @@ import {
   readSelectedThinkingEffort,
   resolveByokThinkingProtocol,
   supportsJsonObjectOutput,
-} from './model-ref.js';
+} from "./model-ref.js";
 import {
   firstBuiltinModel,
   planCustomProviderResolution,
   planMinimaxApiResolution,
   readStringRecord,
-} from './model-resolver-byok.js';
+} from "./model-resolver-byok.js";
 import {
   buildLocalProviderHeaders,
   createManagedAuthRetryFetch,
   readAgentHeaderId,
   stripUrlCredentials,
-} from './model-resolver-helpers.js';
-import { hasOpenPlatformThinkingVariants } from './openplatform-thinking.js';
-import { withByokErrorAttribution } from './byok-error-attribution.js';
-import { withLocalDynamicMaxTokens } from './dynamic-max-tokens.js';
-import { normalizeLocalMultimodalLimitCapabilities } from './file-api-capabilities.js';
-import { resolveLocalFileApiGatewayAuth } from './file-api-gateway-auth.js';
+} from "./model-resolver-helpers.js";
+import { hasOpenPlatformThinkingVariants } from "./openplatform-thinking.js";
+import { withByokErrorAttribution } from "./byok-error-attribution.js";
+import { withLocalDynamicMaxTokens } from "./dynamic-max-tokens.js";
+import { normalizeLocalMultimodalLimitCapabilities } from "./file-api-capabilities.js";
+import { resolveLocalFileApiGatewayAuth } from "./file-api-gateway-auth.js";
 
 const FALLBACK_MODEL_LIMITS = {
   contextWindow: 200_000,
   maxTokens: 128_000,
 } as const;
 
-const DEFAULT_LOCAL_PI_API: Api = 'anthropic-messages';
-const MANAGED_PROVIDER_API_KEY_PLACEHOLDER = 'sk-xxx';
+const DEFAULT_LOCAL_PI_API: Api = "anthropic-messages";
+const MANAGED_PROVIDER_API_KEY_PLACEHOLDER = "sk-xxx";
 
 const THINKING_LEVEL_TO_PI: Record<ThinkingLevel, PiThinkingLevel> = {
-  [ThinkingLevel.OFF]: 'off',
-  [ThinkingLevel.MINIMAL]: 'minimal',
-  [ThinkingLevel.LOW]: 'low',
-  [ThinkingLevel.MEDIUM]: 'medium',
-  [ThinkingLevel.HIGH]: 'high',
-  [ThinkingLevel.XHIGH]: 'xhigh',
+  [ThinkingLevel.OFF]: "off",
+  [ThinkingLevel.MINIMAL]: "minimal",
+  [ThinkingLevel.LOW]: "low",
+  [ThinkingLevel.MEDIUM]: "medium",
+  [ThinkingLevel.HIGH]: "high",
+  [ThinkingLevel.XHIGH]: "xhigh",
 };
 
 interface ModelIdentity {
@@ -85,7 +95,9 @@ interface ModelIdentity {
   readonly modelId: string;
 }
 
-type ByokResolutionPlan = NonNullable<ReturnType<typeof planMinimaxApiResolution>>;
+type ByokResolutionPlan = NonNullable<
+  ReturnType<typeof planMinimaxApiResolution>
+>;
 
 interface SelectedModel {
   readonly identity: ModelIdentity;
@@ -107,6 +119,7 @@ interface FinishResolveInput extends ModelIdentity {
   readonly runtimeProvider?: string;
   readonly configHeaders?: Record<string, string>;
   readonly modelCompat?: LocalModelCompatOverrides;
+  readonly requestPatch?: Readonly<Record<string, unknown>>;
   readonly catalogModel?: Model<Api>;
   readonly authContext?: LocalRuntimeAuthContext;
   readonly routingContext?: ManagedBackendRoutingContext;
@@ -119,11 +132,22 @@ export class LocalModelResolver implements LocalModelResolverLike {
     this.defaultApi = options.defaultApi ?? DEFAULT_LOCAL_PI_API;
   }
 
-  async resolveModel(input: LocalModelResolveInput): Promise<LocalResolvedModelConfig> {
-    const providerConfig = this.options.providerConfigGetter?.() ?? this.options.providerConfig;
-    const selected = selectModel(input.agentConfig, providerConfig, this.options);
+  async resolveModel(
+    input: LocalModelResolveInput,
+  ): Promise<LocalResolvedModelConfig> {
+    const providerConfig =
+      this.options.providerConfigGetter?.() ?? this.options.providerConfig;
+    const selected = selectModel(
+      input.agentConfig,
+      providerConfig,
+      this.options,
+    );
     if (selected.byokPlan) return this.finishByok(input, selected);
-    const switched = selectMinimaxByok(selected.identity, providerConfig, this.options);
+    const switched = selectMinimaxByok(
+      selected.identity,
+      providerConfig,
+      this.options,
+    );
     if (switched.byokPlan) return this.finishByok(input, switched);
     return this.resolveManagedModel(input, switched.identity, providerConfig);
   }
@@ -134,20 +158,28 @@ export class LocalModelResolver implements LocalModelResolverLike {
   ): Promise<LocalResolvedModelConfig> {
     const plan = selected.byokPlan;
     if (!plan || !selected.route) {
-      throw new Error('LocalModelResolver: incomplete BYOK resolution plan');
+      throw new Error("LocalModelResolver: incomplete BYOK resolution plan");
     }
     const resolvedPlan = await resolveByokResolutionPlan(plan, this.options);
-    this.logRoute(selected.identity.provider, selected.identity.modelId, selected.route);
+    this.logRoute(
+      selected.identity.provider,
+      selected.identity.modelId,
+      selected.route,
+    );
     return this.finishResolve({
       sessionId: input.sessionId,
       agentConfig: input.agentConfig,
       ...selected.identity,
       managedProvider: false,
       byokProvider: true,
-      customProvider: selected.route === 'custom_provider' && !plan.authProvider,
+      customProvider:
+        selected.route === "custom_provider" && !plan.authProvider,
       ...(plan.runtimeProvider
         ? {
-            catalogModel: lookupLocalCatalogModel(plan.runtimeProvider, selected.identity.modelId),
+            catalogModel: lookupLocalCatalogModel(
+              plan.runtimeProvider,
+              selected.identity.modelId,
+            ),
           }
         : {}),
       ...resolvedPlan,
@@ -161,7 +193,9 @@ export class LocalModelResolver implements LocalModelResolverLike {
   ): Promise<LocalResolvedModelConfig> {
     const { provider, modelId, modelRef } = identity;
     const currentAuthContext = this.options.authContextGetter?.();
-    const authContext = currentAuthContext ? { ...currentAuthContext } : undefined;
+    const authContext = currentAuthContext
+      ? { ...currentAuthContext }
+      : undefined;
     const routingContext = this.options.routingContextGetter?.();
     const credentials = resolveLocalProviderCredentials(
       provider,
@@ -171,10 +205,24 @@ export class LocalModelResolver implements LocalModelResolverLike {
     );
     const limits = lookupLocalModelLimits(provider, modelId);
     const openAiCodex = provider === OPENAI_CODEX_PROVIDER_ID;
-    const apiKey = await resolveProviderApiKey(provider, credentials.apiKey, this.options);
-    const baseUrl = credentials.baseUrl ?? (openAiCodex ? limits.baseUrl : undefined);
-    const usable = requireUsableCredentials(provider, apiKey, baseUrl, credentials);
-    this.logRoute(provider, modelId, providerRouteForAuthMode(credentials.authMode));
+    const apiKey = await resolveProviderApiKey(
+      provider,
+      credentials.apiKey,
+      this.options,
+    );
+    const baseUrl =
+      credentials.baseUrl ?? (openAiCodex ? limits.baseUrl : undefined);
+    const usable = requireUsableCredentials(
+      provider,
+      apiKey,
+      baseUrl,
+      credentials,
+    );
+    this.logRoute(
+      provider,
+      modelId,
+      providerRouteForAuthMode(credentials.authMode),
+    );
     return this.finishResolve({
       sessionId: input.sessionId,
       agentConfig: input.agentConfig,
@@ -184,8 +232,8 @@ export class LocalModelResolver implements LocalModelResolverLike {
       baseUrl: usable.baseUrl,
       contextWindow: limits.contextWindow,
       maxTokens: limits.maxTokens,
-      managedProvider: credentials.authMode === 'managed-login',
-      byokProvider: credentials.authMode === 'oauth',
+      managedProvider: credentials.authMode === "managed-login",
+      byokProvider: credentials.authMode === "oauth",
       customProvider: false,
       configHeaders: credentials.headers,
       catalogModel: lookupLocalCatalogModel(provider, modelId),
@@ -195,14 +243,31 @@ export class LocalModelResolver implements LocalModelResolverLike {
   }
 
   private finishResolve(input: FinishResolveInput): LocalResolvedModelConfig {
-    const contextWindow = positive(input.modelRef.context_window) || input.contextWindow;
+    const contextWindow =
+      positive(input.modelRef.context_window) || input.contextWindow;
     const maxTokens = positive(input.modelRef.max_tokens) || input.maxTokens;
-    const thinking = resolveThinking(input, this.options.implicitCustomProviderThinking === true);
+    const thinking = resolveThinking(
+      input,
+      this.options.implicitCustomProviderThinking === true,
+    );
+    // Keep the prepared-payload channel shared by turns and auxiliary callers.
+    // Fast only adds disjoint transport fields, never a replacement effort.
+    const requestPatch =
+      thinking.requestPatch || input.requestPatch
+        ? { ...thinking.requestPatch, ...input.requestPatch }
+        : undefined;
     const baseUrl = normalizeResolvedBaseUrl(input.api, input.baseUrl);
     const maxRequestBodyBytes = Number(
-      normalizeLocalMultimodalLimitCapabilities(input.modelRef.capabilities).max_request_body_bytes,
+      normalizeLocalMultimodalLimitCapabilities(input.modelRef.capabilities)
+        .max_request_body_bytes,
     );
-    const model = buildResolvedModel({ input, contextWindow, maxTokens, baseUrl, thinking });
+    const model = buildResolvedModel({
+      input,
+      contextWindow,
+      maxTokens,
+      baseUrl,
+      thinking,
+    });
     const streamFn = resolveModelStream(input, this.options.streamFn);
     const fileApiGatewayAuth = input.managedProvider
       ? resolveLocalFileApiGatewayAuth(input.authContext, input.routingContext)
@@ -220,7 +285,7 @@ export class LocalModelResolver implements LocalModelResolverLike {
         maxTokens,
         reasoning: thinking.enabled,
       },
-      'Resolved local conversation model',
+      "Resolved local conversation model",
     );
     return {
       model,
@@ -243,15 +308,17 @@ export class LocalModelResolver implements LocalModelResolverLike {
       ...(fileApiGatewayAuth ? { fileApiGatewayAuth } : {}),
       ...(streamFn ? { streamFn } : {}),
       ...(fetchImpl ? { fetch: fetchImpl } : {}),
-      ...(thinking.exposedLevel ? { thinkingLevel: thinking.exposedLevel } : {}),
-      ...(thinking.requestPatch ? { thinkingRequestPatch: thinking.requestPatch } : {}),
+      ...(thinking.exposedLevel
+        ? { thinkingLevel: thinking.exposedLevel }
+        : {}),
+      ...(requestPatch ? { thinkingRequestPatch: requestPatch } : {}),
     };
   }
 
   private logRoute(provider: string, modelId: string, route: string): void {
     this.options.logger?.info(
       { provider, modelId, route },
-      'Resolved local conversation model route',
+      "Resolved local conversation model route",
     );
   }
 }
@@ -259,9 +326,12 @@ export class LocalModelResolver implements LocalModelResolverLike {
 function resolveModelFetch(
   input: FinishResolveInput,
   options: LocalModelResolverOptions,
-): LocalResolvedModelConfig['fetch'] {
+): LocalResolvedModelConfig["fetch"] {
   return input.managedProvider
-    ? createManagedAuthRetryFetch({ ...options, authContext: input.authContext })
+    ? createManagedAuthRetryFetch({
+        ...options,
+        authContext: input.authContext,
+      })
     : options.fetchImpl;
 }
 
@@ -272,8 +342,13 @@ function selectModel(
 ): SelectedModel {
   const identity = requireModelIdentity(agentConfig);
   const parsed = parseProviderId(identity.provider);
-  if (!parsed || parsed.source === 'provider') return { identity };
-  const byokPlan = selectExternalByokPlan(identity, parsed, providerConfig, options);
+  if (!parsed || parsed.source === "provider") return { identity };
+  const byokPlan = selectExternalByokPlan(
+    identity,
+    parsed,
+    providerConfig,
+    options,
+  );
   if (byokPlan) return { identity, byokPlan, route: parsed.source };
   return {
     identity: fallbackBuiltinIdentity(identity, providerConfig, options.logger),
@@ -282,11 +357,14 @@ function selectModel(
 
 function requireModelIdentity(agentConfig: IAgentConfig): ModelIdentity {
   const modelRef = agentConfig.model;
-  if (!modelRef) throw new Error('LocalModelResolver: agentConfig.model is required');
-  const provider = modelRef.provider?.trim() ?? '';
-  const modelId = modelRef.model_id?.trim() ?? '';
-  if (!provider) throw new Error('LocalModelResolver: ModelRef.provider is required');
-  if (!modelId) throw new Error('LocalModelResolver: ModelRef.model_id is required');
+  if (!modelRef)
+    throw new Error("LocalModelResolver: agentConfig.model is required");
+  const provider = modelRef.provider?.trim() ?? "";
+  const modelId = modelRef.model_id?.trim() ?? "";
+  if (!provider)
+    throw new Error("LocalModelResolver: ModelRef.provider is required");
+  if (!modelId)
+    throw new Error("LocalModelResolver: ModelRef.model_id is required");
   return { modelRef, provider, modelId };
 }
 
@@ -296,12 +374,15 @@ function selectExternalByokPlan(
   providerConfig: LocalModelsConfig | undefined,
   options: LocalModelResolverOptions,
 ): ByokResolutionPlan | undefined {
-  if (parsed.source === 'minimax_api') {
+  if (parsed.source === "minimax_api") {
     return planMinimaxApiResolution({
       byok: options.byokConfigGetter?.(),
       providerConfig,
       modelId: identity.modelId,
-      catalog: lookupLocalModelLimits(MANAGED_MINIMAX_PROVIDER_ID, identity.modelId),
+      catalog: lookupLocalModelLimits(
+        MANAGED_MINIMAX_PROVIDER_ID,
+        identity.modelId,
+      ),
     });
   }
   return planCustomProviderResolution({
@@ -329,7 +410,7 @@ function fallbackBuiltinIdentity(
       fallbackProvider: fallback.provider,
       fallbackModelId: fallback.modelId,
     },
-    'LocalModelResolver: provider not found; falling back to builtin managed model',
+    "LocalModelResolver: provider not found; falling back to builtin managed model",
   );
   return {
     provider: fallback.provider,
@@ -350,7 +431,7 @@ function selectMinimaxByok(
   const byok = options.byokConfigGetter?.();
   if (
     identity.provider !== MANAGED_MINIMAX_PROVIDER_ID ||
-    byok?.minimaxModelSource !== 'minimax_api_key'
+    byok?.minimaxModelSource !== "minimax_api_key"
   ) {
     return { identity };
   }
@@ -358,9 +439,14 @@ function selectMinimaxByok(
     byok,
     providerConfig,
     modelId: identity.modelId,
-    catalog: lookupLocalModelLimits(MANAGED_MINIMAX_PROVIDER_ID, identity.modelId),
+    catalog: lookupLocalModelLimits(
+      MANAGED_MINIMAX_PROVIDER_ID,
+      identity.modelId,
+    ),
   });
-  return byokPlan ? { identity, byokPlan, route: 'minimax_api_key' } : { identity };
+  return byokPlan
+    ? { identity, byokPlan, route: "minimax_api_key" }
+    : { identity };
 }
 
 async function resolveProviderApiKey(
@@ -372,7 +458,10 @@ async function resolveProviderApiKey(
   return (await options.providerAuthGetter?.(provider))?.trim();
 }
 
-type ResolvedByokResolutionPlan = Omit<ByokResolutionPlan, 'apiKey' | 'authProvider'> & {
+type ResolvedByokResolutionPlan = Omit<
+  ByokResolutionPlan,
+  "apiKey" | "authProvider"
+> & {
   readonly apiKey: string;
 };
 
@@ -382,7 +471,9 @@ async function resolveByokResolutionPlan(
 ): Promise<ResolvedByokResolutionPlan> {
   const { authProvider, apiKey: configuredApiKey, ...resolved } = plan;
   const apiKey = (
-    authProvider ? await options.providerAuthGetter?.(authProvider) : configuredApiKey
+    authProvider
+      ? await options.providerAuthGetter?.(authProvider)
+      : configuredApiKey
   )?.trim();
   if (!apiKey) {
     throw new Error(
@@ -403,7 +494,7 @@ interface ResolvedThinking {
   readonly requestPatch?: Readonly<Record<string, unknown>>;
   readonly forceAdaptiveThinking?: true;
   readonly completionsThinkingCompat?: {
-    readonly thinkingFormat: 'openai';
+    readonly thinkingFormat: "openai";
     readonly supportsReasoningEffort: true;
   };
 }
@@ -441,7 +532,9 @@ function resolveThinkingContext(
   const thinkingToggleOn = isThinkingToggleOn(thinkingLevel);
   const selectedEffort =
     input.modelRef.thinking_effort ??
-    readSelectedThinkingEffort(input.modelRef.capabilities as Record<string, unknown> | undefined);
+    readSelectedThinkingEffort(
+      input.modelRef.capabilities as Record<string, unknown> | undefined,
+    );
   const protocolThinking = resolveConfiguredThinkingProtocol(
     input,
     thinkingToggleOn,
@@ -487,14 +580,19 @@ function resolveConfiguredThinkingProtocol(
   thinkingToggleOn: boolean,
   selectedEffort: string | undefined,
 ): ByokThinkingProtocol | undefined {
-  const configurable = input.customProvider || input.api === 'openai-codex-responses';
+  const configurable =
+    input.customProvider || input.api === "openai-codex-responses";
   if (!configurable || (!thinkingToggleOn && !selectedEffort)) return undefined;
   const api = supportedByokThinkingApi(input.api);
-  return api ? resolveByokThinkingProtocol(api, selectedEffort, input.modelId) : undefined;
+  return api
+    ? resolveByokThinkingProtocol(api, selectedEffort, input.modelId)
+    : undefined;
 }
 
 function supportedByokThinkingApi(api: Api): Api | undefined {
-  return isModelProviderApi(api) || api === 'openai-codex-responses' ? api : undefined;
+  return isModelProviderApi(api) || api === "openai-codex-responses"
+    ? api
+    : undefined;
 }
 
 function resolveThinkingEnabled(input: {
@@ -507,7 +605,8 @@ function resolveThinkingEnabled(input: {
 }): boolean {
   if (isThinkingEffortDisabled(input.selectedEffort)) return false;
   if (input.selectedEffort) return true;
-  if (!input.customProvider || input.openPlatform) return input.thinkingToggleOn;
+  if (!input.customProvider || input.openPlatform)
+    return input.thinkingToggleOn;
   if (input.protocolThinking) return input.protocolThinking.enabled !== false;
   return input.implicitCustomProviderThinking && input.thinkingToggleOn;
 }
@@ -518,11 +617,15 @@ function resolvePiThinkingLevel(input: {
   readonly selectedEffort: string | undefined;
   readonly thinkingLevel: ThinkingLevel | undefined;
   readonly modelId: string;
-}): Pick<ThinkingResolutionContext, 'piLevel'> {
+}): Pick<ThinkingResolutionContext, "piLevel"> {
   if (!input.enabled) return {};
   const piLevel =
     input.protocolThinking?.piLevel ??
-    selectedEffortPiLevel(input.selectedEffort, input.thinkingLevel, input.modelId) ??
+    selectedEffortPiLevel(
+      input.selectedEffort,
+      input.thinkingLevel,
+      input.modelId,
+    ) ??
     piThinkingLevelFor(input.thinkingLevel);
   return piLevel ? { piLevel } : {};
 }
@@ -538,8 +641,12 @@ function selectedEffortPiLevel(
   return selectedEffort as PiThinkingLevel | undefined;
 }
 
-function piThinkingLevelFor(thinkingLevel: ThinkingLevel | undefined): PiThinkingLevel | undefined {
-  return thinkingLevel === undefined ? undefined : THINKING_LEVEL_TO_PI[thinkingLevel];
+function piThinkingLevelFor(
+  thinkingLevel: ThinkingLevel | undefined,
+): PiThinkingLevel | undefined {
+  return thinkingLevel === undefined
+    ? undefined
+    : THINKING_LEVEL_TO_PI[thinkingLevel];
 }
 
 function shouldExposeThinkingLevel(options: {
@@ -552,7 +659,7 @@ function shouldExposeThinkingLevel(options: {
   if (!options.enabled) return false;
   return (
     options.protocolThinking !== undefined ||
-    options.input.api !== 'anthropic-messages' ||
+    options.input.api !== "anthropic-messages" ||
     options.openPlatform ||
     (options.implicitCustomProviderThinking && options.input.customProvider)
   );
@@ -561,20 +668,24 @@ function shouldExposeThinkingLevel(options: {
 function resolveCatalogMaxThinkingLevel(
   selectedEffort: string | undefined,
   catalogModel: Model<Api> | undefined,
-): Pick<ThinkingResolutionContext, 'maxLevel'> {
+): Pick<ThinkingResolutionContext, "maxLevel"> {
   const maxLevel = catalogModel?.thinkingLevelMap?.max;
-  return selectedEffort === 'max' && typeof maxLevel === 'string' ? { maxLevel } : {};
+  return selectedEffort === "max" && typeof maxLevel === "string"
+    ? { maxLevel }
+    : {};
 }
 
 function exposedThinkingLevel(
   context: ThinkingResolutionContext,
-): Pick<ResolvedThinking, 'exposedLevel'> {
-  return context.shouldExposeLevel && context.piLevel ? { exposedLevel: context.piLevel } : {};
+): Pick<ResolvedThinking, "exposedLevel"> {
+  return context.shouldExposeLevel && context.piLevel
+    ? { exposedLevel: context.piLevel }
+    : {};
 }
 
 function thinkingLevelMapFields(
   context: ThinkingResolutionContext,
-): Pick<ResolvedThinking, 'thinkingLevelMap'> {
+): Pick<ResolvedThinking, "thinkingLevelMap"> {
   return context.enabled && context.protocolThinking
     ? { thinkingLevelMap: context.protocolThinking.thinkingLevelMap }
     : {};
@@ -582,25 +693,31 @@ function thinkingLevelMapFields(
 
 function thinkingRequestPatchFields(
   context: ThinkingResolutionContext,
-): Pick<ResolvedThinking, 'requestPatch'> {
-  return context.protocolThinking ? { requestPatch: context.protocolThinking.requestPatch } : {};
+): Pick<ResolvedThinking, "requestPatch"> {
+  return context.protocolThinking
+    ? { requestPatch: context.protocolThinking.requestPatch }
+    : {};
 }
 
 function maxThinkingLevelFields(
   context: ThinkingResolutionContext,
-): Pick<ResolvedThinking, 'maxLevel'> {
+): Pick<ResolvedThinking, "maxLevel"> {
   return context.maxLevel ? { maxLevel: context.maxLevel } : {};
 }
 
 function thinkingCompatibilityFields(
   context: ThinkingResolutionContext,
-): Pick<ResolvedThinking, 'forceAdaptiveThinking' | 'completionsThinkingCompat'> {
+): Pick<
+  ResolvedThinking,
+  "forceAdaptiveThinking" | "completionsThinkingCompat"
+> {
   if (!context.enabled || !context.protocolThinking) return {};
-  if (context.protocolThinking.forceAdaptiveThinking) return { forceAdaptiveThinking: true };
-  if (context.protocolThinking.completionsThinkingFormat === 'openai') {
+  if (context.protocolThinking.forceAdaptiveThinking)
+    return { forceAdaptiveThinking: true };
+  if (context.protocolThinking.completionsThinkingFormat === "openai") {
     return {
       completionsThinkingCompat: {
-        thinkingFormat: 'openai',
+        thinkingFormat: "openai",
         supportsReasoningEffort: true,
       },
     };
@@ -611,7 +728,7 @@ function thinkingCompatibilityFields(
 function normalizeResolvedBaseUrl(api: Api, baseUrl: string): string {
   return isModelProviderApi(api)
     ? normalizeProviderBaseUrl(api, baseUrl)
-    : baseUrl.replace(/\/+$/u, '');
+    : baseUrl.replace(/\/+$/u, "");
 }
 
 function buildResolvedModel(scope: {
@@ -640,7 +757,9 @@ function buildResolvedModel(scope: {
   };
 }
 
-function resolvedThinkingLevelMap(thinking: ResolvedThinking): ThinkingLevelMap | undefined {
+function resolvedThinkingLevelMap(
+  thinking: ResolvedThinking,
+): ThinkingLevelMap | undefined {
   if (thinking.thinkingLevelMap) return thinking.thinkingLevelMap;
   return thinking.maxLevel ? { max: thinking.maxLevel } : undefined;
 }
@@ -648,15 +767,21 @@ function resolvedThinkingLevelMap(thinking: ResolvedThinking): ThinkingLevelMap 
 function resolvedModelCompatibility(
   input: FinishResolveInput,
   thinking: ResolvedThinking,
-): Model<Api>['compat'] | undefined {
-  let thinkingCompat: Model<Api>['compat'] | undefined = thinking.completionsThinkingCompat;
+): Model<Api>["compat"] | undefined {
+  let thinkingCompat: Model<Api>["compat"] | undefined =
+    thinking.completionsThinkingCompat;
   if (
     thinking.forceAdaptiveThinking ||
-    (input.api === 'anthropic-messages' && thinking.openPlatform && thinking.enabled)
+    (input.api === "anthropic-messages" &&
+      thinking.openPlatform &&
+      thinking.enabled)
   ) {
     thinkingCompat = { forceAdaptiveThinking: true };
   }
-  const firstPartyMinimaxMessages = isFirstPartyMinimaxMessagesRoute(input.api, input.provider);
+  const firstPartyMinimaxMessages = isFirstPartyMinimaxMessagesRoute(
+    input.api,
+    input.provider,
+  );
   const base = firstPartyMinimaxMessages
     ? { ...thinkingCompat, supportsLongCacheRetention: false }
     : thinkingCompat;
@@ -692,7 +817,8 @@ export function lookupLocalModelLimits(
   const entry = lookupLocalCatalogModel(provider, modelId);
   if (!entry) return { ...FALLBACK_MODEL_LIMITS, fromCatalog: false };
   return {
-    contextWindow: positive(entry.contextWindow) || FALLBACK_MODEL_LIMITS.contextWindow,
+    contextWindow:
+      positive(entry.contextWindow) || FALLBACK_MODEL_LIMITS.contextWindow,
     maxTokens: positive(entry.maxTokens) || FALLBACK_MODEL_LIMITS.maxTokens,
     fromCatalog: true,
     ...(entry.api ? { api: entry.api } : {}),
@@ -716,17 +842,24 @@ export function resolveLocalProviderCredentials(
   readonly warnings: string[];
 } {
   const options = providerConfig?.[provider]?.options;
-  const configuredBaseUrl = modelRef.base_url?.trim() || options?.baseURL?.trim();
+  const configuredBaseUrl =
+    modelRef.base_url?.trim() || options?.baseURL?.trim();
   const auth = resolveProviderAuthMode({
     authMode: options?.authMode,
     baseURL: configuredBaseUrl,
   });
   const optionHeaders = readStringRecord(options?.headers);
   const modelHeaders = readStringRecord(
-    providerConfig?.[provider]?.models?.[modelRef.model_id?.trim() ?? '']?.headers,
+    providerConfig?.[provider]?.models?.[modelRef.model_id?.trim() ?? ""]
+      ?.headers,
   );
   const token = authContext?.accessToken?.trim();
-  const headers = resolveCredentialHeaders(optionHeaders, modelHeaders, token, auth.authMode);
+  const headers = resolveCredentialHeaders(
+    optionHeaders,
+    modelHeaders,
+    token,
+    auth.authMode,
+  );
   return {
     apiKey: resolveCredentialApiKey(modelRef, options, auth.authMode),
     baseUrl: resolveCredentialBaseUrl(configuredBaseUrl, auth.managedBaseURL),
@@ -746,13 +879,15 @@ function resolveCredentialApiKey(
 ): string | undefined {
   const configured = modelRef.api_key?.trim() || options?.apiKey?.trim();
   if (configured) return configured;
-  return authMode === 'managed-login' ? MANAGED_PROVIDER_API_KEY_PLACEHOLDER : undefined;
+  return authMode === "managed-login"
+    ? MANAGED_PROVIDER_API_KEY_PLACEHOLDER
+    : undefined;
 }
 
 function providerRouteForAuthMode(authMode: ProviderAuthMode): string {
-  if (authMode === 'managed-login') return 'token_plan';
-  if (authMode === 'oauth') return 'oauth';
-  return 'provider_api_key';
+  if (authMode === "managed-login") return "token_plan";
+  if (authMode === "oauth") return "oauth";
+  return "provider_api_key";
 }
 
 function resolveCredentialBaseUrl(
@@ -760,7 +895,9 @@ function resolveCredentialBaseUrl(
   managedBaseUrl: boolean,
 ): string | undefined {
   if (!configuredBaseUrl) return undefined;
-  return managedBaseUrl ? stripUrlCredentials(configuredBaseUrl) : configuredBaseUrl;
+  return managedBaseUrl
+    ? stripUrlCredentials(configuredBaseUrl)
+    : configuredBaseUrl;
 }
 
 function resolveCredentialHeaders(
@@ -770,7 +907,7 @@ function resolveCredentialHeaders(
   authMode: ProviderAuthMode,
 ): Record<string, string> | undefined {
   if (!optionHeaders && !modelHeaders && !token) return undefined;
-  const managedToken = authMode === 'managed-login' ? token : undefined;
+  const managedToken = authMode === "managed-login" ? token : undefined;
   return {
     ...optionHeaders,
     ...modelHeaders,
@@ -787,20 +924,22 @@ function requireUsableCredentials(
   if (!apiKey) {
     throw new Error(
       provider === OPENAI_CODEX_PROVIDER_ID
-        ? 'LocalModelResolver: openai-codex login required; no OAuth credentials found.'
+        ? "LocalModelResolver: openai-codex login required; no OAuth credentials found."
         : `LocalModelResolver: api_key not configured for provider "${provider}".`,
     );
   }
   if (!baseUrl) {
-    throw new Error(`LocalModelResolver: base_url not configured for provider "${provider}".`);
+    throw new Error(
+      `LocalModelResolver: base_url not configured for provider "${provider}".`,
+    );
   }
-  if (credentials.authMode === 'managed-login' && !credentials.managedBaseURL) {
+  if (credentials.authMode === "managed-login" && !credentials.managedBaseURL) {
     throw new Error(
       `LocalModelResolver: managed-login requires a known managed base_url for provider "${provider}".`,
     );
   }
   if (
-    credentials.authMode === 'managed-login' &&
+    credentials.authMode === "managed-login" &&
     apiKey === MANAGED_PROVIDER_API_KEY_PLACEHOLDER &&
     !credentials.headers?.Authorization
   ) {
@@ -811,18 +950,24 @@ function requireUsableCredentials(
   return { apiKey, baseUrl };
 }
 
-function deriveModelInput(modelRef: IModelRef): Model<Api>['input'] {
-  return modelRef.capabilities?.support_image || modelRef.capabilities?.support_video
-    ? ['text', 'image']
-    : ['text'];
+function deriveModelInput(modelRef: IModelRef): Model<Api>["input"] {
+  return modelRef.capabilities?.support_image ||
+    modelRef.capabilities?.support_video
+    ? ["text", "image"]
+    : ["text"];
 }
 
-function lookupLocalCatalogModel(provider: string, modelId: string): Model<Api> | undefined {
-  const knownProvider = getProviders().find((candidate) => candidate === provider);
+function lookupLocalCatalogModel(
+  provider: string,
+  modelId: string,
+): Model<Api> | undefined {
+  const knownProvider = getProviders().find(
+    (candidate) => candidate === provider,
+  );
   if (!knownProvider) return undefined;
   return getModels(knownProvider).find((model) => model.id === modelId);
 }
 
 function positive(value: unknown): number {
-  return typeof value === 'number' && value > 0 ? value : 0;
+  return typeof value === "number" && value > 0 ? value : 0;
 }

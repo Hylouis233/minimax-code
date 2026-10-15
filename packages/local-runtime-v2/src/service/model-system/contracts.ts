@@ -1,6 +1,6 @@
-import type { Api } from '@earendil-works/pi-ai';
-import type { StreamFn } from '@earendil-works/pi-agent-core';
-import type { LLMModelConfig } from '@mavis/agent-core/pi-turn-runner';
+import type { Api } from "@earendil-works/pi-ai";
+import type { StreamFn } from "@earendil-works/pi-agent-core";
+import type { LLMModelConfig } from "@mavis/agent-core/pi-turn-runner";
 import type {
   AgentCapabilityConfig,
   Config,
@@ -8,17 +8,18 @@ import type {
   ModelConfig,
   ProviderAuthMode,
   ResolvedAgentCapabilities,
-} from '@mavis/config';
-import type { IAgentConfig } from '@mavis/protocol';
+} from "@mavis/config";
+import type { IAgentConfig } from "@mavis/protocol";
 
-import type { ModelProviderApi, ModelProviderSource } from './identity.js';
+import type { ModelProviderApi, ModelProviderSource } from "./identity.js";
+import type { LocalModelFastConfig } from "./resolution/fast-request.js";
 
 export type { LocalByokConfigDraft };
-export type { ModelProviderSource } from './identity.js';
+export type { ModelProviderSource } from "./identity.js";
 
-type LocalModelLimit = Partial<NonNullable<ModelConfig['limit']>>;
-type LocalModelModalities = Partial<NonNullable<ModelConfig['modalities']>>;
-type LocalModelCapabilities = Partial<NonNullable<ModelConfig['capabilities']>>;
+type LocalModelLimit = Partial<NonNullable<ModelConfig["limit"]>>;
+type LocalModelModalities = Partial<NonNullable<ModelConfig["modalities"]>>;
+type LocalModelCapabilities = Partial<NonNullable<ModelConfig["capabilities"]>>;
 
 /**
  * Protocol compatibility overrides a BYOK custom provider may declare per model.
@@ -48,29 +49,31 @@ export interface LocalModelCompatOverrides {
   zaiToolStream?: boolean;
   forceAdaptiveThinking?: boolean;
   allowEmptySignature?: boolean;
-  maxTokensField?: 'max_tokens' | 'max_completion_tokens';
+  maxTokensField?: "max_tokens" | "max_completion_tokens";
   thinkingFormat?:
-    | 'openai'
-    | 'openrouter'
-    | 'together'
-    | 'deepseek'
-    | 'zai'
-    | 'qwen'
-    | 'qwen-chat-template'
-    | 'string-thinking'
-    | 'ant-ling';
-  cacheControlFormat?: 'anthropic';
+    | "openai"
+    | "openrouter"
+    | "together"
+    | "deepseek"
+    | "zai"
+    | "qwen"
+    | "qwen-chat-template"
+    | "string-thinking"
+    | "ant-ling";
+  cacheControlFormat?: "anthropic";
 }
 
 export interface LocalModelConfig extends Omit<
   Partial<ModelConfig>,
-  'limit' | 'modalities' | 'capabilities'
+  "limit" | "modalities" | "capabilities"
 > {
   reasoning?: boolean;
   capabilities?: LocalModelCapabilities;
   limit?: LocalModelLimit;
   modalities?: LocalModelModalities;
   compat?: LocalModelCompatOverrides;
+  /** Explicit BYOK Fast preference; independent of reasoning and orchestration. */
+  fast?: LocalModelFastConfig;
 }
 
 export interface LocalProviderOptions {
@@ -104,20 +107,24 @@ export interface LocalCustomProviderConfig extends LocalProviderConfig {
   enabled?: boolean;
 }
 
-export type LocalCustomProvidersConfig = Record<string, LocalCustomProviderConfig>;
-export type LocalBetaConfig = Partial<Config['beta']>;
+export type LocalCustomProvidersConfig = Record<
+  string,
+  LocalCustomProviderConfig
+>;
+export type LocalBetaConfig = Partial<Config["beta"]>;
 
 /** Model configuration read by the resolution and management capabilities. */
 export interface LocalRuntimeConfig {
   provider: LocalModelsConfig;
   minimax_api?: LocalMinimaxApiConfig;
   custom_provider?: LocalCustomProvidersConfig;
-  minimaxModelSource?: 'token_plan' | 'minimax_api_key';
+  minimaxModelSource?: "token_plan" | "minimax_api_key";
   defaultModel?: string;
   defaultModelVariant?: string;
   defaultModelThinking?: { effort?: string };
   defaultModelContextWindow?: number;
-  permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'auto' | 'off';
+  permissionMode?:
+    "default" | "acceptEdits" | "bypassPermissions" | "auto" | "off";
   dataDir: string;
   beta?: LocalBetaConfig;
 }
@@ -126,14 +133,14 @@ export interface LocalRuntimeConfig {
 export interface LocalConversationRuntimeConfig extends LocalRuntimeConfig {
   readonly defaultLightModel?: string;
   /** Goal verifier policy consumed by process-local auxiliary model calls. */
-  readonly goal?: Config['goal'];
-  readonly memory?: Partial<Config['memory']>;
+  readonly goal?: Config["goal"];
+  readonly memory?: Partial<Config["memory"]>;
   /** Session title auto-generation flag — see @mavis/config SessionTitleConfig. */
-  readonly sessionTitle?: Config['sessionTitle'];
+  readonly sessionTitle?: Config["sessionTitle"];
   /** Runaway Guard local policy resolved from config.yaml. */
-  readonly runawayGuard?: Config['runawayGuard'];
+  readonly runawayGuard?: Config["runawayGuard"];
   /** ToolResult compaction values resolved from config.yaml. */
-  readonly toolResultCompaction?: Config['toolResultCompaction'];
+  readonly toolResultCompaction?: Config["toolResultCompaction"];
   /**
    * Widened past `Config['agents']`: the v2 Agent cutover also threads
    * already-resolved capabilities through this read model, and `default` is
@@ -192,13 +199,13 @@ export interface LocalRuntimeAuthContext {
   readonly userName?: string;
   readonly subUserName?: string;
   /** Electron-internal propagation state; omitted by non-Desktop hosts. */
-  readonly authState?: 'pending' | 'authenticated' | 'logged_out';
+  readonly authState?: "pending" | "authenticated" | "logged_out";
 }
 
 export interface LocalByokProviderConfig {
   readonly minimax_api?: LocalMinimaxApiConfig;
   readonly custom_provider?: LocalCustomProvidersConfig;
-  readonly minimaxModelSource?: 'token_plan' | 'minimax_api_key';
+  readonly minimaxModelSource?: "token_plan" | "minimax_api_key";
 }
 
 export interface LocalModelResolverLogger {
@@ -217,14 +224,14 @@ export interface LocalModelResolverOptions {
     loginEpoch?: string,
   ) => void | Promise<void>;
   readonly routingContextGetter?: () =>
-    | import('@mavis/agent-tools/desktop').ManagedBackendRoutingContext
+    | import("@mavis/agent-tools/desktop").ManagedBackendRoutingContext
     | undefined;
   readonly providerAuthGetter?: (
     provider: string,
   ) => Promise<string | undefined> | string | undefined;
   readonly defaultApi?: Api;
   readonly streamFn?: StreamFn;
-  readonly fetchImpl?: LLMModelConfig['fetch'];
+  readonly fetchImpl?: LLMModelConfig["fetch"];
   readonly logger?: LocalModelResolverLogger;
   /** Enables metadata-free custom-provider thinking only for the new TUI product. */
   readonly implicitCustomProviderThinking?: boolean;
@@ -253,14 +260,16 @@ export interface LocalResolvedModelConfig extends LLMModelConfig {
 }
 
 export interface LocalModelResolverLike {
-  resolveModel(input: LocalModelResolveInput): Promise<LocalResolvedModelConfig>;
+  resolveModel(
+    input: LocalModelResolveInput,
+  ): Promise<LocalResolvedModelConfig>;
 }
 
-export type MiniMaxM3ThinkingMode = 'on' | 'off';
+export type MiniMaxM3ThinkingMode = "on" | "off";
 
 export type ModelProviderTestApi = ModelProviderApi;
 
-export type ModelCacheState = 'unknown' | 'available' | 'failed';
+export type ModelCacheState = "unknown" | "available" | "failed";
 
 export interface ModelCacheStatusEntry {
   state: ModelCacheState;
@@ -280,7 +289,10 @@ export interface ModelCacheData {
 
 export interface LocalModelCacheLike {
   load(): ModelCacheData;
-  setProviderStatus(providerId: string, entry: ModelCacheStatusEntry): Promise<void>;
+  setProviderStatus(
+    providerId: string,
+    entry: ModelCacheStatusEntry,
+  ): Promise<void>;
   setModelStatus(modelKey: string, entry: ModelCacheStatusEntry): Promise<void>;
   replaceModelStatus(
     modelKey: string,
@@ -302,11 +314,12 @@ export interface ModelCacheStatusView {
   lastErrorMessage?: string;
 }
 
-export type ModelProviderKind = 'minimax-managed' | 'minimax-api-key' | 'oauth' | 'custom';
+export type ModelProviderKind =
+  "minimax-managed" | "minimax-api-key" | "oauth" | "custom";
 
 export interface ModelThinkingConfigView {
-  mode: 'switchable' | 'forced_on' | 'forced_off' | 'hidden';
-  default_value?: 'true' | 'false';
+  mode: "switchable" | "forced_on" | "forced_off" | "hidden";
+  default_value?: "true" | "false";
 }
 
 export interface ModelProviderModelEntry {
@@ -314,14 +327,14 @@ export interface ModelProviderModelEntry {
   modelId: string;
   modelConfigId: string;
   displayName: string;
-  configurationSource?: 'manual' | 'discovered';
+  configurationSource?: "manual" | "discovered";
   enabled: boolean;
   selected: boolean;
   contextLimit?: number;
   defaultContextLimit?: number;
   thinking?: { effort?: string };
   contextWindowOptions?: number[];
-  contextWindowOptionHints?: Record<string, 'higher_usage'>;
+  contextWindowOptionHints?: Record<string, "higher_usage">;
   maxOutputTokens?: number;
   effortOptions?: string[];
   defaultEffort?: string;
@@ -395,7 +408,7 @@ export interface ModelConnectionTestResult {
 }
 
 export class LocalModelProviderError extends Error {
-  override name = 'LocalModelProviderError';
+  override name = "LocalModelProviderError";
 
   constructor(
     readonly status: number,
@@ -415,7 +428,7 @@ export interface UserModelInputView {
   reasoning?: boolean;
   toolCall?: boolean;
   temperature?: boolean;
-  capabilities?: LocalModelConfig['capabilities'];
+  capabilities?: LocalModelConfig["capabilities"];
   modalities?: { input?: string[]; output?: string[] };
   limit?: { context?: number; output?: number };
   thinkingConfig?: { mode?: string; defaultValue?: string };
@@ -470,7 +483,10 @@ export interface LocalModelProviderServiceDeps {
   ) => Promise<unknown>;
   cache: LocalModelCacheLike;
   tester: {
-    test(dedupKey: string, target: ModelConnectionTestTarget): Promise<ModelConnectionTestResult>;
+    test(
+      dedupKey: string,
+      target: ModelConnectionTestTarget,
+    ): Promise<ModelConnectionTestResult>;
   };
   discoverer?: ModelDiscoveryClientLike;
   compareAndSetModelContext?: (

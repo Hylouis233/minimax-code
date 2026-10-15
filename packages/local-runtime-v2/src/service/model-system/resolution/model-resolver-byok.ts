@@ -1,5 +1,5 @@
-import type { Api } from '@earendil-works/pi-ai';
-import { minimaxApiModels, getRuntimeRegion } from '@mavis/config';
+import type { Api } from "@earendil-works/pi-ai";
+import { minimaxApiModels, getRuntimeRegion } from "@mavis/config";
 
 import type {
   LocalByokProviderConfig,
@@ -7,19 +7,20 @@ import type {
   LocalModelCompatOverrides,
   LocalModelConfig,
   LocalModelsConfig,
-} from '../contracts.js';
-import { mergeProviderHeaders } from '../connectivity/provider-request.js';
+} from "../contracts.js";
+import { mergeProviderHeaders } from "../connectivity/provider-request.js";
+import { resolveFastRequestOptions } from "./fast-request.js";
 import {
   isModelProviderApi,
   MANAGED_MINIMAX_PROVIDER_ID,
   MINIMAX_API_PROVIDER_ID,
-} from '../identity.js';
+} from "../identity.js";
 
 const BYOK_FALLBACK_MODEL_LIMITS = {
   contextWindow: 200_000,
   maxTokens: 16_384,
 } as const;
-const MESSAGES_API_COMPAT_PATH = '\x61\x6e\x74\x68\x72\x6f\x70\x69\x63';
+const MESSAGES_API_COMPAT_PATH = "\x61\x6e\x74\x68\x72\x6f\x70\x69\x63";
 
 export interface ByokResolutionPlan {
   readonly provider: string;
@@ -32,6 +33,7 @@ export interface ByokResolutionPlan {
   readonly maxTokens: number;
   readonly configHeaders?: Record<string, string>;
   readonly modelCompat?: LocalModelCompatOverrides;
+  readonly requestPatch?: Readonly<Record<string, unknown>>;
 }
 
 export function planMinimaxApiResolution(input: {
@@ -48,14 +50,17 @@ export function planMinimaxApiResolution(input: {
   if (!config) return undefined;
   const apiKey = config.apiKey?.trim();
   if (!apiKey) {
-    throw new Error('LocalModelResolver: minimax_api apiKey is not configured.');
+    throw new Error(
+      "LocalModelResolver: minimax_api apiKey is not configured.",
+    );
   }
-  const catalogModel = minimaxApiModels({ provider: input.providerConfig, minimax_api: config })[
-    input.modelId
-  ];
+  const catalogModel = minimaxApiModels({
+    provider: input.providerConfig,
+    minimax_api: config,
+  })[input.modelId];
   return {
     provider: MINIMAX_API_PROVIDER_ID,
-    api: 'anthropic-messages',
+    api: "anthropic-messages",
     apiKey,
     baseUrl: config.baseURL?.trim() || defaultMinimaxApiBaseUrl(),
     contextWindow:
@@ -65,7 +70,9 @@ export function planMinimaxApiResolution(input: {
         : BYOK_FALLBACK_MODEL_LIMITS.contextWindow),
     maxTokens:
       catalogModel?.limit?.output ??
-      (input.catalog.fromCatalog ? input.catalog.maxTokens : BYOK_FALLBACK_MODEL_LIMITS.maxTokens),
+      (input.catalog.fromCatalog
+        ? input.catalog.maxTokens
+        : BYOK_FALLBACK_MODEL_LIMITS.maxTokens),
   };
 }
 
@@ -85,12 +92,15 @@ export function planCustomProviderResolution(input: {
     readStringRecord(modelConfig.headers),
   );
   const modelCompat = readModelCompat(modelConfig.compat);
+  const api = resolveCustomProviderApi(config.api);
+  const fast = resolveFastRequestOptions(api, modelConfig.fast, configHeaders);
   return {
     provider: input.provider,
-    api: resolveCustomProviderApi(config.api),
+    api,
     ...credentials,
     ...customProviderLimits(modelConfig),
-    ...(configHeaders ? { configHeaders } : {}),
+    ...(fast.headers ? { configHeaders: fast.headers } : {}),
+    ...(fast.requestPatch ? { requestPatch: fast.requestPatch } : {}),
     ...(modelCompat ? { modelCompat } : {}),
   };
 }
@@ -98,12 +108,19 @@ export function planCustomProviderResolution(input: {
 function resolveCustomProviderCredentials(
   config: LocalCustomProviderConfig,
   input: { readonly provider: string; readonly providerKey: string },
-): Pick<ByokResolutionPlan, 'apiKey' | 'authProvider' | 'runtimeProvider' | 'baseUrl'> {
+): Pick<
+  ByokResolutionPlan,
+  "apiKey" | "authProvider" | "runtimeProvider" | "baseUrl"
+> {
   const authProvider =
-    config.kind === 'oauth' || config.options?.authMode === 'oauth' ? input.providerKey : undefined;
+    config.kind === "oauth" || config.options?.authMode === "oauth"
+      ? input.providerKey
+      : undefined;
   const apiKey = config.options?.apiKey?.trim();
   if (!apiKey && !authProvider) {
-    throw new Error(`LocalModelResolver: api_key not configured for provider "${input.provider}".`);
+    throw new Error(
+      `LocalModelResolver: api_key not configured for provider "${input.provider}".`,
+    );
   }
   const baseUrl = config.options?.baseURL?.trim();
   if (!baseUrl) {
@@ -120,9 +137,10 @@ function resolveCustomProviderCredentials(
 
 function customProviderLimits(
   modelConfig: LocalModelConfig,
-): Pick<ByokResolutionPlan, 'contextWindow' | 'maxTokens'> {
+): Pick<ByokResolutionPlan, "contextWindow" | "maxTokens"> {
   return {
-    contextWindow: modelConfig.limit?.context ?? BYOK_FALLBACK_MODEL_LIMITS.contextWindow,
+    contextWindow:
+      modelConfig.limit?.context ?? BYOK_FALLBACK_MODEL_LIMITS.contextWindow,
     maxTokens: byokEffectiveOutputLimit(modelConfig),
   };
 }
@@ -132,18 +150,20 @@ function customProviderLimits(
  * default. The connection probe sends the same value so it stays a dry run of
  * the first real turn; a budget rejection can then only be a real one.
  */
-export function byokEffectiveOutputLimit(modelConfig: LocalModelConfig | undefined): number {
+export function byokEffectiveOutputLimit(
+  modelConfig: LocalModelConfig | undefined,
+): number {
   return modelConfig?.limit?.output ?? BYOK_FALLBACK_MODEL_LIMITS.maxTokens;
 }
 
 function resolveCustomProviderApi(value: unknown): Api {
   if (
-    typeof value === 'string' &&
-    (isModelProviderApi(value) || value === 'openai-codex-responses')
+    typeof value === "string" &&
+    (isModelProviderApi(value) || value === "openai-codex-responses")
   ) {
     return value;
   }
-  return 'anthropic-messages';
+  return "anthropic-messages";
 }
 
 export function firstBuiltinModel(
@@ -152,72 +172,87 @@ export function firstBuiltinModel(
   const preferredModelId = Object.keys(
     providerConfig?.[MANAGED_MINIMAX_PROVIDER_ID]?.models ?? {},
   )[0];
-  if (preferredModelId) return { provider: MANAGED_MINIMAX_PROVIDER_ID, modelId: preferredModelId };
+  if (preferredModelId)
+    return { provider: MANAGED_MINIMAX_PROVIDER_ID, modelId: preferredModelId };
   return Object.entries(providerConfig ?? {}).flatMap(([provider, config]) => {
     const modelId = Object.keys(config.models ?? {})[0];
     return modelId ? [{ provider, modelId }] : [];
   })[0];
 }
 
-export function readStringRecord(value: unknown): Record<string, string> | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+export function readStringRecord(
+  value: unknown,
+): Record<string, string> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    return undefined;
   const entries = Object.entries(value as Record<string, unknown>).filter(
-    (entry): entry is [string, string] => typeof entry[1] === 'string',
+    (entry): entry is [string, string] => typeof entry[1] === "string",
   );
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
 /** Keys of `LocalModelCompatOverrides` whose declared value is a boolean. */
 type BooleanCompatKey = {
-  [K in keyof LocalModelCompatOverrides]-?: boolean extends LocalModelCompatOverrides[K]
-    ? K
-    : never;
+  [
+    K in keyof LocalModelCompatOverrides
+  ]-?: boolean extends LocalModelCompatOverrides[K] ? K : never;
 }[keyof LocalModelCompatOverrides];
 
 const BOOLEAN_COMPAT_KEYS = [
-  'supportsStore',
-  'supportsDeveloperRole',
-  'supportsReasoningEffort',
-  'supportsUsageInStreaming',
-  'requiresToolResultName',
-  'requiresAssistantAfterToolResult',
-  'requiresThinkingAsText',
-  'requiresReasoningContentOnAssistantMessages',
-  'supportsStrictMode',
-  'supportsLongCacheRetention',
-  'supportsEagerToolInputStreaming',
-  'supportsCacheControlOnTools',
-  'supportsTemperature',
-  'sendSessionAffinityHeaders',
-  'sendSessionIdHeader',
-  'zaiToolStream',
-  'forceAdaptiveThinking',
-  'allowEmptySignature',
+  "supportsStore",
+  "supportsDeveloperRole",
+  "supportsReasoningEffort",
+  "supportsUsageInStreaming",
+  "requiresToolResultName",
+  "requiresAssistantAfterToolResult",
+  "requiresThinkingAsText",
+  "requiresReasoningContentOnAssistantMessages",
+  "supportsStrictMode",
+  "supportsLongCacheRetention",
+  "supportsEagerToolInputStreaming",
+  "supportsCacheControlOnTools",
+  "supportsTemperature",
+  "sendSessionAffinityHeaders",
+  "sendSessionIdHeader",
+  "zaiToolStream",
+  "forceAdaptiveThinking",
+  "allowEmptySignature",
 ] as const satisfies readonly BooleanCompatKey[];
 
 const MAX_TOKENS_FIELDS = [
-  'max_tokens',
-  'max_completion_tokens',
-] as const satisfies readonly NonNullable<LocalModelCompatOverrides['maxTokensField']>[];
-
-const THINKING_FORMATS = [
-  'openai',
-  'openrouter',
-  'together',
-  'deepseek',
-  'zai',
-  'qwen',
-  'qwen-chat-template',
-  'string-thinking',
-  'ant-ling',
-] as const satisfies readonly NonNullable<LocalModelCompatOverrides['thinkingFormat']>[];
-
-const CACHE_CONTROL_FORMATS = ['anthropic'] as const satisfies readonly NonNullable<
-  LocalModelCompatOverrides['cacheControlFormat']
+  "max_tokens",
+  "max_completion_tokens",
+] as const satisfies readonly NonNullable<
+  LocalModelCompatOverrides["maxTokensField"]
 >[];
 
-function readCompatEnum<T extends string>(value: unknown, allowed: readonly T[]): T | undefined {
-  return typeof value === 'string' ? allowed.find((option) => option === value) : undefined;
+const THINKING_FORMATS = [
+  "openai",
+  "openrouter",
+  "together",
+  "deepseek",
+  "zai",
+  "qwen",
+  "qwen-chat-template",
+  "string-thinking",
+  "ant-ling",
+] as const satisfies readonly NonNullable<
+  LocalModelCompatOverrides["thinkingFormat"]
+>[];
+
+const CACHE_CONTROL_FORMATS = [
+  "anthropic",
+] as const satisfies readonly NonNullable<
+  LocalModelCompatOverrides["cacheControlFormat"]
+>[];
+
+function readCompatEnum<T extends string>(
+  value: unknown,
+  allowed: readonly T[],
+): T | undefined {
+  return typeof value === "string"
+    ? allowed.find((option) => option === value)
+    : undefined;
 }
 
 /**
@@ -228,25 +263,39 @@ function readCompatEnum<T extends string>(value: unknown, allowed: readonly T[])
  * forwarded, because pi treats any present field as an explicit override and a truthy
  * string such as `"false"` would otherwise invert the intended behavior.
  */
-function readModelCompat(value: unknown): LocalModelCompatOverrides | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+function readModelCompat(
+  value: unknown,
+): LocalModelCompatOverrides | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    return undefined;
   const source: Record<string, unknown> = { ...value };
   const compat: LocalModelCompatOverrides = {};
   for (const key of BOOLEAN_COMPAT_KEYS) {
     const candidate = source[key];
-    if (typeof candidate === 'boolean') compat[key] = candidate;
+    if (typeof candidate === "boolean") compat[key] = candidate;
   }
-  const maxTokensField = readCompatEnum(source.maxTokensField, MAX_TOKENS_FIELDS);
+  const maxTokensField = readCompatEnum(
+    source.maxTokensField,
+    MAX_TOKENS_FIELDS,
+  );
   if (maxTokensField) compat.maxTokensField = maxTokensField;
-  const thinkingFormat = readCompatEnum(source.thinkingFormat, THINKING_FORMATS);
+  const thinkingFormat = readCompatEnum(
+    source.thinkingFormat,
+    THINKING_FORMATS,
+  );
   if (thinkingFormat) compat.thinkingFormat = thinkingFormat;
-  const cacheControlFormat = readCompatEnum(source.cacheControlFormat, CACHE_CONTROL_FORMATS);
+  const cacheControlFormat = readCompatEnum(
+    source.cacheControlFormat,
+    CACHE_CONTROL_FORMATS,
+  );
   if (cacheControlFormat) compat.cacheControlFormat = cacheControlFormat;
   return Object.keys(compat).length > 0 ? compat : undefined;
 }
 
 function defaultMinimaxApiBaseUrl(): string {
   const origin =
-    getRuntimeRegion() === 'cn' ? 'https://api.minimaxi.com' : 'https://api.minimax.io';
+    getRuntimeRegion() === "cn"
+      ? "https://api.minimaxi.com"
+      : "https://api.minimax.io";
   return `${origin}/${MESSAGES_API_COMPAT_PATH}`;
 }

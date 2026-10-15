@@ -44,12 +44,12 @@ Use only the effort values, model limits and capabilities your provider actually
 supports. Preserve existing credentials; the example is not a complete credential
 configuration and does not contact an endpoint.
 
-| Mode | Compatible API | Prepared request |
-| --- | --- | --- |
-| `openai-priority` | `openai-responses`, `openai-completions` | `service_tier: priority` |
-| `openai-fast` | `openai-responses`, `openai-completions` | `service_tier: fast` |
-| `anthropic-fast` | `anthropic-messages` | `speed: fast` and the `fast-mode-2026-02-01` beta header |
-| `model` | Existing supported custom-provider API | No tier/speed field; retain the exact selected model ID |
+| Mode              | Compatible API                           | Prepared request                                         |
+| ----------------- | ---------------------------------------- | -------------------------------------------------------- |
+| `openai-priority` | `openai-responses`, `openai-completions` | `service_tier: priority`                                 |
+| `openai-fast`     | `openai-responses`, `openai-completions` | `service_tier: fast`                                     |
+| `anthropic-fast`  | `anthropic-messages`                     | `speed: fast` and the `fast-mode-2026-02-01` beta header |
+| `model`           | Existing supported custom-provider API   | No tier/speed field; retain the exact selected model ID  |
 
 Omit `fast` or set `enabled: false` to retain the existing route behavior. Enabled
 malformed or incompatible configurations fail before a provider request instead
@@ -83,6 +83,7 @@ run. Interactive TUI/ACP acceptance, plugin execution, actual premium billing,
 latency and access to the requested future SKU require separate validation.
 
 Protocol references, checked 2026-10-15:
+
 - OpenAI Responses: https://developers.openai.com/api/reference/resources/responses/methods/create
 - OpenAI Chat Completions: https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create
 - Anthropic Fast mode: https://platform.claude.com/docs/en/build-with-claude/fast-mode
