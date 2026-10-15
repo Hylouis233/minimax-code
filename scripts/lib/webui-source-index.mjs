@@ -19,6 +19,12 @@ export function discoverModules(clientRoot) {
     if (parts[0] === "features" && parts.length >= 4) {
       [, name, role] = parts;
       location = `client/features/${name}/${role}/`;
+    } else if (parts[0] === "shell" && parts.length >= 2) {
+      // The shell's presentation is a target top-level home rather than a role
+      // directory under a business: `client/shell/` is where the shell renders.
+      name = "shell";
+      role = "ui";
+      location = "client/shell/";
     } else if (["components", "application", "projection", "contracts", "bindings"].includes(parts[0]) && parts.length >= 3) {
       name = parts[1];
       role = parts[0] === "components" ? "ui" : parts[0];

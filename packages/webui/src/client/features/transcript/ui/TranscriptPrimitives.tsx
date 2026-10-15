@@ -16,7 +16,7 @@ import {
   WebuiIconChevronDown,
   WebuiIconDiffFile,
   WebuiIconDiffSummary,
-} from "../../../components/shell/icons.js";
+} from "../../../shell/icons.js";
 import { WebuiMarkdown } from "./markdown.js";
 import {
   isWebuiEditTool,

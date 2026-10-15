@@ -47,7 +47,7 @@ import {
 } from "../../terminal/projection/terminal-size.js";
 import type { WebuiTerminalSize } from "../../terminal/contracts/terminal-port.js";
 import type { WebuiTerminalOwner } from "../../terminal/contracts/terminal-owner.js";
-import { WebuiIconAgent, WebuiIconCheck, WebuiIconChevronDown, WebuiIconClose, WebuiIconDiffFile, WebuiIconFile, WebuiIconFolder, WebuiIconRunLocation, WebuiIconSearch, WebuiIconSidebarToggle, WebuiIconWorkspaceCanvas, WebuiIconWorkspaceExpand, WebuiIconWorkspaceReview, WebuiIconWorkspaceTerminal } from "../../../components/shell/icons.js";
+import { WebuiIconAgent, WebuiIconCheck, WebuiIconChevronDown, WebuiIconClose, WebuiIconDiffFile, WebuiIconFile, WebuiIconFolder, WebuiIconRunLocation, WebuiIconSearch, WebuiIconSidebarToggle, WebuiIconWorkspaceCanvas, WebuiIconWorkspaceExpand, WebuiIconWorkspaceReview, WebuiIconWorkspaceTerminal } from "../../../shell/icons.js";
 import { FileTree, filterWorkspaceFiles, findWorkspaceFile, getWorkspaceFileParentPaths, mergeWorkspaceFileChildren } from "./WorkspaceFileTree.js";
 import { WorkspaceMediaPreview } from "./WorkspaceMediaPreview.js";
 import { isMediaContent } from "../projection/media-preview.js";

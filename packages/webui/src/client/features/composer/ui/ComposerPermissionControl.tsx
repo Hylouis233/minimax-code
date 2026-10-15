@@ -15,14 +15,14 @@
 import type { ReactElement, Ref } from "react";
 
 import type { WebuiPermissionMode } from "../../../features/settings/contracts/settings-port.js";
-import type { WebuiIconProps } from "../../../components/shell/icons.js";
+import type { WebuiIconProps } from "../../../shell/icons.js";
 import {
   WebuiIconCheck,
   WebuiIconChevronDown,
   WebuiIconPermissionAuto,
   WebuiIconPermissionFull,
   WebuiIconPermissionRequest,
-} from "../../../components/shell/icons.js";
+} from "../../../shell/icons.js";
 
 type WebuiComposerPermissionMode = WebuiPermissionMode;
 

@@ -15,21 +15,21 @@
  */
 import { useCallback, useMemo, useRef, useState } from "react";
 
-import type { WebuiProjectGroup } from "../../features/sessions/projection/rail-groups.js";
+import type { WebuiProjectGroup } from "../features/sessions/projection/rail-groups.js";
 import {
   filterWebuiSessionsByQuery,
   sessionLabel,
-} from "../../features/sessions/projection/rail-groups.js";
+} from "../features/sessions/projection/rail-groups.js";
 import type {
   WebuiClientSession,
   WebuiClientSessionPage,
-} from "../../features/sessions/contracts/session-view.js";
-import type { selectWebuiCatalogTreePage } from "../../features/sessions/application/session-catalog.js";
-import { sessionHash } from "../../projection/common/router.js";
+} from "../features/sessions/contracts/session-view.js";
+import type { selectWebuiCatalogTreePage } from "../features/sessions/application/session-catalog.js";
+import { sessionHash } from "../projection/common/router.js";
 import {
   useSessionRailOverlays,
   type WebuiRailOverlayStorage,
-} from "../../features/sessions/bindings/use-session-rail-overlays.js";
+} from "../features/sessions/bindings/use-session-rail-overlays.js";
 
 /** The tree page's shape, taken from the selector that builds it. */
 export type WebuiRailTreePage = ReturnType<typeof selectWebuiCatalogTreePage>;

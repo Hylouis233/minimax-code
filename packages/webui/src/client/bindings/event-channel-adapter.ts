@@ -24,7 +24,7 @@ import type {
   WebuiOpenEventChannel,
   WebuiProcessEventChannel,
 } from "../features/turn/application/event-channel.js";
-import type {WebuiClientEventWatcher} from "../contracts/shell/watch-port.js";
+import type {WebuiClientEventWatcher} from "../features/shell/contracts/watch-port.js";
 
 /**
  * Adapts one transport `watchEvents` watcher into the application's channel

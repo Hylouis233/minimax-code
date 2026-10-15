@@ -4,7 +4,7 @@ import {
   useWebuiPluginWorkflows,
   useWebuiPluginWorkflowsState,
 } from "../../../bindings/use-query-state.js";
-import { WebuiIconAgent } from "../../../components/shell/icons.js";
+import { WebuiIconAgent } from "../../../shell/icons.js";
 import {
   readWebuiPluginRow as read,
   type WebuiPluginRow as Row,

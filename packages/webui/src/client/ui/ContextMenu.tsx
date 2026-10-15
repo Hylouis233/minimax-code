@@ -9,7 +9,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
-import { WebuiIconContextChevron } from "../components/shell/icons.js";
+import { WebuiIconContextChevron } from "../shell/icons.js";
 import { evaluateOutsideClose } from "../projection/common/outside-close.js";
 import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js";
 import { placeWebuiContextMenu } from "../projection/common/context-menu.js";

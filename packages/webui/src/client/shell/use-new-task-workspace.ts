@@ -14,10 +14,10 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { deriveRecentWorkspaceDirs } from "../../features/composer/projection/composer-state.js";
-import { sessionHash } from "../../projection/common/router.js";
-import type { WebuiClientSession } from "../../features/sessions/contracts/session-view.js";
-import type { WebuiShellSurfaceCommand } from "../../projection/shell/shell-surface.js";
+import { deriveRecentWorkspaceDirs } from "../features/composer/projection/composer-state.js";
+import { sessionHash } from "../projection/common/router.js";
+import type { WebuiClientSession } from "../features/sessions/contracts/session-view.js";
+import type { WebuiShellSurfaceCommand } from "../features/shell/projection/shell-surface.js";
 
 /** The browser storage surface this behaviour reads and writes. */
 export interface NewTaskWorkspaceStorage {

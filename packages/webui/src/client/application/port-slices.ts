@@ -54,7 +54,7 @@ import type { ModelsPort } from "../features/models/contracts/provider-port.js";
 import type { PluginPort } from "../features/plugins/contracts/plugin-port.js";
 import type { SessionPort } from "../features/sessions/contracts/session-port.js";
 import type { SettingsPort } from "../features/settings/contracts/settings-port.js";
-import type { ShellEventPort } from "../contracts/shell/watch-port.js";
+import type { ShellEventPort } from "../features/shell/contracts/watch-port.js";
 import type { TranscriptPort } from "../features/transcript/contracts/session-read-port.js";
 import type { TurnExecutionPort } from "../features/turn/contracts/execution-port.js";
 import type { TerminalPort } from "../features/terminal/contracts/terminal-port.js";

@@ -27,7 +27,7 @@ import {
   WebuiIconContextTrash,
   WebuiIconFolder,
   WebuiIconSessionStar,
-} from "../../../components/shell/icons.js";
+} from "../../../shell/icons.js";
 import { type WebuiContextMenuItem } from "../../../ui/ContextMenu.js";
 import type {
   WebuiClientSession,

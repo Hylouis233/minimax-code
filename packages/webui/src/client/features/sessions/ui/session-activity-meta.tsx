@@ -3,7 +3,7 @@
 // import specifiers are the only differences.
 
 import { type ReactElement } from "react";
-import { WebuiIconSessionPinMark, WebuiIconSessionStarMark } from "../../../components/shell/icons.js";
+import { WebuiIconSessionPinMark, WebuiIconSessionStarMark } from "../../../shell/icons.js";
 import {
   formatWebuiSessionAge,
   type WebuiSessionActivityMap,

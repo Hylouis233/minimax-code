@@ -5,7 +5,7 @@ import {
   WebuiIconMore,
   WebuiIconProjectAdd,
   WebuiIconSessionPinMark,
-} from "../../../components/shell/icons.js";
+} from "../../../shell/icons.js";
 import type {
   WebuiClientSession,
   WebuiClientSessionPage,

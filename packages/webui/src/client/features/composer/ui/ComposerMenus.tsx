@@ -17,7 +17,7 @@
 // The wrapper's keyboard handling — Escape closes the stack, the arrows move
 // between a submenu and its trigger — belongs to this surface and moved with it.
 
-import { WebuiIconAttach, WebuiIconCommandGoal, WebuiIconCommandPlan, WebuiIconPlugins, WebuiIconSkillGeneric } from "../../../components/shell/icons.js";
+import { WebuiIconAttach, WebuiIconCommandGoal, WebuiIconCommandPlan, WebuiIconPlugins, WebuiIconSkillGeneric } from "../../../shell/icons.js";
 import type { WebuiComposerPluginSummary } from "../../../features/plugins/application/composer-catalogue.js";
 import type { WebuiSlashSkillSummary } from "./slash-palette.js";
 

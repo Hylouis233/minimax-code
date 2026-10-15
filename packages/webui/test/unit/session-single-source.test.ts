@@ -64,7 +64,7 @@ describe("the session state source is single", () => {
   });
 
   it("derives the shell's page from the catalog instead of holding sessions", () => {
-    const shell = flat(read("components/shell/WebuiClientFoundationApp.tsx"));
+    const shell = flat(read("shell/WebuiClientFoundationApp.tsx"));
     // The catalog is a subscription to the application store...
     expect(shell).toContain("selectWebuiCatalogFlatPage(catalog)");
     expect(shell).toContain("useSyncExternalStore(");

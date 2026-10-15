@@ -9,7 +9,7 @@
 // The method stays optional — `undefined` means "the operation is not wired",
 // and the application opens nothing when it is absent.
 
-import type { WebuiRuntimeEvent } from "../../../shared/contracts/stream.js";
+import type { WebuiRuntimeEvent } from "../../../../shared/contracts/stream.js";
 
 export type WebuiClientEventWatcher = (
   onEvent: (event: WebuiRuntimeEvent) => void,

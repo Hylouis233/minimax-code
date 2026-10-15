@@ -373,8 +373,8 @@ describe("WebuiProjectList under a search query", () => {
 describe("rail search wiring in WebuiClientFoundationApp", () => {
   const read = (path: string) =>
     readFileSync(new URL(`../../src/client/${path}`, import.meta.url), "utf8");
-  const hook = read("components/shell/use-session-rail-actions.ts");
-  const frame = read("components/shell/WebuiClientFoundationApp.tsx");
+  const hook = read("shell/use-session-rail-actions.ts");
+  const frame = read("shell/WebuiClientFoundationApp.tsx");
   const region = read("features/sessions/ui/SessionRailRegion.tsx");
   const source = `${hook}\n${frame}\n${region}`;
 

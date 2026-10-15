@@ -112,8 +112,14 @@ describe("prohibition 2 — turn's rules are filed inside turn", () => {
     }
     // And no component so much as names them: a component that reached the
     // mechanism directly would be holding the loop rather than submitting an
-    // intent to it.
-    for (const modulePath of modules.filter((p) => p.startsWith("components/"))) {
+    // intent to it. Presentation lives in `client/shell/`, `client/ui/` and each
+    // feature's `ui/`; a scan of one spelling alone finds nothing and would pass
+    // for the wrong reason, so the guard below pins that something was scanned.
+    const isPresentation = (path: string): boolean =>
+      path.startsWith("shell/") || path.startsWith("ui/") || /^features\/[^/]+\/ui\//u.test(path);
+    const presentations = modules.filter(isPresentation);
+    expect(presentations.length).toBeGreaterThan(0);
+    for (const modulePath of presentations) {
       const source = read(modulePath);
       for (const { symbol } of declarations) expect(source).not.toContain(symbol);
       expect(source).not.toMatch(/(?:mechanisms|conversation)\/stream-(loop|lease)\.js/u);

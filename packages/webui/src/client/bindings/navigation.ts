@@ -2,7 +2,7 @@
 // session out of the URL hash and listening for it to change. Split out of the
 // shell so the shell holds the React tree rather than the browser's URL plumbing.
 //
-// Both symbols are re-exported by `components/shell/WebuiClientFoundationApp.tsx` for
+// Both symbols are re-exported by `client/shell/WebuiClientFoundationApp.tsx` for
 // back-compat: `main.tsx` re-exports `subscribeToSessionHash`, and the SSR
 // snapshot reads `readSessionIdFromHash` through the shell.
 

@@ -4,8 +4,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   WebuiErrorBoundary,
   WebuiErrorBoundaryFallback,
-} from "../../src/client/components/shell/WebuiErrorBoundary.js";
-import { describeWebuiBoundaryError } from "../../src/client/application/shell/boundary-error.js";
+} from "../../src/client/shell/WebuiErrorBoundary.js";
+import { describeWebuiBoundaryError } from "../../src/client/features/shell/application/boundary-error.js";
 
 /**
  * The webui suite runs in the `node` environment with no DOM, and React does

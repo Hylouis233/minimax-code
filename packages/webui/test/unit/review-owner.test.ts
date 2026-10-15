@@ -45,7 +45,8 @@ describe("the diff machine has one owner", () => {
     // `features/transcript/projection/`, and a scan of the old home alone would
     // find nothing and pass for the wrong reason.
     const declarers = [
-      ...modulesUnder("components/"),
+      ...modulesUnder("shell/"),
+      ...modulesUnder("ui/"),
       ...modulesUnder("projection/"),
       ...modulesUnder("features/"),
     ].filter(
@@ -72,7 +73,8 @@ describe("the diff machine has one owner", () => {
 
   it("keeps the failure copy in exactly one module", () => {
     const holders = [
-      ...modulesUnder("components/"),
+      ...modulesUnder("shell/"),
+      ...modulesUnder("ui/"),
       ...modulesUnder("projection/"),
       ...modulesUnder("features/"),
     ].filter(
@@ -96,7 +98,7 @@ describe("the two readers share it", () => {
     // turn, and the review page, which renders the working tree. The surfaces do
     // not read it — the transcript's card reads the owner — so this list is the
     // pair the "one owner" promise is about, and a third reader fails here.
-    const readers = [...modulesUnder("components/"), ...modulesUnder("features/")]
+    const readers = [...modulesUnder("shell/"), ...modulesUnder("ui/"), ...modulesUnder("features/")]
       .filter((file) => /from "[^"]*\breview-state\.js"/u.test(read(file)))
       .sort();
     expect(readers).toEqual([

@@ -6,7 +6,7 @@
 // the rail still lit up as if nothing had happened.
 //
 // No DOM framework is allowed in this package, so the transitions live in
-// `projection/shell/shell-surface.ts` and are driven here directly. The wiring that
+// `features/shell/projection/shell-surface.ts` and are driven here directly. The wiring that
 // the reducer cannot see (the rail anchors resolving through the
 // `hashchange` subscription, and the shell effect that watches the selected
 // session id) is covered by the source assertions at the bottom.
@@ -19,7 +19,7 @@ import {
   reduceWebuiShellSurface,
   webuiPluginManagementArea,
   type WebuiShellSurface,
-} from "../../src/client/projection/shell/shell-surface.js";
+} from "../../src/client/features/shell/projection/shell-surface.js";
 
 const open = (surface: WebuiShellSurface, area: "plugins" | "skills"): WebuiShellSurface =>
   reduceWebuiShellSurface(surface, { type: "open-plugin-management", area });
@@ -72,13 +72,13 @@ describe("shell surface", () => {
 
 describe("shell surface wiring", () => {
   const shell = readFileSync(
-    new URL("../../src/client/components/shell/WebuiClientFoundationApp.tsx", import.meta.url),
+    new URL("../../src/client/shell/WebuiClientFoundationApp.tsx", import.meta.url),
     "utf8",
   );
   // A-005 moved the new-task workspace behaviour out of the frame; the probe
   // below follows the responsibility, not the file it used to sit in.
   const newTaskWorkspace = readFileSync(
-    new URL("../../src/client/components/shell/use-new-task-workspace.ts", import.meta.url),
+    new URL("../../src/client/shell/use-new-task-workspace.ts", import.meta.url),
     "utf8",
   );
 
@@ -99,7 +99,7 @@ describe("shell surface wiring", () => {
   it("gates the marketplace on the surface rather than a separate boolean", () => {
     // A second flag is how the two got out of step: the gate read `open`, the
     // area came from elsewhere, and nothing tied either to navigation.
-    expect(shell).toContain('from "../../projection/shell/shell-surface.js"');
+    expect(shell).toContain('from "../features/shell/projection/shell-surface.js"');
     expect(shell).toContain("pluginManagementArea ? <PluginCatalogue");
     expect(shell).not.toContain("setPluginManagementOpen");
     expect(shell).not.toContain("setPluginManagementArea");

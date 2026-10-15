@@ -21,7 +21,7 @@ import {
   WebuiProjectList,
   WebuiSessionList,
 } from "../../src/client/features/sessions/ui/SessionRail.js";
-import { WebuiClientFoundationApp } from "../../src/client/components/shell/WebuiClientFoundationApp.js";
+import { WebuiClientFoundationApp } from "../../src/client/shell/WebuiClientFoundationApp.js";
 import { shellElement } from "../support/shell-fixture.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 import { createWebuiSessionCatalogFromPage } from "../../src/client/features/sessions/application/session-catalog.js";
@@ -756,7 +756,6 @@ describe("host wiring", () => {
     "..",
     "src",
     "client",
-    "components",
     "shell",
   );
   const appSource = [

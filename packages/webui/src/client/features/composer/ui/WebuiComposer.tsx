@@ -139,7 +139,7 @@ import {
 } from "../../../features/models/projection/thinking-control.js";
 import {
   WebuiIconAttach,
-} from "../../../components/shell/icons.js";
+} from "../../../shell/icons.js";
 import { OutputError } from "../../../features/transcript/ui/OutputError.js";
 import { isTurnLive } from "../../turn/contracts/stream-state.js";
 import { evaluateComposerDismiss } from "../../../projection/common/outside-close.js";

@@ -4,7 +4,7 @@
 // ways: these four are `turn`'s (`client/features/turn/contracts/execution-port.ts`),
 // `runCommand` and the queue members are the composer's
 // (`client/features/composer/contracts/command-port.ts`), and the process-event
-// watcher is the shell's (`client/contracts/shell/watch-port.ts`).
+// watcher is the shell's (`client/features/shell/contracts/watch-port.ts`).
 //
 // `sendMessage` and `resumeSession` are the two members §9 names for the
 // substrate. `abortSession` and `getActiveTurn` are assigned here too, because

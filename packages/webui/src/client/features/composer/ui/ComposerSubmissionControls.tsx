@@ -14,7 +14,7 @@ import {
   WebuiIconCommandGoal,
   WebuiIconCommandPlan,
   WebuiIconSend,
-} from "../../../components/shell/icons.js";
+} from "../../../shell/icons.js";
 
 export interface WebuiComposerModePillsProps {
   /** Whether goal mode is running with a goal the coordinator can create. */

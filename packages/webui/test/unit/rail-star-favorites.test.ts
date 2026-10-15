@@ -8,7 +8,7 @@ import {
   selectWebuiRailViewTabs,
   type WebuiRailView,
 } from "../../src/client/features/sessions/projection/rail-buckets.js";
-import { WebuiIconSessionStar } from "../../src/client/components/shell/icons.js";
+import { WebuiIconSessionStar } from "../../src/client/shell/icons.js";
 import { WebuiProjectList } from "../../src/client/features/sessions/ui/SessionRail.js";
 import type { WebuiSessionActivityMap } from "../../src/client/features/sessions/projection/session-activity.js";
 import type { WebuiClientProject, WebuiClientSession } from "../../src/client/features/sessions/contracts/session-view.js";

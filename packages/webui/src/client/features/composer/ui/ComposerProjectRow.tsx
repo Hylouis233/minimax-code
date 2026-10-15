@@ -19,7 +19,7 @@ import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilit
 import { evaluateOutsideClose } from "../../../projection/common/outside-close.js";
 import { workspaceProjectName } from "../../../features/workspace/projection/workspace-name.js";
 import { WebuiWorkspaceDirectoryBrowser } from "../../../features/workspace/ui/WebuiWorkspaceDirectoryBrowser.js";
-import { WebuiIconCheck, WebuiIconFolder } from "../../../components/shell/icons.js";
+import { WebuiIconCheck, WebuiIconFolder } from "../../../shell/icons.js";
 
 export interface WebuiComposerProjectRowProps {
   /** The directory the next session would use, or `undefined` for none. */

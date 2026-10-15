@@ -13,7 +13,7 @@
  */
 import { useEffect, useState } from "react";
 
-import { readSessionIdFromHash, subscribeToSessionHash } from "../../bindings/navigation.js";
+import { readSessionIdFromHash, subscribeToSessionHash } from "../bindings/navigation.js";
 
 export function useSelectedSessionId(
   locationHash?: string,

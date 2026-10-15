@@ -10,7 +10,7 @@ import {
   WebuiIconMore,
   WebuiIconSessionDisclosure,
   WebuiIconSessionStar,
-} from "../../../components/shell/icons.js";
+} from "../../../shell/icons.js";
 import type { WebuiClientSession } from "../contracts/session-view.js";
 import { sessionHash } from "../../../projection/common/router.js";
 import { type WebuiSessionActivityMap } from "../projection/session-activity.js";

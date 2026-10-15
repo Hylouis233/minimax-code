@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { WebuiIconContextPin } from "../../src/client/components/shell/icons.js";
+import { WebuiIconContextPin } from "../../src/client/shell/icons.js";
 import { WebuiProjectList } from "../../src/client/features/sessions/ui/SessionRail.js";
 import type { WebuiClientProject, WebuiClientSession, WebuiClientSessionPage } from "../../src/client/features/sessions/contracts/session-view.js";
 

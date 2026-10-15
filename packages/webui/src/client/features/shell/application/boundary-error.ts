@@ -1,6 +1,6 @@
 // How a render failure is normalised for the boundary to report.
 //
-// Carved out of `components/shell/WebuiErrorBoundary.tsx` by Phase 4b: the derivation moves to the
+// Carved out of `client/shell/WebuiErrorBoundary.tsx` by Phase 4b: the derivation moves to the
 // layer that already owns the concept instead of riding along in the
 // component that renders it. What moves is
 // **1 declaration**, 1 function.

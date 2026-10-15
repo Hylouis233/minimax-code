@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactElement, type ReactNode } from "react";
-import { describeWebuiBoundaryError } from "../../application/shell/boundary-error.js";
+import { describeWebuiBoundaryError } from "../features/shell/application/boundary-error.js";
 
 /** Why the boundary holds the `Error` rather than a boolean: the fallback shows
  *  its message, and the same value is what reaches the console. A boolean would

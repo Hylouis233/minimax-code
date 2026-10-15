@@ -134,11 +134,11 @@ describe("the rail's export button", () => {
   // files so the button and its route cannot drift apart unnoticed.
   const shell = [
     readFileSync(
-      new URL("../../src/client/components/shell/WebuiClientFoundationApp.tsx", import.meta.url),
+      new URL("../../src/client/shell/WebuiClientFoundationApp.tsx", import.meta.url),
       "utf8",
     ),
     readFileSync(
-      new URL("../../src/client/components/shell/use-session-rail-actions.ts", import.meta.url),
+      new URL("../../src/client/shell/use-session-rail-actions.ts", import.meta.url),
       "utf8",
     ),
   ].join("\n");

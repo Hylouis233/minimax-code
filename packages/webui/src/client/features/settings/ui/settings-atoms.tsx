@@ -9,7 +9,7 @@
 //
 // They were declared inside `SettingsModal.tsx`; the review page moved to
 // `components/workspace/` (plan §5.6's `workspace` row) and needs the same two,
-// so they live here rather than being copied. `client/components/shell/icons.tsx` has a folder and
+// so they live here rather than being copied. `client/shell/icons.tsx` has a folder and
 // a search icon, but they are filled paths with different geometry — substituting
 // them would change what the user sees, which this programme does not do to save
 // a file.

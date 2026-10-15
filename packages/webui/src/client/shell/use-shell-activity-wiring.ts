@@ -24,8 +24,8 @@
  */
 import { useEffect, useState, useSyncExternalStore } from "react";
 
-import type { WebuiSessionActivityMap } from "../../features/sessions/projection/session-activity.js";
-import type { WebuiClientSession } from "../../features/sessions/contracts/session-view.js";
+import type { WebuiSessionActivityMap } from "../features/sessions/projection/session-activity.js";
+import type { WebuiClientSession } from "../features/sessions/contracts/session-view.js";
 
 /** The activity slice, as the shell's session store holds it. */
 export interface ShellActivitySessionStore {

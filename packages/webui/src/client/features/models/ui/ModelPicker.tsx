@@ -23,7 +23,7 @@
  */
 import { useEffect, useId, useMemo, useState, type ReactElement } from "react";
 
-import { WebuiIconChevronDown } from "../../../components/shell/icons.js";
+import { WebuiIconChevronDown } from "../../../shell/icons.js";
 import type {
   WebuiModelPickerDraft,
   WebuiModelPickerEntry,

@@ -16,7 +16,7 @@ import {
   initialWorkspacePanelSessionState,
   type WorkspacePanelCommand,
   type WorkspacePanelSessionState,
-} from "../../features/workspace/projection/workspace-panel-state.js";
+} from "../features/workspace/projection/workspace-panel-state.js";
 
 /**
  * What the hook needs from the panel owner, stated as the surface it uses rather

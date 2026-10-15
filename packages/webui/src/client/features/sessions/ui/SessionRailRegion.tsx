@@ -1,7 +1,7 @@
 import type { ChangeEvent, ComponentProps, ReactElement, ReactNode, RefObject } from "react";
 import { WebuiProjectList } from "./SessionRail.js";
 import { RailRow } from "./RailRow.js";
-import { WebuiIconContextExport, WebuiIconNewTask, WebuiIconPlugins, WebuiIconRemote, WebuiIconSites } from "../../../components/shell/icons.js";
+import { WebuiIconContextExport, WebuiIconNewTask, WebuiIconPlugins, WebuiIconRemote, WebuiIconSites } from "../../../shell/icons.js";
 
 type ProjectListProps = ComponentProps<typeof WebuiProjectList>;
 

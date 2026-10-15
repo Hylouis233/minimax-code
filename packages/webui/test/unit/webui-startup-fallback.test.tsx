@@ -24,7 +24,7 @@ import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { WebuiStartupFallback } from "../../src/client/components/shell/StartupFallback.js";
+import { WebuiStartupFallback } from "../../src/client/shell/StartupFallback.js";
 
 const MAIN_SOURCE = readFileSync(
   new URL("../../src/client/main.tsx", import.meta.url),

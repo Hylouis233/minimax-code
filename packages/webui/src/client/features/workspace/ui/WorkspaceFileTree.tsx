@@ -4,7 +4,7 @@
 
 import type { ReactElement } from "react";
 import type { WebuiWorkspaceFile } from "../../../../shared/contracts/workspace.js";
-import { WebuiIconChevronLeft, WebuiIconFile } from "../../../components/shell/icons.js";
+import { WebuiIconChevronLeft, WebuiIconFile } from "../../../shell/icons.js";
 import { formatWorkspaceFileSize, formatWorkspaceFileModifiedAt } from "../projection/workspace-file-tree.js";
 
 // The pure tree helpers moved to `projection/workspace/workspace-file-tree.ts` so the

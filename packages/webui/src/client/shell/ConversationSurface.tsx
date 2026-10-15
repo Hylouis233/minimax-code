@@ -1,7 +1,7 @@
 import type { ReactElement, ReactNode } from "react";
 import { WebuiIconBrand } from "./icons.js";
-import { GreetingSkeleton } from "../../features/transcript/ui/TranscriptSkeletons.js";
-import { WebuiWorkspacePanelControls } from "../../features/workspace/ui/WorkspacePanels.js";
+import { GreetingSkeleton } from "../features/transcript/ui/TranscriptSkeletons.js";
+import { WebuiWorkspacePanelControls } from "../features/workspace/ui/WorkspacePanels.js";
 
 /** Conversation column layout; Shell supplies already-owned feature surfaces and named navigation actions. */
 export function ConversationSurface(props: {

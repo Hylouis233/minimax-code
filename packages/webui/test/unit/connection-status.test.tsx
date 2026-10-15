@@ -12,7 +12,7 @@ import {
   ConnectionStatus as BaseConnectionStatus,
   projectWebuiConnectionState,
   type ConnectionStatusProps,
-} from "../../src/client/components/shell/ConnectionStatus.js";
+} from "../../src/client/shell/ConnectionStatus.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 import { WebuiSessionStoreProvider } from "../../src/client/bindings/application-context.js";
 import type { WebuiStreamState } from "../../src/client/features/turn/projection/stream-state.js";
@@ -189,7 +189,7 @@ describe("ConnectionStatus host layout calls", () => {
     // before Q-1 the component existed with zero consumers, which is exactly
     // the gap that made every connection state invisible.
     const source = readFileSync(
-      new URL("../../src/client/components/shell/WebuiClientFoundationApp.tsx", import.meta.url),
+      new URL("../../src/client/shell/WebuiClientFoundationApp.tsx", import.meta.url),
       "utf8",
     );
     const mountAt = source.indexOf("<ConnectionStatus");
