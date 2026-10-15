@@ -3,7 +3,7 @@
 // import specifiers are the only differences.
 
 import { type ReactElement } from "react";
-import { WebuiContextMenu, type WebuiContextMenuItem } from "../../../components/shared/ContextMenu.js";
+import { WebuiContextMenu, type WebuiContextMenuItem } from "../../../ui/ContextMenu.js";
 
 /**
  * The rail's context menu (plan §16.10's three in-file regions: the context menu).

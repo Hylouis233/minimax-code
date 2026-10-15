@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useState, type ReactElement, type ReactNode } from "react";
 import type { WebuiAgentMemoryView, WebuiMemorySettingsView } from "../../../../shared/contracts/personalization.js";
-import { ToggleSwitch } from "../../../components/shared/ToggleSwitch.js";
+import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
 import { PERSONALIZATION_SECTION_HINTS, SectionHeader } from "./settings-atoms.js";
 import { MemoryManagerDialog, formatMemoryTimestamp, isMemorySaveable, type MemoryHandoff } from "./MemoryManagerDialog.js";
 

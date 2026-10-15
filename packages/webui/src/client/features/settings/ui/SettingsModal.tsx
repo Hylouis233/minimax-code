@@ -9,8 +9,8 @@ import {
   type WebuiWorktreeSourceSession,
   type WebuiWorktreeWorkspace,
 } from "../../../features/sessions/projection/worktree-state.js";
-import { ToggleSwitch as Switch } from "../../../components/shared/ToggleSwitch.js";
-import { FolderIcon, SearchIcon } from "../../../components/shared/settings-glyphs.js";
+import { ToggleSwitch as Switch } from "../../../ui/ToggleSwitch.js";
+import { FolderIcon, SearchIcon } from "../../../ui/settings-glyphs.js";
 import { ReviewSettingsPage } from "../../../features/review/ui/ReviewSettingsPage.js";
 import { UsageModelSettings } from "./UsageModelSettings.js";
 import { PersonalizationSettings } from "./PersonalizationSettings.js";

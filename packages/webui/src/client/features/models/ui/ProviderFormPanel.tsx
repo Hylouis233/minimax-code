@@ -25,7 +25,7 @@ import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilit
 import { reorderModelIds } from "../projection/model-reorder.js";
 import { projectProviderHeaders, type ProviderHeaderDraft } from "../projection/usage-settings.js";
 import { recordOf, textOf } from "../../../contracts/value-readers.js";
-import { ToggleSwitch } from "../../../components/shared/ToggleSwitch.js";
+import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
 import { CloseIcon, IconButton, RefreshIcon } from "../../settings/ui/settings-atoms.js";
 
 /**

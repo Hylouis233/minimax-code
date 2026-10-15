@@ -74,7 +74,6 @@ command ownership or substrate policy. The exported declaration index is `docs/w
 | `review` | `client/features/review/ui/` | `client/features/review/application/` | `client/features/review/projection/` | `client/features/review/bindings/` | `client/features/review/contracts/` |
 | `sessions` | `client/features/sessions/ui/` | `client/features/sessions/application/` | `client/features/sessions/projection/` | `client/features/sessions/bindings/` | `client/contracts/sessions/` |
 | `settings` | `client/features/settings/ui/` | `client/features/settings/application/` | `client/features/settings/projection/` | — | `client/features/settings/contracts/` |
-| `shared` | `client/components/shared/` | — | — | — | — |
 | `shell` | `client/components/shell/` | `client/application/shell/` | `client/projection/shell/` | — | `client/contracts/shell/` |
 | `terminal` | — | `client/features/terminal/application/` | `client/features/terminal/projection/` | — | `client/features/terminal/contracts/` |
 | `transcript` | `client/features/transcript/ui/` | `client/features/transcript/application/` | `client/features/transcript/projection/` | `client/features/transcript/bindings/` | `client/features/transcript/contracts/` |

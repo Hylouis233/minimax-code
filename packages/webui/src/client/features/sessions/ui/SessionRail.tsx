@@ -28,7 +28,7 @@ import {
   WebuiIconFolder,
   WebuiIconSessionStar,
 } from "../../../components/shell/icons.js";
-import { type WebuiContextMenuItem } from "../../../components/shared/ContextMenu.js";
+import { type WebuiContextMenuItem } from "../../../ui/ContextMenu.js";
 import type {
   WebuiClientSession,
   WebuiClientSessionPage,

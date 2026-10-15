@@ -1,6 +1,6 @@
 import { useCallback, useState, type MouseEvent } from "react";
 
-import type { WebuiContextMenuItem } from "../../../components/shared/ContextMenu.js";
+import type { WebuiContextMenuItem } from "../../../ui/ContextMenu.js";
 
 type RailContextMenuState = {
   readonly x: number;

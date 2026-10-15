@@ -2,7 +2,7 @@ import type { ReactElement } from "react";
 import type { WebuiPluginIntent } from "../contracts/plugin-actions.js";
 import { readWebuiPluginRow as read } from "../contracts/plugin-rows.js";
 import type { WebuiPluginCatalogueRow } from "../projection/catalogue-view.js";
-import { ToggleSwitch } from "../../../components/shared/ToggleSwitch.js";
+import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
 
 export type PluginManagementArea =
   | "plugins"

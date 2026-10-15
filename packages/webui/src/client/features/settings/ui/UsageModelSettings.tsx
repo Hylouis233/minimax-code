@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactElement } from "react";
 import { formatWebuiCredits, recordOf, textOf } from "../../../contracts/value-readers.js";
 import { useWebuiModelsWorkflows, useWebuiModelsWorkflowsState, useWebuiSettingsWorkflows, useWebuiSettingsWorkflowsState } from "../../../bindings/use-query-state.js";
 import { useWebuiAccountWorkflows, useWebuiAccountWorkflowsState } from "../../../features/account/bindings/use-account-workflows.js";
-import { ToggleSwitch } from "../../../components/shared/ToggleSwitch.js";
+import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
 import { formatResetLabel, getActiveSourceBadge, type ProviderHeaderDraft } from "../../../features/models/projection/usage-settings.js";
 import { IconButton, RefreshIcon } from "./settings-atoms.js";
 import { ProviderFormPanel, type WebuiProviderFormCommands } from "../../../features/models/ui/ProviderFormPanel.js";

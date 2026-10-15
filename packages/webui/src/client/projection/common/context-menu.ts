@@ -1,6 +1,6 @@
 // Where a context menu opens, given the pointer and the viewport.
 //
-// Carved out of `components/shared/ContextMenu.tsx` by Phase 4b, and moved here
+// Carved out of `client/ui/ContextMenu.tsx` by Phase 4b, and moved here
 // from `projection/shell/` by T18: the placement rule has no shell policy in it
 // — it clamps a floating box to the viewport for whichever surface opened it —
 // so it belongs with the other generic menu mechanics
