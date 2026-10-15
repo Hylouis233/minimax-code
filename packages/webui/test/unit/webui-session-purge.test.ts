@@ -50,7 +50,7 @@ import type { WebuiStreamLoopExtra } from "../../src/client/features/turn/contra
 import { buildWebuiStreamLoopSink } from "../../src/client/conversation/stream-loop.js";
 import { streamStateBundle } from "../../src/client/features/turn/application/stream-state-bundle.js";
 import type { WebuiSessionActivityMap } from "../../src/client/features/sessions/projection/session-activity.js";
-import type { WebuiClientSession } from "../../src/client/contracts/sessions/session-view.js";
+import type { WebuiClientSession } from "../../src/client/features/sessions/contracts/session-view.js";
 import type { WebuiSessionListItem } from "../../src/shared/contracts/session.js";
 import type { WebuiStreamFrame } from "../../src/shared/contracts/stream.js";
 

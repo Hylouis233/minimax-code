@@ -10,7 +10,7 @@
 // rendered to run at all. They are the same bodies, moved; the rail imports them
 // from here and `session-rail-search.test.ts` drives them directly.
 
-import type { WebuiClientSession } from "../../../contracts/sessions/session-view.js";
+import type { WebuiClientSession } from "../contracts/session-view.js";
 import { workspaceProjectName } from "../../workspace/projection/workspace-name.js";
 
 export const PROJECT_SESSION_BATCH_SIZE = 6;

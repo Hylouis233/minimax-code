@@ -52,7 +52,7 @@ import type { GoalPort } from "../features/goal/contracts/goal-port.js";
 import type { InteractionPort } from "../features/interactions/contracts/interaction-port.js";
 import type { ModelsPort } from "../features/models/contracts/provider-port.js";
 import type { PluginPort } from "../features/plugins/contracts/plugin-port.js";
-import type { SessionPort } from "../contracts/sessions/session-port.js";
+import type { SessionPort } from "../features/sessions/contracts/session-port.js";
 import type { SettingsPort } from "../features/settings/contracts/settings-port.js";
 import type { ShellEventPort } from "../contracts/shell/watch-port.js";
 import type { TranscriptPort } from "../features/transcript/contracts/session-read-port.js";

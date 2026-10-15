@@ -3,7 +3,7 @@ import type {
   WebuiComposerSubmitArgs,
   WebuiComposerSubmitHandlers,
 } from "../contracts/composer-turn.js";
-import type { WebuiClientCreateSessionResult, WebuiClientSessionCreator } from "../../../contracts/sessions/session-port.js";
+import type { WebuiClientCreateSessionResult, WebuiClientSessionCreator } from "../../sessions/contracts/session-port.js";
 import type { WebuiGoal, WebuiGoalCreateRequest, WebuiGoalPatchRequest } from "../../../../shared/contracts/goal.js";
 import type { WebuiAttachmentInput } from "../../../../shared/contracts/messages.js";
 import { formatWebuiError } from "../../../contracts/value-readers.js";

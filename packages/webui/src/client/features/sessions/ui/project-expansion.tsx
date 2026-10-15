@@ -11,7 +11,7 @@ import {
   WebuiIconSessionDisclosure,
   WebuiIconSessionStar,
 } from "../../../components/shell/icons.js";
-import type { WebuiClientSession } from "../../../contracts/sessions/session-view.js";
+import type { WebuiClientSession } from "../contracts/session-view.js";
 import { sessionHash } from "../../../projection/common/router.js";
 import { type WebuiSessionActivityMap } from "../projection/session-activity.js";
 import { sessionLabel } from "../projection/rail-groups.js";

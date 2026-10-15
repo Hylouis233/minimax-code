@@ -11,7 +11,7 @@ import {
 } from "../../src/client/features/sessions/projection/rail-buckets.js";
 import { WebuiProjectList } from "../../src/client/features/sessions/ui/SessionRail.js";
 import type { WebuiSessionActivityMap } from "../../src/client/features/sessions/projection/session-activity.js";
-import type { WebuiClientSession } from "../../src/client/contracts/sessions/session-view.js";
+import type { WebuiClientSession } from "../../src/client/features/sessions/contracts/session-view.js";
 
 function session(
   sessionId: string,

@@ -10,8 +10,8 @@
 // implementation — composition injects the factories, and these are the shapes it
 // and the interactions coordinator name.
 
-import type { WebuiStreamLoopSink } from "../../features/turn/contracts/stream-loop.js";
-import type { WebuiStreamState } from "../../features/turn/contracts/stream-state.js";
+import type { WebuiStreamLoopSink } from "../../turn/contracts/stream-loop.js";
+import type { WebuiStreamState } from "../../turn/contracts/stream-state.js";
 
 /** The phases the stream slice can be moved to by name. */
 export type WebuiStreamPhase = WebuiStreamState["phase"];

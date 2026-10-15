@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { WebuiIconContextPin } from "../../src/client/components/shell/icons.js";
 import { WebuiProjectList } from "../../src/client/features/sessions/ui/SessionRail.js";
-import type { WebuiClientProject, WebuiClientSession, WebuiClientSessionPage } from "../../src/client/contracts/sessions/session-view.js";
+import type { WebuiClientProject, WebuiClientSession, WebuiClientSessionPage } from "../../src/client/features/sessions/contracts/session-view.js";
 
 /**
  * Pin affordance: the two things a pinned row has to be able to say.

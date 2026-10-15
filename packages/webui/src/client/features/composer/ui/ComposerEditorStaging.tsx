@@ -15,7 +15,7 @@
 
 import { Fragment } from "react";
 
-import type { WebuiClientSession } from "../../../contracts/sessions/session-view.js";
+import type { WebuiClientSession } from "../../sessions/contracts/session-view.js";
 import {
   type WebuiComposerAttachment,
   type WebuiComposerUrlReference,

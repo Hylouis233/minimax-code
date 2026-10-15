@@ -9,7 +9,7 @@ import {
   type WebuiSessionActivityMap,
 } from "../projection/session-activity.js";
 import { formatWebuiUnreadBadge } from "../../../projection/common/unread-badge.js";
-import type { WebuiClientSession } from "../../../contracts/sessions/session-view.js";
+import type { WebuiClientSession } from "../contracts/session-view.js";
 
 /**
  * The right-hand end of a rail row: a spinner while a turn holds the session,

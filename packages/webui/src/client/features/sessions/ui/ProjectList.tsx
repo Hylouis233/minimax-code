@@ -9,7 +9,7 @@ import {
 import type {
   WebuiClientSession,
   WebuiClientSessionPage,
-} from "../../../contracts/sessions/session-view.js";
+} from "../contracts/session-view.js";
 import type { WebuiSessionActivityMap } from "../projection/session-activity.js";
 import type { WebuiProjectGroup } from "../projection/rail-groups.js";
 import {

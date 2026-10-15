@@ -23,7 +23,7 @@ import { createWebuiSessionStore } from "../../src/client/application/session-st
 import { createWebuiSessionWorkflows } from "../../src/client/features/sessions/application/session-workflows.js";
 import { createWebuiSessionScopeManager } from "../../src/client/conversation/session-scope.js";
 import { selectWebuiWorkspaceProgress } from "../../src/client/features/workspace/projection/workspace-progress.js";
-import type { WebuiClientSession } from "../../src/client/contracts/sessions/session-view.js";
+import type { WebuiClientSession } from "../../src/client/features/sessions/contracts/session-view.js";
 import { selectWebuiSessionAgentName, selectWebuiSessionLookups } from "../../src/client/features/sessions/projection/session-lookups.js";
 
 /**

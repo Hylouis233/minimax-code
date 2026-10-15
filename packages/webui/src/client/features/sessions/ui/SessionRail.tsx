@@ -34,7 +34,7 @@ import type {
   WebuiClientSessionPage,
   WebuiClientSessionTreePage,
   WebuiClientProject,
-} from "../../../contracts/sessions/session-view.js";
+} from "../contracts/session-view.js";
 import { formatWebuiUnreadBadge } from "../../../projection/common/unread-badge.js";
 import { workspaceProjectName } from "../../workspace/projection/workspace-name.js";
 import { ProjectList } from "./ProjectList.js";

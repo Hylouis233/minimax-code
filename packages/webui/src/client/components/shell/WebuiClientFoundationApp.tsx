@@ -60,7 +60,7 @@ import {
   WebuiIconSearch,
   WebuiIconSidebarToggle,
 } from "./icons.js";
-import type { WebuiClientSession, WebuiClientSessionPage } from "../../contracts/sessions/session-view.js";
+import type { WebuiClientSession, WebuiClientSessionPage } from "../../features/sessions/contracts/session-view.js";
 import type {
   WebuiClientMessage,
   WebuiClientMessagePage,

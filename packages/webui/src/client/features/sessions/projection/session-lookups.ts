@@ -1,6 +1,6 @@
-import type { WebuiClientSession } from "../../../contracts/sessions/session-view.js";
-import type { WebuiClientSessionPage } from "../../../contracts/sessions/session-view.js";
-import type { WebuiClientSessionTreePage } from "../../../contracts/sessions/session-view.js";
+import type { WebuiClientSession } from "../contracts/session-view.js";
+import type { WebuiClientSessionPage } from "../contracts/session-view.js";
+import type { WebuiClientSessionTreePage } from "../contracts/session-view.js";
 
 /** Merge the committed flat page with child rows in the committed tree. */
 export function selectWebuiSessionLookups(

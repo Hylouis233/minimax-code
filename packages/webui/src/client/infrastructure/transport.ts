@@ -16,7 +16,7 @@ import type {
   WebuiClientSessionPage,
   WebuiClientSessionTreePage,
   WebuiClientProject,
-} from "../contracts/sessions/session-view.js";
+} from "../features/sessions/contracts/session-view.js";
 import type { WebuiTransport } from "../contracts/transport.js";
 import type { WebuiVersionInfo } from "../../shared/contracts/version.js";
 import {

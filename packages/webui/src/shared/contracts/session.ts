@@ -6,46 +6,46 @@
 // | --- | --- | --- | --- |
 // | `WebuiSessionListRequest` | Session list query (name, paging, filters). | Browser `client/infrastructure/transport.ts` (`listSessions`). | runtime `listSessions`; `server/operation/session.ts`. |
 // | `WebuiSessionListItem` | One session in a list/tree page. | Runtime `listSessions`/`getSessionTree` (`runtime/harness/sessions.ts`; CliService). | `client/features/settings/ui/SettingsModal.tsx`; `server/index.ts` (barrel). |
-// | `WebuiSessionPage` | A page of session-list results. | Runtime `listSessions`. | `client/contracts/sessions/session-port.ts`; `server/operation/session.ts`. |
-// | `WebuiProjectRecord` | One visible project (rail grouping). | Runtime `listVisibleProjects` (`runtime/harness/sessions.ts`). | `client/contracts/sessions/session-view.ts` (`WebuiClientProject`); `server/operation/session.ts`. |
+// | `WebuiSessionPage` | A page of session-list results. | Runtime `listSessions`. | `client/features/sessions/contracts/session-port.ts`; `server/operation/session.ts`. |
+// | `WebuiProjectRecord` | One visible project (rail grouping). | Runtime `listVisibleProjects` (`runtime/harness/sessions.ts`). | `client/features/sessions/contracts/session-view.ts` (`WebuiClientProject`); `server/operation/session.ts`. |
 // | `WebuiSessionTreeRequest` | Session tree query (name, paging, filters). | Browser `client/infrastructure/transport.ts` (`getSessionTree`). | runtime `getSessionTree`; `server/operation/session.ts`. |
 // | `WebuiSessionTreeNode` | One parent session with its child sessions. | Runtime `getSessionTree`. | `server/index.ts` (barrel). |
-// | `WebuiSessionTreePage` | A page of session-tree results. | Runtime `getSessionTree`. | `client/contracts/sessions/session-port.ts`; `server/operation/session.ts`. |
+// | `WebuiSessionTreePage` | A page of session-tree results. | Runtime `getSessionTree`. | `client/features/sessions/contracts/session-port.ts`; `server/operation/session.ts`. |
 // | `WebuiSessionLookupRequest` | Request to look up one session by id. | Browser `client/infrastructure/transport.ts` (`getSession`). | `server/operation/common.ts`; runtime `getSession`. |
 // | `WebuiActiveTurn` | Authoritative active-turn probe (turnId, busyReason, locallyOwned). | Runtime `getActiveTurn` (`runtime/harness/execution.ts`; CliService). | `client/features/sessions/projection/session-activity.ts`. |
 // | `WebuiActiveTurnResult` | The active turn, or undefined when idle. | Runtime `getActiveTurn`. | `client/features/turn/contracts/execution-port.ts`; `client/features/composer/ui/WebuiComposer.tsx`. |
 // | `WebuiActiveTurnRequest` | Request naming the session whose active turn is probed. | Browser `client/infrastructure/transport.ts` (`getActiveTurn`). | `client/features/turn/application/active-turn-probe.ts`; `client/features/turn/contracts/execution-port.ts`; `client/features/composer/ui/WebuiComposer.tsx`. |
 // | `WebuiSessionInfo` | The session identity/fields returned by lookup and mutations. | Runtime `getSession`/`updateSession`/`forkSession`/`createSession`. | `server/service.ts` (session-transfer route); `server/index.ts` (barrel). |
-// | `WebuiSessionLookupResult` | The `{ session }` envelope from a lookup. | Runtime `getSession`. | `client/contracts/sessions/session-port.ts`; `server/operation/session.ts`. |
+// | `WebuiSessionLookupResult` | The `{ session }` envelope from a lookup. | Runtime `getSession`. | `client/features/sessions/contracts/session-port.ts`; `server/operation/session.ts`. |
 // | `WebuiUpdateSessionRequest` | Request to set a session title. | Browser `client/infrastructure/transport.ts` (`updateSession`). | `server/operation/session.ts`; runtime `updateSession`. |
-// | `WebuiUpdateSessionResult` | The updated `{ session }`. | Runtime `updateSession`. | `server/operation/session.ts`; `client/contracts/sessions/session-port.ts`. |
+// | `WebuiUpdateSessionResult` | The updated `{ session }`. | Runtime `updateSession`. | `server/operation/session.ts`; `client/features/sessions/contracts/session-port.ts`. |
 // | `WebuiForkSessionRequest` | Request to fork a session. | Browser `client/infrastructure/transport.ts`; built in `client/features/sessions/projection/action-requests.ts` (`forkSession`). | `server/operation/session.ts`; runtime `forkSession`. |
 // | `WebuiGetSessionForkOptionsRequest` | Request for fork options. | Browser `client/infrastructure/transport.ts`. | `server/operation/session.ts`; runtime `getSessionForkOptions`. |
-// | `WebuiGetSessionForkOptionsResult` | Whether/where a session can be forked. | Runtime `getSessionForkOptions`. | `server/operation/session.ts`; `client/contracts/sessions/session-port.ts`; `client/features/transcript/ui/MessageItem.tsx`. |
-// | `WebuiForkSessionResult` | The forked session and its lineage ids. | Runtime `forkSession`. | `server/operation/session.ts`; `client/contracts/sessions/session-port.ts`. |
+// | `WebuiGetSessionForkOptionsResult` | Whether/where a session can be forked. | Runtime `getSessionForkOptions`. | `server/operation/session.ts`; `client/features/sessions/contracts/session-port.ts`; `client/features/transcript/ui/MessageItem.tsx`. |
+// | `WebuiForkSessionResult` | The forked session and its lineage ids. | Runtime `forkSession`. | `server/operation/session.ts`; `client/features/sessions/contracts/session-port.ts`. |
 // | `WebuiCreateSessionRequest` | Request to create a session (name, workspace, teamModeOff). | Browser `client/infrastructure/transport.ts` (`createSession`). | runtime `createSession`; `server/operation/session.ts`; `server/service.ts`. |
 // | `WebuiSessionTransferFile` | A round-trippable session export (canonical + display layers). | Runtime `exportSessionTransfer` (`runtime/harness/sessions.ts`; CliService). | `runtime/port.ts` capability surface only; no src reader beyond it. |
 // | `WebuiImportSessionTransferRequest` | Request to import a session transfer into a target session. | HTTP route `server/service.ts` (session-transfer handler). | runtime `importSessionTransfer`; `runtime/port.ts`. |
 // | `WebuiImportSessionTransferResult` | Counts and revision after an import. | Runtime `importSessionTransfer`. | `runtime/port.ts` capability surface only. |
-// | `WebuiCreateSessionResult` | The created session info. | Runtime `createSession`. | `client/contracts/sessions/session-port.ts`; `server/operation/session.ts`. |
+// | `WebuiCreateSessionResult` | The created session info. | Runtime `createSession`. | `client/features/sessions/contracts/session-port.ts`; `server/operation/session.ts`. |
 // | `WebuiFileDiffInfoView` | One file's add/delete counts and patch in a session/turn diff. | Runtime `getSessionDiff`/`getTurnDiff` (`runtime/harness/sessions.ts`); also `client/features/transcript/projection/message-projection.ts`. | `client/features/transcript/contracts/message-view.ts`; `client/features/workspace/ui/WorkspacePanels.tsx`. |
 // | `WebuiTurnDiffView` | A turn's reversible diff state. | Runtime `getTurnDiff`/`revertTurnDiff`/`reapplyTurnDiff`; also `client/features/transcript/projection/message-projection.ts`. | `client/features/transcript/contracts/transcript-view.ts`; `client/features/review/contracts/review-view.ts`; `client/features/transcript/ui/DiffCard.tsx`; `client/features/transcript/ui/AssistantBody.tsx`; `client/features/workspace/projection/workspace-panel-state.ts`. |
 // | `WebuiGetSessionDiffRequest` | Request for a session-level diff. | Browser `client/infrastructure/transport.ts`. | `server/operation/messages.ts`; runtime `getSessionDiff`. |
-// | `WebuiGetSessionDiffResult` | Session-level diff result. | Runtime `getSessionDiff`. | `client/contracts/sessions/session-port.ts`; `server/operation/messages.ts`. |
+// | `WebuiGetSessionDiffResult` | Session-level diff result. | Runtime `getSessionDiff`. | `client/features/sessions/contracts/session-port.ts`; `server/operation/messages.ts`. |
 // | `WebuiGetTurnDiffRequest` | Request for one turn's diff. | Browser `client/infrastructure/transport.ts`; requested from `client/features/transcript/ui/DiffCard.tsx`. | `server/operation/messages.ts`; runtime `getTurnDiff`. |
-// | `WebuiGetTurnDiffResult` | One turn's diff. | Runtime `getTurnDiff`. | `client/contracts/sessions/session-port.ts`; `server/operation/messages.ts`. |
+// | `WebuiGetTurnDiffResult` | One turn's diff. | Runtime `getTurnDiff`. | `client/features/sessions/contracts/session-port.ts`; `server/operation/messages.ts`. |
 // | `WebuiRevertTurnDiffRequest` | Request to revert a turn's diff. | Browser `client/infrastructure/transport.ts`; requested from `client/features/transcript/ui/DiffCard.tsx`. | `server/operation/messages.ts`; runtime `revertTurnDiff`. |
-// | `WebuiRevertTurnDiffResult` | Revert outcome. | Runtime `revertTurnDiff`. | `client/contracts/sessions/session-port.ts`; `client/features/transcript/ui/DiffCard.tsx`. |
+// | `WebuiRevertTurnDiffResult` | Revert outcome. | Runtime `revertTurnDiff`. | `client/features/sessions/contracts/session-port.ts`; `client/features/transcript/ui/DiffCard.tsx`. |
 // | `WebuiReapplyTurnDiffRequest` | Request to reapply a reverted turn diff. | Browser `client/infrastructure/transport.ts`; requested from `client/features/transcript/ui/DiffCard.tsx`. | `server/operation/messages.ts`; runtime `reapplyTurnDiff`. |
-// | `WebuiReapplyTurnDiffResult` | Reapply outcome. | Runtime `reapplyTurnDiff`. | `client/contracts/sessions/session-port.ts`; `client/features/transcript/ui/DiffCard.tsx`. |
+// | `WebuiReapplyTurnDiffResult` | Reapply outcome. | Runtime `reapplyTurnDiff`. | `client/features/sessions/contracts/session-port.ts`; `client/features/transcript/ui/DiffCard.tsx`. |
 // | `WebuiGetSessionRewindPreviewRequest` | Request for a rewind preview. | Browser `client/infrastructure/transport.ts`. | `server/operation/messages.ts`; runtime `getSessionRewindPreview`. |
 // | `WebuiRewindPreviewFile` | One file action in a rewind preview turn. | Runtime `getSessionRewindPreview`. | unverified — nested in `WebuiRewindPreviewTurn.files`; no direct importer. |
 // | `WebuiRewindPreviewTurn` | One turn's file actions in a rewind preview. | Runtime `getSessionRewindPreview`. | unverified — nested in `WebuiGetSessionRewindPreviewResult.turns`; no direct importer. |
 // | `WebuiGetSessionRewindPreviewResult` | The rewind preview (turns and file actions). | Runtime `getSessionRewindPreview`. | `client/features/transcript/ui/MessageActions.tsx`; `client/features/transcript/ui/MessageItem.tsx`. |
 // | `WebuiRewindSessionRequest` | Request to rewind a session to a user message. | Browser `client/infrastructure/transport.ts`; built in `client/features/sessions/projection/action-requests.ts`. | `server/operation/messages.ts`; runtime `rewindSession`. |
-// | `WebuiRewindSessionResult` | Rewind outcome (revisions, deleted ids). | Runtime `rewindSession`. | `client/contracts/sessions/session-port.ts`; `server/operation/messages.ts`. |
+// | `WebuiRewindSessionResult` | Rewind outcome (revisions, deleted ids). | Runtime `rewindSession`. | `client/features/sessions/contracts/session-port.ts`; `server/operation/messages.ts`. |
 // | `WebuiEditSessionMessageRequest` | Request to edit a user message and rewind. | Browser `client/infrastructure/transport.ts`; built in `client/features/sessions/projection/action-requests.ts`. | `server/operation/messages.ts`; runtime `editSessionMessage`. |
-// | `WebuiEditSessionMessageResult` | Edit/rewind outcome. | Runtime `editSessionMessage`. | `client/contracts/sessions/session-port.ts`; `server/operation/messages.ts`. |
+// | `WebuiEditSessionMessageResult` | Edit/rewind outcome. | Runtime `editSessionMessage`. | `client/features/sessions/contracts/session-port.ts`; `server/operation/messages.ts`. |
 export interface WebuiSessionListRequest {
   readonly name: string;
   readonly limit?: number;

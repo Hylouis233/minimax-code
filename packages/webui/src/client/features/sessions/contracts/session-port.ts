@@ -8,8 +8,8 @@
 //
 // Every method stays optional — `undefined` means "the operation is not wired".
 
-import type { WebuiClientProject, WebuiClientSessionPage, WebuiClientSessionTreePage } from ".././sessions/session-view.js";
-import type { WebuiForkSessionRequest, WebuiForkSessionResult, WebuiGetSessionForkOptionsRequest, WebuiGetSessionForkOptionsResult, WebuiUpdateSessionRequest, WebuiUpdateSessionResult } from "../../../shared/contracts/session.js";
+import type { WebuiClientProject, WebuiClientSessionPage, WebuiClientSessionTreePage } from "./session-view.js";
+import type { WebuiForkSessionRequest, WebuiForkSessionResult, WebuiGetSessionForkOptionsRequest, WebuiGetSessionForkOptionsResult, WebuiUpdateSessionRequest, WebuiUpdateSessionResult } from "../../../../shared/contracts/session.js";
 
 export interface SessionPort {
   readonly loadProjects?: () => Promise<readonly WebuiClientProject[]>;

@@ -23,7 +23,7 @@ import {
 import type {
   WebuiClientSession,
   WebuiClientSessionPage,
-} from "../../contracts/sessions/session-view.js";
+} from "../../features/sessions/contracts/session-view.js";
 import type { selectWebuiCatalogTreePage } from "../../features/sessions/application/session-catalog.js";
 import { sessionHash } from "../../projection/common/router.js";
 import {

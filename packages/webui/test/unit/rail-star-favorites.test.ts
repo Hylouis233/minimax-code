@@ -11,7 +11,7 @@ import {
 import { WebuiIconSessionStar } from "../../src/client/components/shell/icons.js";
 import { WebuiProjectList } from "../../src/client/features/sessions/ui/SessionRail.js";
 import type { WebuiSessionActivityMap } from "../../src/client/features/sessions/projection/session-activity.js";
-import type { WebuiClientProject, WebuiClientSession } from "../../src/client/contracts/sessions/session-view.js";
+import type { WebuiClientProject, WebuiClientSession } from "../../src/client/features/sessions/contracts/session-view.js";
 
 /**
  * Favourites: the fourth rail view, and the star that feeds it.

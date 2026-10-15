@@ -53,7 +53,7 @@ import {
 import type {
   WebuiStreamPhaseCommands,
   WebuiTurnLifecycleCommands,
-} from "../contracts/sessions/turn-command-views.js";
+} from "../features/sessions/contracts/turn-command-views.js";
 import { createWebuiTurnCommandCollaborators } from "../application/turn-command-wiring.js";
 import { createWebuiConversationTurnCommands } from "../features/turn/application/turn-commands.js";
 import {

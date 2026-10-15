@@ -1,5 +1,5 @@
 import type { WebuiAttachmentInput } from "../../../../shared/contracts/messages.js";
-import type { WebuiClientSessionCreator } from "../../../contracts/sessions/session-port.js";
+import type { WebuiClientSessionCreator } from "../../sessions/contracts/session-port.js";
 import type {
   WebuiStreamLoopSink,
   WebuiStreamLoopTransports,

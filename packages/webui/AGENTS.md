@@ -72,7 +72,7 @@ command ownership or substrate policy. The exported declaration index is `docs/w
 | `models` | `client/features/models/ui/` | `client/features/models/application/` | `client/features/models/projection/` | `client/features/models/bindings/` | `client/features/models/contracts/` |
 | `plugins` | `client/features/plugins/ui/` | `client/features/plugins/application/` | `client/features/plugins/projection/` | — | `client/features/plugins/contracts/` |
 | `review` | `client/features/review/ui/` | `client/features/review/application/` | `client/features/review/projection/` | `client/features/review/bindings/` | `client/features/review/contracts/` |
-| `sessions` | `client/features/sessions/ui/` | `client/features/sessions/application/` | `client/features/sessions/projection/` | `client/features/sessions/bindings/` | `client/contracts/sessions/` |
+| `sessions` | `client/features/sessions/ui/` | `client/features/sessions/application/` | `client/features/sessions/projection/` | `client/features/sessions/bindings/` | `client/features/sessions/contracts/` |
 | `settings` | `client/features/settings/ui/` | `client/features/settings/application/` | `client/features/settings/projection/` | — | `client/features/settings/contracts/` |
 | `shell` | `client/components/shell/` | `client/application/shell/` | `client/projection/shell/` | — | `client/contracts/shell/` |
 | `terminal` | — | `client/features/terminal/application/` | `client/features/terminal/projection/` | — | `client/features/terminal/contracts/` |

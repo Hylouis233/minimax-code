@@ -3,7 +3,7 @@
 // Projection outputs and loader inputs the components consume. Split from the
 // former `client/contracts.ts`; nothing here crosses the process boundary.
 
-import type { WebuiProjectRecord } from "../../../shared/contracts/session.js";
+import type { WebuiProjectRecord } from "../../../../shared/contracts/session.js";
 
 export interface WebuiClientSession {
   readonly sessionId: string;

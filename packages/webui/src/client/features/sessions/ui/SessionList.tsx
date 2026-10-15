@@ -2,7 +2,7 @@ import { useMemo, type MouseEvent, type ReactElement } from "react";
 import type {
   WebuiClientSession,
   WebuiClientSessionPage,
-} from "../../../contracts/sessions/session-view.js";
+} from "../contracts/session-view.js";
 import { sessionHash } from "../../../projection/common/router.js";
 import { sessionLabel } from "../projection/rail-groups.js";
 import { SessionActivityMeta } from "./session-activity-meta.js";
