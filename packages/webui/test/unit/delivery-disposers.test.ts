@@ -133,4 +133,56 @@ describe("an attempt the client started is closable by the application", () => {
     // …and the host turn was never cancelled: disposal is not a stop.
     expect(abort).not.toHaveBeenCalled();
   });
+
+  it("leaves the attempt's completion unsettled when the observer detaches", async () => {
+    // P02's exit item: "a detached observer is not evidence that host execution
+    // completed". Detaching closes this client's half of the delivery, and that is
+    // the whole of it — the operation it started has not finished, so nothing may
+    // report the turn as done, and the host is still producing frames.
+    const app = createWebuiApplication({
+      openEventChannel: () => ({ subscribe: () => () => undefined, close: () => undefined }),
+      turns: { resumeSession: (async () => undefined) as unknown as WebuiClientSessionResumer },
+    });
+    app.start({ initialSessionId: "s1" });
+
+    const closed = vi.fn();
+    const abort = vi.fn(async () => ({ success: true }));
+    const send = vi.fn(
+      async (
+        _body: unknown,
+        _onFrame: unknown,
+        onDelivery?: (handle: { close: () => void }) => void,
+      ) => {
+        onDelivery?.({ close: closed });
+        // The host keeps producing; this client's read never ends on its own.
+        return new Promise<never>(() => undefined);
+      },
+    );
+    const commands = createWebuiConversationTurnCommands({
+      store: app.store,
+      sessionId: "s1",
+      capabilities: { send: send as never, stop: abort as never },
+      deliveries: app.deliveries,
+    });
+
+    let outcome: "pending" | "settled" | "rejected" = "pending";
+    void commands
+      .send({ message: "hello", sending: false, callbacks: { onDraftChange: () => undefined } })
+      .then(() => {
+        outcome = "settled";
+      })
+      .catch(() => {
+        outcome = "rejected";
+      });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(app.deliveries.count("s1")).toBe(1);
+
+    app.dispose();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(closed).toHaveBeenCalledTimes(1);
+    // Still in flight: detaching is neither a completion nor a cancellation.
+    expect(outcome).toBe("pending");
+    expect(abort).not.toHaveBeenCalled();
+  });
 });
