@@ -519,7 +519,10 @@ export function WebuiClientFoundationApp(
     handleSessionCreatedViewEffect,
     startNewTask,
   } = useNewTaskWorkspace({
-    storage: browserStorage,
+    // The workspace policy is the application's use case now (plan §5.5 P01
+    // step 3): the shell still owns the picker, the recent list and the
+    // navigation effects, and it asks for the decision instead of holding it.
+    taskSessions: application.taskSessions,
     workflows: sessionWorkflows,
     selectedSession,
     flatSessionsWithChildren,

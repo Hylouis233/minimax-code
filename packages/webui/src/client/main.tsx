@@ -103,6 +103,13 @@ function WebuiClientRoot({
           read: storage.readUnreadCounts,
           write: storage.writeUnreadCounts,
         },
+        // The persisted "no project" choice the new-task workspace reads and
+        // writes. The use case owns the decision and the host owns the storage,
+        // so it arrives the same way the unread counts do.
+        workspacePreference: {
+          readNoProjectFlag: storage.readNoProjectFlag,
+          writeNoProjectFlag: storage.writeNoProjectFlag,
+        },
         // The port slices this root cut above (T19). The assembly builds every
         // business owner from them, so the shell composes screens instead of
         // constructing owners.

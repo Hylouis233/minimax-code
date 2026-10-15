@@ -2,27 +2,43 @@
  * The new-task workspace: which directory the next session starts in, and the
  * three ways that choice changes.
  *
- * The rule the effect encodes is the part worth keeping in one place: an explicit
- * "no project" choice (this session's, or the persisted one) wins over the
- * auto-fill, so picking a project and then hitting 「新建任务」 does not pull a
- * workspace back. `startNewTask` clears the draft and the selection, and
- * `handleSessionCreated` adopts the home session onto the created one.
+ * The *policy* is not here. Which directory a fresh home starts in, what the
+ * auto-fill may do to it, what an explicit pick or an explicit clearing means,
+ * and what starting a new task does to the home's identity are all
+ * `taskSessions`' (plan §5.5 P01 step 3): the rule that an explicit "no project"
+ * choice wins over the auto-fill lived in this file's effect before, where
+ * reaching it needed a mounted shell. What stays is the presentation — the
+ * picker's open flag, the recent-directory projection, and the navigation
+ * effects that only the shell can perform.
  *
  * Extracted from `WebuiClientFoundationApp.tsx` (A-005): the frame keeps layout
  * and public business composition, and this is one behaviour with its own
  * change driver.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { deriveRecentWorkspaceDirs } from "../features/composer/projection/composer-state.js";
 import { sessionHash } from "../projection/common/router.js";
 import type { WebuiClientSession } from "../features/sessions/contracts/session-view.js";
 import type { WebuiShellSurfaceCommand } from "../features/shell/projection/shell-surface.js";
 
-/** The browser storage surface this behaviour reads and writes. */
-export interface NewTaskWorkspaceStorage {
-  readonly readNoProjectFlag: () => boolean;
-  readonly writeNoProjectFlag: (value: boolean) => void;
+/**
+ * The workspace-policy capability the shell consumes, as the application's task
+ * use case satisfies it. Declared here rather than imported: the shell may not
+ * import the assembly (plan §5.3), so it states the shape it needs and the
+ * composition satisfies it.
+ */
+export interface NewTaskWorkspacePolicy {
+  readonly initialWorkspaceDir: (input: {
+    readonly selectedSessionId?: string;
+    readonly sessions: readonly WebuiClientSession[];
+  }) => string | undefined;
+  readonly autoFillWorkspaceDir: (input: {
+    readonly current: string | undefined;
+    readonly selectedSessionId?: string;
+    readonly sessions: readonly WebuiClientSession[];
+  }) => string | undefined;
+  readonly chooseWorkspaceDir: (workspaceDir: string | undefined) => string | undefined;
 }
 
 /** The session commands the rail refresh needs, as the shell holds them. */
@@ -34,7 +50,8 @@ export interface NewTaskWorkspaceWorkflows {
 }
 
 export interface UseNewTaskWorkspaceOptions {
-  readonly storage: NewTaskWorkspaceStorage;
+  /** The task/session use case: workspace policy, home identity, creation. */
+  readonly taskSessions: NewTaskWorkspacePolicy;
   readonly workflows: NewTaskWorkspaceWorkflows;
   /** The session the shell currently shows, if any. */
   readonly selectedSession: WebuiClientSession | undefined;
@@ -66,7 +83,7 @@ export interface NewTaskWorkspace {
 
 export function useNewTaskWorkspace(options: UseNewTaskWorkspaceOptions): NewTaskWorkspace {
   const {
-    storage,
+    taskSessions,
     workflows,
     selectedSession,
     flatSessionsWithChildren,
@@ -77,16 +94,11 @@ export function useNewTaskWorkspace(options: UseNewTaskWorkspaceOptions): NewTas
     recordSessionTeamMode,
   } = options;
 
-  const [newTaskWorkspaceDir, setNewTaskWorkspaceDir] = useState<string | undefined>(
-    () => {
-      // Honour an explicit "no project" choice from localStorage so the
-      // auto-fill below doesn't immediately pull a workspace back.
-      if (storage.readNoProjectFlag()) return undefined;
-      return (
-        selectedSession?.workspaceDir ??
-        flatSessionsWithChildren.find((session) => session.workspaceDir)?.workspaceDir
-      );
-    },
+  const [newTaskWorkspaceDir, setNewTaskWorkspaceDir] = useState<string | undefined>(() =>
+    taskSessions.initialWorkspaceDir({
+      selectedSessionId: selectedSession?.sessionId,
+      sessions: flatSessionsWithChildren,
+    }),
   );
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
   // The `最近` group in the workspace picker. Derived from the sessions the
@@ -96,36 +108,31 @@ export function useNewTaskWorkspace(options: UseNewTaskWorkspaceOptions): NewTas
     () => deriveRecentWorkspaceDirs(flatSessionsWithChildren),
     [flatSessionsWithChildren],
   );
-  // Tracks whether the user has explicitly cleared the workspace in *this*
-  // session; the effect below checks both this and the persisted flag.
-  const userClearedWorkspaceRef = useRef(storage.readNoProjectFlag());
   useEffect(() => {
-    if (userClearedWorkspaceRef.current) return;
-    if (selectedSession?.workspaceDir) {
-      setNewTaskWorkspaceDir(selectedSession.workspaceDir);
-    } else if (!newTaskWorkspaceDir) {
-      const workspaceDir = flatSessionsWithChildren.find(
-        (session) => session.workspaceDir,
-      )?.workspaceDir;
-      if (workspaceDir) setNewTaskWorkspaceDir(workspaceDir);
-    }
-  }, [newTaskWorkspaceDir, flatSessionsWithChildren, selectedSession?.workspaceDir]);
-  // Single workspace-change entry point the composer calls. It records the
-  // user's intent (cleared vs picked) so the auto-fill effect above stops
-  // fighting us, and folds the no-project flag into localStorage.
+    // The use case answers with the directory that should be showing, so an
+    // explicit clearing needs no separate flag here: it returns the current
+    // value and nothing moves. The effect still owns *when* to ask — sessions
+    // loading and the selection moving are shell facts.
+    const next = taskSessions.autoFillWorkspaceDir({
+      current: newTaskWorkspaceDir,
+      selectedSessionId: selectedSession?.sessionId,
+      sessions: flatSessionsWithChildren,
+    });
+    if (next !== newTaskWorkspaceDir) setNewTaskWorkspaceDir(next);
+  }, [
+    taskSessions,
+    newTaskWorkspaceDir,
+    flatSessionsWithChildren,
+    selectedSession?.sessionId,
+  ]);
+  // Single workspace-change entry point the composer calls: the use case records
+  // the user's intent (cleared vs picked) and answers what to render.
   const handleWorkspaceChange = useCallback(
     (workspaceDir?: string) => {
-      if (workspaceDir === undefined) {
-        userClearedWorkspaceRef.current = true;
-        storage.writeNoProjectFlag(true);
-      } else {
-        userClearedWorkspaceRef.current = false;
-        storage.writeNoProjectFlag(false);
-      }
-      setNewTaskWorkspaceDir(workspaceDir);
+      setNewTaskWorkspaceDir(taskSessions.chooseWorkspaceDir(workspaceDir));
       setWorkspaceMenuOpen(false);
     },
-    [],
+    [taskSessions],
   );
   const handleSessionCreatedViewEffect = (id: string) => {
     setSelectedSessionId(id);
@@ -149,11 +156,17 @@ export function useNewTaskWorkspace(options: UseNewTaskWorkspaceOptions): NewTas
   };
   const startNewTask = (workspaceDir?: string) => {
     // A project row's plus action opens a fresh home composer preselected to
-    // that workspace; the global new-task action still clears the workspace.
-    const clearedWorkspace = workspaceDir === undefined;
-    userClearedWorkspaceRef.current = clearedWorkspace;
-    storage.writeNoProjectFlag(clearedWorkspace);
-    setNewTaskWorkspaceDir(workspaceDir);
+    // that workspace; the global new-task action still clears the workspace. The
+    // choice is the use case's, so the persisted "no project" flag and the rule
+    // about what an explicit clearing means have one home.
+    //
+    // Deliberately *not* the use case's `beginNewTask` here: that also advances
+    // the home incarnation and drops the home record, which is the identity half
+    // of the creation reservation. It belongs with the adoption cutover (P01
+    // step 4-5 with P02), where the machinery it protects is live; wiring it now
+    // would change what 「新建任务」 does to a running home turn while nothing
+    // consumes the incarnation yet.
+    setNewTaskWorkspaceDir(taskSessions.chooseWorkspaceDir(workspaceDir));
     setWorkspaceMenuOpen(false);
     setDraft("");
     // 「新建任务」 is the one navigation that does not change the selected

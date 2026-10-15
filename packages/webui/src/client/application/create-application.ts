@@ -39,6 +39,7 @@ import {
 } from "../features/turn/application/event-coordinator.js";
 import type { WebuiOpenEventChannel, WebuiProcessEventChannel } from "../features/turn/application/event-channel.js";
 import { createWebuiSessionStore, createWebuiTranscriptHistoryWriter } from "./session-store.js";
+import { createWebuiTaskSessionWorkflows } from "./task-session-workflows.js";
 import type { WebuiSessionStore } from "./session-store.js";
 import {
   createWebuiStreamLeaseController,
@@ -175,6 +176,16 @@ export interface WebuiApplicationDeps {
     readonly read?: () => Readonly<Record<string, number>>;
     readonly write?: (counts: Readonly<Record<string, number>>) => void;
   };
+  /**
+   * The new-task workspace's persisted "no project" choice
+   * (`platform/storage.ts`), injected for the same reason as `unreadStorage`.
+   * Absent reads as "nothing was ever cleared" and drops the write, which is
+   * what a host with no storage (SSR, unit tests) means.
+   */
+  readonly workspacePreference?: {
+    readonly readNoProjectFlag?: () => boolean;
+    readonly writeNoProjectFlag?: (value: boolean) => void;
+  };
   /** Seed for the composer store (SSR / tests). */
   readonly composer?: WebuiComposerStore;
   /**
@@ -303,6 +314,8 @@ export interface WebuiApplication {
   readonly terminalOwner: ReturnType<typeof createWebuiTerminalOwner>;
   /** The session business's loads and mutations, one per assembly (T19). */
   readonly sessionWorkflows: ReturnType<typeof createWebuiSessionWorkflows>;
+  /** The task/session use case: task workspace policy, creation, and home identity. */
+  readonly taskSessions: ReturnType<typeof createWebuiTaskSessionWorkflows>;
   /** The composer business's slash-command runner. */
   readonly commandWorkflows: ReturnType<typeof createWebuiCommandWorkflows>;
   /** The workspace file/environment/review query owner (T19). */
@@ -687,6 +700,23 @@ export function createWebuiApplication(
   // The composer's view of what is installed and what the agent can run: a
   // separate read model from `pluginWorkflows` on purpose, so neither
   // overwrites the other when one reloads (T08).
+  /**
+   * The task/session use case (plan §5.5 P01 step 3). The workspace policy it owns
+   * used to be the shell's: which directory a fresh home starts in, what the
+   * auto-fill may do to it, and what an explicit pick means. It is constructed
+   * here because it needs the canonical store, the composer store and the session
+   * catalogue; the host injects only the persisted preference.
+   */
+  const taskSessionWorkflows = createWebuiTaskSessionWorkflows({
+    store,
+    composer,
+    storage: {
+      readNoProjectFlag: () => deps.workspacePreference?.readNoProjectFlag?.() ?? false,
+      writeNoProjectFlag: (value) => deps.workspacePreference?.writeNoProjectFlag?.(value),
+    },
+    catalogue: sessionWorkflows,
+  });
+
   const composerPluginCatalogue = createWebuiComposerPluginCatalogue({
     actions: createWebuiPluginActions(slices.plugins),
     ...(slices.plugins.listSkills ? { listSkills: slices.plugins.listSkills } : {}),
@@ -771,6 +801,7 @@ export function createWebuiApplication(
     portSlices: slices,
     terminalOwner,
     sessionWorkflows,
+    taskSessions: taskSessionWorkflows,
     commandWorkflows,
     workspaceQueries,
     accountWorkflows,
