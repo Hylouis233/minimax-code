@@ -1,4 +1,5 @@
-import type { Api } from "@earendil-works/pi-ai";
+import { streamSimple, type Api, type Context } from "@earendil-works/pi-ai";
+import { Type } from "typebox";
 import type { IAgentConfig } from "@mavis/protocol";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -243,3 +244,152 @@ describe("Fast reaches the prepared request without replacing native reasoning",
     },
   );
 });
+
+describe("Anthropic Fast final SDK request headers", () => {
+  it.each([
+    { label: "API key", apiKey: "synthetic-key", oauth: false },
+    {
+      label: "OAuth-shaped synthetic token",
+      apiKey: "sk-ant-oat-SYNTHETIC",
+      oauth: true,
+    },
+  ])(
+    "preserves generated and custom beta tokens for $label",
+    async ({ apiKey, oauth }) => {
+      const { headers, payload } = await captureAnthropicFastRequest(
+        apiKey,
+        true,
+      );
+      const beta = headers.get("anthropic-beta")?.split(",") ?? [];
+      expect(new Set(beta)).toEqual(
+        new Set([
+          "fine-grained-tool-streaming-2025-05-14",
+          "interleaved-thinking-2025-05-14",
+          "model-beta",
+          "existing-beta",
+          "fast-mode-2026-02-01",
+          ...(oauth ? ["claude-code-20250219", "oauth-2025-04-20"] : []),
+        ]),
+      );
+      expect(beta).toHaveLength(new Set(beta).size);
+      expect(headers.get("Existing")).toBe("kept");
+      expect(payload.speed).toBe("fast");
+      expect(payload.output_config).toMatchObject({ effort: "high" });
+      expect(payload.model).toBe("synthetic-model");
+      if (oauth) {
+        expect(headers.get("authorization")).toBe(`Bearer ${apiKey}`);
+        expect(headers.has("x-api-key")).toBe(false);
+      } else {
+        expect(headers.get("x-api-key")).toBe(apiKey);
+        expect(headers.has("authorization")).toBe(false);
+      }
+    },
+  );
+
+  it("leaves generated betas and credentials unchanged when Fast is disabled", async () => {
+    const { headers, payload } = await captureAnthropicFastRequest(
+      "synthetic-key",
+      false,
+    );
+    expect(new Set(headers.get("anthropic-beta")?.split(","))).toEqual(
+      new Set([
+        "fine-grained-tool-streaming-2025-05-14",
+        "interleaved-thinking-2025-05-14",
+      ]),
+    );
+    expect(headers.get("x-api-key")).toBe("synthetic-key");
+    expect(headers.has("authorization")).toBe(false);
+    expect(payload).not.toHaveProperty("speed");
+    expect(payload.output_config).toMatchObject({ effort: "high" });
+  });
+});
+
+async function captureAnthropicFastRequest(apiKey: string, enabled: boolean) {
+  const { llm, agentConfig } = await resolveFixture(
+    "anthropic-messages",
+    "anthropic-fast",
+    "high",
+  );
+  const preference = resolveFastRequestOptions(
+    "anthropic-messages",
+    { enabled, mode: "anthropic-fast" },
+    enabled
+      ? { "ANTHROPIC-BETA": "existing-beta", Existing: "kept" }
+      : undefined,
+  );
+  const model = {
+    ...llm.model,
+    // Exercise beta-generating transport branches rather than the default
+    // adaptive/eager paths. These are synthetic model compatibility settings.
+    compat: {
+      ...llm.model.compat,
+      forceAdaptiveThinking: false,
+      supportsEagerToolInputStreaming: false,
+    },
+    ...(enabled
+      ? { headers: { "Anthropic-Beta": "model-beta,existing-beta" } }
+      : {}),
+  };
+  const requestPatch = { ...llm.thinkingRequestPatch };
+  if (!enabled) delete requestPatch.speed;
+  const transform = buildLocalRequestPayloadTransform(
+    {
+      agentConfig: { ...agentConfig },
+      llm: { ...llm, model, thinkingRequestPatch: requestPatch },
+      sessionId: "synthetic-session",
+      signal: new AbortController().signal,
+    },
+    {},
+  );
+  const context: Context = {
+    messages: [{ role: "user", content: "Synthetic request", timestamp: 1 }],
+    tools: [
+      {
+        name: "read",
+        description: "Synthetic tool",
+        parameters: Type.Object({ path: Type.String() }),
+      },
+    ],
+  };
+  let captured:
+    | { headers: Headers; payload: Record<string, unknown> }
+    | undefined;
+  const fetchImpl = vi.fn(
+    async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+      const request = new Request(input, init);
+      captured = {
+        headers: request.headers,
+        payload: JSON.parse(await request.text()) as Record<string, unknown>,
+      };
+      // Deliberate terminal response after the real SDK serializes the request.
+      // No live endpoint, actual token, SDK mock or successful inference is used.
+      return new Response(
+        JSON.stringify({
+          type: "error",
+          error: {
+            type: "invalid_request_error",
+            message: "Synthetic capture complete",
+          },
+        }),
+        { status: 400, headers: { "content-type": "application/json" } },
+      );
+    },
+  );
+  const unexpectedNetwork = vi.fn(() => {
+    throw new Error("Only the injected capture fetch is allowed");
+  });
+  vi.stubGlobal("fetch", unexpectedNetwork);
+  const result = await streamSimple(model, context, {
+    apiKey,
+    headers: preference.headers,
+    fetch: fetchImpl,
+    maxRetries: 0,
+    reasoning: "high",
+    onPayload: transform,
+  }).result();
+  expect(result.stopReason).toBe("error");
+  expect(fetchImpl).toHaveBeenCalledTimes(1);
+  expect(unexpectedNetwork).not.toHaveBeenCalled();
+  expect(captured).toBeDefined();
+  return captured!;
+}
