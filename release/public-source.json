@@ -94,6 +94,7 @@
     "docs/telemetry.md",
     "docs/tui-capabilities.md",
     "docs/verification.md",
+    "docs/webui/DECISION-webui-observation.md",
     "docs/webui/PLAN-webui-architecture-review.md",
     "docs/webui/PLAN-webui-business-cohesion.md",
     "docs/webui/PLAN-webui-business-reorganization.md",

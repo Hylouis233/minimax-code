@@ -347,7 +347,7 @@ one effective owner, a coherent import graph, and the applicable checks passing.
 | P03 | done | (this commit) | `test/unit/webui-unary-operation-typing.test.ts`; report under `…/business-cohesion-20261015/p03/evidence.md` |
 | P04 | done — D04 and D05 landed | (this commit) | `test/unit/model-provider-projection.test.ts`, `test/unit/webui-candidate-wire-compatibility.test.ts`; reports under `…/business-cohesion-20261015/p04/` and `…/p04b/` |
 | P05 | **done** — the editor is the Models policy, the Usage screen hosts one instance per visit above its custom-tab branch, and the provider form renders that editor's snapshot | `b1c2366c`, `8d2ed010`, `c4220980` | `test/unit/provider-editor.test.ts` (15), `test/unit/provider-form-panel.test.ts` (rewritten for the new home), `test/webui-browser/provider-form.spec.mjs` (4, whole browser suite 124 green); reports under `…/business-cohesion-20261015/p05/` |
-| P06 | not started | | |
+| P06 | **done** — the A5 comparison executed: nine deterministic scenarios against an always-online oracle, Arm A driven through the repository's own reconciliation functions, Arm B0 on what today's host offers and B1 on an invented epoch + cursor + session-scoped update channel, plus a real-host probe of the frames a real turn actually produced. Outcome: **keep-client**; one bounded client defect specified, not fixed | (this commit) | `docs/webui/DECISION-webui-observation.md`; `…/business-cohesion-20261015/p06/real-host-evidence.md`, `p06/results/real-host.json`, `p06/results/traces.json` |
 | P07 | not started | | |
 
 ```mermaid
