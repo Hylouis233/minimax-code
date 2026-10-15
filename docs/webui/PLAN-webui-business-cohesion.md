@@ -340,6 +340,11 @@ wired in the shell (decision D-1, §7.0 P01). D03 passes through the production 
 "destination event/second-client state survives" half unproven. D04 is verified at the browser tier.
 D05's five operations each now have a malformed-body ingress refusal and a positive forwarding case
 (`test/unit/webui-candidate-wire-compatibility.test.ts`) — before that, only one of the five did.
+Two further disclosures, so this section is not read as fuller than the code: §5.2's promise-shaped
+`decision`/`completion` pair is not implemented (`operation.decision` is written and never read), and
+§5.2 is left as the requirement rather than amended to match the shortfall; and P02's exit test list is
+fully covered, including "attachments-only sends" (`composer-submission-gate.test.ts`) and "resume
+versus resend" (`webui-stream.test.ts`, `turn-substrate-fences.test.ts`).
 
 ## 7. Implementation carriers and dependencies
 
@@ -665,10 +670,23 @@ recorded with their evidence, not silently substituted for a narrower goal.
 - [x] P06: both observation approaches evaluated, or executable consistency no-go established;
   decision and any bounded follow-up completed, with no production rollout implied.
 - [x] P07: obsolete paths retired, effective docs/generated declarations current, required gates pass.
-- [ ] I01–I09 and D01–D05 have evidence at the appropriate tier; limits are explicit.
-  Carrier-level limits are recorded in §7.0. The per-invariant and per-decision evidence matrix is
-  the independent review's output; this box is left open until that matrix is checked against the
-  code rather than asserted here.
+- [x] I01–I09 and D01–D05 have evidence at the appropriate tier; limits are explicit.
+  The invariant evidence, by the deciding file rather than by assertion: I01
+  `check:webui-dependency` (404 files, 0 role violations) plus the peer ledger; I02
+  `webui-runtime-lifecycle-invariants.test.ts`, `webui-application-lifecycle.test.ts`; I03
+  `session-single-source.test.ts`, `webui-session-catalog.test.ts`; I04 `webui-event-coordinator.test.ts`,
+  `webui-creation-origins.test.ts` (all four origins with nothing mounted); I05
+  `delivery-disposers.test.ts` (detach is not a stop, with its completion control), `session-scope.test.ts`;
+  I06 `turn-substrate-fences.test.ts`, `stream-lease.test.ts`, `request-freshness.test.ts`,
+  `webui-identity-epoch-wiring.test.ts`; I07 `task-session-workflows.test.ts` and every application
+  command test, which run without React; I08 `webui-transport-wire.test.ts`,
+  `webui-candidate-wire-compatibility.test.ts`, `test/integration/real-host-loopback.test.ts`; I09
+  `composer-field-transitions.test.ts`, `composer-history.test.ts`, `composer-submission-gate.test.ts`.
+  The D01–D05 matrix and the limits are in §6 and §7.0.
+  **Stated in the independent review's own words, so the claim is not read as more than it is: carriers
+  complete, with two behaviour-delta acceptance items disclosed as unmet — D02's "explicit New Task"
+  (decision D-1) and D03's "destination event/second-client state survives" — and D01's §5.2 mechanism
+  clause undelivered. "All carriers complete" is defensible; "all of D01–D05 delivered" is not.**
 
 This document is the proposed executable plan. None of these unchecked items is an implementation
 or experiment result from the planning session.

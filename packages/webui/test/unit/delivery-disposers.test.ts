@@ -145,10 +145,20 @@ describe("an attempt the client started is closable by the application", () => {
     app.start({ initialSessionId: "s1" });
 
     const abort = vi.fn(async () => ({ success: true }));
-    const send = vi.fn(async (_body: unknown, onFrame: (frame: { dataJson: string }) => void) => {
-      onFrame({ dataJson: '{"type":2,"agent_message":{"msg_id":"m1","msg_content":"hello"}}' });
-      onFrame({ dataJson: "[DONE]" });
-    });
+    const closed = vi.fn();
+    const send = vi.fn(
+      async (
+        _body: unknown,
+        onFrame: (frame: { dataJson: string }) => void,
+        onDelivery?: (handle: { close: () => void }) => void,
+      ) => {
+        onDelivery?.({ close: closed });
+        // The attempt holds its own delivery while it runs…
+        expect(app.deliveries.count("s1")).toBe(1);
+        onFrame({ dataJson: '{"type":2,"agent_message":{"msg_id":"m1","msg_content":"hello"}}' });
+        onFrame({ dataJson: "[DONE]" });
+      },
+    );
     const commands = createWebuiConversationTurnCommands({
       store: app.store,
       sessionId: "s1",
@@ -163,10 +173,11 @@ describe("an attempt the client started is closable by the application", () => {
     });
 
     expect(outcome).toMatchObject({ completion: { kind: "dispatched" } });
-    // The submit-lifecycle flag came back down and the delivery was released by
-    // the attempt itself.
+    // The submit-lifecycle flag came back down, and the attempt released its own
+    // handle when it ended: that release is not a detach, so nothing was closed.
     expect(app.store.readSession("s1").sending).toBe(false);
     expect(app.deliveries.count("s1")).toBe(0);
+    expect(closed).not.toHaveBeenCalled();
     app.dispose();
   });
 
