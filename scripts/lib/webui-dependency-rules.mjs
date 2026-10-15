@@ -338,10 +338,13 @@ export const CATEGORIES = Object.freeze({
 // `session-activity` is the relocated pure activity rules (plan §7.3, ticket
 // #49): it moved from `client/session-activity.ts` (classified `domain`) to
 // `client/features/sessions/projection/session-activity.ts`, keeping that layer.
+// `context-usage` and `event-parsers` are gone from the list: the first is now
+// `client/features/composer/contracts/context-usage.ts`, which the contracts
+// branch decides before any basename lookup, and the second was re-homed to
+// `client/projection/common/` by T21 and decodes the shared wire contracts into
+// shared view models with no business policy in it, so the view rule holds.
 const PROJECTION_DOMAIN = new Set([
   "action-requests",
-  "context-usage",
-  "event-parsers",
   "goal-state",
   "model-favorites",
   "model-reorder",
@@ -354,24 +357,9 @@ const PROJECTION_DOMAIN = new Set([
   "worktree-state",
 ]);
 
-// Current `server/*` files whose destination is `runtime/`. Everything else
-// under `server/` stays the loopback network layer.
-const SERVER_RUNTIME_PROVENANCE = new Set([
-  "host.ts",
-  "assembly.ts",
-  "auth-context.ts",
-  "account-login.ts",
-  "usage-quota.ts",
-  "check-in.ts",
-  "runtime-environment.ts",
-  "profile-files.ts",
-  "workspace-archive.ts",
-  "mcode-tools.ts",
-  "mcode-tools-entry.ts",
-  "mcode-tools-environment.ts",
-  "commands/descriptors.ts",
-  "commands/runner.ts",
-]);
+// (No `server/*` provenance table remains: every file whose destination was
+// `runtime/` has moved there, so what is left under `server/` is the loopback
+// network layer and the path alone decides it.)
 
 function basenameWithoutExtension(relative) {
   return path.basename(relative).replace(/\.(d\.ts|tsx|ts)$/u, "");
@@ -425,11 +413,8 @@ export function classifyLayers(relative) {
   if (normalized.startsWith("client/platform/")) return ["infrastructure"];
   if (normalized.startsWith("client/ui/")) return ["bindings"];
   if (normalized.startsWith("client/shell/")) return ["bindings"];
-  if (normalized.startsWith("client/components/")) return ["bindings"];
   if (normalized.startsWith("client/bindings/")) return ["bindings"];
   if (normalized.startsWith("client/application/")) return ["application"];
-  if (normalized.startsWith("client/infrastructure/")) return ["infrastructure"];
-  if (normalized.startsWith("client/mechanisms/")) return ["mechanisms"];
   if (normalized.startsWith("client/contracts/")) return ["contracts"];
   if (normalized.startsWith("shared/")) return ["shared"];
   if (normalized.startsWith("runtime/")) {
@@ -440,13 +425,9 @@ export function classifyLayers(relative) {
 
   // Current layout: provenance from plan §7.1/§7.2/§7.3.
   if (normalized === "server/envelope.ts") return ["server"];
-  if (normalized === "server/session-transfer.ts") return ["runtime"];
   if (normalized.startsWith("server/operation/")) return ["server"];
   if (normalized.startsWith("server/projections/")) return ["server"];
-  if (normalized.startsWith("server/")) {
-    const rest = normalized.slice("server/".length);
-    return SERVER_RUNTIME_PROVENANCE.has(rest) ? ["runtime"] : ["server"];
-  }
+  if (normalized.startsWith("server/")) return ["server"];
   if (normalized.startsWith("client/projection/")) {
     const b = basenameWithoutExtension(normalized);
     if (PROJECTION_DOMAIN.has(b)) return ["domain"];
@@ -543,13 +524,10 @@ const TARGET_HOME_ROLES = Object.freeze({
  * `businessless` lists an exception for that home.
  */
 const CURRENT_HOME_ROLES = Object.freeze([
-  { prefix: "client/components/", role: "feature-ui", business: "segment", businessless: { shell: "shell", shared: "ui" } },
   { prefix: "client/application/", role: "feature-application", business: "segment", flat: { role: "assembly", business: null } },
   { prefix: "client/projection/", role: "feature-projection", business: "segment", businessless: { common: "projection-common" } },
   { prefix: "client/contracts/", role: "feature-contracts", business: "segment", flat: { role: "contracts-shared", business: null } },
   { prefix: "client/bindings/", role: "bindings", business: "none" },
-  { prefix: "client/infrastructure/", role: "platform", business: "none" },
-  { prefix: "client/mechanisms/", role: "conversation", business: "none" },
   { prefix: "client/styles/", role: "styles", business: "none" },
 ]);
 

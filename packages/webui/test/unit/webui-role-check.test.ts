@@ -2,8 +2,8 @@
 // dependency direction (plan §5.1, §5.3; Spec decisions 20–22).
 //
 // The layer matrix cannot express these, and neither can a directory prefix:
-// `client/components/composer/` and `client/features/composer/ui/` are the same
-// presentation in two spellings, while `client/application/session-store.ts`
+// `client/shell/WebuiClientFoundationApp.tsx` and `client/ui/Button.tsx` are both
+// presentation while `client/application/session-store.ts`
 // (assembly) and `client/application/models/models-workflows.ts` (a business
 // owner) share a prefix but not an owner. Every fixture below is built in a
 // temporary tree and resolved by the same code path the CLI uses, so the
@@ -76,10 +76,9 @@ function rulesOf(violations: readonly { readonly rule: string }[]): string[] {
 }
 
 describe("the role classifier", () => {
-  it("reads the same business and role from both spellings", () => {
+  it("reads the business and role from each home that still exists", () => {
     const spellings: ReadonlyArray<readonly [string, string, string | null]> = [
       ["client/features/composer/ui/WebuiComposer.tsx", "feature-ui", "composer"],
-      ["client/components/composer/WebuiComposer.tsx", "feature-ui", "composer"],
       ["client/features/composer/application/submit.ts", "feature-application", "composer"],
       ["client/application/composer/composer-workflows.ts", "feature-application", "composer"],
       ["client/features/models/projection/groups.ts", "feature-projection", "models"],
@@ -108,34 +107,17 @@ describe("the role classifier", () => {
       role: "projection-common",
       business: null,
     });
-    // The homes that move without changing what they are, so one rule holds
-    // before and after the move.
-    expect(classifyRole("client/infrastructure/transport.ts")).toMatchObject({
-      role: "platform",
-      home: "current",
-    });
+    // The homes that are reachable now, each read from its own spelling.
     expect(classifyRole("client/platform/transport.ts")).toMatchObject({
       role: "platform",
       home: "target",
-    });
-    expect(classifyRole("client/mechanisms/stream-lease.ts")).toMatchObject({
-      role: "conversation",
-      home: "current",
     });
     expect(classifyRole("client/conversation/stream-lease.ts")).toMatchObject({
       role: "conversation",
       home: "target",
     });
-    expect(classifyRole("client/components/shell/WebuiClientFoundationApp.tsx")).toMatchObject({
-      role: "shell",
-      business: null,
-    });
     expect(classifyRole("client/shell/FoundationApp.tsx")).toMatchObject({
       role: "shell",
-      business: null,
-    });
-    expect(classifyRole("client/components/shared/ContextMenu.tsx")).toMatchObject({
-      role: "ui",
       business: null,
     });
     expect(classifyRole("client/main.tsx")).toMatchObject({ role: "entry", business: null });
@@ -169,10 +151,8 @@ describe("the role classifier", () => {
     expect([...produced].sort()).toEqual([...ROLES].sort());
   });
 
-  it("treats both presentation spellings as presentation, and a bridge as not", () => {
-    expect(isPresentationRole("client/components/composer/WebuiComposer.tsx")).toBe(true);
+  it("treats presentation as presentation, and a bridge as not", () => {
     expect(isPresentationRole("client/features/composer/ui/WebuiComposer.tsx")).toBe(true);
-    expect(isPresentationRole("client/components/shell/WebuiClientFoundationApp.tsx")).toBe(true);
     expect(isPresentationRole("client/shell/FoundationApp.tsx")).toBe(true);
     expect(isPresentationRole("client/ui/Overlay.tsx")).toBe(true);
     expect(isPresentationRole("client/bindings/use-session-state.ts")).toBe(false);
@@ -184,13 +164,13 @@ describe("the role classifier", () => {
 describe("the duplicate-owner rule", () => {
   it("rejects a business role held in both homes at once", () => {
     const graph = buildFixture({
-      "client/components/composer/WebuiComposer.tsx": leaf,
-      "client/features/composer/ui/WebuiComposer.tsx": leaf,
+      "client/projection/models/groups.ts": leaf,
+      "client/features/models/projection/groups.ts": leaf,
     });
     const { violations } = roleRule(graph, []);
     expect(rulesOf(violations)).toEqual(["duplicate-owner"]);
-    expect(violations[0]?.detail).toContain("client/components/composer/WebuiComposer.tsx");
-    expect(violations[0]?.detail).toContain("client/features/composer/ui/WebuiComposer.tsx");
+    expect(violations[0]?.detail).toContain("client/projection/models/groups.ts");
+    expect(violations[0]?.detail).toContain("client/features/models/projection/groups.ts");
   });
 
   it("rejects a duplicated contracts or application role too", () => {
@@ -514,13 +494,13 @@ describe("the call-site rule follows the role, not the prefix", () => {
     expect(evaluateGraph(graph, { approvedPeerImports: [] }).forbiddenCalls).toEqual([]);
   });
 
-  it("rejects a writer factory held by presentation, in either spelling", () => {
+  it("rejects a writer factory held by presentation, in either presentation home", () => {
     const store =
       "export interface WebuiSessionStore { createSessionWriter(kind: string): void }\n";
     const graph = buildFixture({
       "client/application/session-store.ts": store,
-      "client/components/composer/WebuiComposer.tsx":
-        'import type { WebuiSessionStore } from "../../application/session-store.js";\n' +
+      "client/shell/WebuiClientFoundationApp.tsx":
+        'import type { WebuiSessionStore } from "../application/session-store.js";\n' +
         'export function use(store: WebuiSessionStore): void {\n  store.createSessionWriter("session");\n}\n',
       "client/features/composer/ui/WebuiComposer.tsx":
         'import type { WebuiSessionStore } from "../../../application/session-store.js";\n' +
@@ -531,8 +511,8 @@ describe("the call-site rule follows the role, not the prefix", () => {
         .forbiddenCalls.map((violation) => violation.file)
         .sort(),
     ).toEqual([
-      "client/components/composer/WebuiComposer.tsx",
       "client/features/composer/ui/WebuiComposer.tsx",
+      "client/shell/WebuiClientFoundationApp.tsx",
     ]);
   });
 });
@@ -571,30 +551,18 @@ describe("the role rules feed the dependency gate", () => {
   });
 });
 
-// A-004 / gate review G-005: the judgement may not depend on which of the two
-// directory spellings a file happens to use. These fixtures write the same edge
-// twice — once in an old home, once in a target home — and require both to fail,
-// then require the explicit exception to carry exactly the edges that cannot move
-// yet, and to expire when its edge goes away.
-describe("the role rules judge every home, not only the target homes", () => {
-  it("rejects the shell importing the platform from the old components home", () => {
+// A-004 / gate review G-005: the shell may not reach the platform adapters. This
+// is a role judgement, and the fixture pins the edge the measured tree has to
+// keep refusing now that both homes have their final spelling.
+describe("the role rules judge the role, not the directory", () => {
+  it("rejects the shell importing the platform", () => {
     const graph = buildFixture({
-      "client/infrastructure/storage.ts": leaf,
-      "client/components/shell/WebuiClientFoundationApp.tsx":
-        'export { leaf } from "../../infrastructure/storage.js";\n',
+      "client/platform/storage.ts": leaf,
+      "client/shell/WebuiClientFoundationApp.tsx":
+        'export { leaf } from "../platform/storage.js";\n',
     });
     const { violations } = roleRule(graph, []);
     expect(rulesOf(violations)).toEqual(["role-import"]);
     expect(violations[0]?.detail).toContain("shell may not import platform");
   });
-
-  it("rejects the same edge written in the target home", () => {
-    const graph = buildFixture({
-      "client/infrastructure/storage.ts": leaf,
-      "client/shell/WebuiClientFoundationApp.tsx":
-        'export { leaf } from "../infrastructure/storage.js";\n',
-    });
-    expect(rulesOf(roleRule(graph, []).violations)).toEqual(["role-import"]);
-  });
-
 });

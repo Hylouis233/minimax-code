@@ -19,10 +19,12 @@ does change `release/public-source.json`, which must be regenerated.
 ```
 src/
   client/             browser shell: entry, transport, contracts, runtime store, router
-    components/       React components (the shell and every panel it renders)
-    contracts/        one directory per business: its capability port and its view types; transport.ts joins them
+    shell/            the shell frame and its React modules
+    ui/               presentation reused across businesses (context menu, toggle, glyphs)
+    features/         one directory per business: application/, projection/, bindings/, ui/, contracts/
     platform/         browser transport, event channel, storage and browser IO
-    mechanisms/       stream lease and stream-loop algorithms without application policy
+    conversation/     turn/history/stream lifecycle, lease and stream-loop algorithms
+    contracts/        the shared contract modules; contracts/transport.ts joins the business ports
     bindings/          React subscriptions, application context, navigation and browser effects
     application/       business workflows, state owners and query/request coordination
     projection/       pure state and message projections — no React, no transport
@@ -88,23 +90,23 @@ Composer surface is `client/features/composer/ui/WebuiComposer.tsx`; its queue p
 `client/features/composer/ui/QueuePanel.tsx`. Composer submission workflows and persisted history
 live in `client/features/composer/application/`. The settings dialog is
 `client/features/settings/ui/SettingsModal.tsx`.
-`components/shared/settings-glyphs.tsx` contains glyph presentation shared by settings and review pages.
+`client/ui/settings-glyphs.tsx` contains glyph presentation shared by settings and review pages.
 
 ### Client modules
 
 | Module | Role | Use it by |
 | --- | --- | --- |
 | `client/main.tsx` | Build entry. Mounts the shell into `#webui-root` and constructs the transport **once** at module scope. | Importing nothing from it — it runs for side effects. |
-| `client/contracts/` | The client-facing contracts, filed by business: one directory per business (`sessions/`, `composer/`, `transcript/`, `turn/`, `goal/`, `interactions/`, `models/`, `plugins/`, `settings/`, `account/`, `shell/`, `workspace/`) holding that business's capability port and view types, joined by `contracts/transport.ts` into the `WebuiTransport` interface (every method optional — `undefined` means "this operation is not wired"). `contracts/transport.ts` declares no method of its own. | Importing a type from the business directory that owns it, rather than from a component or the shell. |
+| `client/contracts/` | The contract modules no single business owns: `transport.ts` joins the per-business ports into the `WebuiTransport` interface (every method optional — `undefined` means "this operation is not wired") and declares no method of its own, and `value-readers.ts` holds the defensive readers for untrusted payload fields. A business's own capability port and view types are its published surface and live in `client/features/<business>/contracts/`. | Importing a type from the business directory that owns it, rather than from a component or the shell. |
 | `client/platform/transport.ts`, `client/platform/event-channel.ts` | Request/response and independent-stream WebSocket IO; the application-owned `watchEvents` channel and reconnection. Components do not subscribe directly. | Constructed and owned by the application composition root. |
 | `client/platform/storage.ts` | Browser storage IO for unread, favorites, no-project, team-mode, composer history and the rail's overlay flags (session stars/pins/archives, project pins/names). | Application composition injects the storage adapter; preserve normalization and pruning rules as pure functions. |
-| `client/mechanisms/stream-lease.ts`, `client/mechanisms/stream-loop.ts` | Lease algorithm and stream frame IO/control. Stream history/context transforms are injected; application turn coordination owns recovery policy. | Called by the turn coordinator, not by components. |
+| `client/conversation/stream-lease.ts`, `client/conversation/stream-loop.ts` | Lease algorithm and stream frame IO/control. Stream history/context transforms are injected; application turn coordination owns recovery policy. | Called by the turn coordinator, not by components. |
 | `client/bindings/` | React subscriptions, application context, browser navigation, focus, scroll and other DOM effects. | Components use bindings for snapshots and named commands; a session binding mints the turn's generation-fenced stream sink inside `attachTurn` / `sendTurn`, so it hands out neither a store writer nor a sink factory. |
 | `client/application/` and `client/features/*/application/` | Shared application coordination and business workflows, with one directory per business. The canonical session store and turn/event/interaction/goal coordinators remain under `client/application/`; Composer submit workflows and history live in `client/features/composer/application/`, pure event-effect reduction in `client/features/turn/application/effect-reducer.ts`, model workflows in `client/features/models/application/models-workflows.ts`, and every caching owner reads through `client/application/query-store.ts`. | Composition root wires transport, storage and the store. UI consumes published reads/bindings and named commands; composition owns application construction. |
 | `client/application/session-store.ts` + `client/bindings/use-session-state.ts` | The framework-free canonical session/interaction store (`createWebuiSessionStore`, the writer and home-adoption types) and its React read binding (`useWebuiSessionStore`, `useWebuiSessionState`, `useWebuiSessionStream`, `useWebuiSessionSending`, `useWebuiSessionActivity`, `useWebuiSessionPermissions`). One map and one listener registry; there is no second complete session-store map. | Importing the binding from a component. The binding exposes named commands plus the `attachTurn` / `sendTurn` turn intents; the store writer and the attempt's sink never leave it. |
-| `client/features/turn/projection/stream-state.ts`, `client/mechanisms/stream-loop.ts` | Stream frame reduction (`reduceWebuiStreamFrame`) and send/resume loop (`runWebuiStreamLoop`, `buildWebuiStreamLoopSink`). The loop receives history/context and stream-state transforms as injected bundles (`WebuiStreamLoopDeps.projection`, `.streamState`). | Through application turn coordination; tests drive the pure reducer and loop directly. |
+| `client/features/turn/projection/stream-state.ts`, `client/conversation/stream-loop.ts` | Stream frame reduction (`reduceWebuiStreamFrame`) and send/resume loop (`runWebuiStreamLoop`, `buildWebuiStreamLoopSink`). The loop receives history/context and stream-state transforms as injected bundles (`WebuiStreamLoopDeps.projection`, `.streamState`). | Through application turn coordination; tests drive the pure reducer and loop directly. |
 | `client/projection/common/router.ts`, `client/bindings/navigation.ts` | `route(pathname)` maps paths; `navigation.ts:16` implements `readSessionIdFromHash` and the browser hash subscription. | Import route rules from `projection/common/router.ts` and navigation state from its binding. |
-| `client/features/composer/ui/slash-palette.ts`, `client/contracts/value-readers.ts`, `client/platform/team-mode.ts`, `client/components/transcript/markdown.tsx`, `client/shell/icons.tsx` | Slash-command UI palette, defensive readers for untrusted payload fields, team-mode helpers, markdown and icon renderers. Command field types belong in contracts, not this icon-bearing UI module. | Importing UI helpers directly; application/projection code must not use the palette for command types or classification. |
+| `client/features/composer/ui/slash-palette.ts`, `client/contracts/value-readers.ts`, `client/platform/team-mode.ts`, `client/features/transcript/ui/markdown.tsx`, `client/shell/icons.tsx` | Slash-command UI palette, defensive readers for untrusted payload fields, team-mode helpers, markdown and icon renderers. Command field types belong in contracts, not this icon-bearing UI module. | Importing UI helpers directly; application/projection code must not use the palette for command types or classification. |
 
 ### Client / projection
 
@@ -183,9 +185,13 @@ Registry order is the `registerOperation` call order and is observable; keep it 
 The allowed direction, top to bottom:
 
 ```
-components/  →  projection/  →  client/contracts/  →  shared/
-server/      →  runtime/port.ts  ↔  runtime/  →  shared/
+presentation/  →  projection/  →  contracts/  →  shared/
+server/        →  runtime/port.ts  ↔  runtime/  →  shared/
 ```
+
+"Presentation" is `client/shell/`, `client/ui/` and every `client/features/<business>/ui/`;
+`contracts/` is the shared `client/contracts/` modules plus each feature's own
+`contracts/`.
 
 `shared/` imports neither execution side, and the browser never imports `server/` or `runtime/`.
 `pnpm check:webui-dependency` enforces this direction over the source (including `import type` edges).
@@ -217,7 +223,7 @@ current technical directories and the target `client/features/<business>/` homes
   entry whose edge is gone (or whose file was deleted) fails the check, so an exception cannot
   outlive its reason.
 
-The capability-call rule uses the same role judgement instead of the `client/components/` prefix, so
+The capability-call rule uses the same role judgement instead of a presentation-directory prefix, so
 it still applies after a component moves to `client/features/<business>/ui/`. The measured baseline,
 the correction ledger and the recorded scenario results are in
 `docs/webui/webui-architecture-baseline-ledger.md`.

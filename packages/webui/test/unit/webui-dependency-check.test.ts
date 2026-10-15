@@ -177,12 +177,6 @@ describe("layer matrix", () => {
     // `client/projection/` classifies by basename, so the `turn/` sub-directory
     // does not change the verdict.
     expect(classifyLayers("client/features/turn/projection/stream-state.ts")).toEqual(["view"]);
-    // The migrated modules are decided by their directory now, so no
-    // provenance entry is needed for them.
-    expect(classifyLayers("client/mechanisms/stream-loop.ts")).toEqual(["mechanisms"]);
-    expect(classifyLayers("client/infrastructure/transport.ts")).toEqual([
-      "infrastructure",
-    ]);
   });
 
   it("classifies the business-first homes by the layers their files carry", () => {
@@ -226,16 +220,16 @@ describe("layer matrix", () => {
     // Phase 4 moved each former client-root module under a layer directory. None
     // of these has a provenance entry any more; each is decided by its prefix,
     // or — under `client/projection/` — by its basename.
-    expect(classifyLayers("client/infrastructure/team-mode.ts")).toEqual(["infrastructure"]);
-    expect(classifyLayers("client/infrastructure/no-project.ts")).toEqual(["infrastructure"]);
+    expect(classifyLayers("client/platform/team-mode.ts")).toEqual(["infrastructure"]);
+    expect(classifyLayers("client/platform/no-project.ts")).toEqual(["infrastructure"]);
     expect(classifyLayers("client/contracts/value-readers.ts")).toEqual(["contracts"]);
     expect(classifyLayers("client/projection/common/paths.ts")).toEqual(["view"]);
     expect(classifyLayers("client/projection/common/router.ts")).toEqual(["view"]);
-    expect(classifyLayers("client/projection/sessions/rail-buckets.ts")).toEqual(["view"]);
-    expect(classifyLayers("client/components/composer/slash-palette.ts")).toEqual(["bindings"]);
+    expect(classifyLayers("client/features/sessions/projection/rail-buckets.ts")).toEqual(["view"]);
+    expect(classifyLayers("client/features/composer/ui/slash-palette.ts")).toEqual(["bindings"]);
     expect(classifyLayers("client/features/transcript/ui/markdown.tsx")).toEqual(["bindings"]);
-    expect(classifyLayers("client/components/shell/icons.tsx")).toEqual(["bindings"]);
-    expect(classifyLayers("client/components/shell/ConnectionStatus.tsx")).toEqual(["bindings"]);
+    expect(classifyLayers("client/shell/icons.tsx")).toEqual(["bindings"]);
+    expect(classifyLayers("client/shell/ConnectionStatus.tsx")).toEqual(["bindings"]);
   });
 
   it("classifies the two re-filed projections as application by prefix", () => {
@@ -279,7 +273,7 @@ describe("layer matrix", () => {
     // Both names are asserted: the path the file used to sit at, and the one it
     // occupies now. A relocated entry must not come back under either spelling.
     expect(KNOWN_AMBIGUOUS_FILES).not.toContain("client/slash-palette.ts");
-    expect(KNOWN_AMBIGUOUS_FILES).not.toContain("client/components/composer/slash-palette.ts");
+    expect(KNOWN_AMBIGUOUS_FILES).not.toContain("client/ui/composer/slash-palette.ts");
     expect(KNOWN_AMBIGUOUS_FILES).not.toContain("server/envelope.ts");
     expect(KNOWN_AMBIGUOUS_FILES).not.toContain("server/service.ts");
     // Entries removed earlier stay removed.
@@ -299,7 +293,7 @@ describe("layer matrix", () => {
   // should fail first.
   it("classifies the files the empty list removed", () => {
     expect(classifyLayers("runtime/port.ts")).toEqual(["runtime-port"]);
-    expect(classifyLayers("client/components/composer/slash-palette.ts")).toEqual(["bindings"]);
+    expect(classifyLayers("client/features/composer/ui/slash-palette.ts")).toEqual(["bindings"]);
     expect(classifyLayers("server/envelope.ts")).toEqual(["server"]);
     expect(classifyLayers("server/service.ts")).toEqual(["server"]);
   });
@@ -415,7 +409,7 @@ describe("provisional judgements for plan section 7.5 mixed files", () => {
       .toBe(false);
     // Same for the four entries resolved by this refactor: with the real list
     // empty, none of them makes an edge provisional.
-    expect(touchesAmbiguousFile("client/components/composer/slash-palette.ts", "server/service.ts"))
+    expect(touchesAmbiguousFile("client/ui/composer/slash-palette.ts", "server/service.ts"))
       .toBe(false);
   });
 
@@ -496,13 +490,13 @@ describe("direction fixtures", () => {
 
   it("rejects application -> components", () => {
     const { result } = evaluateFixture({
-      "client/components/Widget.tsx": widget,
-      "client/application/app.ts": 'import { widget } from "../components/Widget.js";\nexport const use = widget;\n',
+      "client/ui/Widget.tsx": widget,
+      "client/application/app.ts": 'import { widget } from "../ui/Widget.js";\nexport const use = widget;\n',
     });
     expect(result.direction).toHaveLength(1);
     expect(result.direction[0]).toMatchObject({
       from: "client/application/app.ts",
-      to: "client/components/Widget.tsx",
+      to: "client/ui/Widget.tsx",
       layerFrom: ["application"],
       layerTo: ["bindings"],
     });
@@ -543,12 +537,12 @@ describe("direction fixtures", () => {
 
   it("resolves a tsconfig alias to an actual component edge", () => {
     const { graph, result } = evaluateFixture({
-      "client/components/Widget.tsx": widget,
-      "client/application/app.ts": 'import { widget } from "@/components/Widget.js";\nexport const use = widget;\n',
+      "client/ui/Widget.tsx": widget,
+      "client/application/app.ts": 'import { widget } from "@/ui/Widget.js";\nexport const use = widget;\n',
     }, { ...compilerOptions, paths: { "@/*": ["client/*"] } });
     expect(graph.edges).toContainEqual(expect.objectContaining({
       from: "client/application/app.ts",
-      to: "client/components/Widget.tsx",
+      to: "client/ui/Widget.tsx",
       kind: "import",
     }));
     expect(result.direction).toHaveLength(1);
@@ -556,7 +550,7 @@ describe("direction fixtures", () => {
 
   it("rejects an unresolved configured alias instead of treating it as a package import", () => {
     const { result } = evaluateFixture({
-      "client/application/app.ts": 'import { missing } from "@/components/Missing.js";\nexport const use = missing;\n',
+      "client/application/app.ts": 'import { missing } from "@/ui/Missing.js";\nexport const use = missing;\n',
     }, { ...compilerOptions, paths: { "@/*": ["client/*"] } });
     expect(result.unresolved).toHaveLength(1);
     expect(result.pass).toBe(false);
@@ -565,7 +559,7 @@ describe("direction fixtures", () => {
   it("rejects direct document and storage globals in application and components", () => {
     const { result } = evaluateFixture({
       "client/application/app.ts": 'export const current = document.title;\n',
-      "client/components/Widget.tsx": 'export const saved = localStorage.getItem("k");\n',
+      "client/ui/Widget.tsx": 'export const saved = localStorage.getItem("k");\n',
       "client/bindings/Other.ts": 'export const tab = sessionStorage.getItem("k");\n',
     });
     expect(result.browserGlobals.map((entry) => entry.global)).toEqual([
@@ -661,8 +655,8 @@ describe("direction fixtures", () => {
 
   it("keeps the relative component negative control rejected", () => {
     const { result } = evaluateFixture({
-      "client/components/Widget.tsx": widget,
-      "client/application/app.ts": 'import { widget } from "../components/Widget.js";\nexport const use = widget;\n',
+      "client/ui/Widget.tsx": widget,
+      "client/application/app.ts": 'import { widget } from "../ui/Widget.js";\nexport const use = widget;\n',
     });
     expect(result.direction).toHaveLength(1);
   });
@@ -689,8 +683,8 @@ describe("direction fixtures", () => {
 
   it("rejects a pure domain projection -> concrete transport", () => {
     const { result } = evaluateFixture({
-      "client/infrastructure/transport.ts": leaf,
-      "client/projection/plan-mode.ts": 'import { leaf } from "../infrastructure/transport.js";\nexport const use = leaf;\n',
+      "client/platform/transport.ts": leaf,
+      "client/projection/plan-mode.ts": 'import { leaf } from "../platform/transport.js";\nexport const use = leaf;\n',
     });
     expect(result.direction).toHaveLength(1);
     expect(result.direction[0]).toMatchObject({
@@ -703,12 +697,12 @@ describe("direction fixtures", () => {
 describe("require() direction fixtures", () => {
   it("rejects a cross-layer dependency hidden behind require()", () => {
     const { graph, result } = evaluateFixture({
-      "client/components/Widget.tsx": widget,
-      "client/application/consumer.ts": 'const Widget = require("../components/Widget.js");\nexport { Widget };\n',
+      "client/ui/Widget.tsx": widget,
+      "client/application/consumer.ts": 'const Widget = require("../ui/Widget.js");\nexport { Widget };\n',
     });
     expect(graph.edges).toContainEqual(expect.objectContaining({
       from: "client/application/consumer.ts",
-      to: "client/components/Widget.tsx",
+      to: "client/ui/Widget.tsx",
       kind: "require",
     }));
     expect(result.direction).toHaveLength(1);
@@ -718,8 +712,8 @@ describe("require() direction fixtures", () => {
 describe("what the metafile cannot see", () => {
   it("rejects a violation expressed only as an import type", () => {
     const { result } = evaluateFixture({
-      "client/components/Widget.tsx": widget,
-      "client/application/app.ts": 'import type { Widget } from "../components/Widget.js";\nexport type Use = Widget;\n',
+      "client/ui/Widget.tsx": widget,
+      "client/application/app.ts": 'import type { Widget } from "../ui/Widget.js";\nexport type Use = Widget;\n',
     });
     expect(result.direction).toHaveLength(1);
     expect(result.direction[0]).toMatchObject({
@@ -731,8 +725,8 @@ describe("what the metafile cannot see", () => {
 
   it("rejects a forbidden edge hidden behind a type-only re-export barrel", () => {
     const { result } = evaluateFixture({
-      "client/components/Widget.tsx": widget,
-      "client/contracts/barrel.ts": 'export type { Widget } from "../components/Widget.js";\n',
+      "client/ui/Widget.tsx": widget,
+      "client/contracts/barrel.ts": 'export type { Widget } from "../ui/Widget.js";\n',
       "client/application/consumer.ts": 'import type { Widget } from "../contracts/barrel.js";\nexport type Use = Widget;\n',
     });
     // The application -> barrel edge is legal (application may import contracts)…
@@ -746,7 +740,7 @@ describe("what the metafile cannot see", () => {
       result.direction.some(
         (violation) =>
           violation.from === "client/contracts/barrel.ts" &&
-          violation.to === "client/components/Widget.tsx" &&
+          violation.to === "client/ui/Widget.tsx" &&
           violation.layerFrom.join() === "contracts",
       ),
     ).toBe(true);
@@ -754,8 +748,8 @@ describe("what the metafile cannot see", () => {
 
   it("rejects a violation expressed as a literal dynamic import", () => {
     const { result } = evaluateFixture({
-      "client/components/Widget.tsx": widget,
-      "client/application/app.ts": 'export const load = async () => import("../components/Widget.js");\n',
+      "client/ui/Widget.tsx": widget,
+      "client/application/app.ts": 'export const load = async () => import("../ui/Widget.js");\n',
     });
     expect(result.direction).toHaveLength(1);
     expect(result.direction[0]).toMatchObject({
@@ -777,7 +771,7 @@ describe("the ambient-member rule", () => {
   }> = [
     {
       label: "a component reading window.localStorage",
-      file: "client/components/Widget.tsx",
+      file: "client/ui/Widget.tsx",
       body: "export const s = window.localStorage;\n",
       names: ["localStorage"],
     },
@@ -801,13 +795,13 @@ describe("the ambient-member rule", () => {
     },
     {
       label: "window[\"localStorage\"] as an element access",
-      file: "client/components/Widget.tsx",
+      file: "client/ui/Widget.tsx",
       body: 'export const s = window["localStorage"];\n',
       names: ["localStorage"],
     },
     {
       label: "destructuring localStorage off window",
-      file: "client/components/Widget.tsx",
+      file: "client/ui/Widget.tsx",
       body: "const { localStorage } = window;\nexport const s = localStorage;\n",
       names: ["localStorage"],
     },
@@ -825,19 +819,19 @@ describe("the ambient-member rule", () => {
     },
     {
       label: "a nested pattern reading window.localStorage off globalThis",
-      file: "client/components/Widget.tsx",
+      file: "client/ui/Widget.tsx",
       body: "const { window: { localStorage } } = globalThis;\nexport const s = localStorage;\n",
       names: ["localStorage"],
     },
     {
       label: "an assignment pattern reading window.localStorage",
-      file: "client/components/Widget.tsx",
+      file: "client/ui/Widget.tsx",
       body: "let s: Storage;\n({ localStorage: s } = window);\nexport const read = (): Storage => s;\n",
       names: ["localStorage"],
     },
     {
       label: "a template element access of window.localStorage",
-      file: "client/components/Widget.tsx",
+      file: "client/ui/Widget.tsx",
       body: "export const s = window[`localStorage`];\n",
       names: ["localStorage"],
     },
@@ -858,9 +852,9 @@ describe("the ambient-member rule", () => {
     // *binds* it to a local called `localStorage`, so neither the pattern nor the
     // local reads the storage capability.
     const { result } = evaluateFixture({
-      "client/components/Widget.tsx":
+      "client/ui/Widget.tsx":
         "const { name: localStorage } = window;\nexport const read = (): string => localStorage;\n",
-      "client/components/Other.tsx":
+      "client/ui/Other.tsx":
         "let sessionStorage: string | undefined;\n({ name: sessionStorage } = globalThis);\nexport const read = (): string | undefined => sessionStorage;\n",
     });
     expect(result.browserGlobals).toHaveLength(0);
@@ -872,14 +866,14 @@ describe("the ambient-member rule", () => {
     // root's, a binding listening to window events, the shell's URL sync, and a
     // locally typed object that happens to own a `document` property.
     const { result } = evaluateFixture({
-      "client/infrastructure/storage.ts": "export const s = globalThis.localStorage;\n",
+      "client/platform/storage.ts": "export const s = globalThis.localStorage;\n",
       "client/main.tsx": "export const d = globalThis.document;\n",
       "client/bindings/navigation.ts": "export const h = window.location.hash;\n",
-      "client/components/WebuiClientFoundationApp.tsx":
+      "client/shell/WebuiClientFoundationApp.tsx":
         'export function sync(): void {\n  const p = window.location.pathname;\n  window.history.replaceState(null, "", p);\n}\n',
-      "client/components/Widget.tsx":
+      "client/ui/Widget.tsx":
         'export function boot(): void {\n  window.addEventListener("hashchange", () => {});\n}\n',
-      "client/components/Local.tsx":
+      "client/ui/Local.tsx":
         "const local: { document: number } = { document: 1 };\nexport const d = local.document;\n",
     });
     expect(result.browserGlobals).toHaveLength(0);
@@ -915,7 +909,7 @@ describe("the resolved-host rule", () => {
 describe("structural failures", () => {
   it("rejects an unresolved intra-package import", () => {
     const { result } = evaluateFixture({
-      "client/application/app.ts": 'import { missing } from "../components/Missing.js";\nexport const use = missing;\n',
+      "client/application/app.ts": 'import { missing } from "../ui/Missing.js";\nexport const use = missing;\n',
     });
     expect(result.unresolved).toHaveLength(1);
     expect(result.unresolved[0]).toMatchObject({ kind: "unresolved" });
@@ -932,15 +926,15 @@ describe("structural failures", () => {
 
   it("detects an import cycle even when every edge is directionally legal", () => {
     const { graph, result } = evaluateFixture({
-      "client/components/A.tsx": 'import { b } from "./B.js";\nexport const a = b;\n',
-      "client/components/B.tsx": 'import { a } from "./A.js";\nexport const b = a;\n',
+      "client/ui/A.tsx": 'import { b } from "./B.js";\nexport const a = b;\n',
+      "client/ui/B.tsx": 'import { a } from "./A.js";\nexport const b = a;\n',
     });
     expect(result.direction).toHaveLength(0);
     expect(result.cycles).toHaveLength(1);
     const [cycle] = detectCycles(graph.edges);
     expect(cycle).toBeDefined();
-    expect(canonicalCycle(cycle as string[])).toContain("client/components/A.tsx");
-    expect(canonicalCycle(cycle as string[])).toContain("client/components/B.tsx");
+    expect(canonicalCycle(cycle as string[])).toContain("client/ui/A.tsx");
+    expect(canonicalCycle(cycle as string[])).toContain("client/ui/B.tsx");
   });
 });
 
@@ -949,7 +943,7 @@ describe("baseline comparison", () => {
     const violation = {
       kind: "direction" as const,
       from: "client/application/app.ts",
-      to: "client/components/Widget.tsx",
+      to: "client/ui/Widget.tsx",
       line: 1,
       referenceKind: "import",
       layerFrom: ["application"],
@@ -989,7 +983,7 @@ describe("baseline comparison", () => {
     const violation = (line: number) => ({
       kind: "direction" as const,
       from: "client/application/app.ts",
-      to: "client/components/Widget.tsx",
+      to: "client/ui/Widget.tsx",
       line,
       referenceKind: "import",
       layerFrom: ["application"],
@@ -1097,7 +1091,7 @@ describe("declared shapes match the runtime shapes", () => {
   });
 });
 
-// The capability-call rule. `classifyLayers` maps `client/components/` and
+// The capability-call rule. `classifyLayers` maps `client/ui/` and
 // `client/bindings/` to the same `bindings` layer, so these fixtures exist to
 // pin the half of the judgement the layer set cannot express: the bridge may
 // hold a writer factory, a component may not.
@@ -1113,7 +1107,7 @@ describe("the capability-call rule", () => {
   it("rejects a capability call from a component, whose layer is bindings", () => {
     const { result } = evaluateFixture({
       "client/application/session-store.ts": storeContract,
-      "client/components/Widget.tsx": caller(
+      "client/ui/Widget.tsx": caller(
         "../application/session-store.js",
         "WebuiSessionStore",
         'port.createSessionWriter("session");',
@@ -1122,7 +1116,7 @@ describe("the capability-call rule", () => {
     expect(result.forbiddenCalls).toHaveLength(1);
     expect(result.forbiddenCalls[0]).toMatchObject({
       kind: "forbidden-call",
-      file: "client/components/Widget.tsx",
+      file: "client/ui/Widget.tsx",
       target: "WebuiSessionStore.createSessionWriter",
     });
     expect(result.pass).toBe(false);
@@ -1131,7 +1125,7 @@ describe("the capability-call rule", () => {
   it("rejects any method on a capability port from a component", () => {
     const { result } = evaluateFixture({
       "client/contracts/transport.ts": transportContract,
-      "client/components/Widget.tsx": caller(
+      "client/ui/Widget.tsx": caller(
         "../contracts/transport.js",
         "WebuiTransport",
         "void port.sendMessage({});",
@@ -1139,7 +1133,7 @@ describe("the capability-call rule", () => {
     });
     expect(result.forbiddenCalls).toHaveLength(1);
     expect(result.forbiddenCalls[0]).toMatchObject({
-      file: "client/components/Widget.tsx",
+      file: "client/ui/Widget.tsx",
       target: "WebuiTransport.sendMessage",
     });
   });
@@ -1165,7 +1159,7 @@ describe("the capability-call rule", () => {
   it("still rejects a capability call from a lower layer", () => {
     const { result } = evaluateFixture({
       "client/application/session-store.ts": storeContract,
-      "client/mechanisms/stream-loop.ts": caller(
+      "client/conversation/stream-loop.ts": caller(
         "../application/session-store.js",
         "WebuiSessionStore",
         'port.createSessionWriter("session");',
@@ -1173,7 +1167,7 @@ describe("the capability-call rule", () => {
     });
     expect(result.forbiddenCalls).toHaveLength(1);
     expect(result.forbiddenCalls[0]).toMatchObject({
-      file: "client/mechanisms/stream-loop.ts",
+      file: "client/conversation/stream-loop.ts",
       target: "WebuiSessionStore.createSessionWriter",
     });
   });
@@ -1266,7 +1260,7 @@ describe("the capability-call rule", () => {
     it(`rejects a capability call whose result is consumed by ${form.label}`, () => {
       const { result } = evaluateFixture({
         "client/contracts/transport.ts": transportContract,
-        "client/components/Widget.tsx": caller(
+        "client/ui/Widget.tsx": caller(
           "../contracts/transport.js",
           "WebuiTransport",
           form.body,
@@ -1274,7 +1268,7 @@ describe("the capability-call rule", () => {
       });
       expect(result.forbiddenCalls).toHaveLength(1);
       expect(result.forbiddenCalls[0]).toMatchObject({
-        file: "client/components/Widget.tsx",
+        file: "client/ui/Widget.tsx",
         target: "WebuiTransport.sendMessage",
       });
       expect(result.pass).toBe(false);
@@ -1287,7 +1281,7 @@ describe("the capability-call rule", () => {
     // the chain that consumes its result.
     const { result } = evaluateFixture({
       "client/contracts/transport.ts": transportContract,
-      "client/components/Widget.tsx":
+      "client/ui/Widget.tsx":
         'import type { WebuiTransport } from "../contracts/transport.js";\n' +
         'export function use(port: WebuiTransport): void {\n' +
         "  const { sendMessage } = port;\n" +
@@ -1306,7 +1300,7 @@ describe("the capability-call rule", () => {
     // site was recorded twice.
     const { graph } = evaluateFixture({
       "client/contracts/transport.ts": transportContract,
-      "client/components/Widget.tsx": caller(
+      "client/ui/Widget.tsx": caller(
         "../contracts/transport.js",
         "WebuiTransport",
         'void port.sendMessage({}).then(() => {});',
@@ -1341,10 +1335,10 @@ describe("the capability-call rule", () => {
     // capability method into a violation: a local function has no capability
     // declaration behind it, and an index signature has no member to resolve.
     const { result } = evaluateFixture({
-      "client/components/Widget.tsx":
+      "client/ui/Widget.tsx":
         'function deleteSession(id: string): void {\n  void id;\n}\n' +
         'export function use(): void {\n  deleteSession("x");\n}\n',
-      "client/components/Table.tsx":
+      "client/ui/Table.tsx":
         'const handlers: Record<string, () => void> = { deleteSession: () => {} };\n' +
         'export function use(): void {\n  handlers["deleteSession"]();\n}\n',
     });
