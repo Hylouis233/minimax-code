@@ -18,7 +18,7 @@ import type {
   WebuiGetSessionForkOptionsResult,
   WebuiGetSessionRewindPreviewResult,
 } from "../../../../shared/contracts/session.js";
-import type { WebuiTransport } from "../../../contracts/transport.js";
+import type { WebuiTranscriptCommands } from "../contracts/session-read-port.js";
 import type { WebuiMessageFileReference } from "../projection/message-file-reference.js";
 import type { WorkspacePanelCommand } from "../../workspace/contracts/panel-command.js";
 import type {
@@ -27,17 +27,6 @@ import type {
   WebuiTurnView,
 } from "../projection/transcript-shape.js";
 
-/** Capability subset the message item consumes. Single source of truth
- *  lives in `WebuiTransport`; this alias keeps the prop block free of
- *  per-key `WebuiTransport["x"]` redeclarations. */
-type WebuiMessageItemCapabilities = Pick<
-  WebuiTransport,
-  | "getSessionForkOptions"
-  | "forkSession"
-  | "getSessionRewindPreview"
-  | "rewindSession"
-  | "editSessionMessage"
->;
 import { WebuiAssistantBody } from "./AssistantBody.js";
 import { WebuiIconCommandGoal } from "../../../shell/icons.js";
 import {
@@ -64,11 +53,7 @@ import {
 export function MessageItem({
   view,
   wallClockDurationMs,
-  getSessionForkOptions,
-  forkSession,
-  getSessionRewindPreview,
-  rewindSession,
-  editSessionMessage,
+  transcriptCommands = {},
   workspaceDir,
   onOpenFile,
   onOpenTurnReview,
@@ -80,7 +65,8 @@ export function MessageItem({
   readonly workspaceDir?: string;
   readonly onOpenFile?: (input: { readonly sessionId: string; readonly workspaceDir: string; readonly reference: WebuiMessageFileReference }) => void;
   readonly onOpenTurnReview?: (command: Extract<WorkspacePanelCommand, { type: "open-turn-review" }>) => void;
-} & WebuiMessageItemCapabilities): ReactElement {
+  readonly transcriptCommands?: WebuiTranscriptCommands;
+}): ReactElement {
   const { dom } = useWebuiBrowserCapabilities();
   // Narrowing: historical view can read historical-only fields; live view
   // can read live-only fields. The union member types live in
@@ -135,35 +121,35 @@ export function MessageItem({
     setRewindOpen(true);
     setRewindPreview(undefined);
     setMutationError(undefined);
-    if (!sessionId || !getSessionRewindPreview) return;
+    if (!sessionId || !transcriptCommands.getSessionRewindPreview) return;
     setRewindLoading(true);
-    void getSessionRewindPreview({ id: sessionId, userMessageId: messageId })
+    void transcriptCommands.getSessionRewindPreview({ id: sessionId, userMessageId: messageId })
       .then(setRewindPreview)
       .catch((error: unknown) => setMutationError(error instanceof Error ? error.message : String(error)))
       .finally(() => setRewindLoading(false));
   };
   const confirmRewind = (rewindTurnDiff: boolean) => {
-    if (!sessionId || !rewindSession) return;
+    if (!sessionId || !transcriptCommands.rewindSession) return;
     setMutationBusy(true);
-    void rewindSession(buildWebuiRewindRequest(sessionId, messageId, webuiClientRequestId("rewind"), rewindTurnDiff))
+    void transcriptCommands.rewindSession(buildWebuiRewindRequest(sessionId, messageId, webuiClientRequestId("rewind"), rewindTurnDiff))
       .then(() => { setRewindOpen(false); })
       .catch((error: unknown) => setMutationError(error instanceof Error ? error.message : String(error)))
       .finally(() => setMutationBusy(false));
   };
   const submitEdit = () => {
-    if (!sessionId || !editSessionMessage) return;
+    if (!sessionId || !transcriptCommands.editSessionMessage) return;
     const request = buildWebuiEditRequest(sessionId, messageId, webuiClientRequestId("edit"), editText);
     if (!request) return;
     setMutationBusy(true);
-    void editSessionMessage(request)
+    void transcriptCommands.editSessionMessage(request)
       .then(() => { setEditing(false); })
       .catch((error: unknown) => setMutationError(error instanceof Error ? error.message : String(error)))
       .finally(() => setMutationBusy(false));
   };
   const confirmFork = () => {
-    if (!sessionId || !forkSession || forkOptions?.canFork === false) return;
+    if (!sessionId || !transcriptCommands.forkSession || forkOptions?.canFork === false) return;
     setMutationBusy(true);
-    void forkSession(buildWebuiMessageForkRequest(sessionId, messageId, webuiClientRequestId("fork"), forkTitle))
+    void transcriptCommands.forkSession(buildWebuiMessageForkRequest(sessionId, messageId, webuiClientRequestId("fork"), forkTitle))
       .then(() => { setForkOpen(false); })
       .catch((error: unknown) => setMutationError(error instanceof Error ? error.message : String(error)))
       .finally(() => setMutationBusy(false));
@@ -171,8 +157,8 @@ export function MessageItem({
   const openFork = () => {
     setForkOpen(true);
     setForkOptions(undefined);
-    if (!sessionId || !getSessionForkOptions) return;
-    void getSessionForkOptions({ id: sessionId, assistantMessageId: assistantMessageId ?? messageId })
+    if (!sessionId || !transcriptCommands.getSessionForkOptions) return;
+    void transcriptCommands.getSessionForkOptions({ id: sessionId, assistantMessageId: assistantMessageId ?? messageId })
       .then((nextOptions) => {
         setForkOptions(nextOptions);
         if (nextOptions.suggestedTitle) setForkTitle(nextOptions.suggestedTitle);

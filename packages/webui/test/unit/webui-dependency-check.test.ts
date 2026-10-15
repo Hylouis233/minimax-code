@@ -1212,6 +1212,23 @@ describe("the capability-call rule", () => {
     });
   }
 
+  it("rejects a capability call destructured from a function parameter", () => {
+    const { result } = evaluateFixture({
+      "client/contracts/transport.ts": transportContract,
+      "client/ui/Widget.tsx":
+        'import type { WebuiTransport } from "../contracts/transport.js";\n' +
+        'export function Widget({ sendMessage }: WebuiTransport): void {\n' +
+        '  void sendMessage({});\n' +
+        '}\n',
+    });
+    expect(result.forbiddenCalls).toHaveLength(1);
+    expect(result.forbiddenCalls[0]).toMatchObject({
+      file: "client/ui/Widget.tsx",
+      target: "WebuiTransport.sendMessage",
+    });
+    expect(result.pass).toBe(false);
+  });
+
   it("rejects a capability call through a Pick alias of the port", () => {
     const { result } = evaluateFixture({
       "client/contracts/session-port.ts": portContract,

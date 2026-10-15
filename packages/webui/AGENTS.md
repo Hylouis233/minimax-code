@@ -18,16 +18,19 @@ does change `release/public-source.json`, which must be regenerated.
 
 ```
 src/
-  client/             browser shell: entry, transport, contracts, runtime store, router
-    shell/            the shell frame and its React modules
-    ui/               presentation reused across businesses (context menu, toggle, glyphs)
-    features/         one directory per business: application/, projection/, bindings/, ui/, contracts/
-    platform/         browser transport, event channel, storage and browser IO
+  client/             browser application entry and business-first UI
+    application/      composition root: owners, feature workflows and injected capabilities
     conversation/     turn/history/stream lifecycle, lease and stream-loop algorithms
-    contracts/        the shared contract modules; contracts/transport.ts joins the business ports
-    bindings/          React subscriptions, application context, navigation and browser effects
-    application/       business workflows, state owners and query/request coordination
-    projection/       pure state and message projections — no React, no transport
+    contracts/        shared client contracts; transport.ts joins business ports
+    features/<business>/
+      contracts/      public feature contracts and view models
+      application/    feature-owned workflows, state owners and query coordination
+      projection/     pure feature state and view projections
+      bindings/       React subscriptions, application context and browser effects
+      ui/             feature presentation
+    platform/         browser transport, event channel, storage and browser IO
+    shell/            page composition and the shell frame
+    ui/               presentation primitives shared across businesses
     styles/           index.css, tokens.css, shell.css, transcript-widgets.css
     assets/           fonts, images, lottie
   runtime/            Node-side runtime: port, assembly, lifecycle, auth-session, commands/, harness/
@@ -47,7 +50,8 @@ package tsconfig. The browser bundle has its own metafile (`dist-webui/metafile.
 checked by `scripts/check-webui-boundary.mjs`.
 
 `@mavis/shared` is a **different** workspace package (`packages/shared`), not `src/shared/` — the
-server imports `@mavis/shared/daily-signin` and `@mavis/shared/runtime-boundary-env` from it.
+server and browser import its public subpaths, including `daily-signin`, protocol and runtime
+boundary contracts.
 
 ## Core modules
 
@@ -182,16 +186,24 @@ Registry order is the `registerOperation` call order and is observable; keep it 
 
 ## Dependency rules
 
-The allowed direction, top to bottom:
+These are ownership rules as well as import rules. Use the role of the target module to judge an
+edge; a cross-feature call through an approved public contract or command is not automatically a
+violation.
 
-```
-presentation/  →  projection/  →  contracts/  →  shared/
-server/        →  runtime/port.ts  ↔  runtime/  →  shared/
-```
+| Caller role | May depend on | Boundary |
+| --- | --- | --- |
+| `client/shell/` and `client/ui/` | feature public UI/bindings and shared contracts | Compose or present; do not create owners, call transport business methods or write application state. |
+| Feature `ui/` | its own public bindings/contracts and explicitly approved peer public UI/commands | Present data and dispatch application commands; do not call IO ports, instantiate owners or access generic store writers. |
+| Feature `application/` | its own contracts/projections, conversation public APIs, injected capabilities and approved peer contracts | Own business workflows/state; do not depend on browser globals or concrete transport. |
+| `client/application/` | feature application APIs, platform adapters and shared contracts | Compose owners and bind transport capabilities to application commands. |
+| `client/platform/` and `client/bindings/` | browser APIs and capability contracts | Adapt IO and React/browser effects; business decisions stay with application owners. |
+| `server/` | `runtime/port.ts`, `shared/` and server modules | Validate and dispatch loopback requests without importing runtime implementations. |
+| `runtime/` | `runtime/port.ts`, `shared/` and runtime modules | Implement the process-local host adapter without depending on browser or server implementation. |
+| `shared/` | leaf dependencies only | Wire contracts and shared values import neither execution side. |
 
-"Presentation" is `client/shell/`, `client/ui/` and every `client/features/<business>/ui/`;
-`contracts/` is the shared `client/contracts/` modules plus each feature's own
-`contracts/`.
+Within a layer, feature implementation is private by default. A feature may use another feature's
+public `contracts/`; other peer edges require an explicit reviewed entry in
+`scripts/lib/webui-peer-imports.json`.
 
 `shared/` imports neither execution side, and the browser never imports `server/` or `runtime/`.
 `pnpm check:webui-dependency` enforces this direction over the source (including `import type` edges).

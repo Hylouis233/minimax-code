@@ -211,10 +211,7 @@ export function WebuiClientFoundationApp(
   // provided to the screens below. The shell holds no capability to cut its own
   // and no transport to fall back to.
   const portSlices = application.portSlices;
-  const sessionsPort = portSlices.sessions;
-  const getSessionForkOptions = sessionsPort.getSessionForkOptions;
-  const forkSession = sessionsPort.forkSession;
-  const transcriptPort = portSlices.transcript;
+  const transcriptCommands = application.transcriptCommands;
   const workspacePort = portSlices.workspace;
   // The browser Terminal owner (T15), built by the assembly for the same reason
   // as the rest: this component renders the provider that `useWebuiPortSlice`
@@ -239,7 +236,7 @@ export function WebuiClientFoundationApp(
   // a pure conduit. Everything else that used to be rebound here is now
   // read directly off `transport` at the JSX consumption point — see the
   // 67-rebind classification table in the revision report.
-  const loadMessages = transcriptPort.loadMessages;
+  const loadMessages = portSlices.transcript.loadMessages;
 
   // The one session catalog (plan §7.6 "Flat/tree queries"; ticket #49). The
   // shell subscribes to the store's catalog slice and resolves the flat and
@@ -912,11 +909,7 @@ export function WebuiClientFoundationApp(
                   onOpenFile={({ sessionId, workspaceDir, reference }) => dispatchWorkspacePanel({ type: "open-file", sessionId, workspaceDir, path: reference.path, ...(reference.lineStart !== undefined ? { lineStart: reference.lineStart } : {}), ...(reference.lineEnd !== undefined ? { lineEnd: reference.lineEnd } : {}) })}
                   onOpenTurnReview={(command) => dispatchWorkspacePanel(command)}
                   {...(initialMessages ? { initialMessages } : {})}
-                  getSessionForkOptions={getSessionForkOptions}
-                  forkSession={forkSession}
-                  getSessionRewindPreview={transcriptPort.getSessionRewindPreview}
-                  rewindSession={transcriptPort.rewindSession}
-                  editSessionMessage={transcriptPort.editSessionMessage}
+                  transcriptCommands={transcriptCommands}
                   answerPlanBuild={planReviewWorkflow.answerPlanBuild}
                   onOpenPlanFile={({ sessionId: planSessionId, path, content }) => dispatchWorkspacePanel({ type: "open-plan-file", sessionId: planSessionId, workspaceDir: selectedSession?.workspaceDir ?? "", path, content })}
                 /></Transcript> : null}

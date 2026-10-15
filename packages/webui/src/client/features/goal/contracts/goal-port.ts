@@ -9,6 +9,14 @@
 
 import type { WebuiGoal, WebuiGoalCreateRequest, WebuiGoalEnabledResult, WebuiGoalPatchRequest, WebuiGoalSessionRequest } from "../../../../shared/contracts/goal.js";
 
+/** The goal operations exposed to presentation through the application owner. */
+export interface WebuiGoalCommands {
+  readonly patchGoal?: (request: WebuiGoalPatchRequest) => Promise<WebuiGoal>;
+  readonly clearGoal?: (
+    request: WebuiGoalSessionRequest,
+  ) => Promise<{ readonly success: boolean }>;
+}
+
 export interface GoalPort {
   readonly isGoalEnabled?: () => Promise<WebuiGoalEnabledResult>;
   readonly getGoal?: (

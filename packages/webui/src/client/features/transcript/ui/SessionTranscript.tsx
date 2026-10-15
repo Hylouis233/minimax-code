@@ -22,20 +22,9 @@ import { WebuiTranscriptPlanDelivery } from "./PlanDelivery.js";
 import { WebuiQuestionnaireResponse } from "./QuestionnaireResponse.js";
 import type { WebuiClientMessagePage } from "../contracts/message-view.js";
 import type { WebuiTranscriptItem } from "../contracts/transcript-view.js";
-import type { WebuiTransport } from "../../../contracts/transport.js";
+import type { WebuiTranscriptCommands } from "../contracts/session-read-port.js";
 import type { WebuiQuestionnaireRequest } from "../../../../shared/contracts/interactions.js";
 
-/** Capability subset the transcript passes through to each message item.
- *  Single source of truth lives in `WebuiTransport`; this alias keeps the
- *  prop block free of per-key `WebuiTransport["x"]` redeclarations. */
-type WebuiSessionTranscriptCapabilities = Pick<
-  WebuiTransport,
-  | "getSessionForkOptions"
-  | "forkSession"
-  | "getSessionRewindPreview"
-  | "rewindSession"
-  | "editSessionMessage"
->;
 import type { WebuiTurnDiffView } from "../../../../shared/contracts/session.js";
 import type { WebuiQuestionnaireResponseSummary } from "../contracts/transcript-view.js";
 import type { WebuiMessageFileReference } from "../projection/message-file-reference.js";
@@ -64,11 +53,7 @@ const EMPTY_TRANSCRIPT_PAGE: WebuiClientMessagePage = {};
 export function WebuiSessionTranscript({
   sessionId,
   initialMessages,
-  getSessionForkOptions,
-  forkSession,
-  getSessionRewindPreview,
-  rewindSession,
-  editSessionMessage,
+  transcriptCommands,
   answerPlanBuild,
   workspaceDir,
   onOpenFile,
@@ -82,7 +67,8 @@ export function WebuiSessionTranscript({
   readonly onOpenTurnReview?: (command: Extract<WorkspacePanelCommand, { type: "open-turn-review" }>) => void;
   readonly onOpenPlanFile?: (input: { readonly sessionId: string; readonly path: string; readonly content: string }) => void;
   readonly answerPlanBuild?: (request: WebuiQuestionnaireRequest) => Promise<void>;
-} & WebuiSessionTranscriptCapabilities): ReactElement {
+  readonly transcriptCommands?: WebuiTranscriptCommands;
+}): ReactElement {
   const historyOwner = useWebuiTranscriptHistoryOwner();
   const transcriptState = useWebuiSessionState(sessionId).transcript;
   const hasCanonicalPage = transcriptState.page.messages !== undefined;
@@ -313,11 +299,7 @@ export function WebuiSessionTranscript({
                     isGoal: userItem.isGoal,
                   }
                 }
-                getSessionForkOptions={getSessionForkOptions}
-                forkSession={forkSession}
-                getSessionRewindPreview={getSessionRewindPreview}
-                rewindSession={rewindSession}
-                editSessionMessage={editSessionMessage}
+                transcriptCommands={transcriptCommands}
                 workspaceDir={workspaceDir}
                 onOpenFile={onOpenFile}
                 onOpenTurnReview={onOpenTurnReview}
@@ -419,14 +401,10 @@ export function WebuiSessionTranscript({
               <MessageItem
                 view={assistantView}
                 wallClockDurationMs={group.wallClockDurationMs}
-                getSessionForkOptions={getSessionForkOptions}
-                forkSession={forkSession}
-                getSessionRewindPreview={getSessionRewindPreview}
-                rewindSession={rewindSession}
-              editSessionMessage={editSessionMessage}
-              workspaceDir={workspaceDir}
-              onOpenFile={onOpenFile}
-              onOpenTurnReview={onOpenTurnReview}
+                transcriptCommands={transcriptCommands}
+                workspaceDir={workspaceDir}
+                onOpenFile={onOpenFile}
+                onOpenTurnReview={onOpenTurnReview}
             />
               {planAnchorMessageId !== undefined &&
               group.items.some((item) => item.messageId === planAnchorMessageId) ? (

@@ -1354,10 +1354,33 @@ function boundMemberOf(identifier, checker) {
   if (isPatternElement(declaration)) {
     const key = sourceKeyOf(declaration);
     const path = key ? destructuredMemberPath(key.node) : undefined;
-    if (!path) return undefined;
-    const member = propertyAlongPath(path, checker);
-    if (!member) return undefined;
-    return { name: path.keys[path.keys.length - 1], symbol: member, receiver: path.source };
+    if (path) {
+      const member = propertyAlongPath(path, checker);
+      if (!member) return undefined;
+      return { name: path.keys[path.keys.length - 1], symbol: member, receiver: path.source };
+    }
+    // Component parameters can destructure a capability directly, e.g.
+    // `function View({ sendMessage }: WebuiTransport)`. There is no source
+    // expression to walk, so resolve the binding's function type back to the
+    // property signature that declared it.
+    const callSignature = checker
+      .getNonNullableType(checker.getTypeAtLocation(identifier))
+      .getCallSignatures()[0];
+    const functionType = callSignature?.declaration;
+    const property = functionType && ts.isFunctionTypeNode(functionType) ? functionType.parent : undefined;
+    if (property && ts.isPropertySignature(property) && property.name) {
+      const member = checker.getSymbolAtLocation(property.name);
+      if (member) return { name: property.name.getText(), symbol: member, receiver: undefined };
+    }
+    const bindingPattern = declaration.parent;
+    const parameter = bindingPattern.parent;
+    const propertyName = declaration.propertyName ?? declaration.name;
+    if (ts.isParameter(parameter) && ts.isIdentifier(propertyName)) {
+      const parameterType = checker.getTypeAtLocation(parameter);
+      const member = checker.getPropertyOfType(parameterType, propertyName.text);
+      if (member) return { name: propertyName.text, symbol: member, receiver: undefined };
+    }
+    return undefined;
   }
   if (!ts.isVariableDeclaration(declaration) || !declaration.initializer) return undefined;
   const initializer = declaration.initializer;

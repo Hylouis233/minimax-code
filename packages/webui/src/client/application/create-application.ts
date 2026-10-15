@@ -110,6 +110,7 @@ import type {
   WebuiClientMessageLoader,
   WebuiClientMessagePage,
 } from "../features/transcript/contracts/message-view.js";
+import type { WebuiTranscriptCommands } from "../features/transcript/contracts/session-read-port.js";
 import type { WebuiStreamState } from "../features/turn/projection/stream-state.js";
 import {
   selectWebuiSessionStream,
@@ -285,6 +286,8 @@ export interface WebuiApplication {
   /** The one owner of a turn's diff query and revert/reapply (T10). */
   readonly turnReview: WebuiTurnReviewOwner;
   readonly transcriptHistory: WebuiTranscriptHistoryOwner;
+  /** Message actions exposed to transcript UI as application commands. */
+  readonly transcriptCommands: WebuiTranscriptCommands;
   /** The one owner of unread hydration ordering (plan §7.6). */
   readonly unread: WebuiUnreadController;
   /** The one owner of composer drafts and input history (plan §7.6). */
@@ -570,6 +573,23 @@ export function createWebuiApplication(
   // port a component happened to be handed.
   const slices = deps.slices ?? createWebuiPortSlices(deps.turnCapabilities ?? {});
   const terminalOwner = createWebuiTerminalOwner(slices.workspace);
+  const transcriptCommands: WebuiTranscriptCommands = {
+    ...(slices.sessions.getSessionForkOptions
+      ? { getSessionForkOptions: (request) => slices.sessions.getSessionForkOptions!(request) }
+      : {}),
+    ...(slices.sessions.forkSession
+      ? { forkSession: (request) => slices.sessions.forkSession!(request) }
+      : {}),
+    ...(slices.transcript.getSessionRewindPreview
+      ? { getSessionRewindPreview: (request) => slices.transcript.getSessionRewindPreview!(request) }
+      : {}),
+    ...(slices.transcript.rewindSession
+      ? { rewindSession: (request) => slices.transcript.rewindSession!(request) }
+      : {}),
+    ...(slices.transcript.editSessionMessage
+      ? { editSessionMessage: (request) => slices.transcript.editSessionMessage!(request) }
+      : {}),
+  };
   const sessionWorkflows = createWebuiSessionWorkflows({
     store,
     // A delete clears the composer slot's draft and history, so a fresh session
@@ -744,6 +764,7 @@ export function createWebuiApplication(
     turnCapabilities,
     turnReview,
     transcriptHistory,
+    transcriptCommands,
     unread,
     composer,
     composerController,
