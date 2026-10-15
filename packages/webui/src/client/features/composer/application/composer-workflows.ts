@@ -3,7 +3,10 @@ import type {
   WebuiComposerSubmitArgs,
   WebuiComposerSubmitHandlers,
 } from "../contracts/composer-turn.js";
-import type { WebuiClientCreateSessionResult, WebuiClientSessionCreator } from "../../sessions/contracts/session-port.js";
+import {
+  createdWebuiSessionId,
+  type WebuiClientSessionCreator,
+} from "../../sessions/contracts/session-port.js";
 import type { WebuiGoal, WebuiGoalCreateRequest, WebuiGoalPatchRequest } from "../../../../shared/contracts/goal.js";
 import type { WebuiAttachmentInput } from "../../../../shared/contracts/messages.js";
 import { formatWebuiError } from "../../../contracts/value-readers.js";
@@ -51,10 +54,6 @@ function createSessionWorkspaceField(workspaceDir?: string): { readonly workspac
   return { workspaceDir: value };
 }
 
-export function createdSessionId(result: WebuiClientCreateSessionResult): string | undefined {
-  return result.sessionId?.trim() || result.session?.sessionId?.trim() || undefined;
-}
-
 export async function submitWebuiGoal(
   args: WebuiGoalSubmitArgs,
   onSessionCreated?: (sessionId: string) => void,
@@ -69,7 +68,7 @@ export async function submitWebuiGoal(
       ...createSessionWorkspaceField(args.createSessionWorkspaceDir),
       teamModeOff: args.teamModeOff,
     });
-    sessionId = createdSessionId(result);
+    sessionId = createdWebuiSessionId(result);
     if (!sessionId) throw new Error("创建目标会话未返回会话 ID");
     onSessionCreated?.(sessionId);
   }
@@ -97,7 +96,7 @@ export async function submitWebuiComposerTurn(
         ...createSessionWorkspaceField(args.createSessionWorkspaceDir),
         teamModeOff: args.teamModeOff,
       });
-      sessionId = createdSessionId(result);
+      sessionId = createdWebuiSessionId(result);
       if (!sessionId) throw new Error("createSession response did not include a session id");
       handlers.resetStreamForTurn();
       handlers.onSessionCreated?.(sessionId);

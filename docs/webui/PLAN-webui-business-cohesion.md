@@ -342,7 +342,7 @@ one effective owner, a coherent import graph, and the applicable checks passing.
 | Carrier | Status | Revision | Evidence |
 | --- | --- | --- | --- |
 | P00 | done | (work material, not a source change) | baseline gate run, caller/import map, field/lifetime matrix, broad-contract inventory, before-change scenario ledger — all under `~/my_data/project/my_project/minimax-code-webui-work/business-cohesion-20261015/p00/` |
-| P01 | not started | | |
+| P01 | in progress — slice 1 landed (creation use case + store guards, no production switch) | (this commit) | `test/unit/task-session-workflows.test.ts`; report under `…/business-cohesion-20261015/p01/slice-1-evidence.md` |
 | P02 | not started | | |
 | P03 | done | (this commit) | `test/unit/webui-unary-operation-typing.test.ts`; report under `…/business-cohesion-20261015/p03/evidence.md` |
 | P04 | not started | | |

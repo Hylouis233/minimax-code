@@ -68,6 +68,30 @@ export type WebuiSessionWriterOwner<SessionId extends string = string> =
   | { readonly kind: "session"; readonly sessionId: SessionId };
 
 /**
+ * What a guarded transfer did. Every member is distinct and actionable, so a
+ * caller must decide — there is no "nothing happened" that reads like success.
+ */
+export type WebuiSessionTransferOutcome =
+  /** The source held a record, the destination did not, and the record moved. */
+  | "transferred"
+  /** Nothing to move: the source held no record, or source and destination are the same key. */
+  | "no-source"
+  /** The destination already holds a record. The destination wins; both are left untouched. */
+  | "target-exists"
+  /** The destination is a purged id; carrying anything onto it would resurrect a deleted session. */
+  | "purged"
+  /** The captured source incarnation is no longer the live one (an explicit New Task intervened). */
+  | "stale-source"
+  /** The store is terminal; nothing can be written. */
+  | "disposed";
+
+export interface WebuiSessionTransferResult {
+  readonly outcome: WebuiSessionTransferOutcome;
+  /** The incarnation of the source at the moment of the attempt, when the source was the home slot. */
+  readonly sourceIncarnation?: number;
+}
+
+/**
  * The interaction slice's write targets. It is what the interaction commands
  * (`session-commands.ts`) are bound to, so a component submits
  * `replacePendingPermissions` / `applyGoal` and never holds one of these
@@ -126,6 +150,33 @@ export interface WebuiSessionStore {
     owner: WebuiSessionWriterOwner,
   ) => WebuiInteractionWriter;
   /**
+   * The home slot's incarnation. It advances whenever the home record is reset
+   * (an explicit New Task), so a creation that started before that reset can be
+   * told apart from one that started after it: a late creation whose captured
+   * incarnation is no longer the live one is refused with `stale-source` rather
+   * than adopted onto a home the user has already replaced.
+   */
+  readonly readHomeIncarnation: () => number;
+  /** Start a fresh home record: drop the current one and advance its incarnation. */
+  readonly resetHomeRecord: () => void;
+  /** Whether one key currently holds a record. */
+  readonly hasSession: (sessionId: string) => boolean;
+  /**
+   * The guarded home→session transfer (P01, plan §5.3 rule 4).
+   *
+   * `migrateSession` below is the legacy unconditional move that the two
+   * production adoption sites still use; this one is the API the creation use
+   * case drives. It never overwrites a destination that already holds a record
+   * and never resurrects a purged id, and it reports every outcome — including
+   * the ones that moved nothing — so a submission cannot be left unsettled by a
+   * silent no-op.
+   */
+  readonly transferSession: (
+    sourceKey: string,
+    targetKey: string,
+    options?: { readonly expectSourceIncarnation?: number },
+  ) => WebuiSessionTransferResult;
+  /**
    * Carry a session's live record (stream + sending + interaction slices) from
    * one key to another and clear the source. It deliberately does **not**
    * notify: the only subscriber is the view that is about to switch keys (its
@@ -164,6 +215,14 @@ export function createWebuiSessionStore(options?: {
     options?.catalog ?? initialWebuiSessionCatalogState;
   let selectedSessionId: string | undefined;
   let disposed = false;
+  /**
+   * The home slot's incarnation (P01, plan §5.3 rule 2). It starts at 1 so a
+   * capture of `0` can never be mistaken for a live one, and it advances
+   * whenever an explicit New Task resets the home record. The counter is
+   * deliberately not part of the session map: it describes the home slot's
+   * identity, not any session's state.
+   */
+  let homeIncarnation = 1;
   // The first snapshot must reflect the seeded catalog, not the empty initial
   // one: `getSnapshot` is read before any notify (SSR first paint).
   let snapshot: WebuiApplicationState = {
@@ -372,6 +431,42 @@ export function createWebuiSessionStore(options?: {
       createInteractionWriterFor(
         owner.kind === "home" ? WEBUI_HOME_SESSION_KEY : owner.sessionId,
       ),
+    readHomeIncarnation: () => homeIncarnation,
+    resetHomeRecord: () => {
+      if (disposed) return;
+      // One notification only when a record actually went away: a second New
+      // Task with an already-empty home changes the incarnation and nothing a
+      // subscriber can see, and notifying would re-render every one of them.
+      const had = sessions.delete(WEBUI_HOME_SESSION_KEY);
+      homeIncarnation += 1;
+      if (had) notify();
+    },
+    hasSession: (sessionId) => sessions.has(sessionId),
+    transferSession: (fromKey, toKey, options) => {
+      const sourceIncarnation =
+        fromKey === WEBUI_HOME_SESSION_KEY ? homeIncarnation : undefined;
+      if (disposed) return { outcome: "disposed" };
+      // The incarnation is checked before anything is touched: an explicit New
+      // Task between capture and completion means the record this transfer
+      // would carry is not the record the user is looking at.
+      if (
+        options?.expectSourceIncarnation !== undefined &&
+        sourceIncarnation !== undefined &&
+        options.expectSourceIncarnation !== sourceIncarnation
+      )
+        return { outcome: "stale-source", sourceIncarnation };
+      if (purged.has(toKey)) return { outcome: "purged", sourceIncarnation };
+      if (fromKey === toKey || !sessions.has(fromKey))
+        return { outcome: "no-source", sourceIncarnation };
+      // The destination wins: a record that is already there carries the
+      // authoritative event, and overwriting it would erase that. Both records
+      // are left exactly as they were.
+      if (sessions.has(toKey)) return { outcome: "target-exists", sourceIncarnation };
+      const state = sessions.get(fromKey);
+      sessions.delete(fromKey);
+      if (state) sessions.set(toKey, state);
+      return { outcome: "transferred", sourceIncarnation };
+    },
     migrateSession: (fromKey, toKey) => {
       // A key this instance has purged is dead in the store, exactly as it is
       // for `updateSession`: carrying a record onto it would resurrect the

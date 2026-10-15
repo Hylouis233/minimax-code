@@ -326,6 +326,7 @@
       "packages/webui/test/unit/slash-classification.test.ts",
       "packages/webui/test/unit/slash-palette.test.ts",
       "packages/webui/test/unit/stream-lease.test.ts",
+      "packages/webui/test/unit/task-session-workflows.test.ts",
       "packages/webui/test/unit/team-mode.test.ts",
       "packages/webui/test/unit/terminal-owner.test.ts",
       "packages/webui/test/unit/terminal-process-manager.test.ts",

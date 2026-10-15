@@ -71,10 +71,10 @@ import {
 import { looksLikeAbsoluteWorkspacePath } from "../../src/client/projection/common/paths.js";
 import {
   buildWebuiComposerHandlers,
-  createdSessionId,
   submitWebuiGoal,
   submitWebuiComposerTurn,
 } from "../../src/client/features/composer/application/composer-workflows.js";
+import { createdWebuiSessionId } from "../../src/client/features/sessions/contracts/session-port.js";
 import type { WebuiComposerSubmitHandlers } from "../../src/client/features/composer/contracts/composer-turn.js";
 import { createWebuiTurnLifecycleCommands } from "../../src/client/features/sessions/application/session-commands.js";
 import { projectWebuiMessage } from "../../src/client/features/transcript/projection/message-projection.js";
@@ -339,14 +339,14 @@ describe("WebUI shell", () => {
   });
 
   it("reads a created session id from either supported response shape", () => {
-    expect(createdSessionId({ sessionId: "a" })).toBe("a");
-    expect(createdSessionId({ session: { sessionId: "b" } })).toBe("b");
-    expect(createdSessionId({ sessionId: "  c  " })).toBe("c");
-    expect(createdSessionId({ session: { sessionId: "  d  " } })).toBe("d");
-    expect(createdSessionId({})).toBeUndefined();
+    expect(createdWebuiSessionId({ sessionId: "a" })).toBe("a");
+    expect(createdWebuiSessionId({ session: { sessionId: "b" } })).toBe("b");
+    expect(createdWebuiSessionId({ sessionId: "  c  " })).toBe("c");
+    expect(createdWebuiSessionId({ session: { sessionId: "  d  " } })).toBe("d");
+    expect(createdWebuiSessionId({})).toBeUndefined();
     expect(
-      createdSessionId({ agentName: "x" } as Parameters<
-        typeof createdSessionId
+      createdWebuiSessionId({ agentName: "x" } as Parameters<
+        typeof createdWebuiSessionId
       >[0]),
     ).toBeUndefined();
   });

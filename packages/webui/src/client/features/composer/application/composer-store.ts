@@ -21,6 +21,7 @@ import {
   parseWebuiComposerPersisted,
   recordWebuiInputHistory,
   serializeWebuiComposerPersisted,
+  WEBUI_COMPOSER_HOME_KEY,
   type WebuiComposerPersisted,
 } from "./composer-history.js";
 
@@ -104,8 +105,23 @@ export interface WebuiComposerStore {
   /**
    * Move the home slot's draft and history onto a freshly created session key.
    * The composer half of home→session adoption.
+   *
+   * With `expectSourceRevision` the move happens only while the home slot still
+   * carries that revision: input typed during creation is newer than the
+   * adoption's own decision, so it stays where the user typed it. The call
+   * reports whether it moved anything, so a caller never reports a move that
+   * the revision guard refused.
    */
-  readonly adoptHome: (targetKey: string) => void;
+  readonly adoptHome: (
+    targetKey: string,
+    options?: { readonly expectSourceRevision?: number },
+  ) => boolean;
+  /**
+   * One slot's write revision: bumped by every write that changes the slot.
+   * A caller captures it before an async operation and compares after, which is
+   * how a completion tells "the fields I saw" from "the fields I would drop".
+   */
+  readonly readSlotRevision: (key: string) => number;
   /**
    * Drop both the draft and the input history for one slot. Called by the
    * session workflow after a successful delete, so a removed session does not
@@ -194,6 +210,15 @@ export function createWebuiComposerStore(options?: {
   let modes = WEBUI_COMPOSER_EMPTY_MODES;
   let retry: WebuiRecordedTurn | undefined;
   let mentionRange: WebuiMentionRange | undefined;
+  /**
+   * Per-slot write revisions (P01). Not part of the snapshot: they exist to be
+   * captured and compared around an in-flight operation, and publishing them
+   * would re-render every subscriber for a fence.
+   */
+  const slotRevisions = new Map<string, number>();
+  const bumpSlot = (key: string): void => {
+    slotRevisions.set(key, (slotRevisions.get(key) ?? 0) + 1);
+  };
   // The queue mirror's destination and its generation. Neither rides the
   // snapshot: they are read imperatively around an in-flight request, and
   // publishing them would re-render every subscriber for a fence.
@@ -249,6 +274,7 @@ export function createWebuiComposerStore(options?: {
     readDraft: (key) => state.drafts[key] ?? "",
     readHistory: (key) => state.history[key] ?? [],
     setDraft: (key, draft) => {
+      bumpSlot(key);
       apply((current) => {
         const drafts = { ...current.drafts };
         if (draft) drafts[key] = draft;
@@ -257,6 +283,7 @@ export function createWebuiComposerStore(options?: {
       }, [key]);
     },
     recordInput: (key, text) => {
+      bumpSlot(key);
       apply((current) => {
         const history = {
           ...current.history,
@@ -265,9 +292,25 @@ export function createWebuiComposerStore(options?: {
         return { ...current, history };
       }, [key]);
     },
-    adoptHome: (targetKey) => {
+    adoptHome: (targetKey, options) => {
+      // The captured revision is the adoption's precondition, checked before
+      // anything is written: a draft typed while the creation was in flight does
+      // not belong to it, and dropping it would lose the user's text.
+      if (
+        options?.expectSourceRevision !== undefined &&
+        (slotRevisions.get(WEBUI_COMPOSER_HOME_KEY) ?? 0) !== options.expectSourceRevision
+      )
+        return false;
+      // A destination slot holding a draft is newer than this adoption by
+      // construction — the session did not exist when the adoption was decided —
+      // so it is preserved and nothing moves.
+      if (state.drafts[targetKey]) return false;
+      bumpSlot(WEBUI_COMPOSER_HOME_KEY);
+      bumpSlot(targetKey);
       apply((current) => migrateWebuiHomeComposerState(current, targetKey), [targetKey]);
+      return true;
     },
+    readSlotRevision: (key) => slotRevisions.get(key) ?? 0,
     readQueue: () => snapshot.queue,
     setQueue: (next) => {
       const patch = typeof next === "function" ? next(queue) : next;
@@ -332,6 +375,7 @@ export function createWebuiComposerStore(options?: {
       notify();
     },
     purgeSlot: (key) => {
+      bumpSlot(key);
       apply((current) => {
         // Read the slots *before* deleting: an absent slot must leave the
         // snapshot — and therefore every subscriber — untouched.

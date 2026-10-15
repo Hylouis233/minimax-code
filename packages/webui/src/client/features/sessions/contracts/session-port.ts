@@ -64,3 +64,18 @@ export interface WebuiClientCreateSessionResult {
 export type WebuiClientSessionCreator = (
   request: WebuiClientCreateSessionRequest,
 ) => Promise<WebuiClientCreateSessionResult>;
+
+/**
+ * The created session's id, or `undefined` when the response carried none.
+ *
+ * The response carries the id in one of two places depending on the host's
+ * generation — `sessionId` at the top level, or nested under `session` — and
+ * every creation flow has to settle on the created destination before it can
+ * adopt anything onto it. It is published here rather than declared per caller
+ * because the response type is this module's.
+ */
+export function createdWebuiSessionId(
+  result: WebuiClientCreateSessionResult,
+): string | undefined {
+  return result.sessionId?.trim() || result.session?.sessionId?.trim() || undefined;
+}
