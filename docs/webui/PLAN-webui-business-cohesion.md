@@ -348,7 +348,7 @@ one effective owner, a coherent import graph, and the applicable checks passing.
 | P04 | done — D04 and D05 landed | `362940c3` (D05), `6f376ae0` (D04) | `test/unit/model-provider-projection.test.ts`, `test/unit/webui-candidate-wire-compatibility.test.ts`; reports under `…/business-cohesion-20261015/p04/` and `…/p04b/` |
 | P05 | **done** — the editor is the Models policy, the Usage screen hosts one instance per visit above its custom-tab branch, and the provider form renders that editor's snapshot | `b1c2366c`, `8d2ed010`, `c4220980` | `test/unit/provider-editor.test.ts` (15), `test/unit/provider-form-panel.test.ts` (rewritten for the new home), `test/webui-browser/provider-form.spec.mjs` (4, whole browser suite 124 green); reports under `…/business-cohesion-20261015/p05/` |
 | P06 | **done** — the A5 comparison executed: nine deterministic scenarios against an always-online oracle, Arm A driven through the repository's own reconciliation functions, Arm B0 on what today's host offers and B1 on an invented epoch + cursor + session-scoped update channel, plus a real-host probe of the frames a real turn actually produced. Outcome: **keep-client**; one bounded client defect specified, not fixed | `834114f5` | `docs/webui/DECISION-webui-observation.md`; `…/business-cohesion-20261015/p06/real-host-evidence.md`, `p06/results/real-host.json`, `p06/results/traces.json` |
-| P07 | not started | | |
+| P07 | **done** — steps 1-4: the last measured peer exception retired by publishing the interaction phase intents (P02 step 3's named output), the ownership recorded in ADR 0018 / `CONTEXT.md` / the package guide, generated surfaces regenerated, and the validation matrix run on this tree. The P01/P02/P06 limits stay explicit rather than closed | `78436bba` | `docs/adr/0018-webui-business-cohesion-owners-and-measured-observation.md`, `CONTEXT.md`, `packages/webui/AGENTS.md`; report under `…/business-cohesion-20261015/p07/evidence.md` |
 
 ```mermaid
 flowchart LR
@@ -646,16 +646,19 @@ Provider malformed-input compatibility change, and A5's experiment-versus-produc
 Intermediate design questions are resolved above; implementation-specific discoveries must be
 recorded with their evidence, not silently substituted for a narrower goal.
 
-- [ ] P00: baseline and test seams established; broad-contract inventory reproducible.
-- [ ] P01: task creation/adoption/goal ownership and collision semantics implemented and verified.
-- [ ] P02: complete execution owner, all callers migrated, peer factory cycle retired.
-- [ ] P03: all unary calls derive types from OperationSpec with compiled negative evidence.
-- [ ] P04: actual Provider DTOs and the five validators integrated through the real seam.
-- [ ] P05: Models editor replaces parent field plumbing with preserved/reset lifetimes verified.
-- [ ] P06: both observation approaches evaluated, or executable consistency no-go established;
+- [x] P00: baseline and test seams established; broad-contract inventory reproducible.
+- [x] P01: task creation/adoption/goal ownership and collision semantics implemented and verified.
+- [x] P02: complete execution owner, all callers migrated, peer factory cycle retired.
+- [x] P03: all unary calls derive types from OperationSpec with compiled negative evidence.
+- [x] P04: actual Provider DTOs and the five validators integrated through the real seam.
+- [x] P05: Models editor replaces parent field plumbing with preserved/reset lifetimes verified.
+- [x] P06: both observation approaches evaluated, or executable consistency no-go established;
   decision and any bounded follow-up completed, with no production rollout implied.
-- [ ] P07: obsolete paths retired, effective docs/generated declarations current, required gates pass.
+- [x] P07: obsolete paths retired, effective docs/generated declarations current, required gates pass.
 - [ ] I01–I09 and D01–D05 have evidence at the appropriate tier; limits are explicit.
+  Carrier-level limits are recorded in §7.0. The per-invariant and per-decision evidence matrix is
+  the independent review's output; this box is left open until that matrix is checked against the
+  code rather than asserted here.
 
 This document is the proposed executable plan. None of these unchecked items is an implementation
 or experiment result from the planning session.
