@@ -5,10 +5,9 @@
 // caller has to honour, and the home→session migration rebuilds the whole writer
 // rather than swapping a field.
 
-import { buildWebuiStreamLoopSink } from "../../../conversation/stream-loop.js";
+import { buildWebuiStreamLoopSink } from "./stream-loop-sink.js";
 import type { WebuiTurnCommandWriter } from "../contracts/turn-command-views.js";
 import type { WebuiStreamState } from "../projection/stream-state.js";
-import { streamStateBundle } from "./stream-state-bundle.js";
 import { createWebuiTurnLifecycleCommands } from "./turn-lifecycle-commands.js";
 
 export function createWebuiTurnCommands(writer: {
@@ -33,7 +32,7 @@ export function createWebuiTurnCommands(writer: {
     kind: writer.kind,
     // The attempt's sink, built from this writer's own `setStream`: the fence
     // travels with the writer instead of being a convention the caller honours.
-    createSink: () => buildWebuiStreamLoopSink(writer.setStream, streamStateBundle),
+    createSink: () => buildWebuiStreamLoopSink(writer.setStream),
     resetStreamForTurn: lifecycle.resetStreamForTurn,
     setStreamRefusal: lifecycle.setStreamRefusal,
     setTurnSending: lifecycle.setTurnSending,

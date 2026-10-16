@@ -96,10 +96,11 @@ describe("prohibition 2 — turn's rules are filed inside turn", () => {
   it("declares the loop and the lease in conversation/, never in a component", () => {
     const declarations = [
       { symbol: "function runWebuiStreamLoop", owner: "conversation/stream-loop.ts" },
-      { symbol: "function buildWebuiStreamLoopSink", owner: "conversation/stream-loop.ts" },
+      // The sink is `turn`'s, not the mechanism's: it is the one module that
+      // turns an attempt's frames into the session's stream record.
+      { symbol: "function buildWebuiStreamLoopSink", owner: "features/turn/application/stream-loop-sink.ts" },
       { symbol: "function nextWebuiLeaseGeneration", owner: "conversation/stream-lease.ts" },
       { symbol: "function isWebuiLeaseGenerationCurrent", owner: "conversation/stream-lease.ts" },
-      { symbol: "function fenceWebuiLeaseStream", owner: "conversation/stream-lease.ts" },
     ];
     const modules = clientModules();
     for (const { symbol, owner } of declarations) {
@@ -154,7 +155,6 @@ describe("prohibition 4 — turn's shared rules have exactly one owner", () => {
     for (const symbol of [
       "nextWebuiLeaseGeneration",
       "isWebuiLeaseGenerationCurrent",
-      "fenceWebuiLeaseStream",
     ]) {
       const declaring = modules.filter((modulePath) =>
         new RegExp(`function ${symbol}\\b`, "u").test(read(modulePath)),

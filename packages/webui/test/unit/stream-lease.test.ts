@@ -3,7 +3,7 @@
 //
 // These pin the property the module's own header states: there is exactly one
 // counter. Two claim paths stamp the same `lastClaimedGeneration` field — the
-// lease's `claimWebuiLease` and the loop sink's `claimSubscription`, which
+// lease's `claimWebuiLease` and the loop sink's `claim`, which
 // receives its number through the injected `streamState` bundle — and
 // `isWebuiLeaseGenerationCurrent` compares only the number. With two counters
 // both starting at 0 and incrementing independently the numbers overlap, so a
@@ -21,7 +21,7 @@ import { streamStateBundle } from "../../src/client/features/turn/application/st
 import { initialWebuiStreamState } from "../../src/client/features/turn/projection/stream-state.js";
 import type { WebuiStreamState } from "../../src/client/features/turn/contracts/stream-state.js";
 
-/** What the loop sink's `claimSubscription` does, without a React store. */
+/** What the loop sink's `claim` does, without a React store. */
 function claimFromLoop(state: WebuiStreamState): {
   state: WebuiStreamState;
   generation: number;

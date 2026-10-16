@@ -45,7 +45,7 @@ import {
   type WebuiStreamState,
 } from "../../src/client/features/turn/projection/stream-state.js";
 import type { WebuiStreamLoopExtra } from "../../src/client/features/turn/contracts/stream-loop.js";
-import { buildWebuiStreamLoopSink } from "../../src/client/conversation/stream-loop.js";
+import { buildWebuiStreamLoopSink } from "../../src/client/features/turn/application/stream-loop-sink.js";
 import { streamStateBundle } from "../../src/client/features/turn/application/stream-state-bundle.js";
 import type { WebuiSessionActivityMap } from "../../src/client/features/sessions/projection/session-activity.js";
 import type { WebuiClientSession } from "../../src/client/features/sessions/contracts/session-view.js";
@@ -659,15 +659,15 @@ describe("R7 · the command surface carries no raw writer", () => {
     const current = openSink(cell);
     // A loop sink always owns the claim; the assertion documents that the
     // fence is part of the sink rather than something the caller adds.
-    expect(superseded.claimSubscription).toBeDefined();
-    expect(current.claimSubscription).toBeDefined();
-    superseded.claimSubscription?.("local-send");
-    current.claimSubscription?.("recovered");
+    expect(superseded.claim).toBeDefined();
+    expect(current.claim).toBeDefined();
+    superseded.claim("local-send");
+    current.claim("recovered");
 
-    superseded.applyFrame(frame);
+    superseded.accept(frame);
     expect(cell.get().messages).toEqual([]);
 
-    current.applyFrame(frame);
+    current.accept(frame);
     expect(cell.get().messages.map((message) => message.id)).toEqual(["m1"]);
   });
 
@@ -678,7 +678,7 @@ describe("R7 · the command surface carries no raw writer", () => {
       setSending: () => undefined,
     });
     const sink = openSink(cell);
-    const generation = sink.claimSubscription?.("local-send");
+    const generation = sink.claim("local-send");
     expect(cell.get().subscription).toBeDefined();
 
     lifecycle.releaseStreamSubscription((generation ?? 0) - 1);
@@ -698,57 +698,55 @@ describe("R7 · the command surface carries no raw writer", () => {
     // way a superseded sink ends up alive — the loop for the old turn has not
     // finished when the newer one claims.
     const stale = openSink(cell);
-    const staleGeneration = stale.claimSubscription?.("local-send");
+    const staleGeneration = stale.claim("local-send");
     const current = openSink(cell);
-    const currentGeneration = current.claimSubscription?.("recovered");
+    const currentGeneration = current.claim("recovered");
     expect(cell.get().lastClaimedGeneration).toBe(currentGeneration);
 
     // A second claim must not mint a newer generation. It used to: the sink
     // wrote a fresh number as `lastClaimedGeneration`, made itself the newest
     // claimant again and could then stamp `refused` over the turn that had
     // replaced it.
-    expect(stale.claimSubscription?.("local-send")).toBe(staleGeneration);
+    expect(stale.claim("local-send")).toBe(staleGeneration);
     expect(cell.get().lastClaimedGeneration).toBe(currentGeneration);
-    stale.refuse("stale failure");
-    stale.setPhase("waiting");
+    stale.fail({ origin: "transport", reason: "stale failure", acceptedFrames: 0 });
+    stale.begin();
     expect(cell.get().phase).toBe(initialWebuiStreamState.phase);
     expect(cell.get().refusal).toBeUndefined();
 
     // The live sink still writes normally.
-    current.refuse("current failure");
+    current.fail({ origin: "transport", reason: "current failure", acceptedFrames: 0 });
     expect(cell.get().phase).toBe("refused");
     expect(cell.get().refusal).toBe("current failure");
   });
 
-  it("keeps the generation fence out of reach of setStreamExtra", () => {
+  it("keeps the generation fence out of reach of the anchor page", () => {
     const cell = streamCell();
     const lifecycle = createWebuiTurnLifecycleCommands({
       setStream: cell.setStream,
       setSending: () => undefined,
     });
     const sink = openSink(cell);
-    const generation = sink.claimSubscription?.("local-send");
+    const generation = sink.claim("local-send");
 
     // The seed fields the attach path needs still land.
-    sink.setStreamExtra?.({
-      contextUsage: { used: 11 },
-      processingStartedAtMs: 42,
-      resumeRequired: false,
-      refusal: undefined,
+    sink.anchor({
+      messages: [],
+      contextSnapshot: { usage: { used: 11 } },
     });
     expect(cell.get().contextUsage).toEqual({ used: 11 });
-    expect(cell.get().processingStartedAtMs).toBe(42);
+    expect(cell.get().processingStartedAtMs).toBeTypeOf("number");
 
-    // A forged extra — a cast, or a plain-JavaScript caller — naming the two
-    // fields the fence reads must not reach them. With the open-ended
-    // `Partial<WebuiStreamState>` parameter this rewrote the fence and every
-    // later write from a superseded sink passed it.
-    const forged = {
+    // A forged page — a cast, or a plain-JavaScript caller — naming the two
+    // fields the fence reads must not reach them. The loop hands the page over
+    // raw and the adapter copies only the fields it declared, so an open-ended
+    // page cannot rewrite the fence and re-admit every later write from a
+    // superseded sink.
+    sink.anchor({
       subscription: { owner: "recovered", generation: 0 },
       lastClaimedGeneration: 0,
       phase: "waiting",
-    } as unknown as WebuiStreamLoopExtra;
-    sink.setStreamExtra?.(forged);
+    } as unknown as WebuiStreamLoopExtra);
     expect(cell.get().lastClaimedGeneration).toBe(generation);
     expect(cell.get().subscription?.generation).toBe(generation);
     expect(cell.get().phase).not.toBe("waiting");
@@ -768,8 +766,8 @@ describe("R7 · the command surface carries no raw writer", () => {
     writer.setStreamRefusal("boom");
     expect(cell.get().refusal).toBe("boom");
     const sink = writer.createSink();
-    sink.claimSubscription?.("local-send");
-    sink.applyFrame(frame);
+    sink.claim("local-send");
+    sink.accept(frame);
     expect(cell.get().messages.map((message) => message.id)).toEqual(["m1"]);
   });
 
@@ -790,8 +788,8 @@ describe("R7 · the command surface carries no raw writer", () => {
     expect(writer.kind).toBe("home");
     const migrated = writer.migrateToSession?.("created");
     const sink = migrated?.createSink();
-    sink?.claimSubscription?.("local-send");
-    sink?.applyFrame(frame);
+    sink?.claim("local-send");
+    sink?.accept(frame);
 
     expect(home.get().messages).toEqual([]);
     expect(sessionCell.get().messages.map((message) => message.id)).toEqual(["m1"]);

@@ -13,14 +13,19 @@ import {
   buildWebuiComposerHandlers,
   submitWebuiComposerTurn,
 } from "../../src/client/features/turn/application/composer-submission.js";
-import type { WebuiStreamLoopSink } from "../../src/client/features/turn/contracts/stream-loop.js";
+import type { WebuiDeliverySink } from "../../src/shared/contracts/delivery.js";
 
 /** The sink the loop would write through; these sends never open one, so every member is a spy. */
-const sink: WebuiStreamLoopSink = {
-  applyFrame: vi.fn(),
-  setPhase: vi.fn(),
-  setMessages: vi.fn(),
-  refuse: vi.fn(),
+const sink: WebuiDeliverySink = {
+  claim: vi.fn(() => undefined),
+  accept: vi.fn(),
+  begin: vi.fn(),
+  recovering: vi.fn(),
+  anchor: vi.fn(),
+  replace: vi.fn(),
+  complete: vi.fn(),
+  fail: vi.fn(),
+  release: vi.fn(),
 };
 
 /** The handlers a caller supplies; every one is a spy so the preserved calls are observable. */

@@ -151,7 +151,7 @@ export interface WebuiApplicationDeps {
   readonly readActiveSessionId?: () => string | undefined;
 
   /** Transport-facing dependencies of the turn coordinator. */
-  readonly turns: Omit<WebuiTurnCoordinatorDeps, "store" | "leases">;
+  readonly turns: Omit<WebuiTurnCoordinatorDeps, "store">;
   /**
    * The port the turn capability slice is cut from — the composition root's
    * closure over the transport. The slice is built here, not by the component
@@ -560,7 +560,6 @@ export function createWebuiApplication(
   });
   const turns = createWebuiTurnCoordinator({
     store,
-    leases,
     ...deps.turns,
   });
   // The slice is cut once, here, from the port the composition root holds. A

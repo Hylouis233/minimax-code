@@ -42,8 +42,13 @@ import type {
 } from "../contracts/submission.js";
 import { isWebuiSubscriptionProbeCurrent, ownsWebuiStreamGeneration, resolveWebuiSubscriptionRecheck, settleStaleWebuiSubscription, type WebuiStreamState } from "../projection/stream-state.js";
 import { streamRecoveryProjection } from "../projection/stream-recovery.js";
-import { runWebuiStreamLoop, type WebuiStreamLoopDeps } from "../../../conversation/stream-loop.js";
-import type { WebuiStreamLoopSink } from "../contracts/stream-loop.js";
+import { runWebuiStreamLoop } from "../../../conversation/stream-loop.js";
+import type {
+  WebuiDeliveryDeps,
+  WebuiDeliverySink,
+  WebuiDeliveryTransports,
+} from "../../../../shared/contracts/delivery.js";
+import { classifyStreamFrame } from "./stream-frame-classify.js";
 import {
   webuiActiveTurnProbeFor,
   type WebuiActiveTurnProbe,
@@ -75,7 +80,7 @@ export interface WebuiAttachTurnDeps {
    * against the generation it claims, and no component ever holds the factory
    * that mints it.
    */
-  readonly sink: WebuiStreamLoopSink;
+  readonly sink: WebuiDeliverySink;
 }
 
 /**
@@ -90,10 +95,14 @@ export function attachWebuiTurn(deps: WebuiAttachTurnDeps): Promise<void> {
   if (existing.subscription) return Promise.resolve();
   setSending(true);
   return runWebuiStreamLoop(
-    { resumeSession, loadMessages, projection: streamRecoveryProjection, streamState: streamStateBundle },
+    {
+      resumeSession,
+      ...(loadMessages ? { loadHistory: loadMessages } : {}),
+      classify: classifyStreamFrame,
+    },
     {
       sessionId,
-      attachTurnId: turnId,
+      attachId: turnId,
       ...(existing.cursor ? { afterCursor: existing.cursor } : {}),
     },
     sink,
@@ -221,7 +230,7 @@ export interface WebuiSendTurnArgs {
   readonly callbacks: WebuiComposerTurnCallbacks;
   /** Read the live slice. The home→session migration below changes the key. */
   readonly readStream?: () => WebuiStreamState;
-  readonly deps: Omit<WebuiStreamLoopDeps, "projection" | "streamState">;
+  readonly deps: Omit<WebuiDeliveryDeps, "projection" | "streamState">;
   readonly enqueueMessage?: WebuiClientMessageEnqueuer;
   readonly createSessionWorkspaceDir?: string;
   readonly teamModeOff?: boolean;
@@ -396,7 +405,7 @@ export function createWebuiConversationTurnCommands(
   };
   const loopDeps = (
     hold: { readonly onDelivery: (handle: { readonly close: () => void }) => void },
-  ): Omit<WebuiStreamLoopDeps, "projection" | "streamState"> => ({
+  ): WebuiDeliveryTransports => ({
     ...(capabilities?.send
       ? { sendMessage: (body, onFrame) => capabilities.send!(body, onFrame, hold.onDelivery) }
       : {}),
@@ -406,7 +415,7 @@ export function createWebuiConversationTurnCommands(
             capabilities.resume!(body, onFrame, hold.onDelivery),
         }
       : {}),
-    ...(capabilities?.load ? { loadMessages: capabilities.load } : {}),
+    ...(capabilities?.load ? { loadHistory: capabilities.load } : {}),
   });
 
   // One shared, deduplicated probe per transport: `webuiActiveTurnProbeFor` keys
@@ -442,7 +451,7 @@ export function createWebuiConversationTurnCommands(
       sessionId,
       turnId,
       ...(capabilities?.resume ? { resumeSession: capabilities.resume } : {}),
-      ...(capabilities?.load ? { loadMessages: capabilities.load } : {}),
+      ...(capabilities?.load ? { loadHistory: capabilities.load } : {}),
       readStream,
       setSending: writer.setTurnSending,
       sink: writer.createSink(),

@@ -20,23 +20,19 @@
 // retry cannot strand a "thinking" indicator or let a superseded attempt write.
 
 import type {WebuiClientSessionResumer} from "../contracts/execution-port.js";
-import type { WebuiClientMessageLoader } from "../../transcript/contracts/message-view.js";
-import { streamRecoveryProjection } from "../projection/stream-recovery.js";
+import type {
+  WebuiClientMessage,
+  WebuiClientMessageLoader,
+} from "../../transcript/contracts/message-view.js";
 import type { WebuiStreamState } from "../projection/stream-state.js";
-import { reduceWebuiStreamFrame } from "../projection/stream-state.js";
-import { fenceWebuiLeaseStream } from "../../../conversation/stream-lease.js";
-import {
-  applyWebuiStreamLoopExtra,
-  runWebuiStreamLoop,
-} from "../../../conversation/stream-loop.js";
-import type { WebuiStreamLoopSink } from "../contracts/stream-loop.js";
-import type { WebuiSessionStore, WebuiSessionWriter } from "../../../application/session-store.js";
-import type { WebuiStreamLeaseController } from "./stream-lease-controller.js";
+import { runWebuiStreamLoop } from "../../../conversation/stream-loop.js";
+import { buildWebuiStreamLoopSink } from "./stream-loop-sink.js";
+import { classifyStreamFrame } from "./stream-frame-classify.js";
+import type { WebuiSessionStore } from "../../../application/session-store.js";
 import { streamStateBundle } from "./stream-state-bundle.js";
 
 export interface WebuiTurnCoordinatorDeps {
   readonly store: WebuiSessionStore;
-  readonly leases: WebuiStreamLeaseController;
   readonly resumeSession: WebuiClientSessionResumer;
   readonly loadMessages?: WebuiClientMessageLoader;
   /** Injected for tests; production uses the mechanism's loop. */
@@ -52,62 +48,10 @@ export interface WebuiTurnCoordinator {
   readonly retry: (sessionId: string) => Promise<number | undefined>;
 }
 
-/**
- * The attempt's sink. It is the loop sink, but every write goes through the
- * lease fence first, so only the newest attempt reaches the store.
- */
-function createLeaseSink(
-  sessionId: string,
-  store: WebuiSessionStore,
-  leases: WebuiStreamLeaseController,
-): WebuiStreamLoopSink {
-  const writer: WebuiSessionWriter = store.createSessionWriter({
-    kind: "session",
-    sessionId,
-  });
-  let generation: number | undefined;
-  const write = (
-    apply: (current: WebuiStreamState) => WebuiStreamState,
-  ): void => {
-    writer.setStream((current) =>
-      fenceWebuiLeaseStream(current, generation, apply),
-    );
-  };
-  return {
-    // Claims once, like every sink: a repeat call hands back the generation
-    // this attempt already owns instead of taking the lease from a newer one.
-    claimSubscription: (owner, turnId) => {
-      if (generation !== undefined) return generation;
-      generation = leases.claim(sessionId, owner, turnId);
-      return generation;
-    },
-    // Released raw on every terminal exit, scoped to this attempt's generation
-    // so a superseded attempt cannot clear the lease the current one holds.
-    releaseSubscription: () => {
-      if (generation === undefined) return;
-      leases.release(sessionId, { generation });
-    },
-    applyFrame: (frame) => write((current) => reduceWebuiStreamFrame(current, frame)),
-    setPhase: (phase) => write((current) => ({ ...current, phase })),
-    setMessages: (messages) => write((current) => ({ ...current, messages })),
-    // The seed fields only, through the same closed projection the loop sink
-    // uses — not a spread of the caller's object.
-    setStreamExtra: (extra) =>
-      write((current) => applyWebuiStreamLoopExtra(current, extra)),
-    refuse: (reason, options) =>
-      write((current) => ({
-        ...current,
-        phase: "refused",
-        refusal: reason,
-        transcriptIncomplete: options?.transcriptIncomplete ?? false,
-      })),
-  };
-}
-
 export function createWebuiTurnCoordinator(
   deps: WebuiTurnCoordinatorDeps,
 ): WebuiTurnCoordinator {
-  const { store, leases, resumeSession, loadMessages } = deps;
+  const { store, resumeSession, loadMessages } = deps;
   const runStreamLoop = deps.runStreamLoop ?? runWebuiStreamLoop;
   return {
     retry: (sessionId) => {
@@ -123,12 +67,20 @@ export function createWebuiTurnCoordinator(
         transcriptIncomplete: false,
       }));
       return runStreamLoop(
-        { resumeSession, loadMessages, projection: streamRecoveryProjection, streamState: streamStateBundle },
+        {
+          resumeSession,
+          ...(loadMessages ? { loadHistory: loadMessages } : {}),
+          classify: classifyStreamFrame,
+        },
         {
           sessionId,
           ...(current.cursor ? { afterCursor: current.cursor } : {}),
         },
-        createLeaseSink(sessionId, store, leases),
+        // The Turn-owned adapter, not a second copy of it: this coordinator's
+        // retry path and the composer's submit path must translate a frame into
+        // the record the same way, or a retried turn would seed itself
+        // differently from a submitted one.
+        buildWebuiStreamLoopSink(writer.setStream, streamStateBundle),
       );
     },
   };

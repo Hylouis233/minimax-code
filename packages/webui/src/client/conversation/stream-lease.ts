@@ -113,15 +113,6 @@ export function isWebuiLeaseGenerationCurrent(
   return state.lastClaimedGeneration === generation;
 }
 
-/** Apply a write only when `generation` is still the newest claimant. */
-export function fenceWebuiLeaseStream(
-  state: WebuiStreamState,
-  generation: number | undefined,
-  apply: (current: WebuiStreamState) => WebuiStreamState,
-): WebuiStreamState {
-  return isWebuiLeaseGenerationCurrent(state, generation) ? apply(state) : state;
-}
-
 export function releaseWebuiSubscription(
   state: WebuiStreamState,
   scope?: WebuiSubscriptionReleaseScope,

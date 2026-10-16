@@ -93,14 +93,49 @@ import {
 import { createWebuiTranscriptHistoryOwner } from "../../src/client/conversation/transcript-history.js";
 import { WEBUI_HOME_SESSION_KEY } from "../../src/client/application/state.js";
 import { WebuiSessionStoreProvider } from "../../src/client/bindings/application-context.js";
-import {
-  buildWebuiStreamLoopSink,
-  runWebuiStreamLoop as runStreamLoop,
-  type WebuiStreamLoopArgs,
-  type WebuiStreamLoopDeps,
-} from "../../src/client/conversation/stream-loop.js";
-import type { WebuiStreamLoopSink } from "../../src/client/features/turn/contracts/stream-loop.js";
-import { streamRecoveryProjection } from "../../src/client/features/turn/projection/stream-recovery.js";
+import { runWebuiStreamLoop as runStreamLoop } from "../../src/client/conversation/stream-loop.js";
+import type {
+  WebuiDeliveryArgs,
+  WebuiDeliveryDeps,
+  WebuiDeliverySink,
+} from "../../src/shared/contracts/delivery.js";
+import { buildWebuiStreamLoopSink } from "../../src/client/features/turn/application/stream-loop-sink.js";
+import { classifyStreamFrame } from "../../src/client/features/turn/application/stream-frame-classify.js";
+
+/**
+ * The phase each lifecycle callback would produce, so a test that used to watch
+ * a `setPhase(phase)` recorder can keep reading the same phase names. The loop
+ * no longer names phases — it names the moment — and the adapter is what turns
+ * a moment into one.
+ */
+const LIFECYCLE_PHASES = {
+  begin: "streaming",
+  recovering: "reconnecting",
+  complete: "done",
+} as const;
+
+/**
+ * An inert delivery sink with the given members replaced.
+ *
+ * Built from the whole port rather than a hand-written literal, because the loop
+ * now calls `claim` and `release` unconditionally: a fixture that quietly omits
+ * one would fail with a `TypeError` from inside the loop rather than a clear
+ * "this sink is incomplete".
+ */
+const inertDeliverySink = (
+  overrides: Partial<WebuiDeliverySink> = {},
+): WebuiDeliverySink => ({
+  claim: () => undefined,
+  accept: () => undefined,
+  begin: () => undefined,
+  recovering: () => undefined,
+  anchor: () => undefined,
+  replace: () => undefined,
+  complete: () => undefined,
+  fail: () => undefined,
+  release: () => undefined,
+  ...overrides,
+});
 
 /**
  * The three writes `buildWebuiComposerHandlers` needs, taken from the **real**
@@ -123,24 +158,14 @@ const composerHandlerWrites = (
 };
 
 /**
- * `runWebuiStreamLoop` now requires the injected history/context bundle so a
- * caller cannot forget it and get a mis-shaped transcript. The shell tests that
- * never traverse a resync/attach path pass no bundle; this fills the real pure
- * transforms in, changing nothing about what is asserted.
+ * The loop's only injected knowledge is what a frame asks for, so the shell
+ * tests supply the one real classifier and nothing else.
  */
 const loopWithProjection = (
-  deps: Omit<WebuiStreamLoopDeps, "projection" | "streamState"> & {
-    readonly projection?: WebuiStreamLoopDeps["projection"];
-    readonly streamState?: WebuiStreamLoopDeps["streamState"];
-  },
-  args: WebuiStreamLoopArgs,
-  sink: WebuiStreamLoopSink,
-) =>
-  runStreamLoop(
-    { ...deps, projection: deps.projection ?? streamRecoveryProjection, streamState: deps.streamState ?? streamStateBundle },
-    args,
-    sink,
-  );
+  deps: WebuiDeliveryDeps,
+  args: WebuiDeliveryArgs,
+  sink: WebuiDeliverySink,
+) => runStreamLoop({ ...deps, classify: deps.classify ?? classifyStreamFrame }, args, sink);
 import { createSessionOperation } from "../../src/server/operation/operations.js";
 import { stopWebuiTurn } from "../../src/client/features/turn/application/turn-coordinator.js";
 import {
@@ -180,7 +205,9 @@ function renderSessionShell(): string {
         ],
         hasMore: false,
       },
-    transport: { loadMessages: async () => ({ messages: [], hasMore: false }) },
+      // The shell's transcript reader. It is not the delivery loop's
+      // `loadHistory` transport, and it is still named for what it loads.
+      transport: { loadMessages: async () => ({ messages: [], hasMore: false }) },
     }),
   );
 }
@@ -1374,7 +1401,7 @@ describe("WebUI composer send/resume loop", () => {
         resumeCalls.push({ afterCursor: req.afterCursor });
         // The fresh subscription ends with `[DONE]` — same wire shape
         // as a successful send. The loop's only job here is to route
-        // the frames through `applyFrame` and resolve.
+        // the frames through `accept` and resolve.
         onFrame({ dataJson: '{"type":10}' });
         onFrame({ dataJson: "[DONE]" });
       },
@@ -1383,12 +1410,12 @@ describe("WebUI composer send/resume loop", () => {
     await loopWithProjection(
       { sendMessage, resumeSession },
       { sessionId: "session-1", message: "hello" },
-      {
-        applyFrame: (frame) => applied.push(frame),
-        setPhase: (phase) => observedPhases.push(phase),
-        setMessages: () => undefined,
-        refuse: () => undefined,
-      },
+      inertDeliverySink({
+        accept: (frame) => applied.push(frame),
+        begin: () => observedPhases.push(LIFECYCLE_PHASES.begin),
+        recovering: () => observedPhases.push(LIFECYCLE_PHASES.recovering),
+        complete: () => observedPhases.push(LIFECYCLE_PHASES.complete),
+      }),
     );
 
     // The loop's phase trace must contain `reconnecting` — the same
@@ -1420,7 +1447,7 @@ describe("WebUI composer send/resume loop", () => {
     // before the next iteration could observe it.
     const observedPhases: string[] = [];
     const resumeCalls: { afterCursor?: string }[] = [];
-    let loadMessagesCalls = 0;
+    let loadHistoryCalls = 0;
 
     const sendMessage: WebuiClientMessageSender = vi.fn(
       async (_req, onFrame) => {
@@ -1439,24 +1466,23 @@ describe("WebUI composer send/resume loop", () => {
         onFrame({ dataJson: "[DONE]" });
       },
     );
-    const loadMessages: WebuiClientMessageLoader = vi.fn(async () => {
-      loadMessagesCalls += 1;
+    const loadHistory: WebuiClientMessageLoader = vi.fn(async () => {
+      loadHistoryCalls += 1;
       return { messages: [], hasMore: false };
     });
 
     await loopWithProjection(
-      { sendMessage, resumeSession, loadMessages, projection: streamRecoveryProjection, streamState: streamStateBundle },
+      { sendMessage, resumeSession, loadHistory },
       { sessionId: "session-1", message: "hello" },
-      {
-        applyFrame: () => undefined,
-        setPhase: (phase) => observedPhases.push(phase),
-        setMessages: () => undefined,
-        refuse: () => undefined,
-      },
+      inertDeliverySink({
+        begin: () => observedPhases.push(LIFECYCLE_PHASES.begin),
+        recovering: () => observedPhases.push(LIFECYCLE_PHASES.recovering),
+        complete: () => observedPhases.push(LIFECYCLE_PHASES.complete),
+      }),
     );
 
-    // `loadMessages` ran exactly once.
-    expect(loadMessagesCalls).toBe(1);
+    // `loadHistory` ran exactly once.
+    expect(loadHistoryCalls).toBe(1);
     // `resumeSession` was called once, with no `afterCursor`, because
     // the reload already established the fresh subscription point.
     expect(resumeCalls).toEqual([{ afterCursor: undefined }]);
@@ -1499,7 +1525,6 @@ describe("WebUI composer send/resume loop", () => {
       msgContent: "original prompt",
     };
     const history = [orderedHistoryMessage, legacyHistoryMessage, userHistoryMessage];
-    let resyncedMessages: Parameters<WebuiStreamLoopSink["setMessages"]>[0] = [];
     const sendMessage: WebuiClientMessageSender = async (_request, onFrame) => {
       onFrame({ dataJson: '{"type":"resume_overflow"}' });
       onFrame({ dataJson: "[DONE]" });
@@ -1507,22 +1532,22 @@ describe("WebUI composer send/resume loop", () => {
     const resumeSession: WebuiClientSessionResumer = async (_request, onFrame) => {
       onFrame({ dataJson: "[DONE]" });
     };
-    const loadMessages: WebuiClientMessageLoader = async () => ({
-      messages: history,
-      hasMore: false,
-    });
+    const loadHistory = async () => ({ messages: history, hasMore: false });
+
+    // The loop hands the authoritative page over raw; projecting it is the Turn
+    // adapter's work, so this drives the real sink and reads the slice it wrote.
+    let state = initialWebuiStreamState;
+    const setStream = (update: (current: WebuiStreamState) => WebuiStreamState): void => {
+      state = update(state);
+    };
 
     await loopWithProjection(
-      { sendMessage, resumeSession, loadMessages, projection: streamRecoveryProjection, streamState: streamStateBundle },
+      { sendMessage, resumeSession, loadHistory },
       { sessionId: "session-resync", message: "prompt" },
-      {
-        applyFrame: () => undefined,
-        setPhase: () => undefined,
-        setMessages: (messages) => { resyncedMessages = messages; },
-        refuse: () => undefined,
-      },
+      buildWebuiStreamLoopSink(setStream, streamStateBundle),
     );
 
+    const resyncedMessages = state.messages;
     expect(resyncedMessages).toHaveLength(history.length);
     expect(resyncedMessages.map((message) => message.id)).toEqual([
       "resync-ordered", "resync-legacy", "msg-user-resync",
@@ -1572,19 +1597,19 @@ describe("WebUI composer send/resume loop", () => {
         onFrame({ dataJson: "[DONE]" });
       },
     );
-    const throwingSink = {
-      applyFrame: () => {
-        throw new Error("applyFrame blew up");
-      },
-      setPhase: () => {
-        throw new Error("setPhase blew up");
-      },
-      setMessages: () => {
-        throw new Error("setMessages blew up");
-      },
-      refuse: () => {
-        throw new Error("refuse blew up");
-      },
+    const throwOnCall = (label: string) => () => {
+      throw new Error(`${label} blew up`);
+    };
+    const throwingSink: WebuiDeliverySink = {
+      claim: throwOnCall("claim"),
+      accept: throwOnCall("accept"),
+      begin: throwOnCall("begin"),
+      recovering: throwOnCall("recovering"),
+      anchor: throwOnCall("anchor"),
+      replace: throwOnCall("replace"),
+      complete: throwOnCall("complete"),
+      fail: throwOnCall("fail"),
+      release: throwOnCall("release"),
     };
     await expect(
       loopWithProjection(
@@ -1604,15 +1629,15 @@ describe("WebUI composer sink binding", () => {
   // the binding into `buildWebuiStreamLoopSink`, which the production
   // shell now uses. This describe block exercises that helper with a
   // recording state reducer so that:
-  //  - `applyFrame` routed to `setStream(reduce(current, frame))` —
+  //  - `accept` routed to `setStream(reduce(current, frame))` —
   //    dropping this binding leaves the reducer out of the loop and
-  //    fails the `applyFrame` assertion;
-  //  - `setPhase` updates `state.phase` only — confusing it with
+  //    fails the `accept` assertion;
+  //  - `recovering` updates `state.phase` only — confusing it with
   //    `refuse` would write `phase: "refused"` instead of the
   //    intended value;
-  //  - `setMessages` replaces `state.messages` without touching phase
-  //    — confusing it with `setPhase` would drop the messages;
-  //  - `refuse` writes `phase: "refused"` and `refusal` — confusing
+  //  - `replace` replaces `state.messages` without touching phase
+  //    — confusing it with `recovering` would drop the messages;
+  //  - `fail` writes `phase: "refused"` and `refusal` — confusing
   //    either field fails the corresponding assertion.
   type Reducer = (current: WebuiStreamState) => WebuiStreamState;
   const recordingReducer = (log: Reducer[]): ((update: Reducer) => void) => {
@@ -1626,8 +1651,8 @@ describe("WebUI composer sink binding", () => {
     const setStream = recordingReducer(log);
     const sink = buildWebuiStreamLoopSink(setStream, streamStateBundle);
 
-    // `applyFrame` must reduce the current state with the frame.
-    sink.applyFrame({
+    // `accept` must reduce the current state with the frame.
+    sink.accept({
       dataJson:
         '{"type":2,"agent_message":{"msg_id":"m1","msg_content":"hello","thinking_content":"thought"}}',
     });
@@ -1641,8 +1666,8 @@ describe("WebUI composer sink binding", () => {
     expect(applyResult.phase).toBe("streaming");
     log.length = 0;
 
-    // `setPhase` must update phase without touching the rest.
-    sink.setPhase("reconnecting");
+    // `recovering` must update phase without touching the rest.
+    sink.recovering();
     expect(log).toHaveLength(1);
     const phaseResult = log[0]!({
       ...initialWebuiStreamState,
@@ -1652,8 +1677,11 @@ describe("WebUI composer sink binding", () => {
     expect(phaseResult.messages).toEqual(applyResult.messages);
     log.length = 0;
 
-    // `setMessages` must replace messages without touching phase.
-    sink.setMessages([{ id: "loaded", answer: "from server", thinking: "" }]);
+    // `replace` must replace messages without touching phase — and it is the
+    // adapter, not the loop, that projects the page it is handed.
+    sink.replace({
+      messages: [{ msgId: "loaded", role: "assistant", msgContent: "from server" }],
+    });
     expect(log).toHaveLength(1);
     const messagesResult = log[0]!({
       ...initialWebuiStreamState,
@@ -1665,10 +1693,10 @@ describe("WebUI composer sink binding", () => {
     expect(messagesResult.phase).toBe("streaming");
     log.length = 0;
 
-    // `refuse` must write phase: "refused" AND the refusal string —
+    // `fail` must write phase: "refused" AND the refusal string —
     // the test asserts both fields so a binding that forgot to set
     // `phase` (or to write the refusal string) fails one of them.
-    sink.refuse("connection closed");
+    sink.fail({ origin: "transport", reason: "connection closed", acceptedFrames: 0 });
     expect(log).toHaveLength(1);
     const refuseResult = log[0]!({
       ...initialWebuiStreamState,
@@ -1769,12 +1797,12 @@ describe("WebUI composer sink binding", () => {
           onFrame({ dataJson: "[DONE]" });
         },
       );
-      const loadMessages: WebuiClientMessageLoader = vi.fn(async () => ({
+      const loadHistory: WebuiClientMessageLoader = vi.fn(async () => ({
         messages: [],
         hasMore: false,
       }));
       await loopWithProjection(
-        { sendMessage, resumeSession, loadMessages, projection: streamRecoveryProjection, streamState: streamStateBundle },
+        { sendMessage, resumeSession, loadHistory },
         { sessionId: "s", message: "hi" },
         sink,
       );
@@ -2261,35 +2289,46 @@ describe("WebUI composer app-to-helper seam", () => {
   });
 });
 
-// Sink failure must change the outcome. `safeSink` used to be a
-// defensive try/catch that did nothing with the failure: when
-// `applyFrame` threw, the loop still committed `phase: "done"`. The fixed
-// `safeSink` records the first failure, disables further callbacks,
-// blocks the normal `done` commit, and surfaces the failure through a
-// direct `sink.refuse` call (with a `console.error` fallback when
-// every callback is broken). These tests pin that contract.
+// Sink failure must change the outcome. The callback guard used to be a
+// defensive try/catch that did nothing with the failure: when `accept`
+// threw, the loop still committed `phase: "done"`. The guard records the
+// first failure, disables further callbacks, blocks the normal `done`
+// commit, and surfaces the failure through a direct `fail` call (with a
+// `console.error` fallback when every callback is broken). These tests pin
+// that contract.
 describe("WebUI composer sink-failure semantics", () => {
-  it("skips the normal done commit when applyFrame throws and emits a refusal", async () => {
-    // Reproduction: `applyFrame` throws, the stream continues to emit
+  it("skips the normal done commit when accept throws and emits a refusal", async () => {
+    // Reproduction: `accept` throws, the stream continues to emit
     // `[DONE]`, and the loop would previously commit `phase: "done"` with no
     // refusal. The fixed loop records the failure, blocks the done commit, and
-    // calls `sink.refuse` with a reason that names the failing
+    // calls `sink.fail` with a reason that names the failing
     // callback.
     const events: string[] = [];
-    const sink = {
-      applyFrame: () => {
-        events.push("applyFrame");
-        throw new Error("applyFrame blew up");
+    const sink: WebuiDeliverySink = {
+      claim: () => undefined,
+      accept: () => {
+        events.push("accept");
+        throw new Error("accept blew up");
       },
-      setPhase: (phase: string) => {
-        events.push(`phase:${phase}`);
+      begin: () => {
+        events.push(`phase:${LIFECYCLE_PHASES.begin}`);
       },
-      setMessages: (messages: readonly unknown[]) => {
-        events.push(`messages:${messages.length}`);
+      recovering: () => {
+        events.push(`phase:${LIFECYCLE_PHASES.recovering}`);
       },
-      refuse: (reason: string) => {
-        events.push(`refuse:${reason}`);
+      anchor: (page) => {
+        events.push(`messages:${((page as { messages?: readonly unknown[] })?.messages ?? []).length}`);
       },
+      replace: (page) => {
+        events.push(`messages:${((page as { messages?: readonly unknown[] })?.messages ?? []).length}`);
+      },
+      complete: () => {
+        events.push(`phase:${LIFECYCLE_PHASES.complete}`);
+      },
+      fail: (failure) => {
+        events.push(`refuse:${failure.reason}`);
+      },
+      release: () => undefined,
     };
     const sendMessage: WebuiClientMessageSender = vi.fn(
       async (_req, onFrame) => {
@@ -2308,7 +2347,7 @@ describe("WebUI composer sink-failure semantics", () => {
     expect(events).not.toContain("phase:done");
     expect(
       events.some(
-        (event) => event.startsWith("refuse:") && event.includes("applyFrame"),
+        (event) => event.startsWith("refuse:") && event.includes("accept"),
       ),
     ).toBe(true);
   });
@@ -2322,19 +2361,19 @@ describe("WebUI composer sink-failure semantics", () => {
       .spyOn(console, "error")
       .mockImplementation(() => undefined);
     try {
-      const sink = {
-        applyFrame: () => {
-          throw new Error("applyFrame broken");
-        },
-        setPhase: () => {
-          throw new Error("setPhase broken");
-        },
-        setMessages: () => {
-          throw new Error("setMessages broken");
-        },
-        refuse: () => {
-          throw new Error("refuse broken");
-        },
+      const throwOnCall = (label: string) => () => {
+        throw new Error(`${label} broken`);
+      };
+      const sink: WebuiDeliverySink = {
+        claim: throwOnCall("claim"),
+        accept: throwOnCall("accept"),
+        begin: throwOnCall("begin"),
+        recovering: throwOnCall("recovering"),
+        anchor: throwOnCall("anchor"),
+        replace: throwOnCall("replace"),
+        complete: throwOnCall("complete"),
+        fail: throwOnCall("fail"),
+        release: throwOnCall("release"),
       };
       const sendMessage: WebuiClientMessageSender = vi.fn(
         async (_req, onFrame) => {
@@ -2371,15 +2410,19 @@ describe("WebUI composer sink-failure semantics", () => {
       .spyOn(console, "error")
       .mockImplementation(() => undefined);
     try {
-      const sink = {
-        applyFrame: () => undefined,
-        setPhase: (phase: string) => {
-          // setPhase works; only refuse throws.
+      const sink: WebuiDeliverySink = {
+        claim: () => undefined,
+        accept: () => undefined,
+        begin: () => undefined,
+        recovering: () => undefined,
+        anchor: () => undefined,
+        replace: () => undefined,
+        complete: () => undefined,
+        // Everything but `fail` works; only the failure report throws.
+        fail: () => {
+          throw new Error("fail broken");
         },
-        setMessages: () => undefined,
-        refuse: () => {
-          throw new Error("refuse broken");
-        },
+        release: () => undefined,
       };
       const sendMessage: WebuiClientMessageSender = vi.fn(async () => {
         throw new Error("dropped before any frame");
@@ -2397,25 +2440,34 @@ describe("WebUI composer sink-failure semantics", () => {
     }
   });
 
-  it("routes the loadMessages-rejection early return through the finalization helper", async () => {
-    // The case where the resume_overflow path runs `loadMessages`, which
+  it("routes the loadHistory-rejection early return through the finalization helper", async () => {
+    // The case where the resume_overflow path runs `loadHistory`, which
     // rejects; the early-return inside that try/catch used to skip
     // the failure report. With `finalizeOnExit`, the rejection
-    // reason is finalised through `sink.refuse` before returning.
+    // reason is finalised through `sink.fail` before returning.
     // The reproduction mirrors the
     // "load-rejects-with-sink-throws" scenario in a recoverable
     // form: a sink that records the failure but still accepts the
     // raw refuse.
     const events: string[] = [];
-    const sink = {
-      applyFrame: () => undefined,
-      setPhase: (phase: string) => {
-        events.push(`phase:${phase}`);
+    const sink: WebuiDeliverySink = {
+      claim: () => undefined,
+      accept: () => undefined,
+      begin: () => {
+        events.push(`phase:${LIFECYCLE_PHASES.begin}`);
       },
-      setMessages: () => undefined,
-      refuse: (reason: string) => {
-        events.push(`refuse:${reason}`);
+      recovering: () => {
+        events.push(`phase:${LIFECYCLE_PHASES.recovering}`);
       },
+      anchor: () => undefined,
+      replace: () => undefined,
+      complete: () => {
+        events.push(`phase:${LIFECYCLE_PHASES.complete}`);
+      },
+      fail: (failure) => {
+        events.push(`refuse:${failure.reason}`);
+      },
+      release: () => undefined,
     };
     const sendMessage: WebuiClientMessageSender = vi.fn(
       async (_req, onFrame) => {
@@ -2423,11 +2475,11 @@ describe("WebUI composer sink-failure semantics", () => {
         onFrame({ dataJson: "[DONE]" });
       },
     );
-    const loadMessages = vi.fn(async () => {
+    const loadHistory = vi.fn(async () => {
       throw new Error("history unavailable");
     });
     await loopWithProjection(
-      { sendMessage, loadMessages, resumeSession: vi.fn(), projection: streamRecoveryProjection },
+      { sendMessage, loadHistory, resumeSession: vi.fn() },
       { sessionId: "s", message: "hi" },
       sink,
     );
@@ -2445,15 +2497,24 @@ describe("WebUI composer sink-failure semantics", () => {
     // The events observed end with a refuse call naming the missing
     // transport.
     const events: string[] = [];
-    const sink = {
-      applyFrame: () => undefined,
-      setPhase: (phase: string) => {
-        events.push(`phase:${phase}`);
+    const sink: WebuiDeliverySink = {
+      claim: () => undefined,
+      accept: () => undefined,
+      begin: () => {
+        events.push(`phase:${LIFECYCLE_PHASES.begin}`);
       },
-      setMessages: () => undefined,
-      refuse: (reason: string) => {
-        events.push(`refuse:${reason}`);
+      recovering: () => {
+        events.push(`phase:${LIFECYCLE_PHASES.recovering}`);
       },
+      anchor: () => undefined,
+      replace: () => undefined,
+      complete: () => {
+        events.push(`phase:${LIFECYCLE_PHASES.complete}`);
+      },
+      fail: (failure) => {
+        events.push(`refuse:${failure.reason}`);
+      },
+      release: () => undefined,
     };
     const sendMessage: WebuiClientMessageSender = vi.fn(
       async (_req, onFrame) => {
@@ -2462,7 +2523,7 @@ describe("WebUI composer sink-failure semantics", () => {
       },
     );
     await loopWithProjection(
-      // No resumeSession; no loadMessages.
+      // No resumeSession; no loadHistory.
       { sendMessage },
       { sessionId: "s", message: "hi" },
       sink,
@@ -2489,15 +2550,24 @@ describe("WebUI composer sink-failure semantics", () => {
     // (`c1`), schedules `nextAction = "resume"`, and the next
     // iteration enters the resume branch with `!resumeSession`.
     const events: string[] = [];
-    const sink = {
-      applyFrame: () => undefined,
-      setPhase: (phase: string) => {
-        events.push(`phase:${phase}`);
+    const sink: WebuiDeliverySink = {
+      claim: () => undefined,
+      accept: () => undefined,
+      begin: () => {
+        events.push(`phase:${LIFECYCLE_PHASES.begin}`);
       },
-      setMessages: () => undefined,
-      refuse: (reason: string) => {
-        events.push(`refuse:${reason}`);
+      recovering: () => {
+        events.push(`phase:${LIFECYCLE_PHASES.recovering}`);
       },
+      anchor: () => undefined,
+      replace: () => undefined,
+      complete: () => {
+        events.push(`phase:${LIFECYCLE_PHASES.complete}`);
+      },
+      fail: (failure) => {
+        events.push(`refuse:${failure.reason}`);
+      },
+      release: () => undefined,
     };
     const sendMessage: WebuiClientMessageSender = vi.fn(
       async (_req, onFrame) => {
@@ -2528,15 +2598,24 @@ describe("WebUI composer sink-failure semantics", () => {
     // The very first iteration finds `sendMessage` is
     // missing and refuses with the documented reason.
     const events: string[] = [];
-    const sink = {
-      applyFrame: () => undefined,
-      setPhase: (phase: string) => {
-        events.push(`phase:${phase}`);
+    const sink: WebuiDeliverySink = {
+      claim: () => undefined,
+      accept: () => undefined,
+      begin: () => {
+        events.push(`phase:${LIFECYCLE_PHASES.begin}`);
       },
-      setMessages: () => undefined,
-      refuse: (reason: string) => {
-        events.push(`refuse:${reason}`);
+      recovering: () => {
+        events.push(`phase:${LIFECYCLE_PHASES.recovering}`);
       },
+      anchor: () => undefined,
+      replace: () => undefined,
+      complete: () => {
+        events.push(`phase:${LIFECYCLE_PHASES.complete}`);
+      },
+      fail: (failure) => {
+        events.push(`refuse:${failure.reason}`);
+      },
+      release: () => undefined,
     };
     await loopWithProjection(
       // No sendMessage at all.
@@ -2559,8 +2638,8 @@ describe("WebUI composer sink-failure semantics", () => {
 // transcript may be incomplete. The state field `transcriptIncomplete`
 // is set as part of the failure transition; the shell renders an
 // additional user-visible message alongside the refusal. The
-// `applyFrame`-throw case after some frames flips the flag; the
-// applyFrame-throw-before-any-frame case does not.
+// `accept`-throw case after some frames flips the flag; the
+// accept-throw-before-any-frame case does not.
 describe("WebUI composer transcriptIncomplete", () => {
   it("sets transcriptIncomplete when a sink failure happens after frames were accepted", async () => {
     let state = initialWebuiStreamState;
@@ -2570,27 +2649,35 @@ describe("WebUI composer transcriptIncomplete", () => {
       state = update(state);
     };
     // The third frame is delivered by the transport, but the sink's
-    // applyFrame throws before the reducer sees it. We wire a sink
+    // accept throws before the reducer sees it. We wire a sink
     // whose third call blows up; the loop must record the failure,
-    // refuse with `transcriptIncomplete: true`, and leave the
-    // previously accepted frames in state.
-    let applyCount = 0;
-    const sink: WebuiStreamLoopSink = {
-      applyFrame: (frame) => {
-        applyCount += 1;
-        if (applyCount >= 3) throw new Error("third applyFrame blew up");
+    // report it as a `sink` failure with two accepted frames, and leave
+    // the previously accepted frames in state.
+    let acceptCount = 0;
+    const sink: WebuiDeliverySink = {
+      claim: () => undefined,
+      accept: (frame) => {
+        acceptCount += 1;
+        if (acceptCount >= 3) throw new Error("third accept blew up");
         setStream((current) => reduceWebuiStreamFrame(current, frame));
       },
-      setPhase: (phase) => setStream((current) => ({ ...current, phase })),
-      setMessages: (messages) =>
-        setStream((current) => ({ ...current, messages })),
-      refuse: (reason, options) =>
+      begin: () => setStream((current) => ({ ...current, phase: "streaming" })),
+      recovering: () => setStream((current) => ({ ...current, phase: "reconnecting" })),
+      // Neither seeding path is taken here: this is a locally sent turn.
+      anchor: () => undefined,
+      replace: () => undefined,
+      complete: () => setStream((current) => ({ ...current, phase: "done" })),
+      fail: (failure) =>
         setStream((current) => ({
           ...current,
           phase: "refused",
-          refusal: reason,
-          transcriptIncomplete: options?.transcriptIncomplete ?? false,
+          refusal: failure.reason,
+          // The interpretation the loop deliberately does not make: a `sink`
+          // failure after accepted frames is the only case that can leave the
+          // visible transcript short of what the turn produced.
+          transcriptIncomplete: failure.origin === "sink" && failure.acceptedFrames > 0,
         })),
+      release: () => undefined,
     };
     const sendMessage: WebuiClientMessageSender = vi.fn(
       async (_req, onFrame) => {
@@ -2621,7 +2708,7 @@ describe("WebUI composer transcriptIncomplete", () => {
     expect(state.transcriptIncomplete).toBe(true);
     // The user-visible transcript still contains the frames that
     // arrived before the failure — the reducer accumulated them
-    // before the third `applyFrame` threw. The third frame did not
+    // before the third `accept` threw. The third frame did not
     // reach the reducer, so it is not in the list.
     expect(state.messages.map((m) => m.id)).toEqual(["m1", "m2"]);
   });
@@ -2633,25 +2720,29 @@ describe("WebUI composer transcriptIncomplete", () => {
     ): void => {
       state = update(state);
     };
-    // A sink whose applyFrame throws on the very first call. The
+    // A sink whose accept throws on the very first call. The
     // reducer never accepted a frame; `transcriptIncomplete` must
     // stay false (there is nothing incomplete to flag).
-    let applyCount = 0;
-    const sink: WebuiStreamLoopSink = {
-      applyFrame: () => {
-        applyCount += 1;
-        throw new Error("applyFrame blew up before any frame");
+    let acceptCount = 0;
+    const sink: WebuiDeliverySink = {
+      claim: () => undefined,
+      accept: () => {
+        acceptCount += 1;
+        throw new Error("accept blew up before any frame");
       },
-      setPhase: (phase) => setStream((current) => ({ ...current, phase })),
-      setMessages: (messages) =>
-        setStream((current) => ({ ...current, messages })),
-      refuse: (reason, options) =>
+      begin: () => setStream((current) => ({ ...current, phase: "streaming" })),
+      recovering: () => setStream((current) => ({ ...current, phase: "reconnecting" })),
+      anchor: () => undefined,
+      replace: () => undefined,
+      complete: () => setStream((current) => ({ ...current, phase: "done" })),
+      fail: (failure) =>
         setStream((current) => ({
           ...current,
           phase: "refused",
-          refusal: reason,
-          transcriptIncomplete: options?.transcriptIncomplete ?? false,
+          refusal: failure.reason,
+          transcriptIncomplete: failure.origin === "sink" && failure.acceptedFrames > 0,
         })),
+      release: () => undefined,
     };
     const sendMessage: WebuiClientMessageSender = vi.fn(
       async (_req, onFrame) => {
@@ -2667,7 +2758,7 @@ describe("WebUI composer transcriptIncomplete", () => {
     expect(state.phase).toBe("refused");
     expect(state.transcriptIncomplete).toBe(false);
     expect(state.messages).toEqual([]);
-    expect(applyCount).toBe(1);
+    expect(acceptCount).toBe(1);
   });
 
   it("does not render the incomplete-state paragraph unless transcriptIncomplete is set", () => {
@@ -3014,26 +3105,33 @@ function parkedResume() {
 describe("WebUI stream loop · subscription lease discipline", () => {
   it("claims as local-send before the first frame of a locally sent turn", async () => {
     const order: string[] = [];
-    const sink: WebuiStreamLoopSink = {
-      applyFrame: () => {
-        order.push("frame");
-      },
-      setPhase: (phase) => {
-        order.push(`phase:${phase}`);
-      },
-      setMessages: () => undefined,
-      claimSubscription: (owner) => {
+    const sink: WebuiDeliverySink = {
+      claim: (owner) => {
         order.push(`claim:${owner}`);
-        // `claimSubscription` returns the claimed generation, or `undefined`
+        // `claim` returns the claimed generation, or `undefined`
         // when the caller does not model one. These sinks only record the
         // order, so `undefined` is the honest return and
         // `runWebuiStreamLoop` tolerates it.
         return undefined;
       },
-      releaseSubscription: () => {
+      accept: () => {
+        order.push("frame");
+      },
+      begin: () => {
+        order.push(`phase:${LIFECYCLE_PHASES.begin}`);
+      },
+      recovering: () => {
+        order.push(`phase:${LIFECYCLE_PHASES.recovering}`);
+      },
+      anchor: () => undefined,
+      replace: () => undefined,
+      complete: () => {
+        order.push(`phase:${LIFECYCLE_PHASES.complete}`);
+      },
+      fail: () => undefined,
+      release: () => {
         order.push("release");
       },
-      refuse: () => undefined,
     };
     const sendMessage: WebuiClientMessageSender = vi.fn(async (_req, onFrame) => {
       onFrame({ dataJson: JSON.stringify({ type: "agent_message", agent_message: { msg_id: "m1", msg_content: "hi" } }) });
@@ -3054,24 +3152,27 @@ describe("WebUI stream loop · subscription lease discipline", () => {
   it("claims as recovered with the turn id when attaching to a server-started turn", async () => {
     const claims: { owner: string; turnId?: string }[] = [];
     let released = 0;
-    const sink: WebuiStreamLoopSink = {
-      applyFrame: () => undefined,
-      setPhase: () => undefined,
-      setMessages: () => undefined,
-      claimSubscription: (owner, turnId) => {
+    const sink: WebuiDeliverySink = {
+      claim: (owner, turnId) => {
         claims.push({ owner, ...(turnId ? { turnId } : {}) });
         // This sink records the claim rather than holding a lease, so it has
         // no generation to hand back — `undefined` is the real return type.
         return undefined;
       },
-      releaseSubscription: () => {
+      accept: () => undefined,
+      begin: () => undefined,
+      recovering: () => undefined,
+      anchor: () => undefined,
+      replace: () => undefined,
+      complete: () => undefined,
+      fail: () => undefined,
+      release: () => {
         released += 1;
       },
-      refuse: () => undefined,
     };
     const resumeSession = vi.fn(async () => undefined);
     // No `message`: the loop attaches to a turn it did not start.
-    await loopWithProjection({ resumeSession }, { sessionId: "lease-2", attachTurnId: "turn-9" }, sink);
+    await loopWithProjection({ resumeSession }, { sessionId: "lease-2", attachId: "turn-9" }, sink);
 
     expect(claims).toEqual([{ owner: "recovered", turnId: "turn-9" }]);
     expect(released).toBe(1);
@@ -3085,7 +3186,7 @@ describe("WebUI stream loop · subscription lease discipline", () => {
     const resumeSession = vi.fn<WebuiClientSessionResumer>(
       async () => undefined,
     );
-    const loadMessages = vi.fn(async () => ({
+    const loadHistory = vi.fn(async () => ({
       messages: [
         { msgId: "history-1", role: "user", msgContent: "earlier", timestamp: 1_700_000_000_001 },
         { msgId: "history-2", role: "assistant", msgContent: "earlier answer", timestamp: 1_700_000_000_002 },
@@ -3093,16 +3194,18 @@ describe("WebUI stream loop · subscription lease discipline", () => {
       hasMore: false,
     }));
     await loopWithProjection(
-      { resumeSession, loadMessages, projection: streamRecoveryProjection, streamState: streamStateBundle },
-      { sessionId: "lease-3", attachTurnId: "turn-10" },
+      { resumeSession, loadHistory },
+      { sessionId: "lease-3", attachId: "turn-10" },
       {
-        applyFrame: () => undefined,
-        setPhase: () => undefined,
-        setMessages: () => undefined,
-        setStreamExtra: () => undefined,
-        claimSubscription: () => undefined,
-        releaseSubscription: () => undefined,
-        refuse: () => undefined,
+        claim: () => undefined,
+        accept: () => undefined,
+        begin: () => undefined,
+        recovering: () => undefined,
+        anchor: () => undefined,
+        replace: () => undefined,
+        complete: () => undefined,
+        fail: () => undefined,
+        release: () => undefined,
       },
     );
     // An unanchored resume makes the runtime skip every frame the turn
@@ -3122,14 +3225,17 @@ describe("WebUI stream loop · subscription lease discipline", () => {
       { sendMessage },
       { sessionId: "lease-4", message: "hello" },
       {
-        applyFrame: () => undefined,
-        setPhase: () => undefined,
-        setMessages: () => undefined,
-        claimSubscription: () => undefined,
-        releaseSubscription: () => {
+        claim: () => undefined,
+        accept: () => undefined,
+        begin: () => undefined,
+        recovering: () => undefined,
+        anchor: () => undefined,
+        replace: () => undefined,
+        complete: () => undefined,
+        fail: () => undefined,
+        release: () => {
           released += 1;
         },
-        refuse: () => undefined,
       },
     );
     // A refusal is a terminal exit: leaving the lease behind would make every
@@ -3142,7 +3248,7 @@ describe("WebUI stream loop · subscription lease discipline", () => {
     const setStream = (update: (current: WebuiStreamState) => WebuiStreamState): void => {
       state = update(state);
     };
-    const loadMessages = vi.fn(async () => ({
+    const loadHistory = vi.fn(async () => ({
       messages: [
         { msgId: "history-1", role: "user", msgContent: "earlier", timestamp: 1_700_000_000_001 },
         {
@@ -3158,8 +3264,8 @@ describe("WebUI stream loop · subscription lease discipline", () => {
     // Park the stream so the state can be read while the turn is still live.
     const parked = parkedResume();
     const run = loopWithProjection(
-      { resumeSession: parked.resumer, loadMessages, projection: streamRecoveryProjection },
-      { sessionId: "lease-5", attachTurnId: "turn-11" },
+      { resumeSession: parked.resumer, loadHistory },
+      { sessionId: "lease-5", attachId: "turn-11" },
       buildWebuiStreamLoopSink(setStream, streamStateBundle),
     );
     for (let tick = 0; tick < 8 && state.processingStartedAtMs === undefined; tick += 1)
@@ -3203,9 +3309,9 @@ describe("WebUI stream loop · superseded loop fencing", () => {
     loopWithProjection(
       {
         resumeSession: old.resumer,
-        loadMessages: vi.fn(async () => ({ messages: [], hasMore: false })),
+        loadHistory: vi.fn(async () => ({ messages: [], hasMore: false })),
       },
-      { sessionId: "fence-1", attachTurnId: "turn-old" },
+      { sessionId: "fence-1", attachId: "turn-old" },
       buildWebuiStreamLoopSink(setStream, streamStateBundle),
     );
     for (let tick = 0; tick < 8 && old.handle.deliver === undefined; tick += 1)
@@ -3215,7 +3321,7 @@ describe("WebUI stream loop · superseded loop fencing", () => {
     const fresh = parkedResume();
     const newRun = loopWithProjection(
       { resumeSession: fresh.resumer },
-      { sessionId: "fence-1", attachTurnId: "turn-new" },
+      { sessionId: "fence-1", attachId: "turn-new" },
       buildWebuiStreamLoopSink(setStream, streamStateBundle),
     );
     for (let tick = 0; tick < 8 && fresh.handle.deliver === undefined; tick += 1)
@@ -3247,9 +3353,9 @@ describe("WebUI stream loop · superseded loop fencing", () => {
     loopWithProjection(
       {
         resumeSession: old.resumer,
-        loadMessages: vi.fn(async () => ({ messages: [], hasMore: false })),
+        loadHistory: vi.fn(async () => ({ messages: [], hasMore: false })),
       },
-      { sessionId: "fence-6", attachTurnId: "turn-old" },
+      { sessionId: "fence-6", attachId: "turn-old" },
       buildWebuiStreamLoopSink(setStream, streamStateBundle),
     );
     for (let tick = 0; tick < 8 && old.handle.deliver === undefined; tick += 1)
@@ -3258,7 +3364,7 @@ describe("WebUI stream loop · superseded loop fencing", () => {
     const fresh = parkedResume();
     const newRun = loopWithProjection(
       { resumeSession: fresh.resumer },
-      { sessionId: "fence-6", attachTurnId: "turn-new" },
+      { sessionId: "fence-6", attachId: "turn-new" },
       buildWebuiStreamLoopSink(setStream, streamStateBundle),
     );
     for (let tick = 0; tick < 8 && fresh.handle.deliver === undefined; tick += 1)
@@ -3287,16 +3393,20 @@ describe("WebUI stream loop · superseded loop fencing", () => {
     const resolveSession = vi.fn(async () => undefined);
     await expect(
       loopWithProjection(
-        { resumeSession: resolveSession, loadMessages: vi.fn(async () => ({ messages: [], hasMore: false })), projection: streamRecoveryProjection },
-        { sessionId: "fence-7", attachTurnId: "turn-13" },
+        { resumeSession: resolveSession, loadHistory: vi.fn(async () => ({ messages: [], hasMore: false })) },
+        { sessionId: "fence-7", attachId: "turn-13" },
         {
-          applyFrame: () => undefined,
-          setPhase: () => undefined,
-          setMessages: () => undefined,
-          claimSubscription: () => {
+          claim: () => {
             throw new Error("claim exploded");
           },
-          refuse: () => undefined,
+          accept: () => undefined,
+          begin: () => undefined,
+          recovering: () => undefined,
+          anchor: () => undefined,
+          replace: () => undefined,
+          complete: () => undefined,
+          fail: () => undefined,
+          release: () => undefined,
         },
       ),
     ).resolves.toBeUndefined();
@@ -3315,16 +3425,19 @@ describe("WebUI stream loop · superseded loop fencing", () => {
       { sendMessage },
       { sessionId: "fence-2", message: "hello" },
       {
-        applyFrame: () => {
+        claim: () => undefined,
+        accept: () => {
           throw new Error("renderer exploded");
         },
-        setPhase: () => undefined,
-        setMessages: () => undefined,
-        claimSubscription: () => undefined,
-        releaseSubscription: () => {
+        begin: () => undefined,
+        recovering: () => undefined,
+        anchor: () => undefined,
+        replace: () => undefined,
+        complete: () => undefined,
+        fail: () => undefined,
+        release: () => {
           released += 1;
         },
-        refuse: () => undefined,
       },
     );
     expect(released).toBe(1);
@@ -3342,16 +3455,16 @@ describe("WebUI stream loop · superseded loop fencing", () => {
       onFrame({ dataJson: '{"type":"resume_overflow"}' });
       onFrame({ dataJson: "[DONE]" });
     });
-    const loadMessages = vi.fn(async () => ({ messages: [], hasMore: false }));
+    const loadHistory = vi.fn(async () => ({ messages: [], hasMore: false }));
     const resumeSession: WebuiClientSessionResumer = vi.fn(async (_req, onFrame) => {
       onFrame({ dataJson: "[DONE]" });
     });
     await loopWithProjection(
-      { sendMessage, resumeSession, loadMessages, projection: streamRecoveryProjection, streamState: streamStateBundle },
+      { sendMessage, resumeSession, loadHistory },
       { sessionId: "fence-3", message: "hello" },
       buildWebuiStreamLoopSink(setStream, streamStateBundle),
     );
-    expect(loadMessages).toHaveBeenCalled();
+    expect(loadHistory).toHaveBeenCalled();
     expect(getState().messages).toEqual([]);
     expect(getState().phase).toBe("done");
   });
@@ -3373,9 +3486,9 @@ describe("WebUI stream loop · superseded loop fencing", () => {
     loopWithProjection(
       {
         resumeSession: oldResume,
-        loadMessages: vi.fn(async () => ({ messages: [], hasMore: false })),
+        loadHistory: vi.fn(async () => ({ messages: [], hasMore: false })),
       },
-      { sessionId: "fence-8", attachTurnId: "turn-old" },
+      { sessionId: "fence-8", attachId: "turn-old" },
       buildWebuiStreamLoopSink(setStream, streamStateBundle),
     );
     for (let tick = 0; tick < 8 && failOldLoop === undefined; tick += 1)
@@ -3384,7 +3497,7 @@ describe("WebUI stream loop · superseded loop fencing", () => {
     const fresh = parkedResume();
     const newRun = loopWithProjection(
       { resumeSession: fresh.resumer },
-      { sessionId: "fence-8", attachTurnId: "turn-new" },
+      { sessionId: "fence-8", attachId: "turn-new" },
       buildWebuiStreamLoopSink(setStream, streamStateBundle),
     );
     for (let tick = 0; tick < 8 && fresh.handle.deliver === undefined; tick += 1)
@@ -3483,6 +3596,8 @@ describe("canonical transcript page wins over the initial render seed", () => {
     let load = 0;
     const owner = createWebuiTranscriptHistoryOwner({
       transcript: createWebuiTranscriptHistoryWriter(refreshedStore),
+      // The transcript history owner's own reader — unrelated to the delivery
+      // loop's `loadHistory` transport, and still named for what it loads.
       loadMessages: async ({ before }) => {
         if (before) return {
           messages: [{ msgId: "older", role: "user", msgContent: "OLDER-CANONICAL" }],

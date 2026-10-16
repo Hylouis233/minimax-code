@@ -40,17 +40,22 @@ import type { WebuiVersionInfo } from "../../src/shared/contracts/version.js";
 import type { WebuiSessionActivityMap } from "../../src/client/features/sessions/projection/session-activity.js";
 import type { WebuiActiveTurn } from "../../src/shared/contracts/session.js";
 import type { WebuiRuntimeEvent } from "../../src/shared/contracts/stream.js";
-import type { WebuiStreamLoopSink } from "../../src/client/features/turn/contracts/stream-loop.js";
+import type { WebuiDeliverySink } from "../../src/shared/contracts/delivery.js";
 import type { WebuiComposerSubmitHandlers } from "../../src/client/features/composer/contracts/composer-turn.js";
 
 const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
 /** A sink that accepts every write; the sends under test never open a loop. */
-const noopSink: WebuiStreamLoopSink = {
-  applyFrame: () => undefined,
-  setPhase: () => undefined,
-  setMessages: () => undefined,
-  refuse: () => undefined,
+const noopSink: WebuiDeliverySink = {
+  claim: () => undefined,
+  accept: () => undefined,
+  begin: () => undefined,
+  recovering: () => undefined,
+  anchor: () => undefined,
+  replace: () => undefined,
+  complete: () => undefined,
+  fail: () => undefined,
+  release: () => undefined,
 };
 
 /** The composer's stream writes, all inert except the ones a test asserts on. */

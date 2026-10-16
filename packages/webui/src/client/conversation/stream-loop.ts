@@ -1,157 +1,66 @@
-// The composer send/resume loop, extracted from the React component so a
-// test can drive it through the WebSocket-drop and `resume_overflow` paths
-// without standing up a DOM. Two failure signals share the same control
-// flow — both ultimately mean "the current subscription is dead; start a
-// new one" — and only the cursor used to resume (or the need to reload
-// authoritative history) differs.
+// The delivery loop.
 //
-// `runWebuiStreamLoop` resolves once the user's turn has reached a final
-// state (steady-state `[DONE]`, refusal, or a non-resumable failure). The
-// returned promise never rejects: sink callback failures are contained
-// by `safeSink` and reported through the sink's `refuse` callback (with a
-// `console.error` fallback when every callback is broken). This matches
-// the submit path's `try/finally` shape, which does not catch and would
-// otherwise lose a sink-originated rejection.
+// One loop owns a delivery attempt from the first frame to its settlement: the
+// cursor it last saw, which recovery to attempt when the transport drops, and
+// the moment the attempt is over. It knows nothing about what a frame *means*.
+//
+// That separation is the point. The loop used to carry Turn and Transcript
+// vocabulary — a phase, a message setter, a refusal string, a
+// `transcriptIncomplete` flag — and imported their contracts to type them. So
+// the mechanism could name the outcome a user sees, and "what does this frame
+// change" was decided in two places: here, and again in the reducer the sink
+// called. Worse, the loop had to decide *where the failure came from* to know
+// whether the transcript might now be short, which is a question about the
+// user's data that only the aggregate owns.
+//
+// So the loop says three things, in its own words:
+//
+//   - `accept(frame)` — the transport handed me this frame;
+//   - `anchor`/`replace` — history arrived, here is the raw page;
+//   - `fail(origin, reason, acceptedFrames)` — the attempt ended, and *how*.
+//
+// `fail`'s origin is the whole trick. A sink that threw after frames were
+// accepted means the visible transcript may be short; a transport that dropped,
+// or a history reload that failed, is an ordinary refusal even though frames
+// had arrived — the frames were not lost, the *request* was. The loop knows which
+// of the three happened because it is the one that observed them, so it reports
+// the origin and the adapter decides what a user should be told. It never
+// decides it here.
+//
+// Settlement is a void promise that never rejects: a sink whose every callback
+// throws still has to settle, because the caller has a `finally` that would
+// otherwise lose the turn's state.
 
-import type {WebuiClientMessageSender, WebuiClientSessionResumer} from "../features/turn/contracts/execution-port.js";
 import type {
-  WebuiClientMessage,
-  WebuiClientMessageLoader,
-} from "../features/transcript/contracts/message-view.js";
-
-import type {
-  WebuiStreamMessage,
-  WebuiStreamPayloadRecognised,
-  WebuiStreamState,
-  WebuiStreamSubscription,
-  WebuiSubscriptionReleaseScope,
-} from "../features/turn/contracts/stream-state.js";
-import type {
-  WebuiStreamLoopExtra,
-  WebuiStreamLoopSink,
-  WebuiStreamLoopTransports,
-} from "../features/turn/contracts/stream-loop.js";
+  WebuiDeliveryArgs,
+  WebuiDeliveryDeps,
+  WebuiDeliveryFailure,
+  WebuiDeliveryFailureOrigin,
+  WebuiDeliverySignal,
+  WebuiDeliverySink,
+} from "../../shared/contracts/delivery.js";
 import type { WebuiStreamFrame } from "../../shared/contracts/stream.js";
-import type { WebuiAttachmentInput } from "../../shared/contracts/messages.js";
 import { isWebuiLeaseGenerationCurrent } from "./stream-lease.js";
 
-export interface WebuiStreamLoopDeps extends WebuiStreamLoopTransports {
-  /**
-   * Pure history/context transforms, injected by the caller so this mechanism
-   * imports no `projection/` module. The turn coordinator supplies
-   * the existing pure functions — this is not a re-implementation.
-   *
-   * Required on purpose: the loop no longer carries a runtime fallback for a
-   * missing bundle, so forgetting to inject it is a compile error rather than a
-   * silently mis-shaped transcript discovered only when a resync/attach path
-   * runs. Callers that never traverse those paths still pass a stub.
-   */
-  readonly projection: StreamRecoveryProjection;
-  /**
-   * The stream-state transforms the loop applies to frames, injected by the
-   * caller for the same reason as `projection`: these are the existing pure
-   * functions from `features/turn/projection/stream-state.ts`, re-used, not
-   * re-implemented.
-   *
-   * Required on purpose, like `projection`: forgetting it is a compile error
-   * rather than a stream that silently never reduces a frame.
-   */
-  readonly streamState: WebuiStreamStateBundle;
-}
-
 /**
- * The stream-state transforms the loop injects instead of importing
- * `projection/`. Declared on the mechanism side so no view module is
- * pulled across the boundary; callers pass a structurally compatible bundle.
+ * Every callback the loop can make, named for the failure report.
  *
- * `reduceFrame` takes two arguments: the loop never attaches the reducer's
- * test-only probe, and naming that option type here would put a view type in the
- * mechanism's interface.
+ * The list is the loop's own vocabulary. It has no "refuse", no "setPhase" and
+ * no "setMessages" in it — which is how the aggregate's decisions stopped being
+ * reachable from here.
  */
-export interface WebuiStreamStateBundle {
-  readonly nextSubscriptionGeneration: () => number;
-  readonly recognisePayload: (
-    dataJson: string | undefined,
-  ) => WebuiStreamPayloadRecognised;
-  readonly reduceFrame: (
-    state: WebuiStreamState,
-    frame: WebuiStreamFrame,
-  ) => WebuiStreamState;
-  readonly releaseSubscription: (
-    state: WebuiStreamState,
-    scope?: WebuiSubscriptionReleaseScope,
-  ) => WebuiStreamState;
-}
+type DeliveryCallbackName =
+  | "claim"
+  | "accept"
+  | "begin"
+  | "recovering"
+  | "anchor"
+  | "replace"
+  | "complete"
+  | "fail";
 
-/**
- * The pure transforms the loop injects instead of importing `projection/`.
- * Declared on the mechanism side so no view module is pulled across the
- * boundary; callers pass a structurally compatible bundle.
- */
-export interface StreamRecoveryProjection {
-  readonly projectMessage: (message: WebuiClientMessage) => WebuiStreamMessage;
-  readonly latestContextUsage: (
-    messages: readonly WebuiStreamMessage[],
-  ) => Record<string, unknown> | undefined;
-  readonly readContextUsageSnapshot: (
-    snapshot: Record<string, unknown> | undefined,
-  ) => Record<string, unknown> | undefined;
-}
-
-export interface WebuiStreamLoopArgs {
-  readonly sessionId: string;
-  /**
-   * Omitted when attaching to a turn the server started on its own — the goal
-   * flow posts a hidden continuation prompt, a queued message drains, another
-   * client sends. Present for a locally sent turn.
-   */
-  readonly message?: string;
-  readonly clientIntent?: string;
-  readonly attachments?: readonly WebuiAttachmentInput[];
-  /** Turn this attachment belongs to, so the lease starts out identified. */
-  readonly attachTurnId?: string;
-  /** Resume point to reuse instead of re-anchoring from history. */
-  readonly afterCursor?: string;
-}
-
-/**
- * Applies a {@link WebuiStreamLoopExtra} to a stream state. The four declared
- * fields are copied one by one rather than spread, so an undeclared key — from
- * a plain-JavaScript caller or a cast — cannot reach any other field of the
- * slice. A field absent from `extra` is left untouched, which keeps the
- * "seed, do not patch" semantics the spread had for these four.
- */
-export function applyWebuiStreamLoopExtra(
-  current: WebuiStreamState,
-  extra: WebuiStreamLoopExtra,
-): WebuiStreamState {
-  const has = (key: keyof WebuiStreamLoopExtra): boolean =>
-    Object.prototype.hasOwnProperty.call(extra, key);
-  return {
-    ...current,
-    ...(has("contextUsage") ? { contextUsage: extra.contextUsage } : {}),
-    ...(has("processingStartedAtMs")
-      ? { processingStartedAtMs: extra.processingStartedAtMs }
-      : {}),
-    ...(has("resumeRequired") ? { resumeRequired: extra.resumeRequired } : {}),
-    ...(has("refusal") ? { refusal: extra.refusal } : {}),
-  };
-}
-
-/**
- * Snapshot of the first sink callback failure, kept so the loop can
- * commit a refusal (or the fallback diagnostic) and skip the normal
- * `done` commit. The label names the callback that failed; the error
- * is the throw value, normalised to an `Error`.
- */
-interface SinkFailure {
-  readonly label:
-    | "applyFrame"
-    | "setPhase"
-    | "setMessages"
-    | "claimSubscription"
-    | "setStreamExtra"
-    | "refuse";
+interface DeliveryCallbackFailure {
+  readonly label: DeliveryCallbackName;
   readonly error: Error;
 }
 
@@ -160,368 +69,239 @@ function describeError(error: unknown): Error {
 }
 
 /**
- * Wrap a sink so a callback throwing never escapes the loop's promise
- * contract. The first failure is recorded and the wrapped callbacks
- * become no-ops afterwards, so a half-broken sink does not cascade
- * further exceptions and does not let the loop commit a normal `done`
- * state. `reportSinkFailure` lets the loop surface the failure once
- * after the loop body finishes — calling `sink.refuse` directly,
- * bypassing the disable guard, and falling back to `console.error`
- * when the raw refuse callback also throws.
+ * Every callback, wrapped so a throw never escapes the loop.
+ *
+ * The first failure disables the rest: a half-broken aggregate must not
+ * cascade into a dozen exceptions, and must not be able to record a *normal*
+ * completion after it has already failed. `release` is deliberately outside this
+ * rule — see {@link WebuiDeliverySink.release}.
  */
-function safeSink(
-  sink: WebuiStreamLoopSink,
-  framesAcceptedBeforeFailureRef: { value: number },
-): {
-  readonly safe: WebuiStreamLoopSink;
-  readonly firstFailure: () => SinkFailure | undefined;
-  readonly reportSinkFailure: () => boolean;
+function guardedSink(sink: WebuiDeliverySink): {
+  readonly safe: WebuiDeliverySink;
+  readonly firstFailure: () => DeliveryCallbackFailure | undefined;
+  readonly reportFailure: (failure: WebuiDeliveryFailure) => void;
 } {
-  let first: SinkFailure | undefined;
-  const wrap =
-    <Args extends unknown[]>(
-      fn: (...args: Args) => void,
-      label: SinkFailure["label"],
-    ): ((...args: Args) => void) =>
-    (...args) => {
-      if (first !== undefined) return;
+  let first: DeliveryCallbackFailure | undefined;
+  const safe: WebuiDeliverySink = {
+    claim: (owner, attachId) => {
+      if (first) return undefined;
       try {
-        fn(...args);
+        return sink.claim(owner, attachId);
       } catch (error) {
-        first = { label, error: describeError(error) };
+        first = { label: "claim", error: describeError(error) };
+        return undefined;
       }
-    };
-  return {
-    safe: {
-      applyFrame: wrap(sink.applyFrame, "applyFrame"),
-      setPhase: wrap(sink.setPhase, "setPhase"),
-      setMessages: wrap(sink.setMessages, "setMessages"),
-      claimSubscription: sink.claimSubscription
-        ? ((owner, turnId) => {
-            // `wrap` returns void; the claim's generation has to reach the
-            // loop so the caller can still recognise its own writes.
-            try {
-              return sink.claimSubscription?.(owner, turnId);
-            } catch (error) {
-              first = { label: "claimSubscription", error: describeError(error) };
-              return undefined;
-            }
-          })
-        : () => undefined,
-      // `releaseSubscription` is deliberately absent: cleanup must survive
-      // the disable rule, so the loop calls the raw sink through
-      // `releaseLease` instead.
-      setStreamExtra: sink.setStreamExtra
-        ? wrap(sink.setStreamExtra, "setStreamExtra")
-        : undefined,
-      refuse: wrap(sink.refuse, "refuse"),
     },
-    firstFailure: () => first,
-    reportSinkFailure: () => {
-      // Direct, non-wrapped call to sink.refuse. If refuse itself was
-      // the failing callback we expect this to throw; the caller
-      // catches and falls back to console.error. The second argument
-      // carries `transcriptIncomplete` when frames had been accepted
-      // before the failure — the shell uses that flag to render a
-      // user-visible "transcript may be incomplete" message alongside
-      // the refusal.
-      if (!first) return true;
-      const reason = `Sink callback "${first.label}" failed: ${first.error.message}`;
+    accept: (frame) => {
+      if (first) return;
       try {
-        sink.refuse(reason, {
-          transcriptIncomplete: framesAcceptedBeforeFailureRef.value > 0,
-        });
-        return true;
-      } catch {
+        sink.accept(frame);
+      } catch (error) {
+        first = { label: "accept", error: describeError(error) };
+      }
+    },
+    begin: () => {
+      if (first) return;
+      try {
+        sink.begin();
+      } catch (error) {
+        first = { label: "begin", error: describeError(error) };
+      }
+    },
+    recovering: () => {
+      if (first) return;
+      try {
+        sink.recovering();
+      } catch (error) {
+        first = { label: "recovering", error: describeError(error) };
+      }
+    },
+    anchor: (page) => {
+      if (first) return;
+      try {
+        sink.anchor(page);
+      } catch (error) {
+        first = { label: "anchor", error: describeError(error) };
+      }
+    },
+    replace: (page) => {
+      if (first) return;
+      try {
+        sink.replace(page);
+      } catch (error) {
+        first = { label: "replace", error: describeError(error) };
+      }
+    },
+    complete: () => {
+      if (first) return;
+      try {
+        sink.complete();
+      } catch (error) {
+        first = { label: "complete", error: describeError(error) };
+      }
+    },
+    fail: (failure) => {
+      if (first) return;
+      try {
+        sink.fail(failure);
+      } catch (error) {
+        first = { label: "fail", error: describeError(error) };
+      }
+    },
+    release: sink.release,
+  };
+  return {
+    safe,
+    firstFailure: () => first,
+    reportFailure: (failure) => {
+      // Direct, unwrapped. If `fail` is itself the broken callback this throws,
+      // and the caller falls back to the console. The failure has been observed
+      // by then, which is the part that matters.
+      try {
+        sink.fail(failure);
+      } catch (error) {
         try {
           // eslint-disable-next-line no-console
-          console.error("[webui] sink refusal failed; diagnostic only:", reason, first.error);
+          console.error("[webui] delivery failure could not be recorded:", failure.reason, error);
         } catch {
-          // Even console.error can throw in extreme environments. Give
-          // up — the failure has been observed at least once at this
-          // point.
+          // console.error can throw too. Nothing further to try.
         }
-        return false;
       }
     },
   };
 }
 
 /**
- * Build the React-shell binding for `runWebuiStreamLoop`. The submit path
- * calls this once per submit and feeds the resulting sink into the loop.
- * Tests exercise this helper directly with a recording state reducer — see
- * `webui-shell.test.ts > "binds the composer sink to the React state
- * reducer correctly"`. That test is the strongest evidence available
- * that a misrouted callback (for example, dropping `applyFrame` or
- * putting `refuse` into `setPhase`) would be caught by a failing
- * assertion: it walks each callback through a synthetic state and
- * asserts the resulting reducer transitions.
- */
-export function buildWebuiStreamLoopSink(
-  setStream: (
-    update: (current: WebuiStreamState) => WebuiStreamState,
-  ) => void,
-  streamState: WebuiStreamStateBundle,
-): WebuiStreamLoopSink {
-  // Set when this sink claims a lease. Everything a superseded loop writes —
-  // late chunks, a late `[DONE]`, a stray `phase: "streaming"` that would
-  // resurrect the "思考中" spinner — is dropped here rather than in the shared
-  // reducer, because the reducer cannot tell which loop a frame came from.
-  let generation: number | undefined;
-  // Fencing is about *other* loops, not about our own lease still being
-  // visible. A `[DONE]` frame releases the lease mid-loop and the loop keeps
-  // working (a `resume_overflow` may already be pending a resync), so the
-  // test is "am I still the newest claimer", not "do I still hold a lease".
-  // Comparing against the lease instead would re-admit a superseded loop the
-  // moment the newer turn's `[DONE]` cleared it.
-  //
-  // The predicate is the lease mechanism's own (`conversation/stream-lease.ts`);
-  // this sink only binds it to the generation it claimed.
-  const mine = (current: WebuiStreamState): boolean =>
-    isWebuiLeaseGenerationCurrent(current, generation);
-  return {
-    /**
-     * Claims once and only once. A second claim would mint a new generation and
-     * write it as `lastClaimedGeneration`, which is the whole escalation the
-     * fence exists to stop: a superseded loop still holding its own sink could
-     * take the lease back from the turn that replaced it and then write
-     * `refused` over that turn's state. The loop claims at most once per run —
-     * its attach and local-send claims are exclusive branches behind the `sent`
-     * flag — so returning the first claim keeps every caller's contract and
-     * makes a repeat inert.
-     */
-    claimSubscription: (owner, turnId) => {
-      if (generation !== undefined) return generation;
-      const next = streamState.nextSubscriptionGeneration();
-      generation = next;
-      setStream((current) => ({
-        ...current,
-        lastClaimedGeneration: next,
-        subscription: {
-          owner,
-          generation: next,
-          ...(turnId ? { turnId } : {}),
-        },
-      }));
-      return next;
-    },
-    applyFrame: (frame) =>
-      setStream((current) =>
-        mine(current) ? streamState.reduceFrame(current, frame) : current,
-      ),
-    setPhase: (phase) =>
-      setStream((current) => (mine(current) ? { ...current, phase } : current)),
-    setMessages: (messages) =>
-      setStream((current) => (mine(current) ? { ...current, messages } : current)),
-    setStreamExtra: (extra) =>
-      setStream((current) =>
-        mine(current) ? applyWebuiStreamLoopExtra(current, extra) : current,
-      ),
-    // Scoped by generation: if a newer loop already claimed, this clears
-    // nothing.
-    releaseSubscription: () => {
-      if (generation === undefined) return;
-      setStream((current) => streamState.releaseSubscription(current, { generation }));
-    },
-    // Refusal is a write to the same shared state as everything else, so it
-    // carries the same fence. A loop that was superseded must not stamp
-    // `refused` over the turn that replaced it — that would show the user
-    // the old turn's failure as the new turn's.
-    refuse: (reason, options) =>
-      setStream((current) =>
-        mine(current)
-          ? {
-              ...current,
-              phase: "refused",
-              refusal: reason,
-              transcriptIncomplete: options?.transcriptIncomplete ?? false,
-            }
-          : current,
-      ),
-  };
-}
-
-/**
- * Drives the composer send/resume loop. The two retry cases are unified:
- * a socket drop sets `nextAction = "resume"` and the next iteration calls
- * `resumeSession({ id, afterCursor })`; a `resume_overflow` frame sets
- * `nextAction = "resync"` and the next iteration reloads history via
- * `getMessages` and starts a fresh subscription with no cursor. Either
- * case loops until `[DONE]` arrives without another failure signal.
+ * Drives one delivery attempt to settlement.
  *
- * The returned promise resolves once the loop reaches a final state. It
- * never rejects — sink callback failures are contained by `safeSink`
- * above, and transport/load errors are caught and surfaced through
- * `sink.refuse`.
+ * Resolves with the generation this attempt claimed, or `undefined` if it never
+ * claimed one — the caller needs that to answer "is my post-loop cleanup still
+ * mine to do?", because an attempt that finished late must not clear the
+ * sending flag of a turn that started after it.
  *
- * It resolves with the subscription generation this loop claimed, or
- * `undefined` if it never claimed one. Callers need that to answer
- * "is my post-loop cleanup still mine to do?": a loop that finished late
- * must not clear the sending flag of a turn that started after it.
+ * Never rejects.
  */
 export function runWebuiStreamLoop(
-  deps: WebuiStreamLoopDeps,
-  args: WebuiStreamLoopArgs,
-  sink: WebuiStreamLoopSink,
+  deps: WebuiDeliveryDeps,
+  args: WebuiDeliveryArgs,
+  sink: WebuiDeliverySink,
 ): Promise<number | undefined> {
-  const claimed = { value: undefined as number | undefined };
-  const observed: WebuiStreamLoopSink = sink.claimSubscription
-    ? {
-        ...sink,
-        claimSubscription: (owner, turnId) => {
-          claimed.value = sink.claimSubscription?.(owner, turnId);
-          return claimed.value;
-        },
-      }
-    : sink;
-  return driveWebuiStreamLoop(deps, args, observed).then(() => claimed.value);
+  const claimed: { value: number | undefined } = { value: undefined };
+  const observed: WebuiDeliverySink = {
+    ...sink,
+    claim: (owner, attachId) => {
+      claimed.value = sink.claim(owner, attachId);
+      return claimed.value;
+    },
+  };
+  return drive(deps, args, observed).then(() => claimed.value);
 }
 
-async function driveWebuiStreamLoop(
-  deps: WebuiStreamLoopDeps,
-  args: WebuiStreamLoopArgs,
-  sink: WebuiStreamLoopSink,
+async function drive(
+  deps: WebuiDeliveryDeps,
+  args: WebuiDeliveryArgs,
+  sink: WebuiDeliverySink,
 ): Promise<void> {
-  const { sendMessage, resumeSession, loadMessages, projection } = deps;
+  const { sendMessage, resumeSession, loadHistory } = deps;
   const { sessionId, message } = args;
-  // No message means we are attaching to a turn the server started, not
-  // sending one. Both modes share this loop so there is exactly one place
-  // that owns the stream, its recovery and its lease.
+  const classify = deps.classify ?? (() => ({ kind: "continue" }) as const);
+  // No message means we are attaching to a turn the server started. Both modes
+  // share this loop so there is exactly one place that owns an attempt, its
+  // recovery and its ownership.
   const attaching = message === undefined;
-  // Count frames the reducer accepted before any sink failure was
-  // recorded. `transcriptIncomplete` is part of the refusal contract: when
-  // a sink failure ends the turn, the visible transcript may be stale.
-  // Frames accepted before the failure are the ones the user already
-  // saw, so the flag is set only when the counter is non-zero. We
-  // hold the count in a wrapper object so the closure captured by
-  // `safeSink` can read the live value when the failure report runs.
-  const framesAcceptedBeforeFailureRef = { value: 0 };
-  const guarded = safeSink(sink, framesAcceptedBeforeFailureRef);
+  const framesAccepted = { value: 0 };
+  const guarded = guardedSink(sink);
   const safe = guarded.safe;
 
   let cursor: string | undefined;
   let nextAction: "resume" | "resync" | undefined;
   let sent = false;
-  let leaseReleased = false;
+  let released = false;
 
   /**
-   * Releases the lease exactly once, through the raw sink, on every exit
-   * path — including the ones taken after a sink callback already threw.
-   * Idempotent so that a `finalizeOnExit` that runs before the transport
-   * error surfaces does not release twice.
+   * Ends the attempt with the given origin.
+   *
+   * Ownership goes first, through the raw sink: cleanup must not be governed by
+   * the rule that disables callbacks after a failure, because the moment that
+   * rule exists is the moment the store is least likely to answer.
    */
-  const releaseLease = (): void => {
-    if (leaseReleased) return;
-    leaseReleased = true;
+  const end = (origin: WebuiDeliveryFailureOrigin, reason: string): void => {
+    release();
+    const failure: WebuiDeliveryFailure = {
+      origin,
+      reason,
+      acceptedFrames: framesAccepted.value,
+    };
+    if (guarded.firstFailure() === undefined) {
+      // Direct, unwrapped: the attempt is over, so there is no cascade to guard
+      // against, and refusing through a disabled callback would drop the failure
+      // the user most needs to see.
+      guarded.reportFailure(failure);
+      return;
+    }
+    guarded.reportFailure({
+      origin: "sink",
+      reason: `Delivery callback "${guarded.firstFailure()!.label}" failed: ${guarded.firstFailure()!.error.message}`,
+      acceptedFrames: framesAccepted.value,
+    });
+  };
+
+  const release = (): void => {
+    if (released) return;
+    released = true;
     try {
-      sink.releaseSubscription?.();
+      sink.release();
     } catch (error) {
-      // Cleanup is the last thing standing between a finished turn and a
-      // permanently stuck "thinking" indicator. Report and move on: the
-      // loop must still resolve.
       try {
         // eslint-disable-next-line no-console
-        console.error("[webui] lease release failed:", error);
+        console.error("[webui] delivery release failed:", error);
       } catch {
-        // Give up; console.error can throw in extreme environments.
+        // Give up; the attempt still has to settle.
       }
     }
   };
 
   const captureFrame = (frame: WebuiStreamFrame): void => {
     if (frame.cursor !== undefined) cursor = frame.cursor;
-    // The reducer recognises `{type:"resume_overflow"}` and surfaces it
-    // through the `reconnecting` phase + `resumeRequired` flag, but the
-    // loop also needs to know *which* failure signal fired so it can
-    // pick the right recovery path. The shared `recognise…` helper is
-    // what the reducer and this loop both use to interpret the JSON
-    // body, so a future envelope change touches one site.
-    if (deps.streamState.recognisePayload(frame.dataJson).kind === "resume_overflow") {
-      nextAction = "resync";
-    }
-    // The wrapper catches any throw and records the first failure;
-    // subsequent calls become no-ops. We only count a frame when the
-    // wrapper was not already disabled at entry — that is the case
-    // where the frame actually reached the reducer.
+    if (classify(frame).kind === "reload_history") nextAction = "resync";
+    // Counted only when the callback actually reached the aggregate. Once a
+    // callback has failed the wrapper is disabled, and frames dropped after that
+    // are not frames the user saw — which is exactly what the count is for.
     const wasDisabled = guarded.firstFailure() !== undefined;
-    safe.applyFrame(frame);
-    if (!wasDisabled && guarded.firstFailure() === undefined) {
-      framesAcceptedBeforeFailureRef.value += 1;
-    }
-  };
-
-  /**
-   * Finalization helper called on every early-return path. When the
-   * loop is about to exit, this checks whether a sink callback has
-   * failed and either surfaces the failure through
-   * `guarded.reportSinkFailure()` (which bypasses the disabled
-   * wrapper and falls back to `console.error`) or commits a normal
-   * refusal with the given reason. The shared helper is non-
-   * recursive: it does not call the wrapped sink directly, only the
-   * raw sink via `guarded` or the `sink` parameter.
-   */
-  const finalizeOnExit = (reason: string): void => {
-    // The lease is released before anything else, and through the *raw*
-    // sink: `safeSink` disables every wrapped callback after the first
-    // failure, so a released-by-wrapper call would silently become a no-op
-    // exactly when the store is most likely to be wedged. A stuck lease is
-    // the "思考中" spinner that never goes away, so cleanup must not be
-    // governed by the failure rule that protects the render path.
-    releaseLease();
-    if (guarded.firstFailure() !== undefined) {
-      guarded.reportSinkFailure();
-      return;
-    }
-    // No sink failure recorded yet; commit the normal refusal path.
-    // The raw `sink.refuse` is used here on purpose — the loop is
-    // about to return, so the wrapper's disable rule does not need to
-    // guard against a cascade. If even this raw refuse throws, fall
-    // back to `console.error` rather than letting the promise reject.
-    try {
-      sink.refuse(reason);
-    } catch (rawRefuseError) {
-      try {
-        // eslint-disable-next-line no-console
-        console.error("[webui] early-exit refusal failed:", reason, rawRefuseError);
-      } catch {
-        // Give up; console.error can throw in extreme environments.
-      }
-    }
+    safe.accept(frame);
+    if (!wasDisabled && guarded.firstFailure() === undefined) framesAccepted.value += 1;
   };
 
   try {
-    // Claim before anything opens, inside the try: a claim that throws is a
-    // sink failure like any other, and letting it escape would reject the
-    // loop's promise, breaking the never-reject contract every caller
-    // relies on. An attachment knows its turn up front; a local send
-    // learns it from the `session.start` the runtime publishes.
-    if (attaching) sink.claimSubscription?.("recovered", args.attachTurnId);
-    safe.setPhase("streaming");
+    // Claim before anything opens, inside the try: a claim that throws is a sink
+    // failure like any other, and letting it escape would reject the promise
+    // every caller relies on not rejecting. An attachment knows its turn up
+    // front; a local send learns it from the stream itself.
+    if (attaching) sink.claim("recovered", args.attachId);
+    safe.begin();
     while (true) {
       if (nextAction === "resync") {
         nextAction = undefined;
         if (!resumeSession) {
-          finalizeOnExit("resumeSession transport is unavailable");
+          end("transport", "resumeSession transport is unavailable");
           return;
         }
-        // The server told us our view has fallen too far behind. Reload
-        // authoritative history through the existing `getMessages`
-        // operation and then establish a fresh subscription with no
+        // The server told us our view has fallen too far behind. Read the
+        // authoritative history and establish a fresh subscription with no
         // cursor so the server replays from the latest persisted point.
-        safe.setPhase("reconnecting");
-        if (loadMessages) {
+        safe.recovering();
+        if (loadHistory) {
+          let page: unknown;
           try {
-            const page = await loadMessages({ id: sessionId });
-            safe.setMessages(
-              (page.messages ?? []).map(projection.projectMessage),
-            );
+            page = await loadHistory({ id: sessionId });
           } catch (error) {
-            const reason =
-              error instanceof Error ? error.message : String(error);
-            finalizeOnExit(reason);
+            // A failed reload leaves the last good transcript visible. Nothing
+            // is missing from it, so this is `recovery`, not `sink`: the frames
+            // that arrived are still exactly what the turn produced.
+            end("recovery", error instanceof Error ? error.message : String(error));
             return;
           }
+          safe.replace(page);
         }
         cursor = undefined;
         await resumeSession({ id: sessionId }, captureFrame);
@@ -531,84 +311,53 @@ async function driveWebuiStreamLoop(
       if (nextAction === "resume") {
         nextAction = undefined;
         if (!cursor || !resumeSession) {
-          const reason =
+          end(
+            "transport",
             !cursor && !resumeSession
               ? "Cannot resume: no cursor observed before the drop and resumeSession transport is unavailable"
               : !cursor
                 ? "Cannot resume: no cursor observed before the drop"
-                : "Cannot resume: resumeSession transport is unavailable";
-          finalizeOnExit(reason);
+                : "Cannot resume: resumeSession transport is unavailable",
+          );
           return;
         }
-        safe.setPhase("reconnecting");
-        await resumeSession(
-          { id: sessionId, afterCursor: cursor },
-          captureFrame,
-        );
+        safe.recovering();
+        await resumeSession({ id: sessionId, afterCursor: cursor }, captureFrame);
         if (!nextAction) break;
         continue;
       }
       if (!sent) {
         sent = true;
         if (attaching) {
-          // Attach to a turn the server started without us. An unanchored
-          // resume makes the runtime take its unanchored branch and skip
-          // every frame the turn produced before we subscribed, so anchor on
-          // the newest persisted message (or reuse the cursor we already hold).
           if (!resumeSession) {
-            finalizeOnExit("resumeSession transport is unavailable");
+            end("transport", "resumeSession transport is unavailable");
             return;
           }
           let anchor: { afterCursor?: string; afterMsgId?: string } = {};
-          if (args.afterCursor) anchor = { afterCursor: args.afterCursor };
-          else if (loadMessages) {
-            let page;
+          if (args.afterCursor) {
+            anchor = { afterCursor: args.afterCursor };
+          } else if (loadHistory) {
+            let page: unknown;
             try {
-              page = await loadMessages({ id: sessionId });
+              page = await loadHistory({ id: sessionId });
             } catch (error) {
-              finalizeOnExit(
-                error instanceof Error ? error.message : String(error),
-              );
+              end("recovery", error instanceof Error ? error.message : String(error));
               return;
             }
-            // Seed the transcript with the turn we are attaching to. Older
-            // history is already served by the transcript's own page, so
-            // only the latest user turn is projected here — mirroring what
-            // this path did before it became the single entry point.
-            const history = page.messages ?? [];
-            let latestUserIndex = -1;
-            for (let index = history.length - 1; index >= 0; index -= 1) {
-              const message = history[index];
-              if (message?.role === "user" || message?.msgId.startsWith("msg-user-")) {
-                latestUserIndex = index;
-                break;
-              }
-            }
-            const latestTurn = history.slice(
-              latestUserIndex >= 0 ? latestUserIndex : Math.max(0, history.length - 1),
-            );
-            const anchored = latestTurn.map(projection.projectMessage);
-            const startedAt = latestTurn.find((message) => message.role === "user")?.timestamp;
-            const contextUsage =
-              projection.readContextUsageSnapshot(page.contextSnapshot) ?? projection.latestContextUsage(anchored);
-            safe.setMessages(anchored);
-            safe.setPhase("streaming");
-            safe.setStreamExtra?.({
-              ...(contextUsage ? { contextUsage } : {}),
-              processingStartedAtMs:
-                typeof startedAt === "number" ? startedAt : Date.now(),
-              resumeRequired: false,
-              refusal: undefined,
-            });
-            const last = history.at(-1);
-            if (last) anchor = { afterMsgId: last.msgId };
+            // Hand the page over rather than picking from it: an unanchored
+            // resume makes the runtime skip every frame the turn produced before
+            // we subscribed, so the aggregate has to seed first — and which
+            // messages that means is its decision, not the loop's.
+            safe.anchor(page);
+            const last = lastMessageId(page);
+            if (last) anchor = { afterMsgId: last };
           }
           try {
             await resumeSession({ id: sessionId, ...anchor }, captureFrame);
           } catch (error) {
             const reason = error instanceof Error ? error.message : String(error);
             if (!cursor) {
-              finalizeOnExit(reason);
+              end("transport", reason);
               return;
             }
             nextAction = "resume";
@@ -617,15 +366,23 @@ async function driveWebuiStreamLoop(
           if (nextAction) continue;
           break;
         }
-        if (!sendMessage) {
-          finalizeOnExit("sendMessage transport is unavailable");
+        // Reached only when `attaching` is false, which is exactly "a message
+        // was supplied". Checked rather than narrowed, because the flag and the
+        // field are two facts about the same call and a `?? ""` here would send
+        // an empty turn on a bug rather than say so.
+        if (!sendMessage || message === undefined) {
+          end(
+            "transport",
+            message === undefined
+              ? "sendMessage transport is unavailable for an attachment"
+              : "sendMessage transport is unavailable",
+          );
           return;
         }
-        // Claim the subscription before the stream opens. The runtime
-        // publishes `session.start` for every turn including locally sent
-        // ones, so without this lease the composer would attach a second
-        // stream to our own turn.
-        sink.claimSubscription?.("local-send");
+        // Claim before the stream opens. The runtime publishes a start frame for
+        // every turn including locally sent ones, so without this lease a second
+        // stream would attach to our own turn.
+        sink.claim("local-send");
         try {
           await sendMessage(
             {
@@ -637,57 +394,67 @@ async function driveWebuiStreamLoop(
             captureFrame,
           );
         } catch (error) {
-          // Mid-stream socket drop. Schedule a resume and let the loop
-          // decide on the next iteration whether the cursor we observed
-          // is enough to carry on. A rejection without a cursor is not
-          // recoverable — surface it as a refusal instead of looping
-          // forever.
+          // Mid-stream drop. The next iteration decides whether the cursor we
+          // observed is enough to carry on; a drop with no cursor is not
+          // recoverable and must not loop forever.
           const reason = error instanceof Error ? error.message : String(error);
           if (!cursor) {
-            finalizeOnExit(reason);
+            end("transport", reason);
             return;
           }
           nextAction = "resume";
           continue;
         }
-        // `sendMessage` resolves only on `[DONE]`. If the stream also
-        // signalled `resume_overflow`, the next iteration will reload
-        // via `loadMessages` and start a fresh subscription. A bare
-        // `[DONE]` with no failure signal exits the loop normally.
         if (nextAction) continue;
         break;
       }
       break;
     }
-    // The normal completion path commits `phase: "done"` only when no
-    // sink callback has failed during the loop. If a failure was
-    // recorded, the loop refuses the turn and surfaces the failure
-    // through `guarded.reportSinkFailure`, which falls back to
-    // `console.error` if every sink callback is broken. The never-
-    // reject promise contract is preserved on every path.
-    // The lease is released before the phase settles, so a `session.start`
-    // for the next turn that lands in between sees no owner and attaches
-    // instead of colliding with a dead one. `releaseLease` is raw and
-    // idempotent, so this still holds when an earlier sink callback threw.
-    releaseLease();
+    // Ownership is released before the attempt settles, so a start frame for the
+    // next turn that lands in between sees no owner and attaches rather than
+    // colliding with a dead one. `release` is raw and idempotent, so this still
+    // holds when an earlier callback threw.
+    release();
     if (guarded.firstFailure() === undefined) {
-      safe.setPhase("done");
+      safe.complete();
     } else {
-      guarded.reportSinkFailure();
+      const failure = guarded.firstFailure()!;
+      guarded.reportFailure({
+        origin: "sink",
+        reason: `Delivery callback "${failure.label}" failed: ${failure.error.message}`,
+        acceptedFrames: framesAccepted.value,
+      });
     }
   } catch (error) {
-    // Transport/load errors that escape the per-iteration try blocks
-    // land here. The never-reject guarantee is honoured: the promise
-    // resolves with `safe.refuse` called, not rejected. If a sink
-    // callback already failed, prefer the recorded failure over the
-    // transport error so we don't lose the diagnostic. Either way the
-    // lease goes first — reporting the failure must not skip the cleanup.
-    releaseLease();
+    release();
+    // A recorded callback failure is the more specific diagnosis: it says which
+    // write into the aggregate broke, which a transport error does not.
     if (guarded.firstFailure() === undefined) {
-      const reason = error instanceof Error ? error.message : String(error);
-      finalizeOnExit(reason);
+      end("transport", error instanceof Error ? error.message : String(error));
     } else {
-      guarded.reportSinkFailure();
+      const failure = guarded.firstFailure()!;
+      guarded.reportFailure({
+        origin: "sink",
+        reason: `Delivery callback "${failure.label}" failed: ${failure.error.message}`,
+        acceptedFrames: framesAccepted.value,
+      });
     }
   }
+}
+
+/**
+ * The last message id on a history page, if it carries one.
+ *
+ * The only thing the loop reads from a page, and it reads it for the transport's
+ * benefit: anchoring the resume at the newest persisted message is what stops the
+ * runtime skipping the turn. Everything else about the page is the adapter's.
+ */
+function lastMessageId(page: unknown): string | undefined {
+  if (!page || typeof page !== "object") return undefined;
+  const messages = (page as { readonly messages?: unknown }).messages;
+  if (!Array.isArray(messages) || messages.length === 0) return undefined;
+  const last = messages[messages.length - 1];
+  if (!last || typeof last !== "object") return undefined;
+  const msgId = (last as { readonly msgId?: unknown }).msgId;
+  return typeof msgId === "string" ? msgId : undefined;
 }

@@ -19,9 +19,10 @@
 //      observed cursor resumes with `afterCursor`; a `resume_overflow` frame
 //      takes the other branch, reloading history and starting a fresh
 //      subscription with no cursor.
-//   4. **`finalizeOnExit`** — an early return on the absent-capability path
-//      releases the lease through the *raw* sink exactly once and commits a
-//      refusal carrying the reason, instead of leaving a "思考中" spinner behind.
+//   4. **the early-exit finalizer** — an early return on the absent-capability
+//      path releases ownership through the *raw* sink exactly once and reports a
+//      failure carrying the reason, instead of leaving a "thinking" spinner
+//      behind.
 //
 // Every case drives `runWebuiStreamLoop` against the real store and the real
 // sink (`buildWebuiStreamLoopSink`), so the lease's visible effect — the
@@ -29,23 +30,22 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  buildWebuiStreamLoopSink,
-  runWebuiStreamLoop,
-} from "../../src/client/conversation/stream-loop.js";
-import type { WebuiStreamLoopSink } from "../../src/client/features/turn/contracts/stream-loop.js";
+import { runWebuiStreamLoop } from "../../src/client/conversation/stream-loop.js";
+import type { WebuiDeliverySink } from "../../src/client/conversation/stream-loop.js";
+import { buildWebuiStreamLoopSink } from "../../src/client/features/turn/application/stream-loop-sink.js";
+import { classifyStreamFrame } from "../../src/client/features/turn/application/stream-frame-classify.js";
 import { streamStateBundle } from "../../src/client/features/turn/application/stream-state-bundle.js";
-import { streamRecoveryProjection } from "../../src/client/features/turn/projection/stream-recovery.js";
 import {
   createWebuiSessionStore,
   type WebuiSessionStore,
 } from "../../src/client/application/session-store.js";
 import type {WebuiClientMessageSender} from "../../src/client/features/turn/contracts/execution-port.js";
 import type {WebuiClientSessionResumer} from "../../src/client/features/turn/contracts/execution-port.js";
-import type { WebuiClientMessageLoader } from "../../src/client/features/transcript/contracts/message-view.js";
-import type { WebuiStreamFrame } from "../../src/shared/contracts/stream.js";
 
 const SESSION_ID = "session-fences";
+
+/** The history reader the loop hands to the sink as a raw page. */
+type HistoryLoader = (request: { readonly id: string }) => Promise<unknown>;
 
 /** The store, the sink built from its writer, and a reader for the live slice. */
 function harness(sessionId = SESSION_ID) {
@@ -54,21 +54,20 @@ function harness(sessionId = SESSION_ID) {
   return {
     store,
     writer,
-    newSink: (): WebuiStreamLoopSink =>
+    newSink: (): WebuiDeliverySink =>
       buildWebuiStreamLoopSink(writer.setStream, streamStateBundle),
     stream: () => store.readSession(sessionId).stream,
   };
 }
 
-/** The two pure bundles the loop must be handed; nothing else is needed. */
+/** The transports the loop must be handed, plus the one classifier it needs. */
 const loopDeps = (extra: {
   sendMessage?: WebuiClientMessageSender;
   resumeSession?: WebuiClientSessionResumer;
-  loadMessages?: WebuiClientMessageLoader;
+  loadHistory?: HistoryLoader;
 }) => ({
   ...extra,
-  projection: streamRecoveryProjection,
-  streamState: streamStateBundle,
+  classify: classifyStreamFrame,
 });
 
 /** A send that never settles: the loop stays inside the open subscription. */
@@ -83,7 +82,7 @@ describe("fence 1 — the stream lease is claimed before the turn opens", () => 
     );
     void runWebuiStreamLoop(
       loopDeps({ resumeSession }),
-      { sessionId: SESSION_ID, attachTurnId: "turn-9" },
+      { sessionId: SESSION_ID, attachId: "turn-9" },
       shell.newSink(),
     );
     // Claimed synchronously, before the first await: a `session.start` for this
@@ -112,28 +111,29 @@ describe("fence 2 — the generation guard drops a superseded attempt's writes",
     const shell = harness();
     const stale = shell.newSink();
     const live = shell.newSink();
-    stale.claimSubscription?.("local-send");
-    live.claimSubscription?.("local-send");
+    stale.claim("local-send");
+    live.claim("local-send");
 
-    stale.applyFrame({ dataJson: '{"type":6,"agent_message_chunk":{"msg_id":"m1","msg_content":"stale"}}' });
+    stale.accept({ dataJson: '{"type":6,"agent_message_chunk":{"msg_id":"m1","msg_content":"stale"}}' });
     expect(shell.stream().messages).toHaveLength(0);
 
-    live.applyFrame({ dataJson: '{"type":6,"agent_message_chunk":{"msg_id":"m2","msg_content":"live"}}' });
+    live.accept({ dataJson: '{"type":6,"agent_message_chunk":{"msg_id":"m2","msg_content":"live"}}' });
     expect(shell.stream().messages).toHaveLength(1);
 
     // Every write the superseded sink still attempts is dropped: a late frame,
-    // a wholesale message replacement, a phase move and a refusal. The live
+    // a wholesale message replacement, a completion and a refusal. The live
     // turn's transcript and phase are untouched.
     const liveBefore = shell.stream();
-    stale.applyFrame({ dataJson: '{"type":6,"agent_message_chunk":{"msg_id":"m3","msg_content":"late"}}' });
-    stale.setMessages([]);
+    stale.accept({ dataJson: '{"type":6,"agent_message_chunk":{"msg_id":"m3","msg_content":"late"}}' });
+    stale.replace({ messages: [] });
     expect(shell.stream().messages).toHaveLength(1);
     expect(shell.stream().messages).toEqual(liveBefore.messages);
 
-    // A late refusal from the superseded attempt must not stamp itself over the
-    // turn that replaced it.
-    stale.setPhase("refused");
-    stale.refuse("late failure");
+    // A late completion and a late refusal from the superseded attempt must not
+    // stamp themselves over the turn that replaced it.
+    stale.complete();
+    stale.fail({ origin: "transport", reason: "late failure", acceptedFrames: 1 });
+    expect(shell.stream().phase).not.toBe("done");
     expect(shell.stream().phase).not.toBe("refused");
     expect(shell.stream().refusal).toBeUndefined();
   });
@@ -142,14 +142,14 @@ describe("fence 2 — the generation guard drops a superseded attempt's writes",
     const shell = harness();
     const first = shell.newSink();
     const second = shell.newSink();
-    const a = first.claimSubscription?.("local-send");
-    const b = second.claimSubscription?.("local-send");
+    const a = first.claim("local-send");
+    const b = second.claim("local-send");
     expect(a).toBeTypeOf("number");
     expect(b).toBeTypeOf("number");
     expect(b).toBeGreaterThan(a as number);
     // Re-claiming on the same sink hands back the generation it already owns
     // rather than minting a new one and re-stamping the fence.
-    expect(first.claimSubscription?.("local-send")).toBe(a);
+    expect(first.claim("local-send")).toBe(a);
     expect(shell.stream().lastClaimedGeneration).toBe(b);
   });
 });
@@ -190,13 +190,13 @@ describe("fence 3 — the cursor resume/resync transition", () => {
       resumeCalls.push({ afterCursor: req.afterCursor });
       onFrame({ dataJson: "[DONE]" });
     });
-    const loadMessages: WebuiClientMessageLoader = vi.fn(async () => {
+    const loadHistory: HistoryLoader = vi.fn(async () => {
       loads += 1;
       return { messages: [], hasMore: false };
     });
 
     await runWebuiStreamLoop(
-      loopDeps({ sendMessage, resumeSession, loadMessages }),
+      loopDeps({ sendMessage, resumeSession, loadHistory }),
       { sessionId: SESSION_ID, message: "hello" },
       shell.newSink(),
     );
@@ -207,29 +207,29 @@ describe("fence 3 — the cursor resume/resync transition", () => {
   });
 });
 
-describe("fence 4 — finalizeOnExit releases the lease once and states the reason", () => {
+describe("fence 4 — the early-exit finalizer releases ownership once and states the reason", () => {
   it("releases through the raw sink exactly once on the absent-capability exit", async () => {
     const shell = harness();
     let releases = 0;
     const refusals: string[] = [];
     const inner = shell.newSink();
-    const sink: WebuiStreamLoopSink = {
+    const sink: WebuiDeliverySink = {
       ...inner,
-      releaseSubscription: () => {
+      release: () => {
         releases += 1;
-        inner.releaseSubscription?.();
+        inner.release();
       },
-      refuse: (reason, options) => {
-        refusals.push(reason);
-        inner.refuse(reason, options);
+      fail: (failure) => {
+        refusals.push(failure.reason);
+        inner.fail(failure);
       },
     };
 
-    // The attach path with no `resumeSession`: `finalizeOnExit` is the only
+    // The attach path with no `resumeSession`: the finalizer is the only
     // thing standing between the user and a spinner that never stops.
     await runWebuiStreamLoop(
       loopDeps({}),
-      { sessionId: SESSION_ID, attachTurnId: "turn-1" },
+      { sessionId: SESSION_ID, attachId: "turn-1" },
       sink,
     );
 
@@ -247,14 +247,14 @@ describe("fence 4 — finalizeOnExit releases the lease once and states the reas
     const shell = harness();
     let releases = 0;
     const inner = shell.newSink();
-    const sink: WebuiStreamLoopSink = {
+    const sink: WebuiDeliverySink = {
       ...inner,
-      applyFrame: () => {
+      accept: () => {
         throw new Error("sink write failed");
       },
-      releaseSubscription: () => {
+      release: () => {
         releases += 1;
-        inner.releaseSubscription?.();
+        inner.release();
       },
     };
     const resumeSession: WebuiClientSessionResumer = vi.fn(async (_req, onFrame) => {
@@ -263,7 +263,7 @@ describe("fence 4 — finalizeOnExit releases the lease once and states the reas
 
     await runWebuiStreamLoop(
       loopDeps({ resumeSession }),
-      { sessionId: SESSION_ID, attachTurnId: "turn-2" },
+      { sessionId: SESSION_ID, attachId: "turn-2" },
       sink,
     );
 
@@ -272,5 +272,107 @@ describe("fence 4 — finalizeOnExit releases the lease once and states the reas
     expect(releases).toBe(1);
     expect(shell.stream().phase).toBe("refused");
     expect(shell.stream().subscription).toBeUndefined();
+  });
+});
+
+/**
+ * What a user is told depends on *where* an attempt failed, not on how far it
+ * got. This is the one judgement the loop deliberately refuses to make: it knows
+ * both facts — which kind of failure it was, and how many frames the aggregate
+ * had accepted — and reports them without interpreting either. The adapter, which
+ * owns the record, turns them into the flag the shell renders.
+ *
+ * The contrast is the point, so every case below drives the **real** sink and
+ * fails *after* frames have landed in the store. A case that failed before any
+ * frame would pass under either reading.
+ */
+describe("failure origin decides what the user is told", () => {
+  const chunkFor = (id: string, text: string, cursor?: string) => ({
+    dataJson: JSON.stringify({
+      type: "agent_message_chunk",
+      agent_message_chunk: { msg_id: id, msg_content: text },
+    }),
+    ...(cursor === undefined ? {} : { cursor }),
+  });
+
+  it("marks the transcript incomplete when the aggregate itself fails after frames", async () => {
+    const shell = harness();
+    const inner = shell.newSink();
+    let accepts = 0;
+    const sink: WebuiDeliverySink = {
+      ...inner,
+      accept: (frame) => {
+        accepts += 1;
+        // The first two frames reach the store; the third is what the user will
+        // never see, because the write that would have shown it broke.
+        if (accepts >= 3) throw new Error("third accept blew up");
+        inner.accept(frame);
+      },
+    };
+    const sendMessage: WebuiClientMessageSender = vi.fn(async (_req, onFrame) => {
+      onFrame(chunkFor("m1", "first", "c1"));
+      onFrame(chunkFor("m1", " second", "c2"));
+      onFrame(chunkFor("m1", " third"));
+      onFrame({ dataJson: "[DONE]" });
+    });
+
+    await runWebuiStreamLoop(
+      loopDeps({ sendMessage }),
+      { sessionId: SESSION_ID, message: "hello" },
+      sink,
+    );
+
+    expect(shell.stream().phase).toBe("refused");
+    expect(shell.stream().transcriptIncomplete).toBe(true);
+    expect(shell.stream().messages[0]?.answer).toBe("first second");
+  });
+
+  it("stays an ordinary refusal when the transport drops after frames", async () => {
+    const shell = harness();
+    // No cursor on any frame: a drop here is not resumable, so the attempt ends
+    // as a transport failure with two frames already on screen.
+    const sendMessage: WebuiClientMessageSender = vi.fn(async (_req, onFrame) => {
+      onFrame(chunkFor("m1", "first"));
+      onFrame(chunkFor("m1", " second"));
+      throw new Error("connection closed before [DONE]");
+    });
+
+    await runWebuiStreamLoop(
+      loopDeps({ sendMessage }),
+      { sessionId: SESSION_ID, message: "hello" },
+      shell.newSink(),
+    );
+
+    expect(shell.stream().phase).toBe("refused");
+    expect(shell.stream().refusal).toBe("connection closed before [DONE]");
+    // Everything the turn produced before the drop did arrive, so nothing is
+    // missing from the transcript and the flag must stay down.
+    expect(shell.stream().transcriptIncomplete).toBe(false);
+    expect(shell.stream().messages[0]?.answer).toBe("first second");
+  });
+
+  it("stays an ordinary refusal when reloading history fails after frames", async () => {
+    const shell = harness();
+    // A `resume_overflow` after a frame sends the attempt down the resync path;
+    // the reload then fails, which leaves the last good transcript visible.
+    const sendMessage: WebuiClientMessageSender = vi.fn(async (_req, onFrame) => {
+      onFrame(chunkFor("m1", "first", "c1"));
+      onFrame({ dataJson: '{"type":"resume_overflow"}' });
+      onFrame({ dataJson: "[DONE]" });
+    });
+    const loadHistory: HistoryLoader = vi.fn(async () => {
+      throw new Error("history unavailable");
+    });
+
+    await runWebuiStreamLoop(
+      loopDeps({ sendMessage, loadHistory, resumeSession: vi.fn() }),
+      { sessionId: SESSION_ID, message: "hello" },
+      shell.newSink(),
+    );
+
+    expect(shell.stream().phase).toBe("refused");
+    expect(shell.stream().refusal).toBe("history unavailable");
+    expect(shell.stream().transcriptIncomplete).toBe(false);
+    expect(shell.stream().messages[0]?.answer).toBe("first");
   });
 });

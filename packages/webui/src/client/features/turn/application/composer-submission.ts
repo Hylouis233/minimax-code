@@ -27,6 +27,7 @@ import type {
 import { queueWebuiTurn } from "./queue-command.js";
 import { ownsWebuiStreamGeneration } from "../projection/stream-state.js";
 import { runWebuiStreamLoop } from "../../../conversation/stream-loop.js";
+import { classifyStreamFrame } from "./stream-frame-classify.js";
 import { streamRecoveryProjection } from "../projection/stream-recovery.js";
 import { streamStateBundle } from "./stream-state-bundle.js";
 
@@ -173,7 +174,7 @@ export async function submitWebuiComposerTurn(
   let claimed: number | undefined;
   try {
     claimed = await runWebuiStreamLoop(
-      { ...args.deps, projection: streamRecoveryProjection, streamState: streamStateBundle },
+      { ...args.deps, classify: classifyStreamFrame },
       { sessionId, message, ...(args.clientIntent ? { clientIntent: args.clientIntent } : {}), ...(attachments.length ? { attachments } : {}) },
       handlers.createSink(),
     );

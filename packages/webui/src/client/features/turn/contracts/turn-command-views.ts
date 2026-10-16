@@ -9,7 +9,7 @@
 // is what the sessions business reads when it builds a view for a record it owns.
 
 import type { WebuiInteractionPhaseIntents, WebuiStreamPhase } from "./interaction-phase-intents.js";
-import type { WebuiStreamLoopSink } from "./stream-loop.js";
+import type { WebuiDeliverySink } from "../../../../shared/contracts/delivery.js";
 
 export type { WebuiStreamPhase };
 
@@ -75,7 +75,7 @@ export interface WebuiTurnLifecycleCommands {
  */
 export interface WebuiTurnCommandWriter {
   readonly kind: "session" | "home";
-  readonly createSink: () => WebuiStreamLoopSink;
+  readonly createSink: () => WebuiDeliverySink;
   readonly resetStreamForTurn: () => void;
   readonly setStreamRefusal: (refusal: string | undefined) => void;
   readonly setTurnSending: (sending: boolean) => void;

@@ -1,9 +1,9 @@
 import type { WebuiAttachmentInput } from "../../../../shared/contracts/messages.js";
 import type { WebuiTaskSessionSubmitter } from "../../turn/contracts/submission.js";
 import type {
-  WebuiStreamLoopSink,
-  WebuiStreamLoopTransports,
-} from "../../turn/contracts/stream-loop.js";
+  WebuiDeliverySink,
+  WebuiDeliveryTransports,
+} from "../../../../shared/contracts/delivery.js";
 import type { WebuiStreamState } from "../../turn/contracts/stream-state.js";
 import type { WebuiClientMessageEnqueuer } from "./command-port.js";
 
@@ -25,7 +25,7 @@ export interface WebuiComposerSubmitArgs {
    * its whole dependency object: the two injected transforms are the caller's to
    * supply, and this workflow supplies them itself.
    */
-  readonly deps: WebuiStreamLoopTransports;
+  readonly deps: WebuiDeliveryTransports;
   readonly enqueueMessage?: WebuiClientMessageEnqueuer;
   /**
    * The task use case the submission creates through. It replaced a raw `createSession`: creation
@@ -44,7 +44,7 @@ export interface WebuiComposerSubmitHandlers {
    * never receives the stream writer itself, so no caller can write a slice
    * field directly or skip the fence.
    */
-  readonly createSink: () => WebuiStreamLoopSink;
+  readonly createSink: () => WebuiDeliverySink;
   /** Reset the stream slice for a turn that is about to open. */
   readonly resetStreamForTurn: () => void;
   /**

@@ -28,14 +28,14 @@ import {
   ownsWebuiStreamGeneration,
   type WebuiStreamState,
 } from "../../src/client/features/turn/projection/stream-state.js";
-import {
-  buildWebuiStreamLoopSink,
-  runWebuiStreamLoop as runStreamLoop,
-  type WebuiStreamLoopArgs,
-  type WebuiStreamLoopDeps,
+import { runWebuiStreamLoop as runStreamLoop } from "../../src/client/conversation/stream-loop.js";
+import type {
+  WebuiDeliveryArgs,
+  WebuiDeliveryDeps,
+  WebuiDeliverySink,
 } from "../../src/client/conversation/stream-loop.js";
-import type { WebuiStreamLoopSink } from "../../src/client/features/turn/contracts/stream-loop.js";
-import { streamRecoveryProjection } from "../../src/client/features/turn/projection/stream-recovery.js";
+import { buildWebuiStreamLoopSink } from "../../src/client/features/turn/application/stream-loop-sink.js";
+import { classifyStreamFrame } from "../../src/client/features/turn/application/stream-frame-classify.js";
 import type {WebuiClientMessageSender} from "../../src/client/features/turn/contracts/execution-port.js";
 import type { WebuiStreamFrame } from "../../src/shared/contracts/stream.js";
 import { streamStateBundle } from "../../src/client/features/turn/application/stream-state-bundle.js";
@@ -44,24 +44,15 @@ import { createWebuiStreamPhaseCommands } from "../../src/client/features/turn/a
 const SESSION_ID = "session-under-test";
 
 /**
- * `runWebuiStreamLoop` now requires the injected history/context bundle so a
- * caller cannot forget it and get a mis-shaped transcript. None of these cases
- * traverse a resync/attach path that reads the bundle, so the real pure
- * transforms stand in and change nothing about what is asserted.
+ * The loop's own classifier is the one these turns need, so no case here has to
+ * restate it. Nothing else is injected: the mechanism no longer takes bundles of
+ * the record's transforms, because it no longer knows what a frame means.
  */
 const loopWithProjection = (
-  deps: Omit<WebuiStreamLoopDeps, "projection" | "streamState"> & {
-    readonly projection?: WebuiStreamLoopDeps["projection"];
-    readonly streamState?: WebuiStreamLoopDeps["streamState"];
-  },
-  args: WebuiStreamLoopArgs,
-  sink: WebuiStreamLoopSink,
-) =>
-  runStreamLoop(
-    { ...deps, projection: deps.projection ?? streamRecoveryProjection, streamState: deps.streamState ?? streamStateBundle },
-    args,
-    sink,
-  );
+  deps: WebuiDeliveryDeps,
+  args: WebuiDeliveryArgs,
+  sink: WebuiDeliverySink,
+) => runStreamLoop({ ...deps, classify: deps.classify ?? classifyStreamFrame }, args, sink);
 
 /**
  * The React shell's binding, minus React: one shared state cell, one updater,
@@ -79,7 +70,7 @@ function createShell() {
       return current;
     },
     setStream,
-    newSink: (): WebuiStreamLoopSink => buildWebuiStreamLoopSink(setStream, streamStateBundle),
+    newSink: (): WebuiDeliverySink => buildWebuiStreamLoopSink(setStream, streamStateBundle),
     // The stop command's settle write, taken from the real command surface so
     // this suite covers the command the button actually submits.
     settleStoppedStream: createWebuiStreamPhaseCommands({ setStream }).settleStoppedStream,
@@ -184,7 +175,7 @@ describe("C-3.1 interrupting a turn preserves the order of already-received fram
     // A frame the server had already queued for the aborted turn. It must not
     // land: not as a new message, not as a cursor advance (that would move the
     // next turn's resume point), not as a phase change.
-    sink.applyFrame(wholeMessage("msg-2", "迟到的回复", "cursor-3"));
+    sink.accept(wholeMessage("msg-2", "迟到的回复", "cursor-3"));
 
     expect(answerIds(shell.state)).toEqual(["msg-1"]);
     expect(shell.state.messages[0]?.answer).toBe("第一段第二段");
@@ -211,7 +202,7 @@ describe("C-3.1 interrupting a turn preserves the order of already-received fram
     await tick();
     await interrupt(shell);
 
-    sink.applyFrame(chunk("msg-1", "被中断后迟到的续写", "cursor-2"));
+    sink.accept(chunk("msg-1", "被中断后迟到的续写", "cursor-2"));
 
     expect(shell.state.messages).toHaveLength(1);
     expect(shell.state.messages[0]?.answer).toBe("已经写好的部分");
@@ -273,12 +264,12 @@ describe("C-3.1 interrupting a turn preserves the order of already-received fram
     // The second turn streams a further frame, then the first turn's terminal
     // frame arrives. It must not settle the second turn.
     const liveSink = shell.newSink();
-    liveSink.claimSubscription?.("local-send");
-    liveSink.applyFrame(chunk("msg-2", "补充", "cursor-5"));
+    liveSink.claim("local-send");
+    liveSink.accept(chunk("msg-2", "补充", "cursor-5"));
     expect(shell.state.phase).toBe("streaming");
     expect(shell.state.messages[1]?.answer).toBe("新的回答补充");
 
-    interruptedSink.applyFrame(done());
+    interruptedSink.accept(done());
     expect(shell.state.phase).toBe("streaming");
     expect(answerIds(shell.state)).toEqual(["msg-1", "msg-2"]);
 
