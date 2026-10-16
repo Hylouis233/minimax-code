@@ -11,7 +11,7 @@
 //   1. A composer that has submitted a turn records the exact text it put on
 //      the wire, locally, and that recorded value is what a retry re-sends.
 //   2. The retry itself re-enters the production send path
-//      (`submitWebuiComposerTurn`) with that text, and has no abort anywhere in
+//      (`submitWebuiTurn`) with that text, and has no abort anywhere in
 //      it.
 //   3. A composer with nothing recorded offers no retry button at all — the
 //      original sin was a control that was present and could not work.
@@ -79,7 +79,7 @@ import { planWebuiRetryResend, resendRecordedWebuiTurn } from "../../src/client/
 import { OutputError } from "../../src/client/features/transcript/ui/OutputError.js";
 import {
   buildWebuiComposerHandlers,
-  submitWebuiComposerTurn,
+  submitWebuiTurn,
 } from "../../src/client/features/turn/application/composer-submission.js";
 import type { WebuiSubmissionOperation } from "../../src/client/features/turn/contracts/submission.js";
 import { createWebuiSessionStore, type WebuiSessionStore } from "../../src/client/application/session-store.js";
@@ -93,7 +93,7 @@ import type { WebuiDeliverySink } from "../../src/shared/contracts/delivery.js";
 
 /**
  * A sink that accepts every write. The retry path under test never opens a
- * loop — it re-enters `submitWebuiComposerTurn` and drains before any frame —
+ * loop — it re-enters `submitWebuiTurn` and drains before any frame —
  * so the sink exists only to satisfy the handler bundle's shape.
  */
 const noopSink: WebuiDeliverySink = {
@@ -256,32 +256,31 @@ describe("retry re-sends the recorded input and never aborts", () => {
     const sent: { id: string; content: string }[] = [];
     const abortSession = vi.fn(async () => ({ success: true }));
     // The real turn sender, assembled the way the composer assembles it.
-    let inFlight: Promise<WebuiSubmissionOperation | undefined> | undefined;
+    let inFlight: Promise<unknown> | undefined;
     const sendTurn = (turn: { message: string }) => {
-      inFlight = submitWebuiComposerTurn(
-        {
-          sessionId: SESSION_ID,
-          // The same pair the composer passes, so the
-          // no-session hand-off sees the real input here too and a future
-          // `args.draft` read on this path is exercised rather than undefined.
-          draft: turn.message,
-          message: turn.message,
-          sending: false,
-          deps: {
-            sendMessage: async (request) => {
-              sent.push(request);
-            },
+      // The real turn sender, assembled the way the composer assembles it: an
+      // intent, an admission, and the transports. The ticket is what comes back,
+      // and only its completion is pending.
+      const ticket = submitWebuiTurn({
+        intent: { kind: "ordinary", message: turn.message },
+        admission: { kind: "dispatching" },
+        sessionId: SESSION_ID,
+        sending: false,
+        deps: {
+          sendMessage: async (request) => {
+            sent.push(request);
           },
-          teamModeOff: false,
         },
-        buildWebuiComposerHandlers({
+        teamModeOff: false,
+        handlers: buildWebuiComposerHandlers({
           createSink: () => noopSink,
           resetStreamForTurn: () => undefined,
           setRefusal: () => undefined,
           setSending: () => undefined,
           onDraftChange: () => undefined,
         }),
-      );
+      });
+      inFlight = ticket?.completion;
     };
 
     const plan = resendRecordedWebuiTurn({

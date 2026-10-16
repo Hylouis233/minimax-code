@@ -92,12 +92,14 @@ describe("the conversation turn commands", () => {
       capabilities: { enqueue: enqueueMessage as never, send: sendMessage as never },
     });
 
-    const operation = await commands.send({
+    const ticket = commands.send({
       message: "queue from live state",
       callbacks: { onDraftChange: () => undefined },
     });
 
-    expect(operation?.completion).toEqual({ kind: "queued", sessionId: "s1" });
+    // The queue is chosen from the live store, not from what the caller passed.
+    expect(ticket?.admission).toEqual({ kind: "queued" });
+    await expect(ticket?.completion).resolves.toEqual({ kind: "queued", sessionId: "s1" });
     expect(enqueueMessage).toHaveBeenCalledWith({ id: "s1", content: "queue from live state" });
     expect(sendMessage).not.toHaveBeenCalled();
   });
@@ -113,14 +115,14 @@ describe("the conversation turn commands", () => {
     // The loop's own absent-capability guard decides; what this seam owes the
     // caller is that no attempt is started, nothing is reported as running, and
     // the transition says why rather than leaving it to be inferred.
-    await expect(
-      commands.send({
-        message: "hello",
-        callbacks: { onDraftChange: () => undefined },
-      }),
-    ).resolves.toMatchObject({
-      decision: "unsupported",
-      completion: { kind: "unsupported", missing: "transport" },
+    const refused = commands.send({
+      message: "hello",
+      callbacks: { onDraftChange: () => undefined },
+    });
+    expect(refused?.admission).toEqual({ kind: "unsupported", missing: "transport" });
+    await expect(refused?.completion).resolves.toMatchObject({
+      kind: "unsupported",
+      missing: "transport",
     });
     expect(store.readSession("s1").sending).toBe(false);
     expect(store.readSession("s1").stream.phase).not.toBe("streaming");

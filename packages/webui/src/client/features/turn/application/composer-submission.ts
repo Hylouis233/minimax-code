@@ -19,10 +19,15 @@ import {
 } from "../../sessions/contracts/session-port.js";
 import { formatWebuiError } from "../../../contracts/value-readers.js";
 import { readWorkspaceDirField } from "../../../projection/common/paths.js";
+import type { WebuiAttachmentInput } from "../../../../shared/contracts/messages.js";
+import type { WebuiDeliveryTransports } from "../../../../shared/contracts/delivery.js";
+import type { WebuiClientMessageEnqueuer } from "../../composer/contracts/command-port.js";
+import type { WebuiTaskSessionSubmitter } from "../contracts/submission.js";
 import type {
+  WebuiSubmissionAdmission,
   WebuiSubmissionCompletion,
-  WebuiSubmissionDecision,
-  WebuiSubmissionOperation,
+  WebuiSubmissionIntent,
+  WebuiSubmissionTicket,
 } from "../contracts/submission.js";
 import { queueWebuiTurn } from "./queue-command.js";
 import { ownsWebuiStreamGeneration } from "../projection/stream-state.js";
@@ -47,142 +52,196 @@ export function buildWebuiComposerHandlers(
   };
 }
 
-/** Operation ids are process-local and monotonic: they correlate a submission with its transition. */
+/** Ticket ids are process-local and monotonic: they correlate a transition with its submission. */
 let nextSubmissionId = 0;
 
 /**
- * The decision a completion *is*, so the two can never disagree. `dispatching` and `queued` describe an
- * operation on its way; the rest describe one that did not happen, and the completion carries why.
+ * What an intent means to the wire, read from the intent's **kind**.
  *
- * A completion that is not listed here cannot be produced by this module, and the case is exhaustive on
- * purpose: adding a completion kind without classifying it stops compiling.
+ * This is the whole point of making the intent a union: the mapping from "what the
+ * user asked for" to "what the runtime is told" lives in one exhaustive switch,
+ * so a new kind is one case here rather than an optional field threaded through
+ * every contract between the caller and this module.
  */
-function decideFor(completion: WebuiSubmissionCompletion): WebuiSubmissionDecision {
-  switch (completion.kind) {
-    case "dispatched":
-      return "dispatching";
+function wireIntentFor(intent: WebuiSubmissionIntent): {
+  readonly message: string;
+  readonly clientIntent?: string;
+  readonly attachments: readonly WebuiAttachmentInput[];
+} {
+  switch (intent.kind) {
+    case "ordinary":
     case "queued":
-      return "queued";
-    case "needs-session":
-      return "needs-session";
-    case "creation-failed":
-      return "creation-failed";
-    case "failed":
-      return "failed";
-    case "busy":
-      return "busy";
-    case "unsupported":
-      return "unsupported";
+      return {
+        message: intent.message,
+        ...(intent.attachments && intent.attachments.length
+          ? { attachments: intent.attachments }
+          : {}),
+        attachments: intent.attachments ?? [],
+      };
+    case "goal":
+      return { message: intent.message, clientIntent: "goal-entry", attachments: [] };
+    case "command":
+      return {
+        message: intent.message ?? "",
+        clientIntent: intent.command,
+        attachments: [],
+      };
   }
 }
 
-export async function submitWebuiComposerTurn(
-  args: WebuiComposerSubmitArgs,
-  handlers: WebuiComposerSubmitHandlers,
-): Promise<WebuiSubmissionOperation | undefined> {
-  const message = (args.message ?? args.draft).trim();
-  const attachments = args.attachments ?? [];
-  // Nothing to submit is not a refusal, so it is not an operation: the vocabulary in
-  // `contracts/submission.ts` covers what a submission *decided*, and an empty intent never reached a
-  // decision. The caller's guard produced exactly this no-op before.
-  if (!message && attachments.length === 0) return undefined;
-  const record = (completion: WebuiSubmissionCompletion): WebuiSubmissionOperation => ({
-    id: ++nextSubmissionId,
-    decision: decideFor(completion),
-    completion,
-  });
-  if (!args.deps.sendMessage && !args.enqueueMessage) {
-    // The baseline returned silently here, before it would have created anything: a creator alone is
-    // not a way to deliver a message.
-    return record({ kind: "unsupported", missing: "transport" });
+/**
+ * Submit one turn and return its ticket.
+ *
+ * The ticket comes back **synchronously**: the admission is a conclusion about
+ * observed state, and there is nothing to await before the owner has that state.
+ * Only the completion is asynchronous, which is the shape the caller actually
+ * wants — it can render the decision now and observe the outcome later, instead
+ * of awaiting a promise that would have told it both at once.
+ *
+ * The callbacks below are the owner's, not the caller's. They existed on the
+ * public submission so a caller could wire a business setter into a branch; the
+ * caller now holds a ticket, and the owner performs its own writes.
+ */
+export function submitWebuiTurn(
+  args: {
+    readonly intent: WebuiSubmissionIntent;
+    readonly sessionId: string | undefined;
+    /** Decided by the owner from observed state, before any work. */
+    readonly admission: WebuiSubmissionAdmission;
+    readonly sending: boolean;
+    readonly deps: WebuiDeliveryTransports;
+    readonly handlers: WebuiComposerSubmitHandlers;
+    readonly enqueueMessage?: WebuiClientMessageEnqueuer;
+    readonly submitTask?: WebuiTaskSessionSubmitter;
+    readonly createSessionWorkspaceDir?: string;
+    readonly teamModeOff?: boolean;
+    readonly onAttachmentsSubmitted?: () => void;
+  },
+): WebuiSubmissionTicket {
+  const id = ++nextSubmissionId;
+  const handlers = args.handlers;
+  const { message, clientIntent, attachments } = wireIntentFor(args.intent);
+
+  /**
+   * The promise a caller observes. It never rejects: every failure below is
+   * caught and returned as a value, so a caller awaiting completion has no error
+   * path it can forget to handle.
+   */
+  const completion = (async (): Promise<WebuiSubmissionCompletion> => {
+    try {
+      return await runSubmission();
+    } catch (error) {
+      return ({ kind: "failed", error: formatWebuiError(error) });
+    }
+  })();
+
+  async function runSubmission(): Promise<WebuiSubmissionCompletion> {
+    // Nothing to submit is not a refusal: it never reached a decision. What
+    // counts as "something" is a property of the intent's **kind**, not of the
+    // text: a `command` carries its payload in the command name, so a nameless
+    // prose body is still a complete submission and must not be refused here.
+    const carriesPayload =
+      args.intent.kind === "command" ||
+      message.trim().length > 0 ||
+      attachments.length > 0;
+    if (!carriesPayload) {
+      return { kind: "failed", error: "Nothing to submit" };
+    }
+    if (!args.deps.sendMessage && !args.enqueueMessage) {
+      // The baseline returned silently here, before it would have created
+      // anything: a creator alone is not a way to deliver a message.
+      return ({ kind: "unsupported", missing: "transport" });
+    }
+
+    let sessionId = args.sessionId;
+    let created = false;
+    if (!sessionId) {
+      const submitTask = args.submitTask;
+      if (!submitTask) {
+        handlers.onNeedsSession?.(args.intent.kind === "command" ? "" : args.intent.message);
+        return ({ kind: "needs-session" });
+      }
+      let workspaceDir: string | undefined;
+      try {
+        workspaceDir = readWorkspaceDirField(args.createSessionWorkspaceDir);
+      } catch (error) {
+        const text = formatWebuiError(error);
+        handlers.setRefusal(text);
+        return ({ kind: "creation-failed", error: text });
+      }
+      // The creation is the task use case's: single-flight per home incarnation,
+      // it transfers the home record onto the created session under the
+      // destination-wins and purge guards, and it reports whether the created
+      // session may be selected.
+      const outcome = await submitTask.submit({
+        name: "main",
+        ...(workspaceDir === undefined ? {} : { workspaceDir }),
+        ...(args.teamModeOff === undefined ? {} : { teamModeOff: args.teamModeOff }),
+      });
+      if (outcome.kind === "unsupported") {
+        handlers.onNeedsSession?.(args.intent.kind === "command" ? "" : args.intent.message);
+        return ({ kind: "needs-session" });
+      }
+      if (outcome.kind === "busy") return ({ kind: "busy", reason: "creating" });
+      if (outcome.kind === "creation-failed") {
+        handlers.setRefusal(outcome.error);
+        return ({ kind: "creation-failed", error: outcome.error });
+      }
+      sessionId = outcome.sessionId;
+      created = true;
+      handlers.onSessionCreated?.(sessionId, outcome.selected);
+    }
+    if (sessionId === undefined) return ({ kind: "failed", error: "No session to submit to" });
+    if (args.sending || args.intent.kind === "queued") {
+      if (!args.enqueueMessage) {
+        // A live turn with nowhere to queue: refused, and the caller may keep the
+        // input. The baseline dropped it in silence.
+        return ({ kind: "busy", reason: "turn-live" });
+      }
+      let refusal: string | undefined;
+      await queueWebuiTurn({
+        sessionId,
+        message,
+        ...(clientIntent ? { clientIntent } : {}),
+        ...(attachments.length ? { attachments } : {}),
+        enqueueMessage: args.enqueueMessage,
+        onDraftChange: handlers.onDraftChange,
+        onAttachmentsSubmitted: args.onAttachmentsSubmitted,
+        onQueued: handlers.onQueued,
+        setRefusal: (next) => {
+          refusal = next;
+          handlers.setRefusal(next);
+        },
+      });
+      return refusal === undefined
+        ? ({ kind: "queued", sessionId })
+        : ({ kind: "failed", error: refusal });
+    }
+    if (!args.deps.sendMessage) return ({ kind: "unsupported", missing: "transport" });
+    handlers.setSending(true);
+    handlers.onDraftChange("");
+    args.onAttachmentsSubmitted?.();
+    handlers.resetStreamForTurn();
+    let claimed: number | undefined;
+    try {
+      claimed = await runWebuiStreamLoop(
+        { ...args.deps, classify: classifyStreamFrame },
+        {
+          sessionId,
+          message,
+          ...(clientIntent ? { clientIntent } : {}),
+          ...(attachments.length ? { attachments } : {}),
+        },
+        handlers.createSink(),
+      );
+    } finally {
+      const current = handlers.readStream?.();
+      if (current === undefined || ownsWebuiStreamGeneration(current, claimed)) {
+        handlers.setSending(false);
+      }
+    }
+    return ({ kind: "dispatched", sessionId, created });
   }
 
-  let sessionId = args.sessionId;
-  let created = false;
-  if (!sessionId) {
-    const submitTask = args.submitTask;
-    if (!submitTask) {
-      handlers.onNeedsSession?.(args.draft);
-      return record({ kind: "needs-session" });
-    }
-    let workspaceDir: string | undefined;
-    try {
-      workspaceDir = readWorkspaceDirField(args.createSessionWorkspaceDir);
-    } catch (error) {
-      const message = formatWebuiError(error);
-      handlers.setRefusal(message);
-      return record({ kind: "creation-failed", error: message });
-    }
-    // The creation is the task use case's: it is single-flight per home incarnation, it
-    // transfers the home record onto the created session under the destination-wins and purge guards,
-    // it moves the composer's home slot and it refreshes the catalogue. Nothing here resets the
-    // stream after a create — that reset is what made an adopted destination unsafe, and the
-    // transferred record is the destination's now.
-    const outcome = await submitTask.submit({
-      name: "main",
-      ...(workspaceDir === undefined ? {} : { workspaceDir }),
-      ...(args.teamModeOff === undefined ? {} : { teamModeOff: args.teamModeOff }),
-    });
-    if (outcome.kind === "unsupported") {
-      // The host cannot create at all, which is the baseline's `onNeedsSession`: the user is asked for
-      // a session rather than told a capability is missing. (A missing *transport* is the other
-      // refusal, and it is checked before this branch.)
-      handlers.onNeedsSession?.(args.draft);
-      return record({ kind: "needs-session" });
-    }
-    if (outcome.kind === "busy") return record({ kind: "busy", reason: "creating" });
-    if (outcome.kind === "creation-failed") {
-      handlers.setRefusal(outcome.error);
-      return record({ kind: "creation-failed", error: outcome.error });
-    }
-    sessionId = outcome.sessionId;
-    created = true;
-    handlers.onSessionCreated?.(sessionId, outcome.selected);
-  }
-  if (args.sending) {
-    if (!args.enqueueMessage) {
-      // A live turn with nowhere to queue: the submission is refused, and the caller may keep the
-      // input. The baseline dropped it in silence.
-      return record({ kind: "busy", reason: "turn-live" });
-    }
-    // The enqueue reports its own failure through a refusal; capturing it is what lets the operation
-    // say `failed` instead of `queued` for a write that never landed.
-    let refusal: string | undefined;
-    await queueWebuiTurn({
-      sessionId,
-      message,
-      ...(args.clientIntent ? { clientIntent: args.clientIntent } : {}),
-      ...(attachments.length ? { attachments } : {}),
-      enqueueMessage: args.enqueueMessage,
-      onDraftChange: handlers.onDraftChange,
-      onAttachmentsSubmitted: args.onAttachmentsSubmitted,
-      onQueued: handlers.onQueued,
-      setRefusal: (next) => {
-        refusal = next;
-        handlers.setRefusal(next);
-      },
-    });
-    return refusal === undefined
-      ? record({ kind: "queued", sessionId })
-      : record({ kind: "failed", error: refusal });
-  }
-  if (!args.deps.sendMessage) return record({ kind: "unsupported", missing: "transport" });
-  handlers.setSending(true);
-  handlers.onDraftChange("");
-  args.onAttachmentsSubmitted?.();
-  handlers.resetStreamForTurn();
-  let claimed: number | undefined;
-  try {
-    claimed = await runWebuiStreamLoop(
-      { ...args.deps, classify: classifyStreamFrame },
-      { sessionId, message, ...(args.clientIntent ? { clientIntent: args.clientIntent } : {}), ...(attachments.length ? { attachments } : {}) },
-      handlers.createSink(),
-    );
-  } finally {
-    const current = handlers.readStream?.();
-    if (current === undefined || ownsWebuiStreamGeneration(current, claimed)) handlers.setSending(false);
-  }
-  // A dispatch that rejects still rejects: the loop's own error path is the caller's today, and the
-  // owner makes it a `failed` completion when it takes the callbacks over.
-  return record({ kind: "dispatched", sessionId, created });
+  return { id, admission: args.admission, completion };
 }

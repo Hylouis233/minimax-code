@@ -43,7 +43,7 @@ import {
   seedWebuiSessionActivity,
   type WebuiSessionActivityMap,
 } from "../projection/session-activity.js";
-import type { WebuiActiveTurnProbe } from "../../turn/application/active-turn-probe.js";
+import type { WebuiActiveTurnProbe } from "../../turn/contracts/active-turn-probe.js";
 
 /**
  * The activity slice's write authority: the application store's activity

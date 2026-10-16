@@ -1,5 +1,5 @@
 import type { WebuiAttachmentInput } from "../../../../shared/contracts/messages.js";
-import type { WebuiSubmissionOperation } from "./submission.js";
+import type { WebuiSubmissionTicket } from "./submission.js";
 import type {
   WebuiStreamPhaseCommands,
   WebuiTurnLifecycleCommands,
@@ -31,10 +31,14 @@ export interface WebuiTurnSendIntent {
 /** Commands exposed to a conversation surface by application composition. */
 export interface WebuiConversationTurnCommands {
   /**
-   * The submission's semantic transition, or `undefined` when the intent carried nothing to submit.
-   * A refusal is a value rather than a rejection, so the caller can report it and keep going.
+   * Submit a turn and get its ticket, or `undefined` when the intent carried
+   * nothing to submit.
+   *
+   * The ticket is returned synchronously: its `admission` is already decided, and
+   * its `completion` settles later and never rejects. A caller reads the decision
+   * now and the outcome later, instead of awaiting a promise that carried both.
    */
-  readonly send: (intent: WebuiTurnSendIntent) => Promise<WebuiSubmissionOperation | undefined>;
+  readonly send: (intent: WebuiTurnSendIntent) => WebuiSubmissionTicket | undefined;
   readonly attach: (turnId: string | undefined) => void;
   readonly recheck: (turnId: string | undefined) => void;
   readonly recover: () => void;

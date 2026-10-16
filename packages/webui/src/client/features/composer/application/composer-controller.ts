@@ -4,7 +4,7 @@ import type { WebuiComposerStore } from "./composer-store.js";
 import type { WebuiComposerSubmitIntent } from "../contracts/composer-controller.js";
 import type { WebuiRunCommandRequest, WebuiCommandWorkflows } from "./command-workflows.js";
 import type { WebuiConversationTurnCommands } from "../../turn/contracts/turn-commands.js";
-import type { WebuiSubmissionOperation } from "../../turn/contracts/submission.js";
+import type { WebuiSubmissionCompletion, WebuiSubmissionTicket } from "../../turn/contracts/submission.js";
 import { resolveWebuiSubmissionIntent } from "../projection/composer-state.js";
 import { readWebuiComposerGoalModeAfterSubmit } from "../projection/composer-goal-outcome.js";
 import { planWebuiRetryResend } from "./turn-retry.js";
@@ -90,7 +90,8 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
     readonly planMode?: boolean;
     readonly createSessionWorkspaceDir?: string;
     readonly teamModeOff?: boolean;
-  }, clearStaging: () => void, settlement: { needsSession: boolean; sessionId?: string; queueGeneration?: number }, onSessionCreated?: (sessionId: string, selected: boolean) => void): Promise<WebuiSubmissionOperation | undefined> => deps.turnCommandsFor(sessionId).send({
+  }, clearStaging: () => void, settlement: { needsSession: boolean; sessionId?: string; queueGeneration?: number }, onSessionCreated?: (sessionId: string, selected: boolean) => void): Promise<WebuiSubmissionCompletion | undefined> => {
+    const ticket: WebuiSubmissionTicket | undefined = deps.turnCommandsFor(sessionId).send({
     message: turn.message,
     ...(turn.clientIntent ? { clientIntent: turn.clientIntent } : {}),
     ...(turn.planMode ? { planMode: true } : {}),
@@ -113,6 +114,10 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
 
     },
   });
+    // The ticket is the whole protocol: nothing else about this submission is
+    // handed back, and its completion never rejects.
+    return ticket === undefined ? Promise.resolve(undefined) : ticket.completion;
+  }
 
   snapshot = {
     composer: deps.store.getSnapshot(),
@@ -239,9 +244,9 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
         ...(input.createSessionWorkspaceDir ? { createSessionWorkspaceDir: input.createSessionWorkspaceDir } : {}),
         ...(input.teamModeOff ? { teamModeOff: true } : {}),
       }, clearStaging, settlement, input.onSessionCreated);
-      if (operation?.completion.kind === "needs-session")
+      if (operation?.kind === "needs-session")
         return { kind: "needs-session", draft: input.draft };
-      if (operation?.completion.kind === "queued") {
+      if (operation?.kind === "queued") {
         const destination = settlement.sessionId ?? sessionId;
         if (destination) refreshQueue(destination, settlement.queueGeneration);
         return { kind: "queued", sessionId: settlement.sessionId ?? sessionId!, ...(settlement.sessionId && !sessionId ? { createdSessionId: settlement.sessionId } : {}) };

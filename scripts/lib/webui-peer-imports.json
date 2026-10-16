@@ -12,11 +12,6 @@
       "reason": "The transcript's message actions build session commands (fork / edit / rewind). Those builders are the sessions business's command shape, filed under its projection until sessions publishes its public command surface; the entry goes when it does (T07)."
     },
     {
-      "from": "client/features/sessions/application/unread.ts",
-      "to": "client/features/turn/application/active-turn-probe.ts",
-      "reason": "The unread controller decides whether a session is still working by asking the turn business for its active-turn probe; before the sessions owner moved into features/sessions/ both files sat in the application layer, so the edge was intra-layer. The probe is a turn read that turn has not published as a public contract yet; the entry goes when it does."
-    },
-    {
       "from": "client/features/sessions/application/session-workflows.ts",
       "to": "client/features/composer/application/composer-store.ts",
       "reason": "Archiving or deleting a session clears that session's Composer draft, so the workflow calls the composer store's own clear. Repointed when T13 moved the composer owner into its feature home; the entry goes when composer publishes a public clear command."

@@ -8,10 +8,10 @@
 import { WEBUI_HOME_SESSION_KEY } from "../../../application/state.js";
 import type {
   WebuiSubmissionAdmissionState,
-  WebuiSubmissionDecision,
+  WebuiSubmissionAdmission,
 } from "../contracts/submission.js";
 import type { WebuiTurnCapabilitySlice } from "./turn-capabilities.js";
-import { decideWebuiSubmissionAdmission } from "./submission-admission.js";
+import { admitWebuiSubmission } from "./submission-admission.js";
 
 /** The target a submission names. An absent session is the home surface. */
 export interface WebuiExecutionTarget {
@@ -59,6 +59,6 @@ export function readWebuiSubmissionAdmissionState(
 export function classifyWebuiSubmission(
   deps: WebuiExecutionObservationDeps,
   target: WebuiExecutionTarget,
-): WebuiSubmissionDecision {
-  return decideWebuiSubmissionAdmission(readWebuiSubmissionAdmissionState(deps, target));
+): WebuiSubmissionAdmission {
+  return admitWebuiSubmission(readWebuiSubmissionAdmissionState(deps, target));
 }

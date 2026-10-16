@@ -35,7 +35,7 @@ import type { WebuiPluginManagementAction } from "../../shared/plugin-management
 import { createWebuiComposerPluginCatalogue } from "../features/plugins/application/composer-catalogue.js";
 import { createWebuiPluginActions } from "../features/plugins/contracts/plugin-actions.js";
 import { createWebuiPlanReviewWorkflow } from "../features/interactions/application/interaction-coordinator.js";
-import { webuiActiveTurnProbeFor } from "../features/turn/application/active-turn-probe.js";
+import { webuiActiveTurnProbeFor } from "../features/turn/contracts/active-turn-probe.js";
 import {
   createWebuiEventCoordinator,
   type WebuiEventCoordinator,

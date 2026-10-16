@@ -165,12 +165,12 @@ describe("an attempt the client started is closable by the application", () => {
       deliveries: app.deliveries,
     });
 
-    const outcome = await commands.send({
+    const ticket = commands.send({
       message: "hello",
       callbacks: { onDraftChange: () => undefined },
     });
 
-    expect(outcome).toMatchObject({ completion: { kind: "dispatched" } });
+    await expect(ticket?.completion).resolves.toMatchObject({ kind: "dispatched" });
     // The submit-lifecycle flag came back down, and the attempt released its own
     // handle when it ended: that release is not a detach, so nothing was closed.
     expect(app.store.readSession("s1").sending).toBe(false);
@@ -213,13 +213,12 @@ describe("an attempt the client started is closable by the application", () => {
     });
 
     let outcome: "pending" | "settled" | "rejected" = "pending";
+    // The ticket's completion never rejects, so there is no rejection arm here
+    // that the caller could forget: a submission that failed settles as a value.
     void commands
       .send({ message: "hello", callbacks: { onDraftChange: () => undefined } })
-      .then(() => {
+      ?.completion.then(() => {
         outcome = "settled";
-      })
-      .catch(() => {
-        outcome = "rejected";
       });
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(app.deliveries.count("s1")).toBe(1);

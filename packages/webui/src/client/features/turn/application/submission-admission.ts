@@ -6,8 +6,8 @@
 // added as the first thing a second submission meets; each branch names the baseline it preserves.
 
 import type {
+  WebuiSubmissionAdmission,
   WebuiSubmissionAdmissionState,
-  WebuiSubmissionDecision,
 } from "../contracts/submission.js";
 
 /**
@@ -33,24 +33,31 @@ import type {
  *    The baseline returned silently for that last shape (`!args.deps.sendMessage` after the queue
  *    branch), and a queue capability is not a dispatch capability.
  */
-export function decideWebuiSubmissionAdmission(
+export function admitWebuiSubmission(
   state: WebuiSubmissionAdmissionState,
-): WebuiSubmissionDecision {
-  if (!state.canSend && !state.canEnqueue) return "unsupported";
-  if (state.creating) return "busy";
-  if (!state.hasSession) return state.canCreateSession ? "dispatching" : "needs-session";
-  if (state.turnLive) return state.canEnqueue ? "queued" : "busy";
-  return state.canSend ? "dispatching" : "unsupported";
+): WebuiSubmissionAdmission {
+  if (!state.canSend && !state.canEnqueue) {
+    return { kind: "unsupported", missing: "transport" };
+  }
+  if (state.creating) return { kind: "busy", reason: "creating" };
+  if (!state.hasSession) {
+    return state.canCreateSession ? { kind: "dispatching" } : { kind: "needs-session" };
+  }
+  if (state.turnLive) {
+    return state.canEnqueue ? { kind: "queued" } : { kind: "busy", reason: "turn-live" };
+  }
+  // A queue capability is not a dispatch capability: with a session, no live turn
+  // and no way to send, there is nothing this submission can do.
+  return state.canSend ? { kind: "dispatching" } : { kind: "unsupported", missing: "transport" };
 }
 
 /**
- * The refusal a decision implies, for the decisions that refuse. `undefined` for `dispatching` and
- * `queued`: those have not refused anything, and their completion comes from the attempt.
+ * The string form of an admission, for the places that still compare rather than
+ * branch. Derived from the union so the two can never disagree.
  */
 export function webuiSubmissionRefusalFor(
-  decision: WebuiSubmissionDecision,
+  admission: WebuiSubmissionAdmission,
 ): "busy" | "unsupported" | "needs-session" | undefined {
-  if (decision === "busy" || decision === "unsupported" || decision === "needs-session")
-    return decision;
-  return undefined;
+  if (admission.kind === "dispatching" || admission.kind === "queued") return undefined;
+  return admission.kind;
 }

@@ -10,7 +10,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { createWebuiActiveTurnProbe, webuiActiveTurnProbeFor } from "../../src/client/features/turn/application/active-turn-probe.js";
+import { createWebuiActiveTurnProbe, webuiActiveTurnProbeFor } from "../../src/client/features/turn/contracts/active-turn-probe.js";
 import {
   createWebuiUnreadController,
   type WebuiUnreadStore,
@@ -703,15 +703,18 @@ describe("the send command", () => {
       setStreamRefusal: vi.fn(),
       setTurnSending: vi.fn(),
     };
-    await sendWebuiTurn({
+    const ticket = sendWebuiTurn({
       sessionId: "s1",
-      message: "queued",
+      intent: { kind: "ordinary", message: "queued" },
+      admission: { kind: "queued" },
       sending: true,
       callbacks: { onDraftChange },
       deps: { sendMessage: vi.fn() },
       enqueueMessage,
       createWriter: () => writer,
     });
+    expect(ticket?.admission).toEqual({ kind: "queued" });
+    await ticket?.completion;
     expect(enqueueMessage).toHaveBeenCalledWith({ id: "s1", content: "queued" });
     expect(writer.setTurnSending).not.toHaveBeenCalled();
     // The queue branch writes nothing to the stream slice: it is the running

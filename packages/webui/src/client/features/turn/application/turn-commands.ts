@@ -34,10 +34,12 @@ import { createWebuiTurnCommands } from "./turn-command-writer.js";
 import type { WebuiComposerSubmitHandlers } from "../../composer/contracts/composer-turn.js";
 import {
   buildWebuiComposerHandlers,
-  submitWebuiComposerTurn,
+  submitWebuiTurn,
 } from "./composer-submission.js";
 import type {
-  WebuiSubmissionOperation,
+  WebuiSubmissionAdmission,
+  WebuiSubmissionIntent,
+  WebuiSubmissionTicket,
   WebuiTaskSessionSubmitter,
 } from "../contracts/submission.js";
 import { isWebuiSubscriptionProbeCurrent, ownsWebuiStreamGeneration, resolveWebuiSubscriptionRecheck, settleStaleWebuiSubscription, type WebuiStreamState } from "../projection/stream-state.js";
@@ -53,7 +55,7 @@ import {
   webuiActiveTurnProbeFor,
   type WebuiActiveTurnProbe,
   type WebuiActiveTurnProbeFn,
-} from "./active-turn-probe.js";
+} from "../contracts/active-turn-probe.js";
 import { streamStateBundle } from "./stream-state-bundle.js";
 import type { WebuiSessionStore } from "../../../application/session-store.js";
 import { WEBUI_HOME_SESSION_KEY } from "../../../application/state.js";
@@ -211,7 +213,6 @@ export function recoverMissedWebuiTurn(deps: WebuiRecoverMissedTurnDeps): void {
 
 export interface WebuiSendTurnArgs {
   readonly sessionId: string | undefined;
-  readonly message: string;
   /**
    * The task use case, so a first message's creation goes through the one owner.
    * Absent on a host that cannot create, which the submission reports as `unsupported`.
@@ -228,6 +229,10 @@ export interface WebuiSendTurnArgs {
    * intent and never a sink.
    */
   readonly callbacks: WebuiComposerTurnCallbacks;
+  /** What the user asked for, as a kind. */
+  readonly intent: WebuiSubmissionIntent;
+  /** Decided by the owner before any work, so the ticket can say it immediately. */
+  readonly admission: WebuiSubmissionAdmission;
   /** Read the live slice. The home→session migration below changes the key. */
   readonly readStream?: () => WebuiStreamState;
   readonly deps: Omit<WebuiDeliveryDeps, "projection" | "streamState">;
@@ -248,9 +253,33 @@ export interface WebuiSendTurnArgs {
  * obeys — including the "a turn is already in flight ⇒ enqueue" branch inside
  * `submitWebuiComposerTurn`.
  */
-export async function sendWebuiTurn(
+/**
+ * The public send intent, read as one of the submission's kinds.
+ *
+ * This is the mapping the intent union bought: a surface says *what it wants*
+ * (`goal`, a named `command`, prose) and the qualifiers it used to thread — a
+ * `clientIntent` string, a `planMode` flag — stop crossing the boundary at all.
+ * A new kind is a new case here, not a new optional field on four contracts.
+ */
+function toSubmissionIntent(intent: WebuiTurnSendIntent): WebuiSubmissionIntent {
+  if (intent.clientIntent !== undefined) {
+    return {
+      kind: "command",
+      command: intent.clientIntent,
+      ...(intent.message ? { message: intent.message } : {}),
+    };
+  }
+  if (intent.planMode) return { kind: "goal", message: intent.message };
+  return {
+    kind: "ordinary",
+    message: intent.message,
+    ...(intent.attachments ? { attachments: intent.attachments } : {}),
+  };
+}
+
+export function sendWebuiTurn(
   args: WebuiSendTurnArgs,
-): Promise<WebuiSubmissionOperation | undefined> {
+): WebuiSubmissionTicket | undefined {
   let writer = args.createWriter();
   // The bundle is woven here, from the writer this command owns: `createSink`
   // reads the *current* writer, so a turn whose first message created the
@@ -273,30 +302,19 @@ export async function sendWebuiTurn(
       }
     },
   });
-  return await submitWebuiComposerTurn(
-    {
-      sessionId: args.sessionId,
-      // `submitWebuiComposerTurn` reads `message ?? draft` and trims it, so
-      // passing the effective text as `message` re-sends it through exactly the
-      // path an ordinary send takes.
-      draft: args.message,
-      message: args.message,
-      ...(args.clientIntent
-        ? { clientIntent: args.clientIntent }
-        : args.planMode
-          ? { clientIntent: "plan-entry" }
-          : {}),
-      attachments: args.attachments,
-      onAttachmentsSubmitted: args.onAttachmentsSubmitted,
-      sending: args.sending,
-      deps: args.deps,
-      enqueueMessage: args.enqueueMessage,
-      ...(args.taskSessions ? { submitTask: args.taskSessions } : {}),
-      createSessionWorkspaceDir: args.createSessionWorkspaceDir,
-      teamModeOff: args.teamModeOff,
-    },
-    turnHandlers,
-  );
+  return submitWebuiTurn({
+    intent: args.intent,
+    sessionId: args.sessionId,
+    admission: args.admission,
+    sending: args.sending,
+    deps: args.deps,
+    handlers: turnHandlers,
+    ...(args.enqueueMessage ? { enqueueMessage: args.enqueueMessage } : {}),
+    ...(args.taskSessions ? { submitTask: args.taskSessions } : {}),
+    createSessionWorkspaceDir: args.createSessionWorkspaceDir,
+    teamModeOff: args.teamModeOff,
+    onAttachmentsSubmitted: args.onAttachmentsSubmitted,
+  });
 }
 
 /**
@@ -483,7 +501,7 @@ export function createWebuiConversationTurnCommands(
         settleStaleSubscription,
         attach,
       }),
-    send: async (intent) => {
+    send: (intent) => {
       const writer = writerFor();
       const hold = holdDelivery();
       const admissionDeps = {
@@ -493,17 +511,16 @@ export function createWebuiConversationTurnCommands(
       };
       const admission = readWebuiSubmissionAdmissionState(admissionDeps, { sessionId });
       const decision = classifyWebuiSubmission(admissionDeps, { sessionId });
-      return await sendWebuiTurn({
+      const ticket = sendWebuiTurn({
         sessionId,
         ...(taskSessions ? { taskSessions } : {}),
-        message: intent.message,
-        ...(intent.clientIntent ? { clientIntent: intent.clientIntent } : {}),
-        ...(intent.planMode ? { planMode: intent.planMode } : {}),
+        intent: toSubmissionIntent(intent),
+        admission: decision,
         attachments: intent.attachments,
         onAttachmentsSubmitted: intent.onAttachmentsSubmitted,
         // The UI submits intent only. The execution owner reads the canonical
         // target at invocation time so a stale render cannot choose send vs queue.
-        sending: admission.turnLive && decision !== "unsupported" && decision !== "needs-session",
+        sending: admission.turnLive && decision.kind !== "unsupported" && decision.kind !== "needs-session",
         callbacks: intent.callbacks,
         readStream,
         deps: loopDeps(hold),
@@ -515,7 +532,12 @@ export function createWebuiConversationTurnCommands(
         // The writer and, through it, the sink are built here: the caller names
         // no key and holds no factory.
         createWriter: () => writer,
-      }).finally(hold.release);
+      });
+      // The delivery hold covers the attempt, not the decision: releasing it the
+      // moment the ticket exists would let a second submission through while the
+      // first is still dispatching.
+      void ticket?.completion.finally(hold.release);
+      return ticket;
     },
     attach: (turnId) => {
       void attach(turnId);

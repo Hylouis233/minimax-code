@@ -72,10 +72,13 @@ import { looksLikeAbsoluteWorkspacePath } from "../../src/client/projection/comm
 import { submitWebuiGoal } from "../../src/client/features/goal/application/goal-submission.js";
 import {
   buildWebuiComposerHandlers,
-  submitWebuiComposerTurn,
+  submitWebuiTurn,
 } from "../../src/client/features/turn/application/composer-submission.js";
 import { createdWebuiSessionId } from "../../src/client/features/sessions/contracts/session-port.js";
-import type { WebuiComposerSubmitHandlers } from "../../src/client/features/composer/contracts/composer-turn.js";
+import type {
+  WebuiComposerSubmitArgs,
+  WebuiComposerSubmitHandlers,
+} from "../../src/client/features/composer/contracts/composer-turn.js";
 import { createWebuiTurnLifecycleCommands } from "../../src/client/features/turn/application/turn-lifecycle-commands.js";
 import { projectWebuiMessage } from "../../src/client/features/transcript/projection/message-projection.js";
 import { projectLiveTurnView } from "../../src/client/features/transcript/projection/transcript-shape.js";
@@ -977,6 +980,39 @@ describe("WebUI shell", () => {
     expect(html).not.toContain("暂无会话");
   });
 });
+
+/**
+ * One submission, awaited — the shape the cases below read best in.
+ *
+ * These cases assert what the submission **did**, not what it decided; the
+ * admission has its own suite. So the helper supplies the one the owner's rule
+ * would have concluded for the arguments it was given, and returns the
+ * completion the ticket settles with.
+ */
+async function submitTurn(
+  args: WebuiComposerSubmitArgs,
+  handlers: ReturnType<typeof buildWebuiComposerHandlers>,
+) {
+  const ticket = submitWebuiTurn({
+    intent: { kind: "ordinary", message: args.message ?? args.draft ?? "" },
+    admission:
+      args.sending && args.enqueueMessage ? { kind: "queued" } : { kind: "dispatching" },
+    sending: args.sending,
+    deps: args.deps,
+    handlers,
+    ...(args.enqueueMessage ? { enqueueMessage: args.enqueueMessage } : {}),
+    ...(args.submitTask ? { submitTask: args.submitTask } : {}),
+    ...(args.createSessionWorkspaceDir
+      ? { createSessionWorkspaceDir: args.createSessionWorkspaceDir }
+      : {}),
+    ...(args.teamModeOff === undefined ? {} : { teamModeOff: args.teamModeOff }),
+    ...(args.onAttachmentsSubmitted
+      ? { onAttachmentsSubmitted: args.onAttachmentsSubmitted }
+      : {}),
+    ...(args.sessionId === undefined ? {} : { sessionId: args.sessionId }),
+  });
+  return ticket?.completion;
+}
 
 describe("WebUI shell — desktop anatomy", () => {
   it("declares the shell as a two-column rail plus surface", () => {
@@ -1990,7 +2026,7 @@ describe("WebUI composer app-to-helper seam", () => {
         onFrame({ dataJson: "[DONE]" });
       },
     );
-    await submitWebuiComposerTurn(
+    await submitTurn(
       { sessionId: "s", draft: "hi", sending: false, deps: { sendMessage } },
       buildWebuiComposerHandlers({
         ...handlerWrites,
@@ -2021,7 +2057,7 @@ describe("WebUI composer app-to-helper seam", () => {
     );
     const onSessionCreated = vi.fn();
 
-    await submitWebuiComposerTurn(
+    await submitTurn(
       {
         draft: "start working",
         sending: false,
@@ -2065,7 +2101,7 @@ describe("WebUI composer app-to-helper seam", () => {
       events.push("session-created");
     });
 
-    await submitWebuiComposerTurn(
+    await submitTurn(
       {
         draft: "hi",
         sending: false,
@@ -2102,7 +2138,7 @@ describe("WebUI composer app-to-helper seam", () => {
     });
     const onSessionCreated = vi.fn();
 
-    await submitWebuiComposerTurn(
+    await submitTurn(
       {
         draft: "你好",
         sending: false,
@@ -2162,7 +2198,7 @@ describe("WebUI composer app-to-helper seam", () => {
     const submit = vi.fn(async () => ({ kind: "created" as const, sessionId: "created", selected: true }));
     const sendMessage: WebuiClientMessageSender = vi.fn(async () => undefined);
 
-    await submitWebuiComposerTurn(
+    await submitTurn(
       {
         draft: "hi",
         sending: false,
@@ -2194,7 +2230,7 @@ describe("WebUI composer app-to-helper seam", () => {
       onFrame({ dataJson: "[DONE]" });
     });
 
-    await submitWebuiComposerTurn(
+    await submitTurn(
       {
         draft: "hi",
         sending: false,
@@ -2264,7 +2300,7 @@ describe("WebUI composer app-to-helper seam", () => {
     }));
     const onDraftChange = vi.fn();
     const onQueued = vi.fn();
-    await submitWebuiComposerTurn(
+    await submitTurn(
       {
         sessionId: "s",
         draft: "second turn",
@@ -2792,7 +2828,7 @@ describe("WebUI composer transcriptIncomplete", () => {
         onFrame({ dataJson: "[DONE]" });
       },
     );
-    await submitWebuiComposerTurn(
+    await submitTurn(
       {
         sessionId: "s",
         draft: "你好",

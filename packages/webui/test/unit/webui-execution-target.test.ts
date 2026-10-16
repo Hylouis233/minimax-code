@@ -74,14 +74,16 @@ describe("D01: the reservation belongs to a home submission", () => {
   it("classifies a home submission while a creation is in flight as busy", () => {
     // One create, and the second submission leaves its input alone.
     const { deps } = host({ taskSessions: { creationPending: () => true } });
-    expect(classifyWebuiSubmission(deps, {})).toBe("busy");
+    expect(classifyWebuiSubmission(deps, {})).toEqual({ kind: "busy", reason: "creating" });
   });
 
   it("does not let a pending home creation block a session target", () => {
     // The reservation is per home incarnation; a session target is not waiting on a creation.
     const { deps } = host({ taskSessions: { creationPending: () => true } });
     expect(readWebuiSubmissionAdmissionState(deps, { sessionId: "session-A" }).creating).toBe(false);
-    expect(classifyWebuiSubmission(deps, { sessionId: "session-A" })).toBe("dispatching");
+    expect(classifyWebuiSubmission(deps, { sessionId: "session-A" })).toEqual({
+      kind: "dispatching",
+    });
   });
 
   it("treats a host with no creation use case as having no reservation", () => {
@@ -93,27 +95,35 @@ describe("D01: the reservation belongs to a home submission", () => {
 describe("the classification a caller sees", () => {
   it("dispatches a first home message", () => {
     const { deps } = host();
-    expect(classifyWebuiSubmission(deps, {})).toBe("dispatching");
+    expect(classifyWebuiSubmission(deps, {})).toEqual({ kind: "dispatching" });
   });
 
   it("queues onto a live turn, and is busy when it cannot queue", () => {
     const live = host({ store: { readSession: () => ({ sending: true }) } });
-    expect(classifyWebuiSubmission(live.deps, { sessionId: "session-A" })).toBe("queued");
+    expect(classifyWebuiSubmission(live.deps, { sessionId: "session-A" })).toEqual({
+      kind: "queued",
+    });
     const queueLess = host({
       store: { readSession: () => ({ sending: true }) },
       capabilities: { send: async () => undefined },
     });
-    expect(classifyWebuiSubmission(queueLess.deps, { sessionId: "session-A" })).toBe("busy");
+    expect(classifyWebuiSubmission(queueLess.deps, { sessionId: "session-A" })).toEqual({
+      kind: "busy",
+      reason: "turn-live",
+    });
   });
 
   it("asks for a session when the host cannot create one", () => {
     const { deps } = host({ capabilities: { send: async () => undefined } });
-    expect(classifyWebuiSubmission(deps, {})).toBe("needs-session");
+    expect(classifyWebuiSubmission(deps, {})).toEqual({ kind: "needs-session" });
   });
 
   it("refuses a host with no transport at all, before it would create", () => {
     // The creator is wired and still must not be reached: there is nowhere to deliver the message.
     const { deps } = host({ capabilities: { createSession: async () => ({ sessionId: "c" }) } });
-    expect(classifyWebuiSubmission(deps, {})).toBe("unsupported");
+    expect(classifyWebuiSubmission(deps, {})).toEqual({
+      kind: "unsupported",
+      missing: "transport",
+    });
   });
 });
