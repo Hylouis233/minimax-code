@@ -5,13 +5,23 @@
 import type { WebuiHarnessPort } from "../port.js";
 import type { WebuiRuntimeHostHandle } from "./host-contract.js";
 import { requireCliService } from "./requirements.js";
+import {
+  toWebuiModelEntries,
+  toWebuiRecord,
+  toWebuiRecordList,
+} from "./result-conversion.js";
 
 export function createModelsPluginsAdapter(
   host: WebuiRuntimeHostHandle,
 ): Pick<WebuiHarnessPort, "listModels" | "selectModel" | "listSkills" | "pluginManagement" | "listUserModelProviders" | "createUserModelProvider" | "updateUserModelProvider" | "deleteUserModelProvider" | "testUserModelProvider" | "testUserModel" | "discoverUserModelsCandidate" | "saveUserModelProviderCandidate" | "listProviderPresets" | "getMiniMaxApiKeyStatus" | "upsertMiniMaxApiKey" | "getCodexOAuthStatus" | "getMiniMaxModelSource" | "setMiniMaxModelSource" | "testUserModelCandidate" | "revealModelProviderApiKey" | "startCodexOAuthLogin" | "cancelCodexOAuthLogin" | "refreshModels"> {
   return {
     async listModels(request) {
-      return requireCliService(host).listModels(request);
+      // Converted: the runtime lists untyped entries, and the wire's entry has
+      // two fields that make an entry selectable at all. A row without them is
+      // dropped here rather than rendered and failing when clicked.
+      return toWebuiModelEntries(
+        await requireCliService(host).listModels(request),
+      );
     },
 
     async selectModel(request) {
@@ -78,7 +88,9 @@ export function createModelsPluginsAdapter(
     },
 
     async listProviderPresets() {
-      return requireCliService(host).listProviderPresets();
+      return toWebuiRecordList(
+        await requireCliService(host).listProviderPresets(),
+      );
     },
 
     async getMiniMaxApiKeyStatus() {
@@ -90,7 +102,7 @@ export function createModelsPluginsAdapter(
     },
 
     async getCodexOAuthStatus() {
-      return requireCliService(host).getCodexOAuthStatus();
+      return toWebuiRecord(await requireCliService(host).getCodexOAuthStatus());
     },
 
     async getMiniMaxModelSource() { return requireCliService(host).getMiniMaxModelSource(); },

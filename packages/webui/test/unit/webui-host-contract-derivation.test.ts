@@ -18,11 +18,16 @@
  * name in the message. This file is in `tsconfig.test.json`'s `include` for
  * exactly that reason: a probe in a file no gate compiles proves nothing.
  *
- * What this does not do: remove the mirror. The 22 results below are still
- * declared twice, and `assembly.ts` still states the difference with one cast.
- * Deriving them member by member and converting runtime -> wire explicitly is
- * the remaining work; until then, this file makes the difference measured
- * instead of assumed.
+ * `MISMATCHED_RESULT_NAMES` is now empty, and that is the point: every forwarded
+ * result the runtime does not hand back in the wire's shape converts member by
+ * member in `harness/result-conversion.ts` instead of passing through an
+ * assertion. A name that stops belonging to this list is not a bookkeeping
+ * detail — `pnpm typecheck:test` rejects it until its conversion lands, which is
+ * what keeps the list honest instead of aspirational.
+ *
+ * What this still does not do: remove `assembly.ts`'s cast entirely. That needs
+ * the *requests* to agree too, and the result list has never tracked requests —
+ * see the note on the cast itself for what is left and why.
  */
 import { describe, expect, it } from "vitest";
 
@@ -58,6 +63,30 @@ const WEBUI_ONLY_NAMES = [
  * The forwarded results that still need an explicit runtime -> wire conversion.
  * This is the remaining work, named member by member.
  *
+ * Six members have left it. `getSessionUsage`, `listProviderPresets` and
+ * `getCodexOAuthStatus` are answers the WebUI contract declares as open records
+ * and the runtime returns interfaces for; an interface is not assignable to an
+ * index-signature type, so no spelling of the declaration could satisfy them and
+ * the adapter now copies the fields instead. `listModels` is the same problem
+ * with two required fields: the runtime lists untyped entries, and an entry with
+ * no provider and model id is not one the picker could select, so the adapter
+ * refuses it rather than rendering a row that fails when clicked.
+ *
+ * Seven more left it as one cause: the runtime declares its answers as
+ * interfaces (`SessionInfoView`, `SessionMessageView`, `FileDiffInfoView`) and
+ * the wire DTOs declare an index signature, and an interface is not assignable to
+ * an index-signature type however alike the two look. `listSessions` also
+ * translates the runtime's numeric `sessionType` into the wire's name, which is
+ * the one genuinely semantic field in the family — the numbering is the runtime's
+ * and a migration can renumber it. The four diff answers share one conversion
+ * because they differ in what surrounds their `diffs` list, not in the list.
+ *
+ * Six more are the plain interface-to-record case: `createSession`,
+ * `updateSession`, `forkSession` and `requestCompaction` answer with an
+ * interface where the wire wants a record; `listPendingPermissions` needs every
+ * required field rebuilt, and `listWorkspaceFileTree` is converted so the panel
+ * can stat the files it keeps.
+ *
  * `readCanvas` and `applyCanvas` are no longer on it: both now go through
  * `result-conversion.ts`, which reads the runtime's own canvas view and rebuilds
  * the WebUI's document field by field. They were on this list because the
@@ -67,28 +96,7 @@ const WEBUI_ONLY_NAMES = [
  * its conversion lands, and the compiler decides that: adding a name that already
  * satisfies the wire type fails `pnpm typecheck:test`.
  */
-const MISMATCHED_RESULT_NAMES = [
-  "listSessions",
-  "getSessionTree",
-  "createSession",
-  "updateSession",
-  "forkSession",
-  "sendMessage",
-  "getMessages",
-  "getSessionUsage",
-  "resumeSession",
-  "requestCompaction",
-  "listPendingPermissions",
-  "watchEvents",
-  "listWorkspaceFileTree",
-  "getSessionDiff",
-  "getTurnDiff",
-  "revertTurnDiff",
-  "reapplyTurnDiff",
-  "listModels",
-  "listProviderPresets",
-  "getCodexOAuthStatus",
-] as const satisfies readonly MismatchedResultNames[];
+const MISMATCHED_RESULT_NAMES = [] as const satisfies readonly MismatchedResultNames[];
 
 /** A sample of what the runtime declares and the WebUI deliberately does not forward. */
 const NOT_FORWARDED_NAMES = [
@@ -137,7 +145,7 @@ describe("the WebUI host surface against the runtime it forwards to", () => {
   });
 
   it("names every forwarded result that still needs a conversion", () => {
-    expect(MISMATCHED_RESULT_NAMES).toHaveLength(20);
+    expect(MISMATCHED_RESULT_NAMES).toHaveLength(0);
     // A compatible result is not in the list, so the list cannot be padded.
     // @ts-expect-error `archiveSession`'s result already satisfies the wire type
     const alreadyCompatible: MismatchedResultNames = "archiveSession";
@@ -147,6 +155,12 @@ describe("the WebUI host surface against the runtime it forwards to", () => {
     // @ts-expect-error `readCanvas` is converted, not merely forwarded
     const converted: MismatchedResultNames = "readCanvas";
     expect(converted).toBe("readCanvas");
+    // @ts-expect-error `listModels` has an explicit conversion too
+    const convertedList: MismatchedResultNames = "listModels";
+    expect(convertedList).toBe("listModels");
+    // @ts-expect-error `listSessions` translates the runtime's numeric session type
+    const convertedSession: MismatchedResultNames = "listSessions";
+    expect(convertedSession).toBe("listSessions");
   });
 
   it("forwards a subset, and every forwarded name still exists on the runtime", () => {

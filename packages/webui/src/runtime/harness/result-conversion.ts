@@ -27,6 +27,28 @@ import type {
   WebuiWorkspaceReviewSummary,
 } from "../../shared/contracts/review.js";
 import type { WebuiCanvasDocument } from "../../shared/contracts/canvas.js";
+import type { WebuiModelEntry } from "../../shared/contracts/models.js";
+import type {
+  WebuiRuntimeEvent,
+  WebuiStreamFrame,
+  WebuiStreamResult,
+} from "../../shared/contracts/stream.js";
+import type { WebuiWorkspaceFile } from "../../shared/contracts/workspace.js";
+import type { WebuiRuntimeAttachment } from "./host-contract.js";
+import type { WebuiEnqueueMessageResult } from "../../shared/contracts/queue.js";
+import type { WebuiEditSessionMessageResult } from "../../shared/contracts/session.js";
+import type { WebuiPendingPermission } from "../../shared/contracts/interactions.js";
+import type {
+  WebuiMessage,
+  WebuiMessagesResult,
+} from "../../shared/contracts/messages.js";
+import type {
+  WebuiFileDiffInfoView,
+  WebuiSessionListItem,
+  WebuiSessionPage,
+  WebuiSessionTreePage,
+} from "../../shared/contracts/session.js";
+
 
 /**
  * A runtime value that could not be converted.
@@ -241,5 +263,418 @@ export function toWebuiCanvasApplyResult(value: unknown): {
   return {
     operationId: requiredText(result.operationId, "an operation id"),
     document: toWebuiCanvasDocument(result.document),
+  };
+}
+
+/**
+ * An open record the WebUI contract declares as `Record<string, unknown>`.
+ *
+ * These members are "the runtime decides the shape, the WebUI does not care
+ * which one". They were the reason a whole-layer assertion existed: the runtime
+ * returns interfaces, and an interface is not assignable to an index-signature
+ * type, so `Record<string, unknown>` could not be satisfied by the runtime's own
+ * answer no matter how the mirror was written. Copying the fields is the
+ * conversion that says what the WebUI contract actually promises — an opaque
+ * record — instead of asserting a compatibility that never existed.
+ */
+export function toWebuiRecord(value: unknown): Record<string, unknown> {
+  const source = record(value);
+  // Rebuilt rather than returned: the WebUI contract owns a plain record, and
+  // handing back the runtime's object would let a later mutation on either side
+  // change what the other believes it read.
+  return { ...source };
+}
+
+export function toWebuiRecordList(value: unknown): readonly Record<string, unknown>[] {
+  return list(value).map(toWebuiRecord);
+}
+
+/**
+ * The model catalogue.
+ *
+ * `providerId` and `modelId` are the only fields the wire contract requires, and
+ * they are the two a model *is*: an entry that arrives without them is not a
+ * model the client could select, and reporting it as one would put a row in the
+ * picker that fails when clicked. Everything else is passed through, because
+ * `WebuiModelEntry` declares an index signature precisely so a runtime field the
+ * WebUI has not named yet still reaches the surface that wants it.
+ */
+export function toWebuiModelEntries(value: unknown): readonly WebuiModelEntry[] {
+  return list(value).map((entry) => {
+    const model = record(entry);
+    const providerId = model.providerId;
+    const modelId = model.modelId;
+    if (typeof providerId !== "string" || !providerId || typeof modelId !== "string" || !modelId) {
+      throw new WebuiResultShapeError(
+        "the runtime listed a model with no provider id or model id",
+      );
+    }
+    return { ...model, providerId, modelId } as WebuiModelEntry;
+  });
+}
+
+/**
+ * The runtime's view types, as plain records.
+ *
+ * Most of what remains is one cause wearing different clothes. The runtime
+ * declares its answers as `interface`s — `SessionInfoView`, `SessionMessageView`,
+ * `FileDiffInfoView` — and the WebUI's wire DTOs declare an index signature, and
+ * an interface is not assignable to an index-signature type however alike the
+ * two look. No spelling of the declaration closes that gap, which is why these
+ * members sat behind a whole-layer assertion rather than behind a missing type.
+ *
+ * Copying is the conversion that says what the wire contract actually promises:
+ * an open record whose named fields mean what the WebUI says they mean. The
+ * required-field list is the part that matters, because it is where the WebUI's
+ * contract is allowed to be strict: a record missing an identity is not
+ * converted into a record with an empty one.
+ */
+export function toWebuiView<T>(
+  value: unknown,
+  required: readonly string[],
+  what: string,
+): T {
+  const source = record(value);
+  for (const field of required) {
+    if (source[field] === undefined || source[field] === null) {
+      throw new WebuiResultShapeError(`the runtime's ${what} is missing ${field}`);
+    }
+  }
+  return { ...source } as T;
+}
+
+/** The runtime's numeric session type, as the wire's string. */
+const SESSION_TYPE_NAMES: Readonly<Record<number, string>> = { 0: "branch", 1: "root" };
+
+/**
+ * A session, as the list and the tree both report it.
+ *
+ * The one genuinely semantic field is `sessionType`: the runtime sends a number
+ * (`SessionTypeView.Root === 1`) and the wire carries a name. Translating it here
+ * is what lets a client branch on "is this a root session" without hard-coding
+ * the runtime's numbering — and numbering is exactly the kind of thing a
+ * migration renumbers.
+ */
+function toSessionListItem(value: unknown): WebuiSessionListItem {
+  const source = record(value);
+  const sessionType = source.sessionType;
+  return {
+    ...source,
+    sessionId: requiredText(source.sessionId, "a session id"),
+    agentName: text(source.agentName, ""),
+    createdAt: count(source.createdAt),
+    updatedAt: count(source.updatedAt),
+    ...(typeof sessionType === "number" && SESSION_TYPE_NAMES[sessionType] !== undefined
+      ? { sessionType: SESSION_TYPE_NAMES[sessionType] }
+      : typeof sessionType === "string"
+        ? { sessionType }
+        : {}),
+  } as WebuiSessionListItem;
+}
+
+export function toWebuiSessionPage(value: unknown): WebuiSessionPage {
+  const page = record(value);
+  return {
+    sessions: list(page.sessions).map(toSessionListItem),
+    hasMore: page.hasMore === true,
+    ...(typeof page.nextCursor === "string" ? { nextCursor: page.nextCursor } : {}),
+  };
+}
+
+export function toWebuiSessionTreePage(value: unknown): WebuiSessionTreePage {
+  const page = record(value);
+  return {
+    sessions: list(page.sessions ?? page.nodes).map((node) => {
+      const parent = record(node);
+      return {
+        // The wire nests each session under `session` and its children under
+        // `childSessions`; the runtime reports them flat. The nesting is the
+        // WebUI's own and the adapter is where the two meet, so a surface reading
+        // the tree never has to know the runtime's arrangement.
+        session: toSessionListItem(parent.session ?? parent),
+        childSessions: list(parent.childSessions ?? parent.children).map(toSessionListItem),
+      };
+    }),
+    hasMore: page.hasMore === true,
+    ...(typeof page.nextCursor === "string" ? { nextCursor: page.nextCursor } : {}),
+  };
+}
+
+/** One stored message. `msgId` is the only field the wire cannot do without. */
+export function toWebuiMessage(value: unknown): WebuiMessage {
+  return toWebuiView<WebuiMessage>(value, ["msgId"], "message");
+}
+
+export function toWebuiMessagesResult(value: unknown): WebuiMessagesResult {
+  const result = record(value);
+  return {
+    ...result,
+    ...(Array.isArray(result.messages)
+      ? { messages: (result.messages as unknown[]).map(toWebuiMessage) }
+      : {}),
+  } as WebuiMessagesResult;
+}
+
+/** A diff entry. Its identity is the pair that names which file and which side. */
+export function toWebuiFileDiff(value: unknown): WebuiFileDiffInfoView {
+  return toWebuiView<WebuiFileDiffInfoView>(value, ["fileId"], "file diff");
+}
+
+/**
+ * A diff answer.
+ *
+ * Generic over the four operations that share the shape (`getSessionDiff`,
+ * `getTurnDiff`, `revertTurnDiff`, `reapplyTurnDiff`), because they differ in
+ * what surrounds their `diffs` list and not in the list itself — which is the
+ * only part whose element type had to change.
+ */
+export function toWebuiDiffResult<T>(value: unknown): T {
+  const result = record(value);
+  return {
+    ...result,
+    ...(Array.isArray(result.diffs)
+      ? { diffs: (result.diffs as unknown[]).map(toWebuiFileDiff) }
+      : {}),
+  } as T;
+}
+
+/** One workspace tree entry, recursively. */
+/** The runtime's answer, as a plain record, for an adapter that reads two of its fields. */
+export function asWebuiRecord(value: unknown): Record<string, unknown> {
+  return record(value);
+}
+
+export function toWebuiWorkspaceFiles(value: unknown): readonly WebuiWorkspaceFile[] {
+  return list(value).map((entry) => {
+    const node = record(entry);
+    return {
+      ...node,
+      path: requiredText(node.path, "a path"),
+      name: requiredText(node.name, "a name"),
+      ...(typeof node.type === "string" ? { type: node.type } : {}),
+      ...(Array.isArray(node.children)
+        ? { children: toWebuiWorkspaceFiles(node.children) }
+        : {}),
+    } as WebuiWorkspaceFile;
+  });
+}
+
+/**
+ * One pending permission request.
+ *
+ * Every field here is required, and `ruleContents` is the one that must not be
+ * defaulted: it is the list the dialog shows the user as the thing being asked
+ * for. An empty list would render a permission request that grants nothing and
+ * explains nothing, which is the one outcome worse than refusing the read.
+ */
+export function toWebuiPendingPermissions(
+  value: unknown,
+): readonly WebuiPendingPermission[] {
+  return list(value).map((entry) => {
+    const request = record(entry);
+    if (!Array.isArray(request.ruleContents)) {
+      throw new WebuiResultShapeError(
+        "the runtime listed a permission request with no rule contents",
+      );
+    }
+    return {
+      ...request,
+      requestId: requiredText(request.requestId, "a request id"),
+      sessionId: requiredText(request.sessionId, "a session id"),
+      agentName: text(request.agentName, ""),
+      toolName: text(request.toolName, ""),
+      ruleContents: (request.ruleContents as unknown[]).map((rule) => String(rule)),
+      reason: text(request.reason, ""),
+      allowAlwaysSupported: request.allowAlwaysSupported === true,
+      createdAt: count(request.createdAt),
+    } as WebuiPendingPermission;
+  });
+}
+
+/**
+ * The compaction answer.
+ *
+ * An open record on both sides; the runtime simply answers with an interface, so
+ * the conversion copies it.
+ */
+export function toWebuiCompactionResult(value: unknown): Record<string, unknown> {
+  return toWebuiRecord(value);
+}
+
+/**
+ * A session-stream answer: an iterable source of frames, or a structured failure.
+ *
+ * Both `sendMessage` and `resumeSession` answer with this envelope, and the
+ * conversion has two halves because the difference is in two places. The failure
+ * body already carries the wire's `key`/`message`/`detail`, so it is copied
+ * rather than reshaped. The frames are not: the runtime's view type declares
+ * `messageActionDeltas` as its own interface, and the wire declares the list as
+ * open records — the same index-signature gap as everywhere else, reached here
+ * through an iterator.
+ *
+ * The source is wrapped rather than drained. A session stream is unbounded and
+ * long-lived; collecting it to convert it would turn "start a turn" into "buffer
+ * the whole turn", which is the failure mode this conversion exists to avoid.
+ * Each frame is converted as it is pulled, so a shape drift surfaces at the
+ * frame that caused it instead of after the stream has already ended.
+ */
+export function toWebuiStreamResult(value: unknown): WebuiStreamResult {
+  const envelope = record(value);
+  if (envelope.ok !== true) {
+    const body = record(envelope.body);
+    return {
+      ok: false,
+      status: count(envelope.status),
+      body: {
+        ...(typeof body.key === "string" ? { key: body.key } : {}),
+        // `message` is required by the wire and by every reader of a failed
+        // stream. A failure body without one is not a failure a caller can
+        // report, so it is refused here rather than turned into an empty string.
+        message: requiredText(body.message, "a failure message"),
+        ...(typeof body.detail === "string" ? { detail: body.detail } : {}),
+      },
+    };
+  }
+  const source = envelope.source;
+  const toFrame = (frame: unknown): WebuiStreamFrame => {
+    const view = record(frame);
+    return {
+      ...view,
+      ...(Array.isArray(view.messageActionDeltas)
+        ? { messageActionDeltas: (view.messageActionDeltas as unknown[]).map(toWebuiRecord) }
+        : {}),
+    } as WebuiStreamFrame;
+  };
+  if (Symbol.asyncIterator in Object(source)) {
+    const iterable = source as AsyncIterable<unknown>;
+    return {
+      ok: true,
+      source: {
+        [Symbol.asyncIterator](): AsyncIterator<WebuiStreamFrame> {
+          const iterator = iterable[Symbol.asyncIterator]();
+          return {
+            // The final step carries `value: undefined`; converting that would
+            // read a frame that was never sent. Only a yielded value is a frame.
+            next: async () => {
+              const step = await iterator.next();
+              if (step.done) return { done: true as const, value: undefined };
+              return { done: false as const, value: toFrame(step.value) };
+            },
+            return: async (value?: unknown) => {
+              await iterator.return?.(value);
+              return { done: true as const, value: undefined };
+            },
+          };
+        },
+      },
+    };
+  }
+  return { ok: true, source: [...(source as Iterable<unknown>)].map(toFrame) };
+}
+
+/**
+ * The event stream, as the wire's event.
+ *
+ * Same cause as the stream frames, and the same answer: the runtime's event
+ * `payload` is a discriminated union keyed by event type, and the wire declares
+ * it as an open record. A union of interfaces cannot satisfy an index signature,
+ * so this wraps the iterable and copies each payload as it is pulled — never
+ * draining it, because this stream runs for the life of the application.
+ *
+ * `type`, `timestamp` and `source` are passed through rather than rebuilt: they
+ * are the event's identity, and an event that arrived without a type could not be
+ * routed to the surface that cares about it, so that is refused.
+ */
+export function toWebuiEventStream(
+  source: AsyncIterable<unknown>,
+): AsyncIterable<WebuiRuntimeEvent> {
+  return {
+    [Symbol.asyncIterator](): AsyncIterator<WebuiRuntimeEvent> {
+      const iterator = source[Symbol.asyncIterator]();
+      return {
+        next: async () => {
+          const step = await iterator.next();
+          if (step.done) return { done: true as const, value: undefined };
+          return { done: false as const, value: toWebuiRuntimeEvent(step.value) };
+        },
+        return: async (value?: unknown) => {
+          await iterator.return?.(value);
+          return { done: true as const, value: undefined };
+        },
+      };
+    },
+  };
+}
+
+function toWebuiRuntimeEvent(value: unknown): WebuiRuntimeEvent {
+  const event = record(value);
+  return {
+    type: requiredText(event.type, "an event type"),
+    timestamp: count(event.timestamp),
+    source: text(event.source, "local-runtime"),
+    payload: toWebuiRecord(event.payload),
+  };
+}
+
+/**
+ * The queue-answer and the edit-answer, both rebuilt field by field.
+ *
+ * Both are closed contracts — every field is named and the type has no index
+ * signature — so unlike the open-record members they cannot be satisfied by
+ * copying. Naming each field is the conversion: it states what the WebUI expects
+ * from an edit that rewound a turn and from a queue item's position, instead of
+ * asserting that the runtime's answer happens to have those fields.
+ */
+export function toWebuiEnqueueResult(value: unknown): WebuiEnqueueMessageResult {
+  const result = record(value);
+  return {
+    ...result,
+    ...(typeof result.itemId === "string" ? { itemId: result.itemId } : {}),
+    ...(typeof result.status === "string" ? { status: result.status } : {}),
+    ...(typeof result.position === "number" ? { position: result.position } : {}),
+  } as WebuiEnqueueMessageResult;
+}
+
+export function toWebuiEditMessageResult(value: unknown): WebuiEditSessionMessageResult {
+  const result = record(value);
+  // `rewound` is the whole answer: whether the edit actually rewound the turn.
+  // Defaulting it would tell the transcript to re-render as though it had.
+  if (typeof result.rewound !== "boolean") {
+    throw new WebuiResultShapeError("the runtime's message-edit result says nothing about whether it rewound");
+  }
+  return {
+    ...result,
+    rewound: result.rewound,
+    ...(Array.isArray(result.deletedMessageIds)
+      ? { deletedMessageIds: (result.deletedMessageIds as unknown[]).map((id) => String(id)) }
+      : {}),
+  } as WebuiEditSessionMessageResult;
+}
+
+/**
+ * A request whose attachments the runtime wants as a mutable list.
+ *
+ * The last mismatch between the mirror and the runtime, and the only one that is
+ * not about a result. `WebuiAttachmentInput` is `readonly` all the way down —
+ * which is right for a wire contract a surface builds — while the runtime's
+ * `AttachmentInput` is mutable, because it keeps and normalises what it is
+ * given. The two agree field for field; only the variance differs.
+ *
+ * Copying the list is the conversion. It is done here, in the adapter, rather
+ * than by loosening the wire contract to be mutable: a contract that other code
+ * can write to after the fact is a contract nobody can rely on.
+ */
+export function toRuntimeAttachmentRequest<
+  T extends { readonly attachments?: readonly unknown[] },
+>(
+  request: T,
+): Omit<T, "attachments"> & { readonly attachments?: WebuiRuntimeAttachment[] } {
+  const attachments = request.attachments;
+  if (attachments === undefined) return request as Omit<T, "attachments"> & { readonly attachments?: WebuiRuntimeAttachment[] };
+  return {
+    ...request,
+    attachments: attachments.map(
+      (attachment) => ({ ...record(attachment) }) as WebuiRuntimeAttachment,
+    ),
   };
 }

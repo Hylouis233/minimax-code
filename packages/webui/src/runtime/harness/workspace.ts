@@ -21,6 +21,7 @@ import {
   toWebuiReviewFileContent,
   toWebuiReviewSearchResult,
   toWebuiReviewSummary,
+  toWebuiWorkspaceFiles,
 } from "./result-conversion.js";
 import type {
   WebuiWorkspaceFile,
@@ -44,14 +45,14 @@ export function createWorkspaceAdapter(
       const tree = await requireHostSlot(
         cliService.listWorkspaceFileTree,
         "Workspace file listing",
-      ).call(cliService, request) as readonly WebuiWorkspaceFile[];
+      ).call(cliService, request);
       // The runtime reports names and shape but no file facts, while the port
       // contract now promises `size` and `modifiedAt` for the panel's metadata
       // column. Statted here because this is the one place that sees both the
       // tree and the filesystem — extending the runtime would put the change
       // outside this package, and a tree that silently omits the fields would
       // leave the column blank rather than failing loudly.
-      return Promise.all(tree.map(async (entry) => {
+      return Promise.all(toWebuiWorkspaceFiles(tree).map(async (entry) => {
         if (entry.type === "directory") return entry;
         try {
           const stats = await stat(path.join(request.workspaceDir, entry.path));

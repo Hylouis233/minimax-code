@@ -5,6 +5,13 @@
 import type { WebuiHarnessPort } from "../port.js";
 import type { WebuiRuntimeHostHandle } from "./host-contract.js";
 import { requireCliService, requireHostSlot } from "./requirements.js";
+import {
+  toWebuiCompactionResult,
+  toWebuiEnqueueResult,
+  toWebuiEventStream,
+  toWebuiStreamResult,
+  toRuntimeAttachmentRequest,
+} from "./result-conversion.js";
 
 export function createExecutionAdapter(
   host: WebuiRuntimeHostHandle,
@@ -36,19 +43,36 @@ export function createExecutionAdapter(
     },
 
     async sendMessage(request, signal) {
-      return requireCliService(host).sendMessage(request, signal ? { signal } : {});
+      return toWebuiStreamResult(
+        await requireCliService(host).sendMessage(
+          toRuntimeAttachmentRequest(request),
+          signal ? { signal } : {},
+        ),
+      );
     },
 
     async enqueueMessage(request) {
-      return requireCliService(host).enqueueMessage(request, {});
+      return toWebuiEnqueueResult(
+        await requireCliService(host).enqueueMessage(
+          toRuntimeAttachmentRequest(request),
+          {},
+        ),
+      );
     },
 
     async resumeSession(request, signal) {
-      return requireCliService(host).resumeSession(request, signal ? { signal } : {});
+      return toWebuiStreamResult(
+        await requireCliService(host).resumeSession(request, signal ? { signal } : {}),
+      );
     },
 
     watchEvents(signal) {
-      return requireCliService(host).watchEvents(signal);
+      // Converted, and not drained: this stream runs for the life of the
+      // application, so each event is copied as it is pulled rather than
+      // collected. The runtime's payload is a per-type union of interfaces and
+      // the wire declares an open record — a union of interfaces cannot satisfy
+      // an index signature however alike the two look.
+      return toWebuiEventStream(requireCliService(host).watchEvents(signal));
     },
 
     async abortSession(request) {
@@ -72,10 +96,12 @@ export function createExecutionAdapter(
       // does not support conversation compaction; folding the two errors
       // into one would only mention the CLI service).
       const cliService = requireCliService(host);
-      return requireHostSlot(
-        cliService.requestCompaction,
-        "requestCompaction",
-      ).call(cliService, request);
+      return toWebuiCompactionResult(
+        await requireHostSlot(
+          cliService.requestCompaction,
+          "requestCompaction",
+        ).call(cliService, request),
+      );
     },
   };
 }

@@ -7,6 +7,7 @@
 import type { WebuiHarnessPort } from "../port.js";
 import type { WebuiRuntimeHostHandle } from "./host-contract.js";
 import { requireCliService, requireHostSlot } from "./requirements.js";
+import { toWebuiRecord } from "./result-conversion.js";
 
 export function createAccountAdapter(
   host: WebuiRuntimeHostHandle,
@@ -68,7 +69,7 @@ export function createAccountAdapter(
     },
 
     async getSessionUsage(request) {
-      return requireCliService(host).getSessionUsage(request);
+      return toWebuiRecord(await requireCliService(host).getSessionUsage(request));
     },
   };
 }

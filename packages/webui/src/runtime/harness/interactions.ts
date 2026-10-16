@@ -7,6 +7,10 @@
 import type { WebuiHarnessPort } from "../port.js";
 import type { WebuiRuntimeHostHandle } from "./host-contract.js";
 import { requireCliService } from "./requirements.js";
+import {
+  asWebuiRecord,
+  toWebuiPendingPermissions,
+} from "./result-conversion.js";
 import type { WebuiPermissionDecision } from "../../shared/contracts/interactions.js";
 
 export function createInteractionsAdapter(
@@ -20,8 +24,14 @@ export function createInteractionsAdapter(
       // every reader — the client already defends with `?? []`
       // (`interaction-coordinator.ts:183`). The runtime's own input type is an
       // empty record, so the absent argument is not a dropped request field.
-      const result = await requireCliService(host).listPendingPermissions();
-      return { requests: result.requests ?? [] };
+      // The runtime's own input type is an empty record, so the argument
+      // carries nothing; it is passed because the signature requires one.
+      const result = await requireCliService(host).listPendingPermissions({});
+      // Converted, and the required fields are the point: `ruleContents` is what
+      // the dialog shows as the thing being asked for, so an entry without it is
+      // refused here rather than rendered as a permission request that grants
+      // nothing and explains nothing.
+      return { requests: toWebuiPendingPermissions(asWebuiRecord(result).requests) };
     },
 
     async getPendingQuestionnaire(request) {

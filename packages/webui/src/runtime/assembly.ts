@@ -434,7 +434,27 @@ const defaultWebuiRuntimeHostFactory: WebuiRuntimeHostFactory = async (
   options,
 ) => {
   const { createLocalRuntimeHostV2 } = await import("@mavis/local-runtime-v2");
-  return (await createLocalRuntimeHostV2(options)) as unknown as Omit<
+  // One assertion, and it is now a small one.
+  //
+  // This cast covered *every* forwarded member for the life of the seam. It is
+  // gone for all of them except three, and that is measurable rather than
+  // believed: `test/unit/webui-host-contract-derivation.test.ts` enumerates the
+  // forwarded results whose type does not match the wire's, and it is empty.
+  // Every one of those answers now converts at the boundary that owns it, in
+  // `harness/result-conversion.ts`, so a runtime that renames a field or changes
+  // what it returns fails there instead of in the browser.
+  //
+  // What the three have in common is that the difference is in the *request*,
+  // not the answer: the WebUI's contracts say `readonly` where the runtime wants
+  // a mutable list it keeps, and the runtime's own model-provider candidate is a
+  // closed type with a required `baseUrl` where the mirror says an open record.
+  // The adapter copies each of those across already — see
+  // `toRuntimeAttachmentRequest` — so the runtime's behaviour is correct; what is
+  // left is that the mirror's declaration is looser than the runtime's, and a
+  // looser parameter type is not assignable where the runtime wants a specific
+  // one. Narrowing those three declarations is the remaining work, and it is a
+  // smaller job than the forty it used to be.
+  return (await createLocalRuntimeHostV2(options)) as Omit<
     WebuiAssembledHost,
     | "invalidateAuth"
     | "getUsageQuota"

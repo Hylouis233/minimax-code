@@ -5,13 +5,28 @@
 import type { WebuiHarnessPort } from "../port.js";
 import type { WebuiRuntimeHostHandle } from "./host-contract.js";
 import { requireCliService, requireHostSlot } from "./requirements.js";
+import {
+  toWebuiDiffResult,
+  toWebuiEditMessageResult,
+  toWebuiMessagesResult,
+  toWebuiRecord,
+  toWebuiSessionPage,
+  toWebuiSessionTreePage,
+  toRuntimeAttachmentRequest,
+} from "./result-conversion.js";
 
 export function createSessionsAdapter(
   host: WebuiRuntimeHostHandle,
 ): Pick<WebuiHarnessPort, "listSessions" | "listVisibleProjects" | "getSessionTree" | "archiveSession" | "deleteSession" | "updateSession" | "getSessionForkOptions" | "forkSession" | "createSession" | "getSession" | "getMessages" | "exportSessionTransfer" | "importSessionTransfer" | "getSessionDiff" | "getTurnDiff" | "revertTurnDiff" | "reapplyTurnDiff" | "getSessionRewindPreview" | "rewindSession" | "editSessionMessage"> {
   return {
     async listSessions(request) {
-      return requireCliService(host).listSessions(request, {});
+      // Converted: the runtime sends `sessionType` as a number and the wire
+      // carries its name. The numbering is the runtime's business and a
+      // migration can renumber it; translating here is what lets a client branch
+      // on "is this a root session" without copying that numbering into a UI.
+      return toWebuiSessionPage(
+        await requireCliService(host).listSessions(request, {}),
+      );
     },
 
     async listVisibleProjects(request) {
@@ -24,7 +39,9 @@ export function createSessionsAdapter(
     },
 
     async getSessionTree(request) {
-      return requireCliService(host).getSessionTree(request, {});
+      return toWebuiSessionTreePage(
+        await requireCliService(host).getSessionTree(request, {}),
+      );
     },
 
     async archiveSession(request) {
@@ -36,7 +53,7 @@ export function createSessionsAdapter(
     },
 
     async updateSession(request) {
-      return requireCliService(host).updateSession(request, {});
+      return toWebuiRecord(await requireCliService(host).updateSession(request, {}));
     },
 
     async getSessionForkOptions(request) {
@@ -44,11 +61,11 @@ export function createSessionsAdapter(
     },
 
     async forkSession(request) {
-      return requireCliService(host).forkSession(request, {});
+      return toWebuiRecord(await requireCliService(host).forkSession(request, {}));
     },
 
     async createSession(request) {
-      return requireCliService(host).createSession(request, {});
+      return toWebuiRecord(await requireCliService(host).createSession(request, {}));
     },
 
     async getSession(request) {
@@ -56,7 +73,12 @@ export function createSessionsAdapter(
     },
 
     async getMessages(request) {
-      return requireCliService(host).getMessages(request, {});
+      // Each message is copied so the wire's `msgId` requirement is a place the
+      // adapter can enforce, rather than a field a surface has to discover is
+      // missing once it is already rendering the transcript.
+      return toWebuiMessagesResult(
+        await requireCliService(host).getMessages(request, {}),
+      );
     },
 
     async exportSessionTransfer(request) {
@@ -68,19 +90,19 @@ export function createSessionsAdapter(
     },
 
     async getSessionDiff(request) {
-      return requireCliService(host).getSessionDiff(request, {});
+      return toWebuiDiffResult(await requireCliService(host).getSessionDiff(request, {}));
     },
 
     async getTurnDiff(request) {
-      return requireCliService(host).getTurnDiff(request, {});
+      return toWebuiDiffResult(await requireCliService(host).getTurnDiff(request, {}));
     },
 
     async revertTurnDiff(request) {
-      return requireCliService(host).revertTurnDiff(request, {});
+      return toWebuiDiffResult(await requireCliService(host).revertTurnDiff(request, {}));
     },
 
     async reapplyTurnDiff(request) {
-      return requireCliService(host).reapplyTurnDiff(request, {});
+      return toWebuiDiffResult(await requireCliService(host).reapplyTurnDiff(request, {}));
     },
 
     async getSessionRewindPreview(request) {
@@ -92,7 +114,12 @@ export function createSessionsAdapter(
     },
 
     async editSessionMessage(request) {
-      return requireCliService(host).editSessionMessage(request, {});
+      return toWebuiEditMessageResult(
+        await requireCliService(host).editSessionMessage(
+          toRuntimeAttachmentRequest(request),
+          {},
+        ),
+      );
     },
   };
 }
