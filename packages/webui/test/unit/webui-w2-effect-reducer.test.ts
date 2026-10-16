@@ -25,6 +25,8 @@ import {
 } from "../../src/client/features/turn/application/effect-reducer.js";
 import {
   applyWebuiEffectCommands,
+  reduceWebuiSessionStatePatch,
+  type WebuiSessionStatePatch,
   applyWebuiEventToSession,
   type WebuiEffectHandlers,
 } from "../../src/client/features/turn/application/event-coordinator.js";
@@ -462,16 +464,25 @@ describe("W2 · stream subscription ownership · one stream per turn", () => {
       ...stale.stream,
       subscription: { owner: "recovered", turnId: "turn-2", generation: 2 },
     };
-    applyWebuiEffectCommands(terminal.commands, {
-      refreshPending: () => undefined,
-      refreshGoal: () => undefined,
-      setSending,
-      setStream,
-      setPermissions: vi.fn(),
-      setQuestionnaire: vi.fn(),
-      setGoal: vi.fn(),
-    }, () => live);
-    expect(setSending).not.toHaveBeenCalled();
+    // The guard is evaluated as the batch folds, against the stream the batch
+    // is leaving behind — the record the earlier patch in this same event wrote,
+    // not a store read from outside it.
+    let folded: { readonly stream: WebuiStreamState; readonly sending: boolean } = live;
+    applyWebuiEffectCommands(
+      terminal.commands,
+      {
+        refreshPending: () => undefined,
+        refreshGoal: () => undefined,
+        applyPatches: (patches) => {
+          folded = patches.reduce(reduceWebuiSessionStatePatch, folded);
+        },
+        setGoal: vi.fn(),
+      },
+      // The live store, which is the only thing that knows turn-2 claimed after
+      // these commands were built.
+      () => live,
+    );
+    expect(folded.sending).toBe(live.sending);
     // The stream patch carries its own guard, so the phase is untouched too.
     for (const cmd of terminal.commands) {
       if (cmd.type === "set-stream" && cmd.patch(live).phase !== live.phase)
@@ -1069,10 +1080,9 @@ describe("D3 · watchEvents reduces each event against the latest stream", () =>
     const handlers: WebuiEffectHandlers = {
         refreshPending: () => undefined,
         refreshGoal: () => undefined,
-        setSending: () => undefined,
-        setStream: (patch) => { store = { ...store, stream: patch(store.stream) }; },
-        setPermissions: (patch) => { store = { ...store, permissions: patch(store.permissions) }; },
-        setQuestionnaire: (patch) => { store = { ...store, questionnaire: patch(store.questionnaire) }; },
+        applyPatches: (patches) => {
+          store = patches.reduce(reduceWebuiSessionStatePatch, store);
+        },
         setGoal: (goal) => { store = { ...store, goal }; },
     };
 
@@ -1137,11 +1147,32 @@ describe("W2.9 · executor · applyWebuiEffectCommands walks commands in order",
       calls,
       refreshPending: record("refreshPending"),
       refreshGoal: record("refreshGoal"),
-      setSending: record("setSending"),
-      setStream: record("setStream"),
-      setPermissions: record("setPermissions"),
-      setQuestionnaire: record("setQuestionnaire"),
+      // One call per event, carrying the event's patches in order. The order the
+      // executor used to prove by counting setter calls is now the order inside
+      // this array — and the single call is itself the property under test.
+      applyPatches: (patches) => {
+        calls.push({ type: "applyPatches", payload: patches.map((p) => p.type) });
+      },
       setGoal: record("setGoal"),
+    };
+  }
+
+  /** Captures the batch itself, not just the shape of it. */
+  function makeBatchCapturingHandlers(): {
+    readonly handlers: WebuiEffectHandlers;
+    readonly batches: WebuiSessionStatePatch[][];
+  } {
+    const batches: WebuiSessionStatePatch[][] = [];
+    return {
+      batches,
+      handlers: {
+        refreshPending: () => undefined,
+        refreshGoal: () => undefined,
+        applyPatches: (patches) => {
+          batches.push([...patches]);
+        },
+        setGoal: () => undefined,
+      },
     };
   }
 
@@ -1153,33 +1184,33 @@ describe("W2.9 · executor · applyWebuiEffectCommands walks commands in order",
       SESSION,
     );
     applyWebuiEffectCommands(result.commands, handlers);
-    expect(handlers.calls.map((c) => c.type)).toEqual([
-      "setStream",
-      "setSending",
-      "setStream",
+    expect(handlers.calls).toEqual([
+      { type: "applyPatches", payload: ["set-stream", "set-sending", "set-stream"] },
     ]);
   });
 
   it("set-sending passes the boolean value, not a patch", () => {
-    const handlers = makeCapturingHandlers();
+    const { handlers, batches } = makeBatchCapturingHandlers();
     const result = reduceWebuiEffect(
       makeState(),
       event({ type: "session.start", payload: { sessionId: SESSION } }),
       SESSION,
     );
-    applyWebuiEffectCommands(result.commands, handlers);
-    expect(handlers.calls[1]).toEqual({ type: "setSending", payload: true });
+    applyWebuiEffectCommands(result.commands, handlers, () => makeState().stream);
+    const sending = batches[0]?.find((patch) => patch.type === "set-sending");
+    expect(sending).toMatchObject({ type: "set-sending", sending: true });
   });
 
-  it("set-stream passes the patch function itself (functional updater)", () => {
-    const handlers = makeCapturingHandlers();
+  it("set-stream carries the patch function itself (functional updater)", () => {
+    const { handlers, batches } = makeBatchCapturingHandlers();
     const result = reduceWebuiEffect(
       makeState(),
       event({ type: "session.start", payload: { sessionId: SESSION } }),
       SESSION,
     );
-    applyWebuiEffectCommands(result.commands, handlers);
-    expect(typeof handlers.calls[0]?.payload).toBe("function");
+    applyWebuiEffectCommands(result.commands, handlers, () => makeState().stream);
+    const stream = batches[0]?.find((patch) => patch.type === "set-stream");
+    expect(typeof (stream as { patch?: unknown } | undefined)?.patch).toBe("function");
   });
 
   it("refresh-goal is executed like any other handler", () => {
@@ -1196,10 +1227,7 @@ describe("W2.9 · executor · applyWebuiEffectCommands walks commands in order",
         return Promise.reject(new Error("boom"));
       },
       refreshGoal: () => undefined,
-      setSending: () => undefined,
-      setStream: () => undefined,
-      setPermissions: () => undefined,
-      setQuestionnaire: () => undefined,
+      applyPatches: () => undefined,
       setGoal: () => undefined,
     };
     const result = reduceWebuiEffect(

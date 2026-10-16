@@ -637,9 +637,6 @@ export function WebuiClientFoundationApp(
   applicationRef.current = application;
   const activityWiring = useMemo(
     () => ({
-      onWorkspaceGitChanged: (
-        listener: Parameters<typeof application.onWorkspaceGitChanged>[0],
-      ) => applicationRef.current.onWorkspaceGitChanged(listener),
       onChannelReady: (listener: () => void) =>
         applicationRef.current.onChannelReady(listener),
       select: (id: string | undefined) => applicationRef.current.select(id),
@@ -660,14 +657,11 @@ export function WebuiClientFoundationApp(
           now: () => Date.now(),
         });
       },
-      subscribeTurnReviewMutations: (listener: () => void) =>
-        applicationRef.current.turnReview?.subscribeMutations(listener) ?? (() => undefined),
     }),
     [],
   );
   const { sessionActivity, activityNow, activityProbeNonce } = useShellActivityWiring({
     sessionStore,
-    workspaceQueries,
     railPage,
     selectedSessionId,
     ...activityWiring,
@@ -676,8 +670,12 @@ export function WebuiClientFoundationApp(
   // The application-wide effects the coordinator runs. It composes the
   // per-session registry the composer registers into with the shell's own
   // reach: the channel-accepted signal re-probes the rail (a reconnect can miss
-  // a `session.start`), and a workspace-git event invalidates the panel
-  // git/review queries through the same coordinator.
+  // a `session.start`).
+  //
+  // The workspace-git and turn-review invalidations are *not* here. They are
+  // links between businesses — one writes the working tree, the other reads it —
+  // so the assembly installs them before event ingress starts rather than the
+  // shell installing them for as long as a view happens to be mounted.
   // The shell never disposes the application: its lifetime belongs to the
   // composition root that built it.
 

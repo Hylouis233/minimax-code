@@ -175,7 +175,7 @@ describe("context-usage panel — the shape the source has to keep", () => {
     readClient("features/composer/ui/composer.css"),
   ].join("\n");
   // The panel lives in its own module; the composer keeps the call site.
-  const indicator = readClient("features/sessions/ui/ContextUsageIndicator.tsx");
+  const indicator = readClient("features/composer/ui/ContextUsageIndicator.tsx");
   // The panel's OWN declaration block and nothing after it. Slicing to the end of
   // the sheet would match every later rule, including rules that have nothing to
   // do with this panel — which is how a tripwire starts passing for the wrong

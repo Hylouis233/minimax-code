@@ -1,5 +1,11 @@
 // The context-usage indicator.
 //
+// It lives in Composer because Composer is its only production consumer: the
+// gauge, the popover and the two projections they render are one surface, and
+// while it sat in the Sessions rail every one of those facts was an edge out of
+// Sessions into four other businesses — including two back into Composer itself.
+// A chip nobody else renders is not Sessions' surface.
+//
 // The composer's context gauge and its popover: the ring, the five-hour and weekly windows, the
 // token-plan figures when the selected model is a plan model, the breakdown rows, and the placement
 // arithmetic that keeps the popover inside the viewport. Its opted-in flag, hover and breakdown state
@@ -8,13 +14,13 @@
 import type { WebuiModelEntry } from "../../../../shared/contracts/models.js";
 import type { WebuiUsageQuotaResult } from "../../../../shared/contracts/usage-quota.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
-import { breakdownSegmentPercent, breakdownShareLabel, breakdownSwatchStyle, contextBreakdownRows, drawableBreakdownRows } from "../../../features/composer/projection/context-breakdown.js";
+import { breakdownSegmentPercent, breakdownShareLabel, breakdownSwatchStyle, contextBreakdownRows, drawableBreakdownRows } from "../projection/context-breakdown.js";
 import {
   contextUsagePopoverStyle,
   positionContextUsagePopover,
   sameContextUsagePlacement,
   type ContextUsagePlacement,
-} from "../../../features/composer/projection/context-usage-popover.js";
+} from "../projection/context-usage-popover.js";
 import { readUsageNumber } from "../../transcript/contracts/message-stream.js";
 import { isTokenPlanModel } from "../../models/projection/token-plan-model.js";
 import { formatUsageResetLabel } from "../../account/projection/usage.js";

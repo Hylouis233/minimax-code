@@ -31,13 +31,13 @@ import { createWebuiAccountWorkflows } from "../features/account/application/acc
 import { createWebuiModelsWorkflows } from "../features/models/application/models-workflows.js";
 import { createWebuiSettingsWorkflows } from "../features/settings/application/settings-workflows.js";
 import { createWebuiPluginWorkflows } from "../features/plugins/application/plugin-workflows.js";
+import type { WebuiPluginManagementAction } from "../../shared/plugin-management.js";
 import { createWebuiComposerPluginCatalogue } from "../features/plugins/application/composer-catalogue.js";
 import { createWebuiPluginActions } from "../features/plugins/contracts/plugin-actions.js";
 import { createWebuiPlanReviewWorkflow } from "../features/interactions/application/interaction-coordinator.js";
 import { webuiActiveTurnProbeFor } from "../features/turn/application/active-turn-probe.js";
 import {
   createWebuiEventCoordinator,
-  type WebuiWorkspaceGitChangedPayload,
   type WebuiEventCoordinator,
 } from "../features/turn/application/event-coordinator.js";
 import type { WebuiOpenEventChannel, WebuiProcessEventChannel } from "../features/turn/application/event-channel.js";
@@ -228,6 +228,27 @@ export interface WebuiApplicationDeps {
   readonly sessionExport?: Parameters<typeof createWebuiSessionWorkflows>[0]["exportSession"];
 }
 
+/**
+ * The writes that make the composer's installed-plugin read stale. The list is
+ * actions rather than methods, because one method can route several actions and
+ * the catalogue only cares what became untrue.
+ */
+const PLUGIN_CATALOGUE_ACTIONS: ReadonlySet<WebuiPluginManagementAction> = new Set([
+  "installPlugin",
+  "uninstallPlugin",
+  "enablePlugin",
+  "disablePlugin",
+  "importGithubPlugin",
+]);
+
+/** The writes that make one agent's composer's skill read stale. */
+const SKILL_CATALOGUE_ACTIONS: ReadonlySet<WebuiPluginManagementAction> = new Set([
+  "installSkill",
+  "createSkill",
+  "setSkillEnabled",
+  "deleteSkill",
+]);
+
 export type WebuiApplicationLifecycleState = "constructed" | "started" | "disposed";
 
 /** What `start` needs from the caller: the route it booted at. */
@@ -371,17 +392,6 @@ export interface WebuiApplication {
    */
   readonly reconcile: (sessionId?: string) => void;
   /**
-   * Subscribe to a domain event that carries no session id (a workspace-git
-   * change). A reaction, not a route: it runs after the coordinator has routed
-   * the event to the owners, and it cannot displace anything.
-   *
-   * The surface that holds the affected views subscribes here; the workspace
-   * business owns the invalidation the signal triggers.
-   */
-  readonly onWorkspaceGitChanged: (
-    listener: (payload: WebuiWorkspaceGitChangedPayload) => void,
-  ) => () => void;
-  /**
    * Subscribe to the channel-accepted signal. A reaction, not a route: the
    * application's own reconciliation runs first, then listeners are told.
    */
@@ -470,12 +480,6 @@ export function createWebuiApplication(
   // coordinator holds the slot object, not a copy of its members, so a
   // registration made after construction is what the next event sees.
   /**
-   * The reactions a surface subscribes to for the two signals that carry no
-   * session id of their own. They run after the owners have been routed to, and
-   * they cannot replace a route.
-   */
-  const workspaceGitListeners = new Set<(payload: WebuiWorkspaceGitChangedPayload) => void>();
-  /**
    * The dirty markers a read-required event left behind for a session nothing
    * needs yet. They survive until interest arrives or the session is purged —
    * the alternative, dropping the event, is a silent loss.
@@ -555,7 +559,11 @@ export function createWebuiApplication(
         }
         notify(channelReadyListeners, undefined);
       },
-      workspaceGitChanged: (payload) => notify(workspaceGitListeners, payload),
+      // The one writer of the working tree tells the reader of it, and the link
+      // between them is a fact about the businesses rather than something a
+      // mounted view arranges. It is resolved per event, so it cannot be missing
+      // for the one event that mattered because a view was not on screen.
+      workspaceGitChanged: (payload) => workspaceQueries.invalidateWorkspaceGit(payload),
     },
   });
   const turns = createWebuiTurnCoordinator({
@@ -689,7 +697,34 @@ export function createWebuiApplication(
     refreshApiKeyStatus: () => accountWorkflows.loadApiKeyStatus(),
     identityEpochs,
   });
-  const pluginWorkflows = createWebuiPluginWorkflows({ port: slices.plugins });
+  const composerPluginCatalogue = createWebuiComposerPluginCatalogue({
+    actions: createWebuiPluginActions(slices.plugins),
+    ...(slices.plugins.listSkills ? { listSkills: slices.plugins.listSkills } : {}),
+  });
+  /**
+   * The agent a skill write was aimed at, or `undefined` for the runtime-wide
+   * default. The catalogue keys its skill reads by exactly this, so this is what
+   * decides which slot goes stale and which ones survive.
+   */
+  const mutatedAgentName = (input: unknown): string | undefined => {
+    const value = (input as { readonly agentName?: unknown } | null | undefined)?.agentName;
+    return typeof value === "string" ? value : undefined;
+  };
+  const pluginWorkflows = createWebuiPluginWorkflows({
+    port: slices.plugins,
+    onMutated: (action, input) => {
+      // A plugin write can add, remove, rename or reconfigure any installed
+      // plugin, so every installed-plugin slot is stale. It says nothing about
+      // skills: the runtime answers those separately, per agent.
+      if (PLUGIN_CATALOGUE_ACTIONS.has(action)) composerPluginCatalogue.invalidatePlugins();
+      // A skill write is scoped to the agent it was aimed at, so the other
+      // agents' slots survive — re-reading them would cost a round trip to
+      // learn nothing.
+      if (SKILL_CATALOGUE_ACTIONS.has(action)) {
+        composerPluginCatalogue.invalidateSkills(mutatedAgentName(input));
+      }
+    },
+  });
   // The composer's view of what is installed and what the agent can run: a
   // separate read model from `pluginWorkflows` on purpose, so neither overwrites
   // the other when one reloads.
@@ -716,10 +751,6 @@ export function createWebuiApplication(
     catalogue: sessionWorkflows,
   });
 
-  const composerPluginCatalogue = createWebuiComposerPluginCatalogue({
-    actions: createWebuiPluginActions(slices.plugins),
-    ...(slices.plugins.listSkills ? { listSkills: slices.plugins.listSkills } : {}),
-  });
   // The plan-review reply goes to the session's interaction owner. The selection
   // and the agent name are read when the reply is submitted rather than captured
   // by the view that renders the card, so a card left open across a selection
@@ -740,6 +771,25 @@ export function createWebuiApplication(
         .answerQuestionnaire(request, answers, readAgentName(target));
     },
   });
+  // The links between businesses, installed here and never removed.
+  //
+  // Each one is a fact about two owners — this one writes the working tree or
+  // the plugin list, that one reads it — rather than something a view arranges.
+  // Installing them at construction is what makes them unconditional: a link
+  // routed through a mount only holds while a component happens to be on screen,
+  // so the one event that mattered most is the one most likely to arrive when
+  // nothing is watching.
+  //
+  // 1. workspace git → the workspace owner's affected views is a route, above:
+  //    the coordinator already hands the payload to a link that exists for the
+  //    application's whole life.
+  // 2. A settled turn mutation (revert / reapply) changed the working tree, so
+  //    the review views for it are stale. The turn owner announces the
+  //    settlement; no panel keeps a refresh token for it.
+  turnReview.subscribeMutations(() => workspaceQueries.invalidateReview());
+  // 3. plugin writes → the composer catalogue is wired above, at the workflows
+  //    that made the write.
+
   // The ingress handle: nothing is opened at construction. `start` opens exactly
   // one channel and attaches the coordinator to it; `dispose` detaches, disposes
   // the store that fences late commits, and closes the channel.
@@ -821,10 +871,6 @@ export function createWebuiApplication(
       if (!target) return;
       reconcileSession(target);
     },
-    onWorkspaceGitChanged: (listener) => {
-      workspaceGitListeners.add(listener);
-      return () => workspaceGitListeners.delete(listener);
-    },
     onChannelReady: (listener) => {
       channelReadyListeners.add(listener);
       return () => channelReadyListeners.delete(listener);
@@ -849,7 +895,6 @@ export function createWebuiApplication(
       // page that is going away. Fire-and-forget because this disposal is
       // synchronous; the requests are already on their way.
       void terminalOwner.disposeAll();
-      workspaceGitListeners.clear();
       channelReadyListeners.clear();
       dirtyResources.clear();
       composerController?.dispose();

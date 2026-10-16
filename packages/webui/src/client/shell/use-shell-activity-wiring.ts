@@ -14,6 +14,14 @@
  * anything (restore before the first write lives in one place, and it is not
  * this one).
  *
+ * What this hook does *not* subscribe to is as load-bearing as what it does. A
+ * workspace-git change and a settled turn mutation both invalidate resources
+ * other businesses read, and both links are installed by the assembly before
+ * event ingress starts. Routing them through a mount meant a fact reached two
+ * owners only while a particular view happened to be on screen — so the reactions
+ * below are about the rail's own view of the world (reconnect, selection, read
+ * state, age) and nothing else.
+ *
  * The options are the capabilities this wiring uses, not the application object:
  * the shell may not reach into the assembly that composes it (role rule), and
  * the active-turn probe's own type lives with the turn substrate. The caller
@@ -35,31 +43,15 @@ export interface ShellActivitySessionStore {
 
 export type ShellSessionActivity = WebuiSessionActivityMap;
 
-/** The `workspace.git.changed` signal's shape, as the owner publishes it. */
-export interface ShellWorkspaceGitSignal {
-  readonly workspace?: string;
-  readonly aliases?: readonly string[];
-}
-
 /** The rows the unread controller seeds from, and the probe's narrower input. */
 export type ShellActivitySessionRow = Pick<WebuiClientSession, "sessionId" | "updatedAt">;
 export type ShellActivityProbeRow = Pick<WebuiClientSession, "sessionId">;
 
-export interface ShellActivityWorkspaceQueries {
-  readonly invalidateWorkspaceGit: (payload: ShellWorkspaceGitSignal) => void;
-  readonly invalidateReview: () => void;
-}
-
 export interface UseShellActivityWiringOptions {
   readonly sessionStore: ShellActivitySessionStore;
-  readonly workspaceQueries: ShellActivityWorkspaceQueries;
   /** The rail's current page; its sessions seed the restore and the probe. */
   readonly railPage: { readonly sessions: readonly ShellActivitySessionRow[] };
   readonly selectedSessionId: string | undefined;
-  /** Routes a `workspace.git.changed` signal to the owner that invalidates views. */
-  readonly onWorkspaceGitChanged: (
-    listener: (payload: ShellWorkspaceGitSignal) => void,
-  ) => () => void;
   /** Fires when the channel is ready again, so the rail can re-probe. */
   readonly onChannelReady: (listener: () => void) => () => void;
   /** Follows the route the shell resolved; the application keeps the one record. */
@@ -73,8 +65,6 @@ export interface UseShellActivityWiringOptions {
    * of this module.
    */
   readonly probeActiveTurns: (sessions: readonly ShellActivityProbeRow[]) => () => void;
-  /** Subscribes to settled turn mutations, which stale the review views. */
-  readonly subscribeTurnReviewMutations: (listener: () => void) => () => void;
 }
 
 export interface ShellActivityWiring {
@@ -88,17 +78,14 @@ export function useShellActivityWiring(
 ): ShellActivityWiring {
   const {
     sessionStore,
-    workspaceQueries,
     railPage,
     selectedSessionId,
-    onWorkspaceGitChanged,
     onChannelReady,
     select,
     markRead,
     seed,
     hydrate,
     probeActiveTurns,
-    subscribeTurnReviewMutations,
   } = options;
 
   const sessionActivity = useSyncExternalStore(
@@ -113,22 +100,6 @@ export function useShellActivityWiring(
   const [activityProbeNonce, setActivityProbeNonce] = useState(0);
 
   /**
-   * A `workspace.git.changed` signal invalidates exactly the views it affects: the
-   * owner matches the signal against the review and environment views it currently
-   * holds and refreshes only those, coalescing the environment reload into its
-   * window. The route reaches the owner through this subscription — no shell
-   * state and no revision counter in between; the subscription exists because
-   * the workspace owners are still built by this mount, which the shell
-   * composition moves.
-   */
-  useEffect(
-    () =>
-      onWorkspaceGitChanged((payload) =>
-        workspaceQueries.invalidateWorkspaceGit(payload),
-      ),
-    [onWorkspaceGitChanged, workspaceQueries],
-  );
-  /**
    * The shell's remaining reaction, subscribed rather than installed as a
    * replaceable set: it runs after the application's own routes have run and
    * cannot displace one. Temporary adapter until the reconnect reconciliation
@@ -141,14 +112,6 @@ export function useShellActivityWiring(
         setActivityProbeNonce((nonce) => nonce + 1);
       }),
     [onChannelReady],
-  );
-  // A settled turn mutation (revert / reapply) changed the working tree, so the
-  // review views for it are stale. The turn owner announces the settlement and
-  // this is where the affected family is invalidated — no panel keeps a refresh
-  // token for it.
-  useEffect(
-    () => subscribeTurnReviewMutations(() => workspaceQueries.invalidateReview()),
-    [subscribeTurnReviewMutations, workspaceQueries],
   );
   // The application's selection follows the route the shell resolved. The
   // coordinator and the unread controller judge events against the selected

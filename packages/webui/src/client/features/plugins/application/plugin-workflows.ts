@@ -292,6 +292,16 @@ function runWebuiPluginIntent(
 
 export function createWebuiPluginWorkflows(deps: {
   readonly port: WebuiPluginPortSlice;
+  /**
+   * A settled mutation changed something another business reads.
+   *
+   * Announced, not delegated: the assembly decides what a given action means for
+   * the read models it owns, because "what is stale" is a different question from
+   * "what did I write". Only a mutation that *succeeded* is announced — a rejected
+   * write changed nothing, and invalidating on it would make a failed attempt
+   * look like a state change.
+   */
+  readonly onMutated?: (action: WebuiPluginManagementAction, input: unknown) => void;
 }): WebuiPluginWorkflows {
   const { port } = deps;
   let state = initialWebuiPluginWorkflowsState;
@@ -519,6 +529,7 @@ export function createWebuiPluginWorkflows(deps: {
     });
     try {
       const result = await call(action, input);
+      deps.onMutated?.(action, input);
       set((current) => ({ ...current, revision: current.revision + 1 }));
       await reload();
       set((current) => (current.mutating ? { ...current, mutating: false } : current));

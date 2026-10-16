@@ -150,16 +150,101 @@ describe("stage 4 — the four call sites' handling through the coordinator", ()
     expect(listPendingPermissions).toHaveBeenCalledTimes(1);
   });
 
-  it("delivers a workspace-git event to the surfaces that subscribed", () => {
-    const { application, channels } = makeApplication();
-    const seen: unknown[] = [];
-    application.onWorkspaceGitChanged((payload) => seen.push(payload));
+  it("reaches the workspace owner on a workspace-git event with nothing mounted", () => {
+    // The signal used to travel through a listener a mounted shell subscribed,
+    // so it was delivered exactly when a view happened to be on screen. These
+    // three cases pin the links the assembly installs instead: they hold from
+    // construction, and none of them needs a component.
+    const fake = makeChannel();
+    const application = createWebuiApplication({
+      openEventChannel: () => fake.channel,
+    });
+    application.start();
+    const queries = application.workspaceQueries;
+    const invalidate = vi.fn();
+    // The route resolves the owner per event, so replacing the method is the
+    // same observation a mounted view's callback used to make.
+    Object.defineProperty(queries, "invalidateWorkspaceGit", {
+      value: invalidate,
+      configurable: true,
+    });
 
-    channels[0]!.emit(
+    fake.emit(
       event("workspace.git.changed", { workspace: "/repo", aliases: ["/repo-alias"] }),
     );
 
-    expect(seen).toEqual([{ workspace: "/repo", aliases: ["/repo-alias"] }]);
+    expect(invalidate).toHaveBeenCalledWith({ workspace: "/repo", aliases: ["/repo-alias"] });
+  });
+
+  it("reaches the workspace owner when a turn review mutation settles", async () => {
+    // A revert is the mutation: it changes the working tree, so the review views
+    // for it are stale. There is no start(), no mount and no teardown between
+    // the subscription and the write — exactly the condition a shell-side
+    // subscription would have needed to survive.
+    const view = {
+      changeSetId: "c1",
+      status: "active",
+      canUndo: true,
+      canReapply: false,
+      fileChanges: [{ file: "a.ts", additions: 1, deletions: 0 }],
+    };
+    const fake = makeChannel();
+    const application = createWebuiApplication({
+      openEventChannel: () => fake.channel,
+      turnReview: {
+        getTurnDiff: async () => view,
+        revertTurnDiff: async () => ({ success: true, turnDiff: view }),
+      } as never,
+    });
+    const queries = application.workspaceQueries;
+    const invalidate = vi.fn();
+    Object.defineProperty(queries, "invalidateReview", { value: invalidate, configurable: true });
+
+    await application.turnReview.load({ sessionId: "S", turnId: "T1" });
+    await application.turnReview.mutate({ sessionId: "S", turnId: "T1" }, "revert");
+
+    expect(invalidate).toHaveBeenCalledTimes(1);
+  });
+
+  it("commits one process event's state patches in a single store write", () => {
+    // `session.start` produces three session-slice patches: the workspace
+    // progress write, the sending flag, and the phase. Three writes would let a
+    // subscriber read a record caught mid-event — progress advanced with no turn
+    // explaining it — and would render three times for one event.
+    const fake = makeChannel();
+    const application = createWebuiApplication({ openEventChannel: () => fake.channel });
+    application.start();
+    const updateSession = vi.spyOn(application.store, "updateSession");
+
+    fake.emit(event("session.start", { sessionId: "s1", turnId: "turn-1" }));
+
+    expect(updateSession).toHaveBeenCalledTimes(1);
+    const session = application.store.readSession("s1");
+    // All three landed, in order, inside that one call.
+    expect(session.stream.phase).toBe("streaming");
+    expect(session.sending).toBe(true);
+  });
+
+  it("invalidates the composer catalogue after a settled plugin write", async () => {
+    const fake = makeChannel();
+    const application = createWebuiApplication({
+      openEventChannel: () => fake.channel,
+      turnCapabilities: {
+        pluginManagement: vi.fn(async () => ({ ok: true })),
+      } as never,
+    });
+    const catalogue = application.composerPluginCatalogue;
+    const invalidatePlugins = vi.fn();
+    const invalidateSkills = vi.fn();
+    Object.defineProperty(catalogue, "invalidatePlugins", { value: invalidatePlugins, configurable: true });
+    Object.defineProperty(catalogue, "invalidateSkills", { value: invalidateSkills, configurable: true });
+
+    await application.pluginWorkflows.installPlugin({ name: "demo" } as never);
+
+    expect(invalidatePlugins).toHaveBeenCalledTimes(1);
+    // A plugin write says nothing about skills: the runtime answers those per
+    // agent, and dropping those slots would cost a round trip to learn nothing.
+    expect(invalidateSkills).not.toHaveBeenCalled();
   });
 
   it("reconciles every interested session on a ready signal, then tells subscribers", () => {

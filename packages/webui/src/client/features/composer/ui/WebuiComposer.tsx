@@ -71,7 +71,7 @@ import {
   useWebuiTranscriptHistoryOwner,
 } from "../../../bindings/use-session-state.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
-import { ContextUsageIndicator } from "../../../features/sessions/ui/ContextUsageIndicator.js";
+import { ContextUsageIndicator } from "./ContextUsageIndicator.js";
 import {
   useWebuiModelsWorkflows,
   useWebuiModelsWorkflowsState,

@@ -41,14 +41,60 @@ import type { WebuiStreamState } from "../projection/stream-state.js";
 import { eventSessionId } from "../../../projection/common/event-parsers.js";
 import type { WebuiProcessEventChannel } from "./event-channel.js";
 import type { WebuiSessionStore } from "../../../application/session-store.js";
+import type { WebuiApplicationSessionState } from "../../../application/state.js";
 import type { WebuiStreamLeaseController } from "./stream-lease-controller.js";
+
+/**
+ * One session-record write, taken out of an event's command list.
+ *
+ * The patches are the session's own slices, so they can all be folded into a
+ * single update; the commands that are not this — an owner's fenced write, a
+ * refresh, an attach — are not, and run separately.
+ */
+export type WebuiSessionStatePatch =
+  | {
+      readonly type: "set-stream";
+      readonly patch: (current: WebuiStreamState) => WebuiStreamState;
+    }
+  | {
+      readonly type: "set-sending";
+      readonly sending: boolean;
+      /**
+       * Optional live-state guard, resolved against the *store* before the
+       * batch is folded — never against the batch's own earlier patches.
+       *
+       * That is the whole point of the guard: a terminal event for an older turn
+       * must not clear the sending flag of the turn we have since attached to,
+       * and the event's own progress patch has already released the lease the
+       * guard would otherwise read. A batch that consulted itself would answer
+       * the question the guard exists to avoid.
+       */
+      readonly when?: (current: WebuiStreamState) => boolean;
+    }
+  | {
+      readonly type: "set-permissions";
+      readonly patch: (
+        current: readonly WebuiPendingPermission[],
+      ) => readonly WebuiPendingPermission[];
+    }
+  | {
+      readonly type: "set-questionnaire";
+      readonly patch: (
+        current: WebuiQuestionnaireRequest | undefined,
+      ) => WebuiQuestionnaireRequest | undefined;
+    };
 
 export interface WebuiEffectHandlers {
   readonly refreshPending: () => void | Promise<unknown>;
-  readonly setSending: (sending: boolean) => void;
-  readonly setStream: (patch: (current: WebuiStreamState) => WebuiStreamState) => void;
-  readonly setPermissions: (patch: (current: readonly WebuiPendingPermission[]) => readonly WebuiPendingPermission[]) => void;
-  readonly setQuestionnaire: (patch: (current: WebuiQuestionnaireRequest | undefined) => WebuiQuestionnaireRequest | undefined) => void;
+  /**
+   * Commit every patch one event produced, in the order the event produced them.
+   *
+   * One call, one notification, one render: a subscriber that reads the record
+   * between two patches of the same event would otherwise see a state that never
+   * existed — the progress write applied without the turn write that explains
+   * it — and could act on it.
+   */
+  readonly applyPatches: (patches: readonly WebuiSessionStatePatch[]) => void;
   readonly setGoal: (goal: WebuiGoal | undefined) => void;
   readonly refreshGoal: () => void | Promise<unknown>;
   readonly attachStream?: (turnId: string | undefined, mode: "attach" | "recheck") => void;
@@ -60,7 +106,38 @@ export function applyWebuiEffectCommands(
   handlers: WebuiEffectHandlers,
   readStream?: () => WebuiStreamState,
 ): void {
+  // The session's own slices, in the order the event produced them.
+  const patches: WebuiSessionStatePatch[] = [];
+  // Everything that is not a session-slice write: an owner's fenced write, a
+  // refresh, an attach. Order among these is preserved; they run after the
+  // commit, because a refresh has to re-read what the commit wrote.
+  const after: WebuiEffectCommand[] = [];
   for (const cmd of commands) {
+    if (
+      cmd.type === "set-stream" ||
+      cmd.type === "set-sending" ||
+      cmd.type === "set-permissions" ||
+      cmd.type === "set-questionnaire"
+    ) {
+      patches.push(cmd);
+      continue;
+    }
+    after.push(cmd);
+  }
+
+  if (patches.length > 0) {
+    // Guards are resolved first, against the store, so a patch this event must
+    // not apply never reaches the commit at all.
+    const permitted = patches.filter((patch) => {
+      if (patch.type !== "set-sending" || patch.when === undefined) return true;
+      // A guard with nothing to read against cannot be answered, and admitting
+      // it would apply a patch whose entire condition is unknown.
+      return readStream !== undefined && patch.when(readStream());
+    });
+    if (permitted.length > 0) handlers.applyPatches(permitted);
+  }
+
+  for (const cmd of after) {
     switch (cmd.type) {
       case "refresh-pending":
         Promise.resolve(handlers.refreshPending()).catch(() => undefined);
@@ -68,26 +145,54 @@ export function applyWebuiEffectCommands(
       case "refresh-goal":
         Promise.resolve(handlers.refreshGoal()).catch(() => undefined);
         break;
-      case "set-sending":
-        if (cmd.when && readStream && !cmd.when(readStream())) break;
-        handlers.setSending(cmd.sending);
-        break;
-      case "set-stream":
-        handlers.setStream(cmd.patch);
-        break;
-      case "set-permissions":
-        handlers.setPermissions(cmd.patch);
-        break;
-      case "set-questionnaire":
-        handlers.setQuestionnaire(cmd.patch);
-        break;
       case "set-goal":
         handlers.setGoal(cmd.goal);
         break;
       case "attach-stream":
         handlers.attachStream?.(cmd.turnId, cmd.mode);
         break;
+      default:
+        break;
     }
+  }
+}
+
+/**
+ * Fold an event's patches into one session record.
+ *
+ * Exported so the owner and the tests fold patches the same way: the guard on
+ * `set-sending` reads the stream *as the batch leaves it*, which is the only
+ * record a later patch in the same event can be looking at.
+ */
+/**
+ * The slices a patch may write: the session record's own state, without the
+ * fields no patch touches (the goal, which has a fenced owner, and the
+ * transcript, which is its own keyed resource).
+ */
+export type WebuiSessionStateWritable = Pick<
+  WebuiApplicationSessionState,
+  "stream" | "sending" | "permissions" | "questionnaire"
+>;
+
+export function reduceWebuiSessionStatePatch<T extends WebuiSessionStateWritable>(
+  session: T,
+  patch: WebuiSessionStatePatch,
+): T {
+  switch (patch.type) {
+    case "set-stream":
+      return { ...session, stream: patch.patch(session.stream) };
+    case "set-sending":
+      // No guard check here: the executor resolves them against the store
+      // before folding. A patch that reaches this function has already been
+      // admitted, and re-reading `session.stream` would consult the batch rather
+      // than the world.
+      return { ...session, sending: patch.sending };
+    case "set-permissions":
+      return { ...session, permissions: patch.patch(session.permissions) };
+    case "set-questionnaire":
+      return { ...session, questionnaire: patch.patch(session.questionnaire) };
+    default:
+      return session;
   }
 }
 
@@ -210,23 +315,13 @@ export function createWebuiEventCoordinator(
     // The route, never the replaceable set: a mounted view cannot take the goal
     // read away from the owner that fences it.
     refreshGoal: () => deps.routes.refreshGoal(sessionId),
-    setSending: (sending) =>
-      store.updateSession(sessionId, (current) => ({ ...current, sending })),
-    setStream: (patch) =>
-      store.updateSession(sessionId, (current) => ({
-        ...current,
-        stream: patch(current.stream),
-      })),
-    setPermissions: (patch) =>
-      store.updateSession(sessionId, (current) => ({
-        ...current,
-        permissions: patch(current.permissions),
-      })),
-    setQuestionnaire: (patch) =>
-      store.updateSession(sessionId, (current) => ({
-        ...current,
-        questionnaire: patch(current.questionnaire),
-      })),
+    // One event, one commit. Folding here rather than calling four writers means
+    // the store notifies once, so no subscriber ever reads a record caught
+    // between two of the same event's writes.
+    applyPatches: (patches) =>
+      store.updateSession(sessionId, (current) =>
+        patches.reduce(reduceWebuiSessionStatePatch, current),
+      ),
     setGoal: (goal) => {
       // Every goal write goes through the session's owner, so the version fence
       // sees it and a late re-read cannot resurrect what it replaced.

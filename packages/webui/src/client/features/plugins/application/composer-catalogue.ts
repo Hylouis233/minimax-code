@@ -56,6 +56,17 @@ export interface WebuiComposerPluginCatalogue {
   readonly runtimeSkills: (
     agentName?: string,
   ) => Promise<readonly WebuiComposerSkillSummary[]>;
+  /**
+   * The installed-plugin read is stale. Every slot goes, because a plugin write
+   * can add, remove, rename or reconfigure any of them.
+   */
+  readonly invalidatePlugins: () => void;
+  /**
+   * One agent's skill read is stale. Slots for other agents survive: a plugin
+   * write does not answer a different agent's runtime, so re-reading them would
+   * cost a round trip to learn nothing.
+   */
+  readonly invalidateSkills: (agentName?: string) => void;
 }
 
 /** How many installed plugins the composer asks for. */
@@ -81,6 +92,12 @@ export function createWebuiComposerPluginCatalogue(deps: {
 }): WebuiComposerPluginCatalogue {
   const { actions } = deps;
   // Separate maps, separate keys: the two readers below must not share a slot.
+  //
+  // Each map is a cache with no clock, so something has to say when a slot went
+  // stale. That is the `invalidate*` pair below, and the assembly calls it off
+  // the plugin writes themselves — the catalogue is a reader, and the fact that
+  // something it reads changed is owned by whoever wrote it, not by whichever
+  // view happens to be looking at a cached answer when it does.
   const pluginReads = new Map<string, Promise<readonly WebuiComposerPluginSummary[]>>();
   const skillReads = new Map<string, Promise<readonly WebuiComposerSkillSummary[]>>();
 
@@ -111,6 +128,14 @@ export function createWebuiComposerPluginCatalogue(deps: {
         });
       pluginReads.set(key, request);
       return request;
+    },
+
+    invalidatePlugins: () => {
+      pluginReads.clear();
+    },
+
+    invalidateSkills: (agentName) => {
+      skillReads.delete(agentName ?? "");
     },
 
     runtimeSkills: (agentName) => {

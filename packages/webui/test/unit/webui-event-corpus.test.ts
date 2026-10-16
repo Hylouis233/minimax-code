@@ -20,6 +20,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyWebuiEffectCommands,
+  reduceWebuiSessionStatePatch,
   type WebuiEffectHandlers,
 } from "../../src/client/features/turn/application/event-coordinator.js";
 import {
@@ -81,15 +82,8 @@ function reduceFixture(
   const handlers: WebuiEffectHandlers = {
     refreshPending: () => undefined,
     refreshGoal: () => undefined,
-    setSending: () => undefined,
-    setStream: (patch) => {
-      state = { ...state, stream: patch(state.stream) };
-    },
-    setPermissions: (patch) => {
-      state = { ...state, permissions: patch(state.permissions) };
-    },
-    setQuestionnaire: (patch) => {
-      state = { ...state, questionnaire: patch(state.questionnaire) };
+    applyPatches: (patches) => {
+      state = patches.reduce(reduceWebuiSessionStatePatch, state);
     },
     setGoal: (goal) => {
       state = { ...state, goal };
