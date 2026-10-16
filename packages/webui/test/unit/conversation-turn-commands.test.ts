@@ -70,7 +70,6 @@ describe("the conversation turn commands", () => {
     // the assertions below read the record — which is the state being asserted.
     void commands.send({
       message: "hello",
-      sending: false,
       callbacks: { onDraftChange: () => undefined },
     });
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -81,6 +80,27 @@ describe("the conversation turn commands", () => {
     // the session's record without the caller naming either.
     expect(store.readSession("s1").sending).toBe(true);
     expect(store.readSession("s1").stream.phase).toBe("streaming");
+  });
+
+  it("chooses queueing from the live store state rather than a caller snapshot", async () => {
+    const store = createWebuiSessionStore();
+    store.createSessionWriter({ kind: "session", sessionId: "s1" }).setSending(true);
+    const enqueueMessage = vi.fn(async () => undefined);
+    const sendMessage = vi.fn(async () => openStream());
+    const commands = createWebuiConversationTurnCommands({
+      store,
+      sessionId: "s1",
+      capabilities: { enqueue: enqueueMessage as never, send: sendMessage as never },
+    });
+
+    const operation = await commands.send({
+      message: "queue from live state",
+      callbacks: { onDraftChange: () => undefined },
+    });
+
+    expect(operation?.completion).toEqual({ kind: "queued", sessionId: "s1" });
+    expect(enqueueMessage).toHaveBeenCalledWith({ id: "s1", content: "queue from live state" });
+    expect(sendMessage).not.toHaveBeenCalled();
   });
 
   it("does not pretend to run a send the slice cannot run", async () => {
@@ -97,7 +117,6 @@ describe("the conversation turn commands", () => {
     await expect(
       commands.send({
         message: "hello",
-        sending: false,
         callbacks: { onDraftChange: () => undefined },
       }),
     ).resolves.toMatchObject({
@@ -166,6 +185,33 @@ describe("recheck and gap recovery are the command set's, not the view's", () =>
     // on the session's record with the turn the server named.
     expect(store.readSession("s1").stream.subscription?.turnId).toBe("t-1");
     expect(store.readSession("s1").sending).toBe(true);
+  });
+
+  it("settles a stale lease when the authoritative recovery read finds no active turn", async () => {
+    const store = createWebuiSessionStore();
+    store.updateSession("s1", (current) => ({
+      ...current,
+      sending: true,
+      stream: {
+        ...current.stream,
+        phase: "streaming",
+        lastClaimedGeneration: 7,
+        subscription: { owner: "recovered", generation: 7, turnId: "t-old" },
+      },
+    }));
+    const commands = createWebuiConversationTurnCommands({
+      store,
+      sessionId: "s1",
+      capabilities: { activeTurn: (async () => undefined) as never },
+    });
+
+    commands.recover();
+    await tick();
+
+    expect(store.readSession("s1").stream.phase).toBe("idle");
+    expect(store.readSession("s1").stream.subscription).toBeUndefined();
+    expect(store.readSession("s1").stream.lastClaimedGeneration).toBeUndefined();
+    expect(store.readSession("s1").sending).toBe(false);
   });
 
   it("shares one probe across recovery calls in the same round trip", async () => {
@@ -237,7 +283,6 @@ describe("an accepted attempt leases its session", () => {
 
     void commands.send({
       message: "hello",
-      sending: false,
       callbacks: { onDraftChange: () => undefined },
     });
     await new Promise((resolve) => setTimeout(resolve, 0));

@@ -14,12 +14,17 @@
 
 import { describe, expect, it, vi } from "vitest";
 
+import { createWebuiApplication } from "../../src/client/application/create-application.js";
 import { createWebuiApplicationFixture } from "../support/application-fixture.js";
 import { createWebuiPortSlices } from "../../src/client/application/port-slices.js";
 import { WEBUI_HOME_SESSION_KEY } from "../../src/client/application/state.js";
 import { WEBUI_COMPOSER_HOME_KEY } from "../../src/client/features/composer/application/composer-history.js";
-import type { WebuiClientMessageSender } from "../../src/client/features/turn/contracts/execution-port.js";
+import type {
+  WebuiClientMessageSender,
+  WebuiClientSessionResumer,
+} from "../../src/client/features/turn/contracts/execution-port.js";
 import type { WebuiGoal } from "../../src/shared/contracts/goal.js";
+import type { WebuiRuntimeEvent } from "../../src/shared/contracts/stream.js";
 
 function goal(sessionId: string, objective: string): WebuiGoal {
   return {
@@ -65,8 +70,6 @@ function host() {
 describe("the creation origins with nothing mounted", () => {
   it("ordinary send: one create, dispatch to the created session, catalogue refreshed", async () => {
     const { app, createSession, sendMessage, loadSessions, loadSessionTree } = host();
-    // A home turn is already streaming: that record is what adoption has to protect.
-    app.store.createSessionWriter({ kind: "home" }).setSending(true);
     app.composer.setDraft(WEBUI_COMPOSER_HOME_KEY, "start working");
 
     const outcome = await app.composerController.submit({
@@ -184,6 +187,56 @@ describe("the creation origins with nothing mounted", () => {
       name: "main",
       workspaceDir: "/work/other",
     });
+    app.dispose();
+  });
+
+  it("keeps destination state that arrives from another client while creation is pending", async () => {
+    let resolveCreate!: (value: { sessionId: string }) => void;
+    let emit!: (event: WebuiRuntimeEvent) => void;
+    const createSession = vi.fn(
+      () => new Promise<{ sessionId: string }>((resolve) => { resolveCreate = resolve; }),
+    );
+    const resumeSession: WebuiClientSessionResumer = vi.fn(async (_request, onFrame) => {
+      onFrame({
+        dataJson: JSON.stringify({
+          type: "agent_message",
+          agent_message: { msg_id: "other-client-message", msg_content: "preserve me" },
+        }),
+      });
+      await new Promise<void>(() => undefined);
+    });
+    const app = createWebuiApplication({
+      openEventChannel: () => ({
+        subscribe: (listener) => { emit = listener; return () => undefined; },
+        close: () => undefined,
+      }),
+      turns: { resumeSession },
+      turnCapabilities: { resumeSession },
+      slices: createWebuiPortSlices({ createSession: createSession as never }),
+    });
+    app.start({ initialSessionId: undefined });
+    app.store.createSessionWriter({ kind: "home" }).setSending(true);
+    const creating = app.taskSessions.submit({ name: "main" });
+    await Promise.resolve();
+
+    // A second client starts the just-created destination and sends transcript
+    // data while this client's create response is still pending.
+    emit({
+      type: "session.start",
+      payload: { sessionId: "s1", turnId: "other-client-turn" },
+      timestamp: 1,
+      source: "other-client",
+    });
+    await Promise.resolve();
+    expect(app.store.readSession("s1").stream.messages[0]?.answer).toBe("preserve me");
+    resolveCreate({ sessionId: "s1" });
+
+    await expect(creating).resolves.toMatchObject({ kind: "created", transfer: "target-exists" });
+    expect(app.store.readSession("s1").sending).toBe(true);
+    expect(app.store.readSession("s1").stream.phase).toBe("streaming");
+    expect(app.store.readSession("s1").stream.subscription?.turnId).toBe("other-client-turn");
+    expect(app.store.readSession("s1").stream.messages[0]?.answer).toBe("preserve me");
+    expect(app.store.hasSession(WEBUI_HOME_SESSION_KEY)).toBe(true);
     app.dispose();
   });
 });

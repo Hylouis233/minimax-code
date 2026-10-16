@@ -113,6 +113,39 @@ test("home turn migrates its live writer once to the newly created session", asy
   await expect.poll(() => page.evaluate(() => window.__fixture.requests.filter((request) => request.operation === "sendMessage" && request.body.id === "created-C").length)).toBe(1);
 });
 
+test("New Task fences a pending home creation without stealing the new draft or navigation", async ({ page }) => {
+  await configureFixture(page, () => {
+    window.__fixture.setModels([{
+      providerId: "fixture-provider",
+      providerName: "Fixture Provider",
+      modelId: "fixture-model",
+      displayName: "Fixture Model",
+    }]);
+    window.__fixture.delayNext("createSession", { name: "main" });
+  });
+  await openApp(page, "");
+  await page.getByRole("button", { name: "新建任务", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe("");
+  const input = page.getByPlaceholder("输入消息…（输入 / 唤起命令）");
+  await input.fill("Pending home submission");
+  await expect(page.getByRole("button", { name: "发送" })).toBeEnabled();
+  await page.getByRole("button", { name: "发送" }).click();
+  await expect.poll(() => page.evaluate(() => window.__fixture.pending.some(
+    (request) => request.operation === "createSession" && request.body.name === "main",
+  ))).toBe(true);
+
+  await page.getByRole("button", { name: "新建任务", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe("");
+  await input.fill("Draft for the replacement home");
+
+  await page.evaluate(() => window.__fixture.resolve("createSession", { name: "main" }, { sessionId: "late-created" }));
+  await expect.poll(() => page.evaluate(() => window.__fixture.requests.some(
+    (request) => request.operation === "sendMessage" && request.body.id === "late-created",
+  ))).toBe(true);
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe("");
+  await expect(input).toHaveValue("Draft for the replacement home");
+});
+
 test("a late questionnaire.dismiss cannot revive the turn after a local skip", async ({ page }) => {
   await openApp(page, "#session=A");
   const composer = page.getByPlaceholder("输入消息…（输入 / 唤起命令）");

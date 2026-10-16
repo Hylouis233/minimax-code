@@ -118,7 +118,6 @@ describe("an attempt the client started is closable by the application", () => {
 
     void commands.send({
       message: "hello",
-      sending: false,
       callbacks: { onDraftChange: () => undefined },
     });
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -168,7 +167,6 @@ describe("an attempt the client started is closable by the application", () => {
 
     const outcome = await commands.send({
       message: "hello",
-      sending: false,
       callbacks: { onDraftChange: () => undefined },
     });
 
@@ -215,7 +213,7 @@ describe("an attempt the client started is closable by the application", () => {
 
     let outcome: "pending" | "settled" | "rejected" = "pending";
     void commands
-      .send({ message: "hello", sending: false, callbacks: { onDraftChange: () => undefined } })
+      .send({ message: "hello", callbacks: { onDraftChange: () => undefined } })
       .then(() => {
         outcome = "settled";
       })

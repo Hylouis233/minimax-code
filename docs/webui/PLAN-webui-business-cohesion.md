@@ -331,20 +331,24 @@ Internal command naming and typed request inference do not authorize a wire rena
 operation. Earlier result availability is an internal contract change: preserve the visible
 send/queue clearing boundaries through named transitions and keep terminal cleanup separate.
 
-Where each of the five actually stands, after the independent review and the fixes it prompted:
-D01 passes both *acceptance* clauses through the production seam, while §5.2's mechanism clause —
-execution reading live state itself — is undelivered: the classifier that would do it has no
-production importer, and wiring it would need a real send-start boundary plus a Turn→Sessions
-dependency (see §7.0 P02). D02 passes at the use-case seam; its "explicit New Task" clause is not
-wired in the shell (decision D-1, §7.0 P01). D03 passes through the production use case, with its
-"destination event/second-client state survives" half unproven. D04 is verified at the browser tier.
-D05's five operations each now have a malformed-body ingress refusal and a positive forwarding case
-(`test/unit/webui-candidate-wire-compatibility.test.ts`) — before that, only one of the five did.
-Two further disclosures, so this section is not read as fuller than the code: §5.2's promise-shaped
-`decision`/`completion` pair is not implemented (`operation.decision` is written and never read), and
-§5.2 is left as the requirement rather than amended to match the shortfall; and P02's exit test list is
-fully covered, including "attachments-only sends" (`composer-submission-gate.test.ts`) and "resume
-versus resend" (`webui-stream.test.ts`, `turn-substrate-fences.test.ts`).
+Current implementation evidence for the five deltas:
+D01's public send intent no longer carries `sending`; the Turn application command reads the canonical
+store and classifies admission when invoked (`turn/contracts/turn-commands.ts`,
+`turn/application/turn-commands.ts`). The production-path test verifies a live turn queues without
+calling send. D02's shell action now calls `beginNewTask` before resetting the view, advancing the home
+incarnation and navigation claim even when selection is already empty. The browser race test holds
+creation while a replacement home draft is entered. D03's assembled application test delivers a
+second-client `session.start` and transcript frame while creation is pending, then verifies destination
+sending, lease, phase and transcript survive adoption; the purged-destination case remains covered by
+the existing creation workflow tests. D04 remains verified at the browser tier. D05's five operations
+each have a malformed-body ingress refusal and positive forwarding case
+(`test/unit/webui-candidate-wire-compatibility.test.ts`).
+
+One separate §5.2 shape remains a documented implementation limit: the promise-shaped
+`decision`/`completion` pair is not implemented (`operation.decision` is written and never read).
+Do not report that promise-shaped contract as delivered. P02's remaining acceptance cases include
+attachments-only sends (`composer-submission-gate.test.ts`) and resume versus resend
+(`webui-stream.test.ts`, `turn-substrate-fences.test.ts`).
 
 ## 7. Implementation carriers and dependencies
 
@@ -357,13 +361,13 @@ one effective owner, a coherent import graph, and the applicable checks passing.
 | Carrier | Status | Revision | Evidence |
 | --- | --- | --- | --- |
 | P00 | done | (work material, not a source change) | baseline gate run, caller/import map, field/lifetime matrix, broad-contract inventory, before-change scenario ledger — all under `~/my_data/project/my_project/minimax-code-webui-work/business-cohesion-20261015/p00/` |
-| P01 | **done** — steps 1-5: the use case owns the workspace policy, creation, identity, the guarded transfer and the goal path's create-or-patch decision; all four creation origins create through it, the shell consumes the committed navigation result, and no inline adoption remains. One operator-held limit, sharpened by the independent review: `beginNewTask` is not bound in the shell (decision D-1), so on the home surface 「新建任务」 advances neither the home incarnation nor the navigation epoch (`shell/use-new-task-workspace.ts:150-178` calls `chooseWorkspaceDir`; `noteNavigation` advances only on a *change*), which is exactly D02's "explicit New Task" clause. The use-case half is proven (`task-session-workflows.test.ts:214,231`, `webui-creation-origins.test.ts:176` drives `beginNewTask` directly); the button is not wired, and binding it is forbidden by the handoff pending those race cases | `da8f75e0`, `fc133a86`, `aad232c6`, `d9948f69` | `test/unit/task-session-workflows.test.ts` (22), `test/unit/webui-creation-origins.test.ts` (4 — all four origins with nothing mounted), `test/unit/webui-submission-transition.test.ts`, `test/unit/home-adoption-transaction.test.ts` (through the production path); reports under `…/business-cohesion-20261015/p01/` and `…/p01s4/` |
-| P02 | **done** — steps 1-9: the execution substrate owns its command modules and the submission, the peer-factory cycle is retired, the goal path's assembly decisions have moved to Goal, and the session binding reads the application's one conversation command set instead of assembling a second ("no second binding command assembly", now true). Limits, all verified in code by the independent review and recorded rather than claimed: (1) the admission classifier `turn/application/execution-target.ts` has **no production importer** — the production path reads a live `sending` value threaded from the store through the shell, so D01's acceptance passes while D01's "execution reads live state" mechanism is reached only by its own test; (2) the submission intent still carries `sending`, `createSink` and the UI setters (`composer/contracts/composer-turn.ts:22,48,58,60,61`) against §5.1, and `composer-controller.ts:232` keeps a second admission branch; (3) step 4's mid-flight transition is unfinished by its own code comment (`composer-controller.ts:233-237`); (4) per-path delivery-handle registration was verified as a mechanism, not path by path — the two paths are `turn-commands.ts` `sendMessage` and `resumeSession`, and both delivery tests supply only the send capability; (5) `operation.decision` is written and read nowhere in production (`composer-submission.ts` writes it, `composer-controller.ts:246,248` read only `completion.kind`), and §5.2's promise-shaped `decision`/`completion` is not implemented — the plan is left as written rather than amended to match the shortfall. The "detached observer" exit item is now covered (`test/unit/delivery-disposers.test.ts`, with the completion control beside it) | `5bf66ed3`, `d9948f69`, `5fbbdd3c` | `test/unit/webui-session-commands-binding.test.tsx` (rewritten: the binding hands out the application's owner), `test/unit/webui-submission-transition.test.ts`, `test/unit/delivery-disposers.test.ts` (the detached-observer case), `test/unit/task-session-workflows.test.ts`; reports under `…/business-cohesion-20261015/p01s4/` and `…/p02s8/` |
+| P01 | **done; D02 shell gap closed by follow-up** — the use case owns workspace policy, creation, identity, guarded transfer and goal create-or-patch; all four creation origins use it. `use-new-task-workspace.ts` now calls `beginNewTask` before resetting draft/selection, advancing home incarnation/navigation even when selection is already empty. An in-flight create race is covered in `test/webui-browser/transcript.spec.mjs`; application creation tests continue to cover other origins and no-mounted behavior | `da8f75e0`, `fc133a86`, `aad232c6`, `d9948f69`, current follow-up | `test/unit/task-session-workflows.test.ts`, `test/unit/webui-creation-origins.test.ts`, browser case “New Task fences a pending home creation…”; reports under `…/business-cohesion-20261015/p01/` and `…/p01s4/` |
+| P02 | **done; D01 live-admission gap closed by follow-up** — the execution substrate owns command modules and submission; the peer-factory cycle is retired; Goal owns goal assembly; session binding hands out the application's conversation commands. Composer no longer passes a `sending` snapshot or makes a second admission decision. Turn reads canonical application state and classifies send versus queue at invocation; the production-path test verifies a live turn queues without calling send. The separate §5.2 promise-shaped `decision`/`completion` pair remains unimplemented and is not claimed as delivered. Delivery disposal and send/resume behavior retain their named tests | `5bf66ed3`, `d9948f69`, `5fbbdd3c`, current follow-up | `test/unit/conversation-turn-commands.test.ts`, `test/unit/webui-application-commands.test.ts`, `test/unit/webui-session-commands-binding.test.tsx`, `test/unit/delivery-disposers.test.ts`; reports under `…/business-cohesion-20261015/p01s4/` and `…/p02s8/` |
 | P03 | done | `4a0c6310` | `test/unit/webui-unary-operation-typing.test.ts`; report under `…/business-cohesion-20261015/p03/evidence.md` |
 | P04 | done — D04 and D05 landed | `362940c3` (D05), `6f376ae0` (D04) | `test/unit/model-provider-projection.test.ts`, `test/unit/webui-candidate-wire-compatibility.test.ts`; reports under `…/business-cohesion-20261015/p04/` and `…/p04b/` |
 | P05 | **done** — the editor is the Models policy, the Usage screen hosts one instance per visit above its custom-tab branch, and the provider form renders that editor's snapshot | `b1c2366c`, `8d2ed010`, `c4220980` | `test/unit/provider-editor.test.ts` (15), `test/unit/provider-form-panel.test.ts` (rewritten for the new home), `test/webui-browser/provider-form.spec.mjs` (4, whole browser suite 124 green); reports under `…/business-cohesion-20261015/p05/` |
-| P06 | **done** — the A5 comparison executed: nine deterministic scenarios against an always-online oracle, Arm A driven through the repository's own reconciliation functions, Arm B0 on what today's host offers and B1 on an invented epoch + cursor + session-scoped update channel, plus a real-host probe of the frames a real turn actually produced. Outcome: **keep-client**; one bounded client defect specified, not fixed — and it has no in-repo regression test, so its failing case lives only in the out-of-repo harness and nothing in `test/` would catch that regression | `834114f5` | `docs/webui/DECISION-webui-observation.md`; `…/business-cohesion-20261015/p06/real-host-evidence.md`, `p06/results/real-host.json`, `p06/results/traces.json` |
-| P07 | **done** — steps 1-4: the last measured peer exception retired by publishing the interaction phase intents (P02 step 3's named output), the ownership recorded in ADR 0018 / `CONTEXT.md` / the package guide, generated surfaces regenerated, and the validation matrix run on this tree. The P01/P02/P06 limits stay explicit rather than closed | `78436bba` | `docs/adr/0018-webui-business-cohesion-owners-and-measured-observation.md`, `CONTEXT.md`, `packages/webui/AGENTS.md`; report under `…/business-cohesion-20261015/p07/evidence.md` |
+| P06 | **done; bounded defect repaired** — the nine-scenario A5 comparison still supports **keep-client**. When an authoritative idle read confirms the same recovered lease, the client settles it; locally issued sends and newer/replaced generations are preserved. In-repository policy, state-transform, local-lease preservation and assembled-command tests cover recovery | `834114f5`, current follow-up | `docs/webui/DECISION-webui-observation.md`; `test/unit/webui-application-commands.test.ts`, `test/unit/conversation-turn-commands.test.ts`; original real-host and trace evidence under `…/business-cohesion-20261015/p06/` |
+| P07 | **done — residual D01–D03 integration and publication completed** — explicit New Task, live admission, stale-lease repair and second-client destination preservation have application/browser coverage. The plan and decision record now reflect the implementation and its remaining limits; generated command surface is current. Focused tests, WebUI suite, both typechecks, dependency/build-boundary/source/generated checks, build and the three affected browser paths passed. The broad browser run passed 123/125 before the local-send preservation correction; both affected failures passed on the corrected build | current follow-up | `test/unit/conversation-turn-commands.test.ts`, `test/unit/webui-application-commands.test.ts`, `test/unit/webui-creation-origins.test.ts`, `test/webui-browser/transcript.spec.mjs`, `test/webui-browser/turn-lifecycle.spec.mjs`; `pnpm typecheck:webui`, `pnpm typecheck:webui-full`, `pnpm test:webui` (171 files / 2697 tests), `pnpm check:webui-dependency`, `pnpm build:webui`, `pnpm check:webui-boundary`, `pnpm check:webui-commands`, `pnpm check:webui-business-navigation`, `pnpm check:source`; focused browser paths (3 passed) |
 
 ```mermaid
 flowchart LR
@@ -683,10 +687,10 @@ recorded with their evidence, not silently substituted for a narrower goal.
   `webui-candidate-wire-compatibility.test.ts`, `test/integration/real-host-loopback.test.ts`; I09
   `composer-field-transitions.test.ts`, `composer-history.test.ts`, `composer-submission-gate.test.ts`.
   The D01–D05 matrix and the limits are in §6 and §7.0.
-  **Stated in the independent review's own words, so the claim is not read as more than it is: carriers
-  complete, with two behaviour-delta acceptance items disclosed as unmet — D02's "explicit New Task"
-  (decision D-1) and D03's "destination event/second-client state survives" — and D01's §5.2 mechanism
-  clause undelivered. "All carriers complete" is defensible; "all of D01–D05 delivered" is not.**
+  The earlier independent review recorded D02's explicit-New-Task gap, D03's second-client preservation
+  gap, and D01's caller-supplied admission state. The current follow-up closes those behaviors through
+  the shell, assembled application and browser seams. The separate promise-shaped `decision`/`completion`
+  contract remains an explicit implementation limit; it is not represented as implemented by this pass.
 
 This document is the proposed executable plan. None of these unchecked items is an implementation
 or experiment result from the planning session.

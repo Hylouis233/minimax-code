@@ -41,7 +41,7 @@ import type {
   WebuiSubmissionOperation,
   WebuiTaskSessionSubmitter,
 } from "../contracts/submission.js";
-import { isWebuiSubscriptionProbeCurrent, ownsWebuiStreamGeneration, resolveWebuiSubscriptionRecheck, type WebuiStreamState } from "../projection/stream-state.js";
+import { isWebuiSubscriptionProbeCurrent, ownsWebuiStreamGeneration, resolveWebuiSubscriptionRecheck, settleStaleWebuiSubscription, type WebuiStreamState } from "../projection/stream-state.js";
 import { streamRecoveryProjection } from "../projection/stream-recovery.js";
 import { runWebuiStreamLoop, type WebuiStreamLoopDeps } from "../../../conversation/stream-loop.js";
 import type { WebuiStreamLoopSink } from "../contracts/stream-loop.js";
@@ -57,6 +57,10 @@ import type { WebuiTurnCapabilitySlice } from "./turn-capabilities.js";
 import type { WebuiDeliveryDisposers } from "./delivery-disposers.js";
 import type { WebuiSessionScopeManager } from "../../../conversation/session-scope.js";
 import { stopWebuiTurn } from "./turn-coordinator.js";
+import {
+  classifyWebuiSubmission,
+  readWebuiSubmissionAdmissionState,
+} from "./execution-target.js";
 
 export interface WebuiAttachTurnDeps {
   readonly sessionId: string | undefined;
@@ -156,6 +160,8 @@ export interface WebuiRecoverMissedTurnDeps {
   readonly getActiveTurn?: WebuiActiveTurnProbeFn;
   readonly probe?: WebuiActiveTurnProbe;
   readonly readStream: () => WebuiStreamState;
+  /** Settle only the same lease when an authoritative read finds no active turn. */
+  readonly settleStaleSubscription: (generation: number) => void;
   readonly attach: (turnId: string | undefined) => void;
 }
 
@@ -166,13 +172,26 @@ export interface WebuiRecoverMissedTurnDeps {
  * server instead.
  */
 export function recoverMissedWebuiTurn(deps: WebuiRecoverMissedTurnDeps): void {
-  const { sessionId, readStream, attach } = deps;
+  const { sessionId, readStream, settleStaleSubscription, attach } = deps;
   if (!sessionId) return;
   const probe = deps.probe ?? webuiActiveTurnProbeFor(deps.getActiveTurn);
   if (!probe) return;
+  const probed = readStream().subscription;
   void probe
     .probe(sessionId)
     .then((active) => {
+      // A locally issued send can be accepted before `getActiveTurn` reflects
+      // it. Its stream lease is already evidence of a live attempt, so an
+      // empty probe must not settle it. Recovery only reconciles recovered
+      // leases that were established from an earlier authoritative read.
+      if (probed?.owner === "recovered") {
+        const owned = readStream().subscription;
+        if (!isWebuiSubscriptionProbeCurrent(probed, owned)) return;
+        if (!active || active.busyReason !== "turn") {
+          settleStaleSubscription(probed.generation);
+          return;
+        }
+      }
       if (!active || active.busyReason !== "turn") return;
       // Read the lease at resolution time, not at call time: a local send that
       // started while the probe was in flight has already claimed it.
@@ -407,6 +426,17 @@ export function createWebuiConversationTurnCommands(
     }).releaseStreamSubscription(generation);
   };
 
+  const settleStaleSubscription = (generation: number): void => {
+    const writer = storeWriterFor();
+    let settled = false;
+    writer.setStream((current) => {
+      const next = settleStaleWebuiSubscription(current, generation);
+      settled = next !== current;
+      return next;
+    });
+    if (settled) writer.setSending(false);
+  };
+
   const attach = (turnId: string | undefined): Promise<void> => {
     const writer = writerFor();
     const hold = holdDelivery();
@@ -443,11 +473,19 @@ export function createWebuiConversationTurnCommands(
         ...(capabilities?.activeTurn ? { getActiveTurn: capabilities.activeTurn } : {}),
         ...probeDeps(),
         readStream,
+        settleStaleSubscription,
         attach,
       }),
     send: async (intent) => {
       const writer = writerFor();
       const hold = holdDelivery();
+      const admissionDeps = {
+        store,
+        capabilities: capabilities ?? {},
+        ...(taskSessions ? { taskSessions } : {}),
+      };
+      const admission = readWebuiSubmissionAdmissionState(admissionDeps, { sessionId });
+      const decision = classifyWebuiSubmission(admissionDeps, { sessionId });
       return await sendWebuiTurn({
         sessionId,
         ...(taskSessions ? { taskSessions } : {}),
@@ -456,7 +494,9 @@ export function createWebuiConversationTurnCommands(
         ...(intent.planMode ? { planMode: intent.planMode } : {}),
         attachments: intent.attachments,
         onAttachmentsSubmitted: intent.onAttachmentsSubmitted,
-        sending: intent.sending,
+        // The UI submits intent only. The execution owner reads the canonical
+        // target at invocation time so a stale render cannot choose send vs queue.
+        sending: admission.turnLive && decision !== "unsupported" && decision !== "needs-session",
         callbacks: intent.callbacks,
         readStream,
         deps: loopDeps(hold),

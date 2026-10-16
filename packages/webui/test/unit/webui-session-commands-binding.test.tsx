@@ -224,7 +224,6 @@ describe("send", () => {
     const { commands } = commandsFor("s1", store, { sendMessage });
     await commands.send({
       message: "你好",
-      sending: false,
       callbacks: { onDraftChange: () => undefined },
     });
     expect(sendMessage).toHaveBeenCalledTimes(1);
@@ -238,7 +237,6 @@ describe("send", () => {
     const { commands } = commandsFor("s1", store);
     await commands.send({
       message: "你好",
-      sending: false,
       callbacks: { onDraftChange: () => undefined },
     });
     expect(sendMessage).not.toHaveBeenCalled();
@@ -252,7 +250,6 @@ describe("send", () => {
     const { commands } = commandsFor("s1", store);
     await commands.send({
       message: "你好",
-      sending: false,
       callbacks: { onDraftChange: () => undefined },
       deps: { sendMessage },
     } as unknown as WebuiTurnSendIntent);
@@ -296,7 +293,7 @@ describe("stop", () => {
  */
 type SendIntentCapabilityFields = Extract<
   keyof WebuiTurnSendIntent,
-  "resumeSession" | "loadMessages" | "sendMessage" | "deps" | "sink" | "createWriter"
+  "resumeSession" | "loadMessages" | "sendMessage" | "deps" | "sink" | "createWriter" | "sending"
 >;
 type OnlyTrue<T extends true> = T;
 

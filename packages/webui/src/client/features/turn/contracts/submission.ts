@@ -79,6 +79,8 @@ export type WebuiSubmissionCompletion =
  * started the creation is still current.
  */
 export interface WebuiTaskSessionSubmitter {
+  /** Whether the current home incarnation already has a creation in flight. */
+  readonly creationPending?: () => boolean;
   readonly submit: (input: {
     readonly name?: string;
     readonly workspaceDir?: string;

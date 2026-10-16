@@ -21,7 +21,7 @@ import {
   recheckWebuiSubscription,
   sendWebuiTurn,
 } from "../../src/client/features/turn/application/turn-commands.js";
-import { initialWebuiStreamState } from "../../src/client/features/turn/projection/stream-state.js";
+import { initialWebuiStreamState, settleStaleWebuiSubscription, type WebuiStreamState } from "../../src/client/features/turn/projection/stream-state.js";
 import {
   createWebuiSessionStore,
   createWebuiTranscriptHistoryWriter,
@@ -479,6 +479,7 @@ describe("the assembled composer controller", () => {
       slices,
     });
     app.start({ initialSessionId: "s1" });
+    app.store.createSessionWriter({ kind: "session", sessionId: "s1" }).setSending(true);
 
     await expect(app.composerController.submit({
       draft: "queued text",
@@ -562,6 +563,7 @@ describe("the assembled composer controller", () => {
     app.start();
     app.select("s1");
     await flush();
+    app.store.createSessionWriter({ kind: "session", sessionId: "s1" }).setSending(true);
     const accepted = app.composerController.submit({
       draft: "queued while selected",
       sending: true,
@@ -648,6 +650,7 @@ describe("the assembled composer controller", () => {
     expect(app.composer.readStaging().urlReferences).toEqual([]);
 
     stage();
+    app.store.createSessionWriter({ kind: "session", sessionId: "s1" }).setSending(true);
     await expect(app.composerController.submit({
       draft: "enqueue attachment", attachments: [attachmentWire], sending: true, goalEnabled: true, agentName: "main",
     })).resolves.toMatchObject({ kind: "queued", sessionId: "s1" });
@@ -723,6 +726,7 @@ describe("attach, recheck and gap recovery", () => {
       sessionId: "s1",
       getActiveTurn: async () => busy,
       readStream: () => initialWebuiStreamState,
+      settleStaleSubscription: vi.fn(),
       attach,
     });
     await flush();
@@ -735,10 +739,94 @@ describe("attach, recheck and gap recovery", () => {
       sessionId: "s1",
       getActiveTurn: async () => ({ turnId: "t-c", busyReason: "compaction", locallyOwned: false }),
       readStream: () => initialWebuiStreamState,
+      settleStaleSubscription: vi.fn(),
       attach,
     });
     await flush();
     expect(attach).not.toHaveBeenCalled();
+  });
+
+  it("settles the captured lease when recovery confirms that no turn is active", async () => {
+    const settleStaleSubscription = vi.fn();
+    const stream = {
+      ...initialWebuiStreamState,
+      phase: "streaming" as const,
+      lastClaimedGeneration: 7,
+      subscription: { owner: "recovered" as const, generation: 7, turnId: "t-old" },
+    };
+    recoverMissedWebuiTurn({
+      sessionId: "s1",
+      getActiveTurn: async () => undefined,
+      readStream: () => stream,
+      settleStaleSubscription,
+      attach: vi.fn(),
+    });
+    await flush();
+    expect(settleStaleSubscription).toHaveBeenCalledTimes(1);
+    expect(settleStaleSubscription).toHaveBeenCalledWith(7);
+  });
+
+  it("keeps a locally issued send lease when the active-turn read is still empty", async () => {
+    const settleStaleSubscription = vi.fn();
+    const stream = {
+      ...initialWebuiStreamState,
+      phase: "streaming" as const,
+      lastClaimedGeneration: 7,
+      subscription: { owner: "local-send" as const, generation: 7 },
+    };
+    recoverMissedWebuiTurn({
+      sessionId: "s1",
+      getActiveTurn: async () => undefined,
+      readStream: () => stream,
+      settleStaleSubscription,
+      attach: vi.fn(),
+    });
+    await flush();
+    expect(settleStaleSubscription).not.toHaveBeenCalled();
+  });
+
+  it("does not settle a newer lease when an idle probe resolves late", async () => {
+    let resolveProbe!: (active: undefined) => void;
+    const probe = { probe: () => new Promise<undefined>((resolve) => { resolveProbe = resolve; }) };
+    let stream: WebuiStreamState = {
+      ...initialWebuiStreamState,
+      lastClaimedGeneration: 7,
+      subscription: { owner: "recovered" as const, generation: 7, turnId: "t-old" },
+    };
+    const settleStaleSubscription = vi.fn();
+    recoverMissedWebuiTurn({
+      sessionId: "s1",
+      probe,
+      readStream: () => stream,
+      settleStaleSubscription,
+      attach: vi.fn(),
+    });
+    stream = {
+      ...stream,
+      lastClaimedGeneration: 8,
+      subscription: { owner: "local-send", generation: 8 },
+    };
+    resolveProbe(undefined);
+    await flush();
+    expect(settleStaleSubscription).not.toHaveBeenCalled();
+  });
+
+  it("settles only the stale generation and preserves its transcript", () => {
+    const stream = {
+      ...initialWebuiStreamState,
+      phase: "streaming" as const,
+      lastClaimedGeneration: 7,
+      subscription: { owner: "recovered" as const, generation: 7, turnId: "t-old" },
+      messages: [{ id: "m1", answer: "answer", thinking: "" }],
+    };
+    const settled = settleStaleWebuiSubscription(stream, 7);
+    expect(settled.phase).toBe("idle");
+    expect(settled.subscription).toBeUndefined();
+    expect(settled.lastClaimedGeneration).toBeUndefined();
+    expect(settled.messages).toBe(stream.messages);
+
+    const newer = { ...stream, lastClaimedGeneration: 8 };
+    expect(settleStaleWebuiSubscription(newer, 7)).toBe(newer);
   });
 
   it("recheck retargets a stale lease onto the running turn", async () => {

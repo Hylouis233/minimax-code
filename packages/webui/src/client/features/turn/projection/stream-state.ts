@@ -202,6 +202,23 @@ export function isWebuiSubscriptionProbeCurrent(
   return current.generation === captured.generation;
 }
 
+/** Settle a lease whose turn the authoritative active-turn read no longer sees. */
+export function settleStaleWebuiSubscription(
+  state: WebuiStreamState,
+  generation: number,
+): WebuiStreamState {
+  if (
+    state.subscription?.generation !== generation ||
+    state.lastClaimedGeneration !== generation
+  ) return state;
+  return {
+    ...state,
+    phase: "idle",
+    subscription: undefined,
+    lastClaimedGeneration: undefined,
+  };
+}
+
 /**
  * Session lists carry `SessionStatusInfoView.statusType` as a numeric enum
  * (`Started` is 1), while early WebUI adapters supplied a status string.

@@ -23,7 +23,6 @@ export interface WebuiTurnSendIntent {
   readonly planMode?: boolean;
   readonly attachments?: readonly WebuiAttachmentInput[];
   readonly onAttachmentsSubmitted?: () => void;
-  readonly sending: boolean;
   readonly callbacks: WebuiComposerTurnCallbacks;
   readonly createSessionWorkspaceDir?: string;
   readonly teamModeOff?: boolean;

@@ -30,7 +30,7 @@ export interface WebuiExecutionObservationDeps {
    * The task/session use case, for D01's reservation. Absent on a host that has no creation use case,
    * which means no creation can be in flight either.
    */
-  readonly taskSessions?: { readonly creationPending: () => boolean };
+  readonly taskSessions?: { readonly creationPending?: () => boolean };
 }
 
 /**
@@ -52,7 +52,7 @@ export function readWebuiSubmissionAdmissionState(
     turnLive: deps.store.readSession(target.sessionId ?? WEBUI_HOME_SESSION_KEY).sending,
     // The reservation is per home incarnation and only a home submission can be behind one: a
     // session target is not waiting on a creation, so it never reads as `creating`.
-    creating: !hasSession && (deps.taskSessions?.creationPending() ?? false),
+    creating: !hasSession && (deps.taskSessions?.creationPending?.() ?? false),
   };
 }
 

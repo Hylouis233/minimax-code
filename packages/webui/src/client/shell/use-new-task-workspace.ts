@@ -39,6 +39,10 @@ export interface NewTaskWorkspacePolicy {
     readonly sessions: readonly WebuiClientSession[];
   }) => string | undefined;
   readonly chooseWorkspaceDir: (workspaceDir: string | undefined) => string | undefined;
+  readonly beginNewTask: (workspaceDir?: string) => {
+    readonly navigationEpoch: number;
+    readonly workspaceDir: string | undefined;
+  };
 }
 
 export interface UseNewTaskWorkspaceOptions {
@@ -153,13 +157,11 @@ export function useNewTaskWorkspace(options: UseNewTaskWorkspaceOptions): NewTas
     // choice is the use case's, so the persisted "no project" flag and the rule
     // about what an explicit clearing means have one home.
     //
-    // Deliberately *not* the use case's `beginNewTask` here: that also advances
-    // the home incarnation and drops the home record, which is the identity half
-    // of the creation reservation. It belongs with the adoption cutover (P01
-    // step 4-5 with P02), where the machinery it protects is live; wiring it now
-    // would change what 「新建任务」 does to a running home turn while nothing
-    // consumes the incarnation yet.
-    setNewTaskWorkspaceDir(taskSessions.chooseWorkspaceDir(workspaceDir));
+    // Advance the home identity before clearing view state. A pending create must
+    // finish against the incarnation that started it, not adopt into this new
+    // home slot when the user explicitly starts another task.
+    const task = taskSessions.beginNewTask(workspaceDir);
+    setNewTaskWorkspaceDir(task.workspaceDir);
     setWorkspaceMenuOpen(false);
     setDraft("");
     // 「新建任务」 is the one navigation that does not change the selected

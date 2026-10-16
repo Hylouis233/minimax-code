@@ -87,7 +87,6 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
     readonly message: string;
     readonly clientIntent?: string;
     readonly attachments?: WebuiComposerSubmitIntent["attachments"];
-    readonly sending: boolean;
     readonly planMode?: boolean;
     readonly createSessionWorkspaceDir?: string;
     readonly teamModeOff?: boolean;
@@ -96,7 +95,6 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
     ...(turn.clientIntent ? { clientIntent: turn.clientIntent } : {}),
     ...(turn.planMode ? { planMode: true } : {}),
     attachments: turn.attachments,
-    sending: turn.sending,
     ...(turn.createSessionWorkspaceDir ? { createSessionWorkspaceDir: turn.createSessionWorkspaceDir } : {}),
     ...(turn.teamModeOff ? { teamModeOff: turn.teamModeOff } : {}),
     onAttachmentsSubmitted: clearStaging,
@@ -110,7 +108,7 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
         // navigation claim that started the creation is still current (rule 7).
         if (selected) deps.selectCreatedSession(createdSessionId);
         onSessionCreated?.(createdSessionId, selected);
-        if (turn.sending) settlement.queueGeneration = queueCommands.captureDestination(createdSessionId);
+        settlement.queueGeneration = queueCommands.captureDestination(createdSessionId);
       },
 
     },
@@ -228,8 +226,7 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
       deps.store.setRetry({ session: sessionId, message });
       const settlement: { needsSession: boolean; sessionId?: string; queueGeneration?: number } = { needsSession: false };
       const clearStaging = (): void => deps.store.setStaging({ attachments: [], urlReferences: [] });
-      if (input.sending && sessionId) settlement.queueGeneration = queueCommands.captureDestination(sessionId);
-      if (!sessionId && input.sending && !deps.canEnqueue) return { kind: "ignored" };
+      if (sessionId) settlement.queueGeneration = queueCommands.captureDestination(sessionId);
       // The submission reports what it decided; the settle flags it used to write back through
       // callbacks are read off that transition instead (plan §5.5 P02 step 4). What could not move is
       // the mid-flight half — clearing the draft and adopting the created session — because the
@@ -238,7 +235,6 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
         message,
         ...(resolved.clientIntent ? { clientIntent: resolved.clientIntent } : {}),
         attachments: input.attachments,
-        sending: input.sending,
         ...(input.planMode ? { planMode: true } : {}),
         ...(input.createSessionWorkspaceDir ? { createSessionWorkspaceDir: input.createSessionWorkspaceDir } : {}),
         ...(input.teamModeOff ? { teamModeOff: true } : {}),

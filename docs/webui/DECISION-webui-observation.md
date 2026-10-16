@@ -3,7 +3,7 @@
 Status: **decided** by execution under P06 of
 [the business-cohesion plan](PLAN-webui-business-cohesion.md). Outcome: **keep the client's
 reconciliation approach**. A server snapshot-plus-deltas design is **not** promoted, and one bounded
-client defect is specified as a follow-up rather than fixed here.
+client defect found by the comparison has since been repaired in the P06/P07 implementation follow-up.
 
 ## What was executed
 
@@ -102,13 +102,14 @@ consistency obligation fails on the existing host, executed rather than inferred
 `stale-lease-repaired-by-next-start` converges with the branch sequence
 `session-start:recheck → release-scoped → attach`).
 
-**Remediation, specified not implemented.** In the recovery pass, when the authoritative read reports
-no active turn and this client still holds a lease whose turn is not that one, release the lease and
-settle the phase — the same transition the next `session.start` already performs, applied at the point
-the client actually looks. It is bounded: one branch in `recoverMissedWebuiTurn`, its own
-before/after scenario (the trace above is the failing case), and no change to the wire. It is not
-implemented under this plan because it changes a behavioural path (when the phase settles) and P07's
-validation matrix owns that decision.
+**Remediation, implemented.** In the recovery pass, when the authoritative read reports no active
+turn, the probed lease is a recovered lease, and that exact generation is still current, the client
+settles it and returns the phase to idle. A locally issued send lease is preserved when the active-turn
+read is empty because that read can race send acceptance. It does not release a newer/replaced
+generation. The wire is unchanged. Regression coverage
+now lives in `test/unit/webui-application-commands.test.ts` (the policy decision and newer-generation
+fence) and `test/unit/conversation-turn-commands.test.ts` (the assembled production command updates
+phase, lease, and sending state while preserving the transcript).
 
 ## Limits of this evidence
 

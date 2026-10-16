@@ -31,9 +31,12 @@ One bounded client defect is named there — a lease whose terminal was lost on 
 `streaming` until the next turn's start resolves it — with its remediation specified and left to the
 plan's validation matrix.
 
-The programme preserves the retained invariants (I01–I09) and states its limits rather than claiming
-them closed: `beginNewTask` is still unbound in the shell, the exit's "detached observer" and
-per-path delivery-handle cases have no named test, and the real-host probe exercised one turn shape.
+The implementation follow-up closes the previously disclosed `beginNewTask` shell gap, adds live
+admission at the Turn application command, preserves a second client's destination state during
+creation adoption, and repairs the stale lease identified by A5. The `decision`/`completion` promise
+shape remains a separate unimplemented contract detail. The existing detached-observer and delivery
+tests remain the evidence for those lifecycle paths; the real-host probe still exercises one turn
+shape, so it does not establish cross-shape runtime behavior.
 [The plan](../webui/PLAN-webui-business-cohesion.md) §7.0 is the authoritative carrier position table
 and carries each carrier's commit; the earlier reorganization programme and its evidence remain
 intact and are not restated here.

@@ -307,6 +307,20 @@ export function installFixtureTransport() {
       }
       if (frame.operation === "createSession") {
         const created = { sessionId: "created-C", agentName: "synthetic-created", title: "Synthetic created", createdAt: 1_700_000_000_010, updatedAt: 1_700_000_000_010, workspaceDir: "/synthetic/workspace" };
+        const isHeld = held.some((entry) => entry.operation === frame.operation && matches(frame.body, entry.condition));
+        const waitIndex = delayed.findIndex((entry) => entry.operation === frame.operation && matches(frame.body, entry.condition));
+        if (isHeld || waitIndex >= 0) {
+          if (!isHeld) delayed.splice(waitIndex, 1);
+          pending.push({
+            operation: frame.operation,
+            body: clone(frame.body ?? {}),
+            resolve: (result) => {
+              sessions.push({ ...created, ...clone(result) });
+              this.respond(frame, result);
+            },
+          });
+          return;
+        }
         sessions.push(created);
         queueMicrotask(() => this.respond(frame, created));
         return;
