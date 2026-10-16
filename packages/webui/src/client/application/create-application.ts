@@ -512,6 +512,14 @@ export function createWebuiApplication(
       // use case, which reserves the admission, transfers the home record under
       // its guards and answers whether the created session may be selected.
       taskSessions: taskSessionWorkflows,
+      // The one business write a submission performs on the caller's behalf: the
+      // draft it consumed. Installed here rather than passed per send, which is
+      // what lets the public submit intent carry no setters at all.
+      clearDraft: (targetSessionId) =>
+        composer.setDraft(
+          targetSessionId ?? readActiveSessionId() ?? WEBUI_COMPOSER_HOME_KEY,
+          "",
+        ),
     });
   /**
    * The one reconciliation entry point: the same owner routes the event path

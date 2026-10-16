@@ -91,8 +91,26 @@ export type WebuiSubmissionCompletion =
       readonly sessionId: string;
       /** Whether this submission had to create the session first. */
       readonly created: boolean;
+      /**
+       * Whether the created session may be selected: false when the navigation
+       * claim that started the creation is no longer current.
+       *
+       * A fact about what happened, not a setter — the caller still decides what
+       * to do about it. It is here because the alternative was handing the caller
+       * a callback whose *argument* was this value.
+       */
+      readonly selected: boolean;
     }
-  | { readonly kind: "queued"; readonly sessionId: string }
+  | {
+      readonly kind: "queued";
+      readonly sessionId: string;
+      /** Whether this submission had to create the session first. */
+      readonly created: boolean;
+      /** Whether that created session may be selected. A queued submission can
+       * create one too, so a caller must not have to branch on the outcome kind
+       * to find out. */
+      readonly selected: boolean;
+    }
   | WebuiSubmissionRefusal;
 
 /**

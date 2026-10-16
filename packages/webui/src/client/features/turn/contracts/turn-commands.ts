@@ -17,13 +17,23 @@ export interface WebuiComposerTurnCallbacks {
   readonly onQueued?: () => void;
 }
 
+/**
+ * What a surface submits: intent and data, never a setter.
+ *
+ * The `callbacks` bag this replaces was four business setters per call — a draft
+ * writer, a created-session handler, a needs-session handler and a queue handler
+ * — which meant the caller had to know which branch fired which one, and a
+ * callback could write a business field the submission never knew it was
+ * changing. Everything the caller still needs is now either in the ticket's
+ * admission or in its completion.
+ */
 export interface WebuiTurnSendIntent {
   readonly message: string;
   readonly clientIntent?: string;
   readonly planMode?: boolean;
   readonly attachments?: readonly WebuiAttachmentInput[];
+  /** Tell the composer its staged attachments were consumed. */
   readonly onAttachmentsSubmitted?: () => void;
-  readonly callbacks: WebuiComposerTurnCallbacks;
   readonly createSessionWorkspaceDir?: string;
   readonly teamModeOff?: boolean;
 }

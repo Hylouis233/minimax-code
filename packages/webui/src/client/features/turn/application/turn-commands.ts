@@ -214,6 +214,15 @@ export function recoverMissedWebuiTurn(deps: WebuiRecoverMissedTurnDeps): void {
 export interface WebuiSendTurnArgs {
   readonly sessionId: string | undefined;
   /**
+   * The composer draft this submission consumes.
+   *
+   * A link the **application** installs, not a setter a caller passes per send.
+   * It is the one write the submission genuinely has to make — everything else it
+   * used to ask the caller for is now a fact in the completion — and routing it
+   * through the composition root is what keeps the public intent free of them.
+   */
+  readonly clearDraft?: (sessionId: string | undefined) => void;
+  /**
    * The task use case, so a first message's creation goes through the one owner.
    * Absent on a host that cannot create, which the submission reports as `unsupported`.
    */
@@ -228,7 +237,6 @@ export interface WebuiSendTurnArgs {
    * is assembled here, from the writer this command builds, so a caller supplies
    * intent and never a sink.
    */
-  readonly callbacks: WebuiComposerTurnCallbacks;
   /** What the user asked for, as a kind. */
   readonly intent: WebuiSubmissionIntent;
   /** Decided by the owner before any work, so the ticket can say it immediately. */
@@ -281,6 +289,9 @@ export function sendWebuiTurn(
   args: WebuiSendTurnArgs,
 ): WebuiSubmissionTicket | undefined {
   let writer = args.createWriter();
+  // The session a first message creates, remembered because the draft's key
+  // moves with it.
+  let createdSessionId: string | undefined;
   // The bundle is woven here, from the writer this command owns: `createSink`
   // reads the *current* writer, so a turn whose first message created the
   // session mints its lease against the migrated key rather than the home slot.
@@ -290,15 +301,23 @@ export function sendWebuiTurn(
     setRefusal: (refusal) => writer.setStreamRefusal(refusal),
     setSending: (sending) => writer.setTurnSending(sending),
     ...(args.readStream ? { readStream: args.readStream } : {}),
-    onDraftChange: args.callbacks.onDraftChange,
-    ...(args.callbacks.onNeedsSession ? { onNeedsSession: args.callbacks.onNeedsSession } : {}),
-    ...(args.callbacks.onQueued ? { onQueued: args.callbacks.onQueued } : {}),
-    onSessionCreated: (createdSessionId, selected) => {
-      args.callbacks.onSessionCreated?.(createdSessionId, selected);
+    // The draft is consumed by the submission, through the link the assembly
+    // installed. No caller supplies a writer.
+    //
+    // It is cleared against the session the turn actually landed on, which is
+    // not necessarily the one it started from: a first message creates its
+    // session, and the draft belongs to the created session's key from then on.
+    // Clearing the pre-creation key would leave the words the user just sent
+    // sitting in a home slot they can no longer reach.
+    onDraftChange: (next) => args.clearDraft?.(createdSessionId ?? args.sessionId),
+    onSessionCreated: (created, selected) => {
+      createdSessionId = created;
       // The writer moves whatever the use case decided about selection: the attempt's frames belong to
       // the session it created, whether or not the view follows the user there.
+      // The selection itself is reported in the completion, not applied here.
+      void selected;
       if (writer.kind === "home" && writer.migrateToSession) {
-        writer = writer.migrateToSession(createdSessionId);
+        writer = writer.migrateToSession(created);
       }
     },
   });
@@ -339,6 +358,14 @@ export interface WebuiTurnCommandContext {
   readonly scope?: WebuiSessionScopeManager;
   /** The task use case the substrate creates through. */
   readonly taskSessions?: WebuiTaskSessionSubmitter;
+  /**
+   * The composer draft a submission consumes.
+   *
+   * Installed once by the composition root, not supplied per send by a caller.
+   * It is the single business write the submission has to make, and putting it
+   * here is what lets the public intent carry no setters at all.
+   */
+  readonly clearDraft?: (sessionId: string | undefined) => void;
 }
 
 /** What a surface supplies to send: intent and data, never a writer or a sink. */
@@ -521,7 +548,7 @@ export function createWebuiConversationTurnCommands(
         // The UI submits intent only. The execution owner reads the canonical
         // target at invocation time so a stale render cannot choose send vs queue.
         sending: admission.turnLive && decision.kind !== "unsupported" && decision.kind !== "needs-session",
-        callbacks: intent.callbacks,
+        ...(context.clearDraft ? { clearDraft: context.clearDraft } : {}),
         readStream,
         deps: loopDeps(hold),
         ...(capabilities?.enqueue ? { enqueueMessage: capabilities.enqueue } : {}),

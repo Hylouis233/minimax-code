@@ -118,7 +118,6 @@ describe("an attempt the client started is closable by the application", () => {
 
     void commands.send({
       message: "hello",
-      callbacks: { onDraftChange: () => undefined },
     });
     await new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -167,7 +166,6 @@ describe("an attempt the client started is closable by the application", () => {
 
     const ticket = commands.send({
       message: "hello",
-      callbacks: { onDraftChange: () => undefined },
     });
 
     await expect(ticket?.completion).resolves.toMatchObject({ kind: "dispatched" });
@@ -216,7 +214,7 @@ describe("an attempt the client started is closable by the application", () => {
     // The ticket's completion never rejects, so there is no rejection arm here
     // that the caller could forget: a submission that failed settles as a value.
     void commands
-      .send({ message: "hello", callbacks: { onDraftChange: () => undefined } })
+      .send({ message: "hello" })
       ?.completion.then(() => {
         outcome = "settled";
       });

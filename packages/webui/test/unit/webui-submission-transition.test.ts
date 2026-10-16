@@ -162,7 +162,12 @@ describe("the ticket a submission returns", () => {
       enqueueMessage,
       handlers: h,
     });
-    expect(completion).toEqual({ kind: "queued", sessionId: "s1" });
+    expect(completion).toEqual({
+      kind: "queued",
+      sessionId: "s1",
+      created: false,
+      selected: false,
+    });
     expect(enqueueMessage).toHaveBeenCalledWith(expect.objectContaining({ id: "s1", content: "hello" }));
     expect(h.onQueued).toHaveBeenCalled();
   });

@@ -224,7 +224,6 @@ describe("send", () => {
     const { commands } = commandsFor("s1", store, { sendMessage });
     await commands.send({
       message: "你好",
-      callbacks: { onDraftChange: () => undefined },
     });
     expect(sendMessage).toHaveBeenCalledTimes(1);
     expect(sendMessage.mock.calls[0]?.[0]).toEqual({ id: "s1", content: "你好" });
@@ -237,7 +236,6 @@ describe("send", () => {
     const { commands } = commandsFor("s1", store);
     await commands.send({
       message: "你好",
-      callbacks: { onDraftChange: () => undefined },
     });
     expect(sendMessage).not.toHaveBeenCalled();
     expect(store.readSession("s1").sending).toBe(false);
@@ -250,7 +248,6 @@ describe("send", () => {
     const { commands } = commandsFor("s1", store);
     await commands.send({
       message: "你好",
-      callbacks: { onDraftChange: () => undefined },
       deps: { sendMessage },
     } as unknown as WebuiTurnSendIntent);
     expect(sendMessage).not.toHaveBeenCalled();

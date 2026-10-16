@@ -176,3 +176,47 @@ describe("prohibition 4 — turn's shared rules have exactly one owner", () => {
     }
   });
 });
+
+describe("prohibition 5 — a submit carries intent, never a setter", () => {
+  it("publishes a send intent with no business setter on it", () => {
+    // The public intent is what a surface submits. A setter here means the
+    // caller has to know which branch fires which write, and a submission that
+    // does not know about it can change a business field it never named.
+    const source = read("features/turn/contracts/turn-commands.ts");
+    const intent = source.slice(
+      source.indexOf("export interface WebuiTurnSendIntent"),
+    );
+    // Take only the interface, not the module below it.
+    const body = intent.slice(0, intent.indexOf("\n}"));
+    for (const setter of [
+      "onDraftChange",
+      "onSessionCreated",
+      "onNeedsSession",
+      "onQueued",
+      "setDraft",
+      "setSending",
+      "setRefusal",
+      "resetStreamForTurn",
+      "createSink",
+    ]) {
+      expect(body).not.toContain(setter);
+    }
+    // And the ticket carries no setter either: an admission and a completion
+    // are the whole protocol.
+    const submission = read("features/turn/contracts/submission.ts");
+    const ticket = submission.slice(
+      submission.indexOf("export interface WebuiSubmissionTicket"),
+    );
+    expect(ticket.slice(0, ticket.indexOf("\n}"))).not.toMatch(/set[A-Z]/u);
+  });
+
+  it("clears the draft through a link the assembly installs, not through a caller", () => {
+    // The one business write a submission makes is wired once at the composition
+    // root. A per-send setter would put the caller's draft writer back on the
+    // boundary this prohibition exists to keep closed.
+    const application = read("application/create-application.ts");
+    expect(application).toContain("clearDraft:");
+    const context = read("features/turn/application/turn-commands.ts");
+    expect(context).toMatch(/readonly clearDraft\?: \(sessionId: string \| undefined\) => void/u);
+  });
+});

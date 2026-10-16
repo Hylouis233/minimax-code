@@ -69,7 +69,6 @@ describe("the conversation turn commands", () => {
     // the assertions below read the record — which is the state being asserted.
     void commands.send({
       message: "hello",
-      callbacks: { onDraftChange: () => undefined },
     });
     await new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -94,12 +93,16 @@ describe("the conversation turn commands", () => {
 
     const ticket = commands.send({
       message: "queue from live state",
-      callbacks: { onDraftChange: () => undefined },
     });
 
     // The queue is chosen from the live store, not from what the caller passed.
     expect(ticket?.admission).toEqual({ kind: "queued" });
-    await expect(ticket?.completion).resolves.toEqual({ kind: "queued", sessionId: "s1" });
+    await expect(ticket?.completion).resolves.toEqual({
+      kind: "queued",
+      sessionId: "s1",
+      created: false,
+      selected: false,
+    });
     expect(enqueueMessage).toHaveBeenCalledWith({ id: "s1", content: "queue from live state" });
     expect(sendMessage).not.toHaveBeenCalled();
   });
@@ -117,7 +120,6 @@ describe("the conversation turn commands", () => {
     // the transition says why rather than leaving it to be inferred.
     const refused = commands.send({
       message: "hello",
-      callbacks: { onDraftChange: () => undefined },
     });
     expect(refused?.admission).toEqual({ kind: "unsupported", missing: "transport" });
     await expect(refused?.completion).resolves.toMatchObject({
@@ -284,7 +286,6 @@ describe("an accepted attempt leases its session", () => {
 
     void commands.send({
       message: "hello",
-      callbacks: { onDraftChange: () => undefined },
     });
     await new Promise((resolve) => setTimeout(resolve, 0));
 

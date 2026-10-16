@@ -155,6 +155,9 @@ export function submitWebuiTurn(
 
     let sessionId = args.sessionId;
     let created = false;
+    // The use case's selection verdict, reported rather than applied: a caller
+    // decides what to do with it, and the submission only has to survive it.
+    let selectedAfterCreation = false;
     if (!sessionId) {
       const submitTask = args.submitTask;
       if (!submitTask) {
@@ -189,6 +192,7 @@ export function submitWebuiTurn(
       }
       sessionId = outcome.sessionId;
       created = true;
+      selectedAfterCreation = outcome.selected;
       handlers.onSessionCreated?.(sessionId, outcome.selected);
     }
     if (sessionId === undefined) return ({ kind: "failed", error: "No session to submit to" });
@@ -214,8 +218,8 @@ export function submitWebuiTurn(
         },
       });
       return refusal === undefined
-        ? ({ kind: "queued", sessionId })
-        : ({ kind: "failed", error: refusal });
+        ? { kind: "queued", sessionId, created, selected: selectedAfterCreation }
+        : { kind: "failed", error: refusal };
     }
     if (!args.deps.sendMessage) return ({ kind: "unsupported", missing: "transport" });
     handlers.setSending(true);
@@ -240,7 +244,7 @@ export function submitWebuiTurn(
         handlers.setSending(false);
       }
     }
-    return ({ kind: "dispatched", sessionId, created });
+    return { kind: "dispatched", sessionId, created, selected: selectedAfterCreation };
   }
 
   return { id, admission: args.admission, completion };

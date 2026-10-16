@@ -90,32 +90,21 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
     readonly planMode?: boolean;
     readonly createSessionWorkspaceDir?: string;
     readonly teamModeOff?: boolean;
-  }, clearStaging: () => void, settlement: { needsSession: boolean; sessionId?: string; queueGeneration?: number }, onSessionCreated?: (sessionId: string, selected: boolean) => void): Promise<WebuiSubmissionCompletion | undefined> => {
+  }, clearStaging: () => void): Promise<WebuiSubmissionCompletion | undefined> => {
+    // Intent and data only. No setter crosses this boundary: the draft is
+    // consumed through the link the assembly installed on the command set, and
+    // the session, the queue and the selection all come back on the completion.
     const ticket: WebuiSubmissionTicket | undefined = deps.turnCommandsFor(sessionId).send({
-    message: turn.message,
-    ...(turn.clientIntent ? { clientIntent: turn.clientIntent } : {}),
-    ...(turn.planMode ? { planMode: true } : {}),
-    attachments: turn.attachments,
-    ...(turn.createSessionWorkspaceDir ? { createSessionWorkspaceDir: turn.createSessionWorkspaceDir } : {}),
-    ...(turn.teamModeOff ? { teamModeOff: turn.teamModeOff } : {}),
-    onAttachmentsSubmitted: clearStaging,
-    callbacks: {
-      onDraftChange: setDraft,
-
-      onSessionCreated: (createdSessionId, selected) => {
-        settlement.sessionId = createdSessionId;
-        // The transfer and the composer's slot move are the task use case's, and they happened
-        // before this handler ran; what is left is the selection, and only while the navigation
-        // claim that started the creation is still current.
-        if (selected) deps.selectCreatedSession(createdSessionId);
-        onSessionCreated?.(createdSessionId, selected);
-        settlement.queueGeneration = queueCommands.captureDestination(createdSessionId);
-      },
-
-    },
-  });
-    // The ticket is the whole protocol: nothing else about this submission is
-    // handed back, and its completion never rejects.
+      message: turn.message,
+      ...(turn.clientIntent ? { clientIntent: turn.clientIntent } : {}),
+      ...(turn.planMode ? { planMode: true } : {}),
+      attachments: turn.attachments,
+      ...(turn.createSessionWorkspaceDir
+        ? { createSessionWorkspaceDir: turn.createSessionWorkspaceDir }
+        : {}),
+      ...(turn.teamModeOff ? { teamModeOff: turn.teamModeOff } : {}),
+      onAttachmentsSubmitted: clearStaging,
+    });
     return ticket === undefined ? Promise.resolve(undefined) : ticket.completion;
   }
 
@@ -229,13 +218,16 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
       if (resolved.clientIntent === "plan-entry") deps.store.setModes({ goal: false, plan: true });
       const message = (resolved.message ?? input.draft).trim();
       deps.store.setRetry({ session: sessionId, message });
-      const settlement: { needsSession: boolean; sessionId?: string; queueGeneration?: number } = { needsSession: false };
       const clearStaging = (): void => deps.store.setStaging({ attachments: [], urlReferences: [] });
-      if (sessionId) settlement.queueGeneration = queueCommands.captureDestination(sessionId);
-      // The submission reports what it decided; the settle flags it used to write back through
-      // callbacks are read off that transition instead. What could not move is the mid-flight half —
-      // clearing the draft and adopting the created session — because the writer's home→session
-      // migration depends on that ordering, so those stay callbacks.
+      // Captured *before* the submission, not just before the refresh. A user who
+      // switches sessions while an enqueue is in flight must not have the mirror
+      // reclaimed by the reply: the refresh is only allowed to apply if the
+      // destination it was issued for is still the one it was captured against.
+      const queueGeneration = sessionId ? queueCommands.captureDestination(sessionId) : undefined;
+      // Everything the submission used to report back through callbacks is on its
+      // completion now: the session it created, whether it may be selected, and
+      // whether it queued. Nothing here has to be in flight for the caller to
+      // learn any of it.
       const operation = await queueView(sessionId, {
         message,
         ...(resolved.clientIntent ? { clientIntent: resolved.clientIntent } : {}),
@@ -243,15 +235,38 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
         ...(input.planMode ? { planMode: true } : {}),
         ...(input.createSessionWorkspaceDir ? { createSessionWorkspaceDir: input.createSessionWorkspaceDir } : {}),
         ...(input.teamModeOff ? { teamModeOff: true } : {}),
-      }, clearStaging, settlement, input.onSessionCreated);
-      if (operation?.kind === "needs-session")
-        return { kind: "needs-session", draft: input.draft };
+      }, clearStaging);
+      if (operation?.kind === "needs-session") return { kind: "needs-session", draft: input.draft };
+      // A created session is named by the completion, and whether the view should
+      // follow the user there is the use case's verdict, not something to guess.
+      const created =
+        operation !== undefined &&
+        (operation.kind === "dispatched" || operation.kind === "queued") &&
+        operation.created === true
+          ? operation
+          : undefined;
+      if (created?.selected === true) deps.selectCreatedSession(created.sessionId);
+      const settledSessionId = created?.sessionId ?? sessionId;
       if (operation?.kind === "queued") {
-        const destination = settlement.sessionId ?? sessionId;
-        if (destination) refreshQueue(destination, settlement.queueGeneration);
-        return { kind: "queued", sessionId: settlement.sessionId ?? sessionId!, ...(settlement.sessionId && !sessionId ? { createdSessionId: settlement.sessionId } : {}) };
+        if (settledSessionId) {
+          // A session this submission created had no pre-submit capture to hold
+          // against; capturing now is the earliest the caller can see it.
+          const generation = created
+            ? queueCommands.captureDestination(settledSessionId)
+            : queueGeneration;
+          refreshQueue(settledSessionId, generation);
+        }
+        return {
+          kind: "queued",
+          sessionId: settledSessionId ?? sessionId!,
+          ...(created && !sessionId ? { createdSessionId: created.sessionId } : {}),
+        };
       }
-      return { kind: "submitted", ...((settlement.sessionId ?? sessionId) ? { sessionId: settlement.sessionId ?? sessionId } : {}), ...(settlement.sessionId && !sessionId ? { createdSessionId: settlement.sessionId } : {}) };
+      return {
+        kind: "submitted",
+        ...(settledSessionId ? { sessionId: settledSessionId } : {}),
+        ...(created && !sessionId ? { createdSessionId: created.sessionId } : {}),
+      };
     },
     retry: async ({ refusal, sessionId, ...input }) => {
       const recordedTurn = deps.store.readRetry();

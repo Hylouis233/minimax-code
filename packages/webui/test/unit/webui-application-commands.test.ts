@@ -708,7 +708,6 @@ describe("the send command", () => {
       intent: { kind: "ordinary", message: "queued" },
       admission: { kind: "queued" },
       sending: true,
-      callbacks: { onDraftChange },
       deps: { sendMessage: vi.fn() },
       enqueueMessage,
       createWriter: () => writer,
