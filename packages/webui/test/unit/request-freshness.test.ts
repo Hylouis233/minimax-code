@@ -1,11 +1,11 @@
-// The request/freshness primitive (T03; plan §4.5, §3 P3).
+// The request/freshness primitive.
 //
 // The first case reproduces the old seam's defect on purpose: `query-store.ts`
 // fences by an arbitrary key but writes one destination field, so a late answer
 // for one key overwrites the answer for another. That reproduction is the
-// "before" half of the ticket's requirement — the rest of the file is the
-// corrected contract, driven through the same adversarial scheduling (two
-// requests, resolved out of order, with an invalidation in between).
+// "before" half; the rest of the file is the corrected contract, driven through
+// the same adversarial scheduling (two requests, resolved out of order, with an
+// invalidation in between).
 //
 // Every case asserts an externally visible outcome: which entry holds what, which
 // fetch ran, and whether a disposed owner accepted anything.

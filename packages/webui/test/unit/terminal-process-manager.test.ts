@@ -1,7 +1,7 @@
 // The terminal process manager: cancellation, resource traces and the limits
-// T15's criteria 4 and 5 pin. The native module is injected, so every case runs
-// without a PTY — but it runs against the real manager: the same queue, the same
-// listener bookkeeping, the same disposal paths the service drives.
+// these cases pin. The native module is injected, so every case runs without a
+// PTY — but it runs against the real manager: the same queue, the same listener
+// bookkeeping, the same disposal paths the service drives.
 //
 // Why the traces matter: "exactly once" is a claim about calls, not about a
 // state we can read from outside. Each case therefore asserts the call trace the

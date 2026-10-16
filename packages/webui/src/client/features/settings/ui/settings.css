@@ -1,4 +1,4 @@
-/* settings — moved out of styles/shell.css (T20); rules kept in their original relative order. */
+/* settings — moved out of styles/shell.css; rules kept in their original relative order. */
 @layer components {
 
   .webui-workspace-panel { position: relative; display: flex; width: 50%; min-width: 0; min-height: 0; flex: 0 1 50%; flex-direction: column; overflow: hidden; border-left: 1px solid var(--border_default); background: var(--bg_default_primary); color: var(--text_default_primary); animation: webui-panel-enter-right 180ms cubic-bezier(.2, .7, .2, 1) both; }
@@ -243,7 +243,7 @@
   .webui-archived-delete-all:hover { background: rgba(255, 59, 48, .16); }
   .webui-archived-delete-all:disabled { opacity: .45; cursor: default; }
 
-  /* Code review (roadmap E 区 Review 审查模式 / 修复建议+跳转). */
+  /* Code review (Review 审查模式 / 修复建议+跳转). */
   .webui-review-page { width: 100%; max-width: 760px; margin: 0 auto; padding: 0 var(--spacing_20) var(--spacing_32); }
   .webui-review-totals { display: flex; align-items: center; gap: var(--spacing_8); margin-bottom: var(--spacing_12); color: var(--text_default_secondary); font-size: var(--size_12); }
   .webui-review-search { display: flex; min-width: 0; height: 38px; align-items: center; gap: var(--spacing_8); margin-bottom: var(--spacing_12); border: 1px solid var(--border_default); border-radius: 12px; padding: 0 12px; background: var(--bg_default_primary); color: var(--text_default_secondary); }
@@ -275,7 +275,7 @@
   .webui-review-loading, .webui-review-empty { margin: 0; padding: var(--spacing_16) 0; color: var(--text_default_secondary); font-size: var(--size_12); }
   .webui-review-error { margin: 0 0 var(--spacing_8); color: var(--text_label_danger_secondary_default); font-size: var(--size_12); }
 
-  /* Worktree list (roadmap E 区 工作树隔离). */
+  /* Worktree list (工作树隔离). */
   .webui-worktree-section-title { margin: var(--spacing_20) 0 var(--spacing_8); color: var(--text_default_primary); font-size: var(--size_14); }
   .webui-worktree-branches { display: flex; flex-direction: column; gap: var(--spacing_8); margin: 0; padding: 0; list-style: none; }
   .webui-worktree-group { padding: 10px 12px; border: 0.5px solid var(--border_default); border-radius: 10px; }

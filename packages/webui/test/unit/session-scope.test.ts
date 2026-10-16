@@ -1,4 +1,4 @@
-// The session scope manager (plan §4.3; T04's `session-interest-lease-manager`).
+// The session scope manager.
 //
 // The rules under test are the ones that decide whether navigating away can
 // abandon work: selection releases only the selected-view lease, an accepted

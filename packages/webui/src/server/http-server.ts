@@ -1,8 +1,8 @@
 // HTTP listener lifecycle for the loopback service: create the Node HTTP
 // server, bind it to the loopback address and resolve once it is listening,
-// and close it. Split from `service.ts` (plan section 7.1) with no behaviour
-// change — the listen/close order and the non-TCP-socket guard are the ones
-// the service wrote before.
+// and close it. Split from `service.ts` with no behaviour change — the
+// listen/close order and the non-TCP-socket guard are the ones the service
+// wrote before.
 
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";

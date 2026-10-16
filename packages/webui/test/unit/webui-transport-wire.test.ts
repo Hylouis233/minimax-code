@@ -142,8 +142,7 @@ describe("the terminal watch", () => {
   });
 });
 
-// The delivery handle (`stream`'s third argument; T04's
-// `delivery-disposer-registry`). A streaming operation used to return a promise
+// The delivery handle (`stream`'s third argument). A streaming operation used to return a promise
 // and nothing else, so the client held no disposer at all: the only ways a stream
 // could end were `[DONE]`, an error, or the socket dropping. These cases pin the
 // handle the application can now keep, and that detaching is about THIS client's

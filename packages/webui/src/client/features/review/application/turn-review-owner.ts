@@ -1,4 +1,4 @@
-// The turn-review owner (plan §5.2 review row; T10's `turn-review-owner`).
+// The turn-review owner.
 //
 // One owner for a turn's diff: the query, the revert/reapply mutations and the
 // freshness of both. It used to be the diff card's own: the component held the
@@ -6,7 +6,7 @@
 // so a second surface wanting the same turn could only duplicate it, and the
 // card's unmount took the answer with it.
 //
-// The identity is the plan's turn-review key (session + turn/changeset), and the
+// The identity is the turn-review key (session + turn/changeset), and the
 // answer lives under it in a keyed resource: two readers of one turn share the
 // read, a newer read for one key supersedes only that key's earlier answer, and a
 // mutation that took effect is announced so the workspace review family can be
@@ -54,9 +54,9 @@ export interface WebuiTurnReviewOwner {
   readonly subscribe: (listener: () => void) => () => void;
   /**
    * Settled mutations, for the families they affect. The workspace review
-   * family is the caller's (plan §4.5: a mutation commits once, then invokes the
-   * affected owners' explicit invalidation commands), so this owner announces
-   * rather than reaches into it.
+   * family is the caller's — a mutation commits once, then invokes the affected
+   * owners' explicit invalidation commands — so this owner announces rather
+   * than reaches into it.
    */
   readonly subscribeMutations: (listener: (mutation: WebuiTurnReviewMutation) => void) => () => void;
 }

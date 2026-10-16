@@ -1,13 +1,11 @@
-// The cached-read store (plan §16.3: a shared invariant holds when exactly one
-// implementation exists; §7.1 files the query machinery here).
+// The cached-read store.
 //
 // Every application owner that caches answers from the transport reads through
 // this one object: the owner's snapshot, its listener set, and the version
 // guard that drops a superseded answer instead of applying it over a newer one.
 // Two owners each holding their own copy of that guard would be two
-// implementations of one rule, which §16.3 forbids; two owners *importing* it is
-// the permitted shape, and it is why the `models` carve extracts this module
-// before it moves any command out of `settings-workflows.ts`.
+// implementations of one rule; two owners *importing* it is the permitted
+// shape.
 //
 // Framework-free: no React, no DOM, no storage.
 

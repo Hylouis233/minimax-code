@@ -3,21 +3,18 @@
 // personalization editors hang their titles and hints on.
 //
 // The header is here rather than in `PersonalizationSettings.tsx` because that file *composes* those
-// editors (ticket #73): a child importing the header back from its parent would be a cycle, and
-// §5.1's second prohibition wants a shared rule under a module that owns the concept — a
-// settings-surface atom belongs with the other settings-surface atoms.
+// editors: a child importing the header back from its parent would be a cycle, and a shared rule
+// belongs with the module that owns the concept — a settings-surface atom belongs with the other
+// settings-surface atoms.
 //
-// They were declared inside `SettingsModal.tsx`; the review page moved to
-// `components/workspace/` (plan §5.6's `workspace` row) and needs the same two,
-// so they live here rather than being copied. `client/shell/icons.tsx` has a folder and
-// a search icon, but they are filled paths with different geometry — substituting
-// them would change what the user sees, which this programme does not do to save
-// a file.
+// They were declared inside `SettingsModal.tsx`; more than one module needs them, so they live here
+// rather than being copied. `client/shell/icons.tsx` has a folder and a search icon, but they are
+// filled paths with different geometry — substituting them would change what the user sees, which
+// this package does not do to save a file.
 //
-// `IconButton`, `CloseIcon` and `RefreshIcon` moved here for the same reason when the
-// provider form was carved out of `UsageModelSettings` (ticket #71): both files use
-// them, and copying their markup into a second file is the duplication §5.1's fourth
-// prohibition rules out.
+// `IconButton`, `CloseIcon` and `RefreshIcon` moved here for the same reason when the provider form
+// was carved out of `UsageModelSettings`: both files use them, and copying their markup into a
+// second file is the duplication a shared atom avoids.
 
 import type { ReactElement, ReactNode } from "react";
 

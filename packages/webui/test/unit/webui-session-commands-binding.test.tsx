@@ -1,4 +1,4 @@
-// The session binding's contribution to the turn seam (U43; ticket #57; P02 step 8).
+// The session binding's contribution to the turn seam.
 //
 // `webui-application-commands.test.ts` drives `sendWebuiTurn` and `attachWebuiTurn`
 // directly, and `webui-shell.test.ts` renders the shell. What is this file's own
@@ -8,11 +8,11 @@
 // live stream read behind the attach guard, the store-backed sink, the
 // absent-capability refusals, and the home slot.
 //
-// Before P02 step 8 the hook built its own context: it chose the record key, built
-// the store writer, cut the transports out of the capability slice and assembled the
-// two view objects. The behaviour cases below are kept, because the behaviour has to
-// survive the move; what changed is who constructs it, and the first two cases pin
-// that.
+// The hook used to build its own context: it chose the record key, built the
+// store writer, cut the transports out of the capability slice and assembled the
+// two view objects. The behaviour cases below are kept, because the behaviour has
+// to survive the move; what changed is who constructs it, and the first two cases
+// pin that.
 //
 // The package has no DOM and no `react-test-renderer`, but it does not need either:
 // `useMemo` runs during SSR, so a probe component rendered inside the providers
@@ -42,7 +42,7 @@ const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 /**
  * Render the binding over a store and the application that owns it. The turn
  * capabilities arrive through `turnCapabilities` — the composition root's slice —
- * because a command call site has no way to hand one in (ticket #57).
+ * because a command call site has no way to hand one in.
  */
 function commandsFor(
   sessionId: string | undefined,
@@ -116,7 +116,7 @@ describe("the binding's command set", () => {
     const store = createWebuiSessionStore();
     const { commands, accessor } = commandsFor("s1", store);
     // The binding asked the application, for this session, exactly once — and what
-    // it hands out is what the application built (plan §5.1, P02 step 8).
+    // it hands out is what the application built.
     expect(accessor).toHaveBeenCalledTimes(1);
     expect(accessor).toHaveBeenCalledWith("s1");
     expect(typeof commands.send).toBe("function");

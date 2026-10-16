@@ -6,9 +6,9 @@
  * both writers refuse to act without a selected session (there is no session to
  * key the state by).
  *
- * Extracted from `WebuiClientFoundationApp.tsx` (A-005): this is the panel's
- * session wiring, and it changes when the panel's state machine or its queries
- * change — not when the shell's layout does.
+ * Extracted from `WebuiClientFoundationApp.tsx`: this is the panel's session
+ * wiring, and it changes when the panel's state machine or its queries change —
+ * not when the shell's layout does.
  */
 import { useCallback, useSyncExternalStore } from "react";
 
@@ -21,8 +21,7 @@ import {
 /**
  * What the hook needs from the panel owner, stated as the surface it uses rather
  * than by importing the owner's type: the shell may not reach into the assembly
- * that composes it (role rule, plan §5.3), and the owner is handed down as a
- * capability.
+ * that composes it (role rule), and the owner is handed down as a capability.
  */
 export interface WorkspacePanelOwnerView {
   readonly subscribe: (listener: () => void) => () => void;
@@ -74,7 +73,7 @@ export function useWorkspacePanelSession(
     if (!selectedSessionId) return;
     owner.dispatch(selectedSessionId, command);
     // A closed tab has no reader: its file slot goes with it, and any read still
-    // in flight for it can no longer commit (T11). Other tabs' reads are keyed
+    // in flight for it can no longer commit. Other tabs' reads are keyed
     // separately, so this stops nothing else.
     if (command.type === "close-tab") queries.discardFileTab(command.tabId);
   }, [selectedSessionId, queries]);

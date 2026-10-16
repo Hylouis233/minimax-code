@@ -1,4 +1,4 @@
-// The interaction owner for one session, read from the application (T05).
+// The interaction owner for one session, read from the application.
 //
 // Permissions and the questionnaire are the session's, and so is the fence that
 // orders their reads against their replies. The owner is the application's now,

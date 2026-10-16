@@ -1,10 +1,10 @@
-// The turn-review owner (T10's `turn-review-owner`): one owner for a turn's diff
-// query and its revert/reapply, with the surfaces reading it rather than holding
-// their own copy.
+// The turn-review owner: one owner for a turn's diff query and its
+// revert/reapply, with the surfaces reading it rather than holding their own
+// copy.
 //
-// These cases are the ticket's verification list for this family: two consumers
-// of one turn, a superseded read, an absent capability versus a refused mutation,
-// and the mutation announcement the workspace family is invalidated on.
+// These cases are the family's verification list: two consumers of one turn, a
+// superseded read, an absent capability versus a refused mutation, and the
+// mutation announcement the workspace family is invalidated on.
 
 import { describe, expect, it, vi } from "vitest";
 

@@ -1,5 +1,4 @@
-// The transport-backed process-event channel adapter (ticket #45, pre-flip
-// bridge).
+// The transport-backed process-event channel adapter.
 //
 // The application event coordinator consumes a `WebuiProcessEventChannel`
 // (`features/turn/application/event-channel.ts`); the only concrete source of that stream is
@@ -7,18 +6,13 @@
 // two: it turns the transport's event frames into the application channel shape
 // the coordinator subscribes to.
 //
-// **Deliberate divergence from plan §7.2.** The plan names
-// `client/infrastructure/event-channel.ts` as the home for this adapter, but an
-// infrastructure module may not import `application/` (see `ALLOWED_EDGES` in
-// `scripts/lib/webui-dependency-rules.mjs` and plan §3), and this adapter is an
-// `application` shape wrapping `infrastructure` IO. The bindings layer may
-// import both, so the adapter lives here instead. This is a reasoned placement,
-// not a silent one: the plan's §7.1 row names the target *behaviour*, and the
-// direction matrix, which is authoritative for edges, fixes the file's layer.
+// The adapter lives here because it is an `application` shape wrapping
+// `infrastructure` IO: an infrastructure module may not import `application/`,
+// while the bindings layer may import both (`ALLOWED_EDGES` in
+// `scripts/lib/webui-dependency-rules.mjs`).
 //
 // It is the live adapter: the composition root opens one channel through
-// `createWebuiOpenEventChannel` and the application coordinator consumes it
-// (ticket #45, the atomic ingress flip).
+// `createWebuiOpenEventChannel` and the application coordinator consumes it.
 
 import type {
   WebuiOpenEventChannel,

@@ -1,4 +1,4 @@
-// The composer's goal reset rule (T13 criterion 6). Inline it was
+// The composer's goal reset rule. Inline it was
 // `status !== "complete"`; here it is the named decision with its matrix.
 
 import { describe, expect, it } from "vitest";

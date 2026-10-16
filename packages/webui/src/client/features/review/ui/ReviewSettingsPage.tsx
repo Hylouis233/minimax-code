@@ -1,7 +1,4 @@
-// The review page under `workspace` (plan §5.6's `workspace` row: "the coding and
-// worktree settings pages are `workspace`' — `ReviewSettingsPage` and
-// `WebuiReviewPanel` file under `components/workspace/`, and their review commands
-// are the `review` capability's, not `settings`'"; ticket #70).
+// The review page.
 //
 // It is rendered by the settings dialog's existing branch, so its mount and
 // unmount are the dialog's and unchanged. It submits and reads the queries the
@@ -39,15 +36,14 @@ import { FolderIcon, SearchIcon } from "../../../ui/settings-glyphs.js";
 
 type WebuiReviewStateAction = Parameters<typeof reduceWebuiReviewState>[1];
 
-/** Roadmap E 区「Review 审查模式」and「修复建议+跳转」.
+/** 「Review 审查模式」and「修复建议+跳转」.
  *
- * The whole change set now comes from the workspace query owner (plan §7.6;
- * tickets #51/#52): this page submits `loadReviewSummary` / `loadReviewDiffs` /
- * `searchReviewDiffs` and reads the owner's snapshot, and it lists workspaces
- * from the session catalog instead of a session fetch of its own. Every
- * decision that does not need the network still lives in `review-state.ts` so
- * it can be tested without a DOM — this component is the thin shell that
- * renders what the owner answered. */
+ * The whole change set now comes from the workspace query owner: this page
+ * submits `loadReviewSummary` / `loadReviewDiffs` / `searchReviewDiffs` and
+ * reads the owner's snapshot, and it lists workspaces from the session catalog
+ * instead of a session fetch of its own. Every decision that does not need the
+ * network still lives in `review-state.ts` so it can be tested without a DOM —
+ * this component is the thin shell that renders what the owner answered. */
 export function ReviewSettingsPage({ workspaceDir, onOpenFileLine }: {
   readonly workspaceDir?: string;
   readonly onOpenFileLine?: (path: string, line: number) => void;
@@ -188,10 +184,10 @@ export function ReviewSettingsPage({ workspaceDir, onOpenFileLine }: {
  * that depends on data is decided upstream in `review-state.ts` and arrives
  * here as a plain value, which makes the populated render reachable from a
  * test without a DOM. */
-/* Roadmap E 区 follow-up: the review page used to answer "先打开一个工作区"
- * and stop. The instruction named the problem and gave no way out of it — and
- * the settings dialog is `aria-modal`, so the rail cannot be clicked while it
- * is open. Choosing here is the only route that stays inside the page.
+/* The review page used to answer "先打开一个工作区" and stop. That answer
+ * named the problem and gave no way out of it — and the settings dialog is
+ * `aria-modal`, so the rail cannot be clicked while it is open. Choosing here
+ * is the only route that stays inside the page.
  *
  * Presentational like `WebuiReviewPanel`, so the list is assertable without a
  * DOM. It deliberately reuses the worktree panel's class names instead of

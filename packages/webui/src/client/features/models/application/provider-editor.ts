@@ -1,11 +1,11 @@
-// The Models-owned provider editor (plan §5.5, P05).
+// The Models-owned provider editor.
 //
 // Models defines the editing policy — identity, draft, candidate construction,
 // test validity, pending operation/error state and command outcomes — and the
 // binding owns **one instance for a Usage page visit**, above the
-// `sourceTab === "custom"` conditional. Today those live as fourteen `useState`s
+// `sourceTab === "custom"` conditional. Those used to live as fourteen `useState`s
 // in `UsageModelSettings` handed down to `ProviderFormPanel` as setters, which
-// makes the parent the editor's storage and the panel the editor's policy.
+// made the parent the editor's storage and the panel the editor's policy.
 //
 // It is framework-free on purpose: no React, no DOM. The binding supplies the
 // command set and renders the snapshot; the editor never writes a cache of its

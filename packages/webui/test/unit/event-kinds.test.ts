@@ -1,18 +1,18 @@
-// The event-kind registry (plan §15.4 S9, §10; ticket #66).
+// The event-kind registry.
 //
-// Phase 3 B1's third clause is that the `goal` and `interactions` kinds live in
-// **one** enumeration, and its acceptance is deliberately not "adding a kind is
-// now a one-line edit": it is that **the second site cannot exist**. A kind used
-// to be known in three places — `event-parsers.ts` tested a literal prefix,
-// `goal-state.ts` listed three literal types, and the effect reducer names them in
-// its `case` labels — and §10 S9 permits parse and render sites only alongside one
-// registry, keeping the reducer's switch.
+// The `goal` and `interactions` kinds live in **one** enumeration, and the
+// property asserted is deliberately not "adding a kind is now a one-line edit":
+// it is that **the second site cannot exist**. A kind used to be known in three
+// places — `event-parsers.ts` tested a literal prefix, `goal-state.ts` listed
+// three literal types, and the effect reducer names them in its `case` labels —
+// so parse and render sites are permitted only alongside the one registry, and
+// the reducer keeps its own switch.
 //
 // So this file asserts both halves: the registry answers for the kinds it owns,
 // and no parse or render site restates one. The source-level half is the
-// acceptance — it is the assertion that fails when the second site reappears, and
-// it is written over source text for the same reason the boundary tests are: the
-// claim is structural, not behavioural.
+// assertion that fails when the second site reappears, and it is written over
+// source text for the same reason the boundary tests are: the claim is
+// structural, not behavioural.
 
 import { describe, expect, it } from "vitest";
 
@@ -91,7 +91,7 @@ function reducerKindLabels(): readonly string[] {
 
 describe("no second enumeration site can exist", () => {
   it("the reducer's kinds are all in the registry", () => {
-    // The reducer keeps its own switch — §10 S9 leaves it alone — so the two
+    // The reducer keeps its own switch, so the two
     // enumerations have to agree. A case added without a registry entry fails
     // here, which is the drift this assertion exists to catch.
     const labels = reducerKindLabels();
@@ -103,7 +103,7 @@ describe("no second enumeration site can exist", () => {
   });
 
   it("the parse and render sites restate none of them", () => {
-    // The acceptance in its literal form: these two files used to know the kinds.
+    // The same claim in its literal form: these two files used to know the kinds.
     // Neither may hold a literal again — the parser asks the registry whether an
     // event is a goal event, and the projector asks it which types carry an
     // objective.

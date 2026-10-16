@@ -69,8 +69,8 @@ import type { WebuiTodo } from "../projection/panel-projection.js";
 // `mergeWorkspaceFileChildren`, `chunkWebuiWorkspaceReviewFileIds` and
 // `WEBUI_WORKSPACE_REVIEW_DIFF_BATCH_SIZE` are re-exported below: the panel
 // tests import them from this module, which stays the panel's public surface.
-// The implementations moved to `projection/workspace/workspace-file-tree.ts` and
-// the review owner (`features/review/application/workspace-review-owner.ts`).
+// The implementations moved to `features/workspace/projection/workspace-file-tree.ts`
+// and the review owner (`features/review/application/workspace-review-owner.ts`).
 export {
   mergeWorkspaceFileChildren,
   chunkWebuiWorkspaceReviewFileIds,
@@ -326,7 +326,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   readonly sessionId?: string; readonly workspaceDir?: string;
   readonly workspaceFileUrl?: (request: { readonly workspaceDir: string; readonly path: string }) => string;
   /**
-   * The Terminal business's published owner (T15). The panel used to take six
+   * The Terminal business's published owner. The panel used to take six
    * raw capability methods and keep the catalogue and the watch handle itself;
    * it now renders the owner's catalogue and drives the owner's commands, while
    * the xterm instance, the fit observer and the caret stay local.
@@ -337,7 +337,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   const { dom } = useWebuiBrowserCapabilities();
   // Query truth lives in the owner; this component reads its snapshot and
   // submits query commands. Display state — active tab, expansion, search box,
-  // code mode — stays here (ticket #51).
+  // code mode — stays here.
   const queries = useWebuiWorkspaceQueries();
   const queryState = useWebuiWorkspaceQueriesState();
   const fileTree = queryState.fileTree;
@@ -359,7 +359,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   /**
    * A terminal list answer is rendered directly (`terminals.find`, `terminals.map`),
    * so a runtime that answers something else must not reach the render: it becomes
-   * an empty list (T11).
+   * an empty list.
    */
   const setTerminals = (answer: unknown): void => {
     setTerminalsState(Array.isArray(answer) ? (answer as readonly Record<string, unknown>[]) : []);
@@ -523,9 +523,9 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     void terminalOwner.refresh().then(() => syncTerminalsFromOwner(terminalOwner));
     return undefined;
   }, [terminalOwner, activeTab?.id, activeWorkspace]);
-  // A view going away releases its watch and its xterm; it never kills a PTY
-  // (plan §5.2's terminal row, criterion 3 of T15). Process death is the panel's
-  // explicit dispose button or the application's disposal.
+  // A view going away releases its watch and its xterm; it never kills a PTY.
+  // Process death is the panel's explicit dispose button or the application's
+  // disposal.
   useEffect(() => () => { terminalStop.current?.(); terminalInstance.current?.dispose(); }, []);
   useEffect(() => {
     const active = terminals.find((candidate) => String(candidate.terminalId) === activeTerminalId) ?? terminals[0];
@@ -564,11 +564,11 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     // its commands are stable, so a panel drag cannot re-run this effect and
     // rebuild a shell that is running.
   }, [activeTerminalId, terminalOwner, terminals]);
-  // The label rule lives in the registry (plan §4.4, §10 S4); the icon below is the
-  // host render branch the registry is allowed to have.
+  // The label rule lives in the registry; the icon below is the host render
+  // branch the registry is allowed to have.
   const tabLabel = (item: WorkspacePanelTab): string => webuiWorkspaceTabLabel(item);
   // The registry carries the kinds, their words and how each opens; the glyphs are
-  // this file's, which is the host render branch §10 S4 allows.
+  // this file's.
   const addMenuGlyph = (kind: WebuiWorkspaceTabKind) => {
     switch (kind) {
       case "review":

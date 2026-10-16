@@ -1,4 +1,4 @@
-// Snapshot selectors (plan §7.1 `application/`, §7.6 readers).
+// Snapshot selectors.
 //
 // Components subscribe to the application snapshot through the React bindings
 // and then narrow it with these pure selectors; they never read a store writer.
@@ -41,7 +41,7 @@ export function selectWebuiSessionStream(
 /**
  * The session's pending permissions, or the empty list when unknown. Reading a
  * slice through the snapshot (rather than through a store writer) is what lets
- * the composer hold no writer for it (plan §7.6, ticket #45).
+ * the composer hold no writer for it.
  */
 export function selectWebuiSessionPermissions(
   state: WebuiApplicationState,
@@ -78,8 +78,8 @@ export function selectWebuiSelectedSessionId(
 /**
  * The session's transcript page, or an empty page when the session is unknown.
  *
- * The transcript history owner (plan §7.1 `application/transcript/transcript-history.ts`)
- * owns the `loadMessages` RPC and commits each answer here. A reader that needs
+ * The transcript history owner owns the `loadMessages` RPC and commits each
+ * answer here. A reader that needs
  * the history — the shell's workspace-progress backfill, for one — projects this
  * slice instead of fetching a second copy, so the RPC, its request fence and its
  * error state stay with one owner.

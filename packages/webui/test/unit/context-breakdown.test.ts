@@ -1,4 +1,4 @@
-// The context-window panel's breakdown rows (roadmap H, 模型与用量).
+// The context-window panel's breakdown rows.
 //
 // The rule under test is the one that is easiest to get wrong and hardest to
 // notice: a category the engine did not report must print a dash, never

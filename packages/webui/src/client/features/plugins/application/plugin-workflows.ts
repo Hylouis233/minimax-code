@@ -1,9 +1,8 @@
-// The plugin workflow owner (plan §7.1 `application/plugins/plugin-workflows.ts`;
-// §7.6 "Plugin list" row; §7.7 stage 5; ticket #52).
+// The plugin workflow owner.
 //
 // One owner for the plugin manager: the marketplace/installed/skill/app/mcp/
 // agent listings it reads, and every mutation it performs. The two problems
-// this closes, both named in the ticket:
+// this closes:
 //
 //  1. **A listing with no owner.** The component held the rows, the totals,
 //     the busy flag, the error and the request-generation counter itself, so

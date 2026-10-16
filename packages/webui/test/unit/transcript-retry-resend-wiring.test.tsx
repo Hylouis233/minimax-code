@@ -138,7 +138,7 @@ function renderComposer(props: {
   const sessionId = props.sessionId ?? SESSION_ID;
   const sessionStore = createWebuiSessionStore();
   seedFailedTurn(sessionStore, sessionId, props.refusal);
-  // Ticket #57: the send capability reaches the turn through the application's
+  // The send capability reaches the turn through the application's
   // published slice, not through the composer's props. The composer still takes
   // `sendMessage` for the submit affordance it renders, but the wire call under
   // test is the slice's.
@@ -256,7 +256,7 @@ describe("retry re-sends the recorded input and never aborts", () => {
       inFlight = submitWebuiComposerTurn(
         {
           sessionId: SESSION_ID,
-          // The same pair the composer passes (`SessionComposer.tsx`), so the
+          // The same pair the composer passes, so the
           // no-session hand-off sees the real input here too and a future
           // `args.draft` read on this path is exercised rather than undefined.
           draft: turn.message,

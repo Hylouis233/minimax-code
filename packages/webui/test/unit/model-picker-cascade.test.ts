@@ -1,4 +1,4 @@
-// The model picker's cascade (roadmap H, 模型选择器级联).
+// The model picker's cascade.
 //
 // Two halves, and the split is deliberate.
 //
@@ -429,9 +429,8 @@ describe("cascade — the shape the source has to keep", () => {
   it("keeps the list container from being duplicated", () => {
     // The list is rendered from one place; a second copy would be a second
     // scroll container inside the same menu.
-    // The list is rendered from one place, and since the cut (ticket #71) that one place is the
-    // menu cluster — which is itself rendered once. Counting render sites rather than mentions:
-    // the cluster's props type names `WebuiModelMenuList` too.
+    // That one place is the menu cluster, which is itself rendered once. Counting render sites
+    // rather than mentions: the cluster's props type names `WebuiModelMenuList` too.
     expect(menu.match(/<WebuiModelMenuList/g) ?? []).toHaveLength(1);
     expect(picker.match(/<WebuiModelMenuCluster/g) ?? []).toHaveLength(1);
   });

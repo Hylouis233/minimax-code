@@ -1,14 +1,11 @@
 // Pure-presentation transcript primitives — leaves of the component tree.
 //
-// W3 tier 1 lift: these components were moved out of `app.tsx` in W3. The
-// transcript structure and data attributes remain stable; the live thinking
+// The transcript structure and data attributes remain stable; the live thinking
 // marker is intentionally shared with ActivityIndicator so streaming never
 // renders a second, static animation implementation.
 //
-// Re-exported from `app.tsx` so existing consumers (tests, importers)
-// keep their current import path during the W3 wave. `WebuiToolRow`
-// stays private — it was a non-exported helper in `app.tsx`, used only
-// by `WebuiToolResults`.
+// `WebuiToolRow` stays private — it is a non-exported helper used only by
+// `WebuiToolResults`.
 
 import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { ActivityIndicator } from "./ActivityIndicator.js";

@@ -1,13 +1,10 @@
-// The review/diff machine has one owner and two readers (plan §5.6's `transcript`
-// row; §10 S13: "review/diff rendered in a second place | the reducer is filed in
-// the transcript's component | one owner (`review`'s reducer module) and two
-// readers"; ticket #69).
+// The review/diff machine has one owner and two readers.
 //
 // Two surfaces render a diff — the transcript's card on an assistant message and
 // the review page over a whole change set — and the machine, the failure copy and
 // the mutation decisions used to be filed in the first of them. They live in
-// `features/transcript/projection/review-state.ts` now, and this file asserts both halves of the
-// acceptance: one machine, two readers, and no private copy in either.
+// `features/review/projection/review-state.ts` now, and this file asserts both
+// halves: one machine, two readers, and no private copy in either.
 
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
@@ -64,7 +61,7 @@ describe("the diff machine has one owner", () => {
     expect(card).not.toContain("switch (action.type)");
     expect(card).not.toContain("WEBUI_DIFF_FAILURE_COPY");
     // It does not read the machine either: the query, the mutation and the
-    // machine's decisions are the review owner's (T10), and the card reads the
+    // machine's decisions are the review owner's, and the card reads the
     // owner's answer through its binding. Reading the projection directly is what
     // the dependency gate refuses, so this assertion and that rule agree.
     expect(card).not.toContain("review-state.js");
@@ -86,10 +83,9 @@ describe("the diff machine has one owner", () => {
 
 describe("the two readers share it", () => {
   it("is read by the turn-review owner and by the review page, and by nothing else", () => {
-    // Scanned rather than listed: the review page moved to
-    // `features/workspace/ui/` in ticket #70, so a hardcoded path went stale
-    // while the acceptance ("one owner, two readers") still held. Scanning the
-    // tree makes a third reader fail here and a relocation a no-op.
+    // Scanned rather than listed: a hardcoded path would go stale on a
+    // relocation while the pair ("one owner, two readers") still held. Scanning
+    // the tree makes a third reader fail here and a relocation a no-op.
     // The transcript's card now lives in the feature home and reads the owner by a
     // sibling path, so the scan covers both homes and matches the imported module
     // rather than a path fragment: what is asserted is "one owner, two readers",

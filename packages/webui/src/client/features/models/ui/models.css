@@ -1,4 +1,4 @@
-/* models — moved out of styles/shell.css (T20); rules kept in their original relative order. */
+/* models — moved out of styles/shell.css; rules kept in their original relative order. */
 @layer components {
 
   .webui-provider-dialog-backdrop { position: fixed; inset: 0; z-index: 110; display: flex; align-items: center; justify-content: center; background: rgb(10 10 10 / 24%); padding: 24px; }

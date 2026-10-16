@@ -1,8 +1,7 @@
 // Static client asset serving for the loopback service: resolve the requested
 // `index.html` / `client.js` / `styles.css` / `assets/*` / `fonts/*` name under
 // the client directory, inject the runtime config into `index.html`, and write
-// the bytes. Split from `service.ts` (plan section 7.1) with no behaviour
-// change.
+// the bytes. Split from `service.ts` with no behaviour change.
 
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";

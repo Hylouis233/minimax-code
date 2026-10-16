@@ -1,15 +1,13 @@
-// The single stream-lease implementation (plan §7.1 `application/`, §7.2
-// stream lease; home `client/conversation/stream-lease.ts`, ticket #45): claim,
-// release and generation fencing in one place.
+// The single stream-lease implementation: claim, release and generation
+// fencing in one place.
 //
-// The recovery policy the ticket calls "the highest-risk part" reduces to one
-// rule: a stream attempt owns a *generation*, and only the newest generation
-// may write. A superseded attempt — one whose `[DONE]` already arrived, or one
-// the user replaced by retrying — holds an older generation, so its late
-// chunks, its late `[DONE]` and its late refusal are dropped before they reach
-// the store. That is what "frames from a superseded generation produce zero
-// state writes" means, and it is why the fence lives here rather than in each
-// caller.
+// The recovery policy reduces to one rule: a stream attempt owns a
+// *generation*, and only the newest generation may write. A superseded
+// attempt — one whose `[DONE]` already arrived, or one the user replaced by
+// retrying — holds an older generation, so its late chunks, its late `[DONE]`
+// and its late refusal are dropped before they reach the store. That is what
+// "frames from a superseded generation produce zero state writes" means, and it
+// is why the fence lives here rather than in each caller.
 //
 // Why the counter lives in this module and not on the wire: only the client can
 // tell two concurrent attempts apart. The server exposes no handle to cancel a

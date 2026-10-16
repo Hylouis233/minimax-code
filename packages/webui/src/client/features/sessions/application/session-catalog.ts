@@ -1,6 +1,5 @@
 // The session entity catalog: one copy of every session record, plus the two
-// query results that reference it (plan §7.1 `application/sessions/session-catalog.ts`;
-// §7.6 "Flat/tree queries"; §7.7 stage 5; ticket #49 correction 1).
+// query results that reference it.
 //
 // Flat and tree are **two queries, not two sets of entities**. Each keeps its
 // own identifiers, cursor, loading and error state; the session records
@@ -200,7 +199,7 @@ export function setWebuiCatalogFlatError(
 /**
  * Patch one entity in place — the rename/fork/delete coordination point. Both
  * query views re-derive from the patched entity, so a caller updates exactly
- * one structure (ticket #49 correction 2).
+ * one structure.
  */
 export function patchWebuiCatalogEntity(
   catalog: WebuiSessionCatalogState,

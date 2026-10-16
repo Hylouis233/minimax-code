@@ -1,17 +1,15 @@
-// The rail context menu's single registry (plan §10 S1, §16.10; ticket #68).
+// The rail context menu's single registry.
 //
-// S1's measurement is "the rule in two builders and two render branches". The rule
-// is which items the menu offers, in what order, with which label, and for which
-// subject; it used to live in `openSessionMenu`'s two tables and
+// The rule is which items the menu offers, in what order, with which label, and
+// for which subject; it used to live in `openSessionMenu`'s two tables and
 // `openProjectMenu`'s one. It now lives in `projection/rail-menu.ts`, and the host
 // maps a declared key to its icon and its wiring through one branch.
 //
-// **The acceptance is that a second renderer cannot enumerate independently**, not
-// that adding an item becomes a one-line edit: §10 S4 permits a registry to carry a
-// host render branch. So this file asserts both halves of "cannot": no label
-// appears outside the registry, and the host's wired keys are exactly the declared
-// ones — a key wired without a declaration fails, and a declared key nothing wires
-// fails.
+// **A second renderer cannot enumerate independently** — the claim is not that
+// adding an item becomes a one-line edit, since a registry may carry a host render
+// branch. So this file asserts both halves of "cannot": no label appears outside
+// the registry, and the host's wired keys are exactly the declared ones — a key
+// wired without a declaration fails, and a declared key nothing wires fails.
 
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
@@ -124,7 +122,7 @@ describe("the rail menu is declared once", () => {
 describe("no second renderer can enumerate independently", () => {
   it("keeps every label out of the component layer", () => {
     // The labels come from the registry, so the component must not hold one. A
-    // second builder with its own copy fails here, which is the acceptance.
+    // second builder with its own copy fails here.
     const labels = webuiRailMenuKeys().flatMap((key) => {
       const entry = [...WEBUI_RAIL_MENU.session, ...WEBUI_RAIL_MENU.project].find(
         (candidate) => candidate.key === key,
@@ -142,7 +140,7 @@ describe("no second renderer can enumerate independently", () => {
   });
 
   it("wires exactly the declared keys, both directions", () => {
-    // The host branch is the §10 S4 exception; what it may not do is cover a key
+    // The host branch is a permitted exception; what it may not do is cover a key
     // the registry does not declare, or leave a declared key unwired.
     const wiring = rail.slice(rail.indexOf("const railMenuWiring"), rail.indexOf("const buildRailMenu"));
     const wired = [...wiring.matchAll(/^\s{4}(?:"([a-z-]+)"|([a-z]+)): \{/gmu)].map(

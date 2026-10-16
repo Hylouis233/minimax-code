@@ -2,12 +2,11 @@
 // as the footer of the turn that wrote a plan, and the two commands it offers
 // (build, view).
 //
-// Cut out of `SessionTranscript.tsx` (plan §6: view-model, scroll and response
-// responsibilities) with the submitting/error state that belongs to those
-// commands. The transcript still decides *whether* a plan card belongs in the
-// message column — that read is composition, and the composer keeps its own copy
-// for the decision — but the response itself, and what it does when asked, is
-// here.
+// Cut out of `SessionTranscript.tsx` with the submitting/error state that
+// belongs to those commands. The transcript still decides *whether* a plan card
+// belongs in the message column — that read is composition, and the composer
+// keeps its own copy for the decision — but the response itself, and what it
+// does when asked, is here.
 
 import { useCallback, useState, type ReactElement } from "react";
 

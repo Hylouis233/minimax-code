@@ -1,4 +1,4 @@
-// SessionActivityMeta — extracted from `SessionRail.tsx` (T07's responsibility cut of the rail).
+// SessionActivityMeta — extracted from `SessionRail.tsx`.
 // The declaration body is verbatim; the `export` keyword, this header and the
 // import specifiers are the only differences.
 

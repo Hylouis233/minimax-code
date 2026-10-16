@@ -130,8 +130,8 @@ describe("the rail's export button", () => {
   // change too, while the actual defect was that the rail never asked the
   // route for it. The gap is the wire between the button and the URL, and
   // that wire is only visible in the source.
-  // A-005 moved the row actions into the rail hook; the wire is read from both
-  // files so the button and its route cannot drift apart unnoticed.
+  // The row actions live in the rail hook; the wire is read from both files so
+  // the button and its route cannot drift apart unnoticed.
   const shell = [
     readFileSync(
       new URL("../../src/client/shell/WebuiClientFoundationApp.tsx", import.meta.url),
@@ -144,7 +144,7 @@ describe("the rail's export button", () => {
   ].join("\n");
 
   it("routes the export through the transfer download", () => {
-    // T19 moved the call one hop out of the view: the rail submits the sessions
+    // The call sits one hop out of the view: the rail submits the sessions
     // owner's command, that owner calls the adapter the composition root
     // injected, and the composition root is where the adapter is the real
     // download. All three links are read, so the button and its route cannot
@@ -165,7 +165,7 @@ describe("the rail's export button", () => {
   });
 
   it("does not assemble a file in the browser any more", () => {
-    // The regression this review found. Re-introducing a browser-side builder
+    // The regression this guards against. Re-introducing a browser-side builder
     // would compile again, and the builder's own tests would pass again,
     // because they never knew the importer rejected the tag it writes.
     expect(shell).not.toContain("buildWebuiSessionExport");

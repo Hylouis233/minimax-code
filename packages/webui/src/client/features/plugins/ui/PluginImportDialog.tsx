@@ -1,6 +1,4 @@
-// The Git-import dialog (plan §15.1's `PluginImportDialog.tsx` row, ticket #72). It is the
-// marketplace's "从 Git 仓库导入插件" surface, cut out of `PluginManagement.tsx` where it was
-// `:1481-1591` of one 1594-line file.
+// The Git-import dialog: the marketplace's "从 Git 仓库导入插件" surface.
 //
 // It is rendered by the catalogue's existing conditional, so it mounts and unmounts on the same
 // condition it always did, and it owns no state: the URL, the preview and the busy/error flags are

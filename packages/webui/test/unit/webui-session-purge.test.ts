@@ -1,4 +1,4 @@
-// R7 — write authority on the session slices, and the delete teardown.
+// Write authority on the session slices, and the delete teardown.
 //
 // Two findings are pinned here.
 //
@@ -53,9 +53,9 @@ import type { WebuiSessionListItem } from "../../src/shared/contracts/session.js
 import type { WebuiStreamFrame } from "../../src/shared/contracts/stream.js";
 
 /**
- * A purger spy for the cases whose subject is something else. §5.6 makes the
- * dependency required, so every construction supplies one; the cases below assert
- * the *other* teardown effects.
+ * A purger spy for the cases whose subject is something else. The dependency is
+ * required, so every construction supplies one; the cases below assert the
+ * *other* teardown effects.
  */
 const purger = () => ({ purgeSlot: vi.fn() });
 
@@ -641,7 +641,7 @@ describe("R7 · the command surface carries no raw writer", () => {
     // ...and the lease itself is not on the surface either. A sink factory here
     // let a component mint a fresh generation at will and take the lease from a
     // newer turn; opening a turn's stream now belongs to the binding that owns
-    // the store writer (plan §7.2 `:555`, §7.6 `:583`).
+    // the store writer.
     expect(Object.keys(lifecycle)).not.toContain("createStreamSink");
     expect(Object.keys(lifecycle)).not.toContain("createSink");
     expect(
@@ -799,18 +799,17 @@ describe("R7 · the command surface carries no raw writer", () => {
 });
 
 /**
- * §5.6's composer row: "`purgeSlot` becomes a published command (no injected
- * optional)". The optional was the soft-loss path — absent meant the deleted
- * session's draft and history outlived it.
+ * `purgeSlot` is a published command with no injected optional. The optional was
+ * the soft-loss path — absent meant the deleted session's draft and history
+ * outlived it.
  *
  * The compile-time half is **not** asserted here, and deliberately: this suite is
- * not in a type-checked program (`tsconfig.test.json` lists two files, neither of
- * them this one), so a `@ts-expect-error` written here would never be checked and
- * would read as a guard while guarding nothing. The demonstration is a probe
+ * not in a type-checked program (`tsconfig.test.json` does not include it), so a
+ * `@ts-expect-error` written here would never be checked and would read as a guard
+ * while guarding nothing. The demonstration is a probe
  * against the real client program — remove the dependency from the shell's
- * construction and `tsc -p tsconfig.client.json` rejects it — and its output is
- * recorded on the ticket. What stays here is the runtime half: the delete reaches
- * the command on both paths.
+ * construction and `tsc -p tsconfig.client.json` rejects it. What stays here is
+ * the runtime half: the delete reaches the command on both paths.
  */
 describe("a session delete invokes the composer's purge command", () => {
   it("purges the slot on both deletion paths", async () => {

@@ -1,6 +1,5 @@
 // The session workflows: the business requests that load and mutate session
-// entities, bound to the single catalog (plan §7.1 `application/sessions/session-workflows.ts`;
-// §7.7 stage 5; ticket #49 correction 2 and criterion 8).
+// entities, bound to the single catalog.
 //
 // The foundation shell used to call `transport.loadSessions` /
 // `loadSessionTree` / `updateSession` / `archiveSession` / `deleteSession`
@@ -101,9 +100,9 @@ function generateForkClientRequestId(): string {
 }
 
 /**
- * The archived-sessions read (ticket #52). The archived page lives inside the
- * settings dialog, but the query is a session query, so it belongs to the
- * session workflows rather than to a settings owner.
+ * The archived-sessions read. The archived page lives inside the settings
+ * dialog, but the query is a session query, so it belongs to the session
+ * workflows rather than to a settings owner.
  */
 export interface WebuiArchivedSessionsState {
   readonly status: "idle" | "loading" | "ready" | "error";
@@ -202,15 +201,14 @@ export interface WebuiSessionWorkflows {
 export function createWebuiSessionWorkflows(deps: {
   readonly store: WebuiSessionCatalogStore;
   /**
-   * The composer's published purge command (§5.6: "`purgeSlot` becomes a published
-   * command (no injected optional)"). It used to be optional, and absent meant
-   * drafts outlive the delete — a soft-loss the plan refuses to keep as a
-   * configuration of this module, so the delete **cannot compile** without it.
+   * The composer's published purge command. It used to be optional, and absent
+   * meant drafts outlive the delete — a soft-loss this module must not keep as a
+   * configuration, so the delete **cannot compile** without it.
    */
   readonly composer: Pick<WebuiComposerStore, "purgeSlot">;
   /**
-   * The session scope (plan §4.3). A delete is an accepted mutation, so it holds
-   * a **settlement** lease until its outcome and the invalidation it owes are
+   * The session scope. A delete is an accepted mutation, so it holds a
+   * **settlement** lease until its outcome and the invalidation it owes are
    * committed — or until the failure is recorded — and it revokes the deleted
    * session's remaining browser interests at the commit point.
    */

@@ -16,7 +16,7 @@ import { createWebuiBrowserStorage } from "../../src/client/platform/storage.js"
 
 /**
  * Pure-function tests for the composer input history + cross-session draft
- * store (roadmap Module B: 输入历史/草稿).
+ * store (输入历史/草稿).
  *
  * The history semantics mirror the terminal readline convention codex uses:
  * every committed submission is recorded newest-last, ↑ walks older, ↓ walks
@@ -271,9 +271,9 @@ describe("composer persistence ownership", () => {
     expect(createWebuiComposerStore({ storage: adapter }).getSnapshot()).toEqual({
       drafts: { home: "draft" },
       history: { home: ["sent"] },
-      // The snapshot carries the live state too — the queue (§4.2 field 1) and the
-      // staged attachments (§5.6) ride this one subscription; both start empty
-      // because nothing persisted them.
+      // The snapshot carries the live state too — the queue and the staged
+      // attachments ride this one subscription; both start empty because nothing
+      // persisted them.
       queue: { items: [], paused: false },
       staging: { attachments: [], urlReferences: [], busy: false },
       modes: { goal: false, plan: false },

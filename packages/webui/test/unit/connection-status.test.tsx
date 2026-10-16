@@ -21,7 +21,7 @@ import type { WebuiStreamState } from "../../src/client/features/turn/projection
  * One application store for this suite. It replaces the module-level runtime
  * map the component used to read: a case seeds the session key it claims, then
  * the local `ConnectionStatus` renders the real component inside the provider
- * so the binding reads that store (plan §7.6; ticket #45 prerequisite 5).
+ * so the binding reads that store.
  */
 const store = createWebuiSessionStore();
 
@@ -186,7 +186,7 @@ describe("ConnectionStatus host layout calls", () => {
     // tests use: `renderToStaticMarkup` cannot fire the store subscription a
     // real mount needs, and the browser spec proves the placed region for
     // real. What this pins is that the shell actually renders the component —
-    // before Q-1 the component existed with zero consumers, which is exactly
+    // the component once existed with zero consumers, which is exactly
     // the gap that made every connection state invisible.
     const source = readFileSync(
       new URL("../../src/client/shell/WebuiClientFoundationApp.tsx", import.meta.url),
@@ -211,7 +211,7 @@ describe("ConnectionStatus and the idle event channel", () => {
   });
 
   it("shows 正在重连 when the event channel degrades while the stream is idle", () => {
-    // Q-b's exact shape: no turn running (phase idle, which alone reads as
+    // The shape to pin: no turn running (phase idle, which alone reads as
     // connected) while the always-on watcher's link is down. Before the
     // merge this rendered nothing at all.
     token = registerWebuiEventWatcher();

@@ -1,13 +1,13 @@
-// The request/freshness primitive (plan §4.5; T03's `request-freshness-primitive`).
+// The request/freshness primitive.
 //
 // One cached read has to answer three questions that a state container plus a
 // request counter cannot: *which resource* the answer belongs to, whether the
 // answer is still the one that should be visible, and whether an in-flight
 // request is still allowed to land. The old `query-store.ts` fenced by an
 // arbitrary string key but wrote into an independent destination field, so two
-// keys could write one field and both stay "current" — the executed probe in the
-// T01 ledger returns B and then a late A overwrites it. This module is the
-// repair, expressed as two explicit contracts rather than one loose helper:
+// keys could write one field and both stay "current" — a probe returned B and
+// then a late A overwrote it. This module is the repair, expressed as two
+// explicit contracts rather than one loose helper:
 //
 //   * **Keyed resource** — answers live under a resource key. The key carries
 //     every response-affecting input (session/agent context, an opaque

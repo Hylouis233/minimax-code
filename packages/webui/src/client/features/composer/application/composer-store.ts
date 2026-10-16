@@ -1,5 +1,4 @@
-// The application composer store (plan §7.1 `application/composer/composer-store.ts`;
-// §7.6 "Draft"; ticket #49 criterion 5).
+// The application composer store.
 //
 // The composer's per-session drafts and input history used to live in the
 // shell's own `useState`, with a hand-written updater that read the current
@@ -40,12 +39,11 @@ export interface WebuiComposerPersistence {
 }
 
 /**
- * The live queue mirror (§4.2 field 1: "the queue's state (`queueItems`,
- * `queuePaused` — component-local today)"). It is the composer's state, but it is
- * **not** persisted and **not** per-slot: unlike the draft it does not survive a
- * session switch, and the composer that renders it is a single instance. Keying it
- * by session would make switching back resurrect a stale list, which is a behaviour
- * change, not a reorganisation.
+ * The live queue mirror. It is the composer's state, but it is **not** persisted
+ * and **not** per-slot: unlike the draft it does not survive a session switch,
+ * and the composer that renders it is a single instance. Keying it by session
+ * would make switching back resurrect a stale list, which is a behaviour change,
+ * not a reorganisation.
  */
 export const WEBUI_COMPOSER_EMPTY_QUEUE: WebuiComposerQueueState = {
   items: [],
@@ -54,8 +52,7 @@ export const WEBUI_COMPOSER_EMPTY_QUEUE: WebuiComposerQueueState = {
 
 /**
  * The staged attachments and URL references, with the upload's in-flight flag and
- * the seed guard that keeps one memory-handoff attachment from being staged twice
- * (§5.6 lists attachments and url references as the composer's own state).
+ * the seed guard that keeps one memory-handoff attachment from being staged twice.
  *
  * Live, like the queue, and for the same reason: one composer instance is mounted
  * at a time, so a single field reproduces exactly what the component's own state
@@ -63,9 +60,7 @@ export const WEBUI_COMPOSER_EMPTY_QUEUE: WebuiComposerQueueState = {
  * does because nothing remounts it.
  */
 /**
- * The composer's input modes (§4.2 field 1 lists them with the owned state; §5.6's
- * may-write cell calls the pair "toolbar state"). Live, like the queue and the
- * staging.
+ * The composer's input modes. Live, like the queue and the staging.
  */
 export const WEBUI_COMPOSER_EMPTY_MODES: WebuiComposerModes = {
   goal: false,
@@ -81,7 +76,7 @@ export const WEBUI_COMPOSER_EMPTY_STAGING: WebuiComposerStagingState = {
 /**
  * What a subscriber sees: the persisted slots plus the live queue. One store, one
  * subscription — the queue rides the snapshot rather than getting a second channel,
- * because two subscriptions to one owner is the arrangement this programme forbids.
+ * because two subscriptions to one owner is the arrangement this package forbids.
  */
 export interface WebuiComposerStore {
   /**
@@ -180,16 +175,14 @@ export interface WebuiComposerStore {
    * Claim the mirror for one destination and return the generation to check back
    * with. Every claim — including a reselection of the same key — issues a new
    * generation, so a read answered for an earlier selection cannot commit to the
-   * current one (plan §5.6, queue-mirror row: fence destination identity and
-   * generation).
+   * current one: the claim fences destination identity and generation.
    */
   readonly claimQueueDestination: (key: string) => number;
   /**
    * Apply one read's answer to the mirror, but only while its claim is still the
    * live one. Returns whether it committed, so the caller can tell a dropped
    * stale answer from an applied one. A destination is claimed, never cleared:
-   * leaving for home does not wipe the mirror, matching the row's "does not
-   * unconditionally clear on home".
+   * leaving for home does not unconditionally wipe the mirror.
    */
   readonly applyQueueRead: (
     key: string,
@@ -211,7 +204,7 @@ export function createWebuiComposerStore(options?: {
   let retry: WebuiRecordedTurn | undefined;
   let mentionRange: WebuiMentionRange | undefined;
   /**
-   * Per-slot write revisions (P01). Not part of the snapshot: they exist to be
+   * Per-slot write revisions. Not part of the snapshot: they exist to be
    * captured and compared around an in-flight operation, and publishing them
    * would re-render every subscriber for a fence.
    */

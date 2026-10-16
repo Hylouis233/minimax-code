@@ -1,4 +1,4 @@
-// The application instance (plan §7.1 `application/create-application.ts`).
+// The application instance.
 //
 // One call builds the whole browser-side application object: the store, the
 // single lease controller, the event coordinator and the turn coordinator, and
@@ -8,11 +8,11 @@
 // exposes.
 //
 // This module is the live process-event ingress. The composition root creates
-// one application through it; ticket #45 switched all four former `watchEvents`
-// call sites (the shell, the composer and both workspace panels) onto it in one
-// delivery unit, because a migration period where the shell used the new
-// ingress while the composer still opened its own connection would make the
-// migration itself a source of duplicated state.
+// one application through it, and all four former `watchEvents` call sites (the
+// shell, the composer and both workspace panels) moved onto it in one delivery
+// unit, because a migration period where the shell used the new ingress while
+// the composer still opened its own connection would make the migration itself
+// a source of duplicated state.
 
 import { createWebuiPortSlices, type WebuiPortSlices } from "./port-slices.js";
 import { createWebuiSessionWorkflows } from "../features/sessions/application/session-workflows.js";
@@ -122,13 +122,13 @@ import {
 } from "./selectors.js";
 
 /**
- * The session reads the shell composes its screens from (plan §5.1: the shell
- * may not import the assembly, and it renders the providers its descendants
- * read through, so it cannot reach them through those bindings either).
- * Published on the application instance — the composition root's own interface
- * — because that instance is what the shell is handed. Both reads answer from
- * the one store; `undefined` means "whatever is selected", and with no session
- * selected that is the home slot the first turn streams into.
+ * The session reads the shell composes its screens from. The shell may not
+ * import the assembly, and it renders the providers its descendants read
+ * through, so it cannot reach them through those bindings either. Published on
+ * the application instance — the composition root's own interface — because
+ * that instance is what the shell is handed. Both reads answer from the one
+ * store; `undefined` means "whatever is selected", and with no session selected
+ * that is the home slot the first turn streams into.
  */
 export interface WebuiApplicationReads {
   readonly stream: (sessionId: string | undefined) => WebuiStreamState;
@@ -154,18 +154,17 @@ export interface WebuiApplicationDeps {
   readonly turns: Omit<WebuiTurnCoordinatorDeps, "store" | "leases">;
   /**
    * The port the turn capability slice is cut from — the composition root's
-   * closure over the transport (plan §8 Phase 1 step 1). The slice is built
-   * here, not by the component that invokes a turn command, so a submission
-   * receives no capability from its caller. Absent on a host with nothing wired
-   * (SSR, unit tests), which is exactly the state the loop's absent-capability
-   * guards exist for.
+   * closure over the transport. The slice is built here, not by the component
+   * that invokes a turn command, so a submission receives no capability from
+   * its caller. Absent on a host with nothing wired (SSR, unit tests), which is
+   * exactly the state the loop's absent-capability guards exist for.
    */
   readonly turnCapabilities?: WebuiTurnCapabilityPort;
   /**
    * The turn-review capability. The application owns the review family's query
-   * and mutation (plan §5.2 review row), so a surface reads it from the
-   * application rather than holding its own copy; the absent case is the state
-   * the owner's own `unsupported` outcome covers.
+   * and mutation, so a surface reads it from the application rather than
+   * holding its own copy; the absent case is the state the owner's own
+   * `unsupported` outcome covers.
    */
   readonly turnReview?: WebuiTurnReviewPort;
   readonly loadMessages?: WebuiClientMessageLoader;
@@ -193,13 +192,13 @@ export interface WebuiApplicationDeps {
   readonly composer?: WebuiComposerStore;
   /**
    * The goal capability, so the application can own the goal owner rather than
-   * the view that happens to be mounted (T05). Absent on a host with nothing
-   * wired, which is the state the owner's own absent-capability handling covers.
+   * the view that happens to be mounted. Absent on a host with nothing wired,
+   * which is the state the owner's own absent-capability handling covers.
    */
   readonly goalPort?: WebuiGoalPortSlice;
   /**
    * The interaction capability, so the application owns the permission and
-   * questionnaire owner rather than the view that happens to be mounted (T05).
+   * questionnaire owner rather than the view that happens to be mounted.
    */
   readonly interactionsPort?: WebuiInteractionPortSlice;
   /**
@@ -208,11 +207,11 @@ export interface WebuiApplicationDeps {
    */
   readonly readAgentName?: (sessionId: string) => string;
   /**
-   * The per-business port slices (T19). The composition root cuts them once and
-   * hands them in; the application builds every business owner from them, so no
-   * view builds an owner to reach a capability (plan §8 Phase 2, §6 W6). Absent
-   * on a host with nothing wired: the slices then cut from the turn capability,
-   * which is the same degradation the shell used to perform.
+   * The per-business port slices. The composition root cuts them once and hands
+   * them in; the application builds every business owner from them, so no view
+   * builds an owner to reach a capability. Absent on a host with nothing wired:
+   * the slices then cut from the turn capability, which is the same degradation
+   * the shell used to perform.
    */
   readonly slices?: WebuiPortSlices;
   /**
@@ -243,8 +242,8 @@ export interface WebuiApplicationStart {
 
 export interface WebuiApplication {
   /**
-   * The lifecycle state (plan §4.1). `constructed` performs no IO; `started` has
-   * one open ingress; `disposed` is terminal and refuses to restart.
+   * The lifecycle state. `constructed` performs no IO; `started` has one open
+   * ingress; `disposed` is terminal and refuses to restart.
    */
   readonly state: () => WebuiApplicationLifecycleState;
   /**
@@ -263,34 +262,34 @@ export interface WebuiApplication {
   /** Subscribe to snapshot changes. Returns a detach; never closes a channel. */
   readonly subscribe: (listener: () => void) => () => void;
   /**
-   * The session reads a surface composes from without importing the assembly
-   * (T19). Same store, same subscription as `getSnapshot`; the mapping from
-   * "nothing selected" to the home slot stays inside the assembly, so a reader
-   * asks for the selected slot rather than naming the sentinel.
+   * The session reads a surface composes from without importing the assembly.
+   * Same store, same subscription as `getSnapshot`; the mapping from "nothing
+   * selected" to the home slot stays inside the assembly, so a reader asks for
+   * the selected slot rather than naming the sentinel.
    */
   readonly reads: WebuiApplicationReads;
   readonly select: (sessionId: string | undefined) => void;
   readonly store: WebuiSessionStore;
   readonly leases: WebuiStreamLeaseController;
   /**
-   * Why each session is still needed (plan §4.3). Independent of component
-   * mounting: a delivery or settlement lease outlives the view that started it.
+   * Why each session is still needed. Independent of component mounting: a
+   * delivery or settlement lease outlives the view that started it.
    */
   readonly sessionScope: WebuiSessionScopeManager;
   /**
-   * The goal owners, one per session (T05). An event route commits through them
+   * The goal owners, one per session. An event route commits through them
    * whether or not a view is mounted, and each session has its own fence.
    */
   readonly goals: WebuiGoalSessionOwners;
   /**
-   * The interaction owners, one per session (T05). An event route re-reads and
-   * fences through them, and a transcript submits its reply to them, whether or
-   * not the composer is mounted on that session.
+   * The interaction owners, one per session. An event route re-reads and fences
+   * through them, and a transcript submits its reply to them, whether or not the
+   * composer is mounted on that session.
    */
   readonly interactions: WebuiInteractionSessionOwners;
   /**
-   * The client deliveries this application can actually close (plan §4.3).
-   * Disposal closes them; it never aborts a host turn.
+   * The client deliveries this application can actually close. Disposal closes
+   * them; it never aborts a host turn.
    */
   readonly deliveries: WebuiDeliveryDisposers;
   readonly events: WebuiEventCoordinator;
@@ -300,93 +299,84 @@ export interface WebuiApplication {
    * application and shared by every surface that drives a turn: the event
    * coordinator's attach and recheck routes, the composer controller's
    * submissions, and the session binding that hands it to a component. It is the
-   * one construction, so a binding reads this instead of assembling a second one
-   * (plan §5.1, P02 step 8).
+   * one construction, so a binding reads this instead of assembling a second one.
    */
   readonly turnCommandsFor: (sessionId: string | undefined) => WebuiConversationTurnCommands;
   /** The published turn capability slice (send / resume / load / stop). */
   readonly turnCapabilities: WebuiTurnCapabilitySlice;
-  /** The one owner of a turn's diff query and revert/reapply (T10). */
+  /** The one owner of a turn's diff query and revert/reapply. */
   readonly turnReview: WebuiTurnReviewOwner;
   readonly transcriptHistory: WebuiTranscriptHistoryOwner;
   /** Message actions exposed to transcript UI as application commands. */
   readonly transcriptCommands: WebuiTranscriptCommands;
-  /** The one owner of unread hydration ordering (plan §7.6). */
+  /** The one owner of unread hydration ordering. */
   readonly unread: WebuiUnreadController;
-  /** The one owner of composer drafts and input history (plan §7.6). */
+  /** The one owner of composer drafts and input history. */
   readonly composer: WebuiComposerStore;
   readonly composerController: WebuiComposerController;
   /**
-   * The port slices the assembly cut (§6 W6). Published so a surface reads the
-   * narrowed slice rather than the composed transport: the shell provides these
-   * to its descendants and reads none of them itself.
+   * The port slices the assembly cut. Published so a surface reads the narrowed
+   * slice rather than the composed transport: the shell provides these to its
+   * descendants and reads none of them itself.
    */
   readonly portSlices: WebuiPortSlices;
-  /** The browser terminal owner (T15). */
+  /** The browser terminal owner. */
   readonly terminalOwner: ReturnType<typeof createWebuiTerminalOwner>;
-  /** The session business's loads and mutations, one per assembly (T19). */
+  /** The session business's loads and mutations, one per assembly. */
   readonly sessionWorkflows: ReturnType<typeof createWebuiSessionWorkflows>;
   /** The task/session use case: task workspace policy, creation, and home identity. */
   readonly taskSessions: ReturnType<typeof createWebuiTaskSessionWorkflows>;
   /** The composer business's slash-command runner. */
   readonly commandWorkflows: ReturnType<typeof createWebuiCommandWorkflows>;
-  /** The workspace file/environment/review query owner (T19). */
+  /** The workspace file/environment/review query owner. */
   readonly workspaceQueries: ReturnType<typeof createWebuiWorkspaceQueries>;
-  /** The account owner: sign-in, api-key status and usage (T19). */
+  /** The account owner: sign-in, api-key status and usage. */
   readonly accountWorkflows: ReturnType<typeof createWebuiAccountWorkflows>;
-  /** The settings owner: instructions, memory, profile and display (T19). */
+  /** The settings owner: instructions, memory, profile and display. */
   readonly settingsWorkflows: ReturnType<typeof createWebuiSettingsWorkflows>;
-  /** The models owner: catalogue, selection and provider CRUD (T19). */
+  /** The models owner: catalogue, selection and provider CRUD. */
   readonly modelsWorkflows: ReturnType<typeof createWebuiModelsWorkflows>;
-  /** The plugin manager's owner (T19). */
+  /** The plugin manager's owner. */
   readonly pluginWorkflows: ReturnType<typeof createWebuiPluginWorkflows>;
-  /** The composer's plugin/skill read model, separate from the manager's (T08). */
+  /** The composer's plugin/skill read model, separate from the manager's. */
   readonly composerPluginCatalogue: ReturnType<typeof createWebuiComposerPluginCatalogue>;
-  /** The plan-review reply workflow (T19). */
+  /** The plan-review reply workflow. */
   readonly planReviewWorkflow: ReturnType<typeof createWebuiPlanReviewWorkflow>;
   /**
-   * The one active-turn probe (plan §7.1): a same-session probe from two views
-   * collapses to one round trip, and absent means the host predates the
-   * operation — the rail's own condition, not a second probe.
+   * The one active-turn probe: a same-session probe from two views collapses to
+   * one round trip, and absent means the host predates the operation — the
+   * rail's own condition, not a second probe.
    */
   readonly activeTurnProbe: ReturnType<typeof webuiActiveTurnProbeFor>;
   /**
-   * The two version cells, one per fence (§4.2 field 6). The application owns the
-   * instance; the business owns the policy and reads the cell it is given.
+   * The two version cells, one per fence. The application owns the instance; the
+   * business owns the policy and reads the cell it is given.
    */
   readonly versionCells: WebuiVersionCells;
   /**
-   * The opaque credential/config generation context (§4.5; T02). Owners put a
-   * token in a resource key and compare with `isCurrent`; the business that owns
-   * a write advances the epoch it invalidates. Tokens are instance-scoped and
-   * carry no credential value.
+   * The opaque credential/config generation context. Owners put a token in a
+   * resource key and compare with `isCurrent`; the business that owns a write
+   * advances the epoch it invalidates. Tokens are instance-scoped and carry no
+   * credential value.
    */
   readonly identityEpochs: WebuiIdentityEpochs;
   /**
-   * The one reconciliation entry point (plan §4.4: "Reconnect and selection use
-   * the same reconciliation entry point, with per-key request coalescing and
-   * epoch guards").
+   * The one reconciliation entry point.
    *
    * It runs the authoritative re-reads the installed routes own for one session —
    * the pending-interaction read, the goal re-read and the pending invalidation —
    * and is what a selection change or a suspected observation gap calls instead of
    * each surface inventing its own probe. `sessionId` defaults to the application's
    * selection.
-   *
-   * Today the routes are the ones the mounted surfaces registered (the same
-   * objects the channel's coordinator runs), so this adds a named entry point
-   * without a second path; T05 replaces the registration with permanent
-   * application-owned routes behind the same call.
    */
   readonly reconcile: (sessionId?: string) => void;
   /**
    * Subscribe to a domain event that carries no session id (a workspace-git
    * change). A reaction, not a route: it runs after the coordinator has routed
-   * the event to the owners, and it cannot displace anything (plan §4.4).
+   * the event to the owners, and it cannot displace anything.
    *
-   * Temporary adapter: the workspace business owns this invalidation once its
-   * query owner exists (T11); until then the surface that holds the affected
-   * views subscribes here.
+   * The surface that holds the affected views subscribes here; the workspace
+   * business owns the invalidation the signal triggers.
    */
   readonly onWorkspaceGitChanged: (
     listener: (payload: WebuiWorkspaceGitChangedPayload) => void,
@@ -408,7 +398,7 @@ export function createWebuiApplication(
   const sessionScope = createWebuiSessionScopeManager();
   const deliveries = createWebuiDeliveryDisposers();
   // The goal owners are the application's, not a view's: a goal event commits
-  // through the session's owner even with nothing mounted (plan §4.4).
+  // through the session's owner even with nothing mounted.
   const goals = createWebuiGoalSessionOwners({
     store,
     ...(deps.goalPort ? { port: deps.goalPort } : {}),
@@ -427,7 +417,7 @@ export function createWebuiApplication(
   const interactions = createWebuiInteractionSessionOwners({
     store,
     // The assembly builds the intents because it is what holds the store; the
-    // owner itself consumes turn's published contract (plan §5.5 P02 step 3).
+    // owner itself consumes turn's published contract.
     readPhaseIntents: (sessionId) =>
       createWebuiInteractionPhaseIntents({
         setStream: store.createSessionWriter({ kind: "session", sessionId }).setStream,
@@ -445,7 +435,7 @@ export function createWebuiApplication(
     store.select(sessionId);
     composerController?.selectSession(sessionId);
     // Selecting is where a retained dirty marker pays out: the session was
-    // marked while nothing needed it, and now something does (plan §4.3).
+    // marked while nothing needed it, and now something does.
     if (sessionId !== undefined && dirtyResources.has(sessionId)) {
       dirtyResources.delete(sessionId);
       reconcileSession(sessionId);
@@ -458,22 +448,22 @@ export function createWebuiApplication(
   // persisted browser state, so it belongs to `start`, after the initial route
   // is known. `recordEvent` stays gated on the hydration flag, and the ingress
   // is opened after hydration in the same call, so the ordering guarantee is
-  // unchanged (plan §4.1).
+  // unchanged.
   const unread = createWebuiUnreadController({
     store,
     ...(deps.unreadStorage?.read ? { read: deps.unreadStorage.read } : {}),
     ...(deps.unreadStorage?.write ? { write: deps.unreadStorage.write } : {}),
   });
   const composer = deps.composer ?? createWebuiComposerStore();
-  // The two fence cells (§8 Phase 3 B2). Created once per application, because
-  // the coordinator that uses one is constructed on every render and a counter
-  // living in it would reset; published, because §4.2 field 6 makes the goal's
-  // fence `goal`'s state and interactions' late-read protection `interactions'`,
-  // so the component must not be the thing that declares them.
+  // The two fence cells. Created once per application, because the coordinator
+  // that uses one is constructed on every render and a counter living in it
+  // would reset; published, because the goal's fence is `goal`'s state and
+  // interactions' late-read protection is `interactions'`, so the component must
+  // not be the thing that declares them.
   const versionCells = createWebuiVersionCells();
-  // The opaque identity/freshness context (§4.5). Created once per instance so a
-  // remount gets fresh tokens, and published because every owner that keys a
-  // resource by credential/config generation reads it.
+  // The opaque identity/freshness context. Created once per instance so a remount
+  // gets fresh tokens, and published because every owner that keys a resource by
+  // credential/config generation reads it.
   const identityEpochs = createWebuiIdentityEpochs();
   // The effects slot: the initial set is the composition root's, and a later
   // registration (the subtree that owns the effects) replaces it in place. The
@@ -482,13 +472,13 @@ export function createWebuiApplication(
   /**
    * The reactions a surface subscribes to for the two signals that carry no
    * session id of their own. They run after the owners have been routed to, and
-   * they cannot replace a route (plan §4.4).
+   * they cannot replace a route.
    */
   const workspaceGitListeners = new Set<(payload: WebuiWorkspaceGitChangedPayload) => void>();
   /**
    * The dirty markers a read-required event left behind for a session nothing
    * needs yet. They survive until interest arrives or the session is purged —
-   * the alternative, dropping the event, is the silent loss plan §4.3 forbids.
+   * the alternative, dropping the event, is a silent loss.
    */
   const dirtyResources = new Set<string>();
   const channelReadyListeners = new Set<() => void>();
@@ -497,16 +487,15 @@ export function createWebuiApplication(
   };
   let composerController: WebuiComposerController | undefined;
   /**
-   * The conversation command set for one session, built on demand and deliberately
-   * **not** cached (plan §5.1: "Stateless identity-bound facades may be returned
-   * without an unbounded per-session command map"). Each set is a closure over the
-   * store and the shared owners and holds no state of its own, so a map would only
-   * accumulate one entry per session this client ever commanded.
+   * The conversation command set for one session, built on demand and
+   * deliberately **not** cached: each set is a closure over the store and the
+   * shared owners and holds no state of its own, so a map would only accumulate
+   * one entry per session this client ever commanded.
    *
    * The attach and recheck routes are the application's, so a `session.start` is
-   * followed whether or not a composer is mounted (T05); and because this is the
+   * followed whether or not a composer is mounted; and because this is the
    * application's one construction, a binding reads it instead of building a
-   * second one (P02 step 8).
+   * second one.
    */
   const turnCommandsFor = (sessionId: string | undefined): WebuiConversationTurnCommands =>
     createWebuiConversationTurnCommands({
@@ -515,14 +504,14 @@ export function createWebuiApplication(
       ...(deps.turnCapabilities ? { capabilities: turnCapabilities } : {}),
       deliveries,
       scope: sessionScope,
-      // The one creation owner (P01 step 4): a first message's session is created by the task use
-      // case, which reserves the admission, transfers the home record under its guards and answers
-      // whether the created session may be selected.
+      // The one creation owner: a first message's session is created by the task
+      // use case, which reserves the admission, transfers the home record under
+      // its guards and answers whether the created session may be selected.
       taskSessions: taskSessionWorkflows,
     });
   /**
-   * The one reconciliation entry point (plan §4.4): the same owner routes the
-   * event path uses, so selection and reconnect do not run a second one.
+   * The one reconciliation entry point: the same owner routes the event path
+   * uses, so selection and reconnect do not run a second one.
    */
   const reconcileSession = (sessionId: string): void => {
     if (lifecycleState() === "disposed") return;
@@ -544,7 +533,7 @@ export function createWebuiApplication(
       refreshPending: (sessionId) => {
         if (!sessionScope.isInterested(sessionId)) {
           // No interest yet: retain the marker and reconcile when it arrives,
-          // rather than fanning out a background read (plan §4.3).
+          // rather than fanning out a background read.
           dirtyResources.add(sessionId);
           return;
         }
@@ -575,23 +564,22 @@ export function createWebuiApplication(
     ...deps.turns,
   });
   // The slice is cut once, here, from the port the composition root holds. A
-  // caller of a conversation command never supplies a capability again
-  // (plan §8 Phase 1 step 1).
+  // caller of a conversation command never supplies a capability again.
   const turnCapabilities = createWebuiTurnCapabilitySlice(
     deps.turnCapabilities ?? {},
   );
   const turnReview = createWebuiTurnReviewOwner({ port: deps.turnReview ?? {} });
   const transcriptHistory = createWebuiTranscriptHistoryOwner({
-    // The substrate writes the transcript slice through this contract rather than
-    // through the record repository (plan §5.3).
+    // The substrate writes the transcript slice through this contract rather
+    // than through the record repository.
     transcript: createWebuiTranscriptHistoryWriter(store),
     loadMessages: deps.loadMessages,
   });
-  // The business owners, built by the assembly rather than by the mounted view
-  // (T19; plan §6 W6, the shell's own treatment). A view composes screens and
-  // reads these; it neither builds one nor holds the capability to build one, so
-  // "which business can reach which port" is decided here rather than by which
-  // port a component happened to be handed.
+  // The business owners, built by the assembly rather than by the mounted view —
+  // the shell's own treatment. A view composes screens and reads these; it
+  // neither builds one nor holds the capability to build one, so "which business
+  // can reach which port" is decided here rather than by which port a component
+  // happened to be handed.
   const slices = deps.slices ?? createWebuiPortSlices(deps.turnCapabilities ?? {});
   const terminalOwner = createWebuiTerminalOwner(slices.workspace);
   const transcriptCommands: WebuiTranscriptCommands = {
@@ -620,7 +608,7 @@ export function createWebuiApplication(
     ...(deps.sessionImport ? { importSession: deps.sessionImport } : {}),
     ...(deps.sessionExport ? { exportSession: deps.sessionExport } : {}),
     // A delete is an accepted mutation: it holds a settlement lease and revokes
-    // the deleted session's interests (plan §4.3).
+    // the deleted session's interests.
     scope: sessionScope,
   });
   const commandWorkflows = createWebuiCommandWorkflows({ port: slices.composer });
@@ -628,9 +616,8 @@ export function createWebuiApplication(
    * The goal capability one target session offers, read when the submission asks
    * for it rather than captured up front: a session this submission just created
    * holds no goal, and that is what makes its objective a create rather than a
-   * patch. It was the assembly's inline `usesPatch`/`resolveGoal` pair before
-   * (plan §5.3: "Remove `usesPatch`/create-or-patch business decisions from
-   * `create-application.ts`").
+   * patch. The create-or-patch choice used to be the assembly's inline
+   * `usesPatch`/`resolveGoal` pair.
    */
   const goalCapabilityFor = (sessionId: string): WebuiGoalOwnerCapability => {
     const owner = goals.owner(sessionId);
@@ -644,27 +631,27 @@ export function createWebuiApplication(
   composerController = createWebuiComposerController({
     store: composer,
     readSelectedSessionId: readActiveSessionId,
-    // Every creation the composer drives is the task use case's (P01 step 4), so the controller is
-    // left with the selection — gated on the use case's own answer (rule 7).
+    // Every creation the composer drives is the task use case's, so the controller is left with
+    // the selection — gated on the use case's own answer.
     selectCreatedSession: selectSession,
     turnCommandsFor,
     commandWorkflows,
     canEnqueue: turnCapabilities.enqueue !== undefined,
     canSend: turnCapabilities.send !== undefined,
     readGoal: (sessionId) => store.readSession(sessionId).goal,
-    // The goal submission command is Goal's (plan §5.3): the create-or-patch
-    // decision, and which owner answers it, live in that module. What the
-    // assembly supplies is the capability to read a target session's goal state
-    // and the commit that lands a created goal on its owner.
+    // The goal submission command is Goal's: the create-or-patch decision, and
+    // which owner answers it, live in that module. What the assembly supplies is
+    // the capability to read a target session's goal state and the commit that
+    // lands a created goal on its owner.
     submitGoal: (input, onSessionCreated) =>
       submitWebuiGoal(
         {
           sessionId: input.sessionId,
           objective: input.objective,
           capabilityFor: goalCapabilityFor,
-          // The goal path creates through the same use case the send path does
-          // (P01 step 4), so the admission reservation, the guarded transfer and
-          // the composer's slot move happen once.
+          // The goal path creates through the same use case the send path does,
+          // so the admission reservation, the guarded transfer and the composer's
+          // slot move happen once.
           submitTask: taskSessionWorkflows,
           applyGoal: (sessionId, goal) => goals.owner(sessionId).applyGoal(goal),
           ...(input.createSessionWorkspaceDir ? { createSessionWorkspaceDir: input.createSessionWorkspaceDir } : {}),
@@ -694,10 +681,10 @@ export function createWebuiApplication(
     port: slices.settings,
     identityEpochs,
   });
-  // `models` owns the catalogue, the selection and the provider list (plan
-  // §5.6). The one call that crosses the boundary is the api-key upsert's: it
-  // refreshes `settings`' status read through that owner's published command
-  // rather than copying the read.
+  // `models` owns the catalogue, the selection and the provider list. The one
+  // call that crosses the boundary is the api-key upsert's: it refreshes
+  // `settings`' status read through that owner's published command rather than
+  // copying the read.
   const modelsWorkflows = createWebuiModelsWorkflows({
     port: slices.models,
     refreshApiKeyStatus: () => accountWorkflows.loadApiKeyStatus(),
@@ -705,14 +692,14 @@ export function createWebuiApplication(
   });
   const pluginWorkflows = createWebuiPluginWorkflows({ port: slices.plugins });
   // The composer's view of what is installed and what the agent can run: a
-  // separate read model from `pluginWorkflows` on purpose, so neither
-  // overwrites the other when one reloads (T08).
+  // separate read model from `pluginWorkflows` on purpose, so neither overwrites
+  // the other when one reloads.
   /**
-   * The task/session use case (plan §5.5 P01 step 3). The workspace policy it owns
-   * used to be the shell's: which directory a fresh home starts in, what the
-   * auto-fill may do to it, and what an explicit pick means. It is constructed
-   * here because it needs the canonical store, the composer store and the session
-   * catalogue; the host injects only the persisted preference.
+   * The task/session use case. The workspace policy it owns used to be the
+   * shell's: which directory a fresh home starts in, what the auto-fill may do to
+   * it, and what an explicit pick means. It is constructed here because it needs
+   * the canonical store, the composer store and the session catalogue; the host
+   * injects only the persisted preference.
    */
   const taskSessionWorkflows = createWebuiTaskSessionWorkflows({
     store,
@@ -734,14 +721,14 @@ export function createWebuiApplication(
     actions: createWebuiPluginActions(slices.plugins),
     ...(slices.plugins.listSkills ? { listSkills: slices.plugins.listSkills } : {}),
   });
-  // The plan-review reply goes to the session's interaction owner (T05). The
-  // selection and the agent name are read when the reply is submitted rather
-  // than captured by the view that renders the card, so a card left open across
-  // a selection change replies to the session it belongs to.
-  // One shared, deduplicated active-turn probe (plan §7.1). The rail and the
-  // composer ask the same question, so a probe racing between two views for one
-  // session collapses to one round trip; the probe is built by the assembly so a
-  // second consumer cannot build a second one (T19).
+  // The plan-review reply goes to the session's interaction owner. The selection
+  // and the agent name are read when the reply is submitted rather than captured
+  // by the view that renders the card, so a card left open across a selection
+  // change replies to the session it belongs to.
+  // One shared, deduplicated active-turn probe. The rail and the composer ask the
+  // same question, so a probe racing between two views for one session collapses
+  // to one round trip; the probe is built by the assembly so a second consumer
+  // cannot build a second one.
   const activeTurnProbe = webuiActiveTurnProbeFor(slices.turn.activeTurn);
   const planReviewWorkflow = createWebuiPlanReviewWorkflow({
     answerQuestionnaire: (request, answers) => {
@@ -767,7 +754,7 @@ export function createWebuiApplication(
     state: () => lifecycle,
     start: (options) => {
       // A disposed instance is terminal: no hydration, no ingress, no second
-      // life through the same object (plan §4.1).
+      // life through the same object.
       if (lifecycle === "disposed") return false;
       if (lifecycle === "started") return true;
       const initialSessionId = options?.initialSessionId;
@@ -784,8 +771,8 @@ export function createWebuiApplication(
     getSnapshot: store.getSnapshot,
     subscribe: store.subscribe,
     // Read through the store's live snapshot, exactly as the selectors did at
-    // their call sites; `undefined` selects the home slot (plan §4.2 home
-    // adoption), which is the assembly's own identity for "no session yet".
+    // their call sites; `undefined` selects the home slot, which is the
+    // assembly's own identity for "no session yet".
     reads: {
       stream: (sessionId) =>
         selectWebuiSessionStream(
@@ -849,19 +836,19 @@ export function createWebuiApplication(
       detach = undefined;
       // Close what this client is observing before fencing the store: the
       // attempt's frames can no longer reach a snapshot, and the host turn keeps
-      // running (plan §4.3, §8.1).
+      // running.
       deliveries.closeAll();
       sessionScope.dispose();
       goals.dispose();
       interactions.dispose();
       // The account owner runs the login and OAuth-status polls, so its end is
-      // the application's end rather than a component unmount (T09, T19).
+      // the application's end rather than a component unmount.
       accountWorkflows.dispose();
       sessionWorkflows.dispose();
       // The terminal owner's disposer is the client's own end: its watches stop
       // and the PTYs it created are killed here rather than left running for a
-      // page that is going away (T15 criterion 3). Fire-and-forget because this
-      // disposal is synchronous; the requests are already on their way.
+      // page that is going away. Fire-and-forget because this disposal is
+      // synchronous; the requests are already on their way.
       void terminalOwner.disposeAll();
       workspaceGitListeners.clear();
       channelReadyListeners.clear();

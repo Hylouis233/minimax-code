@@ -1,4 +1,4 @@
-// The account descriptors (plan §7.1 `operation/account.ts`; §7.7 stage 3).
+// The account descriptors.
 //
 // One file for the account domain's request validation: the sign-in panel, the
 // claim, sign-out and the device-login flow (split out of `operation/provider.ts`)

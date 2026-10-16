@@ -1,5 +1,4 @@
-// The composer editor's staging row and its two typed popups (T13 criterion 5 —
-// the editor/staging unit).
+// The composer editor's staging row and its two typed popups.
 //
 // This is the part of the composer that sits under the textarea: the attachment
 // and URL-reference chips, the `@` mention list and the `/` command palette.

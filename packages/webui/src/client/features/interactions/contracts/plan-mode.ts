@@ -1,8 +1,8 @@
-// The plan request's published derivations (plan §5.2 interactions row: the
-// transcript and the composer both read whether a pending request is a plan
-// review, and the file the plan was written to). They are pure functions of the
-// published questionnaire payload, declared here so a consumer reads them from
-// the interactions business instead of from the projection that renders them.
+// The plan request's published derivations: the transcript and the composer both
+// read whether a pending request is a plan review, and the file the plan was
+// written to. They are pure functions of the published questionnaire payload,
+// declared here so a consumer reads them from the interactions business instead
+// of from the projection that renders them.
 
 import type { WebuiQuestionnaireRequest } from "../../../../shared/contracts/interactions.js";
 

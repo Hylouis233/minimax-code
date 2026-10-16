@@ -84,7 +84,7 @@ export const runCommandOperation: WebuiOperation<
 };
 
 /* ------------------------------------------------------------------ *
- * Provider write validation (plan 5.4 / D05).
+ * Provider write validation.
  *
  * These five are the provider operations whose body is validated at ingress:
  * `createUserModelProvider`, `updateUserModelProvider`,
@@ -101,7 +101,7 @@ export const runCommandOperation: WebuiOperation<
  * runtime forwards extensions, so rebuilding a whitelist here would drop them.
  *
  * A malformed body now fails here with `invalidBody` instead of reaching the
- * runtime and failing there. That reclassification is deliberate (D05).
+ * runtime and failing there. That reclassification is deliberate.
  * ------------------------------------------------------------------ */
 
 /** A bad known field: the whole body is an ingress failure. */

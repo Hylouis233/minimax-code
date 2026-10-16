@@ -1,8 +1,7 @@
-// The 关于你 editor (ticket #73; §15.1's `UserProfileSection.tsx` row). One of the three co-visible
-// editors `PersonalizationSettings.tsx` composes, moved out of that file with its own lifecycle: it
-// reads the profile view, keeps a three-field draft (narrowed by `pickProfileFields`, so a save can
-// never carry the view's `path` or `sizeBytes` into a request that takes only the three), and saves
-// through `setUserProfile`.
+// The 关于你 editor. One of the three co-visible editors `PersonalizationSettings.tsx` composes,
+// moved out of that file with its own lifecycle: it reads the profile view, keeps a three-field draft
+// (narrowed by `pickProfileFields`, so a save can never carry the view's `path` or `sizeBytes` into a
+// request that takes only the three), and saves through `setUserProfile`.
 //
 // `isProfileSaveable` is exported for the same reason it was exported from the parent: it is the save
 // button's three states as one predicate, and `renderToStaticMarkup` paints one frame and never

@@ -1,13 +1,11 @@
-// The queue command (plan §7.1 `application/` turn coordinator: "owns
-// send/queue/stop/retry").
+// The queue command.
 //
 // Queueing is what a send becomes when a turn is already in flight: rather than
 // racing the running turn, the message drains behind it. The orchestration —
 // enqueue against the transport, clear the draft, hand off attachments, refresh
-// the queue panel, and surface a refusal inline on failure — used to live inside
-// `submitWebuiComposerTurn`'s `sending` branch in `projection/composer/composer-state.ts`.
-// It moves here so the application owns the command, and `composer-state` calls
-// this one implementation rather than carrying its own copy.
+// the queue panel, and surface a refusal inline on failure — lives here so the
+// application owns the command, and `composer-state` calls this one
+// implementation rather than carrying its own copy.
 //
 // Kept deliberately dependency-light (no import of `composer-state`, so the
 // latter can call in without forming a cycle): the only collaborator is the

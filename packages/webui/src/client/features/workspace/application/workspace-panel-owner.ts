@@ -1,4 +1,4 @@
-// The workspace panel owner (T11; produced target `workspace-panel-state`).
+// The workspace panel owner.
 //
 // Which panel is open, which tab is active, and whether the right-side progress
 // panel is showing: the panel's own state, keyed by session and kept for the life
@@ -9,8 +9,8 @@
 // The file browser's own view state — the search box, whether the tree is showing,
 // which directories are expanded, preview versus code — deliberately stays where
 // it was, as component state on the panel. Those never survived a session switch
-// before this change either, and giving them that behaviour now would be a new
-// promise rather than a preserved one.
+// before either, and giving them that behaviour would be a new promise rather than
+// a preserved one.
 //
 // The transition rules stay where they were — the pure reducers in
 // `projection/workspace-panel-state.ts` — and this owner holds the map and

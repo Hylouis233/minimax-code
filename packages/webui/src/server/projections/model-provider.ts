@@ -1,4 +1,4 @@
-// The webui's projection of the runtime's provider rows (plan §5.4 / D04).
+// The webui's projection of the runtime's provider rows.
 //
 // The runtime's capability declares this read as `readonly Record<string,
 // unknown>[]`; `ModelProviderView` in `local-runtime-v2`'s model-system

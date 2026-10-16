@@ -1,12 +1,10 @@
-// React application provider and context (plan §7.2
-// `client/bindings/application-context.tsx`).
+// React application provider and context.
 //
 // This is the boundary between the framework-free application layer and React.
 // The application object is created once by the composition root and provided
 // here; the bindings that need a part of it read it through the optional hook
 // below. Components never receive a store writer and never register a
-// process-event callback — that is the ticket's "components subscribe to
-// application snapshots or selectors and register no business event callback".
+// process-event callback.
 
 import {
   createContext,
@@ -23,7 +21,7 @@ import type { WebuiApplicationState } from "../application/state.js";
  * The session store, provided on its own so a subtree can read and submit
  * commands without the whole application object — and, crucially, without
  * opening the process-event channel. The composition root owns one store and
- * provides it once (plan §7.2, §7.6; ticket #45).
+ * provides it once.
  */
 const WebuiSessionStoreContext = createContext<WebuiSessionStore | undefined>(
   undefined,

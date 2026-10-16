@@ -1,4 +1,4 @@
-// The process-event channel abstraction (plan §7.1 `client/application/`).
+// The process-event channel abstraction.
 //
 // One channel is opened per application instance, and the application's event
 // coordinator is its *sole* consumer: components never subscribe to the raw

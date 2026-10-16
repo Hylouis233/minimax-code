@@ -138,14 +138,14 @@ interface CacheEntry<V> {
 /**
  * The one owner of the quota request and its cache.
  *
- * T17's keep decision, recorded here because the absence of a split is as much a
- * decision as a split is. This class stays in one piece: the identity keys, the
- * two TTLs, the in-flight sharing, the force-refresh path, the signing headers,
- * the auth rejection and the credits-only degradation are one policy, and they
- * share one cache — a reader that spread them over per-endpoint modules would
- * have to hand the cache and the clock between them, which is exactly the
- * complexity the split would have been meant to remove. What left is the pure
- * projection in `usage-quota-projection.ts`.
+ * The absence of a split is as much a decision as a split is, so it is recorded
+ * here: this class stays in one piece. The identity keys, the two TTLs, the
+ * in-flight sharing, the force-refresh path, the signing headers, the auth
+ * rejection and the credits-only degradation are one policy, and they share one
+ * cache — a reader that spread them over per-endpoint modules would have to hand
+ * the cache and the clock between them, which is exactly the complexity the
+ * split would have been meant to remove. What left is the pure projection in
+ * `usage-quota-projection.ts`.
  */
 export class UsageQuotaClient {
   private readonly fetchImpl: typeof fetch;

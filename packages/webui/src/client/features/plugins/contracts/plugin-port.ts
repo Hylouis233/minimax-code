@@ -1,14 +1,12 @@
 // Plugin capability port.
 //
 // Plugin management and the skill catalogue. Split from the monolithic
-// `WebuiTransport` in the former `client/contracts.ts`; `transport.ts` composes
-// it. Every method stays optional — `undefined` means "the operation is not
-// wired".
+// `WebuiTransport`; `transport.ts` composes it. Every method stays optional —
+// `undefined` means "the operation is not wired".
 //
-// `listSkills` was declared on `SettingsPort` until the port re-file (plan §9,
-// ticket #59). The operator's decision of 2026-10-12 files it here: the skill
-// catalogue is `plugins`' surface, and §9's "count the port's actions, not its
-// members" rule is why a one-member port is not a reason to leave it where the
+// `listSkills` was declared on `SettingsPort` until the port re-file. The skill
+// catalogue is `plugins`' surface, and counting a port's actions rather than its
+// members is why a one-member port is not a reason to leave it where the
 // server's own grouping happens to put it.
 //
 // `pluginManagement` carries 29 actions behind its one member

@@ -1,11 +1,11 @@
 // Pure workspace file-tree helpers (view layer).
 //
-// Moved here from `components/workspace/WorkspaceFileTree.tsx` so the one tree structure
-// is shared: the tree query owner (`application/workspace/workspace-queries.ts`) merges a
-// directory's freshly loaded children with the same function the tree component
-// filters and walks with, instead of a second copy living beside each consumer
-// (plan §7.1 "never copied, leaving two implementations"; ticket #51). The
-// component re-exports these names, so its public surface is unchanged.
+// Moved here from `client/features/workspace/ui/WorkspaceFileTree.tsx` so the one tree
+// structure is shared: the tree query owner
+// (`client/features/workspace/application/workspace-queries.ts`) merges a directory's
+// freshly loaded children with the same function the tree component filters and walks
+// with, instead of a second copy living beside each consumer. The component re-exports
+// these names, so its public surface is unchanged.
 
 import type { WebuiWorkspaceFile } from "../../../../shared/contracts/workspace.js";
 
@@ -58,13 +58,8 @@ export function getWorkspaceFileParentPaths(path: string): string[] {
 
 // How a file's size and modified time read in the tree.
 //
-// Carved out of `components/workspace/WorkspaceFileTree.tsx` by Phase 4b: the derivation moves to the
-// layer that already owns the concept instead of riding along in the
-// component that renders it. What moves is
-// **4 declarations**, 2 functions, 2 types and constants they close over.
-//
-// The text below is the declaration as it stood in the source module — no
-// behaviour change.
+// The derivation lives on the layer that already owns the concept instead of
+// riding along in the component that renders it.
 
 const BYTE_UNITS = ["B", "KB", "MB", "GB", "TB"] as const;
 

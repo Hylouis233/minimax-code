@@ -13,8 +13,7 @@
 //
 // The installed CLI writes the same three variables before it builds the
 // host (`packages/tui/src/cli/environment.ts:40-72`); the WebUI does not,
-// which is the regression the assembly step 2 of `packages/webui/docs/runtime.md`
-// was meant to cover.
+// which is the regression this resolver was meant to cover.
 //
 // ADR 0003 forbids importing the terminal client's reader, so this pins the
 // WebUI's resolver against the same store layout the auth-context reader

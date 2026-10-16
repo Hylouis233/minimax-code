@@ -1,12 +1,11 @@
-// Home adoption as one committed transaction (T04's `home-adoption-transaction`;
-// plan §4.2 ordinary home/session flow, §8.1 "Home adoption").
+// Home adoption as one committed transaction.
 //
 // The transaction moves four things at once: the home record (stream, sending,
 // interaction slices), the composer's home slot (draft and recorded turns), the
 // selected session, and the scope's selected-view lease. It is driven here by the
 // production path — the task use case's `submit`, which is what a first message
 // and a plugin-chat creation both call — followed by the selection the caller
-// makes, because rule 7 leaves the selection to composition.
+// makes, because the selection belongs to composition.
 //
 // Two properties matter to a subscriber and both are asserted here: it notifies
 // ONCE, and no notified snapshot is a mixed identity — the selected session and
@@ -39,7 +38,7 @@ function application() {
 async function createFirstSession(app: ReturnType<typeof application>): Promise<void> {
   const outcome = await app.taskSessions.submit({ name: "main" });
   expect(outcome.kind).toBe("created");
-  // Rule 7: selection belongs to composition, and the use case says whether the
+  // Selection belongs to composition, and the use case says whether the
   // navigation claim that started the creation is still current.
   app.select("s1");
 }

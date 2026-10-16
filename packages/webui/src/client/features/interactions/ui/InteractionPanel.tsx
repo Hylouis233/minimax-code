@@ -1,10 +1,4 @@
 // WebuiInteractionPanel — the per-session permission and questionnaire UI.
-//
-// W3 tier 3 lift: this component was moved verbatim out of `app.tsx`. The
-// body is byte-identical to what used to live there; the lift is move-only.
-// `app.tsx` keeps a thin re-export block so existing consumers
-// (`webui-shell.test.ts`, `webui-round3-acceptance.test.tsx`, importers
-// via `app.tsx`) keep their current import path during the W3 wave.
 
 import { useEffect, useState, type ReactElement } from "react";
 import {

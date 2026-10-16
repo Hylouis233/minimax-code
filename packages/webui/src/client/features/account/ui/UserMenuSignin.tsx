@@ -1,9 +1,9 @@
-// The daily check-in panel (ticket #74; §15.1's `UserMenuSignin.tsx` row).
+// The daily check-in panel.
 //
 // It is the menu's check-in surface: the artwork, the streak progress, the credits row and the claim
 // button, plus the three copy helpers that turn the owner's answers into the panel's strings. It holds
-// no open/closed state and submits nothing itself — the menu owns both, because §5.7 LC-7/LC-8 make
-// the two panels mutually exclusive and dismissed together, and that bookkeeping is the menu's.
+// no open/closed state and submits nothing itself — the menu owns both, because the two panels are
+// mutually exclusive and dismissed together, and that bookkeeping is the menu's.
 
 import { Fragment, useState, type ReactElement } from "react";
 import {

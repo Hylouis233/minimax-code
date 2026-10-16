@@ -1,4 +1,4 @@
-// The skill form unit (T08; produced target `plugin-catalogue-form-cuts`).
+// The skill form unit.
 //
 // A skill is created, never edited in place: the one command this form can reach
 // is `createSkill`. Its two draft fields were two `useState` calls in

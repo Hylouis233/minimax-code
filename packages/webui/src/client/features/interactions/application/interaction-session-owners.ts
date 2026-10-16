@@ -1,5 +1,5 @@
-// The interaction owner, keyed by session (plan §4.2 "Goal and interaction owners
-// retain independent policies and fences"; §4.4; T05's `interaction-session-owner`).
+// The interaction owner, keyed by session: goal and interaction owners retain
+// independent policies and fences.
 //
 // Permissions and the questionnaire are the session's, and so is the fence that
 // orders their reads against their replies. The owner used to be constructed by
@@ -50,7 +50,7 @@ export function createWebuiInteractionSessionOwners(deps: {
   readonly store: WebuiSessionStore;
   /**
    * The phase intents this owner drives, per session. Injected rather than built
-   * here: the intents are turn's published contract (plan §5.5 P02 step 3), and
+   * here: the intents are turn's published contract, and
    * the composition that knows the store builds them for the session it is
    * creating the owner for. Required, so no caller silently loses the phase writes
    * a pending interaction implies.

@@ -1,13 +1,13 @@
-// The composer's field transition matrix (T13 criterion 2).
+// The composer's field transition matrix.
 //
-// The criterion asks for one application-owned controller to coordinate the
-// existing store's complete field transition matrix. The store owns the
-// canonical fields (draft, history, staging, queue mirror, modes, retry record,
-// mention range); the controller owns named transition behavior. This file
-// establishes store persistence and generation invariants. Assembled controller
-// transitions are exercised in `webui-application-commands.test.ts`.
+// One application-owned controller coordinates the existing store's complete
+// field transition matrix. The store owns the canonical fields (draft, history,
+// staging, queue mirror, modes, retry record, mention range); the controller
+// owns named transition behavior. This file establishes store persistence
+// and generation invariants. Assembled controller transitions are exercised
+// in `webui-application-commands.test.ts`.
 //
-// Every case is named after the event the criterion names: selection, home
+// Every case is named after the transition event it covers: selection, home
 // adoption, hide/remount, an accepted submit, a successful submit, a failed
 // submit, and disposal. Where a transition has no store command of its own
 // (hide/remount), the case pins what actually carries the fields across it — the
@@ -150,7 +150,7 @@ describe("the composer's field transition matrix", () => {
     expect(store.getSnapshot()).toBe(after);
   });
 
-  // Criterion 3: the selected queue destination is fenced on its own, so an
+  // The selected queue destination is fenced on its own, so an
   // answer that arrives for an earlier selection cannot commit to the new one,
   // and leaving for home does not wipe the mirror.
   it("queue fence: a live claim applies and says so", () => {

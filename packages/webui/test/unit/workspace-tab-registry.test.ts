@@ -1,18 +1,15 @@
-// The tab-kind registry (plan §4.4 "the single tab-kind registry"; §5.6's
-// `workspace` row; §10 S4; ticket #70).
+// The tab-kind registry.
 //
-// S4's measured problem: the right-column tab kinds were enumerated in **three**
-// places — the union at `workspace-panel-state.ts:3-9`, the label map at
-// `WorkspacePanels.tsx:631`, and the add-menu's four buttons at `:655-657` — so a
-// new kind meant finding all three, and the type system caught only two of them
-// (§5.1.3's recorded violation). §5.6 makes this ticket discharge the registry
-// obligation, **and a passing prohibition test does not**: the registry has to
-// exist and be the thing the host reads.
+// The right-column tab kinds were enumerated in **three** places — the union in
+// `workspace-panel-state.ts`, the label map in `WorkspacePanels.tsx`, and the
+// add-menu's four buttons — so a new kind meant finding all three, and the type
+// system caught only two of them. The registry has to exist and be the thing the
+// host reads, **and a passing prohibition test does not discharge that**.
 //
 // The acceptance is that **a rule added to a second enumeration site fails the
-// suite**. §10 S4 permits a registry to carry a host render branch, which is why
-// the glyphs and the dispatch calls stay in the component: the assertions below
-// target the words and the closed set, not the icons.
+// suite**. A registry may carry a host render branch, which is why the glyphs and
+// the dispatch calls stay in the component: the assertions below target the words
+// and the closed set, not the icons.
 
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";

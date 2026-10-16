@@ -1,4 +1,4 @@
-// The account menu's shell and its two panels (ticket #74; plan §5.7 LC-7, LC-8 and LC-9).
+// The account menu's shell and its two panels.
 //
 // The three conditions all constrain where state lives, and none of them is visible from the rendered
 // markup alone, which is why this file reads the three modules. The card and the popover need a DOM to

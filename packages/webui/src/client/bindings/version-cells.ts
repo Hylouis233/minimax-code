@@ -1,10 +1,10 @@
-// The two fence cells, read from the application (plan §8 Phase 3 B2; ticket #67).
+// The two fence cells, read from the application.
 //
-// §4.2 field 6: the composer owns neither the goal's fence nor interactions'
-// late-read protection, and §5.6 gives the cells to the two businesses. The
-// application creates the instance (once per mount, so the counter outlives a
-// render), and a business coordinator is handed the cell it reads — the same
-// arrangement as the session store and the composer store.
+// The composer owns neither the goal's fence nor interactions' late-read
+// protection: the cells belong to the two businesses. The application creates
+// the instance (once per mount, so the counter outlives a render), and a
+// business coordinator is handed the cell it reads — the same arrangement as the
+// session store and the composer store.
 //
 // The fallback exists for a composer mounted without an application (unit tests,
 // a standalone surface): a per-mount pair, so the guards keep working rather than

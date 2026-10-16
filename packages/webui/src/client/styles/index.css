@@ -16,12 +16,11 @@
 
 @import "./tokens.css";
 @import "./shell.css";
-/* Feature rules follow their business (T20). Each file holds that business's
- * rules out of the old monolith, in their original relative order, and every one
- * of them is still inside `@layer components` — Tailwind collects that layer and
+/* Feature rules follow their business. Each file holds that business's rules
+ * out of the old monolith, in their original relative order, and every one of
+ * them is still inside `@layer components` — Tailwind collects that layer and
  * emits it at the `@tailwind components` directive below, so what the split had
- * to preserve is the rules' order relative to each other, which the verifier for
- * this change checked as an identical rule and declaration multiset. */
+ * to preserve is the rules' order relative to each other. */
 @import "../features/plugins/ui/plugins.css";
 @import "../features/settings/ui/settings.css";
 @import "../features/models/ui/models.css";

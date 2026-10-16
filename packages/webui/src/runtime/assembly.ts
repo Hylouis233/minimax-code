@@ -25,8 +25,8 @@
 //     and capability projection (lines 85–93).
 //   * `packages/tui/src/runtime/lifecycle.ts:456-460` — the conditional
 //     `startupExecutionPolicy: 'quarantined'`. The CLI applies it per
-//     surface; ADR 0002 and assembly step 6 of `packages/webui/docs/runtime/boot.md`
-//     require the WebUI to set it unconditionally.
+//     surface; ADR 0002 and `packages/webui/docs/runtime/boot.md` require the
+//     WebUI to set it unconditionally.
 //
 // The factory is injectable so the assembly can be unit-tested without
 // standing up the full host. The default is the real local-runtime-v2
@@ -94,8 +94,8 @@ export interface WebuiAssembledHost extends WebuiRuntimeHostHandle {
 }
 
 // The browser provider types and the adoption rule live in
-// `runtime/browser-provider.ts` (plan §7.1); they are re-exported here so the
-// runtime's public surface is unchanged.
+// `runtime/browser-provider.ts`; they are re-exported here so the runtime's
+// public surface is unchanged.
 export {
   adoptWebuiBrowserProvider,
   type WebuiBrowserAdapter,
@@ -161,10 +161,10 @@ export type WebuiRuntimeHostFactory = (
 
 export interface CreateWebuiRuntimeHostOptions {
   /**
-   * The CLI data directory (`~/.minimax` by default), shared per ADR 0006 and
-   * assembly step 1 of `packages/webui/docs/runtime/boot.md`. It carries the login state,
-   * the provider configuration and the session history the WebUI shows, so a
-   * run that needs a clean slate has to opt into `MINIMAX_DATA_DIR` instead.
+   * The CLI data directory (`~/.minimax` by default), shared per ADR 0006. It
+   * carries the login state, the provider configuration and the session history
+   * the WebUI shows, so a run that needs a clean slate has to opt into
+   * `MINIMAX_DATA_DIR` instead.
    */
   readonly dataDir: string;
   /** Build identity forwarded to the host for metric labels. */
@@ -198,10 +198,10 @@ export interface WebuiRuntimeHost {
 }
 
 /**
- * Boots one process-local runtime host with the assembly step 6 owner
- * combination and the unconditionally quarantined cold-start policy.
- * Returns a `WebuiHarnessPort` the `WebuiService` can tear down in
- * the close order `packages/webui/docs/runtime/boot.md` states.
+ * Boots one process-local runtime host as the `webui` owner with the
+ * unconditionally quarantined cold-start policy. Returns a `WebuiHarnessPort`
+ * the `WebuiService` can tear down in the close order
+ * `packages/webui/docs/runtime/boot.md` states.
  */
 export async function createWebuiRuntimeHost(
   options: CreateWebuiRuntimeHostOptions,
@@ -281,8 +281,7 @@ export async function createWebuiRuntimeHost(
     // Interaction capabilities mirror `packages/tui/src/runtime/lifecycle.ts:451-455`:
     // the WebUI is the surface that answers the questionnaire, permission
     // prompt and elicitation, so all three are unconditionally true here.
-    // Adding a `webui` value to `surface` is out of scope per ADR 0004 and
-    // assembly step 4 of `packages/webui/docs/runtime/boot.md`.
+    // Adding a `webui` value to `surface` is out of scope per ADR 0004.
     capabilities: {
       cliEmbedded: true,
       questionnaireReply: true,

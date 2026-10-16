@@ -1,7 +1,4 @@
-// The turn-review family's published port and outcome (plan §5.2 review row:
-// "`turnReview` and `workspaceReview` APIs; separate models, shared invalidation
-// coordination"; §4.5: "turn review keys include session, turn/changeset
-// identity").
+// The turn-review family's published port and outcome.
 //
 // The transcript's diff card and the review page both read this family, and
 // neither of them owns it: the owner holds the query and the mutation, the
@@ -56,7 +53,7 @@ export type WebuiTurnReviewOutcome =
   | { readonly status: "failed"; readonly reason: string };
 
 /** A mutation that took effect, announced so the workspace family can be
- *  invalidated as part of settlement (plan §4.5, T10's cross-family rule). */
+ *  invalidated as part of settlement. */
 export interface WebuiTurnReviewMutation {
   readonly sessionId: string;
   readonly action: "revert" | "reapply";

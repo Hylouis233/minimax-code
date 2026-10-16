@@ -1,4 +1,4 @@
-/* transcript — moved out of styles/shell.css (T20); rules kept in their original relative order. */
+/* transcript — moved out of styles/shell.css; rules kept in their original relative order. */
 @layer components {
 
 
@@ -1113,7 +1113,7 @@
     background: var(--bg_interaction_tertiary_hover);
   }
 
-  /* ===== Phase 5: message actions, goal banner, and questionnaire states ===== */
+  /* ===== Message actions, goal banner, and questionnaire states ===== */
   .webui-message-actions {
     display: flex;
     align-items: center;

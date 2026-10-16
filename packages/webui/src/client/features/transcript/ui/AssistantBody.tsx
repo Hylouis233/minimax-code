@@ -1,10 +1,5 @@
-// WebuiAssistantBody — the assistant message body, deferred from W3 tier 1
-// because it directly renders <WebuiDiffCard>.
-//
-// W3 tier 2 lift: this component was moved verbatim out of `app.tsx`. The
-// body is byte-identical to what used to live there; the lift is move-only.
-// `app.tsx` keeps a thin re-export block so existing consumers (the shell
-// and tests) keep their current import path during the W3 wave.
+// WebuiAssistantBody — the assistant message body. It renders <WebuiDiffCard>
+// at its end.
 
 import { useState, type ReactElement } from "react";
 import { WebuiMarkdown } from "./markdown.js";

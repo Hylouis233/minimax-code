@@ -1,8 +1,8 @@
 // WebSocket lifecycle for the loopback service: the upgrade admission path,
 // the open-socket set, the liveness heartbeat and connection close. Split from
-// `service.ts` (plan section 7.1) with no behaviour change — the upgrade
-// decision, the heartbeat interval and the forced-termination order are the
-// ones the service wrote before.
+// `service.ts` with no behaviour change — the upgrade decision, the heartbeat
+// interval and the forced-termination order are the ones the service wrote
+// before.
 
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";

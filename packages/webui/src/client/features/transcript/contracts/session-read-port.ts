@@ -1,10 +1,9 @@
-// Transcript capability port (plan §9; ticket #59).
+// Transcript capability port.
 //
 // The conversation's own reads and rewrites: loading a history page, the turn
 // diff read/revert/reapply, the rewind preview, rewinding and editing a message.
-// §9 assigns `message-view` (the message half) to `transcript`, and these
-// operations travel with it because §5.6 files the review surface — and the read
-// that presents it — inside the business that presents it.
+// They travel with `message-view` (the message half) because the review surface
+// — and the read that presents it — belongs to the business that presents it.
 //
 // Every method stays optional — `undefined` means "the operation is not wired".
 

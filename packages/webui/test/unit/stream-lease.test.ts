@@ -1,5 +1,5 @@
-// The stream lease's generation counter (plan §7.2
-// `client/conversation/stream-lease.ts`).
+// The stream lease's generation counter in
+// `client/conversation/stream-lease.ts`.
 //
 // These pin the property the module's own header states: there is exactly one
 // counter. Two claim paths stamp the same `lastClaimedGeneration` field — the

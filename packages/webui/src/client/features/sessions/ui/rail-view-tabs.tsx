@@ -1,11 +1,11 @@
-// RailViewTabs — extracted from `SessionRail.tsx` (T07's responsibility cut of the rail).
+// RailViewTabs — extracted from `SessionRail.tsx`.
 // The declaration body is verbatim; the `export` keyword, this header and the
 // import specifiers are the only differences.
 
 import { type WebuiRailView, type WebuiRailViewTab } from "../projection/rail-buckets.js";
 
 /**
- * The rail's view strip (plan §16.10's three in-file regions: the rail-view strip).
+ * The rail's view strip.
  *
  * Markup and one callback: the active view stays `WebuiProjectList`'s, because the
  * shell may pass it in and an in-file cut must not change a lifetime. Both of that

@@ -1,6 +1,4 @@
-// The goal submission (plan §5.3: "Goal submission moves to
-// `features/goal/application/goal-submission.ts`, using this target resolution
-// capability and the target session's Goal owner").
+// The goal submission.
 //
 // It owns the create-or-patch decision, and that decision is Goal's: whether a
 // session's goal is created or patched follows from the goal the *target* session
@@ -9,10 +7,10 @@
 // apply-after-create — while assembling the composer's controller.
 //
 // What the module cannot hold itself arrives as capabilities: the target
-// session's goal owner, the task/session creation use case (P01 step 4, which is
-// where a home submission's session comes from), and the commit that lands a
-// created goal on its owner. It reads no store, knows no home key, and performs
-// no IO of its own.
+// session's goal owner, the task/session creation use case (which is where a
+// home submission's session comes from), and the commit that lands a created
+// goal on its owner. It reads no store, knows no home key, and performs no IO
+// of its own.
 
 import type {
   WebuiGoal,
@@ -37,10 +35,9 @@ export interface WebuiGoalSubmitArgs {
   /** The goal capability the target session currently offers. */
   readonly capabilityFor: (sessionId: string) => WebuiGoalOwnerCapability;
   /**
-   * The task use case the goal path creates through (P01 step 4). Same contract
-   * as the send path's: it reserves the admission (D01), transfers the home
-   * record under its guards and answers whether the created session may be
-   * selected.
+   * The task use case the goal path creates through. Same contract as the send
+   * path's: it reserves the admission, transfers the home record under its guards
+   * and answers whether the created session may be selected.
    */
   readonly submitTask?: WebuiTaskSessionSubmitter;
   readonly createSessionWorkspaceDir?: string;
@@ -73,8 +70,8 @@ export async function submitWebuiGoal(
       ...(workspaceDir === undefined ? {} : { workspaceDir }),
       ...(args.teamModeOff === undefined ? {} : { teamModeOff: args.teamModeOff }),
     });
-    // Rule 3: a goal submission refuses rather than creating a second session, and
-    // a creation already in flight is the one refusal that is not a failure (D01).
+    // A goal submission refuses rather than creating a second session, and a
+    // creation already in flight is the one refusal that is not a failure.
     if (outcome.kind !== "created") {
       if (outcome.kind === "creation-failed") throw new Error(outcome.error);
       throw new Error(

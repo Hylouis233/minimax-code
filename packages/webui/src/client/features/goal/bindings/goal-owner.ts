@@ -1,11 +1,11 @@
-// The goal owner for one session, read from the application (T05).
+// The goal owner for one session, read from the application.
 //
 // The owner used to be constructed by the composer on every render, which is why
-// a goal event that arrived with nothing mounted had no owner to commit through
-// (the T01 ledger's C2) and why the fence was one cell for every session. It is
-// the application's now, keyed by session, and these bindings are how a surface
-// reads the one it belongs to and subscribes to its re-reads — the same
-// arrangement as the version cells and the session store.
+// a goal event that arrived with nothing mounted had no owner to commit through,
+// and why the fence was one cell for every session. It is the application's now,
+// keyed by session, and these bindings are how a surface reads the one it belongs
+// to and subscribes to its re-reads — the same arrangement as the version cells
+// and the session store.
 //
 // The fallback exists for a composer mounted without an application (unit tests, a
 // standalone surface): a per-mount owner registry, so the surface keeps working
@@ -44,7 +44,7 @@ export function useWebuiGoalOwner(
 /**
  * The view's half of a steering re-read: after one lands, the listener is told
  * the goal it returned. A subscription rather than a replaceable effect, so a
- * reaction cannot displace the authoritative route (plan §4.4).
+ * reaction cannot displace the authoritative route.
  */
 export function useWebuiGoalReaction(
   sessionId: string | undefined,

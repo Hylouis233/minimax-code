@@ -1,4 +1,4 @@
-// The version cell the two fences share (plan §8 Phase 3, B1; ticket #66).
+// The version cell the two fences share.
 //
 // Both fences are the same mechanism — a monotonically increasing counter that a
 // read captures before asking and compares after answering — and both need it
@@ -22,8 +22,8 @@ export interface WebuiVersionCell {
  *
  * They are made here rather than in the component that currently hands them to
  * the two coordinators: the cell must outlive a render (a counter inside a
- * per-render coordinator resets and silently disables the guard), and §4.2 field
- * 6 puts the goal's fence in `goal` and interactions' late-read protection in
+ * per-render coordinator resets and silently disables the guard), and the goal's
+ * fence belongs to `goal` while interactions' late-read protection belongs to
  * `interactions` — so neither is the composer's state to declare.
  *
  * Still two independent objects. The pair is a construction convenience, not a

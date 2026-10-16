@@ -1,5 +1,5 @@
 /**
- * The model picker's cascade rules (roadmap H, 模型选择器级联).
+ * The model picker's cascade rules.
  *
  * The picker's settings live in a fly-out anchored to a row, not in a
  * permanent right column. That shape forces a set of decisions that are easy to

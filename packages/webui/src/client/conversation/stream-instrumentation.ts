@@ -9,10 +9,10 @@
 //
 // It takes the reducer as an argument instead of importing it. This
 // module is classified `mechanisms`, and a mechanism may import only
-// `contracts` and `shared` (plan §7.2), so importing
-// `features/turn/projection/stream-state.ts` from here would be a boundary
-// violation. The type parameters keep the module free of stream types
-// altogether: the caller's reducer fixes `S` and `F`.
+// `contracts` and `shared`, so importing
+// `features/turn/projection/stream-state.ts` from here would be a
+// boundary violation. The type parameters keep the module free of
+// stream types altogether: the caller's reducer fixes `S` and `F`.
 //
 // Production code MUST NOT import from this module. There is no
 // runtime guard enforcing that; the rule is by convention. The

@@ -382,14 +382,13 @@ export interface WebuiHarnessPort {
   /**
    * Release anything the port owns. The service calls this after closing
    * every transport-side resource so the harness can tear itself down in
-   * the order step 13 of the assembly checklist requires.
+   * the required order.
    */
   close(): Promise<void>;
 }
 
 /**
- * The narrow terminal-process port (T14's produced target; T15 moved it here
- * with the implementation behind it).
+ * The narrow terminal-process port.
  *
  * The six terminal operations consume this port, not a concrete manager: the
  * registry must not depend on the class that happens to implement it. It lives

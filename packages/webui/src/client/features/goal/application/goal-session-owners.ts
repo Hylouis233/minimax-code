@@ -1,6 +1,4 @@
-// The goal owner, keyed by session (plan §4.2 "Goal and interaction owners retain
-// independent policies and fences"; §4.4 "A goal owner may lazily create its fence
-// when a cheap record is first touched"; T05's `goal-session-owner`).
+// The goal owner, keyed by session.
 //
 // The goal duty had two problems that this module fixes together:
 //
@@ -8,9 +6,9 @@
 //     session could be fenced by a write to another. The fence belongs to the
 //     session whose goal it orders, so it is created with that session's owner;
 //   * the owner was constructed by the composer, which meant a goal event that
-//     arrived with no view mounted had no owner to commit through — the executed
-//     probe in the T01 ledger (C2) shows exactly that: an empty registry drops a
-//     `thread_goal.updated` for a session nobody has registered.
+//     arrived with no view mounted had no owner to commit through: an empty
+//     registry drops a `thread_goal.updated` for a session nobody has
+//     registered.
 //
 // So the owner lives here, in the application, and an event route can commit
 // through it whether or not anything is on screen. Owners are created on first
@@ -42,8 +40,7 @@ export interface WebuiGoalSessionOwners {
    * A view reaction on the steering re-read: after a re-read lands, the listener
    * is told the goal it returned. This is the *view's* half — the composer's goal
    * mode is not this owner's state — and it is a subscription rather than a
-   * replaceable effect set, so a reaction cannot displace the authoritative route
-   * (plan §4.4).
+   * replaceable effect set, so a reaction cannot displace the authoritative route.
    */
   readonly subscribe: (
     sessionId: string,

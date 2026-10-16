@@ -28,11 +28,10 @@ export interface WebuiComposerSubmitArgs {
   readonly deps: WebuiStreamLoopTransports;
   readonly enqueueMessage?: WebuiClientMessageEnqueuer;
   /**
-   * The task use case the submission creates through (P01 step 4). It replaced a raw
-   * `createSession`: creation is single-flight per home incarnation, it transfers the home record
-   * under the destination-wins and purge guards, and it is what reports whether the created session
-   * may be selected. Absent means the host cannot create, which the submission reports as
-   * `unsupported`.
+   * The task use case the submission creates through. It replaced a raw `createSession`: creation
+   * is single-flight per home incarnation, it transfers the home record under the destination-wins
+   * and purge guards, and it is what reports whether the created session may be selected. Absent
+   * means the host cannot create, which the submission reports as `unsupported`.
    */
   readonly submitTask?: WebuiTaskSessionSubmitter;
   readonly createSessionWorkspaceDir?: string;
@@ -51,7 +50,7 @@ export interface WebuiComposerSubmitHandlers {
   /**
    * The session a first message created, with the use case's selection decision: `selected` is false
    * when the navigation claim that started the creation is no longer current, so the caller must not
-   * select a session the user has already navigated away from (rule 7).
+   * select a session the user has already navigated away from.
    */
   readonly onSessionCreated?: (sessionId: string, selected: boolean) => void;
   /** Record (or clear) the refusal the transcript banner renders. */

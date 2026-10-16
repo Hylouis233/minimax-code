@@ -17,8 +17,8 @@ export interface WebuiComposerControllerDeps {
   readonly readSelectedSessionId: () => string | undefined;
   /**
    * Select the session a *send* created. The send's transfer and composer adoption are the task use
-   * case's (P01 step 4), so all that is left for the caller is the selection — and only when the use
-   * case says the navigation claim that started the creation is still current.
+   * case's, so all that is left for the caller is the selection — and only when the use case says
+   * the navigation claim that started the creation is still current.
    */
   readonly selectCreatedSession: (sessionId: string) => void;
   readonly turnCommandsFor: (sessionId: string | undefined) => WebuiConversationTurnCommands;
@@ -27,9 +27,9 @@ export interface WebuiComposerControllerDeps {
   readonly canSend: boolean;
   readonly readGoal: (sessionId: string) => WebuiGoal | undefined;
   /**
-   * The goal submission command, which Goal owns (plan §5.3): whether the
-   * objective is created or patched — and on which owner — is decided there, and
-   * the objective is created as the home slot's session when there is no session.
+   * The goal submission command, which Goal owns: whether the objective is
+   * created or patched — and on which owner — is decided there. The objective is
+   * created as the home slot's session when there is no session.
    */
   readonly submitGoal: (input: {
     readonly sessionId?: string;
@@ -103,9 +103,9 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
 
       onSessionCreated: (createdSessionId, selected) => {
         settlement.sessionId = createdSessionId;
-        // The transfer and the composer's slot move are the task use case's now (P01 step 4), and
-        // they happened before this handler ran; what is left is the selection, and only while the
-        // navigation claim that started the creation is still current (rule 7).
+        // The transfer and the composer's slot move are the task use case's, and they happened
+        // before this handler ran; what is left is the selection, and only while the navigation
+        // claim that started the creation is still current.
         if (selected) deps.selectCreatedSession(createdSessionId);
         onSessionCreated?.(createdSessionId, selected);
         settlement.queueGeneration = queueCommands.captureDestination(createdSessionId);
@@ -176,7 +176,7 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
           }, (createdId, selected) => {
             createdSessionId = createdId;
             // The transfer and the composer's slot move are the use case's; the caller is left with
-            // the selection, gated on the use case's own answer (rule 7).
+            // the selection, gated on the use case's own answer.
             if (selected) deps.selectCreatedSession(createdId);
             input.onSessionCreated?.(createdId, selected);
           });
@@ -228,9 +228,9 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
       const clearStaging = (): void => deps.store.setStaging({ attachments: [], urlReferences: [] });
       if (sessionId) settlement.queueGeneration = queueCommands.captureDestination(sessionId);
       // The submission reports what it decided; the settle flags it used to write back through
-      // callbacks are read off that transition instead (plan §5.5 P02 step 4). What could not move is
-      // the mid-flight half — clearing the draft and adopting the created session — because the
-      // writer's home→session migration depends on that ordering, so those stay callbacks.
+      // callbacks are read off that transition instead. What could not move is the mid-flight half —
+      // clearing the draft and adopting the created session — because the writer's home→session
+      // migration depends on that ordering, so those stay callbacks.
       const operation = await queueView(sessionId, {
         message,
         ...(resolved.clientIntent ? { clientIntent: resolved.clientIntent } : {}),

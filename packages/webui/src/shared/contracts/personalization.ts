@@ -8,12 +8,12 @@
 // declarations itself.
 //
 // Split out of `client/features/settings/contracts/settings-port.ts` during the Node runtime
-// extraction (plan section 7.1: profile-files' client-contract import is
-// rewired to shared personalization DTOs). `settings-port.ts` re-exports these
-// names for the harness host and the capability port, whose references move
-// with their own split.
+// extraction: `profile-files`' client-contract import is rewired to the shared
+// personalization DTOs. `settings-port.ts` re-exports these names for the
+// harness host and the capability port, whose references move with their own
+// split.
 
-// Wire contract record (plan section 7.1 / 7.5): every exported
+// Wire contract record: every exported
 // declaration below records its wire purpose, its producer and its
 // consumers, verified against the tree. Documentation only.
 //

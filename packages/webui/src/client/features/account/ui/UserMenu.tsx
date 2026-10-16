@@ -1,15 +1,14 @@
-// The rail's account menu and the shell around its two panels (ticket #74; §15.1's
-// `components/account/UserMenu.tsx` row).
+// The rail's account menu and the shell around its two panels.
 //
 // This file is what is left after the check-in panel and the quota popover moved out: the menu button,
 // the popover's four items, the account/usage/check-in snapshot reads, and the two effects that load
 // the account when the menu opens and dismiss the surface on an outside pointer or Escape.
 //
-// **The open/closed flags, the dismissal and the mutual exclusion stay here**, which is what §5.7
-// LC-7 and LC-8 require: `loadUsage` opens usage and closes check-in (and `loadSignin` the reverse),
-// dismissal closes both together, and neither panel can be dismissed from inside itself. §5.7 LC-9
-// also holds: the panels load on hover, focus or click — never on mount — and this file keeps those
-// handlers. Each panel owns only its own presentation.
+// **The open/closed flags, the dismissal and the mutual exclusion stay here**: `loadUsage` opens
+// usage and closes check-in (and `loadSignin` the reverse), dismissal closes both together,
+// and neither panel can be dismissed from inside itself. The panels load on hover, focus or
+// click — never on mount — and this file keeps those handlers. Each panel owns only its own
+// presentation.
 
 import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
@@ -93,8 +92,8 @@ export function UserMenu({
 }: UserMenuProps): ReactElement {
   const { dom } = useWebuiBrowserCapabilities();
   // The account, usage, check-in and login answers all come from the one
-  // application owner (ticket #52). This component submits commands and reads
-  // the snapshot; it holds no transport method for them.
+  // application owner. This component submits commands and reads the snapshot;
+  // it holds no transport method for them.
   const accountWorkflows = useWebuiAccountWorkflows();
   const accountSnapshot = useWebuiAccountWorkflowsState();
   const anchorRef = useRef<HTMLDivElement>(null);

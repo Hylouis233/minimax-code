@@ -1,6 +1,6 @@
 /**
  * Whether a seed attachment enters the composer's staging, and what happens
- * instead when it cannot (T13 criterion 6, "seed deduplication").
+ * instead when it cannot.
  *
  * The composer receives a seed from whatever opened it — a transcript file
  * hand-off, typically a text file large enough that the caller did not want it

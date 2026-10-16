@@ -1,10 +1,8 @@
-// The workspace-review family's published state, port and reads (plan §5.2 review
-// row: "workspace summary/diff/search queries with distinct snapshot identities";
-// T10's `workspace-review-owner`).
+// The workspace-review family's published state, port and reads.
 //
 // Distinct from the turn family on purpose: a turn changeset and a working-tree
-// snapshot are different identities, and the plan forbids substituting one schema
-// for the other. The two families share invalidation coordination, not a model.
+// snapshot are different identities, and one schema must not be substituted for
+// the other. The two families share invalidation coordination, not a model.
 
 import type {
   WebuiWorkspaceReviewDiffs,
@@ -103,7 +101,7 @@ export interface WebuiWorkspaceReviewPort {
 /**
  * The diff-batch size and its chunking helper. They are declarations the surfaces
  * and the owner both use, so they live with the contract rather than inside the
- * owner's implementation (T11: a peer surface reads the contract, not the owner).
+ * owner's implementation: a peer surface reads the contract, not the owner.
  */
 export const WEBUI_WORKSPACE_REVIEW_DIFF_BATCH_SIZE = 5;
 

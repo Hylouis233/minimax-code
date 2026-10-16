@@ -1,4 +1,4 @@
-/* workspace — moved out of styles/shell.css (T20); rules kept in their original relative order. */
+/* workspace — moved out of styles/shell.css; rules kept in their original relative order. */
 @layer components {
 
   /* No `min-width` here: the shared `.webui-workspace-menu` rule already sets
@@ -6,8 +6,8 @@
    * split. This rule's 240px never won the cascade in the pre-split sheet — the
    * engine reports the pre-split panel at min-width: 220px and width: 220px —
    * but after the split it started winning, which widened the panel by
-   * 20px. T20's criterion is the computed result, so the dead declaration is
-   * removed rather than left to change behaviour. */
+   * 20px. The dead declaration is removed rather than left to change
+   * behaviour. */
   .webui-workspace-menu--desktop {
     display: flex;
     max-width: 320px;

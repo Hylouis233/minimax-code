@@ -1,4 +1,4 @@
-// The task/session creation use case (plan §5.3, P01).
+// The task/session creation use case.
 //
 // This module is a **named cross-business use case**, not another generic
 // service layer. It owns three things that used to be spread across the

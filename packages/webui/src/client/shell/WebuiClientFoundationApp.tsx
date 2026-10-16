@@ -1,13 +1,7 @@
 // WebuiClientFoundationApp — the WebUI shell: rail, main column, session
 // transcript, composer, workspace panels. This is the React entrypoint
-// `main.tsx` mounts.
-//
-// W3 tier 5 lift: this component (plus `useSelectedSessionId`,
-// `subscribeToSessionHash`, `WebuiClientFoundationAppProps`) was moved verbatim
-// into this file from the module that used to hold the shell — `app.tsx`, which
-// this file replaced. The body is byte-identical to what used to live there;
-// the lift was move-only, and `main.tsx` and
-// `webui-transcript-widgets-integration.test.ts` import from here.
+// `main.tsx` mounts, and `webui-transcript-widgets-integration.test.ts` imports
+// it from here.
 
 import {
   useCallback,
@@ -103,7 +97,7 @@ import { ConnectionStatus } from "./ConnectionStatus.js";
 import { deriveConversationUsageNotice } from "../features/transcript/projection/message-projection.js";
 import { normalizeFavoriteModelIds } from "../features/models/projection/model-favorites.js";
 
-// The hash plumbing moved to `client/bindings/navigation.ts` (plan §7.2). Both
+// The hash plumbing moved to `client/bindings/navigation.ts`. Both
 // symbols stay re-exported here: `main.tsx` re-exports `subscribeToSessionHash`
 // from this module, and the SSR snapshot reads `readSessionIdFromHash` through it.
 import {
@@ -112,8 +106,8 @@ import {
 } from "../bindings/navigation.js";
 export { readSessionIdFromHash, subscribeToSessionHash };
 
-// A-005: the shell's own responsibilities now have their own modules; the frame
-// keeps layout, owner acquisition and public business composition.
+// The shell's own responsibilities now have their own modules; the frame keeps
+// layout, owner acquisition and public business composition.
 import { useSelectedSessionId } from "./use-selected-session.js";
 import { useWorkspacePanelSession } from "./use-workspace-panel-session.js";
 import { useNewTaskWorkspace } from "./use-new-task-workspace.js";
@@ -121,10 +115,8 @@ import { useShellActivityWiring } from "./use-shell-activity-wiring.js";
 import { useSessionRailActions } from "./use-session-rail-actions.js";
 
 export interface WebuiClientFoundationAppProps {
-  // Non-method props (seed / UI / SSR). The 78 method props that used to
-  // live here are now bundled into `transport` (see contracts.ts →
-  // `WebuiTransport`). Optional semantics preserved: `transport.X` is
-  // `undefined` exactly when the underlying operation is not wired.
+  // Non-method props only (seed / UI / SSR). The capability methods the shell
+  // uses come from the application it is handed, not from props.
   readonly label: string;
   /** The Agent Team badge's tooltip, resolved by the composition root. */
   readonly teamModeLabel?: string;
@@ -155,7 +147,7 @@ export interface WebuiClientFoundationAppProps {
  * The assembled application this shell renders, taken from the value the
  * composition root provides rather than named by an import of the assembly's
  * module: the shell's contract is the instance it is handed, and the binding
- * that hands it is what types it (T19).
+ * that hands it is what types it.
  */
 type ShellApplication = NonNullable<
   ReturnType<typeof useWebuiApplicationOptional>
@@ -164,10 +156,10 @@ type ShellApplication = NonNullable<
 /**
  * The assembled application this shell renders, or a named failure.
  *
- * The shell composes what the assembly built; it does not build one (plan §4.1,
- * §5.1). A host that renders it without an application has a wiring defect, and
- * the failure says which wiring: an absent owner is an assembly error, never a
- * silent second composition that behaves differently from production.
+ * The shell composes what the assembly built; it does not build one. A host
+ * that renders it without an application has a wiring defect, and the failure
+ * says which wiring: an absent owner is an assembly error, never a silent second
+ * composition that behaves differently from production.
  */
 function requireApplication(
   application: ShellApplication | undefined,
@@ -186,7 +178,7 @@ export function WebuiClientFoundationApp(
   props: WebuiClientFoundationAppProps,
 ): ReactElement {
   const { storage: browserStorage } = useWebuiBrowserCapabilities();
-  // One application, assembled and owned by the composition root (plan §4.1).
+  // One application, assembled and owned by the composition root.
   // The shell adopts that instance — its store, its composer owner and its
   // lifetime — and builds nothing of its own; a missing one is an assembly
   // error rather than a second composition with different inputs.
@@ -201,47 +193,37 @@ export function WebuiClientFoundationApp(
     dataDir,
     hostLabel,
   } = props;
-  // The per-business port slices (plan §8 Phase 2, A4-s3). A business reads its
-  // own slice instead of reaching into the composed transport, so what it *can*
-  // reach is decided here rather than by convention. When the composition root
-  // provides them the shell uses those instances; otherwise it cuts its own from
-  // the transport prop, so the prop-driven hosts (SSR, unit tests) get the same
-  // narrowed shape instead of a fallback to the whole transport.
-  // The assembly's slices (T19): cut once by the application, published on it and
+  // The assembly's slices: cut once by the application, published on it and
   // provided to the screens below. The shell holds no capability to cut its own
   // and no transport to fall back to.
   const portSlices = application.portSlices;
   const transcriptCommands = application.transcriptCommands;
   const workspacePort = portSlices.workspace;
-  // The browser Terminal owner (T15), built by the assembly for the same reason
-  // as the rest: this component renders the provider that `useWebuiPortSlice`
-  // reads (see the provider below), so it cannot read through it itself.
+  // The browser Terminal owner, built by the assembly for the same reason as the
+  // rest: this component renders the provider that `useWebuiPortSlice` reads (see
+  // the provider below), so it cannot read through it itself.
   const terminalOwner = application.terminalOwner;
   const turnPort = portSlices.turn;
   // The one application store, taken from the assembled application. There is no
-  // second map: the shell provides this exact object through
-  // `WebuiSessionStoreProvider` and reads its own slices off it (plan §7.6). A
-  // host that needs a seeded catalogue (SSR first paint, a fixture) seeds the
-  // store it passes to the assembly; the shell does not build one to seed.
+  // second map: the shell provides this exact object to the subtree through
+  // `WebuiApplicationProvider` and reads its own slices off it. A host that needs
+  // a seeded catalogue (SSR first paint, a fixture) seeds the store it passes to
+  // the assembly; the shell does not build one to seed.
   const sessionStore = application.store;
-  // The one per-session effects registry for this mount (plan §7.1
-  // `features/turn/application/event-coordinator.ts`; ticket #45). The shell holds it and
+  // The one per-session effects registry for this mount
+  // (`features/turn/application/event-coordinator.ts`). The shell holds it and
   // provides it; the composer registers its session's effect handlers here and
   // `asWebuiEventEffects()` is what the application coordinator consumes over
   // the single process-event channel.
-  // Each method comes from `transport`. Re-binding to the same local
-  // name as before keeps the rest of the function body identical.
-  // Local rebinds: each name below is consumed by a shell-side effect or
-  // handler below this declaration, so it is a real local capability, not
-  // a pure conduit. Everything else that used to be rebound here is now
-  // read directly off `transport` at the JSX consumption point — see the
-  // 67-rebind classification table in the revision report.
+  // A local rebind of the transcript slice's `loadMessages`, read below where the
+  // transcript is rendered; the other capabilities are taken off the port slices
+  // at the point the JSX consumes them.
   const loadMessages = portSlices.transcript.loadMessages;
 
-  // The one session catalog (plan §7.6 "Flat/tree queries"; ticket #49). The
-  // shell subscribes to the store's catalog slice and resolves the flat and
-  // tree pages from it; both views share one entity map, so a rename patches
-  // one structure and neither view can drift from the other.
+  // The one session catalog. The shell subscribes to the store's catalog slice
+  // and resolves the flat and tree pages from it; both views share one entity
+  // map, so a rename patches one structure and neither view can drift from the
+  // other.
   const catalog = useSyncExternalStore(
     sessionStore.subscribe,
     () => sessionStore.getSnapshot().catalog,
@@ -254,7 +236,7 @@ export function WebuiClientFoundationApp(
   );
   const loading = catalog.flat.loading;
   // Composer store declared before sessionWorkflows so the delete-success purge
-  // (R7) can hand the workflows the same instance.
+  // can hand the workflows the same instance.
   const composerStore = application.composer;
   // The session workflows: the loads and mutations the shell used to call
   // through `transport` and then patch onto two structures by hand. The shell
@@ -262,28 +244,23 @@ export function WebuiClientFoundationApp(
   const sessionWorkflows = application.sessionWorkflows;
   const projectState = useSessionRailState(sessionWorkflows);
   const projectRecords = projectState.projects;
-  // The slash-command runner the composer submits through (ticket #49
-  // criterion 8): the component holds no transport call, it calls the workflow.
-  // The one workspace query owner (ticket #51): it caches the workspace file
-  // tree, file contents, the working-tree review and the git environment, and
-  // discards a late response from a superseded request. Provided to the two
-  // workspace panels, which submit query commands and read its snapshot.
+  // The one workspace query owner: it caches the workspace file tree, file
+  // contents, the working-tree review and the git environment, and discards a
+  // late response from a superseded request. Provided to the two workspace
+  // panels, which submit query commands and read its snapshot.
   const workspaceQueries = application.workspaceQueries;
-  // The account, settings and plugin owners (ticket #52). One of each per
-  // mount, provided to the user menu, the settings dialog and the plugin
-  // manager; those components submit commands and read the snapshot instead of
-  // holding their own copies of the answers.
+  // The account, settings and plugin owners. One of each per mount, provided to
+  // the user menu, the settings dialog and the plugin manager; those components
+  // submit commands and read the snapshot instead of holding their own copies of
+  // the answers.
   const accountWorkflows = application.accountWorkflows;
   // The account owner's timers (the login poll and the OAuth status poll) end
-  // with the application rather than with this component's mount (T09, T19).
+  // with the application rather than with this component's mount.
   const settingsWorkflows = application.settingsWorkflows;
-  // `models` owns the catalogue, the selection and the provider list (plan §5.6),
-  // so it is its own owner with its own snapshot. The one call that crosses the
-  // boundary is `upsertApiKey`'s: it refreshes `settings`' api-key *status* read
-  // through that owner's published command rather than copying the read.
-  // `models` owns the catalogue, the selection and the provider list (plan §5.6);
-  // the one cross-business call it makes — refreshing the api-key status read —
-  // is wired inside the assembly, through that owner's published command.
+  // `models` owns the catalogue, the selection and the provider list, so it is
+  // its own owner with its own snapshot. The one cross-business call it makes —
+  // refreshing `settings`' api-key *status* read — is wired inside the assembly,
+  // through that owner's published command, rather than copying the read.
   const modelsWorkflows = application.modelsWorkflows;
   // The runtime handshake fact is a `SettingsPort` method, so it is read through
   // the settings owner like every other settings read rather than invoked here.
@@ -303,7 +280,7 @@ export function WebuiClientFoundationApp(
   // The composer's view of what is installed and what the agent can run. It is a
   // separate read model from `pluginWorkflows` on purpose: the `@` menu and the
   // plugin manager are two readers with two identities, so neither overwrites the
-  // other when one of them reloads (T08).
+  // other when one of them reloads.
   // The usage quota is an `AccountPort` method, so it is read through the
   // account owner that already caches it for the user menu and the settings
   // dialog. The shell used to hold its own copy, fetched independently, with
@@ -335,7 +312,7 @@ export function WebuiClientFoundationApp(
   );
   const [selectedSessionId, setSelectedSessionId] =
     useSelectedSessionId(locationHash);
-  // The plan-review reply workflow lives with the assembly (T19): it reads the
+  // The plan-review reply workflow lives with the assembly: it reads the
   // selection and the session's agent name when the reply is submitted, so a card
   // left open across a selection change replies to the session it belongs to
   // instead of to whichever session the shell had selected when it mounted.
@@ -350,9 +327,8 @@ export function WebuiClientFoundationApp(
   useEffect(() => {
     dispatchShellSurface({ type: "show-conversation" });
   }, [dispatchShellSurface, selectedSessionId]);
-  // Composer input history + per-session drafts (roadmap Module B:
-  // 输入历史/草稿). The one owner is the application composer store, created
-  // once here and handed to the application; the shell subscribes and submits
+  // Composer input history + per-session drafts. The one owner is the application
+  // composer store: the shell subscribes to it and submits through it.
   const composerState = useSyncExternalStore(
     composerStore.subscribe,
     composerStore.getSnapshot,
@@ -377,9 +353,9 @@ export function WebuiClientFoundationApp(
     },
     [composerStore],
   );
-  // The Agent Team choice belongs to Sessions (T19): the state, the storage read
-  // and the write-back live in that feature's binding, and the shell renders
-  // what it returns.
+  // The Agent Team choice belongs to Sessions: the state, the storage read and the
+  // write-back live in that feature's binding, and the shell renders what it
+  // returns.
   const { teamModeOff, teamModeOffFor, recordSessionTeamMode } =
     useSessionTeamMode(browserStorage);
   const pageError = catalog.flat.error;
@@ -391,7 +367,7 @@ export function WebuiClientFoundationApp(
   // row actions live in `./use-session-rail-actions.js`; it is called below,
   // once the session it acts on is resolved.
   // The selected slot's live stream, read through the application's published
-  // reads rather than by importing the assembly's selectors (plan §5.1; T19).
+  // reads rather than by importing the assembly's selectors.
   // Which slot "nothing selected" names — the home slot the first turn streams
   // into — is the assembly's own mapping, so the shell asks for the selection
   // and holds no sentinel. The subscription is the application's, which is the
@@ -464,10 +440,9 @@ export function WebuiClientFoundationApp(
       parentSessionId: selectedSessionId,
     }));
   }, [selectedSessionId, treePage.sessions]);
-  // One pure derivation over the three labelled progress inputs (plan §7.6
-  // "Progress"; ticket #49 correction 3). The shell no longer merges by hand —
-  // the precedence, including the snapshot-gated todo choice, lives in the
-  // domain selector.
+  // One pure derivation over the three labelled progress inputs. The shell no
+  // longer merges by hand — the precedence, including the snapshot-gated todo
+  // choice, lives in the domain selector.
   const progress = useMemo(
     () =>
       selectWebuiWorkspaceProgress({
@@ -518,9 +493,9 @@ export function WebuiClientFoundationApp(
     handleSessionCreatedViewEffect,
     startNewTask,
   } = useNewTaskWorkspace({
-    // The workspace policy is the application's use case now (plan §5.5 P01
-    // step 3): the shell still owns the picker, the recent list and the
-    // navigation effects, and it asks for the decision instead of holding it.
+    // The workspace policy is the application's use case now: the shell still
+    // owns the picker, the recent list and the navigation effects, and it asks
+    // for the decision instead of holding it.
     taskSessions: application.taskSessions,
     selectedSession,
     flatSessionsWithChildren,
@@ -529,11 +504,11 @@ export function WebuiClientFoundationApp(
     setSelectedSessionId,
     recordSessionTeamMode,
   });
-  // The navigation claim the creation use case measures its completions against
-  // (plan §5.3 rules 2 and 7): every selection the shell makes — a rail click, the
-  // boot route, 「新建任务」 — is a navigation, and a duplicate notification of the
-  // same destination is not. Without this the claim would never advance and a late
-  // creation could not tell that the user had already moved.
+  // The navigation claim the creation use case measures its completions against:
+  // every selection the shell makes — a rail click, the boot route, 「新建任务」 —
+  // is a navigation, and a duplicate notification of the same destination is not.
+  // Without this the claim would never advance and a late creation could not tell
+  // that the user had already moved.
   useEffect(() => {
     application.taskSessions.noteNavigation(selectedSessionId);
   }, [application.taskSessions, selectedSessionId]);
@@ -632,8 +607,8 @@ export function WebuiClientFoundationApp(
   const openPluginManagement = useCallback((area: WebuiPluginManagementArea) => {
     dispatchShellSurface({ type: "open-plugin-management", area });
   }, [dispatchShellSurface]);
-  // The panel/tab state belongs to the workspace business (T11): the shell reads
-  // the slice for the session it shows and dispatches; it owns neither.
+  // The panel/tab state belongs to the workspace business: the shell reads the
+  // slice for the session it shows and dispatches; it owns neither.
   const workspacePanelOwner = workspaceQueries.panel;
   // ---- Rail activity: which sessions are running, and when each last moved.
   //
@@ -648,9 +623,8 @@ export function WebuiClientFoundationApp(
   // subscription covers every row); and `getActiveTurn` repairs what the stream
   // never delivered.
   // The activity slice lives on a single application store, not in component
-  // state (plan §7.6 "Unread"; ticket #45 prerequisite 3). The shell subscribes
-  // to the slice; the application unread controller owns the writes and the
-  // hydration ordering (ticket #49 criterion 4).
+  // state. The shell subscribes to the slice; the application unread controller
+  // owns the writes and the hydration ordering.
   // The activity slice, the reconnect nonce and every reaction that keeps them
   // current live in `./use-shell-activity-wiring.js`.
   // The wiring's capabilities are stable for the component's whole life: they
@@ -705,7 +679,7 @@ export function WebuiClientFoundationApp(
   // a `session.start`), and a workspace-git event invalidates the panel
   // git/review queries through the same coordinator.
   // The shell never disposes the application: its lifetime belongs to the
-  // composition root that built it (plan §4.1).
+  // composition root that built it.
 
   // The manual arm of the stream loop's recovery. Undefined on the home screen
   // (no session to resume) and on hosts without a `resumeSession` transport: no
@@ -750,12 +724,9 @@ export function WebuiClientFoundationApp(
 
   return (
     <>
-      {/* The slices are provided, not only read (plan §8 Phase 2). A consumer
-        * below reads its business's slice from this context; production mounts
-        * the composition root's instances (A4-s2) and this re-provides the same
-        * objects, while a host that renders the shell from props gets the slices
-        * the shell cut from that prop — the same narrowed shape either way, and
-        * the reason a child component never has to fall back to the transport. */}
+      {/* The slices are provided, not only read: a consumer below reads its
+        * business's slice from this context, which is the reason a child
+        * component never has to fall back to the transport. */}
       <WebuiPortSlicesProvider slices={portSlices}>
     <WebuiWorkspaceQueriesProvider queries={workspaceQueries}>
     <WebuiAccountWorkflowsProvider workflows={accountWorkflows}>
@@ -861,16 +832,16 @@ export function WebuiClientFoundationApp(
           >
             {pluginManagementArea ? <PluginCatalogue initialArea={pluginManagementArea} onChatWithAgent={async (name) => {
               // Plugin-chat creation is the same completion policy as the composer's
-              // and the goal path's (plan §5.3): it goes through the task use case, so
-              // the admission reservation (D01), the guarded transfer (D03) and the
-              // catalogue refresh happen once, here, with nothing mounted.
+              // and the goal path's: it goes through the task use case, so the
+              // admission reservation, the guarded transfer and the catalogue
+              // refresh happen once, here, with nothing mounted.
               const outcome = await application.taskSessions.submit({ name });
               if (outcome.kind === "unsupported")
                 throw new Error("当前 WebUI 未连接会话创建服务");
               if (outcome.kind === "busy") throw new Error("会话正在创建中，请稍后再试。");
               if (outcome.kind === "creation-failed") throw new Error(outcome.error);
-              // Rule 7: the rail's chat action opens what it created only while the
-              // claim that started the creation is still current.
+              // The rail's chat action opens what it created only while the claim
+              // that started the creation is still current.
               if (outcome.selected) application.select(outcome.sessionId);
               handleSessionCreatedViewEffect(outcome.sessionId, outcome.selected, teamModeOff);
             }} /> : <>

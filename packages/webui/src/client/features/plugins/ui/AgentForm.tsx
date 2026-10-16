@@ -1,4 +1,4 @@
-// The agent form unit (T08; produced target `plugin-catalogue-form-cuts`).
+// The agent form unit.
 //
 // Its four draft fields used to be four `useState` calls in `PluginCatalogue`,
 // seeded by `beginAgent` there and handed to the dialog as values and setters.

@@ -1,5 +1,5 @@
 // The stream-state transforms the loop needs, bundled so a caller can inject
-// them instead of the mechanism importing `projection/` directly (plan §7.2).
+// them instead of the mechanism importing `projection/` directly.
 // The generation counter and the scoped release live in
 // `client/conversation/stream-lease.ts`, so this bundle is an `application` module.
 // `client/conversation/stream-loop.ts` may import only `contracts` and

@@ -1,8 +1,7 @@
 // HTTP router for the loopback service: dispatch one admitted request to the
 // session-transfer, workspace-file or static client-asset route. Split from
-// `service.ts` (plan section 7.1) with no behaviour change — the admission
-// order, route order, status codes and bodies are the ones the service wrote
-// before.
+// `service.ts` with no behaviour change — the admission order, route order,
+// status codes and bodies are the ones the service wrote before.
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 

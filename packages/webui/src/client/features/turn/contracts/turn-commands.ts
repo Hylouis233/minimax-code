@@ -11,7 +11,7 @@ export interface WebuiComposerTurnCallbacks {
   /**
    * The session a first message created, with the use case's selection decision: the transfer and the
    * composer's slot move have already happened, and `selected` says whether the navigation claim that
-   * started the creation is still current (rule 7).
+   * started the creation is still current.
    */
   readonly onSessionCreated?: (sessionId: string, selected: boolean) => void;
   readonly onQueued?: () => void;
@@ -32,8 +32,7 @@ export interface WebuiTurnSendIntent {
 export interface WebuiConversationTurnCommands {
   /**
    * The submission's semantic transition, or `undefined` when the intent carried nothing to submit.
-   * A refusal is a value rather than a rejection (plan §5.5 P02 step 4), so the caller can report it
-   * and keep going.
+   * A refusal is a value rather than a rejection, so the caller can report it and keep going.
    */
   readonly send: (intent: WebuiTurnSendIntent) => Promise<WebuiSubmissionOperation | undefined>;
   readonly attach: (turnId: string | undefined) => void;
@@ -41,11 +40,11 @@ export interface WebuiConversationTurnCommands {
   readonly recover: () => void;
   readonly stop: () => Promise<void>;
   /**
-   * The stream-phase and turn-lifecycle views for this target (ticket #58), built
-   * from the owner's own record writer. A consumer handed one of them cannot reach
-   * the other's writes, and neither can reach the store directly — and because the
+   * The stream-phase and turn-lifecycle views for this target, built from the
+   * owner's own record writer. A consumer handed one of them cannot reach the
+   * other's writes, and neither can reach the store directly — and because the
    * owner builds them, a surface hands out no writer of its own and assembles no
-   * second command context (plan §5.1, P02 step 8).
+   * second command context.
    */
   readonly phase: WebuiStreamPhaseCommands;
   readonly lifecycle: WebuiTurnLifecycleCommands;

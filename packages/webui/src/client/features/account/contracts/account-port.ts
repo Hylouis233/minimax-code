@@ -29,7 +29,7 @@ export interface AccountPort {
   readonly signOut?: () => Promise<{ readonly success?: boolean }>;
   /** Credential-status reads. They answer *which* credential the runtime holds,
    *  so they belong to the Account lifetime, not to the settings surface that
-   *  happens to render them (T09). */
+   *  happens to render them. */
   readonly getMiniMaxApiKeyStatus?: () => Promise<Record<string, unknown>>;
   readonly getCodexOAuthStatus?: () => Promise<Record<string, unknown>>;
 }

@@ -1,4 +1,4 @@
-// Test the WebUI internal dependency-direction rules (ADR 0014, plan §3/§7.5).
+// Test the WebUI internal dependency-direction rules (ADR 0014).
 //
 // These fixtures exist because `check:webui-boundary` (the esbuild metafile
 // check) cannot catch what this check catches: it sees a build input only if it
@@ -180,7 +180,7 @@ describe("layer matrix", () => {
   });
 
   it("classifies the business-first homes by the layers their files carry", () => {
-    // The target homes (plan §5.1) carry the same layers as the technical homes
+    // The target homes carry the same layers as the technical homes
     // the files come from, so a direction rule is not re-spelled when a file
     // moves. Without these mappings a moved path would classify `unknown`, which
     // is reported rather than constrained: the gate would look green while
@@ -208,8 +208,8 @@ describe("layer matrix", () => {
   });
 
   it("classifies the two client-root files by path rule alone", () => {
-    // These are the only two files plan §6.1 keeps at the client root. Their
-    // `root` layer used to come from `CLIENT_FILE_PROVENANCE`, which C-fin
+    // These are the only two files at the client root. Their
+    // `root` layer used to come from `CLIENT_FILE_PROVENANCE`, which was
     // deleted, so it is now stated as a path rule — and these assertions exist
     // to fail if that rule is ever dropped.
     expect(classifyLayers("client/main.tsx")).toEqual(["root"]);
@@ -217,7 +217,7 @@ describe("layer matrix", () => {
   });
 
   it("classifies every relocated module from its own path", () => {
-    // Phase 4 moved each former client-root module under a layer directory. None
+    // Each former client-root module now sits under a layer directory. None
     // of these has a provenance entry any more; each is decided by its prefix,
     // or — under `client/projection/` — by its basename.
     expect(classifyLayers("client/platform/team-mode.ts")).toEqual(["infrastructure"]);
@@ -234,9 +234,9 @@ describe("layer matrix", () => {
 
   it("classifies the two re-filed projections as application by prefix", () => {
     // `composer-history` and `effect-reducer` were the only two modules the gate
-    // classified `application` while they sat in `client/projection/`
-    // (plan §7.2). They moved under `client/application/`, so the prefix rule now
-    // carries that verdict and `PROJECTION_SPLIT` is gone.
+    // classified `application` while they sat in `client/projection/`. They
+    // moved under `client/application/`, so the prefix rule now carries that
+    // verdict and `PROJECTION_SPLIT` is gone.
     expect(classifyLayers("client/application/composer/composer-history.ts")).toEqual(["application"]);
     expect(classifyLayers("client/features/turn/application/effect-reducer.ts")).toEqual(["application"]);
     expect(classifyLayers("client/application/transcript/transcript-request-ownership.ts")).toEqual(["application"]);
@@ -264,8 +264,8 @@ describe("layer matrix", () => {
     // lost their contract re-export shells, and `server/envelope.ts` /
     // `server/service.ts` were re-read and hold a single layer. The reasoning is
     // recorded on `KNOWN_AMBIGUOUS_FILES` in `scripts/lib/webui-dependency-rules.mjs`.
-    // The symbol-level ownership check §7.5 asks for is still not implemented —
-    // an empty list means nothing left to judge, not that judgement is automatic.
+    // The symbol-level ownership check is still not implemented — an empty list
+    // means nothing left to judge, not that judgement is automatic.
     expect(KNOWN_AMBIGUOUS_FILES).toEqual([]);
     // The four resolved entries must not come back: each is now judged by its
     // path, and listing it again would assert a mixture that no longer exists.
@@ -314,8 +314,8 @@ describe("layer matrix", () => {
 describe("provisional judgements for plan section 7.5 mixed files", () => {
   // A violation that touches a mixed-responsibility file may or may not be a
   // real defect: the file's layer is an assumption until it is split. The list
-  // has to surface those judgements (plan §7.5 promises the CLI reports every
-  // violation touching one) without turning them into a new gate.
+  // has to surface those judgements — the CLI reports every violation touching
+  // one — without turning them into a new gate.
   const violation = (from: string, to: string) => ({
     from,
     to,

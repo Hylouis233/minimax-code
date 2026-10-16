@@ -2,17 +2,16 @@ import type { WebuiTurnDiffView } from "../../../../shared/contracts/session.js"
 import { basenamePath } from "../../../projection/common/paths.js";
 
 // ---------------------------------------------------------------------------
-// The tab-kind registry (plan §4.4: "the single tab-kind registry"; §5.6's
-// `workspace` row; §10 S4). The kinds used to be enumerated in three places — the
+// The tab-kind registry. The kinds used to be enumerated in three places — the
 // union here, the label map and the add menu in `WorkspacePanels.tsx` — so adding
-// a kind meant finding all three, and the type system caught only two of them
-// (§5.1.3's recorded violation). They are declared once, below, and everything
-// else derives: the union from the shapes' keys, the tab's label from the table,
-// and the add menu from the table plus its order.
+// a kind meant finding all three, and the type system caught only two of them.
+// They are declared once, below, and everything else derives: the union from the
+// shapes' keys, the tab's label from the table, and the add menu from the table
+// plus its order.
 //
-// §10 S4 permits the registry to carry a host render branch, which is why the
-// *icons* and the dispatch calls stay in the component: this module has no React
-// and no dispatcher. What it owns is the closed set and the words.
+// The registry may carry a host render branch, which is why the *icons* and the
+// dispatch calls stay in the component: this module has no React and no
+// dispatcher. What it owns is the closed set and the words.
 // ---------------------------------------------------------------------------
 
 /**
@@ -71,8 +70,8 @@ export type WorkspacePanelTab = {
 }[WebuiWorkspaceTabKind];
 
 // Both unions describe the shape of a panel command, so they live with it in the
-// workspace's contract (see `contracts/workspace/panel-command.ts`); they are
-// re-exported here for the panel code that already read them from this module.
+// workspace's contract (see `features/workspace/contracts/panel-command.ts`); they
+// are re-exported here for the panel code that already read them from this module.
 export type { WebuiWorkspaceAddMenuOpen, WebuiWorkspaceMenuTabKind };
 
 
@@ -147,11 +146,11 @@ export interface WorkspacePanelSessionState {
 
 /**
  * The coordinator-produced signal that a workspace's git state changed. It is
- * what replaces the panels' own `watchEvents` subscription (ticket #45): the
- * application event coordinator receives `workspace.git.changed` on the single
- * channel and hands the payload here, and the panels react to the signal rather
- * than to a raw process event. `revision` bumps on every signal so an effect
- * keyed on it re-runs even when two events name the same workspace.
+ * what replaces the panels' own `watchEvents` subscription: the application
+ * event coordinator receives `workspace.git.changed` on the single channel and
+ * hands the payload here, and the panels react to the signal rather than to a
+ * raw process event. `revision` bumps on every signal so an effect keyed on it
+ * re-runs even when two events name the same workspace.
  */
 export interface WebuiWorkspaceGitChangedSignal {
   readonly revision: number;

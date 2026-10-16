@@ -1,11 +1,10 @@
-// W0 safety net — SSR markup fixtures for the components the refactor moves.
+// Safety net — SSR markup fixtures for components with no SSR assertions.
 //
-// Scope: the five exported components that no existing test renders at all.
-// W0 measured the coverage and found these five with zero SSR assertions
-// anywhere in the suite, while the other fourteen already have them (mostly in
-// `webui-shell.test.ts` and `webui-round3-acceptance.test.tsx`). Duplicating the
-// covered ones would add noise, not evidence, so this file fills exactly the
-// gap. Shell-level session switching is already asserted in
+// Scope: the exported components that no existing test renders at all. These had
+// zero SSR assertions anywhere in the suite, while the others already have them
+// (mostly in `webui-shell.test.ts` and `webui-round3-acceptance.test.tsx`).
+// Duplicating the covered ones would add noise, not evidence, so this file fills
+// exactly the gap. Shell-level session switching is already asserted in
 // `webui-shell.test.ts` and is deliberately not repeated here.
 //
 // The assertions are structural — `data-testid`, `aria-*`, `role`, and the

@@ -1,8 +1,8 @@
-// The identity-epoch wiring (T02's `opaque-identity-freshness-context`, second
-// half): which successful command advances which generation.
+// The identity-epoch wiring (the second half of the opaque identity/freshness
+// context): which successful command advances which generation.
 //
 // The context itself is asserted in `webui-application-lifecycle.test.ts`. What
-// these cases pin is the *policy* the ticket assigns to the owning businesses:
+// these cases pin is the *policy* the owning businesses implement:
 // a successful Account/Models/Settings write retires the answers computed under
 // the generation it changed, an authoritative status answer that reports a
 // different identity does the same, and a failure retires nothing — because a

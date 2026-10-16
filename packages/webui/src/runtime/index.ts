@@ -7,10 +7,9 @@
 // the host handle it returns; re-exporting them here would invite a second
 // composition root.
 //
-// The Node startup file imports this module and `server/index.ts` separately
-// (plan section 7.5): the runtime does not depend on the network service, and
-// the network service consumes runtime capabilities rather than re-declaring
-// them.
+// The Node startup file imports this module and `server/index.ts` separately:
+// the runtime does not depend on the network service, and the network service
+// consumes runtime capabilities rather than re-declaring them.
 
 export {
   createWebuiRuntimeHost,

@@ -332,7 +332,7 @@ describe("loopback to harness-port evidence", () => {
     const port = scriptedPort();
     const terminal = stubTerminalPort();
     // The registry is built by the host from both ports and handed to the
-    // service, which binds it (T14).
+    // service, which binds it.
     service = new WebuiService({
       port,
       operations: createOperationRegistry(port, terminal),

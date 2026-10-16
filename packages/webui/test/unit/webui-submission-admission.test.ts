@@ -1,9 +1,9 @@
-// The submission admission rule (plan §5.5 P02 step 9).
+// The submission admission rule.
 //
 // Every case here is a fact the Composer's `submitWebuiComposerTurn` already decided at `4fce25f2`,
-// plus D01's reservation, which is the one rule that is new. Pinning them before the execution owner
-// takes over is what makes the later switch checkable: if the baseline's ordering is wrong here, the
-// cutover would change behaviour while looking like a move.
+// plus the reservation, which is the one rule that is new. Pinning them is what makes the later switch
+// checkable: if the baseline's ordering is wrong here, the cutover would change behaviour while looking
+// like a move.
 
 import { describe, expect, it } from "vitest";
 

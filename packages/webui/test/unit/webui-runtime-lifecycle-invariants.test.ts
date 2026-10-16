@@ -1,7 +1,6 @@
-// The WebUI runtime's three single-owner invariants (plan section 7.1, the
-// `runtime/` exit condition): exactly one OAuth core, exactly one refresh-timer
-// owner and exactly one close owner, with a single host close that is not
-// double-wrapped and a re-close that is idempotent.
+// The WebUI runtime's three single-owner invariants: exactly one OAuth core,
+// exactly one refresh-timer owner and exactly one close owner, with a single
+// host close that is not double-wrapped and a re-close that is idempotent.
 //
 // These are asserted as *behaviour* through the real factory
 // (`createWebuiRuntimeHost`), not as a snapshot of the source. The OAuth-core

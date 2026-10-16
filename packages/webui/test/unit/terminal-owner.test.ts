@@ -1,7 +1,7 @@
 // The browser terminal owner's watch registry: what a view release does, what a
 // process disposal does, and what must never happen (a PTY killed because a view
-// went away). T15's criteria 2, 3 and 4 turn on exactly these distinctions, and
-// they are claims about calls — so the cases assert the port's call trace.
+// went away). These distinctions are claims about calls, so the cases assert the
+// port's call trace.
 //
 // The defect this pins: `disposeAll` is documented as ending every watch AND
 // every process, while the application's disposal is the only caller it has. It

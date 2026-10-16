@@ -2,13 +2,14 @@
 // component-facing transcript items, plus the small diff helpers the
 // projection relies on.
 //
-// The split is deliberate: `projection/transcript/message-parts.ts` turns the same wire
+// The split is deliberate: `message-parts.ts` turns the same wire
 // message into an ordered `parts[]`, and this module adapts those parts
 // into the `WebuiTranscriptItem[]` shape the components already render. It
 // also owns `readMessageDiff`, which both projections consume. The wire
-// normalisation and the usage readers moved to `../contracts/message-stream.ts`
-// (T21) — the conversation substrate's recovery bundle and two other businesses
-// read them, so they are published there — and are imported back here.
+// normalisation and the usage readers moved to
+// `../contracts/message-stream.ts` — the conversation substrate's recovery
+// bundle and two other businesses read them, so they are published there — and
+// are imported back here.
 
 import {
   booleanValue,
@@ -327,7 +328,7 @@ export function projectWebuiTranscriptMessage(
 
 // The wire-message seam — `normalizeWebuiClientMessage`, `readMessageUsage`,
 // `projectWebuiMessageToStreamMessage` and `readUsageNumber` — moved to
-// `../contracts/message-stream.ts` (T21): the conversation substrate's recovery
+// `../contracts/message-stream.ts`: the conversation substrate's recovery
 // bundle and two other businesses read it, and they may not import this private
 // projection. They are imported at the top of this module; this file keeps the
 // component-facing projection.

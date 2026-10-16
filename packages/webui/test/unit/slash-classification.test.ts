@@ -205,8 +205,8 @@ describe("resolveWebuiSubmissionIntent — operational consequence: disabled / i
         }
       } else {
         // The operational promise (negative): every non-runnable entry
-        // — inert-wired (skills) and inert-unsupported (plan / fork /
-        // memory) — must NOT reach the run-command intent.
+        // — inert-wired (skills) and inert-unsupported (`plan` / `fork` /
+        // `memory`) — must NOT reach the run-command intent.
         expect(intent?.kind).not.toBe("run-command");
       }
     });
@@ -277,7 +277,7 @@ describe("host `runCommand` stub counter — disabled entries trigger zero host 
       commandInvocationInput: "payload",
       goalMode: false,
     });
-    // Mirror SessionComposer.tsx submit()'s `if (intent.kind === "run-command")`
+    // Mirror the composer's submit() `if (intent.kind === "run-command")`
     // branch — every other kind falls through to a different executor
     // (goal / submit-turn), which this test does not invoke.
     if (intent?.kind === "run-command") {

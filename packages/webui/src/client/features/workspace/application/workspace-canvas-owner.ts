@@ -1,4 +1,4 @@
-// The workspace canvas owner (T11; plan §5.2 workspace row, acceptance 4).
+// The workspace canvas owner.
 //
 // The canvas document is a resource of the session it belongs to, and a canvas
 // operation is a mutation whose outcome the surface must show. Both were the view's

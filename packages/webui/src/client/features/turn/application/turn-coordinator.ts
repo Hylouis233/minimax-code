@@ -1,9 +1,9 @@
-// The turn coordinator (plan §7.1 `features/turn/application/turn-coordinator.ts`).
+// The turn coordinator.
 //
-// Stage 4 of this slice brings over one owning command: the **manual retry**,
-// the arm the connection banner's "重试连接" button runs. It replaces
-// `client/session-stream-retry.ts`, which is deleted once its behaviour has
-// moved (plan §7.3); its tests are rewired to `retry()` rather than deleted.
+// It owns one command: the **manual retry**, the arm the connection banner's
+// "重试连接" button runs. It takes over the session-stream retry helper's
+// behaviour, and that helper's tests are rewired to `retry()` rather than
+// deleted.
 //
 // The command preserves every property the old helper pinned:
 //

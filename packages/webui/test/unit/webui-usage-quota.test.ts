@@ -15,7 +15,7 @@ import {
   UsageQuotaAuthError,
   UsageQuotaClient,
 } from "../../src/runtime/usage-quota.js";
-// The pure projection half, split out by T17; the suite drives it from its own
+// The pure projection half; the suite drives it from its own
 // module rather than through a re-export.
 import {
   readQuotaWindow,

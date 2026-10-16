@@ -52,7 +52,7 @@ export class WebuiTerminalManager implements WebuiTerminalProcessPort {
     let cancelled = signal?.aborted ?? false;
     // A parked iterator has nothing to wake it when the terminal is quiet, so
     // the abort signal has to wake it itself: without this, cancelling a watch
-    // on a silent terminal parked the consumer for good (T15 criterion 4).
+    // on a silent terminal parked the consumer for good.
     const onAbort = () => { cancelled = true; wake?.(); };
     signal?.addEventListener("abort", onAbort, { once: true });
     const listener = (data: string) => { queue.push(data); wake?.(); };

@@ -1,11 +1,10 @@
-// The workspace environment owner (T11; produced target
-// `workspace-files-environment-owners`).
+// The workspace environment owner.
 //
 // The git environment of one workspace is its own resource: it is keyed by the
 // workspace directory, it is invalidated by its own signals, and its reload is
 // coalesced into one window. It used to share an owner with the file tree, the
 // file contents and the review — four concerns with four identities and four
-// invalidations. The review half left in T10; this is the environment half.
+// invalidations. The review half is its own owner; this is the environment half.
 //
 // What stays behind is the *composition*: the panels read one snapshot, so the
 // mixed owner merges this slice on read, exactly as it merges the review's.

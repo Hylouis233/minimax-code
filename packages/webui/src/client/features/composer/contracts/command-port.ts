@@ -1,10 +1,9 @@
-// Composer capability port (plan §9; ticket #59).
+// Composer capability port.
 //
-// The queue's four members and the command runner. §9 assigns `runCommand` to
-// `composer`, and §5.6 gives `composer` "the queue commands" while §4.12 keeps
-// only the queue's *command* with `turn` and its *state* with `composer` — so
-// the queue's own request/result members live here, with the business that owns
-// the state they write.
+// The queue's four members and the command runner. `composer` owns `runCommand`,
+// the queue's commands and the queue's state; `turn` keeps only the queue's
+// *command* — so the queue's own request/result members live here, with the business
+// that owns the state they write.
 //
 // Every method stays optional — `undefined` means "the operation is not wired".
 

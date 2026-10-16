@@ -1,8 +1,8 @@
 // The four creation origins, driven at the application level with nothing mounted.
 //
-// Plan P01's exit is "all creation origins work without a mounted callback", and the
-// coordinated cutover's evidence row names them: the ordinary send, the goal
-// submission, the plugin-chat creation, and the rail's project/New-Task actions.
+// The four origins, all reachable with nothing mounted: the ordinary send, the
+// goal submission, the plugin-chat creation, and the rail's project/New-Task
+// actions.
 //
 // Nothing here renders React or the shell. Each case drives the assembled
 // application the way its surface does — the composer controller for a send and for
@@ -174,7 +174,7 @@ describe("the creation origins with nothing mounted", () => {
 
     // 「新建任务」 with a project chosen: the home record is dropped, its incarnation
     // advances and the navigation claim moves, so a creation that started before
-    // this point cannot adopt onto the home the user has already replaced (D02's
+    // this point cannot adopt onto the home the user has already replaced (the
     // in-flight half is covered by the use case's own cases).
     const started = app.taskSessions.beginNewTask("/work/other");
     expect(started.workspaceDir).toBe("/work/other");

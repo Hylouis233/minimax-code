@@ -1,7 +1,6 @@
-// The session entity catalog and the session workflows (plan §7.1, §7.6;
-// ticket #49 corrections 1 and 2).
+// The session entity catalog and the session workflows.
 //
-// These are the deterministic application tests for the ownership correction:
+// These are the deterministic application tests:
 // flat and tree resolve from one entity map (so a rename cannot leave two
 // copies disagreeing), and the loads/mutations run through the workflow
 // surface against a scripted port.
@@ -27,7 +26,7 @@ import type { WebuiClientSession } from "../../src/client/features/sessions/cont
 import { selectWebuiSessionAgentName, selectWebuiSessionLookups } from "../../src/client/features/sessions/projection/session-lookups.js";
 
 /**
- * The composer purger the workflows now require (§5.6: `purgeSlot` is a published
+ * The composer purger the workflows now require (`purgeSlot` is a published
  * command, not an optional). These cases are about the catalog, so the purger is a
  * no-op.
  */
@@ -399,7 +398,7 @@ describe("the tree ingest reads a node's children defensively", () => {
 
 // A delete is an accepted mutation, so it holds a settlement lease until its
 // outcome and invalidation are committed, and revokes the deleted session's
-// remaining interests at the commit point (T04; plan §4.3).
+// remaining interests at the commit point.
 describe("the session scope across a delete", () => {
   function deletingWorkflows(deleteSession: () => Promise<{ success?: boolean }>) {
     const store = createWebuiSessionStore({

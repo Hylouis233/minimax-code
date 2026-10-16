@@ -1,10 +1,9 @@
-// The shell's seam and its startup duties (ticket #75; §4.11, and A4-s5's exit condition
-// re-verified at the boundary).
+// The shell's seam and its startup duties.
 //
-// §4.11 gives the foundation shell three jobs: render the supplied APIs, hold the routing/layout/startup
-// duties, and construct no duplicate business owner. A4-s5's exit adds the seam condition — the shell
-// forwards **zero** transport members — and Phase 2's slices are what satisfy it: each business reads
-// its own slice and the shell passes slice-derived values, never `transport.X`.
+// The foundation shell has three jobs: render the supplied APIs, hold the routing/layout/startup
+// duties, and construct no duplicate business owner. The seam condition is that the shell forwards
+// **zero** transport members, and the slices are what satisfy it: each business reads its own slice
+// and the shell passes slice-derived values, never `transport.X`.
 //
 // Source assertions, like the rest of the shell's structural coverage: the claim is about which
 // expressions exist, and this package has no DOM to observe them in. A `transport.` read outside a
@@ -23,8 +22,8 @@ const main = read("../../src/client/main.tsx");
 
 describe("the shell forwards zero transport members", () => {
   it("never reads a member off the composed transport in code", () => {
-    // The prop stays (SSR and the unit tests drive it, and its optionality is the not-wired mode the
-    // exit condition preserves), and the type is imported for it. What must not exist is a *read*.
+    // The prop stays (SSR and the unit tests drive it, and its optionality is what preserves the
+    // not-wired mode), and the type is imported for it. What must not exist is a *read*.
     const mentions = shell
       .split("\n")
       .map((line) => line.trim())
@@ -36,7 +35,7 @@ describe("the shell forwards zero transport members", () => {
   });
 
   it("cuts no port slices of its own: the composition root cuts them once", () => {
-    // T19 moved the cut out of the shell entirely. The seam this case guards is
+    // The port-slice cut moved out of the shell entirely. The seam this case guards is
     // unchanged — the shell forwards zero transport members — so a second cut
     // inside it, or the fallback coming back, turns the case red.
     expect(shell.match(/createWebuiPortSlices\(/gu) ?? []).toHaveLength(0);
@@ -46,7 +45,7 @@ describe("the shell forwards zero transport members", () => {
 
 describe("the shell keeps its startup duties", () => {
   it("constructs no application of its own", () => {
-    // The alternate factory is gone (plan §4.1): the shell renders the
+    // The alternate factory is gone: the shell renders the
     // application the composition root assembled, and a missing one is a named
     // assembly error rather than a second composition with different inputs.
     expect(shell).not.toMatch(/createWebuiApplication\(\{/u);

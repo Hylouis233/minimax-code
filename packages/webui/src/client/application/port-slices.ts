@@ -1,7 +1,7 @@
-// The per-business port slices (plan §8 Phase 2, ticket #60).
+// The per-business port slices.
 //
-// **Why this module exists.** Phase 1 re-filed the port *declarations* by
-// business (§9). That made the seam legible; it did not narrow it. Until this
+// **Why this module exists.** The port *declarations* were re-filed by business
+// once already. That made the seam legible; it did not narrow it. Until this
 // module, the shell still held one composed object and forwarded 47 of its
 // members as props, so every business could reach every capability and the
 // boundary was a naming convention. A directory re-file does not narrow the
@@ -25,26 +25,19 @@
 // | `settings` | `WebuiSettingsSlice` | `SettingsPort` | the seventeen instruction / memory / profile / permission / source members |
 // | `account` | `WebuiAccountSlice` | `AccountPort` | the eight login, signin and quota members |
 // | `shell` | `WebuiShellSlice` | `ShellEventPort` | `watchEvents` |
-// | `turn` | `WebuiTurnCapabilitySlice` | `TurnExecutionPort` (+ the queue write, the message loader and the session creator its send path needs) | the capability slice ticket #57 published |
+// | `turn` | `WebuiTurnCapabilitySlice` | `TurnExecutionPort` (+ the queue write, the message loader and the session creator its send path needs) | the published capability slice |
 //
-// **`turn` is not a `Pick` of one port, and that is the plan's shape, not an
-// exception.** §4.12 has `turn` read the execution slice *and* the session slice
-// for messages, and §8 Phase 1 step 1 already published exactly that object. This
-// module re-uses `createWebuiTurnCapabilitySlice` rather than declaring a second
-// turn slice, so there is one construction site for it.
+// **`turn` is not a `Pick` of one port.** It reads the execution slice *and* the
+// session slice for messages, and `createWebuiTurnCapabilitySlice` already
+// publishes exactly that object. This module re-uses that factory rather than
+// declaring a second turn slice, so there is one construction site for it.
 //
 // **Optionality is carried verbatim, and that is the whole risk.** Every port
 // member is optional. A slice copies the member's value, so an operation the host
 // does not wire stays `undefined` in the slice, exactly as it was `undefined` on
-// the composed transport — `WebuiClientFoundationApp`'s `transport?` prop and its
-// "not wired" mode keep working, and a consumer reads `slice.X === undefined` the
-// way it used to read `transport?.X === undefined`. `Partial` is preserved in the
-// same places: `sendMessage?`, `resumeSession?`, `watchEvents?` among them.
-//
-// Nothing consumes these slices yet: ticket #60 only makes them exist and be
-// injectable, so reverting its commit leaves the tree green. A4-s2 wires the
-// provider, A4-s3/s4 move the consumers, A4-s5 is where the shell forwards zero
-// transport members.
+// the composed transport, and a consumer reads `slice.X === undefined` the way it
+// used to read `transport?.X === undefined`. `Partial` is preserved in the same
+// places: `sendMessage?`, `resumeSession?`, `watchEvents?` among them.
 
 import type { AccountPort } from "../features/account/contracts/account-port.js";
 import type { ComposerPort } from "../features/composer/contracts/command-port.js";
@@ -274,7 +267,7 @@ export function createWebuiPortSlices(
   return {
     sessions: cut(source, SESSIONS_KEYS),
     transcript: cut(source, TRANSCRIPT_KEYS),
-    // Two ports, one business: §9 puts the terminal capability inside
+    // Two ports, one business: the terminal capability belongs inside
     // `workspace`, so its slice is the intersection of the two cuts.
     workspace: { ...cut(source, WORKSPACE_KEYS), ...cut(source, TERMINAL_KEYS) },
     composer: cut(source, COMPOSER_KEYS),
@@ -286,7 +279,7 @@ export function createWebuiPortSlices(
     account: cut(source, ACCOUNT_KEYS),
     shell: cut(source, SHELL_KEYS),
     // `turn`'s published slice, built by its own factory so there is exactly one
-    // construction site for it (ticket #57). That factory drops an absent member
+    // construction site for it. That factory drops an absent member
     // instead of storing `undefined` under it, so `turn` is the one slice whose
     // not-wired state is an absent key rather than a key holding `undefined` —
     // the same thing to every reader, and pinned by a test so it stays a

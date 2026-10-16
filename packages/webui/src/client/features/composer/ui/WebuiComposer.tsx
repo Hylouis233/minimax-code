@@ -264,13 +264,12 @@ export function WebuiComposer({
    *
    * One-shot by `token`: the shell keeps the seed around across the view switch
    * that opens the composer, so an effect keyed on anything else would re-attach
-   * the same 74KB file on every re-render of this 3000-line component.
+   * the same 74KB file on every re-render of this component.
    */
   readonly seedAttachment?: WebuiComposerSeed;
   /**
-   * Submitted-input history for ↑ recall (roadmap Module B: 输入历史/草稿).
-   * Keyed by session on the shell; the composer only walks it with the pure
-   * helpers from `composer-history.ts`.
+   * Submitted-input history for ↑ recall. Keyed by session on the shell; the composer
+   * only walks it with the pure helpers from `composer-history.ts`.
    */
   readonly inputHistory?: readonly string[];
   /** Records one committed submission into the shell's history store. */
@@ -280,7 +279,7 @@ export function WebuiComposer({
    * The created session, whether the navigation claim that started the creation is
    * still current, and the Agent Team choice the request was submitted with. The
    * third value is the captured one, not the default reached at completion, so a
-   * default changed while the creation was in flight does not rewrite it (D02).
+   * default changed while the creation was in flight does not rewrite it.
    */
   readonly onSessionCreated?: (sessionId: string, selected: boolean, teamModeOff: boolean) => void;
   readonly teamModeOff: boolean;
@@ -290,9 +289,9 @@ export function WebuiComposer({
   };
   /**
    * What is installed, and what the agent can run, answered by the plugins
-   * business (T08). The composer used to hold `pluginManagement` and
-   *   `listSkills` itself and dispatch a raw wire verb from an effect; it
-   *   now asks a question and receives rows it already recognises.
+   * business. The composer used to hold `pluginManagement` and `listSkills`
+   * itself and dispatch a raw wire verb from an effect; it now asks a question
+   * and receives rows it already recognises.
    */
   readonly workspaceDir?: string;
   readonly onSelectSession?: (sessionId: string) => void;
@@ -302,69 +301,69 @@ export function WebuiComposer({
   const { dom } = useWebuiBrowserCapabilities();
   const { stream, sending } = useWebuiSessionState(sessionId);
   const turnCommands = useWebuiSessionCommands(sessionId);
-  // The per-session effects registry the shell provides (ticket #45). The
-  // composer registers this session's event handlers here so the application
-  // event coordinator — the sole consumer of the process-event channel — runs
-  // them for events addressed to this session; it holds no channel and
-  // registers nothing when no provider is mounted (SSR, tests).
+  // The per-session effects registry the shell provides. The composer registers
+  // this session's event handlers here so the application event coordinator —
+  // the sole consumer of the process-event channel — runs them for events
+  // addressed to this session; it holds no channel and registers nothing when no
+  // provider is mounted (SSR, tests).
   // The interaction slices live on the one application store, read here through
-  // selectors and kept nowhere else (plan §7.6; ticket #45). The commands write
-  // through the store's interaction writer; the composer holds no store writer
-  // and no local copy of permissions, questionnaire or goal.
+  // selectors and kept nowhere else. The commands write through the store's
+  // interaction writer; the composer holds no store writer and no local copy
+  // of permissions, questionnaire or goal.
   const permissions = useWebuiSessionPermissions(sessionId);
   const questionnaire = useWebuiSessionQuestionnaire(sessionId);
   const goal = useWebuiSessionGoal(sessionId);
-  // The interaction flows (plan §7.1 `client/features/interactions/application/interaction-coordinator.ts`).
+  // The interaction flows
+  // (`client/features/interactions/application/interaction-coordinator.ts`).
   // The policy — what counts as an accepted reply, what state transition follows
   // it, which permissions a re-read keeps — lives there. This component supplies
   // the wiring and keeps the one error slot that every other flow in this file
   // also writes, which is why the flows return an outcome instead of an error.
-  // The two fence cells come from the application, not from this component
-  // (§4.2 field 6: the composer owns neither the goal's fence nor interactions'
-  // late-read protection). Bumped by every write, so a steering re-read that
-  // lands after a newer update can tell it is stale and stand down; EVERY goal
-  // writer must go through `applyGoal`, because a direct store write would let
-  // an in-flight read resurrect the state it was meant to replace. The policy is
-  // each coordinator's; the cell has to outlive a render, which is why the
-  // application creates it — a counter inside a per-render coordinator would
+  // The two fence cells come from the application, not from this component:
+  // the composer owns neither the goal's fence nor interactions' late-read
+  // protection. Bumped by every write, so a steering re-read that lands after a
+  // newer update can tell it is stale and stand down; EVERY goal writer must go
+  // through `applyGoal`, because a direct store write would let an in-flight
+  // read resurrect the state it was meant to replace. The policy is each
+  // coordinator's; the cell has to outlive a render, which is why the application
+  // creates it — a counter inside a per-render coordinator would
   // reset and silently disable the guard it protects. Both fences are the
-  // owners' now (T05), so this component reads neither.
+  // owners' now, so this component reads neither.
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
-  // The interaction owner is the application's, keyed by session (T05): this
+  // The interaction owner is the application's, keyed by session: this
   // component reads the one for the session it is showing instead of
   // constructing one, so an event re-reads and a reply commits whether or not
   // this view is mounted, and each session has its own fence.
   const interactionCoordinator = useWebuiInteractionOwner(sessionId);
   // The fallback requester name is this surface's prop — the session list's
   // answer for the session it is showing — so it is installed as the owners'
-  // reader rather than re-derived from a second source (T05).
+  // reader rather than re-derived from a second source.
   useWebuiInteractionAgentNameReader(agentName);
-  // The goal owner is the application's, keyed by session (T05): this component
+  // The goal owner is the application's, keyed by session: this component
   // reads the one for the session it is showing instead of constructing one, so a
   // goal event commits whether or not this view is mounted and each session has
   // its own fence.
   const goalCoordinator = useWebuiGoalOwner(sessionId);
   const applyGoal = goalCoordinator.applyGoal;
   const [goalEnabled, setGoalEnabled] = useState(true);
-  // The composer's owner, read once for everything this component keeps in it
-  // (§4.2 field 1: the input modes, the retry record, the queue; §5.6's may-write
-  // cell for the staging). One store, one subscription.
+  // The composer's owner, read once for everything this component keeps in it:
+  // the input modes, the retry record, the queue and the may-write cell for
+  // the staging. One store, one subscription.
   const { controller: composerController, snapshot: controllerSnapshot, isAttachedTo } = useComposerController(sessionId);
   if (!composerController || !controllerSnapshot) {
     throw new Error("WebuiComposer requires the application-owned composer controller");
   }
   // Sessions' published create command, read from its owner rather than relayed
-  // through a prop (plan 4.2 field 4, 4.2 field 8).
-  // The composer's own command workflows and the substrate's capability slice.
-  // Both are published by the assembly; holding them as props was the relay
-  // 4.2 field 8 rules out.
+  // through a prop. The composer's own command workflows and the substrate's
+  // capability slice are the same: both are published by the assembly rather
+  // than relayed through props.
   const application = useWebuiApplicationOptional();
   // Published by the plugins/composer owner; a read model the composer consumes
-  // rather than a prop the shell relays (plan 4.2 field 4).
+  // rather than a prop the shell relays.
   const pluginCatalogue = application?.composerPluginCatalogue;
   // Sessions' published read model: the one catalog the store holds, resolved to
-  // the flat page (plan 4.2 field 4). The child sessions the mention menu lists
+  // the flat page. The child sessions the mention menu lists
   // are entries of it, so the component reads them rather than receiving a page.
   const sessionCatalog = useWebuiSessionStoreSnapshot().catalog;
   const sessions = useMemo(
@@ -374,7 +373,7 @@ export function WebuiComposer({
   const workspaceQueries = useWebuiWorkspaceQueries();
   const workspaceFileTree = useWebuiWorkspaceQueriesState().fileTree;
   const composerSnapshot = controllerSnapshot.composer;
-  // The input modes are the composer's own state (§4.2 field 1), kept by its owner.
+  // The input modes are the composer's own state, kept by its owner.
   const goalMode = composerSnapshot.modes.goal;
   const planMode = composerSnapshot.modes.plan;
   const setGoalMode = composerController.setGoalMode;
@@ -387,14 +386,12 @@ export function WebuiComposer({
     if (error === undefined) composerController.clearError();
   }, [composerController]);
   // The queue mirror is the composer's own state, and its owner is the composer
-  // store (§4.2 field 1: "the queue's state (`queueItems`, `queuePaused` —
-  // component-local today)"; §5.6's composer row names the owner module). It is
-  // live state: not persisted, and not per-slot, because unlike the draft it does
-  // not survive a session switch.
+  // store. It is live state: not persisted, and not per-slot, because unlike
+  // the draft it does not survive a session switch.
   const queueState = composerSnapshot.queue;
   const queueItems = queueState.items;
   const queuePaused = queueState.paused;
-  // The model catalogue is the models owner's cached read (T13 criterion 1):
+  // The model catalogue is the models owner's cached read:
   // the composer used to hold a second copy fed by its own 2s poll of the raw
   // `listModels` port method.
   const modelsWorkflows = useWebuiModelsWorkflows();
@@ -411,7 +408,7 @@ export function WebuiComposer({
   const models: readonly WebuiModelEntry[] =
     modelsScope === sessionId ? (modelsSnapshot.models.value ?? []) : [];
   // The account status is the account owner's answer, not this component's copy
-  // of an RPC result (plan 4.2 field 4, 5.6). The owner drops a superseded read.
+  // of an RPC result. The owner drops a superseded read.
   const accountSnapshot = useWebuiAccountWorkflowsState();
   // Same scope guard the catalogue read uses: an answer the owner holds for
   // another session must not bleed into this one, and on home nothing shows.
@@ -420,7 +417,7 @@ export function WebuiComposer({
   const commandOutput = controllerSnapshot.commandOutput;
   const commandRunning = controllerSnapshot.commandRunning;
   // The staged attachments and URL references are the composer's own state, kept
-  // by its owner module (§5.6) and read from the same snapshot as the queue.
+  // by its owner module and read from the same snapshot as the queue.
   const attachments = composerSnapshot.staging.attachments;
   const urlReferences = composerSnapshot.staging.urlReferences;
   const attachmentBusy = composerSnapshot.staging.busy;
@@ -441,13 +438,13 @@ export function WebuiComposer({
   const [skillsMenuLoading, setSkillsMenuLoading] = useState(false);
   const [skillsMenuError, setSkillsMenuError] = useState<string>();
   const [workspaceFiles, setWorkspaceFiles] = useState<readonly { readonly path: string; readonly name: string; readonly type?: string }[]>([]);
-  // The mention range is the composer's own state (§5.6: mention/slash ranges); the
-  // slash range is derived (`commandRange` below), so only this half is state.
+  // The mention range is the composer's own state; the slash range is derived
+  // (`commandRange` below), so only this half is state.
   const mentionRange = composerSnapshot.mentionRange;
   const setMentionRange = composerController.setMentionRange;
   const composerInput = useComposerInput(draft, sessionId);
   const { mentionIndex, setMentionIndex, commandIndex, setCommandIndex, historyBrowse, setHistoryBrowse } = composerInput;
-  // The mode is the settings owner's answer, read through its snapshot (T12);
+  // The mode is the settings owner's answer, read through its snapshot;
   // only the menu's open/busy/unavailable presentation state is local.
   const settingsWorkflows = useWebuiSettingsWorkflows();
   const settingsSnapshot = useWebuiSettingsWorkflowsState();
@@ -478,10 +475,9 @@ export function WebuiComposer({
   // to be judged against THIS, not `composerRegionRef` — see the effect below.
   const fieldId = useId();
   const contextUsage = stream.contextUsage ?? stream.messages.at(-1)?.contextUsage;
-  // Context inspection joins the transcript's history read (plan §4.5:
-  // "context-only inspection can reuse a compatible history response"). This used
-  // to issue its own `getMessages` for the session, so every switch paid a second
-  // page read whose only product was `contextSnapshot`.
+  // Context inspection joins the transcript's history read. This used to issue
+  // its own `getMessages` for the session, so every switch paid a second page
+  // read whose only product was `contextSnapshot`.
   const transcriptHistory = useWebuiTranscriptHistoryOwner();
   useEffect(() => {
     if (!sessionId || webuiSessionStatusType(sessionStatus) === "started") return;
@@ -535,7 +531,7 @@ export function WebuiComposer({
     setPluginsLoading(true);
     setPluginsError(undefined);
     // The rows are already the shape this menu renders, so there is no local
-    // copy of the runtime's naming rules here any more (T08).
+    // copy of the runtime's naming rules here any more.
     pluginCatalogue.installedPlugins()
       .then((plugins) => { if (!cancelled) setInstalledPlugins(plugins); })
       .catch((error: unknown) => {
@@ -549,7 +545,7 @@ export function WebuiComposer({
   // it through one loader. The request cache is the catalogue's, keyed by agent,
   // rather than a ref in this component: a second reader joins the request the
   // first one started instead of replacing the pool underneath it, and the
-  // composer no longer owns that lifetime (T08).
+  // composer no longer owns that lifetime.
   const [slashSkills, setSlashSkills] = useState<readonly WebuiSlashSkillSummary[]>(
     [],
   );
@@ -577,9 +573,9 @@ export function WebuiComposer({
   }, [composerMenu, pluginCatalogue, readSlashSkills]);
 
   useEffect(() => {
-    // The directory listing is `workspace`'s capability (plan 5.6): the composer
-    // asks its owner and reads the answer from the owner's state rather than
-    // holding the operation itself (4.2 field 8 asks for no transport member).
+    // The directory listing is `workspace`'s capability: the composer asks its
+    // owner and reads the answer from the owner's state rather than holding
+    // the operation itself.
     if (!mentionRange || !workspaceDir || !workspaceQueries?.canListFileTree) {
       setWorkspaceFiles([]);
       return undefined;
@@ -604,8 +600,8 @@ export function WebuiComposer({
   /**
    * The view's half of a steering re-read: after one lands, the composer's goal
    * mode follows the goal it returned. A subscription rather than a replaceable
-   * effect, so a reaction cannot displace the authoritative route (plan §4.4),
-   * and it is keyed by the session whose goal it describes.
+   * effect, so a reaction cannot displace the authoritative route, and it is
+   * keyed by the session whose goal it describes.
    */
   useWebuiGoalReaction(sessionId, (next) => {
     if (next) setGoalMode(next.status !== "complete");
@@ -667,8 +663,7 @@ export function WebuiComposer({
     setInteractionError(undefined);
     try {
       // The stop capability comes from the application's turn capability
-      // slice, inside the owner; this component invokes the command only
-      // (ticket #57, P02 step 8).
+      // slice, inside the owner; this component invokes the command only.
       await turnCommands?.stop();
     } catch (error) {
       setInteractionError(
@@ -1017,8 +1012,7 @@ export function WebuiComposer({
   // staying distinct.
   useComposerLayout(sessionLayout, composerRegionRef);
   const messageDraft = [draft.trim(), ...urlReferences.map((reference) => reference.url.trim()).filter(Boolean)].filter(Boolean).join("\n");
-  // The button and Enter read one gate (T13 criterion 6); its rule and its
-  // matrix live in the projection.
+  // The button and Enter read one gate; its rule and its matrix live in the projection.
   const { submitBlocked } = readWebuiComposerSubmitGate({
     canCompose,
     canQueue,

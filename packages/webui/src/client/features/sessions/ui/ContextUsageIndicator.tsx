@@ -1,4 +1,4 @@
-// The context-usage indicator (ticket #77; §15.1's `components/sessions/ContextUsageIndicator.tsx` row).
+// The context-usage indicator.
 //
 // The composer's context gauge and its popover: the ring, the five-hour and weekly windows, the
 // token-plan figures when the selected model is a plan model, the breakdown rows, and the placement

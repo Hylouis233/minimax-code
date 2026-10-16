@@ -1,5 +1,4 @@
-// The typed plugin action adapter (T08; produced target
-// `plugins-typed-action-adapters`).
+// The typed plugin action adapter.
 //
 // `pluginManagement` is one wire operation standing in front of 29 actions, so
 // the client's only handle on it used to be a string:

@@ -1,23 +1,21 @@
-// The writer-command regroup (plan §8 Phase 1 step 2; ticket #58).
+// The writer-command regroup.
 //
 // `session-commands.ts` used to publish one `WebuiSessionCommands` bag of eleven
 // members plus a separate four-member `WebuiInteractionCommands`. The regroup
-// makes the three views the plan names — **stream phase**, **turn lifecycle**
-// and **interaction** — three separate objects, each with its own factory and
-// its own injected write targets, so a consumer handed one view cannot reach
+// makes the three views — **stream phase**, **turn lifecycle** and
+// **interaction** — three separate objects, each with its own factory and its
+// own injected write targets, so a consumer handed one view cannot reach
 // another's commands.
 //
 // This file is the disposition record in executable form. `DISPOSITION` below
 // is the complete enumeration of the writer commands that existed before the
-// regroup, each assigned to exactly one view — including the two the ticket
-// calls out (`clearStream`, `setContextUsage`) — and the assertions check that
-// the published views are exactly that partition: nothing dropped, nothing
-// duplicated, and no member reachable from a view it does not belong to.
+// regroup, each assigned to exactly one view — including `clearStream` and
+// `setContextUsage` — and the assertions check that the published views are
+// exactly that partition: nothing dropped, nothing duplicated, and no member
+// reachable from a view it does not belong to.
 //
-// Interface *counts* are deliberately not asserted. The plan's "stream phase
-// (5), turn lifecycle (4), interaction (4)" is a description of the split, not
-// an acceptance criterion; what matters is that each member has one home and
-// that the homes are disjoint.
+// Interface *counts* are deliberately not asserted: what matters is that each
+// member has one home and that the homes are disjoint.
 
 import { describe, expect, it, vi } from "vitest";
 
@@ -40,12 +38,10 @@ const DISPOSITION: readonly {
   { view: "stream-phase", member: "settleStoppedStream" },
   // Turn lifecycle: opening, clearing, recording and closing a turn's stream.
   // `resetStreamForTurn` opens one; `clearStream` clears the slice for New Task
-  // (the ticket's explicitly-assigned first member — it is a whole-slice reset,
-  // not a phase move, so it is not in the phase view); `setContextUsage` is the
-  // snapshot a loaded turn carries onto the slice (the ticket's second
-  // explicitly-assigned member); `setStreamRefusal` records its failure;
-  // `setTurnSending` is the submit-lifecycle flag; `releaseStreamSubscription`
-  // closes its lease.
+  // (it is a whole-slice reset, not a phase move, so it is not in the phase
+  // view); `setContextUsage` is the snapshot a loaded turn carries onto the
+  // slice; `setStreamRefusal` records its failure; `setTurnSending` is the
+  // submit-lifecycle flag; `releaseStreamSubscription` closes its lease.
   { view: "turn-lifecycle", member: "resetStreamForTurn" },
   { view: "turn-lifecycle", member: "clearStream" },
   { view: "turn-lifecycle", member: "setContextUsage" },

@@ -1,9 +1,8 @@
-// Models capability port (plan §9; ticket #59).
+// Models capability port.
 //
-// The model catalogue, the selection command and the provider CRUD. §9 sends
-// "models + providers" here, and §5.6 confirms the provider CRUD is this row's duty
-// rather than `settings`' — `upsertMiniMaxApiKey` included, even though the *status*
-// read beside it stays with `settings`.
+// The model catalogue, the selection command and the provider CRUD. The provider
+// CRUD is this port's duty rather than `settings`' — `upsertMiniMaxApiKey`
+// included, even though the *status* read beside it stays with `settings`.
 //
 // Every method stays optional — `undefined` means "the operation is not wired".
 

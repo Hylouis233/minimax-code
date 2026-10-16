@@ -1,6 +1,6 @@
 // The pure half of the quota client: payload in, view out.
 //
-// T17 splits `runtime/usage-quota.ts` along the one boundary it actually has.
+// Split from `runtime/usage-quota.ts` along the one boundary it actually has.
 // The client next to this module owns the request and the cache — identity keys,
 // TTLs, in-flight sharing, force-refresh, signing, auth rejection and the
 // credits-only degradation — because those decisions only make sense together

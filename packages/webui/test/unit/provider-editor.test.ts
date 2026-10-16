@@ -1,7 +1,7 @@
 /**
- * The Models-owned provider editor (plan §5.5, P05).
+ * The Models-owned provider editor.
  *
- * The cases the plan names: opening/editing/testing/saving/deleting from the
+ * What these cases cover: opening/editing/testing/saving/deleting from the
  * editor's own interface without React, the header semantics a saved provider
  * carries, a changed candidate after a successful test, late reveal/discovery/
  * test/save completions, and disposal clearing the credential-bearing fields.

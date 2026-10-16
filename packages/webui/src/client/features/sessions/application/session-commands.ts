@@ -1,6 +1,4 @@
-// Purpose-named domain commands for the migrated execution state
-// (plan §7.6 "Final state ownership and write authority"; ticket #45
-// prerequisite 3).
+// Purpose-named domain commands for the migrated execution state.
 //
 // The session store owns the session record — the live stream, the `sending`
 // flag, the pending permissions, the questionnaire and the goal — and every
@@ -13,9 +11,8 @@
 // a component rewrite any field of the slice and walk straight around the
 // generation fence the owner applies. The stream-phase and turn-lifecycle views,
 // and the writer a turn's sink is built from, are the execution substrate's and
-// live in `features/turn/application/` (plan §5.5 P02 step 2) — a component
-// submits a command instead of holding and calling a store writer, whichever of
-// those views it holds.
+// live in `features/turn/application/` — a component submits a command instead
+// of holding and calling a store writer, whichever of those views it holds.
 
 import type { WebuiGoal } from "../../../../shared/contracts/goal.js";
 import type {

@@ -1,5 +1,4 @@
-// The delivery disposers the application actually holds (plan §4.3; T04's
-// `delivery-disposer-registry`).
+// The delivery disposers the application actually holds.
 //
 // A version guard rejects a superseded attempt's commits but does not cancel its
 // IO: something has to close the client's half of the delivery. That something is

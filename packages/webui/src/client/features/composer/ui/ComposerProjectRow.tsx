@@ -1,7 +1,7 @@
 // The home composer's project row: the workspace picker, its recent list and the
-// directory browser it opens (T13 criterion 5 — the composer's placement unit).
+// directory browser it opens.
 //
-// This was the tail of the 2417-line `WebuiComposer` render. It is the unit that
+// This was the tail of the `WebuiComposer` render. It is the unit that
 // carries where the composer sits on the home surface: the row lives INSIDE the
 // scrim container rather than beside it, because `.message-input-home-container`
 // is the light surface that already wraps the card — sharing that box is what

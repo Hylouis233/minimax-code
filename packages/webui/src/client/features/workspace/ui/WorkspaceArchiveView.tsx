@@ -201,7 +201,7 @@ export function WorkspaceArchiveView(props: WorkspaceArchiveViewProps): ReactEle
   // The listing belongs to the archive owner: this view states what it wants read
   // and renders what came back. A read for a prefix the user has left is superseded
   // by the owner's version key rather than by a per-render flag, and the extract
-  // outcome is the owner's too (T11; the parser is T16's).
+  // outcome is the owner's too.
   useEffect(() => {
     queries?.readArchive({ workspaceDir, path, ...(prefix ? { prefix } : {}) });
   }, [queries, workspaceDir, path, prefix]);

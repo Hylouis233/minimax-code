@@ -1,4 +1,4 @@
-// The quota popover (ticket #74; §15.1's `UserMenuUsage.tsx` row).
+// The quota popover.
 //
 // The panel's four answers — loading, error, plan-and-credits, quota windows — the skeleton and rows
 // that render them, and the reset-label formatter the panel uses. `UsagePanel` is the entry

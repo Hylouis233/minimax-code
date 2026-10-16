@@ -9,19 +9,13 @@ import { MemorySection } from "./MemorySection.js";
 /**
  * Personalization panel — the three blocks: 自定义指令, 关于你, 记忆.
  *
- * Shape note for reviewers: 记忆 is a card of three rows
- * (two switches plus a 管理 action that opens the memory manager), not a
- * single textarea. The earlier revision rendered a standalone 长期记忆 editor;
- * it was the same file and the same operations, just a different surface, and
- * the roadmap's "管理 UI 未见" is only closed by the row that points at a
- * manager.
+ * Shape note: 记忆 is a card of three rows (two switches plus a 管理 action
+ * that opens the memory manager), not a single textarea.
  *
- * Scope note: this lands in the same settings modal that the P area (设置中心)
- * also touches, but the two do not overlap in behaviour. P owns the shell — tab
- * list, groups, search filtering. This component owns one tab body and the
- * transport calls behind it. The only shared line is the `disabled` flag on the
- * `custom-instructions` tab definition in `SettingsModal.tsx`, which the earlier
- * PR removed.
+ * Scope note: this component lands in the same settings modal the shell owns,
+ * but the two do not overlap in behaviour. The shell owns the tab list, groups
+ * and search filtering; this component owns one tab body and the transport
+ * calls behind it.
  */
 
 /**
@@ -50,11 +44,11 @@ export interface PersonalizationSettingsProps {
 /**
  * Personalization panel — the settings owner's per-surface consumer.
  *
- * Every read and write below is derived from the settings workflow owner
- * (ticket #52): this component calls the owner's commands and reads its
- * snapshot, and hands the three section components the same read/write
- * callback shape they always took. The sections keep their own uncommitted
- * editor state; only what was submitted belongs to the application.
+ * Every read and write below is derived from the settings workflow owner: this
+ * component calls the owner's commands and reads its snapshot, and hands the
+ * three section components the same read/write callback shape they always
+ * took. The sections keep their own uncommitted editor state; only what was
+ * submitted belongs to the application.
  */
 export function PersonalizationSettings({ onCreateInSession }: PersonalizationSettingsProps = {}): ReactElement {
   const settings = useWebuiSettingsWorkflows();

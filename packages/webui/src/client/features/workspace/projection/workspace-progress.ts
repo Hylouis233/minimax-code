@@ -1,11 +1,11 @@
 // The workspace-progress view the panels and the shell read.
 //
-// What is left here after T21: the consolidated view selector and the history
-// rebuild, both consumed by surfaces (the shell, the workspace panels). The
-// reducers and their event-name tables moved to
-// `features/workspace/contracts/progress.ts` because the conversation substrate
-// folds stream-frame events into the progress slice and may not import another
-// business's private projection; they are imported back above.
+// What is left here: the consolidated view selector and the history rebuild,
+// both consumed by surfaces (the shell, the workspace panels). The reducers and
+// their event-name tables moved to `features/workspace/contracts/progress.ts`
+// because the conversation substrate folds stream-frame events into the progress
+// slice and may not import another business's private projection; they are
+// imported back above.
 //
 // The progress *types* live in `features/turn/contracts/stream-state.ts` (the
 // stream state carries `workspaceProgress`) and are re-exported here so a reader
@@ -34,7 +34,7 @@ import {
 } from "../contracts/progress.js";
 
 /**
- * The consolidated progress view (plan §7.6 "Progress"; ticket #49 correction 3).
+ * The consolidated progress view.
  *
  * Progress keeps **distinct source inputs, not multiple writable final
  * values**: the history baseline, the tree's child metadata and the live

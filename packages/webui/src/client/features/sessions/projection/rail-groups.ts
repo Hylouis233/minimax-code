@@ -1,11 +1,11 @@
-// The rail's grouping, labelling and search rules (T07's responsibility cut).
+// The rail's grouping, labelling and search rules.
 //
 // These are the decisions about *which* sessions and projects the rail shows and
 // in what order, with no React in them: the project grouping the rail
 // is built on, the pin-then-recency order inside a group, the label a row
 // renders, and the two search predicates (a session, and a project row).
 //
-// They were declared inside `SessionRail.tsx` — a 1358-line presentation module —
+// They were declared inside `SessionRail.tsx` — a presentation module —
 // so the rules could only be exercised through a component that has to be
 // rendered to run at all. They are the same bodies, moved; the rail imports them
 // from here and `session-rail-search.test.ts` drives them directly.

@@ -1339,15 +1339,14 @@ describe("WebUI rail row click wiring", () => {
 // transport would otherwise hand to a real socket). The assertions
 // observe the loop's outcome through the sink callbacks, which is the
 // same observable the React shell binds to `setStream`. No DOM is
-// rendered; the review noted the absence of a DOM environment and
-// ruled out adding one. What this gives us is effect-based evidence
-// that the reconnect branch is reachable and that the composer calls
-// `resumeSession` with the cursor it observed before the drop.
+// rendered, and adding a DOM environment was ruled out. What this gives us is
+// effect-based evidence that the reconnect branch is reachable and that the
+// composer calls `resumeSession` with the cursor it observed before the drop.
 describe("WebUI composer send/resume loop", () => {
   it("calls resumeSession with the cursor it observed before a mid-stream socket drop", async () => {
     // Scenario: the user's prompt starts a stream; the server emits a
     // cursor-bearing frame; then the WebSocket closes before [DONE].
-    // The brief's F1 says the loop must call `resumeSession` with
+    // The loop must call `resumeSession` with
     // `afterCursor: <that cursor>` and surface the `reconnecting`
     // phase the shell renders. The previous implementation had the
     // reconnect branch after the `await sendMessage` line, so a
@@ -1400,7 +1399,7 @@ describe("WebUI composer send/resume loop", () => {
     expect(observedPhases).not.toContain("refused");
     // The cursor captured before the drop is forwarded to
     // `resumeSession` as `afterCursor`. That is the exact contract the
-    // brief's resume criterion relies on.
+    // resume branch must honour.
     expect(resumeCalls).toEqual([{ afterCursor: "c1" }]);
     // The capture pipeline saw both the chunk from the original stream
     // and the frames from the resumed stream. The chunk is what gave
@@ -1413,7 +1412,7 @@ describe("WebUI composer send/resume loop", () => {
 
   it("reloads history and resubscribes with no cursor after a resume_overflow frame", async () => {
     // Scenario: a stream emits a `resume_overflow` event mid-flight
-    // before `[DONE]`. The brief's F2 says the loop must reload
+    // before `[DONE]`. The loop must reload
     // authoritative history through `getMessages` and establish a
     // fresh `resumeSession` subscription with no cursor. The previous
     // implementation read the `needsHistoryReload` flag at the top of
@@ -1456,7 +1455,7 @@ describe("WebUI composer send/resume loop", () => {
       },
     );
 
-    // `loadMessages` ran exactly once, the way the brief intends.
+    // `loadMessages` ran exactly once.
     expect(loadMessagesCalls).toBe(1);
     // `resumeSession` was called once, with no `afterCursor`, because
     // the reload already established the fresh subscription point.
@@ -1562,11 +1561,11 @@ describe("WebUI composer send/resume loop", () => {
   });
 
   it("contains sink callback failures — the loop never rejects even if the sink throws", async () => {
-    // Brief R8 said the documented "never rejects" guarantee was false
-    // when a sink callback throws. The fix wraps every sink callback
-    // in a try/catch; the outer loop must resolve regardless. The
-    // transport mocks here all resolve cleanly so the only failures
-    // come from the sink itself; we then assert the loop resolved.
+    // The documented "never rejects" guarantee was false when a sink
+    // callback throws. The fix wraps every sink callback in a try/catch;
+    // the outer loop must resolve regardless. The transport mocks here all
+    // resolve cleanly so the only failures come from the sink itself; we
+    // then assert the loop resolved.
     const sendMessage: WebuiClientMessageSender = vi.fn(
       async (_req, onFrame) => {
         onFrame({ dataJson: '{"type":10}' });
@@ -1598,7 +1597,7 @@ describe("WebUI composer send/resume loop", () => {
 });
 
 describe("WebUI composer sink binding", () => {
-  // Brief R7: the previous shell tests called `runWebuiStreamLoop`
+  // The previous shell tests called `runWebuiStreamLoop`
   // directly with their own sinks, so a misrouted or dropped callback
   // in the production binding (the inline object literal the composer
   // used to build) would not fail a test. The fix extracts
@@ -1682,10 +1681,9 @@ describe("WebUI composer sink binding", () => {
   it("drives the actual loop with the production sink binding", async () => {
     // End-to-end evidence: a single submit run, with the production
     // binding helper, drives the same React state a real composer
-    // would. We then assert the final state matches what the brief
-    // expects for each of the three reachable outcomes (resumed,
-    // refused, resynced). A misbinding inside the helper would fail
-    // one of these assertions.
+    // would. We then assert the final state expected for each of the
+    // three reachable outcomes (resumed, refused, resynced). A
+    // misbinding inside the helper would fail one of these assertions.
     const buildState = () => {
       const log: Reducer[] = [];
       let state = initialWebuiStreamState;
@@ -1850,7 +1848,7 @@ describe("WebUI composer app-to-helper seam", () => {
     const createGoal = vi.fn(async (request: { sessionId: string; objective: string }) =>
       nextGoal(request.sessionId, request.objective),
     );
-    // Creation is the task use case's now (P01 step 4): the goal path hands it the objective's
+    // Creation belongs to the task use case now: the goal path hands it the objective's
     // session request and reads its answer, exactly as the send path does.
     const submit = vi.fn(async () => ({ kind: "created" as const, sessionId: "new-session", selected: true }));
     const onSessionCreated = vi.fn();
@@ -1917,7 +1915,7 @@ describe("WebUI composer app-to-helper seam", () => {
   });
 
   it("buildWebuiComposerHandlers passes every field through unchanged", () => {
-    // R13: the handler assembly is a named unit. A regression that
+    // The handler assembly is a named unit. A regression that
     // drops `createSink`, swaps it for `setSending`, or ignores any
     // other field is caught here. The component's single call into
     // the helper is verified by inspection only — no DOM exists —
@@ -1948,7 +1946,7 @@ describe("WebUI composer app-to-helper seam", () => {
   });
 
   it("drives the production helper seam end-to-end", async () => {
-    // R11: the production path. `submitWebuiComposerTurn` calls
+    // The production path. `submitWebuiComposerTurn` calls
     // `handlers.createSink()` unconditionally and passes the result to the loop. If a regression replaces the helper
     // with an empty object, passes a no-op state setter, or ignores
     // the returned sink, the live reducer never sees the frames and
@@ -1983,7 +1981,7 @@ describe("WebUI composer app-to-helper seam", () => {
 
   it("creates the first task silently and sends the original draft", async () => {
     const { handlerWrites, getState } = makeRecording();
-    // Creation is the task use case's now (P01 step 4): the submission hands it the validated
+    // Creation belongs to the task use case now: the submission hands it the validated
     // request and reads its answer. What this seam still owns is the workspace field it validates and
     // the order of what follows.
     const submit = vi.fn(async () => ({ kind: "created" as const, sessionId: "created", selected: true }));
@@ -2263,20 +2261,18 @@ describe("WebUI composer app-to-helper seam", () => {
   });
 });
 
-// R12 — sink failure must change the outcome. The previous commit
-// implemented `safeSink` as a defensive try/catch that did nothing
-// with the failure; the reviewer reproduced a case where `applyFrame`
-// threw and the loop still committed `phase: "done"`. The fixed
+// Sink failure must change the outcome. `safeSink` used to be a
+// defensive try/catch that did nothing with the failure: when
+// `applyFrame` threw, the loop still committed `phase: "done"`. The fixed
 // `safeSink` records the first failure, disables further callbacks,
 // blocks the normal `done` commit, and surfaces the failure through a
 // direct `sink.refuse` call (with a `console.error` fallback when
 // every callback is broken). These tests pin that contract.
 describe("WebUI composer sink-failure semantics", () => {
   it("skips the normal done commit when applyFrame throws and emits a refusal", async () => {
-    // Reproduction from the reviewer's edge-case script: `applyFrame`
-    // throws, the stream continues to emit `[DONE]`, and the loop
-    // would previously commit `phase: "done"` with no refusal. The
-    // fixed loop records the failure, blocks the done commit, and
+    // Reproduction: `applyFrame` throws, the stream continues to emit
+    // `[DONE]`, and the loop would previously commit `phase: "done"` with no
+    // refusal. The fixed loop records the failure, blocks the done commit, and
     // calls `sink.refuse` with a reason that names the failing
     // callback.
     const events: string[] = [];
@@ -2361,11 +2357,11 @@ describe("WebUI composer sink-failure semantics", () => {
   });
 
   it("routes the no-cursor-during-drop early return through the finalization helper", async () => {
-    // R14 site: sendMessage rejects before any cursor was observed;
+    // The case where `sendMessage` rejects before any cursor was observed:
     // the loop's send-error branch used to return after the wrapped
-    // refuse recorded the failure, never finalising it. The reviewer
-    // reproduced this with a sink that only fails the raw refuse; the
-    // loop resolved with no refusal and no console diagnostic. With
+    // refuse recorded the failure, never finalising it. With a sink
+    // that only fails the raw refuse, the loop resolved with no refusal
+    // and no console diagnostic. With
     // `finalizeOnExit`, the early-return path now calls the raw
     // refuse through `guarded.reportSinkFailure`; that call also
     // throws here, so the fallback `console.error` runs and the
@@ -2402,11 +2398,11 @@ describe("WebUI composer sink-failure semantics", () => {
   });
 
   it("routes the loadMessages-rejection early return through the finalization helper", async () => {
-    // R14 site: the resume_overflow path runs `loadMessages`, which
+    // The case where the resume_overflow path runs `loadMessages`, which
     // rejects; the early-return inside that try/catch used to skip
     // the failure report. With `finalizeOnExit`, the rejection
     // reason is finalised through `sink.refuse` before returning.
-    // The reproduction mirrors the reviewer's
+    // The reproduction mirrors the
     // "load-rejects-with-sink-throws" scenario in a recoverable
     // form: a sink that records the failure but still accepts the
     // raw refuse.
@@ -2445,7 +2441,7 @@ describe("WebUI composer sink-failure semantics", () => {
   });
 
   it("routes the missing-resumeSession early return through the finalization helper", async () => {
-    // R14 site: the resync branch with no `resumeSession` available.
+    // The resync branch with no `resumeSession` available.
     // The events observed end with a refuse call naming the missing
     // transport.
     const events: string[] = [];
@@ -2481,7 +2477,7 @@ describe("WebUI composer sink-failure semantics", () => {
   });
 
   it("routes the missing-resumeSession-during-resume early return through the finalization helper", async () => {
-    // R14 site: the resume branch finds no `resumeSession`. We
+    // The resume branch finds no `resumeSession`. We
     // arrange for the loop to enter the resume branch with a cursor
     // by emitting a cursor-bearing chunk first, then letting
     // `sendMessage` reject. The loop schedules `resume`, schedules
@@ -2529,7 +2525,7 @@ describe("WebUI composer sink-failure semantics", () => {
   });
 
   it("routes the missing-sendMessage early return through the finalization helper", async () => {
-    // R14 site: the very first iteration finds `sendMessage` is
+    // The very first iteration finds `sendMessage` is
     // missing and refuses with the documented reason.
     const events: string[] = [];
     const sink = {
@@ -2558,7 +2554,7 @@ describe("WebUI composer sink-failure semantics", () => {
   });
 });
 
-// R16 — when the loop ends in `refused` because a sink callback failed
+// When the loop ends in `refused` because a sink callback failed
 // after the reducer had already accepted frames, the rendered
 // transcript may be incomplete. The state field `transcriptIncomplete`
 // is set as part of the failure transition; the shell renders an
@@ -3468,7 +3464,7 @@ describe("WebUI stream loop · superseded loop fencing", () => {
  * `WebuiSessionTranscript` now reads the stream slice through the application
  * store bindings (`useWebuiSessionStream`), so it needs the store provided.
  * This wrapper supplies one store for the suite's transcript renders — the
- * module-level runtime map it used to read is gone (plan §7.6; ticket #45).
+ * module-level runtime map it used to read is gone.
  */
 const transcriptStore = createWebuiSessionStore();
 

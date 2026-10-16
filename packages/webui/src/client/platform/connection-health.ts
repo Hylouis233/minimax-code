@@ -1,6 +1,5 @@
 // Event-channel connection health — the transport's always-on watcher,
-// surfaced. (Plan §7.2 `client/infrastructure/connection-health.ts`: the fact
-// is recorded here, with no React.)
+// surfaced.
 //
 // The WebUI holds no single "connection" to lose: every request opens its own
 // WebSocket. The one socket that IS long-lived is the `watchEvents`
@@ -23,7 +22,7 @@
 // without each of them wiring callbacks.
 //
 // This module is framework-free. The React subscription lives in
-// `client/bindings/use-connection-health.ts`.
+// `bindings/use-connection-health.ts`.
 
 interface WebuiWatcherHealth {
   readonly token: number;

@@ -1,11 +1,9 @@
 // Unit tests for the turn coordinator's manual retry — the manual arm of the
-// stream loop's recovery, now owned by `features/turn/application/turn-coordinator.ts`
-// (ticket #45, the atomic ingress flip).
+// stream loop's recovery, owned by
+// `features/turn/application/turn-coordinator.ts`.
 //
-// This suite used to drive `client/session-stream-retry.ts`. That module is
-// deleted once its behaviour moved; the module path goes, the manual recovery
-// feature does not. The same three properties are pinned here against the
-// command that replaced it, through `createWebuiApplication`:
+// The three properties are pinned here against the command that owns the retry,
+// through `createWebuiApplication`:
 //
 //   * clear the standing refusal synchronously (a banner that still says
 //     连接失败 over a loop that is already streaming is a lie),
@@ -27,7 +25,7 @@ import type { WebuiStreamState } from "../../src/client/features/turn/projection
 
 type ResumeRequest = Parameters<WebuiClientSessionResumer>[0];
 
-/** The one application store the retry moves (plan §7.6; ticket #45). */
+/** The one application store the retry moves. */
 const store = createWebuiSessionStore();
 
 const channel: WebuiProcessEventChannel = {
@@ -59,7 +57,7 @@ function pendingResume() {
 function appWithResume(resumeSession: WebuiClientSessionResumer) {
   // The command reads and writes the shared store; the application is built on
   // it (not a second map) so the assertions observe the same records. The
-  // instance is started explicitly: construction opens no ingress (plan §4.1).
+  // instance is started explicitly: construction opens no ingress.
   const application = createWebuiApplication({
     openEventChannel: () => channel,
     store,

@@ -1,5 +1,4 @@
-// What a submission's target looks like right now (plan §5.5 P02 step 1: "reads authoritative current
-// execution state itself", step 2: "per-target admission"; D01's reservation is bound here).
+// What a submission's target looks like right now. The creation reservation is bound here.
 //
 // The admission rule in `submission-admission.ts` is pure and takes state; this is where the state
 // comes from, so the rule never has to be told a fact the client already knows. Nothing passes
@@ -27,8 +26,8 @@ export interface WebuiExecutionObservationDeps {
   };
   readonly capabilities: WebuiTurnCapabilitySlice;
   /**
-   * The task/session use case, for D01's reservation. Absent on a host that has no creation use case,
-   * which means no creation can be in flight either.
+   * The task/session use case, for the creation reservation. Absent on a host that has no creation use
+   * case, which means no creation can be in flight either.
    */
   readonly taskSessions?: { readonly creationPending?: () => boolean };
 }

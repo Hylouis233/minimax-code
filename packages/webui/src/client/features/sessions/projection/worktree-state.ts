@@ -1,4 +1,4 @@
-/** Pure grouping for the WebUI worktree surface (roadmap E 区「工作树隔离」).
+/** Pure grouping for the WebUI worktree surface.
  *
  * Creating an isolated worktree already works — the rail's context menu
  * carries 「复制到新工作树」 and the server answers with

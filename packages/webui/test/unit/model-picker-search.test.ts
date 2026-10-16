@@ -1,4 +1,4 @@
-// The model picker's search box and starred section (roadmap H, 模型搜索).
+// The model picker's search box and starred section.
 //
 // The suite drives the PRODUCT functions in `projection/models/model-picker-search.ts`
 // and `projection/models/model-favorites.ts`, not copies of them. An earlier revision

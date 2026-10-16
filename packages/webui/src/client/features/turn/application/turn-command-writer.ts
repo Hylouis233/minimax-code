@@ -1,6 +1,4 @@
-// A turn's stream writer, built from the store writer that owns the record
-// (plan §5.5 P02 step 2 — it was Sessions' until the execution substrate took it
-// over).
+// A turn's stream writer, built from the store writer that owns the record.
 //
 // The sink is built **inside** this factory from the writer's own `setStream`, so
 // the generation fence travels with the writer instead of being a convention the

@@ -1,19 +1,17 @@
-// The opaque identity/freshness context (plan §4.5; T02's
-// `opaque-identity-freshness-context`).
+// The opaque identity/freshness context.
 //
 // A query answer's freshness depends on more than the parameters the caller
 // typed: it depends on whether the credentials behind it were replaced, or the
-// configuration it was computed under was changed. §4.5 puts those in the
-// resource key as *opaque credential/config generations*, and this module is
-// where those generations live.
+// configuration it was computed under was changed. The resource key carries
+// those as *opaque credential/config generations*, and this module is where
+// those generations live.
 //
 // Three properties make it safe to hand to every owner:
 //
 //   * **Opaque.** A token is an instance-scoped counter string. It never carries
 //     a credential, a lease or a config value, so it can appear in a key, a log
 //     line or a test without disclosing anything; the values themselves stay in
-//     the runtime (plan §4.5: "Never place credential values in keys exposed to
-//     the UI").
+//     the runtime.
 //   * **Per instance.** Tokens embed the application instance's own opaque id,
 //     so two instances never produce equal tokens even at the same generation.
 //     A remount that builds a fresh assembly therefore cannot accept an answer

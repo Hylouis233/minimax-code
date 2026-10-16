@@ -1,5 +1,5 @@
 /**
- * The provider read and the header rows (plan §5.4/§5.5, D04).
+ * The provider read and the header rows.
  *
  * The runtime's capability declares this read as untyped rows, so
  * `server/projections/model-provider.ts` is the seam that makes the wire

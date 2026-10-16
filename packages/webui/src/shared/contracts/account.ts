@@ -4,7 +4,7 @@ import type { ClaimSigninData, SigninPanel } from "@mavis/shared/daily-signin";
 // `@mavis/shared/daily-signin` module the TUI uses as well (the webui
 // panel renders them directly, so there is no second shape to drift).
 //
-// Wire contract record (plan section 7.1 / 7.5): every exported
+// Wire contract record: every exported
 // declaration below records its wire purpose, its producer and its
 // consumers, verified against the tree. Documentation only.
 //

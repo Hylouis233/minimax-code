@@ -1,8 +1,7 @@
 /**
- * Whether the composer keeps goal mode on after a goal submission (T13
- * criterion 6, the "goal reset" half of goal reset/loading).
+ * Whether the composer keeps goal mode on after a goal submission.
  *
- * The rule was one ternary inside the 2043-line component's submit path:
+ * The rule was one ternary inside the component's submit path:
  * `setGoalMode(nextGoal.status !== "complete")`. It reads as an accident of the
  * expression until you notice what it means — a goal the server finished with is
  * over, so the composer leaves goal mode; a goal that is active, blocked, paused

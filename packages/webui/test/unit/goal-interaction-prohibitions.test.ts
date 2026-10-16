@@ -1,14 +1,14 @@
-// The eight §5.1 prohibition cases for `goal` and `interactions` (ticket #66).
+// The prohibition cases for `goal` and `interactions`.
 //
-// §5.1 has four prohibitions, so "the eight prohibition cases for both businesses"
-// is four per business. `turn`'s four are in `turn-boundary-prohibitions.test.ts`,
-// written by the ticket that widened its intents because `turn` takes no carve;
-// every other business's four are written by its own carve, and this is B1's.
+// There are four prohibitions, so "the eight prohibition cases for both
+// businesses" is four per business. `turn`'s four are in
+// `turn-boundary-prohibitions.test.ts`; every other business's four are in its
+// own suite, and this file holds `goal`'s and `interactions`'.
 //
-// They are source-level and type-level assertions, and that is deliberate. §12.1
-// says the dependency checker holds **no** business-boundary rule and this
-// programme proposes none, so the machine half of the prohibitions is these tests —
-// a reading, made repeatable. Each one states what it cannot see.
+// They are source-level and type-level assertions, and that is deliberate: the
+// dependency checker holds **no** business-boundary rule, so the machine half of
+// the prohibitions is these tests — a reading, made repeatable. Each one states
+// what it cannot see.
 
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
@@ -80,9 +80,9 @@ describe("prohibition 1 — a business may not hold a writer for another busines
     const narrow: OnlyTrue<Foreign extends never ? true : never> = true;
     expect(narrow).toBe(true);
     // The stream transitions are invoked as turn's published commands instead
-    // (§5.2: an injected optional object is the violation, an invocation of the
-    // owner's published command is the legal form); `interaction-coordinator.ts`
-    // holds that command view — `prohibition 1` in `interaction-coordinator.test.ts`
+    // (an injected optional object is the violation, an invocation of the owner's
+    // published command is the legal form); `interaction-coordinator.ts` holds
+    // that command view — `prohibition 1` in `interaction-coordinator.test.ts`
     // asserts the runtime half.
     expect(flat(read("features/interactions/application/interaction-coordinator.ts"))).toContain(
       "readonly streams: WebuiInteractionPhaseIntents;",
@@ -93,7 +93,7 @@ describe("prohibition 1 — a business may not hold a writer for another busines
 describe("prohibition 2 — a rule may not be filed under a module that does not own its concept", () => {
   it("interactions: the answers→phase rule lives with the flow that knows the outcome", () => {
     // The composer's wiring computed this; the transition's policy is the
-    // interaction flow's, so both moved into the owner in this carve.
+    // interaction flow's, so both moved into the owner.
     const composer = flat(read("features/composer/ui/WebuiComposer.tsx"));
     expect(composer).not.toContain("webuiAnswersEndTurn");
     expect(flat(read("features/interactions/application/interaction-coordinator.ts"))).toContain(
@@ -102,11 +102,11 @@ describe("prohibition 2 — a rule may not be filed under a module that does not
   });
 
   it("the two fence cells are created by the application, not by the component", () => {
-    // §4.2 field 6: the composer owns neither fence. The cell has to outlive a
+    // The composer owns neither fence. The cell has to outlive a
     // render, so the application creates the instance and the business reads the
     // one it is handed.
     const composer = flat(read("features/composer/ui/WebuiComposer.tsx"));
-    // T05 moved both fences into the session-keyed owners: the component reads
+    // Both fences live in the session-keyed owners: the component reads
     // neither cell and holds no counter of its own.
     expect(composer).not.toContain("useWebuiVersionCells()");
     expect(composer).not.toMatch(/useRef\(0\)/u);
@@ -159,7 +159,7 @@ describe("prohibition 3 — the set of valid values is enumerated in exactly one
   it("goal: no module but the registry and the reducer names a goal kind", () => {
     const naming = clientModules().filter((file) => {
       if (file === "projection/common/event-kinds.ts") return false;
-      if (file === "features/turn/application/effect-reducer.ts") return false; // §10 S9 keeps the reducer's switch
+      if (file === "features/turn/application/effect-reducer.ts") return false; // the reducer keeps its own switch
       if (file === MESSAGE_BLOCK_KINDS) return false; // message-block kinds, not event kinds
       return literal.test(flat(read(file)));
     });
@@ -197,8 +197,8 @@ describe("prohibition 4 — a rule shared across businesses gets one owner every
     );
     expect(declaring).toEqual(["application/version-cell.ts"]);
     // Read as a type by both fences, one cell each — the independence the two
-    // coordinators assert in their own suites. T05 moved the two owners into
-    // their feature homes (`features/goal/application/` and
+    // coordinators assert in their own suites. The two owners live in their
+    // feature homes (`features/goal/application/` and
     // `features/interactions/application/`), so both now reach the shared cell
     // the assembly creates by ascending out of the feature directory; the cell
     // itself stays a shared application module, which is why the specifier is

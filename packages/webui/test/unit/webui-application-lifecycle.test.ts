@@ -1,11 +1,11 @@
-// The application lifecycle: constructed → started → disposed (plan §4.1; T02).
+// The application lifecycle: constructed → started → disposed.
 //
 // The seam is the assembled application's own public lifecycle, driven with
 // injected storage and a scripted channel: what a host can observe is the order
 // of its IO, the number of ingress links it opens, and what a disposed instance
-// refuses. The fixtures below assert exactly that, plus the ordering rule the
-// ticket calls out — the initial route reaches unread hydration before the first
-// persistence write, so opening a session never restores its own badge.
+// refuses. The fixtures below assert exactly that, plus the ordering rule — the
+// initial route reaches unread hydration before the first persistence write, so
+// opening a session never restores its own badge.
 //
 // No DOM: these are the framework-free assembly's guarantees, and the built
 // client's boot is covered by the browser suite.
@@ -267,10 +267,10 @@ describe("the entry's boot shape", () => {
   });
 });
 
-// The opaque identity/freshness context (T02's `opaque-identity-freshness-context`).
-// §4.5 puts credential and configuration generations in the resource key; these
-// cases pin the three properties a key can rely on — the token is opaque, it
-// belongs to one instance, and a generation only ever moves forward.
+// The opaque identity/freshness context: credential and configuration
+// generations go in the resource key. These cases pin the three properties a key
+// can rely on — the token is opaque, it belongs to one instance, and a
+// generation only ever moves forward.
 describe("the identity epoch context", () => {
   it("hands out opaque tokens that carry no credential", () => {
     const epochs = createWebuiIdentityEpochs();
@@ -340,10 +340,10 @@ describe("the identity epoch context", () => {
   });
 });
 
-// The one reconciliation entry point (plan §4.4). A selection change and a
-// suspected observation gap must reach the same authoritative re-reads instead
-// of each surface probing on its own, and the re-reads are the ones the
-// installed routes own — asserted through the routes themselves, not a copy.
+// The one reconciliation entry point. A selection change and a suspected
+// observation gap must reach the same authoritative re-reads instead of each
+// surface probing on its own, and the re-reads are the ones the installed
+// routes own — asserted through the routes themselves, not a copy.
 describe("the reconciliation entry point", () => {
   it("runs the reconciled session's authoritative re-reads through their owners", () => {
     const listPendingPermissions = vi.fn(async () => ({ requests: [] }));

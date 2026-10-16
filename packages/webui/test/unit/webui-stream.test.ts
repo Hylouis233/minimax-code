@@ -456,9 +456,8 @@ describe("WebUI mixed stream reducer", () => {
     // `stream-instrumentation.ts` does. The probe is the explicit,
     // documented mechanism for verifying the cursor-ordering
     // invariant; it lives in a separate module so production code
-    // cannot reach it without an obvious import. The brief that
-    // introduced this ticket accepts this trade-off explicitly: the
-    // public boundary cannot observe the ordering, and the
+    // cannot reach it without an obvious import. The trade-off is
+    // explicit: the public boundary cannot observe the ordering, and the
     // instrumentation is isolated so it cannot be mistaken for
     // production API.
     const frame = {

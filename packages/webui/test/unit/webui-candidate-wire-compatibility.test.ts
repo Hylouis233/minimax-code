@@ -1,7 +1,7 @@
 /**
- * Provider write-body ingress validation (plan §5.4 / D05).
+ * Provider write-body ingress validation.
  *
- * D05 says **five** malformed Provider write bodies fail at ingress, and §5.4 names which five. This
+ * Five malformed Provider write bodies fail at ingress. This
  * file covers all of them: `createUserModelProvider`, `updateUserModelProvider`,
  * `discoverUserModelsCandidate`, `saveUserModelProviderCandidate` and `testUserModelCandidate`. Each
  * block asserts the same two things — the frame is `invalidBody` and the runtime was never invoked —
@@ -10,7 +10,7 @@
  *
  * The `testUserModelCandidate` block is the one this file started as: it used to compare the old
  * record-forwarding validator with the new registry byte for byte and assert that each malformed body
- * reached the runtime anyway. That expectation is the behaviour D05 removes, so it is replaced in full
+ * reached the runtime anyway. That expectation no longer holds, so it is replaced in full
  * rather than kept beside the new one — keeping it would require weakening the validator back to a
  * record-forwarder.
  */
@@ -105,7 +105,7 @@ async function refusesAtIngress(operation: string, body: unknown): Promise<void>
 const BASE_URL = "https://example.test/v1";
 
 describe("testUserModelCandidate refuses malformed bodies at ingress", () => {
-  // The first five reached the runtime before D05, where the missing fields
+  // The first five reached the runtime regardless, where the missing fields
   // became a TypeError inside the adapter. All of them are ingress failures now.
   const malformed: ReadonlyArray<{ readonly name: string; readonly body: unknown }> = [
     { name: "a candidate with no modelId", body: { candidate: { providerId: "p1" } } },

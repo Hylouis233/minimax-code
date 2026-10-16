@@ -1,5 +1,5 @@
 /**
- * The model picker's search arithmetic (roadmap H, 模型搜索).
+ * The model picker's search arithmetic.
  *
  * Pure functions on purpose: the search box is a filter over a catalogue the
  * runtime refreshes underneath us, and the rules below — fuzzy matching, a
@@ -8,10 +8,9 @@
  * component. Each rule is pinned by a named test in
  * `test/unit/model-picker-search.test.ts`.
  *
- * This is a port of `webapp/lib/model-groups.ts#filterModelGroups` from the
- * other WebUI implementation, re-shaped onto this repository's entry type
- * (`WebuiModelPickerEntry`: `modelId`/`displayName` rather than `id`/`label`).
- * The matching rules are unchanged; only the field names moved.
+ * The matching rules operate on this package's entry type
+ * (`WebuiModelPickerEntry`: `modelId`/`displayName` rather than `id`/`label`),
+ * so a rule change lands here and not in the component that reads it.
  */
 import type {
   WebuiModelPickerEntry,

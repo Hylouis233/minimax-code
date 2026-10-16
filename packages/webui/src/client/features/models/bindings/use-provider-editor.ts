@@ -1,4 +1,4 @@
-// The Models provider editor's React edge (plan §5.5).
+// The Models provider editor's React edge.
 //
 // One editor per Usage page visit, hosted *above* the `sourceTab === "custom"`
 // conditional so switching source tabs does not discard a draft and so the

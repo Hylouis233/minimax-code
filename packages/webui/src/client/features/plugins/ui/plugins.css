@@ -1,4 +1,4 @@
-/* plugins — moved out of styles/shell.css (T20); rules kept in their original relative order. */
+/* plugins — moved out of styles/shell.css; rules kept in their original relative order. */
 @layer components {
 
   /* Opt out of the base layer's stable scrollbar gutter for horizontal-only

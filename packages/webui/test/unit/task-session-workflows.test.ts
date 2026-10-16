@@ -1,8 +1,8 @@
 /**
- * The task/session creation use case (P01) and the guards the canonical store
+ * The task/session creation use case and the guards the canonical store
  * exposes to it.
  *
- * The cases below are the ones the plan calls out as distinguishing: single
+ * The cases below are the distinguishing ones: single
  * flight per home incarnation, a destination that wins, a purged destination
  * that is not resurrected, a home incarnation that moved under an in-flight
  * creation, the captured input revision, the recorded Agent Team choice, a

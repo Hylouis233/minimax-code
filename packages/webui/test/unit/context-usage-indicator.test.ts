@@ -1,11 +1,10 @@
-// The context-usage indicator's behaviours and its write-free reading (ticket #77's acceptance
-// criteria).
+// The context-usage indicator's behaviours and its write-free reading.
 //
 // The panel needs a DOM to open and hover, so the state, the listeners and the placement are asserted as
 // the expressions that implement them. Two claims are load-bearing and both are negative ones: the
 // indicator **writes nothing** — it reads usage, quota and the selected model and hands nothing back —
-// and it is **not filed under `client/projection/`**, because §6.1 resolves a module's edges by its
-// basename, so filing a stateful component there would silently reclassify them.
+// and it is **not filed under `client/projection/`**, because a module's edges resolve by its basename —
+// filing a stateful component there would silently reclassify them.
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -53,7 +52,7 @@ describe("the indicator reads and writes nothing it does not own", () => {
   });
 
   it("is a component, not a projection", () => {
-    // §6.1: a module's edges resolve by basename, so the home is part of the contract.
+    // A module's edges resolve by basename, so the home is part of the contract.
     expect(RELATIVE).toContain("src/client/features/sessions/ui/");
     expect(RELATIVE).not.toContain("src/client/projection/");
   });

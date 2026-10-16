@@ -1,11 +1,7 @@
-// Round-2 widget integration tests.
-//
 // These tests render the full `WebuiClientFoundationApp` shell with the
 // minimum scaffolding each transcript widget needs to be reached, then
-// assert ONE core marker per widget. They were written BEFORE the
-// corresponding wiring landed in the shell and confirmed to fail; the
-// widget-specific unit tests in this directory cover the per-component
-// shape, while this file covers the wiring.
+// assert ONE core marker per widget. The widget-specific unit tests in this
+// directory cover the per-component shape, while this file covers the wiring.
 
 import { describe, it, expect } from "vitest";
 import { createElement } from "react";
@@ -31,7 +27,7 @@ function sessionShell(opts: {
   readonly transcriptIncomplete?: boolean;
 }): string {
   // The shell is handed the one application store, so the transcript reads
-  // exactly this instance (ticket #45). A fresh store starts clean, so each
+  // exactly this instance. A fresh store starts clean, so each
   // test sees no prior turn on the key.
   const sessionStore = createWebuiSessionStore();
   sessionStore.updateSession(SESSION_ID, (current) => ({

@@ -10,7 +10,7 @@
 // inputs stay optional.
 //
 // No React imports here — this is a pure type that lives in the contracts
-// layer so the props layer (app.tsx) and the transport implementation
+// layer so the props layer and the transport implementation
 // (`client/platform/transport.ts`) both import it without crossing
 // boundaries.
 

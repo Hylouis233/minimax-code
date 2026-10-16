@@ -75,7 +75,7 @@ describe("shell surface wiring", () => {
     new URL("../../src/client/shell/WebuiClientFoundationApp.tsx", import.meta.url),
     "utf8",
   );
-  // A-005 moved the new-task workspace behaviour out of the frame; the probe
+  // The new-task workspace behaviour moved out of the frame; the probe
   // below follows the responsibility, not the file it used to sit in.
   const newTaskWorkspace = readFileSync(
     new URL("../../src/client/shell/use-new-task-workspace.ts", import.meta.url),

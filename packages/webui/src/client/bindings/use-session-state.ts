@@ -1,5 +1,4 @@
-// React subscription to a session's snapshot (plan §7.2
-// `client/bindings/use-session-state.ts`).
+// React subscription to a session's snapshot.
 //
 // It is the split-out React half of the retired module-level session store
 // hook: the store and its writer now live in
@@ -11,17 +10,16 @@
 //
 // The interaction commands are built here too, bound to the store's interaction
 // writer for the owner key, so the composer submits `applyGoal` /
-// `replacePendingPermissions` and holds no writer for that state (plan §7.6;
-// ticket #45).
+// `replacePendingPermissions` and holds no writer for that state.
 //
 // The turn commands are not built here. `useWebuiSessionCommands` reads the
-// application's one conversation command set (plan §5.1, P02 step 8) — the same
-// construction the event coordinator's attach/recheck routes and the composer's
-// submissions use — and the capabilities those commands run on are the
-// application's published turn capability slice
-// (`application/turn-capabilities.ts`), cut from the port the composition root
-// holds. A host with nothing wired has no slice member for the operation, and the
-// loop's own absent-capability guard refuses the turn with a stated reason.
+// application's one conversation command set — the same construction the event
+// coordinator's attach/recheck routes and the composer's submissions use — and
+// the capabilities those commands run on are the application's published turn
+// capability slice (`features/turn/application/turn-capabilities.ts`), cut from
+// the port the composition root holds. A host with nothing wired has no slice
+// member for the operation, and the loop's own absent-capability guard refuses
+// the turn with a stated reason.
 
 import { useMemo } from "react";
 
@@ -128,13 +126,13 @@ export function useWebuiInteractionCommands(
  * attempt's sink, cut the transports out of the capability slice and assemble the
  * two view objects — five decisions about application state, made in a React hook,
  * and a second construction of what the application's own routes already drive.
- * It reads the application's one owner now (plan §5.1, P02 step 8), so a component
- * invokes a command and receives no writer, no sink factory and no capability.
+ * It reads the application's one owner, so a component invokes a command and
+ * receives no writer, no sink factory and no capability.
  *
  * `undefined` means this host has no application at all (SSR, a store-only
- * render), so there is no execution owner to invoke. That is the honest answer;
- * building a second owner here to keep a fixture working is exactly what plan §5.1
- * forbids.
+ * render), so there is no execution owner to invoke. That is the honest answer:
+ * a second owner built here to keep a fixture working would be exactly the
+ * duplicate construction this hook removes.
  */
 export function useWebuiSessionCommands(
   sessionId: string | undefined,

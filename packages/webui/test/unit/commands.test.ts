@@ -144,8 +144,7 @@ describe("WebUI command adapter", () => {
       message: "getSessionRewindPreview body requires a non-empty userMessageId",
     });
 
-    // A create needs its endpoint and its key; the record-forwarding validator
-    // that accepted `{ providerId }` here is what D05 replaced.
+    // A create needs its endpoint and its key.
     assert.deepEqual(createUserModelProviderOperation.validate({ providerId: "p" }), {
       ok: false,
       code: "invalid_body",

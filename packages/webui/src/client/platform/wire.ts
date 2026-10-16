@@ -1,4 +1,4 @@
-// The WebSocket wire mechanics every operation shares (T18; plan §6, W7).
+// The WebSocket wire mechanics every operation shares.
 //
 // One socket carries one request: this module opens it, writes the same
 // envelope once the socket opens, tells the caller's own answer apart from
@@ -195,8 +195,7 @@ export function createWebuiWire({
 
   // `sendMessage` and `resumeSession` share the same wire shape: the
   // operation returns an `event`-framed iterable that ends with a
-  // `[DONE]` payload (see `session-stream-delivery.ts` and the brief's
-  // "two facts that make this ticket small"). One helper keeps the
+  // `[DONE]` payload (see `session-stream-delivery.ts`). One helper keeps the
   // close/error race in lockstep across both operations.
   function stream(
     operation: string,

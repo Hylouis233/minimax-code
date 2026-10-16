@@ -1,7 +1,7 @@
 // The shell element a host must render: the assembled application wrapping it.
 //
-// The shell renders what the assembly built and constructs nothing of its own
-// (plan §4.1), so a markup fixture has to hand it an application the same way
+// The shell renders what the assembly built and constructs nothing of its own,
+// so a markup fixture has to hand it an application the same way
 // production does. `sessionStore` in the properties is consumed as the
 // *assembly's* store rather than passed down — the shell reads the store off the
 // application it was given, so a fixture that seeds a store seeds the assembly.
@@ -29,15 +29,15 @@ export function shellElement(
   const store = sessionStore ?? options.store;
   // A fixture that hands the shell a transport-shaped bag means it as the
   // assembly's port slices — the shell cuts nothing and holds no transport of
-  // its own (plan §4.1), so it goes in through the same door production uses.
+  // its own, so it goes in through the same door production uses.
   const slices = options.slices ?? createWebuiPortSlices(transport ?? {});
   return createElement(WebuiApplicationProvider, {
     application: createWebuiApplicationFixture({
       ...options,
       ...(store ? { store } : {}),
       slices,
-      // The same bag drives the substrate's capability slice, which §5.6
-      // derives from the port: wiring the slices alone told the substrate that
+      // The same bag drives the substrate's capability slice, which is
+      // derived from the port: wiring the slices alone told the substrate that
       // no host capability existed at all.
       turnCapabilities: options.turnCapabilities ?? transport ?? {},
     }),

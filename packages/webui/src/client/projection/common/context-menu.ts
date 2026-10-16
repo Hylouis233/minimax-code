@@ -1,14 +1,12 @@
 // Where a context menu opens, given the pointer and the viewport.
 //
-// Carved out of `client/ui/ContextMenu.tsx` by Phase 4b, and moved here
-// from `projection/shell/` by T18: the placement rule has no shell policy in it
-// — it clamps a floating box to the viewport for whichever surface opened it —
-// so it belongs with the other generic menu mechanics
+// Carved out of `client/ui/ContextMenu.tsx`: the placement rule has no shell
+// policy in it — it clamps a floating box to the viewport for whichever surface
+// opened it — so it belongs with the other generic menu mechanics
 // (`projection/common/outside-close.ts`, which the same component reads for its
-// close rule). While it sat under the shell's projection, the shared menu, which
-// no business owns, reached into one business's private projection; here the
-// edge is what it always was in substance: reusable mechanics read by reusable
-// presentation.
+// close rule). The shared menu is owned by no business, so it must not reach into
+// one business's private projection; here the edge is reusable mechanics read by
+// reusable presentation.
 //
 // The body is the declaration as it stood in the source module — no behaviour
 // change.

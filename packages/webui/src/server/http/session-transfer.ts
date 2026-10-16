@@ -1,9 +1,8 @@
 // Session transfer routes for the loopback service: export one session as a
 // file and recreate a session from a transfer file. Split from `service.ts`
-// (plan section 7.1) with no behaviour change — the network-facing half (body
-// and query reading, status codes, headers and bodies) is the one the service
-// wrote before; the import workflow arrives through the runtime capability
-// seam.
+// with no behaviour change — the network-facing half (body and query reading,
+// status codes, headers and bodies) is the one the service wrote before; the
+// import workflow arrives through the runtime capability seam.
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 

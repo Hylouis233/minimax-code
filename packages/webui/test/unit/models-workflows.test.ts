@@ -1,5 +1,4 @@
-// Unit tests for the models workflow owner (plan §5.6's `models` row; §5.7's
-// provider-form attribution).
+// Unit tests for the models workflow owner.
 //
 // These cases used to run against `settings-workflows.ts`, which published the
 // model catalogue, the selection and the provider list without owning them. The
@@ -144,13 +143,13 @@ describe("writing a provider key", () => {
   });
 });
 
-// The keyed resources behind the owner (T03; plan §4.5, §3 P3).
+// The keyed resources behind the owner.
 //
-// These are the ticket's criterion-6 claims asserted through the owner's own
-// public commands: keyed independence, freshness coverage across a write, and a
-// disposed owner accepting nothing. The adversarial part is the scheduling —
-// two reads in flight, resolved out of order — because that is the shape the old
-// destination field failed.
+// These are asserted through the owner's own public commands: keyed
+// independence, freshness coverage across a write, and a disposed owner
+// accepting nothing. The adversarial part is the scheduling — two reads in
+// flight, resolved out of order — because that is the shape the old destination
+// field failed.
 describe("the catalogue is keyed, not one destination", () => {
   const model = (modelId: string) => ({ modelId }) as unknown as WebuiModelEntry;
 

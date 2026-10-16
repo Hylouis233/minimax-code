@@ -1,9 +1,8 @@
-// Sessions capability port (plan §9; ticket #59).
+// Sessions capability port.
 //
 // The session's own lifecycle: list, tree, create, archive, delete, update, fork
 // and the per-session usage read, with the loader/creator types those members
-// take. §9 halves `session-port` between `sessions` and `transcript`; the session
-// records themselves are this file's, and the message half is
+// take. The session records themselves are this file's, and the message half is
 // `transcript/session-read-port.ts`.
 //
 // Every method stays optional — `undefined` means "the operation is not wired".

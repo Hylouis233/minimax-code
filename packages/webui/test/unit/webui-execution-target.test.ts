@@ -1,4 +1,4 @@
-// Reading a submission target's live state (plan §5.5 P02 step 1/2; D01's reservation).
+// Reading a submission target's live state.
 //
 // The rule in `submission-admission.ts` is already pinned; this pins where its inputs come from. The
 // cases that matter are the ones a copy-paste bug would get wrong: that a home submission reads the

@@ -1,7 +1,7 @@
 // Workspace file route for the loopback service: serve one workspace file as a
-// byte-range-capable HTTP resource. Split from `service.ts` (plan section 7.1)
-// with no behaviour change — the path containment check, the range parsing and
-// the status codes, headers and bodies are the ones the service wrote before.
+// byte-range-capable HTTP resource. Split from `service.ts` with no behaviour
+// change — the path containment check, the range parsing and the status codes,
+// headers and bodies are the ones the service wrote before.
 
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";

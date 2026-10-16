@@ -1,4 +1,4 @@
-// The per-business port slices (plan §8 Phase 2; ticket #60).
+// The per-business port slices.
 //
 // This file is the slice mapping in executable form. The key lists in
 // `application/port-slices.ts` are the old-to-new optional capability mapping,
@@ -6,7 +6,7 @@
 // nothing dropped, nothing widened, and no member of another business reachable
 // from it.
 //
-// Two modes are tested throughout, because that is the risk Phase 2 carries: a
+// Two modes are tested throughout, because that is the risk the slices carry: a
 // **wired** member must pass through by identity, and an **unwired** one must be
 // `undefined` in the slice exactly as it was `undefined` on the composed
 // transport. A slice that turned `undefined` into a defined no-op would change
@@ -124,9 +124,9 @@ describe("every slice carries exactly the members its key list names", () => {
 });
 
 describe("turn's slice attaches a member only when the source carries it", () => {
-  // `turn` is the one slice built by its own factory rather than by `cut`
-  // (ticket #57), and that factory *drops* an absent member instead of storing
-  // `undefined` under it. A consumer reads `slice.send === undefined` either
+  // `turn` is the one slice built by its own factory rather than by `cut`, and
+  // that factory *drops* an absent member instead of storing `undefined` under
+  // it. A consumer reads `slice.send === undefined` either
   // way, so the not-wired branch is identical; what differs is that the key is
   // absent rather than present-and-undefined. Pinned here so the difference
   // stays a decision instead of drifting into an accident.

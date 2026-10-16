@@ -1,4 +1,4 @@
-// The goal owner, keyed by session (T05's `goal-session-owner`; plan §4.2, §4.4).
+// The goal owner, keyed by session.
 //
 // Two properties are the reason this moved out of the composer, and both are
 // asserted here rather than assumed:
@@ -6,7 +6,7 @@
 //   * the fence belongs to the session whose goal it orders, so a write to one
 //     session cannot fence a read of another;
 //   * the owner exists whether or not a view is mounted, so an event route can
-//     commit through it — the gap the T01 ledger's executed probe (C2) records.
+//     commit through it.
 
 import { describe, expect, it, vi } from "vitest";
 

@@ -1,6 +1,5 @@
-// Composer input history + cross-session draft store (roadmap Module B:
-// 输入历史/草稿). Pure decision functions for persisted state; browser IO is
-// owned by `client/platform/storage.ts`.
+// Composer input history + cross-session draft store. Pure decision functions
+// for persisted state; browser IO is owned by `client/platform/storage.ts`.
 //
 // The recall semantics follow the terminal readline convention codex uses:
 // every committed submission lands in a per-session list (newest last), ↑
@@ -16,7 +15,7 @@ export const WEBUI_COMPOSER_STATE_KEY = "webui.composer.state.v1";
 /** Store slot for the home composer (no session selected yet). */
 export const WEBUI_COMPOSER_HOME_KEY = "home";
 
-/** Default per-session history cap (roadmap: ↑ recall keeps a bounded list). */
+/** Default per-session history cap. */
 export const WEBUI_INPUT_HISTORY_LIMIT = 100;
 
 interface WebuiComposerPersistedLimits {

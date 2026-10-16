@@ -2,12 +2,11 @@
  * The composer's attachment acquisition, as one binding.
  *
  * The staged attachments live in the composer store (`staging.attachments` /
- * `staging.busy`, §5.6), so the component only ever read them — while the flow
- * around them was spread over seven places in a 2000-line file: the file reader,
- * the limit check, the concurrent read, the seed decision, the wire projection,
- * the two hidden inputs and the drop/paste handlers. No single own此前没有任何自动化端到端证er existed for
- * "how a file becomes a staged attachment", which is the responsibility this
- * binding takes.
+ * `staging.busy`), so the component only ever read them — while the flow around
+ * them was spread over seven places in the file: the file reader, the limit
+ * check, the concurrent read, the seed decision, the wire projection, the two hidden
+ * inputs and the drop/paste handlers. No single owner existed for "how a file becomes
+ * a staged attachment", which is the responsibility this binding takes.
  *
  * A pure move: the seed's mark-then-consume order, the limit error's precedence
  * over reading the file, and the busy window are exactly as they were. The

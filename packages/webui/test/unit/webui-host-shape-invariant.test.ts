@@ -1,6 +1,6 @@
-// Host-shape invariants added in batch C.
+// Host-shape invariants.
 //
-// Before this batch, `createOperationRegistry` registered 18 of its ~70
+// `createOperationRegistry` used to register 18 of its ~70
 // operations only when the runtime host happened to implement the matching
 // capability gates (`port.getSessionDiff && port.getTurnDiff && ...`, etc.).
 // Six capability gates meant the registry contents depended on which optional
@@ -422,7 +422,7 @@ describe("WebUI host-shape invariant (batch C seam)", () => {
     } as never);
 
     // The validator requires both halves of the request; a body missing either
-    // one never reaches the adapter (D05).
+    // one never reaches the adapter.
     for (const raw of [{ candidate: { baseUrl: "https://example.test" } }, { modelId: "model-1" }]) {
       const validation = testUserModelCandidateOperation.validate(raw);
       expect(validation).toMatchObject({ ok: false, code: "invalid_body" });
@@ -535,7 +535,7 @@ describe("WebUI host-shape invariant (batch C seam)", () => {
   });
 
   // The 18 operations whose registration used to depend on a host capability
-  // gate. After batch C every one of them is in the registry — see `operations.ts`,
+  // gate. Every one of them is in the registry — see `operations.ts`,
   // where the six `if (port.<x> && port.<y>)` capability gates were deleted.
   const GATED_BUT_NOW_UNCONDITIONAL: readonly string[] = [
     // diff group (was: `if (port.getSessionDiff && port.getTurnDiff && port.revertTurnDiff && port.reapplyTurnDiff)`)
@@ -604,9 +604,9 @@ describe("WebUI host-shape invariant (batch C seam)", () => {
   });
 
   // --------------------------------------------------------------------
-  // C-07: wire-error contract for capability-gated operations.
+  // Wire-error contract for capability-gated operations.
   //
-  // Before batch C the 18 capability-gated operations were absent from the
+  // The 18 capability-gated operations used to be absent from the
   // registry when their port hooks were missing, so the dispatcher answered
   // with `unknown_operation`. They now register unconditionally (the
   // type-checked-port contract forces every implementor to provide them),
@@ -660,7 +660,7 @@ describe("WebUI host-shape invariant (batch C seam)", () => {
       // A port that satisfies the type-checked seam but throws on a method
       // the host adapter's nested guards would also throw. We use the
       // getSessionDiff capability (one of the 18 gated ops) so a
-      // post-batch-C build that still owed gate semantics would manifest
+      // build that still owed gate semantics would manifest
       // here. To prove the dispatcher answers via the handler's own
       // message, we throw with a code-free Error whose message we pick.
       class FailingDiffPort extends FullPort {

@@ -185,7 +185,7 @@ describe("the search box reflects filter state", () => {
   });
 });
 
-/* Roadmap E 区 follow-up: the review page refused to do anything until the
+/* The review page refused to do anything until the
  * selected session already carried a workspace, and the refusal named the
  * problem without offering a way out of it. Opening a workspace-bound session
  * was the only route, and that route is not reachable from the page — the
@@ -314,9 +314,8 @@ describe("tab-to-page wiring", () => {
  * exact expressions, so removing the picker call or hard-coding the prop back
  * in turns them red. */
 describe("the chosen workspace reaches the review load", () => {
-  /* The page has its own file (plan §5.6: the coding settings page is `workspace`,
-   * ticket #70), so the slice reads it directly and stops at the picker — the
-   * page's own call is what these assertions are about. */
+  /* The page has its own file, so the slice reads it directly and stops at the
+   * picker — the page's own call is what these assertions are about. */
   const source = readFileSync(
     fileURLToPath(new URL("../../src/client/features/review/ui/ReviewSettingsPage.tsx", import.meta.url)),
     "utf8",

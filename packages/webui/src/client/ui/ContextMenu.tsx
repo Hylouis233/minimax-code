@@ -1,11 +1,5 @@
 // WebuiContextMenu — the floating right-click menu, plus the placement helper
 // and item shape that drive it.
-//
-// W3 tier 2 lift: `placeWebuiContextMenu` (placement helper), `WebuiContextMenuItem`
-// (item type), and `WebuiContextMenu` (renderer) were moved verbatim out of the
-// module that used to hold the shell — `app.tsx`, since replaced by
-// `WebuiClientFoundationApp.tsx`. The bodies are byte-identical to what used to
-// live there; the lift was move-only, and consumers import them from this file.
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";

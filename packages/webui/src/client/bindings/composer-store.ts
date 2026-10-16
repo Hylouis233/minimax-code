@@ -1,9 +1,7 @@
-// The composer's own owner module, read by its own presentation (plan §8 Phase 3
-// B2; ticket #67).
+// The composer's own owner module, read by its own presentation.
 //
-// §4.2 field 1 gives `composer` the queue's state, and §5.6 puts the owner at
-// `application/composer/composer-store.ts`. The component used to hold the queue in
-// `useState`, which is the temporary home the ledger recorded at `:780-781`.
+// The `composer` business owns the queue's state. The component used to hold the
+// queue in `useState`.
 //
 // The fallback keeps a composer mounted without an application (unit tests, a
 // standalone surface) working against a per-mount store instead of no store at all.

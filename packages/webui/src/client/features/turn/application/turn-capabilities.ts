@@ -1,4 +1,4 @@
-// The turn capability slice (plan §4.12 field 3, §8 Phase 1 step 1; ticket #57).
+// The turn capability slice.
 //
 // `turn` reaches the harness through four capabilities — **send**, **resume**,
 // **load** and **stop** — and this is the one published object that carries
@@ -36,10 +36,9 @@ export interface WebuiTurnCapabilitySlice {
   /** **stop** — abort the running turn. */
   readonly stop?: TurnExecutionPort["abortSession"];
   /**
-   * The active-turn probe (§4.12 gives `turn` "the in-flight read"). It rides on
-   * this slice from A4-s5 because the presentation that renders a turn no longer
-   * receives it as a prop: with it here, a consumer reads the probe the same way
-   * it reads send/resume/stop.
+   * The active-turn probe. It rides on this slice because the presentation that
+   * renders a turn no longer receives it as a prop: with it here, a consumer
+   * reads the probe the same way it reads send/resume/stop.
    */
   readonly activeTurn?: TurnExecutionPort["getActiveTurn"];
   /** The queue's write; a send while a turn is in flight enqueues instead. */

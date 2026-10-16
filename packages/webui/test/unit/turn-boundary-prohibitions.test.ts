@@ -1,17 +1,13 @@
-// `turn`'s four §5.1 prohibition assertions (ticket #57).
+// `turn`'s four prohibition assertions.
 //
-// Ticketing note: every other business's four prohibitions are written by that
-// business's own Phase 3 carve ticket. `turn` takes no carve ticket — it *is*
-// the substrate — so its four are carried by the ticket that widens its
-// intents, as a separate item from the four substrate fences
-// (`turn-substrate-fences.test.ts`). The two are different claims: a fence
-// asserts that a mechanism holds; a prohibition asserts that one business
-// cannot reach another's state.
+// They are a different claim from the four substrate fences
+// (`turn-substrate-fences.test.ts`): a fence asserts that a mechanism holds; a
+// prohibition asserts that one business cannot reach another's state.
 //
-// They are source-level assertions, and that is deliberate. §12.1 says the
-// dependency checker holds **no** business-boundary rule and this programme
-// proposes none, so the machine half of the prohibitions is these tests — a
-// reading, made repeatable. Each one states what it cannot see.
+// They are source-level assertions, and that is deliberate: the dependency
+// checker holds **no** business-boundary rule, so the machine half of the
+// prohibitions is these tests — a reading, made repeatable. Each one states what
+// it cannot see.
 
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";

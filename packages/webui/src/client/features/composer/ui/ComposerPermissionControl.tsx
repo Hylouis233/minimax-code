@@ -1,5 +1,4 @@
-// The composer's permission-mode control: the pill and the popover it opens
-// (T13 criterion 5 — part of the toolbar unit).
+// The composer's permission-mode control: the pill and the popover it opens.
 //
 // The pill, its option table and the popover were 58 lines of the composer
 // render plus four module constants that only this control reads. They live

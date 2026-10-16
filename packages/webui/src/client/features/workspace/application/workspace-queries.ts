@@ -1,10 +1,9 @@
-// The workspace composer (T11).
+// The workspace composer.
 //
 // This module owns no resource of its own: the file tree and contents, the git
-// environment and the review each have their own owner (plan §5.2 workspace row).
-// The panels read ONE snapshot, so this composes the three slices on read and
-// forwards every command, which is what the plan means by composing the submodule
-// APIs rather than reimplementing their policy.
+// environment and the review each have their own owner. The panels read ONE
+// snapshot, so this composes the sub-slices on read and forwards every command —
+// composing the submodule APIs rather than reimplementing their policy.
 //
 // It keeps exactly two things: the git-changed fan-out (one signal, the owners it
 // names) and the composed snapshot's identity, which `useSyncExternalStore`
@@ -76,9 +75,9 @@ export interface WebuiWorkspaceQueriesState {
   readonly environmentRevision: number;
   readonly environment: import("./workspace-environment-owner.js").WebuiWorkspaceEnvironmentState;
   readonly files: ReadonlyMap<string, import("./workspace-files-owner.js").WebuiWorkspaceFileContentState>;
-  /** The directory picker's listing (the files owner's slice, T11). */
+  /** The directory picker's listing (the files owner's slice). */
   readonly directoryBrowse: import("./workspace-files-owner.js").WebuiDirectoryBrowseState;
-  /** The archive owner's slice: one listing and one extract outcome (T11). */
+  /** The archive owner's slice: one listing and one extract outcome. */
   readonly archive: WebuiWorkspaceArchiveState;
   /** The canvas owner's slice: the session's document and the last outcome. */
   readonly canvas: WebuiWorkspaceCanvasState;
@@ -109,7 +108,7 @@ export interface WebuiWorkspaceQueries {
   readonly canBrowseWorkspaceDirs: boolean;
   /**
    * The panel/tab owner. Its state is keyed by session and is not part of the
-   * composed snapshot: a surface subscribes to the session it shows (T11).
+   * composed snapshot: a surface subscribes to the session it shows.
    */
   readonly panel: WebuiWorkspacePanelOwner;
   readonly loadReviewSummary: (

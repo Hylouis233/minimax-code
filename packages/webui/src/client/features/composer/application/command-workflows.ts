@@ -1,8 +1,8 @@
-// The command workflow (plan §7.1 `application/`; ticket #49 criterion 8).
+// The command workflow.
 //
 // The composer's slash-command runner was the one business request a component
 // still issued straight through the transport (`runCommand({...})` inside the
-// 3000-line `SessionComposer`). It moves here so the component submits a
+// `SessionComposer`). It moves here so the component submits a
 // workflow and holds no transport call, exactly as the session and execution
 // commands already do.
 //
@@ -11,11 +11,10 @@
 // to remove the direct transport edge from the presentation layer, so the one
 // place a command reaches the wire is the application.
 //
-// The queue's read and its remove joined it under T13 for the same reason and
-// with the same shape: §4.2 field 3 names `refreshQueue` and `removeQueued` as
-// this owner's commands, and the component held both as props. What the caller
-// does with the answer — applying it to the queue mirror the store owns — stays
-// with the caller; nothing here holds state.
+// The queue's read and its remove belong here for the same reason and with the same shape:
+// `refreshQueue` and `removeQueued` are this owner's commands, and the component held both as
+// props. What the caller does with the answer — applying it to the queue mirror the store owns —
+// stays with the caller; nothing here holds state.
 
 import type { ComposerPort } from "../contracts/command-port.js";
 

@@ -1,12 +1,6 @@
 // SessionTranscript — the per-session message log: groups, projectWebuiMessage
 // flattening, history paging, streaming loader, and the embedded
 // WebuiQuestionnaireResponse renderer for historical questionnaire answers.
-//
-// W3 tier 4 lift: this cluster (2 components) was moved verbatim out of
-// `app.tsx`. The bodies are byte-identical to what used to live there;
-// the lift is move-only. `app.tsx` keeps a thin re-export block so
-// existing consumers (`webui-shell.test.ts`, importers via `app.tsx`)
-// keep their current import path during the W3 wave.
 
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, type ReactElement } from "react";
 import { ChatSkeleton } from "./TranscriptSkeletons.js";
@@ -117,8 +111,8 @@ export function WebuiSessionTranscript({
     void historyOwner?.refreshPage(sessionId);
     return undefined;
   }, [historyOwner, sessionId, turnLive]);
-  // One view model, derived in one place (`projection/transcript/
-  // transcript-view-model.ts`); this component renders what it returns.
+  // One view model, derived in one place (`projection/transcript-view-model.ts`);
+  // this component renders what it returns.
   const view = useMemo(
     () =>
       projectWebuiTranscriptView({
@@ -156,8 +150,7 @@ export function WebuiSessionTranscript({
     turns,
     showEmptyState,
   } = view;
-  // The scroll binding owns the viewport, the auto-follow policy and the pin
-  // (plan §6: scroll is one of the three responsibilities cut out of this file).
+  // The scroll binding owns the viewport, the auto-follow policy and the pin.
   const { releaseAutoFollow } = useWebuiTranscriptScroll({
     transcriptRef,
     sessionId,

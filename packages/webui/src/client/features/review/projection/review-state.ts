@@ -3,8 +3,8 @@
  * The workspace review capability (getWorkspaceReviewSummary /
  * listWorkspaceReviewFileDiffs / searchWorkspaceReviewDiffs) is already wired
  * end to end — the diff card's Review button dispatches into the workspace
- * panel. What was missing was a place to read a whole change set, which is
- * what roadmap E 区's "Review 审查模式" row asks for.
+ * panel. What was missing was a place to read a whole change set; this module
+ * is that place.
  *
  * Everything that can be decided without the network lives here so it can be
  * tested directly: the webui suite runs `environment: "node"` with no jsdom,
@@ -285,13 +285,10 @@ export const WEBUI_REVIEW_DIFF_BATCH_SIZE = 5;
 
 
 // ---------------------------------------------------------------------------
-// The diff card's machine (plan §5.6's `transcript` row: "`DiffCard.tsx`'s reducer
-// and its five other pure functions leave the component file"; §10 S13: "one owner
-// (`review`'s reducer module) and two readers"). It was filed in the transcript's
-// component — the second place review/diff rendering lives — and it belongs here
-// with the review page's own machine, so the two readers share one module rather
-// than one of them keeping a private copy of the failure copy and the mutation
-// decisions.
+// The diff card's machine. It was filed in the transcript's component — the
+// second place review/diff rendering lives — and it belongs here with the review
+// page's own machine, so the two readers share one module rather than one of them
+// keeping a private copy of the failure copy and the mutation decisions.
 //
 // The bodies are verbatim from `DiffCard.tsx`; the move changed the export site
 // and nothing else.

@@ -1,4 +1,4 @@
-// ProjectExpansion — extracted from `SessionRail.tsx` (T07's responsibility cut of the rail).
+// ProjectExpansion — extracted from `SessionRail.tsx`.
 // The declaration body is verbatim; the `export` keyword, this header and the
 // import specifiers are the only differences.
 
@@ -18,13 +18,11 @@ import { sessionLabel } from "../projection/rail-groups.js";
 import { SessionActivityMeta } from "./session-activity-meta.js";
 
 /**
- * One project's expansion (plan §16.10's three in-file regions: the project-list
- * expansion): the sessions under a project's row, each collapsible to its child
- * sessions, with the "更多" control that reveals the next batch.
+ * One project's expansion: the sessions under a project's row, each collapsible
+ * to its child sessions, with the "更多" control that reveals the next batch.
  *
  * A cut, not a move: the state stays in `WebuiProjectList` and arrives as props and
- * callbacks, so the lifetimes are exactly what they were — which is what §16.10
- * requires of an in-file region. Nothing here is stateful.
+ * callbacks, so the lifetimes are exactly what they were. Nothing here is stateful.
  */
 export function ProjectExpansion({
   projectKey,

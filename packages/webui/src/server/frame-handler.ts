@@ -1,8 +1,7 @@
 // Inbound WebSocket frame handling for the loopback service: reject binary
 // frames, enforce the message-size cap, parse JSON and invoke the dispatcher.
-// Split from `service.ts` (plan section 7.1) with no behaviour change — the
-// error codes, the messages and the dispatcher call are the ones the service
-// wrote before.
+// Split from `service.ts` with no behaviour change — the error codes, the
+// messages and the dispatcher call are the ones the service wrote before.
 
 import type { RawData, WebSocket } from "ws";
 

@@ -1,6 +1,4 @@
-// SPEC-C item C-3 — "Stop, and sending after stop".
-//
-// C-3 was marked "not verified" by the roadmap. These tests drive the real
+// These tests drive the real
 // product path with no DOM, exactly as `packages/webui/AGENTS.md` prescribes
 // for `client/stream.ts` / `client/stream-loop.ts`: a shared `setStream`,
 // one `buildWebuiStreamLoopSink(setStream, streamStateBundle)` per submit (what the composer

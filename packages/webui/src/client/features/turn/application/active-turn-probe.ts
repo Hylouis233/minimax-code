@@ -1,4 +1,4 @@
-// Deduplicated same-session active-turn probe (plan §7.1 `application/`).
+// Deduplicated same-session active-turn probe.
 //
 // `getActiveTurn` is the authoritative repair for a turn this client never saw:
 // a `session.start` that arrived before the subscription was live, or was lost

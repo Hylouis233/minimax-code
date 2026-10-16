@@ -1,6 +1,6 @@
 // The **turn-lifecycle** view: opening a turn's stream, clearing it for a new
-// task, recording what it carries and closing it (plan §5.5 P02 step 2 — it was
-// Sessions' until the execution substrate took it over).
+// task, recording what it carries and closing it. It was Sessions' until the
+// execution substrate took it over.
 //
 // It is the one view that also writes the `sending` indicator, because `sending`
 // is the submit's lifecycle flag rather than part of the phase. The *lease* is

@@ -1,5 +1,4 @@
-// The composer's submission, executed (plan §5.5 P02 step 3: "`submitWebuiComposerTurn`,
-// `buildWebuiComposerHandlers` leave" Composer; step 4: the caller consumes the semantic transition).
+// The composer's submission, executed.
 //
 // It lives here because execution does: the substrate that dispatches a turn is Turn's, and it may not
 // reach back into Composer's application modules to do it. Composer keeps what is Composer's — slash,
@@ -8,7 +7,7 @@
 //
 // The submission now *reports* what it decided. Every callback it already called fires exactly as
 // before, so this is additive to the callers that still read them; the returned operation is what the
-// Composer will consume instead (step 4), and it is the honest classification of what happened rather
+// Composer will consume instead, and it is the honest classification of what happened rather
 // than a prediction: the branch produces the completion and the decision is derived from it.
 
 import type {
@@ -113,7 +112,7 @@ export async function submitWebuiComposerTurn(
       handlers.setRefusal(message);
       return record({ kind: "creation-failed", error: message });
     }
-    // The creation is the task use case's (P01): it is single-flight per home incarnation (D01), it
+    // The creation is the task use case's: it is single-flight per home incarnation, it
     // transfers the home record onto the created session under the destination-wins and purge guards,
     // it moves the composer's home slot and it refreshes the catalogue. Nothing here resets the
     // stream after a create — that reset is what made an adopted destination unsafe, and the
@@ -183,6 +182,6 @@ export async function submitWebuiComposerTurn(
     if (current === undefined || ownsWebuiStreamGeneration(current, claimed)) handlers.setSending(false);
   }
   // A dispatch that rejects still rejects: the loop's own error path is the caller's today, and the
-  // owner makes it a `failed` completion when it takes the callbacks over (P02 step 1).
+  // owner makes it a `failed` completion when it takes the callbacks over.
   return record({ kind: "dispatched", sessionId, created });
 }

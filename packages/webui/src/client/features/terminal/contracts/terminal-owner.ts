@@ -1,4 +1,4 @@
-// The Terminal business's published surface (T15, plan §5.2's terminal row).
+// The Terminal business's published surface.
 //
 // These declarations are what a peer business — the workspace panel today —
 // consumes: the owner interface and the catalogue it answers with. The

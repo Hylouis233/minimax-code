@@ -1,5 +1,5 @@
 // The composer toolbar's submission controls: the goal/plan mode pills and the
-// send-or-stop button (T13 criterion 5 — the remainder of the toolbar unit).
+// send-or-stop button.
 //
 // They are two components in one module rather than one component, because the
 // toolbar places them apart: the pills sit beside the permission control, the

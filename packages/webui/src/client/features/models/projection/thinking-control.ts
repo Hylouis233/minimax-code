@@ -1,5 +1,5 @@
 /**
- * The composer's thinking trigger (roadmap H, 模型与用量).
+ * The composer's thinking trigger.
  *
  * A brain icon beside the send button that answers ONE question — is thinking
  * on — and, for a model with a depth scale, a second control beside it that
@@ -15,11 +15,8 @@
  * assert a state nothing here can verify. `null` renders in the neutral colour
  * and lets the LABEL carry the truth; colour reinforces, text decides.
  *
- * Ported from `webapp/lib/effort-control.ts` in the other WebUI implementation,
- * re-shaped onto this repository's model entry: the target reports
- * `effortOptions` plus `thinking.effort` / `variant`, where the source reported
- * a `thinkingLevels` array and a single `thinking` string. The shape decisions
- * are unchanged.
+ * The model target reports `effortOptions` plus `thinking.effort` /
+ * `variant`; a single `thinking` string is not what this wire carries.
  */
 
 import type {

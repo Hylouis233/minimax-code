@@ -1,6 +1,6 @@
-// A-003: the adapter's translations, asserted through the real host.
+// The adapter's translations, asserted through the real host.
 //
-// A-003's gap is that `createHarnessPortFromHost` — the layer that turns the
+// The gap this file closes is that `createHarnessPortFromHost` — the layer that turns the
 // runtime's objects into the WebUI's port types — was only ever exercised against
 // host stubs shaped by the WebUI's own declarations, so its expectations came from
 // the same place as its implementation. This file pins the translations that
@@ -19,7 +19,7 @@
 // | execution | `getActiveTurn()` no active turn -> `undefined` | yes | — |
 // | execution | `sendMessage`/`resumeSession` signal -> `{ signal }` context | the turn's stream (see `real-host-model-turn.test.ts`) | — |
 // | execution | `requestCompaction` optional-slot guard + its own message | — | stub: the v2 host always exposes it, so the missing-slot branch cannot be reached live |
-// | sessions | `listSessions` items reach `WebuiSessionListItem` unchanged | identity fields | the wire-declaration rows (e.g. `sessionType`) belong to A-001's derivation pass |
+// | sessions | `listSessions` items reach `WebuiSessionListItem` unchanged | identity fields | the wire-declaration rows (e.g. `sessionType`) belong to the derivation pass |
 // | workspace | `getWorkspaceEnvironment` projection with defaults (`0`, `"skipped"`) | yes, repo and non-repo | — |
 // | workspace | `readWorkspaceFile` path fallback + its two refusal messages | yes | — |
 // | workspace | `readWorkspaceArchive` falls back to this package's reader | yes (the v2 host has no archive method) | — |

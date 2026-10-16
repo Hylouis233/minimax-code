@@ -1,5 +1,4 @@
-// The cached-read store (plan §16.3's shared invariant; extracted from
-// `settings-workflows.ts` for the `models` carve).
+// The cached-read store, extracted from `settings-workflows.ts`.
 //
 // The store is the one implementation of the fence every caching owner reads
 // through, so its two guarantees are asserted here directly rather than only

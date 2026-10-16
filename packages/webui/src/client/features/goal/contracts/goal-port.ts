@@ -1,9 +1,9 @@
-// Goal capability port (plan §9; ticket #59).
+// Goal capability port.
 //
-// The goal entity: its enablement probe, its read, and create / patch / clear. §5.6
-// gives `goal` the entity projection, the status and version, and the version fence —
-// so the operations that move it are this business's, not the interaction
-// coordinator's, whose third duty it used to be.
+// The goal entity: its enablement probe, its read, and create / patch / clear. With
+// the entity projection, the status and version, and the version fence in this
+// business, the operations that move it are this business's too — not the
+// interaction coordinator's, whose third duty they used to be.
 //
 // Every method stays optional — `undefined` means "the operation is not wired".
 

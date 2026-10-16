@@ -1,4 +1,4 @@
-// The event coordinator's routing guard (ticket #45/#47 regression pin).
+// The event coordinator's routing guard.
 //
 // `thread_goal.updated` declares its session id inside `goal` rather than at
 // the payload top level. The effect reducer's own session guard carries a

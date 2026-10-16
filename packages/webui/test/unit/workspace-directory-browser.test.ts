@@ -1,4 +1,4 @@
-// The workspace directory browser's behaviours (ticket #76's second acceptance criterion).
+// The workspace directory browser's behaviours.
 //
 // Browse, loading/error, manual path, selection and dismissal. The picker needs a DOM to drive, so each
 // behaviour is asserted as the expression that implements it — the project's convention for structural
@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 
 const PATH = "../../src/client/features/workspace/ui/WebuiWorkspaceDirectoryBrowser.tsx";
 const source = readFileSync(fileURLToPath(new URL(PATH, import.meta.url)), "utf8");
-// The listing, its loading state and its failure belong to the files owner (T11);
+// The listing, its loading state and its failure belong to the files owner;
 // the component states what it wants read and renders what came back. Both halves
 // are scanned, so a regression that drops the behaviour fails here whichever side
 // it lands on.

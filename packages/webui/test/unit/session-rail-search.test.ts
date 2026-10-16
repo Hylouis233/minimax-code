@@ -367,7 +367,7 @@ describe("WebuiProjectList under a search query", () => {
 // such: it proves the query reaches both consumers, not that the screen looks
 // right. The screen was checked by hand against a real rail.
 //
-// A-005 split the rail's state out of the frame: the query and the two filters
+// The rail's state was split out of the frame: the query and the two filters
 // live in `use-session-rail-actions.ts`, and the frame still renders the input
 // and the list. The probes read both files, so neither side can be emptied.
 describe("rail search wiring in WebuiClientFoundationApp", () => {

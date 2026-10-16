@@ -1,7 +1,7 @@
-// The 自定义指令 editor (ticket #73; §15.1's `GlobalInstructionsSection.tsx` row). One of the three
-// co-visible editors `PersonalizationSettings.tsx` composes, moved out of that file with its own
-// lifecycle: it reads the profile file, seeds a pre-migration browser draft when there is no file to
-// conflict with, and saves through `setGlobalInstructions`.
+// The 自定义指令 editor. One of the three co-visible editors `PersonalizationSettings.tsx`
+// composes, moved out of that file with its own lifecycle: it reads the profile file, seeds a
+// pre-migration browser draft when there is no file to conflict with, and saves through
+// `setGlobalInstructions`.
 //
 // Its section header comes from `settings-atoms.tsx`, not from the parent — the parent composes this
 // module, so a child importing back from it would be a cycle.

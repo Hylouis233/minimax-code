@@ -1,6 +1,5 @@
-// The 记忆 card (ticket #73; §15.1's `MemorySection.tsx` row). The third of the three co-visible
-// editors `PersonalizationSettings.tsx` composes: a card of rows — two switches and a 管理 action —
-// rather than a standalone textarea.
+// The 记忆 card. The third of the three co-visible editors `PersonalizationSettings.tsx` composes:
+// a card of rows — two switches and a 管理 action — rather than a standalone textarea.
 //
 // It renders the manager dialog (the 管理 row's body) in the same conditional it always used, and it
 // imports that dialog's shared pieces rather than the other way round: the section renders the dialog,

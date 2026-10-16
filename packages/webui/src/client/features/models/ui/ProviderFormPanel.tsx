@@ -1,21 +1,19 @@
-// The provider form under `models` (plan §5.6's `settings` row: "the provider list, draft
-// and CRUD (`:280-380`) are `models`' and file under `components/models/`"; §16.10's
-// `UsageModelSettings.tsx → models/ProviderFormPanel.tsx` row, ticket #71).
+// The provider form under `models`.
 //
 // **What the parent keeps, and why it is not a preference.** `UsageModelSettings` stays the
 // parent and stays mounted, so it hosts the Models provider editor *above* the
-// `sourceTab === "custom"` conditional (§5.7 LC-4). The draft, the tested flag and the operation
+// `sourceTab === "custom"` conditional. The draft, the tested flag and the operation
 // state live in that editor, which is what keeps them alive across a sub-tab switch and what makes
 // a connection test belong to the draft it tested rather than to whatever the fields hold later.
 // The panel is rendered inside the same `sourceTab === "custom"` conditional it occupied before, so
-// its own mount and unmount boundary is unchanged (§5.7 LC-1) — which is also why
+// its own mount and unmount boundary is unchanged — which is also why
 // `ProviderPresetPicker`'s `open`/`query` still reset when the form's subtree goes away. The
-// session-keyed preload and both intervals stay in the parent (LC-2, LC-3); the OAuth surface stays
-// there too, because §5.6 files it under `settings`.
+// session-keyed preload and both intervals stay in the parent; the OAuth surface stays
+// there too, because it is `settings`' to render.
 //
-// This is a **controlled region** in §16.5's sense: it renders one editor's snapshot and forks no
+// This is a **controlled region**: it renders one editor's snapshot and forks no
 // state of its own beyond the preset picker's open flag, so nothing here can disagree with what a
-// write will actually send. The editor and its commands arrive as props — per §5.6 the provider CRUD
+// write will actually send. The editor and its commands arrive as props — the provider CRUD
 // is `models`' duty, not `settings`'.
 
 import { useState, type Dispatch, type ReactElement, type SetStateAction } from "react";
@@ -44,8 +42,8 @@ import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
 import { CloseIcon, IconButton, RefreshIcon } from "../../settings/ui/settings-atoms.js";
 
 /**
- * The provider commands this panel invokes. §5.6 files them under `models` rather than
- * `settings`; today the parent hands over the workflows object's members, which is the wiring
+ * The provider commands this panel invokes. They are `models`' rather than
+ * `settings`'; the parent hands over the workflows object's members, which is the wiring
  * boundary this panel declares and no longer owns around.
  */
 export interface WebuiProviderFormCommands {
@@ -72,9 +70,9 @@ export interface WebuiProviderFormCommands {
 }
 
 /**
- * The drafts, the tested flag and the operation state belong to the Models editor (§5.5), which
- * the parent hosts above the custom-tab conditional so a sub-tab switch does not lose them (§5.7
- * LC-4). The panel is a view over that editor's snapshot and calls its commands; the delete
+ * The drafts, the tested flag and the operation state belong to the Models editor, which
+ * the parent hosts above the custom-tab conditional so a sub-tab switch does not lose them.
+ * The panel is a view over that editor's snapshot and calls its commands; the delete
  * *confirmation* stays here, because asking before deleting is the list's question.
  */
 export interface WebuiProviderFormPanelProps {

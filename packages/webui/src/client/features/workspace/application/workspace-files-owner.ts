@@ -1,11 +1,10 @@
-// The workspace files owner (T11; produced target
-// `workspace-files-environment-owners`).
+// The workspace files owner.
 //
 // The file tree and the file contents are one resource: both are keyed by the
 // workspace directory and the tab, both are read through the workspace port, and
 // both invalidate together when the workspace changes. They used to share an owner
-// with the environment and the review; the environment left first, the review
-// before it. What is left here is the file half.
+// with the environment and the review; the review left first, then the environment.
+// What is left here is the file half.
 //
 // The mixed owner composes this slice with the other two on read, so the panels
 // keep reading one snapshot.
@@ -52,7 +51,6 @@ export interface WebuiWorkspaceFileTreeState {
   readonly directoryErrors: Readonly<Record<string, string>>;
 }
 
-/** The git-environment query for one workspace. */
 /** The directory picker's listing: one answer, its freshness, its failure. */
 export type WebuiDirectoryBrowseState =
   | { readonly status: "idle" }
@@ -62,7 +60,7 @@ export type WebuiDirectoryBrowseState =
 
 export interface WebuiWorkspaceFilesState {
   readonly fileTree: WebuiWorkspaceFileTreeState;
-  /** The directory browser's listing (T11: the view renders, the owner reads). */
+  /** The directory browser's listing: the view renders, the owner reads. */
   readonly directoryBrowse: WebuiDirectoryBrowseState;
   /** File read results, keyed by the caller's tab id. */
   readonly files: ReadonlyMap<string, WebuiWorkspaceFileContentState>;
@@ -123,7 +121,7 @@ export interface WebuiWorkspaceFilesOwner {
   /**
    * Release one tab: supersede its in-flight read and drop the content it held.
    * A closed tab has no reader left, so neither a late answer nor the bytes it
-   * already carries belong to anything (T11; plan §4.5).
+   * already carries belong to anything.
    */
   readonly discardTab: (tabId: string) => void;
   readonly canBrowseDirectories: boolean;
@@ -214,7 +212,7 @@ export function createWebuiWorkspaceFilesOwner(deps: {
         if (!isCurrent(key, version)) return;
         // The panel renders the tree it is handed, so an answer that is not a
         // tree must not reach it: it becomes an error state instead of a
-        // "files is not iterable" crash inside the render (T11).
+        // "files is not iterable" crash inside the render.
         const files = Array.isArray(answer) ? answer : undefined;
         set((current) =>
           current.fileTree.workspaceDir === workspaceDir

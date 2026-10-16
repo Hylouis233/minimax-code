@@ -1,12 +1,12 @@
-// Unit tests for ticket #45 prerequisite 2: the composer's send/queue/attach
-// commands and the unread controller, both now application-owned, plus the
-// deduplicated active-turn probe they share.
+// Unit tests for the composer's send/queue/attach commands and the unread
+// controller, both now application-owned, plus the deduplicated active-turn
+// probe they share.
 //
 // The suite drives application commands directly and also exercises the app's
-// event ingress in the assembled lifecycle suite, pinning the properties the
-// moves had to preserve: one probe per concurrent
-// same-session request, the queue branch's draft-clear/refusal behaviour, the
-// attach/recheck/gap-recovery decisions, and the unread persistence shape.
+// event ingress in the assembled lifecycle suite, pinning the properties these
+// cases cover: one probe per concurrent same-session request, the queue branch's
+// draft-clear/refusal behaviour, the attach/recheck/gap-recovery decisions, and
+// the unread persistence shape.
 
 import { describe, expect, it, vi } from "vitest";
 
@@ -445,8 +445,8 @@ describe("the assembled composer controller", () => {
 
     // No selected session and no `createSession` capability: the submission cannot open a turn, and
     // the outcome says so rather than leaving the caller to infer it from a missing callback. The
-    // draft stays where the user left it. (P02 step 4: this used to be read off a settle flag that
-    // the submission wrote back through `onNeedsSession`.)
+    // draft stays where the user left it; this used to be read off a settle flag that the submission
+    // wrote back through `onNeedsSession`.
     await expect(
       app.composerController.submit({
         draft: "needs a session",

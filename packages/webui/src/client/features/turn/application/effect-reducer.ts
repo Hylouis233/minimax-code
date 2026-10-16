@@ -1,7 +1,7 @@
 // Effect reducer — extract the runtime-event switch from the
 // `WebuiClientFoundationApp` component effect into a pure function.
 //
-// `app.tsx`'s `watchEvents` callback is an inline closure that closes over
+// The `watchEvents` callback is an inline closure that closes over
 // `sessionId`, `setStream`, `setSending`, `setPermissions`,
 // `setQuestionnaire`, `setGoal`, and `refreshPending`. The closure does
 // two things: (a) guard on the event's target session, and (b) dispatch
@@ -10,7 +10,7 @@
 // `(state, event) → { state, commands }` — so a test can drive the
 // production protocol without standing up a DOM.
 //
-// ## Design contract (W2.9)
+// ## Design contract
 //
 //   1. The **session guard is the first thing** the reducer does. If
 //      `eventSessionId(event) !== sessionId`, the reducer returns
@@ -69,10 +69,9 @@ import {
 import { projectWebuiThreadGoalMessage } from "../../../projection/common/goal-message.js";
 
 /** The slice of component state the reducer mutates. Workspace progress
- *  lives on the stream slice (where `app.tsx` puts it) — see the source
- *  for `WebuiStreamState`. The full `WebuiClientFoundationApp` state has
- *  more (models, account status, …) but those are owned by sibling
- *  effects, not this one. */
+ *  lives on the stream slice — see the source for `WebuiStreamState`. The
+ *  full `WebuiClientFoundationApp` state has more (models, account status, …)
+ *  but those are owned by sibling effects, not this one. */
 export interface WebuiEffectState {
   readonly stream: WebuiStreamState;
   readonly permissions: readonly WebuiPendingPermission[];

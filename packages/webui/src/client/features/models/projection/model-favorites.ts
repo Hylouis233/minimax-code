@@ -15,10 +15,9 @@
  * has to become the last-touched entry, because that order is what the
  * favourites section falls back to when labels tie.
  *
- * Ported from `webapp/lib/model-favorites.ts` in the other WebUI
- * implementation. The storage accessor follows this repository's
- * infrastructure adapter rather than reaching for browser globals, so a
- * server render cannot touch storage.
+ * The storage accessor goes through this package's browser-persistence
+ * adapter rather than reaching for browser globals, so a server render cannot
+ * touch storage.
  */
 import type { WebuiModelProviderGroup } from "../contracts/model-view.js";
 

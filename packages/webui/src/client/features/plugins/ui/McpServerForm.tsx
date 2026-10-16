@@ -1,4 +1,4 @@
-// The MCP server form unit (T08; produced target `plugin-catalogue-form-cuts`).
+// The MCP server form unit.
 //
 // This form used to live as thirteen `useState` calls in `PluginCatalogue`, handed
 // to the dialog as thirteen values and thirteen setters, with the save logic —

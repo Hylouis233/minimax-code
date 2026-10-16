@@ -360,8 +360,8 @@ describe("rail rendering", () => {
     // The wiring test. Every assertion above passes even if the app stops
     // passing `activity`/`now` down, because they hand the props to the rail
     // themselves. Rendering the real shell is what proves the connection.
-    // The catalogue is seeded where the target architecture seeds it: into the
-    // store the assembly is given, not by the shell from a prop (plan §4.1).
+    // The catalogue is seeded where the assembly seeds it: into the store the
+    // assembly is given, not by the shell from a prop.
     const page = { sessions: [session({ sessionId: "mvs_a" })], hasMore: false };
     const html = renderToStaticMarkup(
       shellElement(
@@ -746,7 +746,7 @@ describe("host wiring", () => {
   // literal here, which is what makes that safe.
   const strip = (source: string): string =>
     source.replace(/\/\*[\s\S]*?\*\//gu, "").replace(/\/\/[^\n]*/gu, "");
-  // A-005 moved the shell's own behaviours into sibling modules. The probes
+  // The shell's own behaviours moved into sibling modules. The probes
   // below ask where the wiring is, not which file it sits in, so they read the
   // frame together with those modules: a guarantee that moved is still asserted
   // at its new home, and one that disappears from all of them still goes red.
@@ -770,8 +770,8 @@ describe("host wiring", () => {
   // The activity/unread slice now lives in the application layer. Its half of
   // each guarantee is asserted alongside the shell's delegation, so neither
   // side can be emptied — the shell stops calling in, or the module stops doing
-  // the work — without a red test. The module was `rail-activity.ts`; ticket
-  // #49 evolved it into the unread controller that owns hydration ordering.
+  // the work — without a red test. The unread controller owns hydration
+  // ordering.
   const unreadSource = strip(
     readFileSync(
       path.join(
@@ -788,10 +788,9 @@ describe("host wiring", () => {
       "utf8",
     ),
   );
-  // The shell's event handling moved onto the application event coordinator in
-  // the atomic ingress flip; ticket #49 moved the activity reduction off the
-  // coordinator and onto the unread controller, which is what gates counted
-  // events on hydration.
+  // The shell's event handling sits on the application event coordinator; the
+  // activity reduction sits on the unread controller, which is what gates
+  // counted events on hydration.
   const coordinatorSource = strip(
     readFileSync(
       path.join(
@@ -824,7 +823,7 @@ describe("host wiring", () => {
       "utf8",
     ),
   );
-  // The entry assembles the application and owns its lifecycle (plan §4.1): the
+  // The entry assembles the application and owns its lifecycle: the
   // shell renders the instance and constructs nothing, so the construction and
   // the ingress assertions below point here.
   const entrySource = strip(
@@ -854,13 +853,13 @@ describe("host wiring", () => {
   };
 
   it("hands the single event ingress to the application coordinator", () => {
-    // The shell no longer opens a `watchEvents` subscription of its own. The
+    // The shell opens no `watchEvents` subscription of its own. The
     // application event coordinator is the channel's single consumer, and it
-    // now routes every event to the unread controller rather than reducing the
-    // activity map itself (ticket #49 criterion 4).
+    // routes every event to the unread controller rather than reducing the
+    // activity map itself.
     //
     // The assembly and the ingress are the entry's: the shell renders the
-    // instance it is given and constructs nothing (plan §4.1).
+    // instance it is given and constructs nothing.
     expect(entrySource).toMatch(/createWebuiApplication\(/u);
     expect(entrySource).toMatch(/createWebuiOpenEventChannel\(transport\.watchEvents\)/u);
     expect(appSource).not.toMatch(/createWebuiApplication\(\{/u);
@@ -876,7 +875,7 @@ describe("host wiring", () => {
     // And the selection is the store's, kept current from the route the shell
     // resolved, so the single subscription always judges the turn against the
     // session the user has open without the shell holding a second copy. The
-    // call lives in `use-shell-activity-wiring.ts` (A-005); the frame hands it
+    // call lives in `use-shell-activity-wiring.ts`; the frame hands it
     // the application's own function.
     expect(appSource).toMatch(/select\(\s*selectedSessionId\s*\)\s*;/u);
     expect(appSource).toMatch(/select:\s*\(id[^)]*\)\s*=>\s*applicationRef\.current\.select\(id\)/u);
@@ -941,7 +940,7 @@ describe("host wiring", () => {
     // This one is a real bug that shipped once and was caught only in a browser:
     // an ungated writer above the restore serialised the empty map it saw on
     // the first render, `removeItem`ed the key, and the restore then read back
-    // nothing. Ticket #49 moves the whole ordering into the unread controller.
+    // nothing. The whole ordering lives in the unread controller.
     //
     // The gate is asserted on all three halves:
     //   * `recordEvent` refuses a counted event until hydration;

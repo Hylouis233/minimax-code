@@ -1,7 +1,7 @@
 // The composer's `+` menu stack: the root panel, its skills submenu and its
-// plugins submenu (T13 criterion 5 — the mention/slash/menu unit).
+// plugins submenu.
 //
-// It was 47 lines inside the 2400-line `WebuiComposer` render, reading fifteen
+// It was 47 lines inside the `WebuiComposer` render, reading fifteen
 // of the component's state cells and refs directly. Those became named props:
 // each one is either a field the menu displays or an intent it raises, so the
 // menu holds no submission logic of its own and the caret it inserts at stays

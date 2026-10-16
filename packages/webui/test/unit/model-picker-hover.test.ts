@@ -1,4 +1,4 @@
-// The model picker's hover timing (roadmap H).
+// The model picker's hover timing.
 //
 // Two halves, split for the same reason `model-picker-cascade.test.ts` splits.
 //
@@ -37,9 +37,9 @@ const interaction = readFileSync(
   "utf8",
 );
 const menu = readFileSync(path.join(componentDir, "ModelMenu.tsx"), "utf8");
-// The row rules' home is the Models projection (T03's responsibility cut); the
-// picker reads them from there. Read both, so "the rule exists" and "the picker
-// uses the rule" are separate assertions.
+// The row rules' home is the Models projection; the picker reads them from
+// there. Read both, so "the rule exists" and "the picker uses the rule" are
+// separate assertions.
 const rows = readFileSync(
   path.resolve(here, "../../src/client/features/models/projection/model-picker-rows.ts"),
   "utf8",
@@ -212,8 +212,8 @@ describe("model picker — the hover wiring", () => {
     // it, since a keystroke can unmount the very row the panel is anchored to
     // and leave it describing a model that is no longer in the list.
     expect(interaction).toContain("const retract = useCallback(() => {");
-    // Since the cut (ticket #71) the field lives in `WebuiModelMenuCluster` and retracts through
-    // the picker's own seams. Both routes are asserted ACROSS that boundary — the field asks
+    // The field lives in `WebuiModelMenuCluster` and retracts through the picker's own seams.
+    // Both routes are asserted ACROSS that boundary — the field asks
     // (`onFocus={onSearchFocus}`, and the keystroke's `onQueryChange`), and the picker's seam
     // performs the retraction. A no-op seam would leave the old form green while the panel
     // stopped going away, which is the defect this case exists for.

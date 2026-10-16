@@ -60,8 +60,8 @@ export function WebuiSessionList({
   readonly preserveOrder?: boolean;
   /**
    * The Agent Team badge's tooltip, injected by the composition root. A view may
-   * not read the platform adapter that holds the team-mode choice (plan §5.3), so
-   * whoever renders the rail passes the label in.
+   * not read the platform adapter that holds the team-mode choice, so whoever
+   * renders the rail passes the label in.
    */
   readonly teamModeLabel?: string;
 

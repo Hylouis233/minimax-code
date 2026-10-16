@@ -1,12 +1,12 @@
-// Unit tests for the settings workflow owner (ticket #52).
+// Unit tests for the settings workflow owner.
 //
 // The owner is framework-free, so these run the real decision logic the
 // settings dialog delegates to: that a superseded read is dropped rather than
 // applied over a newer one, and that a successful write invalidates exactly the
 // caches it affects.
 //
-// The catalogue, the selection and the provider list are `models`' owner since
-// the §5.6 carve, so their cases live in `models-workflows.test.ts`.
+// The catalogue, the selection and the provider list are `models`' owner, so
+// their cases live in `models-workflows.test.ts`.
 
 import { describe, expect, it } from "vitest";
 

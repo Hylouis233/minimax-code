@@ -11,7 +11,7 @@
  * an empty `mutations` array, an `add_file` carrying both or neither file
  * identity, a non-positive width or height, and a non-integer `zIndex`.
  */
-// Wire contract record (plan section 7.1 / 7.5): every exported
+// Wire contract record: every exported
 // declaration below records its wire purpose, its producer and its
 // consumers, verified against the tree. Documentation only.
 //

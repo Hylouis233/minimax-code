@@ -1,13 +1,10 @@
-// The transcript's session fence and its handover (plan §5.6's `transcript` row;
-// ticket #69): "Transcript history/request ownership remains session-fenced; a late
-// page after a session switch is discarded, and live-to-history handover renders a
-// completed turn once."
+// The transcript's session fence and its handover.
 //
 // Both behaviours were already covered elsewhere — the fence by
 // `webui-application-commands.test.ts`'s two cases, the handover by
 // `transcript-shape.test.ts`'s "updates matching history identities in place" and
 // the shell's "canonical page wins over the initial render seed" — but no test is
-// *named* for the acceptance, so an edit that removed either would fail a case
+// *named* for either promise, so an edit that removed one would fail a case
 // whose name does not say which promise broke. These four do.
 
 import { describe, expect, it, vi } from "vitest";
@@ -67,11 +64,9 @@ describe("a late page after a session switch is discarded", () => {
   });
 
   // The fence above is per key, not per owner. A head read and an older-page read
-  // for one session are different keys (plan §4.5: "stream recovery and
-  // older-page pagination cannot be assumed to share one key"), so the newer
-  // request for one of them must not cancel the other. The singleton this
-  // replaced shared one request id across both, which made one of these two
-  // answers stale — the conflation the ticket calls out.
+  // for one session are different keys, so the newer request for one of them must
+  // not cancel the other. The singleton this replaced shared one request id across
+  // both, which made one of these two answers stale.
   it("does not let a newer older-page request cancel the head request for that session", async () => {
     const releases: Record<string, (page: WebuiClientMessagePage) => void> = {};
     const store = createWebuiSessionStore();
@@ -161,7 +156,7 @@ describe("a context-only inspection reuses the history answer", () => {
     await owner.loadPage("S");
     expect(loads).toEqual(["S"]);
     // The composer's context inspection asks for the same page; the owner answers
-    // from its resource, so the switch costs nothing extra (plan §4.5).
+    // from its resource, so the switch costs nothing extra.
     await expect(owner.ensurePage("S")).resolves.toMatchObject({
       messages: [{ msgId: "S-1" }],
     });
@@ -171,8 +166,7 @@ describe("a context-only inspection reuses the history answer", () => {
   it("joins one read when two readers need the same page at once", async () => {
     // The transcript opening a session and a context inspection asking for the
     // same page are two readers of one key. They share the request in flight
-    // rather than one of them superseding the other (plan §4.5: a call whose key,
-    // freshness revision and owner incarnation all match joins that request).
+    // rather than one of them superseding the other.
     const loads: string[] = [];
     const releases: Array<(page: WebuiClientMessagePage) => void> = [];
     const store = createWebuiSessionStore();

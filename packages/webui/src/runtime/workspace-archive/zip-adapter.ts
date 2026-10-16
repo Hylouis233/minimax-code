@@ -50,15 +50,15 @@ const ZIP_SENTINEL_ENTRIES = 0xffff;
 const ZIP_SENTINEL_32 = 0xffffffff;
 
 /**
- * ZIP: `yauzl` walks the container, this module keeps the policy (T16).
+ * ZIP: `yauzl` walks the container, this module keeps the policy.
  *
  * The hand-rolled central-directory walk this replaced was a re-implementation
- * of a mature format — the class of code the plan forbids keeping for its own
- * sake. What stays here is what is *this* product's policy and not the format's:
- * the zip64 refusal keeps its named outcome, the entry ceiling still stops a
- * listing from building a million strings, every name still goes through
- * `nameVerdict`, the symlink refusal is unchanged, and the byte budget still
- * charges the bytes as they arrive rather than trusting the header.
+ * of a mature format — the class of code this repository does not keep for its
+ * own sake. What stays here is what is *this* product's policy and not the
+ * format's: the zip64 refusal keeps its named outcome, the entry ceiling still
+ * stops a listing from building a million strings, every name still goes
+ * through `nameVerdict`, the symlink refusal is unchanged, and the byte budget
+ * still charges the bytes as they arrive rather than trusting the header.
  *
  * The parser's own failures are translated into the module's messages, because
  * those messages are what the panel shows and what the conformance corpus
@@ -72,7 +72,7 @@ export async function readZipEntries(buffer: Buffer): Promise<ArchiveContents> {
   // The sentinels mean "look in the zip64 end-of-central-directory records".
   // yauzl could read those; this reader deliberately does not, so the outcome a
   // zip64 archive gets is the one it already had rather than a silent capability
-  // change (T16's nonGoal: no new archive feature).
+  // change.
   if (
     declaredEntries === ZIP_SENTINEL_ENTRIES ||
     directoryOffset === ZIP_SENTINEL_32 ||

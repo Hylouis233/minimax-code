@@ -850,7 +850,7 @@ function renderListing(overrides: Record<string, unknown> = {}): string {
 
 describe("workspace archive view", () => {
   it("paints the loading state on first render, before any effect has run", () => {
-    // The listing is the archive owner's resource now (T11), so the view is
+    // The listing is the archive owner's resource now, so the view is
     // rendered inside the provider the shell installs. Static rendering does not
     // run the effect, so this is the state a reader actually sees first: the
     // owner has not read anything yet and the view paints the loading notice.

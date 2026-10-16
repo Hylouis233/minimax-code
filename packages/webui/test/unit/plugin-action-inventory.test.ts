@@ -71,10 +71,9 @@ describe("the inventory is the population the carve covers", () => {
 
   it("is sized by actions, not by port members", () => {
     // The port declares two members: `pluginManagement` carries the 29 actions, and `listSkills`
-    // joined it at the port re-file (§9; the operator's 2026-10-12 decision files the skill
-    // catalogue under `plugins`). The point of this case is that neither member's COUNT is the
-    // size of the business — 2 members, 29 actions — so a carve driven by the member list
-    // under-scopes by an order of magnitude (§15.3).
+    // carries the skill catalogue, which is filed under `plugins`. The point of this case is that
+    // neither member's COUNT is the size of the business — 2 members, 29 actions — so a carve
+    // driven by the member list under-scopes by an order of magnitude.
     const port = read(new URL("features/plugins/contracts/plugin-port.ts", CLIENT));
     const members = [...port.matchAll(/^  readonly (\w+)\??:/gmu)].map((m) => m[1]!);
     expect(members).toEqual(["pluginManagement", "listSkills"]);
@@ -102,7 +101,7 @@ describe("each action's business is the one the inventory records", () => {
     // The allowance is per module and each entry states its reason; a new module reaching this port
     // fails the case rather than passing a count. The composer is NOT on it any more: it used to be
     // the declared reader of `listInstalledPlugins`, dispatching that wire verb from its own effect.
-    // It now asks the composer catalogue for installed plugins (T08), so it no longer touches the
+    // It now asks the composer catalogue for installed plugins, so it no longer touches the
     // port at all — the next case says so.
     const allowed = [
       "features/plugins/application/plugin-workflows.ts", // the owner
@@ -127,10 +126,10 @@ describe("each action's business is the one the inventory records", () => {
   });
 
   it("keeps the composer's read of installed plugins, but through the read model", () => {
-    // The composer still gets exactly what §4.2/§4.8 promised it — the installed
-    // plugins for the `@` menu — but it no longer names a wire verb to get them.
-    // Naming one is the defect this ticket removed, so both halves are asserted:
-    // the menu is still wired, and the verb is gone from the composer.
+    // The composer still gets exactly what it needs — the installed plugins for
+    // the `@` menu — but it no longer names a wire verb to get them. Naming one is
+    // the defect this case guards against, so both halves are asserted: the menu
+    // is still wired, and the verb is gone from the composer.
     const composer = codeOf(new URL("features/composer/ui/WebuiComposer.tsx", CLIENT));
     expect(composer).toContain("pluginCatalogue");
     expect(composer).not.toMatch(/listInstalledPlugins/u);
@@ -163,11 +162,10 @@ function readSafe(path: string): string {
   }
 }
 
-// T08 acceptance 6: the three authoritative action populations, and the typed
-// adapter that consumed them, proved to agree exhaustively and without
-// duplicates. The ticket counts them as three; the adapter is the fourth witness
-// added here, because a fourth carrier that disagreed would be the defect this
-// ticket exists to remove.
+// The three authoritative action populations, and the typed adapter that consumed
+// them, proved to agree exhaustively and without duplicates. The adapter is the
+// fourth witness added here, because a fourth carrier that disagreed would be the
+// defect this suite exists to catch.
 describe("the action populations are exhaustive and non-duplicated", () => {
   /** The server's accepted-action set, parsed on its own, not merged with the shapes. */
   const acceptedActions = [...serverSrc.matchAll(/^\s{2}"(\w+)",$/gmu)].map((m) => m[1]!);

@@ -1,5 +1,4 @@
-// How the model catalogue becomes rows (T03's `model-picker-responsibility-cut`;
-// plan §5 row for `components/models/ModelPicker.tsx`).
+// How the model catalogue becomes rows.
 //
 // The picker renders rows; it does not decide what a row IS. Grouping, the row's
 // key, the difference between a model key and a row id, and where the highlight

@@ -1,5 +1,4 @@
-// The interaction coordinator's policy (plan §7.1
-// `client/features/interactions/application/interaction-coordinator.ts`).
+// The interaction coordinator's policy.
 //
 // These pin the decisions the composer used to make inline: what counts as an
 // accepted reply, what state transition follows it, which permissions a re-read
@@ -40,7 +39,7 @@ function sink(): WebuiInteractionSink & Record<string, unknown> {
 
 /**
  * `turn`'s published stream-phase commands, as this suite hands them in. The four
- * transitions are no longer sink callbacks: §5.1 prohibition 1 is about writers,
+ * transitions are no longer sink callbacks: prohibition 1 is about writers,
  * and these are turn's state, so the flow invokes turn's named commands and the
  * sink carries only this business's own projection writes.
  */
@@ -242,9 +241,9 @@ describe("interaction coordinator — questionnaire replies", () => {
 });
 
 // The goal write path and its fence used to be tested here; the duty moved to
-// `goal-coordinator.ts` at the B1 carve (ticket #66) and its six cases moved with
-// it to `goal-coordinator.test.ts`, which also asserts the two fences are
-// independent. Nothing about the goal duty is left to test through this owner.
+// `goal-coordinator.ts` and its six cases moved with it to
+// `goal-coordinator.test.ts`, which also asserts the two fences are independent.
+// Nothing about the goal duty is left to test through this owner.
 
 describe("interaction coordinator — the authoritative re-read", () => {
   it("keeps only this session's permissions and awaits when either is pending", async () => {
@@ -308,13 +307,11 @@ describe("interaction coordinator — the authoritative re-read", () => {
 });
 
 /**
- * §5.1 prohibition 1, asserted rather than described: an owner may invoke another
+ * Prohibition 1 is asserted rather than described: an owner may invoke another
  * business's published command and may not be handed that business's state
- * writers. The four stream-phase transitions are `turn`'s state, and §5.1 states
- * this violation in its own evidence ("one `sink` holding four interaction
- * writers, four stream-phase writers…"), so the shape is checked in both
- * directions — the sink type cannot carry one, and the transitions are reached
- * through the command view by name.
+ * writers. The four stream-phase transitions are `turn`'s state, so the shape is
+ * checked in both directions — the sink type cannot carry one, and the
+ * transitions are reached through the command view by name.
  */
 describe("prohibition 1: the interaction owner holds no stream writer", () => {
   type StreamMemberInSink = Extract<

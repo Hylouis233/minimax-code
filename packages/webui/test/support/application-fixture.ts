@@ -1,7 +1,7 @@
 // The one shared test-side assembly for hosts that render the shell.
 //
 // The shell renders an application the composition root assembled; it no longer
-// builds a fallback of its own (plan §4.1). A fixture that renders the shell
+// builds a fallback of its own. A fixture that renders the shell
 // therefore has to hand it an application built the same way production builds
 // one — through `createWebuiApplication` — rather than a second composition with
 // different inputs. This helper is that construction, in one place:
@@ -37,12 +37,12 @@ export interface ApplicationFixtureOptions {
   /**
    * The per-business port slices the assembly hands its owners. A fixture that
    * supplies a transport-shaped bag must cut them and pass them here: the shell
-   * builds no fallback of its own (plan §4.1).
+   * builds no fallback of its own.
    */
   readonly slices?: WebuiPortSlices;
   /**
    * The turn capability port. The substrate publishes its capability slice by
-   * cutting this port (plan §5.6), so it is derived from the same bag the port
+   * cutting this port, so it is derived from the same bag the port
    * slices are cut from rather than shared with them: a fixture that wires only
    * the slices leaves the substrate reporting no send and no enqueue, which a
    * reader sees as "this host cannot send".
@@ -51,7 +51,7 @@ export interface ApplicationFixtureOptions {
   /**
    * The goal capability port. A fixture that drives a goal submission needs it:
    * the submission asks the created session's owner, and the owner answers from
-   * this port (P01's goal path).
+   * this port.
    */
   readonly goalPort?: GoalPort;
 }

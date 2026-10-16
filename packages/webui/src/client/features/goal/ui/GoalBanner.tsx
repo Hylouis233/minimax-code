@@ -1,8 +1,8 @@
 // WebuiGoalBanner — the thread-level goal banner (status, edit, clear).
 //
-// W3 tier 3 lift: this component owns the session-scoped goal card. Its
-// transport calls stay on the existing WebUI goal contract while the visual
-// surface keeps a compact status/actions layout.
+// This component owns the session-scoped goal card. Its transport calls stay on
+// the existing WebUI goal contract while the visual surface keeps a compact
+// status/actions layout.
 
 import { useEffect, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";

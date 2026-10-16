@@ -2,9 +2,8 @@
 // the service, the operation registry, credentials, the envelope and the wire
 // DTOs. It holds no runtime implementation — the runtime factory and the
 // harness adapter are exported from `../runtime/index.ts`, which the Node
-// startup file imports separately (plan section 7.5). The standalone CLI build
-// never bundles the server module (it is its own entry in
-// `scripts/build-webui.mjs`).
+// startup file imports separately. The standalone CLI build never bundles the
+// server module (it is its own entry in `scripts/build-webui.mjs`).
 
 export {
   WebuiService,

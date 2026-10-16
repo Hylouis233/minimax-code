@@ -3,7 +3,7 @@
 // Both container formats are read by a mature parser, and only the policy is
 // ours: `zip` through `yauzl`, `tar` / `.tar.gz` through `tar`. The gzip is
 // decompressed here first, under the same uncompressed cap, so that cap is not
-// handed to a library to enforce. T16 replaced two hand-written walks — a
+// handed to a library to enforce. Two hand-written walks were replaced — a
 // central-directory walk with `inflateRawSync`, and a 512-byte header walk with
 // its own checksum, base-256 and pax readers — because reimplementing a mature
 // format is not something to keep for its own sake.

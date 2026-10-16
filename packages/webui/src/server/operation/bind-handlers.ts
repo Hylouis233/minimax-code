@@ -120,8 +120,8 @@ import {
 
 /**
  * The mechanism — the port view, the capability groups, the declaration helper
- * and the executor — lives in `./binding-mechanism.js` (A-005: the generic half
- * and this 86-row table change for different reasons). It is re-exported here so
+ * and the executor — lives in `./binding-mechanism.js` (the generic half and
+ * this 86-row table change for different reasons). It is re-exported here so
  * the registry, the dedicated handlers and the tests keep their import path.
  */
 export { bind, executeBinding } from "./binding-mechanism.js";
@@ -584,7 +584,7 @@ export const WEBUI_OPERATION_BINDINGS = {
     operation: listUserModelProvidersOperation,
     args: () => [],
     // The runtime declares this read as untyped rows; the projection is what
-    // makes the wire contract's `WebuiModelProviderView` true (D04).
+    // makes the wire contract's `WebuiModelProviderView` true.
     result: toWebuiModelProviderViews,
   }),
   createUserModelProvider: bind("providers")("createUserModelProvider")(

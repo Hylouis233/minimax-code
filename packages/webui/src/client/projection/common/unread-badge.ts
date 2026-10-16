@@ -1,8 +1,7 @@
-// The unread badge rule (plan §7.6 "Unread"; ticket #49 criterion 6).
+// The unread badge rule.
 //
-// The presentation half of the former `client/session-unread.ts`, split out so
-// the storage IO could move to `platform/storage.ts` and the source path
-// could be deleted. It decides how many unread turns to draw, nothing else.
+// It decides how many unread turns to draw, nothing else; the counts themselves
+// are stored by `platform/storage.ts`.
 
 /** Above this the badge says "99+" -- a 4-digit pill has nowhere to go. */
 export const SESSION_UNREAD_BADGE_MAX = 99;

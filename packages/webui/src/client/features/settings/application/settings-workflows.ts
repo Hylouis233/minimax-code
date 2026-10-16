@@ -1,17 +1,15 @@
-// The settings workflow owner (plan §7.1 `application/settings/settings-workflows.ts`;
-// §7.6 "Settings" row; §7.7 stage 5; ticket #52).
+// The settings workflow owner.
 //
 // One owner for every *settings* surface the browser reads and writes:
 // personalization (global instructions, the user profile, agent memory and the
 // memory switches), the model source, the api-key status and the Codex OAuth
 // status. The model catalogue, the selection and the provider list are `models`'
-// (`models-workflows.ts`) — §5.6 gives them to that business, and §5.7 states
-// that the provider form's commands are `models`' while this owner renders the
-// page. The settings dialog and the usage page used to hold their own copies of
-// each answer and decide their own error strings; here one cache answers both.
+// (`models-workflows.ts`) — the provider form's commands belong to that business
+// while this owner renders the page. The settings dialog and the usage page used
+// to hold their own copies of each answer and decide their own error strings;
+// here one cache answers both.
 //
-// The split between *cached reads* and *submitted writes* is deliberate and is
-// what the ticket asks for:
+// The split between *cached reads* and *submitted writes* is deliberate:
 //
 //  - A read is cached in the snapshot with a request version per key, so a
 //    superseded answer is dropped rather than applied over a newer one, and
@@ -44,10 +42,9 @@ import type {
 } from "../../../../shared/contracts/personalization.js";
 
 /**
- * The settings half of the port re-file (plan §9, ticket #59). The provider half
- * this workflow used to consume is `models`' now: `models-workflows.ts` declares
- * `WebuiModelsPortSlice` over the same port, so the two owners no longer share
- * one slice.
+ * The settings half of the port. The provider half this workflow used to consume
+ * is `models`' now: `models-workflows.ts` declares `WebuiModelsPortSlice` over
+ * the same port, so the two owners no longer share one slice.
  */
 export type WebuiSettingsPortSlice = Pick<
   SettingsPort,
@@ -186,9 +183,9 @@ export interface WebuiSettingsWorkflows {
 export function createWebuiSettingsWorkflows(deps: {
   readonly port: WebuiSettingsPortSlice;
   /**
-   * The application's opaque generation context (§4.5; T02). An instruction,
-   * memory, profile or preference write changes the configuration answers were
-   * computed under, so the write advances that generation.
+   * The application's opaque generation context. An instruction, memory, profile
+   * or preference write changes the configuration answers were computed under,
+   * so the write advances that generation.
    */
   readonly identityEpochs?: WebuiIdentityEpochs;
 }): WebuiSettingsWorkflows {
@@ -199,7 +196,7 @@ export function createWebuiSettingsWorkflows(deps: {
   };
   // The cached-read fence is not this module's: `query-store.ts` holds the one
   // implementation of the snapshot, the listener set and the version guard, and
-  // every owner that caches transport answers reads through it (§16.3).
+  // every owner that caches transport answers reads through it.
   const { getSnapshot, subscribe, set, withQuery, readInto, unavailable } =
     createWebuiQueryStore(initialWebuiSettingsWorkflowsState);
 
@@ -340,9 +337,9 @@ export function createWebuiSettingsWorkflows(deps: {
    * absence: the surface must be able to say "the runtime returned a mode this
    * build does not know" rather than render an empty switch.
    *
-   * The write does not advance the configuration epoch. It was a raw port call
-   * from the composer before T12, so advancing it here would add an invalidation
-   * the delivered behaviour does not have; whether a permission-preference change
+   * The write does not advance the configuration epoch. It used to be a raw port
+   * call from the composer, so advancing it here would add an invalidation the
+   * current behaviour does not have; whether a permission-preference change
    * should retire cached answers is a separate decision with its own evidence.
    */
   const loadPermissionMode = async (): Promise<void> => {

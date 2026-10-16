@@ -1,5 +1,4 @@
-// The interaction owner, keyed by session (T05's `interaction-session-owner`;
-// plan §4.2, §4.4).
+// The interaction owner, keyed by session.
 //
 // The two properties that made this leave the composer, asserted rather than
 // assumed: the pending fence belongs to the session whose reads it orders, and
@@ -14,8 +13,8 @@ import { createWebuiInteractionPhaseIntents } from "../../src/client/features/tu
 
 /**
  * The phase intents the composition supplies. They are turn's published contract
- * built over this store's session writer (plan §5.5 P02 step 3), so the owner is
- * handed them rather than importing turn's factory.
+ * built over this store's session writer, so the owner is handed them rather than
+ * importing turn's factory.
  */
 const phaseIntentsFor =
   (store: ReturnType<typeof createWebuiSessionStore>) => (sessionId: string) =>

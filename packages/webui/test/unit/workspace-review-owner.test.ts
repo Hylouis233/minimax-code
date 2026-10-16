@@ -1,7 +1,6 @@
-// The workspace-review owner (T10's `workspace-review-owner`): the summary, the
-// per-snapshot file diffs and the search, with the two rules the extraction had to
-// keep — a snapshot mismatch is not applied, and the retry it earns happens once
-// per (tab, snapshot).
+// The workspace-review owner: the summary, the per-snapshot file diffs and the
+// search, with two rules — a snapshot mismatch is not applied, and the retry it
+// earns happens once per (tab, snapshot).
 
 import { describe, expect, it, vi } from "vitest";
 

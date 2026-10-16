@@ -5,7 +5,7 @@
 // hand the client heterogeneous shapes, and centralising the trim/number/
 // boolean coercion keeps the projection files focused on shape instead of
 // type narrowing. They are deliberately side-effect free so they can live in
-// the same dependency layer as `contracts.ts` (no React, no I/O).
+// the same dependency layer as the rest of `contracts/` (no React, no I/O).
 
 export function recordValue(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -16,8 +16,7 @@ export function recordValue(value: unknown): Record<string, unknown> | undefined
 /**
  * The defaulted pair. `recordValue`/`stringValue` answer "is this one?"; these answer with the
  * empty record or string when it is not, which is the reading the settings and provider surfaces
- * want and used to each declare for themselves (§5.1's fourth prohibition: a rule shared across
- * businesses gets one owner).
+ * want and used to each declare for themselves (a rule shared across businesses gets one owner).
  */
 export function recordOf(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === "object" ? value as Record<string, unknown> : {};

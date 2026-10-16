@@ -1,16 +1,15 @@
-// Turn execution capability port (plan §9; ticket #59).
+// Turn execution capability port.
 //
-// The substrate's four execution members. §9 splits the execution port three
+// The substrate's four execution members. The execution surface is split three
 // ways: these four are `turn`'s (`client/features/turn/contracts/execution-port.ts`),
 // `runCommand` and the queue members are the composer's
 // (`client/features/composer/contracts/command-port.ts`), and the process-event
 // watcher is the shell's (`client/features/shell/contracts/watch-port.ts`).
 //
-// `sendMessage` and `resumeSession` are the two members §9 names for the
-// substrate. `abortSession` and `getActiveTurn` are assigned here too, because
-// §4.12 gives `turn` "the in-flight read (`readStream`, the active-turn probe)"
-// and "the turn commands (attach/send/stop/retry)" — the stop command's
-// capability is `abortSession`.
+// `sendMessage` and `resumeSession` are the two members the substrate drives.
+// `abortSession` and `getActiveTurn` are assigned here too, because `turn` owns
+// the in-flight read (the active-turn probe) and the turn commands
+// (attach/send/stop/retry) — the stop command's capability is `abortSession`.
 //
 // Every method stays optional — `undefined` means "the operation is not wired".
 
@@ -22,7 +21,7 @@ import type {
 import type { WebuiStreamFrame } from "../../../../shared/contracts/stream.js";
 
 /**
- * The client's half of an accepted delivery (plan §4.3, §4.3 disposal row).
+ * The client's half of an accepted delivery.
  *
  * Closing it stops **this client** observing the attempt — no further frames are
  * delivered — and nothing else: the host turn keeps running, and cancelling it

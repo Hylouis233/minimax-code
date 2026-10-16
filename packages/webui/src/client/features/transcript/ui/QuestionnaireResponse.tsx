@@ -1,7 +1,7 @@
 // The transcript's historical questionnaire-response projection: a message in the
 // conversation, so a rewound session still shows what the user picked.
 //
-// Cut out of `SessionTranscript.tsx` (plan §6: view-model, scroll and response
+// Cut out of `SessionTranscript.tsx` (view-model, scroll and response
 // responsibilities). The transcript composes this surface; it does not own the
 // interaction business the answers came from.
 

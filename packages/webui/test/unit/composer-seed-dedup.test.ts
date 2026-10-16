@@ -1,4 +1,4 @@
-// Seed deduplication in the composer (T13 criterion 6). The decision used to be
+// Seed deduplication in the composer. The decision used to be
 // an effect body: an early return, a store write, a limit check and an
 // attachment literal, in that order, with the invariant that matters — the token
 // is consumed before anything can bail — stated only in a comment. It is a read

@@ -1,6 +1,6 @@
 // The workspace-progress reducer the workspace business publishes.
 //
-// Moved here from `projection/workspace-progress.ts` by T21. The conversation
+// Moved here from `projection/workspace-progress.ts`. The conversation
 // substrate is the only caller that needs the reducers — it folds the
 // `todo_updated` / `session.spawned` / `session.status_updated` events a stream
 // frame carries into the progress slice of its stream state — and the substrate
@@ -12,7 +12,6 @@
 // What stays in `projection/workspace-progress.ts`: the consolidated view
 // selector (`selectWebuiWorkspaceProgress`) and the history rebuild
 // (`projectWebuiWorkspaceHistory`), which import the reducers back from here.
-// The bodies are the declarations as they stood, unchanged.
 
 import {
   numberAmongKeys,

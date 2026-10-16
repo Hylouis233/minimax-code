@@ -8,7 +8,7 @@
 //   * the operation registry the host assembled from that port,
 //   * the access control rules described in ADR 0004.
 //
-// The network lifecycle now lives in dedicated modules (plan section 7.1):
+// The network lifecycle now lives in dedicated modules:
 // `http-server.ts` (listener lifecycle), `websocket-server.ts` (upgrade, socket
 // set, heartbeat, connection close), `frame-handler.ts` (inbound frame parsing
 // and dispatch), `access-policy.ts` (host/origin/upgrade admission) and the
@@ -63,15 +63,14 @@ export interface WebuiServiceOptions {
    * The complete, preassembled operation registry. The host builds it from its
    * own port (`createOperationRegistry(port, terminalPort)`), so the network
    * service binds what it was handed instead of projecting the harness port
-   * member by member (T14; plan §6 bind-handlers, §7 D10). The registry is
-   * exhaustive by construction: an operation missing from it fails the inbound
-   * lookup, which is the same error a cold-started runtime produces.
+   * member by member. The registry is exhaustive by construction: an operation
+   * missing from it fails the inbound lookup, which is the same error a
+   * cold-started runtime produces.
    */
   readonly operations: ReadonlyMap<string, WebuiOperationRegistryEntry>;
   /**
    * The terminal-process port the registry's terminal operations were built
-   * with. The service owns its lifecycle and disposes it on close; T15 moves the
-   * implementation and the resource ownership behind this port.
+   * with. The service owns its lifecycle and disposes it on close.
    */
   readonly terminal?: WebuiTerminalProcessPort;
   /**
@@ -226,9 +225,8 @@ export class WebuiService {
 
   /**
    * Stop accepting new operations, drain every connection, then close
-   * the harness port. The order is the one step 13 of the assembly
-   * checklist requires: refuse new work first, then release resources,
-   * then tear down the host.
+   * the harness port. The order matters: refuse new work first, then
+   * release resources, then tear down the host.
    */
   async close(): Promise<void> {
     this.terminal?.disposeBySession();

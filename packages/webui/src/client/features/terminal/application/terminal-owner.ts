@@ -1,4 +1,4 @@
-// The browser Terminal owner (T15, plan §5.2's terminal row).
+// The browser Terminal owner.
 //
 // The workspace panel used to hold this state and call six raw capability
 // methods itself: it kept the catalogue, the active id, the watch handle and the
@@ -122,7 +122,7 @@ export function createWebuiTerminalOwner(
   const disposeAll = async (): Promise<void> => {
     // End every watch AND every process, which is what the contract says this
     // is for: a view going away calls `detachAll` and leaves the PTYs running,
-    // while disposal ends the client's processes too (T15 criterion 3).
+    // while disposal ends the client's processes too.
     detachAll();
     const known = snapshot.terminals.map((terminal) => terminal.terminalId);
     for (const terminalId of known) await port.disposeTerminal?.({ terminalId });

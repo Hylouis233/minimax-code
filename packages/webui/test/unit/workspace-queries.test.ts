@@ -1,4 +1,4 @@
-// Unit tests for the workspace query owner (ticket #51).
+// Unit tests for the workspace query owner.
 //
 // The owner is framework-free, so these run the actual decision logic the
 // panels delegate to: that a superseded request's late response is discarded
@@ -199,7 +199,7 @@ describe("the archive owner drops a listing nobody is looking at", () => {
     await flush();
 
     // The reader moved into `src`; the root listing that answered afterwards has
-    // no reader and must not replace what is shown (T11 acceptance 4).
+    // no reader and must not replace what is shown.
     const state = queries.getSnapshot().archive;
     expect(state.listing.status).toBe("ready");
     expect(state.key).toBe("/w\u0000a.zip\u0000src");
@@ -268,9 +268,9 @@ describe("the canvas owner keeps one document per session", () => {
   });
 });
 
-// T11 acceptance 6: the response cases that decide whether a panel shows the
-// bytes it asked for. Each of these was a real behaviour with no test naming it,
-// so a regression would have been invisible.
+// The response cases that decide whether a panel shows the bytes it asked for.
+// Each of these was a real behaviour with no test naming it, so a regression
+// would have been invisible.
 
 describe("inline content supersedes a read that is still in flight", () => {
   it("keeps the inline bytes when the earlier read answers late", async () => {

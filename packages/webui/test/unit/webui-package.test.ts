@@ -19,8 +19,7 @@ describe("webui package foundation", () => {
     expect(manifest.license).toBe("MIT");
     expect(manifest.private).toBe(true);
     // Server, client and shared are deliberately NOT published subpaths:
-    // the standalone CLI configuration is not asked to cover them
-    // (ADR 0005 / acceptance criteria for ticket 01).
+    // the standalone CLI configuration is not asked to cover them (ADR 0005).
     expect(manifest.exports).toBeUndefined();
   });
 

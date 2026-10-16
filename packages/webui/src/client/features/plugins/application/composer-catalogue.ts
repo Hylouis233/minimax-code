@@ -1,5 +1,4 @@
-// The Composer-facing plugin catalogue (T08; produced target
-// `composer-plugin-skill-catalogue-api`).
+// The Composer-facing plugin catalogue.
 //
 // The composer needed two things from this business and had to reach past the
 // owner for both:
@@ -17,7 +16,7 @@
 // Both are the same mistake: the composer's view of what is installed is a
 // business fact, so it is answered here and the composer asks a question.
 //
-// The identity rule from the ticket matters here. This read is keyed and cached
+// The identity rule matters here. This read is keyed and cached
 // under its own key, deliberately not shared with the management owner's
 // selection: opening the composer menu must not overwrite what the plugin
 // manager is showing, and a management reload must not blank the mention list.

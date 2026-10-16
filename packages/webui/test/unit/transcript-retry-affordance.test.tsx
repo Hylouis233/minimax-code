@@ -1,6 +1,4 @@
-// SPEC-C item C-4 — "Mixed media and retry".
-//
-// C-4 was marked "not verified" by the roadmap. The three clauses are:
+// Mixed media and retry: the three properties pinned here.
 //
 //   1. A failed turn surfaces a retry affordance, and retrying re-sends the
 //      same user input.
@@ -317,8 +315,8 @@ describe("C-4.3 image and text in one assistant message render together, in orde
     // case wants; no prior turn can bleed in. The application is constructed
     // dormant (no ingress) because this fixture renders markup, not a session.
     const sessionStore = createWebuiSessionStore();
-    // The shell cuts no port slices of its own (plan §4.1), so the bag the
-    // props name is handed to the assembly instead.
+    // The shell cuts no port slices of its own, so the bag the props name is
+    // handed to the assembly instead.
     const transport = {
       loadMessages: async () => ({ messages, hasMore: false }),
       watchEvents: () => () => undefined,

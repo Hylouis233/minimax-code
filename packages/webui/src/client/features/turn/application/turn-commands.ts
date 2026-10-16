@@ -1,8 +1,7 @@
-// The turn commands the composer runs through the application layer
-// (plan §7.1 `features/turn/application/turn-coordinator.ts`: "owns send/queue/stop/retry").
+// The turn commands the composer runs through the application layer.
 //
 // The stop command already lives in `turn-coordinator.ts`. This module moves
-// the rest of the composer's owned execution out of the 3000-line component and
+// the rest of the composer's owned execution out of the component and
 // alongside it: the **attach** that follows a turn this client did not start,
 // the **recheck** of a lease a `session.start` no longer matches, the **gap
 // recovery** that repairs a missed `session.start`, and the **send** whose first
@@ -205,7 +204,7 @@ export interface WebuiSendTurnArgs {
   readonly sessionId: string | undefined;
   readonly message: string;
   /**
-   * The task use case, so a first message's creation goes through the one owner (P01 step 4).
+   * The task use case, so a first message's creation goes through the one owner.
    * Absent on a host that cannot create, which the submission reports as `unsupported`.
    */
   readonly taskSessions?: WebuiTaskSessionSubmitter;
@@ -293,8 +292,7 @@ export async function sendWebuiTurn(
 
 /**
  * What a turn command needs to run: the application-owned canonical record
- * repository, the session it is about, and the published capability slice
- * (§4.2; T04's `conversation-turn-commands`).
+ * repository, the session it is about, and the published capability slice.
  */
 export interface WebuiTurnCommandContext {
   readonly store: WebuiSessionStore;
@@ -302,17 +300,17 @@ export interface WebuiTurnCommandContext {
   readonly capabilities?: WebuiTurnCapabilitySlice;
   /**
    * Where each attempt's real disposer is registered, so the application holds
-   * something it can close (plan §4.3). Absent on a host that has no registry;
-   * the attempt then simply cannot be detached by this client.
+   * something it can close. Absent on a host that has no registry; the attempt
+   * then simply cannot be detached by this client.
    */
   readonly deliveries?: WebuiDeliveryDisposers;
   /**
-   * The session scope (plan §4.3). An accepted attempt takes a **delivery** lease
-   * for as long as it runs, so navigating away cannot release a session that still
-   * owes a turn — and the lease ends when the attempt does, not when the view does.
+   * The session scope. An accepted attempt takes a **delivery** lease for as long
+   * as it runs, so navigating away cannot release a session that still owes a
+   * turn — and the lease ends when the attempt does, not when the view does.
    */
   readonly scope?: WebuiSessionScopeManager;
-  /** The task use case the substrate creates through (P01 step 4). */
+  /** The task use case the substrate creates through. */
   readonly taskSessions?: WebuiTaskSessionSubmitter;
 }
 
@@ -350,7 +348,7 @@ export function createWebuiConversationTurnCommands(
   const writerFor = (): WebuiTurnCommandWriter => createWebuiTurnCommands(storeWriterFor());
 
   /**
-   * The published views (ticket #58), bound to a writer of this owner's own. A
+   * The published views, bound to a writer of this owner's own. A
    * surface used to build these — and the writer behind them — itself, which made
    * every binding a second construction of the same two objects; they are built
    * here instead and handed out through the contract.

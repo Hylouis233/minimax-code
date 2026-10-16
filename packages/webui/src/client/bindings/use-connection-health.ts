@@ -1,6 +1,4 @@
-// React subscription to the connection-health fact (plan §7.2
-// `client/bindings/use-connection-health.ts`, split from
-// `client/connection-health.ts:87`).
+// React subscription to the connection-health fact.
 //
 // The fact itself — which watchers are live, and whether a link that was held
 // has gone down — is recorded in `client/platform/connection-health.ts`.

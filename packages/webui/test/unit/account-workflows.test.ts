@@ -1,4 +1,4 @@
-// Unit tests for the account workflow owner (ticket #52).
+// Unit tests for the account workflow owner.
 //
 // The owner is framework-free, so these run the real decision logic the user
 // menu, the login dialog and the settings dialog delegate to: that the login

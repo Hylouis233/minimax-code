@@ -1,7 +1,7 @@
 // HTTP response helpers for the loopback service: the plain-text rejection
 // writer, the JSON success writer and the request-URL parser. Split from
-// `service.ts` (plan section 7.1) with no behaviour change — the status codes,
-// headers and bodies are the ones the service wrote before.
+// `service.ts` with no behaviour change — the status codes, headers and bodies
+// are the ones the service wrote before.
 
 import type { ServerResponse } from "node:http";
 

@@ -1,9 +1,8 @@
-// The memory manager dialog (ticket #73; §15.1's `MemoryManagerDialog.tsx` row, 427 lines estimated).
+// The memory manager dialog.
 //
-// It is the body behind 记忆's 管理 row, and §16.10 keeps it a target in its own right because it owns
-// eleven states plus its own save and delete-confirm — it is not part of `MemorySection`. It is
-// mounted conditionally by that section (`{managing ? … : null}`), so it appears when the user asks
-// for it and not before.
+// It is the body behind 记忆's 管理 row, and it stands on its own because it owns eleven states plus
+// its own save and delete-confirm — it is not part of `MemorySection`. It is mounted conditionally
+// by that section (`{managing ? … : null}`), so it appears when the user asks for it and not before.
 //
 // **It also owns the memory feature's shared pieces**, and the direction matters: `MemorySection`
 // renders this dialog, so the dialog must not import the section back. `isMemorySaveable`,

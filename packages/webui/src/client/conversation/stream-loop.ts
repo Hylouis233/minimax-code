@@ -10,8 +10,8 @@
 // returned promise never rejects: sink callback failures are contained
 // by `safeSink` and reported through the sink's `refuse` callback (with a
 // `console.error` fallback when every callback is broken). This matches
-// the React shell's `try/finally` shape at `app.tsx`, which does not
-// catch and would otherwise lose a sink-originated rejection.
+// the submit path's `try/finally` shape, which does not catch and would
+// otherwise lose a sink-originated rejection.
 
 import type {WebuiClientMessageSender, WebuiClientSessionResumer} from "../features/turn/contracts/execution-port.js";
 import type {
@@ -38,7 +38,7 @@ import { isWebuiLeaseGenerationCurrent } from "./stream-lease.js";
 export interface WebuiStreamLoopDeps extends WebuiStreamLoopTransports {
   /**
    * Pure history/context transforms, injected by the caller so this mechanism
-   * imports no `projection/` module (plan §7.2). The turn coordinator supplies
+   * imports no `projection/` module. The turn coordinator supplies
    * the existing pure functions — this is not a re-implementation.
    *
    * Required on purpose: the loop no longer carries a runtime fallback for a
@@ -49,8 +49,8 @@ export interface WebuiStreamLoopDeps extends WebuiStreamLoopTransports {
   readonly projection: StreamRecoveryProjection;
   /**
    * The stream-state transforms the loop applies to frames, injected by the
-   * caller for the same reason as `projection` (plan §7.2): these are the
-   * existing pure functions from `features/turn/projection/stream-state.ts`, re-used, not
+   * caller for the same reason as `projection`: these are the existing pure
+   * functions from `features/turn/projection/stream-state.ts`, re-used, not
    * re-implemented.
    *
    * Required on purpose, like `projection`: forgetting it is a compile error
@@ -61,7 +61,7 @@ export interface WebuiStreamLoopDeps extends WebuiStreamLoopTransports {
 
 /**
  * The stream-state transforms the loop injects instead of importing
- * `projection/` (plan §7.2). Declared on the mechanism side so no view module is
+ * `projection/`. Declared on the mechanism side so no view module is
  * pulled across the boundary; callers pass a structurally compatible bundle.
  *
  * `reduceFrame` takes two arguments: the loop never attaches the reducer's
@@ -84,9 +84,9 @@ export interface WebuiStreamStateBundle {
 }
 
 /**
- * The pure transforms the loop injects instead of importing `projection/`
- * (plan §7.2). Declared on the mechanism side so no view module is pulled
- * across the boundary; callers pass a structurally compatible bundle.
+ * The pure transforms the loop injects instead of importing `projection/`.
+ * Declared on the mechanism side so no view module is pulled across the
+ * boundary; callers pass a structurally compatible bundle.
  */
 export interface StreamRecoveryProjection {
   readonly projectMessage: (message: WebuiClientMessage) => WebuiStreamMessage;
@@ -248,10 +248,9 @@ function safeSink(
 }
 
 /**
- * Build the React-shell binding for `runWebuiStreamLoop`. The shell's
- * submit handler in `app.tsx` calls this once per submit and feeds the
- * resulting sink into the loop. Tests exercise this helper directly
- * with a recording state reducer — see
+ * Build the React-shell binding for `runWebuiStreamLoop`. The submit path
+ * calls this once per submit and feeds the resulting sink into the loop.
+ * Tests exercise this helper directly with a recording state reducer — see
  * `webui-shell.test.ts > "binds the composer sink to the React state
  * reducer correctly"`. That test is the strongest evidence available
  * that a misrouted callback (for example, dropping `applyFrame` or
@@ -391,7 +390,7 @@ async function driveWebuiStreamLoop(
   // that owns the stream, its recovery and its lease.
   const attaching = message === undefined;
   // Count frames the reducer accepted before any sink failure was
-  // recorded. `transcriptIncomplete` is part of the R16 contract: when
+  // recorded. `transcriptIncomplete` is part of the refusal contract: when
   // a sink failure ends the turn, the visible transcript may be stale.
   // Frames accepted before the failure are the ones the user already
   // saw, so the flag is set only when the counter is non-zero. We

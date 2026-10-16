@@ -1,5 +1,5 @@
 /**
- * A-001's compile-time binding between the WebUI's host surface and the runtime
+ * The compile-time binding between the WebUI's host surface and the runtime
  * it talks to.
  *
  * `WebuiRuntimeCliService` is still hand-written: the WebUI declares the members
@@ -21,8 +21,8 @@
  * What this does not do: remove the mirror. The 22 results below are still
  * declared twice, and `assembly.ts` still states the difference with one cast.
  * Deriving them member by member and converting runtime -> wire explicitly is
- * A-001's remaining work; until it lands, this file makes the difference
- * measured instead of assumed.
+ * the remaining work; until then, this file makes the difference measured
+ * instead of assumed.
  */
 import { describe, expect, it } from "vitest";
 
@@ -56,7 +56,7 @@ const WEBUI_ONLY_NAMES = [
 
 /**
  * The forwarded results that still need an explicit runtime -> wire conversion.
- * This is A-001's remaining work, named member by member.
+ * This is the remaining work, named member by member.
  */
 const MISMATCHED_RESULT_NAMES = [
   "listSessions",

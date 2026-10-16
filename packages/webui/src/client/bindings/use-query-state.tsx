@@ -1,10 +1,9 @@
-// React subscription to the application query owners (plan §7.2
-// `client/bindings/use-query-state.ts`; ticket #51).
+// React subscription to the application query owners.
 //
-// The workspace query owner lives in `application/workspace/workspace-queries.ts` and is
-// created once by the composition root. This binding is the only React edge to
-// it: components read its snapshot and submit query commands, and they never
-// receive a transport method or a store writer for these queries (plan §7.6).
+// The workspace query owner lives in `features/workspace/application/workspace-queries.ts`
+// and is created once by the composition root. This binding is the only React
+// edge to it: components read its snapshot and submit query commands, and they
+// never receive a transport method or a store writer for these queries.
 //
 // The context is deliberately non-throwing: an SSR render or a unit test that
 // mounts a panel without the provider reads the initial snapshot and submits
@@ -89,7 +88,7 @@ function initialSnapshot(): WebuiWorkspaceQueriesState {
 }
 
 // ---------------------------------------------------------------------------
-// Account, settings and plugin owners (ticket #52)
+// Account, settings and plugin owners
 //
 // Same shape as the workspace queries above: one provider, one imperative hook
 // for commands, one subscription hook for the snapshot. A component with no
@@ -132,7 +131,7 @@ function settingsInitialSnapshot(): WebuiSettingsWorkflowsState {
   return initialWebuiSettingsWorkflowsState;
 }
 
-// `models` is its own owner (plan §5.6): the catalogue, the selection and the
+// `models` is its own owner: the catalogue, the selection and the
 // provider list have their own snapshot and their own commands, so a surface
 // that only needs models does not subscribe to the settings snapshot.
 const WebuiModelsWorkflowsContext = createContext<WebuiModelsWorkflows | undefined>(
@@ -206,7 +205,7 @@ function pluginInitialSnapshot(): WebuiPluginWorkflowsState {
 }
 
 // ---------------------------------------------------------------------------
-// The session workflows (ticket #52)
+// The session workflows
 //
 // Provided so the settings dialog can read the archived-sessions query — a
 // session query that lives inside a settings surface — without holding a

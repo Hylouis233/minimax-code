@@ -1,7 +1,7 @@
-// Unit tests for the application event coordinator (ticket #45, slice B).
+// Unit tests for the application event coordinator.
 //
 // Every case drives the coordinator through `createWebuiApplication` against a
-// fake process-event channel. What it pins is exactly the list the ticket names:
+// fake process-event channel. What it pins is this list:
 //
 //   * one channel per application instance, and repeated mount/unmount still
 //     yields one;
@@ -97,7 +97,7 @@ function makeApplication(
 describe("stage 4 — the four call sites' handling through the coordinator", () => {
   it("attaches to the turn a session.start names, with no view mounted", async () => {
     // The application builds the conversation command set for the session and
-    // attaches itself: the composer is not involved (T05). The evidence is the
+    // attaches itself: the composer is not involved. The evidence is the
     // attempt reaching the session's own transport.
     const { application, channels } = makeApplication({
       turnCapabilities: { resume: async () => undefined },
@@ -120,7 +120,7 @@ describe("stage 4 — the four call sites' handling through the coordinator", ()
       interactionsPort: { listPendingPermissions },
       goalPort: { getGoal },
     });
-    // Interest is what makes the read worth running (plan §4.3).
+    // Interest is what makes the read worth running.
     application.sessionScope.acquire("s1", "secondary", "tab-1");
 
     channels[0]!.emit(event("session.queue.updated", { sessionId: "s1" }));
@@ -136,9 +136,8 @@ describe("stage 4 — the four call sites' handling through the coordinator", ()
       interactionsPort: { listPendingPermissions },
     });
 
-    // Nothing needs s1 yet: the marker is retained instead of a background read
-    // (plan §4.3), which is the alternative to the silent drop the old registry
-    // produced.
+    // Nothing needs s1 yet: the marker is retained instead of a background read,
+    // which is the alternative to the silent drop the old registry produced.
     channels[0]!.emit(event("session.queue.updated", { sessionId: "s1" }));
     expect(listPendingPermissions).not.toHaveBeenCalled();
 

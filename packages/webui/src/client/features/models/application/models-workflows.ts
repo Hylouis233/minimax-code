@@ -1,17 +1,16 @@
-// The models workflow owner (plan §5.6's `models` row; §5.7's provider-form
-// attribution; §16.10's `models` rows).
+// The models workflow owner.
 //
 // One owner for the model catalogue, the selection, and the provider list and
 // presets. These states and their commands used to be published by
-// `settings-workflows.ts`, which owned none of them: §5.6 gives `models` "the
-// model catalogue query state, selection command state, thinking state, the
-// provider list", and §5.7 states that the provider form's commands are
-// `models`' while `settings` renders the page. The two owners now hold their
-// own state and their own snapshot.
+// `settings-workflows.ts`, which owned none of them: the model catalogue query
+// state, the selection command state, the thinking state and the provider list
+// are this owner's, and the provider form's commands are `models'` while
+// `settings` renders the page. The two owners hold their own state and their own
+// snapshot.
 //
 // The cached-read fence is not this module's either: `query-store.ts` holds the
-// one implementation of the snapshot, the listener set and the version guard
-// (§16.3), and both owners read through it.
+// one implementation of the snapshot, the listener set and the version guard, and
+// both owners read through it.
 //
 // One call crosses a boundary: writing a provider key is `models`' command, but
 // the api-key *status* it invalidates is `settings`' read, so this owner invokes
@@ -43,7 +42,7 @@ import {
   type WebuiQueryState,
 } from "../../../application/query-store.js";
 
-/** The provider half of the port re-file (plan §9, ticket #59). */
+/** The provider half of the port. */
 export type WebuiModelsPortSlice = Pick<
   ModelsPort,
   | "listModels"
@@ -150,7 +149,7 @@ export function createWebuiModelsWorkflows(deps: {
   /** `settings`' api-key status read, invoked after `upsertApiKey` writes. */
   readonly refreshApiKeyStatus: () => Promise<void>;
   /**
-   * The application's opaque generation context (§4.5; T02). A provider or
+   * The application's opaque generation context. A provider or
    * credential write changes what the catalogue means, so the answers computed
    * under the previous generation are retired here rather than by each reader.
    */
@@ -164,7 +163,7 @@ export function createWebuiModelsWorkflows(deps: {
     deps.identityEpochs?.advance("credentials");
     deps.identityEpochs?.advance("configuration");
   };
-  // The keyed resources (§4.5; T03). Identity is storage identity: each answer
+  // The keyed resources. Identity is storage identity: each answer
   // lives under a key that carries every response-affecting input, so a late
   // answer for one context lands in *its own* entry instead of overwriting the
   // context the user is looking at — the defect the old destination field had.
@@ -397,7 +396,7 @@ export function createWebuiModelsWorkflows(deps: {
     // A credential write retires both generations: the credential changed, and
     // the catalogue it unlocks may have too.
     afterCredentialWrite();
-    // The api-key *status* read is `settings`' (§5.6), so this owner calls that
+    // The api-key *status* read is `settings`', so this owner calls that
     // owner's published command instead of holding a second copy of the read.
     await refreshApiKeyStatus();
     return result;

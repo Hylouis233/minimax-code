@@ -1,4 +1,4 @@
-// Unit tests for the plugin workflow owner (ticket #52).
+// Unit tests for the plugin workflow owner.
 //
 // The owner is framework-free, so these run the real decision logic the plugin
 // manager delegates to: that a superseded listing answer is dropped rather than

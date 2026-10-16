@@ -1,10 +1,9 @@
-// The single session store and write authority (plan §7.1 `application/`,
-// §7.6 "Final state ownership and write authority").
+// The single session store and write authority.
 //
 // One store per application instance owns one map of session records; every
 // writer is created from it, so there is exactly one place a session's state is
 // written and exactly one map. Components never receive a writer — the bindings
-// layer (plan §7.2) subscribes to snapshots and submits commands; the writer
+// layer subscribes to snapshots and submits commands; the writer
 // stays inside the application.
 //
 // Two guards are load-bearing:
@@ -18,8 +17,8 @@
 //     every other component's view of the application.
 //
 // The React hook that used to live beside the module-level store is split out
-// into `client/bindings/use-session-state.ts` (plan §7.2); it reads this store's
-// snapshot and creates no second map.
+// into `client/bindings/use-session-state.ts`; it reads this store's snapshot and
+// creates no second map.
 
 import type {
   WebuiSessionActivity,
@@ -95,7 +94,7 @@ export interface WebuiSessionTransferResult {
  * The interaction slice's write targets. It is what the interaction commands
  * (`session-commands.ts`) are bound to, so a component submits
  * `replacePendingPermissions` / `applyGoal` and never holds one of these
- * setters itself (plan §7.6; ticket #45).
+ * setters itself.
  */
 export interface WebuiInteractionWriter {
   readonly setPermissions: (
@@ -127,7 +126,7 @@ export interface WebuiSessionStore {
   updateActivity: (
     update: (current: WebuiSessionActivityMap) => WebuiSessionActivityMap,
   ) => void;
-  /** The one catalog slice's writer (plan §7.6; ticket #49). */
+  /** The one catalog slice's writer. */
   updateCatalog: (
     update: (current: WebuiSessionCatalogState) => WebuiSessionCatalogState,
   ) => void;
@@ -144,7 +143,7 @@ export interface WebuiSessionStore {
   };
   /**
    * The interaction slice's writer, bound to one owner key. A component builds
-   * its interaction commands from this and never keeps the writer (plan §7.6).
+   * its interaction commands from this and never keeps the writer.
    */
   createInteractionWriter: (
     owner: WebuiSessionWriterOwner,
@@ -162,7 +161,7 @@ export interface WebuiSessionStore {
   /** Whether one key currently holds a record. */
   readonly hasSession: (sessionId: string) => boolean;
   /**
-   * The guarded home→session transfer (P01, plan §5.3 rule 4).
+   * The guarded home→session transfer.
    *
    * `migrateSession` below is the legacy unconditional move that the two
    * production adoption sites still use; this one is the API the creation use
@@ -182,8 +181,8 @@ export interface WebuiSessionStore {
    * notify: the only subscriber is the view that is about to switch keys (its
    * effect re-reads the target key) and the target key has no subscriber yet.
    * This is the application-store form of the old
-   * `migrateSessionRuntimeState` (plan §7.7 stage 4), and the no-notify
-   * semantics are load-bearing for the home → first-session flow.
+   * `migrateSessionRuntimeState`, and the no-notify semantics are load-bearing
+   * for the home → first-session flow.
    */
   migrateSession: (fromKey: string, toKey: string) => void;
   /**
@@ -216,7 +215,7 @@ export function createWebuiSessionStore(options?: {
   let selectedSessionId: string | undefined;
   let disposed = false;
   /**
-   * The home slot's incarnation (P01, plan §5.3 rule 2). It starts at 1 so a
+   * The home slot's incarnation. It starts at 1 so a
    * capture of `0` can never be mistaken for a live one, and it advances
    * whenever an explicit New Task resets the home record. The counter is
    * deliberately not part of the session map: it describes the home slot's
@@ -391,7 +390,7 @@ export function createWebuiSessionStore(options?: {
         return createSessionWriter(owner.sessionId);
       // Home turn: the first message streams before the session exists, so the
       // writer starts on the home key and migrates onto the created session in
-      // one committed transition (plan §7.1, `turn-coordinator.ts`).
+      // one committed transition (`turn-coordinator.ts`).
       let sessionKey = WEBUI_HOME_SESSION_KEY;
       let migrated = false;
       const writeStream = (
@@ -478,7 +477,7 @@ export function createWebuiSessionStore(options?: {
       const state = sessions.get(fromKey);
       sessions.delete(fromKey);
       if (state) sessions.set(toKey, state);
-      // No `notify()` on purpose (plan §7.7 stage 4; the module-level store's
+      // No `notify()` on purpose (the module-level store's
       // `migrateSessionRuntimeState` had the same semantics). The only
       // subscriber is the view switching keys, which re-reads the target key in
       // its own effect; the target key has no subscriber yet.
@@ -504,8 +503,8 @@ export function createWebuiSessionStore(options?: {
 
 /**
  * The conversation substrate's view of the transcript slice, satisfied by this
- * store. The substrate may not import the record repository (plan §5.3), so the
- * assembly hands it this instead: one narrow writer over the slice it owns.
+ * store. The substrate may not import the record repository, so the assembly
+ * hands it this instead: one narrow writer over the slice it owns.
  */
 export function createWebuiTranscriptHistoryWriter(
   store: WebuiSessionStore,

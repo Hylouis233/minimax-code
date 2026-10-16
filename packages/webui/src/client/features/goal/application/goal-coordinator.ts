@@ -1,11 +1,10 @@
-// The goal coordinator (plan §8 Phase 3 B1; §4.6; §5.6; ticket #66).
+// The goal coordinator.
 //
 // `goal` publishes the objective and the write that moves it, and it owns the
 // **version fence** that keeps a late re-read from resurrecting the objective a
-// newer write already replaced. Until this carve the fence lived in
+// newer write already replaced. The fence used to live in
 // `interaction-coordinator.ts`, which had absorbed the goal duty as a third
-// responsibility; §5.6 records that the coordinator "loses the goal duty it
-// absorbed" here, and this module is where it goes.
+// responsibility.
 //
 // What moved is the duty, not the mechanism: the counter is still injected by the
 // caller (`WebuiVersionCell`, one cell per duty) because a coordinator may be

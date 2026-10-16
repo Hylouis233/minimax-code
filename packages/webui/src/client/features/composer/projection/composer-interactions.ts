@@ -85,10 +85,9 @@ export const WEBUI_MAX_ATTACHMENT_COUNT = 10;
 // Attachments travel as data URLs over the local WebSocket. Keep the decoded
 // aggregate below its 100 MiB frame limit after base64 expansion.
 /**
- * One staged attachment, and one staged URL reference (plan §5.6: attachments and
- * url references are the composer's own state). They live here rather than in the
- * component because the composer's owner module keeps them, and an application
- * module may not import a component.
+ * One staged attachment, and one staged URL reference. They live here rather than
+ * in the component because the composer's owner module keeps them, and an
+ * application module may not import a component.
  */
 export const WEBUI_MAX_ATTACHMENT_TOTAL_BYTES = 70 * 1024 * 1024;
 

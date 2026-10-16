@@ -1,4 +1,4 @@
-// The application event coordinator (plan §7.1 `features/turn/application/event-coordinator.ts`).
+// The application event coordinator.
 //
 // It is the **sole consumer of the process-event channel** and the sole owner of
 // the two write paths that used to be spread across the shell, the composer and
@@ -123,16 +123,15 @@ export interface WebuiWorkspaceGitChangedPayload {
 }
 
 /**
- * The permanent domain routes (T05's `permanent-domain-event-routing`).
+ * The permanent domain routes.
  *
  * They are installed by the application assembly **before** ingress opens, and
  * there is no replaceable effect set: a view reaction may subscribe after a
- * commit, but it cannot displace the route that owns the commit. The distinction
- * is the correction the T01 ledger's C2 records — an event set registered by a
- * subtree supplied its own goal handler for the session it was mounted on, and a
- * goal event for any other session was dropped, because the handler's presence
- * suppressed the coordinator's own write and then found no registration to route
- * to.
+ * commit, but it cannot displace the route that owns the commit. An event set
+ * registered by a subtree supplied its own goal handler for the session it was
+ * mounted on, and a goal event for any other session was dropped, because the
+ * handler's presence suppressed the coordinator's own write and then found no
+ * registration to route to.
  *
  * Every member is required: a missing route would be a silent drop, and
  * `createWebuiApplication` always installs them.
@@ -173,9 +172,9 @@ export interface WebuiEventCoordinatorDeps {
   readonly readActiveSessionId: () => string | undefined;
   /**
    * The unread controller, which owns the activity reduction and gates counted
-   * events on hydration (plan §7.6 "Unread"). The coordinator routes every
-   * event to it instead of reducing the activity map itself, so there is one
-   * implementation of the activity write path.
+   * events on hydration. The coordinator routes every event to it instead of
+   * reducing the activity map itself, so there is one implementation of the
+   * activity write path.
    */
   readonly unread: WebuiActivityIngress;
 }

@@ -1,10 +1,9 @@
-// The account workflow owner (plan §7.1 `application/account/account-workflows.ts`;
-// §7.6 "Goal"/"Settings" rows; §7.7 stage 5; ticket #52).
+// The account workflow owner.
 //
 // One owner for everything the account surfaces read and write: the account
 // record, the usage quota, the daily check-in panel and claim, the device
 // login flow — including its **poll** — and sign-out. The two problems this
-// closes, both named in the ticket:
+// closes:
 //
 //  1. **Polling with no owner.** The login dialog opened its own interval and
 //     cleared it from its own effect cleanup, so "who stops the poll" was an
@@ -91,7 +90,7 @@ export interface WebuiAccountSignOutState {
 /**
  * One credential-status read. `error` carries the unavailable message too: an
  * un-wired capability and a failed read are both "no answer", and the surface
- * that renders them already distinguishes the two by their text (T09).
+ * that renders them already distinguishes the two by their text.
  */
 export interface WebuiAccountCredentialStatusState {
   readonly status: "idle" | "loading" | "ready" | "error";
@@ -186,14 +185,14 @@ export interface WebuiAccountWorkflows {
   /**
    * Poll the Codex OAuth status while a login surface needs it, and stop when the
    * last holder releases. The timer lives here so a hidden or remounted surface
-   * cannot leave a second one behind (T09; plan §4.1).
+   * cannot leave a second one behind.
    */
   readonly acquireCodexOAuthPolling: () => () => void;
 
   /**
    * Terminal teardown: every timer this owner runs stops and a late answer can no
    * longer commit. The application is replaced per mount, so an owner that kept
-   * polling after its mount went away would be a leak (T09; plan §4.1).
+   * polling after its mount went away would be a leak.
    */
   readonly dispose: () => void;
 
@@ -206,9 +205,9 @@ export interface WebuiAccountWorkflows {
 export function createWebuiAccountWorkflows(deps: {
   readonly port: WebuiAccountPortSlice;
   /**
-   * The application's opaque generation context (§4.5; T02). Sign-in, sign-out,
-   * a claim and an authoritative status answer that reports a different identity
-   * all retire the answers computed under the previous credential generation.
+   * The application's opaque generation context. Sign-in, sign-out, a claim and
+   * an authoritative status answer that reports a different identity all retire
+   * the answers computed under the previous credential generation.
    */
   readonly identityEpochs?: WebuiIdentityEpochs;
 }): WebuiAccountWorkflows {

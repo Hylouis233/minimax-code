@@ -5,15 +5,15 @@
  * The *policy* is not here. Which directory a fresh home starts in, what the
  * auto-fill may do to it, what an explicit pick or an explicit clearing means,
  * and what starting a new task does to the home's identity are all
- * `taskSessions`' (plan §5.5 P01 step 3): the rule that an explicit "no project"
- * choice wins over the auto-fill lived in this file's effect before, where
- * reaching it needed a mounted shell. What stays is the presentation — the
- * picker's open flag, the recent-directory projection, and the navigation
- * effects that only the shell can perform.
+ * `taskSessions`': the rule that an explicit "no project" choice wins over the
+ * auto-fill lived in this file's effect before, where reaching it needed a
+ * mounted shell. What stays is the presentation — the picker's open flag, the
+ * recent-directory projection, and the navigation effects that only the shell
+ * can perform.
  *
- * Extracted from `WebuiClientFoundationApp.tsx` (A-005): the frame keeps layout
- * and public business composition, and this is one behaviour with its own
- * change driver.
+ * Extracted from `WebuiClientFoundationApp.tsx`: the frame keeps layout and
+ * public business composition, and this is one behaviour with its own change
+ * driver.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -25,8 +25,8 @@ import type { WebuiShellSurfaceCommand } from "../features/shell/projection/shel
 /**
  * The workspace-policy capability the shell consumes, as the application's task
  * use case satisfies it. Declared here rather than imported: the shell may not
- * import the assembly (plan §5.3), so it states the shape it needs and the
- * composition satisfies it.
+ * import the assembly, so it states the shape it needs and the composition
+ * satisfies it.
  */
 export interface NewTaskWorkspacePolicy {
   readonly initialWorkspaceDir: (input: {
@@ -57,8 +57,8 @@ export interface UseNewTaskWorkspaceOptions {
   readonly setSelectedSessionId: (id: string | undefined) => void;
   /**
    * Records the Agent Team choice the created session was started with. Sessions
-   * owns that choice (T19), so this hook asks for the record rather than
-   * reaching the storage adapter itself.
+   * owns that choice, so this hook asks for the record rather than reaching the
+   * storage adapter itself.
    */
   readonly recordSessionTeamMode: (sessionId: string, teamModeOff: boolean) => void;
 }

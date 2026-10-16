@@ -4,13 +4,11 @@
 // `createWebuiAccountWorkflows`'s, created once by the composition root. This
 // binding is the only React edge to it: a surface reads the snapshot and
 // invokes the owner's named commands, and never receives the owner object or a
-// transport method for the account operations (plan §5.1).
+// transport method for the account operations.
 //
-// It sat in the shared `client/bindings/use-query-state.tsx`, which held one
-// provider hook pair per owner. T09 moved the account pair into the account
-// business's own home, which is where its contracts, projections and UI already
-// are; the other owners' pairs stay in that file until their own tickets move
-// them.
+// The account pair lives here rather than in the shared `client/bindings/use-query-state.tsx`,
+// which holds one provider hook pair per owner. This business's contracts, projections and UI are
+// here too, while the other owners' pairs stay in that file.
 //
 // The context is deliberately non-throwing: an SSR render or a unit test that
 // mounts a panel without the provider reads the initial snapshot and submits

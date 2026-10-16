@@ -60,10 +60,10 @@ function Section({ title, testId, children }: { readonly title: string; readonly
 
 /** Compatibility alias for the settings modal's capability surface.
  *
- *  The modal no longer accepts a `transport` prop — it reads the application
- *  owners directly (plan §7.6; ticket #52) — but the name is kept exported for
- *  consumers that used to thread that prop through (`UserMenu`). It now names
- *  the settings owner's command surface. */
+ *  The modal does not accept a `transport` prop — it reads the application
+ *  owners directly — but the name is kept exported for consumers that used to
+ *  thread that prop through (`UserMenu`). It now names the settings owner's
+ *  command surface. */
 interface SettingsModalProps {
   readonly open: boolean;
   readonly onClose: () => void;
@@ -86,12 +86,12 @@ interface SettingsModalProps {
 
 export function SettingsModal({ open, onClose, dataDir, version, sessionId, workspaceDir, onOpenFileLine, onCreateMemorySession }: SettingsModalProps): ReactElement | null {
   const { dom, storage } = useWebuiBrowserCapabilities();
-  // The modal reads the four application owners directly (plan §7.6; ticket
-  // #52): the `transport` prop and its bound capability map are gone, and so is
-  // every business request this component used to hold.
+  // The modal reads the four application owners directly: the `transport` prop
+  // and its bound capability map are gone, and so is every business request
+  // this component used to hold.
   const settingsWorkflows = useWebuiSettingsWorkflows();
   const settingsState = useWebuiSettingsWorkflowsState();
-  // The model list is `models`' (plan §5.6): read and select through that owner.
+  // The model list is `models`': read and select through that owner.
   const modelsWorkflows = useWebuiModelsWorkflows();
   const modelsState = useWebuiModelsWorkflowsState();
   const accountWorkflows = useWebuiAccountWorkflows();
@@ -122,14 +122,14 @@ function ModeCard({ testId, title, description, icon, selected = false }: { read
 function SettingPanel({ title, children }: { readonly title: string; readonly children: ReactNode }): ReactElement { return <section className="webui-settings-panel"><h3>{title}</h3><div>{children}</div></section>; }
 /** The pure presentation reducer's action type, so the review page dispatches
  *  into the same state machine the panel renders. */
-/** Roadmap E 区「工作树隔离」.
+/** The worktree page: see which parallel experiment branches exist and switch
+ * into one.
  *
  * Creating an isolated worktree already works from the rail's context menu;
- * this is the other half of the row — being able to see which parallel
- * experiment branches exist and switch into one. The session list is read from
- * the session catalog the rail already loaded (plan §7.6; ticket #52); grouping
- * is done by `groupWebuiWorktreeWorkspaces`, so the list a test asserts on is
- * the same list the page renders. */
+ * this is the other half of the feature. The session list is read from the
+ * session catalog the rail already loaded; grouping is done by
+ * `groupWebuiWorktreeWorkspaces`, so the list a test asserts on is the same
+ * list the page renders. */
 function SettingsWorktreePage(): ReactElement {
   const store = useWebuiSessionStoreContext();
   const catalog = useSyncExternalStore(store.subscribe, () => store.getSnapshot().catalog, () => store.getSnapshot().catalog);

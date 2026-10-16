@@ -1,13 +1,12 @@
 /**
  * The composer's submission gate, read by both the send button and the editor's
- * Enter handler (T13 criterion 6: "current button/Enter shared gate").
+ * Enter handler.
  *
- * It was two expressions inline in the 2046-line component, which made the one
- * rule this criterion names — the button and Enter accept exactly the same
- * submissions — impossible to check without rendering the whole composer, and
- * possible to drift apart one edit at a time. As a read it has one definition
- * and one test; the component computes it once per render and hands the same
- * value to both consumers.
+ * It was two expressions inline in the component, which made the one
+ * rule — the button and Enter accept exactly the same submissions — impossible
+ * to check without rendering the whole composer, and possible to drift apart one
+ * edit at a time. As a read it has one definition and one test; the component
+ * computes it once per render and hands the same value to both consumers.
  *
  * Two destinations satisfy a submission: sending (the substrate can send for
  * this session) and queueing (the substrate can enqueue for a known session).

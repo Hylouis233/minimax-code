@@ -2,9 +2,8 @@
 // coordinators speak in session ids while the fencing rules stay in one pure
 // module (`stream-lease.ts`).
 //
-// This is the entry point plan §7.6 calls "turn coordinator claims and releases
-// through one entry": every claim, release and currency check in the application
-// goes through here, and every one of them reads and writes the same store.
+// Every claim, release and currency check in the application goes through here,
+// and every one of them reads and writes the same store.
 
 import type { WebuiStreamState } from "../projection/stream-state.js";
 import type { WebuiSessionStore } from "../../../application/session-store.js";

@@ -1,7 +1,6 @@
-// Browser storage IO (plan §7.2 `client/infrastructure/storage.ts`; ticket #49
-// criterion 6).
+// Browser storage IO.
 //
-// The browser persistence half of the former `client/session-unread.ts`: the
+// The browser persistence half of the former session-unread module: the
 // storage key, the read that validates every stored value, and the write that
 // keeps only positive counts. It decides no unread business rule — the badge
 // format lives in `projection/common/unread-badge.ts` and the ordering lives with the
@@ -54,11 +53,11 @@ export interface WebuiBrowserStorage {
   readonly readUnreadCounts: () => Record<string, number>;
   readonly writeUnreadCounts: (counts: Readonly<Record<string, number>>) => void;
   /**
-   * The rail's browser-local overlays (T19). Declared here as part of the
-   * adapter's own surface; the sessions feature states the subset it needs in
-   * `features/sessions/contracts/rail-overlays.ts` and this adapter satisfies
-   * it structurally, so a feature binding holds a contract rather than this
-   * module.
+   * The rail's browser-local overlays. Declared here as part of the adapter's
+   * own surface; the sessions feature states the subset it needs in
+   * `features/sessions/bindings/use-session-rail-overlays.ts` and this adapter
+   * satisfies it structurally, so a feature binding holds a contract rather
+   * than this module.
    */
   readonly readSessionOverlay: (kind: WebuiSessionOverlay) => Record<string, boolean>;
   readonly toggleSessionOverlay: (
@@ -149,11 +148,10 @@ export function createWebuiBrowserStorage(
     },
     readUnreadCounts: () => readWebuiUnreadCounts(storage),
     writeUnreadCounts: (counts) => writeWebuiUnreadCounts(counts, storage),
-    // The rail's overlays (T19). The keys and the stored format stay in this
-    // module — the equivalence obligation (§8.1 "Browser overlays") is about
-    // exactly these — while the rail's binding reads them through
-    // `features/sessions/contracts/rail-overlays.ts`, which this adapter
-    // satisfies. Self-reference is safe: these run after construction.
+    // The rail's overlays. The keys and the stored format stay in this module,
+    // while the rail's binding reads them through the interface in
+    // `features/sessions/bindings/use-session-rail-overlays.ts`, which this
+    // adapter satisfies. Self-reference is safe: these run after construction.
     readSessionOverlay: (kind) => readSessionOverlay(kind, browserStorage),
     toggleSessionOverlay: (kind, sessionId) =>
       toggleSessionOverlay(kind, sessionId, browserStorage),
@@ -215,12 +213,10 @@ export function writeWebuiUnreadCounts(
 }
 
 // ---------------------------------------------------------------------------
-// The rail's overlay flags (plan §5.1.2, §5.6's `sessions` row). They used to
-// live in `components/sessions/LeftRail.tsx`, which the package's own guide forbids —
-// "browser storage IO in a component file" — and §5.1.2 records the instance:
-// the overlay/pins adapter is "storage filed in a component named `LeftRail`".
-// The component keeps the frame; the adapter lives with the other storage keys
-// and readers in this module.
+// The rail's overlay flags. They live here rather than in the sessions feature's
+// rail component (`features/sessions/ui/LeftRail.tsx`): browser storage IO
+// belongs with the storage keys and readers, not in a component file. The
+// component keeps the frame.
 // ---------------------------------------------------------------------------
 
 export const WEBUI_SESSION_OVERLAY_KEYS = {

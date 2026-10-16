@@ -1,8 +1,8 @@
-// Smoke tests for the React bindings (plan §7.2).
+// Smoke tests for the React bindings.
 //
 // The bindings are the only place the application layer is allowed to touch
-// React. These cases prove the two properties the ticket cares about from the
-// component side: a component reads the application snapshot through the hook
+// React. These cases prove two properties from the component side: a component
+// reads the application snapshot through the hook
 // (it holds no store writer and no map of its own), and rendering components
 // never opens another process-event channel — the coordinator remains the
 // channel's sole consumer.

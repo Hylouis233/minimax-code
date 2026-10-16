@@ -11,16 +11,16 @@
  *
  * The writes belong to the application's unread controller; this hook is the
  * shell's read and its subscriptions, which is why nothing here persists
- * anything (ticket #49 criterion 4: restore before the first write lives in one
- * place, and it is not this one).
+ * anything (restore before the first write lives in one place, and it is not
+ * this one).
  *
  * The options are the capabilities this wiring uses, not the application object:
- * the shell may not reach into the assembly that composes it (role rule, plan
- * §5.3), and the active-turn probe's own type lives with the turn substrate. The
- * caller supplies `probeActiveTurns` as a closure, so the probe stays opaque
- * here and no second declaration of it exists.
+ * the shell may not reach into the assembly that composes it (role rule), and
+ * the active-turn probe's own type lives with the turn substrate. The caller
+ * supplies `probeActiveTurns` as a closure, so the probe stays opaque here and
+ * no second declaration of it exists.
  *
- * Extracted from `WebuiClientFoundationApp.tsx` (A-005).
+ * Extracted from `WebuiClientFoundationApp.tsx`.
  */
 import { useEffect, useState, useSyncExternalStore } from "react";
 
@@ -68,9 +68,9 @@ export interface UseShellActivityWiringOptions {
   readonly seed: (sessions: readonly ShellActivitySessionRow[]) => void;
   readonly hydrate: (sessionId: string | undefined) => void;
   /**
-   * Runs the shared, deduplicated active-turn probe (plan §7.1 slice) for the
-   * given rows. The caller closes over the probe the assembly built (T19), which
-   * keeps its type out of this module.
+   * Runs the shared, deduplicated active-turn probe for the given rows. The
+   * caller closes over the probe the assembly built, which keeps its type out
+   * of this module.
    */
   readonly probeActiveTurns: (sessions: readonly ShellActivityProbeRow[]) => () => void;
   /** Subscribes to settled turn mutations, which stale the review views. */
@@ -116,10 +116,10 @@ export function useShellActivityWiring(
    * A `workspace.git.changed` signal invalidates exactly the views it affects: the
    * owner matches the signal against the review and environment views it currently
    * holds and refreshes only those, coalescing the environment reload into its
-   * window (ticket #51). The route reaches the owner through this subscription —
-   * no shell state and no revision counter in between (T11); the subscription
-   * exists because the workspace owners are still built by this mount, which the
-   * shell composition (T19) moves.
+   * window. The route reaches the owner through this subscription — no shell
+   * state and no revision counter in between; the subscription exists because
+   * the workspace owners are still built by this mount, which the shell
+   * composition moves.
    */
   useEffect(
     () =>
@@ -130,9 +130,9 @@ export function useShellActivityWiring(
   );
   /**
    * The shell's remaining reaction, subscribed rather than installed as a
-   * replaceable set (T05): it runs after the application's own routes have run and
-   * cannot displace one. Temporary adapter until the reconnect reconciliation has
-   * an owner (T12).
+   * replaceable set: it runs after the application's own routes have run and
+   * cannot displace one. Temporary adapter until the reconnect reconciliation
+   * has an owner.
    */
   useEffect(
     () =>
@@ -144,9 +144,8 @@ export function useShellActivityWiring(
   );
   // A settled turn mutation (revert / reapply) changed the working tree, so the
   // review views for it are stale. The turn owner announces the settlement and
-  // this is where the affected family is invalidated (plan §4.5: a mutation
-  // commits once, then invokes the affected owners' explicit invalidation
-  // commands) — no panel keeps a refresh token for it.
+  // this is where the affected family is invalidated — no panel keeps a refresh
+  // token for it.
   useEffect(
     () => subscribeTurnReviewMutations(() => workspaceQueries.invalidateReview()),
     [subscribeTurnReviewMutations, workspaceQueries],
@@ -154,7 +153,7 @@ export function useShellActivityWiring(
   // The application's selection follows the route the shell resolved. The
   // coordinator and the unread controller judge events against the selected
   // session, so the store's selection is the one record of it — the shell does
-  // not keep a second copy to hand over (plan §4.2, §4.3).
+  // not keep a second copy to hand over.
   useEffect(() => {
     select(selectedSessionId);
   }, [select, selectedSessionId]);

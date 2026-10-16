@@ -3,8 +3,7 @@
 // The WebUI previously had no login at all: it served whatever credential the
 // terminal client had written, and 退出登录 did not remove it, so neither
 // signing in nor switching accounts was possible without leaving the
-// browser. This dialog is the missing surface for both rows of the roadmap's
-// 登录与账号 group:
+// browser. This dialog is the missing surface for both:
 //
 //   * 登录方式 — the device-authorization flow the terminal client uses,
 //     rendered for the browser: a user code, the page to enter it on, and a
@@ -164,8 +163,8 @@ export function AccountLoginDialog({
 }): ReactElement | null {
   const { dom } = useWebuiBrowserCapabilities();
   // The device flow — begin, poll and cancel — belongs to the application
-  // account owner (ticket #52). This dialog is a view over its snapshot: it
-  // submits commands and renders `login.view`; it owns no interval.
+  // account owner. This dialog is a view over its snapshot: it submits commands
+  // and renders `login.view`; it owns no interval.
   const workflows = useWebuiAccountWorkflows();
   const snapshot = useWebuiAccountWorkflowsState();
   const phase = deriveWebuiAccountLoginPhase(snapshot.login.view);

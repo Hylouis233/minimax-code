@@ -1,6 +1,6 @@
 // SessionRail — the rail listing projects + recent sessions.
 //
-// T07's responsibility cut: the grouping/labelling/search rules now live in
+// The grouping/labelling/search rules live in
 // `features/sessions/projection/rail-groups.ts`, and the four cohesive units this
 // file used to hold in one piece are their own modules beside it — the view
 // strip (`rail-view-tabs.tsx`), a project's expansion (`project-expansion.tsx`),
@@ -170,8 +170,8 @@ export function WebuiProjectList({
   readonly onViewChange?: (view: WebuiRailView) => void;
   /**
    * The Agent Team badge's tooltip, injected by the composition root. A view may
-   * not read the platform adapter that holds the team-mode choice (plan §5.3), so
-   * whoever renders the rail passes the label in.
+   * not read the platform adapter that holds the team-mode choice, so whoever
+   * renders the rail passes the label in.
    */
   readonly teamModeLabel?: string;
 }): ReactElement {
@@ -248,11 +248,11 @@ export function WebuiProjectList({
   const contextMenu = menuAttachment.menu;
 
   /**
-   * The host render branch for the rail's context menu (plan §10 S1, S4). What the
-   * menu *is* lives in `projection/rail-menu.ts`; what each declared key *does* —
-   * its icon, whether it is enabled, and what it calls — is this one table. A
-   * second place that enumerates the items is what S1's acceptance forbids, so the
-   * two builders below read the registry and nothing here lists a label.
+   * The host render branch for the rail's context menu. What the menu *is* lives
+   * in `projection/rail-menu.ts`; what each declared key *does* — its icon,
+   * whether it is enabled, and what it calls — is this one table. A second place
+   * that enumerates the items is forbidden, so the two builders below read the
+   * registry and nothing here lists a label.
    */
   const railMenuWiring: Readonly<
     Record<

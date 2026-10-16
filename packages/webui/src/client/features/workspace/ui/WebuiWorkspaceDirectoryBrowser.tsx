@@ -1,4 +1,4 @@
-// The workspace directory browser (ticket #76; §15.1's `components/workspace/…` row).
+// The workspace directory browser.
 //
 // The picker the composer opens for a working directory: it lists a directory, walks up and down,
 // accepts a typed absolute path, and hands the chosen directory back. It owns its listing, loading and
@@ -23,7 +23,7 @@ export function WebuiWorkspaceDirectoryBrowser({
   readonly onSelect: (dir: string) => void;
   readonly onCancel: () => void;
 }): ReactElement {
-  // The listing, its freshness and its failure belong to the files owner (T11):
+  // The listing, its freshness and its failure belong to the files owner:
   // a browse that answers after a newer one is dropped there, so fast navigation
   // cannot show the wrong directory. This component keeps the typed draft and the
   // geometry.

@@ -1,4 +1,4 @@
-// The WebUI application state container (plan §7.1 `client/application/`).
+// The WebUI application state container.
 //
 // This module declares the *shape* of the state the application owns and the
 // initial value. It is deliberately free of React (the layer matrix forbids
@@ -65,7 +65,7 @@ export const initialWebuiApplicationSessionState: WebuiApplicationSessionState =
 export interface WebuiApplicationState {
   readonly sessions: ReadonlyMap<string, WebuiApplicationSessionState>;
   readonly activity: WebuiSessionActivityMap;
-  /** The one session entity catalog (plan §7.6; ticket #49). */
+  /** The one session entity catalog. */
   readonly catalog: WebuiSessionCatalogState;
   readonly selectedSessionId?: string;
 }

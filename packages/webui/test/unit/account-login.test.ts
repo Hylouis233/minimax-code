@@ -1,7 +1,7 @@
 // Unit tests for the server-owned account login session and the dialog's
 // phase derivation.
 //
-// Roadmap N (登录与账号): the WebUI had no login at all, and its sign-out
+// The WebUI had no login at all, and its sign-out
 // only cleared projections — the credential survived and the next lease
 // refresh signed straight back in. `account-login.ts` is the server half of
 // the fix: one session over the shared `MCodeOAuthCore`, answering the

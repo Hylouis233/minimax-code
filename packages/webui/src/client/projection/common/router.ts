@@ -13,8 +13,8 @@ export function route(pathname: string): WebuiRoute {
  *
  * It was declared in `SessionRail.tsx`, which was its only caller while the rail
  * was the only surface that could navigate to a session. The shell navigates too
- * (a created/imported session, a subagent), and T07's responsibility cut moved
- * it to the module that owns the route.
+ * (a created/imported session, a subagent), so it lives in the module that owns
+ * the route.
  */
 export function sessionHash(sessionId: string): string {
   const params = new URLSearchParams();

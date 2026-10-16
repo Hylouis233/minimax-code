@@ -374,9 +374,9 @@ describe("记忆 section markup", () => {
     expect(markup).toContain("记忆");
     expect(markup).toContain("主动记忆");
     expect(markup).toContain("记忆摘要");
-    // "管理" is the row that actually points at a manager. The roadmap's
-    // "管理 UI 未见" only closes once that entry point exists, so its absence
-    // has to fail here rather than pass as a tidier layout.
+    // "管理" is the row that actually points at a manager. The manager UI is
+    // only complete once that entry point exists, so its absence has to fail
+    // here rather than pass as a tidier layout.
     expect(markup).toContain("管理");
     expect(markup).toContain("agent-memory-load");
   });

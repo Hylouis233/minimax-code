@@ -77,7 +77,7 @@ export function PluginCatalogue({
   const pluginPreviewRequestRef = useRef(0);
   const [showAllCatalogue, setShowAllCatalogue] = useState(true);
   /* Local form-level messages only. A load or mutation failure belongs to the
-   * application plugin owner (ticket #52) and is read from its snapshot. */
+   * application plugin owner and is read from its snapshot. */
   const [localError, setLocalError] = useState("");
   const [dialog, setDialog] = useState<"mcp" | "agent" | "skill" | null>(null);
   const [editing, setEditing] = useState<Row | undefined>();
@@ -106,7 +106,7 @@ export function PluginCatalogue({
   };
 
   // The plugin manager's listings and mutations belong to the application
-  // plugin owner (ticket #52). This component submits named intents and reads
+  // plugin owner. This component submits named intents and reads
   // the snapshot; only detail/preview attachment identities stay local so a
   // late answer cannot populate a replacement dialog.
   const workflows = useWebuiPluginWorkflows();
@@ -475,7 +475,7 @@ export function PluginCatalogue({
             its own name/model/prompt fields — a second copy of the same draft
             the dialog owns — and the two could disagree, because saving one left
             the other showing stale values. What it shows now it reads from the
-            row; the draft lives in `AgentForm`, once (T08).
+            row; the draft lives in `AgentForm`, once.
           */}
           <div className="webui-agent-detail">
             <div className="webui-agent-fields">

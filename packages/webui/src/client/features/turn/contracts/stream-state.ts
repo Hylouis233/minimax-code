@@ -2,7 +2,7 @@
 // mechanism (`client/conversation/stream-loop.ts`, layer `mechanisms`) and the
 // projections that reduce frames into them (`client/features/turn/projection/stream-state.ts`
 // and `client/features/workspace/projection/workspace-progress.ts`). A mechanism may import only
-// `contracts` and `shared` (plan §7.2), so the state types live here instead of
+// `contracts` and `shared`, so the state types live here instead of
 // in the projection that reduces them: the loop operates on these types and
 // must not reach into `view` to name them.
 

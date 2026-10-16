@@ -1,10 +1,8 @@
-// The port-slice provider and its read hooks (plan §8 Phase 2; ticket #60).
+// The port-slice provider and its read hooks.
 //
 // This is the delivery half of `application/port-slices.ts`: the composition root
 // builds the slices once and provides them here, and a business reads *its own*
-// slice through `useWebuiPortSlice`. Nothing consumes it yet — A4-s2 wires the
-// provider into `main.tsx`, A4-s3/s4 move the consumers — so this module exists
-// to make the slices injectable and independently revertible.
+// slice through `useWebuiPortSlice`.
 //
 // **Absent provider means "not wired", not "throw".** The hook returns
 // `undefined` when no provider is mounted (SSR, unit tests) and when the

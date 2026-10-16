@@ -1,6 +1,4 @@
-// The narrow phase intents a non-Turn business may drive (plan §5.5 P02 step 3:
-// "Publish narrow interaction phase intents without exposing a generic writer or
-// creating another private peer import").
+// The narrow phase intents a non-Turn business may drive.
 //
 // The interaction flow decides *when* the phase moves — a pending permission gates
 // the turn, an allowed one resumes it, a skipped questionnaire may end it. Turn owns

@@ -1,8 +1,8 @@
 // Verify the WebUI design-token file against the token surface
-// the design-language doc describes (ADR 0009, ticket 04).
+// the design-language doc describes.
 //
 // The source of truth for what the file must contain is
-// `packages/webui/docs/design-language.md`: primitive ramps, scale tokens, and 211
+// `packages/webui/docs/design/design-language.md`: primitive ramps, scale tokens, and 211
 // semantic tokens with light and dark bindings on a `.light` / `.dark` class.
 
 import { describe, it, expect, beforeAll } from "vitest";
@@ -85,8 +85,8 @@ describe("WebUI design tokens", () => {
   });
 
   it("carries the 211 semantic tokens that packages/webui/docs/design-language.md names", () => {
-    // 211 is the documented count from the visual-language extraction. If our
-    // count drifts, the test fails loudly rather than silently adjusting.
+    // 211 is the count `packages/webui/docs/design/design-language.md` records.
+    // If our count drifts, the test fails loudly rather than silently adjusting.
     expect(semanticNames().length).toBe(211);
   });
 
@@ -166,10 +166,9 @@ describe("WebUI design tokens", () => {
   });
 
   it("is not the compiled desktop stylesheet copied across", () => {
-    // ADR 0009 / acceptance criterion: the token file is authored here rather
-    // than copied wholesale. The easiest proxy is checking that
-    // the file is *only* tokens: no font-family declarations, no Tailwind
-    // directives, no @media queries, no @keyframes.
+    // The token file is authored here rather than copied wholesale. The easiest
+    // proxy is checking that the file is *only* tokens: no font-family
+    // declarations, no Tailwind directives, no @media queries, no @keyframes.
     expect(tokens).not.toMatch(/font-family/u);
     expect(tokens).not.toMatch(/@tailwind/u);
     expect(tokens).not.toMatch(/@media/u);
@@ -183,7 +182,7 @@ describe("WebUI design tokens", () => {
 
 // Reference: tailwind.config.cjs declares the utilities that map the tokens.
 // We don't run Tailwind here, but we do read the compiled stylesheet that
-// `pnpm build:webui` produced and assert the brief's named examples exist.
+// `pnpm build:webui` produced and assert the named utilities exist.
 describe("WebUI compiled stylesheet", () => {
   let compiled: string;
   beforeAll(() => {
@@ -264,13 +263,12 @@ describe("WebUI compiled stylesheet", () => {
   });
 
   it("emits every component class the new shell references", () => {
-    // Ticket 08 (B3) added `.webui-button-primary`, `.webui-button-secondary`,
-    // `.webui-textarea`, `.webui-input`, `.webui-nav-item`,
-    // `.webui-session-card`, and `.webui-empty-state` to the markup, and
-    // the @layer components block in `shell.css` emits the matching
-    // styles. The component classes only carry meaning if Tailwind
-    // actually compiles them — assert each one lands in the output
-    // rather than silently degrading to a no-op.
+    // The new shell's markup carries `.webui-button-primary`,
+    // `.webui-button-secondary`, `.webui-textarea`, `.webui-input`, `.webui-nav-item`,
+    // `.webui-session-card`, and `.webui-empty-state`, and the @layer
+    // components block in `shell.css` emits the matching styles. The component
+    // classes only carry meaning if Tailwind actually compiles them — assert each
+    // one lands in the output rather than silently degrading to a no-op.
     const required = [
       /\.webui-button-primary\s*\{/u,
       /\.webui-button-secondary\s*\{/u,

@@ -1,10 +1,3 @@
-// RailRow — the navigation row used in the rail.
-//
-// W3 tier 2 lift: this component was moved verbatim out of the module that used
-// to hold the shell — `app.tsx`, since replaced by `WebuiClientFoundationApp.tsx`.
-// The body is byte-identical to what used to live there; the lift was move-only,
-// and consumers import it from this file.
-
 import type { ReactElement } from "react";
 
 export function RailRow({

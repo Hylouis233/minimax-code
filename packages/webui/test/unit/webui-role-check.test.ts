@@ -1,5 +1,5 @@
 // The WebUI role rules: who may reach whom, judged by ownership rather than by
-// dependency direction (plan §5.1, §5.3; Spec decisions 20–22).
+// dependency direction.
 //
 // The layer matrix cannot express these, and neither can a directory prefix:
 // `client/shell/WebuiClientFoundationApp.tsx` and `client/ui/Button.tsx` are both
@@ -551,7 +551,7 @@ describe("the role rules feed the dependency gate", () => {
   });
 });
 
-// A-004 / gate review G-005: the shell may not reach the platform adapters. This
+// The shell may not reach the platform adapters. This
 // is a role judgement, and the fixture pins the edge the measured tree has to
 // keep refusing now that both homes have their final spelling.
 describe("the role rules judge the role, not the directory", () => {

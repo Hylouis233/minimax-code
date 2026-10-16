@@ -1,10 +1,10 @@
-// The single session state source (plan §5.6's `sessions` row; ticket #68's fourth
-// item). §4.1's field 1 gives `sessions` "the session store (the single writable
-// copy), the catalog read model, unread hydration ordering, and the per-session
-// context-window consumption published for the composer's ring", and §5.6 repeats
-// it. The item is a **check**, and the check passes: these are the assertions, not
-// a description, so a second copy introduced later fails here rather than being
-// noticed in review.
+// The single session state source.
+//
+// The `sessions` owner holds the session store (the single writable copy), the
+// catalog read model, unread hydration ordering, and the per-session context-window
+// consumption published for the composer's ring. This file is a **check** rather
+// than a description: these are the assertions, so a second copy introduced later
+// fails here rather than being noticed in review.
 //
 // Every scan below reads source text. That is deliberate: "there is no second map"
 // is a structural claim, and the webui suite has no DOM to observe it in.

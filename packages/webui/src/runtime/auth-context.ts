@@ -1,10 +1,9 @@
 // Account credentials for the WebUI's runtime host.
 //
-// Assembly step 3 of `packages/webui/docs/runtime/boot.md` requires an auth context getter
-// with refresh and invalidation. Managed MiniMax login carries no API key: the
-// credential is an OAuth access token sent as `Authorization: Bearer`, and the
-// resolver throws `managed OAuth bearer is not synced` when the header is
-// absent. `@mavis/local-runtime-v2` defaults the getter to `() => undefined`
+// The assembly requires an auth context getter with refresh and invalidation.
+// Managed MiniMax login carries no API key: the credential is an OAuth access
+// token sent as `Authorization: Bearer`, and the resolver throws
+// `managed OAuth bearer is not synced` when the header is absent. `@mavis/local-runtime-v2` defaults the getter to `() => undefined`
 // (`compat/v1/runtime.ts`), so an assembly that passes nothing can never talk
 // to a managed provider: every turn fails at the agent preflight.
 //
@@ -32,7 +31,7 @@
 //
 // One decision, two consumers. The scope picked here is also the scope
 // `MAVIS_REGION` / `MAVIS_BUILD_ENV` are written from
-// (`packages/webui/src/server/runtime-environment.ts`). The projection is
+// (`packages/webui/src/runtime/runtime-environment.ts`). The projection is
 // adopted only when its directory actually carries a credential; otherwise
 // the scan falls through to the first scoped directory that does. Without
 // this guard a stale projection strands the runtime on a scope whose

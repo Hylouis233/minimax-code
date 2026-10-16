@@ -1,4 +1,4 @@
-// The submission vocabulary (plan §5.5 P02 step 9).
+// The submission vocabulary.
 //
 // One submission is one intent classified by one decision and closed by one completion. The decision
 // is what the admission rule concluded — not a UI instruction: the caller decides how a `busy` or an
@@ -6,7 +6,7 @@
 //
 // The completion never rejects. A refusal is a value, because the caller has to be able to report it
 // and keep going: a rejected promise would make the refusal path the exception path, and the
-// transition the Composer consumes (P02 step 4) has to be observable either way.
+// transition the Composer consumes has to be observable either way.
 
 /** What the user asked for, before any decision. */
 export interface WebuiSubmissionIntent {
@@ -20,7 +20,7 @@ export interface WebuiSubmissionIntent {
  *
  * `dispatching` and `queued` mean the submission is on its way; the rest mean it is not, and
  * `creation-failed` / `failed` are the two ways an attempt that got as far as IO ended. `busy` covers
- * both reasons a live target refuses input — a creation already in flight for this home (D01) and a
+ * both reasons a live target refuses input — a creation already in flight for this home and a
  * turn already running with nowhere to queue it.
  */
 export type WebuiSubmissionDecision =
@@ -45,7 +45,7 @@ export interface WebuiSubmissionAdmissionState {
   /** A turn is known to be running on the target. */
   readonly turnLive: boolean;
   /**
-   * A creation is already in flight for the current home incarnation (D01). This is the one piece of
+   * A creation is already in flight for the current home incarnation. This is the one piece of
    * state the reservation owns: the single-flight check itself lives where the create is issued.
    */
   readonly creating: boolean;
@@ -71,11 +71,11 @@ export type WebuiSubmissionCompletion =
   | WebuiSubmissionRefusal;
 
 /**
- * The task/session use case, as the submission needs it (P01 step 4). Declared structurally because
+ * The task/session use case, as the submission needs it. Declared structurally because
  * the use case is the application's own module: what crosses is the capability, not the assembly.
  *
- * `busy` is D01: one creation per home incarnation, decided before any wire IO, with the input left
- * alone. `selected` is rule 7: the created session is selected only while the navigation claim that
+ * `busy` means one creation per home incarnation, decided before any wire IO, with the input left
+ * alone. `selected` means the created session is selected only while the navigation claim that
  * started the creation is still current.
  */
 export interface WebuiTaskSessionSubmitter {

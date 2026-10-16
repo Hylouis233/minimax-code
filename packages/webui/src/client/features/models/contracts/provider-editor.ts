@@ -1,4 +1,4 @@
-// The provider editor's published surface (plan §5.5).
+// The provider editor's published surface.
 //
 // The editor's *policy* lives in `features/models/application/provider-editor.ts`;
 // these are its public shapes, and they live in `contracts/` because the surface

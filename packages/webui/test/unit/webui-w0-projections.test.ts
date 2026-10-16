@@ -1,11 +1,11 @@
-// W0 safety net — the session-scoped workspace-progress projection.
+// Safety net — the session-scoped workspace-progress projection.
 //
 // `reduceWebuiWorkspaceProgressEvent` and `projectWebuiWorkspaceHistory` turn
 // raw workspace-progress events into the todos/subagents the workspace panel
-// renders. W2 moves them out of `workspace-progress.ts`, and W0 found they had
-// no direct test at all — only the rendered panel is asserted, in
-// `webui-shell.test.ts`. A move that silently changed the accepted event shape
-// or the status mapping would have shown up nowhere.
+// renders. They live in `workspace-progress.ts` and had no direct test at all —
+// only the rendered panel is asserted, in `webui-shell.test.ts`. A change that
+// silently altered the accepted event shape or the status mapping would have
+// shown up nowhere.
 //
 // The fixtures below are written against the *event* shape, and every expected
 // value is spelled out here rather than derived from an implementation

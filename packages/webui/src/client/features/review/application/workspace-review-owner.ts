@@ -1,11 +1,11 @@
-// The workspace-review owner (plan §5.2 review row; T10's `workspace-review-owner`).
+// The workspace-review owner.
 //
 // This was the review half of `application/workspace/workspace-queries.ts`, which
 // held it together with the file tree, file contents and the environment — three
 // concerns with different identities and different invalidation. Only the review
-// responsibility moved here (T11 owns the rest): the summary, the per-snapshot
-// file diffs and the search, their snapshot identity, and the bounded retry a
-// snapshot mismatch earns.
+// responsibility moved here: the summary, the per-snapshot file diffs and the
+// search, their snapshot identity, and the bounded retry a snapshot mismatch
+// earns.
 //
 // Two rules the extraction had to keep, both visible in the code below:
 //

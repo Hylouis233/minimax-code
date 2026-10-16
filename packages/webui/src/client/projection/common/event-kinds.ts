@@ -1,17 +1,15 @@
-// The event-kind registry (plan §15.4 S9, §10; ticket #66).
+// The event-kind registry.
 //
 // **What this file is for.** A new event kind used to mean editing every place
 // that knows how to recognise one: the parser that turns a payload into a view,
 // the render path that decides what to draw, and — for the kinds that move state
-// — the effect reducer. §15.4's S9 row records the cost as "7 files / 4 dirs / 3
-// layers", and the intended end state as "parse + render keyed by one kind
-// registry; the reducer untouched for a purely presentational kind".
+// — the effect reducer.
 //
 // So this is the **one** enumeration for the kinds the `goal` and `interactions`
 // businesses own. A parse site asks it whether an event is a goal event instead
 // of testing a literal prefix; a render site asks it which kind it is holding
 // instead of re-listing the names. The effect reducer keeps its own `case` labels
-// — that is the reducer site the plan leaves alone — and
+// — a purely presentational kind leaves it untouched — and
 // `event-kinds.test.ts` asserts the two enumerations cannot drift: every goal or
 // interaction label in the reducer has to be in this table, and no parse or
 // render site may restate one.

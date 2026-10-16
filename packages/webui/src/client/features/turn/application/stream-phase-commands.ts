@@ -1,8 +1,7 @@
-// The **stream-phase** view: the phase field, and nothing else (plan §5.5 P02
-// step 2 — it was Sessions' until the execution substrate took it over).
+// The **stream-phase** view: the phase field, and nothing else.
 //
-// Ticket #58 split the old command bag into three views so a consumer handed one
-// cannot reach another's commands; this is the narrowest of them. It carries no
+// The old command bag was split into three views so a consumer handed one cannot
+// reach another's commands; this is the narrowest of them. It carries no
 // `sending` write, because `sending` is the submit's lifecycle flag rather than
 // part of the phase, and that flag belongs to the lifecycle view next door.
 //

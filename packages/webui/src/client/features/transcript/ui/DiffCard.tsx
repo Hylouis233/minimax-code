@@ -1,10 +1,10 @@
 // WebuiDiffCard — the diff-card renderer.
 //
 // It renders; it does not own the query or the mutation. Those belong to the
-// review owner (plan §5.2 review row, T10): the card asks the owner for a turn
-// and the owner answers with whatever the runtime said — an answer a second
-// surface asked for is the same answer. What stays here is presentation: which
-// files are shown, whether the review panel is open, and the confirmation.
+// review owner: the card asks the owner for a turn and the owner answers with
+// whatever the runtime said — an answer a second surface asked for is the same
+// answer. What stays here is presentation: which files are shown, whether the
+// review panel is open, and the confirmation.
 //
 // The runtime keys a turn diff by the turn: an `assistantMessageId` is answered
 // only for the turn's LAST assistant message, and any other message of the same
@@ -35,8 +35,8 @@ export function WebuiDiffCard({
   readonly initialState?: Partial<WebuiDiffState>;
   readonly onReview?: (view: WebuiTurnDiffView, selectedPath?: string) => void;
 }): ReactElement | null {
-  // Presentation, owned here and nowhere else (T10: "presentation expansion and
-  // search selection stay local independent state").
+  // Presentation, owned here and nowhere else: the expansion and review-panel
+  // state are local.
   const [expanded, setExpanded] = useState(initialState?.expanded ?? false);
   const [reviewing, setReviewing] = useState(initialState?.reviewing ?? false);
   const { state: reviewState, mutate: runMutation, dismissError } = useWebuiTurnReview(

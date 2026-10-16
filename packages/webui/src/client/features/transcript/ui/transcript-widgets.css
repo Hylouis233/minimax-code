@@ -1,13 +1,11 @@
 /*
- * Styles for the Phase 3 / Phase 6 standalone transcript widgets
+ * Styles for the standalone transcript widgets
  * (ActivityIndicator, TurnNavigator, OutputError, MessageAttachments,
  *  TranscriptSkeletons, ConversationUsageBanner).
  *
  * These utility classes are declared here because no generated utility covers
- * them; the brief (`brief-m3-transcript-widgets.md`) §1 names the widgets they
- * serve. Declaring them locally means the WebUI's
- * `pnpm build:webui` stylesheet still emits the same computed values — that is
- * what the `test:app` greps assert at runtime.
+ * them. Declaring them locally means the WebUI's `pnpm build:webui` stylesheet
+ * still emits the same computed values.
  *
  *   .animate-shimmer   — skeleton loader; --shimmer-duration drives the
  *                        keyframe interval, default 1.6s.
@@ -17,10 +15,6 @@
  *                        `var(--shadow-s1-…)` is not present).
  *
  * The keyframes are defined here too — `shimmer` is a translateX mask sweep.
- *
- * Add the file to `packages/webui/src/client/styles/index.css` once the
- * integration session owns that file (see the Integration section of the
- * delivery report).
  */
 
 @keyframes transcript-shimmer {

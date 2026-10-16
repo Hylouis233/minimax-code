@@ -1,5 +1,4 @@
-// The single long-lived `watchEvents` channel (plan §7.2
-// `client/infrastructure/event-channel.ts`, split from `transport.ts`).
+// The single long-lived `watchEvents` channel, split from `transport.ts`.
 //
 // One channel per application instance, with its reconnection policy: the socket
 // reconnects after a close, and immediately when the document becomes visible or
@@ -75,9 +74,8 @@ export function createWebuiEventChannel({
     // Reported from inside the transport so the watcher counts every
     // subscription without each call site wiring callbacks; the store's
     // ever-healthy rule keeps boot quiet. There is exactly one subscription
-    // per application instance now (plan §7.7 stage 4): the event
-    // coordinator owns the process-event ingress, and no panel subscribes
-    // to process events directly any more.
+    // per application instance: the event coordinator owns the process-event
+    // ingress, and no panel subscribes to process events directly any more.
     const watcherToken = registerWebuiEventWatcher();
     let stopped = false;
     let socket: WebuiSocket | undefined;

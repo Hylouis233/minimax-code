@@ -1,11 +1,10 @@
 // Service tests for the WebUI loopback service and runtime seam.
 //
-// The brief calls for TDD at the service seam: construct the real
-// `WebuiService` with a scripted stand-in for the harness port, connect a
-// real WebSocket client, and assert the frames. Each acceptance criterion
-// has its own fixture; the same scripted port keeps the harness-side
-// surface honest (the harness never runs against real history, per ADR
-// 0006) while the wire side exercises the real `ws` package.
+// These tests drive the service seam: construct the real `WebuiService` with a
+// scripted stand-in for the harness port, connect a real WebSocket client, and
+// assert the frames. Each case has its own fixture; the same scripted port keeps
+// the harness-side surface honest (the harness never runs against real history,
+// per ADR 0006) while the wire side exercises the real `ws` package.
 
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import assert from "node:assert/strict";
@@ -1728,10 +1727,9 @@ describe("WebUI service", () => {
   });
 
   it("reads assets from the supplied clientDir override rather than the discovered path", async () => {
-    // The brief asks for the built-artifact path to be testable so the
-    // blank-page regression cannot come back. We stage a small fixture
-    // and assert the override reaches the served page without the
-    //    credential the previous mode demanded.
+    // The built-artifact path has to be testable so the blank-page regression
+    // cannot come back. We stage a small fixture and assert the override reaches
+    // the served page without the credential the previous mode demanded.
     const workspaceDir = await mkdtemp(
       path.join(os.tmpdir(), "webui-clientdir-"),
     );
@@ -2899,9 +2897,8 @@ describe("WebUI operation allowlist", () => {
       expect(registry.has("getWorkspaceEnvironment")).toBe(true);
       expect(registry.has("mutateWorkspaceGit")).toBe(true);
       // resumeSession sits next to sendMessage in the allowlist because it
-      // shares the same wire shape (the brief's "resume is not a second
-      // transport"). It must be registered, validator-bound, and reachable
-      // through the same `entry.handle(...)` plumbing.
+      // shares the same wire shape. It must be registered, validator-bound,
+      // and reachable through the same `entry.handle(...)` plumbing.
       expect(registry.has("resumeSession")).toBe(true);
       expect(registry.has("watchEvents")).toBe(true);
       expect(registry.has("replyPermission")).toBe(true);
@@ -3070,10 +3067,9 @@ describe("WebUI runtime host assembly", () => {
   });
 
   it("hands the runtime an auth context getter and invalidator for managed login", async () => {
-    // Assembly step 3 of `packages/webui/docs/runtime.md`. Managed MiniMax login has no
-    // API key, so without this pair the resolver throws "managed OAuth bearer is
-    // not synced" and every turn dies at the agent preflight — even with the
-    // credential sitting in the data directory.
+    // Managed MiniMax login has no API key, so without this pair the resolver
+    // throws "managed OAuth bearer is not synced" and every turn dies at the
+    // agent preflight — even with the credential sitting in the data directory.
     const { createWebuiRuntimeHost } =
       await import("../../src/runtime/index.js");
     const dataDir = await mkdtemp(
@@ -3171,10 +3167,10 @@ describe("WebUI runtime host assembly", () => {
         },
       });
       await assembled.harnessPort.close();
-      // The assembly intentionally omits `surface`; ADR 0004 forbids
-      // extending the `surface` enum, and assembly step 4 says the WebUI
-      // does not need a new value because `runtimeOwnerKind: 'webui'` plus
-      // the capabilities already identify the surface.
+      // The assembly intentionally omits `surface`; ADR 0004 forbids extending
+      // the `surface` enum, and the WebUI does not need a new value because
+      // `runtimeOwnerKind: 'webui'` plus the capabilities already identify the
+      // surface.
       expect("surface" in (lastOptions ?? {})).toBe(false);
     } finally {
       await rm(dataDir, { recursive: true, force: true });
@@ -3496,8 +3492,8 @@ describe("WebUI operation body validation", () => {
 describe("WebUI shutdown order (criterion 7)", () => {
   it("refuses new operations before closing connections, and closes connections before the harness port", async () => {
     // A recording port that logs the order in which the service calls
-    // its lifecycle hooks. This is the assertion surface for step 13 of
-    // the assembly checklist.
+    // its lifecycle hooks. This is the assertion surface for the shutdown
+    // order the service must follow.
     const events: string[] = [];
     let resolveConnectionClosed!: () => void;
     const connectionClosedGate = new Promise<void>((resolve) => {

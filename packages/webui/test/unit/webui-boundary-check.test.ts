@@ -2,7 +2,7 @@
 //
 // Each rule is driven against a fixture input map with both a passing
 // graph (clean) and a contaminating entry that should fire. This is the
-// gate that fails-fast when a later ticket accidentally re-introduces a
+// gate that fails-fast when a later change accidentally re-introduces a
 // retired source path, the terminal renderer, an internal host reference,
 // a CLI entry point, or an off-allowlist source path into the WebUI
 // build graph.

@@ -1,7 +1,6 @@
 // The synthetic transcript message a goal event produces.
 //
-// Moved here from `features/goal/projection/goal-state.ts` by T21. The
-// conversation substrate's effect reducer is its only reader, and it may not
+// The conversation substrate's effect reducer is its only reader, and it may not
 // import another business's private projection; the goal banner keeps the
 // projection it actually renders (status copy, patch builders, duration).
 //
@@ -29,8 +28,8 @@ export function projectWebuiThreadGoalMessage(
   eventType: string,
   goal: WebuiGoal,
 ): WebuiStreamMessage | undefined {
-  // The kinds that carry an objective come from the registry (§15.4 S9); the
-  // three literals that used to live here were a second place to teach a verb.
+  // The kinds that carry an objective come from the registry; the three literals
+  // that used to live here were a second place to teach a verb.
   if (!WEBUI_GOAL_OBJECTIVE_EVENT_TYPES.includes(eventType)) return undefined;
   return {
     id: `thread-goal-${goal.goalId}`,

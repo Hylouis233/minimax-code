@@ -46,8 +46,8 @@ const catalogueView = squashWhitespace(
   readWebuiSource("features/plugins/projection/catalogue-view.ts"),
 );
 // The listing composition — the skill-hub paging and its unknowable total —
-// moved into the application plugin owner (ticket #52). The two assertions
-// below pin that behaviour where it now lives, with the same intent.
+// lives in the application plugin owner. The two assertions below pin that
+// behaviour where it lives, with the same intent.
 const owner = squashWhitespace(
   readWebuiSource("features/plugins/application/plugin-workflows.ts"),
 );

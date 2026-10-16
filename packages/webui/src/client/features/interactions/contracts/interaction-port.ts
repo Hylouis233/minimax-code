@@ -1,8 +1,8 @@
-// Interaction capability port (plan §9; ticket #59).
+// Interaction capability port.
 //
 // The pending interactions: the permission list and its reply, the questionnaire
-// read, reply and dismissal. §9 splits `interaction-port` between `interactions`
-// and `goal`; the goal entity and its version fence are `goal/goal-port.ts`.
+// read, reply and dismissal. The goal entity and its version fence are a separate
+// port, `features/goal/contracts/goal-port.ts`.
 //
 // Every method stays optional — `undefined` means "the operation is not wired".
 

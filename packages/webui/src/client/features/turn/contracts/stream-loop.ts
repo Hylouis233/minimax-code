@@ -2,8 +2,8 @@
 // what the loop hands back through its sink.
 //
 // These two shapes live here for the same reason the stream *state* types do
-// (`./stream-state.ts`): a mechanism may import only `contracts` and `shared`
-// (plan §7.2), and the loop's own module is a mechanism. Declaring them beside
+// (`./stream-state.ts`): a mechanism may import only `contracts` and `shared`,
+// and the loop's own module is a mechanism. Declaring them beside
 // the state they read means the mechanism imports them back instead of the
 // caller having to name a mechanism-declared type, and it lets a business
 // publish the command views it builds over them without reaching into
@@ -39,12 +39,11 @@ export interface WebuiStreamLoopTransports {
 
 /**
  * The stream fields an attachment may seed while it loads history. Closed on
- * purpose (plan §7.6 "who may write"): the loop's attach path needs the context
- * snapshot, the elapsed anchor, the `resume_overflow` flag it is repairing and
- * the refusal it clears — and nothing else. It deliberately excludes
- * `subscription` and `lastClaimedGeneration`, which the generation fence reads;
- * an extra that could write them would let any holder of a superseded sink
- * re-admit its own writes.
+ * purpose: the loop's attach path needs the context snapshot, the elapsed
+ * anchor, the `resume_overflow` flag it is repairing and the refusal it clears —
+ * and nothing else. It deliberately excludes `subscription` and
+ * `lastClaimedGeneration`, which the generation fence reads; an extra that could
+ * write them would let any holder of a superseded sink re-admit its own writes.
  */
 export interface WebuiStreamLoopExtra {
   readonly contextUsage?: Record<string, unknown>;

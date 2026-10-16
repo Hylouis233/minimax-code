@@ -1,5 +1,4 @@
-// The shell adopting an application the composition root built (plan §8 Phase 2,
-// A4-s2; ticket #61).
+// The shell adopting an application the composition root built.
 //
 // The invariant is "one application, one store, one channel" — and the failure it
 // guards against is the quiet one: a shell that *also* builds an instance renders
@@ -10,8 +9,8 @@
 // The observable used is the session catalog. The shell seeds its own store from
 // the `sessionPage` prop, so a running adoption shows the provided store's session
 // and *not* the prop's. Both directions are tested: with a provider the prop is
-// ignored (the provided store wins), and with no provider the prop is used (the
-// fallback every SSR and unit-test caller takes).
+// ignored (the provided store wins), and with no provider the shell refuses to
+// render rather than composing a fallback of its own.
 
 import { describe, expect, it } from "vitest";
 import { createElement } from "react";
@@ -70,7 +69,7 @@ describe("the shell adopts the application the composition root provides", () =>
   it("still renders the shell when no application is provided", () => {
     // The fallback is gone: a host that renders the shell without an assembled
     // application has a wiring defect, and it must say so rather than silently
-    // composing a second application with different inputs (plan §4.1).
+    // composing a second application with different inputs.
     expect(() =>
       renderToStaticMarkup(
         createElement(WebuiClientFoundationApp, {

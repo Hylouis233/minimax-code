@@ -1,4 +1,4 @@
-// The workspace archive owner (T11; plan §5.2 workspace row, acceptance 4).
+// The workspace archive owner.
 //
 // Reading an archive and extracting it are two commands with their own outcomes,
 // and the listing is a resource keyed by what it names: the workspace, the archive
@@ -7,8 +7,8 @@
 // could land on top of the current one. Here the key and its version decide, so a
 // superseded listing is dropped by the same rule the file reads use.
 //
-// The archive *parser* is not here: T16 produces that policy. This owner holds the
-// command outcomes and the freshness of one listing.
+// The archive *parser* is not here. This owner holds the command outcomes and the
+// freshness of one listing.
 
 import type {
   WebuiWorkspaceArchiveExtractResult,

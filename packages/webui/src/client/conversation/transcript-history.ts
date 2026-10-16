@@ -1,14 +1,10 @@
-// Transcript history request ownership (plan §4.2 "history request
-// coordination", §4.5 "History owns a per-session/page resource with independent
-// request generations, plus a selected-view generation for presentation").
+// Transcript history request ownership.
 //
 // This used to be a singleton: one `selectedSessionId`, one `generation` and one
-// `requestId` for the whole owner. Two of the plan's problems followed from that.
-// A page request for one session fenced a page request for another, and a
-// head-page request and an older-page request for the same session shared one
-// identity, so a pagination anchor and a stream-recovery read were conflated —
-// §4.5: "stream recovery and older-page pagination cannot be assumed to share
-// one key".
+// `requestId` for the whole owner. Two problems followed from that. A page
+// request for one session fenced a page request for another, and a head-page
+// request and an older-page request for the same session shared one identity, so
+// a pagination anchor and a stream-recovery read were conflated.
 //
 // There are now two identities, and they are the two contracts of
 // `request-freshness`:
@@ -35,10 +31,9 @@ import { mergeOlderTranscriptPage } from "./transcript-request-ownership.js";
 /**
  * The slice this owner writes, as a contract the assembly satisfies.
  *
- * The conversation substrate may not reach the session-record repository (plan
- * §5.3: conversation depends on pure shared DTOs and injected IO/writer
- * contracts), so what it needs is stated here and the application adapts its
- * store to it.
+ * The conversation substrate may not reach the session-record repository — it
+ * depends on pure shared DTOs and injected IO/writer contracts — so what it
+ * needs is stated here and the application adapts its store to it.
  */
 export interface WebuiTranscriptHistoryWriter {
   readonly updateTranscript: (
@@ -91,10 +86,9 @@ export interface WebuiTranscriptHistoryOwner {
    * is returned as it is, and otherwise one read is issued (or joined, when the
    * transcript is already reading the same key).
    *
-   * This is the seam a *context-only* inspection uses (plan §4.5: "context-only
-   * inspection can reuse a compatible history response"). It exists so the
-   * composer reads the transcript's page instead of issuing its own `getMessages`
-   * for the same session, which used to cost a second page read on every switch.
+   * This is the seam a *context-only* inspection uses. It exists so the composer
+   * reads the transcript's page instead of issuing its own `getMessages` for the
+   * same session, which used to cost a second page read on every switch.
    */
   readonly ensurePage: (sessionId: string) => Promise<WebuiClientMessagePage | undefined>;
 }

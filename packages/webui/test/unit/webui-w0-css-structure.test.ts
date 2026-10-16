@@ -1,9 +1,9 @@
-// W0 safety net — the shell stylesheet's structure.
+// Safety net — the shell stylesheet's structure.
 //
 // `webui-design-tokens.test.ts` guards the token surface and the compiled
 // stylesheet's `var()` closure. This file guards the layer those assertions do
-// not reach: the structural declarations and the at-rules that W5 is allowed to
-// touch when it deduplicates the two stacked generations of the same selector.
+// not reach: the structural declarations and the at-rules a deduplication may
+// touch when it collapses the two stacked generations of the same selector.
 //
 // Why it matters: `shell.css` defines 39 selectors more than once, and the
 // winner is decided by cascade order. A deduplication that keeps the *wrong*
@@ -147,7 +147,7 @@ function declarationsFor(selector: string, rules: CssRule[] = shellRules): strin
 
 beforeAll(() => {
   indexCss = readFileSync(path.join(stylesDir, "index.css"), "utf8");
-  // The rules under test are the shell's own population (T20): the feature
+  // The rules under test are the shell's own population: the feature
   // rules moved out of `shell.css` into their own business files, so reading
   // that file alone would now assert over the shared remainder only. The
   // sources are that file plus the business files carved out of it — taken from
@@ -433,7 +433,7 @@ describe("W0 · stylesheet composition", () => {
     const imports = [...indexCss.matchAll(/@import\s+"([^"]+)"/gu)].map(
       (match) => match[1],
     );
-    // T20 split the shell's rules into per-business files; the composition
+    // The shell's rules were split into per-business files; the composition
     // order below is the documented one, and the layered order is what makes
     // the split harmless (every file wraps its rules in `@layer components`).
     expect(imports).toEqual([

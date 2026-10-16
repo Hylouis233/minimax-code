@@ -1,8 +1,7 @@
-// How the catalogue hosts the two dialogs, and what a failed operation does to the user's state
-// (ticket #72's third and fourth criteria).
+// How the catalogue hosts the two dialogs, and what a failed operation does to the user's state.
 //
-// The dialogs were cut out of this file, so what the ticket requires is that the *hosting* and the
-// two failure behaviours did not move with them:
+// The dialogs were cut out of this file, so what must hold is that the *hosting* and the two
+// failure behaviours did not move with them:
 //
 //   - each dialog still renders in the conditional it occupied (`dialog ?` / `pluginImportDialog ?`),
 //     which is also what makes both own no state — they are unmounted on close, and the fields they
@@ -15,15 +14,15 @@
 //     catalogue's rows exactly as they were.
 //
 // These are source assertions on purpose: the interactions need a DOM, and this repo has no DOM test
-// framework (§ the no-jsdom rule). Each one names the exact expression, so moving the close out of
-// the success branch or clearing the preview in the catch turns it red.
+// framework. Each one names the exact expression, so moving the close out of the success branch or
+// clearing the preview in the catch turns it red.
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-// The plugin UI lives in its business home now (T08), so these three read from
-// `features/plugins/ui/` rather than the retired `components/` tree.
+// The plugin UI lives in its business home, so these three read from
+// `features/plugins/ui/`.
 const PLUGIN_UI = new URL("../../src/client/features/plugins/ui/", import.meta.url);
 const read = (relative: string): string => readFileSync(fileURLToPath(new URL(relative, PLUGIN_UI)), "utf8");
 
@@ -49,9 +48,9 @@ describe("the catalogue hosts both dialogs as it did", () => {
   });
 
   it("routes to the form the open dialog names, and each form saves through one path", () => {
-    // The dialog is now a chooser, not a form: it picks one of three units by
-    // `dialog`, and each unit runs its own save (T08). The invariant is the same
-    // one this case always guarded — one dialog, three paths, chosen by what is
+    // The dialog is a chooser, not a form: it picks one of three units by
+    // `dialog`, and each unit runs its own save. The invariant is the same one
+    // this case always guarded — one dialog, three paths, chosen by what is
     // open — it just moved from a chain of ternaries to three form units.
     expect(itemDialog).toContain("dialog === \"mcp\"");
     expect(itemDialog).toContain("<McpServerForm");
@@ -70,7 +69,7 @@ describe("a failed operation leaves the user where they were", () => {
     // Closing and clearing live INSIDE the success branch: a rejection runs neither, so the dialog
     // stays open on the preview the user was reading.
     const body = slice(catalogue, "const importPlugin = async () => {", "// Switching the marketplace catalogue");
-    // The import now dispatches a typed intent rather than a wire verb (T08); the
+    // The import dispatches a typed intent rather than a wire verb; the
     // invariant below is unchanged — the dialog only closes after a success.
     expect(body).toContain("kind: \"importGithubPlugin\"");
     const afterSuccess = body.slice(body.indexOf("kind: \"importGithubPlugin\""));

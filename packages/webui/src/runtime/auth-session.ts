@@ -1,5 +1,5 @@
 // The WebUI's sole OAuth core, active lease, refresh timer and invalidation
-// propagation. Split out of `server/assembly.ts` (plan section 7.1).
+// propagation. Split out of `runtime/assembly.ts`.
 //
 // The process-local host, the usage-quota client, the account-login session,
 // the daily check-in and the mcode-tools broker all read the same credential:

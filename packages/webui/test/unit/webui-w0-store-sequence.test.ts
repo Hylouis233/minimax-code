@@ -1,8 +1,8 @@
-// W0 safety net — the session store's transition sequence.
+// Safety net — the session store's transition sequence.
 //
 // The stream/sending slices moved from the module-level runtime map to the one
-// application store (`application/session-store.ts`; plan §7.7 stage 4, ticket
-// #45 prerequisite 5). Two documented contracts hold there:
+// application store (`application/session-store.ts`). Two documented contracts
+// hold there:
 //
 //   1. `store.migrateSession` deliberately does NOT notify listeners: the only
 //      subscriber is the view that is about to switch keys, and the target key

@@ -1,5 +1,4 @@
-// The workspace panel's published command type (plan §5.2 workspace row: "Open/
-// close/select tab, file/preview/git commands"). It is declared here, next to the
+// The workspace panel's published command type. It is declared here, next to the
 // rest of the workspace's contracts, because more than one business dispatches
 // it: the transcript opens a turn review from a message footer, and the shell
 // owns the panel. A consumer reads the type from the owner's contract rather than

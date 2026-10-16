@@ -1,4 +1,4 @@
-// Wire contract record (plan section 7.1 / 7.5): every exported
+// Wire contract record: every exported
 // declaration below records its wire purpose, its producer and its
 // consumers, verified against the tree. Documentation only.
 //
@@ -70,7 +70,7 @@ export interface WebuiSkillEntry {
 }
 
 /* ------------------------------------------------------------------ *
- * Provider write requests (P04 / D05).
+ * Provider write requests.
  *
  * These mirror the runtime's real provider inputs
  * (`packages/local-runtime-v2/src/application/session/process-local-application-contract.ts`,
@@ -192,7 +192,7 @@ export interface WebuiDiscoveredModel {
 }
 
 /* ------------------------------------------------------------------ *
- * Provider reads (P04b / D04).
+ * Provider reads.
  *
  * Closed on purpose: these describe a payload the runtime actually sends
  * (`ModelProviderView` in `local-runtime-v2`'s model-system contracts), so an

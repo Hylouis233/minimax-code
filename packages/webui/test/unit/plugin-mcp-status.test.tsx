@@ -1,7 +1,6 @@
 // Unit tests for the MCP server status the plugin panel puts on each row.
 //
-// Roadmap D-3 (as transcribed): 「MCP 插件连不上时，界面上要看得见」. The row
-// markup, the six-state mapping and the browser spec all landed with #27.
+// The row markup, the six-state mapping and the browser spec are all in place.
 //
 // Read the premise carefully, because it is not what it looks like. The
 // runtime's `LocalMcpPublicServerStatus` does classify every server

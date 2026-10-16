@@ -1,9 +1,8 @@
-// W2 trace tests — exercise `reduceWebuiEffect` against the 10 behaviours
-// enumerated in `refactor-recon/w0-baseline/effect-inventory.md §"W2 抽取时
-// 必须覆盖的 trace 断言"`, plus the W2.9 contract that (a) the session
-// guard runs FIRST, (b) the progress write is ALWAYS the first command
-// once the guard passes, and (c) cross-session events produce zero
-// commands (same state identity returned, no progress touched).
+// Trace tests — exercise `reduceWebuiEffect` against the behaviours the traces
+// pin, plus the contract that (a) the session guard runs FIRST, (b) the progress
+// write is ALWAYS the first command once the guard passes, and (c) cross-session
+// events produce zero commands (same state identity returned, no progress
+// touched).
 //
 // Each `describe` block corresponds to one trace. The fixtures are written
 // against the *event* shape the runtime hands the client, and every
@@ -11,8 +10,7 @@
 // implementation constant, so a change on either side fails the test.
 //
 // Trace 9 (workspace-progress-first) is intentionally written to FAIL
-// when the progress command is moved to the back of the array — see the
-// mutation-test note in §3 of `brief-w2.9-wire-reducer.md`. Trace 10
+// when the progress command is moved to the back of the array. Trace 10
 // covers reducer purity and cross-session rejection; cleanup-friendly
 // behaviour (the `cancelled = true` path) is not asserted here, by
 // design.
@@ -899,7 +897,7 @@ describe("W2 · trace 8 · questionnaire.dismiss/superseded only resumes the sho
 
 describe("W2 · trace 9 · progress is ALWAYS the first command when the guard passes", () => {
   it("cross-session event: guard rejects, zero commands, same state", () => {
-    // Cross-session events no longer touch progress. The previous W2
+    // Cross-session events no longer touch progress. The previous
     // design wrote the progress slice first; this rewrite enforces the
     // original closure's order (guard first, state never touched on
     // mismatch). The trace asserts that.
@@ -921,7 +919,7 @@ describe("W2 · trace 9 · progress is ALWAYS the first command when the guard p
   it("in-session session.start: commands[0] is the progress write (fails if swapped to last)", () => {
     // This assertion is the mutation test: push the progress write to
     // the back of `commands` in `reduceWebuiEffect` and this test goes
-    // red. See brief-w2.9-wire-reducer.md §3 for the procedure.
+    // red.
     const result = reduceWebuiEffect(
       makeState(),
       event({

@@ -3,10 +3,10 @@
  * per-session and per-project overlays (pins, stars, project names), and the
  * row actions the list dispatches.
  *
- * Extracted from `WebuiClientFoundationApp.tsx` (A-005). Everything here changes
- * when the rail changes — its search, its overlays, its row actions — and
- * nothing else does; the shell frame keeps the layout and hands the hook the
- * list it renders plus the two setters it needs.
+ * Extracted from `WebuiClientFoundationApp.tsx`. Everything here changes when
+ * the rail changes — its search, its overlays, its row actions — and nothing
+ * else does; the shell frame keeps the layout and hands the hook the list it
+ * renders plus the two setters it needs.
  *
  * The overlays are browser-local by design: they are display preferences, not
  * session facts, so they live in `browserStorage` and never reach the host. The
@@ -36,8 +36,8 @@ export type WebuiRailTreePage = ReturnType<typeof selectWebuiCatalogTreePage>;
 
 /**
  * The session mutations the rail's rows dispatch, stated as the surface used:
- * the shell may not reach into the workflows assembly (role rule, plan §5.3),
- * and the workflows are handed down as a capability.
+ * the shell may not reach into the workflows assembly (role rule), and the
+ * workflows are handed down as a capability.
  */
 export interface WebuiRailWorkflows {
   readonly canMutate: boolean;
@@ -54,7 +54,7 @@ export interface WebuiRailWorkflows {
   /**
    * Export one session as a transfer file. The rail submits the request and the
    * sessions owner starts the download through the adapter the composition root
-   * injected (T19): navigating is platform IO, and a view may not hold it.
+   * injected: navigating is platform IO, and a view may not hold it.
    */
   exportSession(sessionId: string): void;
   refresh(): Promise<unknown>;
@@ -63,7 +63,7 @@ export interface WebuiRailWorkflows {
 export interface UseSessionRailActionsOptions {
   readonly page: WebuiClientSessionPage;
   readonly treePage: WebuiRailTreePage;
-  /** The browser storage the overlays are read through, injected (T19). */
+  /** The browser storage the overlays are read through, injected. */
   readonly storage: WebuiRailOverlayStorage;
   readonly workflows: WebuiRailWorkflows;
   readonly selectedSessionId: string | undefined;
@@ -114,7 +114,7 @@ export function useSessionRailActions({
   setSelectedSessionId,
   setPageError,
 }: UseSessionRailActionsOptions): SessionRailActions {
-  // The overlay state itself belongs to Sessions (T19) and is read through that
+  // The overlay state itself belongs to Sessions and is read through that
   // feature's own binding; this hook keeps the rail's UI state and actions.
   const overlays = useSessionRailOverlays(storage);
   const { pinnedSessions, starredSessions, pinnedProjects, projectNames } = overlays;
@@ -228,7 +228,7 @@ export function useSessionRailActions({
     // message pages here: that route is the one `POST /session-import` accepts,
     // and a browser-assembled file carries the display layer only. See
     // `session-transfer-download.ts` for why this is a navigation. The request
-    // goes through the sessions owner (T19) rather than this view reaching the
+    // goes through the sessions owner rather than this view reaching the
     // platform adapter.
     try {
       workflows.exportSession(session.sessionId);

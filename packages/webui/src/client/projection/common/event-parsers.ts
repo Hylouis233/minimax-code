@@ -1,15 +1,14 @@
-// Runtime event payload 的解析函数。
+// Parsers for runtime event payloads.
 //
-// Moved here from `features/interactions/projection/` by T21, next to the kind
-// registry these parsers read (`./event-kinds.ts`). Two facts decided the home:
-// the module's only consumers are the conversation substrate's effect protocol
-// (`features/turn/application/effect-reducer.ts` and `event-coordinator.ts`),
-// which may not import another business's private projection; and what it does
-// is decode the *shared* wire contracts into the shared view models, not hold
-// any interaction policy — the fences, settlement and authoritative reads stay
-// in `features/interactions/`. Publishing it beside the registry keeps the two
-// halves of "what is this event" in one place, and lets both businesses read it
-// without one owning the other's decode.
+// They sit next to the kind registry they read (`./event-kinds.ts`). Two facts
+// decided this module's home: the module's only consumers are the conversation
+// substrate's effect protocol (`features/turn/application/effect-reducer.ts`
+// and `event-coordinator.ts`), which may not import another business's private
+// projection; and what it does is decode the *shared* wire contracts into the
+// shared view models, not hold any interaction policy — the fences, settlement
+// and authoritative reads stay in `features/interactions/`. Publishing it beside
+// the registry keeps the two halves of "what is this event" in one place, and
+// lets both businesses read it without one owning the other's decode.
 
 import type {
   WebuiPendingPermission,
@@ -42,8 +41,8 @@ export function eventSessionId(event: WebuiRuntimeEvent): string | undefined {
 }
 
 function nestedGoalSessionId(event: WebuiRuntimeEvent): string | undefined {
-  // The family check comes from the kind registry (§15.4 S9), not from a literal
-  // prefix here: this was one of the three sites that each knew the goal verbs.
+  // The family check comes from the kind registry, not from a literal prefix
+  // here: this was one of the three sites that each knew the goal verbs.
   if (!isWebuiGoalEventKind(event.type)) return undefined;
   const goal = event.payload.goal;
   if (!goal || typeof goal !== "object" || Array.isArray(goal)) return undefined;

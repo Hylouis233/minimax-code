@@ -1,4 +1,4 @@
-/* goal — moved out of styles/shell.css (T20); rules kept in their original relative order. */
+/* goal — moved out of styles/shell.css; rules kept in their original relative order. */
 @layer components {
 
   .webui-session-layout .webui-goal-composer-panel {

@@ -1,4 +1,4 @@
-// The session scope manager (plan §4.3; T04's `session-interest-lease-manager`).
+// The session scope manager.
 //
 // Interest in a session is not the same thing as a component being mounted on
 // it. A turn this client started keeps running after the user navigates away, a

@@ -1,5 +1,4 @@
-// The item dialog: one dialog for three forms (T08; produced target
-// `plugin-catalogue-form-cuts`).
+// The item dialog: one dialog for three forms.
 //
 // It used to take eighteen values, eighteen setters and three save callbacks for
 // the MCP, agent and skill drafts — thirty-nine props — and rendered each form's

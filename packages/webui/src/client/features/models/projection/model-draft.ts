@@ -1,5 +1,4 @@
-// One model-draft selection workflow (T03's `model-picker-responsibility-cut`;
-// plan §5 row for `components/models/ModelPicker.tsx`).
+// One model-draft selection workflow.
 //
 // Selecting a model and editing one of its settings used to be three handlers in
 // the picker, each assembling the next draft and each making its own decision

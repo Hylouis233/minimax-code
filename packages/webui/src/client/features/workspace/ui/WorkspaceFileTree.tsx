@@ -7,9 +7,9 @@ import type { WebuiWorkspaceFile } from "../../../../shared/contracts/workspace.
 import { WebuiIconChevronLeft, WebuiIconFile } from "../../../shell/icons.js";
 import { formatWorkspaceFileSize, formatWorkspaceFileModifiedAt } from "../projection/workspace-file-tree.js";
 
-// The pure tree helpers moved to `projection/workspace/workspace-file-tree.ts` so the
-// tree query owner merges with the same function the component walks with
-// (ticket #51). Re-exported here so this module's public surface is unchanged.
+// The pure tree helpers moved to `features/workspace/projection/workspace-file-tree.ts`
+// so the tree query owner merges with the same function the component walks with.
+// Re-exported here so this module's public surface is unchanged.
 export {
   filterWorkspaceFiles,
   mergeWorkspaceFileChildren,

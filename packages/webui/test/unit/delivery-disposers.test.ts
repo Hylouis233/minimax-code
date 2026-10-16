@@ -1,6 +1,6 @@
-// The delivery disposers (plan §4.3; T04's `delivery-disposer-registry`).
+// The delivery disposers.
 //
-// Two halves, and the split is the point of the ticket. The registry's own rules
+// Two halves, and the split is deliberate. The registry's own rules
 // are driven directly; the wiring is driven through the conversation commands and
 // the application's public disposal, so what is asserted is that an attempt this
 // client started is closable by the application — and that closing it is a
@@ -180,11 +180,12 @@ describe("an attempt the client started is closable by the application", () => {
   });
 
   it("leaves the attempt unsettled and still owed when the observer detaches", async () => {
-    // P02's exit item: "a detached observer is not evidence that host execution
-    // completed". Detaching closes this client's half of the delivery and does
-    // nothing else — so against the control above, the attempt must still be owed:
-    // no completion, and the sending flag the loop clears on a real finish is
-    // still set. A dispose path that marked the attempt complete would fail here.
+    // A detached observer is not evidence that host execution completed:
+    // detaching closes this client's half of the delivery and does nothing
+    // else, so against the control above the attempt must still be owed — no
+    // completion, and the sending flag the loop clears on a real finish is
+    // still set. A dispose path that marked the attempt complete would fail this
+    // case.
     const app = createWebuiApplication({
       openEventChannel: () => ({ subscribe: () => () => undefined, close: () => undefined }),
       turns: { resumeSession: (async () => undefined) as unknown as WebuiClientSessionResumer },

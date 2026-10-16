@@ -1,5 +1,4 @@
-// The browser provider the WebUI process is handed (plan §7.1
-// `runtime/browser-provider.ts`, split from `server/assembly.ts`).
+// The browser provider the WebUI process is handed.
 //
 // The WebUI does **not** create this provider: the host process supplies it when
 // browser tooling is enabled, and this module adopts it — binds it into the

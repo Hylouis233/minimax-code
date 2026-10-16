@@ -1,11 +1,10 @@
-// The four fences `turn`'s substrate rests on (ticket #57; plan §4.12 field 8,
-// §8 Phase 1 step 1).
+// The four fences `turn`'s substrate rests on.
 //
-// These are behavioural assertions of the *mechanism*, not §5.1's four business
+// These are behavioural assertions of the *mechanism*, not the four business
 // boundary rules — a fence asserts that a mechanism holds; a boundary rule
 // asserts that one business cannot write another's state. Carrying the fences
-// here does not close the §5.1 coverage gap, which each business discharges in
-// its own prohibition test.
+// here does not close the business-boundary coverage, which each business
+// discharges in its own prohibition test.
 //
 // The four, each with the assertion that pins it:
 //

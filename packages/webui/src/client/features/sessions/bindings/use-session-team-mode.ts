@@ -1,12 +1,12 @@
-// The Agent Team choice as Sessions owns it (T19).
+// The Agent Team choice as Sessions owns it.
 //
 // It used to be three pieces of shell state plus a platform type import: the
 // default flag, the per-session choices and a write-back effect, read straight
 // off the browser storage adapter. The value decides how a session is created
 // and the rail badges a row with it, so the state belongs to the business that
-// owns the catalogue (plan §5.2) and the read belongs behind its own surface
-// (plan §5.3); the adapter arrives as the injected capability. The transitions
-// are unchanged, including the write-back of the default on every change.
+// owns the catalogue and the read belongs behind its own surface; the adapter
+// arrives as the injected capability. The transitions are unchanged, including
+// the write-back of the default on every change.
 import { useCallback, useEffect, useState } from "react";
 
 /** `sessionId → team-mode-off`, as persisted for the sessions the user chose. */
@@ -32,7 +32,7 @@ export interface SessionTeamMode {
    * Record the choice a creation was submitted with. The value is the request's
    * captured one rather than the default read at completion: changing the default
    * while a creation is in flight must not rewrite what the session was created
-   * with (D02). Storage first, then the state the rail renders from, exactly as
+   * with. Storage first, then the state the rail renders from, exactly as
    * the shell's create effect did in that order.
    */
   readonly recordSessionTeamMode: (sessionId: string, teamModeOff: boolean) => void;

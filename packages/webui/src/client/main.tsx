@@ -2,7 +2,7 @@ import * as React from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { WebuiClientFoundationApp } from "./shell/WebuiClientFoundationApp.js";
 // The composition root may read the platform layer; the shell and the rail may
-// not (plan §5.3), so the label is resolved here and injected.
+// not, so the label is resolved here and injected.
 import { teamModeCopy } from "./platform/team-mode.js";
 export { WebuiSessionList } from "./features/sessions/ui/SessionRail.js";
 export { WebuiSessionTranscript } from "./features/transcript/ui/SessionTranscript.js";
@@ -49,7 +49,7 @@ const config = (
 ).__WEBUI_CONFIG__;
 
 /**
- * The composition root (plan §8 Phase 2, A4-s2).
+ * The composition root.
  *
  * It builds the one application for the page — the store, the event coordinator
  * and the single `watchEvents` channel — cuts the per-business port slices from
@@ -58,8 +58,8 @@ const config = (
  * one channel instead of two.
  *
  * The transport stays at module scope and arrives as a prop: it is IO for the
- * page, it is constructed once, and its identity has to be stable across renders
- * (W2.5). The application is constructed per mount and disposed on unmount, so a
+ * page, it is constructed once, and its identity has to be stable across renders.
+ * The application is constructed per mount and disposed on unmount, so a
  * remount cannot leave a second channel open.
  */
 function WebuiClientRoot({
@@ -93,12 +93,12 @@ function WebuiClientRoot({
           ? createWebuiOpenEventChannel(transport.watchEvents)
           : () => ({ subscribe: () => () => undefined }),
         // The goal capability: the application owns the goal owner, so an event
-        // route commits for any session, mounted or not (T05).
+        // route commits for any session, mounted or not.
         goalPort: slices.goal,
         interactionsPort: slices.interactions,
         // The same storage adapter the shell used to inject by hand, so the
         // production boot persists and restores unread counts exactly as the
-        // fixture assembly always did (plan §4.1; correction C1).
+        // fixture assembly always did.
         unreadStorage: {
           read: storage.readUnreadCounts,
           write: storage.writeUnreadCounts,
@@ -110,7 +110,7 @@ function WebuiClientRoot({
           readNoProjectFlag: storage.readNoProjectFlag,
           writeNoProjectFlag: storage.writeNoProjectFlag,
         },
-        // The port slices this root cut above (T19). The assembly builds every
+        // The port slices this root cut above. The assembly builds every
         // business owner from them, so the shell composes screens instead of
         // constructing owners.
         slices,
@@ -119,7 +119,7 @@ function WebuiClientRoot({
         sessionImport: importWebuiSessionFile,
         // The session-file export the session workflows submit through: the
         // navigation is platform IO, and the rail may not reach into
-        // `platform/` itself (T19).
+        // `platform/` itself.
         sessionExport: startWebuiSessionTransferDownload,
         turns: {
           resumeSession: transport.resumeSession ?? (async () => {}),
@@ -128,8 +128,8 @@ function WebuiClientRoot({
             : {}),
         },
         turnCapabilities: transport,
-        // The review families' capabilities. The application owns both owners
-        // (T10), so a surface reads a turn's diff through the application rather
+        // The review families' capabilities. The application owns both owners,
+        // so a surface reads a turn's diff through the application rather
         // than holding the transport.
         turnReview: {
           ...(transport.getTurnDiff ? { getTurnDiff: transport.getTurnDiff } : {}),
@@ -202,14 +202,14 @@ const browserCapabilities = {
   dom: createWebuiBrowserDom(globalThis.document, globalThis.window),
   storage: createWebuiBrowserStorage(getWebuiBrowserStorage()),
 };
-// W2.5: pass the transport ONCE here so the React effect dependency
+// Pass the transport ONCE here so the React effect dependency
 // identity is stable across renders. Each method is still optional
 // on `WebuiTransport`, so the panel branches continue to gate on
 // `transport?.X` just like they used to gate on `X`.
 //
 // The transport is the module-scope instance; the application, its store and
 // the port slices are built by the root below, once per mount, and provided to
-// the shell (plan §8 Phase 2, A4-s2).
+// the shell.
 const app = <WebuiClientRoot transport={transport} dataDir={runtimeConfig.dataDir} storage={browserCapabilities.storage} />;
 const currentRoute = route(location.pathname);
 root.render(

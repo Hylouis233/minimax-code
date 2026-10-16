@@ -1,11 +1,11 @@
-// The rail's overlay state (T19): the stars and pins of sessions, and the pins
+// The rail's overlay state: the stars and pins of sessions, and the pins
 // and names of projects.
 //
 // It used to live in the shell's rail hook, which read the platform storage
-// adapter for it. The state belongs to Sessions (plan §5.2: the overlays are
-// part of the catalogue the rail presents), and the read belongs behind the
-// feature's own surface (plan §5.3), so both moved here; the adapter arrives as
-// the injected capability the composition root supplies.
+// adapter for it. The state belongs to Sessions — the overlays are part of the
+// catalogue the rail presents — and the read belongs behind the feature's own
+// surface, so both moved here; the adapter arrives as the injected capability
+// the composition root supplies.
 //
 // The storage keys, the stored format and the normalization stay in the
 // platform adapter (`platform/storage.ts`) — they are the persisted

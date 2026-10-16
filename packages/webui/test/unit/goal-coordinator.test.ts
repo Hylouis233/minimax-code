@@ -1,4 +1,4 @@
-// The goal coordinator (plan §8 Phase 3 B1; §4.6; §5.6; ticket #66).
+// The goal coordinator.
 //
 // The goal duty moved out of `interaction-coordinator.ts` at this carve, and the
 // two things this file has to establish are that the duty still behaves exactly
@@ -132,8 +132,8 @@ describe("the two fences are independent", () => {
         removePendingPermission: vi.fn(),
         applyQuestionnaire: vi.fn(),
       } as never,
-      // The four transitions left `sink` for turn's published stream-phase commands (§5.1
-      // prohibition 1 is about writers); this suite still handed them in as sink members.
+      // The four transitions left `sink` for turn's published stream-phase commands
+      // (prohibition 1 is about writers); this suite still handed them in as sink members.
       streams: {
         awaitInteraction: vi.fn(),
         resumeAfterPermission: vi.fn(),
@@ -182,8 +182,7 @@ describe("the two fences are independent", () => {
 });
 
 /**
- * The write commands' failure recovery (ticket #66's "goal … failure-recovery
- * cases"). These are new in this carve: publishing `patchGoal`/`clearGoal` put
+ * The write commands' failure recovery. Publishing `patchGoal`/`clearGoal` put
  * them on the versioned write path, so what happens when they fail is now this
  * owner's behaviour rather than the caller's.
  */

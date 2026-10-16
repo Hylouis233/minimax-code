@@ -46,25 +46,25 @@ const NO_PROVIDER_COMMANDS: WebuiProviderFormCommands = {
 
 export function UsageModelSettings({ sessionId }: Props): ReactElement {
   // The models/providers/api-key/model-source/codex answers come from the
-  // settings owner and the usage quota from the account owner (ticket #52).
+  // settings owner and the usage quota from the account owner.
   // This panel submits commands and reads snapshots; every uncommitted form
   // field below stays local, and the one-second quota clock stays local too.
   //
-  // The provider form is `models`' (plan §5.6): it lives in
-  // `components/models/ProviderFormPanel.tsx` and is rendered below in the same
+  // The provider form is `models`': it lives in
+  // `features/models/ui/ProviderFormPanel.tsx` and is rendered below in the same
   // conditional branch it occupied when it was declared here. Its drafts stay
   // **here**, because a sub-tab switch unmounts that branch and the drafts have
-  // to survive it (§5.7 LC-4).
+  // to survive it.
   const settings = useWebuiSettingsWorkflows();
   const settingsState = useWebuiSettingsWorkflowsState();
-  // The provider form and the model list are `models`' (plan §5.6, §5.7): its commands
-  // and its snapshot come from that owner, not from the settings one.
+  // The provider form and the model list are `models`': its commands and its
+  // snapshot come from that owner, not from the settings one.
   const models = useWebuiModelsWorkflows();
   const modelsState = useWebuiModelsWorkflowsState();
   // The provider editor is hosted *here*, above the custom-tab branch rendered
   // below, so a source-tab switch neither loses a draft nor forgets that the
-  // draft was tested (plan §5.5, §5.7 LC-4). Its lifetime is this component's,
-  // which is leaving the Usage category or closing Settings.
+  // draft was tested. Its lifetime is this component's, which is leaving the
+  // Usage category or closing Settings.
   const { editor, snapshot: providerEditorSnapshot } = useWebuiProviderEditor(
     models ?? NO_PROVIDER_EDITOR_COMMANDS,
   );
@@ -112,7 +112,7 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
   }, []);
   // The poll is the owner's, not this component's: the surface acquires an
   // interest while a Codex login is pending and releases it on unmount, so a
-  // hidden or remounted surface cannot leave a second timer behind (T09).
+  // hidden or remounted surface cannot leave a second timer behind.
   useEffect(() => {
     if (!oauthLoginId || !account) return;
     return account.acquireCodexOAuthPolling();

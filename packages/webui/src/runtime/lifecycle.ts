@@ -1,6 +1,6 @@
 // The WebUI runtime's one close owner and its startup-failure cleanup. Split
-// out of `server/assembly.ts` (plan section 7.1: resource registration, failure
-// recovery, close ordering, idempotent close).
+// out of `runtime/assembly.ts`: resource registration, failure recovery, close
+// ordering, idempotent close.
 //
 // Exactly one module wraps the host's `close()`. The assembly registers the
 // bound host close and installs this lifecycle's `close` in its place, so the

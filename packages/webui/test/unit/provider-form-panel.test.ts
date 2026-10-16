@@ -1,17 +1,17 @@
-// The provider form's lifecycle conditions, pinned where they can go red (ticket #71; plan §5.7).
+// The provider form's lifecycle conditions, pinned where they can go red.
 //
-// The split moved a branch's JSX into `components/models/ProviderFormPanel.tsx`. What the plan
-// requires to be *unchanged* is not the file layout but the lifetime (§5.7 LC-1…LC-6), and every one
-// of those conditions is a fact about which module holds a declaration — so each is asserted against
-// the source, where moving it back turns the case red:
+// The split moved a branch's JSX into `features/models/ui/ProviderFormPanel.tsx`. What must stay
+// *unchanged* is not the file layout but the lifetime: every one of its conditions is a fact about
+// which module holds a declaration, so each is asserted against the source, where moving it back
+// turns the case red:
 //
-//   LC-1  the panel renders inside the same `sourceTab === "custom"` conditional it occupied
-//   LC-2  the session-keyed preload effect stays in the parent, still keyed on `[sessionId]`
-//   LC-3  the parent keeps its quota clock, and the Codex OAuth poll is the Account
-//         owner's (T09): the surface acquires an interest, the owner owns the timer
-//   LC-4  the provider drafts survive a sub-tab switch — since §5.5 they live in the Models
-//         provider editor, which the parent hosts above the `sourceTab === "custom"` conditional
-//   LC-6  `ProviderPresetPicker` still resets on unmount (it lives inside the form's conditional)
+//   * the panel renders inside the same `sourceTab === "custom"` conditional it occupied;
+//   * the session-keyed preload effect stays in the parent, still keyed on `[sessionId]`;
+//   * the parent keeps its quota clock, and the Codex OAuth poll is the Account owner's: the
+//     surface acquires an interest, the owner owns the timer;
+//   * the provider drafts survive a sub-tab switch — they live in the Models provider editor,
+//     which the parent hosts above the `sourceTab === "custom"` conditional;
+//   * `ProviderPresetPicker` still resets on unmount (it lives inside the form's conditional).
 //
 // The drafts editor's counterpart (the picker's two regions) is pinned by the picker's own suites.
 
@@ -40,7 +40,7 @@ describe("the parent keeps the lifetime", () => {
   it("LC-2 keeps the session-keyed preload in the parent", () => {
     const effect = between(parent, "useEffect(() => {", "}, [sessionId]);");
     expect(effect).toContain("account?.loadUsage()");
-    // The credential-status reads belong to the Account owner (T09).
+    // The credential-status reads belong to the Account owner.
     expect(effect).toContain("account?.loadApiKeyStatus()");
     expect(effect).toContain("models?.loadProviders()");
     expect(effect).toContain("settings?.loadModelSource()");
@@ -65,10 +65,9 @@ describe("the parent keeps the lifetime", () => {
   });
 
   it("LC-4 keeps the drafts alive across a sub-tab switch, in the editor the parent hosts", () => {
-    // §5.5 supersedes the §5.7 wording. The drafts are still not the panel's, and they still
-    // survive a sub-tab switch — but they are the Models editor's now, and what makes them survive
-    // is that the parent hosts the *instance* above the conditional. Hoisting the hook below it,
-    // or calling it twice, turns this red.
+    // The drafts are not the panel's, and they survive a sub-tab switch — but they are the Models
+    // editor's, and what makes them survive is that the parent hosts the *instance* above the
+    // conditional. Hoisting the hook below it, or calling it twice, turns this red.
     // Anchored on the branch's own testid, not on the quoted conditional: the hook's own
     // comment names that conditional, so a slice from its first occurrence would stop above it.
     expect(parent.indexOf("useWebuiProviderEditor(")).toBeLessThan(
@@ -89,7 +88,7 @@ describe("the parent keeps the lifetime", () => {
     const branch = parent.slice(parent.indexOf('data-testid="settings-custom-models-panel"'));
     expect(branch).toContain("<ProviderFormPanel");
     expect(parent.match(/<ProviderFormPanel/gu) ?? []).toHaveLength(1);
-    // The OAuth surface is `settings`' (§5.6), so it stayed in the parent, after the panel.
+    // The OAuth surface is `settings`', so it stayed in the parent, after the panel.
     expect(branch.indexOf("<ProviderFormPanel")).toBeLessThan(branch.indexOf("Codex OAuth"));
   });
 });
@@ -110,7 +109,7 @@ describe("the panel keeps the reset boundary", () => {
   it("invokes the provider commands it is handed, and owns none of them", () => {
     expect(panel).toContain("commands.patchProviderModels(");
     expect(panel).toContain("commands.updateProvider(");
-    // The draft's write/test/delete commands are the editor's (§5.5), so the panel no longer
+    // The draft's write/test/delete commands are the editor's, so the panel no longer
     // names them: it calls the editor, and the editor is what sends them.
     expect(panel).not.toContain("commands.saveCandidate(");
     expect(panel).not.toContain("commands.testCandidate(");

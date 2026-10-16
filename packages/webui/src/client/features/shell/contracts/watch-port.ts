@@ -1,10 +1,10 @@
-// Shell event port (plan §9; ticket #59).
+// Shell event port.
 //
-// The process-event watcher. §9 lists `watchEvents` under "`shell`/`turn`" and
-// this re-file follows the plan's own word order: the shell is the composition
-// root that opens the one channel per application instance (`client/main.tsx`),
-// and the event coordinator consumes it. `turn` reads the events it needs from
-// that channel rather than owning the watcher's declaration.
+// The process-event watcher. `watchEvents` belongs to `shell`: the shell is the
+// composition root that opens the one channel per application instance
+// (`client/main.tsx`), and the event coordinator consumes it. `turn` reads the
+// events it needs from that channel rather than owning the watcher's
+// declaration.
 //
 // The method stays optional — `undefined` means "the operation is not wired",
 // and the application opens nothing when it is absent.

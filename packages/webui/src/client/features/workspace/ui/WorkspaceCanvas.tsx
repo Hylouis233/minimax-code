@@ -89,7 +89,7 @@ export function WorkspaceCanvas({ sessionId }: {
   readonly sessionId?: string;
 }): ReactElement {
   // The document, its freshness and the operation outcomes belong to the canvas
-  // owner (T11); what stays here is geometry and gesture (pan, zoom, preview).
+  // owner; what stays here is geometry and gesture (pan, zoom, preview).
   const queries = useWebuiWorkspaceQueries();
   const canvasState = useWebuiWorkspaceQueriesState().canvas;
   const canvas = canvasState.document;

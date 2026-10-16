@@ -1,5 +1,4 @@
-// The conversation turn commands as a surface invokes them (T04's
-// `conversation-turn-commands`; plan §4.2, §4.3).
+// The conversation turn commands as a surface invokes them.
 //
 // The point of this seam is that a caller supplies intent and data and nothing
 // else: no record key, no writer, no sink, no transports. These cases drive the

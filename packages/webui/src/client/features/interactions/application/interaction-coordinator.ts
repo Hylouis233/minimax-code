@@ -1,4 +1,4 @@
-// The interaction coordinator (plan §7.1 `client/features/interactions/application/interaction-coordinator.ts`).
+// The interaction coordinator.
 //
 // One owner for the interaction flows the composer used to run inline: the
 // permission and questionnaire replies, and the authoritative re-read of pending
@@ -13,17 +13,16 @@
 // not run, so these commands return an outcome instead of writing an error
 // themselves.
 //
-// Three of the four duties §7.1 named for this file stay here: the permission and
-// questionnaire replies, the pending/questionnaire re-read, and the late-read
-// protection that re-read needs. The fourth — the goal re-read — left at the B1
-// carve (§5.6: this coordinator "loses the goal duty it absorbed") and lives in
-// `goal-coordinator.ts` with its own version cell, so the two fences cannot bump
-// each other. The event coordinator still
-// reaches them through `features/turn/application/event-effects-registry.ts` — that registry is
-// the per-session routing seam, not an owner, and the composer registers this
-// coordinator's commands with it. This owner is constructed per
-// session, so a re-read cannot land in the wrong one by construction rather than
-// by a guard.
+// Three duties stay here: the permission and questionnaire replies, the
+// pending/questionnaire re-read, and the late-read protection that re-read needs.
+// The goal re-read is not among them: it lives in `goal-coordinator.ts` with its
+// own version cell, so the two fences cannot bump each other. The event
+// coordinator reaches them through its permanent domain event routes
+// (`WebuiDomainEventRoutes` in `features/turn/application/event-coordinator.ts`) —
+// that route set is the per-session seam, not an owner, and the application
+// assembly installs this coordinator's commands in it. This owner is constructed
+// per session, so a re-read cannot land in the wrong one by construction rather
+// than by a guard.
 
 import type { InteractionPort } from "../contracts/interaction-port.js";
 import type {
@@ -100,18 +99,16 @@ export interface WebuiInteractionCoordinatorOptions {
   /**
    * `turn`'s published phase intents, invoked through their names.
    *
-   * Prohibition 1 is about **writers**, not about calling: this owner may invoke
+   * The rule is about **writers**, not about calling: this owner may invoke
    * another business's published command, and may not be handed that business's
    * state writers. The four stream transitions used to arrive as sink callbacks —
    * `awaitInteraction`, `resumeAfterPermission`, `afterQuestionnaireAnswer`,
-   * `afterQuestionnaireDismiss` — which is the shape §5.1 states as its evidence
-   * for the violation ("one `sink` holding four interaction writers, four
-   * stream-phase writers…"). They are turn's state and turn's commands, so the
+   * `afterQuestionnaireDismiss`. They are turn's state and turn's commands, so the
    * flow calls them here and the outcome→transition policy stays with the flow
    * that knows it.
    *
    * The narrow intents rather than the full view: this flow never settles an
-   * aborted slice, so it is not handed the member that does (plan §5.5 P02 step 3).
+   * aborted slice, so it is not handed the member that does.
    */
   readonly streams: WebuiInteractionPhaseIntents;
   /** Persists request/mutation order across render-scoped coordinator objects. */
@@ -121,7 +118,7 @@ export interface WebuiInteractionCoordinatorOptions {
   /**
    * Fallback requester name when the request carries none. A reader rather than
    * a fixed string: the session's agent is a property of the runtime's session
-   * list, which is loaded after the owner exists (T05).
+   * list, which is loaded after the owner exists.
    */
   readonly agentName: string | (() => string);
 }

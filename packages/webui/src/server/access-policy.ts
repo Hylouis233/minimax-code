@@ -1,7 +1,7 @@
 // Admission policy for the loopback service: which host, URL host, origin and
 // credential the HTTP and WebSocket surfaces accept. Split from `service.ts`
-// (plan section 7.1) with no behaviour change — every decision, rejection
-// status and response/socket byte is the one the service wrote before.
+// with no behaviour change — every decision, rejection status and response/socket
+// byte is the one the service wrote before.
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Duplex } from "node:stream";

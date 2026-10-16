@@ -1,6 +1,5 @@
-// The composer's submission gate (T13 criterion 6, "current button/Enter shared
-// gate"). The rule lived inline in the component, where the one property the
-// criterion names — that the button and Enter accept exactly the same
+// The composer's submission gate. The rule lived inline in the component, where
+// the property that matters — that the button and Enter accept exactly the same
 // submissions — could only be checked by rendering the whole composer. Here it
 // is a read with a matrix.
 

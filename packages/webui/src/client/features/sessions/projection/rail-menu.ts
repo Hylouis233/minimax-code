@@ -1,13 +1,11 @@
-// The rail's context menu, declared once (plan §10 S1, §16.10).
+// The rail's context menu, declared once.
 //
-// S1's measurement is "the rule in two builders and two render branches". The rule
-// is which items the rail offers, in what order, with which label and which
+// The rule is which items the rail offers, in what order, with which label and which
 // subject they belong to; the builders were `openSessionMenu`'s two tables and
 // `openProjectMenu`'s one. This module is that rule, and nothing else: it is
 // React-free, so it cannot hold an icon, and the host maps each `key` to its icon
-// and its wiring through one branch. §10's extension target is "one registry",
-// and §10 S4 allows a registry to carry a host render branch, which is what keeps
-// this module free of JSX.
+// and its wiring through one branch. A registry may carry a host render branch,
+// which is what keeps this module free of JSX.
 
 /** Which subject a menu is opened for. */
 export type WebuiRailMenuSubject = "session" | "child-session" | "project";

@@ -1,7 +1,7 @@
 // The binding mechanism: the port view, the capability groups, the declaration
 // helper and the executor.
 //
-// Split out of `bind-handlers.ts` (A-005) because the two halves change for
+// Split out of `bind-handlers.ts` because the two halves change for
 // different reasons and are verified differently: this half is generic — it
 // holds no operation name and no runtime method name of its own — while the
 // roster next door is a 86-row table of concrete declarations that changes with

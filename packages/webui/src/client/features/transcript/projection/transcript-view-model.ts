@@ -1,6 +1,4 @@
-// The transcript's view model (plan §6 "SessionTranscript": cut the large
-// transcript by coherent view-model, scroll and response responsibilities; §5.2
-// transcript row: the transcript owns grouping and view projection).
+// The transcript's view model: the transcript owns grouping and view projection.
 //
 // Everything here is a pure function of the page, the live stream and the stream
 // phase. It used to be eleven `useMemo` blocks inside the component, which made

@@ -17,7 +17,7 @@
 // ---------------------------------------------------------------------------
 
 /**
- * `yauzl`, loaded through `require` and typed here (T16).
+ * `yauzl`, loaded through `require` and typed here.
  *
  * yauzl ships no declarations, and an ambient `declare module "yauzl"` is
  * ignored while the specifier still resolves to the package's JavaScript — which
@@ -156,7 +156,7 @@ export type NameVerdict = {
 // ---------------------------------------------------------------------------
 
 /**
- * `tar`, loaded through `require` and typed here (T16).
+ * `tar`, loaded through `require` and typed here.
  *
  * Only the parser stream is used, so the shape below is what this module calls
  * rather than the library's whole option surface.

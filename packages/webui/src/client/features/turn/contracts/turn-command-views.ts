@@ -1,8 +1,5 @@
 // The command views a session's record writer is bound to, published from Turn
-// because the execution substrate is what drives them (plan §5.5 P02 step 2:
-// "the stream-phase and turn-lifecycle implementations and their
-// `WebuiStreamPhaseCommands` / `WebuiTurnLifecycleCommands` contracts move to
-// Turn").
+// because the execution substrate is what drives them.
 //
 // The substrate both builds and drives these views now: their factories are
 // `turn/application/stream-phase-commands.ts`, `turn-lifecycle-commands.ts` and

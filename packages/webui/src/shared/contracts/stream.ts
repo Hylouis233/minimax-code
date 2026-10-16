@@ -1,6 +1,6 @@
-// Wire contract record (plan section 7.1 / 7.5): every exported
-// declaration below records its wire purpose, its producer and its
-// consumers, verified against the tree. Documentation only.
+// Wire contract record: every exported declaration below records its wire
+// purpose, its producer and its consumers, verified against the tree.
+// Documentation only.
 //
 // | Declaration | Wire purpose | Producer | Consumers |
 // | --- | --- | --- | --- |
@@ -72,8 +72,7 @@ export interface WebuiStreamFrame {
  * Result envelope shared between `sendMessage` and `resumeSession`: the
  * harness session-stream contract returns an iterable source on success or
  * a structured error body on failure. The wire envelope (`event` frames
- * over a WebSocket) is the same in both cases — see the brief's "two
- * facts that make this ticket small".
+ * over a WebSocket) is the same in both cases.
  */
 export type WebuiStreamResult =
   | {

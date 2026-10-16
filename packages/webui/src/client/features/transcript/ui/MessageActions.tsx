@@ -1,20 +1,14 @@
 // Message-actions cluster — the per-message toolbar buttons, the feedback
 // toggle, the row container, and the rewind preview dialog.
 //
-// W3 tier 2 lift: this cluster (4 components + 5 helpers/types) was moved
-// verbatim out of `app.tsx`. The bodies are byte-identical to what used to
-// live there; the lift is move-only. `app.tsx` keeps a thin re-export block
-// so existing consumers (`webui-round3-acceptance.test.tsx`, importers via
-// `app.tsx`) keep their current import path during the W3 wave.
-//
 // Cluster map:
 //   * `WebuiMessageActionButton` — single icon button
 //   * `WebuiFeedbackActions`     — like / dislike pair
 //   * `WebuiMessageActions`      — full action row (copy / rewind / edit / fork / timestamp)
 //   * `WebuiRewindDialog`        — rewind preview modal
 //   * helpers:
-//       `WebuiMessageActionCapabilities` (type) lives in `contracts/transcript/transcript-view.ts`;
-//         this cluster imports it rather than declaring it (plan §3),
+//       `WebuiMessageActionCapabilities` (type) lives in `features/transcript/contracts/transcript-view.ts`;
+//         this cluster imports it rather than declaring it,
 //       `WebuiCopyDependencies` (interface),
 //       `toggleWebuiFeedback`,
 //       `copyWebuiMessageText`,

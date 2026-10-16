@@ -1,11 +1,9 @@
-// The personalization page's composition and the four modules' lifecycle conditions (ticket #73;
-// plan §5.7 LC-5 and §16.10's rows).
+// The personalization page's composition and the four modules' lifecycle conditions.
 //
-// §5.7 LC-5: *"`PersonalizationSettings`' page shell plays the same role: it composes the three editor
-// files and stays mounted."* The page is therefore asserted to compose, not to own: the three sections
-// render together and unconditionally, and **no editor state lives in the page** — which is what makes
-// each editor's load/edit/save/error lifecycle its own, and what the four failure behaviours below
-// hang off.
+// The page is asserted to compose, not to own: the three sections render together
+// and unconditionally, and **no editor state lives in the page** — which is what
+// makes each editor's load/edit/save/error lifecycle its own, and what the four
+// failure behaviours below hang off.
 //
 // Source assertions on purpose: the interactions need a DOM and this package has no DOM test
 // framework. Each names the exact expression, so moving the state up into the page, gating a section,
@@ -37,8 +35,8 @@ describe("the page composes and does not own", () => {
     for (const name of Object.keys(sections)) {
       expect(page, `page does not render ${name}`).toContain(`<${name}`);
     }
-    // Co-visibility is the point (§16.5's eighth rule records it as a layout fact): a section behind
-    // a condition would unmount, and its draft would go with it.
+    // Co-visibility is the point: a section behind a condition would unmount, and
+    // its draft would go with it.
     const body = page.slice(page.indexOf("return ("));
     expect(body).not.toMatch(/\{[^{}]*\?\s*<(?:GlobalInstructions|UserProfile|Memory)Section/u);
   });

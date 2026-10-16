@@ -1,5 +1,5 @@
 // The domain method table: every capability the browser client can ask the host
-// for, joined to the wire (T18; plan §6, W7).
+// for, joined to the wire.
 //
 // The wire lifecycle mechanics — one socket per request, the unary deadline,
 // the stream's `[DONE]` settlement, the terminal watch, the events socket —

@@ -1,4 +1,4 @@
-// The submission's semantic transition (plan §5.5 P02 step 4).
+// The submission's semantic transition.
 //
 // The rule and the target read are pinned in their own suites; what this one pins is that the real
 // submission *reports* what it decided, and that reporting changed no behaviour: every callback the

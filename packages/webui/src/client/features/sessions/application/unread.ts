@@ -1,5 +1,4 @@
-// The application unread controller (plan §7.1 `application/sessions/unread.ts`;
-// §7.6 "Unread"; ticket #49 criterion 4).
+// The application unread controller.
 //
 // It is the **single owner of unread hydration ordering**. The ordering rules
 // used to be spread across the shell: a `unreadCountsReady` flag, a persist

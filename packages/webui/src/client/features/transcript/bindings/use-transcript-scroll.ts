@@ -2,9 +2,7 @@
 // the pin that keeps the last message in view.
 //
 // This was two `useLayoutEffect`s and three module helpers inside
-// `SessionTranscript.tsx` (plan §6: cut the large transcript by coherent
-// view-model, scroll and response responsibilities). The component renders; this
-// owns the viewport.
+// `SessionTranscript.tsx`. The component renders; this owns the viewport.
 //
 // The policy, which the component's comments used to carry:
 //

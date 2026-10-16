@@ -1,6 +1,6 @@
 // The wire-message seam the transcript business publishes.
 //
-// Moved here from `projection/message-projection.ts` by T21. Three readers need
+// Moved here from `projection/message-projection.ts`. Three readers need
 // it and none of them may import that private projection: the conversation
 // substrate's recovery bundle (`features/turn/projection/stream-recovery.ts`),
 // the composer's readout, and the sessions rail's context indicator. What moves
@@ -27,7 +27,7 @@ import type { WebuiClientMessage } from "./message-view.js";
 /**
  * Normalize flattened and persisted raw message shapes at the projection seam.
  *
- * Published with the rest of this seam (T21): the projection module that used
+ * Published with the rest of this seam: the projection module that used
  * to hide it imports it back for `projectWebuiMessage`.
  */
 export function normalizeWebuiClientMessage(

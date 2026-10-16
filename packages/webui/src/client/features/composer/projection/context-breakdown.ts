@@ -1,16 +1,13 @@
 /**
- * The context-window panel's breakdown rows (roadmap H, 模型与用量).
+ * The context-window panel's breakdown rows.
  *
  * Extracted from `SessionComposer.tsx#ContextUsageIndicator` so the suite can
  * drive THIS code. The arithmetic used to live inline in the component, and a
  * rule this load-bearing — what to draw when the engine said nothing — is not
  * one to leave unexercised.
  *
- * Ported from `webapp/lib/context-breakdown.ts` in the other WebUI
- * implementation, re-shaped onto this repository's wire type: the runtime sends
- * `usage.components` as an ARRAY of `{ kind, tokens }` with SCREAMING_SNAKE
- * kinds, where the source sent a `Record<lowerCamelKey, number>`. The rule is
- * the same; the lookup is a `find` instead of a property read.
+ * The runtime sends `usage.components` as an ARRAY of `{ kind, tokens }` with
+ * SCREAMING_SNAKE kinds, so the lookup is a `find` rather than a property read.
  *
  * The rule, and why it is not negotiable:
  *

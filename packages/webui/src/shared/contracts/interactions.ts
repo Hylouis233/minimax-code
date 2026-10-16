@@ -1,4 +1,4 @@
-// Wire contract record (plan section 7.1 / 7.5): every exported
+// Wire contract record: every exported
 // declaration below records its wire purpose, its producer and its
 // consumers, verified against the tree. Documentation only.
 //

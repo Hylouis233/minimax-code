@@ -4,9 +4,8 @@
 // The component consumes the narrowed `WebuiTurnView` (union of
 // `WebuiHistoricalTurnView` and `WebuiLiveTurnView`) as the data source.
 // Side-specific fields (`initialDiff`, `streaming`, `processSegments`, …)
-// are accessed via narrow on `view.source`. The previous per-field legacy
-// prop block was deleted (E-revise-DG-02 narrow); the runtime contract is
-// now view-only.
+// are accessed via narrow on `view.source`. The runtime contract is
+// view-only.
 //
 // The shell still decides which source owns the turn (history after done,
 // composer while active), but the DOM for either role is produced here.
@@ -90,7 +89,7 @@ export function MessageItem({
   const isGoal = view.isGoal;
   const totalRequestDurationMs = view.totalRequestDurationMs;
   const totalOutputTokens = view.totalOutputTokens;
-  // Historical-only (Plan A: `turnId` / `thinkingDurationMs` /
+  // Historical-only (`turnId` / `thinkingDurationMs` /
   // `initialDiff` / `actions` / `attachments`).
   const turnId = historicalView?.turnId;
   const processForceExpanded = historicalView?.processForceExpanded;

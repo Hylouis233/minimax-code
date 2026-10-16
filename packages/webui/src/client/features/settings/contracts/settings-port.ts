@@ -1,16 +1,13 @@
-// Settings capability port (plan §9; ticket #59).
+// Settings capability port.
 //
 // Instructions, agent memory, the user profile, the memory switches, permission
 // mode, the api-key *status*, the Codex OAuth status, the model source and the
-// runtime version. §9 sends "instructions, agent memory, user profile, memory
-// settings" here; §5.6 names the rest of these explicitly ("api-key status, model
-// source and Codex OAuth status are `settings`'", "permission mode stays in
-// `settings`"), and `version` is read by this business's own workflow.
+// runtime version. `version` is read by this business's own workflow.
 //
 // The provider half of the former `settings-port.ts` — the model list and selection
 // and the whole provider CRUD, `upsertMiniMaxApiKey` included — is
-// `models/provider-port.ts`: §5.6 states the provider CRUD "is this row's duty, not
-// `settings`'".
+// `models/provider-port.ts`: the provider CRUD is that business's duty, not
+// `settings`'.
 //
 // Every method stays optional — `undefined` means "the operation is not wired".
 
