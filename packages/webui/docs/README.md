@@ -5,8 +5,9 @@ process-local harness layer. Every document here describes **the code as it stan
 statement and the tree disagree, the tree wins and the statement is a bug in this directory.
 
 Nested directories group documents by subject. The files at this level are the ones that describe the
-package as a whole: this index, verification, the current gaps and open questions, and the release
-procedure.
+package as a whole: this index, the current gaps and open questions, and the release procedure.
+Verification lives in its own directory and is listed in [State of the package](#state-of-the-package)
+below.
 
 ## Authority order
 
@@ -72,9 +73,12 @@ root.
 ## Decisions
 
 [`adr/`](adr/) holds the architecture decision log. The numbering is the decision order, so the
-highest number is the newest. ADR 0016 (business-first modules, application-owned lifetimes) and
-ADR 0017 (temporal ownership) describe the client as it stands; ADR 0014 fixes the four internal
-boundaries; ADR 0018 records the last ownership programme. A new decision takes the next free number.
+highest number is the newest. ADR 0014 fixes the four internal boundaries; ADR 0016 (business-first
+modules, application-owned lifetimes) and ADR 0017 (temporal ownership) describe the client as it
+stands; ADR 0018 records the last ownership programme and the observation decision (whose evidence is
+[`adr/observation-architecture.md`](adr/observation-architecture.md)). ADR 0010 sets the build
+(esbuild artifact, Vite as dev server only); ADR 0011 lets the WebUI re-implement TUI projection
+logic against a shared harness-event corpus. A new decision takes the next free number.
 
 | Retired | Was | Why it is not in the log | Where the live facts are |
 | --- | --- | --- | --- |
@@ -97,7 +101,7 @@ would otherwise read as current.
 ## Not here
 
 - **Operating rules and commands** — `packages/webui/AGENTS.md`.
-- **Decisions and their rationale** — [`adr/`](adr/), with the retired records listed below.
+- **Decisions and their rationale** — [`adr/`](adr/), with the retired records listed in the Decisions section.
 - **Browser-test harness details** — [`verification/browser-suite.md`](verification/browser-suite.md).
 - **The repository glossary** — `CONTEXT.md` at the repository root.
 

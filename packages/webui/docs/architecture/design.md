@@ -37,6 +37,8 @@ nothing from `packages/tui` (ADR 0003) and does not drive the CLI binary (ADR 00
 | ADR 0005 — artifacts build separately | `dist-webui/` has its own two entries and its own metafile; the CLI bundle never contains the server |
 | ADR 0006 — one data directory | `~/.minimax` is shared with the CLI; the harness host is a scripted stand-in where a live `CliSession` would not be deterministic |
 | ADR 0007 — additive changes | `release/public-source.json` lists every file; a new file is a publication decision, and moving a file costs a conflict at the next upstream sync |
+| ADR 0010 — esbuild artifact, Vite as dev server | The shipped artefact is an esbuild build with its own metafile (the input the boundary check reads); Vite serves the dev client only, never the published one |
+| ADR 0011 — shared harness-event corpus | The WebUI may re-implement TUI projection logic locally; each re-implementation pairs with a corpus-backed regression test that the harness protocol change can update in the same cycle |
 | ADR 0013 — editable harness code | `runtimeOwnerKind: "webui"` is a declared identity with its own policy row |
 | ADR 0014 — four internal boundaries | Capability and orchestration are split inside both the client and the runtime; see §3 |
 | ADR 0016, ADR 0017 — business-first ownership, temporal ownership | Businesses own resources; lifetimes, generations and freshness are the application's concern, not a component's; see §8 and §9 |
@@ -221,11 +223,16 @@ use and cannot see out of its slice. Optionality is carried verbatim: an unwired
 screens and constructs no owners; the shell forwards no transport member.
 
 **Businesses own resources; roles own kinds of code.** A business is one cohesive area of behaviour with
-its own resource identity, policies and published commands — `terminal` and `review` are capabilities of
-a surface, while `turn` is a business because its attach-to-settle lifecycle and generation-fenced
-identity outlive any surface. Each business directory holds up to five roles (`contracts/`,
-`application/`, `projection/`, `bindings/`, `ui/`); the role decides what a file may do, and the
-dependency check enforces the layer a role belongs to. Details: [`../client/ownership.md`](../client/ownership.md).
+its own resource identity, policies and published commands — the directories under `client/features/`
+are the list. Owning a screen is not part of the definition: `terminal` owns the catalogue of terminals
+this client knows about, the commands that create, write to, resize and dispose one, and the watch
+registry, while the workspace surface renders them; `review` owns the turn-changeset and
+working-tree-snapshot families, which the transcript, workspace and settings surfaces read; and `turn`
+has no `ui/` at all, yet is a business, because its attach-to-settle lifecycle and generation-fenced
+identity outlive any surface. The process behind a terminal is the service's, not the business's
+(§11). Each business directory holds up to five roles (`contracts/`, `application/`, `projection/`,
+`bindings/`, `ui/`); the role decides what a file may do, and the dependency check enforces the layer a
+role belongs to. Details: [`../client/ownership.md`](../client/ownership.md).
 
 ## 9. State and temporal ownership
 

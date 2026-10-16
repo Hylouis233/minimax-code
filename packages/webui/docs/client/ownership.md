@@ -9,9 +9,13 @@ directory map is in `../architecture/module-map.md`; the decisions behind these 
 
 A business is one cohesive area of WebUI behaviour with its own resource identity, policies and
 published commands or read models. It may serve several presentation surfaces without belonging to
-any one of them. A **capability** presented by a business is not a business: `terminal` and `review`
-are capabilities of the workspace and transcript surfaces, while `turn` is a business even without a
-screen, because its attach-to-settle lifecycle and generation-fenced identity outlive any surface.
+any one of them, and owning a surface is not part of the definition: `terminal` owns the catalogue of
+terminals this client knows about, the commands that create, write to, resize and dispose one, and the
+watch registry that the workspace surface renders; `review` owns the turn-changeset and
+working-tree-snapshot families that the transcript, workspace and settings surfaces read. The process
+behind a terminal belongs to the service, not to the business — see *Surface facts worth knowing*
+below. `turn` is a business even without a screen, because its attach-to-settle lifecycle and
+generation-fenced identity outlive any surface.
 
 Each business directory holds up to five roles, and the role decides what the file may do — not the
 directory it happens to sit in:
