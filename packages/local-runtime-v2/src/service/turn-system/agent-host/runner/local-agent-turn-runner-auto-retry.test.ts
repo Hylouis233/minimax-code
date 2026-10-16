@@ -25,8 +25,55 @@ function terminal(status: RuntimeEventStatus, message?: string): IRuntimeEvent {
   } as unknown as IRuntimeEvent;
 }
 
-function failedTerminal(message: string): IRuntimeEvent {
-  return terminal(RuntimeEventStatus.FAILED, message);
+function failedTerminal(message: string, error: { code?: number } = {}): IRuntimeEvent {
+  const payload = {
+    status: RuntimeEventStatus.FAILED,
+    error: {
+      message,
+      ...(error.code === undefined ? {} : { code: error.code }),
+      stop_reason: { type: 'error', message },
+    },
+  };
+  return {
+    schema: 'runtime.event/v1',
+    event_id: `evt_failed_${message}`,
+    session_id: 'ses',
+    turn_id: 'turn',
+    type: RuntimeEventType.SESSION_STATUS,
+    payload,
+  } as unknown as IRuntimeEvent;
+}
+
+/** An assistant answer rendered through the normal streaming path. */
+function streamedAnswer(call: number): IRuntimeEvent {
+  return {
+    schema: 'runtime.event/v1',
+    event_id: `evt_msg_${call}`,
+    session_id: 'ses',
+    turn_id: 'turn',
+    type: RuntimeEventType.STREAM_RESP,
+    payload: {
+      stream_resp: JSON.stringify({
+        type: RespDataType.AgentMessage,
+        agent_message: {
+          msg_id: `msg_${call}`,
+          role: 'assistant',
+          msg_content: 'THE ANSWER TEXT',
+        },
+      }),
+    },
+  } as unknown as IRuntimeEvent;
+}
+
+function assistantChunks(events: readonly IRuntimeEvent[]): unknown[] {
+  return events
+    .filter((event) => event.type === RuntimeEventType.STREAM_RESP)
+    .map((event) => {
+      const parsed = JSON.parse(String(event.payload?.stream_resp)) as {
+        agent_message?: { msg_content?: string };
+      };
+      return parsed.agent_message?.msg_content;
+    });
 }
 
 function collector() {
@@ -224,6 +271,69 @@ describe('LocalAgentTurnRunner automatic turn retry', () => {
 
     expect(calls).toBe(1);
     expect(statuses(events)).toContain(RuntimeEventStatus.FAILED);
+  });
+
+  it('does not duplicate streamed output under unreviewed streaming', async () => {
+    // Regression: with `streamUnreviewedOutput` the safety writer forwards events
+    // through a fast path that never records approved partials, so a guard that
+    // only read the writer reported "nothing shown" and re-streamed the same
+    // answer. This is the production default for BYOK turns.
+    //
+    // The backoff here deliberately succeeds: the point is that no retry is even
+    // attempted, so a throwing sleep would hide a broken guard.
+    const { events, eventWriter } = collector();
+    const delays: number[] = [];
+    let calls = 0;
+    const runner = new LocalAgentTurnRunner({
+      reviewContent: async () => ({ pass: true }),
+      turnAutoRetrySleep: async (delayMs) => {
+        delays.push(delayMs);
+      },
+      piRunner: {
+        async runTurn(turnInput) {
+          calls += 1;
+          await turnInput.eventWriter.appendEvents([streamedAnswer(calls)]);
+          await turnInput.eventWriter.pushRuntime(failedTerminal('[Error] 529 overloaded'));
+        },
+      },
+    });
+
+    await runner.runTurn({
+      ...input(eventWriter),
+      contentReviewRequired: false,
+      streamUnreviewedOutput: true,
+    });
+
+    expect(calls).toBe(1);
+    expect(delays).toEqual([]);
+    expect(assistantChunks(events)).toEqual(['THE ANSWER TEXT']);
+    expect(statuses(events)).toEqual([RuntimeEventStatus.FAILED]);
+  });
+
+  it('does not retry a generic upstream code that hides a bad request', async () => {
+    const { events, eventWriter } = collector();
+    let calls = 0;
+    const runner = new LocalAgentTurnRunner({
+      reviewContent: async () => ({ pass: true }),
+      turnAutoRetrySleep: async () => {
+        throw new Error('a rejected request must not be resent');
+      },
+      piRunner: {
+        async runTurn(turnInput) {
+          calls += 1;
+          await turnInput.eventWriter.pushRuntime(
+            failedTerminal('invalid params: tool schema rejected', {
+              code: LLM_ERROR_STATUS_CODES.LLM_UPSTREAM_ERROR,
+            }),
+          );
+        },
+      },
+    });
+
+    await runner.runTurn(input(eventWriter));
+
+    expect(calls).toBe(1);
+    expect(statuses(events)).toEqual([RuntimeEventStatus.FAILED]);
   });
 
   it('propagates a throwing retried attempt without emitting a duplicate terminal event', async () => {

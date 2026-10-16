@@ -1,4 +1,5 @@
 import {
+  LLM_ERROR_STATUS_CODES,
   normalizeLLMError,
   toLLMRetryDecision,
   type LLMRetryReason,
@@ -6,7 +7,6 @@ import {
 import type { IRuntimeEvent } from '@mavis/protocol';
 
 import type { LocalRuntimeTurnRuntimeOutcome } from '../execution/executor.js';
-import { isProductionRuntimeErrorRetryable } from '../../runtime-error-retry-policy.js';
 
 /**
  * Turn-level automatic retry for transient turn failures.
@@ -62,28 +62,43 @@ export interface TurnAutoRetryClassification {
 }
 
 /**
- * Classify a failed turn outcome. Reuses the shared classifier so a turn-level
- * policy cannot drift from the transport-level one, then allows the production
- * runtime-error allowlist to cover MiniMax business codes that are not spelled
- * out in the message text.
+ * MiniMax business codes that name a specific transient condition and can
+ * therefore be trusted even when the message text does not classify.
+ *
+ * `LLM_UPSTREAM_ERROR` (50113) is deliberately absent. It is the generic
+ * 4xx/5xx fallback bucket — `mapUpstreamHttpError` assigns it to any status of
+ * 400 or above except 402/401/403/429/529 — so treating it as retryable would
+ * resend requests the provider has already rejected as malformed, and would
+ * turn an HTTP 400 or 404 into ten identical attempts. The shared classifier
+ * fails closed on that code for the same reason, and this list must not reopen
+ * it.
+ */
+const TRANSIENT_PROTOCOL_CODES = new Map<number, LLMRetryReason>([
+  [LLM_ERROR_STATUS_CODES.LLM_RATE_LIMITED, 'rate_limited'],
+  [LLM_ERROR_STATUS_CODES.LLM_TPM_RATE_LIMITED, 'tpm_rate_limited'],
+  [LLM_ERROR_STATUS_CODES.LLM_CLUSTER_OVERLOADED, 'overloaded'],
+]);
+
+/**
+ * Classify a failed turn outcome.
+ *
+ * The shared classifier is the only authority on what a resend can fix. The
+ * narrow protocol-code table above only adds cases where the transport had no
+ * status to classify from; it never widens a refusal the classifier made.
  */
 export function classifyTurnAutoRetryableFailure(
   outcome: LocalRuntimeTurnRuntimeOutcome,
 ): TurnAutoRetryClassification {
   if (outcome.status !== 'failed') return { retryable: false };
   const decision = toLLMRetryDecision(
-    normalizeLLMError(
-      outcome.errorMessage ? { errorMessage: outcome.errorMessage } : {},
-    ),
+    normalizeLLMError(outcome.errorMessage ? { errorMessage: outcome.errorMessage } : {}),
   );
   if (decision.retryable) return { retryable: true, reason: decision.reason };
-  // Explicit allowlist only: usage limit, credits exhausted, auth and bad request
-  // are not members, so a message that failed to classify cannot become
-  // retryable here.
-  if (isProductionRuntimeErrorRetryable(outcome.errorCode)) {
-    return { retryable: true, reason: 'overloaded' };
-  }
-  return { retryable: false };
+  // Only consulted after the classifier refused, and only for codes that name a
+  // specific transient condition. Usage limit (42212), credits (50110) and auth
+  // (50112) are not members.
+  const byCode = outcome.errorCode === undefined ? undefined : TRANSIENT_PROTOCOL_CODES.get(outcome.errorCode);
+  return byCode ? { retryable: true, reason: byCode } : { retryable: false };
 }
 
 export function resolveTurnAutoRetryPolicy(

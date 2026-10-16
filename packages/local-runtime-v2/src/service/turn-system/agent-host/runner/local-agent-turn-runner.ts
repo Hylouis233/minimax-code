@@ -38,6 +38,7 @@ import {
   turnAutoRetrySleep,
   type TurnAutoRetryCoordinator,
   type TurnAutoRetryPolicy,
+  type TurnAutoRetryStopReason,
 } from './turn-auto-retry.js';
 import { appendSafetyReplacement } from './safety-replacement.js';
 import { DEFAULT_OUTPUT_REVISION_INSTRUCTION } from '../preparation/config/prompt-templates.js';
@@ -324,20 +325,38 @@ export class LocalAgentTurnRunner implements LocalRuntimeTurnRunnerPort {
     observation: { regenerations: number; autoRetries: number },
     autoRetry: TurnAutoRetryCoordinator,
   ): Promise<boolean> {
-    if (!autoRetry.hasHeld()) return false;
-    const next = autoRetry.nextAttempt();
-    if (!next.retry) {
+    const logStop = (reason: string): false => {
       this.options.logger?.info?.(
         {
           sessionId: input.sessionId,
           turnId: input.turnId,
-          reason: next.reason,
+          reason,
           retries: autoRetry.retries,
+          maxRetries: autoRetry.policy.maxRetries,
         },
         'Automatic turn retry stopped; surfacing the original turn failure.',
       );
       return false;
+    };
+    if (!autoRetry.hasHeld()) {
+      // The hold was refused outright. Without this the most common give-up —
+      // output already streamed to the user — would be invisible.
+      if (state.lastGiveUpReason) return logStop(state.lastGiveUpReason);
+      return false;
     }
+    const next = autoRetry.nextAttempt();
+    if (!next.retry) return logStop(next.reason);
+    try {
+      await this.turnAutoRetrySleep(next.delayMs, input.signal);
+    } catch {
+      // Cancelled during backoff: never start another attempt. The hold is kept
+      // so `releaseHeldFailure` still surfaces the original terminal error.
+      return logStop('aborted');
+    }
+    if (input.signal?.aborted) return logStop('aborted');
+    // Spend the hold only now that the attempt is really about to run.
+    autoRetry.markAttemptStarted();
+    observation.autoRetries += 1;
     this.options.logger?.info?.(
       {
         sessionId: input.sessionId,
@@ -349,20 +368,6 @@ export class LocalAgentTurnRunner implements LocalRuntimeTurnRunnerPort {
       },
       'Retrying a turn after a retryable failure.',
     );
-    try {
-      await this.turnAutoRetrySleep(next.delayMs, input.signal);
-    } catch {
-      // Cancelled during backoff: never start another attempt. The hold is kept
-      // so `releaseHeldFailure` still surfaces the original terminal error.
-      return false;
-    }
-    if (input.signal?.aborted) return false;
-    // Spend the hold only now that the attempt is really about to run.
-    autoRetry.markAttemptStarted();
-    observation.autoRetries += 1;
-    // A retried turn re-runs the whole tool loop from the committed history, so
-    // the previous attempt's event slice must not be treated as final.
-    state.finalAttemptEventStart = input.eventWriter.outcome?.eventCount ?? input.eventWriter.events.length;
     return true;
   }
 
@@ -608,6 +613,10 @@ interface MutableRunnerState {
   retractionVariant?: LocalRuntimeTurnRunnerResult['retractionVariant'];
   retractionSource?: 'input-review' | 'output-review';
   finalAttemptEventStart: number;
+  /** True once any non-terminal event from this turn reached the client. */
+  streamedToClient: boolean;
+  /** Why the most recent hold was refused, for observability. */
+  lastGiveUpReason?: TurnAutoRetryStopReason;
   readonly eventIdGenerator: NonNullable<LocalRuntimeTurnRunnerInput['eventIdGenerator']>;
   readonly runtimeSeqGenerator: NonNullable<LocalRuntimeTurnRunnerInput['runtimeSeqGenerator']>;
 }
@@ -624,6 +633,7 @@ function createMutableRunnerState(input: LocalRuntimeTurnRunnerInput): MutableRu
     networkStopped: false,
     inputSafetyReviewUnknown: false,
     finalAttemptEventStart: (input.eventWriter.outcome?.eventCount ?? input.eventWriter.events.length),
+    streamedToClient: false,
     eventIdGenerator:
       input.eventIdGenerator ??
       ((kind: string) => `evt_${input.turnId}_${kind}_${++eventIdentitySequence}`),
@@ -666,17 +676,29 @@ function gateTerminalOnInputReview(
     if (!isTerminalStatus(event)) return false;
     if (autoRetry.hasHeld()) return false;
     const held = autoRetry.hold(event, deriveLocalTurnRuntimeOutcome([event]));
+    if (!held.held && held.reason === 'output_already_released') {
+      state.lastGiveUpReason = held.reason;
+    }
     return held.held;
+  };
+  /** Record that an event reached the client, so a retry cannot duplicate it. */
+  const forward = async (event: IRuntimeEvent): Promise<void> => {
+    if (!isTerminalStatus(event)) state.streamedToClient = true;
+    await input.eventWriter.pushRuntime(event);
+  };
+  const forwardAll = async (events: readonly IRuntimeEvent[]): Promise<void> => {
+    if (events.some((event) => !isTerminalStatus(event))) state.streamedToClient = true;
+    await input.eventWriter.appendEvents([...events]);
   };
   return {
     pushRuntime: async (event) => {
       if (isTerminalStatus(event) && (await holdsForRetry(event))) return;
       if (isTerminalStatus(event) && (await suppressTerminal())) return;
-      await input.eventWriter.pushRuntime(event);
+      await forward(event);
     },
     appendEvents: async (events) => {
       if (!events.some(isTerminalStatus)) {
-        await input.eventWriter.appendEvents(events);
+        await forwardAll(events);
         return;
       }
       const accepted: IRuntimeEvent[] = [];
@@ -691,7 +713,7 @@ function gateTerminalOnInputReview(
       const visible = (await suppressTerminal())
         ? accepted.filter((event) => !isTerminalStatus(event))
         : accepted;
-      if (visible.length > 0) await input.eventWriter.appendEvents(visible);
+      if (visible.length > 0) await forwardAll(visible);
     },
   };
 }
@@ -707,11 +729,18 @@ function isTerminalStatus(event: Parameters<PiEventWriter['pushRuntime']>[0]): b
 }
 
 /**
- * True once the in-flight attempt released assistant output the user has already
- * seen. A retry re-runs the whole tool loop from committed history, so it must
- * not be used to duplicate that content.
+ * True once anything from this turn has been streamed to the client.
+ *
+ * The gate is the only place that observes every event on its way out, so
+ * counting here covers both writer modes. The safety writer's approved-partial
+ * record is not enough on its own: with unreviewed streaming
+ * (`streamUnreviewedOutput`) the writer forwards events through a fast path
+ * that never populates it, so a writer-only check would report "nothing shown"
+ * while the user is watching the answer arrive. A retry re-runs the whole tool
+ * loop, so any already-streamed event — including tool results — must block it.
  */
 function attemptReleasedOutput(state: MutableRunnerState): boolean {
+  if (state.streamedToClient) return true;
   const writer = state.activeWriter;
   if (!writer) return false;
   const partial = writer.getApprovedPartial();

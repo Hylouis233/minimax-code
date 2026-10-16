@@ -97,6 +97,61 @@ describe('classifyTurnAutoRetryableFailure', () => {
     expect(classifyTurnAutoRetryableFailure({ status: 'aborted' }).retryable).toBe(false);
   });
 
+  it('never retries a generic 4xx/5xx upstream code', () => {
+    // LLM_UPSTREAM_ERROR (50113) is the catch-all bucket `mapUpstreamHttpError`
+    // assigns to any status >= 400 other than 402/401/403/429/529. Retrying it
+    // would resend a request the provider already rejected as malformed, so an
+    // HTTP 400 or 404 must stay terminal.
+    for (const message of [
+      'invalid params: tool schema rejected',
+      'model not found for this account',
+    ]) {
+      expect(
+        classifyTurnAutoRetryableFailure(
+          failedOutcome({
+            errorMessage: message,
+            errorCode: LLM_ERROR_STATUS_CODES.LLM_UPSTREAM_ERROR,
+          }),
+        ),
+      ).toEqual({ retryable: false });
+    }
+  });
+
+  it('accepts only protocol codes that name a specific transient condition', () => {
+    for (const code of [
+      LLM_ERROR_STATUS_CODES.LLM_RATE_LIMITED,
+      LLM_ERROR_STATUS_CODES.LLM_TPM_RATE_LIMITED,
+      LLM_ERROR_STATUS_CODES.LLM_CLUSTER_OVERLOADED,
+    ]) {
+      expect(classifyTurnAutoRetryableFailure(failedOutcome({ errorCode: code })).retryable).toBe(
+        true,
+      );
+    }
+    for (const code of [
+      LLM_ERROR_STATUS_CODES.USAGE_LIMIT_EXCEEDED,
+      LLM_ERROR_STATUS_CODES.LLM_CREDITS_EXHAUSTED,
+      LLM_ERROR_STATUS_CODES.LLM_AUTH_ERROR,
+      LLM_ERROR_STATUS_CODES.LLM_UPSTREAM_ERROR,
+    ]) {
+      expect(classifyTurnAutoRetryableFailure(failedOutcome({ errorCode: code })).retryable).toBe(
+        false,
+      );
+    }
+  });
+
+  it('reports the classification the protocol code implies, not a generic one', () => {
+    expect(
+      classifyTurnAutoRetryableFailure(
+        failedOutcome({ errorCode: LLM_ERROR_STATUS_CODES.LLM_TPM_RATE_LIMITED }),
+      ),
+    ).toEqual({ retryable: true, reason: 'tpm_rate_limited' });
+    expect(
+      classifyTurnAutoRetryableFailure(
+        failedOutcome({ errorCode: LLM_ERROR_STATUS_CODES.LLM_RATE_LIMITED }),
+      ),
+    ).toEqual({ retryable: true, reason: 'rate_limited' });
+  });
+
   it('accepts a production retryable business code with no message text', () => {
     expect(
       classifyTurnAutoRetryableFailure(
