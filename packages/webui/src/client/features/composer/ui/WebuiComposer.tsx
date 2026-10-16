@@ -81,7 +81,7 @@ import {
   useWebuiSettingsWorkflowsState,
 } from "../../../bindings/use-query-state.js";
 import {
-  useWebuiWorkspaceQueries,
+  useWebuiWorkspaceFiles,
   useWebuiWorkspaceQueriesState,
 } from "../../../bindings/use-query-state.js";
 import { type WebuiPermissionMode } from "../../../features/settings/contracts/settings-port.js";
@@ -370,7 +370,9 @@ export function WebuiComposer({
     () => selectWebuiCatalogFlatPage(sessionCatalog).sessions,
     [sessionCatalog],
   );
-  const workspaceQueries = useWebuiWorkspaceQueries();
+  // The composer renders a file tree, so it takes the files contract — not
+  // the whole workspace, and not a git mutation it has no view for.
+  const workspaceFileCommands = useWebuiWorkspaceFiles();
   const workspaceFileTree = useWebuiWorkspaceQueriesState().fileTree;
   const composerSnapshot = controllerSnapshot.composer;
   // The input modes are the composer's own state, kept by its owner.
@@ -585,13 +587,13 @@ export function WebuiComposer({
     // The directory listing is `workspace`'s capability: the composer asks its
     // owner and reads the answer from the owner's state rather than holding
     // the operation itself.
-    if (!mentionRange || !workspaceDir || !workspaceQueries?.canListFileTree) {
+    if (!mentionRange || !workspaceDir || !workspaceFileCommands?.canListFileTree) {
       setWorkspaceFiles([]);
       return undefined;
     }
-    workspaceQueries.loadFileTree(workspaceDir);
+    workspaceFileCommands.loadFileTree(workspaceDir);
     return undefined;
-  }, [mentionRange !== undefined, workspaceDir, workspaceQueries]);
+  }, [mentionRange !== undefined, workspaceDir, workspaceFileCommands]);
 
   useEffect(() => {
     if (mentionRange === undefined) {

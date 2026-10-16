@@ -10,7 +10,7 @@ import type { WebuiWorkspaceDirectoryListing } from "../../../../shared/contract
 import { looksLikeAbsoluteWorkspacePath } from "../../../projection/common/paths.js";
 import { useCallback, useEffect, useState, type ReactElement } from "react";
 import {
-  useWebuiWorkspaceQueries,
+  useWebuiWorkspaceFiles,
   useWebuiWorkspaceQueriesState,
 } from "../../../bindings/use-query-state.js";
 
@@ -27,7 +27,7 @@ export function WebuiWorkspaceDirectoryBrowser({
   // a browse that answers after a newer one is dropped there, so fast navigation
   // cannot show the wrong directory. This component keeps the typed draft and the
   // geometry.
-  const queries = useWebuiWorkspaceQueries();
+  const queries = useWebuiWorkspaceFiles();
   const browseState = useWebuiWorkspaceQueriesState().directoryBrowse;
   const listing = browseState.status === "ready" ? browseState.listing : undefined;
   const loading = browseState.status === "loading";

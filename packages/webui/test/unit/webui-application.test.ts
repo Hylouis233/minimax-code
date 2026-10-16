@@ -198,7 +198,12 @@ describe("stage 4 — the four call sites' handling through the coordinator", ()
     });
     const queries = application.workspaceQueries;
     const invalidate = vi.fn();
-    Object.defineProperty(queries, "invalidateReview", { value: invalidate, configurable: true });
+    // The review link is one resource's contract now; the root only keeps the
+    // git fan-out, which is the one thing that crosses resources.
+    Object.defineProperty(queries.review, "invalidateReview", {
+      value: invalidate,
+      configurable: true,
+    });
 
     await application.turnReview.load({ sessionId: "S", turnId: "T1" });
     await application.turnReview.mutate({ sessionId: "S", turnId: "T1" }, "revert");

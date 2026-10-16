@@ -794,7 +794,7 @@ export function createWebuiApplication(
   // 2. A settled turn mutation (revert / reapply) changed the working tree, so
   //    the review views for it are stale. The turn owner announces the
   //    settlement; no panel keeps a refresh token for it.
-  turnReview.subscribeMutations(() => workspaceQueries.invalidateReview());
+  turnReview.subscribeMutations(() => workspaceQueries.review.invalidateReview());
   // 3. plugin writes → the composer catalogue is wired above, at the workflows
   //    that made the write.
 

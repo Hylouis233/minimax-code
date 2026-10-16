@@ -220,3 +220,60 @@ describe("prohibition 5 — a submit carries intent, never a setter", () => {
     expect(context).toMatch(/readonly clearDraft\?: \(sessionId: string \| undefined\) => void/u);
   });
 });
+
+describe("prohibition 6 — a workspace reader takes the resource it renders", () => {
+  const read = (relativePath: string): string =>
+    readFileSync(new URL(relativePath, CLIENT_ROOT), "utf8");
+
+  it("declares one contract per resource, and no reader's contract is another's", () => {
+    // The point of the split: a capability added to Archive widens Archive and
+    // the panel, and touches nothing else. A contract that re-declared a
+    // sibling's member would put it back on every reader that took it.
+    const source = read("features/workspace/application/workspace-owner-contracts.ts");
+    const contracts = [
+      "WebuiWorkspaceFilesCommands",
+      "WebuiWorkspaceEnvironmentCommands",
+      "WebuiWorkspaceReviewCommands",
+      "WebuiWorkspaceArchiveCommands",
+      "WebuiWorkspaceCanvasCommands",
+    ];
+    for (const name of contracts) {
+      expect(source).toContain(`export interface ${name}`);
+    }
+    // Mutating git belongs to the environment alone.
+    expect(source).toContain("mutateGit");
+    expect(source.match(/mutateGit/gu)).toHaveLength(1);
+    // Reading a canvas belongs to the canvas alone.
+    expect(source.match(/readCanvas/gu)).toHaveLength(1);
+  });
+
+  it("keeps cross-owner work on the composition root, not on a resource", () => {
+    const root = read("features/workspace/application/workspace-queries.ts");
+    // The git fan-out is the one thing that crosses resources, so it lives on
+    // the root: it must not be reachable through any single resource's contract.
+    const contracts = read("features/workspace/application/workspace-owner-contracts.ts");
+    expect(root).toContain("invalidateWorkspaceGit");
+    expect(contracts).not.toContain("invalidateWorkspaceGit");
+    // And disposal is coordinated once, by the root that built the owners.
+    expect(root).toContain("dispose");
+    expect(contracts).not.toContain("dispose");
+  });
+
+  it("gives each consumer the hook for the resource it renders", () => {
+    // A consumer reaching for the whole facade is how the split decays: the
+    // types stop narrowing and every capability is everyone's again.
+    const expectations: readonly [string, string][] = [
+      ["features/composer/ui/WebuiComposer.tsx", "useWebuiWorkspaceFiles"],
+      ["features/review/ui/ReviewSettingsPage.tsx", "useWebuiWorkspaceReview"],
+      ["features/workspace/ui/WorkspaceArchiveView.tsx", "useWebuiWorkspaceArchive"],
+      ["features/workspace/ui/WorkspaceCanvas.tsx", "useWebuiWorkspaceCanvas"],
+      ["features/workspace/ui/WebuiWorkspaceDirectoryBrowser.tsx", "useWebuiWorkspaceFiles"],
+      // The panel is the one surface whose presentation IS the composition.
+      ["features/workspace/ui/WorkspacePanels.tsx", "useWebuiWorkspacePanelSurface"],
+    ];
+    for (const [modulePath, hook] of expectations) {
+      const source = read(modulePath);
+      expect(source).toContain(hook);
+    }
+  });
+});

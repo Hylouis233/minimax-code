@@ -43,7 +43,7 @@ const CANVAS_PAN_KEY_SCALE = 4;
 export type { CanvasMutation, CanvasNodeLayout, CanvasOperation } from "../../../../shared/contracts/canvas.js";
 import type { CanvasMutation, CanvasNodeLayout, CanvasOperation } from "../../../../shared/contracts/canvas.js";
 import {
-  useWebuiWorkspaceQueries,
+  useWebuiWorkspaceCanvas,
   useWebuiWorkspaceQueriesState,
 } from "../../../bindings/use-query-state.js";
 import { DESKTOP_COPY, resolveCanvasPointerGesture, stepCanvasZoom, canvasPointerMoveLayout, canvasPointerResizeLayout, canvasArrowDirection, canvasKeyStep, nudgeCanvasLayout, resizeCanvasLayoutBy, canvasLayoutsEqual, buildCanvasUpdateLayoutMutation, buildCanvasAddFileMutation, buildCanvasRemoveNodeMutation, createCanvasOperationId, createCanvasNodeId, buildCanvasOperation, nextCanvasNodeLayout, describeCanvasError, parseCanvasNodes, applyCanvasLayoutPreview } from "../projection/canvas-projection.js";
@@ -90,7 +90,7 @@ export function WorkspaceCanvas({ sessionId }: {
 }): ReactElement {
   // The document, its freshness and the operation outcomes belong to the canvas
   // owner; what stays here is geometry and gesture (pan, zoom, preview).
-  const queries = useWebuiWorkspaceQueries();
+  const queries = useWebuiWorkspaceCanvas();
   const canvasState = useWebuiWorkspaceQueriesState().canvas;
   const canvas = canvasState.document;
   const [localError, setLocalError] = useState<string>();

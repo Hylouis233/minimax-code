@@ -54,12 +54,15 @@ import { isMediaContent } from "../projection/media-preview.js";
 import { WorkspaceCanvas } from "./WorkspaceCanvas.js";
 import { WorkspaceArchiveView } from "./WorkspaceArchiveView.js";
 import { WorkspaceHtmlPreview } from "./WorkspaceHtmlPreview.js";
-import { type WebuiWorkspaceQueries } from "../application/workspace-queries.js";
+import type {
+  WebuiWorkspaceEnvironmentCommands,
+} from "../application/workspace-queries.js";
 import {
   WEBUI_WORKSPACE_REVIEW_DIFF_BATCH_SIZE,
   chunkWebuiWorkspaceReviewFileIds,
 } from "../../review/contracts/workspace-review.js";
 import {
+  useWebuiWorkspacePanelSurface,
   useWebuiWorkspaceQueries,
   useWebuiWorkspaceQueriesState,
 } from "../../../bindings/use-query-state.js";
@@ -221,13 +224,13 @@ export function WebuiEnvironmentPanel({ workspaceDir, isDefaultWorkspace = false
   readonly isDefaultWorkspace?: boolean;
   readonly workspaceEnvironment?: WebuiWorkspaceEnvironment;
   /** Injected in tests; defaults to the provided query owner. */
-  readonly queries?: WebuiWorkspaceQueries;
+  readonly queries?: WebuiWorkspaceEnvironmentCommands;
   readonly collapsed?: boolean;
   readonly onToggle?: () => void;
   readonly onOpenChanges?: () => void;
   readonly onOpenTerminal?: () => void;
 }): ReactElement | null {
-  const contextQueries = useWebuiWorkspaceQueries();
+  const contextQueries = useWebuiWorkspacePanelSurface();
   const queries = queriesProp ?? contextQueries;
   const queryState = useWebuiWorkspaceQueriesState();
   const [commitOpen, setCommitOpen] = useState(false);
@@ -338,7 +341,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   // Query truth lives in the owner; this component reads its snapshot and
   // submits query commands. Display state — active tab, expansion, search box,
   // code mode — stays here.
-  const queries = useWebuiWorkspaceQueries();
+  const queries = useWebuiWorkspacePanelSurface();
   const queryState = useWebuiWorkspaceQueriesState();
   const fileTree = queryState.fileTree;
   const fileResults = queryState.files;

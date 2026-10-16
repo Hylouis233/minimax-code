@@ -3806,6 +3806,7 @@
     "packages/webui/src/client/features/workspace/application/workspace-canvas-owner.ts",
     "packages/webui/src/client/features/workspace/application/workspace-environment-owner.ts",
     "packages/webui/src/client/features/workspace/application/workspace-files-owner.ts",
+    "packages/webui/src/client/features/workspace/application/workspace-owner-contracts.ts",
     "packages/webui/src/client/features/workspace/application/workspace-panel-owner.ts",
     "packages/webui/src/client/features/workspace/application/workspace-queries.ts",
     "packages/webui/src/client/features/workspace/contracts/panel-command.ts",

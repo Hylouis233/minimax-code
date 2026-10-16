@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useState, type ReactElement } from "react";
 import {
-  useWebuiWorkspaceQueries,
+  useWebuiWorkspaceArchive,
   useWebuiWorkspaceQueriesState,
 } from "../../../bindings/use-query-state.js";
 import type {
@@ -193,7 +193,7 @@ export function WorkspaceArchiveNotice({
  */
 export function WorkspaceArchiveView(props: WorkspaceArchiveViewProps): ReactElement {
   const { workspaceDir, path, destination } = props;
-  const queries = useWebuiWorkspaceQueries();
+  const queries = useWebuiWorkspaceArchive();
   const archive = useWebuiWorkspaceQueriesState().archive;
   const [prefix, setPrefix] = useState("");
   const target = destination ?? archiveDestinationFor(path);

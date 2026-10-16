@@ -51,8 +51,8 @@ describe("the workspace query owner discards a superseded response", () => {
       },
     });
 
-    queries.readFile("tab", "/w", "a.ts");
-    queries.readFile("tab", "/w", "b.ts");
+    queries.files.readFile("tab", "/w", "a.ts");
+    queries.files.readFile("tab", "/w", "b.ts");
 
     // The second request answers first and lands; the first answers after the
     // selection moved and must be dropped, not applied over b.ts.
@@ -70,9 +70,9 @@ describe("the workspace query owner discards a superseded response", () => {
       port: { listWorkspaceFileTree: () => first.promise as never },
     });
 
-    queries.loadFileTree("/old");
+    queries.files.loadFileTree("/old");
     // Leaving the workspace resets the tree to the new one.
-    queries.selectWorkspace("/new");
+    queries.files.selectWorkspace("/new");
 
     first.resolve([{ path: "a.ts", name: "a.ts", type: "file" }]);
     await flush();
@@ -94,12 +94,12 @@ describe("the workspace query owner invalidates exactly what a mutation affects"
       },
     });
 
-    queries.loadEnvironment("/w");
-    await queries.loadReviewSummary("tab", "/w");
+    queries.environment.loadEnvironment("/w");
+    await queries.review.loadReviewSummary("tab", "/w");
     await flush();
 
     const before = queries.getSnapshot();
-    await queries.mutateGit({ workspaceDir: "/w", action: "commit" });
+    await queries.environment.mutateGit({ workspaceDir: "/w", action: "commit" });
     const after = queries.getSnapshot();
 
     expect(after.environmentRevision).toBe(before.environmentRevision + 1);
@@ -111,7 +111,7 @@ describe("the workspace query owner invalidates exactly what a mutation affects"
       port: { getWorkspaceReviewSummary: async () => summary("snap-1") },
     });
 
-    await queries.loadReviewSummary("tab", "/w");
+    await queries.review.loadReviewSummary("tab", "/w");
     const before = queries.getSnapshot().reviewRevision;
 
     queries.invalidateWorkspaceGit({ workspace: "/other" });
@@ -129,8 +129,8 @@ describe("a closed tab releases its file slot", () => {
       port: { readWorkspaceFile: () => pending.promise },
     });
 
-    queries.readFile("tab", "/w", "a.ts");
-    queries.discardFileTab("tab");
+    queries.files.readFile("tab", "/w", "a.ts");
+    queries.files.discardFileTab("tab");
     // The read the closed tab was waiting for answers late: it has no reader, so
     // it must not commit into a slot nobody shows.
     pending.resolve({ type: "text", content: "A", resolvedPath: "a.ts" });
@@ -153,9 +153,9 @@ describe("a closed tab releases its file slot", () => {
       },
     });
 
-    queries.readFile("a", "/w", "a.ts");
-    queries.readFile("b", "/w", "b.ts");
-    queries.discardFileTab("a");
+    queries.files.readFile("a", "/w", "a.ts");
+    queries.files.readFile("b", "/w", "b.ts");
+    queries.files.discardFileTab("a");
     first.resolve({ type: "text", content: "A", resolvedPath: "a.ts" });
     second.resolve({ type: "text", content: "B", resolvedPath: "b.ts" });
     await flush();
@@ -190,8 +190,8 @@ describe("the archive owner drops a listing nobody is looking at", () => {
       },
     });
 
-    queries.readArchive({ workspaceDir: "/w", path: "a.zip" });
-    queries.readArchive({ workspaceDir: "/w", path: "a.zip", prefix: "src" });
+    queries.archive.readArchive({ workspaceDir: "/w", path: "a.zip" });
+    queries.archive.readArchive({ workspaceDir: "/w", path: "a.zip", prefix: "src" });
 
     second.resolve(listing("a.zip"));
     await flush();
@@ -213,7 +213,7 @@ describe("the archive owner drops a listing nobody is looking at", () => {
       },
     });
 
-    await queries.extractArchive({ workspaceDir: "/w", path: "a.zip", destination: "/out" });
+    await queries.archive.extractArchive({ workspaceDir: "/w", path: "a.zip", destination: "/out" });
 
     expect(queries.getSnapshot().archive.extract.status).toBe("done");
   });
@@ -236,8 +236,8 @@ describe("the canvas owner keeps one document per session", () => {
       },
     });
 
-    queries.readCanvas("A");
-    queries.readCanvas("B");
+    queries.canvas.readCanvas("A");
+    queries.canvas.readCanvas("B");
     second.resolve(doc("B"));
     await flush();
     first.resolve(doc("A"));
@@ -258,8 +258,8 @@ describe("the canvas owner keeps one document per session", () => {
       },
     });
 
-    await queries.readCanvas("A") as never;
-    const landed = await queries.applyCanvas("A", { id: "op", mutations: [] } as never);
+    await queries.canvas.readCanvas("A") as never;
+    const landed = await queries.canvas.applyCanvas("A", { id: "op", mutations: [] } as never);
 
     const state = queries.getSnapshot().canvas;
     expect(landed).toBe(false);
@@ -282,8 +282,8 @@ describe("inline content supersedes a read that is still in flight", () => {
     // The panel starts a read, and then the transcript hands the same tab the
     // document inline (the session's plan file, which lives outside the
     // workspace root and would be rejected by a read anyway).
-    queries.readFile("tab", "/w", "plan.md");
-    queries.setInlineFile("tab", "# plan", "plan.md");
+    queries.files.readFile("tab", "/w", "plan.md");
+    queries.files.setInlineFile("tab", "# plan", "plan.md");
 
     // The read answers afterwards. It was accepted before the inline content
     // arrived, but it must not land on top of what the tab now shows.
@@ -302,14 +302,14 @@ describe("inline content supersedes a read that is still in flight", () => {
       port: { readWorkspaceFile: () => pending.promise },
     });
 
-    queries.readFile("tab", "/w", "plan.md");
+    queries.files.readFile("tab", "/w", "plan.md");
     pending.reject(new Error("读取失败"));
     await flush();
     expect(queries.getSnapshot().files.get("tab")?.error).toBe("读取失败");
 
     // The inline content replaces the slot outright, error included: the tab is
     // no longer showing a read that failed.
-    queries.setInlineFile("tab", "# plan", "plan.md");
+    queries.files.setInlineFile("tab", "# plan", "plan.md");
     const slot = queries.getSnapshot().files.get("tab");
     expect(slot?.content?.content).toBe("# plan");
     expect(slot?.error).toBeUndefined();
@@ -330,8 +330,8 @@ describe("a git signal matches a workspace by its alias too", () => {
     // The runtime reports the repository under a name that is not the path the
     // panel holds — a worktree or a symlink target. Both views were loaded for
     // "/w", so a signal naming only "/w-alias" is still about them.
-    queries.loadEnvironment("/w");
-    await queries.loadReviewSummary("tab", "/w");
+    queries.environment.loadEnvironment("/w");
+    await queries.review.loadReviewSummary("tab", "/w");
     await flush();
 
     const before = queries.getSnapshot();
@@ -349,7 +349,7 @@ describe("a git signal matches a workspace by its alias too", () => {
       port: { getWorkspaceReviewSummary: async () => summary("snap-1") },
     });
 
-    await queries.loadReviewSummary("tab", "/w-alias");
+    await queries.review.loadReviewSummary("tab", "/w-alias");
     const before = queries.getSnapshot().reviewRevision;
 
     queries.invalidateWorkspaceGit({ workspace: "/repo", aliases: ["/w"] });
@@ -368,8 +368,8 @@ describe("a burst of git signals", () => {
       },
     });
 
-    queries.loadEnvironment("/w");
-    await queries.loadReviewSummary("tab", "/w");
+    queries.environment.loadEnvironment("/w");
+    await queries.review.loadReviewSummary("tab", "/w");
     await flush();
 
     const before = queries.getSnapshot();
@@ -401,8 +401,8 @@ describe("a burst of git signals", () => {
       },
     });
 
-    queries.loadEnvironment("/other");
-    await queries.loadReviewSummary("tab", "/other");
+    queries.environment.loadEnvironment("/other");
+    await queries.review.loadReviewSummary("tab", "/other");
     await flush();
     const before = queries.getSnapshot();
 

@@ -704,7 +704,7 @@ export function WebuiClientFoundationApp(
     setProgressPanelOpen,
   } = useWorkspacePanelSession({
     owner: workspacePanelOwner,
-    queries: workspaceQueries,
+    queries: workspaceQueries.files,
     selectedSessionId,
   });
   const [workspaceEnvironmentCollapsed, setWorkspaceEnvironmentCollapsed] = useState(false);

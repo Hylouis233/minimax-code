@@ -31,7 +31,10 @@ import {
 } from "../../sessions/projection/worktree-state.js";
 import { selectWebuiCatalogFlatPage } from "../../sessions/application/session-catalog.js";
 import { useWebuiSessionStoreContext } from "../../../bindings/application-context.js";
-import { useWebuiWorkspaceQueries } from "../../../bindings/use-query-state.js";
+import {
+  useWebuiWorkspaceQueriesState,
+  useWebuiWorkspaceReview,
+} from "../../../bindings/use-query-state.js";
 import { FolderIcon, SearchIcon } from "../../../ui/settings-glyphs.js";
 
 type WebuiReviewStateAction = Parameters<typeof reduceWebuiReviewState>[1];
@@ -48,7 +51,10 @@ export function ReviewSettingsPage({ workspaceDir, onOpenFileLine }: {
   readonly workspaceDir?: string;
   readonly onOpenFileLine?: (path: string, line: number) => void;
 }): ReactElement {
-  const queries = useWebuiWorkspaceQueries();
+  const queries = useWebuiWorkspaceReview();
+  // The review's slice of the composed snapshot: reading it needs the tree, not
+  // the whole workspace.
+  const snapshot = useWebuiWorkspaceQueriesState();
   const store = useWebuiSessionStoreContext();
   const catalog = useSyncExternalStore(store.subscribe, () => store.getSnapshot().catalog, () => store.getSnapshot().catalog);
   const workspaceChoices = selectWebuiCatalogFlatPage(catalog).sessions as readonly WebuiWorktreeSourceSession[];
@@ -99,7 +105,7 @@ export function ReviewSettingsPage({ workspaceDir, onOpenFileLine }: {
         dispatch({ type: "load-failed", reason: error instanceof Error ? error.message : String(error) });
       });
     return () => { cancelled = true; };
-  }, [dispatch, queries, effectiveWorkspaceDir, tabId]);
+  }, [dispatch, queries, snapshot, effectiveWorkspaceDir, tabId]);
 
   /* The snapshot id and the query are passed in rather than read back out of
    * state: reading a `useState` value from inside a setter callback is a type
@@ -109,7 +115,7 @@ export function ReviewSettingsPage({ workspaceDir, onOpenFileLine }: {
     if (!effectiveWorkspaceDir || !queries || !fileIds.length) return;
     dispatch({ type: "diffs-begun", fileIds });
     await queries.loadReviewDiffs({ tabId, workspaceDir: effectiveWorkspaceDir, snapshotId: reviewSnapshotId, fileIds });
-    const entries = queries.getSnapshot().reviewDiffs.diffs;
+    const entries = snapshot.reviewDiffs.diffs;
     const diffs: Record<string, string> = {};
     const errors: Record<string, string> = {};
     for (const fileId of fileIds) {
@@ -120,16 +126,16 @@ export function ReviewSettingsPage({ workspaceDir, onOpenFileLine }: {
       else errors[fileId] = "运行时没有返回这个文件的补丁";
     }
     dispatch({ type: "diffs-loaded", diffs, errors });
-  }, [dispatch, queries, effectiveWorkspaceDir, tabId]);
+  }, [dispatch, queries, snapshot, effectiveWorkspaceDir, tabId]);
 
   const runSearch = useCallback(async (reviewSnapshotId: string, query: string) => {
     if (!effectiveWorkspaceDir || !queries || !query.trim()) return;
     dispatch({ type: "search-begun" });
     await queries.searchReviewDiffs({ tabId, workspaceDir: effectiveWorkspaceDir, snapshotId: reviewSnapshotId, query });
-    const result = queries.getSnapshot().reviewSearch.result;
+    const result = snapshot.reviewSearch.result;
     // A failed search must not leave the list filtered by the previous one.
     dispatch({ type: "search-settled", fileIds: (result?.matchedFiles ?? []).map((entry) => entry.fileId) });
-  }, [dispatch, queries, effectiveWorkspaceDir, tabId]);
+  }, [dispatch, queries, snapshot, effectiveWorkspaceDir, tabId]);
 
   const visible = selectWebuiReviewVisibleFiles(state);
   const filtering = isWebuiReviewFiltering(state);

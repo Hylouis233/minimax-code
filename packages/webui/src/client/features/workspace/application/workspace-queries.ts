@@ -52,6 +52,14 @@ import {
   type WebuiWorkspaceReviewSummaryState,
 } from "../../review/contracts/workspace-review.js";
 
+export type {
+  WebuiWorkspaceArchiveCommands,
+  WebuiWorkspaceCanvasCommands,
+  WebuiWorkspaceEnvironmentCommands,
+  WebuiWorkspaceFilesCommands,
+  WebuiWorkspacePanelSurface,
+  WebuiWorkspaceReviewCommands,
+} from "./workspace-owner-contracts.js";
 export { initialWebuiWorkspaceFileTreeState } from "./workspace-files-owner.js";
 export type {
   WebuiWorkspaceFileContentState,
@@ -86,74 +94,54 @@ export interface WebuiWorkspaceQueriesState {
   readonly reviewSearch: import("../../review/contracts/workspace-review.js").WebuiWorkspaceReviewSearchState;
 }
 
+/**
+ * The composition root, and the only object that knows all five resources exist.
+ *
+ * It is private on purpose. Readers take one of the narrow contracts — `files`,
+ * `environment`, `review`, `archive`, `canvas` — and the panel takes the composed
+ * surface. What stays here is exactly what crosses resources: the composed
+ * snapshot the panels subscribe to, the git-changed fan-out, and disposal.
+ */
+import type {
+  WebuiWorkspaceArchiveCommands,
+  WebuiWorkspaceCanvasCommands,
+  WebuiWorkspaceEnvironmentCommands,
+  WebuiWorkspaceFilesCommands,
+  WebuiWorkspacePanelSurface,
+  WebuiWorkspaceReviewCommands,
+} from "./workspace-owner-contracts.js";
+
 export interface WebuiWorkspaceQueries {
   readonly getSnapshot: () => WebuiWorkspaceQueriesState;
   readonly subscribe: (listener: () => void) => () => void;
-  readonly canListFileTree: boolean;
-  readonly canReadFile: boolean;
-  readonly canReadEnvironment: boolean;
-  readonly canMutateGit: boolean;
-  readonly canReview: boolean;
-  readonly invalidateReview: () => void;
-  readonly canSearchReviewDiffs: boolean;
-  readonly selectWorkspace: (workspaceDir: string | undefined) => void;
-  readonly loadFileTree: (workspaceDir: string) => void;
-  readonly loadDirectory: (workspaceDir: string, path: string) => Promise<WebuiWorkspaceDirLoad>;
-  readonly readFile: (tabId: string, workspaceDir: string, path: string) => void;
-  readonly setInlineFile: (tabId: string, content: string, resolvedPath: string) => void;
-  /** Release a closed tab's file slot and its read commit rights. */
-  readonly discardFileTab: (tabId: string) => void;
-  /** List one directory for the workspace picker (superseded browses dropped). */
-  readonly browseWorkspaceDirs: (dir?: string) => void;
-  readonly canBrowseWorkspaceDirs: boolean;
-  /**
-   * The panel/tab owner. Its state is keyed by session and is not part of the
-   * composed snapshot: a surface subscribes to the session it shows.
-   */
+  /** The file tree and the file slots opened from it. */
+  readonly files: WebuiWorkspaceFilesCommands;
+  /** The git working tree. */
+  readonly environment: WebuiWorkspaceEnvironmentCommands;
+  readonly review: WebuiWorkspaceReviewCommands;
+  readonly archive: WebuiWorkspaceArchiveCommands;
+  readonly canvas: WebuiWorkspaceCanvasCommands;
+  /** The panel/tab owner, for a surface whose presentation *is* the composition. */
   readonly panel: WebuiWorkspacePanelOwner;
-  readonly loadReviewSummary: (
-    tabId: string,
-    workspaceDir: string,
-  ) => Promise<WebuiWorkspaceReviewSummaryState["summary"]>;
-  readonly loadReviewDiffs: (request: {
-    readonly tabId: string;
-    readonly workspaceDir: string;
-    readonly snapshotId: string;
-    readonly fileIds: readonly string[];
-  }) => Promise<void>;
-  readonly searchReviewDiffs: (request: {
-    readonly tabId: string;
-    readonly workspaceDir: string;
-    readonly snapshotId: string;
-    readonly query: string;
-  }) => Promise<void>;
-  /** Read one archive listing (superseded reads are dropped). */
-  readonly readArchive: WebuiWorkspaceArchiveOwner["read"];
-  /** Extract one archive; the outcome is the owner's, not a component's. */
-  readonly extractArchive: WebuiWorkspaceArchiveOwner["extract"];
-  readonly canReadArchive: boolean;
-  /** Read the session's canvas document (a session already left is dropped). */
-  readonly readCanvas: WebuiWorkspaceCanvasOwner["read"];
-  /** Run one canvas operation; resolves `true` when it landed. */
-  readonly applyCanvas: WebuiWorkspaceCanvasOwner["apply"];
-  readonly canReadCanvas: boolean;
-  readonly canApplyCanvas: boolean;
-  readonly canExtractArchive: boolean;
-  readonly loadEnvironment: (workspaceDir: string) => void;
-  readonly mutateGit: (
-    request: WebuiWorkspaceGitMutationRequest,
-  ) => Promise<Record<string, unknown>>;
+  /**
+   * One workspace-git signal, the owners it names. This is the one place a fact
+   * about one resource reaches another, which is why it belongs to the root and
+   * not to any of the five.
+   */
   readonly invalidateWorkspaceGit: (signal: {
     readonly workspace?: string;
     readonly aliases?: readonly string[];
   }) => void;
-  readonly reportDirectoryError: (
-    workspaceDir: string,
-    path: string,
-    error: string,
-  ) => void;
+  /** Tear down every owner, in the order the root built them. */
   readonly dispose: () => void;
 }
+
+/** The panel's contract: every resource, because the panel composes them. */
+export type WebuiWorkspaceComposedPanel = WebuiWorkspacePanelSurface;
+
+/** What a reader gets for the resource it renders. */
+export type WebuiWorkspaceReader<T extends keyof WebuiWorkspaceQueries> =
+  T extends "files" | "environment" | "review" | "archive" | "canvas" ? WebuiWorkspaceQueries[T] : never;
 
 export const initialWebuiWorkspaceQueriesState: WebuiWorkspaceQueriesState = {
   ...initialWebuiWorkspaceFilesState,
@@ -222,20 +210,12 @@ export function createWebuiWorkspaceQueries(deps: {
     if (matches(workspaceDir)) environment.invalidate(workspaceDir!, 350);
   };
 
-  return {
-    getSnapshot: () => snapshot,
-    subscribe: (listener) => {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
+  // The five narrow contracts, each bound to the one owner that implements it.
+  // A reader takes the one it renders; the panel takes all five, and the root
+  // below keeps only what crosses resources.
+  const filesCommands: WebuiWorkspaceFilesCommands = {
     canListFileTree: files.canListFileTree,
     canReadFile: files.canReadFile,
-    canReadEnvironment: environment.canReadEnvironment,
-    canMutateGit: environment.canMutateGit,
-    canReview: review.canReview,
-    canSearchReviewDiffs: review.canSearchDiffs,
     selectWorkspace: files.selectWorkspace,
     loadFileTree: files.loadFileTree,
     loadDirectory: files.loadDirectory,
@@ -244,30 +224,58 @@ export function createWebuiWorkspaceQueries(deps: {
     discardFileTab: files.discardTab,
     browseWorkspaceDirs: files.browse,
     canBrowseWorkspaceDirs: files.canBrowseDirectories,
-    panel,
+    reportDirectoryError: files.reportDirectoryError,
+  };
+  const environmentCommands: WebuiWorkspaceEnvironmentCommands = {
+    canReadEnvironment: environment.canReadEnvironment,
+    canMutateGit: environment.canMutateGit,
+    loadEnvironment: environment.load,
+    mutateGit: environment.mutateGit,
+  };
+  const reviewCommands: WebuiWorkspaceReviewCommands = {
+    canReview: review.canReview,
+    canSearchReviewDiffs: review.canSearchDiffs,
     invalidateReview: review.invalidate,
     loadReviewSummary: review.loadSummary,
     loadReviewDiffs: review.loadDiffs,
     searchReviewDiffs: review.search,
+  };
+  const archiveCommands: WebuiWorkspaceArchiveCommands = {
+    canReadArchive: archive.canRead,
+    canExtractArchive: archive.canExtract,
     readArchive: archive.read,
     extractArchive: archive.extract,
-    canReadArchive: archive.canRead,
-    readCanvas: canvas.read,
-    applyCanvas: canvas.apply,
+  };
+  const canvasCommands: WebuiWorkspaceCanvasCommands = {
     canReadCanvas: canvas.canRead,
     canApplyCanvas: canvas.canApply,
-    canExtractArchive: archive.canExtract,
-    loadEnvironment: environment.load,
-    mutateGit: environment.mutateGit,
-    reportDirectoryError: files.reportDirectoryError,
-    invalidateWorkspaceGit,
-    dispose: () => {
-      files.dispose();
-      archive.dispose();
-      canvas.dispose();
-      panel.dispose();
-      environment.dispose();
-      listeners.clear();
+    readCanvas: canvas.read,
+    applyCanvas: canvas.apply,
+  };
+  const dispose = (): void => {
+    files.dispose();
+    archive.dispose();
+    canvas.dispose();
+    panel.dispose();
+    environment.dispose();
+    listeners.clear();
+  };
+
+  return {
+    getSnapshot: () => snapshot,
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
     },
+    files: filesCommands,
+    environment: environmentCommands,
+    review: reviewCommands,
+    archive: archiveCommands,
+    canvas: canvasCommands,
+    panel,
+    invalidateWorkspaceGit,
+    dispose,
   };
 }

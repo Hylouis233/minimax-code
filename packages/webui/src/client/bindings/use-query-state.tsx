@@ -18,7 +18,13 @@ import {
 
 import {
   initialWebuiWorkspaceQueriesState,
+  type WebuiWorkspaceComposedPanel,
   type WebuiWorkspaceQueries,
+  type WebuiWorkspaceArchiveCommands,
+  type WebuiWorkspaceCanvasCommands,
+  type WebuiWorkspaceEnvironmentCommands,
+  type WebuiWorkspaceFilesCommands,
+  type WebuiWorkspaceReviewCommands,
   type WebuiWorkspaceQueriesState,
 } from "../features/workspace/application/workspace-queries.js";
 import {
@@ -58,6 +64,72 @@ export function WebuiWorkspaceQueriesProvider({
       {children}
     </WebuiWorkspaceQueriesContext.Provider>
   );
+}
+
+/**
+ * One resource's commands, or `undefined` with no provider.
+ *
+ * The selector is the point: a consumer asks for the resource it renders and
+ * gets a contract that cannot name another resource's capabilities. The
+ * composition root is still provided — the panel needs all five, and the tree
+ * needs one snapshot — but nothing reaches for the whole thing by accident.
+ */
+function useWebuiWorkspaceResource<
+  K extends "files" | "environment" | "review" | "archive" | "canvas",
+>(
+  key: K,
+): WebuiWorkspaceQueries[K] | undefined {
+  const queries = useContext(WebuiWorkspaceQueriesContext);
+  return queries?.[key];
+}
+
+/** The file tree and the file slots opened from it. */
+export function useWebuiWorkspaceFiles():
+  | WebuiWorkspaceFilesCommands
+  | undefined {
+  return useWebuiWorkspaceResource("files");
+}
+
+/** The git working tree. */
+export function useWebuiWorkspaceEnvironment():
+  | WebuiWorkspaceEnvironmentCommands
+  | undefined {
+  return useWebuiWorkspaceResource("environment");
+}
+
+/** The diff surface. */
+export function useWebuiWorkspaceReview():
+  | WebuiWorkspaceReviewCommands
+  | undefined {
+  return useWebuiWorkspaceResource("review");
+}
+
+/** Reading and extracting an archive. */
+export function useWebuiWorkspaceArchive():
+  | WebuiWorkspaceArchiveCommands
+  | undefined {
+  return useWebuiWorkspaceResource("archive");
+}
+
+/** The session's canvas document. */
+export function useWebuiWorkspaceCanvas():
+  | WebuiWorkspaceCanvasCommands
+  | undefined {
+  return useWebuiWorkspaceResource("canvas");
+}
+
+/** The panel's composed surface: every resource, because the panel combines them. */
+export function useWebuiWorkspacePanelSurface(): WebuiWorkspaceComposedPanel | undefined {
+  const queries = useContext(WebuiWorkspaceQueriesContext);
+  if (!queries) return undefined;
+  return {
+    ...queries.files,
+    ...queries.environment,
+    ...queries.review,
+    ...queries.archive,
+    ...queries.canvas,
+    panel: queries.panel,
+  };
 }
 
 /** The owner for imperative query commands, or `undefined` with no provider. */
