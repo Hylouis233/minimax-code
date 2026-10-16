@@ -91,17 +91,21 @@ function harness(overrides: Partial<WebuiProviderEditorCommands> = {}): Harness 
       calls.remove.push(providerId);
       return { ok: true };
     },
+    // The commands answer with the typed outcome the Models owner decodes, so
+    // these fixtures state the outcome rather than a raw result record — which is
+    // the whole point: an editor that could not tell success from a refusal is
+    // no longer expressible.
     discoverCandidate: async (body) => {
       calls.discover.push(body);
-      return [];
+      return { outcome: "success", models: [] };
     },
     saveCandidate: async (body) => {
       calls.save.push(body);
-      return { success: true };
+      return { outcome: "success" };
     },
     testCandidate: async (body) => {
       calls.test.push(body);
-      return { ok: true, status: { state: "ready" } };
+      return { outcome: "success", models: [] };
     },
     ...overrides,
   };
@@ -185,7 +189,11 @@ describe("test validity", () => {
 
   it("reads the producer's refusal shape", async () => {
     const { commands } = harness({
-      testCandidate: async () => ({ ok: false, status: { lastErrorMessage: "bad key" } }),
+      testCandidate: async () => ({
+        outcome: "refusal",
+        code: "harness_error",
+        message: "bad key",
+      }),
     });
     const editor = createWebuiProviderEditor({ commands });
     editor.openNew();
@@ -241,7 +249,9 @@ describe("saving", () => {
   });
 
   it("closes the form on success and stays open with an error on refusal", async () => {
-    const refused = harness({ saveCandidate: async () => ({ success: false }) });
+    const refused = harness({
+      saveCandidate: async () => ({ outcome: "refusal", code: "harness_error", message: "保存失败" }),
+    });
     const failing = createWebuiProviderEditor({ commands: refused.commands });
     failing.openNew();
     failing.changeField("baseUrl", "https://example.test");
@@ -278,7 +288,10 @@ describe("discovery", () => {
     const { commands } = harness({
       discoverCandidate: async (body) => {
         discovered.push(body);
-        return [{ modelId: "m1" }, { modelId: "m2" }];
+        return {
+          outcome: "success",
+          models: [{ modelId: "m1" }, { modelId: "m2" }],
+        };
       },
     });
     const editor = createWebuiProviderEditor({ commands });

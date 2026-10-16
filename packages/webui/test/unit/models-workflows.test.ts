@@ -16,6 +16,16 @@ import type {
 } from "../../src/shared/contracts/models.js";
 
 import { createWebuiModelsWorkflows } from "../../src/client/features/models/application/models-workflows.js";
+import {
+  decodeWebuiProviderSaveOutcome,
+  decodeWebuiProviderTestOutcome,
+  unavailableWebuiProviderOutcome,
+} from "../../src/client/features/models/contracts/provider-outcome.js";
+import {
+  buildWebuiModelSelectionRequest,
+  webuiModelFromOptionValue,
+  webuiModelOptionValue,
+} from "../../src/client/features/models/contracts/model-selection.js";
 
 const noStatusRefresh = async (): Promise<void> => {};
 
@@ -211,5 +221,141 @@ describe("the catalogue is keyed, not one destination", () => {
     await pending;
 
     expect(workflows.getSnapshot().models.value).toBeUndefined();
+  });
+});
+
+describe("a provider operation answers with a typed outcome", () => {
+  // The editor used to cast each result to a record and pick fields out of it,
+  // which put "what counts as success" and "what does a refusal say" in the
+  // surface, once per operation, unchecked. These are the three answers it can
+  // now be given.
+  it("separates a success from a refusal and from a revision conflict", () => {
+    const ok = decodeWebuiProviderTestOutcome({ ok: true, status: { state: "ready" } });
+    const refused = decodeWebuiProviderTestOutcome({
+      ok: false,
+      code: "invalid_api_key",
+      message: "接口密钥无效",
+    });
+    const conflicted = decodeWebuiProviderSaveOutcome({
+      success: false,
+      code: "revision_conflict",
+      message: "已被更新",
+    });
+
+    expect(ok.outcome).toBe("success");
+    expect(refused.outcome).toBe("refusal");
+    expect(conflicted.outcome).toBe("conflict");
+  });
+
+  it("keeps an unknown error code rather than collapsing it to one failure", () => {
+    // A runtime that raises a code of its own has said something more precise
+    // than "harness error". The editor shows the runtime's own message, so a
+    // code this build has not heard of must survive to the branch that uses it.
+    const outcome = decodeWebuiProviderTestOutcome({
+      ok: false,
+      code: "provider_quota_exhausted",
+      message: "该提供商额度已用尽",
+    });
+    expect(outcome.outcome).toBe("refusal");
+    if (outcome.outcome !== "refusal") throw new Error("unreachable");
+    expect(outcome.code).toBe("provider_quota_exhausted");
+    expect(outcome.message).toBe("该提供商额度已用尽");
+  });
+
+  it("keeps the extension fields the runtime sent", () => {
+    // The editor passes a candidate through to a save, so a runtime field this
+    // build has not named yet still belongs to the answer. Decoding to a closed
+    // shape would drop it, and the next runtime version would look like data
+    // loss rather than an addition.
+    const outcome = decodeWebuiProviderTestOutcome({
+      ok: true,
+      models: [{ modelId: "m1", contextWindowTokens: 128000 }],
+      status: { state: "ready", fetchedAtMs: 1 },
+      traceId: "trace-7",
+    });
+    expect(outcome.outcome).toBe("success");
+    if (outcome.outcome !== "success") throw new Error("unreachable");
+    expect(outcome.models[0]).toMatchObject({ modelId: "m1", contextWindowTokens: 128000 });
+    expect(outcome.status).toMatchObject({ fetchedAtMs: 1 });
+    expect(outcome.traceId).toBe("trace-7");
+  });
+
+  it("reads the reason from wherever the runtime put it", () => {
+    // A test that answered with a cache status has the reason on that status;
+    // one that did not has it at the top. Defaulting both to a generic
+    // "连接失败" would throw away the only useful part of the answer.
+    const fromStatus = decodeWebuiProviderTestOutcome({
+      ok: false,
+      status: { lastErrorMessage: "bad key" },
+    });
+    const fromTop = decodeWebuiProviderTestOutcome({
+      ok: false,
+      message: "连接超时",
+    });
+    expect(fromStatus.outcome === "refusal" && fromStatus.message).toBe("bad key");
+    expect(fromTop.outcome === "refusal" && fromTop.message).toBe("连接超时");
+  });
+
+  it("treats a stale base as a conflict, not as a refusal", () => {
+    // They want opposite follow-up: a refusal is the user's draft being
+    // rejected, a conflict is the editor's base being out of date and retrying
+    // unchanged would overwrite someone else's edit.
+    const outcome = decodeWebuiProviderSaveOutcome({
+      success: false,
+      skippedTest: true,
+      status: { state: "stale" },
+    });
+    expect(outcome.outcome).toBe("conflict");
+  });
+
+  it("answers an operation this build cannot run as a capability refusal", () => {
+    // The fallback editor used to answer `undefined` and rely on the editor
+    // noticing, which made "unsupported" and "refused" the same absence — and
+    // the one the user must never retry was the one the panel could offer.
+    const outcome = unavailableWebuiProviderOutcome("当前运行时不支持模型测试。");
+    expect(outcome.outcome).toBe("refusal");
+    if (outcome.outcome !== "refusal") throw new Error("unreachable");
+    expect(outcome.code).toBe("capability_unavailable");
+  });
+});
+
+describe("the model-selection request is built by Models", () => {
+  it("lets a per-pick override replace the model's projection", () => {
+    const model: WebuiModelEntry = {
+      providerId: "p",
+      modelId: "m",
+      variant: "thinking",
+      contextLimit: 64000,
+    };
+    expect(buildWebuiModelSelectionRequest(model, {})).toEqual({
+      providerId: "p",
+      modelId: "m",
+      variant: "thinking",
+      contextLimit: 64000,
+    });
+    expect(
+      buildWebuiModelSelectionRequest(model, { variant: "", contextLimit: 128000 }),
+    ).toEqual({ providerId: "p", modelId: "m", variant: "", contextLimit: 128000 });
+  });
+
+  it("keeps an empty variant, which is how thinking is turned off", () => {
+    // Treated as absence, the model's default would stay in force: the picker
+    // would appear to accept the choice and the model would behave as before.
+    const model: WebuiModelEntry = { providerId: "p", modelId: "m", variant: "thinking" };
+    const request = buildWebuiModelSelectionRequest(model, { variant: "" });
+    expect(request.variant).toBe("");
+    expect("variant" in request).toBe(true);
+  });
+
+  it("round-trips a model through its option value", () => {
+    // Two halves of one round trip, so they live beside each other: a value
+    // written by one and read by the other is where the trailing-slash bug is.
+    const model: WebuiModelEntry = { providerId: "p", modelId: "m", variant: "fast" };
+    const plain: WebuiModelEntry = { providerId: "p", modelId: "m" };
+    expect(webuiModelOptionValue(model)).toBe("p/m/fast");
+    // The trailing variant is kept even when empty so the lookup after a change
+    // selects the entry the user actually chose.
+    expect(webuiModelOptionValue(plain)).toBe("p/m/");
+    expect(webuiModelFromOptionValue([model, plain], "p/m/")).toBe(plain);
   });
 });

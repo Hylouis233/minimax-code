@@ -67,7 +67,7 @@ import type { WebuiTranscriptItem } from "../../src/client/features/transcript/c
 import {
   buildWebuiModelSelectionRequest,
   webuiModelOptionValue,
-} from "../../src/client/features/sessions/projection/action-requests.js";
+} from "../../src/client/features/models/contracts/model-selection.js";
 import { looksLikeAbsoluteWorkspacePath } from "../../src/client/projection/common/paths.js";
 import { submitWebuiGoal } from "../../src/client/features/goal/application/goal-submission.js";
 import {

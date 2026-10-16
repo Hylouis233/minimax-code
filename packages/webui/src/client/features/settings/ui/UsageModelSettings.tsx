@@ -8,6 +8,7 @@ import { IconButton, RefreshIcon } from "./settings-atoms.js";
 import { ProviderFormPanel, type WebuiProviderFormCommands } from "../../../features/models/ui/ProviderFormPanel.js";
 import { useWebuiProviderEditor } from "../../../features/models/bindings/use-provider-editor.js";
 import type { WebuiProviderEditorCommands } from "../../../features/models/contracts/provider-editor.js";
+import { unavailableWebuiProviderOutcome } from "../../../features/models/contracts/provider-outcome.js";
 import type { WebuiModelProviderView } from "../../../../shared/contracts/models.js";
 
 type Props = {
@@ -25,9 +26,13 @@ const NO_PROVIDER_EDITOR_COMMANDS: WebuiProviderEditorCommands = {
   createProvider: async () => undefined,
   updateProvider: async () => undefined,
   deleteProvider: async () => undefined,
-  discoverCandidate: async () => undefined,
-  saveCandidate: async () => undefined,
-  testCandidate: async () => undefined,
+  // A refusal with the stable "this host does not implement it" code, rather
+  // than an absence the editor has to interpret. `undefined` made the
+  // unsupported case and the runtime-refused case identical, and the one the
+  // user must never retry was the one the panel could offer.
+  discoverCandidate: async () => unavailableWebuiProviderOutcome("当前运行时不支持模型发现。"),
+  saveCandidate: async () => unavailableWebuiProviderOutcome("当前运行时不支持保存提供商。"),
+  testCandidate: async () => unavailableWebuiProviderOutcome("当前运行时不支持模型测试。"),
 };
 
 const NO_PROVIDER_COMMANDS: WebuiProviderFormCommands = {
@@ -36,8 +41,8 @@ const NO_PROVIDER_COMMANDS: WebuiProviderFormCommands = {
   loadPresets: async () => {},
   revealApiKey: async () => "",
   testModel: async () => undefined,
-  discoverCandidate: async () => undefined,
-  testCandidate: async () => undefined,
+  discoverCandidate: async () => unavailableWebuiProviderOutcome("当前运行时不支持模型发现。"),
+  testCandidate: async () => unavailableWebuiProviderOutcome("当前运行时不支持模型测试。"),
   saveCandidate: async () => undefined,
   deleteProvider: async () => undefined,
   updateProvider: async () => undefined,

@@ -67,6 +67,16 @@ export interface WebuiResourceState<T> {
   readonly error?: string;
 }
 
+/** The state of one cached read, before anyone has asked for it. */
+export function idleWebuiResourceState<T>(): WebuiResourceState<T> {
+  return { status: "idle" };
+}
+
+/** A failure's message, for the error field of a cached read. */
+export function webuiResourceMessage(reason: unknown): string {
+  return reason instanceof Error ? reason.message : String(reason);
+}
+
 /**
  * What one `load` produced.
  *

@@ -13,8 +13,6 @@ import type {
   WebuiForkSessionRequest,
   WebuiRewindSessionRequest,
 } from "../../../../shared/contracts/session.js";
-import type { WebuiModelEntry } from "../../../../shared/contracts/models.js";
-import type { WebuiModelSelectionRequest, WebuiModelPickerDraft } from "../../models/contracts/model-view.js";
 
 /** Rewind a session to a specific user message, optionally reverting the
  *  file changes that turn produced. */
@@ -95,41 +93,3 @@ export function webuiClientRequestId(prefix: string): string {
   return `${prefix}-${random}`;
 }
 
-/** Build the model-selection request for a model or setting change. Per-pick
- *  values override the model's current runtime projection; an empty variant
- *  remains meaningful because it disables thinking. */
-export function buildWebuiModelSelectionRequest(
-  model: WebuiModelEntry,
-  draft: WebuiModelPickerDraft,
-  sessionId?: string,
-): WebuiModelSelectionRequest {
-  const variant = draft.variant !== undefined ? draft.variant : model.variant;
-  const inheritedContextLimit =
-    typeof model.contextLimit === "number" ? model.contextLimit : undefined;
-  const contextLimit =
-    draft.contextLimit !== undefined
-      ? draft.contextLimit
-      : inheritedContextLimit;
-  const thinking =
-    draft.thinkingEffort === undefined
-      ? model.thinking
-      : draft.thinkingEffort === null
-        ? null
-        : { effort: draft.thinkingEffort };
-  return {
-    providerId: model.providerId,
-    modelId: model.modelId,
-    ...(variant !== undefined ? { variant } : {}),
-    ...(contextLimit !== undefined ? { contextLimit } : {}),
-    ...(thinking !== undefined ? { thinking } : {}),
-    ...(sessionId ? { sessionId } : {}),
-  };
-}
-
-/** Compute the option value (`providerId/modelId/variant`) for a `<select>`
- *  model entry. The trailing `variant` is included even when empty so the
- *  lookup after a change selects the same catalog entry the user actually
- *  chose. */
-export function webuiModelOptionValue(model: WebuiModelEntry): string {
-  return `${model.providerId}/${model.modelId}/${model.variant ?? ""}`;
-}

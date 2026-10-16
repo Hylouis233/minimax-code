@@ -250,7 +250,7 @@ Four mechanisms hold the resulting concurrency down, each with one home:
 - **Generation fences** (`client/conversation/stream-lease.ts`, `stream-loop.ts`): exactly one stream
   lease is live per session, one generation higher than the last, and every write a stream attempt makes
   is fenced against the generation it claimed — a superseded attempt cannot write.
-- **Incarnation and freshness** (`client/application/identity-epochs.ts`, `query-store.ts`,
+- **Incarnation and freshness** (`client/application/identity-epochs.ts`,
   `client/conversation/request-freshness.ts`): a result commits only to its own live owner incarnation,
   and an invalidation is repaired only by a result that covers its freshness revision, so an earlier
   read cannot clear a later dirty revision.

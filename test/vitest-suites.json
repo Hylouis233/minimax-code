@@ -301,7 +301,6 @@
       "packages/webui/test/unit/projections.test.ts",
       "packages/webui/test/unit/provider-editor.test.ts",
       "packages/webui/test/unit/provider-form-panel.test.ts",
-      "packages/webui/test/unit/query-store.test.ts",
       "packages/webui/test/unit/questionnaire-goal-autoreply.test.tsx",
       "packages/webui/test/unit/queue-panel.test.ts",
       "packages/webui/test/unit/rail-buckets.test.ts",

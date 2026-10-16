@@ -8,6 +8,11 @@
 // leaf every one of them may depend on.
 
 import type {
+  WebuiProviderDiscoveryOutcome,
+  WebuiProviderSaveOutcome,
+  WebuiProviderTestOutcome,
+} from "./provider-outcome.js";
+import type {
   WebuiCreateUserModelProviderRequest,
   WebuiDiscoverUserModelsCandidateRequest,
   WebuiSaveUserModelProviderCandidateRequest,
@@ -44,15 +49,23 @@ export interface WebuiProviderEditorCommands {
     body: WebuiUpdateUserModelProviderRequest,
   ) => Promise<unknown>;
   readonly deleteProvider: (providerId: string) => Promise<unknown>;
+  /**
+   * Each answers with its typed outcome.
+   *
+   * They used to answer `unknown`, which is why this editor cast the result to a
+   * record and picked fields out of it — putting "what counts as success" and
+   * "what does a refusal say" in the surface, once per operation, unchecked. The
+   * decision lives in `provider-outcome.ts` now and the editor branches on it.
+   */
   readonly discoverCandidate: (
     body: WebuiDiscoverUserModelsCandidateRequest,
-  ) => Promise<unknown>;
+  ) => Promise<WebuiProviderDiscoveryOutcome>;
   readonly saveCandidate: (
     body: WebuiSaveUserModelProviderCandidateRequest,
-  ) => Promise<unknown>;
+  ) => Promise<WebuiProviderSaveOutcome>;
   readonly testCandidate: (
     body: WebuiTestUserModelCandidateRequest,
-  ) => Promise<unknown>;
+  ) => Promise<WebuiProviderTestOutcome>;
 }
 
 export interface WebuiProviderEditorSnapshot {

@@ -22,7 +22,6 @@ import {
   WebuiRevisionConflictError,
   type WebuiEpochBinding,
 } from "../../src/client/conversation/request-freshness.js";
-import { createWebuiQueryStore } from "../../src/client/application/query-store.js";
 
 /** A promise whose settlement the test decides. */
 function deferred<T>() {
@@ -60,16 +59,42 @@ function fakeEpoch(token: string) {
 
 describe("the seam the primitive replaces", () => {
   it("lets a late answer for one key overwrite the field another key wrote", async () => {
-    // The reproduction, unchanged: one destination field, two keys, out-of-order
-    // settlement. The field ends on the *earlier* request's answer.
-    const store = createWebuiQueryStore<{ models?: { value?: string } }>({});
+    // The reproduction, written out rather than imported. It used to call
+    // `query-store.ts`, which is retired; keeping the store alive to hold a
+    // reproduction of the defect it embodied would be a transitional consumer
+    // holding a dead module open, so the shape is inlined here instead. It is
+    // twenty lines and it is the reason this module exists.
+    let version = 0;
+    const versions = new Map<string, number>();
+    let state: { models?: { value?: string } } = {};
+    const set = (next: { models?: { value?: string } }): void => {
+      state = next;
+    };
+    const readInto = async (
+      key: string,
+      fetch: () => Promise<string>,
+    ): Promise<void> => {
+      const mine = (versions.get(key) ?? 0) + 1;
+      versions.set(key, mine);
+      try {
+        const value = await fetch();
+        // The whole fence: "is my request still the newest for this key?"
+        if (versions.get(key) !== mine) return;
+        set({ models: { value } });
+      } catch {
+        // not the case under test
+      }
+    };
+
     const slowA = deferred<string>();
-    const first = store.readInto("models", "key-A", () => slowA.promise);
-    await store.readInto("models", "key-B", async () => "B");
-    expect(store.getSnapshot().models?.value).toBe("B");
+    const first = readInto("key-A", () => slowA.promise);
+    await readInto("key-B", async () => "B");
+    expect(state.models?.value).toBe("B");
     slowA.resolve("A");
     await first;
-    expect(store.getSnapshot().models?.value).toBe("A");
+    // The defect: A and B are different reads, but they share one destination
+    // field and one version counter, so the older answer lands last and wins.
+    expect(state.models?.value).toBe("A");
   });
 });
 

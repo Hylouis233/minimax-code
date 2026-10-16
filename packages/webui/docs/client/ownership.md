@@ -60,7 +60,7 @@ Four rules, each with a mechanism in `client/conversation/`:
 - **Incarnation and freshness.** A result may commit only to its own live owner incarnation, and an
   invalidation is repaired only by a result that covers its freshness revision — an earlier read
   cannot clear a later dirty revision. `client/application/identity-epochs.ts`,
-  `client/application/query-store.ts`, `client/conversation/request-freshness.ts`.
+  `client/conversation/request-freshness.ts`.
 - **Keyed resources vs selected slots.** Resource queries are stored under a key covering every
   response-affecting input (including opaque credential/configuration generations), so two answer
   fields cannot overwrite each other. A selected destination is a separate cell with its own

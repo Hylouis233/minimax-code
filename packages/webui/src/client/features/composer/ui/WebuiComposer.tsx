@@ -144,8 +144,8 @@ import { OutputError } from "../../../features/transcript/ui/OutputError.js";
 import { isTurnLive } from "../../turn/contracts/stream-state.js";
 import { evaluateComposerDismiss } from "../../../projection/common/outside-close.js";
 import {
-  buildWebuiModelSelectionRequest,
 } from "../../../features/sessions/projection/action-requests.js";
+import { buildWebuiModelSelectionRequest } from "../../../features/models/contracts/model-selection.js";
 import {
   findWebuiMentionRange,
   findWebuiSlashRange,

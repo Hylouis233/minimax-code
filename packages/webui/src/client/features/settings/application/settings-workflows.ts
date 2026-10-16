@@ -30,17 +30,15 @@
 // unit-tested against a scripted port.
 
 import type { WebuiIdentityEpochs } from "../../../application/identity-epochs.js";
-import {
-  createWebuiQueryStore,
-  idleWebuiQueryState,
-  webuiQueryMessage,
-  type WebuiQueryState,
-} from "../../../application/query-store.js";
+import { createWebuiSnapshotStore } from "../../../application/snapshot-store.js";
 import {
   createWebuiKeyedResource,
+  idleWebuiResourceState,
+  webuiResourceMessage,
   type WebuiKeyedResource,
   type WebuiResourceKey,
   type WebuiResourceLoadOutcome,
+  type WebuiResourceState,
 } from "../../../conversation/request-freshness.js";
 import { WebuiErrorCode } from "../../../../shared/envelope.js";
 import {
@@ -105,8 +103,8 @@ export function readWebuiPermissionMode(value: unknown): WebuiPermissionMode | u
 export interface WebuiSettingsWorkflowsState {
   /** Bumps after any successful settings write, so a reader can refresh. */
   readonly revision: number;
-  readonly instructions: WebuiQueryState<WebuiGlobalInstructionsView>;
-  readonly profile: WebuiQueryState<WebuiUserProfileView>;
+  readonly instructions: WebuiResourceState<WebuiGlobalInstructionsView>;
+  readonly profile: WebuiResourceState<WebuiUserProfileView>;
   /**
    * The memory *summary*: existence, size and timestamp, without the body.
    *
@@ -115,11 +113,11 @@ export interface WebuiSettingsWorkflowsState {
    * summary had settled, and would make the summary's freshness depend on a read
    * the panel only sometimes makes.
    */
-  readonly agentMemorySummary: WebuiQueryState<WebuiAgentMemoryView>;
+  readonly agentMemorySummary: WebuiResourceState<WebuiAgentMemoryView>;
   /** The memory *body*, read only when the editor is open. */
-  readonly agentMemoryContent: WebuiQueryState<WebuiAgentMemoryView>;
-  readonly memorySettings: WebuiQueryState<WebuiMemorySettingsView>;
-  readonly modelSource: WebuiQueryState<WebuiModelSource>;
+  readonly agentMemoryContent: WebuiResourceState<WebuiAgentMemoryView>;
+  readonly memorySettings: WebuiResourceState<WebuiMemorySettingsView>;
+  readonly modelSource: WebuiResourceState<WebuiModelSource>;
   /**
    * The runtime handshake fact (version, protocolVersion, dataDir).
    *
@@ -127,7 +125,7 @@ export interface WebuiSettingsWorkflowsState {
    * owner rather than invoked by a component: the shell and the surfaces it
    * feeds read `runtimeVersion.value` from the snapshot.
    */
-  readonly runtimeVersion: WebuiQueryState<WebuiVersionInfo>;
+  readonly runtimeVersion: WebuiResourceState<WebuiVersionInfo>;
   /**
    * The permission preference, read from the runtime.
    *
@@ -135,19 +133,19 @@ export interface WebuiSettingsWorkflowsState {
    * reads `permissionMode.value` / `.error` off the snapshot instead of holding
    * a copy: one owner, one answer.
    */
-  readonly permissionMode: WebuiQueryState<WebuiPermissionMode>;
+  readonly permissionMode: WebuiResourceState<WebuiPermissionMode>;
 }
 
 export const initialWebuiSettingsWorkflowsState: WebuiSettingsWorkflowsState = {
   revision: 0,
-  instructions: idleWebuiQueryState(),
-  profile: idleWebuiQueryState(),
-  agentMemorySummary: idleWebuiQueryState(),
-  agentMemoryContent: idleWebuiQueryState(),
-  memorySettings: idleWebuiQueryState(),
-  modelSource: idleWebuiQueryState(),
-  runtimeVersion: idleWebuiQueryState(),
-  permissionMode: idleWebuiQueryState(),
+  instructions: idleWebuiResourceState(),
+  profile: idleWebuiResourceState(),
+  agentMemorySummary: idleWebuiResourceState(),
+  agentMemoryContent: idleWebuiResourceState(),
+  memorySettings: idleWebuiResourceState(),
+  modelSource: idleWebuiResourceState(),
+  runtimeVersion: idleWebuiResourceState(),
+  permissionMode: idleWebuiResourceState(),
 };
 
 export interface WebuiSettingsWorkflows {
@@ -235,11 +233,24 @@ export function createWebuiSettingsWorkflows(deps: {
   const afterConfigurationWrite = (): void => {
     deps.identityEpochs?.advance("configuration");
   };
-  // The cached-read fence is not this module's: `query-store.ts` holds the one
-  // implementation of the snapshot, the listener set and the version guard, and
-  // every owner that caches transport answers reads through it.
-  const { getSnapshot, subscribe, set, withQuery, unavailable } =
-    createWebuiQueryStore(initialWebuiSettingsWorkflowsState);
+  // The snapshot is where this owner's answers are *published*, so a surface can
+  // render them. The fence belongs to the keyed resources below, which is why
+  // this store knows nothing about reads: a read that was superseded reports
+  // itself to its caller and never reaches a field.
+  const { getSnapshot, subscribe, set } =
+    createWebuiSnapshotStore(initialWebuiSettingsWorkflowsState);
+  const withResource = <Field extends keyof WebuiSettingsWorkflowsState, T>(
+    current: WebuiSettingsWorkflowsState,
+    field: Field,
+    value: WebuiResourceState<T>,
+  ): WebuiSettingsWorkflowsState =>
+    ({ ...current, [field]: value }) as WebuiSettingsWorkflowsState;
+  const unavailable = <Field extends keyof WebuiSettingsWorkflowsState>(
+    field: Field,
+    error: string,
+  ): void => {
+    set((current) => withResource(current, field, { status: "error", error }));
+  };
 
   /**
    * One cached read, keyed by identity.
@@ -260,7 +271,7 @@ export function createWebuiSettingsWorkflows(deps: {
   ): Promise<WebuiResourceLoadOutcome<T>> => {
     resource.subscribe(() => {
       const entry = resource.read(key);
-      set((current) => withQuery(current, field, entry ?? idleWebuiQueryState()));
+      set((current) => withResource(current, field, entry ?? idleWebuiResourceState()));
     });
     return resource.load(key, fetch).then((outcome) => {
       // A host that says it cannot answer at all is recorded as not supporting

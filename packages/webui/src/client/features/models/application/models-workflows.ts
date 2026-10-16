@@ -23,8 +23,10 @@
 import type { WebuiEpochKey, WebuiIdentityEpochs } from "../../../application/identity-epochs.js";
 import {
   createWebuiKeyedResource,
+  idleWebuiResourceState,
   type WebuiKeyedResource,
   type WebuiResourceKey,
+  type WebuiResourceState,
 } from "../../../conversation/request-freshness.js";
 import type { ModelsPort } from "../contracts/provider-port.js";
 import type {
@@ -37,11 +39,15 @@ import type {
   WebuiTestUserModelCandidateRequest,
   WebuiUpdateUserModelProviderRequest,
 } from "../../../../shared/contracts/models.js";
+import { createWebuiSnapshotStore } from "../../../application/snapshot-store.js";
 import {
-  createWebuiQueryStore,
-  idleWebuiQueryState,
-  type WebuiQueryState,
-} from "../../../application/query-store.js";
+  decodeWebuiProviderDiscoveryOutcome,
+  decodeWebuiProviderSaveOutcome,
+  decodeWebuiProviderTestOutcome,
+  type WebuiProviderDiscoveryOutcome,
+  type WebuiProviderSaveOutcome,
+  type WebuiProviderTestOutcome,
+} from "../contracts/provider-outcome.js";
 
 /** The provider half of the port. */
 export type WebuiModelsPortSlice = Pick<
@@ -66,16 +72,16 @@ export type WebuiModelsPortSlice = Pick<
 export interface WebuiModelsWorkflowsState {
   /** Bumps when the model list must be re-read (a provider or a selection changed). */
   readonly modelsRevision: number;
-  readonly models: WebuiQueryState<readonly WebuiModelEntry[]>;
-  readonly providers: WebuiQueryState<readonly WebuiModelProviderView[]>;
-  readonly presets: WebuiQueryState<readonly Record<string, unknown>[]>;
+  readonly models: WebuiResourceState<readonly WebuiModelEntry[]>;
+  readonly providers: WebuiResourceState<readonly WebuiModelProviderView[]>;
+  readonly presets: WebuiResourceState<readonly Record<string, unknown>[]>;
 }
 
 export const initialWebuiModelsWorkflowsState: WebuiModelsWorkflowsState = {
   modelsRevision: 0,
-  models: idleWebuiQueryState(),
-  providers: idleWebuiQueryState(),
-  presets: idleWebuiQueryState(),
+  models: idleWebuiResourceState(),
+  providers: idleWebuiResourceState(),
+  presets: idleWebuiResourceState(),
 };
 
 export interface WebuiModelsWorkflows {
@@ -121,15 +127,26 @@ export interface WebuiModelsWorkflows {
     readonly providerId: string;
     readonly modelId: string;
   }) => Promise<unknown>;
+  /**
+   * Each returns the operation's *typed outcome*, decoded once here.
+   *
+   * These used to answer with whatever the runtime's result type was, and every
+   * caller cast it to a record and picked fields out — which put the same
+   * "what counts as success, and what does a refusal say" decision in each
+   * surface that made one. `decodeWebuiProvider*Outcome` owns it now, and the
+   * three answers are distinguishable without a cast: success, a refusal with
+   * the runtime's own code, or a revision conflict, which is a stale base rather
+   * than a rejected request and wants the opposite follow-up.
+   */
   readonly discoverCandidate: (
     body: WebuiDiscoverUserModelsCandidateRequest,
-  ) => Promise<unknown>;
+  ) => Promise<WebuiProviderDiscoveryOutcome>;
   readonly saveCandidate: (
     body: WebuiSaveUserModelProviderCandidateRequest,
-  ) => Promise<unknown>;
+  ) => Promise<WebuiProviderSaveOutcome>;
   readonly testCandidate: (
     body: WebuiTestUserModelCandidateRequest,
-  ) => Promise<unknown>;
+  ) => Promise<WebuiProviderTestOutcome>;
   readonly revealApiKey: (providerId: string) => Promise<string>;
   readonly loadPresets: () => Promise<void>;
   readonly upsertApiKey: (body: {
@@ -278,9 +295,9 @@ export function createWebuiModelsWorkflows(deps: {
   const project = (): void => {
     set((current) => ({
       ...current,
-      models: catalogue.read(shownCatalogueKey) ?? idleWebuiQueryState(),
-      providers: providerList.read(providerKey()) ?? idleWebuiQueryState(),
-      presets: presetList.read(PRESETS_KEY) ?? idleWebuiQueryState(),
+      models: catalogue.read(shownCatalogueKey) ?? idleWebuiResourceState(),
+      providers: providerList.read(providerKey()) ?? idleWebuiResourceState(),
+      presets: presetList.read(PRESETS_KEY) ?? idleWebuiResourceState(),
     }));
   };
   catalogue.subscribe(project);
@@ -406,21 +423,33 @@ export function createWebuiModelsWorkflows(deps: {
     return port.testUserModel(body);
   };
 
-  const discoverCandidate = async (body: WebuiDiscoverUserModelsCandidateRequest): Promise<unknown> => {
+  const discoverCandidate = async (
+    body: WebuiDiscoverUserModelsCandidateRequest,
+  ): Promise<WebuiProviderDiscoveryOutcome> => {
     if (!port.discoverUserModelsCandidate) throw new Error("当前运行时不支持模型发现。");
-    return port.discoverUserModelsCandidate(body);
+    return decodeWebuiProviderDiscoveryOutcome(await port.discoverUserModelsCandidate(body));
   };
 
-  const saveCandidate = async (body: WebuiSaveUserModelProviderCandidateRequest): Promise<unknown> => {
+  const saveCandidate = async (
+    body: WebuiSaveUserModelProviderCandidateRequest,
+  ): Promise<WebuiProviderSaveOutcome> => {
     if (!port.saveUserModelProviderCandidate) throw new Error("当前运行时不支持保存提供商。");
-    const result = await port.saveUserModelProviderCandidate(body);
-    await afterProviderMutation();
+    const result = decodeWebuiProviderSaveOutcome(
+      await port.saveUserModelProviderCandidate(body),
+    );
+    // Only a save that actually committed changes the catalogue. Invalidation is
+    // not "the request was made": a refusal or a conflict leaves the provider
+    // list exactly as it was, and refreshing it would make a failed save look
+    // like it had taken effect.
+    if (result.outcome === "success") await afterProviderMutation();
     return result;
   };
 
-  const testCandidate = async (body: WebuiTestUserModelCandidateRequest): Promise<unknown> => {
+  const testCandidate = async (
+    body: WebuiTestUserModelCandidateRequest,
+  ): Promise<WebuiProviderTestOutcome> => {
     if (!port.testUserModelCandidate) throw new Error("当前运行时不支持模型测试。");
-    return port.testUserModelCandidate(body);
+    return decodeWebuiProviderTestOutcome(await port.testUserModelCandidate(body));
   };
 
   const revealApiKey = async (providerId: string): Promise<string> => {

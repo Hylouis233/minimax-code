@@ -28,6 +28,7 @@ import type {
 import { formatWebuiError } from "../../../contracts/value-readers.js";
 import { projectProviderHeaders } from "../projection/usage-settings.js";
 import type { ProviderHeaderDraft } from "../contracts/provider-editor.js";
+import type { WebuiProviderModelRef } from "../contracts/provider-outcome.js";
 import type {
   WebuiProviderEditor,
   WebuiProviderEditorCommands,
@@ -274,24 +275,13 @@ export function createWebuiProviderEditor(
       const draftAtStart = draftGeneration;
       publish();
       try {
+        // A typed outcome, decoded once by the Models owner. What counts as
+        // success and what a refusal says are no longer decided here by picking
+        // fields out of a record.
         const result = await commands.testCandidate({ candidate: built.value, modelId });
         if (generation !== operationGeneration || disposed) return;
-        const record =
-          result !== null && typeof result === "object"
-            ? (result as Record<string, unknown>)
-            : {};
-        // The producer answers `{ ok, status }` for this operation; a refusal
-        // carries the reason on its status.
-        if (record.ok !== true) {
-          const status =
-            record.status !== null && typeof record.status === "object"
-              ? (record.status as Record<string, unknown>)
-              : {};
-          const message =
-            typeof status.lastErrorMessage === "string" && status.lastErrorMessage
-              ? status.lastErrorMessage
-              : "连接失败";
-          settle(generation, message);
+        if (result.outcome !== "success") {
+          settle(generation, result.message);
           return;
         }
         // Only the draft this test described may be marked tested.
@@ -319,16 +309,14 @@ export function createWebuiProviderEditor(
           baseUrl,
         });
         if (generation !== operationGeneration || disposed) return;
-        const ids = Array.isArray(result)
-          ? result
-              .map((entry) =>
-                entry !== null && typeof entry === "object"
-                  ? (entry as Record<string, unknown>).modelId
-                  : undefined,
-              )
-              .filter((modelId): modelId is string => typeof modelId === "string")
-          : [];
+        if (result.outcome !== "success") {
+          settle(generation, result.message);
+          return;
+        }
+        const ids = result.models.map((entry: WebuiProviderModelRef) => entry.modelId);
         if (ids.length) draft = { ...draft, modelIdText: ids.join("\n") };
+        // A discovery lists what the endpoint offers; it does not prove the
+        // endpoint works, so the draft is untested again.
         tested = false;
         settle(generation);
       } catch (reason) {
@@ -355,12 +343,8 @@ export function createWebuiProviderEditor(
           skipConnectionTest,
         });
         if (generation !== operationGeneration || disposed) return;
-        const record =
-          result !== null && typeof result === "object"
-            ? (result as Record<string, unknown>)
-            : {};
-        if (record.success !== true) {
-          settle(generation, "保存失败");
+        if (result.outcome !== "success") {
+          settle(generation, result.message);
           return;
         }
         // The form view ends on a successful save; the Models workflow owns the
