@@ -1,8 +1,9 @@
 /**
- * Byte-identity proof for the phase 3 rewiring.
+ * Byte-identity proof for the owner-policy rewiring.
  *
- * Phase 3 of docs/webui/webui-client-identity-plan.md replaced ~20 owner-derived string
- * comparisons with reads of a resolved policy cell. The guarantee is that, for every
+ * The owner-derived string comparisons were replaced with reads of a resolved policy cell, so the
+ * `webui` row is a declared identity rather than a borrowed one (see
+ * `packages/webui/docs/runtime.md`). The guarantee is that, for every
  * owner declaration in use today, the observable result is unchanged.
  *
  * This file is what makes that claim checkable rather than aspirational: every cell is

@@ -98,7 +98,7 @@ describe("plan-mode projection", () => {
     expect(isWebuiPlanReviewRequest(planReviewRequest())).toBe(true);
     expect(isWebuiPlanReviewRequest({ ...planReviewRequest(), mode: "questionnaire" })).toBe(false);
     // A plan request without a written file is the entry confirmation, not the
-    // decision — the same distinction the desktop draws.
+    // decision.
     expect(isWebuiPlanReviewRequest({ ...planReviewRequest(), modePayload: undefined })).toBe(false);
     expect(isWebuiPlanEnterRequest?.({ ...planReviewRequest(), modePayload: undefined })).toBe(true);
   });
@@ -357,7 +357,7 @@ describe("interaction panel — plan routing", () => {
     expect(html).toContain('data-testid="plan-surface"');
     expect(html).toContain('data-testid="plan-review-decision"');
     // The plan FILE is a message in the transcript, not part of this panel —
-    // the desktop anchors it to the turn that wrote the plan.
+    // it is anchored to the turn that wrote the plan.
     expect(html).not.toContain('data-testid="plan-delivery-card"');
     // The generic step picker must not render for a plan request.
     expect(html).not.toContain('data-testid="questionnaire-composer"');

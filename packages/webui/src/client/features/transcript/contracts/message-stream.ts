@@ -146,7 +146,7 @@ export function readMessageUsage(
 }
 
 /** Rebuild one historical record as one live/resync message without losing
- *  the Desktop ordered parts or the live message-level fields. */
+ *  the ordered parts or the live message-level fields. */
 export function projectWebuiMessageToStreamMessage(
   message: WebuiClientMessage,
 ): WebuiStreamMessage {

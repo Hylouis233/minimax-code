@@ -16,8 +16,8 @@
 // The row decides wiring and turn behaviour in one place, so the WebUI states
 // what it is instead of copying the terminal client's answers and inheriting
 // its drift. It also no longer sets `capabilityProfile: "cli"`, which the
-// `webui` row accounts for directly. The decision record is
-// `docs/webui/webui-client-identity-plan.md`.
+// `webui` row accounts for directly. The row and its cells are documented in
+// `packages/webui/docs/runtime/boot.md`.
 //
 // The remaining fields mirror the documented call sites:
 //
@@ -25,7 +25,7 @@
 //     and capability projection (lines 85–93).
 //   * `packages/tui/src/runtime/lifecycle.ts:456-460` — the conditional
 //     `startupExecutionPolicy: 'quarantined'`. The CLI applies it per
-//     surface; ADR 0002 and assembly step 6 of `docs/webui-v1-scope.md`
+//     surface; ADR 0002 and assembly step 6 of `packages/webui/docs/runtime/boot.md`
 //     require the WebUI to set it unconditionally.
 //
 // The factory is injectable so the assembly can be unit-tested without
@@ -162,7 +162,7 @@ export type WebuiRuntimeHostFactory = (
 export interface CreateWebuiRuntimeHostOptions {
   /**
    * The CLI data directory (`~/.minimax` by default), shared per ADR 0006 and
-   * assembly step 1 of `docs/webui-v1-scope.md`. It carries the login state,
+   * assembly step 1 of `packages/webui/docs/runtime/boot.md`. It carries the login state,
    * the provider configuration and the session history the WebUI shows, so a
    * run that needs a clean slate has to opt into `MINIMAX_DATA_DIR` instead.
    */
@@ -201,7 +201,7 @@ export interface WebuiRuntimeHost {
  * Boots one process-local runtime host with the assembly step 6 owner
  * combination and the unconditionally quarantined cold-start policy.
  * Returns a `WebuiHarnessPort` the `WebuiService` can tear down in
- * the order step 13 of `docs/webui-v1-scope.md` requires.
+ * the close order `packages/webui/docs/runtime/boot.md` states.
  */
 export async function createWebuiRuntimeHost(
   options: CreateWebuiRuntimeHostOptions,
@@ -282,7 +282,7 @@ export async function createWebuiRuntimeHost(
     // the WebUI is the surface that answers the questionnaire, permission
     // prompt and elicitation, so all three are unconditionally true here.
     // Adding a `webui` value to `surface` is out of scope per ADR 0004 and
-    // assembly step 4 of `docs/webui-v1-scope.md`.
+    // assembly step 4 of `packages/webui/docs/runtime/boot.md`.
     capabilities: {
       cliEmbedded: true,
       questionnaireReply: true,

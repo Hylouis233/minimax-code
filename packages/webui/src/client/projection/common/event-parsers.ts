@@ -32,7 +32,7 @@ import type { WebuiRuntimeEvent } from "../../../shared/contracts/stream.js";
  * ONLY: a general "dig into any nested payload" rule would let an unrelated
  * event that happens to carry a goal-shaped field through the session
  * boundary. The fix stays in this consumer on purpose: the wire contract is
- * shared with the TUI and Desktop, so the runtime is the better place to add a
+ * shared with the TUI, so the runtime is the better place to add a
  * top-level id, but that is a contract change every frontend has to agree to.
  */
 export function eventSessionId(event: WebuiRuntimeEvent): string | undefined {

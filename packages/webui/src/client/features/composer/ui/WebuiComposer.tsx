@@ -172,7 +172,7 @@ const WEBUI_SLASH_FALLBACK_SECTIONED: SlashCommandEntry[] = await (async () => {
   return sectionWebuiSlashPalette(WEBUI_BUILTIN_COMMANDS, resolved.skills);
 })();
 
-// Desktop keeps the viewport pinned through the short hand-off window where
+// The viewport stays pinned through the short hand-off window where
 // the live turn is replaced by the refreshed historical transcript.
 
 
@@ -783,7 +783,7 @@ export function WebuiComposer({
         : Math.min(current, commandSuggestions.length - 1),
     );
   }, [commandRange?.query, commandSuggestions.length]);
-  // Mirror the desktop's TipTap suggestion plugin behaviour: while the slash
+  // TipTap suggestion-plugin behaviour: while the slash
   // popover is open, a pointerdown outside the composer region cancels the
   // slash invocation. The Escape handler above already does the same thing
   // for the keyboard. Without this, the popover stays pinned above the
@@ -1089,8 +1089,8 @@ export function WebuiComposer({
   };
   // A request that sets `replaceComposer` owns the composer's slot: the
   // runtime sets it on every ordinary questionnaire and on the plan review
-  // (only feature-enable requests leave it false), and the desktop draws the
-  // interaction card exactly where the input would be. The input therefore
+  // (only feature-enable requests leave it false), and the interaction card
+  // is drawn exactly where the input would be. The input therefore
   // yields its place rather than sitting under the card, and comes back the
   // moment the request is answered — which is the whole point of the flag.
   const composerReplaced =

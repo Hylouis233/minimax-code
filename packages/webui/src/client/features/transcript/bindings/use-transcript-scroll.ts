@@ -14,7 +14,7 @@
 // the bottom re-arms it. A non-live session used to have a second follower that
 // released on any wheel or touchmove wherever the viewport sat and then never
 // re-armed, so content arriving after such a gesture stayed below the fold — and
-// a wheel at the bottom, which Desktop records as `wheel-intent:ignored-boundary`,
+// a wheel at the bottom, which is recorded as `wheel-intent:ignored-boundary`,
 // was enough to trigger it.
 //
 // Pinning cannot be a one-off either: after the first paint the content keeps

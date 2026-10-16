@@ -1,26 +1,25 @@
-// ConversationUsageBanner — WebUI transcription of `function p()` from
-// `mine-transcript/58686.pretty.js` (lines 26984–27108). Shown when the cloud
+// ConversationUsageBanner — the cloud-quota banner. Shown when the cloud
 // quota signals an `insufficient_credit` / `five_hour` / `weekly` /
 // `video` notice; data is passed through props so the WebUI shell can decide
 // how to wire it to the runtime.
 //
 // The brief says: "若依赖云端数据，做成纯展示组件、数据由 props 传入。"
 // That matches `notice.kind`, `notice.messageKey`, `notice.resetAtMs`,
-// `notice.actions` (the action IDs the desktop translates to
+// `notice.actions` (the action IDs that map to
 // `buy_credits` / `subscribe_plan` / `upgrade_plan`) and `notice.dismissable`
-// (driven by `f.Rm(t)` — Desktop calls `Rm` the "should I render the close
-// button" decision; here we expose `notice.dismissable` as a simple boolean).
+// (the "should I render the close
+// button" decision, exposed here as a simple boolean).
 //
 // The CTA buttons keep their verbatim labels:
 //   "buy_credits"      → chat_button_buy_credits
 //   "subscribe_plan"   → chat_button_subscribe_plan
 //   "upgrade_plan"     → chat_button_upgrade_plan
-// The container class names come straight from line 27041–27043 (`h` toggles
+// The container class names come from `h`, which toggles
 // between the inline `relative mb-2 flex min-h-16 flex-col gap-3 …` and the
-// compact `mb-3 flex min-h-12 flex-wrap items-center …` variant).
+// compact `mb-3 flex min-h-12 flex-wrap items-center …` variant.
 //
-// The dismiss button testid is `conversation-usage-dismiss` (line 27066 /
-// 27101); the brief also names `conversation-usage-banner-dismiss`. We emit
+// The dismiss button testid is `conversation-usage-dismiss`; the brief also
+// names `conversation-usage-banner-dismiss`. We emit
 // both testids on the same node so Playwright selectors written against either
 // form land on the same element.
 

@@ -52,8 +52,8 @@ export function toolCallName(tool: Record<string, unknown>): string {
 }
 
 /** User-facing label for the tool row. Maps the common English tool names
- *  to the Chinese copy Desktop uses; for anything else it falls back to a
- *  normalised display of the raw name. */
+ *  to the Chinese copy the transcript shows; for anything else it falls back
+ *  to a normalised display of the raw name. */
 export function toolCallLabel(tool: Record<string, unknown>): string {
   const name = toolCallName(tool);
   const normalized = name.toLowerCase();
@@ -104,7 +104,7 @@ export function toolCallInputText(
   }
 }
 
-/** Read-file calls expose their resource path in the Desktop row summary. */
+/** Read-file calls expose their resource path in the tool row summary. */
 export function toolCallResourcePath(tool: Record<string, unknown>): string | undefined {
   const name = toolCallName(tool).toLowerCase();
   if (name !== "read" && name !== "read_file") return undefined;
@@ -129,7 +129,7 @@ export type WebuiToolCallStatus = "pending" | "running" | "completed" | "error" 
 
 export type WebuiDesktopToolIcon = "command" | "file" | "code" | "search" | "web" | "browser" | "logo" | "memory" | "image" | "video" | "music" | "combine" | "task" | "bot" | "goal" | "tool" | "thinking";
 
-/** Icon identifiers transcribed from Desktop 3.0.73's tool presentation registry. */
+/** Icon category identifiers for the tool rows. */
 export const WEBUI_DESKTOP_TOOL_ICON_GROUPS: Readonly<Record<WebuiDesktopToolIcon, readonly string[]>> = {
   command: ["bash", "python", "python3", "shell", "command", "terminal"],
   file: ["read", "read_file", "ls", "find", "glob", "read_mcp_resource", "list_mcp_resources", "list_mcp_resource_templates", "deliver_asset", "archon.asset.deliver"],
@@ -150,8 +150,8 @@ export const WEBUI_DESKTOP_TOOL_ICON_GROUPS: Readonly<Record<WebuiDesktopToolIco
   thinking: [],
 };
 
-/** Chinese `tool_call.display` values from Desktop 3.0.73's zh locale, keyed by
- * the tool ids/aliases exposed by its renderer registry. */
+/** Chinese `tool_call.display` values, keyed by
+ * the tool ids/aliases the runtime exposes. */
 export const WEBUI_DESKTOP_TOOL_DISPLAY_LABELS: Readonly<Record<string, string>> = {
   bash: "终端", terminal: "终端", command: "终端", shell: "终端",
   python: "Python", python3: "Python", read: "读取文件", read_file: "读取文件",
@@ -200,12 +200,12 @@ export function toolCallIconCategory(tool: Record<string, unknown>): WebuiDeskto
   return name.startsWith("mcp:") || name.includes("__mcp__") ? "logo" : "tool";
 }
 
-/** Keep Desktop's lifecycle vocabulary while accepting runtime spellings. */
+/** Normalize the lifecycle vocabulary while accepting runtime spellings. */
 export function toolCallStatus(tool: Record<string, unknown>): WebuiToolCallStatus {
   const raw = tool.status ?? tool.tool_call_status ?? tool.toolCallStatus;
   if (typeof raw === "number") {
-    // Desktop's formatter maps Start/Finished/Failed explicitly and falls
-    // back to pending for Preparing/Prepared and other non-terminal stages.
+    // 1/2/3 map to running/completed/error explicitly; Preparing, Prepared and
+    // other non-terminal stages fall back to pending.
     switch (raw) {
       case 1: return "running";
       case 2: return "completed";
@@ -242,8 +242,8 @@ const WEBUI_EDIT_TOOL_LABELS: ReadonlySet<string> = new Set([
 ]);
 
 /** True when the tool is one of the file-mutating edit/write tools. Used to
- *  decide whether the renderer should show the desktop-style diff stat
- *  card or the simple tool-row fallback. */
+ *  decide whether the renderer should show the diff stat card or the simple
+ *  tool-row fallback. */
 export function isWebuiEditTool(tool: Record<string, unknown>): boolean {
   return WEBUI_EDIT_TOOL_LABELS.has(toolCallLabel(tool));
 }

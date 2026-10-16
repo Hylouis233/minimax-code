@@ -1,8 +1,8 @@
 // Unit tests for the Phase-3 ActivityIndicator transcription.
 //
 // We render through `renderToStaticMarkup` (the project's SSR test convention,
-// see `minimax-code-webui` SKILL.md) and assert against Desktop's exact
-// `data-testid` values, so any future Playwright parity probe can reuse the
+// see `minimax-code-webui` SKILL.md) and assert against the exact
+// `data-testid` values, so any future Playwright probe can reuse the
 // same selectors.
 //
 // `lottie-web` is mocked so the test runs under the vitest `node`

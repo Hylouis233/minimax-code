@@ -1,26 +1,20 @@
-// MessageAttachments — WebUI transcription of `function e2()` from
-// `mine-transcript/58686.pretty.js` (lines 1550–1613) plus the image render
-// helper it composes (`function e1()`, lines 1495–1549) and the file-card row
-// it composes (the inline `rounded-xl border-[0.5px] bg-bg_default_secondary
-// p-2 w-60` block at lines 1588–1609).
+// MessageAttachments — the attachments rendered under an assistant message:
+// image tiles plus a file-card row, which uses the inline
+// `rounded-xl border-[0.5px] bg-bg_default_secondary p-2 w-60` block.
 //
-// In the desktop this is called from `tl` (line 2043) which is what the
-// transcript wires under each assistant message. The Desktop source maps
-// attachments into image / file buckets (line 1552–1553) and renders each
-// bucket separately. The single image case (`a.length === 1`) is intentionally
-// full-width and lacks the wrapping `flex flex-wrap gap-2` container (line
-// 1562).
+// The transcript wires this under each assistant message. Attachments are
+// bucketed into images and files, and each bucket renders separately. The
+// single-image case is intentionally full-width and lacks the wrapping
+// `flex flex-wrap gap-2` container.
 //
-// `onPreview` is invoked identically to Desktop — `r?.(e)` on click, on
-// Enter / Space key. The file-card preview click is wired too.
+// `onPreview` fires on click and on Enter / Space key. The file-card preview
+// click is wired too.
 //
-// The actual image bytes come from `ey(t, workspaceDir)` in Desktop (a hook
-// that resolves `preview_url || file_path` to a renderer URL via the desktop
-// runtime). On the WebUI we just pass `src` through, leaving the integrator
-// responsible for hydrating `preview_url` on the message before it reaches the
-// component. When `src` is missing the component falls back to the
-// "broken-image placeholder" from Desktop's `e1` (lines 1511–1525) so callers
-// never see a half-rendered tile.
+// Image bytes arrive as `src`: the component passes the URL through, leaving
+// the integrator responsible for hydrating `preview_url` on the message before
+// it reaches the component. `preview_url ?? file_path` is what resolves to a
+// renderer URL. When `src` is missing the component falls back to the
+// "broken-image placeholder" so callers never see a half-rendered tile.
 
 import { useEffect, useState, type KeyboardEvent, type MouseEvent } from "react";
 

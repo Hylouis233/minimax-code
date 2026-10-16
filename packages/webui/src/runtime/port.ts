@@ -236,7 +236,7 @@ export interface WebuiHarnessPort {
   }): Promise<readonly WebuiModelEntry[]>;
   /**
    * Returns the slash-palette skill catalogue for the given agent. Mirrors
-   * the desktop's `listSkills(agentName, ...)` call shape so the WebUI can
+   * the `listSkills(agentName, ...)` call shape so the WebUI can
    * populate the popover from the live registry instead of a fixture set.
    * `agentName` is optional: the harness may default to the active agent
    * when the WebUI has no session yet (e.g. the home composer).

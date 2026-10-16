@@ -46,7 +46,7 @@
   @media (max-width: 720px) { .webui-provider-form-provider-grid { grid-template-columns: minmax(0, 1fr); } .webui-provider-form-actions { flex-wrap: wrap; } }
   /* --------------------------------------------------------------- surfaces */
 
-  /* Match the desktop navigation rail while keeping the main surface roomy. */
+  /* Match the navigation rail while keeping the main surface roomy. */
   .webui-rail {
     display: flex;
     flex-direction: column;

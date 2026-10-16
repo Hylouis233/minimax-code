@@ -1,13 +1,11 @@
-// TranscriptSkeletons — WebUI transcription of `function c()` and `function u()`
-// from `mine-transcript/58686.pretty.js` (lines 23310 and 23342). Used as the
-// first-paint placeholder when the transcript viewport is still loading
-// history; the desktop shows `chat-skeleton` for ongoing sessions and
+// TranscriptSkeletons — the first-paint placeholder shown when the transcript
+// viewport is still loading history: `chat-skeleton` for ongoing sessions and
 // `greeting-skeleton` for fresh / no-history cases.
 //
-// The line widths are lifted verbatim from Desktop's `i` and `l` arrays
-// (lines 23297–23298) and the gradient mask is copied from Desktop's `s`
-// constant (lines 23299–23302) into `transcript-widgets.css`'s
-// `@keyframes transcript-shimmer` + `.animate-shimmer` rule.
+// The line widths (8 primary + 4 secondary) are fixed, and the gradient mask
+// lives in `transcript-widgets.css`'s
+// `@keyframes transcript-shimmer` + `.animate-shimmer` rule. Both are pinned
+// by `transcript-skeletons.test.tsx`.
 //
 // The 736px content column below MUST track `.webui-session-layout
 // .message-list`'s `max-width` in `shell.css`. These skeletons stand in for
@@ -15,7 +13,7 @@
 // transcript jump sideways when the real content lands.
 // `webui-w0-css-structure.test.ts` asserts the two stay in lockstep.
 //
-// `34890.O` from Desktop is just the shimmer background colour rectangle —
+// The shimmer is just a background colour rectangle —
 // `--shimmer-duration` is set by the CSS file at the body level so the
 // animation interval stays in lockstep with the rest of the WebUI shell.
 

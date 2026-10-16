@@ -4,7 +4,7 @@
 
   /* --------------------------------------------------------------- rail rows */
 
-  /* Navigation rows. The row's geometry is the desktop's own utility
+  /* Navigation rows. The row's geometry is a utility
    * composition (`h-8`, `rounded-lg`, `gap-2`, `pl-2 pr-2.5`); this rule carries
    * the selected state, which those utilities cannot express. */
   .webui-nav-item {
@@ -195,7 +195,7 @@
     text-align: center;
   }
 
-  /* The desktop home rail is project-first. A project row uses the same quiet
+  /* The home rail is project-first. A project row uses the same quiet
    * navigation treatment as the fixed rows, but keeps the folder glyph and
    * label aligned as one navigation target. */
   .webui-project-row,
@@ -372,7 +372,7 @@
     padding-right: 100px;
   }
 
-  /* Subagent rows retain the desktop's nested-session geometry: a compact
+  /* Subagent rows retain the nested-session geometry: a compact
    * 30px row, 2px spacing between siblings, and a 34px leading indent that
    * makes the parent/child relationship visible without changing the data
    * projection. */

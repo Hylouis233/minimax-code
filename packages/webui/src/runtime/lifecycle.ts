@@ -5,8 +5,8 @@
 // Exactly one module wraps the host's `close()`. The assembly registers the
 // bound host close and installs this lifecycle's `close` in its place, so the
 // harness host is torn down once, followed by the mcode-tools broker and the
-// externally supplied browser provider, in the order step 13 of
-// `docs/webui-v1-scope.md` requires. The same wrapper is reused for the
+// externally supplied browser provider, in the close order
+// `packages/webui/docs/runtime/boot.md` states. The same wrapper is reused for the
 // post-host startup failure, so a broker socket or a Browser profile never
 // survives a WebUI start that failed after the host was built.
 //

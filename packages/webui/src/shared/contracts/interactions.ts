@@ -67,7 +67,7 @@ export interface WebuiQuestionnaireRequest {
   /**
    * The message that raised this request. The plan card is rendered as a
    * message in the transcript, so it needs the id of the turn message to
-   * anchor itself to — the desktop attaches it as that message's footer.
+   * anchor itself to — the transcript attaches it as that message's footer.
    */
   readonly tool?: {
     readonly messageId: string;

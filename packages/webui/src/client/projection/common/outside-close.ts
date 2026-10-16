@@ -19,8 +19,7 @@
  *                    SessionComposer's permission popover, workspace picker
  *                    and slash-popover.
  *   `mousedown`    — the legacy mouse-only event. Used by ContextMenu;
- *                    kept verbatim because the desktop's context menu
- *                    listener is also `mousedown`.
+ *                    kept because ContextMenu's own listener is `mousedown`.
  *   `keydown`      — keyboard event. Used by UserMenu and ContextMenu
  *                    for the Escape key, and by the composer for the
  *                    permission popover; the `pointerdown`-only surfaces

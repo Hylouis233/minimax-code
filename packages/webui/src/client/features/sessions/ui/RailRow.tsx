@@ -1,4 +1,4 @@
-// RailRow — the desktop-faithful navigation row used in the rail.
+// RailRow — the navigation row used in the rail.
 //
 // W3 tier 2 lift: this component was moved verbatim out of the module that used
 // to hold the shell — `app.tsx`, since replaced by `WebuiClientFoundationApp.tsx`.

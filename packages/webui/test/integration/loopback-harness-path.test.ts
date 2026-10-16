@@ -1,13 +1,11 @@
-// The loopback → server → harness-port evidence the runtime layer plan asks
-// for, as one reproducible check instead of a one-off run recorded in an
-// issue comment (plan §6 acceptance level 4; §7.7 stage 6 "all required
-// verification done").
+// The loopback → server → harness-port evidence, as one reproducible check
+// instead of a one-off run recorded in an issue comment: this is evidence
+// level 3 in packages/webui/docs/verification/gates.md.
 //
-// Plan §6 asks for a real run covering authentication failure, shutdown and
+// That level asks for a real run covering authentication failure, shutdown and
 // reconnect, and says explicitly that fixtures do not substitute for it. What
-// this file does and does not establish is stated at the bottom, and the same
-// statement is carried in the plan; read it before treating a green run as
-// proof of the live-agent path.
+// this file does and does not establish is stated at the bottom; read it before
+// treating a green run as proof of the live-agent path.
 //
 // What is real here, end to end and in one process:
 //   * a real `WebuiService` binds a real loopback TCP port;
@@ -40,7 +38,7 @@ import type {
   WebuiRuntimeEvent,
   WebuiWatchEventsResult,
 } from "../../src/shared/contracts/stream.js";
-import type { WebuiSessionListResult } from "../../src/shared/contracts/session.js";
+import type { WebuiSessionPage } from "../../src/shared/contracts/session.js";
 
 interface TestPort extends WebuiHarnessPort {
   /** Every harness method the run actually reached, in call order. */
@@ -65,7 +63,7 @@ function scriptedPort(): TestPort {
   const port = {
     calls,
     version: () => ({ version: "loopback-fixture", protocolVersion: 1 }),
-    listSessions: async (): Promise<WebuiSessionListResult> => {
+    listSessions: async (): Promise<WebuiSessionPage> => {
       calls.push("listSessions");
       return {
         sessions: [
@@ -78,7 +76,7 @@ function scriptedPort(): TestPort {
             updatedAt: 1,
           },
         ],
-      } as unknown as WebuiSessionListResult;
+      } as unknown as WebuiSessionPage;
     },
     watchEvents: (): AsyncIterable<WebuiRuntimeEvent> => {
       calls.push("watchEvents");

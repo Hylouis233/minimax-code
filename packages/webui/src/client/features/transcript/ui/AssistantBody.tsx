@@ -239,7 +239,7 @@ export function WebuiAssistantBody({
     ),
   );
   const primaryAnswerPart = processTextParts[processTextParts.length - 1];
-  // Desktop builds one activity disclosure for each run between assistant
+  // One activity disclosure is built for each run between assistant
   // replies. Keep each part's source message so rows can be returned to their
   // original segment, but group over the flattened sequence so a tool round
   // split across messageIds does not create a second disclosure.
@@ -343,7 +343,7 @@ export function WebuiAssistantBody({
           <WebuiMarkdown source={answer} onOpenFile={onOpenFile} workspaceDir={workspaceDir} />
         </div>
       ))}
-      {/* Desktop places the diff card after the assistant body so the
+      {/* The diff card sits after the assistant body so the
        * edited-files summary sits at the end of the message. */}
       <WebuiDiffCard
         sessionId={sessionId}

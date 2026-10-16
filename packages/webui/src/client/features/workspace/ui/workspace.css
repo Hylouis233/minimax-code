@@ -2,10 +2,10 @@
 @layer components {
 
   /* No `min-width` here: the shared `.webui-workspace-menu` rule already sets
-   * 220px, and that is the width the desktop panel actually rendered before the
+   * 220px, and that is the width the panel actually rendered before the
    * split. This rule's 240px never won the cascade in the pre-split sheet — the
    * engine reports the pre-split panel at min-width: 220px and width: 220px —
-   * but after the split it started winning, which widened the desktop panel by
+   * but after the split it started winning, which widened the panel by
    * 20px. T20's criterion is the computed result, so the dead declaration is
    * removed rather than left to change behaviour. */
   .webui-workspace-menu--desktop {
@@ -118,7 +118,7 @@
    * `.webui-button-primary` (8/16) and `.webui-button-secondary` (6/12): those
    * two differ by 4px of vertical padding, which would render this side-by-side
    * pair at two different heights. The colours, the hover ramp and the
-   * `:focus-visible` ring are lifted from those buttons unchanged.
+   * `:focus-visible` ring are kept from those buttons unchanged.
    *
    * The rule above the pair separates it from the directory list, mirroring
    * the separator the quick menu uses between `最近` and the commands. */
@@ -176,7 +176,7 @@
     outline-offset: 2px;
   }
 
-  /* Keep the existing desktop surfaces fluid as the browser window narrows.
+  /* Keep the existing surfaces fluid as the browser window narrows.
    * These rules change only available space and panel placement; typography,
    * colors, radii and component styling continue to come from the same tokens. */
   @media (max-width: 1080px) {

@@ -30,7 +30,7 @@ export interface ProjectedMembership {
   readonly freeCredits?: string;
 }
 
-/** Reads the fields the desktop popover derives `hasTokenPlan`/credits from. */
+/** Reads the fields the usage panel derives `hasTokenPlan`/credits from. */
 export function projectMembership(body: Record<string, unknown>): ProjectedMembership {
   const data = asRecord(body.data);
   const hasTokenPlan = readBoolean(body, data, "has_token_plan");
@@ -145,8 +145,8 @@ export function isVideoRow(row: Record<string, unknown>): boolean {
 /**
  * Normalizes one percentage window (5-hour / weekly) from the
  * `remains_percent` response: `current_interval_used_percent` is the USED
- * percent as a `"96%"` string (probe-verified 2026-09-22 — the same response
- * the desktop popover renders as 已用 96%). `resetAtMs` comes from
+ * percent as a `"96%"` string (probe-verified 2026-09-22 — the panel renders
+ * it as 已用 96%). `resetAtMs` comes from
  * `end_time` / `weekly_end_time`, which the API sends in seconds below 1e12
  * or milliseconds above; normalize to ms.
  */

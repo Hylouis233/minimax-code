@@ -76,11 +76,10 @@ function MenuDivider(): ReactElement {
 }
 
 /* ------------------------------------------------------------------ *
- * Daily check-in card — DOM and copy ported from the desktop's
- * `signin-card` (archon page chunk); icons are the desktop's own svgs.
+ * Daily check-in card — the card's DOM, classes and copy, with inline svgs.
  * ------------------------------------------------------------------ */
 
-/** Info circle beside the card title (desktop `L.T3k`, size 14). */
+/** Info circle beside the card title, size 14. */
 
 export function UserMenu({
   collapsed,

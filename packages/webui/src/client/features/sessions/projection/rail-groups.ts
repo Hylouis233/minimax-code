@@ -1,7 +1,7 @@
 // The rail's grouping, labelling and search rules (T07's responsibility cut).
 //
 // These are the decisions about *which* sessions and projects the rail shows and
-// in what order, with no React in them: the project grouping the desktop's rail
+// in what order, with no React in them: the project grouping the rail
 // is built on, the pin-then-recency order inside a group, the label a row
 // renders, and the two search predicates (a session, and a project row).
 //
@@ -26,7 +26,7 @@ export interface WebuiProjectGroup {
 }
 
 /**
- * The desktop's home rail is project-first, even though its source data is a
+ * The home rail is project-first, even though its source data is a
  * session history. Keep the grouping deterministic so paging and a refresh do
  * not reshuffle a project while the user is looking at it.
  */

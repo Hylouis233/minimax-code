@@ -1,0 +1,123 @@
+# WebUI technical documentation
+
+The reference set for `packages/webui`: a browser client and the loopback service in front of the
+process-local harness layer. Every document here describes **the code as it stands**. Where a
+statement and the tree disagree, the tree wins and the statement is a bug in this directory.
+
+Nested directories group documents by subject. The files at this level are the ones that describe the
+package as a whole: this index, verification, the current gaps and open questions, and the release
+procedure.
+
+## Authority order
+
+1. **The source and its tests.** `packages/webui/src`, `packages/webui/test` and `test/webui-browser`
+   are the only executable truth. Every claim here cites a file that carries it.
+2. **Decisions.** [`adr/`](adr/) holds the architecture decision log. Those decisions outrank this
+   prose, and a document here that contradicts one is wrong until the decision is replaced.
+3. **This directory.** Description, reference material and open items.
+
+`packages/webui/AGENTS.md` sits beside this directory and is the *operating* guide — commands, gates,
+conventions and the edit order for common changes. Read it before changing code; read this directory
+when you need to know what the system is. The repository glossary is `CONTEXT.md` at the repository
+root.
+
+## Architecture
+
+| Document | Owns | Read it when |
+| --- | --- | --- |
+| [`architecture/design.md`](architecture/design.md) | The architecture design as a whole: system context, the constraints behind it, the four boundaries, the process model, ingress, the operation contract, the browser application, state ownership, the invariants a change must preserve | **Start here** for any structural work |
+| [`architecture/layered-model.md`](architecture/layered-model.md) | The four execution boundaries and how a request travels from the browser to the harness | You need to know which layer a change belongs to |
+| [`architecture/module-map.md`](architecture/module-map.md) | Where code lives: client roles and businesses, runtime, server, shared | You are looking for a module's home |
+| [`architecture/boundaries.md`](architecture/boundaries.md) | The dependency and ownership rules, the role checks, and the generated artifacts | You are judging whether an import edge is legal |
+
+## Client
+
+| Document | Owns | Read it when |
+| --- | --- | --- |
+| [`client/ownership.md`](client/ownership.md) | Businesses, roles, application lifetime, interest leases, generation and freshness fences | You are changing client state, ownership or a business workflow |
+| [`client/submission.md`](client/submission.md) | Creation origins, guarded adoption, the submission decision and completion vocabulary | You are touching send, queue, goal submission or session creation |
+| [`client/composer.md`](client/composer.md) | The Composer's per-field contract | You are changing the input area or its state |
+| [`client/transcript-rendering.md`](client/transcript-rendering.md) | Markdown rendering contracts: highlighting, line numbers, file references, math | You are changing transcript markdown |
+
+## Runtime
+
+| Document | Owns | Read it when |
+| --- | --- | --- |
+| [`runtime/boot.md`](runtime/boot.md) | Boot order, close order, the process resources, and the service entries | You are changing assembly, credentials, quota, terminal or shutdown |
+| [`runtime/harness-boundary.md`](runtime/harness-boundary.md) | `WebuiHarnessPort`, the adapters, and the roster that must agree with the operation registry | You are adding or removing an operation |
+| [`runtime/owner-identity.md`](runtime/owner-identity.md) | The `webui` runtime-owner row and what each differing cell means | You are changing how the client identifies itself to the harness |
+
+## Design
+
+| Document | Owns | Read it when |
+| --- | --- | --- |
+| [`design/design-language.md`](design/design-language.md) | Tokens, themes, typography, utility naming, layout, styling and asset rules | You are touching styles, marks or bundled assets |
+
+## State of the package
+
+| Document | Owns | Read it when |
+| --- | --- | --- |
+| [`verification/gates.md`](verification/gates.md) | The gates, what each proves, the evidence levels, and the comparison methods | You are about to claim work is verified |
+| [`verification/browser-suite.md`](verification/browser-suite.md) | The built-client browser suite: fixture, determinism, server behaviour | You are changing or debugging `test/webui-browser/` |
+| [`known-gaps.md`](known-gaps.md) | Capabilities the WebUI does not have, verified against the tree | Something looks missing and you want to know whether it is known |
+| [`open-questions.md`](open-questions.md) | Decisions deliberately left to the operator | You are about to pick a behaviour nobody has picked |
+| [`releasing.md`](releasing.md) | The npm preview release of `@fectivnfy112358/minimax-code-web` | You are changing packaging or the publish workflow |
+
+## Reference
+
+| Document | Owns | Read it when |
+| --- | --- | --- |
+| [`reference/plugin-action-inventory.md`](reference/plugin-action-inventory.md) | The 29 plugin-management actions and their owning business. Read by `plugin-action-inventory.test.ts` | You are touching the plugin port, its actions or its callers |
+
+## Decisions
+
+[`adr/`](adr/) holds the architecture decision log. The numbering is the decision order, so the
+highest number is the newest. ADR 0016 (business-first modules, application-owned lifetimes) and
+ADR 0017 (temporal ownership) describe the client as it stands; ADR 0014 fixes the four internal
+boundaries; ADR 0018 records the last ownership programme. A new decision takes the next free number.
+
+| Retired | Was | Why it is not in the log | Where the live facts are |
+| --- | --- | --- | --- |
+| 0008 | The first version assembles the full tool capability set | Its claim that the first version ships the same tool capabilities as the terminal client is no longer true: the mcode-tools integration sits behind a beta feature and Browser Use is optional | [`runtime/boot.md`](runtime/boot.md), [`known-gaps.md`](known-gaps.md) |
+| 0009 | A decision that the WebUI's design language is taken from another application | The design language is the WebUI's own and is documented as such | [`design/design-language.md`](design/design-language.md) |
+| 0012 | The WebUI runs its own scheduled tasks until the runtime offers one | Reversed: the whole WebUI-owned scheduler was deleted on 2026-10-09 | [`known-gaps.md`](known-gaps.md) §7 |
+| 0015 | The WebUI client is organized by business within its existing layers | Superseded by ADR 0016's business-first homes; the layer-first paths it describes did not survive | [`architecture/module-map.md`](architecture/module-map.md) |
+
+A retired record stays in git history rather than in the log: a decision that is no longer in force
+would otherwise read as current.
+
+## Working in this repository
+
+| Document | Owns | Read it when |
+| --- | --- | --- |
+| [`agents/issue-tracker.md`](agents/issue-tracker.md) | Where issues and specs live, and the `gh` conventions for them | You are filing, reading, labelling or closing an issue |
+| [`agents/triage-labels.md`](agents/triage-labels.md) | The five triage roles and their label strings here | You are applying or reading a triage label |
+| [`agents/domain.md`](agents/domain.md) | How the engineering skills consume this repo's glossary and decisions | You are exploring the codebase with a skill |
+
+## Not here
+
+- **Operating rules and commands** — `packages/webui/AGENTS.md`.
+- **Decisions and their rationale** — [`adr/`](adr/), with the retired records listed below.
+- **Browser-test harness details** — [`verification/browser-suite.md`](verification/browser-suite.md).
+- **The repository glossary** — `CONTEXT.md` at the repository root.
+
+## Retired documents
+
+Planning, migration and audit documents for this package were removed once their work landed: each
+had become a false statement about the current tree (a plan still saying "implementation has not
+started" after the implementation shipped, a ledger still naming pre-migration paths), and repository
+policy keeps review material and verification reports outside the tree. What survives is here, in
+[`adr/`](adr/), and in git history — the `webui` branch's commits of 2026-09-21 through 2026-10-16.
+
+Retired: the TUI-harness migration plan and its review brief, the runtime-layer plan, the client
+identity plan, the business-reorganization and cohesion plans with their ledgers (substrate matrix,
+composer disposition, contract re-file, baseline conformance), the architecture review plan, the
+architecture spec, the decision record, the development board and its ticket manifest, the v1 scope,
+the pending-decision list, the capability-gap investigation and the large-file decomposition plan.
+
+Two generated indexes were retired with them, together with their generators and gates: the
+exported-declaration surface (`pnpm check:webui-commands`) and the business-navigation table that
+was written into `packages/webui/AGENTS.md` (`pnpm check:webui-business-navigation`). Neither was
+read by any test or script — each only compared its own output with the committed copy. A symbol's
+home is found by search or the language server, and the businesses are the directories under
+`client/features/`.

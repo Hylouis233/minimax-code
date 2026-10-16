@@ -33,7 +33,7 @@ describe("TranscriptSkeletons", () => {
   it("ChatSkeleton uses the desktop line widths (8 primary + 4 secondary)", () => {
     const html = renderToStaticMarkup(createElement(ChatSkeleton));
     // Eight 22px bars in the primary block, four 24px bars in the secondary
-    // block (Desktop `i` array has 8 entries, `l` array has 4).
+    // block (8 primary entries, 4 secondary).
     expect(countByClass(html, "animate-shimmer")).toBe(13);
     expect((html.match(/height:22px/g) ?? []).length).toBe(8);
     expect((html.match(/height:24px/g) ?? []).length).toBe(4);

@@ -1,7 +1,7 @@
 /**
- * Desktop-compatible message projection.
+ * Message projection into the transcript's ordered `parts[]`.
  *
- * The runtime sends message fields, not the Desktop renderer's `parts[]`
+ * The runtime sends message fields, not a pre-built `parts[]`
  * projection. Keep this module pure so history, live stream tests, and future
  * renderers all consume the same ordering and synthetic-message rules.
  */
@@ -26,11 +26,11 @@ export interface WebuiMessageForParts {
   readonly thinkingDurationMs?: number;
   readonly toolCalls?: readonly Record<string, unknown>[];
   readonly attachments?: readonly unknown[];
-  /** Desktop's ordered activity parts when the runtime includes them. */
+  /** Ordered activity parts when the runtime includes them. */
   readonly parts?: readonly Record<string, unknown>[];
   readonly communicationInfosJson?: unknown;
   /** Per-message token usage (matches `TokenUsage` from agent-core). Used to
-   *  compute the Desktop-style output rate and turn duration for historical
+   *  compute the output rate and turn duration for historical
    *  messages. */
   readonly usage?: Record<string, unknown>;
 }
@@ -221,8 +221,9 @@ function projectSyntheticParts(
   return parts;
 }
 
-/** Desktop consumes the serialized todo_updated system event as progress
- *  state; it must not also appear as an assistant message containing JSON. */
+/** The workspace progress projection consumes the serialized todo_updated
+ *  system event as state; it must not also appear as an assistant message
+ *  containing JSON. */
 function isTodoUpdatedEventMessage(message: WebuiMessageForParts): boolean {
   const content = message.msgContent?.trimStart();
   if (!content?.startsWith('{"eventType":')) return false;
@@ -268,7 +269,7 @@ const DESKTOP_INTERNAL_MESSAGE_BLOCK = /<(agent-message|agent-context|system-rem
 function stripDesktopInternalMessageBlocks(content: string): string {
   return content
     .replace(DESKTOP_INTERNAL_MESSAGE_BLOCK, "")
-    // Desktop normalizes <path> to <asset-path> and unwraps <filepath> before
+    // Normalize <path> to <asset-path> and unwrap <filepath> before
     // passing the remaining text through Markdown. Keep the path text so the
     // WebUI file-reference renderer can turn workspace paths into links.
     .replace(/<(?:asset-path|path|filepath)\b[^>]*>([\s\S]*?)<\/(?:asset-path|path|filepath)\s*>/giu, "$1")
@@ -287,12 +288,12 @@ function projectMavisThinking(content: string, messageId: string): { content: st
   return { content: cleaned, parts };
 }
 
-/** Build parts in the exact Desktop order: thinking, text, then tool calls. */
+/** Build parts in the transcript's order: thinking, text, then tool calls. */
 export function projectMessageParts(
   message: WebuiMessageForParts,
 ): readonly WebuiMessagePart[] {
   // `todo_updated` is a persisted SystemEvent envelope. Workspace progress
-  // consumes it separately; mirroring Desktop means omitting it from the
+  // consumes it separately; the rule here is to omit it from the
   // conversational transcript while retaining actual `todowrite` calls.
   if (isTodoUpdatedEventMessage(message)) return [];
   const assetProjection = projectDeliveredAssets(message.msgContent ?? "", message.msgId);
@@ -309,7 +310,7 @@ export function projectMessageParts(
           ? { id, type: "thinking", content, ...(kind ? { kind } : {}) }
           : { id, type: type === "compaction" ? "compaction" : "cognitive", content, ...(kind ? { kind } : {}) });
       } else if (type === "text" && content.trim()) {
-        // Persisted/Desktop messages may already have an ordered parts array,
+        // Persisted messages may already have an ordered parts array,
         // while still carrying renderer-only XML inside a text part. Apply
         // the same special-message projection as the legacy msgContent path.
         const assetProjection = projectDeliveredAssets(content, `${message.msgId}-${id}`);
@@ -379,7 +380,7 @@ export function projectMessageParts(
         : `tool-${index}`;
     parts.push({ id: toolId, type: "tool_call", toolCall });
   }
-  // Desktop message type 3 is a file/attachment-only row. Give the ordinary
+  // Wire message type 3 is a file/attachment-only row. Give the ordinary
   // attachment renderer a text-shaped anchor even when the record has no
   // caption; this keeps the attachment visible instead of dropping the row.
   if (parts.length === 0 && (message.attachments?.length ?? 0) > 0)
@@ -588,7 +589,7 @@ function remapConflictingPartIds(
  * Merge adjacent messages from one turn/query into one render unit.
  *
  * A repeated message id is legal when the runtime emits several parts for the
- * same logical message. Desktop makes those React keys unique by appending the
+ * same logical message. Those React keys are made unique by appending the
  * part id; this projection applies the same rule to the merged unit.
  */
 export function groupTurnMessages(

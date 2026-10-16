@@ -65,7 +65,7 @@ describe("WebUI slash palette — lite-mode filter", () => {
     const litePalette = applyWebuiSlashLiteMode(fullPalette, true);
     const names = litePalette.map((entry) => entry.name);
     // `deploy-website` sits in the default section (paletteSection: "special")
-    // but its source_type is -1 like the built-ins, so the desktop's predicate
+    // but its source_type is -1 like the built-ins, so the lite-mode predicate
     // removes it in lite mode — only `goal` and `plan` survive via composerMode.
     expect(names).toEqual(["goal", "plan"]);
   });
@@ -259,7 +259,7 @@ describe("WebUI slash palette — skill fixtures", () => {
   });
 
   it("marks every skill entry as supported so the popover row is clickable", async () => {
-    // Mirrors the desktop: skill rows are clickable and insert "/<skill> " into
+    // Skill rows are clickable and insert "/<skill> " into
     // the composer, but submit does not dispatch runCommand (the name isn't in
     // WEBUI_RUN_COMMAND_NAMES), so the slash becomes a user message instead.
     const skills = (await resolveWebuiSlashSkills()).skills;

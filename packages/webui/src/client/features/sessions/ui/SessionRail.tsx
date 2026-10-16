@@ -1,4 +1,4 @@
-// SessionRail — the desktop-faithful rail listing projects + recent sessions.
+// SessionRail — the rail listing projects + recent sessions.
 //
 // T07's responsibility cut: the grouping/labelling/search rules now live in
 // `features/sessions/projection/rail-groups.ts`, and the four cohesive units this
@@ -177,7 +177,7 @@ export function WebuiProjectList({
 }): ReactElement {
   // Build a lookup from parent session id to its child sessions. When
   // `treePage` is provided, this lets the rail render child sessions under
-  // each root — mirroring the desktop sidebar's parent/child grouping.
+  // each root.
   const childrenByParentId = useMemo(() => {
     const map = new Map<string, readonly WebuiClientSession[]>();
     if (!treePage) return map;

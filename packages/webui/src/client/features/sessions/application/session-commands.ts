@@ -15,9 +15,7 @@
 // and the writer a turn's sink is built from, are the execution substrate's and
 // live in `features/turn/application/` (plan §5.5 P02 step 2) — a component
 // submits a command instead of holding and calling a store writer, whichever of
-// those views it holds. Every member's disposition is recorded in
-// `docs/webui/command-surface.md`, which `pnpm check:webui-commands` keeps
-// current.
+// those views it holds.
 
 import type { WebuiGoal } from "../../../../shared/contracts/goal.js";
 import type {

@@ -1,7 +1,7 @@
 // The quota popover (ticket #74; §15.1's `UserMenuUsage.tsx` row).
 //
 // The panel's four answers — loading, error, plan-and-credits, quota windows — the skeleton and rows
-// that render them, and the reset-label formatter the desktop popover uses. `UsagePanel` is the entry
+// that render them, and the reset-label formatter the panel uses. `UsagePanel` is the entry
 // point the menu renders; it takes the state and two callbacks and holds no state of its own.
 
 import type { ReactElement } from "react";
@@ -184,7 +184,7 @@ function UsageReady({
   );
 }
 
-/** The usage sub-panel: desktop states (skeleton / error+retry / signed-out / content). */
+/** The usage sub-panel: skeleton / error+retry / signed-out / content states. */
 export function UsagePanel({
   state,
   onRetry,

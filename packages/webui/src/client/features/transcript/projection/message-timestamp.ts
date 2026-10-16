@@ -8,7 +8,7 @@
 // The text below is the declaration as it stood in the source module — no
 // behaviour change.
 
-/** Desktop timestamp format for the action row: `9月22日, 22:37`. */
+/** Timestamp format for the action row: `9月22日, 22:37`. */
 export function formatWebuiMessageTimestamp(value?: number): string | undefined {
   if (value === undefined || !Number.isFinite(value)) return undefined;
   const date = new Date(value);

@@ -1,25 +1,21 @@
-// ActivityIndicator — the WebUI's transcription of Desktop's `function V()`
-// (defined in `mine-transcript/58686.pretty.js` at line 682). Used for the
-// "thinking…" pulse shown beneath the latest assistant stream and inside the
-// streaming placeholders. Verbatim class names, testids, sizing algorithm and
-// phrase-rotation weights.
+// ActivityIndicator — the "thinking…" pulse shown beneath the latest assistant
+// stream and inside the streaming placeholders. Class names, testids, the
+// sizing algorithm and the phrase-rotation weights are pinned by
+// `activity-indicator.test.tsx`.
 //
-// The phrase rotation weights (basic 0.75 / specific 0.15 / motion 0.1) and the
-// 2000–3000 ms startup delay followed by 3500 ms swaps come from the same
-// source. Avoiding consecutive repeats is verbatim too (line 740–743). When
+// The phrase rotation weights (basic 0.75 / specific 0.15 / motion 0.1), the
+// 2000–3000 ms startup delay followed by 3500 ms swaps, and the avoidance of
+// consecutive repeats are all part of that contract. When
 // `prefers-reduced-motion: reduce` is on the Lottie playback halts but the
-// label keeps ticking, mirroring Desktop's `useEffect` at lines 760–773.
+// label keeps ticking.
 //
-// The runtime dep is `lottie-web` (Desktop ships the same library verbatim;
-// see `minimax-webui/app/out/_next/static/chunks/47bf8baf-*.js`). The exported
-// `LottiePlayer` wrapper accepts the same prop surface Desktop's `qf`
-// component uses (play, loop, speed, name, data, innerClassName, style) so a
-// future port can lift a Desktop chunk without contract drift.
+// The runtime dep is `lottie-web`. The exported
+// `LottiePlayer` wrapper accepts the prop surface this pulse needs
+// (play, loop, speed, name, data, innerClassName, style).
 //
 // Phrase vocabulary defaults to the zh i18n bundle (`message.item.thinking_phrases`)
-// and falls back to the single string `message.item.thinking`. The fallback
-// matches Desktop (`g = e ? (r ?? t ?? p ?? (0, h.t)("message.item.thinking")) : null`,
-// line 758).
+// and falls back to the single string `message.item.thinking`, i.e.
+// `g = e ? (r ?? t ?? p ?? (0, h.t)("message.item.thinking")) : null`.
 //
 // `thinkingPhrases` is overridable so a unit test can pin a deterministic list
 // without having to load the i18n bundle; the integration session can pass the
@@ -67,9 +63,8 @@ export function LottiePlayer(props: LottiePlayerProps): React.JSX.Element {
       animationRef.current = null;
     };
     // We intentionally only run this once: lottie-web's reactive updates are
-    // done through the imperative setters below. This mirrors Desktop's
-    // `useEffect` that mounts the animation once and toggles play/loop via
-    // subsequent prop changes.
+    // done through the imperative setters below. The effect mounts the
+    // animation once and toggles play/loop via subsequent prop changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

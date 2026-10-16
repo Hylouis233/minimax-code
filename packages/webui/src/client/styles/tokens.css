@@ -1,15 +1,15 @@
 /*
- * WebUI design tokens. Re-authored from the desktop application's
- * compiled stylesheet and layout read of the conversation surface.
- * See docs/webui-visual-language.md.
+ * WebUI design tokens. The values are read from the conversation surface's
+ * compiled stylesheet and layout.
+ * See packages/webui/docs/design-language.md.
  *
  * Three layers:
  *   1. Primitive ramps + opacity scales.
  *   2. Scale tokens for radii, spacing, type size, line height and weight.
  *   3. Semantic tokens (211). Two themes rebind them on a class.
  *
- * Names map 1:1 onto the desktop application's tokens so Tailwind utilities
- * (bg-bg_default_primary, rounded-radius_8, ...) line up between clients.
+ * Names map 1:1 onto the utility names Tailwind generates
+ * (bg-bg_default_primary, rounded-radius_8, ...).
  */
 
 :root {

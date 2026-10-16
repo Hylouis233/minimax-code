@@ -1,8 +1,8 @@
-// Verify the WebUI design-token file re-author the desktop application's
-// token surface (ADR 0009, ticket 04).
+// Verify the WebUI design-token file against the token surface
+// the design-language doc describes (ADR 0009, ticket 04).
 //
 // The source of truth for what the file must contain is
-// `docs/webui-visual-language.md`: primitive ramps, scale tokens, and 211
+// `packages/webui/docs/design-language.md`: primitive ramps, scale tokens, and 211
 // semantic tokens with light and dark bindings on a `.light` / `.dark` class.
 
 import { describe, it, expect, beforeAll } from "vitest";
@@ -84,7 +84,7 @@ describe("WebUI design tokens", () => {
     expect(tokensPath.endsWith("src/client/styles/tokens.css")).toBe(true);
   });
 
-  it("carries the 211 semantic tokens that docs/webui-visual-language.md names", () => {
+  it("carries the 211 semantic tokens that packages/webui/docs/design-language.md names", () => {
     // 211 is the documented count from the visual-language extraction. If our
     // count drifts, the test fails loudly rather than silently adjusting.
     expect(semanticNames().length).toBe(211);
@@ -131,9 +131,9 @@ describe("WebUI design tokens", () => {
   });
 
   it("names its scale tokens the same way the desktop does", () => {
-    // The desktop's CSS lists these exact names; the visual-language doc
+    // tokens.css lists these exact names and the design-language doc
     // records them in the same shape. Drift means the utility mapping in
-    // tailwind.config.cjs cannot line up with the desktop.
+    // tailwind.config.cjs no longer lines up with the token names.
     const expectedScales = [
       "radius_4", "radius_8", "radius_12", "radius_16", "radius_20", "radius_24", "radius_32", "radius_full",
       "spacing_0", "spacing_2", "spacing_4", "spacing_6", "spacing_8", "spacing_12", "spacing_16", "spacing_20", "spacing_24", "spacing_32", "spacing_40", "spacing_48", "spacing_64", "spacing_90", "spacing_128",
@@ -166,8 +166,8 @@ describe("WebUI design tokens", () => {
   });
 
   it("is not the compiled desktop stylesheet copied across", () => {
-    // ADR 0009 / acceptance criterion: re-author the token file rather than
-    // copying the desktop's compiled CSS. The easiest proxy is checking that
+    // ADR 0009 / acceptance criterion: the token file is authored here rather
+    // than copied wholesale. The easiest proxy is checking that
     // the file is *only* tokens: no font-family declarations, no Tailwind
     // directives, no @media queries, no @keyframes.
     expect(tokens).not.toMatch(/font-family/u);
@@ -176,7 +176,7 @@ describe("WebUI design tokens", () => {
     expect(tokens).not.toMatch(/@keyframes/u);
     // The file must start with a documentation comment, not a vendored banner.
     expect(tokens.startsWith("/*")).toBe(true);
-    // And it must not start with the desktop's licence/compiled banner.
+    // And it must not start with a licence/compiled banner.
     expect(tokens.startsWith("/*!")).toBe(false);
   });
 });
@@ -242,7 +242,7 @@ describe("WebUI compiled stylesheet", () => {
   });
 
   it("embeds Chinese fallbacks for both the sans and mono font stacks", () => {
-    // The desktop's preflight exposes HarmonyOS Sans SC and PingFang SC for
+    // The preflight exposes HarmonyOS Sans SC and PingFang SC for
     // Chinese fallback in both the sans and mono stacks. Tailwind's reset
     // applies those rules via @tailwind base.
     const sansMatches = compiled.match(

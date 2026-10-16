@@ -15,7 +15,7 @@
 // `http/` route modules. This file keeps the HTTP/WS assembly plus start/close;
 // it holds no OAuth, broker or browser provider.
 //
-// Shutdown order matches step 13 of the assembly checklist: stop accepting
+// Shutdown order is the close order `../docs/runtime/boot.md` states: stop accepting
 // new operations, then close every connection, then close the harness.
 
 import type { IncomingMessage, Server, ServerResponse } from "node:http";

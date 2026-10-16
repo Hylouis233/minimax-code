@@ -4,15 +4,13 @@
  * Tailwind's @layer components slot sits between preflight (base) and the
  * generated utilities (utilities). Rules here carry the parts of a component a
  * utility composition cannot state — a state hook, a compound shape, a
- * descendant — while geometry the desktop's own markup already expresses as
- * utilities stays a utility, so a class composition lifted from the desktop
- * reads the same here.
+ * descendant — while geometry already expressed as utilities stays a utility,
+ * so a class composition reads the same here.
  *
  * Every token referenced below must resolve to a definition in tokens.css — the
  * compiled-stylesheet closure check in webui-design-tokens.test.ts enforces that
  * contract. Values that are plain geometry the token scale does not carry (the
- * desktop's `rounded-[10px]` pills, its 3px grip) are written literally, the way
- * the desktop writes them.
+ * `rounded-[10px]` pills, the 3px grip) are written literally.
  *
  * Rail, composer card and type hierarchy come from
  * `minimax-code-webui-work/webui-visual-align-spec.md`.
@@ -38,7 +36,7 @@
     );
   }
 
-  /* The hero avatar's soft halo. The desktop writes it as a literal
+  /* The hero avatar's soft halo. It is written as a literal
    * `rgba(10,10,10,0.08)`; `--shadow_default` (#0a0a0a14) carries the same
    * colour and keeps the value closed against tokens.css. Shadows belong in this
    * layer rather than in an arbitrary-value utility: the utility form compiles
@@ -252,10 +250,10 @@
     transform: translateX(-50%);
     z-index: 120;
     width: max-content;
-    /* 250, not the 340 this used to carry. The desktop draws every one of
-     * these with antd's `Tooltip`, whose documented `maxWidth` default is 250,
-     * and it never overrides that width — the desktop stylesheet only touches
-     * `.ant-tooltip-inner` typography. The 6px radius and the 8/12 padding on
+    /* 250, not the 340 this used to carry. The value follows antd's
+     * `Tooltip`, whose documented `maxWidth` default is 250, and it is never
+     * overridden — only `.ant-tooltip-inner` typography is touched. The 6px
+     * radius and the 8/12 padding on
      * the next two rules are antd's `borderRadius` / `paddingSM`+`paddingXS`
      * defaults for the same reason, so 340 was the one number on this bubble
      * that came from nowhere. Unlike its two siblings below, this one wraps

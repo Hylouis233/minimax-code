@@ -59,7 +59,7 @@ export interface WebuiModelEntry {
 
 /**
  * Minimal skill projection the WebUI composer needs to populate the slash
- * palette. Mirrors the desktop's `listSkills(agentName, ...)` call shape;
+ * palette. Mirrors the `listSkills(agentName, ...)` call shape;
  * the harness returns whatever subset of `SkillInfo` it needs, and the
  * client only depends on these three fields to render the popover row.
  */

@@ -28,8 +28,8 @@ export function createModelsPluginsAdapter(
     async listSkills(request) {
       // cliService.listSkills returns the full `SkillInfo[]` shape; map it
       // down to the WebUI's minimal projection. `displayDescription` and
-      // i18n keys win over the raw `description` so the popover matches the
-      // desktop's translated copy.
+      // i18n keys win over the raw `description` so the popover shows the
+      // translated copy.
       const result = await requireCliService(host).listSkills(request ?? {});
       return {
         skills: result.skills.map((skill) => ({

@@ -53,8 +53,8 @@ describe("MessageAttachments", () => {
       }),
     );
     expect(html).toContain('alt="diagram.png"');
-    // When only one image is present, the desktop does NOT wrap in
-    // `flex flex-wrap gap-2` (see line 1562).
+    // When only one image is present, it does NOT wrap in
+    // `flex flex-wrap gap-2`.
     expect(html).not.toContain("flex flex-wrap gap-2");
   });
 

@@ -234,7 +234,7 @@ function validateCreateSessionRequestBody(
       message: "createSession body requires a non-empty name",
     };
   // `workspaceDir` is optional: the harness resolves a default workspace
-  // when it is absent (desktop's 不需要项目 / default-directory flows).
+  // when it is absent (the 不需要项目 / default-directory flows).
   // When present it must be a real absolute path — relative and missing
   // directories are still rejected. The browser project picker cannot
   // produce one (see `validateAbsoluteDirectory`), so this is also what

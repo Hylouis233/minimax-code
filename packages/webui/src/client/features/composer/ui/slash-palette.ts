@@ -1,13 +1,12 @@
 // Slash palette for the composer hinting model.
 //
-// Uses the desktop palette's three data pools (built-in commands, the plugin
+// Uses three data pools (built-in commands, the plugin
 // registry, and the skills resolver), sectioning, and four-rank filtering.
 // The built-in list is intentionally scoped to the composer modes supported
-// here; behavior fields remain compatible with the desktop record shape.
+// here; behavior fields keep the same record shape.
 //
-// Source attribution: `docs/webui-visual-language.md` (visual language),
-// ADR 0009 (reuse the desktop's vocabulary), `chunks/10118-*` (palette
-// data structure), `chunks/60554-*` (i18n strings).
+// See `packages/webui/docs/design-language.md` for the visual language and
+// ADR 0009 for the shared vocabulary.
 
 import type { ReactElement } from "react";
 import {
@@ -39,8 +38,8 @@ import {
  *                             `WEBUI_RUN_COMMAND_NAMES` (skills, for example).
  *                             Click inserts `/<name> ` into the composer; the
  *                             submit path treats the slash as a user message
- *                             the user can edit before sending — same as the
- *                             desktop's default behaviour for entries without
+ *                             the user can edit before sending — the same as the
+ *                             default behaviour for entries without
  *                             `composerMode` / `sendIntent` / `directAction`.
  *   - `inert-unsupported`   — `supported: false`. The host port is not
  *                             wired. The row renders inert (aria-disabled,
@@ -54,7 +53,7 @@ import {
  * for the submit pipeline to dispatch on without renaming `supported`.
  */
 /**
- * One row in the slash palette. Mirrors the desktop record shape so a future
+ * One row in the slash palette. Keeps the same record shape so a future
  * `listSkills` RPC can be slotted into `resolveWebuiSkills` without renaming.
  *
  * `supported` is the WebUI-specific capability flag — entries where the
@@ -129,12 +128,12 @@ export const WEBUI_BUILTIN_COMMANDS: readonly SlashCommandEntry[] = [
 ];
 
 /**
- * Plugin registry. Mirrors the desktop's `ez` map: a fixed name → metadata
+ * Plugin registry: a fixed name → metadata
  * table for entries that should sit between the built-in commands and the
- * skills section. The desktop currently registers exactly one — deploy-website.
+ * skills section. Exactly one is registered — deploy-website.
  *
  * The WebUI's harness port has no deploy path today, so the entry renders
- * inert; the row is the desktop's row, just non-functional.
+ * inert; the row is present, just non-functional.
  */
 export const WEBUI_PLUGIN_REGISTRY: Record<
   string,
@@ -173,10 +172,10 @@ export const WEBUI_PLUGIN_REGISTRY: Record<
  * the resolver returns these fixtures so the popover stays usable.
  *
  * Skills are `supported: true` so the popover row is clickable in 1:1 with
- * the desktop. Clicking inserts `/<skill-name> ` into the composer; the
+ * a live row. Clicking inserts `/<skill-name> ` into the composer; the
  * submit path doesn't dispatch `runCommand` for skill names (they're not
  * in `WEBUI_RUN_COMMAND_NAMES`), so the slash becomes a user message that
- * the user can edit before sending — same as the desktop's default
+ * the user can edit before sending — the same default
  * behaviour for entries without `composerMode` / `sendIntent` /
  * `directAction`.
  */
@@ -273,7 +272,7 @@ export interface WebuiSlashSkillsResult {
 }
 
 /**
- * Skills resolver. Mirrors the desktop's `listSkillHub` (signed-out web) /
+ * Skills resolver. Follows the `listSkillHub` (signed-out web) /
  * `listSkills(agentName, ...)` split.
  *
  * The harness port now exposes a `listSkills` RPC, so the preferred path
@@ -373,7 +372,7 @@ function iconForSkillName(name: string): WebuiIconComponent {
 /**
  * Composed API: section + lite-mode filter. Returns the static slice; the
  * caller resolves the skills pool first (`resolveWebuiSlashSkills`), because
- * the desktop's skills come from a runtime IPC call.
+ * the skills come from a runtime IPC call.
  */
 export function buildWebuiSlashPalette(options: {
   readonly skills?: readonly SlashCommandEntry[];

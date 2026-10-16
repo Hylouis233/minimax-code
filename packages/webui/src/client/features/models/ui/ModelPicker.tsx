@@ -1,5 +1,5 @@
 /**
- * Composer-side model picker. Mirrors the desktop's two-column popover:
+ * Composer-side model picker, a two-column popover:
  *
  *   ┌─ models ──────────┬─ detail ──────────────────┐
  *   │ ● MiniMax-M3       │ 上下文窗口                 │

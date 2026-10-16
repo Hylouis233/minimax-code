@@ -85,11 +85,10 @@ export function formatWebuiError(value: unknown): string {
 }
 
 /**
- * A credit balance, formatted the way the desktop formats it.
+ * A credit balance, formatted with thousands separators, integer rounding and
+ * an em dash when the balance is absent.
  *
- * Thousands separators, integer rounding — the API reports
- * `7726.2119999999995` and the desktop shows `7,726` — and an em dash when the
- * balance is absent. The rounding is the part that matters: a second copy in
+ * The API reports `7726.2119999999995` and this renders `7,726`. The rounding is the part that matters: a second copy in
  * the settings panel truncated instead, so the same balance read one credit
  * lower there.
  */

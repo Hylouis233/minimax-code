@@ -152,7 +152,7 @@ export function hasWebuiNonTextActivity(
   );
 }
 
-/** Preserve the per-message activity segments that Desktop renders as rows. */
+/** Preserve the per-message activity segments the transcript renders as rows. */
 export function projectWebuiProcessSegments(
   items: readonly WebuiTranscriptItem[],
 ): readonly WebuiTranscriptProcessSegment[] {
@@ -201,9 +201,9 @@ export function projectWebuiProcessSegments(
     byMessageId.set(item.messageId, withParts);
   }
   // Once a group has process activity, keep text-only assistant messages too:
-  // Desktop treats earlier replies as archived process content while the
-  // final reply remains outside the disclosure. Dropping text-only segments
-  // here makes that boundary impossible to project in the renderer.
+  // earlier replies are archived process content while the final reply stays
+  // outside the disclosure. Dropping text-only segments here makes that
+  // boundary impossible to project in the renderer.
   return hasWebuiNonTextActivity(segments) ? segments : [];
 }
 

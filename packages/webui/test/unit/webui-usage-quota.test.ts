@@ -349,7 +349,7 @@ describe("UsagePanel states", () => {
       result: {
         signedIn: true,
         hasTokenPlan: true,
-        // Verbatim from the production API: desktop renders this as 7,726.
+        // Verbatim from the production API: the panel renders this as 7,726.
         creditBalance: "7726.2119999999995",
         quota: {
           fiveHour: {

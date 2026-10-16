@@ -201,7 +201,7 @@ describe("unified diff projection and the line target it yields", () => {
   });
 
   it("folds the file's own header lines into the file heading, not into rows", () => {
-    // `diff --git` / `index` / `---` / `+++` are file metadata: Desktop's diff
+    // `diff --git` / `index` / `---` / `+++` are file metadata: the diff
     // view parses them into the header it already draws above the patch — path,
     // status, +N/−M — and never renders them as rows of the diff. This list
     // sits under the same heading, so it drops them, and drops them before the

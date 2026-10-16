@@ -1,7 +1,7 @@
 // Dedicated handlers: the terminal PTY bridge.
 //
 // The six terminal operations cannot be plain bindings: they drive a real
-// second runtime surface (the PTY bridge the WebUI shares with the desktop),
+// second runtime surface (a PTY bridge outside the harness port),
 // not a harness port method. `watchTerminal` is a stream. The adapter is only
 // supplied by the service, and when it is absent these operations stay
 // unregistered (see `operations.ts`) rather than becoming registered operations

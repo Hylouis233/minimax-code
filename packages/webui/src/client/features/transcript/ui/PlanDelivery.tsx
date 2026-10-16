@@ -42,8 +42,8 @@ export function WebuiTranscriptPlanDelivery({
       })
       .finally(() => setSubmitting(false));
   }, [answerPlanBuild, request]);
-  // 预览 opens the whole plan file in the workspace panel, the way the desktop
-  // hands the markdown to its file viewer. The file lives outside the workspace
+  // 预览 opens the whole plan file in the workspace panel. The file lives
+  // outside the workspace
   // root, so the content travels with the command instead of being read back.
   const viewPlan = useCallback(() => {
     const path = webuiPlanPath(request);

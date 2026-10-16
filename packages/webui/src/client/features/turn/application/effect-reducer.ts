@@ -324,8 +324,8 @@ export function reduceWebuiEffect(
       //
       // Re-read the goal instead of guessing a patch: steering is rare and the
       // read is authoritative. Publishing the full goal on this event would be
-      // the alternative, but the event contract is shared with the TUI and
-      // Desktop, so the repair belongs in the consumer that is broken.
+      // the alternative, but the event contract is shared with the TUI, so
+      // the repair belongs in the consumer that is broken.
       commands.push({ type: "refresh-goal" });
       break;
     }

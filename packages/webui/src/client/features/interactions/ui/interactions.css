@@ -2,7 +2,7 @@
 @layer components {
 
 
-  /* A block surface in the main column. The desktop's composer card is this
+  /* A block surface in the main column. The composer card is this
    * shape: a hairline border with a soft layer underneath it. The border alone
    * reads as nothing on a light surface; the shadow is what makes the layer
    * visible at all. */
@@ -17,7 +17,7 @@
 
   /* ---------------------------------------------------------------- actions */
 
-  /* Primary action button: the accent fill the desktop uses for one
+  /* Primary action button: the accent fill for one
    * restrained call to action on the page (Send). The
    * hover/selected/focus states ride on the same token family. */
   .webui-button-primary {

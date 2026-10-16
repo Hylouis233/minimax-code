@@ -9,7 +9,7 @@
 //   B-4 文件夹上传/@    — @ menu offers the local file/folder pickers and
 //                          choosing one opens the OS file chooser
 //
-// See docs/webui/webui-composer-module-b-spec.md for the behavior spec.
+// The composer's field contract is in packages/webui/docs/client.md.
 
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

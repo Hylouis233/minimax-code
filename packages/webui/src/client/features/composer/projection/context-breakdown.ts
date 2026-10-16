@@ -37,9 +37,9 @@
  * wire format cannot disagree about what "first" means.
  *
  * `shade` is an opacity multiplier over the single accent swatch rather than a
- * six-colour palette: the desktop's own swatches are too small in the reference
- * screenshot to sample a distinct colour from, so the palette is kept and only
- * the ORDER was taken from the screenshot. Indexing it here — rather than at
+ * six-colour palette: the swatches in the reference are too small to sample a
+ * distinct colour from, so the palette is kept and only the ORDER follows the
+ * reference. Indexing it here — rather than at
  * the call site — is what makes a category's colour a property of the category.
  */
 export const CONTEXT_BREAKDOWN_CATEGORIES = [

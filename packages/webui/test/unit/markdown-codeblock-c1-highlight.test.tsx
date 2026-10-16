@@ -1,6 +1,6 @@
 // C-1 — code fence syntax highlighting in the transcript renderer.
 //
-// The contract is SPEC-C `docs/SPEC-C-transcript.md`, items C-1.1 through
+// The contract is `packages/webui/docs/reference/transcript-rendering.md`, items C-1.1 through
 // C-1.5: a registered language gets hljs markup, and every other fence stays
 // byte-identical to the plain `<pre><code>` path that shipped before. The
 // `expectedPlainDocument` helper below pins that pre-existing output as a

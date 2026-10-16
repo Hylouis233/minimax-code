@@ -232,7 +232,7 @@ export function ContextUsageIndicator({ usage, usageQuota, planModel }: {
             a panel they opened on purpose.
 
             The chevron is the whole affordance. A caret beside a number is the
-            desktop's own convention for "there is more under this", and adding
+            convention for "there is more under this", and adding
             a separate "详情" control next to it would be two controls for one
             section.
           */}

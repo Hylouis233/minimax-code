@@ -68,7 +68,7 @@ function PanelHost(caps: PanelCaps) {
 
 describe("记忆摘要 save button states", () => {
   it("stays disabled until the text actually changes", () => {
-    // The desktop's predicate, lifted so it can be tested without an effect
+    // The save predicate, lifted so it can be tested without an effect
     // flush: `!loading && !saving && draft !== baseline && draft.length > 0`.
     // This is what was missing -- the button was live the moment the dialog
     // opened, offering a write that rewrites the file byte-for-byte.
@@ -125,7 +125,7 @@ describe("记忆摘要 save button states", () => {
 
 describe("记忆摘要 dialog markup", () => {
   it("pairs a grey 取消 with a black 保存, as the desktop does", () => {
-    // The desktop's last row is `flex justify-between` with the timestamp on the
+    // The last row is `flex justify-between` with the timestamp on the
     // left; the two buttons are `variant:"gray"` for 取消 and `variant:"black"`
     // for 保存. Drawing both grey made the committing action the quieter of the
     // two, which is the opposite of the intent.
@@ -144,7 +144,7 @@ describe("记忆摘要 dialog markup", () => {
   });
 
   it("keeps the timestamp in the footer row, below the editor", () => {
-    // The desktop's order is: editor, then one `justify-between` row holding the
+    // The order is: editor, then one `justify-between` row holding the
     // timestamp on the left and 取消/保存 on the right. The editor itself is not
     // asserted here -- `draft` only exists after the first read, and
     // `renderToStaticMarkup` runs no effects, so the count row never paints in
@@ -162,15 +162,15 @@ describe("记忆摘要 dialog markup", () => {
 
 describe("「在会话中创建」 hand-off", () => {
   it("leaves the line the desktop's composer already has typed", () => {
-    // Read off the desktop screenshot, not invented: it is the whole text the
-    // user finds waiting, and the attachment chip carries the file identity.
+    // The whole text the user finds waiting, with the attachment chip carrying
+    // the file identity.
     expect(MEMORY_HANDOFF_PROMPT).toBe("我想调整下这个记忆文件");
   });
 });
 
 describe("the delete confirmation's copy", () => {
   it("matches the desktop's modal word for word", () => {
-    // Transcribed from the desktop modal after zooming it: the title ends on a
+    // The title ends on a
     // half-width `?` (a full-width one carries a full em of advance and opens a
     // visible gap), the body's comma and full stop are full-width, and there is
     // no byte count in the body — the row above the button already shows one.
@@ -184,15 +184,15 @@ describe("the delete confirmation's copy", () => {
 
   it("does not smuggle a byte count back into the body", () => {
     // The WebUI's earlier confirmation opened with "将删除 112 KB 的长期记忆
-    // 文件". The desktop says nothing of the kind, and a paraphrase here is the
-    // whole thing this suite exists to prevent.
+    // 文件". Nothing of the kind belongs in the body, and a paraphrase here is
+    // the whole thing this suite exists to prevent.
     expect(MEMORY_DELETE_CONFIRM.body).not.toMatch(/KB|字节/);
     expect(MEMORY_DELETE_CONFIRM.title).not.toMatch(/KB|字节/);
   });
 });
 
 describe("formatMemoryTimestamp", () => {
-  // The desktop footer reads `更新于 2026-10-06 04:48:48`. Hand-rolled rather
+  // The footer reads `更新于 2026-10-06 04:48:48`. Hand-rolled rather
   // than `toLocaleString`, so these assertions are the thing that keeps the
   // shape from quietly following the host locale.
   it("renders the stamp in the desktop's own shape", () => {
@@ -306,7 +306,7 @@ describe("PersonalizationSettings markup", () => {
       />,
     );
 
-    // The desktop row carries the title, the description and 管理 — nothing
+    // The row carries the title, the description and 管理 — nothing
     // between them. A byte count here was a second, differently-scaled reading
     // of the same file (the manager shows characters), and it is also the
     // reason opening the pane used to fetch the whole memory document.
@@ -459,10 +459,10 @@ describe("关于你 section markup", () => {
   it("renders exactly one control, bound to moreAbout", () => {
     const markup = renderToStaticMarkup(<PersonalizationSettings />);
 
-    // The desktop's `personalization-profile-section` renders a single TextArea
+    // The profile section renders a single TextArea
     // bound to `moreAbout`. `nickname` and `occupation` live only in the file
     // layer — the reader and the writer still handle their `Nickname: ` /
-    // `Occupation: ` lines — and the desktop draws no control for either.
+    // `Occupation: ` lines — and neither gets a control.
     //
     // Rendering inputs for them put two permanently empty boxes above the one
     // editable field: a profile that never filled them in showed as a pair of
@@ -491,7 +491,7 @@ describe("关于你 section markup", () => {
     expect(markup).toContain('aria-label="更多关于你"');
     expect(markup).not.toContain("<span>昵称</span>");
     expect(markup).not.toContain("<span>职业</span>");
-    // The desktop's own placeholder is the i18n key
+    // The placeholder is the i18n key
     // `settings.personalization_more_about_placeholder`; ours is the Chinese
     // rendering of it. Asserted so the field is never left unlabelled.
     expect(markup).toContain("placeholder=");
@@ -502,7 +502,7 @@ describe("关于你 section markup", () => {
   });
 
   it("keeps the section save disabled until a field actually changes", () => {
-    // The desktop has three states: disabled while the fields still match what
+    // Three states: disabled while the fields still match what
     // the server returned, live once one differs, and quiet again after a save
     // because the server's own answer becomes the new baseline.
     //
@@ -541,7 +541,7 @@ describe("关于你 section markup", () => {
     expect(markup).toContain('data-testid="user-profile-save"');
     // The variant class decides the whole look — filled primary vs light fill —
     // so it is pinned here and not only in the stylesheet test. Both section
-    // headers pass `variant: "black"` in the desktop bundle.
+    // headers pass `variant: "black"`.
     expect(markup).toContain("webui-mavis-button-black");
     expect(markup).not.toContain("webui-mavis-button-gray webui-section-save-button");
   });
@@ -666,8 +666,8 @@ describe("section hints", () => {
     // The previous strings described the mechanism instead of the effect
     // ("注入每个会话的 <user_profile>…"), which is a note to whoever debugs
     // the injection rather than a line that tells a user what the field is
-    // for. These three are copied from the desktop bubbles character for
-    // character, so the two surfaces cannot drift on the same control.
+    // for. These three are word for word, so two surfaces cannot drift on the
+    // same control.
     expect(Object.values(PERSONALIZATION_SECTION_HINTS)).toEqual([
       "定义 Agent 应该如何工作、回答和执行任务，为此设备上的所有 Agent 提供额外指令和上下文。",
       "告诉 Agent 你的背景和长期偏好。",

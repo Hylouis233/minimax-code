@@ -21,7 +21,7 @@ export interface SigninState {
   readonly error?: string;
 }
 
-/** zh copy, verbatim from the desktop i18n dictionary's `signin.*` keys. */
+/** zh copy, matching the `signin.*` keys the sign-in copy uses. */
 export const SIGNIN = {
   title: "每日签到",
   subtitle: "连续签到得更多积分",
@@ -68,7 +68,7 @@ function SigninInfoIcon(): ReactElement {
   );
 }
 
-/** Check mark inside a day dot (desktop `L.cvi`, size 14). */
+/** Check mark inside a day dot, size 14. */
 function SigninCheckIcon(): ReactElement {
   return (
     <svg width="14" height="14" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className="signin-day-check" aria-hidden="true">
@@ -77,7 +77,7 @@ function SigninCheckIcon(): ReactElement {
   );
 }
 
-/** Credits glyph in the claim button / bonus tag (desktop `L.J8f`). */
+/** Credits glyph in the claim button / bonus tag. */
 function SigninCreditsIcon({ size }: { readonly size: number }): ReactElement {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -86,7 +86,7 @@ function SigninCreditsIcon({ size }: { readonly size: number }): ReactElement {
   );
 }
 
-/** Dotted connector between day dots (desktop `eK`). */
+/** Dotted connector between day dots. */
 function SigninConnector({ className = "" }: { readonly className?: string }): ReactElement {
   return (
     <svg aria-hidden="true" focusable="false" className={`signin-connector ${className}`}>
@@ -95,7 +95,7 @@ function SigninConnector({ className = "" }: { readonly className?: string }): R
   );
 }
 
-/** Light/dark artwork pair (desktop `eH`). */
+/** Light/dark artwork pair. */
 function SigninArtwork({
   lightUrl,
   darkUrl,
@@ -146,7 +146,7 @@ function SigninSkeleton(): ReactElement {
   );
 }
 
-/** Seven-day progress row (desktop `eY`). */
+/** Seven-day progress row. */
 function SigninProgress({
   days,
   animatedDay,
@@ -210,7 +210,7 @@ function SigninProgress({
   );
 }
 
-/** Title row with the credits-info tooltip trigger (desktop `eU` + h2 row). */
+/** Title row with the credits-info tooltip trigger. */
 function SigninCreditsInfo({ onNavigateToUsage }: { readonly onNavigateToUsage: () => void }): ReactElement {
   const [open, setOpen] = useState(false);
   return (
@@ -248,9 +248,10 @@ function SigninCreditsInfo({ onNavigateToUsage }: { readonly onNavigateToUsage: 
 }
 
 /**
- * The daily check-in card: DOM, classes and copy ported from the desktop's
- * `signin-card` (menu context: `showCloseButton=false`,
- * `autoDismissAfterClaim=false`, `trackView=false`).
+ * The daily check-in card: its DOM, classes and copy.
+ *
+ * Menu context: `showCloseButton=false`,
+ * `autoDismissAfterClaim=false`, `trackView=false`.
  */
 export function SigninCard({
   panel,

@@ -139,7 +139,7 @@ export function UserProfileSection({
     (draft?.occupation.length ?? 0) +
     (draft?.moreAbout.length ?? 0);
   const overLimit = length > maxChars;
-  // Three states, matching the desktop: disabled while the fields still match
+  // Three states: disabled while the fields still match
   // what the server returned, live once one of them differs, and live again
   // after a save because the returned view *is* the new baseline. Without the
   // dirty check the button is clickable on open, and a save that rewrites the
@@ -206,7 +206,7 @@ export function UserProfileSection({
       </SectionHeader>
       <div className="webui-generic-card">
         <div className="webui-user-profile-fields">
-          {/* One control, not three. The desktop's `personalization-profile-section`
+          {/* One control, not three. The section
              renders a single TextArea bound to `moreAbout` — the `nickname` and
              `occupation` keys exist only in the *file* layer, where the reader
              and the writer still parse and re-emit their `Nickname: ` /

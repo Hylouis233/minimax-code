@@ -51,7 +51,7 @@ describe("transcript scroll geometry", () => {
 
 /**
  * Which gestures count as the user taking the viewport away from the newest
- * content. The rules are Desktop's message-viewport ones: a gesture the viewport
+ * content. The rules are the message viewport's: a gesture the viewport
  * cannot answer is not an intent.
  *
  * This layer is the only one of the follower that a test can reach: it lives in a
@@ -70,7 +70,7 @@ describe("which gestures release the transcript's follow", () => {
 
   it("ignores a wheel that pushes further down while the viewport is already at the bottom", () => {
     // The case a second follower used to get wrong: at the bottom, a further
-    // downward wheel has nowhere to go, so Desktop records it as
+    // downward wheel has nowhere to go, so it is recorded as
     // `wheel-intent:ignored-boundary` and keeps following. Reading it as "the
     // user has taken over" is what left later content below the fold.
     expect(webuiScrollIntent({ event: "wheel", deltaY: 120, metrics: { scrollTop: bottom, ...TALL } })).toBe("ignore");

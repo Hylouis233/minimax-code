@@ -25,7 +25,7 @@ export function parseWebuiMessageFileReference(value: string, workspaceDir?: str
   const path = match[1];
   if (!path || (!path.includes("/") && !/\.[a-z\d_-]+$/iu.test(path))) return undefined;
   if (path.split("/").some((segment) => segment === "" || segment === "." || segment === "..")) return undefined;
-  // Desktop renders paths from generated files and user workspaces. Filenames
+  // Paths come from generated files and user workspaces. Filenames
   // may contain spaces or non-ASCII characters, so validate by path segment
   // instead of rejecting everything outside ASCII `\w`.
   if (path.split("/").some((segment) => !/^[\p{L}\p{N}_@.+ ()\[\]-]+$/u.test(segment))) return undefined;

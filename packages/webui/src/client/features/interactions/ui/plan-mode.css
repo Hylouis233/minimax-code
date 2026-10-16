@@ -1,23 +1,23 @@
 /*
  * Plan mode cards.
  *
- * Structure, copy and `data-testid` values come from the desktop's plan chunk
+ * Structure, copy and `data-testid` values follow the plan-mode surface
  * (`plan-delivery-card`, `plan-review-decision`, `plan-enter-confirmation`);
- * this file is the CSS half of that parity. The desktop spells these out as
- * Tailwind utilities in the component, and the classes it uses map 1:1 through
+ * this file is the CSS half of that surface. The classes are spelled out as
+ * Tailwind utilities in the component, and those utilities map 1:1 through
  * this package's `tailwind.config.cjs` — except for three that do not survive
  * the port and are written out here instead:
  *
  *   * the summary's bottom fade mask (`linear-gradient(… transparent)`), which
- *     the desktop inlines as a `style` prop because no utility covers it;
+ *     is inlined as a `style` prop because no utility covers it;
  *   * `.scrollbar-hide`, used by the expandable summary; this shell defines it
  *     nowhere else;
  *   * the `bg-opacity_black_1_2` / `bg-opacity_white_0_2` header hover. Those
  *     two ramp tokens exist as custom properties but were never registered as
- *     Tailwind colours, so the desktop's hover classes compile to nothing here
+ *     Tailwind colours, so the hover classes compile to nothing here
  *     and the hover is expressed against the interaction ramp instead.
  *
- * Heights, radii and the 336px / 104px preview caps are the desktop's numbers.
+ * Heights, radii and the 336px / 104px preview caps are the measured numbers.
  *
  * The placement block at the end is not plan-specific but had to be fixed with
  * the plan cards: the interaction panel is a SIBLING of the composer overlay,
@@ -26,7 +26,7 @@
  * roughly 1500px above the viewport on a loaded session. Pending permissions
  * and questionnaires were invisible for the same reason. Anchoring the panel to
  * the composer's measured inset puts every interaction back above the input,
- * which is where the desktop draws them.
+ * which is where they belong.
  */
 
 .webui-plan-surface {
@@ -168,9 +168,9 @@
 
 /*
  * The preview window. Collapsed it shows the plan's summary section up to the
- * desktop's 336px cap; open it shows the whole file in a 104px window. The
+ * 336px cap; open it shows the whole file in a 104px window. The
  * fade tells the user there is more without a scrollbar, which is what the
- * desktop's inline mask does.
+ * inline mask does.
  */
 .webui-plan-delivery-summary {
   position: relative;
@@ -178,7 +178,7 @@
   min-height: 104px;
   /* No cap. The card is a message in the scrolling column now, so a fixed
      height only hides plan content the reader can simply scroll to — the
-     desktop renders the section in full. The button that used to cap it,
+     the section renders in full. The button that used to cap it,
      预览, opens the whole file in the workspace panel. */
   max-height: none;
   overflow: visible;
@@ -521,7 +521,7 @@
    plan review — means the interaction card OWNS the composer's slot. The input
    is not rendered while the request is open, so the panel takes the overlay's
    exact box, gradient and padding, and the composer returns when the request
-   is answered. This is what the desktop does, and it is why the card no longer
+   is answered. This is the intended behaviour, and it is why the card no longer
    floats over the message column. */
 .webui-session-layout [data-webui-interactions] {
   position: absolute;

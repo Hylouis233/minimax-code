@@ -12,7 +12,7 @@
 // server's own grouping happens to put it.
 //
 // `pluginManagement` carries 29 actions behind its one member
-// (`docs/webui/plugin-action-inventory.md`), which is the figure this port's
+// (`packages/webui/docs/reference/plugin-action-inventory.md`), which is the figure this port's
 // business scope is measured by rather than its member count.
 
 import type { WebuiPluginManagementRequest } from "../../../../shared/plugin-management.js";

@@ -3070,7 +3070,7 @@ describe("WebUI runtime host assembly", () => {
   });
 
   it("hands the runtime an auth context getter and invalidator for managed login", async () => {
-    // Assembly step 3 of `docs/webui-v1-scope.md`. Managed MiniMax login has no
+    // Assembly step 3 of `packages/webui/docs/runtime.md`. Managed MiniMax login has no
     // API key, so without this pair the resolver throws "managed OAuth bearer is
     // not synced" and every turn dies at the agent preflight — even with the
     // credential sitting in the data directory.

@@ -2,8 +2,8 @@
 //
 // The runtime raises plan mode on the same questionnaire channel as every other
 // interaction, and the request is recognised by `mode: "plan"` (see
-// `projection/interactions/plan-mode.ts`). The desktop renders three distinct surfaces for
-// that channel and so does this file:
+// `projection/interactions/plan-mode.ts`). Three distinct surfaces render for
+// that channel:
 //
 //   * `plan-enter-confirmation`  — asked before plan mode starts.
 //   * `plan-delivery-card`       — the plan file itself: title, preview of the
@@ -11,10 +11,9 @@
 //   * `plan-review-decision`     — "计划完成，实施计划？" with the three-way
 //                                  decision.
 //
-// The `data-testid` values are the desktop's own, so the same selectors work
-// against either client. Prose and structure mirror the desktop chunk; the
-// one deliberate difference is 预览, which expands the plan in place — the
-// desktop opens the file in its preview panel, and the composer has no route
+// The `data-testid` values are stable selectors pinned by
+// `webui-plan-mode.test.ts`. One deliberate difference from a file-preview
+// panel: 预览 expands the plan in place, because the composer has no route
 // into that panel to hand the path to.
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from "react";
@@ -42,9 +41,7 @@ import type {
   WebuiQuestionnaireRequest,
 } from "../../../../shared/contracts/interactions.js";
 
-/** Eye glyph for 预览. The desktop ships this one inside a per-chunk icon
- *  module whose path data is not addressable offline; this is an equivalent
- *  outline eye at the same 18px box. */
+/** Eye glyph for 预览: an outline eye in an 18px box. */
 function PlanEyeIcon({ className }: { readonly className?: string }): ReactElement {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true" className={className}>
@@ -77,8 +74,7 @@ function PlanCardError({ error }: { readonly error?: string }): ReactElement | n
 /**
  * The plan file card: title, an always-visible preview of the plan's summary
  * section, and the two actions. The preview is capped and fades out at the
- * bottom edge the way the desktop's masked summary does, and 预览 expands the
- * whole file in place.
+ * bottom edge under a mask, and 预览 expands the whole file in place.
  */
 export function WebuiPlanDeliveryCard({
   request,
@@ -164,7 +160,7 @@ export function WebuiPlanDeliveryCard({
               <PlanEyeIcon />
             </span>
             {/* The label stays 预览 whether or not the preview is open — the
-                desktop's view button reads the same either way, and switching
+                view button reads the same either way, and switching
                 it to 执行 would duplicate the build action sitting next to it.
                 Open state is carried by aria-exppressed semantics. */}
             <span data-testid="plan-view-label">{WEBUI_PLAN_COPY.deliveryView}</span>
@@ -193,7 +189,7 @@ export function WebuiPlanDeliveryCard({
 /**
  * "计划完成，实施计划？" — approve, ask for changes, or skip. The free-text row
  * swaps its 跳过 button for 发送 as soon as there is something to send, which
- * is what makes the two states mutually exclusive on the desktop.
+ * is what makes the two states mutually exclusive.
  */
 export function WebuiPlanReviewDecision({
   request,
@@ -366,7 +362,7 @@ export function WebuiPlanEnterConfirmation({
 }
 
 /**
- * Desktop's plan dispatch in one place: a plan request that already carries the
+ * The plan dispatch in one place: a plan request that already carries the
  * written file is the decision card, and a plan request without it is the entry
  * confirmation. Anything else is not ours and renders nothing.
  */

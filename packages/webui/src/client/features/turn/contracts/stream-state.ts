@@ -42,11 +42,11 @@ export interface WebuiStreamMessage {
   readonly timestamp?: number;
   readonly isGoal?: boolean;
   readonly toolCalls?: readonly Record<string, unknown>[];
-  /** Ordered Desktop activity parts carried by the existing agent_message frame. */
+  /** Ordered activity parts carried by the existing agent_message frame. */
   readonly parts?: readonly Record<string, unknown>[];
   /** Runtime-reported `TokenUsage` (with `request_duration_ms` / `output_tokens`)
-   *  from the agent_message wire frame. The WebUI uses it to render the
-   *  Desktop-style "共执行 N 分 M 秒 · {rate} token/s" row. */
+   *  from the agent_message wire frame. Rendered as the
+   *  "共执行 N 分 M 秒 · {rate} token/s" row. */
   readonly usage?: Record<string, unknown>;
   /** Runtime context-window snapshot attached to the assistant message. */
   readonly contextUsage?: Record<string, unknown>;
@@ -131,7 +131,7 @@ export interface WebuiStreamState {
   readonly actionDeltas: readonly Record<string, unknown>[];
   /** Latest session context snapshot, restored from history and refreshed by live messages. */
   readonly contextUsage?: Record<string, unknown>;
-  /** The session-scoped Todo/Subagent projection fed by Desktop-compatible events. */
+  /** The session-scoped Todo/Subagent projection fed by workspace-progress events. */
   readonly workspaceProgress: WebuiWorkspaceProgressState;
   readonly status?: string;
   readonly refusal?: string;

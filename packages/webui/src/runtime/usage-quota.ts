@@ -1,8 +1,8 @@
 // Cloud account-quota client for the WebUI's user-menu usage panel.
 //
-// The desktop's usage popover reads two cloud APIs: billing/quota
-// (`GET /backend/account/token_plan/remains_percent` — the exact endpoint its
-// popover renders from) and membership
+// The usage panel reads two cloud APIs: billing/quota
+// (`GET /backend/account/token_plan/remains_percent` — the exact endpoint it
+// renders from) and membership
 // (`POST /matrix/api/v1/commerce/get_membership_info`, preceded by
 // `get_user_extra_info` to resolve the personal workspace). Both require a
 // fresh OAuth lease from `@mavis/oauth-core`; the cli-auth projection
@@ -78,7 +78,7 @@ const OPEN_PLATFORM_ORIGINS: Readonly<Record<string, Readonly<Record<string, str
 const USER_EXTRA_INFO_PATH = "/matrix/api/v1/user/get_user_extra_info";
 const MEMBERSHIP_INFO_PATH = "/matrix/api/v1/commerce/get_membership_info";
 const USER_INFO_PATH = "/v1/api/user/info";
-// The desktop popover's own quota endpoint: returns used/total percent per
+// The panel's own quota endpoint: returns used/total percent per
 // window (`"96%"` / `"100%"`) plus count-based video rows. The sibling
 // `/v1/api/openplatform/coding_plan/remains` reports *remaining* percent and
 // feeds the terminal client's "% left" display — not this panel's copy.
@@ -183,10 +183,9 @@ export class UsageQuotaClient {
   /**
    * The panel's payload. A missing lease yields `{ signedIn: false }` so the
    * panel can render the signed-out copy instead of an error. A membership
-   * failure throws (the panel shows the desktop's error-plus-retry branch);
-   * a quota failure after a successful membership read does not — the panel
-   * degrades to the credits-only row exactly as the desktop does when quota
-   * data is empty.
+   * failure throws (the panel shows its error-plus-retry branch); a quota
+   * failure after a successful membership read does not — the panel degrades
+   * to the credits-only row when quota data is empty.
    */
   async getUsageQuota(options?: { forceRefresh?: boolean }): Promise<WebuiUsageQuotaResult> {
     const token = await this.options.tokenProvider().catch(() => undefined);
@@ -430,9 +429,8 @@ export class UsageQuotaClient {
     const rows = modelRemains
       .map(asRecord)
       .filter((row): row is Record<string, unknown> => row !== undefined);
-    // Mirror the desktop's row selection: the `general` row first, else the
-    // first non-video row, else the first row (the bundled SDK's
-    // `queryPercent` behind the popover).
+    // Row selection: the `general` row first, else the first non-video row,
+    // else the first row (the bundled SDK's `queryPercent` that produces it).
     const primary =
       rows.find((row) => readString(row, undefined, "model_name") === "general") ??
       rows.find((row) => !isVideoRow(row)) ??

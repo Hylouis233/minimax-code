@@ -2,8 +2,8 @@
 @layer components {
 
 
-  /* The floating composer card. Same layer as `.webui-card`, at the desktop's
-   * 20px radius, with the shadow the desktop adds from `sm` upward. Same reason
+  /* The floating composer card. Same layer as `.webui-card`, at the 20px
+   * radius, with the shadow added from `sm` upward. Same reason
    * as `.webui-hero-avatar` for living here instead of in the markup. */
   .webui-composer-card {
     box-shadow: 0 0 10px 0 var(--shadow_default);
@@ -48,7 +48,7 @@
     overscroll-behavior: contain;
   }
 
-  /* Keep the root menu mounted beside its active flyout, matching Desktop's
+  /* Keep the root menu mounted beside its active flyout, matching the
    * hover navigation. The stack is also the shared pointer/focus surface, so
    * moving between the root and submenu does not collapse the flyout. */
   .webui-composer-menu-stack {
@@ -460,7 +460,7 @@
    * menu is `position: absolute` in the composer shell, and it was in that
    * original order too: this grouped rule sat *before* the absolute one, so the
    * relative declaration never applied to the workspace menu. After the split
-   * the two rules ended up in different files and the bundle put this one last,
+   * the two rules ended up in different files and the compiled stylesheet put this one last,
    * which made `relative` win and pushed the panel into the document flow —
    * the home composer grew by the panel's height. Dropping the selector keeps
    * the effective result the split was supposed to preserve. */
@@ -516,7 +516,7 @@
   .webui-thinking-brain--unstated {
     color: var(--icon_default_tertiary);
   }
-  /* Slash palette rows reproduce the desktop's icon, bold title, dim
+  /* Slash palette rows reproduce the icon, bold title, dim
      description pattern. The leading icon is the command glyph; the trailing
      "/name" suffix is dim and shows the literal slash form. */
   .webui-command-option {
@@ -538,7 +538,7 @@
   /* Label column. The label is the skill/command name and the user's first
      anchor — it must always render fully. It takes its natural width up to
      a sensible cap so a long name like `docker-container-ops` never
-     collapses to `d...`. The desktop uses `max-w-[50%]` here but that fights
+     collapses to `d...`. A `max-w-[50%]` here fights
      the description's `flex-1` and crushes long skill names; pin the label
      to its content + a 220px ceiling so descriptions can wrap or shrink
      instead. */
@@ -569,8 +569,8 @@
   .webui-command-option[aria-selected="true"] {
     background-color: var(--bg_interaction_tertiary_hover);
   }
-  /* Section header inside the popover. The desktop inserts a small dim
-     divider between the default section and the skills section; this rule
+  /* Section header inside the popover. A small dim
+     divider separates the default section from the skills section; this rule
      gives it a fixed slot above the first skill row, with the same
      type-size + line-height the rest of the popover has. */
   .webui-command-section-header {
@@ -580,7 +580,7 @@
     line-height: var(--line_height_16);
     font-weight: var(--weight_regular);
   }
-  /* Inert palette rows render with the same shape as live rows (desktop 1:1)
+  /* Inert palette rows render with the same shape as live rows (1:1)
      but show as unavailable: muted icon, dimmer label/description, no hover
      tint, and a not-allowed cursor so the user can tell the row exists for
      visual parity only. The harness port still wires the supported commands
@@ -657,7 +657,7 @@
   }
 
   /* The composer's call to action: a filled blue disc carrying an inverted
-   * glyph. `#3a83f7` is a brand blue with no entry in the transcribed desktop
+   * glyph. `#3a83f7` is a brand blue with no entry in the token
    * palette — those run cyan (`#0094fc`, `#0077d9`) and are visibly cooler —
    * so it stays a literal here, matching how the toggle switch already pins
    * `#0094fc`, rather than being forced onto a `--blue_*` step that would
@@ -747,7 +747,7 @@
     display: contents;
   }
 
-  /* Desktop composer overlays the bottom of the session reading column. Its
+  /* The composer overlays the bottom of the session reading column. Its
    * measured height is exported by SessionComposer and consumed by the
    * explicit spacer at the end of the shared message viewport. */
   .webui-session-layout .webui-session-composer-overlay {

@@ -9,7 +9,7 @@
 // behaviour change.
 
 /**
- * Formats a quota reset timestamp the way the desktop popover does:
+ * Formats a quota reset timestamp:
  * `3小时13分后重置` below a day, `5天7小时后重置` once days are involved,
  * `13分后重置` below an hour. A past or invalid timestamp renders nothing.
  */

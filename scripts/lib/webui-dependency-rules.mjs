@@ -9,10 +9,9 @@
 // This check is deliberately separate from `scripts/lib/webui-boundary.mjs`
 // (the esbuild metafile check). The metafile cannot see `import type` edges —
 // they are erased from build output — and it proves an input is *present*, not
-// that its dependency *direction* is legal. The layers and their provenance
-// come from `docs/webui/webui-runtime-layer-plan.md` section 7.1; the allowed
-// edges come from the same plan's section 3 ("Dependency direction and machine
-// enforcement") and ADR 0014.
+// that its dependency *direction* is legal. The layer matrix and the allowed
+// edges are ADR 0014's; the caller-role rules and the checks that enforce them
+// are documented in `packages/webui/docs/architecture.md`.
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { builtinModules } from "node:module";

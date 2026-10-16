@@ -18,12 +18,12 @@ import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilit
 import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
 
 /**
- * The delete confirmation's copy, copied from the desktop word for word.
+ * The delete confirmation's copy, word for word.
  *
- * The half-width `?` is the desktop's, not a typo to tidy up: a full-width
+ * The half-width `?` is deliberate, not a typo to tidy up: a full-width
  * `？` carries a full em of advance and visibly opens a gap after 忆, and the
- * measured dialog does not have one. The body deliberately carries no byte
- * count — the desktop's does not either, and the row above the button already
+ * dialog does not have one. The body deliberately carries no byte
+ * count either, and the row above the button already
  * shows the figure the user would compare it against.
  */
 export const MEMORY_DELETE_CONFIRM = {
@@ -34,7 +34,7 @@ export const MEMORY_DELETE_CONFIRM = {
 } as const;
 
 /**
- * The desktop's own predicate, lifted out so it can be tested directly:
+ * The save predicate, lifted out so it can be tested directly:
  * `!loading && !saving && draft !== baseline && draft.length > 0`.
  *
  * All four clauses matter. Without the dirty check the button is live the moment
@@ -67,7 +67,7 @@ export function formatMemoryTimestamp(value: string | undefined): string {
 }
 
 /** What 「在会话中创建」 leaves in the composer, beside the attached file.
- *  The desktop lands on the home surface with exactly this one line already
+ *  The home surface opens with exactly this one line already
  *  typed, so the user's next action is to add what they actually want changed. */
 export const MEMORY_HANDOFF_PROMPT = "我想调整下这个记忆文件";
 
@@ -157,7 +157,7 @@ export function MemoryManagerDialog({
   }, []);
 
   /**
-   * The body loads on open. The desktop takes 管理 straight into the editor,
+   * The body loads on open. 管理 goes straight into the editor,
    * and a second click to start reading is a step the user has to learn for
    * nothing — the file is the whole point of opening the dialog.
    *
@@ -178,7 +178,7 @@ export function MemoryManagerDialog({
   }, [load]);
 
   /**
-   * The desktop's own predicate: `!loading && !saving && draft !== baseline &&
+   * The save predicate: `!loading && !saving && draft !== baseline &&
    * draft.length > 0`. All four matter — a live button on open offers a write
    * that rewrites the file byte-for-byte, and an empty draft is the delete
    * path, which lives behind the ⋯ menu.
@@ -444,7 +444,7 @@ export function MemoryManagerDialog({
   /**
    * The confirmation is a second modal, not a panel inside the first.
    *
-   * The desktop dims the editor behind a centred dialog with its own title, a
+   * The confirmation dims the editor behind a centred dialog with its own title, a
    * × and a right-aligned footer. Rendering it inline — which is what this used
    * to do — cannot get there: an inline block cannot dim what is behind it, and
    * a scrim over the editor has to be portalled for the same reason the editor

@@ -179,8 +179,8 @@ beforeAll(() => {
 
 describe("W0 · the section save button's three states", () => {
   it("is the desktop's black primary, 76x30, fading to half on disable", () => {
-    // Both personalization headers pass `variant: "black"` in the desktop
-    // bundle, which is a filled primary — not the light `gray` fill this
+    // Both personalization headers pass `variant: "black"`, a filled primary
+    // — not the light `gray` fill this
     // button used to draw. `black` has no disabled override of its own, so the
     // generic rule is the whole disabled state: the fill and the label stay put
     // and the control goes half-transparent.
@@ -200,7 +200,7 @@ describe("W0 · the section save button's three states", () => {
     expect(declaration(geometry, "text-align")).toBe("center");
     expect(declaration(geometry, "line-height")).toBe("var(--line_height_20)");
 
-    // `opacity: .5` is the desktop's `.mavis-button.disabled` value, not the
+    // `opacity: .5` is the `.mavis-button.disabled` value, not the
     // shared `.6`. The shared rule also pins `cursor: default` and wins the
     // cascade unless this button restates it, so the cursor is asserted too.
     const disabled = winning(".webui-section-save-button:disabled").body;
@@ -288,7 +288,7 @@ describe("W0 · the memory manager's header controls", () => {
   });
 
   it("parks the character count inside the editor, 14px off both edges", () => {
-    // Measured off the desktop dialog at 1:1 -- the digits sit 14px left of the
+    // 1:1 off the dialog -- the digits sit 14px left of the
     // border and 14px above it, inside the field.
     //
     // On its own class, and the assertion is deliberately narrow. The count used
@@ -330,7 +330,7 @@ describe("W0 · the memory manager's header controls", () => {
   });
 
   it("sizes the dialog editor by content, 13 to 24 rows", () => {
-    // The desktop's `autoSize: {minRows: 13, maxRows: 24}` at `!leading-6`:
+    // The dialog's `autoSize: {minRows: 13, maxRows: 24}` at `!leading-6`:
     // 24px between baselines, and a 593px box for content long enough to cap
     // out, which is 24 rows. 13 rows + 8px top padding + the 28px the count
     // needs is the floor; 24 rows is the ceiling.
@@ -345,10 +345,10 @@ describe("W0 · the memory manager's header controls", () => {
     expect(declaration(editor, "height")).toBe("auto");
     expect(declaration(editor, "min-height")).toBe("348px");
     expect(declaration(editor, "max-height")).toBe("612px");
-    // The desktop marks the field `shrink-0`: its height is its content's, not
+    // The field is `shrink-0`: its height is its content's, not
     // the leftover space in the dialog. `flex: 1` is what pinned it at 239px.
     expect(declaration(editor, "flex")).toBe("none");
-    // Prose, not code: the desktop runs it at `!text-sm !leading-6` in the UI
+    // Prose, not code: it runs at `!text-sm !leading-6` in the UI
     // face. 12px monospace is also why a "13 row" floor was not 312px here.
     expect(declaration(editor, "font-family")).toBe("inherit");
     expect(declaration(editor, "font-size")).toBe("var(--size_14)");
@@ -383,7 +383,7 @@ describe("W0 · the memory manager's header controls", () => {
     // content 1px and leaves the text sitting against the ring; `outline` paints
     // on the border edge without taking layout, so the content box is the same
     // focused and unfocused. The blue itself is the app's `blue_500`, measured
-    // 1:1 off the desktop dialog, not the `border_heavy` the bundle names.
+    // 1:1 off the dialog, not the `border_heavy` the tokens name.
     const focus = winning(
       ".webui-memory-manager-editor .webui-personalization-textarea:focus",
     ).body;
@@ -395,7 +395,7 @@ describe("W0 · the memory manager's header controls", () => {
     expect(declaration(focus, "border-color")).not.toBe("var(--blue_500)");
 
     // The shared rule is the `mavis-personalization-editor` half. `resize: none`
-    // is global on the desktop (`.mavis-textarea textarea{resize:none!important}`
+    // is global (`.mavis-textarea textarea{resize:none!important}`
     // beats even the inline `resize:vertical` one call site passes), so no
     // editor in this dialog can be dragged taller.
     const shared = winning(".webui-personalization-textarea").body;
@@ -403,8 +403,8 @@ describe("W0 · the memory manager's header controls", () => {
     expect(declaration(shared, "border")).toBe("none");
     expect(declaration(shared, "background")).toBe("var(--bg_grouped_tertiary)");
     expect(declaration(shared, "border-radius")).toBe("var(--radius_16)");
-    // The two settings-page editors are height-clamped, not free. The desktop
-    // passes `minHeight: 144, maxHeight: 200` in the style object, and
+    // The two settings-page editors are height-clamped, not free. Their style
+    // object passes `minHeight: 144, maxHeight: 200`, and
     // `field-sizing: content` with `height: auto` is what makes those two
     // numbers the whole rule -- the field grows with its text and stops at
     // 200px. The dialog overrides both for its own 13-to-24-row range.
@@ -415,7 +415,7 @@ describe("W0 · the memory manager's header controls", () => {
   });
 
   it("separates the dialog's footer with space, not a rule", () => {
-    // The desktop's last row is `flex justify-between`: the timestamp on the
+    // The last row is `flex justify-between`: the timestamp on the
     // left, 取消/保存 on the right, 20px from the editor above and 16px between
     // the two buttons. There is no divider -- the gap is the divider.
     const footer = winning(".webui-memory-manager-footer").body;

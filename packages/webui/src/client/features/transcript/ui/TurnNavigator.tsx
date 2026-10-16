@@ -1,13 +1,12 @@
-// TurnNavigator — WebUI transcription of the right-edge tick strip + hover
-// preview card from `mine-transcript/58686.pretty.js` at lines 10779–11160.
+// TurnNavigator — the right-edge tick strip + hover preview card.
 //
-// Desktop keeps the heavy state (history paging, scroll sync, mask edges,
-// artefacts overflow detection, intersection observers, debounced hover
-// transitions) in the parent; this component is the presentational seam and
-// receives pre-computed `turnSummaries`. Each tick carries a `data-turn-id`
-// matching the desktop contract and the expected `data-state`.
+// The heavy state (history paging, scroll sync, mask edges, artefacts
+// overflow detection, intersection observers, debounced hover transitions)
+// stays in the parent; this component is the presentational seam and receives
+// pre-computed `turnSummaries`. Each tick carries a `data-turn-id` and a
+// `data-state`, both pinned by `turn-navigator.test.tsx`.
 //
-// All testids from the brief are preserved verbatim:
+// All testids are preserved verbatim:
 //
 //   message-turn-navigator, -strip, -tick, -tick-hit-target, -mask-top,
 //   -mask-bottom, -preview, -preview-title, -preview-time, -preview-previous-query,
@@ -15,14 +14,12 @@
 //   -preview-file-change-count, -preview-artifact-icon, -preview-artifact-label.
 //
 // The mask gradients (left/right artefacts scroll edge; top/bottom strip edge)
-// are written as inline gradients that match the desktop's
-// `minimax-webui/app/out/_next/static/css/d58176301f5655a9.css` rule — see
-// `transcript-widgets.css` for the lifted utility classes (`shadow-s1`,
+// are written as inline gradients — see `transcript-widgets.css` for the
+// utility classes (`shadow-s1`,
 // `transcript-navigator-mask-{left,right,top,bottom}`).
 //
 // Interaction (hover, scroll, jump) is owned by the integrator; this surface
-// accepts `onTickHover`, `onTickActivate`, `onMaskTopClick`, `onMaskBottomClick`
-// for the same intent the desktop wires at lines 10738–10740 and 10860–10870.
+// accepts `onTickHover`, `onTickActivate`, `onMaskTopClick`, `onMaskBottomClick`.
 
 import { useState, type CSSProperties, type MouseEvent } from "react";
 

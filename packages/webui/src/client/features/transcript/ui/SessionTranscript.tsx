@@ -85,7 +85,7 @@ export function WebuiSessionTranscript({
   const stream = useWebuiSessionStream(sessionId);
   const streamPhase = stream.phase;
   // The plan file is a MESSAGE in the transcript, not a floating card: the
-  // desktop renders it as the footer of the turn that wrote the plan. It lives
+  // it is rendered as the footer of the turn that wrote the plan. It lives
   // on the pending questionnaire, so the transcript reads the same channel the
   // composer does and anchors the card to `request.tool.messageId`.
   //

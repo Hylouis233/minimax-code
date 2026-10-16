@@ -1,18 +1,16 @@
-// OutputError — WebUI transcription of `function v()` from
-// `mine-transcript/58686.pretty.js` (lines 305–406). The error footer shown
-// beneath the last assistant turn whenever the streaming pipeline reports a
-// failure or retry state. Verbatim testids, class composition, and count-down
-// math (10s rate-limit window, default `0` when `errorAt` is missing).
+// OutputError — the error footer shown beneath the last assistant turn whenever
+// the streaming pipeline reports a failure or retry state. Testids, class
+// composition, and count-down math (10s rate-limit window, default `0` when
+// `errorAt` is missing) are pinned by `output-error.test.tsx`.
 //
-// The desktop uses antd `Tooltip` for the icon hover (`mavis-output-error-tooltip`
-// overlay class) and the shared black button (`p.z` = `mavis-button.black`).
-// Both are external dependencies the integrator must wire; this component
-// leaves the same slots open via props (`renderIconTooltip`, `renderRetryButton`)
-// so a unit test can pin the output structure without dragging antd in.
+// The icon hover overlay uses the `mavis-output-error-tooltip` class and the
+// retry row uses the shared black button (`mavis-button.black`). Both are
+// external dependencies the integrator must wire; this component leaves the
+// same slots open via props (`renderIconTooltip`, `renderRetryButton`) so a
+// unit test can pin the output structure without dragging antd in.
 //
-// `variant` matches Desktop's `m.ku.OutputRetrying` / `OutputRateLimited` /
-// `OutputError` enums; we accept them as plain string literals to keep this
-// file dependency-free.
+// `variant` accepts the `OutputRetrying` / `OutputRateLimited` / `OutputError`
+// variants as plain string literals to keep this file dependency-free.
 
 import { useEffect, useState, type ReactNode } from "react";
 

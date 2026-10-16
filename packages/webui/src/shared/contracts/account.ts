@@ -1,7 +1,7 @@
 import type { ClaimSigninData, SigninPanel } from "@mavis/shared/daily-signin";
 
 // The check-in wire types are the shared validators' own types — the same
-// `@mavis/shared/daily-signin` module the TUI and the desktop use (the webui
+// `@mavis/shared/daily-signin` module the TUI uses as well (the webui
 // panel renders them directly, so there is no second shape to drift).
 //
 // Wire contract record (plan section 7.1 / 7.5): every exported

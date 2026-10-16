@@ -181,7 +181,7 @@ describe("context panel — the six-category split is folded until asked for", (
     );
   });
   it("puts the disclosure on the heading row, with a chevron that states it", () => {
-    // A caret beside the number is the desktop's own "there is more under
+    // A caret beside the number is the "there is more under
     // this" convention, and a separate 详情 button next to it would be two
     // controls for one section.
     expect(indicator).toContain("webui-context-usage-disclosure");

@@ -1,7 +1,7 @@
 // Unit tests for the Phase-6 TurnNavigator transcription.
 //
-// Each test asserts against the desktop's exact `data-testid` values, the
-// `data-turn-id` / `data-state` attributes the desktop emits, and the
+// Each test asserts against the exact `data-testid` values, the
+// `data-turn-id` / `data-state` attributes the component emits, and the
 // `data-mode` / `data-hidden` flags the parent uses to drive the strip
 // visibility. The brief lists 17 testids; this file covers them all.
 

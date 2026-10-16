@@ -36,8 +36,8 @@
 //
 // Topics, daily notes, summary and archive are out of scope. They have their
 // own lifecycles (TTL cleanup, snapshots, a 4KB cap) and belong with the
-// facade. That 4KB cap is also the trap this design avoids: the desktop's
-// 记忆概要 modal renders a 68KB document, so that panel reads main memory, not
+// facade. That 4KB cap is also the trap this design avoids: the 记忆概要 modal
+// renders a 68KB document, so that panel reads main memory, not
 // `writeMemorySummary` — a textarea wired to the summary would reject exactly
 // the content the modal exists to show.
 //
@@ -97,12 +97,12 @@ export const USER_PROFILE_MAX_CHARS = MEMORY_TAIL_INJECTION_CAP_CHARS;
  * therefore show the user machine-written entries they never wrote, and let
  * them change text the model never reads.
  *
- * Nothing in this repository writes these markers: the format is owned by the
- * desktop surface, and `LocalPromptMemoryReader` — the interface that feeds
- * the composer — has no implementation here. So the literals below are a
- * copied contract, pinned by `profile-files.test.ts` against the same strings,
- * and a write that finds them absent or half-present fails loudly instead of
- * guessing.
+ * Nothing in this repository writes these markers: the format belongs to the
+ * `user.md` file, which the other clients that use this data directory share,
+ * and `LocalPromptMemoryReader` — the interface that feeds the composer — has
+ * no implementation here. So the literals below are a fixed contract, pinned
+ * by `profile-files.test.ts` against the same strings, and a write that finds
+ * them absent or half-present fails loudly instead of guessing.
  */
 const USER_PROFILE_START = "<!-- mavis-personalization:start -->";
 const USER_PROFILE_END = "<!-- mavis-personalization:end -->";
@@ -110,21 +110,22 @@ const USER_PROFILE_END = "<!-- mavis-personalization:end -->";
 /**
  * The three field labels and the free-text heading inside the region.
  *
- * These are the desktop's own literals, recovered from its settings bundle: it
- * declares `Nickname: `, `Occupation: ` and `## More about you` alongside the
- * two markers, reads the region by splitting on newlines and pulling the value
- * off whichever line starts with a label, and treats everything after the
- * heading as free text. The region is therefore a *structured* record, not one
- * blob of prose — reading it as a single string is what made the panel show a
- * filled document where the desktop shows an empty profile, because
- * `Nickname: ` and `Occupation: ` are prefixes, and with nothing after either
- * colon every field parses to the empty string.
+ * These are the literals the profile-file format uses: along with the two
+ * markers it declares `Nickname: `, `Occupation: ` and `## More about you`,
+ * reads the region by splitting on newlines and pulling the value off
+ * whichever line starts with a label, and treats everything after the heading
+ * as free text. The same `user.md` file is shared with the other clients that
+ * use this data directory. The region is therefore a *structured* record, not
+ * one blob of prose — reading it as a single string is what made the panel show
+ * a filled document where an empty profile was meant, because `Nickname: ` and
+ * `Occupation: ` are prefixes, and with nothing after either colon every field
+ * parses to the empty string.
  */
 const USER_PROFILE_NICKNAME_LABEL = "Nickname: ";
 const USER_PROFILE_OCCUPATION_LABEL = "Occupation: ";
 const USER_PROFILE_MORE_ABOUT_HEADING = "## More about you";
 
-/** The desktop's own field normaliser: collapse every whitespace run, trim. */
+/** The field normaliser: collapse every whitespace run, trim. */
 function normalizeProfileField(value: string): string {
   return value.replace(/\s+/gu, " ").trim();
 }
@@ -135,7 +136,7 @@ function readProfileField(lines: readonly string[], label: string): string {
   return line?.slice(label.length).trim() ?? "";
 }
 
-/** The desktop's parse: split the region, then cut at the free-text heading. */
+/** The parse: split the region, then cut at the free-text heading. */
 export function parseUserProfileRegion(body: string): WebuiUserProfileFields {
   const lines = body.trim().split("\n");
   const headingIndex = lines.findIndex(
@@ -152,13 +153,13 @@ export function parseUserProfileRegion(body: string): WebuiUserProfileFields {
 }
 
 /**
- * The desktop's write, transcribed.
+ * The write path.
  *
  * The skeleton is fixed and the empty string in the middle is a real blank line
  * produced by the join, so `## More about you` is always present on disk even
- * when there is no free text under it — that is the desktop's own output, not a
+ * when there is no free text under it — that is the format's own output, not a
  * damaged file, and reproducing it is what keeps a file this WebUI writes
- * byte-identical to one the desktop wrote.
+ * byte-identical to one the other clients write.
  *
  * `filter(Boolean)` is applied to the *outer* three parts only, so an absent
  * `before` or `after` collapses the separator instead of leaving a hole. Note
@@ -462,7 +463,7 @@ export async function readUserProfile(
  * Unlike AGENTS.md and main memory, a blank write never deletes the file:
  * `user.md` holds runtime-appended entries the WebUI does not own, and
  * dropping them would delete memory the runtime collected. Writing three empty
- * fields still emits the desktop's skeleton, which reads as "no profile" to the
+ * fields still emits the skeleton, which reads as "no profile" to the
  * composer without touching anything else.
  */
 export async function writeUserProfile(

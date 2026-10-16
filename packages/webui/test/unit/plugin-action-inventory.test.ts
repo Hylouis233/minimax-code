@@ -1,10 +1,9 @@
-// The plugin action inventory, applied and checked (ticket #72; plan §15.3, §4.8, §5.6).
+// The plugin action inventory, applied and checked.
 //
-// §15.3 sizes this business by its **actions**, not by its port member: `plugin-port.ts` declares one
-// member (`pluginManagement?`) standing in front of 29 union values. §5.6 makes the accepted
-// inventory (`docs/webui/plugin-action-inventory.md`, accepted 2026-10-12) a Required predecessor of
-// this carve, and #72's acceptance says the inventory **is applied and each action's business is
-// verified against it — a count of port members is not enough**.
+// `plugins` is sized by its **actions**, not by its port member: `plugin-port.ts` declares two
+// members, of which `pluginManagement?` stands in front of 29 union values. The accepted inventory
+// (`packages/webui/docs/reference/plugin-action-inventory.md`) is this business's population, and
+// each action's business is verified against it — a count of port members is not enough.
 //
 // So the inventory file is this suite's authority, not a restatement of it: the names are read out of
 // the document and compared as a SET against the four places they are carried. A fifth action added
@@ -38,7 +37,7 @@ const stripComments = (source: string): string =>
 
 const codeOf = (url: URL): string => stripComments(read(url));
 
-const inventory = read(new URL("docs/webui/plugin-action-inventory.md", REPO));
+const inventory = read(new URL("packages/webui/docs/reference/plugin-action-inventory.md", REPO));
 
 /** The inventory table's action column: one row per action, numbered. */
 const actions = [...inventory.matchAll(/^\|\s*\d+\s*\|\s*`(\w+)`\s*\|/gmu)].map((m) => m[1]!);

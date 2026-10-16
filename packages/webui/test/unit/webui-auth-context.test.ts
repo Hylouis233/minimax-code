@@ -1,7 +1,7 @@
 // Verify the WebUI's account credential adapter (auth-context.ts).
 //
 // Managed MiniMax login carries no API key: the runtime authenticates with an
-// OAuth access token. Assembly step 3 of `docs/webui-v1-scope.md` requires the
+// OAuth access token. Assembly step 3 of `packages/webui/docs/runtime.md` requires the
 // getter and invalidator that hand that token over, and the harness defaults
 // both to undefined when an assembly supplies neither — which is why every turn
 // used to fail at the agent preflight with "managed OAuth bearer is not synced",

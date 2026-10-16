@@ -107,7 +107,7 @@ export function WebuiComposerProjectRow({
             data-webui-workspace-menu="true"
             className="webui-workspace-menu webui-workspace-menu--desktop"
           >
-            {/* Desktop shape: a `最近` group of workspaces the user has actually
+            {/* A `最近` group of workspaces the user has actually
              * been in, a rule, then the two commands. The group is omitted
              * entirely when there is no history — an empty `最近` header above a
              * divider reads as a broken panel. */}

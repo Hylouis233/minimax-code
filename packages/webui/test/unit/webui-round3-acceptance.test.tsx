@@ -193,7 +193,7 @@ describe("turn review unified diff projection", () => {
   });
 
   it("keeps the no-newline marker as its own row, the way Desktop renders it", () => {
-    // pierre — the diff component Desktop renders with — keeps this marker in
+    // pierre — the diff component the card renders with — keeps this marker in
     // the hunk's line list and draws it as a row with no gutter numbers. The
     // projection dropping it made a patch whose last line has no newline look
     // identical to one whose last line does.

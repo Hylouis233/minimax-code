@@ -6,7 +6,7 @@
  *                     semantic tokens with light and dark bindings.
  *   2. Tailwind base/components/utilities layers — preflight plus the
  *                     token-derived utilities declared in tailwind.config.cjs.
- *   3. The desktop's preflight typography (font-family) is also supplied via
+ *   3. The preflight typography (font-family) is also supplied via
  *      tailwind.config.cjs, so the sans/mono Chinese fallbacks flow from
  *      `font-sans` / `font-mono` rather than from a separate rule.
  *
@@ -48,7 +48,7 @@
  * platforms that still draw them. That is heavier than most of the surfaces it
  * sits on — a settings list, a plugin panel, a queue popover. This pins one
  * shape for all of them: a hairline rounded thumb on a transparent track, in the
- * `--utility_scrollbar` ramp the desktop already ships and the shell previously
+ * `--utility_scrollbar` ramp the shell previously
  * left unreferenced.
  *
  * `scrollbar-width` / `scrollbar-color` carry Firefox and the `::-webkit-`

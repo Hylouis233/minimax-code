@@ -52,11 +52,11 @@ export function WebuiMessageActionButton({
 }: {
   readonly testId: string;
   readonly label: string;
-  /** The desktop's action row is glyph-only: a 26px square holding a 16–18px icon. */
+  /** The action row is glyph-only: a 26px square holding a 16–18px icon. */
   readonly icon: ReactElement;
   readonly onClick: () => void;
   readonly disabled?: boolean;
-  /** Selection state for the feedback toggles; the desktop paints the active glyph differently. */
+  /** Selection state for the feedback toggles; the active glyph is painted differently. */
   readonly active?: boolean;
 }): ReactElement {
   return (
@@ -123,7 +123,7 @@ export function WebuiMessageActions({
   readonly onRewind?: () => void;
   readonly onEdit?: () => void;
   readonly onFork?: () => void;
-  /** Epoch ms; the desktop prints it inside the action row. */
+  /** Epoch ms; printed inside the action row. */
   readonly timestamp?: number;
 }): ReactElement {
   const { dom } = useWebuiBrowserCapabilities();

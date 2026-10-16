@@ -3,7 +3,7 @@
 // `contracts/value-readers.ts` is the leaf the whole projection layer reads through —
 // `recordValue` alone is called from four modules — and it had no test file at
 // all. Two of its behaviours were the ones that drifted when copies existed:
-// "an all-blank string counts as absent", and the credit rounding the desktop
+// "an all-blank string counts as absent", and the credit rounding the module
 // comment records. Both are pinned here.
 import { describe, expect, it } from "vitest";
 
@@ -65,7 +65,7 @@ describe("the formatters", () => {
   });
 
   it("rounds a credit balance the way the desktop does", () => {
-    // The desktop shows `7,726` for `7726.2119999999995`. That example does NOT
+    // The formatter renders `7,726` for `7726.2119999999995`. That example does NOT
     // tell rounding from truncation — both give 7726 — so the discriminating
     // cases are below: `.6` rounds up where truncation would drop it. A second
     // copy in the settings panel truncated, which read one credit lower.

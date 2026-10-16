@@ -3,23 +3,20 @@
  * (ActivityIndicator, TurnNavigator, OutputError, MessageAttachments,
  *  TranscriptSkeletons, ConversationUsageBanner).
  *
- * These utility classes are taken verbatim from the desktop bundle's compiled
- * stylesheet (`minimax-webui/app/out/_next/static/css/*.css`); see the brief
- * (`brief-m3-transcript-widgets.md`) §1 for source paths. Where the desktop
- * produced them via Tailwind plugins we declare them locally so the WebUI's
+ * These utility classes are declared here because no generated utility covers
+ * them; the brief (`brief-m3-transcript-widgets.md`) §1 names the widgets they
+ * serve. Declaring them locally means the WebUI's
  * `pnpm build:webui` stylesheet still emits the same computed values — that is
  * what the `test:app` greps assert at runtime.
  *
- *   .animate-shimmer   — desktop skeleton loader; --shimmer-duration drives the
- *                        keyframe interval, default 1.6s, copied verbatim.
- *   .scrollbar-hide    — desktop hides horizontal/vertical scrollbars on the
+ *   .animate-shimmer   — skeleton loader; --shimmer-duration drives the
+ *                        keyframe interval, default 1.6s.
+ *   .scrollbar-hide    — hides horizontal/vertical scrollbars on the
  *                        navigator artifacts strip and elsewhere.
- *   .shadow-s1         — desktop card shadow (matches `var(--shadow-s1-…)` if
- *                        present, otherwise the literal `0 4px 16px #0000000f`
- *                        that ships in d58176301f5655a9.css).
+ *   .shadow-s1         — card shadow (a literal `0 4px 16px #0000000f` when
+ *                        `var(--shadow-s1-…)` is not present).
  *
- * The keyframes themselves are reproduced verbatim too — Desktop's
- * `ea80bae3e7e1c31b.css` defines `shimmer` as a translateX mask sweep.
+ * The keyframes are defined here too — `shimmer` is a translateX mask sweep.
  *
  * Add the file to `packages/webui/src/client/styles/index.css` once the
  * integration session owns that file (see the Integration section of the
@@ -64,9 +61,8 @@
 }
 
 /*
- * Soft card shadow for the conversation-usage banner. Desktop writes this as
- * `box-shadow: 0 0 20px rgba(10,10,10,0.08)` (see `58686.pretty.js` line
- * 27042 / 27043); a Tailwind arbitrary-value class
+ * Soft card shadow for the conversation-usage banner. The value is
+ * `box-shadow: 0 0 20px rgba(10,10,10,0.08)`; a Tailwind arbitrary-value class
  * (`shadow-[0_0_20px_rgba(10,10,10,0.08)]`) compiles to a `--tw-shadow-color`
  * reference that never resolves in the WebUI's stylesheet, which trips
  * `webui-design-tokens.test.ts`. Keep this as a hand-written utility so the
@@ -78,11 +74,10 @@
 }
 
 /*
- * Turn navigator artifacts horizontal mask. The desktop inlines these gradients
- * via inline styles; we lift them out so the test id (which carries the mask
- * element) can assert against a stable class. The gradient endpoints match
- * `minimax-webui/app/out/_next/static/css/d58176301f5655a9.css` (the
- * `.bg_grouped_secondary_elevated` token resolves through tokens.css).
+ * Turn navigator artifacts horizontal mask. These gradients used to be inline
+ * styles; they are declared here so the test id (which carries the mask
+ * element) can assert against a stable class. The gradient endpoints use the
+ * `.bg_grouped_secondary_elevated` token, which resolves through tokens.css.
  */
 
 .transcript-navigator-mask-left {
@@ -118,10 +113,10 @@
 }
 
 /*
- * Output error tooltip overlay class (`mavis-output-error-tooltip`). The desktop
- * attaches it to an antd Tooltip overlay; the CSS only sets the arrow color, so
+ * Output error tooltip overlay class (`mavis-output-error-tooltip`). It sits on
+ * an antd Tooltip overlay; the CSS only sets the arrow color, so
  * we leave the rule as a no-op placeholder that downstream integrations can
- * override. It exists here so that Desktop's class name never appears in the
+ * override. It exists here so that the class name never appears in the
  * WebUI's compiled stylesheet without a corresponding selector.
  */
 

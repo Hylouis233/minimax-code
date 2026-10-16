@@ -110,7 +110,7 @@ marked.use({
       },
     },
     {
-      // A narrow fallback for Desktop's file references. Some stored
+      // A narrow fallback for file references. Some stored
       // messages carry `[name](/absolute/workspace/path)` as literal text
       // instead of a Markdown link token; recognize that exact file-link
       // shape before marked's generic inline tokenizers.
@@ -198,7 +198,7 @@ function inline(tokens: readonly Token[] | undefined, onOpenFile?: (reference: N
       if (token.tokens) return <Fragment key={key}>{inline(token.tokens, onOpenFile, workspaceDir, lexBareText)}</Fragment>;
       // `marked.lexer` leaves inline children un-tokenized inside some list
       // and blockquote shapes. Tokenize that text here so links, code spans,
-      // emphasis, math and the Desktop file-reference extension render the
+      // emphasis, math and the file-reference extension render the
       // same way regardless of their containing block.
       if (lexBareText) {
         const parsedInline = marked.Lexer.lexInline(token.text, marked.defaults);

@@ -107,13 +107,13 @@
 
   /* ------------------------------------------------------ conversation */
 
-  /* Every message, either role. `mb-4` is the desktop's inter-message gap. */
+  /* Every message, either role. `mb-4` is the inter-message gap. */
   .webui-message {
     width: 100%;
     margin-bottom: var(--spacing_16);
   }
 
-  /* Desktop message-item animation: message-appear .18s ease-out both. */
+  /* Message-item animation: message-appear .18s ease-out both. */
   .message-animate-in {
     animation: message-appear 0.18s ease-out both;
   }
@@ -190,7 +190,7 @@
   }
 
   /* The user's turn: a 16px-radius pale blue bubble, right-aligned and capped
-   * at 80% of the reading column; desktop reads 15px/24px for the user body. */
+   * at 80% of the reading column; the user body reads 15px/24px. */
   .webui-user-bubble {
     max-width: 80%;
     padding: var(--spacing_8) var(--spacing_12);
@@ -226,7 +226,7 @@
     overflow: hidden;
   }
 
-  /* Desktop inline editor stretches across the whole reading column (736px),
+  /* The inline editor stretches across the whole reading column (736px),
    * not the user bubble's 80%. */
   .webui-user-inline-editor {
     width: 100%;
@@ -237,7 +237,7 @@
   /* The assistant's process disclosure: a summary line, a hairline, and the
    * collapsible body that carries the thinking and the tool steps. */
 
-  /* Desktop assistant rows are a plain reading flow. Thinking and tool work
+  /* Assistant rows are a plain reading flow. Thinking and tool work
    * sit in that flow as activity rows; the assistant is never rendered as a
    * generic card. */
   .webui-assistant-body {
@@ -304,7 +304,7 @@
     transition: color 120ms ease;
   }
   /* The category glyph is a viewBox-only <svg> with no width/height, so this
-   * wrapper collapses to a 0x0 box and paints nothing — Desktop's title carries
+   * wrapper collapses to a 0x0 box and paints nothing — the title carries
    * no leading glyph either. A flex `gap` still reserves its 8px beside that
    * empty box, which pushed the title 8px right of the detail rows it heads.
    * Taking the node out of layout drops the phantom gap and leaves the title
@@ -572,16 +572,16 @@
     word-break: break-all;
   }
 
-  /* A 26px square action under a message. The desktop keeps these and the
-   * timestamp hidden until the message is hovered or focused; the WebUI's
+  /* A 26px square action under a message. These and the
+   * timestamp stay hidden until the message is hovered or focused; the WebUI's
    * message model carries neither a per-message timestamp nor clipboard
    * actions, so this row is not rendered yet and the rule is not carried. */
 
   /* --------------------------------------------------------- markdown */
 
-  /* The desktop renders assistant and thinking content through
-   * `.matrix-markdown`. Values below are read from its compiled stylesheet; in
-   * the chat reading column the body resolves to 15px/24px. */
+  /* Assistant and thinking content renders through
+   * `.matrix-markdown`. In the chat reading column the body resolves to
+   * 15px/24px. */
   .webui-markdown {
     font-size: 15px;
     line-height: 24px;
@@ -613,7 +613,7 @@
   .webui-markdown p {
     margin: 0;
   }
-  /* The desktop's `--thinking` variant: a step down from the chat body, and
+  /* The `--thinking` variant: a step down from the chat body, and
    * never bolded. */
 
   .webui-markdown :is(h1, h2, h3, h4, h5, h6):first-child {
@@ -809,7 +809,7 @@
     font-weight: var(--weight_medium);
   }
 
-  /* ===== desktop message-render parity: thinking pulse, turn clock, stop
+  /* ===== message-render parity: thinking pulse, turn clock, stop
      button, questionnaire card, edited-files card ===== */
   .webui-thinking-elapsed {
     color: var(--text_default_secondary);
@@ -830,7 +830,7 @@
     overflow: hidden;
     border: 0.5px solid var(--border_default);
     border-radius: 12px;
-    /* Desktop's diff card sits inside the reading column and inherits the
+    /* The diff card sits inside the reading column and inherits the
      * grouped surface tint through `transparent`. */
     background: transparent;
   }
@@ -1127,7 +1127,7 @@
     transition: opacity 120ms ease;
   }
 
-  /* The action row is glyph-only; the desktop keeps a 26px square per control and
+  /* The action row is glyph-only; it keeps a 26px square per control and
      paints the revealed state on the row, not on each button. */
   .webui-message-action:hover:not(:disabled) {
   }
@@ -1140,7 +1140,7 @@
     justify-content: flex-end;
   }
 
-  /* Desktop timestamps sit inside the action row: trailing on an assistant
+  /* Timestamps sit inside the action row: trailing on an assistant
      message, leading (right-aligned) on a user message. */
   .webui-message-timestamp {
     font-size: 13px;

@@ -21,7 +21,6 @@ import { compareVersions, releaseCli } from '../scripts/release-cli.mjs';
 import { compareRuns, exitCodeForStatus, renderReport, spread, validateRun, validateRequest, validateToolOutput, median, selectScenarios } from '../scripts/perf/report.mjs';
 import { copyMcodeToolsArtifact, downloadMcodeToolsArtifact, MCODE_TOOLS_ARTIFACT } from '../scripts/lib/mcode-tools-artifact.mjs';
 import { checkWindowsSourceLocation, runWindowsSourceLocationCheck } from '../scripts/check-windows-source-location.mjs';
-import { renderNavigation, renderCommandSurface } from '../scripts/lib/webui-source-index.mjs';
 import { recordBuildIntegrity, verifyBuildIntegrity } from '../scripts/lib/webui-build-integrity.mjs';
 import { validateExceptionLedger, sourceFingerprint } from '../scripts/lib/webui-dependency-rules.mjs';
 
@@ -57,31 +56,6 @@ test('WebUI exception ledgers require rationale, ownership and unique edges', ()
   const entry = { from: 'a', to: 'b', reason: 'Reviewed contract' };
   assert.throws(() => validateExceptionLedger([entry, entry], ['reason']), /Duplicate/);
   validateExceptionLedger([entry], ['reason']);
-});
-
-test('WebUI source index discovers new modules, ignores empty homes and retains both populated homes', t => {
-  const root = mkdtempSync(path.join(tmpdir(), 'webui-index-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
-  const put = (name, body) => { mkdirSync(path.dirname(path.join(root, name)), { recursive: true }); writeFileSync(path.join(root, name), body); };
-  mkdirSync(path.join(root, 'contracts/new-business'), { recursive: true });
-  put('features/new-business/contracts/commands.ts', 'export interface Base { send(id: string): void }; export interface Commands extends Base { stop(): void }');
-  put('features/new-business/application/owner.ts', 'export interface Owner { start(): void }; export const run = (id: string) => id;');
-  put('features/new-business/contracts/public.ts', 'export { Commands as PublicCommands } from "./commands";');
-  put('application/new-business/other.ts', 'export interface Other { read(): number }');
-  const navigation = renderNavigation(root);
-  assert.match(navigation, /new-business/);
-  assert.match(navigation, /client\/features\/new-business\/contracts\//);
-  assert.doesNotMatch(navigation, /`client\/contracts\/new-business\//);
-  assert.match(navigation, /client\/application\/new-business\//);
-  assert.match(navigation, /client\/features\/new-business\/application\//);
-  const before = renderCommandSurface(root, {});
-  assert.match(before, /Commands.send/);
-  assert.match(before, /PublicCommands.send/);
-  assert.match(before, /owner.ts.*run.*string/);
-  put('features/new-business/contracts/commands.ts', 'export interface Base { send(id: number): Promise<boolean> }; export interface Commands extends Base { stop(): void }');
-  const after = renderCommandSurface(root, {});
-  assert.notEqual(after, before);
-  assert.match(after, /Commands.send.*number/);
 });
 
 test('Windows source preflight accepts local NTFS without parsing fsutil display text', () => {
@@ -800,7 +774,7 @@ test('documentation and archive profiles preserve their required validation gate
   const full = f.run(['--list']).stdout.trim().split('\n');
   const docs = f.run(['--profile', 'docs', '--list']);
   assert.equal(docs.status, 0, docs.stderr);
-  assert.deepEqual(docs.stdout.trim().split('\n'), ['check:source', 'check:tsconfig', 'export source preview', 'test:release-tools', 'check:webui-commands', 'check:webui-business-navigation']);
+  assert.deepEqual(docs.stdout.trim().split('\n'), ['check:source', 'check:tsconfig', 'export source preview', 'test:release-tools']);
   const archive = f.run(['--profile', 'archive', '--list']);
   assert.equal(archive.status, 0, archive.stderr);
   assert.deepEqual(archive.stdout.trim().split('\n'), full.filter(g => g !== 'export source preview'));
@@ -1033,8 +1007,6 @@ test('Windows contract profile selects focused gates', () => {
       'lint:tui',
       'build',
       'check:standalone',
-      'check:webui-commands',
-      'check:webui-business-navigation',
       'test:artifact',
       'test:windows',
     ]);

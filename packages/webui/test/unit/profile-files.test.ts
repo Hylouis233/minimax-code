@@ -81,11 +81,11 @@ describe("limits copied from the runtime", () => {
 });
 
 /**
- * The personalization markers are a copied contract, not a shared import:
+ * The personalization markers are a fixed contract, not a shared import:
  * nothing in this repository writes them, and `LocalPromptMemoryReader` — the
  * interface that feeds the prompt composer — has no implementation here. So the
- * literals are pinned below. If the desktop surface renames or re-pairs them,
- * this suite fails instead of the panel quietly editing the wrong region.
+ * literals are pinned below. If the profile-file format renames or re-pairs
+ * them, this suite fails instead of the panel quietly editing the wrong region.
  */
 const PROFILE_START = "<!-- mavis-personalization:start -->";
 const PROFILE_END = "<!-- mavis-personalization:end -->";
@@ -140,7 +140,7 @@ describe("readUserProfile", () => {
   it("reads an untouched skeleton as three empty fields, not as text", async () => {
     const dataDir = await tempDataDir();
     await mkdir(join(dataDir, "memory"), { recursive: true });
-    // The shape a first-run desktop write leaves: the labels are present but
+    // The shape a first-run write leaves: the labels are present but
     // every value after them is blank. Reading the region as one string would
     // hand the panel the skeleton itself and make an empty profile look filled.
     await writeFile(
@@ -223,7 +223,7 @@ describe("readUserProfile", () => {
 
     const view = await readUserProfile(dataDir);
 
-    // Only what follows the heading is free text. A line the desktop never
+    // Only what follows the heading is free text. A line the writer never
     // writes still parses, and it must not be silently appended to the user's
     // notes on the next save.
     expect(view.nickname).toBe("izzy");
@@ -242,9 +242,9 @@ describe("writeUserProfile", () => {
       moreAbout: "prefers terse answers",
     });
 
-    // The exact bytes, transcribed from the desktop's own join. There is no
-    // trailing newline: the block ends at the end marker, and the desktop adds
-    // one only because a file that has entries after the region has to put
+    // The exact bytes the join produces. There is no
+    // trailing newline: the block ends at the end marker, and one is added
+    // only because a file that has entries after the region has to put
     // them somewhere — which the next test covers.
     expect(await readFile(userMemoryPath(dataDir), "utf8")).toBe(
       [
@@ -266,11 +266,11 @@ describe("writeUserProfile", () => {
 
     await writeUserProfile(dataDir, { nickname: "", occupation: "", moreAbout: "" });
 
-    // `filter(Boolean)` in the desktop's own compose applies to the three outer
+    // `filter(Boolean)` in the write applies to the three outer
     // parts only, so the empty string inside the block survives the join. The
     // blank line after `## More about you` and the one between `Occupation: `
     // and the heading are both real and both load-bearing: a file written
-    // without them is one the desktop did not write.
+    // without them is not one this writer produced.
     expect(await readFile(userMemoryPath(dataDir), "utf8")).toBe(
       [
         PROFILE_START,
@@ -350,7 +350,7 @@ describe("writeUserProfile", () => {
       moreAbout: "  padded  ",
     });
 
-    // The desktop collapses every whitespace run in the two label fields, and
+    // Normalisation collapses every whitespace run in the two label fields, and
     // trims the free text. A value that kept its newline would re-split into a
     // second line on the next parse and the field would read back as truncated.
     const after = await readFile(userMemoryPath(dataDir), "utf8");

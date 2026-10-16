@@ -1,6 +1,6 @@
 // C-2 — code fence line numbers in the transcript renderer.
 //
-// The contract is SPEC-C `docs/SPEC-C-transcript.md`, items C-2.1 through
+// The contract is `packages/webui/docs/reference/transcript-rendering.md`, items C-2.1 through
 // C-2.5. Two of them are load-bearing for the copy behaviour: the gutter is a
 // sibling of `<pre>`, not a descendant (C-2.2), and it appears whether or not
 // the fence is highlighted (C-2.4, "C-1 and C-2 are independent").

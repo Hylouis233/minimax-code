@@ -7,11 +7,10 @@ import { UserProfileSection } from "./UserProfileSection.js";
 import { MemorySection } from "./MemorySection.js";
 
 /**
- * Personalization panel — the three blocks the desktop surface ships:
- * 自定义指令, 关于你, 记忆.
+ * Personalization panel — the three blocks: 自定义指令, 关于你, 记忆.
  *
- * Shape note for reviewers: the desktop presents 记忆 as a card of three rows
- * (two switches plus a 管理 action that opens the memory manager), not as a
+ * Shape note for reviewers: 记忆 is a card of three rows
+ * (two switches plus a 管理 action that opens the memory manager), not a
  * single textarea. The earlier revision rendered a standalone 长期记忆 editor;
  * it was the same file and the same operations, just a different surface, and
  * the roadmap's "管理 UI 未见" is only closed by the row that points at a
@@ -26,12 +25,12 @@ import { MemorySection } from "./MemorySection.js";
  */
 
 /**
- * The delete confirmation's copy, copied from the desktop word for word.
+ * The delete confirmation's copy, word for word.
  *
- * The half-width `?` is the desktop's, not a typo to tidy up: a full-width
+ * The half-width `?` is deliberate, not a typo to tidy up: a full-width
  * `？` carries a full em of advance and visibly opens a gap after 忆, and the
- * measured dialog does not have one. The body deliberately carries no byte
- * count — the desktop's does not either, and the row above the button already
+ * dialog does not have one. The body deliberately carries no byte
+ * count either, and the row above the button already
  * shows the figure the user would compare it against.
  */
 export const MEMORY_DELETE_CONFIRM = {

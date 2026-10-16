@@ -19,7 +19,6 @@ Do not edit these by hand; regenerate them and commit the result.
 | --- | --- | --- |
 | `release/public-source.json` | `node scripts/source-inventory.mjs --write` | `pnpm check:source` |
 | `tsconfig.standalone.json` (the `paths` block) | `pnpm gen:tsconfig` | `pnpm check:tsconfig` |
-| `docs/webui/command-surface.md` | `pnpm gen:webui-commands` | `pnpm check:webui-commands` |
 
 Review added, removed, and renamed files before regenerating the inventory: recording a file does not make it suitable for publication. Content-only edits to existing files do not require inventory regeneration. Keep private review material, verification reports, and temporary artifacts outside the repository; the inventory scans the working tree, including untracked files outside its explicit exclusions.
 
@@ -56,23 +55,12 @@ Adding a verification gate: add a step to `scripts/verify.mjs`, with `platforms`
 
 Do not reference internal hosts, generated IDL, or private services; `check:source` catches known patterns but does not replace publication review. Do not restore paths listed in `scripts/lib/retired-sources.mjs` or remove supported capabilities to make standalone checks pass. Do not commit account data, sessions, logs, credentials, or real user content; use temporary data directories and synthetic test inputs. Documentation and commit messages are written in English; preserve the required languages of localized product strings and bundled runtime prompts. See `CONTRIBUTING.md`.
 
-## Agent skills
+## WebUI
 
-### Issue tracker
+`packages/webui` is a browser client with its own operating guide. Before changing anything under it,
+read `packages/webui/AGENTS.md` — the layering rules, the gates each kind of change needs, the test
+conventions and the fork's branch and issue workflow — and `packages/webui/docs/README.md` for the
+architecture, module map and decision log. Its issue tracker conventions and triage labels are
+`packages/webui/docs/agents/`.
 
-Issues and specs live as GitHub issues on the fork, driven with the `gh` CLI. See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-The five canonical triage roles use their default label strings. See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
-
-### Merge and baseline
-
-After any PR is merged — yours or someone else's — realign the local
-checkout, the roadmap's baseline line, and the group chat before moving on.
-Branch from an explicit ref, never from wherever `HEAD` happens to be.
-See `.agents/skills/merge-and-baseline/SKILL.md`.
+Repository-wide contributor workflows live in `.agents/skills/` and are listed in `CONTRIBUTING.md`.

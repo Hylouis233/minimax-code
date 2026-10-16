@@ -8,9 +8,6 @@
  * selected-session changes. Without persistence the auto-fill effect in
  * `WebuiClientFoundationApp` would immediately pull the first session's
  * workspace back, defeating the user's explicit choice.
- *
- * The desktop counterpart (`eG` in `project-selector`) similarly clears
- * `localStorage` so the cleared state survives the session lifecycle.
  */
 
 export function isNoProjectFlag(value: unknown): boolean {

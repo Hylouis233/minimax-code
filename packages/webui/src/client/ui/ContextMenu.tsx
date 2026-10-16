@@ -65,7 +65,7 @@ export function WebuiContextMenu({
       const insideContainer =
         menuRef.current?.contains(event.target as Node) ?? false;
       // ContextMenu's per-surface variant subscribes to `mousedown` (NOT
-      // `pointerdown` — desktop parity) + `keydown`; Escape closes. Routing
+      // `pointerdown`) + `keydown`; Escape closes. Routing
       // through `evaluateOutsideClose` keeps the four call sites
       // consistent without changing the original close semantics.
       if (

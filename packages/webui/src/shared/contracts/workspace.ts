@@ -87,7 +87,7 @@ export interface WebuiWorkspaceDirectoryListing {
 }
 
 /**
- * The small, session-scoped projection used by the Desktop environment
+ * The small, session-scoped projection used by the workspace environment
  * section. Keep the runtime's snapshot ids and file-level details private;
  * the browser only needs the state that controls visibility and actions.
  */

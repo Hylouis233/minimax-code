@@ -197,7 +197,7 @@ function terminalSubagentStatus(
 }
 
 /**
- * Reduce one raw Desktop-compatible event into WebUI's session-scoped
+ * Reduce one raw workspace event into WebUI's session-scoped
  * projection. The input is deliberately structural because stream frames
  * contain both protocol-shaped and legacy event-shaped payloads.
  */
@@ -333,7 +333,7 @@ export function applyTodoToolCalls(
 }
 
 /**
- * Reduce the Desktop-compatible events a LIVE stream message carries in its
+ * Reduce the workspace-progress events a LIVE stream message carries in its
  * serialized content.
  *
  * The runtime delivers `todo_updated` and friends as a system event inside

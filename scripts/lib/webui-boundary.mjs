@@ -115,7 +115,8 @@ export function noServerCallIntoCli(inputs) {
   return { pass: violations.length === 0, violations };
 }
 
-// Required by `docs/webui-v1-scope.md`: every bundled file must be either the
+// Required by `packages/webui/docs/verification/gates.md`: every bundled file must be
+// either the
 // process-local WebUI package, an exported subpath of a public workspace
 // package declared in `release/extraction.json`, or a third-party dependency
 // under `node_modules/`. The `cli-service` package and the published

@@ -85,7 +85,7 @@ export type WebuiTranscriptItem =
       readonly timestamp?: number;
     };
 
-/** One Desktop-style thinking/tool segment inside an assistant turn. */
+/** One thinking/tool process segment inside an assistant turn. */
 export interface WebuiTranscriptProcessSegment {
   readonly messageId: string;
   readonly thinking?: string;

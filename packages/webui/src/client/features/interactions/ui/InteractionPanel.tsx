@@ -165,7 +165,7 @@ export function WebuiInteractionPanel({
       ))}
       {/* Plan mode arrives on the same questionnaire channel. Only the DECISION
           belongs here — the plan file card is a message in the transcript,
-          anchored to the turn that wrote it, exactly as the desktop renders it.
+          anchored to the turn that wrote it.
           This surface takes the composer's place while the request is open
           (`presentation.replaceComposer`, the runtime's default for every
           questionnaire), which is what the attribute below switches the CSS to. */}

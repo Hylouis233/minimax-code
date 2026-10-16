@@ -9,7 +9,7 @@
 // `webui-shell.test.ts` and is deliberately not repeated here.
 //
 // The assertions are structural — `data-testid`, `aria-*`, `role`, and the
-// presence of the copy the desktop renders — not whole-HTML equality. A whole
+// presence of the copy the component renders — not whole-HTML equality. A whole
 // string snapshot would fail on every unrelated whitespace change and would
 // fossilise the current output, including its bugs.
 

@@ -1,6 +1,6 @@
 // The 记忆 card (ticket #73; §15.1's `MemorySection.tsx` row). The third of the three co-visible
 // editors `PersonalizationSettings.tsx` composes: a card of rows — two switches and a 管理 action —
-// rather than a standalone textarea, which is the desktop's shape.
+// rather than a standalone textarea.
 //
 // It renders the manager dialog (the 管理 row's body) in the same conditional it always used, and it
 // imports that dialog's shared pieces rather than the other way round: the section renders the dialog,
@@ -12,7 +12,7 @@ import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
 import { PERSONALIZATION_SECTION_HINTS, SectionHeader } from "./settings-atoms.js";
 import { MemoryManagerDialog, formatMemoryTimestamp, isMemorySaveable, type MemoryHandoff } from "./MemoryManagerDialog.js";
 
-/** One switch row inside the 记忆 card. Mirrors the desktop's row grammar. */
+/** One switch row inside the 记忆 card. */
 function MemoryRow({
   title,
   description,
@@ -53,8 +53,8 @@ interface MemorySectionProps {
 /**
  * 记忆 — the two switches plus the entry point to the memory manager.
  *
- * Both switches write through to the shared config, so they are global: the
- * WebUI is one surface of the desktop app, not a separate settings scope. That
+ * Both switches write through to the shared config, so they are global: this is
+ * one settings scope, not a per-session one. That
  * is why the panel reports what it wrote rather than implying a per-session
  * effect, and why `memory.enabled` is the only switch here — it is the master
  * gate the runtime already honours, and the second one is meaningless without
@@ -93,7 +93,7 @@ export function MemorySection({
     };
   }, [getMemorySettings]);
 
-  // No read on open. The desktop's 记忆摘要 row shows only the title, the
+  // No read on open. The 记忆摘要 row shows only the title, the
   // description and 管理 — the column that sits between them names the owning
   // product, not the file size. The byte count that used to live there was a
   // second, differently-scaled reading of the same file (the manager shows

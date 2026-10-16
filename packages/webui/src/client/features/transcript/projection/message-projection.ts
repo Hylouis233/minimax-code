@@ -3,7 +3,7 @@
 // projection relies on.
 //
 // The split is deliberate: `projection/transcript/message-parts.ts` turns the same wire
-// message into Desktop-style `parts[]`, and this module adapts those parts
+// message into an ordered `parts[]`, and this module adapts those parts
 // into the `WebuiTranscriptItem[]` shape the components already render. It
 // also owns `readMessageDiff`, which both projections consume. The wire
 // normalisation and the usage readers moved to `../contracts/message-stream.ts`
@@ -223,10 +223,10 @@ export function deriveConversationUsageNotice(
 
 /**
  * Convert a wire message into the components-facing transcript items. The
- * pure parts layer preserves Desktop's source order (thinking → text → tool
+ * pure parts layer preserves the source order (thinking → text → tool
  * calls → synthetic). Keep that order here: a text part is a boundary between
  * activity groups, so moving tools ahead of text incorrectly merges activity
- * that Desktop renders on opposite sides of an assistant reply.
+ * that the transcript renders on opposite sides of an assistant reply.
  */
 export function projectWebuiMessage(
   message: WebuiClientMessage,

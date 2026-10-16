@@ -56,7 +56,7 @@ function formatRemainingTime(totalSeconds: number): string {
   return `${days}天${remainingHours ? `${remainingHours}小时` : ""}`;
 }
 
-/** Desktop reset_after wording, with its under-one-minute time-only branch. */
+/** `reset_after` wording, with its under-one-minute time-only branch. */
 export function formatResetLabel(resetAtMs: number | undefined, nowMs: number): string | undefined {
   if (resetAtMs === undefined || !Number.isFinite(resetAtMs)) return undefined;
   const remainingSeconds = Math.ceil((resetAtMs - nowMs) / 1000);

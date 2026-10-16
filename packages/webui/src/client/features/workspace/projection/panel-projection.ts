@@ -51,7 +51,7 @@ export function projectWebuiUnifiedDiffLines(diff: string): WebuiUnifiedDiffLine
     if (!raw || raw.startsWith("diff --git ") || raw.startsWith("index ") || raw.startsWith("--- ") || raw.startsWith("+++ ")) continue;
     if (raw.startsWith("\\")) {
       // "\ No newline at end of file" records a fact about the line before it
-      // and takes no number of its own. Desktop's renderer keeps it as its own
+      // and takes no number of its own. The diff renderer keeps it as its own
       // row with no gutter numbers and neutral text, so it is carried through
       // as a marker instead of dropped.
       lines.push({ kind: "noNewline", content: raw });

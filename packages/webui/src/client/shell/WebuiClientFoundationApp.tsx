@@ -144,8 +144,8 @@ export interface WebuiClientFoundationAppProps {
   readonly locationHash?: string;
   readonly dataDir?: string;
   /**
-   * What the identity row shows under the product name. The desktop puts the signed-in
-   * account's plan there; the WebUI is loopback-only and has no account, so it reports
+   * What the identity row shows under the product name. The signed-in
+   * account's plan would go there; the WebUI is loopback-only and has no account, so it reports
    * the scope it actually runs in. `main.tsx` passes the page's host.
    */
   readonly hostLabel?: string;
@@ -548,7 +548,7 @@ export function WebuiClientFoundationApp(
    * prompt inline would put it in whichever slot the shell still considered
    * current, so starting from a session would type it somewhere the user never
    * sees. Once no session is selected the key is the home slot, which is the
-   * slot the desktop's screenshot is showing.
+   * slot on the home surface.
    */
   const [memoryHandoff, setMemoryHandoff] = useState<MemoryHandoff>();
   const createMemorySession = useCallback((input: MemoryHandoff) => {
@@ -739,7 +739,7 @@ export function WebuiClientFoundationApp(
   const [workspaceProgressCollapsed, setWorkspaceProgressCollapsed] = useState(false);
   const [workspaceSubagentsCollapsed, setWorkspaceSubagentsCollapsed] = useState(false);
   useEffect(() => {
-    // Desktop derives these sections from the selected session/workspace. Do
+    // These sections derive from the selected session/workspace. Do
     // not carry a previous session's collapsed state into the next session.
     setWorkspaceEnvironmentCollapsed(false);
     setWorkspaceProgressCollapsed(false);

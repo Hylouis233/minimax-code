@@ -1,14 +1,14 @@
 // Tailwind v3 config for the WebUI shell (ADR 0009, ADR 0010).
 //
-// Token names map 1:1 onto the desktop application's design tokens
-// (see docs/webui-visual-language.md and packages/webui/src/client/styles/tokens.css).
+// Token names map 1:1 onto the tokens declared in tokens.css
+// (see packages/webui/docs/design-language.md and packages/webui/src/client/styles/tokens.css).
 // Every utility whose name starts with a token family — bg_*, text_*, border_*,
 // shadow_*, radius_*, spacing_*, size_*, line_height_* — is generated from the
-// corresponding CSS variable so the WebUI and the desktop application share
+// corresponding CSS variable so the utilities and the token table share
 // one naming surface.
 
 const tailwindConfig = {
-  // Desktop utilities carry `dark:` variants and the token themes switch on
+  // The utilities carry `dark:` variants and the token themes switch on
   // the `.dark` class (tokens.css), so the class strategy is required.
   darkMode: "class",
   content: [
@@ -328,7 +328,7 @@ const tailwindConfig = {
         '"Open Sans"',
         '"Helvetica Neue"',
         "sans-serif",
-        // Chinese fallbacks — desktop's preflight stack.
+        // Chinese fallbacks — the preflight stack.
         '"HarmonyOS Sans SC"',
         '"PingFang SC"',
         '"Hiragino Sans GB"',
@@ -350,7 +350,7 @@ const tailwindConfig = {
         '"SF Mono"',
         "Menlo",
         "Consolas",
-        // Chinese fallbacks — desktop's preflight stack.
+        // Chinese fallbacks — the preflight stack.
         '"HarmonyOS Sans SC"',
         '"PingFang SC"',
         "monospace",
@@ -363,13 +363,13 @@ const tailwindConfig = {
       "blue_600": "var(--blue_600)",
       "violet_500": "var(--violet_500)",
       },
-      // The desktop's markup composes two scales at once: the token-named utilities
+      // The markup composes two scales at once: the token-named utilities
       // above (`p-spacing_16`, `rounded-radius_12`) and Tailwind's stock numeric scale
       // (`h-8`, `gap-2`, `p-3`, `rounded-lg`, `size-7`, `leading-4`). Replacing
       // `spacing` / `borderRadius` / `lineHeight` / `fontWeight` / `size` outright above
-      // left the second set ungenerated, so a class composition lifted from the desktop
-      // compiled to nothing here. These restore the stock values, which are the ones the
-      // desktop's own stylesheet ships; the token-named keys stay the project's
+      // left the second set ungenerated, so a class composition compiled to nothing here.
+      // These restore the stock values, which are the ones Tailwind defines by default;
+      // the token-named keys stay the project's
       // vocabulary for anything the tokens describe.
       spacing: {
         px: "1px",
@@ -460,7 +460,7 @@ const tailwindConfig = {
         semibold: "600",
         bold: "700",
       },
-      // The desktop's named type scale, read out of its compiled stylesheet. Its
+      // The named type scale. The
       // markup writes `text-body-base` / `text-caption-base` rather than raw sizes,
       // so the reading column cannot be reproduced without these names.
       fontSize: {
@@ -544,7 +544,7 @@ const tailwindConfig = {
     "gap-spacing_12",
     "gap-spacing_16",
     "shadow-shadow_default",
-    // The mono stack the desktop's preflight gives `code`/`kbd`/`pre`/`samp` is also a
+    // The mono stack the preflight gives `code`/`kbd`/`pre`/`samp` is also a
     // utility the conversation surface needs for inline code; keep it generated even
     // while no shell element currently carries it.
     "font-mono",

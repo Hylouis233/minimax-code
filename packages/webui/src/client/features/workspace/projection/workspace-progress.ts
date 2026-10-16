@@ -81,7 +81,7 @@ export function selectWebuiWorkspaceProgress(
   return { todos, subagents };
 }
 
-/** Rebuild the last known Desktop-compatible state when opening a session. */
+/** Rebuild the last known workspace-progress state when opening a session. */
 export function projectWebuiWorkspaceHistory(
   messages: readonly WebuiClientMessage[],
   sessionId?: string,

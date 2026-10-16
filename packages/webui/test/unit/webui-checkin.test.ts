@@ -1,5 +1,5 @@
 // Daily check-in: wire-protocol client (copied contract from the TUI
-// gateway), operation validators, and the signin card's desktop-parity render.
+// gateway), operation validators, and the signin card's render.
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
@@ -258,7 +258,7 @@ describe("SigninCard desktop parity", () => {
     expect(html).toContain('data-testid="signin-streak"');
     expect(html).toContain("本轮已连续签到");
     expect(html).toContain(">2</span> 天");
-    // seven day cells with desktop's zh aria labels
+    // seven day cells with zh aria labels
     expect(html).toContain('data-testid="signin-day-3"');
     expect(html).toContain('data-status="2"');
     expect(html).toContain("第 3 天，今日可签到，1,000 积分");

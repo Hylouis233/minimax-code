@@ -30,7 +30,7 @@ export interface WebuiRailMenuEntry {
   readonly label?: string | ((state: WebuiRailMenuState) => string);
   readonly danger?: boolean;
   /**
-   * Declared for parity with Desktop, with no wiring on this client. The host
+   * Declared but unwired on this client. The host
    * renders it disabled, and that is a property of the declaration rather than of
    * a missing prop: an item that exists and cannot run says so here.
    */

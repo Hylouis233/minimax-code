@@ -352,9 +352,9 @@
   }
 
   /* ---- Daily check-in card ----
-   * `.signin-*` rules and the `mavis-button` base are copied from the
-   * desktop stylesheet; the anchor/panel wrapper positions the card the way
-   * desktop's hover popover does (right of the menu, centered on the row).
+   * The `.signin-*` rules and the `mavis-button` base are declared in this
+   * stylesheet; the anchor/panel wrapper positions the card the way the
+   * hover popover does (right of the menu, centered on the row).
    */
   .webui-user-menu-signin-anchor {
     position: relative;
@@ -459,7 +459,7 @@
       animation: none;
     }
   }
-  /* Credits-info tooltip: antd tooltip stand-in (desktop placement top,
+  /* Credits-info tooltip: antd tooltip stand-in (placement top,
    * maxWidth 340, dark bubble with arrow). */
   .webui-signin-credits-anchor {
     position: relative;
@@ -477,7 +477,7 @@
     text-decoration-color: currentColor;
     text-underline-offset: 2px;
   }
-  /* Claiming spinner (desktop uses the antd loading icon). */
+  /* Claiming spinner (a stand-in for the antd loading icon). */
   .webui-signin-claim-spinner {
     width: 14px;
     height: 14px;

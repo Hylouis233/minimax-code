@@ -102,7 +102,7 @@ export function WebuiDiffCard({
             <span className="webui-diff-header-title">{`已编辑 ${files.length} 个文件`}</span>
             <span className="webui-diff-header-stats" data-webui-diff-stats="true">
               <span className="webui-diff-add">{`+${totalAdded}`}</span>
-              {/* Desktop's diff card hides the deletion badge when no lines
+              {/* The diff card hides the deletion badge when no lines
                * were removed from the change set — keeping the row additions-only
                * avoids the misleading "+{n}-0" stat the WebUI used to render. */}
               {totalDeleted > 0 ? <span className="webui-diff-del">{`-${totalDeleted}`}</span> : null}

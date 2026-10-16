@@ -1,14 +1,12 @@
-// Desktop shell icon set.
+// WebUI shell icon set.
 //
-// Every path below is lifted verbatim from the desktop application's front-end as it
-// renders, recorded in `minimax-code-webui-work/webui-visual-align-icons.md`. The
-// attribution follows docs/webui-visual-language.md and ADR 0009: the values are design
-// facts read out of the distributed build, and the file is authored here rather than
-// copied wholesale.
+// Every path below is recorded in
+// `minimax-code-webui-work/webui-visual-align-icons.md`; the values are design
+// facts, and the file is authored here rather than copied wholesale.
 //
-// `viewBox` and the declared `width`/`height` are the desktop's own, so a glyph keeps the
+// `viewBox` and the declared `width`/`height` are the glyph's own, so a glyph keeps the
 // optical size it was drawn for even when the surrounding row is a different height. The
-// brand mark declares no size of its own — the desktop stretches it to its container — so
+// brand mark declares no size of its own — it stretches to its container — so
 // it takes its size from `className` too.
 
 import { useId, type ReactElement } from "react";
@@ -30,7 +28,7 @@ export function WebuiIconClose({ className }: WebuiIconProps): ReactElement {
   return <svg viewBox="0 0 16 16" aria-hidden="true" className={className}><path d="m4 4 8 8m0-8-8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>;
 }
 
-/** The product mark — the desktop's hero avatar and identity glyph. */
+/** The product mark — the hero avatar and identity glyph. */
 export function WebuiIconBrand({ className }: WebuiIconProps): ReactElement {
   const clipId = `webui-brand-logo-${useId().replace(/:/gu, "")}`;
   return (
@@ -48,12 +46,12 @@ export function WebuiIconBrand({ className }: WebuiIconProps): ReactElement {
   );
 }
 
-/** Desktop browser-tab product mark used as the default agent/subagent avatar. */
+/** Browser-tab product mark used as the default agent/subagent avatar. */
 export function WebuiIconAgent({ className }: WebuiIconProps): ReactElement {
   return <img src="/assets/img/minimax-code-agent-icon.png" alt="" aria-hidden="true" className={className} />;
 }
 
-/** circle-plus, the rail's fixed new-task row — the desktop's `新建任务` glyph. */
+/** circle-plus, the rail's fixed new-task row — the `新建任务` glyph. */
 export function WebuiIconNewTask({ className }: WebuiIconProps): ReactElement {
   return (
     <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
@@ -62,7 +60,7 @@ export function WebuiIconNewTask({ className }: WebuiIconProps): ReactElement {
   );
 }
 
-/** rail nav row — the desktop's `插件` glyph. */
+/** rail nav row — the `插件` glyph. */
 export function WebuiIconPlugins({ className }: WebuiIconProps): ReactElement {
   return (
     <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
@@ -71,7 +69,7 @@ export function WebuiIconPlugins({ className }: WebuiIconProps): ReactElement {
   );
 }
 
-/** rail nav row — the desktop's `网站` glyph. */
+/** rail nav row — the `网站` glyph. */
 export function WebuiIconSites({ className }: WebuiIconProps): ReactElement {
   return (
     <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
@@ -80,7 +78,7 @@ export function WebuiIconSites({ className }: WebuiIconProps): ReactElement {
   );
 }
 
-/** rail nav row — the desktop's `远程` glyph. */
+/** rail nav row — the `远程` glyph. */
 export function WebuiIconRemote({ className }: WebuiIconProps): ReactElement {
   return (
     <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
@@ -89,7 +87,7 @@ export function WebuiIconRemote({ className }: WebuiIconProps): ReactElement {
   );
 }
 
-/** identity row trailing action — the desktop's `站内信，无未读消息` glyph. */
+/** identity row trailing action — the `站内信，无未读消息` glyph. */
 export function WebuiIconBell({ className }: WebuiIconProps): ReactElement {
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
@@ -98,7 +96,7 @@ export function WebuiIconBell({ className }: WebuiIconProps): ReactElement {
   );
 }
 
-/** composer toolbar left — the desktop's `attach-button` glyph. */
+/** composer toolbar left — the `attach-button` glyph. */
 export function WebuiIconAttach({ className }: WebuiIconProps): ReactElement {
   return (
     <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
@@ -107,7 +105,7 @@ export function WebuiIconAttach({ className }: WebuiIconProps): ReactElement {
   );
 }
 
-/** model selector / dropdown affordance — the desktop's `model-selector-trigger` glyph. */
+/** model selector / dropdown affordance — the `model-selector-trigger` glyph. */
 export function WebuiIconChevronDown({ className }: WebuiIconProps): ReactElement {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}>
@@ -116,7 +114,7 @@ export function WebuiIconChevronDown({ className }: WebuiIconProps): ReactElemen
   );
 }
 
-/** Filled disclosure arrow used by expandable rows in the Desktop sidebar. */
+/** Filled disclosure arrow used by expandable rows in the sidebar. */
 export function WebuiIconSessionDisclosure({ className }: WebuiIconProps): ReactElement {
   return <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true" className={className}><path d="M4.25 2.75 8 6l-3.75 3.25v-6.5Z" fill="currentColor" /></svg>;
 }
@@ -163,7 +161,7 @@ export function WebuiIconPermissionFull({ className }: WebuiIconProps): ReactEle
   );
 }
 
-/** composer send — the desktop's `send-button` glyph. */
+/** composer send — the `send-button` glyph. */
 export function WebuiIconFile({ className }: WebuiIconProps): ReactElement {
   return (
     <svg
@@ -182,7 +180,7 @@ export function WebuiIconFile({ className }: WebuiIconProps): ReactElement {
   );
 }
 
-/** Edited-files summary glyph — lifted from Desktop icon module 42350 (`ap`). */
+/** Edited-files summary glyph — the `ap` icon. */
 export function WebuiIconDiffSummary({ className }: WebuiIconProps): ReactElement {
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
@@ -194,7 +192,7 @@ export function WebuiIconDiffSummary({ className }: WebuiIconProps): ReactElemen
   );
 }
 
-/** Desktop's file-type glyph projection used by diff rows. */
+/** File-type glyph projection used by diff rows. */
 export function WebuiIconDiffFile({ fileName, className }: WebuiIconProps & { readonly fileName?: string }): ReactElement {
   const extension = fileName?.split(/[./\\]/u).pop()?.toLowerCase();
   const glyphs: Readonly<Record<string, readonly [string, string]>> = {
@@ -219,7 +217,7 @@ export function WebuiIconSend({ className }: WebuiIconProps): ReactElement {
   );
 }
 
-/** workspace pill leading icon — the desktop's `project-selector-leading-icon` glyph. */
+/** workspace pill leading icon — the `project-selector-leading-icon` glyph. */
 export function WebuiIconFolder({ className }: WebuiIconProps): ReactElement {
   return (
     <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
@@ -228,12 +226,12 @@ export function WebuiIconFolder({ className }: WebuiIconProps): ReactElement {
   );
 }
 
-/** Project/session row action — the Desktop's horizontal more-actions glyph. */
+/** Project/session row action — the horizontal more-actions glyph. */
 export function WebuiIconMore({ className }: WebuiIconProps): ReactElement {
   return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}><path d="M2.90039 6.75C3.53534 6.75021 4.0498 7.26539 4.0498 7.90039C4.04959 8.53521 3.53521 9.04959 2.90039 9.0498C2.26539 9.0498 1.75021 8.53534 1.75 7.90039C1.75 7.26526 2.26526 6.75 2.90039 6.75ZM7.90039 6.75C8.53534 6.75021 9.0498 7.26539 9.0498 7.90039C9.04959 8.53521 8.53521 9.04959 7.90039 9.0498C7.26539 9.0498 6.75021 8.53534 6.75 7.90039C6.75 7.26526 7.26526 6.75 7.90039 6.75ZM12.9004 6.75C13.5353 6.75021 14.0498 7.26539 14.0498 7.90039C14.0496 8.53521 13.5352 9.04959 12.9004 9.0498C12.2654 9.0498 11.7502 8.53534 11.75 7.90039C11.75 7.26526 12.2653 6.75 12.9004 6.75Z" fill="currentColor" /></svg>;
 }
 
-/** Project row action — the Desktop's create-task plus glyph. */
+/** Project row action — the create-task plus glyph. */
 export function WebuiIconProjectAdd({ className }: WebuiIconProps): ReactElement {
   return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}><path d="M8 3C8.27614 3 8.5 3.22386 8.5 3.5V7.5H12.5C12.7761 7.5 13 7.72386 13 8C13 8.27614 12.7761 8.5 12.5 8.5H8.5V12.5C8.5 12.7761 8.27614 13 8 13C7.72386 13 7.5 12.7761 7.5 12.5V8.5H3.5C3.22386 8.5 3 8.27614 3 8C3 7.72386 3.22386 7.5 3.5 7.5H7.5V3.5C7.5 3.22386 7.72386 3 8 3Z" fill="currentColor" /></svg>;
 }
@@ -322,12 +320,12 @@ export function WebuiIconSessionPinMark({ className }: WebuiIconProps): ReactEle
   return <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}><path d="M13.9828 5.56887C14.308 5.89408 14.4908 6.33537 14.491 6.79526C14.491 7.25536 14.3081 7.69767 13.9828 8.02303C13.6574 8.34821 13.2157 8.53057 12.7557 8.53057C12.2957 8.53046 11.8546 8.34761 11.5293 8.02234C11.5073 8.00047 11.4774 7.98787 11.4464 7.98781C11.4155 7.98781 11.3856 8.00055 11.3636 8.02234L9.72147 9.66443C9.62503 9.76108 9.55725 9.88298 9.52605 10.0159C9.50274 10.1155 9.50053 10.2186 9.51914 10.3184L9.54538 10.4178L9.54607 10.4213L9.92863 11.5869L9.92932 11.5876C10.0321 11.8935 10.0471 12.2222 9.97351 12.5364C9.89986 12.8505 9.74022 13.1381 9.51224 13.3664L9.18009 13.6985C8.97058 13.908 8.68641 14.0258 8.39012 14.0258C8.09383 14.0258 7.8097 13.908 7.60015 13.6985L5.33382 11.4322L3.50459 13.2614C3.30933 13.4567 2.99275 13.4567 2.79749 13.2614C2.60231 13.0662 2.60225 12.7495 2.79749 12.5543L4.62671 10.7251L2.36038 8.45876C2.15098 8.24922 2.03306 7.96503 2.03307 7.66879C2.03316 7.37255 2.1509 7.08829 2.36038 6.87882L2.69252 6.54667L2.78022 6.4645C2.99256 6.27998 3.2475 6.14989 3.52255 6.08539C3.83675 6.01174 4.16543 6.02678 4.47134 6.12959L5.63765 6.51283L5.6411 6.51352C5.77063 6.55705 5.90995 6.56401 6.043 6.53286C6.17596 6.50167 6.2978 6.4339 6.39448 6.33744L8.03657 4.69535C8.05836 4.67336 8.07109 4.64346 8.07109 4.61248C8.071 4.5815 8.05845 4.55156 8.03657 4.52962C7.71133 4.20435 7.52844 3.7632 7.52833 3.30323C7.52837 2.84329 7.71073 2.40145 8.03588 2.07615C8.36123 1.75084 8.80355 1.56792 9.26365 1.56792C9.72357 1.56805 10.1648 1.75095 10.49 2.07615L13.9828 5.56887Z" fill="currentColor" /></svg>;
 }
 
-/** Small project-rail pin glyph copied from the Desktop sidebar icon. */
+/** Small project-rail pin glyph, matching the sidebar icon. */
 export function WebuiIconSessionPin({ className }: WebuiIconProps): ReactElement {
   return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}><path d="M13.9828 5.56887C14.308 5.89408 14.4908 6.33537 14.491 6.79526C14.491 7.25536 14.3081 7.69767 13.9828 8.02303C13.6574 8.34821 13.2157 8.53057 12.7557 8.53057C12.2957 8.53046 11.8546 8.34761 11.5293 8.02234C11.5073 8.00047 11.4774 7.98787 11.4464 7.98781C11.4155 7.98781 11.3856 8.00055 11.3636 8.02234L9.72147 9.66443C9.62503 9.76108 9.55725 9.88298 9.52605 10.0159C9.50274 10.1155 9.50053 10.2186 9.51914 10.3184L9.54538 10.4178L9.54607 10.4213L9.92863 11.5869L9.92932 11.5876C10.0321 11.8935 10.0471 12.2222 9.97351 12.5364C9.89986 12.8505 9.74022 13.1381 9.51224 13.3664L9.18009 13.6985C8.97058 13.908 8.68641 14.0258 8.39012 14.0258C8.09383 14.0258 7.8097 13.908 7.60015 13.6985L5.33382 11.4322L3.50459 13.2614C3.30933 13.4567 2.99275 13.4567 2.79749 13.2614C2.60231 13.0662 2.60225 12.7495 2.79749 12.5543L4.62671 10.7251L2.36038 8.45876C2.15098 8.24922 2.03306 7.96503 2.03307 7.66879C2.03316 7.37255 2.1509 7.08829 2.36038 6.87882L2.69252 6.54667L2.78022 6.4645C2.99256 6.27998 3.2475 6.14989 3.52255 6.08539C3.83675 6.01174 4.16543 6.02678 4.47134 6.12959L5.63765 6.51283L5.6411 6.51352C5.77063 6.55705 5.90995 6.56401 6.043 6.53286C6.17596 6.50167 6.2978 6.4339 6.39448 6.33744L8.03657 4.69535C8.05836 4.67336 8.07109 4.64346 8.07109 4.61248C8.071 4.5815 8.05845 4.55156 8.03657 4.52962C7.71133 4.20435 7.52844 3.7632 7.52833 3.30323C7.52837 2.84329 7.71073 2.40145 8.03588 2.07615C8.36123 1.75084 8.80355 1.56792 9.26365 1.56792C9.72357 1.56805 10.1648 1.75095 10.49 2.07615L13.9828 5.56887ZM9.78293 2.78326C9.64523 2.64559 9.45835 2.56795 9.26365 2.56781C9.06877 2.56781 8.8808 2.64548 8.74298 2.78326C8.60537 2.92102 8.52827 3.1085 8.52823 3.30323C8.52833 3.49798 8.60598 3.68478 8.74367 3.82251C8.9531 4.03199 9.07089 4.31629 9.07099 4.61248C9.07099 4.90867 8.953 5.19292 8.74367 5.40245L7.10158 7.04454L7.0132 7.12741C6.80099 7.31169 6.54636 7.44135 6.27156 7.50582C5.95814 7.57931 5.6308 7.56372 5.32553 7.46163V7.46301L4.15577 7.07907L4.153 7.07769C4.02342 7.03415 3.88352 7.02785 3.75042 7.05905C3.61748 7.09029 3.49558 7.15797 3.39894 7.25447L3.06748 7.58592C3.04554 7.60787 3.03306 7.63777 3.03296 7.66879C3.03296 7.69982 3.04562 7.72965 3.06748 7.75165L8.30726 12.9914C8.32927 13.0133 8.35905 13.0259 8.39012 13.0259C8.42119 13.0259 8.451 13.0134 8.47298 12.9914L8.80444 12.66L8.87142 12.5833C8.93275 12.502 8.9764 12.4083 8.99986 12.3085C9.03104 12.1754 9.02476 12.0355 8.98122 11.9059L8.97984 11.9031L8.5959 10.7334L8.59659 10.7327C8.49479 10.4277 8.47967 10.1004 8.55309 9.78734C8.61756 9.51259 8.74724 9.25788 8.9315 9.04571L9.01436 8.95732L10.6565 7.31523C10.866 7.10591 11.1502 6.98792 11.4464 6.98792C11.7426 6.98797 12.0269 7.10583 12.2364 7.31523C12.3741 7.45296 12.5609 7.53057 12.7557 7.53068C12.9504 7.53067 13.1379 7.45356 13.2756 7.31592C13.4134 7.1781 13.4911 6.99014 13.4911 6.79526C13.4909 6.60058 13.4133 6.41365 13.2756 6.27598L9.78293 2.78326Z" fill="currentColor" /></svg>;
 }
 
-/** Context-menu glyphs copied from the Desktop sidebar action menu. */
+/** Context-menu glyphs, as used by the sidebar action menu. */
 export function WebuiIconContextPin({ className, pinned = false }: WebuiIconProps & { pinned?: boolean }): ReactElement {
   // The slashed glyph is clipped to the viewBox, so it needs a clipPath, and a
   // shared id would make the second pinned row on screen resolve its clip
@@ -373,7 +371,7 @@ export function WebuiIconContextChevron({ className }: WebuiIconProps): ReactEle
   return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className={className}><path d="M6 4L10 8L6 12" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }
 
-/** run-location pill leading icon — the desktop's `run-location-pill` glyph. */
+/** run-location pill leading icon — the `run-location-pill` glyph. */
 export function WebuiIconRunLocation({ className }: WebuiIconProps): ReactElement {
   return (
     <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}>
@@ -382,7 +380,7 @@ export function WebuiIconRunLocation({ className }: WebuiIconProps): ReactElemen
   );
 }
 
-/** floating rail toggle — the desktop's `mavis-sidebar-toggle` glyph. */
+/** floating rail toggle — the `mavis-sidebar-toggle` glyph. */
 export function WebuiIconSidebarToggle({ className }: WebuiIconProps): ReactElement {
   return (
     <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
@@ -391,7 +389,7 @@ export function WebuiIconSidebarToggle({ className }: WebuiIconProps): ReactElem
   );
 }
 
-/** floating search — the desktop's `mavis-search` glyph. */
+/** floating search — the `mavis-search` glyph. */
 export function WebuiIconSearch({ className }: WebuiIconProps): ReactElement {
   return (
     <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
@@ -400,33 +398,33 @@ export function WebuiIconSearch({ className }: WebuiIconProps): ReactElement {
   );
 }
 
-/** workspace add-menu glyph — Desktop's review/search icon. */
+/** workspace add-menu glyph — the review/search icon. */
 export function WebuiIconWorkspaceReview({ className }: WebuiIconProps): ReactElement {
   return <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}><circle cx="8.5" cy="8.5" r="6.1" stroke="currentColor" strokeWidth="1.2" /><path d="m13 13 4.1 4.1M8.5 5.8v5.4M5.8 8.5h5.4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg>;
 }
 
-/** workspace add-menu glyph — Desktop's terminal prompt icon. */
+/** workspace add-menu glyph — the terminal prompt icon. */
 export function WebuiIconWorkspaceTerminal({ className }: WebuiIconProps): ReactElement {
   return <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}><rect x="2.4" y="3.2" width="15.2" height="13.6" rx="2" stroke="currentColor" strokeWidth="1.2" /><path d="m5.5 7.2 2.6 2.3-2.6 2.3M9.8 12h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }
 
-/** workspace add-menu glyph — Desktop's connected canvas nodes. */
+/** workspace add-menu glyph — connected canvas nodes. */
 export function WebuiIconWorkspaceCanvas({ className }: WebuiIconProps): ReactElement {
   return <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}><rect x="2.3" y="2.5" width="4.2" height="4.2" rx=".7" stroke="currentColor" strokeWidth="1.1" /><rect x="13.5" y="2.5" width="4.2" height="4.2" rx=".7" stroke="currentColor" strokeWidth="1.1" /><rect x="7.9" y="13.3" width="4.2" height="4.2" rx=".7" stroke="currentColor" strokeWidth="1.1" /><path d="M6.5 4.6h7M4.4 6.8v3.2l5.6 3.3m5.6-6.5v3.2L10 13.3" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }
 
-/** workspace panel maximize/restore glyph — Desktop's diagonal expand arrows. */
+/** workspace panel maximize/restore glyph — diagonal expand arrows. */
 export function WebuiIconWorkspaceExpand({ className }: WebuiIconProps): ReactElement {
   return <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}><path d="M11.5 3.5h5v5M16.3 3.7l-5.1 5.1M8.5 16.5h-5v-5M3.7 16.3l5.1-5.1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }
 
 // Slash palette row leading glyphs.
 //
-// The WebUI keeps the desktop's slash-palette visual language (icon + bold title + dim
+// The WebUI keeps the slash-palette visual language (icon + bold title + dim
 // description, sized at 18 with text-icon_default_secondary). The five new glyphs below
 // cover the commands that have no direct rail equivalent: help, compact, status, usage,
 // model. `new` reuses the rail's `WebuiIconNewTask` so the popover and the rail stay in
-// sync when the desktop's glyph shifts.
+// sync when the glyph shifts.
 
 /** slash palette — `compact` row leading glyph. */
 export function WebuiIconCommandCompact({ className }: WebuiIconProps): ReactElement {
@@ -451,15 +449,15 @@ export function WebuiIconCommandUsage({ className }: WebuiIconProps): ReactEleme
   );
 }
 
-// Desktop palette command glyphs.
+// Palette command glyphs.
 //
-// The desktop slash palette uses these glyphs for its built-in commands:
+// The slash palette uses these glyphs for its built-in commands:
 // goal (target), plan (cycle), fork (Y-fork), and memory (brain). They share
-// the desktop's 18x18 / currentColor rule and are inert in WebUI when the
+// the 18x18 / currentColor rule and are inert in WebUI when the
 // underlying harness feature is not wired, so they render with the same row
 // height and weight as the supported entries next to them.
 
-/** slash palette — desktop `goal` row leading glyph. */
+/** slash palette — `goal` row leading glyph. */
 export function WebuiIconCommandGoal({ className }: WebuiIconProps): ReactElement {
   return (
     <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
@@ -470,7 +468,7 @@ export function WebuiIconCommandGoal({ className }: WebuiIconProps): ReactElemen
   );
 }
 
-/** slash palette — desktop `plan` row leading glyph. */
+/** slash palette — `plan` row leading glyph. */
 export function WebuiIconCommandPlan({ className }: WebuiIconProps): ReactElement {
   return (
     <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
@@ -499,10 +497,10 @@ export function WebuiIconCommandPlan({ className }: WebuiIconProps): ReactElemen
 }
 
 // Skills section row leading glyphs. The WebUI ships these as fixtures that
-// mirror the desktop's slash-palette skill rows (mavis/ask-matt,
+// mirror the slash-palette skill rows (mavis/ask-matt,
 // code-review, codebase-design, diagnosing-bugs). Each is inert today.
 
-/** slash palette — skill row glyph (the desktop uses an N-style mark). */
+/** slash palette — skill row glyph (an N-style mark). */
 export function WebuiIconSkillAskMatt({ className }: WebuiIconProps): ReactElement {
   return (
     <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
@@ -564,8 +562,8 @@ export function WebuiIconSkillDiagnosingBugs({ className }: WebuiIconProps): Rea
 
 /** slash palette — generic skill row glyph used when the registry returns a
  * skill name we don't have a dedicated icon for. Spells the same look as the
- * desktop's `skill-default` glyph (a four-point sparkle) so the popover
- * stays in 1:1 with the desktop reference. */
+ * `skill-default` glyph (a four-point sparkle) so the popover
+ * stays in 1:1 with the reference. */
 export function WebuiIconSkillGeneric({ className }: WebuiIconProps): ReactElement {
   return (
     <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
@@ -579,7 +577,7 @@ export function WebuiIconSkillGeneric({ className }: WebuiIconProps): ReactEleme
   );
 }
 
-/** Icon props for the message-action glyphs: the desktop passes an explicit
+/** Icon props for the message-action glyphs: an explicit
  * pixel size per call site (16 or 18), so these keep the same knob. */
 export interface WebuiSizedIconProps {
   readonly className?: string;
@@ -587,7 +585,7 @@ export interface WebuiSizedIconProps {
   readonly size?: number;
 }
 
-/** message copy — desktop `message-copy-button` / `user-message-copy-button` idle glyph. */
+/** message copy — `message-copy-button` / `user-message-copy-button` idle glyph. */
 export function WebuiIconMessageCopy({ className, size = 20 }: WebuiSizedIconProps): ReactElement {
   return (
     <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
@@ -605,7 +603,7 @@ export function WebuiIconMessageCopied({ className, size = 20 }: WebuiSizedIconP
   );
 }
 
-/** rewind — desktop `message-rewind-button` / `user-message-rewind-button` glyph. */
+/** rewind — `message-rewind-button` / `user-message-rewind-button` glyph. */
 export function WebuiIconMessageRewind({ className, size = 20 }: WebuiSizedIconProps): ReactElement {
   return (
     <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
@@ -614,7 +612,7 @@ export function WebuiIconMessageRewind({ className, size = 20 }: WebuiSizedIconP
   );
 }
 
-/** edit — desktop `message-edit-button` glyph, drawn on a 16px grid. */
+/** edit — `message-edit-button` glyph, drawn on a 16px grid. */
 export function WebuiIconMessageEdit({ className, size = 16 }: WebuiSizedIconProps): ReactElement {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}>
@@ -623,7 +621,7 @@ export function WebuiIconMessageEdit({ className, size = 16 }: WebuiSizedIconPro
   );
 }
 
-/** edit — desktop `user-message-edit-button` glyph, drawn on a 20px grid. */
+/** edit — `user-message-edit-button` glyph, drawn on a 20px grid. */
 export function WebuiIconMessageEditUser({ className, size = 20 }: WebuiSizedIconProps): ReactElement {
   return (
     <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
@@ -632,7 +630,7 @@ export function WebuiIconMessageEditUser({ className, size = 20 }: WebuiSizedIco
   );
 }
 
-/** like, unselected — desktop `message-feedback-like-action` idle glyph. */
+/** like, unselected — `message-feedback-like-action` idle glyph. */
 export function WebuiIconMessageLikeOff({ className, size = 20 }: WebuiSizedIconProps): ReactElement {
   return (
     <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
@@ -641,7 +639,7 @@ export function WebuiIconMessageLikeOff({ className, size = 20 }: WebuiSizedIcon
   );
 }
 
-/** like, selected — the desktop fills the same outline and thickens the stroke. */
+/** like, selected — the same outline, filled, with a thickened stroke. */
 export function WebuiIconMessageLikeOn({ className, size = 20 }: WebuiSizedIconProps): ReactElement {
   return (
     <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
@@ -650,7 +648,7 @@ export function WebuiIconMessageLikeOn({ className, size = 20 }: WebuiSizedIconP
   );
 }
 
-/** dislike, unselected — desktop `message-feedback-dislike-action` idle glyph. */
+/** dislike, unselected — `message-feedback-dislike-action` idle glyph. */
 export function WebuiIconMessageDislikeOff({ className, size = 20 }: WebuiSizedIconProps): ReactElement {
   return (
     <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
@@ -668,7 +666,7 @@ export function WebuiIconMessageDislikeOn({ className, size = 20 }: WebuiSizedIc
   );
 }
 
-/** fork — desktop `message-fork-button` glyph (expand toward a new session). */
+/** fork — `message-fork-button` glyph (expand toward a new session). */
 export function WebuiIconMessageFork({ className, size = 20 }: WebuiSizedIconProps): ReactElement {
   return (
     <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>

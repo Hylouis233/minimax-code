@@ -98,7 +98,7 @@ export const WEBUI_WORKSPACE_TAB_KINDS: Readonly<
 
 /**
  * The add menu's order. It is not the table's: 审查 leads and 查看文件 trails the
- * kinds that open a process, which is the order Desktop's menu has.
+ * kinds that open a process.
  */
 export const WEBUI_WORKSPACE_ADD_MENU_ORDER: readonly WebuiWorkspaceTabKind[] = [
   "review",

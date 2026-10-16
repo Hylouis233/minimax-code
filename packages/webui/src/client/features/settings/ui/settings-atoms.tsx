@@ -34,11 +34,11 @@ export function RefreshIcon(): ReactElement {
 }
 
 /**
- * The three section bubbles, copied from the desktop word for word.
+ * The three section bubbles, word for word.
  *
  * Exported because the test asserts the exact strings: a tooltip is copy the
- * user reads, and a paraphrase that reads fine still means the WebUI and the
- * desktop stop saying the same thing about the same control.
+ * user reads, and a paraphrase that reads fine still means two surfaces stop
+ * saying the same thing about the same control.
  */
 export const PERSONALIZATION_SECTION_HINTS = {
   globalInstructions:
@@ -50,8 +50,8 @@ export const PERSONALIZATION_SECTION_HINTS = {
 /**
  * The section title's help affordance.
  *
- * A real bubble rather than a native `title`, because the desktop hangs a dark
- * bubble with an arrow above the glyph and a `title` cannot match it: the
+ * A real bubble rather than a native `title`: `title` cannot match the dark
+ * bubble with an arrow this hangs above the glyph — the
  * browser draws its own surface, delays it about a second, and paints no
  * arrow. The shape itself is not new — `.webui-signin-credits-tooltip` and
  * `.webui-context-usage-label` already carry it, and this is the third call

@@ -1,4 +1,4 @@
-# Contributing
+    # Contributing
 
 This repository contains the standalone MiniMax Code TUI, headless CLI, and ACP source. Start with the [architecture](docs/architecture.md), [capability coverage](docs/tui-capabilities.md), and [installation guide](docs/installation.md).
 

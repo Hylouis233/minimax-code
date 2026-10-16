@@ -62,7 +62,7 @@ export interface WebuiAgentMemoryView {
 /**
  * The three fields the `关于你` region holds.
  *
- * The region is a structured record, not one blob of prose: the desktop writes
+ * The region is a structured record, not one blob of prose: the format writes
  * a fixed skeleton of `Nickname: `, `Occupation: ` and a `## More about you`
  * heading, and reads each label back off whichever line carries it. Exposing
  * the three fields separately is what lets an all-empty region render as an

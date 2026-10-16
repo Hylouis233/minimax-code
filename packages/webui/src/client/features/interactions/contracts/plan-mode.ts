@@ -6,17 +6,17 @@
 
 import type { WebuiQuestionnaireRequest } from "../../../../shared/contracts/interactions.js";
 
-/** Whether this request is a plan-mode request at all. The desktop gates every
- *  plan surface on the same predicate (`mode === "plan"`). */
+/** Whether this request is a plan-mode request at all. Every plan surface
+ *  gates on the same predicate (`mode === "plan"`). */
 export function isWebuiPlanRequest(
   request: WebuiQuestionnaireRequest | undefined,
 ): boolean {
   return request?.mode === "plan";
 }
 
-/** A plan request that already carries the written plan file. This is what the
- *  desktop calls `planReview`, and it selects the decision card over the
- *  entry confirmation. */
+/** A plan request that already carries the written plan file — the
+ *  `planReview` case. It selects the decision card over the entry
+ *  confirmation. */
 export function isWebuiPlanReviewRequest(
   request: WebuiQuestionnaireRequest | undefined,
 ): boolean {

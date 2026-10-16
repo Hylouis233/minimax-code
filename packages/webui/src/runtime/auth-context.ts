@@ -1,6 +1,6 @@
 // Account credentials for the WebUI's runtime host.
 //
-// Assembly step 3 of `docs/webui-v1-scope.md` requires an auth context getter
+// Assembly step 3 of `packages/webui/docs/runtime/boot.md` requires an auth context getter
 // with refresh and invalidation. Managed MiniMax login carries no API key: the
 // credential is an OAuth access token sent as `Authorization: Bearer`, and the
 // resolver throws `managed OAuth bearer is not synced` when the header is

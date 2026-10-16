@@ -481,7 +481,7 @@ describe("ContextMenu — mousedown outside closes; keydown Escape closes; point
 
   it("is `not-subscribed` for pointerdown events (desktop parity)", () => {
     // ContextMenu does NOT listen to pointerdown — it listens to
-    // mousedown only, matching the desktop's mousedown listener.
+    // mousedown only.
     expect(
       evaluateOutsideClose({
         surface: "contextMenu",

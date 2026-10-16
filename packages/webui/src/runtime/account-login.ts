@@ -2,7 +2,7 @@
 // the server because the credential store lives there.
 //
 // The WebUI previously had no login at all: it served whatever OAuth
-// credential `mcode login` (or the desktop) had already written, and its
+// credential `mcode login` had already written, and its
 // 退出登录 only cleared projections — the credential survived and the next
 // lease refresh signed the process right back in. Signing in and switching
 // accounts were therefore both impossible without leaving the browser.

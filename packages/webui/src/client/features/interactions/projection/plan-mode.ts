@@ -4,23 +4,22 @@
 // The runtime raises ONE questionnaire channel for plan mode. A plan request
 // carries `mode: "plan"` and, once the agent has written the plan file, a
 // `modePayload.planReview` holding that file's markdown and absolute path.
-// The generic questionnaire panel cannot render it: the desktop draws a plan
+// The generic questionnaire panel cannot render it: plan mode needs a plan
 // card with a preview of the file plus a three-way decision (implement /
 // adjust / skip), and its answers are `plan-review` step answers rather than
 // option selections.
 //
 // Everything here is a pure function of the request so the parsing rules — the
 // title heading, the summary extraction, the three answer payloads — are
-// asserted directly instead of through a rendered card. The desktop's own
-// helpers are the specification; see the module notes on each function for the
-// behaviour being mirrored.
+// asserted directly instead of through a rendered card. The notes on each
+// function below state the behaviour it implements.
 
 import type {
   WebuiQuestionnaireAnswer,
   WebuiQuestionnaireRequest,
 } from "../../../../shared/contracts/interactions.js";
 
-/** The step id the runtime uses for the post-plan decision. The desktop's
+/** The step id the runtime uses for the post-plan decision. The
  *  approve / feedback / skip payloads all answer this step. */
 export const WEBUI_PLAN_REVIEW_STEP_ID = "plan-review";
 
@@ -31,8 +30,7 @@ const PLAN_REVIEW_APPROVE_OPTION_ID = "approve";
 const PLAN_ENTER_CONFIRM_OPTION_ID = "confirm";
 const PLAN_ENTER_DECLINE_OPTION_ID = "decline";
 
-/** Desktop copy, lifted verbatim from the desktop locale chunk so the plan
- *  cards read exactly as they do there. */
+/** zh copy for the plan cards. */
 export const WEBUI_PLAN_COPY = {
   enterTitle: "使用计划模式？",
   enterDescription: "计划模式会在执行前先梳理复杂任务。",
@@ -61,7 +59,7 @@ export function isWebuiPlanEnterRequest(
 
 
 
-/** The warning line the desktop shows under the plan title, taken from the
+/** The warning line shown under the plan title, taken from the
  *  `plan-review` step's description. */
 export function webuiPlanReviewDescription(
   request: WebuiQuestionnaireRequest | undefined,
@@ -71,7 +69,7 @@ export function webuiPlanReviewDescription(
 }
 
 /** `plan-enter` declares which of confirm/decline this runtime build offers;
- *  the desktop hides a button whose option is absent. */
+ *  a button whose option is absent is hidden. */
 export function webuiPlanEnterOptions(
   request: WebuiQuestionnaireRequest | undefined,
 ): { readonly confirm: boolean; readonly decline: boolean } {
@@ -90,7 +88,7 @@ interface WebuiMarkdownHeading {
   readonly text: string;
 }
 
-/** ATX heading, matching the desktop's `/^ {0,3}(#{1,6})[\t ]+(.+?)[\t ]*#*[\t ]*$/u`. */
+/** ATX heading: `/^ {0,3}(#{1,6})[\t ]+(.+?)[\t ]*#*[\t ]*$/u`. */
 function parseHeading(line: string): WebuiMarkdownHeading | undefined {
   const match = /^ {0,3}(#{1,6})[\t ]+(.+?)[\t ]*#*[\t ]*$/u.exec(line);
   return match?.[1] && match[2]
@@ -98,7 +96,7 @@ function parseHeading(line: string): WebuiMarkdownHeading | undefined {
     : undefined;
 }
 
-/** Fence opener, matching the desktop's `/^ {0,3}(`{3,}|~{3,})/u`. */
+/** Fence opener: `/^ {0,3}(`{3,}|~{3,})/u`. */
 function parseFence(line: string): { readonly marker: string; readonly length: number } | undefined {
   const match = /^ {0,3}(`{3,}|~{3,})/u.exec(line);
   const marker = match?.[1];
@@ -106,8 +104,8 @@ function parseFence(line: string): { readonly marker: string; readonly length: n
 }
 
 /** The plan's title: the first level-1 heading OUTSIDE a fenced code block.
- *  Headings inside fences are skipped rather than closing the fence, matching
- *  the desktop's toggle so a ```# not a heading``` block is ignored. */
+ *  Headings inside fences are skipped rather than closing the fence, so a
+ *  ```# not a heading``` block is ignored. */
 export function webuiPlanTitle(markdown: string): string {
   const lines = markdown.replace(/\r\n?/gu, "\n").split("\n");
   let open: { readonly marker: string; readonly length: number } | undefined;
@@ -127,9 +125,9 @@ export function webuiPlanTitle(markdown: string): string {
 }
 
 /**
- * The plan's one-screen summary, lifted from the desktop's inline extractor.
+ * The plan's one-screen summary.
  *
- * The desktop looks for a heading whose text is `summary` (case-insensitive),
+ * The extractor looks for a heading whose text is `summary` (case-insensitive),
  * then keeps every following line until the next heading at that heading's own
  * level or shallower — so a plan written as `# Title` / `## Summary` / body /
  * `## 画布与调色板` previews the body of the Summary section. Fenced blocks are
@@ -243,7 +241,7 @@ export function buildWebuiPlanSkipAnswers(): readonly WebuiQuestionnaireAnswer[]
 }
 
 /** The entry confirmation posts against the `plan-enter` step, echoing the
- *  clicked option id back the way the desktop does. */
+ *  clicked option id back. */
 export function buildWebuiPlanEnterAnswers(
   optionId: typeof PLAN_ENTER_CONFIRM_OPTION_ID | typeof PLAN_ENTER_DECLINE_OPTION_ID,
 ): readonly WebuiQuestionnaireAnswer[] {

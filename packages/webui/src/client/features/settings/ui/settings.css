@@ -109,7 +109,7 @@
   .webui-turn-review-line--addition { background: var(--bg_status_positive); color: #17251d; }
   .webui-turn-review-line--deletion { background: var(--bg_status_error); color: #302022; }
   .webui-turn-review-line--hunk { background: var(--bg_grouped_secondary); color: var(--text_default_tertiary); }
-  /* The no-newline marker: Desktop renders it as its own row with no gutter
+  /* The no-newline marker: it renders as its own row with no gutter
      numbers and neutral text, because it records a fact about the line above
      rather than being a line of the file. */
   .webui-turn-review-line--noNewline { grid-column: 1 / -1; padding: 1px var(--spacing_12); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--text_default_tertiary); }
@@ -337,24 +337,24 @@
   .webui-settings-info-hint:hover { border-color: var(--border_accent); color: var(--text_default_secondary); }
   .webui-settings-info-hint:focus-visible { outline: 2px solid var(--border_accent); outline-offset: 1px; }
   /* The dark bubble with an arrow is the shell's existing tooltip shape (see
-   * `.webui-signin-credits-tooltip`); measured against the desktop, its 6px
+   * `.webui-signin-credits-tooltip`); its 6px
    * radius, 8/12 padding and 18px line height are the same three numbers, so
    * this is a third call site on one shape rather than a third shape.
    *
    * The hardcoded `rgb(0 0 0 / 85%)` / `#fff` is DELIBERATE and must not be
-   * rebound to a token. The desktop draws these hints with antd's `Tooltip`,
-   * whose colours come from the `colorBgSpotlight` and `colorTextLightSolid`
+   * rebound to a token. These values are antd's `Tooltip` colours, sourced
+   * from the `colorBgSpotlight` and `colorTextLightSolid`
    * global tokens — documented defaults `rgba(0,0,0,0.85)` and `#fff` — and
-   * those are theme-independent: the desktop ships a black bubble under BOTH
-   * `.light` and `.dark`, confirmed by looking at it in each. The same source
+   * they are theme-independent: the bubble is black under BOTH
+   * `.light` and `.dark`. The same source
    * explains the 6px radius and the 250px max width, which are antd's
    * `borderRadius` and Tooltip `maxWidth` defaults rather than measurements.
    * Everything else on this surface is token-driven because it *should* follow
    * the theme; this bubble should not, so a token binding here would be a
    * fidelity regression dressed up as a fix.
    *
-   * The 250 is antd's `Tooltip` `maxWidth` default, which the desktop does not
-   * override — so all three of these bubbles now share one width, and the 340
+   * The 250 is antd's `Tooltip` `maxWidth` default, which is not
+   * overridden — so all three of these bubbles now share one width, and the 340
    * that used to sit on `.webui-signin-credits-tooltip` is gone. Two more
    * labels still read 220, but both are under `white-space: nowrap` where the
    * ceiling cannot shape anything; see the note on `.webui-context-usage-label`.
@@ -381,17 +381,17 @@
      focus reads as a recoloured edge rather than a glow.
    *
      The focus ring is an `outline` outside the box, not a recoloured border.
-     The blue itself is `--blue_500` -- the 1px `#0077d9` the desktop draws,
+     The blue itself is `--blue_500` -- the 1px `#0077d9`,
      which is this app's blue and antd's themed `colorPrimary`, not the
-     `--border_heavy` the bundle's `.mavis-textarea:focus` rule names. But
+     `--border_heavy` that a `.mavis-textarea:focus` rule names. But
      drawing it *as* the border costs the content 1px and leaves the text
      sitting right against the ring. `outline` paints on the border edge
      without taking layout, so the content box is identical focused and
      unfocused and the blue ring sits outside it; `border-color` returns to its
      resting value for the same reason. Hover still deepens the border itself
      to `--border_heavy`. */
-  /* Height follows the desktop's `autoSize: {minRows: 13, maxRows: 24}` at
-     `!leading-6`. Measured off the desktop dialog: 24px between baselines, and
+  /* Height follows `autoSize: {minRows: 13, maxRows: 24}` at
+     `!leading-6`. Measured: 24px between baselines, and
      a 593px box for content long enough to cap out — which is 24 rows. So
      13 rows + 8px top padding + the 28px the count needs is the floor, and 24
      rows is the ceiling.
@@ -407,24 +407,24 @@
      `min-height` at 348px, and the text scrolled underneath the count. Nothing
      errors and nothing is visible in devtools — the declaration is simply
      ignored.
-     `flex: none` because the desktop marks the field `shrink-0`: its height is
+     `flex: none` because the field is marked `shrink-0`: its height is
      its content's, not the leftover space in the dialog.
    *
-     The face changes too. This is prose, not an editor of code: the desktop
-     runs it at `!text-sm !leading-6` in the UI face, and we were running 12px
+     The face changes too. This is prose, not an editor of code: it
+     runs at `!text-sm !leading-6` in the UI face, and we were running 12px
      monospace, which is also why a "13 row" floor was not 312px here. */
   .webui-memory-manager-editor .webui-personalization-textarea { flex: none; height: auto; field-sizing: content; min-height: 348px; max-height: 612px; border: 1px solid var(--border_default); border-radius: var(--radius_12); background: transparent; padding: var(--spacing_8) 0 28px; font-family: inherit; font-size: var(--size_14); line-height: 24px; }
   .webui-memory-manager-editor .webui-personalization-textarea:hover { border-color: var(--border_heavy); outline: none; box-shadow: none; }
   .webui-memory-manager-editor .webui-personalization-textarea:focus { border-color: var(--border_default); outline: 1px solid var(--blue_500); box-shadow: none; }
   /* The character count sits INSIDE the editor, bottom-right, 14px from each
-     edge. Measured off the desktop dialog at 1:1: the digits land 14px left of
+     edge. Measured at 1:1: the digits land 14px left of
      the border and 14px above it, and the focus ring around the field reads as
      1px of `--blue_500`.
    *
      Two earlier shapes were wrong. Absolutely positioned over the editor it
      floated transparently on the panel; as a full-width sibling row below the
-     editor it was outside the control it counts, which is not where the desktop
-     puts it. The desktop's antd `showCount` widens the count suffix to
+     editor it was outside the control it counts, which is not the intended
+     position. The antd `showCount` widens the count suffix to
      `width:100%` and right-aligns it *inside* the field, so the number and the
      text share one surface and one border.
    *
@@ -433,8 +433,8 @@
      glyphs. An earlier `bottom: 8px` did the same arithmetic from the band
      instead; the band is now flush with the editor's bottom edge, so that
      offset is gone. The editor reserves 28px of bottom padding for the row so
-     the last line of text cannot scroll under it -- the desktop does not reserve
-     anything, and the count there overlaps whenever the text is long enough to
+     the last line of text cannot scroll under it -- nothing is reserved
+     otherwise, and the count would overlap whenever the text is long enough to
      scroll. */
   /* The count gets its own class rather than riding on
      `.webui-personalization-meta`. That shared rule carries `width: 100%`,
@@ -462,25 +462,25 @@
      concentric, and no 1px inset arithmetic is needed.
    *
      Not fixed: the band's bottom edge is flush with the editor's, so the 1px
-     bottom border is still covered along the full width. The desktop puts its
-     count in antd's `.ant-input-suffix`, which is a sibling of the textarea
+     bottom border is still covered along the full width. antd puts its
+     count in `.ant-input-suffix`, which is a sibling of the textarea
      inside the bordered box, so that border reads all the way around. Closing
      this would mean insetting the band by 1px and using 11px corners, which
      moves the already-measured 14px inset to 15px. Left alone pending a
-     pixel check against the desktop. */
+     pixel check. */
   .webui-memory-manager-count { position: absolute; right: 0; bottom: 0; left: 0; display: flex; height: 28px; align-items: center; justify-content: flex-end; padding: 0 14px; border-radius: 0 0 var(--radius_12) var(--radius_12); background: var(--bg_grouped_secondary); color: var(--text_default_tertiary); font-size: var(--size_12); line-height: var(--line_height_16); }
   .webui-memory-manager-surface > .webui-mavis-button { align-self: flex-start; }
   .webui-memory-manager-footer { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing_20); }
   .webui-memory-manager-actions { display: flex; flex: none; align-items: center; gap: var(--spacing_16); }
-  /* The memory manager's header controls, transcribed from the desktop dialog
+  /* The memory manager's header controls, declared from the token layer
      rather than measured off a capture.
    *
-     The bundle states all of this: `size-[26px]`, `rounded-lg`, `gap-2`, and a
+     The utilities state all of this: `size-[26px]`, `rounded-lg`, `gap-2`, and a
      rest fill of `bg-bg_interaction_tertiary_default` that the hover rule
      replaces with `bg_interaction_tertiary_hover`. That token is
      `--opacity_black_1_0` in the light theme, so the fill is declared rather
      than left off -- it is transparent here and not transparent in a theme that
-     raises it, and the desktop's own rule is the thing to copy either way.
+     raises it, and the declared rule is the thing to keep either way.
    *
      An earlier pass took the box down to 20px on a 4px gap, from a dark capture
      whose two ink centres measured 24px apart. That reading was wrong twice
@@ -496,7 +496,7 @@
    * `.webui-personalization-header` indents its children by 16px, and the
      manager's editor is a *sibling* of that header rather than a child of it —
      so the editor starts at the surface's padding and the buttons started 16px
-     further in. Measured on the desktop: the × ink ends 11px short of the
+     further in. Measured: the × ink ends 11px short of the
      editor's right border, and the header's own negative margin is what
      closes that gap without moving the title. */
   /* The controls sit on the header row, but the editor they must line up with
@@ -518,9 +518,9 @@
   .webui-memory-manager-menu button:disabled { opacity: 0.4; }
   .webui-memory-manager-menu button.is-danger { color: var(--text_label_danger_secondary_default); }
   .webui-memory-manager-menu-icon { flex: none; }
-  /* 删除记忆's confirmation, measured off the desktop's modal.
+  /* 删除记忆's confirmation, measured in the reference layout.
    *
-   * A second modal, not a panel inside the first: the desktop dims the editor
+   * A second modal, not a panel inside the first: the editor is dimmed
    * behind a centred dialog, which an inline block cannot do — there is nothing
    * behind it inside the surface to dim. The scrim is therefore its own
    * fixed layer at 140, above `.webui-memory-manager-mask`'s 120, because this
@@ -530,10 +530,10 @@
    * the radius ramp, and the difference only shows on the corner arc. Padding
    * 24 plus a 22 title line, a 16 gap, two 22 body lines, a 20 gap and a 30
    * button adds up to the measured 183, which is the number that says the
-   * vertical rhythm is the desktop's and not a guess.
+   * vertical rhythm is measured and not a guess.
    *
    * The footer reuses `.webui-mavis-button-gray` and `-danger` unchanged: those
-   * already resolve to the desktop's own values in the light theme — danger is
+   * already resolve to the token values in the light theme — danger is
    * `red_400` on `gray_0` text, which is exactly the #f73646 the button measures,
    * and gray is `bg_interaction_secondary_default`, ~#f5f5f5 against the
    * measured #f7f7f7. Restating those colours here would be a second place to
@@ -546,7 +546,7 @@
   .webui-memory-confirm-close:focus-visible { outline: 2px solid var(--border_accent); outline-offset: 1px; }
   .webui-memory-confirm-body { margin: var(--spacing_16) 0 0; color: var(--text_default_secondary); font-size: var(--size_14); line-height: var(--line_height_22); }
   .webui-memory-confirm-actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--spacing_8); margin-top: var(--spacing_20); }
-  /* 关于你 is ONE control. The desktop's `personalization-profile-section`
+  /* 关于你 is ONE control. The `personalization-profile-section`
      renders a single TextArea bound to `moreAbout`; `nickname` and `occupation`
      exist only in the file layer, which still parses and re-emits their
      `Nickname: ` / `Occupation: ` lines so an existing profile survives a save
@@ -554,7 +554,7 @@
      one field that is actually editable.
    *
      The two settings-page editors are height-clamped rather than free: the
-     desktop passes `minHeight: 144, maxHeight: 200` in the style object and
+     style object passes `minHeight: 144, maxHeight: 200` and
      `field-sizing: content` is what makes those two numbers the whole rule --
      the field grows with its text and stops at 200px, exactly as antd resolves
      a textarea with min/max and no autoSize. The memory dialog overrides both
@@ -608,11 +608,11 @@
   .webui-mavis-button-black { background: var(--bg_interaction_primary_default); color: var(--text_label_primary_default); }
   .webui-mavis-button-danger { background: var(--bg_interaction_danger_primary_default); color: var(--text_label_danger_primary_default); }
   .webui-mavis-button-danger:hover:not(:disabled) { background: var(--bg_interaction_danger_primary_hover); }
-  /* The section save button, transcribed from the desktop rather than measured
+  /* The section save button, declared from the token layer rather than measured
    * off a capture.
    *
    * Both personalization sections render the same control -- the 关于你 header's
-   * `action` and 自定义指令's save are identical in the bundle down to the
+   * `action` and 自定义指令's save are identical down to the
    * geometry overrides -- and both pass `variant: "black"`. That variant is a
    * filled primary: `.mavis-button.black` is `bg_interaction_primary_default`
    * with `text_label_primary_default`, and its hover is
@@ -621,7 +621,7 @@
    * variant, not theirs.
    *
    * The disabled state needed no colour of its own, and there is no
-   * `.mavis-button.black.disabled` in the bundle to copy: the generic
+   * `.mavis-button.black.disabled` to copy: the generic
    * `.mavis-button.disabled{opacity:.5;cursor:not-allowed}` is the whole rule.
    * A disabled 保存 therefore keeps the black fill and the white label and goes
    * half-transparent. Only the `gray` variant overrides its own disabled fill,
@@ -709,7 +709,7 @@
 
   /* ---------------------------------------------------------- segmented pill */
 
-  /* The desktop's source switcher. */
+  /* The source switcher. */
   .webui-segmented {
     display: inline-flex;
     align-items: center;

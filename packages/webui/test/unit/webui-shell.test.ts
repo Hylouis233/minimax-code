@@ -1,6 +1,6 @@
 // Verify the WebUI shell (retailored by the visual-alignment pass).
 //
-// The shell renders the desktop application's anatomy: a 240px rail on
+// The shell renders the application anatomy: a 240px rail on
 // `bg_default_scrim`, a main surface on `bg_grouped_secondary`, a window strip
 // carrying the rail controls, a fixed "new task" row, the navigation block, the
 // project list, the identity row, and on the surface a centred hero with the
@@ -15,7 +15,7 @@
 // that contract (each named component class lands in the output, and every
 // `var(--x)` in it closes against a definition) is asserted in
 // webui-design-tokens.test.ts against the stylesheet `pnpm build:webui` produces,
-// which is also where the desktop's mono stack for `code`/`pre` is checked.
+// which is also where the mono stack for `code`/`pre` is checked.
 
 import { describe, it, expect, vi } from "vitest";
 import { createElement } from "react";
@@ -185,7 +185,7 @@ function renderSessionShell(): string {
   );
 }
 
-/** The rail destinations the desktop ships that the WebUI has no feature for. */
+/** The rail destinations the WebUI has no feature for. */
 const INERT_NAV_LABELS = ["网站", "远程"];
 
 describe("WebUI shell", () => {
@@ -432,7 +432,7 @@ describe("WebUI shell", () => {
   });
 
   it("groups a flat transcript into one block per message", () => {
-    // The desktop renders one block per turn: a process disclosure carrying the
+    // One block is rendered per turn: a process disclosure carrying the
     // thinking and the tool steps, then the answer. Both belong to the same
     // message and must stay together; a user turn is its own block.
     const groups = groupWebuiTranscriptItems([
@@ -969,7 +969,7 @@ describe("WebUI shell — desktop anatomy", () => {
     expect(html).toMatch(/bg-bg_default_scrim/u);
     // The main surface is the lightest step.
     expect(html).toMatch(/bg-bg_grouped_secondary/u);
-    // The composer carries the elevated desktop surface token.
+    // The composer carries the elevated surface token.
     expect(html).toMatch(/bg-bg_grouped_secondary_elevated/u);
   });
 
@@ -1081,9 +1081,9 @@ describe("WebUI shell — desktop anatomy", () => {
   it("uses the desktop's own class composition for rows and pills", () => {
     const html = renderShell();
 
-    // Row and control geometry the desktop states as utilities rather than as
+    // Row and control geometry stated as utilities rather than as
     // tokens: 32px nav rows on an 8px radius, 48px identity row on 10px,
-    // 14px body type and the user-menu identity row's desktop radius.
+    // 14px body type and the user-menu identity row's radius.
     expect(html).toMatch(/h-8/u);
     expect(html).toMatch(/rounded-lg/u);
     expect(html).toMatch(/text-sm/u);
@@ -1180,13 +1180,13 @@ describe("WebUI shell — desktop anatomy", () => {
 
     expect(html).toMatch(/data-webui-home-content="true"/u);
     expect(html).toContain("MiniMax Code，让工作更简单。");
-    // The hero column keeps the desktop's 743px width below a 240px spacer.
+    // The hero column keeps its 743px width below a 240px spacer.
     expect(html).toMatch(/max-w-\[743px\]/u);
     // The spacer is decorative, full-bleed, and holds its size in the flex
-    // column. Its height is the desktop's 240px as a *cap*, not a literal:
+    // column. Its height is 240px as a *cap*, not a literal:
     // d9b9519 ("update onboarding layout and responsive design") made the
     // spacer responsive with `h-[clamp(96px,24vh,240px)]`, which still resolves
-    // to 240px on any desktop-height window and only shrinks on short ones.
+    // to 240px on a tall window and only shrinks on short ones.
     // Asserting the cap keeps the 240px headroom under test while leaving the
     // responsive expression free to move; pinning the exact utility string
     // would fail again on the next viewport pass without catching a real
@@ -1194,19 +1194,19 @@ describe("WebUI shell — desktop anatomy", () => {
     const spacerMatch = html.match(/<div aria-hidden="true" class="([^"]*)"><\/div>/u);
     expect(spacerMatch, "home hero spacer is missing").not.toBeNull();
     const spacerClasses = spacerMatch?.[1] ?? "";
-    // h-[…] whose expression names 240px, so the headroom is bounded by the
-    // desktop's value and never grows past it.
+    // h-[…] whose expression names 240px, so the headroom is bounded by that
+    // value and never grows past it.
     expect(spacerClasses, "spacer height must stay capped at 240px").toMatch(/(?:^|\s)h-\[[^\]]*\b240px\b[^\]]*\]/u);
     expect(spacerClasses, "spacer must stay full-bleed").toMatch(/(?:^|\s)w-full(?:\s|$)/u);
     expect(spacerClasses, "spacer must not shrink in the flex column").toMatch(/(?:^|\s)shrink(?:\s|$)/u);
     expect(html).not.toMatch(/data-webui-recommendations="true"/u);
     expect(html).not.toMatch(/data-webui-conversation-source="true"/u);
-    // New Task is the desktop's clean home state, not the WebUI-only create-session
+    // New Task is the clean home state, not the WebUI-only create-session
     // form and not a previously selected transcript.
     expect(html).not.toMatch(/data-webui-create-form="true"/u);
     expect(html).not.toMatch(/data-webui-transcript="/u);
 
-    // The composer card carries the desktop's own geometry: a 20px radius over a
+    // The composer card carries its own geometry: a 20px radius over a
     // hairline border plus the soft layer. The border alone reads as nothing on
     // this surface, so the shadow is the load-bearing part.
     expect(html).toMatch(/data-webui-composer="true"/u);
@@ -1265,8 +1265,8 @@ describe("WebUI shell — desktop anatomy", () => {
   });
 
   it("keeps the token-named spacing and type scale in the blocks that use it", () => {
-    // The desktop composes both scales; the WebUI's own surfaces (the transcript,
-    // the transcript) are written in the token-named one, so assert it where it
+    // Both scales are composed; the WebUI's own surfaces (the transcript)
+    // are written in the token-named one, so assert it where it
     // is actually rendered rather than in the home shell.
     const transcript = renderToStaticMarkup(
       createElement(WebuiSessionTranscript, {
@@ -2748,7 +2748,7 @@ describe("WebUI composer transcriptIncomplete", () => {
 
   it("merges adjacent assistant messages into one transcript block", () => {
     // The server splits one reply across several msg_ids (one per tool
-    // round), each with its own thinking — desktop renders the turn as a
+    // round), each with its own thinking — the turn renders as a
     // single disclosure, so adjacent non-user groups collapse into one and
     // the render aggregates their facets.
     const groups = groupWebuiTranscriptItems([

@@ -255,7 +255,7 @@ export function WebuiToolResults({
   );
 }
 
-/** Desktop activity-group: a 16px activity header and a timeline body. */
+/** Activity group: a 16px activity header and a timeline body. */
 export function WebuiActivityGroup({
   tools,
   authoritativeDiffAvailable = false,
@@ -347,7 +347,7 @@ export function WebuiTurnProcess({
   readonly startedAtMs?: number;
   readonly endedAtMs?: number;
   /** Approximate token count streamed during the turn. Used to derive the
-   *  Desktop-style "output rate" (`{N} token/s`) when the turn has finished. */
+   *  "output rate" (`{N} token/s`) when the turn has finished. */
   readonly tokenCount?: number;
   /** Wall-clock duration of the turn measured by the runtime
    *  (`usage.request_duration_ms`). When this is present it wins over the
@@ -362,11 +362,11 @@ export function WebuiTurnProcess({
   /** Content that remains visible outside the collapsible details while the
    *  process is collapsed (for example, the final assistant reply). */
   readonly collapsedContent?: (expanded: boolean) => ReactNode;
-  /** Desktop only renders an outer disclosure control when this turn has
+  /** An outer disclosure control renders only when this turn has
    *  content that can actually be expanded. The duration summary can remain
    *  visible without the control. */
   readonly hasExpandableContent?: boolean;
-  /** Mirrors Desktop turn-process modes: these states suppress the toggle
+  /** Turn-process modes: these states suppress the toggle
    *  and keep available details open. */
   readonly forceExpanded?: boolean;
   readonly disabled?: boolean;
@@ -413,7 +413,7 @@ export function WebuiTurnProcess({
         : typeof wallClockDurationMs === "number"
           ? Math.floor(wallClockDurationMs / 1000)
           : undefined;
-  // Desktop renders the wall-clock duration as "M 分 N 秒" / "N 秒".
+  // The wall-clock duration renders as "M 分 N 秒" / "N 秒".
   const durationLabel =
     typeof seconds === "number"
       ? seconds >= 60
@@ -535,7 +535,7 @@ export function WebuiThinkingBlock({
     return () => observer.disconnect();
   }, [detailOpen, text]);
   if (!text.trim()) return null;
-  // Desktop `think-container`: a pulse dot + 推理中... with a live-second
+  // `think-container`: a pulse dot + 推理中... with a live-second
   // counter while streaming, collapsing to 已完成推理 + total seconds.
   const elapsed = streaming
     ? typeof processingStartedAtMs === "number"
@@ -585,7 +585,7 @@ export function WebuiThinkingBlock({
   );
 }
 
-/** Desktop `turn_process` row: 已执行 N 秒, ticking once per second. */
+/** The `turn_process` row: 已执行 N 秒, ticking once per second. */
 export function TurnElapsedRow({
   startedAtMs,
   running,

@@ -2,7 +2,7 @@
 //
 // W3 tier 3 lift: this component owns the session-scoped goal card. Its
 // transport calls stay on the existing WebUI goal contract while the visual
-// surface follows Desktop's compact status/actions layout.
+// surface keeps a compact status/actions layout.
 
 import { useEffect, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";

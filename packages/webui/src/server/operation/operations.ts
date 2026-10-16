@@ -92,8 +92,8 @@ export function createOperationRegistry(
   registerOperation(registry, entry("listWorkspaceReviewFileDiffs"));
   registerOperation(registry, entry("getWorkspaceReviewFileContent"));
   registerOperation(registry, entry("searchWorkspaceReviewDiffs"));
-  // The terminal adapter is a real second surface (the PTY bridge the WebUI
-  // shares with the desktop); it's a separate runtime from the harness port
+  // The terminal adapter is a real second surface (a PTY bridge, not a harness
+  // port method); it's a separate runtime
   // and only the WebuiService wires one in. When none is supplied, the six
   // terminal operations stay unregistered so an inbound frame becomes an
   // `unknown_operation` error instead of a "method is not a function" runtime

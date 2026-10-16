@@ -1,9 +1,9 @@
 /**
  * Characterisation tests for the runtime owner policy.
  *
- * Phase 1 of docs/webui/webui-client-identity-plan.md extracts six predicates into
- * one module and adds `resolveRuntimeOwnerPolicy`. This file has two jobs, and the
- * split matters:
+ * The predicates were extracted into one module and `resolveRuntimeOwnerPolicy` added; the WebUI
+ * declares its own `webui` identity row, documented in `packages/webui/docs/runtime.md`. This file
+ * has two jobs, and the split matters:
  *
  *   - `describe('today's predicates')` pins the CURRENT behaviour of every predicate
  *     the extraction moves, read from their existing homes. It is written first and
@@ -246,8 +246,8 @@ describe('resolveRuntimeOwnerPolicy', () => {
   });
 
   it('electron without electronHost does not hold the V2 compatibility layer', () => {
-    // This is the failure ADR 0012 records: declaring an Electron owner without the
-    // capability removes the whole v2 service group.
+    // The failure this pins: declaring an Electron owner without the capability
+    // removes the whole v2 service group.
     const policy = policyFor({
       kind: 'electron',
       cliEmbedded: false,

@@ -4,8 +4,8 @@
  * The endpoint contract, request signing, response validation and account
  * guards are copied from `packages/tui/src/checkin/http-gateway.ts` and
  * `packages/tui/src/runtime/public-gateway.ts`; the response validators come
- * from `@mavis/shared/daily-signin` directly (the same module the TUI and the
- * desktop use). ADR 0003 forbids importing `packages/tui` itself — reading it
+ * from `@mavis/shared/daily-signin` directly (the same module the TUI uses).
+ * ADR 0003 forbids importing `packages/tui` itself — reading it
  * and re-implementing the wire protocol is the sanctioned path, exactly like
  * `usage-quota.ts` did for the matrix account endpoints.
  *
