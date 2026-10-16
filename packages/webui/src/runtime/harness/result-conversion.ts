@@ -664,6 +664,41 @@ export function toWebuiEditMessageResult(value: unknown): WebuiEditSessionMessag
  * than by loosening the wire contract to be mutable: a contract that other code
  * can write to after the fact is a contract nobody can rely on.
  */
+/**
+ * A model-provider candidate as the runtime requires it.
+ *
+ * `baseUrl` is the endpoint a candidate is tested against, so a candidate
+ * without one cannot be tested at all. It is required here rather than passed
+ * through: the wire validator accepts an open record, so an absent endpoint
+ * would otherwise travel the whole seam and fail inside the runtime with nothing
+ * to say which request was at fault.
+ */
+/** A string the request must carry, or the shape is refused rather than forwarded. */
+export function asText(value: unknown, what: string): string {
+  if (typeof value !== "string" || !value) {
+    throw new WebuiResultShapeError(`the request is missing ${what}`);
+  }
+  return value;
+}
+
+export function toRuntimeModelProviderCandidate(value: unknown): {
+  readonly providerId?: string;
+  readonly expectedRevision?: string;
+  readonly name?: string;
+  readonly baseUrl: string;
+  readonly apiKey?: string;
+  readonly apiFormat?: string;
+  readonly models?: readonly unknown[];
+  readonly headers?: Readonly<Record<string, string>>;
+  readonly removeHeaders?: readonly string[];
+} {
+  const candidate = record(value);
+  return {
+    ...candidate,
+    baseUrl: requiredText(candidate.baseUrl, "a provider base URL"),
+  } as ReturnType<typeof toRuntimeModelProviderCandidate>;
+}
+
 export function toRuntimeAttachmentRequest<
   T extends { readonly attachments?: readonly unknown[] },
 >(

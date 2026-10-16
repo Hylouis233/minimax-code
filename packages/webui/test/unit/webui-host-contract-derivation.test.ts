@@ -25,9 +25,13 @@
  * detail — `pnpm typecheck:test` rejects it until its conversion lands, which is
  * what keeps the list honest instead of aspirational.
  *
- * What this still does not do: remove `assembly.ts`'s cast entirely. That needs
- * the *requests* to agree too, and the result list has never tracked requests —
- * see the note on the cast itself for what is left and why.
+ * `assembly.ts` no longer asserts. That needed this list *and* the requests to
+ * agree: the mirror used to declare three members more loosely than the runtime
+ * does, and a looser parameter is not assignable where the runtime wants a
+ * specific one. Those are declared at the runtime's shape now and converted at
+ * the boundary — a model-provider candidate's required `baseUrl`, a key reveal
+ * that is synchronous, an OAuth cancel that takes the id itself. `assembly.ts`
+ * says so at the line that used to hold the cast.
  */
 import { describe, expect, it } from "vitest";
 
@@ -125,6 +129,14 @@ type MismatchedExtra = AssertEmpty<
 >;
 
 describe("the WebUI host surface against the runtime it forwards to", () => {
+  it("leaves no forwarded result for the assembly to assert about", () => {
+    // The cast this list used to stand behind is gone, and the reason it can
+    // stay gone is that this list is empty: every answer converts at the
+    // boundary that owns it. A member added to the mirror without a conversion
+    // lands here and fails `pnpm typecheck:test` before it can reach a cast.
+    expect(MISMATCHED_RESULT_NAMES).toEqual([]);
+  });
+
   it("names each union exactly, in both directions", () => {
     const missing: readonly WebuiOnlyMissing[] = [];
     const extra: readonly WebuiOnlyExtra[] = [];

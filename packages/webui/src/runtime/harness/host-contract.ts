@@ -449,10 +449,39 @@ export interface WebuiRuntimeCliService {
   getCodexOAuthStatus(): Promise<unknown>;
   getMiniMaxModelSource(): Promise<"token_plan" | "minimax_api_key">;
   setMiniMaxModelSource(request: { readonly source: "token_plan" | "minimax_api_key" }): Promise<"token_plan" | "minimax_api_key">;
-  testUserModelCandidate(request: { readonly candidate: Record<string, unknown>; readonly modelId: string }): Promise<unknown>;
-  revealModelProviderApiKey(request: { readonly providerId: string }): Promise<string>;
+  testUserModelCandidate(request: {
+    /**
+     * Declared field by field rather than as `Record<string, unknown>`, because
+     * `baseUrl` is required and an open record would accept a candidate with no
+     * endpoint to test against — the request would type-check and then fail in
+     * the runtime, which is the arrangement this whole file exists to undo.
+     */
+    readonly candidate: {
+      readonly providerId?: string;
+      readonly expectedRevision?: string;
+      readonly name?: string;
+      readonly baseUrl: string;
+      readonly apiKey?: string;
+      readonly apiFormat?: string;
+      readonly models?: readonly unknown[];
+      readonly headers?: Readonly<Record<string, string>>;
+      readonly removeHeaders?: readonly string[];
+    };
+    readonly modelId: string;
+  }): Promise<unknown>;
+  /**
+   * Synchronous on the runtime.
+   *
+   * Declared to return the value directly rather than a promise: the runtime
+   * resolves it from a store it already holds, and the mirror's `Promise` was a
+   * shape it could not honour. The adapter wraps it, so a caller of the port
+   * still awaits.
+   */
+  revealModelProviderApiKey(request: { readonly providerId: string }): string;
   startCodexOAuthLogin(request?: Record<string, unknown>): Promise<unknown>;
-  cancelCodexOAuthLogin(request: { readonly loginId: string }): Promise<unknown>;
+  /** Takes the id itself, not a record: the runtime's own shape, unwrapped here
+   * rather than widened to a record the adapter would then have to unwrap. */
+  cancelCodexOAuthLogin(loginId: string): Promise<unknown>;
   refreshModels(): Promise<unknown>;
   /**
    * Compaction is opt-in on the live harness: the `CliService` exposes it

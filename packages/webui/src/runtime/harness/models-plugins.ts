@@ -6,6 +6,8 @@ import type { WebuiHarnessPort } from "../port.js";
 import type { WebuiRuntimeHostHandle } from "./host-contract.js";
 import { requireCliService } from "./requirements.js";
 import {
+  asText,
+  toRuntimeModelProviderCandidate,
   toWebuiModelEntries,
   toWebuiRecord,
   toWebuiRecordList,
@@ -110,20 +112,29 @@ export function createModelsPluginsAdapter(
     async setMiniMaxModelSource(request) { return requireCliService(host).setMiniMaxModelSource(request); },
 
     async testUserModelCandidate(request) {
-      // The wire validator's contract is `Record<string, unknown>` only. Keep
-      // the historical field reads here: missing keys become `undefined` and
-      // malformed values reach the same harness validation path as before.
+      // The wire validator accepts an open record, so `baseUrl` — the endpoint
+      // the test is actually made against — can be missing by the time it
+      // arrives. It is required now, at this boundary, because a candidate with
+      // no endpoint used to type-check all the way down and then fail inside the
+      // runtime with nothing to say which request was at fault.
       return requireCliService(host).testUserModelCandidate({
-        candidate: request.candidate as Record<string, unknown>,
-        modelId: request.modelId as string,
+        candidate: toRuntimeModelProviderCandidate(request.candidate),
+        modelId: asText(request.modelId, "a model id"),
       });
     },
 
-    async revealModelProviderApiKey(request) { return requireCliService(host).revealModelProviderApiKey(request); },
+    async revealModelProviderApiKey(request) {
+      // Synchronous on the runtime; the port is asynchronous. Wrapped here so a
+      // caller of the port still awaits, and so the mirror records the runtime's
+      // real shape instead of a promise it never produces.
+      return Promise.resolve(requireCliService(host).revealModelProviderApiKey(request));
+    },
 
     async startCodexOAuthLogin(request) { return requireCliService(host).startCodexOAuthLogin(request); },
 
-    async cancelCodexOAuthLogin(request) { return requireCliService(host).cancelCodexOAuthLogin(request); },
+    async cancelCodexOAuthLogin(request) {
+      return requireCliService(host).cancelCodexOAuthLogin(request.loginId);
+    },
 
     async refreshModels() { return requireCliService(host).refreshModels(); },
   };
