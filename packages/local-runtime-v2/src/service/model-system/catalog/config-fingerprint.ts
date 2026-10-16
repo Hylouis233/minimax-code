@@ -107,5 +107,7 @@ function withoutProbeOutputLimit(target: unknown): unknown {
   if (!target || typeof target !== 'object' || Array.isArray(target)) return target;
   const rest: Record<string, unknown> = { ...(target as Record<string, unknown>) };
   delete rest.outputLimit;
+  // Like outputLimit, this restates model configuration already in the hash.
+  delete rest.fast;
   return rest;
 }

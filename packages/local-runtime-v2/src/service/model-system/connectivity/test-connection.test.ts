@@ -50,6 +50,96 @@ function openAiResponsesOkResponse(): Response {
 }
 
 describe('ModelConnectionTester requests', () => {
+  it.each(["openai-responses", "openai-completions"] as const)(
+    "probes Fast and reasoning together over %s",
+    async (api) => {
+      const fetchImpl = vi.fn(async () =>
+        api === "openai-responses"
+          ? openAiResponsesOkResponse()
+          : openAiOkResponse(),
+      );
+      const tester = new ModelConnectionTester({
+        fetchImpl: fetchImpl as typeof fetch,
+      });
+      const result = await tester.test(`fast-${api}`, {
+        api,
+        baseUrl: "https://api.example.com/v1",
+        apiKey: API_KEY,
+        modelId: "synthetic-model",
+        effort: "high",
+        fast: { enabled: true, mode: "openai-priority" },
+      });
+      expect(result.ok).toBe(true);
+      const [, init] = fetchImpl.mock.calls[0] as unknown as [
+        string,
+        RequestInit,
+      ];
+      const body = JSON.parse(String(init.body));
+      expect(body.service_tier).toBe("priority");
+      expect(
+        api === "openai-responses"
+          ? body.reasoning.effort
+          : body.reasoning_effort,
+      ).toBe("high");
+    },
+  );
+
+  it("probes Anthropic Fast with its beta header and unchanged credentials", async () => {
+    const fetchImpl = vi.fn(async () => messagesOkResponse());
+    const tester = new ModelConnectionTester({
+      fetchImpl: fetchImpl as typeof fetch,
+    });
+    await tester.test("fast-messages", {
+      api: "anthropic-messages",
+      baseUrl: "https://api.example.com",
+      apiKey: API_KEY,
+      modelId: "synthetic-model",
+      headers: { "Anthropic-Beta": "existing-beta", "X-Tenant": "synthetic" },
+      fast: { enabled: true, mode: "anthropic-fast" },
+    });
+    const [, init] = fetchImpl.mock.calls[0] as unknown as [
+      string,
+      RequestInit,
+    ];
+    expect(JSON.parse(String(init.body)).speed).toBe("fast");
+    const headers = new Headers(init.headers);
+    expect(headers.get("anthropic-beta")).toBe(
+      "existing-beta,fast-mode-2026-02-01",
+    );
+    expect(headers.get("x-api-key")).toBe(API_KEY);
+    expect(headers.get("x-tenant")).toBe("synthetic");
+  });
+
+  it("rejects invalid Fast without fetching and leaves disabled Fast off", async () => {
+    const fetchImpl = vi.fn(async () => openAiOkResponse());
+    const tester = new ModelConnectionTester({
+      fetchImpl: fetchImpl as typeof fetch,
+    });
+    const target = {
+      api: "openai-completions" as const,
+      baseUrl: "https://api.example.com/v1",
+      apiKey: API_KEY,
+      modelId: "synthetic-model",
+    };
+    await expect(
+      tester.test("invalid-fast", {
+        ...target,
+        fast: { enabled: true, mode: "anthropic-fast" },
+      }),
+    ).rejects.toMatchObject({ code: "INVALID_FAST_CONFIGURATION" });
+    expect(fetchImpl).not.toHaveBeenCalled();
+    await tester.test("disabled-fast", {
+      ...target,
+      fast: { enabled: false, mode: "anthropic-fast" },
+    });
+    const [, init] = fetchImpl.mock.calls[0] as unknown as [
+      string,
+      RequestInit,
+    ];
+    expect(JSON.parse(String(init.body))).not.toHaveProperty("service_tier");
+    expect(JSON.parse(String(init.body))).not.toHaveProperty("speed");
+  });
+
   it('sends a Messages-compatible completion with the default output limit', async () => {
     const fetchImpl = vi.fn(async () => messagesOkResponse());
     const tester = new ModelConnectionTester({

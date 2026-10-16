@@ -39,6 +39,7 @@ import {
   type MiniMaxM3ThinkingMode,
 } from '../resolution/model-ref.js';
 import { byokEffectiveOutputLimit } from '../resolution/model-resolver-byok.js';
+import { resolveFastRequestOptions } from '../resolution/fast-request.js';
 
 export interface ResolvedUserProviderCandidate {
   providerKey: string;
@@ -382,6 +383,8 @@ export class ModelProviderServiceContext {
     const model = provider?.models?.[chosenModelId];
     const effortOptions = normalizeModelThinkingEffortOptions(model?.thinking?.effortOptions);
     const headers = mergeProviderHeaders(provider?.options?.headers, model?.headers);
+    // Reject invalid Fast settings even when the tester is replaced or deduplicated.
+    resolveFastRequestOptions(api, model?.fast, headers);
     const outputLimit = byokEffectiveOutputLimit(model);
     const target: ModelConnectionTestTarget = {
       api,
@@ -389,6 +392,7 @@ export class ModelProviderServiceContext {
       apiKey,
       modelId: chosenModelId,
       ...(headers ? { headers } : {}),
+      ...(model?.fast ? { fast: model.fast } : {}),
       outputLimit,
     };
     return {

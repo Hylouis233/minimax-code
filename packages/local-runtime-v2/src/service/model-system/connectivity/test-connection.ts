@@ -10,6 +10,7 @@ import {
   resolveModelThinkingProtocol,
 } from '../resolution/model-ref.js';
 import { byokEffectiveOutputLimit } from '../resolution/model-resolver-byok.js';
+import { resolveFastRequestOptions } from '../resolution/fast-request.js';
 import type {
   ModelConnectionTestResult,
   ModelConnectionTestTarget,
@@ -191,18 +192,21 @@ function resolveTestOutputLimit(target: ModelConnectionTestTarget): number {
 }
 
 function buildTestRequest(target: ModelConnectionTestTarget): { url: string; init: RequestInit } {
+  const fast = resolveFastRequestOptions(target.api, target.fast, target.headers);
+  const preparedTarget = { ...target, headers: fast.headers };
   const messages = [{ role: 'user', content: 'ping' }];
   const thinking = resolveModelThinkingProtocol(target.api, target.effort, target.modelId);
-  const requestPatch = target.minimaxM3ThinkingMode
+  const thinkingPatch = target.minimaxM3ThinkingMode
     ? resolveMiniMaxM3ThinkingProtocol(target.api, target.minimaxM3ThinkingMode)
     : (thinking?.requestPatch ?? {});
+  const requestPatch = { ...thinkingPatch, ...fast.requestPatch };
   const maxTokens = resolveTestOutputLimit(target);
   if (target.api === 'anthropic-messages') {
     return {
       url: providerCompletionUrl(target.api, target.baseUrl),
       init: {
         method: 'POST',
-        headers: buildProviderHeaders(target),
+        headers: buildProviderHeaders(preparedTarget),
         body: JSON.stringify({
           model: target.modelId,
           max_tokens: maxTokens,
@@ -218,7 +222,7 @@ function buildTestRequest(target: ModelConnectionTestTarget): { url: string; ini
       url: providerCompletionUrl(target.api, target.baseUrl),
       init: {
         method: 'POST',
-        headers: buildProviderHeaders(target),
+        headers: buildProviderHeaders(preparedTarget),
         body: JSON.stringify({
           model: target.modelId,
           input: 'ping',
@@ -233,7 +237,7 @@ function buildTestRequest(target: ModelConnectionTestTarget): { url: string; ini
     url: providerCompletionUrl(target.api, target.baseUrl),
     init: {
       method: 'POST',
-      headers: buildProviderHeaders(target),
+      headers: buildProviderHeaders(preparedTarget),
       body: JSON.stringify({
         model: target.modelId,
         max_tokens: maxTokens,

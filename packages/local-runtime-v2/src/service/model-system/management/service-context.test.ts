@@ -107,6 +107,64 @@ afterEach(async () => {
 });
 
 describe('LocalModelProviderService context', () => {
+  it("carries Fast through provider and model tests and preserves cached status", async () => {
+    const harness = createHarness({
+      custom_provider: {
+        work: {
+          api: "openai-responses",
+          options: {
+            apiKey: CUSTOM_KEY,
+            baseURL: "https://api.example.com/v1",
+          },
+          models: { m: { fast: { enabled: true, mode: "openai-priority" } } },
+        },
+      },
+    });
+    await harness.service.testProvider("custom_provider:work");
+    await harness.service.testModel("custom_provider:work", "m");
+    expect(harness.testCalls).toHaveLength(2);
+    for (const call of harness.testCalls) {
+      expect(call.target.fast).toEqual({
+        enabled: true,
+        mode: "openai-priority",
+      });
+    }
+    const provider = harness.service
+      .listEffectiveProviders()
+      .find((entry) => entry.providerId === "custom_provider:work");
+    expect(provider?.models[0]?.status?.state).toBe("available");
+  });
+
+  it.each([
+    { enabled: true, mode: "anthropic-fast" },
+    { enabled: true, mode: "invalid-mode" },
+    { enabled: "yes", mode: "openai-priority" },
+  ])("rejects invalid Fast before either connection test: %j", async (fast) => {
+    const harness = createHarness({
+      custom_provider: {
+        work: {
+          api: "openai-responses",
+          options: {
+            apiKey: CUSTOM_KEY,
+            baseURL: "https://api.example.com/v1",
+          },
+          models: { m: { fast: fast as never } },
+        },
+      },
+    });
+    await expect(
+      harness.service.testProvider("custom_provider:work"),
+    ).rejects.toMatchObject({
+      code: "INVALID_FAST_CONFIGURATION",
+    });
+    await expect(
+      harness.service.testModel("custom_provider:work", "m"),
+    ).rejects.toMatchObject({
+      code: "INVALID_FAST_CONFIGURATION",
+    });
+    expect(harness.testCalls).toHaveLength(0);
+  });
+
   it('stores MiniMax credentials while exposing only their masked view', async () => {
     const harness = createHarness();
 

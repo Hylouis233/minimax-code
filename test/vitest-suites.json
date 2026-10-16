@@ -1,9 +1,7 @@
 {
   "comment": "Vitest suites for the standalone distribution, grouped by the gate that runs them. `vitest.oss.config.mjs` includes every group; `scripts/run-vitest-suite.mjs <group>` runs one. Add a test file here rather than in package.json or the Vitest config.",
   "suites": {
-    "windows": [
-      "test/windows-contract.test.mjs"
-    ],
+    "windows": ["test/windows-contract.test.mjs"],
     "capability": [
       "packages/local-runtime-v2/test/integration/compaction-openai-transport.integration.test.ts",
       "packages/local-runtime/test/unit/skill-directory-symlinks.test.ts",
@@ -207,7 +205,9 @@
       "packages/local-runtime-v2/src/service/turn-system/execution/turn-execution.service.test.ts",
       "packages/local-runtime-v2/test/integration/session-stop-cascade.integration.test.ts",
       "packages/local-runtime/test/unit/local-background-task-user-stop-cascade.test.ts",
-      "packages/local-runtime/test/unit/local-task-append.test.ts"
+      "packages/local-runtime/test/unit/local-task-append.test.ts",
+      "packages/local-runtime-v2/src/service/model-system/resolution/fast-request.test.ts",
+      "packages/config/test/byok-fast-persistence.test.ts"
     ],
     "status-contract": [
       "packages/tui/test/unit/tui-build-mode-contract.test.ts"

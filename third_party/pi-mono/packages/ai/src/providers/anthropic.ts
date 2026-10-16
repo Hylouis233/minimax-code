@@ -265,7 +265,24 @@ function mergeHeaders(...headerSources: (Record<string, string | null> | undefin
 	const merged: Record<string, string | null> = {};
 	for (const headers of headerSources) {
 		if (headers) {
-			Object.assign(merged, headers);
+			for (const [name, value] of Object.entries(headers)) {
+				if (name.toLowerCase() !== "anthropic-beta") {
+					merged[name] = value;
+					continue;
+				}
+				// Preserve transport-generated betas when callers add their own.
+				// An explicit null still removes this header, as before.
+				if (value === null) {
+					merged["anthropic-beta"] = null;
+					continue;
+				}
+				const previous = merged["anthropic-beta"];
+				const tokens = [typeof previous === "string" ? previous : "", value]
+					.flatMap((part) => part.split(","))
+					.map((token) => token.trim())
+					.filter(Boolean);
+				merged["anthropic-beta"] = [...new Set(tokens)].join(",");
+			}
 		}
 	}
 	return merged;
@@ -1315,3 +1332,4 @@ function mapStopReason(reason: Anthropic.Messages.StopReason | string): StopReas
 			throw new Error(`Unhandled stop reason: ${reason}`);
 	}
 }
+
