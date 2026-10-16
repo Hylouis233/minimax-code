@@ -34,6 +34,25 @@
 // Disposal fences everything: no commit, no scheduling, no coalescing. The
 // primitive owns mechanics only — which key a business uses, and what a write
 // invalidates, stay with the business.
+//
+// The *shared protocol* the business owners build on has three parts:
+//
+//   * **Injective keys.** `serializeWebuiResourceKey` encodes each field with an
+//     explicit type tag and a length prefix, so a string, a number, a boolean,
+//     `null`, `undefined` and an absent field are six different resources rather
+//     than whatever `String()` happens to produce. Property order is irrelevant.
+//     Unsupported values are rejected rather than coerced, because a key that
+//     silently collapses two reads into one entry is the defect this module
+//     exists to remove.
+//   * **A request-bound outcome.** `load` resolves to *what its own request
+//     produced*: `ready` with the commit token that actually committed, or
+//     `superseded`, `disposed` and `failed` with the original error. A caller no
+//     longer re-reads a shared entry to find out whether its answer is the
+//     current one.
+//   * **Scoped epoch activation.** `bindEpoch` retires exactly the keys a
+//     generation is responsible for. An epoch advancing while some other key is
+//     selected leaves that key alone — subscribing one key never invalidates
+//     another.
 
 /** A response-affecting input of a resource key. */
 export type WebuiResourceKeyValue = string | number | boolean | null | undefined;
@@ -49,16 +68,81 @@ export interface WebuiResourceState<T> {
 }
 
 /**
- * Serializes a key so equal keys compare equal: entries are sorted, and an
- * explicit `undefined` is written rather than dropped, so `{a: undefined}` and
- * `{}` are different resources. That matters because "no session" and "a session
- * whose id is absent" are not the same read.
+ * What one `load` produced.
+ *
+ * `ready` carries the token that actually committed, so a caller can keep asking
+ * "is this still the answer for my request" without holding a second copy of the
+ * revision. Every other branch is a distinct refusal to know, and collapsing
+ * them — which is what a shared `Promise<void>` did — is how a superseded read
+ * came to present itself as an empty one.
+ */
+export type WebuiResourceLoadOutcome<T> =
+  | { readonly status: "ready"; readonly token: WebuiCommitToken; readonly value: T }
+  | { readonly status: "superseded" }
+  | { readonly status: "disposed" }
+  | { readonly status: "failed"; readonly error: unknown };
+
+/**
+ * An opaque generation whose advance retires the answers computed under it.
+ *
+ * The primitive does not import the epoch module: this is the structural shape it
+ * needs, so the mechanism layer keeps no dependency on an application owner and a
+ * business adapts its own generation source into it.
+ */
+export interface WebuiEpochBinding {
+  /** The generation's current token; a resource key carries it as a field. */
+  readonly token: () => string;
+  /** Invoked when the generation advances. */
+  readonly subscribe: (listener: () => void) => () => void;
+}
+
+/**
+ * Encodes one key value with an explicit type tag and a length prefix.
+ *
+ * The length prefix is what makes the encoding injective without escaping: no
+ * string can forge a boundary, so a session id containing the separator
+ * character cannot collide with a different field's value. `-0` is normalized to
+ * `0` because they are the same number, and a non-finite number is rejected
+ * rather than written as `"NaN"`, which would collide with a real `"NaN"` id.
+ */
+function encodeWebuiResourceKeyValue(value: WebuiResourceKeyValue): string {
+  if (value === null) return "z";
+  if (value === undefined) return "u";
+  switch (typeof value) {
+    case "string":
+      return `s${value.length}:${value}`;
+    case "number":
+      if (!Number.isFinite(value)) {
+        throw new TypeError(
+          `A resource key cannot carry a non-finite number (${String(value)}): it would be indistinguishable from the string of the same text.`,
+        );
+      }
+      return `n${Object.is(value, -0) ? "0" : String(value)}`;
+    case "boolean":
+      return value ? "b1" : "b0";
+    default:
+      throw new TypeError(
+        `A resource key cannot carry a value of type ${typeof value}: only string, finite number, boolean, null, undefined and absence are distinct resources.`,
+      );
+  }
+}
+
+/**
+ * Serializes a key so equal keys compare equal and unequal keys cannot collide.
+ *
+ * Fields are sorted, so property order is irrelevant, and every field is written
+ * whether or not its value is `undefined`, so `{a: undefined}` and `{}` are
+ * different resources. "No session" and "a session whose id is absent" are not
+ * the same read.
+ *
+ * This encoding is internal: it identifies an entry inside one running client and
+ * is never written to disk or sent as a product format.
  */
 export function serializeWebuiResourceKey(key: WebuiResourceKey): string {
   return Object.keys(key)
     .sort()
-    .map((name) => `${name}=${key[name] === undefined ? "\u0000" : String(key[name])}`)
-    .join("\u0001");
+    .map((name) => `${name.length}:${name}=${encodeWebuiResourceKeyValue(key[name])}`)
+    .join("&");
 }
 
 /**
@@ -86,16 +170,27 @@ export interface WebuiKeyedResource<T> {
    */
   readonly commit: (token: WebuiCommitToken, state: WebuiResourceState<T>) => boolean;
   /**
-   * Reads the resource under its key. A call whose key, freshness revision and
-   * owner incarnation all match an in-flight request joins that request instead
-   * of starting a second one; any difference starts a new one.
+   * Reads the resource under its key and reports what this request produced. A
+   * call whose key, freshness revision and owner incarnation all match an
+   * in-flight request joins that request instead of starting a second one, and
+   * receives the same outcome; any difference starts a new one.
    */
-  readonly load: (key: WebuiResourceKey, fetch: () => Promise<T>) => Promise<void>;
+  readonly load: (
+    key: WebuiResourceKey,
+    fetch: () => Promise<T>,
+  ) => Promise<WebuiResourceLoadOutcome<T>>;
   /**
    * Advances the key's freshness. An answer already in flight for the previous
    * revision can no longer commit, and a later read cannot join it.
    */
   readonly invalidate: (key: WebuiResourceKey) => void;
+  /**
+   * Retires exactly the keys this generation is responsible for, when the
+   * generation advances. One binding covers one key, so subscribing a key never
+   * invalidates another and an epoch advancing while an unrelated key is
+   * selected leaves that key untouched. Returns the unbind.
+   */
+  readonly bindEpoch: (binding: WebuiEpochBinding, key: WebuiResourceKey) => () => void;
   /** The freshness revision a key currently holds; exposed for tests and owners. */
   readonly revision: (key: WebuiResourceKey) => number;
   readonly subscribe: (listener: () => void) => () => void;
@@ -142,6 +237,89 @@ export interface WebuiSelectedSlot<T> {
   readonly isDisposed: () => boolean;
 }
 
+/** Why a write did not settle, in terms a caller can branch on. */
+export type WebuiMutationFailureCategory =
+  /** The runtime answered and refused: a refusal is a settled verdict. */
+  | "refused"
+  /** The write's own precondition moved: a newer revision owns the resource. */
+  | "conflict"
+  /** The response never arrived: the command may or may not have taken effect. */
+  | "lost"
+  /** The call exceeded its budget. Treated as lost, not as a refusal. */
+  | "timeout"
+  /** Anything else the transport raised. */
+  | "transport";
+
+/**
+ * What one write produced.
+ *
+ * A caller that only sees a rejection cannot tell a refusal from a lost
+ * response, and those two need opposite follow-up: one re-reads, the other must
+ * not assume the write landed. The category is what makes that branch possible
+ * without matching on message text.
+ */
+export type WebuiMutationOutcome<T = unknown> =
+  | { readonly status: "settled"; readonly value: T }
+  | {
+      readonly status: "failed";
+      readonly category: WebuiMutationFailureCategory;
+      readonly error: unknown;
+    };
+
+/** The error a raised value carries, for the `failed` branch's `error` field. */
+function mutationError(reason: unknown): Error {
+  return reason instanceof Error ? reason : new Error(String(reason));
+}
+
+/**
+ * Classifies a raised write into a branchable category.
+ *
+ * `refused` and `conflict` are answers — the runtime decided — and are carried by
+ * a structured error the command layer raises. Everything else is a transport
+ * fact, and a transport that named a timeout is reported as one rather than
+ * folded into `lost`, because the two lead to different retries.
+ */
+export function classifyWebuiMutationFailure(reason: unknown): WebuiMutationFailureCategory {
+  if (reason instanceof WebuiRefusedError) return "refused";
+  if (reason instanceof WebuiRevisionConflictError) return "conflict";
+  const name = reason instanceof Error ? reason.name : "";
+  if (name === "TimeoutError" || name === "AbortError") return "timeout";
+  return "transport";
+}
+
+/** A write the runtime answered and refused. */
+export class WebuiRefusedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "WebuiRefusedError";
+  }
+}
+
+/** A write whose precondition revision was already superseded. */
+export class WebuiRevisionConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "WebuiRevisionConflictError";
+  }
+}
+
+/**
+ * Runs one write and reports its outcome without rejecting.
+ *
+ * This is the write half of the protocol `load` is the read half of: the caller
+ * receives a branchable verdict, and the commit fence stays with the owner that
+ * holds the resource.
+ */
+export async function runWebuiMutation<T>(
+  command: () => Promise<T>,
+): Promise<WebuiMutationOutcome<T>> {
+  try {
+    return { status: "settled", value: await command() };
+  } catch (reason) {
+    return { status: "failed", category: classifyWebuiMutationFailure(reason), error: mutationError(reason) };
+  }
+}
+
 /**
  * The incarnation counter, one per created primitive. A recreated owner gets a
  * new one, so a commit captured by the previous incarnation is rejected even
@@ -157,7 +335,7 @@ export function createWebuiKeyedResource<T>(): WebuiKeyedResource<T> {
   const revisions = new Map<string, number>();
   const inFlight = new Map<
     string,
-    { readonly revision: number; readonly promise: Promise<void> }
+    { readonly revision: number; readonly promise: Promise<WebuiResourceLoadOutcome<T>> }
   >();
   const listeners = new Set<() => void>();
   let disposed = false;
@@ -180,24 +358,52 @@ export function createWebuiKeyedResource<T>(): WebuiKeyedResource<T> {
     return true;
   };
 
-  const load = (key: WebuiResourceKey, fetch: () => Promise<T>): Promise<void> => {
-    if (disposed) return Promise.resolve();
+  const retire = (serialized: string): void => {
+    if (disposed) return;
+    // Freshness advances first, so the request that was already running can no
+    // longer land and a new read cannot join it.
+    revisions.set(serialized, revisionOf(serialized) + 1);
+    inFlight.delete(serialized);
+    notify();
+  };
+
+  // One binding holds the keys one generation is responsible for, so an advance
+  // retires exactly those and nothing else.
+  const epochBindings = new Map<WebuiEpochBinding, Set<string>>();
+
+  const load = (
+    key: WebuiResourceKey,
+    fetch: () => Promise<T>,
+  ): Promise<WebuiResourceLoadOutcome<T>> => {
+    if (disposed) return Promise.resolve({ status: "disposed" });
     const serialized = serializeWebuiResourceKey(key);
     const revision = revisionOf(serialized);
     const joined = inFlight.get(serialized);
-    // Coalescing is only sound when nothing that affects the answer changed.
+    // Coalescing is only sound when nothing that affects the answer changed. The
+    // joined promise carries the *origin* request's outcome, which is the same
+    // answer for this caller: identical key, revision and owner means identical
+    // freshness, so there is nothing of its own to report.
     if (joined && joined.revision === revision) return joined.promise;
     const token: WebuiCommitToken = { resource: serialized, revision, incarnation };
     commitToken(token, { status: "loading" });
     const promise = fetch()
-      .then((value) => {
-        commitToken(token, { status: "ready", value });
+      .then((value): WebuiResourceLoadOutcome<T> => {
+        // `ready` only when this request's token actually committed. A refusal to
+        // commit is the fence naming what happened, not an empty answer.
+        if (!commitToken(token, { status: "ready", value })) {
+          return disposed ? { status: "disposed" } : { status: "superseded" };
+        }
+        return { status: "ready", token, value };
       })
-      .catch((reason: unknown) => {
-        commitToken(token, {
+      .catch((reason: unknown): WebuiResourceLoadOutcome<T> => {
+        // The cached error state still updates: a caller reading the entry sees
+        // the failure even though this request is reported as superseded.
+        const landed = commitToken(token, {
           status: "error",
           error: reason instanceof Error ? reason.message : String(reason),
         });
+        if (!landed) return disposed ? { status: "disposed" } : { status: "superseded" };
+        return { status: "failed", error: reason };
       })
       .finally(() => {
         if (inFlight.get(serialized)?.promise === promise) inFlight.delete(serialized);
@@ -214,14 +420,27 @@ export function createWebuiKeyedResource<T>(): WebuiKeyedResource<T> {
     },
     commit: commitToken,
     load,
-    invalidate: (key) => {
-      if (disposed) return;
+    invalidate: (key) => retire(serializeWebuiResourceKey(key)),
+    bindEpoch: (binding, key) => {
+      if (disposed) return () => undefined;
       const serialized = serializeWebuiResourceKey(key);
-      // Freshness advances first, so the request that was already running can no
-      // longer land and a new read cannot join it.
-      revisions.set(serialized, revisionOf(serialized) + 1);
-      inFlight.delete(serialized);
-      notify();
+      let keys = epochBindings.get(binding);
+      if (!keys) {
+        keys = new Set<string>();
+        epochBindings.set(binding, keys);
+        // Subscribed once per generation, not once per key, so N keys under one
+        // generation cost one listener.
+        binding.subscribe(() => {
+          for (const bound of [...(epochBindings.get(binding) ?? [])]) retire(bound);
+        });
+      }
+      keys.add(serialized);
+      return () => {
+        const current = epochBindings.get(binding);
+        if (!current) return;
+        current.delete(serialized);
+        if (current.size === 0) epochBindings.delete(binding);
+      };
     },
     revision: (key) => revisionOf(serializeWebuiResourceKey(key)),
     subscribe: (listener) => {
@@ -233,6 +452,7 @@ export function createWebuiKeyedResource<T>(): WebuiKeyedResource<T> {
       entries.clear();
       inFlight.clear();
       listeners.clear();
+      epochBindings.clear();
     },
     isDisposed: () => disposed,
     size: () => entries.size,

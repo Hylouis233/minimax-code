@@ -13,9 +13,14 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  classifyWebuiMutationFailure,
   createWebuiKeyedResource,
   createWebuiSelectedSlot,
+  runWebuiMutation,
   serializeWebuiResourceKey,
+  WebuiRefusedError,
+  WebuiRevisionConflictError,
+  type WebuiEpochBinding,
 } from "../../src/client/conversation/request-freshness.js";
 import { createWebuiQueryStore } from "../../src/client/application/query-store.js";
 
@@ -28,6 +33,29 @@ function deferred<T>() {
     reject = rej;
   });
   return { promise, resolve, reject };
+}
+
+/**
+ * A generation whose advance the test decides, shaped like the opaque epoch
+ * context but owned by the test so a case can move it without the application.
+ */
+function fakeEpoch(token: string) {
+  const listeners = new Set<() => void>();
+  let current = token;
+  const binding: WebuiEpochBinding = {
+    token: () => current,
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  };
+  return {
+    binding,
+    advance: (next: string) => {
+      current = next;
+      for (const listener of [...listeners]) listener();
+    },
+  };
 }
 
 describe("the seam the primitive replaces", () => {
@@ -63,7 +91,7 @@ describe("a keyed resource stores identity as identity", () => {
     resource.dispose();
   });
 
-  it("treats an explicit undefined and an absent field as different resources", () => {
+  it("treats an explicit undefined, an absent field and a null field as different resources", () => {
     expect(serializeWebuiResourceKey({ session: undefined })).not.toBe(
       serializeWebuiResourceKey({}),
     );
@@ -72,6 +100,9 @@ describe("a keyed resource stores identity as identity", () => {
     );
     // "No session" and "a session whose id is empty" are different reads too.
     expect(serializeWebuiResourceKey({ session: "" })).not.toBe(
+      serializeWebuiResourceKey({ session: undefined }),
+    );
+    expect(serializeWebuiResourceKey({ session: null })).not.toBe(
       serializeWebuiResourceKey({ session: undefined }),
     );
   });
@@ -227,3 +258,250 @@ describe("a selected slot belongs to one identity at a time", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 });
+
+describe("a key is injective over its declared domain", () => {
+  // Every pair below would collide under `String(value)` joined with a
+  // separator, which is what the previous encoding did.
+  const distinct: ReadonlyArray<readonly [unknown, unknown]> = [
+    ["1", 1],
+    ["true", true],
+    [true, "true"],
+    [null, "null"],
+    [undefined, "undefined"],
+    ["", undefined],
+  ];
+
+  it("keeps a value and a different type's value in the same text apart", () => {
+    for (const [left, right] of distinct) {
+      expect(serializeWebuiResourceKey({ v: left as string })).not.toBe(
+        serializeWebuiResourceKey({ v: right as string }),
+      );
+    }
+  });
+
+  it("keeps a separator inside a string from forging a field boundary", () => {
+    // Under a joined encoding, `a=1&b=2` in one field could be produced by two.
+    expect(serializeWebuiResourceKey({ "a=1&b": "2" })).not.toBe(
+      serializeWebuiResourceKey({ a: "1&b=2" }),
+    );
+    expect(serializeWebuiResourceKey({ a: "x&b=y" })).not.toBe(
+      serializeWebuiResourceKey({ a: "x", b: "y" }),
+    );
+  });
+
+  it("normalizes the numeric edges deliberately rather than by accident", () => {
+    // The same number, so the same resource: -0 === 0.
+    expect(serializeWebuiResourceKey({ v: -0 })).toBe(serializeWebuiResourceKey({ v: 0 }));
+    // Distinct numbers stay distinct resources.
+    expect(serializeWebuiResourceKey({ v: 1 })).not.toBe(serializeWebuiResourceKey({ v: 2 }));
+  });
+
+  it("rejects an unsupported value instead of coercing it into a collision", () => {
+    expect(() => serializeWebuiResourceKey({ v: NaN })).toThrow(TypeError);
+    expect(() => serializeWebuiResourceKey({ v: Infinity })).toThrow(TypeError);
+    expect(() =>
+      serializeWebuiResourceKey({ v: { toString: () => "1" } as unknown as string }),
+    ).toThrow(TypeError);
+    expect(() => serializeWebuiResourceKey({ v: ["1"] as unknown as string })).toThrow(TypeError);
+    expect(() =>
+      serializeWebuiResourceKey({ v: 1n as unknown as string }),
+    ).toThrow(TypeError);
+  });
+});
+
+describe("a read reports what its own request produced", () => {
+  it("returns ready with the token that actually committed", async () => {
+    const resource = createWebuiKeyedResource<string>();
+    const outcome = await resource.load({ session: "A" }, async () => "value");
+    expect(outcome.status).toBe("ready");
+    if (outcome.status !== "ready") throw new Error("unreachable");
+    expect(outcome.value).toBe("value");
+    // The returned token is the one that committed, so a later check asks the
+    // resource rather than a second copy of the revision.
+    expect(resource.read({ session: "A" })?.value).toBe("value");
+    expect(
+      resource.commit(outcome.token, { status: "ready", value: "still-current" }),
+    ).toBe(true);
+    resource.dispose();
+  });
+
+  it("reports superseded rather than ready when a later write retired the request", async () => {
+    // The acceptance case: a read that resolves after a later write reports the
+    // committed revision's fate, not an empty answer it did not produce.
+    const resource = createWebuiKeyedResource<string>();
+    const slow = deferred<string>();
+    const first = resource.load({ session: "A" }, () => slow.promise);
+    resource.invalidate({ session: "A" });
+    const second = await resource.load({ session: "A" }, async () => "newer");
+    expect(second.status).toBe("ready");
+
+    slow.resolve("older");
+    expect((await first).status).toBe("superseded");
+    // The committed value is the newer read's, so no lost update.
+    expect(resource.read({ session: "A" })?.value).toBe("newer");
+    resource.dispose();
+  });
+
+  it("reports disposed when the owner was disposed under the read", async () => {
+    const resource = createWebuiKeyedResource<string>();
+    const slow = deferred<string>();
+    const pending = resource.load({ session: "A" }, () => slow.promise);
+    resource.dispose();
+    slow.resolve("late");
+    expect((await pending).status).toBe("disposed");
+    // A read started after disposal reports the same thing and issues no request.
+    const fetch = vi.fn(async () => "value");
+    expect((await resource.load({ session: "A" }, fetch)).status).toBe("disposed");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("reports failure with the original error and still updates the cached error state", async () => {
+    const resource = createWebuiKeyedResource<string>();
+    const boom = new Error("the host refused");
+    const outcome = await resource.load({ session: "A" }, async () => {
+      throw boom;
+    });
+    expect(outcome.status).toBe("failed");
+    if (outcome.status !== "failed") throw new Error("unreachable");
+    // The original error, not a stringified copy of it.
+    expect(outcome.error).toBe(boom);
+    expect(resource.read({ session: "A" })?.status).toBe("error");
+    resource.dispose();
+  });
+
+  it("gives coalesced callers the same outcome", async () => {
+    const resource = createWebuiKeyedResource<string>();
+    const slow = deferred<string>();
+    const first = resource.load({ session: "A" }, () => slow.promise);
+    const second = resource.load({ session: "A" }, () => slow.promise);
+    slow.resolve("shared");
+    const [a, b] = await Promise.all([first, second]);
+    // Same request, so the same answer — a joining caller learns what the joined
+    // request produced rather than getting a second, contradictory verdict.
+    expect(a).toBe(b);
+    resource.dispose();
+  });
+
+  it("resolves A → B → A to the value committed for each request", async () => {
+    // Three overlapping reads of one key: only the newest may hold the answer.
+    const resource = createWebuiKeyedResource<string>();
+    const a1 = deferred<string>();
+    const a2 = deferred<string>();
+    const first = resource.load({ session: "A" }, () => a1.promise);
+    resource.invalidate({ session: "A" });
+    const second = resource.load({ session: "A" }, () => a2.promise);
+
+    a1.resolve("first-A");
+    expect((await first).status).toBe("superseded");
+    a2.resolve("second-A");
+    expect((await second).status).toBe("ready");
+    expect(resource.read({ session: "A" })?.value).toBe("second-A");
+    resource.dispose();
+  });
+});
+
+describe("an epoch binding retires only the keys it covers", () => {
+  it("leaves an unrelated key untouched when a generation advances", async () => {
+    const resource = createWebuiKeyedResource<string>();
+    const credentials = fakeEpoch("cred-0");
+    const configuration = fakeEpoch("conf-0");
+    // Two different resources, each carrying one generation.
+    await resource.load({ session: "A", credentials: credentials.binding.token() }, async () => "A");
+    await resource.load(
+      { session: "B", configuration: configuration.binding.token() },
+      async () => "B",
+    );
+    resource.bindEpoch(credentials.binding, { session: "A", credentials: "cred-0" });
+    resource.bindEpoch(configuration.binding, {
+      session: "B",
+      configuration: "conf-0",
+    });
+
+    credentials.advance("cred-1");
+
+    // Only the credential-keyed entry is retired; B — which carries no
+    // credential token at all — keeps the answer it had.
+    expect(resource.read({ session: "A", credentials: "cred-0" })?.value).toBe("A");
+    expect(resource.revision({ session: "A", credentials: "cred-0" })).toBe(1);
+    expect(resource.revision({ session: "B", configuration: "conf-0" })).toBe(0);
+    expect(resource.read({ session: "B", configuration: "conf-0" })?.value).toBe("B");
+    resource.dispose();
+  });
+
+  it("stops retiring a key once it is unbound", () => {
+    const resource = createWebuiKeyedResource<string>();
+    const epoch = fakeEpoch("cred-0");
+    const key = { session: "A", credentials: "cred-0" };
+    const unbind = resource.bindEpoch(epoch.binding, key);
+
+    epoch.advance("cred-1");
+    expect(resource.revision(key)).toBe(1);
+
+    unbind();
+    epoch.advance("cred-2");
+    // The generation no longer speaks for this key, so it stops retiring it.
+    expect(resource.revision(key)).toBe(1);
+    resource.dispose();
+  });
+
+  it("retires the key an in-flight read was captured under", async () => {
+    const resource = createWebuiKeyedResource<string>();
+    const epoch = fakeEpoch("cred-0");
+    const key = { session: "A", credentials: "cred-0" };
+    resource.bindEpoch(epoch.binding, key);
+
+    const slow = deferred<string>();
+    const pending = resource.load(key, () => slow.promise);
+    epoch.advance("cred-1");
+    slow.resolve("computed-under-the-old-generation");
+
+    // The generation moved while the read was running, so its answer is no
+    // longer the current one and is reported as such rather than committed.
+    expect((await pending).status).toBe("superseded");
+    resource.dispose();
+  });
+});
+
+describe("a write reports a machine-readable failure category", () => {
+  it("settles with the runtime's value when the write lands", async () => {
+    const outcome = await runWebuiMutation(async () => "written");
+    expect(outcome).toEqual({ status: "settled", value: "written" });
+  });
+
+  it("distinguishes a refusal from a lost response", async () => {
+    // The distinction the acceptance row is about: these need opposite follow-up,
+    // and matching on message text could not tell them apart.
+    const refused = await runWebuiMutation(async () => {
+      throw new WebuiRefusedError("该模型没有访问权限。");
+    });
+    const lost = await runWebuiMutation(async () => {
+      throw new Error("socket hang up");
+    });
+    expect(refused.status === "failed" && refused.category).toBe("refused");
+    expect(lost.status === "failed" && lost.category).toBe("transport");
+  });
+
+  it("classifies the transport categories separately", () => {
+    expect(classifyWebuiMutationFailure(new WebuiRevisionConflictError("moved"))).toBe("conflict");
+    const timedOut = new Error("no answer");
+    timedOut.name = "TimeoutError";
+    expect(classifyWebuiMutationFailure(timedOut)).toBe("timeout");
+    const aborted = new Error("cancelled");
+    aborted.name = "AbortError";
+    expect(classifyWebuiMutationFailure(aborted)).toBe("timeout");
+    expect(classifyWebuiMutationFailure("a string")).toBe("transport");
+  });
+
+  it("never rejects, so a caller observes settlement without an error path", async () => {
+    // The write's own error is data here: a caller that awaits the outcome has
+    // nothing to catch.
+    const outcome = await runWebuiMutation(async () => {
+      throw new WebuiRefusedError("nope");
+    });
+    expect(outcome.status).toBe("failed");
+    if (outcome.status !== "failed") throw new Error("unreachable");
+    expect(outcome.error).toBeInstanceOf(Error);
+    expect(outcome.error.message).toBe("nope");
+  });
+});
+

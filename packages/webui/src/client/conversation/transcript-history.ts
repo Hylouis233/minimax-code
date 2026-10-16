@@ -50,6 +50,11 @@ export interface WebuiTranscriptRecord {
   readonly error?: string;
 }
 
+/** A failure's message, for the transcript's own error field. */
+function message(reason: unknown): string {
+  return reason instanceof Error ? reason.message : String(reason);
+}
+
 /** The page a load produced, and the identity a later check is made against. */
 export interface WebuiTranscriptPageHandle {
   readonly sessionId: string;
@@ -156,39 +161,27 @@ export function createWebuiTranscriptHistoryOwner(deps: {
       error: undefined,
     }));
     const loadMessages = deps.loadMessages;
-    // What THIS read produced. A joining read produces nothing (its fetch is
-    // never called), and a read the resource refused produces nothing either —
-    // both are told apart below by whether the entry carries this exact answer.
-    let own: { readonly value?: WebuiClientMessagePage } = {};
-    await pages.load(key, async () => {
-      const value = await loadMessages({
+    // What THIS request produced, told by the resource rather than reconstructed
+    // by re-reading the shared entry: a superseded or disposed read says so, and
+    // a joining read receives the joined request's own outcome.
+    const outcome = await pages.load(key, () =>
+      loadMessages({
         id: sessionId,
         ...(cursor ? { before: cursor } : {}),
-      });
-      own = { value };
-      return value;
-    });
-    const entry = pages.read(key);
-    // Not holding a ready answer: either this read was superseded (by a newer
-    // request for the same key, or by an invalidation) or it failed.
-    if (!entry || entry.status !== "ready" || (own.value && entry.value !== own.value)) {
-      // A superseded failure reports nothing: it belongs to a read nobody is
-      // waiting for any more.
-      if (entry?.status === "error" && own.value === undefined) {
-        const failure = entry.error;
-        deps.transcript.updateTranscript(sessionId, (state) => ({
-          ...state,
-          error: failure,
-          loading: false,
-        }));
-        return { status: "failed" };
-      }
+      }),
+    );
+    if (outcome.status === "superseded" || outcome.status === "disposed") {
       return { status: "stale" };
     }
-    const page = entry.value;
-    // `WebuiResourceState.value` is optional even for a ready entry, so the page
-    // is asserted once here rather than at each use.
-    if (!page) return { status: "stale" };
+    if (outcome.status === "failed") {
+      deps.transcript.updateTranscript(sessionId, (state) => ({
+        ...state,
+        error: message(outcome.error),
+        loading: false,
+      }));
+      return { status: "failed" };
+    }
+    const page = outcome.value;
     // The presentation fence: a page that arrived for a session the view has
     // left is not written, so the store never gains a page nothing presented.
     if (
@@ -222,7 +215,14 @@ export function createWebuiTranscriptHistoryOwner(deps: {
     });
     return {
       status: "applied",
-      page: { sessionId, ...(cursor ? { cursor } : {}), token: pages.capture(key) },
+      // The token the resource returned with its own answer: the identity that
+      // committed is the one a later check is made against, so a re-read is not
+      // needed to learn whether this page is still current.
+      page: {
+        sessionId,
+        ...(cursor ? { cursor } : {}),
+        token: outcome.token,
+      },
     };
   };
 
@@ -234,9 +234,10 @@ export function createWebuiTranscriptHistoryOwner(deps: {
     if (cached?.status === "ready") return cached.value;
     if (!deps.loadMessages) return undefined;
     const loadMessages = deps.loadMessages;
-    await pages.load(key, () => loadMessages({ id: sessionId }));
-    const entry = pages.read(key);
-    return entry?.status === "ready" ? entry.value : undefined;
+    const outcome = await pages.load(key, () => loadMessages({ id: sessionId }));
+    // A read that did not commit produced nothing to show. Only `ready` carries
+    // a value, so the entry does not have to be re-read to find out.
+    return outcome.status === "ready" ? outcome.value : undefined;
   };
 
   return {

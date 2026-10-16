@@ -108,17 +108,17 @@ export function createWebuiTurnReviewOwner(deps: {
       write(key, pages.capture(resource), reduceWebuiDiffState(read(key), { type: "unsupported" }));
       return { status: "unsupported" };
     }
-    const token = pages.capture(resource);
     // Joining is the point: two surfaces opening the same turn share one request.
-    await pages.load(resource, async () => {
+    const outcome = await pages.load(resource, async () => {
       const view = await getTurnDiff(queryRequest(key));
       return reduceWebuiDiffState(initialWebuiDiffState, { type: "loaded", view });
     });
-    const entry = pages.read(resource);
-    if (entry?.status !== "ready" || !entry.value) return { status: "stale" };
-    // A read the resource refused belongs to nobody: report it as stale rather
-    // than claiming whatever answer is current.
-    if (pages.capture(resource).revision !== token.revision) return { status: "stale" };
+    // The resource reports what this request produced, so the owner no longer
+    // re-reads the shared entry to guess whether its answer is the current one. A
+    // read the resource refused — superseded, disposed or failed — belongs to
+    // nobody and is reported as stale rather than claiming whatever answer is
+    // current; the failure itself stays visible as the entry's error state.
+    if (outcome.status !== "ready") return { status: "stale" };
     notify();
     return { status: "applied" };
   };

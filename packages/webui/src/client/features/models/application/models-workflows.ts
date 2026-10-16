@@ -20,9 +20,10 @@
 //
 // Framework-free: no React, no DOM, no storage.
 
-import type { WebuiIdentityEpochs } from "../../../application/identity-epochs.js";
+import type { WebuiEpochKey, WebuiIdentityEpochs } from "../../../application/identity-epochs.js";
 import {
   createWebuiKeyedResource,
+  type WebuiKeyedResource,
   type WebuiResourceKey,
 } from "../../../conversation/request-freshness.js";
 import type { ModelsPort } from "../contracts/provider-port.js";
@@ -189,6 +190,53 @@ export function createWebuiModelsWorkflows(deps: {
     configuration: deps.identityEpochs?.configuration().token ?? null,
   });
 
+  /**
+   * Which keys each opaque generation is responsible for.
+   *
+   * The generation is bound to the keys it *participates in*, not to the whole
+   * resource: advancing the credential generation retires the catalogue answers
+   * computed under it, while the provider list — which carries only the
+   * configuration token — and the globally-keyed presets are left alone. Binding
+   * one key therefore never invalidates another, which is the property that keeps
+   * an epoch advance from disturbing an unrelated selected key.
+   *
+   * Each binding watches *its own* generation only: the epoch module publishes
+   * every advance on one subscription, so the listener drops the ones that named
+   * a different generation. Without that filter a credential write would retire
+   * answers that only ever carried the configuration token.
+   */
+  const bindingFor = <T>(
+    generation: WebuiEpochKey,
+    resource: WebuiKeyedResource<T>,
+    key: WebuiResourceKey,
+  ): (() => void) => {
+    const epochs = deps.identityEpochs;
+    if (!epochs) return () => undefined;
+    return resource.bindEpoch(
+      {
+        token: () => epochs.read(generation).token,
+        subscribe: (listener) =>
+          epochs.subscribe((advanced) => {
+            if (advanced.key === generation) listener();
+          }),
+      },
+      key,
+    );
+  };
+  // Rebound whenever the shown catalogue key changes, so the previous generation
+  // retires only the entries that still exist under its own key.
+  let releaseCatalogueEpochs: Array<() => void> = [];
+  const bindCatalogueEpochs = (key: WebuiResourceKey): void => {
+    for (const release of releaseCatalogueEpochs) release();
+    releaseCatalogueEpochs = [
+      bindingFor("credentials", catalogue, key),
+      bindingFor("configuration", catalogue, key),
+    ];
+  };
+  // The provider list carries only the configuration generation, and its key does
+  // not move, so this binding is installed once and released at disposal.
+  const releaseProviderEpoch = () => bindingFor("configuration", providerList, providerKey());
+
   // The owner's own snapshot: the projection below writes it, the React binding
   // subscribes to it. It holds no answer of its own — the keyed resources do.
   let state: WebuiModelsWorkflowsState = initialWebuiModelsWorkflowsState;
@@ -253,6 +301,9 @@ export function createWebuiModelsWorkflows(deps: {
       return;
     }
     shownCatalogueKey = catalogueKeyFor(sessionId);
+    // The shown key is the one the generations are bound to: a later advance
+    // retires exactly this answer, and an unrelated key stays untouched.
+    bindCatalogueEpochs(shownCatalogueKey);
     await catalogue.load(shownCatalogueKey, () =>
       port.listModels!(sessionId ? { sessionId } : undefined),
     );
@@ -434,6 +485,9 @@ export function createWebuiModelsWorkflows(deps: {
     upsertApiKey,
     refreshModels,
     dispose: () => {
+      for (const release of releaseCatalogueEpochs) release();
+      releaseCatalogueEpochs = [];
+      releaseProviderEpoch();
       catalogue.dispose();
       providerList.dispose();
       presetList.dispose();
