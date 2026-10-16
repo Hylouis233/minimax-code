@@ -158,15 +158,20 @@ export class LocalAgentTurnRunner implements LocalRuntimeTurnRunnerPort {
       hasReleasedOutput: () => attemptReleasedOutput(state),
       isAborted: () => input.signal?.aborted === true,
     });
-    await this.runAttempts({
-      input,
-      toolContext,
-      observedLlm,
-      state,
-      observation,
-      autoRetry,
-    });
-    await this.releaseHeldFailure(input, autoRetry);
+    try {
+      await this.runAttempts({
+        input,
+        toolContext,
+        observedLlm,
+        state,
+        observation,
+        autoRetry,
+      });
+    } finally {
+      // Unconditional: a held failure must reach the client even when an attempt
+      // throws, otherwise the turn ends with a swallowed error.
+      await this.releaseHeldFailure(input, autoRetry);
+    }
     const inputRejected = await waitForInputReview(state.inputReview, input.signal);
     if (input.signal?.aborted) return buildRunnerResult(input, state);
     if (input.deferInputReviewResolution === true && shouldReportInputReviewResolution(input)) {
@@ -344,7 +349,6 @@ export class LocalAgentTurnRunner implements LocalRuntimeTurnRunnerPort {
       },
       'Retrying a turn after a retryable failure.',
     );
-    observation.autoRetries += 1;
     try {
       await this.turnAutoRetrySleep(next.delayMs, input.signal);
     } catch {
@@ -355,6 +359,7 @@ export class LocalAgentTurnRunner implements LocalRuntimeTurnRunnerPort {
     if (input.signal?.aborted) return false;
     // Spend the hold only now that the attempt is really about to run.
     autoRetry.markAttemptStarted();
+    observation.autoRetries += 1;
     // A retried turn re-runs the whole tool loop from the committed history, so
     // the previous attempt's event slice must not be treated as final.
     state.finalAttemptEventStart = input.eventWriter.outcome?.eventCount ?? input.eventWriter.events.length;

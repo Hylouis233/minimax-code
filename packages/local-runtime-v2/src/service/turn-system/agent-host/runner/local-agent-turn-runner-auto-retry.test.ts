@@ -226,6 +226,33 @@ describe('LocalAgentTurnRunner automatic turn retry', () => {
     expect(statuses(events)).toContain(RuntimeEventStatus.FAILED);
   });
 
+  it('propagates a throwing retried attempt without emitting a duplicate terminal event', async () => {
+    // The first attempt's hold is legitimately consumed when the retry starts,
+    // so the newer exception wins. What must not happen is a stale FAILED from
+    // the first attempt leaking out alongside it, which would put two
+    // conflicting terminal frames on one turn.
+    const { events, eventWriter } = collector();
+    let calls = 0;
+    const runner = new LocalAgentTurnRunner({
+      reviewContent: async () => ({ pass: true }),
+      turnAutoRetrySleep: async () => {},
+      piRunner: {
+        async runTurn(turnInput) {
+          calls += 1;
+          if (calls === 1) {
+            await turnInput.eventWriter.pushRuntime(failedTerminal('[Error] 529 overloaded'));
+            return;
+          }
+          throw new Error('tool loop exploded');
+        },
+      },
+    });
+
+    await expect(runner.runTurn(input(eventWriter))).rejects.toThrow('tool loop exploded');
+    expect(calls).toBe(2);
+    expect(statuses(events)).toEqual([]);
+  });
+
   it('keeps the previous terminal behaviour when the budget is disabled', async () => {
     const { events, eventWriter } = collector();
     let calls = 0;
