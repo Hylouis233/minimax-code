@@ -16,7 +16,7 @@ import { WebuiIconBell, WebuiIconBrand, WebuiIconCommandUsage } from "../../../s
 import { SigninClaimResult } from "@mavis/shared/daily-signin";
 import { SettingsModal } from "../../settings/ui/SettingsModal.js";
 import { AccountLoginDialog } from "./AccountLoginDialog.js";
-import type { MemoryHandoff } from "../../settings/ui/MemoryManagerDialog.js";
+import type { MemoryHandoff } from "../../settings/contracts/memory-handoff.js";
 import type { WebuiVersionInfo } from "../../../../shared/contracts/version.js";
 import { evaluateOutsideClose } from "../../../projection/common/outside-close.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";

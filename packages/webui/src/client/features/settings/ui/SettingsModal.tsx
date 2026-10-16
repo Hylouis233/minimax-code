@@ -14,7 +14,7 @@ import { FolderIcon, SearchIcon } from "../../../ui/settings-glyphs.js";
 import { ReviewSettingsPage } from "../../../features/review/ui/ReviewSettingsPage.js";
 import { UsageModelSettings } from "./UsageModelSettings.js";
 import { PersonalizationSettings } from "./PersonalizationSettings.js";
-import type { MemoryHandoff } from "./MemoryManagerDialog.js";
+import type { MemoryHandoff } from "../contracts/memory-handoff.js";
 import {
   useWebuiArchivedSessionsState,
   useWebuiSessionWorkflows,

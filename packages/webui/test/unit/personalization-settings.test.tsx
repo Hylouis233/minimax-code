@@ -31,11 +31,17 @@ import {
 import { PERSONALIZATION_SECTION_HINTS } from "../../src/client/features/settings/ui/settings-atoms.js";
 import {
   MEMORY_DELETE_CONFIRM,
-  MEMORY_HANDOFF_PROMPT,
   MemoryManagerDialog,
+} from "../../src/client/features/settings/ui/MemoryManagerDialog.js";
+// The hand-off shape is named from Settings' own contracts, not from the dialog
+// that first produced it: two consumers outside this panel's directory use it,
+// and importing a React component to name an interface pulled the component's
+// whole dependency list across a boundary the interface never needed.
+import {
+  MEMORY_HANDOFF_PROMPT,
   formatMemoryTimestamp,
   isMemorySaveable,
-} from "../../src/client/features/settings/ui/MemoryManagerDialog.js";
+} from "../../src/client/features/settings/contracts/memory-handoff.js";
 import { resolveEditorSeed } from "../../src/client/features/settings/ui/GlobalInstructionsSection.js";
 import { isProfileSaveable } from "../../src/client/features/settings/ui/UserProfileSection.js";
 
@@ -673,5 +679,32 @@ describe("section hints", () => {
       "告诉 Agent 你的背景和长期偏好。",
       "设置在此电脑上如何收集、保留和整合本地记忆。",
     ]);
+  });
+});
+
+describe("the hand-off shape's home", () => {
+  it("is nameable from Settings contracts without the dialog in reach", () => {
+    // The shape crosses a business boundary: Settings decides what to hand over,
+    // the shell decides where to put it, the composer renders the chip. It used
+    // to live in the dialog, which meant two consumers outside Settings imported
+    // a React component module to name an interface. The contract module is
+    // imported above at runtime, so this assertion is about that module standing
+    // on its own: no component, no dialog, no React.
+    const source = readFileSync(
+      new URL(
+        "../../src/client/features/settings/contracts/memory-handoff.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    // Prose may mention the dialog's old home; an import may not reach it.
+    const imports = source.match(/^import .*$/gm) ?? [];
+    expect(imports.join("\n")).not.toMatch(/MemoryManagerDialog/);
+    expect(source).not.toMatch(/from "react/);
+    expect(imports.join("\n")).not.toMatch(/\.tsx/);
+    // And it really does carry the shape, so the import is not vacuous.
+    expect(typeof MEMORY_HANDOFF_PROMPT).toBe("string");
+    expect(typeof formatMemoryTimestamp).toBe("function");
+    expect(typeof isMemorySaveable).toBe("function");
   });
 });

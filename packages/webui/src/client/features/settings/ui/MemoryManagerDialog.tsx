@@ -4,10 +4,12 @@
 // its own save and delete-confirm — it is not part of `MemorySection`. It is mounted conditionally
 // by that section (`{managing ? … : null}`), so it appears when the user asks for it and not before.
 //
-// **It also owns the memory feature's shared pieces**, and the direction matters: `MemorySection`
-// renders this dialog, so the dialog must not import the section back. `isMemorySaveable`,
-// `formatMemoryTimestamp`, `MEMORY_HANDOFF_PROMPT` and the `MemoryHandoff` payload live here and the
-// section reads them, which keeps the edge one-way.
+// The memory feature's *shared* pieces do not live here. `isMemorySaveable`,
+// `formatMemoryTimestamp`, `MEMORY_HANDOFF_PROMPT` and the `MemoryHandoff` payload
+// are in `../contracts/memory-handoff.ts`, because three consumers outside this
+// dialog's own file — including two outside Settings — name them, and a contract
+// should not require its reader to pull in a component to do so. This dialog is
+// one caller of that contract, not its owner.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -15,6 +17,18 @@ import { basenamePath } from "../../../projection/common/paths.js";
 import type { WebuiAgentMemoryView, WebuiMemorySettingsView } from "../../../../shared/contracts/personalization.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
+import {
+  formatMemoryTimestamp,
+  isMemorySaveable,
+  type MemoryHandoff,
+} from "../contracts/memory-handoff.js";
+
+export {
+  formatMemoryTimestamp,
+  isMemorySaveable,
+  MEMORY_HANDOFF_PROMPT,
+  type MemoryHandoff,
+} from "../contracts/memory-handoff.js";
 
 /**
  * The delete confirmation's copy, word for word.
@@ -31,55 +45,6 @@ export const MEMORY_DELETE_CONFIRM = {
   cancel: "取消",
   confirm: "删除",
 } as const;
-
-/**
- * The save predicate, lifted out so it can be tested directly:
- * `!loading && !saving && draft !== baseline && draft.length > 0`.
- *
- * All four clauses matter. Without the dirty check the button is live the moment
- * the dialog opens, offering a write that rewrites the file byte-for-byte;
- * without the length check an emptied editor would save a delete from a control
- * that is not the delete control, behind no confirmation.
- */
-export function isMemorySaveable(input: {
-  readonly draft: string | undefined;
-  readonly baseline: string | undefined;
-  readonly loading: boolean;
-  readonly saving: boolean;
-}): boolean {
-  return (
-    !input.loading &&
-    !input.saving &&
-    input.draft !== undefined &&
-    input.draft !== input.baseline &&
-    input.draft.length > 0
-  );
-}
-
-export function formatMemoryTimestamp(value: string | undefined): string {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const pad = (part: number): string => String(part).padStart(2, "0");
-  const stamp = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
-  return `更新于 ${stamp}`;
-}
-
-/** What 「在会话中创建」 leaves in the composer, beside the attached file.
- *  The home surface opens with exactly this one line already
- *  typed, so the user's next action is to add what they actually want changed. */
-export const MEMORY_HANDOFF_PROMPT = "我想调整下这个记忆文件";
-
-/** What 「在会话中创建」 carries across: the body plus the identity the composer
- *  chip needs. `token` makes the hand-off one-shot — the composer remembers the
- *  last token it consumed, so a re-render cannot double-attach a 74KB file. */
-export interface MemoryHandoff {
-  readonly token: string;
-  readonly fileName: string;
-  readonly mimeType: string;
-  readonly sizeBytes: number;
-  readonly content: string;
-}
 
 export interface MemoryManagerDialogProps {  readonly getAgentMemory?: (request?: {
     readonly includeContent?: boolean;
@@ -143,8 +108,16 @@ export function MemoryManagerDialog({
     try {
       const value = await reader({ includeContent: true });
       if (!value) return;
-      setDraft(value.content ?? "");
-      setBaseline(value.content ?? "");
+      // The body is only taken when the box still holds the server's text.
+      // A read that settles after the user has started typing must not replace
+      // their edit with a body they have not seen: the editor is the user's,
+      // and silently reverting it is worse than showing a value one read old.
+      // The metadata is still refreshed — the size and timestamp describe the
+      // file, not the edit.
+      if (!dirtyRef.current) {
+        setDraft(value.content ?? "");
+        setBaseline(value.content ?? "");
+      }
       setUpdatedAt(value.updatedAt);
       setFilePath(value.path);
       setFileSize(value.sizeBytes);
@@ -154,6 +127,18 @@ export function MemoryManagerDialog({
       setLoading(false);
     }
   }, []);
+
+  /**
+   * Whether the box holds text the user typed rather than text the server sent.
+   *
+   * Read through a ref because `load` is deliberately built with no dependencies
+   * (see below): a callback that closed over the current draft would have to be
+   * rebuilt whenever it changed, and rebuilding it is exactly what re-arms the
+   * effect that must fire only once per open. The ref carries the answer across
+   * without making the callback depend on it.
+   */
+  const dirtyRef = useRef(false);
+  dirtyRef.current = draft !== undefined && draft !== baseline;
 
   /**
    * The body loads on open. 管理 goes straight into the editor,

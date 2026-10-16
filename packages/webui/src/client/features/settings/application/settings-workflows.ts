@@ -9,15 +9,22 @@
 // to hold their own copies of each answer and decide their own error strings;
 // here one cache answers both.
 //
-// The split between *cached reads* and *submitted writes* is deliberate:
+// Two boundaries are deliberate:
 //
-//  - A read is cached in the snapshot with a request version per key, so a
-//    superseded answer is dropped rather than applied over a newer one, and
-//    the dialog re-opens onto the last answer instead of refetching blind.
-//  - A write returns its result to the caller and invalidates exactly the
-//    caches it affects. The uncommitted form stays in the component — that is
-//    the boundary, not an omission — and the application owns only what was
-//    submitted.
+//  - **A read reports its own outcome.** Every read below returns the
+//    `WebuiResourceLoadOutcome` of *its* request, so a caller learns what it got
+//    without re-reading a shared mutable snapshot and hoping it still holds that
+//    request's answer. The snapshot remains what a surface *renders*; it is not
+//    how a caller discovers its own result.
+//  - **A submitted write is a fact, an uncommitted form is not.** A write returns
+//    its result to the caller and invalidates exactly the caches it affects. The
+//    uncommitted text stays in the component — that is the boundary, not an
+//    omission — and the application owns only what was submitted.
+//
+// The memory panel reads twice, deliberately: a summary (existence, size,
+// timestamp) and the body. Those are two request identities, not one overloaded
+// value, so a stale body can never be presented as the current summary and the
+// two settle independently.
 //
 // This module is framework-free — no React, no DOM, no storage — so it can be
 // unit-tested against a scripted port.
@@ -26,8 +33,15 @@ import type { WebuiIdentityEpochs } from "../../../application/identity-epochs.j
 import {
   createWebuiQueryStore,
   idleWebuiQueryState,
+  webuiQueryMessage,
   type WebuiQueryState,
 } from "../../../application/query-store.js";
+import {
+  createWebuiKeyedResource,
+  type WebuiKeyedResource,
+  type WebuiResourceKey,
+  type WebuiResourceLoadOutcome,
+} from "../../../conversation/request-freshness.js";
 import {
   type SettingsPort,
   type WebuiPermissionMode,
@@ -92,7 +106,17 @@ export interface WebuiSettingsWorkflowsState {
   readonly revision: number;
   readonly instructions: WebuiQueryState<WebuiGlobalInstructionsView>;
   readonly profile: WebuiQueryState<WebuiUserProfileView>;
-  readonly agentMemory: WebuiQueryState<WebuiAgentMemoryView>;
+  /**
+   * The memory *summary*: existence, size and timestamp, without the body.
+   *
+   * Separate from `agentMemoryContent` because they are two request identities.
+   * One field holding either would let a pending body read report as though the
+   * summary had settled, and would make the summary's freshness depend on a read
+   * the panel only sometimes makes.
+   */
+  readonly agentMemorySummary: WebuiQueryState<WebuiAgentMemoryView>;
+  /** The memory *body*, read only when the editor is open. */
+  readonly agentMemoryContent: WebuiQueryState<WebuiAgentMemoryView>;
   readonly memorySettings: WebuiQueryState<WebuiMemorySettingsView>;
   readonly modelSource: WebuiQueryState<WebuiModelSource>;
   /**
@@ -117,7 +141,8 @@ export const initialWebuiSettingsWorkflowsState: WebuiSettingsWorkflowsState = {
   revision: 0,
   instructions: idleWebuiQueryState(),
   profile: idleWebuiQueryState(),
-  agentMemory: idleWebuiQueryState(),
+  agentMemorySummary: idleWebuiQueryState(),
+  agentMemoryContent: idleWebuiQueryState(),
   memorySettings: idleWebuiQueryState(),
   modelSource: idleWebuiQueryState(),
   runtimeVersion: idleWebuiQueryState(),
@@ -144,31 +169,38 @@ export interface WebuiSettingsWorkflows {
   readonly canWritePermissionMode: boolean;
 
   /**
-   * Read the permission preference. A superseded answer is dropped, and an
-   * answer this client cannot act on is reported as an error rather than as a
-   * silent absence.
+   * Read the permission preference. The outcome is this request's own: a
+   * superseded answer says so instead of the caller re-reading the snapshot and
+   * assuming it holds this request's value, and an answer this client cannot act
+   * on is reported as an error rather than as a silent absence.
    */
-  readonly loadPermissionMode: () => Promise<void>;
+  readonly loadPermissionMode: () => Promise<WebuiResourceLoadOutcome<WebuiPermissionMode>>;
   /** Write; returns the mode the runtime answered with, or fails. */
   readonly savePermissionMode: (mode: WebuiPermissionMode) => Promise<WebuiPermissionMode>;
 
   /**
-   * Read the runtime handshake fact. A superseded answer is dropped, exactly
-   * like every other cached read here.
+   * Read the runtime handshake fact, reporting this request's own outcome.
    */
-  readonly loadVersion: () => Promise<void>;
+  readonly loadVersion: () => Promise<WebuiResourceLoadOutcome<WebuiVersionInfo>>;
 
-  readonly loadInstructions: () => Promise<void>;
+  readonly loadInstructions: () => Promise<WebuiResourceLoadOutcome<WebuiGlobalInstructionsView>>;
   /** Save; returns the runtime's answer and refreshes the cached read. */
   readonly saveInstructions: (content: string) => Promise<WebuiGlobalInstructionsView>;
 
-  readonly loadProfile: () => Promise<void>;
+  readonly loadProfile: () => Promise<WebuiResourceLoadOutcome<WebuiUserProfileView>>;
   readonly saveProfile: (fields: WebuiUserProfileFields) => Promise<WebuiUserProfileView>;
 
-  readonly loadAgentMemory: (includeContent?: boolean) => Promise<void>;
+  /**
+   * Read memory. `includeContent` selects which identity is read: the summary and
+   * the body are cached under separate keys, so an overlapping pair settles in
+   * either order without either being presented as the other.
+   */
+  readonly loadAgentMemory: (
+    includeContent?: boolean,
+  ) => Promise<WebuiResourceLoadOutcome<WebuiAgentMemoryView>>;
   readonly saveAgentMemory: (content: string) => Promise<WebuiAgentMemoryView>;
 
-  readonly loadMemorySettings: () => Promise<void>;
+  readonly loadMemorySettings: () => Promise<WebuiResourceLoadOutcome<WebuiMemorySettingsView>>;
   readonly saveMemorySettings: (patch: {
     readonly enabled?: boolean;
     readonly proactive?: boolean;
@@ -176,8 +208,16 @@ export interface WebuiSettingsWorkflows {
 
   readonly startCodexOAuth: (body?: Record<string, unknown>) => Promise<unknown>;
   readonly cancelCodexOAuth: (loginId: string) => Promise<unknown>;
-  readonly loadModelSource: () => Promise<void>;
+  readonly loadModelSource: () => Promise<WebuiResourceLoadOutcome<WebuiModelSource>>;
   readonly setModelSource: (source: WebuiModelSource) => Promise<void>;
+  /**
+   * Release every cached read.
+   *
+   * Disposal is what makes a read that never answers distinguishable from one
+   * that was superseded: an answer still in flight can no longer commit, and a
+   * read issued afterwards reports `disposed` without reaching the transport.
+   */
+  readonly dispose: () => void;
 }
 
 export function createWebuiSettingsWorkflows(deps: {
@@ -197,8 +237,89 @@ export function createWebuiSettingsWorkflows(deps: {
   // The cached-read fence is not this module's: `query-store.ts` holds the one
   // implementation of the snapshot, the listener set and the version guard, and
   // every owner that caches transport answers reads through it.
-  const { getSnapshot, subscribe, set, withQuery, readInto, unavailable } =
+  const { getSnapshot, subscribe, set, withQuery, unavailable } =
     createWebuiQueryStore(initialWebuiSettingsWorkflowsState);
+
+  /**
+   * One cached read, keyed by identity.
+   *
+   * The key is the read's own identity — which resource, and for memory whether
+   * the body was asked for — so the body and the summary are separate requests
+   * that settle independently instead of two writes into one field. Every read
+   * publishes into the snapshot for the surface to render *and* returns the
+   * outcome of its own request, which is how a caller stops re-reading the
+   * snapshot to find out what it got.
+   */
+  const readInto = <Field extends keyof WebuiSettingsWorkflowsState, T>(
+    field: Field,
+    resource: WebuiKeyedResource<T>,
+    key: WebuiResourceKey,
+    fetch: () => Promise<T>,
+  ): Promise<WebuiResourceLoadOutcome<T>> => {
+    resource.subscribe(() => {
+      const entry = resource.read(key);
+      set((current) => withQuery(current, field, entry ?? idleWebuiQueryState()));
+    });
+    return resource.load(key, fetch);
+  };
+
+  const instructions = createWebuiKeyedResource<WebuiGlobalInstructionsView>();
+  const profile = createWebuiKeyedResource<WebuiUserProfileView>();
+  const memorySummary = createWebuiKeyedResource<WebuiAgentMemoryView>();
+  const memoryContent = createWebuiKeyedResource<WebuiAgentMemoryView>();
+  const memorySettings = createWebuiKeyedResource<WebuiMemorySettingsView>();
+  const modelSource = createWebuiKeyedResource<WebuiModelSource>();
+  const runtimeVersion = createWebuiKeyedResource<WebuiVersionInfo>();
+  const permissionMode = createWebuiKeyedResource<WebuiPermissionMode>();
+
+  /**
+   * Which cached reads the configuration generation is responsible for.
+   *
+   * A settings write advances that generation, so the answers it invalidates are
+   * not decided one call site at a time — they are every key this generation
+   * participates in. Binding them here means an in-flight read is retired by the
+   * write that makes it wrong, and reports `superseded`, instead of landing on
+   * top of the value the write just committed.
+   *
+   * `permissionMode` is deliberately absent. Its write does not advance this
+   * generation, and retiring a cached answer on a change that does not affect it
+   * would be an invalidation the current behaviour does not have.
+   */
+  const boundReads: Array<WebuiKeyedResource<unknown>> = [];
+  const bindToConfiguration = <T>(resource: WebuiKeyedResource<T>, key: WebuiResourceKey): void => {
+    const epochs = deps.identityEpochs;
+    if (!epochs) return;
+    resource.bindEpoch(
+      {
+        token: () => epochs.configuration().token,
+        subscribe: (listener) =>
+          epochs.subscribe((advanced) => {
+            if (advanced.key === "configuration") listener();
+          }),
+      },
+      key,
+    );
+    boundReads.push(resource as WebuiKeyedResource<unknown>);
+  };
+  bindToConfiguration(instructions, { read: "instructions" });
+  bindToConfiguration(profile, { read: "profile" });
+  bindToConfiguration(memorySummary, { read: "agentMemory", content: false });
+  bindToConfiguration(memoryContent, { read: "agentMemory", content: true });
+  bindToConfiguration(memorySettings, { read: "memorySettings" });
+  bindToConfiguration(modelSource, { read: "modelSource" });
+  bindToConfiguration(runtimeVersion, { read: "version" });
+
+  /**
+   * A read whose capability is absent.
+   *
+   * Reported as a failure carrying this owner's own message, so a caller waiting
+   * on the outcome learns the same thing the snapshot shows instead of finding an
+   * idle field and inventing its own wording.
+   */
+  const unsupported = <T>(error: string): Promise<WebuiResourceLoadOutcome<T>> => {
+    const reason = new Error(error);
+    return Promise.resolve({ status: "failed", error: reason });
+  };
 
   const markRevision = (): void => {
     set((current) => ({ ...current, revision: current.revision + 1 }));
@@ -206,72 +327,99 @@ export function createWebuiSettingsWorkflows(deps: {
 
   /** A provider change can add or remove models, so the model list is stale. */
 
-  const loadInstructions = async (): Promise<void> => {
+  const loadInstructions = (): Promise<WebuiResourceLoadOutcome<WebuiGlobalInstructionsView>> => {
     if (!port.getGlobalInstructions) {
       unavailable("instructions", "当前运行时不支持自定义指令读写。");
-      return;
+      return unsupported("当前运行时不支持自定义指令读写。");
     }
-    await readInto("instructions", "instructions", () => port.getGlobalInstructions!());
+    return readInto("instructions", instructions, { read: "instructions" }, () =>
+      port.getGlobalInstructions!(),
+    );
   };
 
   const saveInstructions = async (content: string): Promise<WebuiGlobalInstructionsView> => {
     if (!port.setGlobalInstructions) throw new Error("当前运行时不支持自定义指令读写。");
     const value = await port.setGlobalInstructions({ content });
     afterConfigurationWrite();
-    set((current) => ({
-      ...current,
-      instructions: { status: "ready", value },
-      revision: current.revision + 1,
-    }));
+    instructions.commit(instructions.capture({ read: "instructions" }), { status: "ready", value });
+    set((current) => ({ ...current, revision: current.revision + 1 }));
     return value;
   };
 
-  const loadProfile = async (): Promise<void> => {
+  const loadProfile = (): Promise<WebuiResourceLoadOutcome<WebuiUserProfileView>> => {
     if (!port.getUserProfile) {
       unavailable("profile", "当前运行时不支持「关于你」读写。");
-      return;
+      return unsupported("当前运行时不支持「关于你」读写。");
     }
-    await readInto("profile", "profile", () => port.getUserProfile!());
+    return readInto("profile", profile, { read: "profile" }, () => port.getUserProfile!());
   };
 
   const saveProfile = async (fields: WebuiUserProfileFields): Promise<WebuiUserProfileView> => {
     if (!port.setUserProfile) throw new Error("当前运行时不支持「关于你」读写。");
     const value = await port.setUserProfile(fields);
     afterConfigurationWrite();
-    set((current) => ({
-      ...current,
-      profile: { status: "ready", value },
-      revision: current.revision + 1,
-    }));
+    profile.commit(profile.capture({ read: "profile" }), { status: "ready", value });
+    set((current) => ({ ...current, revision: current.revision + 1 }));
     return value;
   };
 
-  const loadAgentMemory = async (includeContent = false): Promise<void> => {
+  /**
+   * Read memory — summary or body.
+   *
+   * The two go to different keyed resources, which is the whole point: the panel
+   * reads the summary on open and the body only when the editor appears, and an
+   * overlapping pair must not have one request's answer presented as the other's.
+   * They are published into separate snapshot fields for the same reason.
+   */
+  const loadAgentMemory = (
+    includeContent = false,
+  ): Promise<WebuiResourceLoadOutcome<WebuiAgentMemoryView>> => {
     if (!port.getAgentMemory) {
-      unavailable("agentMemory", "当前运行时不支持长期记忆读写。");
-      return;
+      unavailable(includeContent ? "agentMemoryContent" : "agentMemorySummary", "当前运行时不支持长期记忆读写。");
+      return unsupported("当前运行时不支持长期记忆读写。");
     }
-    await readInto("agentMemory", "agentMemory", () => port.getAgentMemory!(includeContent ? { includeContent: true } : undefined));
+    return includeContent
+      ? readInto(
+          "agentMemoryContent",
+          memoryContent,
+          { read: "agentMemory", content: true },
+          () => port.getAgentMemory!({ includeContent: true }),
+        )
+      : readInto(
+          "agentMemorySummary",
+          memorySummary,
+          { read: "agentMemory", content: false },
+          () => port.getAgentMemory!(),
+        );
   };
 
   const saveAgentMemory = async (content: string): Promise<WebuiAgentMemoryView> => {
     if (!port.setAgentMemory) throw new Error("当前运行时不支持长期记忆读写。");
     const value = await port.setAgentMemory({ content });
     afterConfigurationWrite();
-    set((current) => ({
-      ...current,
-      agentMemory: { status: "ready", value },
-      revision: current.revision + 1,
-    }));
+    // The write answers with the body it committed, so both identities are
+    // refreshed from it: a summary still showing the pre-write size would be
+    // reporting a file state that no longer exists.
+    memoryContent.commit(
+      memoryContent.capture({ read: "agentMemory", content: true }),
+      { status: "ready", value },
+    );
+    memorySummary.commit(
+      memorySummary.capture({ read: "agentMemory", content: false }),
+      { status: "ready", value: { ...value, content: undefined } },
+    );
+    set((current) => ({ ...current, revision: current.revision + 1 }));
     return value;
   };
 
-  const loadMemorySettings = async (): Promise<void> => {
+  const loadMemorySettings = (): Promise<WebuiResourceLoadOutcome<WebuiMemorySettingsView>> => {
     if (!port.getMemorySettings) {
       unavailable("memorySettings", "当前运行时不支持记忆开关。");
-      return;
+      return unsupported("当前运行时不支持记忆开关。");
     }
-    await readInto("memorySettings", "memorySettings", () => port.getMemorySettings!());
+    return readInto("memorySettings", memorySettings, { read: "memorySettings" }, () =>
+      port.getMemorySettings!(),
+    );
   };
 
   const saveMemorySettings = async (patch: {
@@ -281,11 +429,11 @@ export function createWebuiSettingsWorkflows(deps: {
     if (!port.setMemorySettings) throw new Error("当前运行时不支持记忆开关。");
     const value = await port.setMemorySettings(patch);
     afterConfigurationWrite();
-    set((current) => ({
-      ...current,
-      memorySettings: { status: "ready", value },
-      revision: current.revision + 1,
-    }));
+    memorySettings.commit(memorySettings.capture({ read: "memorySettings" }), {
+      status: "ready",
+      value,
+    });
+    set((current) => ({ ...current, revision: current.revision + 1 }));
     return value;
   };
 
@@ -301,32 +449,31 @@ export function createWebuiSettingsWorkflows(deps: {
     return port.cancelCodexOAuthLogin({ loginId });
   };
 
-  const loadModelSource = async (): Promise<void> => {
+  const loadModelSource = (): Promise<WebuiResourceLoadOutcome<WebuiModelSource>> => {
     if (!port.getMiniMaxModelSource) {
       unavailable("modelSource", "当前运行时不支持模型来源。");
-      return;
+      return unsupported("当前运行时不支持模型来源。");
     }
-    await readInto("modelSource", "modelSource", () => port.getMiniMaxModelSource!());
+    return readInto("modelSource", modelSource, { read: "modelSource" }, () =>
+      port.getMiniMaxModelSource!(),
+    );
   };
 
   const setModelSource = async (source: WebuiModelSource): Promise<void> => {
     if (!port.setMiniMaxModelSource) throw new Error("当前运行时不支持切换模型来源。");
     const value = await port.setMiniMaxModelSource(source);
     afterConfigurationWrite();
-    set((current) => ({
-      ...current,
-      modelSource: { status: "ready", value },
-      revision: current.revision + 1,
-    }));
+    modelSource.commit(modelSource.capture({ read: "modelSource" }), { status: "ready", value });
+    set((current) => ({ ...current, revision: current.revision + 1 }));
   };
 
-  const loadVersion = async (): Promise<void> => {
+  const loadVersion = (): Promise<WebuiResourceLoadOutcome<WebuiVersionInfo>> => {
     const read = port.version;
     if (!read) {
       unavailable("runtimeVersion", "当前运行时不支持版本信息。");
-      return;
+      return unsupported("当前运行时不支持版本信息。");
     }
-    await readInto("runtimeVersion", "runtimeVersion", () => read());
+    return readInto("runtimeVersion", runtimeVersion, { read: "version" }, () => read());
   };
 
   /**
@@ -342,13 +489,13 @@ export function createWebuiSettingsWorkflows(deps: {
    * current behaviour does not have; whether a permission-preference change
    * should retire cached answers is a separate decision with its own evidence.
    */
-  const loadPermissionMode = async (): Promise<void> => {
+  const loadPermissionMode = (): Promise<WebuiResourceLoadOutcome<WebuiPermissionMode>> => {
     const read = port.getPermissionMode;
     if (!read) {
       unavailable("permissionMode", "当前运行时不支持授权模式读写。");
-      return;
+      return unsupported("当前运行时不支持授权模式读写。");
     }
-    await readInto("permissionMode", "permissionMode", async () => {
+    return readInto("permissionMode", permissionMode, { read: "permissionMode" }, async () => {
       const mode = readWebuiPermissionMode(await read());
       if (!mode) throw new Error("运行时返回了不支持的授权模式");
       return mode;
@@ -359,11 +506,11 @@ export function createWebuiSettingsWorkflows(deps: {
     if (!port.setPermissionMode) throw new Error("当前运行时不支持授权模式读写。");
     const answer = readWebuiPermissionMode(await port.setPermissionMode({ mode }));
     if (!answer) throw new Error("运行时返回了不支持的授权模式");
-    set((current) => ({
-      ...current,
-      permissionMode: { status: "ready", value: answer },
-      revision: current.revision + 1,
-    }));
+    permissionMode.commit(permissionMode.capture({ read: "permissionMode" }), {
+      status: "ready",
+      value: answer,
+    });
+    set((current) => ({ ...current, revision: current.revision + 1 }));
     return answer;
   };
 
@@ -399,5 +546,24 @@ export function createWebuiSettingsWorkflows(deps: {
     loadPermissionMode,
     savePermissionMode,
     loadVersion,
+    dispose: () => {
+      // Disposal fences every read: an answer still in flight can no longer
+      // commit, and a read started afterwards reports `disposed` without issuing
+      // a request. This is the same rule the primitive applies everywhere, not a
+      // settings-local variant.
+      for (const resource of [
+        instructions,
+        profile,
+        memorySummary,
+        memoryContent,
+        memorySettings,
+        modelSource,
+        runtimeVersion,
+        permissionMode,
+      ]) {
+        resource.dispose();
+      }
+      boundReads.length = 0;
+    },
   };
 }

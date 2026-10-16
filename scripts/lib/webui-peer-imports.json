@@ -53,11 +53,6 @@
     },
     {
       "from": "client/features/account/ui/UserMenu.tsx",
-      "to": "client/features/settings/ui/MemoryManagerDialog.tsx",
-      "reason": "The user menu opens the settings business's memory dialog. It is an Account surface opening a Settings surface; T12 moved the settings files into their feature home and re-pointed this entry. It goes when Settings publishes the dialog as a public contract."
-    },
-    {
-      "from": "client/features/account/ui/UserMenu.tsx",
       "to": "client/features/settings/ui/SettingsModal.tsx",
       "reason": "The user menu opens the settings modal. It is an Account surface opening the settings composition; T12 moved the settings files into their feature home and re-pointed this entry. It goes when Settings publishes the open command as a public contract."
     },

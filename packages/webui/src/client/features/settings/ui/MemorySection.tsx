@@ -9,7 +9,8 @@ import { useCallback, useEffect, useState, type ReactElement, type ReactNode } f
 import type { WebuiAgentMemoryView, WebuiMemorySettingsView } from "../../../../shared/contracts/personalization.js";
 import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
 import { PERSONALIZATION_SECTION_HINTS, SectionHeader } from "./settings-atoms.js";
-import { MemoryManagerDialog, formatMemoryTimestamp, isMemorySaveable, type MemoryHandoff } from "./MemoryManagerDialog.js";
+import { MemoryManagerDialog } from "./MemoryManagerDialog.js";
+import { formatMemoryTimestamp, isMemorySaveable, type MemoryHandoff } from "../contracts/memory-handoff.js";
 
 /** One switch row inside the 记忆 card. */
 function MemoryRow({

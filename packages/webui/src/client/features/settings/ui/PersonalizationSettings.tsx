@@ -1,7 +1,8 @@
 import { useMemo, type ReactElement } from "react";
 import type { WebuiAgentMemoryView, WebuiGlobalInstructionsView, WebuiMemorySettingsView, WebuiUserProfileFields, WebuiUserProfileView } from "../../../../shared/contracts/personalization.js";
 import { useWebuiSettingsWorkflows, useWebuiSettingsWorkflowsState } from "../../../bindings/use-query-state.js";
-import type { MemoryHandoff } from "./MemoryManagerDialog.js";
+import type { WebuiResourceLoadOutcome } from "../../../conversation/request-freshness.js";
+import type { MemoryHandoff } from "../contracts/memory-handoff.js";
 import { GlobalInstructionsSection } from "./GlobalInstructionsSection.js";
 import { UserProfileSection } from "./UserProfileSection.js";
 import { MemorySection } from "./MemorySection.js";
@@ -50,6 +51,30 @@ export interface PersonalizationSettingsProps {
  * took. The sections keep their own uncommitted editor state; only what was
  * submitted belongs to the application.
  */
+
+/**
+ * What a section's callback expects: the value, or a throw it can render.
+ *
+ * The owner already reports what each request produced, so a surface does not
+ * re-read the shared snapshot to discover its own result. It converts that one
+ * outcome here, in one place, instead of repeating the conversion per read.
+ *
+ * A request that was superseded, disposed or refused throws rather than
+ * resolving to `undefined`: "I have nothing to show" and "the read was refused"
+ * are different, and collapsing them is what made a dropped answer look like an
+ * empty field the user could overwrite.
+ */
+function valueOrThrow<T>(outcome: WebuiResourceLoadOutcome<T>, unsupported: string): T {
+  switch (outcome.status) {
+    case "ready":
+      return outcome.value;
+    case "failed":
+      throw outcome.error instanceof Error ? outcome.error : new Error(String(outcome.error));
+    default:
+      throw new Error(unsupported);
+  }
+}
+
 export function PersonalizationSettings({ onCreateInSession }: PersonalizationSettingsProps = {}): ReactElement {
   const settings = useWebuiSettingsWorkflows();
   // Subscribe so a settings write anywhere re-renders this consumer. The
@@ -60,45 +85,36 @@ export function PersonalizationSettings({ onCreateInSession }: PersonalizationSe
   const sections = useMemo(() => {
     const s = settings;
     const getGlobalInstructions = s && s.canReadInstructions
-      ? async (): Promise<WebuiGlobalInstructionsView> => {
-          await s.loadInstructions();
-          const state = s.getSnapshot().instructions;
-          if (state.value === undefined) throw new Error(state.error ?? "当前运行时不支持自定义指令读写。");
-          return state.value;
-        }
+      ? async (): Promise<WebuiGlobalInstructionsView> =>
+          valueOrThrow(await s.loadInstructions(), "当前运行时不支持自定义指令读写。")
       : undefined;
     const setGlobalInstructions = s && s.canWriteInstructions
       ? async (request: { readonly content: string }): Promise<WebuiGlobalInstructionsView> => s.saveInstructions(request.content)
       : undefined;
     const getUserProfile = s && s.canReadProfile
-      ? async (): Promise<WebuiUserProfileView> => {
-          await s.loadProfile();
-          const state = s.getSnapshot().profile;
-          if (state.value === undefined) throw new Error(state.error ?? "当前运行时不支持「关于你」读写。");
-          return state.value;
-        }
+      ? async (): Promise<WebuiUserProfileView> =>
+          valueOrThrow(await s.loadProfile(), "当前运行时不支持「关于你」读写。")
       : undefined;
     const setUserProfile = s && s.canWriteProfile
       ? async (request: WebuiUserProfileFields): Promise<WebuiUserProfileView> => s.saveProfile(request)
       : undefined;
+    // The owner reads the summary and the body as two identities, selected by
+    // `includeContent`. The section asks for one or the other and receives that
+    // request's own answer — the panel never has to work out which of the two a
+    // cached value represents.
     const getAgentMemory = s && s.canReadMemory
-      ? async (request?: { readonly includeContent?: boolean }): Promise<WebuiAgentMemoryView> => {
-          await s.loadAgentMemory(request?.includeContent);
-          const state = s.getSnapshot().agentMemory;
-          if (state.value === undefined) throw new Error(state.error ?? "当前运行时不支持长期记忆读写。");
-          return state.value;
-        }
+      ? async (request?: { readonly includeContent?: boolean }): Promise<WebuiAgentMemoryView> =>
+          valueOrThrow(
+            await s.loadAgentMemory(request?.includeContent === true),
+            "当前运行时不支持长期记忆读写。",
+          )
       : undefined;
     const setAgentMemory = s && s.canWriteMemory
       ? async (request: { readonly content: string }): Promise<WebuiAgentMemoryView> => s.saveAgentMemory(request.content)
       : undefined;
     const getMemorySettings = s && s.canReadMemorySettings
-      ? async (): Promise<WebuiMemorySettingsView> => {
-          await s.loadMemorySettings();
-          const state = s.getSnapshot().memorySettings;
-          if (state.value === undefined) throw new Error(state.error ?? "当前运行时不支持记忆开关。");
-          return state.value;
-        }
+      ? async (): Promise<WebuiMemorySettingsView> =>
+          valueOrThrow(await s.loadMemorySettings(), "当前运行时不支持记忆开关。")
       : undefined;
     const setMemorySettings = s && s.canWriteMemorySettings
       ? async (request: { readonly enabled?: boolean; readonly proactive?: boolean }): Promise<WebuiMemorySettingsView> => s.saveMemorySettings(request)

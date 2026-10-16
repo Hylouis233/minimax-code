@@ -499,18 +499,27 @@ export function WebuiComposer({
       setPermissionUnavailable(true);
       return undefined;
     }
-    // The owner caches the answer; an unsupported payload is its error, and the
-    // surface reports that error rather than rendering an empty switch.
+    // The owner reports what this request produced, so the surface does not
+    // re-read the shared snapshot to find out what it just got — and an
+    // unsupported payload is this request's error rather than a field that may
+    // have been overwritten by a later read.
     settingsWorkflows
       .loadPermissionMode()
-      .then(() => {
+      .then((outcome) => {
         if (cancelled) return;
-        const query = settingsWorkflows.getSnapshot().permissionMode;
-        if (query.status === "error") {
-          setPermissionUnavailable(true);
-          setInteractionError(query.error ?? "加载授权模式失败");
+        if (outcome.status === "ready") {
+          setPermissionUnavailable(false);
           return;
         }
+        setPermissionUnavailable(true);
+        if (outcome.status === "failed") {
+          setInteractionError(
+            outcome.error instanceof Error ? outcome.error.message : "加载授权模式失败",
+          );
+          return;
+        }
+        // Superseded or disposed: this request was refused, so there is nothing
+        // to report — the switch keeps whatever the snapshot already holds.
         setPermissionUnavailable(false);
       })
       .catch((error: unknown) => {

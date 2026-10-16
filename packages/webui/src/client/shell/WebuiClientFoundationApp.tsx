@@ -19,7 +19,7 @@ import { Composer } from "../features/composer/ui/Composer.js";
 import { LeftRail } from "../features/sessions/ui/LeftRail.js";
 import { Transcript } from "../features/transcript/ui/Transcript.js";
 import { UserMenu } from "../features/account/ui/UserMenu.js";
-import { MEMORY_HANDOFF_PROMPT, type MemoryHandoff } from "../features/settings/ui/MemoryManagerDialog.js";
+import { MEMORY_HANDOFF_PROMPT, type MemoryHandoff } from "../features/settings/contracts/memory-handoff.js";
 import {
   WebuiWorkspacePanel,
   WebuiProgressOverviewPanel,

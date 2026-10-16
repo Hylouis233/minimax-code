@@ -3721,6 +3721,7 @@
     "packages/webui/src/client/features/sessions/ui/session-activity-meta.tsx",
     "packages/webui/src/client/features/sessions/ui/sessions.css",
     "packages/webui/src/client/features/settings/application/settings-workflows.ts",
+    "packages/webui/src/client/features/settings/contracts/memory-handoff.ts",
     "packages/webui/src/client/features/settings/contracts/settings-port.ts",
     "packages/webui/src/client/features/settings/projection/settings-view.ts",
     "packages/webui/src/client/features/settings/ui/GlobalInstructionsSection.tsx",
