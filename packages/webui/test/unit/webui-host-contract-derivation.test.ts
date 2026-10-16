@@ -57,6 +57,15 @@ const WEBUI_ONLY_NAMES = [
 /**
  * The forwarded results that still need an explicit runtime -> wire conversion.
  * This is the remaining work, named member by member.
+ *
+ * `readCanvas` and `applyCanvas` are no longer on it: both now go through
+ * `result-conversion.ts`, which reads the runtime's own canvas view and rebuilds
+ * the WebUI's document field by field. They were on this list because the
+ * runtime's node type is an interface, and an interface is not assignable to the
+ * wire's `readonly Record<string, unknown>[]` — a difference a conversion has to
+ * state rather than a declaration has to satisfy. A member leaves this list when
+ * its conversion lands, and the compiler decides that: adding a name that already
+ * satisfies the wire type fails `pnpm typecheck:test`.
  */
 const MISMATCHED_RESULT_NAMES = [
   "listSessions",
@@ -72,8 +81,6 @@ const MISMATCHED_RESULT_NAMES = [
   "listPendingPermissions",
   "watchEvents",
   "listWorkspaceFileTree",
-  "readCanvas",
-  "applyCanvas",
   "getSessionDiff",
   "getTurnDiff",
   "revertTurnDiff",
@@ -130,11 +137,16 @@ describe("the WebUI host surface against the runtime it forwards to", () => {
   });
 
   it("names every forwarded result that still needs a conversion", () => {
-    expect(MISMATCHED_RESULT_NAMES).toHaveLength(22);
+    expect(MISMATCHED_RESULT_NAMES).toHaveLength(20);
     // A compatible result is not in the list, so the list cannot be padded.
     // @ts-expect-error `archiveSession`'s result already satisfies the wire type
     const alreadyCompatible: MismatchedResultNames = "archiveSession";
     expect(alreadyCompatible).toBe("archiveSession");
+    // And a converted one left it: the canvas members now have an explicit
+    // runtime -> wire conversion, so the compiler no longer reports them.
+    // @ts-expect-error `readCanvas` is converted, not merely forwarded
+    const converted: MismatchedResultNames = "readCanvas";
+    expect(converted).toBe("readCanvas");
   });
 
   it("forwards a subset, and every forwarded name still exists on the runtime", () => {

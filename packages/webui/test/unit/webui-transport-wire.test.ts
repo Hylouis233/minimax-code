@@ -10,6 +10,10 @@
 import { describe, expect, it } from "vitest";
 
 import { createWebuiTransport } from "../../src/client/platform/transport.js";
+import {
+  WebuiErrorCode,
+  WebuiWireError,
+} from "../../src/shared/envelope.js";
 
 /** A socket that records what was sent and lets a test deliver frames. */
 class ControllableSocket {
@@ -48,8 +52,14 @@ class ControllableSocket {
     return JSON.parse(this.sent[0] ?? "{}") as never;
   }
 
-  deliver(payload: unknown): void {
-    this.emit("message", { data: JSON.stringify(payload) });
+  /**
+   * Deliver a frame the way the service does: every frame it writes carries the
+   * protocol version, and the client now checks it. The fixtures below used to
+   * omit it and passed precisely because nothing validated the envelope — so a
+   * frame from a service speaking a different version was accepted as an answer.
+   */
+  deliver(payload: Record<string, unknown>): void {
+    this.emit("message", { data: JSON.stringify({ protocolVersion: 1, ...payload }) });
   }
 
   /** A payload that is not JSON at all — `deliver` always stringifies to valid JSON. */
@@ -111,7 +121,12 @@ describe("the shared request envelope", () => {
     const pending = transport.loadSessions();
     await tick();
     ControllableSocket.latest!.deliverRaw("{not json");
-    await expect(pending).rejects.toThrow("WebUI returned invalid JSON");
+    // The code is the branchable half; the message names the operation so a
+    // reader can tell which request produced it.
+    await expect(pending).rejects.toThrow("listSessions returned invalid JSON");
+    await expect(pending).rejects.toMatchObject({
+      code: WebuiErrorCode.invalidEnvelope,
+    });
   });
 });
 
@@ -204,5 +219,123 @@ describe("the delivery handle a streaming operation hands out", () => {
     socket.deliver({ kind: "event", requestId: id, body: { dataJson: "[DONE]" } });
     await expect(settled).resolves.toBeUndefined();
     expect(frames).toHaveLength(1);
+  });
+});
+
+describe("an inbound frame is judged before it is believed", () => {
+  it("carries the service's own code on a refusal, so callers branch on it", async () => {
+    // Before this, every refusal arrived as `new Error(frame.message)` and the
+    // service's stable code was dropped on the floor. A caller could therefore
+    // only tell "shutting down" from "unsupported operation" by matching English
+    // text that no gate protects.
+    const transport = transportWith(ControllableSocket);
+    const pending = transport.loadSessions();
+    await tick();
+    const socket = ControllableSocket.latest!;
+    socket.deliver({
+      protocolVersion: 1,
+      kind: "error",
+      requestId: socket.request.requestId,
+      code: "shutting_down",
+      message: "service is shutting down",
+    });
+
+    const error = await pending.then(
+      () => undefined,
+      (reason: unknown) => reason,
+    );
+    expect(error).toBeInstanceOf(WebuiWireError);
+    // The stable half is what survived.
+    expect((error as WebuiWireError).code).toBe(WebuiErrorCode.shuttingDown);
+    expect((error as WebuiWireError).requestId).toBe(socket.request.requestId);
+  });
+
+  it("keeps an unfamiliar but stable code rather than flattening it", async () => {
+    // A runtime that raises a code of its own has said something more precise
+    // than "harness error"; the client's correct response is not to erase it.
+    const transport = transportWith(ControllableSocket);
+    const pending = transport.loadSessions();
+    await tick();
+    const socket = ControllableSocket.latest!;
+    socket.deliver({
+      protocolVersion: 1,
+      kind: "error",
+      requestId: socket.request.requestId,
+      code: "capability_unavailable",
+      message: "runtime host does not expose project listing",
+    });
+
+    const error = await pending.then(
+      () => undefined,
+      (reason: unknown) => reason,
+    );
+    expect((error as WebuiWireError).code).toBe(
+      WebuiErrorCode.capabilityUnavailable,
+    );
+  });
+
+  it("refuses a frame from a different protocol version instead of reading it as an answer", async () => {
+    // The client used to `JSON.parse(...) as WireFrame` and check nothing else,
+    // so a frame from a service speaking another version was accepted as though
+    // it had answered.
+    const transport = transportWith(ControllableSocket);
+    const pending = transport.loadSessions();
+    await tick();
+    const socket = ControllableSocket.latest!;
+    socket.deliver({
+      protocolVersion: 99,
+      kind: "response",
+      requestId: socket.request.requestId,
+      body: { sessions: [], hasMore: false },
+    });
+
+    const error = await pending.then(
+      () => undefined,
+      (reason: unknown) => reason,
+    );
+    expect((error as WebuiWireError).code).toBe(WebuiErrorCode.protocolMismatch);
+  });
+
+  it("names a malformed frame of the right version as an envelope failure", async () => {
+    // Same version, wrong shape: a different situation from a version mismatch,
+    // and the client needs to tell them apart.
+    const transport = transportWith(ControllableSocket);
+    const pending = transport.loadSessions();
+    await tick();
+    const socket = ControllableSocket.latest!;
+    socket.deliver({
+      protocolVersion: 1,
+      kind: "gossip",
+      requestId: socket.request.requestId,
+    });
+
+    const error = await pending.then(
+      () => undefined,
+      (reason: unknown) => reason,
+    );
+    expect((error as WebuiWireError).code).toBe(WebuiErrorCode.invalidEnvelope);
+  });
+
+  it("ignores an unrelated named response rather than answering with it", async () => {
+    // It belongs to another request. Dropping it is the only correct action:
+    // settling this request with it would answer the wrong question.
+    const transport = transportWith(ControllableSocket);
+    const pending = transport.loadSessions();
+    await tick();
+    const socket = ControllableSocket.latest!;
+    socket.deliver({
+      protocolVersion: 1,
+      kind: "response",
+      requestId: "some-other-request",
+      body: { sessions: [{ sessionId: "elsewhere" }], hasMore: false },
+    });
+    socket.deliver({
+      protocolVersion: 1,
+      kind: "response",
+      requestId: socket.request.requestId,
+      body: { sessions: [], hasMore: false },
+    });
+
+    await expect(pending).resolves.toEqual({ sessions: [], hasMore: false });
   });
 });

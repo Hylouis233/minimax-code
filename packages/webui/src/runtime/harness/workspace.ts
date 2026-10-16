@@ -14,6 +14,14 @@ import {
 import type { WebuiHarnessPort } from "../port.js";
 import type { WebuiRuntimeHostHandle } from "./host-contract.js";
 import { requireCliService, requireHostSlot } from "./requirements.js";
+import {
+  toWebuiCanvasApplyResult,
+  toWebuiCanvasDocument,
+  toWebuiReviewDiffs,
+  toWebuiReviewFileContent,
+  toWebuiReviewSearchResult,
+  toWebuiReviewSummary,
+} from "./result-conversion.js";
 import type {
   WebuiWorkspaceFile,
   WebuiWorkspaceFileContent,
@@ -153,7 +161,13 @@ export function createWorkspaceAdapter(
         cliService.getWorkspaceReviewSummary,
         "Workspace review summaries",
       );
-      return getWorkspaceReviewSummary.call(cliService, request.workspaceDir) as Promise<WebuiWorkspaceReviewSummary>;
+      // Converted, not asserted: the runtime answers with its own review view, and
+      // every field the panel lists is read and defaulted here so a rename on the
+      // runtime side stops at this boundary instead of becoming an undefined
+      // column three layers up.
+      return toWebuiReviewSummary(
+        await getWorkspaceReviewSummary.call(cliService, request.workspaceDir),
+      );
     },
 
     async listWorkspaceReviewFileDiffs(request) {
@@ -162,7 +176,12 @@ export function createWorkspaceAdapter(
         cliService.listWorkspaceReviewFileDiffs,
         "Workspace review file diffs",
       );
-      return listWorkspaceReviewFileDiffs.call(cliService, { ...request, fileIds: [...request.fileIds] }) as Promise<WebuiWorkspaceReviewDiffs>;
+      return toWebuiReviewDiffs(
+        await listWorkspaceReviewFileDiffs.call(cliService, {
+          ...request,
+          fileIds: [...request.fileIds],
+        }),
+      );
     },
 
     async getWorkspaceReviewFileContent(request) {
@@ -171,7 +190,9 @@ export function createWorkspaceAdapter(
         cliService.getWorkspaceReviewFileContent,
         "Workspace review file content",
       );
-      return getWorkspaceReviewFileContent.call(cliService, request) as Promise<WebuiWorkspaceReviewFileContent>;
+      return toWebuiReviewFileContent(
+        await getWorkspaceReviewFileContent.call(cliService, request),
+      );
     },
 
     async searchWorkspaceReviewDiffs(request) {
@@ -180,23 +201,29 @@ export function createWorkspaceAdapter(
         cliService.searchWorkspaceReviewDiffs,
         "Workspace review search",
       );
-      return searchWorkspaceReviewDiffs.call(cliService, request) as Promise<WebuiWorkspaceReviewSearchResult>;
+      return toWebuiReviewSearchResult(
+        await searchWorkspaceReviewDiffs.call(cliService, request),
+      );
     },
 
     async readCanvas(request) {
       const cliService = requireCliService(host);
-      return requireHostSlot(cliService.readCanvas, "canvas documents").call(
-        cliService,
-        request,
-      ) as Promise<WebuiCanvasDocument>;
+      return toWebuiCanvasDocument(
+        await requireHostSlot(cliService.readCanvas, "canvas documents").call(
+          cliService,
+          request,
+        ),
+      );
     },
 
     async applyCanvas(request) {
       const cliService = requireCliService(host);
-      return requireHostSlot(cliService.applyCanvas, "canvas writes").call(
-        cliService,
-        request as never,
-      ) as Promise<{ readonly operationId: string; readonly document: WebuiCanvasDocument }>;
+      return toWebuiCanvasApplyResult(
+        await requireHostSlot(cliService.applyCanvas, "canvas writes").call(
+          cliService,
+          request as never,
+        ),
+      );
     },
   };
 }

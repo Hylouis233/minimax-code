@@ -130,8 +130,9 @@ async function call(url: string, operation: string, body?: unknown): Promise<Rec
 
 describe("personalization operations reach the harness port through the service", () => {
   // Each of these fails if its forwarding line is dropped from the projection
-  // in `service.ts`, because the frame then comes back as a harness_error whose
-  // message is the "runtime host does not expose" guard.
+  // in `service.ts`, because the frame then comes back as a
+  // `capability_unavailable` refusal whose message is the "runtime host does not
+  // expose" guard.
   it.each([
     ["getGlobalInstructions", undefined, INSTRUCTIONS],
     ["setGlobalInstructions", { content: "# x\n" }, INSTRUCTIONS],
@@ -156,9 +157,13 @@ describe("personalization operations reach the harness port through the service"
     const url = await serve(portWithPersonalization({ getAgentMemory: undefined }));
     const frame = await call(url, "getAgentMemory", undefined);
 
+    // `capability_unavailable`, not `harness_error`: this host has no such
+    // capability and will not grow one, which is a different fact from a
+    // supported capability that failed. A client can now hide the control on the
+    // first and offer a retry on the second.
     expect(frame).toMatchObject({
       kind: "error",
-      code: WebuiErrorCode.harnessError,
+      code: WebuiErrorCode.capabilityUnavailable,
       requestId: "probe-getAgentMemory",
     });
     expect(String(frame.message)).toContain("does not expose agent memory");
@@ -177,7 +182,7 @@ describe("personalization operations reach the harness port through the service"
 
     expect(frame).toMatchObject({
       kind: "error",
-      code: WebuiErrorCode.harnessError,
+      code: WebuiErrorCode.capabilityUnavailable,
       requestId: `probe-${operation}`,
     });
     expect(String(frame.message)).toContain(expectedMessage);

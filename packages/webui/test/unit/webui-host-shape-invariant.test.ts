@@ -475,9 +475,13 @@ describe("WebUI host-shape invariant (batch C seam)", () => {
       },
     } as never;
     const port = createHarnessPortFromHost(host);
-    await expect(port.getWorkspaceReviewSummary({ workspaceDir: "/repo" })).resolves.toBe(summary);
-    await expect(port.listWorkspaceReviewFileDiffs({ workspaceDir: "/repo", reviewSnapshotId: "snapshot-7", fileIds: ["file-1"] })).resolves.toBe(fileDiffs);
-    await expect(port.getWorkspaceReviewFileContent({ workspaceDir: "/repo", reviewSnapshotId: "snapshot-7", fileId: "file-1", side: "new" })).resolves.toMatchObject({ reviewSnapshotId: "snapshot-7" });
+    // Equal, not identical: the adapter now *converts* each review answer rather
+    // than forwarding the runtime's own object, so it rebuilds the fields the
+    // wire contract declares. That is the point — a rename or a mistyped field on
+    // the runtime side now stops here instead of reaching a panel.
+    await expect(port.getWorkspaceReviewSummary({ workspaceDir: "/repo" })).resolves.toEqual(summary);
+    await expect(port.listWorkspaceReviewFileDiffs({ workspaceDir: "/repo", reviewSnapshotId: "snapshot-7", fileIds: ["file-1"] })).resolves.toEqual(fileDiffs);
+    await expect(port.getWorkspaceReviewFileContent({ workspaceDir: "/repo", reviewSnapshotId: "snapshot-7", fileId: "file-1", side: "new" })).resolves.toMatchObject({ fileId: "file-1", side: "new" });
     await expect(port.searchWorkspaceReviewDiffs({ workspaceDir: "/repo", reviewSnapshotId: "snapshot-7", query: "needle", includeUntrackedFiles: true })).resolves.toMatchObject({ reviewSnapshotId: "snapshot-7" });
     expect(calls).toEqual([
       { method: "summary", request: "/repo" },

@@ -84,7 +84,6 @@ import type {
   WebuiGoalPatchRequest,
 } from "../../shared/contracts/goal.js";
 import type { WebuiMemorySettingsView } from "../../shared/contracts/personalization.js";
-import type { CliService } from "@mavis/local-runtime-v2/cli-service";
 
 /**
  * The members the WebUI forwards to the runtime `cliService`. The runtime
@@ -197,12 +196,40 @@ export interface WebuiRuntimeCliService {
   extractWorkspaceArchive?(request: { readonly workspaceDir: string; readonly path: string; readonly destination: string; readonly prefix?: string }): Promise<WebuiWorkspaceArchiveExtractResult>;
   getWorkspaceGitEnvironment?(workspaceDir: string): Promise<{ readonly metadata: Record<string, unknown>; readonly changes: Record<string, unknown> }>;
   mutateWorkspaceGit?(request: WebuiWorkspaceGitMutationRequest): Promise<Record<string, unknown>>;
-  getWorkspaceReviewSummary?(workspaceDir: string): Promise<WebuiWorkspaceReviewSummary>;
-  listWorkspaceReviewFileDiffs?(input: { readonly workspaceDir: string; readonly reviewSnapshotId: string; readonly fileIds: string[] }): Promise<WebuiWorkspaceReviewDiffs>;
-  getWorkspaceReviewFileContent?(input: { readonly workspaceDir: string; readonly reviewSnapshotId: string; readonly fileId: string; readonly side: "old" | "new" }): Promise<WebuiWorkspaceReviewFileContent>;
-  searchWorkspaceReviewDiffs?(input: { readonly workspaceDir: string; readonly reviewSnapshotId: string; readonly query: string; readonly includeUntrackedFiles: boolean; readonly pageIndex?: number; readonly pageSize?: number }): Promise<WebuiWorkspaceReviewSearchResult>;
-  readCanvas?(request: { readonly sessionId: string }): Promise<WebuiCanvasDocument>;
-  applyCanvas?(request: { readonly sessionId: string; readonly operation: Record<string, unknown> }): Promise<{ readonly operationId: string; readonly document: WebuiCanvasDocument }>;
+  /**
+   * The review and canvas members below answer with the runtime's own view
+   * types, not with the WebUI's wire projections. That is deliberate: the
+   * adapter owns the conversion (see `result-conversion.ts`), and declaring the
+   * WebUI's shape here would have made the runtime's answer structurally
+   * incompatible with the declaration it is checked against — which is what the
+   * assembly's single whole-layer assertion used to paper over.
+   *
+   * They are therefore declared as records, which is the honest statement of
+   * "the runtime decides the shape and the adapter reads it". A member whose
+   * answer the adapter passes through unchanged keeps its precise type below.
+   */
+  getWorkspaceReviewSummary?(workspaceDir: string): Promise<unknown>;
+  listWorkspaceReviewFileDiffs?(input: {
+    workspaceDir: string;
+    reviewSnapshotId: string;
+    fileIds?: string[];
+  }): Promise<unknown>;
+  getWorkspaceReviewFileContent?(input: {
+    workspaceDir: string;
+    reviewSnapshotId: string;
+    fileId: string;
+    side: "old" | "new";
+  }): Promise<unknown>;
+  searchWorkspaceReviewDiffs?(input: {
+    workspaceDir: string;
+    reviewSnapshotId: string;
+    query: string;
+    includeUntrackedFiles: boolean;
+    pageIndex?: number;
+    pageSize?: number;
+  }): Promise<unknown>;
+  readCanvas?(request: { readonly sessionId: string }): Promise<unknown>;
+  applyCanvas?(request: { readonly sessionId: string; readonly operation: Record<string, unknown> }): Promise<unknown>;
   sendMessage(
     request: WebuiSendMessageRequest,
     context?: { readonly signal?: AbortSignal },
@@ -294,14 +321,29 @@ export interface WebuiRuntimeCliService {
     readonly proactive?: boolean;
   }): Promise<WebuiMemorySettingsView>;
   /**
-   * Derived from the runtime's own service: the application contract is
-   * `models.select(input): Promise<boolean>`, so the adapter maps that verdict to
-   * the wire's `{ success }` instead of forwarding it. Declaring
-   * `Promise<{ success?: boolean }>` here (as this mirror did) is exactly what
-   * made the raw forward look correct while the client's refusal check could not
-   * fire.
+   * The model selection the runtime answers with a verdict, not an object.
+   *
+   * Declared here rather than as `CliService["selectModel"]`: this file is the
+   * WebUI's own statement of the runtime surface, and reaching into the runtime
+   * package's types made the WebUI's boundary a function of a type it does not
+   * own — a rename on the runtime side would then move the WebUI's result
+   * contract, which is supposed to stay independently owned. The runtime's
+   * signature is `{ providerId, modelId, variant?, contextLimit?, sessionId? }`
+   * in, `Promise<boolean>` out; this is that, written down.
+   *
+   * The application contract is `models.select(input): Promise<boolean>`, so the
+   * adapter maps that verdict to the wire's `{ success }` instead of forwarding
+   * it. Declaring `Promise<{ success?: boolean }>` here (as this mirror once did)
+   * is exactly what made the raw forward look correct while the client's refusal
+   * check could not fire.
    */
-  selectModel: CliService["selectModel"];
+  selectModel(input: {
+    readonly providerId: string;
+    readonly modelId: string;
+    readonly variant?: string;
+    readonly contextLimit?: number;
+    readonly sessionId?: string;
+  }): Promise<boolean>;
   getSessionUsage(request: {
     readonly id: string;
   }): Promise<Record<string, unknown>>;

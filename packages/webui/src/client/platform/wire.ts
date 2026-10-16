@@ -21,6 +21,12 @@ import type {
   WebuiUnaryOperationName,
 } from "../../shared/operation-names.js";
 import {
+  decodeWebuiServerFrame,
+  WebuiErrorCode,
+  WebuiWireError,
+  type WebuiFrameRejectionReason,
+} from "../../shared/envelope.js";
+import {
   createWebuiEventChannel,
   type WebuiClientEventWatcher,
   type WebuiSocket,
@@ -49,12 +55,48 @@ export interface WebuiWireSession {
  * `frame` is optional, because the three call shapes below disagree about what a
  * parse failure, a close or a socket error means — `watchTerminal` ignores all
  * three, a unary request rejects on all three.
+ *
+ * `invalidFrame` receives the *reason*, not just the fact. A caller that cannot
+ * tell "the service said something that was not JSON" from "the service speaks a
+ * different protocol version" from "the frame claims this version and is
+ * malformed" cannot decide what to do about any of them.
  */
 interface WebuiWireHandlers {
   readonly frame: (session: WebuiWireSession, frame: WireFrame) => void;
-  readonly invalidFrame?: (session: WebuiWireSession) => void;
+  readonly invalidFrame?: (
+    session: WebuiWireSession,
+    reason: WebuiFrameRejectionReason,
+  ) => void;
   readonly closed?: (session: WebuiWireSession) => void;
   readonly failed?: (session: WebuiWireSession) => void;
+}
+
+/**
+ * The refusal a frame that could not be decoded earns.
+ *
+ * The messages are diagnostic, not product copy — the branchable half is the
+ * code, and these match the English wording the rest of this module already uses
+ * for its transport failures, so a socket problem reads the same way whichever
+ * side noticed it.
+ */
+function rejectionError(reason: WebuiFrameRejectionReason, operation: string): WebuiWireError {
+  switch (reason) {
+    case "invalid_json":
+      return new WebuiWireError(
+        WebuiErrorCode.invalidEnvelope,
+        `${operation} returned invalid JSON`,
+      );
+    case "protocol_mismatch":
+      return new WebuiWireError(
+        WebuiErrorCode.protocolMismatch,
+        `${operation} returned a frame from a different WebUI protocol version`,
+      );
+    default:
+      return new WebuiWireError(
+        WebuiErrorCode.invalidEnvelope,
+        `${operation} returned a frame that does not match the WebUI envelope`,
+      );
+  }
 }
 
 function defaultWebSocket(): new (url: string) => WebuiSocket {
@@ -136,15 +178,22 @@ export function createWebuiWire({
       ),
     );
     ws.addEventListener("message", (event) => {
-      let frame: WireFrame;
-      try {
-        frame = JSON.parse(String(event.data)) as WireFrame;
-      } catch {
-        handlers.invalidFrame?.(session);
+      // Every inbound frame is judged here, once, by the shared decoder: parse,
+      // then protocol version, then kind, then the identity it claims. The client
+      // used to `JSON.parse(...) as WireFrame` and check nothing else, so a
+      // service speaking a different protocol version was read as though it had
+      // answered, and a frame that merely *claimed* to be a response was treated
+      // as one.
+      const decoded = decodeWebuiServerFrame(String(event.data));
+      if (!decoded.ok) {
+        handlers.invalidFrame?.(session, decoded.reason);
         return;
       }
-      if (frame.requestId !== requestId) return;
-      handlers.frame(session, frame);
+      // An unrelated named response belongs to another request on another socket.
+      // Dropping it is the only correct action: it is not an error, and settling
+      // this request with it would answer the wrong question.
+      if (decoded.frame.requestId !== requestId) return;
+      handlers.frame(session, decoded.frame);
     });
     ws.addEventListener("close", () => handlers.closed?.(session));
     ws.addEventListener("error", () => handlers.failed?.(session));
@@ -168,7 +217,14 @@ export function createWebuiWire({
       const session = openWireSession(operation, body, {
         frame: (session, frame) => {
           if (frame.kind === "error") {
-            fail(session, new Error(frame.message ?? "WebUI request refused"));
+            // The service's own code travels with the refusal. This is what lets a
+            // caller branch on `shutting_down` or `unknown_operation` without
+            // matching on an English message, and it keeps an unfamiliar but
+            // stable code intact instead of turning every refusal into one shape.
+            fail(
+              session,
+              new WebuiWireError(frame.code, frame.message, frame.requestId),
+            );
             return;
           }
           if (frame.kind !== "response") return;
@@ -177,7 +233,7 @@ export function createWebuiWire({
           session.close();
           resolve(frame.body as OperationSpec[K]["response"]);
         },
-        invalidFrame: (session) => fail(session, new Error("WebUI returned invalid JSON")),
+        invalidFrame: (session, reason) => fail(session, rejectionError(reason, operation)),
         closed: (session) =>
           fail(session, new Error("WebUI connection closed before the response")),
         failed: (session) => fail(session, new Error("WebUI connection failed")),
@@ -218,7 +274,10 @@ export function createWebuiWire({
         frame: (session, frame) => {
           if (detached) return;
           if (frame.kind === "error") {
-            fail(session, new Error(frame.message ?? `${operation} refused`));
+            fail(
+              session,
+              new WebuiWireError(frame.code, frame.message ?? `${operation} refused`, frame.requestId),
+            );
             return;
           }
           if (frame.kind !== "event") return;
@@ -230,7 +289,7 @@ export function createWebuiWire({
             resolve();
           }
         },
-        invalidFrame: (session) => fail(session, new Error("WebUI returned invalid JSON")),
+        invalidFrame: (session, reason) => fail(session, rejectionError(reason, operation)),
         closed: (session) => fail(session, new Error("WebUI connection closed before [DONE]")),
         failed: (session) => fail(session, new Error("WebUI connection failed")),
       });

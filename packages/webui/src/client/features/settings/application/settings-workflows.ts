@@ -42,6 +42,7 @@ import {
   type WebuiResourceKey,
   type WebuiResourceLoadOutcome,
 } from "../../../conversation/request-freshness.js";
+import { WebuiErrorCode } from "../../../../shared/envelope.js";
 import {
   type SettingsPort,
   type WebuiPermissionMode,
@@ -254,13 +255,21 @@ export function createWebuiSettingsWorkflows(deps: {
     field: Field,
     resource: WebuiKeyedResource<T>,
     key: WebuiResourceKey,
+    capability: string,
     fetch: () => Promise<T>,
   ): Promise<WebuiResourceLoadOutcome<T>> => {
     resource.subscribe(() => {
       const entry = resource.read(key);
       set((current) => withQuery(current, field, entry ?? idleWebuiQueryState()));
     });
-    return resource.load(key, fetch);
+    return resource.load(key, fetch).then((outcome) => {
+      // A host that says it cannot answer at all is recorded as not supporting
+      // the capability, so the surface stops offering a control that would keep
+      // refusing. A failure from a supported capability is left alone: that one
+      // is worth retrying and must not hide the control.
+      if (outcome.status === "failed") markRefused(capability, outcome.error);
+      return outcome;
+    });
   };
 
   const instructions = createWebuiKeyedResource<WebuiGlobalInstructionsView>();
@@ -321,6 +330,31 @@ export function createWebuiSettingsWorkflows(deps: {
     return Promise.resolve({ status: "failed", error: reason });
   };
 
+  /**
+   * Which capabilities this host has told us it does not implement.
+   *
+   * The reason this exists: `port.getAgentMemory !== undefined` answers "does
+   * this client stub have the method", and in the real application the answer is
+   * always yes — the transport's table names every operation the protocol
+   * defines. Reading that as "the host supports it" is how the 记忆 panel
+   * rendered on a host with no memory capability, and how every such host looked
+   * identical to one where the feature was present but failing.
+   *
+   * A host that refuses with `capability_unavailable` is the only thing that can
+   * answer the question, so the answer is recorded when one does. It stays
+   * recorded: a host does not grow a capability while the page is open, and a
+   * control that flickers back on each time the owner is rebuilt is worse than
+   * one that stays hidden.
+   */
+  const refusedCapabilities = new Set<string>();
+  const isSupported = (capability: string, present: boolean): boolean =>
+    present && !refusedCapabilities.has(capability);
+
+  const markRefused = (capability: string, error: unknown): void => {
+    const code = error && typeof error === "object" ? (error as { readonly code?: unknown }).code : undefined;
+    if (code === WebuiErrorCode.capabilityUnavailable) refusedCapabilities.add(capability);
+  };
+
   const markRevision = (): void => {
     set((current) => ({ ...current, revision: current.revision + 1 }));
   };
@@ -332,7 +366,7 @@ export function createWebuiSettingsWorkflows(deps: {
       unavailable("instructions", "当前运行时不支持自定义指令读写。");
       return unsupported("当前运行时不支持自定义指令读写。");
     }
-    return readInto("instructions", instructions, { read: "instructions" }, () =>
+    return readInto("instructions", instructions, { read: "instructions" }, "instructions", () =>
       port.getGlobalInstructions!(),
     );
   };
@@ -351,7 +385,7 @@ export function createWebuiSettingsWorkflows(deps: {
       unavailable("profile", "当前运行时不支持「关于你」读写。");
       return unsupported("当前运行时不支持「关于你」读写。");
     }
-    return readInto("profile", profile, { read: "profile" }, () => port.getUserProfile!());
+    return readInto("profile", profile, { read: "profile" }, "profile", () => port.getUserProfile!());
   };
 
   const saveProfile = async (fields: WebuiUserProfileFields): Promise<WebuiUserProfileView> => {
@@ -383,12 +417,14 @@ export function createWebuiSettingsWorkflows(deps: {
           "agentMemoryContent",
           memoryContent,
           { read: "agentMemory", content: true },
+          "agentMemory",
           () => port.getAgentMemory!({ includeContent: true }),
         )
       : readInto(
           "agentMemorySummary",
           memorySummary,
           { read: "agentMemory", content: false },
+          "agentMemory",
           () => port.getAgentMemory!(),
         );
   };
@@ -417,7 +453,7 @@ export function createWebuiSettingsWorkflows(deps: {
       unavailable("memorySettings", "当前运行时不支持记忆开关。");
       return unsupported("当前运行时不支持记忆开关。");
     }
-    return readInto("memorySettings", memorySettings, { read: "memorySettings" }, () =>
+    return readInto("memorySettings", memorySettings, { read: "memorySettings" }, "memorySettings", () =>
       port.getMemorySettings!(),
     );
   };
@@ -454,7 +490,7 @@ export function createWebuiSettingsWorkflows(deps: {
       unavailable("modelSource", "当前运行时不支持模型来源。");
       return unsupported("当前运行时不支持模型来源。");
     }
-    return readInto("modelSource", modelSource, { read: "modelSource" }, () =>
+    return readInto("modelSource", modelSource, { read: "modelSource" }, "modelSource", () =>
       port.getMiniMaxModelSource!(),
     );
   };
@@ -473,7 +509,7 @@ export function createWebuiSettingsWorkflows(deps: {
       unavailable("runtimeVersion", "当前运行时不支持版本信息。");
       return unsupported("当前运行时不支持版本信息。");
     }
-    return readInto("runtimeVersion", runtimeVersion, { read: "version" }, () => read());
+    return readInto("runtimeVersion", runtimeVersion, { read: "version" }, "version", () => read());
   };
 
   /**
@@ -495,7 +531,7 @@ export function createWebuiSettingsWorkflows(deps: {
       unavailable("permissionMode", "当前运行时不支持授权模式读写。");
       return unsupported("当前运行时不支持授权模式读写。");
     }
-    return readInto("permissionMode", permissionMode, { read: "permissionMode" }, async () => {
+    return readInto("permissionMode", permissionMode, { read: "permissionMode" }, "permissionMode", async () => {
       const mode = readWebuiPermissionMode(await read());
       if (!mode) throw new Error("运行时返回了不支持的授权模式");
       return mode;
@@ -517,20 +553,23 @@ export function createWebuiSettingsWorkflows(deps: {
   return {
     getSnapshot,
     subscribe,
-    canReadInstructions: port.getGlobalInstructions !== undefined,
-    canWriteInstructions: port.setGlobalInstructions !== undefined,
-    canReadProfile: port.getUserProfile !== undefined,
-    canWriteProfile: port.setUserProfile !== undefined,
-    canReadMemory: port.getAgentMemory !== undefined,
-    canWriteMemory: port.setAgentMemory !== undefined,
-    canReadMemorySettings: port.getMemorySettings !== undefined,
-    canWriteMemorySettings: port.setMemorySettings !== undefined,
-    canStartCodexOAuth: port.startCodexOAuthLogin !== undefined,
-    canReadModelSource: port.getMiniMaxModelSource !== undefined,
-    canSetModelSource: port.setMiniMaxModelSource !== undefined,
-    canReadVersion: port.version !== undefined,
-    canReadPermissionMode: port.getPermissionMode !== undefined,
-    canWritePermissionMode: port.setPermissionMode !== undefined,
+    // Live, not computed once: a capability the host has refused is one this host
+    // does not implement, and a surface reading a flag frozen at construction
+    // would keep offering a control that has just proved it cannot work.
+    get canReadInstructions() { return isSupported("instructions", port.getGlobalInstructions !== undefined); },
+    get canWriteInstructions() { return isSupported("instructions", port.setGlobalInstructions !== undefined); },
+    get canReadProfile() { return isSupported("profile", port.getUserProfile !== undefined); },
+    get canWriteProfile() { return isSupported("profile", port.setUserProfile !== undefined); },
+    get canReadMemory() { return isSupported("agentMemory", port.getAgentMemory !== undefined); },
+    get canWriteMemory() { return isSupported("agentMemory", port.setAgentMemory !== undefined); },
+    get canReadMemorySettings() { return isSupported("memorySettings", port.getMemorySettings !== undefined); },
+    get canWriteMemorySettings() { return isSupported("memorySettings", port.setMemorySettings !== undefined); },
+    get canStartCodexOAuth() { return isSupported("codexOAuth", port.startCodexOAuthLogin !== undefined); },
+    get canReadModelSource() { return isSupported("modelSource", port.getMiniMaxModelSource !== undefined); },
+    get canSetModelSource() { return isSupported("modelSource", port.setMiniMaxModelSource !== undefined); },
+    get canReadVersion() { return isSupported("version", port.version !== undefined); },
+    get canReadPermissionMode() { return isSupported("permissionMode", port.getPermissionMode !== undefined); },
+    get canWritePermissionMode() { return isSupported("permissionMode", port.setPermissionMode !== undefined); },
     loadInstructions,
     saveInstructions,
     loadProfile,

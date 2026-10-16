@@ -13,6 +13,10 @@
 // handlers and the tests keep their import path.
 import type { WebuiHarnessPort } from "../../runtime/port.js";
 import type { OperationSpec } from "../../shared/operation-names.js";
+import {
+  WebuiCapabilityUnavailableError,
+  WebuiErrorCode,
+} from "../../shared/envelope.js";
 import type {
   WebuiOperationContext,
   WebuiOperationRegistryEntry,
@@ -283,7 +287,17 @@ export interface WebuiOperationBinding<
   readonly missing: MissingPolicy;
 }
 
-/** The default policy for a capability that the port type requires. */
+/**
+ * The default policy for a capability that the port type requires.
+ *
+ * Both branches name the same stable code, so the refusal survives the trip to
+ * the browser as "this host cannot answer this operation" rather than as an
+ * unlabelled `Error` whose only distinguishing feature was its English text. A
+ * client that cannot tell an absent capability from a failing one has one option
+ * — show an error and retry — which is wrong in both directions: it nags about a
+ * feature that will never appear, and it hides the retry for one that would have
+ * worked.
+ */
 function requiredPolicy(method: PropertyKey): MissingPolicy {
   const message = `port.${String(method)} is not a function`;
   return {
@@ -351,9 +365,15 @@ export function executeBinding<
       if (typeof capability !== "function") {
         const policy =
           capability === undefined ? binding.missing.absent : binding.missing.nonCallable;
+        // The code is what tells a client this host cannot answer at all, as
+        // opposed to one that answered and failed. The error class still
+        // reproduces exactly what the policy declared, because some callers
+        // distinguish a missing capability by `TypeError` today.
         throw policy.kind === "Error"
-          ? new Error(policy.message)
-          : new TypeError(policy.message);
+          ? new WebuiCapabilityUnavailableError(policy.message)
+          : Object.assign(new TypeError(policy.message), {
+              code: WebuiErrorCode.capabilityUnavailable,
+            });
       }
       // The binding carries the method key and its parameter tuple together;
       // restore that exact indexed signature after the runtime presence check.

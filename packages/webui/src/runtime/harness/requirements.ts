@@ -6,13 +6,8 @@
 // call. The port's optional hooks are resolved here, never during assembly.
 import type { WebuiRuntimeHostHandle, WebuiRuntimeCliService } from "./host-contract.js";
 import type { WebuiMemorySettingsView } from "../../shared/contracts/personalization.js";
+import { WebuiCapabilityUnavailableError } from "../../shared/envelope.js";
 
-/**
- * Resolve the runtime host's `cliService` slot. Every harness port method
- * that has no equivalent on the auth/quota/check-in side flows through this
- * helper so the failure message is the same as it was before the batch-C
- * seam work.
- */
 /**
  * Resolve one optional host slot, or fail with the uniform message.
  *
@@ -23,7 +18,7 @@ import type { WebuiMemorySettingsView } from "../../shared/contracts/personaliza
  * ended up as non-null assertions instead.
  */
 export function requireHostSlot<T>(value: T | undefined, what: string): T {
-  if (!value) throw new Error(`runtime host does not expose ${what}`);
+  if (!value) throw new WebuiCapabilityUnavailableError(`runtime host does not expose ${what}`);
   return value;
 }
 

@@ -1,32 +1,48 @@
 import type { WebSocket } from "ws";
-import { isWebuiFrame } from "../envelope.js";
+import { judgeWebuiFrame } from "../envelope.js";
 import {
   WebuiErrorCode,
   WEBUI_PROTOCOL_VERSION,
   type WebuiErrorFrame,
   type WebuiEventFrame,
   type WebuiResponseFrame,
+  type WebuiWireErrorCode,
 } from "../../shared/envelope.js";
 import type { WebuiOperationRegistryEntry } from "./operations.js";
 
+/**
+ * The stable code a thrown failure carries, if it names one.
+ *
+ * A capability that answers a refusal with its own code has said something more
+ * precise than "harness error", and the client's correct response to that is not
+ * to flatten it into one. This was the rule before: only the eight codes in
+ * `WebuiErrorCode` survived and everything else became `harness_error`, so a
+ * runtime's stable code was discarded on its way to the browser.
+ */
+function stableCodeOf(error: unknown): WebuiWireErrorCode {
+  if (error && typeof error === "object") {
+    const code = (error as { readonly code?: unknown }).code;
+    if (typeof code === "string" && code) return code;
+  }
+  return WebuiErrorCode.harnessError;
+}
+
 export async function dispatchWebuiFrame(
   ws: WebSocket,
-  parsed: unknown,
+  incoming: unknown,
   operations: ReadonlyMap<string, WebuiOperationRegistryEntry>,
   accepting: boolean,
   getSignal: () => AbortSignal | undefined,
 ): Promise<void> {
-    if (!isWebuiFrame(parsed)) {
-      sendFrame(
-        ws,
-        errorFrame(
-          "anonymous",
-          WebuiErrorCode.protocolMismatch,
-          "frame does not match the WebUI envelope",
-        ),
-      );
+    const judgement = judgeWebuiFrame(incoming);
+    if (!judgement.ok) {
+      // An unusable frame carries no trustworthy identity, so the refusal is
+      // anonymous: attributing it to a requestId we could not verify would tell
+      // one request it had failed when the frame was never about it.
+      sendFrame(ws, errorFrame("anonymous", judgement.code, judgement.message));
       return;
     }
+    const parsed = judgement.frame;
     if (parsed.kind !== "request") {
       sendFrame(
         ws,
@@ -136,17 +152,11 @@ export async function dispatchWebuiFrame(
       sendFrame(ws, responseFrame(parsed.requestId, result.body));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const errorCode =
-        error && typeof error === "object" &&
-        typeof (error as { readonly code?: unknown }).code === "string" &&
-        Object.values(WebuiErrorCode).includes(
-          (error as { readonly code: string }).code as (typeof WebuiErrorCode)[keyof typeof WebuiErrorCode],
-        )
-          ? ((error as { readonly code: string }).code as (typeof WebuiErrorCode)[keyof typeof WebuiErrorCode])
-          : WebuiErrorCode.harnessError;
+      // The capability's own stable code is preserved; only a failure that names
+      // no code at all becomes `harness_error`.
       sendFrame(
         ws,
-        errorFrame(parsed.requestId, errorCode, message),
+        errorFrame(parsed.requestId, stableCodeOf(error), message),
       );
     }
 }

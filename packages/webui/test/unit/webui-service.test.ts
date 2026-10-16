@@ -571,6 +571,7 @@ class SilentOpenSocket {
     queueMicrotask(() =>
       this.emit("message", {
         data: JSON.stringify({
+          protocolVersion: 1,
           kind: "response",
           requestId: request.requestId,
           body: { ok: true },
@@ -1393,7 +1394,10 @@ describe("WebUI service", () => {
     expect(sentPayload?.requestId).toBeTypeOf("string");
     expect(readyCount).toBe(0);
 
+    // The service stamps every frame it writes with the protocol version, and
+    // the client now checks it rather than trusting whatever arrives.
     socketRef?.deliver({
+      protocolVersion: 1,
       kind: "response",
       requestId: sentPayload?.requestId,
       body: { ok: true },
@@ -1402,7 +1406,10 @@ describe("WebUI service", () => {
     expect(readyCount).toBe(1);
 
     // One signal per connection: a duplicate response must not re-probe.
+    // The service stamps every frame it writes with the protocol version, and
+    // the client now checks it rather than trusting whatever arrives.
     socketRef?.deliver({
+      protocolVersion: 1,
       kind: "response",
       requestId: sentPayload?.requestId,
       body: { ok: true },

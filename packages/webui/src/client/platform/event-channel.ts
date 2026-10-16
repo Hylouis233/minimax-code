@@ -17,6 +17,10 @@ import {
   unregisterWebuiEventWatcher,
 } from "./connection-health.js";
 import type { WebuiRuntimeEvent } from "../../shared/contracts/stream.js";
+import {
+  decodeWebuiServerFrame,
+  type WebuiWireErrorCode,
+} from "../../shared/envelope.js";
 import type {WebuiClientEventWatcher} from "../features/shell/contracts/watch-port.js";
 
 export type { WebuiClientEventWatcher };
@@ -32,16 +36,24 @@ declare const window: {
 };
 
 /**
- * One decoded frame off the socket, before it is classified as a response or
- * an event. `transport.ts` decodes the same frames for the request/stream and
- * terminal sockets and imports this shape rather than restating it.
+ * One frame off the socket that has already been judged by the shared decoder:
+ * its version, kind and identity are known good, and an `error` frame carries
+ * the service's own code. `wire.ts` decodes the same frames for the
+ * request/stream and terminal sockets and imports this shape rather than
+ * restating it.
  */
-export type WireFrame = {
-  readonly kind: string;
-  readonly requestId: string;
-  readonly body?: unknown;
-  readonly message?: string;
-};
+export type WireFrame =
+  | {
+      readonly kind: "response" | "event";
+      readonly requestId: string;
+      readonly body?: unknown;
+    }
+  | {
+      readonly kind: "error";
+      readonly requestId: string;
+      readonly code: WebuiWireErrorCode;
+      readonly message: string;
+    };
 
 export interface WebuiSocket {
   addEventListener(
@@ -107,12 +119,13 @@ export function createWebuiEventChannel({
       });
       ws.addEventListener("message", (event) => {
         if (stopped) return;
-        let frame: WireFrame;
-        try {
-          frame = JSON.parse(String(event.data)) as WireFrame;
-        } catch {
-          return;
-        }
+        // Judged by the same decoder the request sockets use. The event channel
+        // used to parse and trust whatever arrived, so a frame from a different
+        // protocol version counted as a live event and marked the connection
+        // healthy.
+        const decoded = decodeWebuiServerFrame(String(event.data));
+        if (!decoded.ok) return;
+        const frame = decoded.frame;
         if (frame.requestId !== requestId) return;
         if (frame.kind === "error") return;
         if (frame.kind === "response") {

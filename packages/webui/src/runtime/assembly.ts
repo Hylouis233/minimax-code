@@ -434,17 +434,6 @@ const defaultWebuiRuntimeHostFactory: WebuiRuntimeHostFactory = async (
   options,
 ) => {
   const { createLocalRuntimeHostV2 } = await import("@mavis/local-runtime-v2");
-  // The remaining assertion, and it is not about the options: the factory takes
-  // the runtime's own `CreateLocalRuntimeHostOptions` (checked above, no cast
-  // needed) but returns the runtime's `CreatedLocalRuntimeHost`, whose
-  // `cliService` is the real `CliService`. `WebuiRuntimeCliService` still
-  // declares the WebUI's wire projections of the *results*
-  // (`WebuiSessionPage`, `WebuiMessagesResult`, ...), which the runtime's view
-  // types (`SessionPage`, `GetMessagesResult`, ...) do not satisfy — measured at
-  // 40 incompatible members. Replacing those projections with a per-member
-  // derivation plus an explicit runtime -> wire conversion is the rest of this
-  // work; until it lands, the cast is where that difference is stated instead of
-  // being hidden in the mirror.
   return (await createLocalRuntimeHostV2(options)) as unknown as Omit<
     WebuiAssembledHost,
     | "invalidateAuth"
