@@ -14,7 +14,7 @@ import {
   buildAbortedTerminalStatusEvent,
 } from '@mavis/agent-core/event-bridge';
 import { getRuntimeBuildEnv } from '@mavis/config';
-import { RuntimeEventStatus, RuntimeEventType } from '@mavis/protocol';
+import { RuntimeEventStatus, RuntimeEventType, type IRuntimeEvent } from '@mavis/protocol';
 import type { MetricsClient } from '@mavis/shared/metrics-proxy';
 
 import {
@@ -33,6 +33,12 @@ import type {
 import { LocalOutputSafetyEventWriter } from './output-safety-event-writer.js';
 import { runWithLocalEvalReporter, type LocalEvalReporterFactoryPort } from './eval-reporter.js';
 import { deriveLocalTurnRuntimeOutcome } from './turn-outcome.js';
+import {
+  createTurnAutoRetryCoordinator,
+  turnAutoRetrySleep,
+  type TurnAutoRetryCoordinator,
+  type TurnAutoRetryPolicy,
+} from './turn-auto-retry.js';
 import { appendSafetyReplacement } from './safety-replacement.js';
 import { DEFAULT_OUTPUT_REVISION_INSTRUCTION } from '../preparation/config/prompt-templates.js';
 
@@ -51,6 +57,17 @@ export interface LocalAgentTurnRunnerOptions {
   readonly onLLMRequestFailure?: PiLLMRequestFailureHook;
   readonly observeLLMRequest?: PiLLMRequestObserver;
   readonly evalReporterFactory?: LocalEvalReporterFactoryPort;
+  /**
+   * Turn-level automatic retry budget for transient turn failures. Defaults to
+   * {@link DEFAULT_TURN_AUTO_RETRY_POLICY} (10 automatic retries). A policy with
+   * `maxRetries: 0` disables the behaviour and restores the previous terminal
+   * behaviour exactly.
+   */
+  readonly turnAutoRetryPolicy?: Partial<TurnAutoRetryPolicy>;
+  /** Injectable backoff sleep; tests substitute a deterministic implementation. */
+  readonly turnAutoRetrySleep?: (delayMs: number, signal?: AbortSignal) => Promise<void>;
+  /** Injectable clock for the turn-level retry elapsed-time budget. */
+  readonly turnAutoRetryNowMs?: () => number;
   /**
    * Per-turn recorder factory for the development LLM Context Inspector; when omitted, Pi assembly
    * is identical to behavior before injection.
@@ -83,6 +100,9 @@ export class LocalAgentTurnRunner implements LocalRuntimeTurnRunnerPort {
   readonly acceptsEventSummary: boolean;
   private readonly piRunner: LocalPiTurnRunner;
   private readonly outputSafetyMaxRegenerations: number;
+  private readonly turnAutoRetryPolicy: Partial<TurnAutoRetryPolicy> | undefined;
+  private readonly turnAutoRetrySleep: (delayMs: number, signal?: AbortSignal) => Promise<void>;
+  private readonly turnAutoRetryNowMs: (() => number) | undefined;
 
   constructor(private readonly options: LocalAgentTurnRunnerOptions) {
     // Injected runners and evaluation reporters retain their full event contract.
@@ -90,13 +110,16 @@ export class LocalAgentTurnRunner implements LocalRuntimeTurnRunnerPort {
     this.piRunner = options.piRunner ?? new PiTurnRunner(buildLocalPiTurnRunnerOptions(options));
     this.outputSafetyMaxRegenerations =
       options.outputSafetyMaxRegenerations ?? OUTPUT_SAFETY_MAX_REGENERATIONS;
+    this.turnAutoRetryPolicy = options.turnAutoRetryPolicy;
+    this.turnAutoRetrySleep = options.turnAutoRetrySleep ?? turnAutoRetrySleep;
+    this.turnAutoRetryNowMs = options.turnAutoRetryNowMs;
   }
 
   async runTurn(input: LocalRuntimeTurnRunnerInput): Promise<LocalAgentTurnRunnerResult> {
     const isUserTurn =
       input.reviewUserInput !== undefined &&
       (input.caller === undefined || input.caller === 'chat' || input.caller === 'channel_feishu');
-    const observation = { regenerations: 0 };
+    const observation = { regenerations: 0, autoRetries: 0 };
     try {
       return await runWithLocalEvalReporter(
         this.options.evalReporterFactory,
@@ -105,13 +128,16 @@ export class LocalAgentTurnRunner implements LocalRuntimeTurnRunnerPort {
         this.options.logger,
       );
     } finally {
-      if (isUserTurn) this.recordRegenerations(input, observation.regenerations);
+      if (isUserTurn) {
+        this.recordRegenerations(input, observation.regenerations);
+        this.recordAutoRetries(input, observation.autoRetries);
+      }
     }
   }
 
   private async runTurnCore(
     input: LocalRuntimeTurnRunnerInput,
-    observation: { regenerations: number },
+    observation: { regenerations: number; autoRetries: number },
   ): Promise<LocalAgentTurnRunnerResult> {
     const baseToolContext = requireToolContext(input);
     const observedLlm = withLlmResponseIdentifierLogging(input.llm, {
@@ -125,7 +151,22 @@ export class LocalAgentTurnRunner implements LocalRuntimeTurnRunnerPort {
       await appendCancelledTurn(input, state);
       return buildRunnerResult(input, state);
     }
-    await this.runAttempts({ input, toolContext, observedLlm, state, observation });
+    const autoRetry = createTurnAutoRetryCoordinator(this.turnAutoRetryPolicy, {
+      ...(this.turnAutoRetryNowMs ? { nowMs: this.turnAutoRetryNowMs } : {}),
+      // `state.activeWriter` is the attempt currently in flight, so this reads
+      // the authoritative record of what the user has already been shown.
+      hasReleasedOutput: () => attemptReleasedOutput(state),
+      isAborted: () => input.signal?.aborted === true,
+    });
+    await this.runAttempts({
+      input,
+      toolContext,
+      observedLlm,
+      state,
+      observation,
+      autoRetry,
+    });
+    await this.releaseHeldFailure(input, autoRetry);
     const inputRejected = await waitForInputReview(state.inputReview, input.signal);
     if (input.signal?.aborted) return buildRunnerResult(input, state);
     if (input.deferInputReviewResolution === true && shouldReportInputReviewResolution(input)) {
@@ -148,6 +189,40 @@ export class LocalAgentTurnRunner implements LocalRuntimeTurnRunnerPort {
       );
     } catch {
       // Metrics must not change or mask the product-path outcome.
+    }
+  }
+
+  private recordAutoRetries(input: LocalRuntimeTurnRunnerInput, autoRetries: number): void {
+    if (autoRetries <= 0) return;
+    try {
+      this.options.metricsClient?.histogram('turn_auto_retries_per_user_turn', autoRetries, {
+        provider: String(input.llm.model.provider),
+        model: String(input.llm.model.id),
+        caller: input.caller ?? 'unknown',
+      });
+    } catch {
+      // Metrics must not change or mask the product-path outcome.
+    }
+  }
+
+  /**
+   * Re-publish a terminal failure that was held back while the automatic retry
+   * budget was still available. The client must always end up seeing the original
+   * error, never a synthesized "gave up" message.
+   */
+  private async releaseHeldFailure(
+    input: LocalRuntimeTurnRunnerInput,
+    autoRetry: TurnAutoRetryCoordinator,
+  ): Promise<void> {
+    const held = autoRetry.release();
+    if (!held) return;
+    try {
+      await input.eventWriter.pushRuntime(held);
+    } catch (error) {
+      this.options.logger?.warn?.(
+        { error, sessionId: input.sessionId, turnId: input.turnId },
+        'Failed to release the held turn failure after automatic retries stopped.',
+      );
     }
   }
 
@@ -175,14 +250,15 @@ export class LocalAgentTurnRunner implements LocalRuntimeTurnRunnerPort {
     readonly toolContext: LocalRuntimeTurnToolContext;
     readonly observedLlm: LLMModelConfig;
     readonly state: MutableRunnerState;
-    readonly observation: { regenerations: number };
+    readonly observation: { regenerations: number; autoRetries: number };
+    readonly autoRetry: TurnAutoRetryCoordinator;
   }): Promise<void> {
-    const { input, toolContext, observedLlm, state, observation } = scope;
+    const { input, toolContext, observedLlm, state, observation, autoRetry } = scope;
     let regenerationCount = 0;
     let attemptIndex = 0;
     while (regenerationCount <= this.outputSafetyMaxRegenerations) {
       const safetyAbort = new AbortController();
-      const safetyWriter = this.createSafetyWriter(input, state, safetyAbort);
+      const safetyWriter = this.createSafetyWriter(input, state, safetyAbort, autoRetry);
       state.activeWriter = safetyWriter;
       if (state.inputRejected) safetyWriter.block();
       state.finalAttemptEventStart = (input.eventWriter.outcome?.eventCount ?? input.eventWriter.events.length);
@@ -217,7 +293,13 @@ export class LocalAgentTurnRunner implements LocalRuntimeTurnRunnerPort {
         regenerationCount,
         attemptIndex,
       });
-      if (decision === 'break') return;
+      if (decision === 'break') {
+        if (await this.runAutomaticRetry(input, state, observation, autoRetry)) {
+          attemptIndex += 1;
+          continue;
+        }
+        return;
+      }
       attemptIndex += 1;
       if (decision === 'continue') {
         regenerationCount += 1;
@@ -226,32 +308,89 @@ export class LocalAgentTurnRunner implements LocalRuntimeTurnRunnerPort {
     }
   }
 
+  /**
+   * Re-run a turn whose retryable terminal failure was held back by the gate.
+   * Returns true when another attempt was started; false leaves the held event
+   * to be released by the caller so the original error still reaches the user.
+   */
+  private async runAutomaticRetry(
+    input: LocalRuntimeTurnRunnerInput,
+    state: MutableRunnerState,
+    observation: { regenerations: number; autoRetries: number },
+    autoRetry: TurnAutoRetryCoordinator,
+  ): Promise<boolean> {
+    if (!autoRetry.hasHeld()) return false;
+    const next = autoRetry.nextAttempt();
+    if (!next.retry) {
+      this.options.logger?.info?.(
+        {
+          sessionId: input.sessionId,
+          turnId: input.turnId,
+          reason: next.reason,
+          retries: autoRetry.retries,
+        },
+        'Automatic turn retry stopped; surfacing the original turn failure.',
+      );
+      return false;
+    }
+    this.options.logger?.info?.(
+      {
+        sessionId: input.sessionId,
+        turnId: input.turnId,
+        retryReason: next.retryReason,
+        retryAttempt: autoRetry.retries,
+        maxRetries: autoRetry.policy.maxRetries,
+        delayMs: next.delayMs,
+      },
+      'Retrying a turn after a retryable failure.',
+    );
+    observation.autoRetries += 1;
+    try {
+      await this.turnAutoRetrySleep(next.delayMs, input.signal);
+    } catch {
+      // Cancelled during backoff: never start another attempt. The hold is kept
+      // so `releaseHeldFailure` still surfaces the original terminal error.
+      return false;
+    }
+    if (input.signal?.aborted) return false;
+    // Spend the hold only now that the attempt is really about to run.
+    autoRetry.markAttemptStarted();
+    // A retried turn re-runs the whole tool loop from the committed history, so
+    // the previous attempt's event slice must not be treated as final.
+    state.finalAttemptEventStart = input.eventWriter.outcome?.eventCount ?? input.eventWriter.events.length;
+    return true;
+  }
+
   private createSafetyWriter(
     input: LocalRuntimeTurnRunnerInput,
     state: MutableRunnerState,
     safetyAbort: AbortController,
+    autoRetry: TurnAutoRetryCoordinator,
   ): LocalOutputSafetyEventWriter {
-    return new LocalOutputSafetyEventWriter(gateTerminalOnInputReview(input, state), {
-      sessionId: input.sessionId,
-      turnId: input.turnId,
-      ...(input.streamUnreviewedOutput === true && input.contentReviewRequired === false
-        ? { reviewRequired: false, checkText: async () => ({ pass: true as const }) }
-        : {
-            checkText:
-              input.contentReviewRequired === false
-                ? async () => ({ pass: true as const })
-                : this.options.reviewContent,
-          }),
-      onBlocked: () => safetyAbort.abort(state.inputRejected ? 'input_safety' : 'output_safety'),
-      ...(this.options.outputSafetyRetryDelay
-        ? { retryDelay: this.options.outputSafetyRetryDelay }
-        : {}),
-      ...(this.options.metricsClient ? { metricsClient: this.options.metricsClient } : {}),
-      ...(input.contentReviewRequired === true ? { authErrorVariant: 'auth' as const } : {}),
-      ...(input.persistApprovedPartialOnNetworkStop === false
-        ? { persistApprovedPartialOnNetworkStop: false }
-        : {}),
-    });
+    return new LocalOutputSafetyEventWriter(
+      gateTerminalOnInputReview(input, state, autoRetry),
+      {
+        sessionId: input.sessionId,
+        turnId: input.turnId,
+        ...(input.streamUnreviewedOutput === true && input.contentReviewRequired === false
+          ? { reviewRequired: false, checkText: async () => ({ pass: true as const }) }
+          : {
+              checkText:
+                input.contentReviewRequired === false
+                  ? async () => ({ pass: true as const })
+                  : this.options.reviewContent,
+            }),
+        onBlocked: () => safetyAbort.abort(state.inputRejected ? 'input_safety' : 'output_safety'),
+        ...(this.options.outputSafetyRetryDelay
+          ? { retryDelay: this.options.outputSafetyRetryDelay }
+          : {}),
+        ...(this.options.metricsClient ? { metricsClient: this.options.metricsClient } : {}),
+        ...(input.contentReviewRequired === true ? { authErrorVariant: 'auth' as const } : {}),
+        ...(input.persistApprovedPartialOnNetworkStop === false
+          ? { persistApprovedPartialOnNetworkStop: false }
+          : {}),
+      },
+    );
   }
 
   private async runPiAttempt(scope: {
@@ -507,13 +646,26 @@ function applyInputCorrection(state: MutableRunnerState, result?: SafetyCheckRes
 function gateTerminalOnInputReview(
   input: LocalRuntimeTurnRunnerInput,
   state: MutableRunnerState,
+  autoRetry: TurnAutoRetryCoordinator,
 ): PiEventWriter {
   const suppressTerminal = async (): Promise<boolean> =>
     (await waitForInputReview(state.inputReview, input.signal)) ||
     state.inputCorrectionPending ||
     input.signal?.aborted === true;
+  /**
+   * A retryable terminal failure is held back instead of being surfaced, so the
+   * attempt loop can re-run the turn. `hasHeld()` keeps only the first failure:
+   * a later attempt's failure is held again only after that one was consumed.
+   */
+  const holdsForRetry = async (event: IRuntimeEvent): Promise<boolean> => {
+    if (!isTerminalStatus(event)) return false;
+    if (autoRetry.hasHeld()) return false;
+    const held = autoRetry.hold(event, deriveLocalTurnRuntimeOutcome([event]));
+    return held.held;
+  };
   return {
     pushRuntime: async (event) => {
+      if (isTerminalStatus(event) && (await holdsForRetry(event))) return;
       if (isTerminalStatus(event) && (await suppressTerminal())) return;
       await input.eventWriter.pushRuntime(event);
     },
@@ -522,10 +674,19 @@ function gateTerminalOnInputReview(
         await input.eventWriter.appendEvents(events);
         return;
       }
-      const accepted = (await suppressTerminal())
-        ? events.filter((event) => !isTerminalStatus(event))
-        : events;
-      if (accepted.length > 0) await input.eventWriter.appendEvents(accepted);
+      const accepted: IRuntimeEvent[] = [];
+      let heldTerminal = false;
+      for (const event of events) {
+        if (isTerminalStatus(event) && !heldTerminal && (await holdsForRetry(event))) {
+          heldTerminal = true;
+          continue;
+        }
+        accepted.push(event);
+      }
+      const visible = (await suppressTerminal())
+        ? accepted.filter((event) => !isTerminalStatus(event))
+        : accepted;
+      if (visible.length > 0) await input.eventWriter.appendEvents(visible);
     },
   };
 }
@@ -538,6 +699,19 @@ function isTerminalStatus(event: Parameters<PiEventWriter['pushRuntime']>[0]): b
     status === RuntimeEventStatus.ABORTED ||
     status === RuntimeEventStatus.FAILED
   );
+}
+
+/**
+ * True once the in-flight attempt released assistant output the user has already
+ * seen. A retry re-runs the whole tool loop from committed history, so it must
+ * not be used to duplicate that content.
+ */
+function attemptReleasedOutput(state: MutableRunnerState): boolean {
+  const writer = state.activeWriter;
+  if (!writer) return false;
+  const partial = writer.getApprovedPartial();
+  if (partial.content.trim() || partial.thinking.trim()) return true;
+  return writer.getAttemptMessageIds().length > 0;
 }
 
 async function waitForInputReview(
