@@ -423,6 +423,9 @@ export function createWebuiModelsWorkflows(deps: {
     for (const provider of providers) {
       committedModels.set(provider.providerId, provider.models);
     }
+    // The answer is the committed baseline; what is *shown* also carries the intents this
+    // owner has not retired yet.
+    overlayPendingIntents();
   };
 
   /** A provider mutation refreshes the provider list and marks models stale. */
@@ -475,6 +478,31 @@ export function createWebuiModelsWorkflows(deps: {
       value: providers.map((provider) =>
         provider.providerId === providerId ? { ...provider, models } : provider,
       ),
+    });
+  };
+
+  /**
+   * Show what this owner still intends, on top of whatever the server just answered.
+   *
+   * Called after every commit of a server list, because a reload answers the *write that
+   * triggered it* and an intent captured after that write began is newer than the
+   * answer. Without this overlay the earlier write's own reload removed the later intent
+   * from the screen while its write was still pending — the display disagreeing with what
+   * the owner was about to send.
+   */
+  const overlayPendingIntents = (): void => {
+    if (pendingModels.size === 0) return;
+    const rows = projectedProviders();
+    if (!rows || rows.length === 0) return;
+    let overlaid = rows;
+    for (const [id, models] of pendingModels) {
+      overlaid = overlaid.map((provider) =>
+        provider.providerId === id ? { ...provider, models } : provider,
+      );
+    }
+    providerList.commit(providerList.capture(providerKey()), {
+      status: "ready",
+      value: overlaid,
     });
   };
 
@@ -565,6 +593,8 @@ export function createWebuiModelsWorkflows(deps: {
         const rows = projectedProviders();
         if (committed && rows) showProviderModels(rows, providerId, committed);
         else await loadProviders().catch(() => undefined);
+        // Intents this owner still holds are not this provider's refusal: they stay shown.
+        overlayPendingIntents();
         return outcome;
       }
       // Transport failure, timeout or a lost response: the write may or may not have
@@ -574,9 +604,7 @@ export function createWebuiModelsWorkflows(deps: {
       // showing the server's answer while the intent differs is the contradiction this
       // protocol exists to remove.
       await loadProviders().catch(() => undefined);
-      const stillPending = pendingModels.get(providerId);
-      const rows = projectedProviders();
-      if (stillPending && rows) showProviderModels(rows, providerId, stillPending);
+      overlayPendingIntents();
       return outcome;
     };
     const previous = providerWriteChains.get(providerId) ?? Promise.resolve();

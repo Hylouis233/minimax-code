@@ -63,57 +63,86 @@ export type WebuiCapabilityManifest = Readonly<Record<string, WebuiCapabilitySta
  * port members, and the members come from the same adapters the operations are
  * bound to, so a capability cannot be advertised without the wiring behind it.
  */
-export const WEBUI_CAPABILITY_PROOFS: Readonly<
+/**
+ * What proves each family on the **service** side: the operations it bound.
+ *
+ * This is the derivation the handshake uses. The harness object says what the adapter
+ * *could* forward, which is a different question: a wrapper can exist around a host
+ * service that is not there, and a family advertised from a shape alone is a surface
+ * offered for a call that cannot work. Naming operation names here lets the service
+ * answer from its own binding table — was this operation declared, and is the port member
+ * behind it callable?
+ *
+ * The second list is prerequisites rather than proof of existence: a terminal roster
+ * whose frame stream is not wired is `not-ready`, not `absent`.
+ */
+export const WEBUI_CAPABILITY_REGISTRY_PROOFS: Readonly<
   Record<
     WebuiCapabilityName,
-    { readonly required: readonly string[]; readonly ready?: readonly string[] }
+    { readonly operations: readonly string[]; readonly ready?: readonly string[] }
   >
 > = {
-  sessions: { required: ["loadSessions", "updateSession", "deleteSession"] },
-  transcript: { required: ["getMessages"] },
-  turn: { required: ["sendMessage", "resumeSession"], ready: ["abortSession"] },
+  sessions: { operations: ["listSessions", "updateSession", "deleteSession"] },
+  transcript: { operations: ["getMessages"] },
+  turn: { operations: ["sendMessage", "resumeSession"], ready: ["abortSession"] },
   interactions: {
-    required: ["listPendingPermissions", "replyPermission"],
+    operations: ["listPendingPermissions", "replyPermission"],
     ready: ["getPendingQuestionnaire", "replyQuestionnaire"],
   },
-  workspace: { required: ["listWorkspaceFileTree", "getWorkspaceEnvironment"] },
-  // The Terminal bridge is its own capability, and readiness is exactly the case
-  // it exists for: a roster with no frame stream lists terminals nobody can use.
+  workspace: { operations: ["listWorkspaceFileTree", "getWorkspaceEnvironment"] },
   terminal: {
-    required: ["listTerminals", "createTerminal", "disposeTerminal"],
+    operations: ["listTerminals", "createTerminal", "disposeTerminal"],
     ready: ["watchTerminal", "writeTerminal", "resizeTerminal"],
   },
-  models: { required: ["listModels", "selectModel"] },
-  plugins: { required: ["pluginManagement"] },
-  settings: { required: ["getGlobalInstructions", "getPermissionMode"] },
-  account: { required: ["getAccountStatus", "beginAccountLogin"] },
-  commands: { required: ["runCommand"] },
+  models: { operations: ["listModels", "selectModel"] },
+  plugins: { operations: ["pluginManagement"] },
+  settings: { operations: ["getGlobalInstructions", "getPermissionMode"] },
+  account: { operations: ["getAccountStatus", "beginAccountLogin"] },
+  commands: { operations: ["runCommand"] },
 };
 
+/** What is known about one operation, as a service's binding table reports it. */
+export interface WebuiOperationAvailability {
+  /** The service declares this operation: a binding exists for it. */
+  readonly declared: boolean;
+  /** The port member the binding calls is callable. */
+  readonly wired: boolean;
+}
+
 /**
- * Derives the manifest from an assembled port.
+ * Derives the handshake manifest from the operations a service actually bound.
  *
- * Structural input on purpose: the server, the runtime adapter and a test all
- * hold *some* object of wired members, and none of them should have to import the
- * others to answer "what is wired".
+ * `availability` is asked about each operation name, and the service answers from its own
+ * binding table plus the port behind it. A family is:
+ *
+ *   * `supported` — every operation it needs is declared and wired, and every
+ *     prerequisite is wired;
+ *   * `not-ready` — the operations are declared and wired, and a prerequisite is not: the
+ *     surface exists and will not work yet;
+ *   * `absent` — an operation the family needs is not declared, or the port member it
+ *     calls is not callable.
+ *
+ * Families this build has never heard of are carried through as `supported`, so a client
+ * can see what a newer service advertises without this derivation inventing a verdict.
  */
-export function deriveWebuiCapabilityManifest(
-  source: Readonly<Record<string, unknown>>,
+export function deriveWebuiCapabilityManifestFromBindings(
+  availability: (operation: string) => WebuiOperationAvailability,
   extensions: readonly string[] = [],
 ): WebuiCapabilityManifest {
   const manifest: Record<string, WebuiCapabilityState> = {};
+  const wired = (operation: string): boolean => {
+    const known = availability(operation);
+    return known.declared && known.wired;
+  };
   for (const name of WEBUI_CAPABILITY_NAMES) {
-    const proof = WEBUI_CAPABILITY_PROOFS[name];
-    const present = (member: string): boolean => source[member] !== undefined;
-    if (!proof.required.every(present)) {
+    const proof = WEBUI_CAPABILITY_REGISTRY_PROOFS[name];
+    if (!proof.operations.every(wired)) {
       manifest[name] = "absent";
       continue;
     }
     const ready = proof.ready ?? [];
-    manifest[name] = ready.every(present) ? "supported" : "not-ready";
+    manifest[name] = ready.every(wired) ? "supported" : "not-ready";
   }
-  // Extension families the caller knows about but this build does not name are
-  // reported as supported when explicitly handed in.
   for (const name of extensions) manifest[name] = "supported";
   return manifest;
 }

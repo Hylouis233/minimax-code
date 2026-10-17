@@ -12,7 +12,7 @@
 // directly at process start.
 import { WEBUI_PROTOCOL_VERSION } from "../../shared/envelope.js";
 import type { WebuiVersionInfo } from "../../shared/contracts/version.js";
-import { deriveWebuiCapabilityManifest } from "../../shared/capability-manifest.js";
+
 import type { WebuiHarnessPort } from "../port.js";
 import type { WebuiRuntimeHostHandle } from "./host-contract.js";
 import { createSessionsAdapter } from "./sessions.js";
@@ -66,19 +66,11 @@ export function createHarnessPortFromHost(
     runCommand: (request) => runWebuiCommand(port, request),
     importSessionTransferWorkflow: (input) => importWebuiSessionTransfer(port, input),
   };
-  // Derived from the *assembled* port rather than declared per feature: a capability
-  // is advertised because its members are wired, and a family whose companion is
-  // missing is reported `not-ready` instead of silently working halfway.
-  //
-  // Assembled, not the spread above it: `runCommand` and the session-transfer import
-  // join the port after that spread, and a manifest derived from the partial object
-  // reported the command family absent — a capability claim that was wrong about the
-  // very service it describes.
-  version = {
-    ...version,
-    capabilities: deriveWebuiCapabilityManifest(
-      harnessPort as unknown as Readonly<Record<string, unknown>>,
-    ),
-  };
+  // Availability is not decided here. This object says what the harness *can* forward;
+  // whether an operation was registered and bound is a fact about the service, and the
+  // service derives the handshake's answer from its registry
+  // (`server/service.ts` -> `deriveWebuiCapabilityManifestFromRegistry`). A wrapper
+  // around a host service that is not there forwards happily, and advertising a family
+  // from its mere presence is how a surface gets offered for a call that cannot work.
   return harnessPort;
 }

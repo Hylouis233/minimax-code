@@ -90,15 +90,29 @@ const UNKNOWN_RESULT_NAMES = [
 /**
  * Forwarded members whose declared request the runtime member would not accept.
  *
- * The input side of the same boundary, and where an open record shows what it costs:
- * four of these are declared `Record<string, unknown>`, which is not assignable to a
- * runtime member that requires fields, so the adapter was forwarding a shape it never
- * proved. Each needs its request type derived from the host's own declaration, or an
- * executed case on the real host proving the client shape is accepted; until that
- * lands the list is exact, so a tenth one cannot appear quietly.
+ * These five are conversion boundaries, and each is a decision rather than a copy:
+ *
+ *   * `applyCanvas` carries a canvas operation the panel built, which the runtime
+ *     validates against its own canvas node type;
+ *   * `replyPermission` and `replyQuestionnaire` carry the wire's *named* reply and the
+ *     panel's flat answers, where the runtime takes its own enum and its own answer shape —
+ *     `permissionReplyValue` is that mapping;
+ *   * `testUserModelCandidate` carries the panel's candidate, which is validated
+ *     (`baseUrl` made required) before it is forwarded;
+ *   * `listSkills` is the one whose declared *parameters* differ rather than its shape: the
+ *     runtime member takes the input as a required argument.
+ *
+ * Every other forwarded request is derived from the runtime's own declaration
+ * (`WebuiHostRequest`) or rebuilt field by field at the binding that forwards it
+ * (`server/operation/provider-input.ts`). A name leaves this list when its conversion
+ * lands, and the compiler decides that: a name whose declaration already satisfies the
+ * runtime member fails `pnpm typecheck:test` *as an extra*, so this list cannot be left
+ * stale in the comfortable direction.
  */
 /** A member's full parameter list, or `never` when the declaration is not callable. */
 type ParamsOf<M> = M extends (...args: never[]) => unknown ? Parameters<M> : never;
+
+/** Forwarded members whose declared parameters the runtime member would not accept. */
 type MismatchedRequestNames = {
   [K in Keys<WebuiRuntimeCliService>]: K extends Keys<CliService>
     ? [ParamsOf<WebuiRuntimeCliService[K]>] extends [ParamsOf<CliService[K]>]
@@ -111,14 +125,7 @@ const MISMATCHED_REQUEST_NAMES = [
   "applyCanvas",
   "replyPermission",
   "replyQuestionnaire",
-  "createUserModelProvider",
-  "updateUserModelProvider",
-  "discoverUserModelsCandidate",
-  "saveUserModelProviderCandidate",
   "testUserModelCandidate",
-  // Its declared parameters are not the runtime member's either: the comparison is
-  // over the whole parameter list, and this one differs in a parameter the first
-  // would have hidden.
   "listSkills",
 ] as const satisfies readonly MismatchedRequestNames[];
 

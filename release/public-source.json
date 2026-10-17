@@ -3961,6 +3961,7 @@
     "packages/webui/src/server/operation/permission-mode.ts",
     "packages/webui/src/server/operation/personalization.ts",
     "packages/webui/src/server/operation/plugin-management.ts",
+    "packages/webui/src/server/operation/provider-input.ts",
     "packages/webui/src/server/operation/provider.ts",
     "packages/webui/src/server/operation/questionnaire.ts",
     "packages/webui/src/server/operation/queue.ts",

@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 
 import { createWebuiTerminalOwner } from "../../src/client/features/terminal/application/terminal-owner.js";
 import { WebuiErrorCode, WebuiWireError } from "../../src/shared/envelope.js";
-import { deriveWebuiCapabilityManifest } from "../../src/shared/capability-manifest.js";
+import { deriveWebuiCapabilityManifestFromBindings } from "../../src/shared/capability-manifest.js";
 import type { WebuiTerminalFrame } from "../../src/shared/contracts/terminal.js";
 
 interface Trace {
@@ -50,6 +50,17 @@ function port(trace: Trace, terminals: string[] = ["terminal-a", "terminal-b"]) 
 }
 
 const newTrace = (): Trace => ({ calls: [], releases: [] });
+
+
+/** The manifest a service would serve for the given declared-and-wired operations. */
+function manifestFor(wired: readonly string[], notWired: readonly string[] = []) {
+  const wiredSet = new Set(wired);
+  const declaredOnly = new Set(notWired);
+  return deriveWebuiCapabilityManifestFromBindings((operation) => ({
+    declared: wiredSet.has(operation) || declaredOnly.has(operation),
+    wired: wiredSet.has(operation),
+  }));
+}
 
 describe("the terminal owner's watch registry", () => {
   it("returns a real disposer that releases its watch exactly once", async () => {
@@ -354,14 +365,15 @@ describe("V19/V29 · what the handshake declares decides more than the port's sh
   it("calls a family the service declared supported supported, without probing", () => {
     const trace = newTrace();
     const owner = createWebuiTerminalOwner(port(trace), {
-      readCapabilities: () => deriveWebuiCapabilityManifest({
-        listTerminals: () => undefined,
-        createTerminal: () => undefined,
-        disposeTerminal: () => undefined,
-        watchTerminal: () => undefined,
-        writeTerminal: () => undefined,
-        resizeTerminal: () => undefined,
-      }),
+      readCapabilities: () =>
+        manifestFor([
+          "listTerminals",
+          "createTerminal",
+          "disposeTerminal",
+          "watchTerminal",
+          "writeTerminal",
+          "resizeTerminal",
+        ]),
     });
 
     expect(owner.support().create).not.toBe("incompatible");
@@ -371,17 +383,19 @@ describe("V19/V29 · what the handshake declares decides more than the port's sh
 
   it("distinguishes a bridge that is not ready from one that is absent", () => {
     const owner = createWebuiTerminalOwner(port(newTrace()), {
-      // A roster with no frame stream lists terminals nobody can use.
-      readCapabilities: () => deriveWebuiCapabilityManifest({
-        listTerminals: () => undefined,
-        createTerminal: () => undefined,
-        disposeTerminal: () => undefined,
-      }),
+      // A roster with no frame stream lists terminals nobody can use: the operations are
+      // declared and wired, and the prerequisite the family needs is not.
+      readCapabilities: () =>
+        manifestFor(["listTerminals", "createTerminal", "disposeTerminal"], [
+          "watchTerminal",
+          "writeTerminal",
+          "resizeTerminal",
+        ]),
     });
     expect(owner.support().list).toBe("not-ready");
 
     const gone = createWebuiTerminalOwner(port(newTrace()), {
-      readCapabilities: () => deriveWebuiCapabilityManifest({}),
+      readCapabilities: () => manifestFor([]),
     });
     expect(gone.support().list).toBe("absent");
   });

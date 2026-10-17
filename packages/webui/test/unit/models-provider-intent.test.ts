@@ -125,6 +125,53 @@ describe("V10 · provider intent is the owner's, not the caller's array", () => 
     ]);
   });
 
+  it("keeps a later intent on screen when an earlier write settles and reloads", async () => {
+    // The order the probe found: the first write settles, its own reload answers with the
+    // list *it* wrote, and the later intent disappears from the screen while its write is
+    // still pending. A reload answers the write that triggered it; it is not permission to
+    // erase a change that was captured after that write began.
+    const resolutions: ((value: unknown) => void)[] = [];
+    let served = [provider([{ modelId: "m1", enabled: false }, { modelId: "m2", enabled: false }])];
+    const workflows = workflowsWith({
+      listUserModelProviders: async () => served,
+      updateUserModelProvider: (body: { models: readonly { modelId: string; enabled?: boolean }[] }) =>
+        new Promise((resolve) => {
+          const accepted = [provider(body.models)];
+          resolutions.push((value) => {
+            // A live runtime serves what it accepted, and only when it accepted it.
+            served = accepted;
+            resolve(value);
+          });
+        }),
+      listModels: async () => [],
+    });
+    await workflows.loadProviders();
+
+    const one = workflows.setProviderModelEnabled({ providerId: "p1", modelId: "m1", enabled: true });
+    const two = workflows.setProviderModelEnabled({ providerId: "p1", modelId: "m2", enabled: true });
+    await flush();
+    expect(workflows.getSnapshot().providers.value?.[0]?.models.map((m) => m.enabled)).toEqual([
+      true,
+      true,
+    ]);
+
+    // Only the first write answers, and its answer predates the second intent.
+    resolutions[0]!({ success: true });
+    await flush();
+    expect(workflows.getSnapshot().providers.value?.[0]?.models.map((m) => m.enabled)).toEqual([
+      true,
+      true,
+    ]);
+
+    resolutions[1]!({ success: true });
+    await one;
+    await two;
+    expect(workflows.getSnapshot().providers.value?.[0]?.models.map((m) => m.enabled)).toEqual([
+      true,
+      true,
+    ]);
+  });
+
   it("does not serialize across providers", async () => {
     const order: string[] = [];
     const gate = deferred<unknown>();

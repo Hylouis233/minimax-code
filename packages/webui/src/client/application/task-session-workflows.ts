@@ -256,10 +256,16 @@ export function createWebuiTaskSessionWorkflows(
       // occupied destination and a purged destination are the three refusals, and each of them means
       // the draft belongs where it is; `no-source` is not one of them — there was no home record to
       // protect, and the text the user typed is still theirs to keep with the session it created.
+      let adoptedRevision: number | undefined;
       if (transfer.outcome === "transferred" || transfer.outcome === "no-source") {
-        composer.adoptHome(sessionId, {
+        const adopted = composer.adoptHome(sessionId, {
           ...(inputRevision !== undefined ? { expectSourceRevision: inputRevision } : {}),
         });
+        // The revision the destination holds *after* the move is the only identity that
+        // proves the text standing there is the input this submission carried. Comparing
+        // text instead would clear a slot the user had retyped to the same words —
+        // equal text is not equal edit identity, and the slot's revision is.
+        if (adopted) adoptedRevision = composer.readSlotRevision(sessionId);
       }
 
       // Rule 3: the created session records the choice the *request* carried,
@@ -280,6 +286,7 @@ export function createWebuiTaskSessionWorkflows(
         kind: "created",
         sessionId,
         transfer: transfer.outcome,
+        ...(adoptedRevision === undefined ? {} : { adoptedRevision }),
         // Rule 7: the created destination is selected only while the navigation
         // claim that started the creation is still the current one.
         selected: claim === navigationEpoch,

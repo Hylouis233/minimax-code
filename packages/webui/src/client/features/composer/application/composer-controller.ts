@@ -128,17 +128,16 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
   };
 
   /**
-   * Clear a slot that now holds the submitted text because it was *moved* there.
+   * Clear a slot the input was *moved* into, by the revision the move produced.
    *
    * A submission that creates a session transfers the home record under the use case's
-   * guards, so the input ends up in a slot the capture never named and the captured
-   * revision cannot guard it. The identity that survives the move is the text: it is
-   * cleared where it still reads exactly as it was submitted, and left alone the moment
-   * the user has typed something else.
+   * guards, so the input ends up in a slot the capture never named. The identity that
+   * proves the text standing there is *this submission's* input is the destination
+   * revision the adoption produced — text equality is not edit identity, and a slot the
+   * user retyped to the same words is a different edit.
    */
-  const consumeMovedDraft = (key: string, submitted: string): void => {
-    if (submitted.length === 0) return;
-    if (deps.store.readDraft(key) !== submitted) return;
+  const consumeAdoptedDraft = (key: string, adoptedRevision: number): void => {
+    if (deps.store.readSlotRevision(key) !== adoptedRevision) return;
     deps.store.setDraft(key, "");
   };
   const queueCommands = createWebuiComposerQueueCommands({
@@ -321,10 +320,13 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
       void ticket.creation.then((created) => {
         if (!created) return;
         if (created.selected) deps.selectCreatedSession(created.sessionId);
-        // The home record was moved into the created session, so the submitted text is
-        // in that slot now: clearing only the slot it was captured in would leave the
-        // input sitting in the session it was sent to.
-        consumeMovedDraft(created.sessionId, message);
+        // The home record was moved into the created session, so the input is in that
+        // slot now: clearing only the slot it was captured in would leave it sitting in
+        // the session it was sent to. The right to clear that slot is the revision the
+        // adoption produced, and it is reported by the use case that performed it.
+        if (created.adoptedRevision !== undefined) {
+          consumeAdoptedDraft(created.sessionId, created.adoptedRevision);
+        }
         createdSession = { ticketId: ticket.id, ...created };
         publish();
       });

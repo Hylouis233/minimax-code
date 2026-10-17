@@ -17,6 +17,14 @@
 // the profile files itself (`harness/settings.ts` -> `profile-files.ts`).
 
 import type { CliService } from "@mavis/local-runtime-v2/cli-service";
+/**
+ * The request one host member takes, as the host itself declares it.
+ *
+ * Written as a parameter read rather than a transcribed interface: the runtime owns these
+ * shapes, and a copy of them here is a copy that drifts. The four provider mutations all
+ * use it, on the declaration the adapter forwards to.
+ */
+export type WebuiHostRequest<M extends keyof CliService> = Parameters<CliService[M]>[0];
 
 import type {
   WebuiSessionListRequest,
@@ -452,13 +460,13 @@ export interface WebuiRuntimeCliService {
     readonly sessionId?: string;
   }): Promise<Record<string, unknown>>;
   listUserModelProviders(): Promise<readonly Record<string, unknown>[]>;
-  createUserModelProvider(request: Record<string, unknown>): Promise<HostResult<"createUserModelProvider">>;
-  updateUserModelProvider(request: Record<string, unknown>): Promise<HostResult<"updateUserModelProvider">>;
+  createUserModelProvider(request: WebuiHostRequest<"createUserModelProvider">): Promise<HostResult<"createUserModelProvider">>;
+  updateUserModelProvider(request: WebuiHostRequest<"updateUserModelProvider">): Promise<HostResult<"updateUserModelProvider">>;
   deleteUserModelProvider(request: { readonly providerId: string }): Promise<HostResult<"deleteUserModelProvider">>;
   testUserModelProvider(request: { readonly providerId: string; readonly apiKey?: string }): Promise<HostResult<"testUserModelProvider">>;
   testUserModel(request: { readonly providerId: string; readonly modelId: string }): Promise<HostResult<"testUserModel">>;
-  discoverUserModelsCandidate(request: Record<string, unknown>): Promise<HostResult<"discoverUserModelsCandidate">>;
-  saveUserModelProviderCandidate(request: Record<string, unknown>): Promise<HostResult<"saveUserModelProviderCandidate">>;
+  discoverUserModelsCandidate(request: WebuiHostRequest<"discoverUserModelsCandidate">): Promise<HostResult<"discoverUserModelsCandidate">>;
+  saveUserModelProviderCandidate(request: WebuiHostRequest<"saveUserModelProviderCandidate">): Promise<HostResult<"saveUserModelProviderCandidate">>;
   /** Converted: the runtime answers with its own interface, not an open record. */
   listProviderPresets(): Promise<HostResult<"listProviderPresets">>;
   getMiniMaxApiKeyStatus(): Promise<Record<string, unknown>>;

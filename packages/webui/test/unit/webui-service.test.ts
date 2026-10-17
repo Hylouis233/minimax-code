@@ -820,6 +820,34 @@ describe("WebUI service", () => {
     ws.close();
   });
 
+  it("answers availability from what this service bound, not from the harness's shape", async () => {
+    // The evidence the handshake carries is derived from the binding table and the port
+    // behind it. `runCommand` is a real port member here, so the command family is
+    // supported; the families whose operations this scripted port does not implement are
+    // reported absent rather than advertised because a method could be forwarded.
+    const { url } = await bootService();
+    const { ws, upgrade } = openClient(url);
+    await upgrade;
+    const response = await requestOnce(ws, {
+      protocolVersion: WEBUI_PROTOCOL_VERSION,
+      kind: "request",
+      requestId: "req-version-manifest",
+      operation: "version",
+      body: undefined,
+    });
+    expect(isWebuiFrame(response)).toBe(true);
+    if (!isWebuiFrame(response) || response.kind !== "response") {
+      throw new Error("expected a version response frame");
+    }
+    const body = response.body as { capabilities?: Record<string, string> };
+    expect(body.capabilities).toBeDefined();
+    // `runCommand` is wired on the scripted port, so the family it proves is supported.
+    expect(body.capabilities?.commands).toBe("supported");
+    // A family whose operations this port does not implement is not advertised.
+    expect(body.capabilities?.terminal).toBe("absent");
+    ws.close();
+  });
+
   it("streams sendMessage as ordered event frames and preserves mixed frame bodies", async () => {
     port.sendResult = {
       ok: true,

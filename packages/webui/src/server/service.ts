@@ -26,6 +26,9 @@ import {
   type WebuiCredential,
 } from "./credentials.js";
 import { WEBUI_PROTOCOL_VERSION } from "../shared/envelope.js";
+import { VERSION_OPERATION_NAME } from "../shared/operation-names.js";
+import { deriveWebuiCapabilityManifestFromBindings } from "../shared/capability-manifest.js";
+import { WEBUI_OPERATION_BINDINGS } from "./operation/bind-handlers.js";
 import type { WebuiHarnessPort } from "../runtime/port.js";
 import type { WebuiTerminalProcessPort } from "../runtime/port.js";
 import { isLoopbackBindAddress } from "./access-policy.js";
@@ -38,6 +41,47 @@ import { WebuiWebSocketServer } from "./websocket-server.js";
 import { serveHttpRequest, type WebuiHttpRouterContext } from "./http/router.js";
 
 export const WEBUI_MAX_MESSAGE_BYTES = 256 * 1024;
+
+/**
+ * Serve the handshake's availability answer from what this service actually bound.
+ *
+ * The harness port reports what it *could* forward; the binding table reports what this
+ * service answers. The difference is a wrapper around a host service that is not there —
+ * it forwards, it is advertised, and every call to it fails. The availability question is
+ * answered from the bindings themselves, and the prerequisites stay a question for the
+ * port behind them: a bound roster whose frame stream is not wired is `not-ready`, not
+ * absent.
+ *
+ * The wrap is here rather than in the harness because this is the first place that holds
+ * both halves: the bindings it serves from and the port behind them.
+ */
+function withRegistryDerivedAvailability(
+  operations: ReadonlyMap<string, WebuiOperationRegistryEntry>,
+  port: WebuiHarnessPort,
+): ReadonlyMap<string, WebuiOperationRegistryEntry> {
+  const entry = operations.get(VERSION_OPERATION_NAME);
+  if (!entry) return operations;
+  const wired = port as unknown as Readonly<Record<string, unknown>>;
+  const capabilities = deriveWebuiCapabilityManifestFromBindings((operation) => {
+    // Registered is the registry's answer: it holds the table-driven bindings *and* the
+    // bespoke handlers this service adds on top (`runCommand`, the transfer import), so
+    // the question "does this service answer it" is the registry's to answer.
+    if (!operations.has(operation)) return { declared: false, wired: false };
+    const binding = WEBUI_OPERATION_BINDINGS[operation as keyof typeof WEBUI_OPERATION_BINDINGS];
+    // A table-driven binding names the port member it calls, and that member is the
+    // prerequisite: an operation whose member is gone answers nothing but a refusal. A
+    // bespoke handler does its own checking, so registration is the whole answer there.
+    if (binding === undefined) return { declared: true, wired: true };
+    return { declared: true, wired: typeof wired[binding.method] === "function" };
+  });
+  const wrapped: WebuiOperationRegistryEntry["handle"] = async (...call) => {
+    const answer = await entry.handle(...call);
+    if (!("body" in answer)) return answer;
+    return { ...answer, body: { ...(answer.body as object), capabilities } };
+  };
+  return new Map(operations).set(VERSION_OPERATION_NAME, { ...entry, handle: wrapped });
+}
+
 export const WEBUI_WEBSOCKET_HEARTBEAT_INTERVAL_MS = 15_000;
 
 /**
@@ -160,7 +204,7 @@ export class WebuiService {
     // widened by a stray `WEBUI_DEV=1` in the environment.
     this.dev = options.dev ?? readEnvFlag("WEBUI_DEV");
     this.clientDirOverride = options.clientDir;
-    this.operations = options.operations;
+    this.operations = withRegistryDerivedAvailability(options.operations, options.port);
     this.terminal = options.terminal;
     this.httpServer = createHttpListener(options.httpServerFactory);
     this.wsServer = new WebuiWebSocketServer({

@@ -234,7 +234,7 @@ describe("prohibition 5 — a submit carries intent, never a setter", () => {
     expect(context).not.toContain("onDraftChange");
     const controller = read("features/composer/application/composer-controller.ts");
     expect(controller).toContain("consumeDraft(captured)");
-    expect(controller).toContain("consumeMovedDraft(created.sessionId, message)");
+    expect(controller).toContain("consumeAdoptedDraft(created.sessionId, created.adoptedRevision)");
   });
 });
 

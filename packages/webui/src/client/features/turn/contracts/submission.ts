@@ -130,7 +130,19 @@ export interface WebuiTaskSessionSubmitter {
     readonly teamModeOff?: boolean;
     readonly inputRevision?: number;
   }) => Promise<
-    | { readonly kind: "created"; readonly sessionId: string; readonly selected: boolean }
+    | {
+        readonly kind: "created";
+        readonly sessionId: string;
+        readonly selected: boolean;
+        /**
+         * The destination's composer-slot revision after the input was adopted.
+         *
+         * Present only when the composer record actually moved: it is the edit identity
+         * the submission inherited, so a consumer that clears the destination can ask
+         * "is this still the input I carried" instead of comparing text.
+         */
+        readonly adoptedRevision?: number;
+      }
     | { readonly kind: "busy" }
     | { readonly kind: "unsupported" }
     | { readonly kind: "creation-failed"; readonly error: string }
@@ -171,7 +183,14 @@ export interface WebuiSubmissionTicket {
   readonly id: number;
   readonly admission: WebuiSubmissionAdmission;
   /** Resolves when implicit home-session creation completes, before its turn stream settles. */
-  readonly creation: Promise<{ readonly sessionId: string; readonly selected: boolean } | undefined>;
+  readonly creation: Promise<
+    | {
+        readonly sessionId: string;
+        readonly selected: boolean;
+        readonly adoptedRevision?: number;
+      }
+    | undefined
+  >;
   /**
    * Settles with what happened. **Never rejects** — a refusal is a value, so a
    * caller that only wants to know when it is done has no error path to forget.

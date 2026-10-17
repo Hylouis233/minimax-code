@@ -119,8 +119,23 @@ export function submitWebuiTurn(
   const id = ++nextSubmissionId;
   const handlers = args.handlers;
   const { message, clientIntent, attachments } = wireIntentFor(args.intent);
-  let resolveCreation!: (created: { readonly sessionId: string; readonly selected: boolean } | undefined) => void;
-  const creation = new Promise<{ readonly sessionId: string; readonly selected: boolean } | undefined>((resolve) => {
+  let resolveCreation!: (
+    created:
+      | {
+          readonly sessionId: string;
+          readonly selected: boolean;
+          readonly adoptedRevision?: number;
+        }
+      | undefined,
+  ) => void;
+  const creation = new Promise<
+    | {
+        readonly sessionId: string;
+        readonly selected: boolean;
+        readonly adoptedRevision?: number;
+      }
+    | undefined
+  >((resolve) => {
     resolveCreation = resolve;
   });
 
@@ -196,7 +211,13 @@ export function submitWebuiTurn(
       sessionId = outcome.sessionId;
       created = true;
       selectedAfterCreation = outcome.selected;
-      resolveCreation({ sessionId, selected: outcome.selected });
+      resolveCreation({
+        sessionId,
+        selected: outcome.selected,
+        ...(outcome.adoptedRevision === undefined
+          ? {}
+          : { adoptedRevision: outcome.adoptedRevision }),
+      });
       handlers.onSessionCreated?.(sessionId, outcome.selected);
     }
     if (sessionId === undefined) return ({ kind: "failed", error: "No session to submit to" });
