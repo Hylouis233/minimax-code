@@ -81,7 +81,6 @@ import {
   buildWebuiComposerHandlers,
   submitWebuiTurn,
 } from "../../src/client/features/turn/application/composer-submission.js";
-import type { WebuiSubmissionOperation } from "../../src/client/features/turn/contracts/submission.js";
 import { createWebuiSessionStore, type WebuiSessionStore } from "../../src/client/application/session-store.js";
 import {
   WebuiApplicationProvider,

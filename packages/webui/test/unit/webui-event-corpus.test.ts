@@ -83,7 +83,17 @@ function reduceFixture(
     refreshPending: () => undefined,
     refreshGoal: () => undefined,
     applyPatches: (patches) => {
-      state = patches.reduce(reduceWebuiSessionStatePatch, state);
+      // `reduceWebuiSessionStatePatch` expects the writable session shape,
+      // which carries the `sending` flag the `WebuiEffectState` slice omits.
+      // The corpus fixtures never produce `set-sending` patches, so the field
+      // stays at its seed value end-to-end and is discarded on the way out.
+      const augmented = patches.reduce(reduceWebuiSessionStatePatch, {
+        ...state,
+        sending: false,
+      });
+      const { sending: _sending, ...next } = augmented;
+      void _sending;
+      state = next;
     },
     setGoal: (goal) => {
       state = { ...state, goal };

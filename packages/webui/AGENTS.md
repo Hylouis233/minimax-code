@@ -82,7 +82,7 @@ what each gate proves and what it cannot.
 
 | Change | Run |
 | --- | --- |
-| Any TypeScript change | `pnpm typecheck:webui` (and `pnpm typecheck:webui-full` for a second, stricter test program) |
+| Any TypeScript change | `pnpm typecheck:webui` — it covers every source and every test file, so a test fixture that no longer matches its signature fails here |
 | Client behaviour | the focused Vitest file, then `pnpm test:webui` |
 | The built client | `pnpm build:webui`, then `pnpm test:webui-browser` |
 | Imports, roles, moves | `pnpm check:webui-dependency` |

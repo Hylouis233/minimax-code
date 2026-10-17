@@ -184,3 +184,112 @@ describe("V29 · an absent bridge and an incompatible one are different failures
     expect(() => owner.detachAll()).not.toThrow();
   });
 });
+
+describe("V04 · V26 · a PTY belongs to the service, not to the page that opened it", () => {
+  // These two rows are about lifetime across a *view* boundary, and the registry
+  // cases above only ever exercise one owner in one lifetime. The owner's whole
+  // reason to exist is that the panel holding it is a view: what has to survive
+  // is the process, and what must not survive is the panel's xterm and frame
+  // subscription.
+  function serviceHarness() {
+    const trace = newTrace();
+    // The service keeps the terminal table the client rosters from, so a created
+    // terminal is visible to the next `refresh` — the same thing a reload sees.
+    // A static list would make "the PTY survived" true for the wrong reason.
+    const live = new Set(["terminal-a", "terminal-b"]);
+    let counter = 0;
+    const wire = {
+      ...port(trace, []),
+      listTerminals: async () =>
+        [...live].map((terminalId) => ({ terminalId, status: "running" as const, output: "" })),
+      createTerminal: async ({ workspaceDir }: { readonly workspaceDir: string }) => {
+        trace.calls.push(`create:${workspaceDir}`);
+        counter += 1;
+        const terminalId = `terminal-${counter}`;
+        live.add(terminalId);
+        return { terminalId, status: "running" as const };
+      },
+      disposeTerminal: async ({ terminalId }: { readonly terminalId: string }) => {
+        trace.calls.push(`dispose:${terminalId}`);
+        live.delete(terminalId);
+      },
+    };
+    return { trace, live, owner: createWebuiTerminalOwner(wire), counter: () => counter };
+  }
+
+  it("V04 · keeps the PTY alive when the page that opened it goes away", async () => {
+    const { trace, owner } = serviceHarness();
+    const terminal = await owner.create("/repo");
+    expect(terminal?.terminalId).toBe("terminal-1");
+    // The panel then mounts its xterm, which is a frame subscription.
+    owner.attach("terminal-1", () => undefined);
+
+    // The panel unmounts: it releases its watch and its xterm. Nothing else.
+    owner.detachAll();
+    expect(trace.releases).toEqual([1]);
+    expect(trace.calls.filter((entry) => entry.startsWith("dispose:"))).toEqual([]);
+
+    // The process is still there, and a page that mounts again sees it in the
+    // roster — so the user's shell survived the tab closing.
+    await owner.refresh();
+    const rosters = owner.getSnapshot().terminals.map((entry) => entry.terminalId);
+    // Set iteration order is not the contract; membership is.
+    expect([...rosters].sort()).toEqual(["terminal-1", "terminal-a", "terminal-b"]);
+    expect(owner.canDispose).toBe(true);
+  });
+
+  it("V26 · a PTY whose creating page unmounted before the create answered is still adoptable", async () => {
+    // The create is in flight when the panel goes away. The panel's disposal is
+    // not a reason to abandon or lose the answer: the process exists either way,
+    // and the owner that outlives the panel has to hold it.
+    let resolveCreate: (() => void) | undefined;
+    const trace = newTrace();
+    const live = new Set<string>();
+    const owner = createWebuiTerminalOwner({
+      ...port(trace, []),
+      listTerminals: async () =>
+        [...live].map((terminalId) => ({ terminalId, status: "running" as const, output: "" })),
+      createTerminal: async ({ workspaceDir }: { readonly workspaceDir: string }) => {
+        trace.calls.push(`create:${workspaceDir}`);
+        // Deliberately slow: the answer lands after the view is gone.
+        return new Promise<{ terminalId: string; status: "running" }>((resolve) => {
+          resolveCreate = () => {
+            live.add("terminal-late");
+            resolve({ terminalId: "terminal-late", status: "running" });
+          };
+        });
+      },
+    });
+
+    const pending = owner.create("/repo");
+    // The panel goes away before the answer — it had mounted nothing yet, so
+    // there is no watch to release; the point is that the *process* survives.
+    owner.detachAll();
+    resolveCreate?.();
+    const created = await pending;
+
+    expect(created?.terminalId).toBe("terminal-late");
+    // The roster picks it up, so a remounting panel renders it rather than
+    // showing an empty terminal list and offering a second create.
+    await owner.refresh();
+    expect(owner.getSnapshot().terminals.map((entry) => entry.terminalId)).toContain(
+      "terminal-late",
+    );
+    // And it was not killed on the way: a view leaving never disposes a process.
+    expect(trace.calls.filter((entry) => entry.startsWith("dispose:"))).toEqual([]);
+  });
+
+  it("V06 · only the application ends the process, and only once", async () => {
+    const { trace, owner } = serviceHarness();
+    await owner.create("/repo");
+    owner.attach("terminal-1", () => undefined);
+    await owner.disposeAll();
+    const disposals = trace.calls.filter((entry) => entry.startsWith("dispose:"));
+    expect(disposals.length).toBeGreaterThan(0);
+    // Disposal is terminal: a second call ends nothing twice.
+    await owner.disposeAll();
+    expect(trace.calls.filter((entry) => entry.startsWith("dispose:")).length).toBe(
+      disposals.length,
+    );
+  });
+});

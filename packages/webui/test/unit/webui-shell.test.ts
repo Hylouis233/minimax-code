@@ -995,6 +995,7 @@ async function submitTurn(
 ) {
   const ticket = submitWebuiTurn({
     intent: { kind: "ordinary", message: args.message ?? args.draft ?? "" },
+    sessionId: args.sessionId,
     admission:
       args.sending && args.enqueueMessage ? { kind: "queued" } : { kind: "dispatching" },
     sending: args.sending,
@@ -1009,9 +1010,8 @@ async function submitTurn(
     ...(args.onAttachmentsSubmitted
       ? { onAttachmentsSubmitted: args.onAttachmentsSubmitted }
       : {}),
-    ...(args.sessionId === undefined ? {} : { sessionId: args.sessionId }),
   });
-  return ticket?.completion;
+  return ticket.completion;
 }
 
 describe("WebUI shell — desktop anatomy", () => {

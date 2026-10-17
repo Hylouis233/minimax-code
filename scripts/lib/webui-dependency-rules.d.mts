@@ -387,3 +387,10 @@ export function collectProvisionalJudgements(
   violations: readonly ProvisionalJudgementSource[],
   ambiguousFiles?: readonly string[],
 ): ProvisionalJudgement[];
+
+/**
+ * The feature roles that carry a business owner. The role matrix uses this set
+ * to tell "no business here" from "two homes for the same business"; roles
+ * outside it (shell, ui, conversation, platform, …) are ownerless by design.
+ */
+export const BUSINESS_BEARING_ROLES: ReadonlySet<string>;

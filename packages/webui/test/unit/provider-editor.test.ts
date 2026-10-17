@@ -19,6 +19,10 @@ import type {
   WebuiTestUserModelCandidateRequest,
   WebuiUpdateUserModelProviderRequest,
 } from "../../src/shared/contracts/models.js";
+import type {
+  WebuiProviderSaveOutcome,
+  WebuiProviderTestOutcome,
+} from "../../src/client/features/models/contracts/provider-outcome.js";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -172,7 +176,7 @@ describe("test validity", () => {
   });
 
   it("cannot mark a newer draft tested with an older test's answer", async () => {
-    const gate = deferred<{ readonly ok: boolean }>();
+    const gate = deferred<WebuiProviderTestOutcome>();
     const { commands } = harness({ testCandidate: () => gate.promise });
     const editor = createWebuiProviderEditor({ commands });
     editor.openNew();
@@ -182,7 +186,7 @@ describe("test validity", () => {
     // The user edits while the probe is in flight: the answer describes the
     // candidate that no longer exists.
     editor.changeField("baseUrl", "https://changed.test");
-    gate.resolve({ ok: true });
+    gate.resolve({ outcome: "success", models: [] });
     await pending;
     expect(editor.getSnapshot().tested).toBe(false);
   });
@@ -312,7 +316,7 @@ describe("discovery", () => {
 
 describe("the form view's lifetime", () => {
   it("closing ends the view, keeps the draft and fences a late save", async () => {
-    const gate = deferred<{ readonly success: boolean }>();
+    const gate = deferred<WebuiProviderSaveOutcome>();
     const { commands } = harness({ saveCandidate: () => gate.promise });
     const editor = createWebuiProviderEditor({ commands });
     editor.openNew();
@@ -322,7 +326,7 @@ describe("the form view's lifetime", () => {
     editor.close();
     expect(editor.getSnapshot().open).toBe(false);
     expect(editor.getSnapshot().pending).toBeUndefined();
-    gate.resolve({ success: true });
+    gate.resolve({ outcome: "success", providerId: "p-new" });
     await pending;
     // The late completion neither reopens the form nor repopulates an error.
     expect(editor.getSnapshot().open).toBe(false);

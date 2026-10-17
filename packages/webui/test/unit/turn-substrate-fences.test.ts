@@ -31,7 +31,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { runWebuiStreamLoop } from "../../src/client/conversation/stream-loop.js";
-import type { WebuiDeliverySink } from "../../src/client/conversation/stream-loop.js";
+import type { WebuiDeliverySink, WebuiDeliveryFailure } from "../../src/shared/contracts/delivery.js";
 import { buildWebuiStreamLoopSink } from "../../src/client/features/turn/application/stream-loop-sink.js";
 import { classifyStreamFrame } from "../../src/client/features/turn/application/stream-frame-classify.js";
 import { streamStateBundle } from "../../src/client/features/turn/application/stream-state-bundle.js";
@@ -41,6 +41,7 @@ import {
 } from "../../src/client/application/session-store.js";
 import type {WebuiClientMessageSender} from "../../src/client/features/turn/contracts/execution-port.js";
 import type {WebuiClientSessionResumer} from "../../src/client/features/turn/contracts/execution-port.js";
+import type { WebuiStreamFrame } from "../../src/shared/contracts/stream.js";
 
 const SESSION_ID = "session-fences";
 
@@ -219,7 +220,7 @@ describe("fence 4 — the early-exit finalizer releases ownership once and state
         releases += 1;
         inner.release();
       },
-      fail: (failure) => {
+      fail: (failure: WebuiDeliveryFailure) => {
         refusals.push(failure.reason);
         inner.fail(failure);
       },
@@ -301,7 +302,7 @@ describe("failure origin decides what the user is told", () => {
     let accepts = 0;
     const sink: WebuiDeliverySink = {
       ...inner,
-      accept: (frame) => {
+      accept: (frame: WebuiStreamFrame) => {
         accepts += 1;
         // The first two frames reach the store; the third is what the user will
         // never see, because the write that would have shown it broke.

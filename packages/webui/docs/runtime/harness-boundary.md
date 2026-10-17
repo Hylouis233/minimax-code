@@ -18,7 +18,7 @@ rather than by an assertion:
 - the binding count is pinned separately (`createBindingEntries(port).size`).
 
 Drop a port member without dropping its binding, or add one without reaching the registry, and
-`pnpm typecheck:webui-full` stops compiling. The current roster is pinned in
+`pnpm typecheck:webui` stops compiling. The current roster is pinned in
 `test/unit/webui-operation-binding.test.ts`: **86** bindings, **13** dedicated handlers, **99**
 operations. A new operation breaks all three counts, so bump them in the same change — after
 checking that the roster really grew.

@@ -27,6 +27,7 @@ import {
   applyWebuiEffectCommands,
   reduceWebuiSessionStatePatch,
   type WebuiSessionStatePatch,
+  type WebuiSessionStateWritable,
   applyWebuiEventToSession,
   type WebuiEffectHandlers,
 } from "../../src/client/features/turn/application/event-coordinator.js";
@@ -46,6 +47,7 @@ import type {
   WebuiQuestionnaireRequest,
 } from "../../src/shared/contracts/interactions.js";
 import type { WebuiRuntimeEvent } from "../../src/shared/contracts/stream.js";
+import type { WebuiGoal } from "../../src/shared/contracts/goal.js";
 
 const SESSION = "session-1";
 
@@ -466,15 +468,24 @@ describe("W2 · stream subscription ownership · one stream per turn", () => {
     };
     // The guard is evaluated as the batch folds, against the stream the batch
     // is leaving behind — the record the earlier patch in this same event wrote,
-    // not a store read from outside it.
-    let folded: { readonly stream: WebuiStreamState; readonly sending: boolean } = live;
+    // not a store read from outside it. The `sending` start value is `true` so
+    // a guard that *does* let the patch through would land at `false`; the
+    // assertion below pins that the patch was dropped, not applied.
+    let folded: WebuiSessionStateWritable = {
+      stream: live,
+      sending: true,
+      permissions: [],
+      questionnaire: undefined,
+    };
     applyWebuiEffectCommands(
       terminal.commands,
       {
         refreshPending: () => undefined,
         refreshGoal: () => undefined,
         applyPatches: (patches) => {
-          folded = patches.reduce(reduceWebuiSessionStatePatch, folded);
+          for (const patch of patches) {
+            folded = reduceWebuiSessionStatePatch(folded, patch);
+          }
         },
         setGoal: vi.fn(),
       },
@@ -482,7 +493,7 @@ describe("W2 · stream subscription ownership · one stream per turn", () => {
       // these commands were built.
       () => live,
     );
-    expect(folded.sending).toBe(live.sending);
+    expect(folded.sending).toBe(true);
     // The stream patch carries its own guard, so the phase is untouched too.
     for (const cmd of terminal.commands) {
       if (cmd.type === "set-stream" && cmd.patch(live).phase !== live.phase)
@@ -1075,13 +1086,28 @@ describe("W2 · trace 10 · reducer purity + cross-session rejection (no cleanup
 
 describe("D3 · watchEvents reduces each event against the latest stream", () => {
   it("keeps a spawned child available to the following completion event", () => {
-    let store = makeState();
+    // The store here is a session-record projection: `sending` lives alongside
+    // `stream`/`permissions`/`questionnaire`/`goal` so a `set-sending` patch the
+    // executor produces has somewhere to land. Folding happens one patch at a
+    // time because `reduceWebuiSessionStatePatch`'s generic T extends
+    // `WebuiSessionStateWritable`, which is narrower than `WebuiEffectState` and
+    // would otherwise push the test through an incompatible `Array.reduce` call.
+    type ReducibleStore = WebuiSessionStateWritable & { goal: WebuiGoal | undefined };
+    let store: ReducibleStore = {
+      stream: initialWebuiStreamState,
+      sending: false,
+      permissions: [],
+      questionnaire: undefined,
+      goal: undefined,
+    };
     const read = () => store;
     const handlers: WebuiEffectHandlers = {
         refreshPending: () => undefined,
         refreshGoal: () => undefined,
         applyPatches: (patches) => {
-          store = patches.reduce(reduceWebuiSessionStatePatch, store);
+          for (const patch of patches) {
+            store = reduceWebuiSessionStatePatch(store, patch);
+          }
         },
         setGoal: (goal) => { store = { ...store, goal }; },
     };

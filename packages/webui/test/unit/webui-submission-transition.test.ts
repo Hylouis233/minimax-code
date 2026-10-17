@@ -14,8 +14,17 @@ import {
   buildWebuiComposerHandlers,
   submitWebuiTurn,
 } from "../../src/client/features/turn/application/composer-submission.js";
-import type { WebuiSubmissionAdmission } from "../../src/client/features/turn/contracts/submission.js";
-import type { WebuiDeliverySink } from "../../src/shared/contracts/delivery.js";
+import type {
+  WebuiSubmissionAdmission,
+  WebuiSubmissionIntent,
+  WebuiTaskSessionSubmitter,
+} from "../../src/client/features/turn/contracts/submission.js";
+import type {
+  WebuiDeliverySink,
+  WebuiDeliveryTransports,
+} from "../../src/shared/contracts/delivery.js";
+import type { WebuiClientMessageEnqueuer } from "../../src/client/features/composer/contracts/command-port.js";
+import type { WebuiComposerSubmitHandlers } from "../../src/client/features/composer/contracts/composer-turn.js";
 
 /** The sink the loop would write through; these sends never open one, so every member is a spy. */
 const sink: WebuiDeliverySink = {
@@ -49,11 +58,40 @@ const sendMessage = vi.fn(async () => undefined);
 const DISPATCHING: WebuiSubmissionAdmission = { kind: "dispatching" };
 
 /** Submit, and resolve the completion. The ticket is what the caller holds. */
+type SubmitArgs = {
+  readonly intent: WebuiSubmissionIntent;
+  readonly sessionId?: string;
+  readonly admission: WebuiSubmissionAdmission;
+  readonly sending: boolean;
+  readonly deps: WebuiDeliveryTransports;
+  readonly handlers: WebuiComposerSubmitHandlers;
+  readonly enqueueMessage?: WebuiClientMessageEnqueuer;
+  readonly submitTask?: WebuiTaskSessionSubmitter;
+  readonly createSessionWorkspaceDir?: string;
+  readonly teamModeOff?: boolean;
+  readonly onAttachmentsSubmitted?: () => void;
+};
 async function submit(
-  args: Parameters<typeof submitWebuiTurn>[0],
+  args: SubmitArgs,
 ): Promise<{ readonly ticket: ReturnType<typeof submitWebuiTurn>; readonly completion: unknown }> {
-  const ticket = submitWebuiTurn({ admission: DISPATCHING, ...args });
-  return { ticket, completion: await ticket!.completion };
+  const ticket = submitWebuiTurn({
+    intent: args.intent,
+    sessionId: args.sessionId,
+    admission: args.admission,
+    sending: args.sending,
+    deps: args.deps,
+    handlers: args.handlers,
+    ...(args.enqueueMessage !== undefined ? { enqueueMessage: args.enqueueMessage } : {}),
+    ...(args.submitTask !== undefined ? { submitTask: args.submitTask } : {}),
+    ...(args.createSessionWorkspaceDir !== undefined
+      ? { createSessionWorkspaceDir: args.createSessionWorkspaceDir }
+      : {}),
+    ...(args.teamModeOff !== undefined ? { teamModeOff: args.teamModeOff } : {}),
+    ...(args.onAttachmentsSubmitted !== undefined
+      ? { onAttachmentsSubmitted: args.onAttachmentsSubmitted }
+      : {}),
+  });
+  return { ticket, completion: await ticket.completion };
 }
 
 describe("the ticket a submission returns", () => {
@@ -215,6 +253,7 @@ describe("the ticket a submission returns", () => {
   it("numbers its tickets, so a transition can be correlated", () => {
     const first = submitWebuiTurn({
       intent: { kind: "ordinary", message: "hello" },
+      sessionId: undefined,
       sending: false,
       admission: { kind: "unsupported", missing: "transport" },
       deps: {},
@@ -222,6 +261,7 @@ describe("the ticket a submission returns", () => {
     });
     const second = submitWebuiTurn({
       intent: { kind: "ordinary", message: "hello" },
+      sessionId: undefined,
       sending: false,
       admission: { kind: "unsupported", missing: "transport" },
       deps: {},

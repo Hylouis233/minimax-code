@@ -525,8 +525,9 @@ describe("a write reports a machine-readable failure category", () => {
     });
     expect(outcome.status).toBe("failed");
     if (outcome.status !== "failed") throw new Error("unreachable");
-    expect(outcome.error).toBeInstanceOf(Error);
-    expect(outcome.error.message).toBe("nope");
+    const error = outcome.error;
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe("nope");
   });
 });
 

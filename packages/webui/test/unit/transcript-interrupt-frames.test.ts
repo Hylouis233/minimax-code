@@ -33,7 +33,7 @@ import type {
   WebuiDeliveryArgs,
   WebuiDeliveryDeps,
   WebuiDeliverySink,
-} from "../../src/client/conversation/stream-loop.js";
+} from "../../src/shared/contracts/delivery.js";
 import { buildWebuiStreamLoopSink } from "../../src/client/features/turn/application/stream-loop-sink.js";
 import { classifyStreamFrame } from "../../src/client/features/turn/application/stream-frame-classify.js";
 import type {WebuiClientMessageSender} from "../../src/client/features/turn/contracts/execution-port.js";
@@ -295,7 +295,7 @@ describe("C-3.2 a message sent after a stop starts a new turn", () => {
     const next = loopWithProjection(
       {
         sendMessage: second.sender,
-        resumeSession: async (request) => {
+        resumeSession: async (request: { id: string; afterCursor?: string; afterMsgId?: string }) => {
           resumes.push({ id: request.id, afterCursor: request.afterCursor, afterMsgId: request.afterMsgId });
         },
       },

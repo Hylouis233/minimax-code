@@ -45,7 +45,8 @@ describe("desktop settings registry", () => {
     expect(GENERIC_SECTION_TEST_IDS).toEqual(["app-mode-section", "application-section", "link-open-destination-section", "file-section", "session-management-section", "agent-control-permission-section", "about-section"]);
     expect(GENERIC_FILE_ROW_ORDER).toEqual(["file-open-in-new-tab-switch", "file-line-wrap-switch"]);
     expect(GENERIC_RADIO_CONTRACT).toEqual({ position: "absolute right-4 top-[22px]", accentToken: "icon_default_accent" });
-    for (const tab of DESKTOP_SETTINGS_TABS) expect(SETTINGS_ICON_PATHS[tab.icon]).toBeTruthy();
+    const iconPaths = SETTINGS_ICON_PATHS as Readonly<Record<string, string>>;
+    for (const tab of DESKTOP_SETTINGS_TABS) expect(iconPaths[tab.icon]).toBeTruthy();
   });
 
   it("renders the usage source shell and its loading branch without a DOM runtime", () => {

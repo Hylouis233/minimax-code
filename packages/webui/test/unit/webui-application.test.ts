@@ -64,6 +64,8 @@ function makeChannel(): FakeChannel {
   };
 }
 
+const noopResumeSession = vi.fn(async () => {}) as unknown as WebuiClientSessionResumer;
+
 function makeApplication(
   options: {
     readonly interactionsPort?: Record<string, unknown>;
@@ -158,6 +160,7 @@ describe("stage 4 — the four call sites' handling through the coordinator", ()
     const fake = makeChannel();
     const application = createWebuiApplication({
       openEventChannel: () => fake.channel,
+      turns: { resumeSession: noopResumeSession },
     });
     application.start();
     const queries = application.workspaceQueries;
@@ -195,6 +198,7 @@ describe("stage 4 — the four call sites' handling through the coordinator", ()
         getTurnDiff: async () => view,
         revertTurnDiff: async () => ({ success: true, turnDiff: view }),
       } as never,
+      turns: { resumeSession: noopResumeSession },
     });
     const queries = application.workspaceQueries;
     const invalidate = vi.fn();
@@ -217,7 +221,10 @@ describe("stage 4 — the four call sites' handling through the coordinator", ()
     // subscriber read a record caught mid-event — progress advanced with no turn
     // explaining it — and would render three times for one event.
     const fake = makeChannel();
-    const application = createWebuiApplication({ openEventChannel: () => fake.channel });
+    const application = createWebuiApplication({
+      openEventChannel: () => fake.channel,
+      turns: { resumeSession: noopResumeSession },
+    });
     application.start();
     const updateSession = vi.spyOn(application.store, "updateSession");
 
@@ -234,6 +241,7 @@ describe("stage 4 — the four call sites' handling through the coordinator", ()
     const fake = makeChannel();
     const application = createWebuiApplication({
       openEventChannel: () => fake.channel,
+      turns: { resumeSession: noopResumeSession },
       turnCapabilities: {
         pluginManagement: vi.fn(async () => ({ ok: true })),
       } as never,

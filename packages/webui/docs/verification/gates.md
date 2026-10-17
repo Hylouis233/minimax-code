@@ -10,8 +10,7 @@ document: [`browser-suite.md`](browser-suite.md).
 
 | Gate | Proves | Fails on |
 | --- | --- | --- |
-| `pnpm typecheck:webui` | The client config, the server/runtime/shared config and the test program compile together | A port member without its stub, a missing binding, a wrong DTO |
-| `pnpm typecheck:webui-full` | The same sources under the second, stricter test program | Divergence between the two test programs |
+| `pnpm typecheck:webui` | Every source file and every test file compiles under `strict`: the server/runtime/shared config, the client config, and one test program whose `include` is the whole `test/` and `src/` tree | A port member without its stub, a missing binding, a wrong DTO, a test fixture that no longer matches the signature it calls |
 | `pnpm check:webui-dependency` | Import direction and role ownership over the source, including `import type` edges | A forbidden direction, a role violation, a business holding one role in two homes, a stale peer-import exception |
 | `pnpm build:webui` | The client and server bundles build, and prints input counts | A module that is written but not wired (counts do not move) |
 | `pnpm check:webui-boundary` | Nothing outside the allowed entries entered the build graph | A retired source path, the terminal renderer, a client module in the server bundle or vice versa, a forbidden internal reference |

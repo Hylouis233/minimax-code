@@ -74,7 +74,6 @@ afterAll(() => {
 function evaluateFixture(
   files: Record<string, string>,
   options: ts.CompilerOptions = compilerOptions,
-  approved: readonly { readonly from: string; readonly to: string }[] = [],
 ) {
   const root = mkdtempSync(path.join(os.tmpdir(), "webui-dependency-"));
   temporaryRoots.push(root);
@@ -91,9 +90,7 @@ function evaluateFixture(
     compilerOptions: { ...options, baseUrl: options.baseUrl ?? sourceRoot },
     files: absoluteFiles,
   });
-  // A fixture graph states its own approved peers: the repository's list names
-  // files the fixture does not contain, which the rule would report as stale.
-  return { graph, result: evaluateGraph(graph, { approvedPeerImports: approved }) };
+  return { graph, result: evaluateGraph(graph) };
 }
 
 function runCli(args: string[]) {

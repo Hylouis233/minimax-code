@@ -55,10 +55,14 @@ const steps = [
   { name: "build", script: "build", windows: true },
   { name: "check:standalone", script: "check:standalone", windows: true },
   { name: "typecheck:webui", script: "typecheck:webui" },
-  // Compiler inputs are identical across the matrix, and this program is a
-  // second compile of the same WebUI sources as `typecheck:webui` above. One
-  // Linux job runs it; the three per-program checks stay on every platform.
-  { name: "typecheck:webui-full", script: "typecheck:webui-full", fullOnly: true },
+  // There is deliberately no second WebUI typecheck program. There used to be
+  // one — a `test-full` config that held the whole test tree and the client
+  // sources under `strict` while the ordinary `typecheck:test` named four test
+  // files — and having the complete one behind a separate name meant the gate an
+  // author ran locally did not see most of the package. `tsconfig.test.json` now
+  // carries the full program, so this one step checks every source and every
+  // test file on every platform.
+  //
   // Source-level direction check: it must surface before the build and the
   // metafile check, because `import type` edges never reach build output.
   { name: "check:webui-dependency", script: "check:webui-dependency" },

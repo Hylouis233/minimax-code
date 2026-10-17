@@ -124,8 +124,5 @@ describe("the decision vocabulary", () => {
     expect(webuiSubmissionRefusalFor({ kind: "needs-session" })).toBe("needs-session");
     expect(webuiSubmissionRefusalFor({ kind: "dispatching" })).toBeUndefined();
     expect(webuiSubmissionRefusalFor({ kind: "queued" })).toBeUndefined();
-    // A failed attempt is reported by the attempt, which has the error; the decision has none.
-    expect(webuiSubmissionRefusalFor("failed")).toBeUndefined();
-    expect(webuiSubmissionRefusalFor("creation-failed")).toBeUndefined();
   });
 });

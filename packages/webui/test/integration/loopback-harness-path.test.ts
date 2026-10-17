@@ -314,12 +314,18 @@ describe("loopback to harness-port evidence", () => {
 
     // 6. Shutdown: the server closes the live socket and stops accepting.
     const shutdown = service.close();
-    const watcherClosed = once<number>(watcher, "close");
-    const secondClosed = once<number>(second.ws, "close");
+    // `node:events`' `once` resolves to the event's *argument array*, so the
+    // close code has to be taken out of it. Comparing the array itself against a
+    // number was always unequal and made this assertion vacuous — it claimed the
+    // socket was not closed cleanly without ever reading the code.
+    const watcherClosed = once(watcher, "close");
+    const secondClosed = once(second.ws, "close");
     await shutdown;
     service = undefined;
-    expect(await watcherClosed).not.toBe(1000);
-    expect(await secondClosed).not.toBe(1000);
+    const [watcherCloseCode] = await watcherClosed;
+    const [secondCloseCode] = await secondClosed;
+    expect(watcherCloseCode).not.toBe(1000);
+    expect(secondCloseCode).not.toBe(1000);
 
     const afterShutdown = openClient(url);
     await expect(afterShutdown.upgrade).rejects.toThrow();

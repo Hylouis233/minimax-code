@@ -414,7 +414,7 @@ describe("one owner's cleanup failing does not strand the others", () => {
         openEventChannel: () => ({
           ...opened.channel,
           close: () => {
-            opened.channel.close();
+            opened.channel.close?.();
             throw new Error("host channel close failed");
           },
         }),

@@ -167,7 +167,7 @@ describe("the duplicate-owner rule", () => {
       "client/projection/models/groups.ts": leaf,
       "client/features/models/projection/groups.ts": leaf,
     });
-    const { violations } = roleRule(graph, []);
+    const { violations } = roleRule(graph);
     expect(rulesOf(violations)).toEqual(["duplicate-owner"]);
     expect(violations[0]?.detail).toContain("client/projection/models/groups.ts");
     expect(violations[0]?.detail).toContain("client/features/models/projection/groups.ts");
@@ -180,7 +180,7 @@ describe("the duplicate-owner rule", () => {
       "client/application/goal/goal-coordinator.ts": leaf,
       "client/features/goal/application/goal-coordinator.ts": leaf,
     });
-    expect(rulesOf(roleRule(graph, []).violations)).toEqual([
+    expect(rulesOf(roleRule(graph).violations)).toEqual([
       "duplicate-owner",
       "duplicate-owner",
     ]);
@@ -197,7 +197,7 @@ describe("the duplicate-owner rule", () => {
       "client/features/transcript/ui/SessionTranscript.tsx": leaf,
       "client/application/models/models-workflows.ts": leaf,
     });
-    expect(roleRule(graph, []).violations).toEqual([]);
+    expect(roleRule(graph).violations).toEqual([]);
   });
 
   it("reports a target home for a business that never had a current home", () => {
@@ -211,7 +211,7 @@ describe("the duplicate-owner rule", () => {
       // collapses the fixture to one file and asserts nothing.
       "client/projection/transcript/older-timestamps.ts": leaf,
     });
-    expect(rulesOf(roleRule(graph, []).violations)).toEqual(["duplicate-owner"]);
+    expect(rulesOf(roleRule(graph).violations)).toEqual(["duplicate-owner"]);
   });
 });
 
@@ -222,7 +222,7 @@ describe("the conversation substrate", () => {
       "client/conversation/history.ts":
         'import { leaf } from "../features/goal/application/goal-coordinator.js";\nexport const use = leaf;\n',
     });
-    const { violations } = roleRule(graph, []);
+    const { violations } = roleRule(graph);
     expect(rulesOf(violations)).toEqual(["role-import"]);
     expect(violations[0]?.detail).toContain("conversation may not import feature-application");
   });
@@ -234,7 +234,7 @@ describe("the conversation substrate", () => {
         'import type { WebuiGoalCoordinator } from "../features/goal/application/goal-coordinator.js";\n' +
         "export type Use = WebuiGoalCoordinator;\n",
     });
-    expect(rulesOf(roleRule(graph, []).violations)).toEqual(["role-import"]);
+    expect(rulesOf(roleRule(graph).violations)).toEqual(["role-import"]);
   });
 
   it("rejects conversation reaching the assembly or the platform adapters", () => {
@@ -244,7 +244,7 @@ describe("the conversation substrate", () => {
       "client/conversation/a.ts": 'export { leaf } from "../application/session-store.js";\n',
       "client/conversation/b.ts": 'export { leaf } from "../platform/transport.js";\n',
     });
-    expect(roleRule(graph, []).violations).toHaveLength(2);
+    expect(roleRule(graph).violations).toHaveLength(2);
   });
 
   it("keeps conversation importing shared DTOs and a feature's published contracts", () => {
@@ -256,7 +256,7 @@ describe("the conversation substrate", () => {
         'import type { WebuiGoalPort } from "../features/goal/contracts/goal-port.js";\n' +
         "export const use = leaf;\nexport type Port = WebuiGoalPort;\n",
     });
-    expect(roleRule(graph, []).violations).toEqual([]);
+    expect(roleRule(graph).violations).toEqual([]);
   });
 });
 
@@ -269,7 +269,7 @@ describe("presentation reaching for IO or an owner", () => {
       "client/features/composer/ui/b.ts":
         'export { leaf } from "../../../application/session-store.js";\n',
     });
-    expect(rulesOf(roleRule(graph, []).violations)).toEqual(["role-import", "role-import"]);
+    expect(rulesOf(roleRule(graph).violations)).toEqual(["role-import", "role-import"]);
   });
 
   it("rejects the shell importing the platform adapter", () => {
@@ -277,7 +277,7 @@ describe("presentation reaching for IO or an owner", () => {
       "client/platform/transport.ts": leaf,
       "client/shell/FoundationApp.tsx": 'export { leaf } from "../platform/transport.js";\n',
     });
-    expect(rulesOf(roleRule(graph, []).violations)).toEqual(["role-import"]);
+    expect(rulesOf(roleRule(graph).violations)).toEqual(["role-import"]);
   });
 
   it("rejects the generic UI home reaching a business at all", () => {
@@ -285,7 +285,7 @@ describe("presentation reaching for IO or an owner", () => {
       "client/features/models/ui/ModelPicker.tsx": leaf,
       "client/ui/Overlay.tsx": 'export { leaf } from "../features/models/ui/ModelPicker.js";\n',
     });
-    const { violations } = roleRule(graph, []);
+    const { violations } = roleRule(graph);
     expect(rulesOf(violations)).toEqual(["role-import"]);
     expect(violations[0]?.detail).toContain("ui may not import feature-ui");
   });
@@ -298,7 +298,7 @@ describe("presentation reaching for IO or an owner", () => {
       "client/features/composer/ui/WebuiComposer.tsx":
         'export { leaf } from "../bindings/use-composer.js";\n',
     });
-    expect(roleRule(graph, []).violations).toEqual([]);
+    expect(roleRule(graph).violations).toEqual([]);
   });
 
   it("keeps the shell composing a feature's public UI", () => {
@@ -307,7 +307,7 @@ describe("presentation reaching for IO or an owner", () => {
       "client/shell/FoundationApp.tsx":
         'export { leaf } from "../features/transcript/ui/SessionTranscript.js";\n',
     });
-    expect(roleRule(graph, []).violations).toEqual([]);
+    expect(roleRule(graph).violations).toEqual([]);
   });
 });
 
@@ -321,7 +321,7 @@ describe("cross-business imports", () => {
       "client/features/composer/application/submit.ts":
         'import type { WebuiGoalPort } from "../../goal/contracts/goal-port.js";\nexport type Port = WebuiGoalPort;\n',
     });
-    expect(roleRule(graph, []).violations).toEqual([]);
+    expect(roleRule(graph).violations).toEqual([]);
   });
 
   it("rejects a peer's private owner, and the same import written as a type reference", () => {
@@ -330,7 +330,7 @@ describe("cross-business imports", () => {
       "client/features/composer/application/submit.ts":
         'import { leaf } from "../../goal/application/goal-coordinator.js";\nexport const use = leaf;\n',
     });
-    expect(rulesOf(roleRule(value, []).violations)).toEqual(["private-peer-import"]);
+    expect(rulesOf(roleRule(value).violations)).toEqual(["private-peer-import"]);
 
     const typed = buildFixture({
       ...goalOwner,
@@ -338,7 +338,7 @@ describe("cross-business imports", () => {
         'import type { WebuiGoalCoordinator } from "../../goal/application/goal-coordinator.js";\n' +
         "export type Use = WebuiGoalCoordinator;\n",
     });
-    expect(rulesOf(roleRule(typed, []).violations)).toEqual(["private-peer-import"]);
+    expect(rulesOf(roleRule(typed).violations)).toEqual(["private-peer-import"]);
   });
 
   it("rejects a peer import of a still-current home, so a partial migration is judged too", () => {
@@ -347,7 +347,7 @@ describe("cross-business imports", () => {
       "client/features/composer/application/submit.ts":
         'export { leaf } from "../../../application/goal/goal-coordinator.js";\n',
     });
-    const { violations } = roleRule(graph, []);
+    const { violations } = roleRule(graph);
     expect(rulesOf(violations)).toEqual(["private-peer-import"]);
     expect(violations[0]?.detail).toContain("client/application/goal/goal-coordinator.ts");
   });
@@ -398,7 +398,7 @@ describe("cross-business imports", () => {
       "client/application/create-application.ts":
         'export { leaf } from "../features/composer/application/submit.js";\n',
     });
-    expect(roleRule(graph, []).violations).toEqual([]);
+    expect(roleRule(graph).violations).toEqual([]);
   });
 });
 
@@ -551,7 +551,7 @@ describe("the role rules judge the role, not the directory", () => {
       "client/shell/WebuiClientFoundationApp.tsx":
         'export { leaf } from "../platform/storage.js";\n',
     });
-    const { violations } = roleRule(graph, []);
+    const { violations } = roleRule(graph);
     expect(rulesOf(violations)).toEqual(["role-import"]);
     expect(violations[0]?.detail).toContain("shell may not import platform");
   });

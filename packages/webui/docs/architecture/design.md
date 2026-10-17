@@ -159,7 +159,7 @@ One declaration, three consumers, and a compiler that keeps them agreeing:
    `shared/contracts/<domain>.ts` DTOs, and implemented under `src/runtime/harness/` by
    `createHarnessPortFromHost`. `bind-handlers.ts` derives its `Pick` from the port, so the roster and
    the registry cannot drift: the counts are pinned by tests (86 bindings, 13 handlers, 99 operations),
-   and a change that adds or drops one stops `pnpm typecheck:webui-full` compiling until the roster
+   and a change that adds or drops one stops `pnpm typecheck:webui` compiling until the roster
    moves as a unit.
 
 **Optionality is the capability model.** Every port method is optional and `undefined` means "this
