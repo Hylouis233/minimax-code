@@ -751,7 +751,13 @@ export function createWebuiApplication(
     // The scheduler owns when this runs; the composer only says it is interested.
     observations,
     refreshInspection: async (sessionId) => {
-      await Promise.all([modelsWorkflows.loadModels(sessionId), accountWorkflows.loadAccount(sessionId)]);
+      // Acquisition, not selection: this runs on the scheduler's freshness budget
+      // while the user may have moved elsewhere, and a background read that selects
+      // the catalogue it read is a background read changing what is on screen.
+      await Promise.all([
+        modelsWorkflows.acquireModels(sessionId),
+        accountWorkflows.loadAccount(sessionId),
+      ]);
     },
     clearHomeTurn: () => {
       const writer = store.createSessionWriter({ kind: "home" });

@@ -553,10 +553,16 @@ export function createWebuiModelsWorkflows(deps: {
         else await loadProviders();
         return outcome;
       }
-      // Transport failure, timeout or a lost response: the write may or may not
-      // have landed, so the intent stays pending and the answer is reconciled by
-      // re-reading under the same intent instead of being retried blindly.
-      await loadProviders();
+      // Transport failure, timeout or a lost response: the write may or may not have
+      // landed, so the answer is reconciled by reading rather than by retrying the
+      // mutation. The read is the reconcile — it is not permission to overwrite the
+      // intent with it: the owner still holds what it will send next, and a display
+      // showing the server's answer while the intent differs is the contradiction this
+      // protocol exists to remove.
+      await loadProviders().catch(() => undefined);
+      const stillPending = pendingModels.get(providerId);
+      const rows = projectedProviders();
+      if (stillPending && rows) showProviderModels(rows, providerId, stillPending);
       return outcome;
     };
     const previous = providerWriteChains.get(providerId) ?? Promise.resolve();

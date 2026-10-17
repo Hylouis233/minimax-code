@@ -69,7 +69,6 @@ type SubmitArgs = {
   readonly submitTask?: WebuiTaskSessionSubmitter;
   readonly createSessionWorkspaceDir?: string;
   readonly teamModeOff?: boolean;
-  readonly onAttachmentsSubmitted?: () => void;
 };
 async function submit(
   args: SubmitArgs,
@@ -87,9 +86,6 @@ async function submit(
       ? { createSessionWorkspaceDir: args.createSessionWorkspaceDir }
       : {}),
     ...(args.teamModeOff !== undefined ? { teamModeOff: args.teamModeOff } : {}),
-    ...(args.onAttachmentsSubmitted !== undefined
-      ? { onAttachmentsSubmitted: args.onAttachmentsSubmitted }
-      : {}),
   });
   return { ticket, completion: await ticket.completion };
 }

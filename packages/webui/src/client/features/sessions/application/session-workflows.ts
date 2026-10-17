@@ -477,7 +477,7 @@ export function createWebuiSessionWorkflows(deps: {
    *
    * A bounded bucket, like the deletion fence beside it: the record is retired by
    * the user copying, transferring or discarding it, and cleared when the page is
-   * torn down. That is the same boundedness exception the plan accepts for
+   * torn down. That is the same boundedness exception an in-memory fact log takes for
    * tombstones — bounded by user action rather than by a quota — and it is stated
    * rather than implied.
    */
@@ -892,7 +892,7 @@ export function createWebuiSessionWorkflows(deps: {
       if (projects.loading) setProjects({ ...projects, loading: false });
       projectListeners.clear();
       // A retained draft is retained for a notice on this page; the page going
-      // away is the end of the retention the plan accepts.
+      // away is the end of the retention this owner keeps.
       retainedDrafts.clear();
       retainedListeners.clear();
     },

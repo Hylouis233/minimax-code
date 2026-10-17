@@ -111,12 +111,16 @@ describe("a provider mutation is the owner's, applied by intent", () => {
     expect(workflows.getSnapshot().providers.value?.[0]?.models[0]?.enabled).toBe(false);
   });
 
-  it("puts the last committed list back when the write is refused", async () => {
+  it("keeps the intent on screen when the outcome is unknown, and reconciles by reading", async () => {
+    const reads: number[] = [];
     const workflows = build({
-      listUserModelProviders: async () => [
-        providerRow({ providerId: "a", models: [modelRow("m1", true)] }),
-      ],
-      updateUserModelProvider: async () => Promise.reject(new Error("nope")),
+      listUserModelProviders: async () => {
+        reads.push(1);
+        return [providerRow({ providerId: "a", models: [modelRow("m1", true)] })];
+      },
+      // A transport failure: the write may or may not have landed, so the outcome is
+      // unknown rather than refused.
+      updateUserModelProvider: async () => Promise.reject(new Error("socket closed")),
     });
 
     await workflows.loadProviders();
@@ -127,8 +131,11 @@ describe("a provider mutation is the owner's, applied by intent", () => {
     });
 
     expect(outcome.status).toBe("failed");
-    // The write did not happen, so what is on screen is what is committed.
-    expect(workflows.getSnapshot().providers.value?.[0]?.models[0]?.enabled).toBe(true);
+    if (outcome.status === "failed") expect(outcome.category).toBe("transport");
+    // The read is the reconcile, not permission to overwrite the intent: this owner
+    // will send this intent next, so the display cannot show a list it disagrees with.
+    expect(reads.length).toBeGreaterThan(1);
+    expect(workflows.getSnapshot().providers.value?.[0]?.models[0]?.enabled).toBe(false);
   });
 });
 

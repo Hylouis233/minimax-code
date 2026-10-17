@@ -19,8 +19,8 @@ import { describe, expect, it } from "vitest";
 
 import { createWebuiObservationScheduler } from "../../src/client/application/observation-scheduler.js";
 
-function harness() {
-  let clock = 0;
+function harness(startAt = 0) {
+  let clock = startAt;
   const timers: { at: number; run: () => void }[] = [];
   const scheduler = createWebuiObservationScheduler({
     now: () => clock,
@@ -212,6 +212,52 @@ describe("V31 · one scheduler, independent budgets, suspended when hidden", () 
     await flush();
     expect(reads).toBe(2);
     expect(scheduler.stats().activityIssued).toBe(2);
+  });
+
+  it("does not spin when the clock is a wall clock", async () => {
+    // The failure this covers: a freshness deadline computed from `0` is in the past
+    // on a real clock, so the tick armed immediately and re-armed itself — a busy loop
+    // that also re-read the resource while its own read was still running. A test whose
+    // clock starts at 0 cannot produce that shape.
+    const { scheduler, advance } = harness(Date.now());
+    const gate = deferred();
+    let reads = 0;
+    scheduler.setInspectionInterest([
+      {
+        identity: "inspection:s1",
+        run: async () => {
+          reads += 1;
+          await gate.promise;
+        },
+      },
+    ]);
+    await flush();
+
+    // One read, issued once, and nothing armed to fire immediately behind it.
+    expect(reads).toBe(1);
+    expect(scheduler.stats().inspectionIssued).toBe(1);
+
+    // The budget elapses while that read is still running: the identity becomes stale,
+    // which queues one follow-up — not a second concurrent read of the same resource.
+    advance(5_000);
+    await flush();
+    expect(reads).toBe(1);
+    expect(scheduler.stats().inspectionIssued).toBe(1);
+
+    gate.resolve();
+    await flush();
+    // The follow-up ran exactly once, and the identity is fresh again.
+    expect(reads).toBe(2);
+    expect(scheduler.stats().inspectionInFlight).toBe(0);
+    expect(scheduler.stats().inspectionQueued).toBe(0);
+
+    advance(1_000);
+    await flush();
+    expect(reads).toBe(2);
+
+    advance(1_500);
+    await flush();
+    expect(reads).toBe(3);
   });
 
   it("tells a runner that its result is no longer wanted", async () => {

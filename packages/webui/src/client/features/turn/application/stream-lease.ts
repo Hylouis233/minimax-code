@@ -6,7 +6,7 @@
 // session's stream record, its subscription, and the turn it names. Those
 // transforms live here so the mechanism imports no aggregate at all.
 //
-// This module is the other half of the split settled in the plan's R27: the
+// This module is the other half of that split: the
 // delivery loop/lease keep shared frame vocabulary and generation fencing, and the
 // business translation sits with the business. Moving only the declarations while
 // leaving these transforms in `conversation/` would have preserved the defect,

@@ -1,7 +1,7 @@
 // The notice that reports a session somebody else deleted, and what it does with
 // the input that was still unsent for it.
 //
-// This is the plan's only new user-visible surface, and it is deliberately a
+// It is the only new user-visible surface here, and deliberately a
 // per-feature notice rather than a shell notification system: the fact is
 // Sessions', the input is the composer's, and the three ways out are the user's.
 // It reuses the banner pattern the conversation surface already renders, so it

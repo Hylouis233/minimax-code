@@ -18,7 +18,6 @@ export interface WebuiComposerSubmitArgs {
   readonly message?: string;
   readonly clientIntent?: string;
   readonly attachments?: readonly WebuiAttachmentInput[];
-  readonly onAttachmentsSubmitted?: () => void;
   readonly sending: boolean;
   /**
    * The transports the turn's loop drives. It is the loop's transport half, not

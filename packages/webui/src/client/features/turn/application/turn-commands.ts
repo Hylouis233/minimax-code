@@ -230,7 +230,6 @@ export interface WebuiSendTurnArgs {
   readonly clientIntent?: string;
   readonly planMode?: boolean;
   readonly attachments?: readonly WebuiAttachmentInput[];
-  readonly onAttachmentsSubmitted?: () => void;
   readonly sending: boolean;
   /**
    * The component-owned callbacks. The lease-bearing half of the handler bundle
@@ -332,7 +331,6 @@ export function sendWebuiTurn(
     ...(args.taskSessions ? { submitTask: args.taskSessions } : {}),
     createSessionWorkspaceDir: args.createSessionWorkspaceDir,
     teamModeOff: args.teamModeOff,
-    onAttachmentsSubmitted: args.onAttachmentsSubmitted,
   });
 }
 

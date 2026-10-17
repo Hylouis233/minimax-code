@@ -93,18 +93,15 @@ const UNKNOWN_RESULT_NAMES = [
  * The input side of the same boundary, and where an open record shows what it costs:
  * four of these are declared `Record<string, unknown>`, which is not assignable to a
  * runtime member that requires fields, so the adapter was forwarding a shape it never
- * proved. The plan's remedy is to derive each request type from the host input
- * declaration, or to prove the client shape is accepted on the real host; until that
- * lands the list is exact, so a ninth one cannot appear quietly.
+ * proved. Each needs its request type derived from the host's own declaration, or an
+ * executed case on the real host proving the client shape is accepted; until that
+ * lands the list is exact, so a tenth one cannot appear quietly.
  */
-type FirstParamOf<M> = M extends (...args: infer A) => unknown
-  ? A extends [infer P, ...unknown[]]
-    ? P
-    : never
-  : never;
+/** A member's full parameter list, or `never` when the declaration is not callable. */
+type ParamsOf<M> = M extends (...args: never[]) => unknown ? Parameters<M> : never;
 type MismatchedRequestNames = {
   [K in Keys<WebuiRuntimeCliService>]: K extends Keys<CliService>
-    ? [FirstParamOf<WebuiRuntimeCliService[K]>] extends [FirstParamOf<CliService[K]>]
+    ? [ParamsOf<WebuiRuntimeCliService[K]>] extends [ParamsOf<CliService[K]>]
       ? never
       : K
     : never;
@@ -119,6 +116,10 @@ const MISMATCHED_REQUEST_NAMES = [
   "discoverUserModelsCandidate",
   "saveUserModelProviderCandidate",
   "testUserModelCandidate",
+  // Its declared parameters are not the runtime member's either: the comparison is
+  // over the whole parameter list, and this one differs in a parameter the first
+  // would have hidden.
+  "listSkills",
 ] as const satisfies readonly MismatchedRequestNames[];
 
 /**
@@ -198,7 +199,7 @@ type MismatchedExtra = AssertEmpty<
 // The obligations the `unknown`-declared members used to escape, both exact in both
 // directions: no forwarded result may be declared `unknown` beyond the ten named
 // above, and no forwarded request may be one the runtime member would refuse beyond
-// the eight named above.
+// the nine named above.
 type NoUnknownResults = AssertEmpty<
   Exclude<DeclaredUnknownResult, (typeof UNKNOWN_RESULT_NAMES)[number]>
 >;

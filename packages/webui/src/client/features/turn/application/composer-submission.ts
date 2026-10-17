@@ -115,7 +115,6 @@ export function submitWebuiTurn(
     readonly submitTask?: WebuiTaskSessionSubmitter;
     readonly createSessionWorkspaceDir?: string;
     readonly teamModeOff?: boolean;
-    readonly onAttachmentsSubmitted?: () => void;
   },
 ): WebuiSubmissionTicket {
   const id = ++nextSubmissionId;
@@ -216,7 +215,6 @@ export function submitWebuiTurn(
         ...(attachments.length ? { attachments } : {}),
         enqueueMessage: args.enqueueMessage,
         onDraftChange: handlers.onDraftChange,
-        onAttachmentsSubmitted: args.onAttachmentsSubmitted,
         onQueued: handlers.onQueued,
         setRefusal: (next) => {
           refusal = next;
@@ -230,7 +228,6 @@ export function submitWebuiTurn(
     if (!args.deps.sendMessage) return ({ kind: "unsupported", missing: "transport" });
     handlers.setSending(true);
     handlers.onDraftChange("");
-    args.onAttachmentsSubmitted?.();
     handlers.resetStreamForTurn();
     let claimed: number | undefined;
     try {

@@ -1007,9 +1007,6 @@ async function submitTurn(
       ? { createSessionWorkspaceDir: args.createSessionWorkspaceDir }
       : {}),
     ...(args.teamModeOff === undefined ? {} : { teamModeOff: args.teamModeOff }),
-    ...(args.onAttachmentsSubmitted
-      ? { onAttachmentsSubmitted: args.onAttachmentsSubmitted }
-      : {}),
   });
   return ticket.completion;
 }

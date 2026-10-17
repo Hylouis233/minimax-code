@@ -58,14 +58,6 @@ export function createHarnessPortFromHost(
       await host.apiHost.close();
     },
   };
-  // Derived from the assembled port rather than declared per feature: a
-  // capability is advertised because its members are wired, and a family whose
-  // companion is missing is reported `not-ready` instead of silently working
-  // halfway.
-  version = {
-    ...version,
-    capabilities: deriveWebuiCapabilityManifest(port as unknown as Readonly<Record<string, unknown>>),
-  };
   const harnessPort: WebuiHarnessPort = {
     ...port,
     // The slash-command interpreter is runtime logic that reads several port
@@ -73,6 +65,20 @@ export function createHarnessPortFromHost(
     // `runtime-port` instead of importing the runtime implementation beside it.
     runCommand: (request) => runWebuiCommand(port, request),
     importSessionTransferWorkflow: (input) => importWebuiSessionTransfer(port, input),
+  };
+  // Derived from the *assembled* port rather than declared per feature: a capability
+  // is advertised because its members are wired, and a family whose companion is
+  // missing is reported `not-ready` instead of silently working halfway.
+  //
+  // Assembled, not the spread above it: `runCommand` and the session-transfer import
+  // join the port after that spread, and a manifest derived from the partial object
+  // reported the command family absent — a capability claim that was wrong about the
+  // very service it describes.
+  version = {
+    ...version,
+    capabilities: deriveWebuiCapabilityManifest(
+      harnessPort as unknown as Readonly<Record<string, unknown>>,
+    ),
   };
   return harnessPort;
 }

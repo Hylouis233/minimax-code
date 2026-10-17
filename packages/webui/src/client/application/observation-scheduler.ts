@@ -88,6 +88,14 @@ interface ClassState {
   readonly freshAt: Map<string, number>;
   readonly interested: Map<string, WebuiObservationRequest>;
   readonly queued: Map<string, WebuiObservationRequest>;
+  /**
+   * Identities with a read running right now.
+   *
+   * The budget counts reads in flight; this counts *which* identities have one, so a
+   * deadline that fires while its own read is still running queues a follow-up instead
+   * of starting a second, overlapping read of the same resource.
+   */
+  readonly inFlightIds: Set<string>;
   inFlight: number;
   issued: number;
 }
@@ -107,6 +115,7 @@ export function createWebuiObservationScheduler(
     freshAt: new Map(),
     interested: new Map(),
     queued: new Map(),
+    inFlightIds: new Set(),
     inFlight: 0,
     issued: 0,
   };
@@ -115,6 +124,7 @@ export function createWebuiObservationScheduler(
     freshAt: new Map(),
     interested: new Map(),
     queued: new Map(),
+    inFlightIds: new Set(),
     inFlight: 0,
     issued: 0,
   };
@@ -136,7 +146,12 @@ export function createWebuiObservationScheduler(
     // a detached composer costs no timer.
     let nearest: number | undefined;
     for (const identity of inspection.interested.keys()) {
-      const due = (inspection.freshAt.get(identity) ?? 0) + inspectionFreshnessMs;
+      // An identity that has not been read yet is fresh *from registration*, which is
+      // what `register` records. Reading the clock instead of the wall epoch matters:
+      // an unanswered freshness deadline is computed against `0`, which on a real clock
+      // is in the past, so the tick armed immediately and re-armed itself — a spin, not
+      // a schedule. A test whose clock starts at zero cannot see that.
+      const due = (inspection.freshAt.get(identity) ?? now()) + inspectionFreshnessMs;
       nearest = nearest === undefined ? due : Math.min(nearest, due);
     }
     if (nearest === undefined) return;
@@ -164,13 +179,23 @@ export function createWebuiObservationScheduler(
       // probe for a session the user has left is exactly the work the identity
       // rule exists to remove.
       if (!state.interested.has(identity)) continue;
+      if (state.inFlightIds.has(identity)) {
+        // Its own read is still running, so this is a follow-up: put it back and stop
+        // scanning, because nothing else in the queue can be issued ahead of it
+        // without reordering work the caller asked for. The running read's completion
+        // pumps again and this one goes then.
+        state.queued.set(identity, request);
+        break;
+      }
       state.inFlight += 1;
       state.issued += 1;
+      state.inFlightIds.add(identity);
       void Promise.resolve()
         .then(() => request.run({ isCurrent: () => isCurrent(state, identity) }))
         .catch(() => undefined)
         .finally(() => {
           state.inFlight -= 1;
+          state.inFlightIds.delete(identity);
           if (isCurrent(state, identity)) state.freshAt.set(identity, now());
           pump(state);
         });
@@ -200,6 +225,9 @@ export function createWebuiObservationScheduler(
         continue;
       }
       state.queued.set(identity, request);
+      // Fresh from now: the deadline is `now + freshness`, not an epoch-derived
+      // instant that is already past.
+      state.freshAt.set(identity, now());
     }
     pump(state);
   };
