@@ -22,6 +22,25 @@ import type { WebuiClientSessionResumer } from "../../src/client/features/turn/c
 const SESSION = "session-initial";
 const OTHER = "session-other";
 
+it("selects the visible model catalogue without turning background acquisition into selection", async () => {
+  const listModels = vi.fn(async (request?: { readonly sessionId?: string }) => [
+    { providerId: "fixture", modelId: request?.sessionId ?? "home" },
+  ]);
+  const application = createWebuiApplication({
+    openEventChannel: () => scriptedChannel().channel,
+    slices: createWebuiPortSlices({ listModels } as never),
+    turns: { resumeSession: (async () => {}) as unknown as WebuiClientSessionResumer },
+  });
+  await application.modelsWorkflows.acquireModels(SESSION);
+  await application.modelsWorkflows.acquireModels(OTHER);
+  application.select(SESSION);
+  expect(application.modelsWorkflows.getSnapshot().models.value?.[0]?.modelId).toBe(SESSION);
+  application.select(OTHER);
+  expect(application.modelsWorkflows.getSnapshot().models.value?.[0]?.modelId).toBe(OTHER);
+  expect(listModels).toHaveBeenCalledTimes(2);
+  application.dispose();
+});
+
 function scriptedChannel() {
   const listeners = new Set<(event: WebuiRuntimeEvent) => void>();
   const ready = new Set<() => void>();

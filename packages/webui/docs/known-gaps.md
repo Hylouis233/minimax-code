@@ -62,13 +62,14 @@ state.
 with `disabled: true`. They render as tabs that cannot be opened. That is the shipped state, not a
 regression.
 
-## 5. The runtime→wire projection is still a cast
+## 5. Upstream open results need runtime conversion
 
-`runtime/assembly.ts`'s default factory casts the runtime host because the WebUI's handle declares
-its own wire projections of the results (`WebuiSessionPage`, `WebuiMessagesResult`, …) while the
-runtime's `cliService` returns its own view types (`SessionPage`, `GetMessagesResult`, …). They
-disagree on 40 members. Replacing those projections with a derivation plus an explicit conversion is
-outstanding work; the cast is where the difference is currently stated.
+The host assembly no longer casts the runtime host. Harness adapters derive host-facing types
+from public `CliService` methods and convert them into independent WebUI DTOs; semantic readers
+retain those types. Ten upstream methods still declare `unknown` results, so their adapters need
+runtime conversion rather than a stronger inferred contract. The exact set is pinned in
+`test/unit/webui-host-contract-derivation.test.ts`; see
+[`runtime/harness-boundary.md`](runtime/harness-boundary.md).
 
 ## 6. The submission record carries a decision nothing reads
 

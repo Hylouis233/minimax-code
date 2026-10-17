@@ -482,8 +482,10 @@ export function createWebuiSessionWorkflows(deps: {
    * rather than implied.
    */
   const retainedDrafts = new Map<string, WebuiRetainedDeletionDraft>();
+  let retainedSnapshot: readonly WebuiRetainedDeletionDraft[] = [];
   const retainedListeners = new Set<() => void>();
   const notifyRetained = (): void => {
+    retainedSnapshot = [...retainedDrafts.values()];
     for (const listener of [...retainedListeners]) listener();
   };
   const retainUnsentInput = (sessionId: string): void => {
@@ -877,7 +879,7 @@ export function createWebuiSessionWorkflows(deps: {
         }
       }
     },
-    retainedDeletionDrafts: () => [...retainedDrafts.values()],
+    retainedDeletionDrafts: () => retainedSnapshot,
     subscribeRetainedDrafts: (listener) => {
       retainedListeners.add(listener);
       return () => retainedListeners.delete(listener);
@@ -894,6 +896,7 @@ export function createWebuiSessionWorkflows(deps: {
       // A retained draft is retained for a notice on this page; the page going
       // away is the end of the retention this owner keeps.
       retainedDrafts.clear();
+      retainedSnapshot = [];
       retainedListeners.clear();
     },
   };

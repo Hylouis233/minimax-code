@@ -28,7 +28,9 @@ import type {
   WebuiSaveUserModelProviderCandidateRequest,
   WebuiUpdateUserModelProviderRequest,
   WebuiUserModelInput,
+  WebuiTestUserModelCandidateRequest,
 } from "../../shared/contracts/models.js";
+import { asText } from "./result-conversion.js";
 
 /** The runtime's own request shapes for the provider mutations. */
 export type RuntimeCreateProviderRequest = Parameters<CliService["createUserModelProvider"]>[0];
@@ -108,7 +110,9 @@ function toModel(input: WebuiUserModelInput): RuntimeModelInput {
     ...(input.temperature === undefined ? {} : { temperature: input.temperature }),
     ...(input.capabilities === undefined
       ? {}
-      : { capabilities: input.capabilities as RuntimeModelInput["capabilities"] }),
+      : {
+          capabilities: input.capabilities as RuntimeModelInput["capabilities"],
+        }),
     ...(modalities === undefined
       ? {}
       : {
@@ -143,7 +147,9 @@ const CANDIDATE_FIELDS = [
 ] as const;
 
 /** Rebuilds the nested candidate field by field, carrying its extension keys. */
-function toCandidate(input: WebuiModelProviderCandidateInput): RuntimeCandidate {
+function toCandidate(
+  input: WebuiModelProviderCandidateInput,
+): RuntimeCandidate {
   const declared = {
     baseUrl: input.baseUrl,
     ...(input.providerId === undefined ? {} : { providerId: input.providerId }),
@@ -267,10 +273,17 @@ export function toRuntimeDiscoverCandidateRequest(
   // Unreachable through the declared union, and stated rather than forwarded: a body that
   // names neither branch has no endpoint to discover against, and inventing one here would
   // turn a rejected request into a discovery against the wrong address.
-  throw new Error("discoverUserModelsCandidate: the request names neither branch");
+  throw new Error(
+    "discoverUserModelsCandidate: the request names neither branch",
+  );
 }
 
-const SAVE_FIELDS = ["candidate", "modelId", "saveAndUse", "skipConnectionTest"] as const;
+const SAVE_FIELDS = [
+  "candidate",
+  "modelId",
+  "saveAndUse",
+  "skipConnectionTest",
+] as const;
 
 export function toRuntimeSaveCandidateRequest(
   body: WebuiSaveUserModelProviderCandidateRequest,
@@ -282,4 +295,39 @@ export function toRuntimeSaveCandidateRequest(
     ...(body.skipConnectionTest === undefined ? {} : { skipConnectionTest: body.skipConnectionTest }),
   };
   return withExtensions(declared, body, SAVE_FIELDS);
+}
+
+export function toRuntimeTestCandidateRequest(
+  body: WebuiTestUserModelCandidateRequest,
+): Parameters<CliService["testUserModelCandidate"]>[0] {
+  const candidate = toCandidate({
+    ...body.candidate,
+    baseUrl: asText(body.candidate.baseUrl, "a provider base URL"),
+  });
+  const { models, ...fields } = candidate;
+  return withExtensions(
+    {
+      candidate: {
+        ...fields,
+        ...(models === undefined
+          ? {}
+          : {
+              models: models.map(({ modalities, ...model }) => ({
+                ...model,
+                ...(modalities === undefined
+      ? {}
+      : {
+          modalities: {
+            ...(modalities.input === undefined ? {} : { input: [...modalities.input] }),
+            ...(modalities.output === undefined ? {} : { output: [...modalities.output] }),
+          },
+        }),
+              })),
+            }),
+      },
+      modelId: asText(body.modelId, "a model id"),
+    },
+    body,
+    ["candidate", "modelId"],
+  );
 }

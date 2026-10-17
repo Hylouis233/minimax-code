@@ -6,7 +6,10 @@ import type { WebuiHarnessPort } from "../port.js";
 import type { WebuiRuntimeHostHandle } from "./host-contract.js";
 import { requireCliService, requireHostSlot } from "./requirements.js";
 import {
-  toWebuiDiffResult,
+  toWebuiSessionDiff,
+  toWebuiTurnDiff,
+  toWebuiRevertResult,
+  toWebuiReapplyResult,
   toWebuiEditMessageResult,
   toWebuiMessagesResult,
   toWebuiRecord,
@@ -17,7 +20,29 @@ import {
 
 export function createSessionsAdapter(
   host: WebuiRuntimeHostHandle,
-): Pick<WebuiHarnessPort, "listSessions" | "listVisibleProjects" | "getSessionTree" | "archiveSession" | "deleteSession" | "updateSession" | "getSessionForkOptions" | "forkSession" | "createSession" | "getSession" | "getMessages" | "exportSessionTransfer" | "importSessionTransfer" | "getSessionDiff" | "getTurnDiff" | "revertTurnDiff" | "reapplyTurnDiff" | "getSessionRewindPreview" | "rewindSession" | "editSessionMessage"> {
+): Pick<
+  WebuiHarnessPort,
+  | "listSessions"
+  | "listVisibleProjects"
+  | "getSessionTree"
+  | "archiveSession"
+  | "deleteSession"
+  | "updateSession"
+  | "getSessionForkOptions"
+  | "forkSession"
+  | "createSession"
+  | "getSession"
+  | "getMessages"
+  | "exportSessionTransfer"
+  | "importSessionTransfer"
+  | "getSessionDiff"
+  | "getTurnDiff"
+  | "revertTurnDiff"
+  | "reapplyTurnDiff"
+  | "getSessionRewindPreview"
+  | "rewindSession"
+  | "editSessionMessage"
+> {
   return {
     async listSessions(request) {
       // Converted: the runtime sends `sessionType` as a number and the wire
@@ -53,7 +78,9 @@ export function createSessionsAdapter(
     },
 
     async updateSession(request) {
-      return toWebuiRecord(await requireCliService(host).updateSession(request, {}));
+      return toWebuiRecord(
+        await requireCliService(host).updateSession(request, {}),
+      );
     },
 
     async getSessionForkOptions(request) {
@@ -61,11 +88,15 @@ export function createSessionsAdapter(
     },
 
     async forkSession(request) {
-      return toWebuiRecord(await requireCliService(host).forkSession(request, {}));
+      return toWebuiRecord(
+        await requireCliService(host).forkSession(request, {}),
+      );
     },
 
     async createSession(request) {
-      return toWebuiRecord(await requireCliService(host).createSession(request, {}));
+      return toWebuiRecord(
+        await requireCliService(host).createSession(request, {}),
+      );
     },
 
     async getSession(request) {
@@ -90,19 +121,27 @@ export function createSessionsAdapter(
     },
 
     async getSessionDiff(request) {
-      return toWebuiDiffResult(await requireCliService(host).getSessionDiff(request, {}));
+      return toWebuiSessionDiff(
+        await requireCliService(host).getSessionDiff(request, {}),
+      );
     },
 
     async getTurnDiff(request) {
-      return toWebuiDiffResult(await requireCliService(host).getTurnDiff(request, {}));
+      return toWebuiTurnDiff(
+        await requireCliService(host).getTurnDiff(request, {}),
+      );
     },
 
     async revertTurnDiff(request) {
-      return toWebuiDiffResult(await requireCliService(host).revertTurnDiff(request, {}));
+      return toWebuiRevertResult(
+        await requireCliService(host).revertTurnDiff(request, {}),
+      );
     },
 
     async reapplyTurnDiff(request) {
-      return toWebuiDiffResult(await requireCliService(host).reapplyTurnDiff(request, {}));
+      return toWebuiReapplyResult(
+        await requireCliService(host).reapplyTurnDiff(request, {}),
+      );
     },
 
     async getSessionRewindPreview(request) {

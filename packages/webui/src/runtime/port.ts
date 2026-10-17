@@ -90,6 +90,7 @@ import type {
   WebuiSaveUserModelProviderCandidateRequest,
   WebuiSkillEntry,
   WebuiUpdateUserModelProviderRequest,
+  WebuiTestUserModelCandidateRequest,
 } from "../shared/contracts/models.js";
 import type { WebuiHostPrerequisiteFacts } from "../shared/capability-manifest.js";
 import type { WebuiVersionInfo } from "../shared/contracts/version.js";
@@ -120,21 +121,38 @@ import type {
 
 export interface WebuiHarnessPort {
   version(): WebuiVersionInfo;
-  listVisibleProjects?(request: { readonly limit?: number }): Promise<readonly WebuiProjectRecord[]>;
+  listVisibleProjects?(request: {
+    readonly limit?: number;
+  }): Promise<readonly WebuiProjectRecord[]>;
   listSessions(request: WebuiSessionListRequest): Promise<WebuiSessionPage>;
-  getSessionTree(request: WebuiSessionTreeRequest): Promise<WebuiSessionTreePage>;
-  archiveSession(request: { readonly id: string; readonly archived?: boolean }): Promise<{ readonly success?: boolean }>;
-  deleteSession(request: { readonly id: string }): Promise<{ readonly success?: boolean }>;
-  updateSession(request: WebuiUpdateSessionRequest): Promise<WebuiUpdateSessionResult>;
-  getSessionForkOptions(request: WebuiGetSessionForkOptionsRequest): Promise<WebuiGetSessionForkOptionsResult>;
-  forkSession(request: WebuiForkSessionRequest): Promise<WebuiForkSessionResult>;
+  getSessionTree(
+    request: WebuiSessionTreeRequest,
+  ): Promise<WebuiSessionTreePage>;
+  archiveSession(request: {
+    readonly id: string;
+    readonly archived?: boolean;
+  }): Promise<{ readonly success?: boolean }>;
+  deleteSession(request: {
+    readonly id: string;
+  }): Promise<{ readonly success?: boolean }>;
+  updateSession(
+    request: WebuiUpdateSessionRequest,
+  ): Promise<WebuiUpdateSessionResult>;
+  getSessionForkOptions(
+    request: WebuiGetSessionForkOptionsRequest,
+  ): Promise<WebuiGetSessionForkOptionsResult>;
+  forkSession(
+    request: WebuiForkSessionRequest,
+  ): Promise<WebuiForkSessionResult>;
   createSession(
     request: WebuiCreateSessionRequest,
   ): Promise<WebuiCreateSessionResult>;
   getSession(
     request: WebuiSessionLookupRequest,
   ): Promise<WebuiSessionLookupResult>;
-  getActiveTurn(request: WebuiSessionLookupRequest): Promise<WebuiActiveTurnResult>;
+  getActiveTurn(
+    request: WebuiSessionLookupRequest,
+  ): Promise<WebuiActiveTurnResult>;
   getMessages(request: WebuiMessagesRequest): Promise<WebuiMessagesResult>;
   /**
    * Both storage layers of a session, verbatim.
@@ -144,7 +162,9 @@ export interface WebuiHarnessPort {
    * fork-origin rows, and a transfer file built from it cannot be read back
    * without losing them.
    */
-  exportSessionTransfer(request: { readonly id: string }): Promise<WebuiSessionTransferFile>;
+  exportSessionTransfer(request: {
+    readonly id: string;
+  }): Promise<WebuiSessionTransferFile>;
   importSessionTransfer(
     request: WebuiImportSessionTransferRequest,
   ): Promise<WebuiImportSessionTransferResult>;
@@ -153,40 +173,109 @@ export interface WebuiHarnessPort {
     readonly agentName: string;
     readonly workspaceDir?: string;
   }): Promise<
-    | { readonly kind: "imported"; readonly body: { readonly sessionId: string; readonly canonicalMessages: number; readonly displayMessages: number; readonly revision: string } }
+    | {
+        readonly kind: "imported";
+        readonly body: {
+          readonly sessionId: string;
+          readonly canonicalMessages: number;
+          readonly displayMessages: number;
+          readonly revision: string;
+        };
+      }
     | { readonly kind: "create-failed" }
     | { readonly kind: "not-transfer-file" }
     | { readonly kind: "import-failed" }
   >;
-  getSessionDiff(request: WebuiGetSessionDiffRequest): Promise<WebuiGetSessionDiffResult>;
-  getTurnDiff(request: WebuiGetTurnDiffRequest): Promise<WebuiGetTurnDiffResult>;
-  revertTurnDiff(request: WebuiRevertTurnDiffRequest): Promise<WebuiRevertTurnDiffResult>;
-  reapplyTurnDiff(request: WebuiReapplyTurnDiffRequest): Promise<WebuiReapplyTurnDiffResult>;
-  getSessionRewindPreview(request: WebuiGetSessionRewindPreviewRequest): Promise<WebuiGetSessionRewindPreviewResult>;
-  rewindSession(request: WebuiRewindSessionRequest): Promise<WebuiRewindSessionResult>;
-  editSessionMessage(request: WebuiEditSessionMessageRequest): Promise<WebuiEditSessionMessageResult>;
+  getSessionDiff(
+    request: WebuiGetSessionDiffRequest,
+  ): Promise<WebuiGetSessionDiffResult>;
+  getTurnDiff(
+    request: WebuiGetTurnDiffRequest,
+  ): Promise<WebuiGetTurnDiffResult>;
+  revertTurnDiff(
+    request: WebuiRevertTurnDiffRequest,
+  ): Promise<WebuiRevertTurnDiffResult>;
+  reapplyTurnDiff(
+    request: WebuiReapplyTurnDiffRequest,
+  ): Promise<WebuiReapplyTurnDiffResult>;
+  getSessionRewindPreview(
+    request: WebuiGetSessionRewindPreviewRequest,
+  ): Promise<WebuiGetSessionRewindPreviewResult>;
+  rewindSession(
+    request: WebuiRewindSessionRequest,
+  ): Promise<WebuiRewindSessionResult>;
+  editSessionMessage(
+    request: WebuiEditSessionMessageRequest,
+  ): Promise<WebuiEditSessionMessageResult>;
   isGoalEnabled(): Promise<WebuiGoalEnabledResult>;
   getGoal(request: WebuiGoalSessionRequest): Promise<WebuiGoal | undefined>;
   createGoal(request: WebuiGoalCreateRequest): Promise<WebuiGoal>;
   patchGoal(request: WebuiGoalPatchRequest): Promise<WebuiGoal>;
-  clearGoal(request: WebuiGoalSessionRequest): Promise<{ readonly success: boolean }>;
-  listWorkspaceFileTree(request: { readonly workspaceDir: string; readonly path?: string }): Promise<readonly WebuiWorkspaceFile[]>;
-  readWorkspaceFile(request: { readonly workspaceDir: string; readonly path: string }): Promise<WebuiWorkspaceFileContent>;
-  getWorkspaceEnvironment(request: { readonly workspaceDir: string }): Promise<WebuiWorkspaceEnvironment>;
-  mutateWorkspaceGit(request: WebuiWorkspaceGitMutationRequest): Promise<Record<string, unknown>>;
-  getWorkspaceReviewSummary(request: { readonly workspaceDir: string }): Promise<WebuiWorkspaceReviewSummary>;
-  listWorkspaceReviewFileDiffs(request: { readonly workspaceDir: string; readonly reviewSnapshotId: string; readonly fileIds: readonly string[] }): Promise<WebuiWorkspaceReviewDiffs>;
-  getWorkspaceReviewFileContent(request: { readonly workspaceDir: string; readonly reviewSnapshotId: string; readonly fileId: string; readonly side: "old" | "new" }): Promise<WebuiWorkspaceReviewFileContent>;
-  searchWorkspaceReviewDiffs(request: { readonly workspaceDir: string; readonly reviewSnapshotId: string; readonly query: string; readonly includeUntrackedFiles: boolean; readonly pageIndex?: number; readonly pageSize?: number }): Promise<WebuiWorkspaceReviewSearchResult>;
-  readCanvas(request: { readonly sessionId: string }): Promise<WebuiCanvasDocument>;
-  applyCanvas(request: { readonly sessionId: string; readonly operation: Record<string, unknown> }): Promise<{ readonly operationId: string; readonly document: WebuiCanvasDocument }>;
+  clearGoal(
+    request: WebuiGoalSessionRequest,
+  ): Promise<{ readonly success: boolean }>;
+  listWorkspaceFileTree(request: {
+    readonly workspaceDir: string;
+    readonly path?: string;
+  }): Promise<readonly WebuiWorkspaceFile[]>;
+  readWorkspaceFile(request: {
+    readonly workspaceDir: string;
+    readonly path: string;
+  }): Promise<WebuiWorkspaceFileContent>;
+  getWorkspaceEnvironment(request: {
+    readonly workspaceDir: string;
+  }): Promise<WebuiWorkspaceEnvironment>;
+  mutateWorkspaceGit(
+    request: WebuiWorkspaceGitMutationRequest,
+  ): Promise<Record<string, unknown>>;
+  getWorkspaceReviewSummary(request: {
+    readonly workspaceDir: string;
+  }): Promise<WebuiWorkspaceReviewSummary>;
+  listWorkspaceReviewFileDiffs(request: {
+    readonly workspaceDir: string;
+    readonly reviewSnapshotId: string;
+    readonly fileIds: readonly string[];
+  }): Promise<WebuiWorkspaceReviewDiffs>;
+  getWorkspaceReviewFileContent(request: {
+    readonly workspaceDir: string;
+    readonly reviewSnapshotId: string;
+    readonly fileId: string;
+    readonly side: "old" | "new";
+  }): Promise<WebuiWorkspaceReviewFileContent>;
+  searchWorkspaceReviewDiffs(request: {
+    readonly workspaceDir: string;
+    readonly reviewSnapshotId: string;
+    readonly query: string;
+    readonly includeUntrackedFiles: boolean;
+    readonly pageIndex?: number;
+    readonly pageSize?: number;
+  }): Promise<WebuiWorkspaceReviewSearchResult>;
+  readCanvas(request: {
+    readonly sessionId: string;
+  }): Promise<WebuiCanvasDocument>;
+  applyCanvas(request: {
+    readonly sessionId: string;
+    readonly operation: Record<string, unknown>;
+  }): Promise<{
+    readonly operationId: string;
+    readonly document: WebuiCanvasDocument;
+  }>;
   /**
    * Archive listing for the workspace panel. The runtime owns every
    * hardening decision here (entry ceiling, expansion ratio, path
    * validation); the WebUI only renders what the runtime is willing to name.
    */
-  readWorkspaceArchive(request: { readonly workspaceDir: string; readonly path: string; readonly prefix?: string }): Promise<WebuiWorkspaceArchiveListing>;
-  extractWorkspaceArchive(request: { readonly workspaceDir: string; readonly path: string; readonly destination: string; readonly prefix?: string }): Promise<WebuiWorkspaceArchiveExtractResult>;
+  readWorkspaceArchive(request: {
+    readonly workspaceDir: string;
+    readonly path: string;
+    readonly prefix?: string;
+  }): Promise<WebuiWorkspaceArchiveListing>;
+  extractWorkspaceArchive(request: {
+    readonly workspaceDir: string;
+    readonly path: string;
+    readonly destination: string;
+    readonly prefix?: string;
+  }): Promise<WebuiWorkspaceArchiveExtractResult>;
   sendMessage(
     request: WebuiSendMessageRequest,
     signal?: AbortSignal,
@@ -254,7 +343,9 @@ export interface WebuiHarnessPort {
   }): Promise<{ readonly skills: readonly WebuiSkillEntry[] }>;
   pluginManagement?(request: WebuiPluginManagementRequest): Promise<unknown>;
   getPermissionMode?(): Promise<unknown>;
-  setPermissionMode?(request: { readonly mode: "default" | "auto" | "bypassPermissions" }): Promise<unknown>;
+  setPermissionMode?(request: {
+    readonly mode: "default" | "auto" | "bypassPermissions";
+  }): Promise<unknown>;
   selectModel(request: {
     readonly providerId: string;
     readonly modelId: string;
@@ -270,19 +361,38 @@ export interface WebuiHarnessPort {
     readonly sessionId?: string;
   }): Promise<Record<string, unknown>>;
   listUserModelProviders(): Promise<readonly Record<string, unknown>[]>;
-  createUserModelProvider(request: WebuiCreateUserModelProviderRequest): Promise<unknown>;
-  updateUserModelProvider(request: WebuiUpdateUserModelProviderRequest): Promise<unknown>;
+  createUserModelProvider(
+    request: WebuiCreateUserModelProviderRequest,
+  ): Promise<unknown>;
+  updateUserModelProvider(
+    request: WebuiUpdateUserModelProviderRequest,
+  ): Promise<unknown>;
   deleteUserModelProvider(providerId: string): Promise<unknown>;
-  testUserModelProvider(request: { readonly providerId: string; readonly apiKey?: string }): Promise<unknown>;
-  testUserModel(request: { readonly providerId: string; readonly modelId: string }): Promise<unknown>;
-  discoverUserModelsCandidate(request: WebuiDiscoverUserModelsCandidateRequest): Promise<unknown>;
-  saveUserModelProviderCandidate(request: WebuiSaveUserModelProviderCandidateRequest): Promise<unknown>;
+  testUserModelProvider(request: {
+    readonly providerId: string;
+    readonly apiKey?: string;
+  }): Promise<unknown>;
+  testUserModel(request: {
+    readonly providerId: string;
+    readonly modelId: string;
+  }): Promise<unknown>;
+  discoverUserModelsCandidate(
+    request: WebuiDiscoverUserModelsCandidateRequest,
+  ): Promise<unknown>;
+  saveUserModelProviderCandidate(
+    request: WebuiSaveUserModelProviderCandidateRequest,
+  ): Promise<unknown>;
   listProviderPresets(): Promise<readonly Record<string, unknown>[]>;
   getMiniMaxApiKeyStatus(): Promise<Record<string, unknown>>;
-  upsertMiniMaxApiKey(request: { readonly apiKey: string; readonly saveAndUse?: boolean }): Promise<unknown>;
+  upsertMiniMaxApiKey(request: {
+    readonly apiKey: string;
+    readonly saveAndUse?: boolean;
+  }): Promise<unknown>;
   getCodexOAuthStatus(): Promise<Record<string, unknown>>;
   getMiniMaxModelSource(): Promise<"token_plan" | "minimax_api_key">;
-  setMiniMaxModelSource(request: { readonly source: "token_plan" | "minimax_api_key" }): Promise<"token_plan" | "minimax_api_key">;
+  setMiniMaxModelSource(request: {
+    readonly source: "token_plan" | "minimax_api_key";
+  }): Promise<"token_plan" | "minimax_api_key">;
   /** Wire records are validated only as objects; the harness adapter owns field conversion. */
   /**
    * Which host services this harness actually has behind it.
@@ -293,10 +403,16 @@ export interface WebuiHarnessPort {
    * presence.
    */
   readHostPrerequisites?(): WebuiHostPrerequisiteFacts;
-  testUserModelCandidate(request: Record<string, unknown>): Promise<unknown>;
-  revealModelProviderApiKey(request: { readonly providerId: string }): Promise<string>;
+  testUserModelCandidate(
+    request: WebuiTestUserModelCandidateRequest,
+  ): Promise<unknown>;
+  revealModelProviderApiKey(request: {
+    readonly providerId: string;
+  }): Promise<string>;
   startCodexOAuthLogin(request?: Record<string, unknown>): Promise<unknown>;
-  cancelCodexOAuthLogin(request: { readonly loginId: string }): Promise<unknown>;
+  cancelCodexOAuthLogin(request: {
+    readonly loginId: string;
+  }): Promise<unknown>;
   refreshModels(): Promise<unknown>;
   /**
    * Cloud account quota for the user-menu usage panel. Not a harness
@@ -339,7 +455,10 @@ export interface WebuiHarnessPort {
   beginAccountLogin(): Promise<WebuiAccountLoginView>;
   getAccountLoginStatus(): Promise<WebuiAccountLoginView>;
   cancelAccountLogin(): Promise<{ readonly ok: true }>;
-  signOutAccount(): Promise<{ readonly status: string; readonly generation: number }>;
+  signOutAccount(): Promise<{
+    readonly status: string;
+    readonly generation: number;
+  }>;
   /**
    * Profile-wide `AGENTS.md`, the file Turn assembly already reads through
    * `GlobalInstructions.readForPrompt`. Read-only on the v2 `instructions`

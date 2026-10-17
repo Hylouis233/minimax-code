@@ -32,7 +32,10 @@ import type { RawData } from "ws";
 import { createWebuiRuntimeHost } from "../../src/runtime/assembly.js";
 import { createHarnessPortFromHost } from "../../src/runtime/harness/adapter.js";
 import { WebuiTerminalManager } from "../../src/runtime/index.js";
-import { WebuiService, createOperationRegistry } from "../../src/server/index.js";
+import {
+  WebuiService,
+  createOperationRegistry,
+} from "../../src/server/index.js";
 import { WEBUI_PROTOCOL_VERSION } from "../../src/shared/envelope.js";
 
 const CREDENTIAL_TOKEN = "real-host-loopback-token";
@@ -82,7 +85,9 @@ async function bootRealHost(): Promise<Booted> {
   // the one path that would pull an operator's provider entries and api key into
   // this run. A file that already exists skips the copy, and the assertion in the
   // first case checks the file is still this one.
-  await writeFile(join(dataDir, "config.yaml"), CONFIG_MARKER_TEXT, { mode: 0o600 });
+  await writeFile(join(dataDir, "config.yaml"), CONFIG_MARKER_TEXT, {
+    mode: 0o600,
+  });
   // Point the config resolution at this directory too — `MINIMAX_DATA_DIR` is what
   // `getDataDir()`/`getConfigPath()` read, and `@mavis/config` caches its snapshot
   // per process, so it has to be reset for each case.
@@ -167,62 +172,104 @@ function connect(url: string): Promise<Client> {
       if (body !== undefined) frame.body = body;
       ws.send(JSON.stringify(frame));
     });
-  return once(ws, "open").then(() => ({ ws, closed, call, close: () => ws.close() }));
+  return once(ws, "open").then(() => ({
+    ws,
+    closed,
+    call,
+    close: () => ws.close(),
+  }));
 }
 
 describe("real host over the loopback service", () => {
-  it(
-    "answers a session round trip from the real host in an isolated data directory",
-    async () => {
-      const host = await bootRealHost();
-      const client = await connect(host.url);
+  it("answers a session round trip from the real host in an isolated data directory", async () => {
+    const host = await bootRealHost();
+    const client = await connect(host.url);
 
-      // The isolated data directory reached the real host: a run that fell back
-      // to the operator's own `~/.minimax` fails right here.
-      const version = await client.call("version");
-      expect(version.kind).toBe("response");
-      expect(version.body).toMatchObject({
+    // The isolated data directory reached the real host: a run that fell back
+    // to the operator's own `~/.minimax` fails right here.
+    const version = await client.call("version");
+    expect(version.kind).toBe("response");
+    expect(version.body).toMatchObject({
         version: "real-host-loopback",
         dataDir: host.dataDir,
       });
 
-      // The config file the host booted with is still this file: the harness did
-      // not copy the developer's own `<home>/.minimax/config.yaml` into the
-      // isolated directory (which is what would bring an operator's providers and
-      // api key into the run).
-      expect(await readFile(join(host.dataDir, "config.yaml"), "utf8")).toBe(
+    // The config file the host booted with is still this file: the harness did
+    // not copy the developer's own `<home>/.minimax/config.yaml` into the
+    // isolated directory (which is what would bring an operator's providers and
+    // api key into the run).
+    expect(await readFile(join(host.dataDir, "config.yaml"), "utf8")).toBe(
         CONFIG_MARKER_TEXT,
       );
 
-      const created = await client.call("createSession", {
+    const created = await client.call("createSession", {
         name: "main",
         workspaceDir: host.workspaceDir,
       });
-      expect(created.kind).toBe("response");
-      const session = (created.body as { session?: { sessionId?: string; workspaceDir?: string } })
-        .session;
-      expect(typeof session?.sessionId).toBe("string");
-      expect(session?.workspaceDir).toBe(host.workspaceDir);
+    expect(created.kind).toBe("response");
+    const session = (
+      created.body as {
+        session?: { sessionId?: string; workspaceDir?: string };
+      }
+    ).session;
+    expect(typeof session?.sessionId).toBe("string");
+    expect(session?.workspaceDir).toBe(host.workspaceDir);
 
-      // Read back through a second operation: the session really landed in the
-      // host's store, rather than being a value the first response carried.
-      const listed = await client.call("listSessions", { name: "main" });
-      const sessions = (listed.body as { sessions?: readonly { sessionId?: string }[] }).sessions;
-      expect(sessions?.map((entry) => entry.sessionId)).toContain(session?.sessionId);
+    // Read back through a second operation: the session really landed in the
+    // host's store, rather than being a value the first response carried.
+    const listed = await client.call("listSessions", { name: "main" });
+    const sessions = (listed.body as { sessions?: readonly { sessionId?: string }[] }).sessions;
+    expect(sessions?.map((entry) => entry.sessionId)).toContain(
+      session?.sessionId,
+    );
 
-      const messages = await client.call("getMessages", { id: session?.sessionId });
-      expect(messages.kind).toBe("response");
-      expect((messages.body as { messages?: readonly unknown[] }).messages).toEqual([]);
+    const messages = await client.call("getMessages", {
+      id: session?.sessionId,
+    });
+    expect(messages.kind).toBe("response");
+    expect(
+      (messages.body as { messages?: readonly unknown[] }).messages,
+    ).toEqual([]);
 
-      client.close();
-      await client.closed;
-    },
-    120_000,
-  );
+    await writeFile(
+      join(host.workspaceDir, "canvas-input.txt"),
+      "synthetic canvas input\n",
+    );
+    const canvas = await client.call("applyCanvas", {
+      sessionId: session?.sessionId,
+      operation: {
+        schemaVersion: 1,
+        operationId: "webui-canvas-add",
+        mutations: [
+          {
+            kind: "add_file",
+            nodeId: "webui-file",
+            relativePath: "canvas-input.txt",
+            layout: { x: 0, y: 0, width: 100, height: 100, zIndex: 0 },
+          },
+        ],
+      },
+    });
+    expect(canvas.kind).toBe("response");
+    expect(canvas.body).toMatchObject({
+      operationId: "webui-canvas-add",
+      document: {
+        sessionId: session?.sessionId,
+        nodes: [{ id: "webui-file" }],
+      },
+    });
+    const persistedCanvas = await client.call("readCanvas", {
+      sessionId: session?.sessionId,
+    });
+    expect(persistedCanvas.kind).toBe("response");
+    expect(persistedCanvas.body).toMatchObject({
+      nodes: [{ id: "webui-file" }],
+    });
+    client.close();
+    await client.closed;
+  }, 120_000);
 
-  it(
-    "answers with the registry's own error frame for a body the validator rejects",
-    async () => {
+  it("answers with the registry's own error frame for a body the validator rejects", async () => {
       const host = await bootRealHost();
       const client = await connect(host.url);
 
@@ -236,13 +283,9 @@ describe("real host over the loopback service", () => {
 
       client.close();
       await client.closed;
-    },
-    120_000,
-  );
+    }, 120_000);
 
-  it(
-    "refuses a fresh connection once the service is closed",
-    async () => {
+  it("refuses a fresh connection once the service is closed", async () => {
       const host = await bootRealHost();
       const client = await connect(host.url);
       await client.call("version");
@@ -257,7 +300,5 @@ describe("real host over the loopback service", () => {
       const refused = new WebSocket(host.url);
       refused.on("error", () => undefined);
       await expect(once(refused, "open")).rejects.toThrow();
-    },
-    120_000,
-  );
+    }, 120_000);
 });

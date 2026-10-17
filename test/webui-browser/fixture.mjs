@@ -258,6 +258,10 @@ export function installFixtureTransport() {
       return clone(accountLoginState);
     }
     if (operation === "getAccountLoginStatus") return clone(accountLoginState);
+    if (operation === "signOut") {
+      accountLoginState = { state: "idle" };
+      return { success: true };
+    }
     if (operation === "cancelAccountLogin") {
       accountLoginState = { state: "idle" };
       return { ok: true };

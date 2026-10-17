@@ -7,15 +7,20 @@
 import type { WebuiHarnessPort } from "../port.js";
 import type { WebuiRuntimeHostHandle } from "./host-contract.js";
 import { requireCliService } from "./requirements.js";
-import {
-  asWebuiRecord,
-  toWebuiPendingPermissions,
-} from "./result-conversion.js";
+import { toWebuiPendingPermissions } from "./result-conversion.js";
 import type { WebuiPermissionDecision } from "../../shared/contracts/interactions.js";
+import { PermissionReply } from "@mavis/local-runtime-v2/cli-service";
 
 export function createInteractionsAdapter(
   host: WebuiRuntimeHostHandle,
-): Pick<WebuiHarnessPort, "listPendingPermissions" | "getPendingQuestionnaire" | "replyPermission" | "replyQuestionnaire" | "dismissQuestionnaire"> {
+): Pick<
+  WebuiHarnessPort,
+  | "listPendingPermissions"
+  | "getPendingQuestionnaire"
+  | "replyPermission"
+  | "replyQuestionnaire"
+  | "dismissQuestionnaire"
+> {
   return {
     async listPendingPermissions() {
       // The runtime's result makes `requests` optional
@@ -31,7 +36,7 @@ export function createInteractionsAdapter(
       // the dialog shows as the thing being asked for, so an entry without it is
       // refused here rather than rendered as a permission request that grants
       // nothing and explains nothing.
-      return { requests: toWebuiPendingPermissions(asWebuiRecord(result).requests) };
+      return { requests: toWebuiPendingPermissions(result.requests) };
     },
 
     async getPendingQuestionnaire(request) {
@@ -92,13 +97,13 @@ export function createInteractionsAdapter(
   };
 }
 
-function permissionReplyValue(reply: WebuiPermissionDecision): number {
+function permissionReplyValue(reply: WebuiPermissionDecision): PermissionReply {
   switch (reply) {
     case "allowOnce":
-      return 0;
+      return PermissionReply.AllowOnce;
     case "allowAlways":
-      return 1;
+      return PermissionReply.AllowAlways;
     case "deny":
-      return 2;
+      return PermissionReply.Deny;
   }
 }

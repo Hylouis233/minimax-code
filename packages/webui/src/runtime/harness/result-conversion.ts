@@ -18,6 +18,9 @@
 // would produce a review over the wrong repository, and a panel rendering that as
 // empty rather than wrong is the worst of the three outcomes.
 
+import type { CliService } from "@mavis/local-runtime-v2/cli-service";
+import { SessionTypeView } from "@mavis/local-runtime-v2/cli-service";
+import { SessionKind } from "@mavis/protocol/local";
 import type {
   WebuiWorkspaceReviewDiffs,
   WebuiWorkspaceReviewFile,
@@ -47,8 +50,35 @@ import type {
   WebuiSessionListItem,
   WebuiSessionPage,
   WebuiSessionTreePage,
+  WebuiGetSessionDiffResult,
+  WebuiTurnDiffView,
+  WebuiRevertTurnDiffResult,
+  WebuiReapplyTurnDiffResult,
 } from "../../shared/contracts/session.js";
 
+type RuntimeResult<K extends keyof CliService> = Awaited<
+  ReturnType<CliService[K]>
+>;
+type RuntimeSession = RuntimeResult<"listSessions">["sessions"][number];
+type RuntimeChildSession =
+  RuntimeResult<"getSessionTree">["sessions"][number]["childSessions"][number];
+type RuntimeReviewFile =
+  RuntimeResult<"getWorkspaceReviewSummary">["files"][number];
+type RuntimeReviewDiff =
+  RuntimeResult<"listWorkspaceReviewFileDiffs">["diffs"][number];
+type RuntimeStream = RuntimeResult<"sendMessage">;
+type StreamSource = Extract<RuntimeStream, { ok: true }>["source"];
+type Yielded<T> = T extends AsyncIterable<infer Item> | Iterable<infer Item>
+  ? Item
+  : never;
+type RuntimeFrame = Yielded<StreamSource>;
+type RuntimeEvent = Yielded<ReturnType<CliService["watchEvents"]>>;
+
+function isAsyncSource<T>(
+  source: AsyncIterable<T> | Iterable<T>,
+): source is AsyncIterable<T> {
+  return Symbol.asyncIterator in Object(source);
+}
 
 /**
  * A runtime value that could not be converted.
@@ -69,7 +99,9 @@ export class WebuiResultShapeError extends Error {
 
 const record = (value: unknown): Record<string, unknown> => {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new WebuiResultShapeError("expected a record from the runtime, got a different shape");
+    throw new WebuiResultShapeError(
+      "expected a record from the runtime, got a different shape",
+    );
   }
   return value as Record<string, unknown>;
 };
@@ -77,22 +109,24 @@ const record = (value: unknown): Record<string, unknown> => {
 const text = (value: unknown, fallback: string): string =>
   typeof value === "string" ? value : fallback;
 
-const count = (value: unknown): number => (typeof value === "number" ? value : 0);
+const count = (value: unknown): number =>
+  typeof value === "number" ? value : 0;
 
 const list = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 
 const requiredText = (value: unknown, what: string): string => {
   if (typeof value !== "string" || !value) {
-    throw new WebuiResultShapeError(`the runtime's review result is missing ${what}`);
+    throw new WebuiResultShapeError(
+      `the runtime's review result is missing ${what}`,
+    );
   }
   return value;
 };
 
 /** One reviewed file. `path` and the two counts are what the panel lists. */
-function toReviewFile(value: unknown): WebuiWorkspaceReviewFile {
-  const file = record(value);
+function toReviewFile(file: RuntimeReviewFile): WebuiWorkspaceReviewFile {
   return {
-    fileId: requiredText(file.fileId ?? file.id, "a file id"),
+    fileId: requiredText(file.fileId, "a file id"),
     path: text(file.path, ""),
     // Git status is required by the wire contract, so an absent one is named
     // rather than dropped: an empty string would render as a file with no status
@@ -114,16 +148,17 @@ function toReviewFile(value: unknown): WebuiWorkspaceReviewFile {
  * here: the runtime's total can cover files this snapshot deliberately omits, and
  * re-deriving it would silently disagree with the runtime about what was reviewed.
  */
-export function toWebuiReviewSummary(value: unknown): WebuiWorkspaceReviewSummary {
-  const summary = record(value);
-  const totals = record(summary.totals ?? {});
+export function toWebuiReviewSummary(
+  summary: RuntimeResult<"getWorkspaceReviewSummary">,
+): WebuiWorkspaceReviewSummary {
+  const totals = summary.totals;
   return {
     repositoryId: text(summary.repositoryId, ""),
     reviewSnapshotId: requiredText(
       summary.reviewSnapshotId,
       "a review snapshot id",
     ),
-    files: list(summary.files).map(toReviewFile),
+    files: summary.files.map(toReviewFile),
     totals: {
       files: count(totals.files),
       additions: count(totals.additions),
@@ -139,11 +174,10 @@ export function toWebuiReviewSummary(value: unknown): WebuiWorkspaceReviewSummar
  * content, and that is passed through rather than turned into an empty diff: the
  * panel shows the reason, and an empty diff would read as "no changes".
  */
-function toReviewDiff(value: unknown): WebuiWorkspaceReviewFileDiff {
-  const entry = record(value);
+function toReviewDiff(entry: RuntimeReviewDiff): WebuiWorkspaceReviewFileDiff {
   const errorCode = typeof entry.errorCode === "string" ? entry.errorCode : undefined;
   const error = typeof entry.error === "string" ? entry.error : undefined;
-  const fileId = requiredText(entry.fileId ?? entry.id, "a file id");
+  const fileId = requiredText(entry.fileId, "a file id");
   if (errorCode || error) {
     return {
       fileId,
@@ -151,7 +185,11 @@ function toReviewDiff(value: unknown): WebuiWorkspaceReviewFileDiff {
       ...(error ? { error } : {}),
     };
   }
-  const diff = record(entry.diff);
+  const diff = entry.diff;
+  if (!diff)
+    throw new WebuiResultShapeError(
+      "the runtime's review entry has neither a diff nor an error",
+    );
   const type = diff.type === "binary" ? "binary" : "text";
   return {
     fileId,
@@ -166,11 +204,15 @@ function toReviewDiff(value: unknown): WebuiWorkspaceReviewFileDiff {
   };
 }
 
-export function toWebuiReviewDiffs(value: unknown): WebuiWorkspaceReviewDiffs {
-  const diffs = record(value);
+export function toWebuiReviewDiffs(
+  diffs: RuntimeResult<"listWorkspaceReviewFileDiffs">,
+): WebuiWorkspaceReviewDiffs {
   return {
-    reviewSnapshotId: requiredText(diffs.reviewSnapshotId, "a review snapshot id"),
-    diffs: list(diffs.diffs ?? diffs.files).map(toReviewDiff),
+    reviewSnapshotId: requiredText(
+      diffs.reviewSnapshotId,
+      "a review snapshot id",
+    ),
+    diffs: diffs.diffs.map(toReviewDiff),
   };
 }
 
@@ -181,37 +223,37 @@ export function toWebuiReviewDiffs(value: unknown): WebuiWorkspaceReviewDiffs {
  * arrives without one would be attributed to the wrong side of the file and read
  * as a real change that is not in the file at all.
  */
-export function toWebuiReviewFileContent(value: unknown): WebuiWorkspaceReviewFileContent {
-  const content = record(value);
+export function toWebuiReviewFileContent(
+  content: RuntimeResult<"getWorkspaceReviewFileContent">,
+): WebuiWorkspaceReviewFileContent {
   const side = content.side;
   if (side !== "old" && side !== "new") {
-    throw new WebuiResultShapeError("the runtime's file content carries no side");
+    throw new WebuiResultShapeError(
+      "the runtime's file content carries no side",
+    );
   }
-  const errorCode =
-    typeof content.errorCode === "string" ? content.errorCode : undefined;
   const error = typeof content.error === "string" ? content.error : undefined;
   return {
-    fileId: requiredText(content.fileId ?? content.id, "a file id"),
+    fileId: requiredText(content.fileId, "a file id"),
     path: text(content.path, ""),
     side,
     type: content.type === "binary" ? "binary" : "text",
     ...(typeof content.content === "string" ? { content: content.content } : {}),
     ...(error ? { error } : {}),
-    ...(errorCode ? { errorCode } : {}),
   };
 }
 
-export function toWebuiReviewSearchResult(value: unknown): WebuiWorkspaceReviewSearchResult {
-  const search = record(value);
+export function toWebuiReviewSearchResult(
+  search: RuntimeResult<"searchWorkspaceReviewDiffs">,
+): WebuiWorkspaceReviewSearchResult {
   return {
     reviewSnapshotId: requiredText(
       search.reviewSnapshotId,
       "a review snapshot id",
     ),
-    matchedFiles: list(search.matchedFiles).map((entry) => {
-      const matched = record(entry);
+    matchedFiles: search.matchedFiles.map((matched) => {
       return {
-        fileId: requiredText(matched.fileId ?? matched.id, "a file id"),
+        fileId: requiredText(matched.fileId, "a file id"),
         path: text(matched.path, ""),
         matchCount: count(matched.matchCount),
       };
@@ -238,28 +280,34 @@ export function toWebuiReviewSearchResult(value: unknown): WebuiWorkspaceReviewS
  * owned: a new runtime field reaches the panel as an extra key rather than as a
  * type error the cast would have hidden.
  */
-export function toWebuiCanvasDocument(value: unknown): WebuiCanvasDocument {
-  const document = record(value);
+export function toWebuiCanvasDocument(
+  document: RuntimeResult<"readCanvas">,
+): WebuiCanvasDocument {
   return {
     schemaVersion: count(document.schemaVersion),
     canvasId: requiredText(document.canvasId, "a canvas id"),
     sessionId: text(document.sessionId, ""),
     changeSeq: count(document.changeSeq),
-    nodes: list(document.nodes).map((node) =>
-      node && typeof node === "object" && !Array.isArray(node)
-        ? { ...(node as Record<string, unknown>) }
-        : { value: node },
-    ),
+    nodes: document.nodes.map((node) => ({
+      ...node,
+      file: { ...node.file },
+      layout: { ...node.layout },
+      annotations: node.annotations.map((annotation) => ({
+        ...annotation,
+        normalizedRect: { ...annotation.normalizedRect },
+      })),
+    })),
     updatedAtMs: count(document.updatedAtMs),
   };
 }
 
 /** The canvas mutation result: the operation's own id plus the document it produced. */
-export function toWebuiCanvasApplyResult(value: unknown): {
+export function toWebuiCanvasApplyResult(
+  result: RuntimeResult<"applyCanvas">,
+): {
   readonly operationId: string;
   readonly document: WebuiCanvasDocument;
 } {
-  const result = record(value);
   return {
     operationId: requiredText(result.operationId, "an operation id"),
     document: toWebuiCanvasDocument(result.document),
@@ -285,7 +333,9 @@ export function toWebuiRecord(value: unknown): Record<string, unknown> {
   return { ...source };
 }
 
-export function toWebuiRecordList(value: unknown): readonly Record<string, unknown>[] {
+export function toWebuiRecordList(
+  value: unknown,
+): readonly Record<string, unknown>[] {
   return list(value).map(toWebuiRecord);
 }
 
@@ -299,7 +349,9 @@ export function toWebuiRecordList(value: unknown): readonly Record<string, unkno
  * `WebuiModelEntry` declares an index signature precisely so a runtime field the
  * WebUI has not named yet still reaches the surface that wants it.
  */
-export function toWebuiModelEntries(value: unknown): readonly WebuiModelEntry[] {
+export function toWebuiModelEntries(
+  value: unknown,
+): readonly WebuiModelEntry[] {
   return list(value).map((entry) => {
     const model = record(entry);
     const providerId = model.providerId;
@@ -329,22 +381,19 @@ export function toWebuiModelEntries(value: unknown): readonly WebuiModelEntry[] 
  * contract is allowed to be strict: a record missing an identity is not
  * converted into a record with an empty one.
  */
-export function toWebuiView<T>(
-  value: unknown,
-  required: readonly string[],
-  what: string,
-): T {
-  const source = record(value);
-  for (const field of required) {
-    if (source[field] === undefined || source[field] === null) {
-      throw new WebuiResultShapeError(`the runtime's ${what} is missing ${field}`);
-    }
-  }
-  return { ...source } as T;
-}
-
 /** The runtime's numeric session type, as the wire's string. */
-const SESSION_TYPE_NAMES: Readonly<Record<number, string>> = { 0: "branch", 1: "root" };
+const SESSION_TYPE_NAMES = {
+  [SessionTypeView.Branch]: "branch",
+  [SessionTypeView.Root]: "root",
+} satisfies Record<SessionTypeView, string>;
+const SESSION_KIND_NAMES = {
+  [SessionKind.Unknown]: "unknown",
+  [SessionKind.Conversation]: "conversation",
+  [SessionKind.Task]: "task",
+  [SessionKind.Peek]: "peek",
+  [SessionKind.Channel]: "channel",
+  [SessionKind.Cron]: "cron",
+} satisfies Record<RuntimeSession["sessionKind"], string>;
 
 /**
  * A session, as the list and the tree both report it.
@@ -355,44 +404,67 @@ const SESSION_TYPE_NAMES: Readonly<Record<number, string>> = { 0: "branch", 1: "
  * the runtime's numbering — and numbering is exactly the kind of thing a
  * migration renumbers.
  */
-function toSessionListItem(value: unknown): WebuiSessionListItem {
-  const source = record(value);
-  const sessionType = source.sessionType;
+function toSessionListItem(source: RuntimeSession): WebuiSessionListItem {
+  const { sessionType, sessionKind, ...fields } = source;
   return {
-    ...source,
+    ...fields,
     sessionId: requiredText(source.sessionId, "a session id"),
     agentName: text(source.agentName, ""),
     createdAt: count(source.createdAt),
     updatedAt: count(source.updatedAt),
+    sessionKind:
+      typeof sessionKind === "string"
+        ? sessionKind
+        : SESSION_KIND_NAMES[sessionKind],
     ...(typeof sessionType === "number" && SESSION_TYPE_NAMES[sessionType] !== undefined
       ? { sessionType: SESSION_TYPE_NAMES[sessionType] }
       : typeof sessionType === "string"
         ? { sessionType }
         : {}),
-  } as WebuiSessionListItem;
+  };
 }
 
-export function toWebuiSessionPage(value: unknown): WebuiSessionPage {
-  const page = record(value);
+function toChildSession(source: RuntimeChildSession): WebuiSessionListItem {
+  const { sessionKind, ...fields } = source;
   return {
-    sessions: list(page.sessions).map(toSessionListItem),
+    ...fields,
+    sessionId: requiredText(source.sessionId, "a child session id"),
+    agentName: text(source.agentName, ""),
+    createdAt: count(source.createdAt),
+    updatedAt: count(source.updatedAt),
+    ...(sessionKind === undefined
+      ? {}
+      : {
+          sessionKind:
+            typeof sessionKind === "string"
+              ? sessionKind
+              : SESSION_KIND_NAMES[sessionKind],
+        }),
+  };
+}
+
+export function toWebuiSessionPage(
+  page: RuntimeResult<"listSessions">,
+): WebuiSessionPage {
+  return {
+    sessions: page.sessions.map(toSessionListItem),
     hasMore: page.hasMore === true,
     ...(typeof page.nextCursor === "string" ? { nextCursor: page.nextCursor } : {}),
   };
 }
 
-export function toWebuiSessionTreePage(value: unknown): WebuiSessionTreePage {
-  const page = record(value);
+export function toWebuiSessionTreePage(
+  page: RuntimeResult<"getSessionTree">,
+): WebuiSessionTreePage {
   return {
-    sessions: list(page.sessions ?? page.nodes).map((node) => {
-      const parent = record(node);
+    sessions: page.sessions.map((parent) => {
       return {
         // The wire nests each session under `session` and its children under
         // `childSessions`; the runtime reports them flat. The nesting is the
         // WebUI's own and the adapter is where the two meet, so a surface reading
         // the tree never has to know the runtime's arrangement.
-        session: toSessionListItem(parent.session ?? parent),
-        childSessions: list(parent.childSessions ?? parent.children).map(toSessionListItem),
+        session: toSessionListItem(parent.session),
+        childSessions: parent.childSessions.map(toChildSession),
       };
     }),
     hasMore: page.hasMore === true,
@@ -401,50 +473,98 @@ export function toWebuiSessionTreePage(value: unknown): WebuiSessionTreePage {
 }
 
 /** One stored message. `msgId` is the only field the wire cannot do without. */
-export function toWebuiMessage(value: unknown): WebuiMessage {
-  return toWebuiView<WebuiMessage>(value, ["msgId"], "message");
+export function toWebuiMessage(
+  value: NonNullable<RuntimeResult<"getMessages">["messages"]>[number],
+): WebuiMessage {
+  const { toolCalls, ...fields } = value;
+  return {
+    ...fields,
+    msgId: requiredText(value.msgId, "a message id"),
+    ...(toolCalls === undefined
+      ? {}
+      : { toolCalls: toolCalls.map((call) => ({ ...call })) }),
+  };
 }
 
-export function toWebuiMessagesResult(value: unknown): WebuiMessagesResult {
-  const result = record(value);
+export function toWebuiMessagesResult(
+  result: RuntimeResult<"getMessages">,
+): WebuiMessagesResult {
+  const { messages, turnResults, ...fields } = result;
   return {
-    ...result,
-    ...(Array.isArray(result.messages)
-      ? { messages: (result.messages as unknown[]).map(toWebuiMessage) }
+    ...fields,
+    ...(Array.isArray(messages)
+      ? { messages: messages.map(toWebuiMessage) }
       : {}),
-  } as WebuiMessagesResult;
+    ...(turnResults === undefined
+      ? {}
+      : { turnResults: turnResults.map((turn) => ({ ...turn })) }),
+  };
 }
 
 /** A diff entry. Its identity is the pair that names which file and which side. */
-export function toWebuiFileDiff(value: unknown): WebuiFileDiffInfoView {
-  return toWebuiView<WebuiFileDiffInfoView>(value, ["fileId"], "file diff");
+export function toWebuiFileDiff(
+  value: NonNullable<RuntimeResult<"getSessionDiff">["diffs"]>[number],
+): WebuiFileDiffInfoView {
+  const { patch, ...fields } = value;
+  return {
+    ...fields,
+    file: requiredText(value.file, "a diff file path"),
+    ...(patch === undefined ? {} : { patch: { ...patch } }),
+  };
 }
 
 /**
  * A diff answer.
  *
- * Generic over the four operations that share the shape (`getSessionDiff`,
- * `getTurnDiff`, `revertTurnDiff`, `reapplyTurnDiff`), because they differ in
- * what surrounds their `diffs` list and not in the list itself — which is the
- * only part whose element type had to change.
+ * Each operation keeps its own inferred host input. Nested turn/file diffs
+ * are converted explicitly while the operation's remaining fields are copied.
  */
-export function toWebuiDiffResult<T>(value: unknown): T {
-  const result = record(value);
+export function toWebuiSessionDiff(
+  result: RuntimeResult<"getSessionDiff">,
+): WebuiGetSessionDiffResult {
+  const { diffs, ...fields } = result;
   return {
-    ...result,
-    ...(Array.isArray(result.diffs)
-      ? { diffs: (result.diffs as unknown[]).map(toWebuiFileDiff) }
-      : {}),
-  } as T;
+    ...fields,
+    ...(diffs === undefined ? {} : { diffs: diffs.map(toWebuiFileDiff) }),
+  };
+}
+
+export function toWebuiTurnDiff(
+  result: RuntimeResult<"getTurnDiff">,
+): WebuiTurnDiffView {
+  const { fileChanges, ...fields } = result;
+  return {
+    ...fields,
+    ...(fileChanges === undefined
+      ? {}
+      : { fileChanges: fileChanges.map(toWebuiFileDiff) }),
+  };
+}
+
+export function toWebuiRevertResult(
+  result: RuntimeResult<"revertTurnDiff">,
+): WebuiRevertTurnDiffResult {
+  const { turnDiff, ...fields } = result;
+  return {
+    ...fields,
+    ...(turnDiff === undefined ? {} : { turnDiff: toWebuiTurnDiff(turnDiff) }),
+  };
+}
+
+export function toWebuiReapplyResult(
+  result: RuntimeResult<"reapplyTurnDiff">,
+): WebuiReapplyTurnDiffResult {
+  return {
+    ...toWebuiTurnDiff(result),
+    success: result.success,
+    ...(result.error === undefined ? {} : { error: result.error }),
+  };
 }
 
 /** One workspace tree entry, recursively. */
-/** The runtime's answer, as a plain record, for an adapter that reads two of its fields. */
-export function asWebuiRecord(value: unknown): Record<string, unknown> {
-  return record(value);
-}
-
-export function toWebuiWorkspaceFiles(value: unknown): readonly WebuiWorkspaceFile[] {
+export function toWebuiWorkspaceFiles(
+  value: unknown,
+): readonly WebuiWorkspaceFile[] {
   return list(value).map((entry) => {
     const node = record(entry);
     return {
@@ -468,10 +588,9 @@ export function toWebuiWorkspaceFiles(value: unknown): readonly WebuiWorkspaceFi
  * explains nothing, which is the one outcome worse than refusing the read.
  */
 export function toWebuiPendingPermissions(
-  value: unknown,
+  value: RuntimeResult<"listPendingPermissions">["requests"],
 ): readonly WebuiPendingPermission[] {
-  return list(value).map((entry) => {
-    const request = record(entry);
+  return (value ?? []).map((request) => {
     if (!Array.isArray(request.ruleContents)) {
       throw new WebuiResultShapeError(
         "the runtime listed a permission request with no rule contents",
@@ -483,11 +602,11 @@ export function toWebuiPendingPermissions(
       sessionId: requiredText(request.sessionId, "a session id"),
       agentName: text(request.agentName, ""),
       toolName: text(request.toolName, ""),
-      ruleContents: (request.ruleContents as unknown[]).map((rule) => String(rule)),
+      ruleContents: request.ruleContents.map((rule) => String(rule)),
       reason: text(request.reason, ""),
       allowAlwaysSupported: request.allowAlwaysSupported === true,
       createdAt: count(request.createdAt),
-    } as WebuiPendingPermission;
+    };
   });
 }
 
@@ -497,7 +616,9 @@ export function toWebuiPendingPermissions(
  * An open record on both sides; the runtime simply answers with an interface, so
  * the conversion copies it.
  */
-export function toWebuiCompactionResult(value: unknown): Record<string, unknown> {
+export function toWebuiCompactionResult(
+  value: unknown,
+): Record<string, unknown> {
   return toWebuiRecord(value);
 }
 
@@ -518,10 +639,11 @@ export function toWebuiCompactionResult(value: unknown): Record<string, unknown>
  * Each frame is converted as it is pulled, so a shape drift surfaces at the
  * frame that caused it instead of after the stream has already ended.
  */
-export function toWebuiStreamResult(value: unknown): WebuiStreamResult {
-  const envelope = record(value);
+export function toWebuiStreamResult(
+  envelope: RuntimeStream,
+): WebuiStreamResult {
   if (envelope.ok !== true) {
-    const body = record(envelope.body);
+    const body = envelope.body;
     return {
       ok: false,
       status: count(envelope.status),
@@ -536,22 +658,25 @@ export function toWebuiStreamResult(value: unknown): WebuiStreamResult {
     };
   }
   const source = envelope.source;
-  const toFrame = (frame: unknown): WebuiStreamFrame => {
-    const view = record(frame);
+  const toFrame = (frame: RuntimeFrame): WebuiStreamFrame => {
+    const { messageActionDeltas, ...fields } = frame;
     return {
-      ...view,
-      ...(Array.isArray(view.messageActionDeltas)
-        ? { messageActionDeltas: (view.messageActionDeltas as unknown[]).map(toWebuiRecord) }
+      ...fields,
+      ...(Array.isArray(messageActionDeltas)
+        ? {
+            messageActionDeltas: messageActionDeltas.map((delta) => ({
+              ...delta,
+            })),
+          }
         : {}),
-    } as WebuiStreamFrame;
+    };
   };
-  if (Symbol.asyncIterator in Object(source)) {
-    const iterable = source as AsyncIterable<unknown>;
+  if (isAsyncSource(source)) {
     return {
       ok: true,
       source: {
         [Symbol.asyncIterator](): AsyncIterator<WebuiStreamFrame> {
-          const iterator = iterable[Symbol.asyncIterator]();
+          const iterator = source[Symbol.asyncIterator]();
           return {
             // The final step carries `value: undefined`; converting that would
             // read a frame that was never sent. Only a yielded value is a frame.
@@ -569,7 +694,7 @@ export function toWebuiStreamResult(value: unknown): WebuiStreamResult {
       },
     };
   }
-  return { ok: true, source: [...(source as Iterable<unknown>)].map(toFrame) };
+  return { ok: true, source: [...source].map(toFrame) };
 }
 
 /**
@@ -586,7 +711,7 @@ export function toWebuiStreamResult(value: unknown): WebuiStreamResult {
  * routed to the surface that cares about it, so that is refused.
  */
 export function toWebuiEventStream(
-  source: AsyncIterable<unknown>,
+  source: AsyncIterable<RuntimeEvent>,
 ): AsyncIterable<WebuiRuntimeEvent> {
   return {
     [Symbol.asyncIterator](): AsyncIterator<WebuiRuntimeEvent> {
@@ -595,7 +720,10 @@ export function toWebuiEventStream(
         next: async () => {
           const step = await iterator.next();
           if (step.done) return { done: true as const, value: undefined };
-          return { done: false as const, value: toWebuiRuntimeEvent(step.value) };
+          return {
+            done: false as const,
+            value: toWebuiRuntimeEvent(step.value),
+          };
         },
         return: async (value?: unknown) => {
           await iterator.return?.(value);
@@ -606,8 +734,7 @@ export function toWebuiEventStream(
   };
 }
 
-function toWebuiRuntimeEvent(value: unknown): WebuiRuntimeEvent {
-  const event = record(value);
+function toWebuiRuntimeEvent(event: RuntimeEvent): WebuiRuntimeEvent {
   return {
     type: requiredText(event.type, "an event type"),
     timestamp: count(event.timestamp),
@@ -625,37 +752,40 @@ function toWebuiRuntimeEvent(value: unknown): WebuiRuntimeEvent {
  * from an edit that rewound a turn and from a queue item's position, instead of
  * asserting that the runtime's answer happens to have those fields.
  */
-export function toWebuiEnqueueResult(value: unknown): WebuiEnqueueMessageResult {
-  const result = record(value);
+export function toWebuiEnqueueResult(
+  result: RuntimeResult<"enqueueMessage">,
+): WebuiEnqueueMessageResult {
   return {
     ...result,
     ...(typeof result.itemId === "string" ? { itemId: result.itemId } : {}),
     ...(typeof result.status === "string" ? { status: result.status } : {}),
     ...(typeof result.position === "number" ? { position: result.position } : {}),
-  } as WebuiEnqueueMessageResult;
+  };
 }
 
-export function toWebuiEditMessageResult(value: unknown): WebuiEditSessionMessageResult {
-  const result = record(value);
+export function toWebuiEditMessageResult(
+  result: RuntimeResult<"editSessionMessage">,
+): WebuiEditSessionMessageResult {
   // `rewound` is the whole answer: whether the edit actually rewound the turn.
   // Defaulting it would tell the transcript to re-render as though it had.
   if (typeof result.rewound !== "boolean") {
-    throw new WebuiResultShapeError("the runtime's message-edit result says nothing about whether it rewound");
+    throw new WebuiResultShapeError(
+      "the runtime's message-edit result says nothing about whether it rewound",
+    );
   }
   return {
     ...result,
     rewound: result.rewound,
     ...(Array.isArray(result.deletedMessageIds)
-      ? { deletedMessageIds: (result.deletedMessageIds as unknown[]).map((id) => String(id)) }
+      ? { deletedMessageIds: result.deletedMessageIds.map((id) => String(id)) }
       : {}),
-  } as WebuiEditSessionMessageResult;
+  };
 }
 
 /**
  * A request whose attachments the runtime wants as a mutable list.
  *
- * The last mismatch between the mirror and the runtime, and the only one that is
- * not about a result. `WebuiAttachmentInput` is `readonly` all the way down —
+ * `WebuiAttachmentInput` is `readonly` all the way down —
  * which is right for a wire contract a surface builds — while the runtime's
  * `AttachmentInput` is mutable, because it keeps and normalises what it is
  * given. The two agree field for field; only the variance differs.
@@ -663,15 +793,6 @@ export function toWebuiEditMessageResult(value: unknown): WebuiEditSessionMessag
  * Copying the list is the conversion. It is done here, in the adapter, rather
  * than by loosening the wire contract to be mutable: a contract that other code
  * can write to after the fact is a contract nobody can rely on.
- */
-/**
- * A model-provider candidate as the runtime requires it.
- *
- * `baseUrl` is the endpoint a candidate is tested against, so a candidate
- * without one cannot be tested at all. It is required here rather than passed
- * through: the wire validator accepts an open record, so an absent endpoint
- * would otherwise travel the whole seam and fail inside the runtime with nothing
- * to say which request was at fault.
  */
 /** A string the request must carry, or the shape is refused rather than forwarded. */
 export function asText(value: unknown, what: string): string {
@@ -681,31 +802,18 @@ export function asText(value: unknown, what: string): string {
   return value;
 }
 
-export function toRuntimeModelProviderCandidate(value: unknown): {
-  readonly providerId?: string;
-  readonly expectedRevision?: string;
-  readonly name?: string;
-  readonly baseUrl: string;
-  readonly apiKey?: string;
-  readonly apiFormat?: string;
-  readonly models?: readonly unknown[];
-  readonly headers?: Readonly<Record<string, string>>;
-  readonly removeHeaders?: readonly string[];
-} {
-  const candidate = record(value);
-  return {
-    ...candidate,
-    baseUrl: requiredText(candidate.baseUrl, "a provider base URL"),
-  } as ReturnType<typeof toRuntimeModelProviderCandidate>;
-}
-
 export function toRuntimeAttachmentRequest<
   T extends { readonly attachments?: readonly unknown[] },
 >(
   request: T,
-): Omit<T, "attachments"> & { readonly attachments?: WebuiRuntimeAttachment[] } {
+): Omit<T, "attachments"> & {
+  readonly attachments?: WebuiRuntimeAttachment[];
+} {
   const attachments = request.attachments;
-  if (attachments === undefined) return request as Omit<T, "attachments"> & { readonly attachments?: WebuiRuntimeAttachment[] };
+  if (attachments === undefined)
+    return request as Omit<T, "attachments"> & {
+      readonly attachments?: WebuiRuntimeAttachment[];
+    };
   return {
     ...request,
     attachments: attachments.map(

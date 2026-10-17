@@ -1,14 +1,9 @@
 // The surface of the runtime `cliService` the WebUI forwards to, and the
 // harness host handle the runtime assembly hands to the adapter.
 //
-// This file states the members the WebUI forwards, and its member types are the
-// WebUI's own wire projections of what the runtime returns. `runtime/assembly.ts`
-// types the *options* it forwards against the real `CreateLocalRuntimeHostOptions`
-// (the inputs are checked, not mirrored). The results are the remaining gap: a
-// runtime view type (`SessionPage`, `GetMessagesResult`, ...) does not satisfy the
-// wire projection declared for it here, which is why the factory's return still
-// carries one assertion. Closing that gap means deriving each member and
-// converting explicitly at the adapter.
+// Host-facing request and result types come from the public CliService methods.
+// The adapters own the conversion into the independent WebUI wire DTOs;
+// runtime/assembly.ts assigns the host without a whole-host assertion.
 //
 // The six personalization members this interface used to declare
 // (`getGlobalInstructions`, `setGlobalInstructions`, `getAgentMemory`,
@@ -157,7 +152,9 @@ export interface WebuiRuntimeCliService {
     request: WebuiSessionListRequest,
     context?: Record<string, never>,
   ): Promise<HostResult<"listSessions">>;
-  pluginManagement(request: import("../../shared/plugin-management.js").WebuiPluginManagementRequest): Promise<HostResult<"pluginManagement">>;
+  pluginManagement(
+    request: import("../../shared/plugin-management.js").WebuiPluginManagementRequest,
+  ): Promise<HostResult<"pluginManagement">>;
   /** Converted: see `listSessions`. */
   getSessionTree(
     request: WebuiSessionTreeRequest,
@@ -199,7 +196,9 @@ export interface WebuiRuntimeCliService {
     request: import("../../shared/contracts/messages.js").WebuiMessagesRequest,
     context?: Record<string, never>,
   ): Promise<HostResult<"getMessages">>;
-  exportSessionTransfer(sessionId: string): Promise<import("../../shared/contracts/session.js").WebuiSessionTransferFile>;
+  exportSessionTransfer(
+    sessionId: string,
+  ): Promise<import("../../shared/contracts/session.js").WebuiSessionTransferFile>;
   importSessionTransfer(
     request: import("../../shared/contracts/session.js").WebuiImportSessionTransferRequest,
   ): Promise<import("../../shared/contracts/session.js").WebuiImportSessionTransferResult>;
@@ -260,9 +259,19 @@ export interface WebuiRuntimeCliService {
   clearGoal(sessionId: string): Promise<boolean>;
   /** Converted: the runtime reports names and shape but no file facts, and the
    * adapter stats the files it keeps. See `runtime/harness/workspace.ts`. */
-  listWorkspaceFileTree?(request: { readonly workspaceDir: string; readonly path?: string }): Promise<HostResult<"listWorkspaceFileTree">>;
-  readWorkspaceFile?(request: { readonly workspaceDir: string; readonly path: string }): Promise<WebuiWorkspaceFileContent>;
-  searchWorkspaceFiles?(input: { readonly workspaceDir: string; readonly query: string; readonly limit: number }): Promise<readonly string[]>;
+  listWorkspaceFileTree?(request: {
+    readonly workspaceDir: string;
+    readonly path?: string;
+  }): Promise<HostResult<"listWorkspaceFileTree">>;
+  readWorkspaceFile?(request: {
+    readonly workspaceDir: string;
+    readonly path: string;
+  }): Promise<WebuiWorkspaceFileContent>;
+  searchWorkspaceFiles?(input: {
+    readonly workspaceDir: string;
+    readonly query: string;
+    readonly limit: number;
+  }): Promise<readonly string[]>;
   /**
    * Archive listing and extraction are served by this package
    * (`./workspace-archive.ts`, Node built-ins only) rather than by the runtime,
@@ -270,10 +279,26 @@ export interface WebuiRuntimeCliService {
    * own still wins, and a host that has none gets the WebUI's reader instead of
    * an error the panel can only show.
    */
-  readWorkspaceArchive?(request: { readonly workspaceDir: string; readonly path: string; readonly prefix?: string }): Promise<WebuiWorkspaceArchiveListing>;
-  extractWorkspaceArchive?(request: { readonly workspaceDir: string; readonly path: string; readonly destination: string; readonly prefix?: string }): Promise<WebuiWorkspaceArchiveExtractResult>;
-  getWorkspaceGitEnvironment?(workspaceDir: string): Promise<{ readonly metadata: Record<string, unknown>; readonly changes: Record<string, unknown> }>;
-  mutateWorkspaceGit?(request: WebuiWorkspaceGitMutationRequest): Promise<Record<string, unknown>>;
+  readWorkspaceArchive?(request: {
+    readonly workspaceDir: string;
+    readonly path: string;
+    readonly prefix?: string;
+  }): Promise<WebuiWorkspaceArchiveListing>;
+  extractWorkspaceArchive?(request: {
+    readonly workspaceDir: string;
+    readonly path: string;
+    readonly destination: string;
+    readonly prefix?: string;
+  }): Promise<WebuiWorkspaceArchiveExtractResult>;
+  getWorkspaceGitEnvironment?(
+    workspaceDir: string,
+  ): Promise<{
+    readonly metadata: Record<string, unknown>;
+    readonly changes: Record<string, unknown>;
+  }>;
+  mutateWorkspaceGit?(
+    request: WebuiWorkspaceGitMutationRequest,
+  ): Promise<Record<string, unknown>>;
   /**
    * The review and canvas members below answer with the runtime's own view
    * types, not with the WebUI's wire projections. That is deliberate: the
@@ -286,7 +311,9 @@ export interface WebuiRuntimeCliService {
    * "the runtime decides the shape and the adapter reads it". A member whose
    * answer the adapter passes through unchanged keeps its precise type below.
    */
-  getWorkspaceReviewSummary?(workspaceDir: string): Promise<HostResult<"getWorkspaceReviewSummary">>;
+  getWorkspaceReviewSummary?(
+    workspaceDir: string,
+  ): Promise<HostResult<"getWorkspaceReviewSummary">>;
   listWorkspaceReviewFileDiffs?(input: {
     workspaceDir: string;
     reviewSnapshotId: string;
@@ -306,25 +333,18 @@ export interface WebuiRuntimeCliService {
     pageIndex?: number;
     pageSize?: number;
   }): Promise<HostResult<"searchWorkspaceReviewDiffs">>;
-  readCanvas?(request: { readonly sessionId: string }): Promise<HostResult<"readCanvas">>;
+  readCanvas?(request: {
+    readonly sessionId: string;
+  }): Promise<HostResult<"readCanvas">>;
   /**
    * The canvas operation the runtime expects.
    *
-   * Declared here in the WebUI's own words rather than reached for as the
-   * runtime's type: `host-contract.ts` does not import the runtime package for
-   * types, because the WebUI's result contract has to stay independently owned.
-   * `mutations` stays an open list for the same reason — the runtime narrows each
-   * mutation by `kind`, and a list of the variants it accepts is the runtime's to
-   * evolve, not the WebUI's to restate.
+   * Derived from the public host method. The WebUI port keeps its own request
+   * DTO; canvas-input.ts decodes its open mutation list into this inferred union.
    */
-  applyCanvas?(request: {
-    readonly sessionId: string;
-    readonly operation: {
-      readonly schemaVersion: 1;
-      readonly operationId: string;
-      readonly mutations: readonly unknown[];
-    };
-  }): Promise<HostResult<"applyCanvas">>;
+  applyCanvas?(
+    request: WebuiHostRequest<"applyCanvas">,
+  ): Promise<HostResult<"applyCanvas">>;
   /** Converted: the runtime's frame view declares its deltas as an interface
    * where the wire declares open records, and the source is wrapped rather than
    * drained so a session stream stays streaming. */
@@ -348,7 +368,7 @@ export interface WebuiRuntimeCliService {
   ): Promise<HostResult<"resumeSession">>;
   /** Converted: the runtime's event `payload` is a per-type union of interfaces
    * and the wire declares an open record. See `result-conversion.ts`. */
-  watchEvents(signal?: AbortSignal): AsyncIterable<unknown>;
+  watchEvents(signal?: AbortSignal): ReturnType<CliService["watchEvents"]>;
   /**
    * The runtime's result makes `requests` optional (`ListPendingPermissionsResult.requests?`)
    * and its own input type is an empty record, so the adapter passes `{}`-shaped
@@ -361,22 +381,19 @@ export interface WebuiRuntimeCliService {
   /** Converted: `ruleContents` is required by the wire and must not be
    * defaulted — an empty list would render a permission request that grants
    * nothing and explains nothing. */
-  listPendingPermissions(request: Record<string, never>): Promise<HostResult<"listPendingPermissions">>;
+  listPendingPermissions(
+    request: Record<string, never>,
+  ): Promise<HostResult<"listPendingPermissions">>;
   getPendingQuestionnaire(request: {
     readonly name: string;
     readonly sessionId: string;
   }): Promise<{ readonly request?: WebuiQuestionnaireRequest }>;
-  replyPermission(request: {
-    readonly name: string;
-    readonly requestId: string;
-    readonly reply: number;
-  }): Promise<WebuiInteractionReplyResult>;
-  replyQuestionnaire(request: {
-    readonly name: string;
-    readonly requestId: string;
-    readonly schemaVersion: number;
-    readonly answers: readonly WebuiQuestionnaireAnswer[];
-  }): Promise<WebuiInteractionReplyResult>;
+  replyPermission(
+    request: WebuiHostRequest<"replyPermission">,
+  ): Promise<WebuiInteractionReplyResult>;
+  replyQuestionnaire(
+    request: WebuiHostRequest<"replyQuestionnaire">,
+  ): Promise<WebuiInteractionReplyResult>;
   dismissQuestionnaire(request: {
     readonly name: string;
     readonly requestId: string;
@@ -403,9 +420,7 @@ export interface WebuiRuntimeCliService {
    * spells out the wider shape (incl. `displayDescription` for i18n) so the
    * field-selection logic in `listSkills()` below type-checks.
    */
-  listSkills(request?: {
-    readonly agentName?: string;
-  }): Promise<{
+  listSkills(request: WebuiHostRequest<"listSkills">): Promise<{
     readonly skills: readonly {
       readonly name: string;
       readonly displayName?: string;
@@ -460,41 +475,45 @@ export interface WebuiRuntimeCliService {
     readonly sessionId?: string;
   }): Promise<Record<string, unknown>>;
   listUserModelProviders(): Promise<readonly Record<string, unknown>[]>;
-  createUserModelProvider(request: WebuiHostRequest<"createUserModelProvider">): Promise<HostResult<"createUserModelProvider">>;
-  updateUserModelProvider(request: WebuiHostRequest<"updateUserModelProvider">): Promise<HostResult<"updateUserModelProvider">>;
-  deleteUserModelProvider(request: { readonly providerId: string }): Promise<HostResult<"deleteUserModelProvider">>;
-  testUserModelProvider(request: { readonly providerId: string; readonly apiKey?: string }): Promise<HostResult<"testUserModelProvider">>;
-  testUserModel(request: { readonly providerId: string; readonly modelId: string }): Promise<HostResult<"testUserModel">>;
-  discoverUserModelsCandidate(request: WebuiHostRequest<"discoverUserModelsCandidate">): Promise<HostResult<"discoverUserModelsCandidate">>;
-  saveUserModelProviderCandidate(request: WebuiHostRequest<"saveUserModelProviderCandidate">): Promise<HostResult<"saveUserModelProviderCandidate">>;
+  createUserModelProvider(
+    request: WebuiHostRequest<"createUserModelProvider">,
+  ): Promise<HostResult<"createUserModelProvider">>;
+  updateUserModelProvider(
+    request: WebuiHostRequest<"updateUserModelProvider">,
+  ): Promise<HostResult<"updateUserModelProvider">>;
+  deleteUserModelProvider(request: {
+    readonly providerId: string;
+  }): Promise<HostResult<"deleteUserModelProvider">>;
+  testUserModelProvider(request: {
+    readonly providerId: string;
+    readonly apiKey?: string;
+  }): Promise<HostResult<"testUserModelProvider">>;
+  testUserModel(request: {
+    readonly providerId: string;
+    readonly modelId: string;
+  }): Promise<HostResult<"testUserModel">>;
+  discoverUserModelsCandidate(
+    request: WebuiHostRequest<"discoverUserModelsCandidate">,
+  ): Promise<HostResult<"discoverUserModelsCandidate">>;
+  saveUserModelProviderCandidate(
+    request: WebuiHostRequest<"saveUserModelProviderCandidate">,
+  ): Promise<HostResult<"saveUserModelProviderCandidate">>;
   /** Converted: the runtime answers with its own interface, not an open record. */
   listProviderPresets(): Promise<HostResult<"listProviderPresets">>;
   getMiniMaxApiKeyStatus(): Promise<Record<string, unknown>>;
-  upsertMiniMaxApiKey(request: { readonly apiKey: string; readonly saveAndUse?: boolean }): Promise<HostResult<"upsertMiniMaxApiKey">>;
+  upsertMiniMaxApiKey(request: {
+    readonly apiKey: string;
+    readonly saveAndUse?: boolean;
+  }): Promise<HostResult<"upsertMiniMaxApiKey">>;
   /** Converted: see `listProviderPresets`. */
   getCodexOAuthStatus(): Promise<HostResult<"getCodexOAuthStatus">>;
   getMiniMaxModelSource(): Promise<"token_plan" | "minimax_api_key">;
-  setMiniMaxModelSource(request: { readonly source: "token_plan" | "minimax_api_key" }): Promise<"token_plan" | "minimax_api_key">;
-  testUserModelCandidate(request: {
-    /**
-     * Declared field by field rather than as `Record<string, unknown>`, because
-     * `baseUrl` is required and an open record would accept a candidate with no
-     * endpoint to test against — the request would type-check and then fail in
-     * the runtime, which is the arrangement this whole file exists to undo.
-     */
-    readonly candidate: {
-      readonly providerId?: string;
-      readonly expectedRevision?: string;
-      readonly name?: string;
-      readonly baseUrl: string;
-      readonly apiKey?: string;
-      readonly apiFormat?: string;
-      readonly models?: readonly unknown[];
-      readonly headers?: Readonly<Record<string, string>>;
-      readonly removeHeaders?: readonly string[];
-    };
-    readonly modelId: string;
-  }): Promise<HostResult<"testUserModelCandidate">>;
+  setMiniMaxModelSource(request: {
+    readonly source: "token_plan" | "minimax_api_key";
+  }): Promise<"token_plan" | "minimax_api_key">;
+  testUserModelCandidate(
+    request: WebuiHostRequest<"testUserModelCandidate">,
+  ): Promise<HostResult<"testUserModelCandidate">>;
   /**
    * Synchronous on the runtime.
    *
@@ -504,10 +523,14 @@ export interface WebuiRuntimeCliService {
    * still awaits.
    */
   revealModelProviderApiKey(request: { readonly providerId: string }): string;
-  startCodexOAuthLogin(request?: Record<string, unknown>): Promise<HostResult<"startCodexOAuthLogin">>;
+  startCodexOAuthLogin(
+    request?: Record<string, unknown>,
+  ): Promise<HostResult<"startCodexOAuthLogin">>;
   /** Takes the id itself, not a record: the runtime's own shape, unwrapped here
    * rather than widened to a record the adapter would then have to unwrap. */
-  cancelCodexOAuthLogin(loginId: string): Promise<HostResult<"cancelCodexOAuthLogin">>;
+  cancelCodexOAuthLogin(
+    loginId: string,
+  ): Promise<HostResult<"cancelCodexOAuthLogin">>;
   refreshModels(): Promise<HostResult<"refreshModels">>;
   /**
    * Compaction is opt-in on the live harness: the `CliService` exposes it
@@ -555,7 +578,10 @@ export interface WebuiRuntimeHostHandle {
   readonly beginAccountLogin?: () => Promise<import("../../shared/contracts/account.js").WebuiAccountLoginView>;
   readonly getAccountLoginStatus?: () => Promise<import("../../shared/contracts/account.js").WebuiAccountLoginView>;
   readonly cancelAccountLogin?: () => Promise<void>;
-  readonly signOutAccount?: () => Promise<{ readonly status: string; readonly generation: number }>;
+  readonly signOutAccount?: () => Promise<{
+    readonly status: string;
+    readonly generation: number;
+  }>;
   /**
    * Source of every harness command the WebUI maps to operations. Owned by
    * the runtime host; the WebUI only needs the structural shape to forward.

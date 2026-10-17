@@ -9,11 +9,10 @@ import {
   toRuntimeDiscoverCandidateRequest,
   toRuntimeSaveCandidateRequest,
   toRuntimeUpdateProviderRequest,
+  toRuntimeTestCandidateRequest,
 } from "./provider-input.js";
 import { requireCliService } from "./requirements.js";
 import {
-  asText,
-  toRuntimeModelProviderCandidate,
   toWebuiModelEntries,
   toWebuiRecord,
   toWebuiRecordList,
@@ -21,7 +20,32 @@ import {
 
 export function createModelsPluginsAdapter(
   host: WebuiRuntimeHostHandle,
-): Pick<WebuiHarnessPort, "listModels" | "selectModel" | "listSkills" | "pluginManagement" | "listUserModelProviders" | "createUserModelProvider" | "updateUserModelProvider" | "deleteUserModelProvider" | "testUserModelProvider" | "testUserModel" | "discoverUserModelsCandidate" | "saveUserModelProviderCandidate" | "listProviderPresets" | "getMiniMaxApiKeyStatus" | "upsertMiniMaxApiKey" | "getCodexOAuthStatus" | "getMiniMaxModelSource" | "setMiniMaxModelSource" | "testUserModelCandidate" | "revealModelProviderApiKey" | "startCodexOAuthLogin" | "cancelCodexOAuthLogin" | "refreshModels"> {
+): Pick<
+  WebuiHarnessPort,
+  | "listModels"
+  | "selectModel"
+  | "listSkills"
+  | "pluginManagement"
+  | "listUserModelProviders"
+  | "createUserModelProvider"
+  | "updateUserModelProvider"
+  | "deleteUserModelProvider"
+  | "testUserModelProvider"
+  | "testUserModel"
+  | "discoverUserModelsCandidate"
+  | "saveUserModelProviderCandidate"
+  | "listProviderPresets"
+  | "getMiniMaxApiKeyStatus"
+  | "upsertMiniMaxApiKey"
+  | "getCodexOAuthStatus"
+  | "getMiniMaxModelSource"
+  | "setMiniMaxModelSource"
+  | "testUserModelCandidate"
+  | "revealModelProviderApiKey"
+  | "startCodexOAuthLogin"
+  | "cancelCodexOAuthLogin"
+  | "refreshModels"
+> {
   return {
     async listModels(request) {
       // Converted: the runtime lists untyped entries, and the wire's entry has
@@ -68,11 +92,15 @@ export function createModelsPluginsAdapter(
     },
 
     async createUserModelProvider(request) {
-      return requireCliService(host).createUserModelProvider(toRuntimeCreateProviderRequest(request));
+      return requireCliService(host).createUserModelProvider(
+        toRuntimeCreateProviderRequest(request),
+      );
     },
 
     async updateUserModelProvider(request) {
-      return requireCliService(host).updateUserModelProvider(toRuntimeUpdateProviderRequest(request));
+      return requireCliService(host).updateUserModelProvider(
+        toRuntimeUpdateProviderRequest(request),
+      );
     },
 
     async deleteUserModelProvider(providerId) {
@@ -84,15 +112,22 @@ export function createModelsPluginsAdapter(
     },
 
     async testUserModel(request) {
-      return requireCliService(host).testUserModel({ providerId: request.providerId, modelId: request.modelId });
+      return requireCliService(host).testUserModel({
+        providerId: request.providerId,
+        modelId: request.modelId,
+      });
     },
 
     async discoverUserModelsCandidate(request) {
-      return requireCliService(host).discoverUserModelsCandidate(toRuntimeDiscoverCandidateRequest(request));
+      return requireCliService(host).discoverUserModelsCandidate(
+        toRuntimeDiscoverCandidateRequest(request),
+      );
     },
 
     async saveUserModelProviderCandidate(request) {
-      return requireCliService(host).saveUserModelProviderCandidate(toRuntimeSaveCandidateRequest(request));
+      return requireCliService(host).saveUserModelProviderCandidate(
+        toRuntimeSaveCandidateRequest(request),
+      );
     },
 
     async listProviderPresets() {
@@ -123,17 +158,18 @@ export function createModelsPluginsAdapter(
       // arrives. It is required now, at this boundary, because a candidate with
       // no endpoint used to type-check all the way down and then fail inside the
       // runtime with nothing to say which request was at fault.
-      return requireCliService(host).testUserModelCandidate({
-        candidate: toRuntimeModelProviderCandidate(request.candidate),
-        modelId: asText(request.modelId, "a model id"),
-      });
+      return requireCliService(host).testUserModelCandidate(
+        toRuntimeTestCandidateRequest(request),
+      );
     },
 
     async revealModelProviderApiKey(request) {
       // Synchronous on the runtime; the port is asynchronous. Wrapped here so a
       // caller of the port still awaits, and so the mirror records the runtime's
       // real shape instead of a promise it never produces.
-      return Promise.resolve(requireCliService(host).revealModelProviderApiKey(request));
+      return Promise.resolve(
+        requireCliService(host).revealModelProviderApiKey(request),
+      );
     },
 
     async startCodexOAuthLogin(request) { return requireCliService(host).startCodexOAuthLogin(request); },

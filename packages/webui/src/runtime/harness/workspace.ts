@@ -14,6 +14,7 @@ import {
 import type { WebuiHarnessPort } from "../port.js";
 import type { WebuiRuntimeHostHandle } from "./host-contract.js";
 import { requireCliService, requireHostSlot } from "./requirements.js";
+import { toRuntimeCanvasInput } from "./canvas-input.js";
 import {
   toWebuiCanvasApplyResult,
   toWebuiCanvasDocument,
@@ -38,7 +39,21 @@ import type { WebuiCanvasDocument } from "../../shared/contracts/canvas.js";
 
 export function createWorkspaceAdapter(
   host: WebuiRuntimeHostHandle,
-): Pick<WebuiHarnessPort, "listWorkspaceFileTree" | "readWorkspaceArchive" | "extractWorkspaceArchive" | "readWorkspaceFile" | "getWorkspaceEnvironment" | "mutateWorkspaceGit" | "getWorkspaceReviewSummary" | "listWorkspaceReviewFileDiffs" | "getWorkspaceReviewFileContent" | "searchWorkspaceReviewDiffs" | "readCanvas" | "applyCanvas"> {
+): Pick<
+  WebuiHarnessPort,
+  | "listWorkspaceFileTree"
+  | "readWorkspaceArchive"
+  | "extractWorkspaceArchive"
+  | "readWorkspaceFile"
+  | "getWorkspaceEnvironment"
+  | "mutateWorkspaceGit"
+  | "getWorkspaceReviewSummary"
+  | "listWorkspaceReviewFileDiffs"
+  | "getWorkspaceReviewFileContent"
+  | "searchWorkspaceReviewDiffs"
+  | "readCanvas"
+  | "applyCanvas"
+> {
   return {
     async listWorkspaceFileTree(request) {
       const cliService = requireCliService(host);
@@ -52,17 +67,21 @@ export function createWorkspaceAdapter(
       // tree and the filesystem — extending the runtime would put the change
       // outside this package, and a tree that silently omits the fields would
       // leave the column blank rather than failing loudly.
-      return Promise.all(toWebuiWorkspaceFiles(tree).map(async (entry) => {
-        if (entry.type === "directory") return entry;
-        try {
-          const stats = await stat(path.join(request.workspaceDir, entry.path));
-          return { ...entry, size: stats.size, modifiedAt: stats.mtimeMs };
-        } catch {
+      return Promise.all(
+        toWebuiWorkspaceFiles(tree).map(async (entry) => {
+          if (entry.type === "directory") return entry;
+          try {
+            const stats = await stat(
+              path.join(request.workspaceDir, entry.path),
+            );
+            return { ...entry, size: stats.size, modifiedAt: stats.mtimeMs };
+          } catch {
           // A file that vanished or is unreadable keeps its entry and loses
           // only the metadata; dropping it from the tree would be a lie.
           return entry;
         }
-      }));
+        }),
+      );
     },
 
     // Both operations are served by this package now, so the optional runtime
@@ -86,7 +105,9 @@ export function createWorkspaceAdapter(
 
     async readWorkspaceFile(request) {
       const cliService = requireCliService(host);
-      const result = await cliService.readWorkspaceFile!(request) as WebuiWorkspaceFileContent;
+      const result = (await cliService.readWorkspaceFile!(
+        request,
+      )) as WebuiWorkspaceFileContent;
       if (
         result.type !== "binary" ||
         result.error !== "Path traversal denied" ||
@@ -104,21 +125,24 @@ export function createWorkspaceAdapter(
           query: request.path,
           limit: 100,
         });
-        const exactMatches = matches.filter((candidate) => pathPosix.basename(candidate.replace(/\\/gu, "/")) === request.path);
+        const exactMatches = matches.filter(
+          (candidate) => pathPosix.basename(candidate.replace(/\\/gu, "/")) === request.path,
+        );
         const [exactMatch] = exactMatches;
         if (exactMatches.length === 1 && exactMatch) {
-          const resolved = await cliService.readWorkspaceFile!({
+          const resolved = (await cliService.readWorkspaceFile!({
             ...request,
             path: exactMatch,
-          }) as WebuiWorkspaceFileContent;
+          })) as WebuiWorkspaceFileContent;
           return { ...resolved, resolvedPath: exactMatch };
         }
         return {
           type: "text",
           content: "",
-          error: exactMatches.length > 1
-            ? `工作区中有多个名为 ${request.path} 的文件，请使用完整相对路径。`
-            : `工作区中没有找到 ${request.path}。`,
+          error:
+            exactMatches.length > 1
+              ? `工作区中有多个名为 ${request.path} 的文件，请使用完整相对路径。`
+              : `工作区中没有找到 ${request.path}。`,
         };
       } catch {
         return result;
@@ -131,7 +155,10 @@ export function createWorkspaceAdapter(
         cliService.getWorkspaceGitEnvironment,
         "Workspace git state",
       );
-      const { metadata, changes } = await getWorkspaceGitEnvironment.call(cliService, request.workspaceDir);
+      const { metadata, changes } = await getWorkspaceGitEnvironment.call(
+        cliService,
+        request.workspaceDir,
+      );
       return {
         isGitRepo: changes.isGitRepo === true || metadata.isGitRepo === true,
         ...(typeof metadata.branch === "string" ? { branch: metadata.branch } : {}),
@@ -222,7 +249,7 @@ export function createWorkspaceAdapter(
       return toWebuiCanvasApplyResult(
         await requireHostSlot(cliService.applyCanvas, "canvas writes").call(
           cliService,
-          request as never,
+          toRuntimeCanvasInput(request),
         ),
       );
     },

@@ -469,6 +469,7 @@ export function createWebuiApplication(
   const selectSession = (sessionId: string | undefined): void => {
     sessionScope.select(sessionId);
     store.select(sessionId);
+    modelsWorkflows.selectCatalogue(sessionId);
     composerController?.selectSession(sessionId);
     // Selecting is where a retained dirty marker pays out: the session was
     // marked while nothing needed it, and now something does.

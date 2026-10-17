@@ -27,15 +27,18 @@ The thirteen operations that keep a hand-written handler live in `server/operati
 (`account`, `commands`, `messages`, `stream`, `terminal`, `workspace`). They are the ones that cannot
 be expressed as a single capability call.
 
-## The one cast left in the boot path
+## Host types and wire projections
 
-`runtime/assembly.ts`'s default factory casts the host it gets back, and the difference it states is
-not about the options: the runtime's `cliService` returns its own view types (`SessionPage`,
-`GetMessagesResult`, …) while `WebuiRuntimeCliService` declares the WebUI's wire projections of the
-same results (`WebuiSessionPage`, `WebuiMessagesResult`, …). Measured, they disagree on 40 members.
-Replacing those projections with a derivation plus an explicit runtime→wire conversion is
-outstanding work; until it lands, the cast is where the difference is stated instead of being hidden
-in a mirror. See [`../known-gaps.md`](../known-gaps.md).
+`runtime/assembly.ts` assigns the actual host without a whole-host assertion.
+`runtime/harness/host-contract.ts` derives requests and results from the public `CliService`
+methods; private runtime type names do not need new exports. The harness adapters reconstruct
+host inputs and convert results into independently owned WebUI wire DTOs.
+
+Canvas input decoding exhaustively covers the inferred mutation union. Semantic result readers
+retain the inferred host types, so changing a source field reaches the compiler at its reader.
+Opaque extension records and methods whose upstream result is explicitly `unknown` retain
+bounded runtime conversion. `webui-host-contract-derivation.test.ts` pins that remaining set and
+requires zero request or result assignability mismatches.
 
 ## What the browser can ask for
 

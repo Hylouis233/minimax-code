@@ -935,6 +935,27 @@ describe("V36 · this page can act on a session fact another client published", 
     return { store, composer, workflows, closeSession, invalidated };
   }
 
+  it("publishes a stable retained-draft snapshot until its owner changes it", () => {
+    const { workflows } = factFixture();
+    const
+      initial =workflows.retainedDeletionDrafts();
+    expect(workflows.retainedDeletionDrafts()).toBe(
+      initial);
+    const observed: unknown[] =[];
+    workflows.subscribeRetainedDrafts(() => observed.push(workflows.retainedDeletionDrafts()));
+    workflows.applyFact({ kind: "deleted", sessionId: "a" });
+    const retained =workflows.retainedDeletionDrafts();
+    expect(retained).not.toBe(
+      initial);
+    expect(workflows.retainedDeletionDrafts()).toBe(retained);
+    expect(observed).toEqual([retained]);
+    workflows.discardRetainedDeletionDraft("a");
+    expect(workflows.retainedDeletionDrafts()).toEqual([]);
+    expect(workflows.retainedDeletionDrafts()).toBe(observed[1]);
+    workflows.dispose();
+    expect(workflows.retainedDeletionDrafts()).toEqual([]);
+  });
+
   it("applies a rename to the entity the rail resolves from", () => {
     const { store, workflows } = factFixture();
     workflows.applyFact({ kind: "renamed", sessionId: "a", title: "CLI 起的名字" });

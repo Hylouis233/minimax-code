@@ -90,7 +90,7 @@ const UNKNOWN_RESULT_NAMES = [
 /**
  * Forwarded members whose declared request the runtime member would not accept.
  *
- * These five are conversion boundaries, and each is a decision rather than a copy:
+ * These five former mismatches now have explicit adapter conversions:
  *
  *   * `applyCanvas` carries a canvas operation the panel built, which the runtime
  *     validates against its own canvas node type;
@@ -104,7 +104,7 @@ const UNKNOWN_RESULT_NAMES = [
  *
  * Every other forwarded request is derived from the runtime's own declaration
  * (`WebuiHostRequest`) or rebuilt field by field at the binding that forwards it
- * (`server/operation/provider-input.ts`). A name leaves this list when its conversion
+ * (`runtime/harness/provider-input.ts`). A name leaves this list when its conversion
  * lands, and the compiler decides that: a name whose declaration already satisfies the
  * runtime member fails `pnpm typecheck:test` *as an extra*, so this list cannot be left
  * stale in the comfortable direction.
@@ -121,13 +121,8 @@ type MismatchedRequestNames = {
     : never;
 }[Keys<WebuiRuntimeCliService>];
 
-const MISMATCHED_REQUEST_NAMES = [
-  "applyCanvas",
-  "replyPermission",
-  "replyQuestionnaire",
-  "testUserModelCandidate",
-  "listSkills",
-] as const satisfies readonly MismatchedRequestNames[];
+const MISMATCHED_REQUEST_NAMES =
+  [] as const satisfies readonly MismatchedRequestNames[];
 
 /**
  * The two capabilities the WebUI's host adds on top of the runtime's service.
