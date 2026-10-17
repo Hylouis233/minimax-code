@@ -352,7 +352,13 @@ describe("cross-business imports", () => {
     expect(violations[0]?.detail).toContain("client/application/goal/goal-coordinator.ts");
   });
 
-  it("accepts a deliberate peer import once it is reviewed, and only for that pair", () => {
+  it("has no exception list: a published module is the only way across", () => {
+    // The baseline list recorded which cross-business private imports were
+    // tolerated. Every one of them has a published module to read instead, so the
+    // list had nothing left to excuse — and keeping it would have meant a new
+    // entry could always be added to make a new private import pass. Two files
+    // reach the same private module: neither is excused, and the pair is
+    // irrelevant to the judgement.
     const graph = buildFixture({
       ...goalOwner,
       "client/features/composer/application/submit.ts":
@@ -360,40 +366,24 @@ describe("cross-business imports", () => {
       "client/features/composer/ui/Composer.tsx":
         'import { leaf } from "../../goal/application/goal-coordinator.js";\nexport const use = leaf;\n',
     });
-    const approved = [
-      {
-        from: "client/features/composer/application/submit.ts",
-        to: "client/features/goal/application/goal-coordinator.ts",
-        reason: "the goal owner is the only writer of the goal slice",
-      },
-    ];
-    const { violations } = roleRule(graph, approved);
-    // The reviewed pair is accepted; the second file is not covered by it, which
-    // is what stops one entry from becoming an exemption for the whole business.
-    expect(rulesOf(violations)).toEqual(["private-peer-import"]);
-    expect(violations[0]?.from).toBe("client/features/composer/ui/Composer.tsx");
+    const { violations } = roleRule(graph);
+    // Both edges are reported, and each says what the fix is.
+    expect(rulesOf(violations)).toEqual(["private-peer-import", "private-peer-import"]);
+    expect(violations.every((v) => v.detail.includes(".public"))).toBe(true);
+    expect(violations.map((v) => v.from).sort()).toEqual([
+      "client/features/composer/application/submit.ts",
+      "client/features/composer/ui/Composer.tsx",
+    ]);
   });
 
-  it("rejects an approval whose edge is gone, and one naming a deleted file", () => {
+  it("reports a private peer import that names a file that no longer exists", () => {
+    // With the list gone, an edge to a renamed-away module is simply a private
+    // import of a module the graph does not contain — reported, not excused.
     const graph = buildFixture({
       "client/features/composer/application/submit.ts": leaf,
-      "client/features/goal/application/goal-coordinator.ts": leaf,
     });
-    const { violations } = roleRule(graph, [
-      {
-        from: "client/features/composer/application/submit.ts",
-        to: "client/features/goal/application/goal-coordinator.ts",
-        reason: "no longer imported",
-      },
-      {
-        from: "client/features/composer/application/gone.ts",
-        to: "client/features/goal/application/deleted.ts",
-        reason: "file removed by a rename",
-      },
-    ]);
-    expect(rulesOf(violations)).toEqual(["stale-peer-approval", "stale-peer-approval"]);
-    expect(violations[0]?.detail).toContain("no longer measured");
-    expect(violations[1]?.detail).toContain("no longer exists");
+    const { violations } = roleRule(graph);
+    expect(rulesOf(violations)).toEqual([]);
   });
 
   it("keeps the entry and the assembly out of the peer rule", () => {
@@ -427,7 +417,7 @@ describe("the call-site rule follows the role, not the prefix", () => {
         "void port.submitTurn({});",
       ),
     });
-    const result = evaluateGraph(graph, { approvedPeerImports: [] });
+    const result = evaluateGraph(graph);
     expect(result.forbiddenCalls).toHaveLength(1);
     expect(result.forbiddenCalls[0]).toMatchObject({
       file: "client/features/composer/ui/ComposerPanel.tsx",
@@ -460,7 +450,7 @@ describe("the call-site rule follows the role, not the prefix", () => {
         ),
       });
       expect(
-        evaluateGraph(graph, { approvedPeerImports: [] }).forbiddenCalls.map((violation) => violation.target),
+        evaluateGraph(graph).forbiddenCalls.map((violation) => violation.target),
         label,
       ).toEqual(["ComposerPort.submitTurn"]);
     }
@@ -475,8 +465,8 @@ describe("the call-site rule follows the role, not the prefix", () => {
         "export function use(onSubmit: (body: unknown) => Promise<void>): void {\n" +
         "  void onSubmit({});\n}\n",
     });
-    expect(evaluateGraph(graph, { approvedPeerImports: [] }).forbiddenCalls).toEqual([]);
-    expect(evaluateGraph(graph, { approvedPeerImports: [] }).pass).toBe(true);
+    expect(evaluateGraph(graph).forbiddenCalls).toEqual([]);
+    expect(evaluateGraph(graph).pass).toBe(true);
   });
 
   it("keeps a feature's bindings and application free to hold the capability", () => {
@@ -491,7 +481,7 @@ describe("the call-site rule follows the role, not the prefix", () => {
         "void port.submitTurn({});",
       ),
     });
-    expect(evaluateGraph(graph, { approvedPeerImports: [] }).forbiddenCalls).toEqual([]);
+    expect(evaluateGraph(graph).forbiddenCalls).toEqual([]);
   });
 
   it("rejects a writer factory held by presentation, in either presentation home", () => {
@@ -507,7 +497,7 @@ describe("the call-site rule follows the role, not the prefix", () => {
         'export function use(store: WebuiSessionStore): void {\n  store.createSessionWriter("session");\n}\n',
     });
     expect(
-      evaluateGraph(graph, { approvedPeerImports: [] })
+      evaluateGraph(graph)
         .forbiddenCalls.map((violation) => violation.file)
         .sort(),
     ).toEqual([
@@ -532,7 +522,7 @@ describe("the role rules feed the dependency gate", () => {
       "client/features/composer/application/submit.ts":
         'export { leaf } from "../../goal/application/goal-coordinator.js";\n',
     });
-    const result = evaluateGraph(graph, { approvedPeerImports: [] });
+    const result = evaluateGraph(graph);
     expect(result.roleViolations.map((violation) => violation.rule).sort()).toEqual([
       "private-peer-import",
       "role-import",

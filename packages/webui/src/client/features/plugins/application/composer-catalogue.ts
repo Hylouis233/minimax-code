@@ -21,53 +21,23 @@
 // selection: opening the composer menu must not overwrite what the plugin
 // manager is showing, and a management reload must not blank the mention list.
 // Two readers, two identities, one wire.
+//
+// The catalogue SHAPE — `WebuiComposerPluginCatalogue`, `WebuiComposerPluginSummary`
+// and `WebuiComposerSkillSummary` — lives in the published sibling
+// `composer-catalogue.public.ts`, so the composer and its `+` menu read the
+// owner's published types rather than a peer's private module. The creator and
+// the runtime cache stay here because a peer reads the catalogue, it does not
+// build one.
 
 import {
   webuiPluginRows,
   type WebuiPluginActions,
 } from "../contracts/plugin-actions.js";
-
-/** One installed plugin, as the composer's `@` menu needs it. */
-export interface WebuiComposerPluginSummary {
-  readonly name: string;
-  readonly displayName: string;
-  readonly description?: string;
-}
-
-/** One runtime skill, as the slash palette and the skills submenu need it. */
-export interface WebuiComposerSkillSummary {
-  readonly name: string;
-  readonly displayName?: string;
-  readonly description?: string;
-}
-
-export interface WebuiComposerPluginCatalogue {
-  /** False when the runtime exposes no plugin management at all. */
-  readonly available: boolean;
-  /**
-   * The installed plugins the `@` menu offers. Cached per key, so reopening the
-   * menu does not re-ask the runtime for the same answer.
-   */
-  readonly installedPlugins: () => Promise<readonly WebuiComposerPluginSummary[]>;
-  /**
-   * The runtime skills the slash palette and the skills submenu render from.
-   * Keyed by agent, because the runtime answers per agent.
-   */
-  readonly runtimeSkills: (
-    agentName?: string,
-  ) => Promise<readonly WebuiComposerSkillSummary[]>;
-  /**
-   * The installed-plugin read is stale. Every slot goes, because a plugin write
-   * can add, remove, rename or reconfigure any of them.
-   */
-  readonly invalidatePlugins: () => void;
-  /**
-   * One agent's skill read is stale. Slots for other agents survive: a plugin
-   * write does not answer a different agent's runtime, so re-reading them would
-   * cost a round trip to learn nothing.
-   */
-  readonly invalidateSkills: (agentName?: string) => void;
-}
+import type {
+  WebuiComposerPluginCatalogue,
+  WebuiComposerPluginSummary,
+  WebuiComposerSkillSummary,
+} from "./composer-catalogue.public.js";
 
 /** How many installed plugins the composer asks for. */
 const COMPOSER_PLUGIN_LIMIT = 200;

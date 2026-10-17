@@ -20,7 +20,7 @@
 // exists.
 
 import type { WebuiSessionStore } from "../../../application/session-store.js";
-import { createWebuiInteractionCommands } from "../../sessions/application/session-commands.js";
+import { createWebuiInteractionCommands } from "../../sessions/application/session-commands.public.js";
 import type { WebuiInteractionPhaseIntents } from "../../turn/contracts/interaction-phase-intents.js";
 import {
   createWebuiInteractionCoordinator,

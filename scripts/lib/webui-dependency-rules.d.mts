@@ -51,22 +51,12 @@ export function classifyRole(relative: string): RoleClassification;
 /** True when a path is presentation (a feature's `ui/`, generic `ui/`, shell). */
 export function isPresentationRole(relative: string): boolean;
 
-/** One reviewed cross-business import the role check accepts. */
-export interface ApprovedPeerImport {
-  readonly from: string;
-  readonly to: string;
-  readonly reason?: string;
-}
-
-/** Reads `webui-peer-imports.json` lazily and caches the result. */
-export function loadApprovedPeerImports(): readonly ApprovedPeerImport[];
-
 export function validateExceptionLedger(entries: unknown, required: readonly string[]): void;
 
 /** One role-rule finding. `rule` names which role judgement produced it. */
 export interface RoleViolation {
   readonly kind: "role";
-  readonly rule: "duplicate-owner" | "role-import" | "private-peer-import" | "stale-peer-approval";
+  readonly rule: "duplicate-owner" | "role-import" | "private-peer-import";
   readonly file: string;
   readonly from: string;
   readonly to: string;
@@ -81,7 +71,6 @@ export interface RoleViolation {
  */
 export function roleRule(
   graph: DependencyGraph,
-  approved?: readonly ApprovedPeerImport[],
 ): { readonly pass: boolean; readonly violations: readonly RoleViolation[] };
 
 /** Normalises an absolute path to the src-relative POSIX form, or `null`. */
@@ -314,6 +303,11 @@ export interface GraphEvaluation {
   readonly nodeBuiltins: readonly NodeBuiltinViolation[];
   readonly forbiddenCalls: readonly GraphViolation[];
   readonly roleViolations: readonly RoleViolation[];
+  /** What a `.public` module may contain: no export-star, no foreign
+   *  re-export, no foreign namespace, default or dynamic access. Empty when the
+   *  caller supplied no `sourceRoot`, because a gate with nothing to read
+   *  reports nothing rather than guessing a path. */
+  readonly publicationViolations: readonly RoleViolation[];
   readonly sharedNodeBuiltins: readonly NodeBuiltinViolation[];
   readonly unresolved: readonly GraphViolation[];
   readonly nonLiteralDynamic: readonly GraphViolation[];
@@ -323,8 +317,8 @@ export interface GraphEvaluation {
 export function evaluateGraph(
   graph: DependencyGraph,
   options?: {
-    /** A fixture graph states its own approved peers; omitted reads the repo's list. */
-    readonly approvedPeerImports?: readonly ApprovedPeerImport[];
+    /** Where the package's sources live, so the publication gate can read them. */
+    readonly sourceRoot?: string;
   },
 ): GraphEvaluation;
 

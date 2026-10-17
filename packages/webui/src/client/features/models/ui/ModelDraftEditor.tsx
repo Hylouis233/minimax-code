@@ -9,7 +9,7 @@ import {
   resolveModelDraftSelection,
   type ModelDraftChange,
 } from "../projection/model-draft.js";
-import { resolveEffortOptions } from "../projection/thinking-control.js";
+import { resolveEffortOptions } from "../projection/thinking-control.public.js";
 import type { CascadeTier } from "../projection/model-picker-cascade.js";
 import {
   ModelSettingsFlyout,

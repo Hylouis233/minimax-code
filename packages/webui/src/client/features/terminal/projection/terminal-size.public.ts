@@ -1,6 +1,6 @@
 /**
  * What the shell reports about a terminal's size, and when a report is worth
- * sending.
+ * sending, published as a public module.
  *
  * The terminal is opened at a fixed 80x24 and then fitted to the element it was
  * mounted in. Fitting moves the browser's viewport and tells the runtime
@@ -23,9 +23,17 @@
  *     reported" and leave the new one at the default.
  *
  * The observer and the timers that feed these rules live in
- * `components/workspace/WorkspacePanels.tsx`, in the same split `model-picker-hover.ts`
- * uses: the decision is data, the scheduling belongs to the surface that owns
- * the clock.
+ * `components/workspace/WorkspacePanels.tsx`, in the same split
+ * `model-picker-hover.ts` uses: the decision is data, the scheduling belongs
+ * to the surface that owns the clock. The workspace panel reads both the
+ * debounce window and the report-decision rule through this module so the
+ * terminals business owns the rule for "what counts as a worth-sending
+ * report", even though the panel is the one dragging the slider.
+ *
+ * This module is `.public` because the workspace business's terminal-survey
+ * surface needs both the debounce window and the report decision to know
+ * when to send a size to the runtime. The `.public` suffix is a publication
+ * marker; the debounce window and the report-decision filter are unchanged.
  */
 import type { WebuiTerminalSize } from "../contracts/terminal-port.js";
 

@@ -29,7 +29,7 @@ import {
 const here = path.dirname(fileURLToPath(import.meta.url));
 const componentDir = path.resolve(here, "../../src/client/features/models/ui");
 const picker = readFileSync(
-  path.join(componentDir, "ModelPicker.tsx"),
+  path.join(componentDir, "ModelPicker.public.tsx"),
   "utf8",
 );
 const interaction = readFileSync(

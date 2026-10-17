@@ -25,7 +25,7 @@ import {
   WebuiContextMenu,
 } from "../../src/client/ui/ContextMenu.js";
 import { placeWebuiContextMenu } from "../../src/client/projection/common/context-menu.js";
-import { WebuiInteractionPanel } from "../../src/client/features/interactions/ui/InteractionPanel.js";
+import { WebuiInteractionPanel } from "../../src/client/features/interactions/ui/InteractionPanel.public.js";
 import {
   WebuiProjectList,
   WebuiSessionList,
@@ -37,7 +37,7 @@ import {
 } from "../../src/client/features/sessions/projection/rail-groups.js";
 import { sessionHash } from "../../src/client/projection/common/router.js";
 import { WebuiSessionTranscript as BaseWebuiSessionTranscript } from "../../src/client/features/transcript/ui/SessionTranscript.js";
-import { WebuiWorkspaceDirectoryBrowser } from "../../src/client/features/workspace/ui/WebuiWorkspaceDirectoryBrowser.js";
+import { WebuiWorkspaceDirectoryBrowser } from "../../src/client/features/workspace/ui/WebuiWorkspaceDirectoryBrowser.public.js";
 import {
   WebuiIconContextArchive,
   WebuiIconContextCopy,

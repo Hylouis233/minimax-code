@@ -11,7 +11,7 @@ import type {
   WebuiUsageQuotaVideoView,
   WebuiUsageQuotaWindowView,
 } from "../../../../shared/contracts/usage-quota.js";
-import { formatUsageResetLabel } from "../projection/usage.js";
+import { formatUsageResetLabel } from "../projection/usage.public.js";
 
 export interface UsageState {
   readonly status: "idle" | "loading" | "ready" | "error";

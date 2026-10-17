@@ -2,10 +2,8 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 
-import {
-  WebuiModelMenuList,
-  WebuiModelPicker,
-} from "../../src/client/features/models/ui/ModelPicker.js";
+import { WebuiModelMenuList } from "../../src/client/features/models/ui/ModelMenu.js";
+import { WebuiModelPicker } from "../../src/client/features/models/ui/ModelPicker.public.js";
 import {
   groupModelsByProvider,
   modelIdentity,

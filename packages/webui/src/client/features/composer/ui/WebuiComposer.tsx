@@ -35,11 +35,8 @@ import { WebuiComposerProjectRow } from "./ComposerProjectRow.js";
 import type {
   WebuiComposerPluginCatalogue,
   WebuiComposerPluginSummary,
-} from "../../../features/plugins/application/composer-catalogue.js";
+} from "../../../features/plugins/application/composer-catalogue.public.js";
 import { projectWebuiMessageToStreamMessage, readUsageNumber } from "../../../features/transcript/contracts/message-stream.js";
-import {
-  createWebuiInteractionCoordinator,
-} from "../../../features/interactions/application/interaction-coordinator.js";
 import { latestContextUsage, readContextUsageSnapshot } from "../contracts/context-usage.js";
 import { readWebuiComposerSubmitGate } from "../projection/submission-gate.js";
 import {
@@ -58,7 +55,7 @@ import {
   contextBreakdownRows,
   drawableBreakdownRows,
 } from "../projection/context-breakdown.js";
-import { isTokenPlanModel } from "../../../features/models/projection/token-plan-model.js";
+import { isTokenPlanModel } from "../../../features/models/projection/token-plan-model.public.js";
 import type {
   WebuiComposerUrlReference,
 } from "../projection/composer-interactions.js";
@@ -99,7 +96,7 @@ import {
   useWebuiSessionStoreSnapshot,
 } from "../../../bindings/application-context.js";
 import { selectWebuiCatalogFlatPage } from "../../../features/sessions/application/session-catalog.public.js";
-import { useWebuiAccountWorkflowsState } from "../../../features/account/bindings/use-account-workflows.js";
+import { useWebuiAccountWorkflowsState } from "../../../features/account/bindings/use-account-workflows.public.js";
 import { webuiSessionStatusType } from "../../turn/projection/stream-state.public.js";
 
 import type {
@@ -120,20 +117,20 @@ import type {
   WebuiWorkspaceFile,
 } from "../../../../shared/contracts/workspace.js";
 import type { WebuiUsageQuotaResult } from "../../../../shared/contracts/usage-quota.js";
-import { formatUsageResetLabel } from "../../../features/account/projection/usage.js";
+import { formatUsageResetLabel } from "../../../features/account/projection/usage.public.js";
 import { WebuiGoalBanner } from "../../../features/goal/ui/GoalBanner.public.js";
-import { WebuiInteractionPanel } from "../../../features/interactions/ui/InteractionPanel.js";
+import { WebuiInteractionPanel } from "../../../features/interactions/ui/InteractionPanel.public.js";
 import { WebuiQueuePanel } from "./QueuePanel.js";
 import {
   WebuiModelPicker,
   type WebuiModelPickerDraft,
-} from "../../../features/models/ui/ModelPicker.js";
+} from "../../../features/models/ui/ModelPicker.public.js";
 import { ThinkingTrigger } from "./ThinkingTrigger.js";
 import {
   chipLevelLabel,
   resolveEffortOptions,
   thinkingDraftPatch,
-} from "../../../features/models/projection/thinking-control.js";
+} from "../../../features/models/projection/thinking-control.public.js";
 import {
   WebuiIconAttach,
 } from "../../../shell/icons.js";

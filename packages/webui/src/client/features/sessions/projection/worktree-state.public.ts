@@ -1,20 +1,18 @@
-/** Pure grouping for the WebUI worktree surface.
- *
- * Creating an isolated worktree already works — the rail's context menu
- * carries 「复制到新工作树」 and the server answers with
- * `worktreeVisible` / `worktreeUnavailableReason`. What did not exist was a
- * place to see what those worktrees are, which is the "并行实验分支" half of
- * the row.
- *
- * A worktree is not a first-class field on a session. It is inferred: git
- * creates a second checkout with its own absolute path, so a session whose
- * `workspaceDir` differs from the project's default checkout is running in
- * one. `isDefaultWorkspace` is the runtime's own statement of which checkout
- * is the primary one, and it is trusted over any guess made here.
- *
- * Grouping is a pure function so it can be asserted without a DOM: the page
- * that renders it runs `renderToStaticMarkup`, which never runs effects.
- */
+// Pure grouping for the WebUI worktree surface, published as a public module.
+//
+// The sessions business is the one that knows what a worktree is on a session
+// list: a checkout whose `workspaceDir` is not the project's primary checkout.
+// Two peers render this rule — the code-review settings page lists one
+// workspace per parallel branch, and the workspace switcher renders the same
+// grouping as a switchable picker. Neither peer should re-derive the rule or
+// reach into the sessions business for the normalisation helpers that feed
+// it, so the whole module sits here at the publication marker.
+//
+// This module is `.public` because both the review and settings businesses
+// need to group sessions into worktree checkouts to render their pages.
+// The `.public` suffix is a publication marker; the rule list, the order
+// tie-break, the archived-session filter, and the unnormalised-paths
+// tolerance are all unchanged.
 
 export interface WebuiWorktreeSession {
   readonly sessionId: string;

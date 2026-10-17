@@ -20,3 +20,5 @@ export const DESKTOP_SETTINGS_TABS: readonly SettingsTabDefinition[] = [
 export function resolveThemePreference(preference: string, systemDark: boolean): "light" | "dark" { return preference === "system" ? (systemDark ? "dark" : "light") : preference === "dark" ? "dark" : "light"; }
 
 export function filterSettingsTabs(query: string): readonly SettingsTabDefinition[] { const needle = query.trim().toLowerCase(); return DESKTOP_SETTINGS_TABS.filter((tab) => !needle || `${tab.label} ${tab.key}`.toLowerCase().includes(needle)); }
+
+export const SETTINGS_GROUPS = [{ key: "preferences", label: "偏好" }, { key: "management", label: "管理" }, { key: "coding", label: "编码" }, { key: "archived", label: "归档" }] as const;

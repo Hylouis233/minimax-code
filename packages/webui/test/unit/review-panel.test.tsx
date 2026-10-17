@@ -12,7 +12,7 @@ import {
   isWebuiReviewFiltering,
   type WebuiReviewFile,
 } from "../../src/client/features/review/projection/review-state.js";
-import { groupWebuiWorktreeWorkspaces } from "../../src/client/features/sessions/projection/worktree-state.js";
+import { groupWebuiWorktreeWorkspaces } from "../../src/client/features/sessions/projection/worktree-state.public.js";
 
 /* Why this file asserts on markup rather than on clicks:
  *
@@ -286,7 +286,7 @@ describe("choosing a workspace to review", () => {
  */
 describe("tab-to-page wiring", () => {
   const source = readFileSync(
-    fileURLToPath(new URL("../../src/client/features/settings/ui/SettingsModal.tsx", import.meta.url)),
+    fileURLToPath(new URL("../../src/client/features/settings/ui/SettingsModal.public.tsx", import.meta.url)),
     "utf8",
   );
 

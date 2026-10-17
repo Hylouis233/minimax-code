@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const PATH = "../../src/client/features/workspace/ui/WebuiWorkspaceDirectoryBrowser.tsx";
+const PATH = "../../src/client/features/workspace/ui/WebuiWorkspaceDirectoryBrowser.public.tsx";
 const source = readFileSync(fileURLToPath(new URL(PATH, import.meta.url)), "utf8");
 // The listing, its loading state and its failure belong to the files owner;
 // the component states what it wants read and renders what came back. Both halves

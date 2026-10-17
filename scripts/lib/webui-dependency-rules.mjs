@@ -27,6 +27,10 @@ const BUILTIN_NODE_MODULES = new Set(builtinModules.map((name) => name.replace(/
 // side-effect-free; it is only *used* when `buildDependencyGraph` runs.
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
+// The publication predicate is shared, not reimplemented here: the layer rules
+// and the visibility gate must agree about what counts as a published module,
+// or one of them ends up enforcing a set the other has never heard of.
+import { isPublicModulePath, publicationRule } from "./webui-publication.mjs";
 /** @type {typeof import("typescript")} */
 const ts = require("typescript");
 // Names whose resolution to a TypeScript lib `*.d.ts` declaration is the
@@ -403,8 +407,7 @@ export function classifyLayers(relative) {
       // `domain` to `view` and the gate would be enforcing something the plan
       // never decided.
       const b = basenameWithoutExtension(normalized).replace(/\.public$/u, "");
-      return PROJECTION_DOMAIN.has(b) ? ["domain"] : ["view"];
-    }
+      return PROJECTION_DOMAIN.has(b) ? ["domain"] : ["view"];    }
     if (role === "application") return ["application"];
     if (role === "bindings" || role === "ui") return ["bindings"];
     // A file at the feature root is its published surface; if it sits there it
@@ -550,12 +553,18 @@ export function classifyRole(relative) {
   const normalized = relative.split(path.sep).join("/");
   if (normalized === "client/global.d.ts") return { role: "entry", business: null, home: "current" };
 
+  // A `.public` module is the business's published surface, and publishing is
+  // what makes a cross-business import legal. The marker is carried on the role
+  // rather than by making `published` a separate role: the module still occupies
+  // its own role directory, and dropping that would lose the layer and duplicate-
+  // owner judgements that apply to it. Only the *reachability* changes.
   if (normalized.startsWith("client/features/")) {
     const [business, ...tail] = normalized.slice("client/features/".length).split("/");
     if (!business) return { role: "unknown", business: null, home: "target" };
     if (tail.length === 0) return { role: "feature-root", business, home: "target" };
+    const role = FEATURE_ROLE_DIRECTORIES[tail[0]] ?? "feature-root";
     return {
-      role: FEATURE_ROLE_DIRECTORIES[tail[0]] ?? "feature-root",
+      role: isPublicModulePath(normalized) ? `published-${role}` : role,
       business,
       home: "target",
     };
@@ -1885,7 +1894,28 @@ const BUSINESS_BEARING_ROLES = new Set([
 ]);
 
 /**
- * Business roles a feature may not reach into without an approved peer entry.
+ * Whether a role names a published surface rather than a private one.
+ *
+ * `classifyRole` records publication as a `published-` prefix on the role rather
+ * than as a separate role, so the module still occupies its own role directory
+ * and the layer and duplicate-owner judgements apply to it unchanged. Every
+ * judgement that asks "is this private?" asks it here instead of comparing the
+ * role against a set, so publication cannot be forgotten by one of them.
+ *
+ * @param {string} role
+ * @returns {boolean}
+ */
+export function isPublishedRole(role) {
+  return role.startsWith("published-");
+}
+
+/** The role a published module occupies, for judgements about what it is. */
+export function baseRole(role) {
+  return isPublishedRole(role) ? role.slice("published-".length) : role;
+}
+
+/**
+ * Business roles a feature may not reach into at all.
  * `feature-contracts` is absent on purpose: a feature's contracts are its
  * published capability port and view types (plan §5.1), which is exactly what a
  * peer is allowed to consume.
@@ -1917,28 +1947,6 @@ const ROLE_FORBIDDEN_TARGETS = Object.freeze({
   shell: new Set(["assembly", "platform"]),
 });
 
-/**
- * Cross-business imports the check accepts deliberately. Loaded from
- * `webui-peer-imports.json` so the list is data a reviewer can diff, and so
- * every migration that needs one records why. Read lazily and cached: the
- * module stays side-effect-free to import.
- *
- * @returns {ReadonlyArray<{readonly from: string, readonly to: string, readonly reason?: string}>}
- */
-export function loadApprovedPeerImports() {
-  if (approvedPeerImportsCache === null) {
-    approvedPeerImportsCache = Object.freeze(
-      JSON.parse(
-        readFileSync(new URL("./webui-peer-imports.json", import.meta.url), "utf8"),
-      ).entries,
-    );
-    validateExceptionLedger(approvedPeerImportsCache, ["reason"]);
-  }
-  return approvedPeerImportsCache;
-}
-
-/** @type {ReadonlyArray<{from: string, to: string, reason?: string}> | null} */
-let approvedPeerImportsCache = null;
 
 export function validateExceptionLedger(entries, required) {
   if (!Array.isArray(entries)) throw new Error("WebUI exception ledger must contain an entries array");
@@ -1967,19 +1975,18 @@ export function validateExceptionLedger(entries, required) {
  * 2. **Forbidden by kind.** A migrated source role reaching a role it never
  *    owns (`ROLE_FORBIDDEN_TARGETS`, plus `client/ui/` reaching any business at
  *    all).
- * 3. **Unapproved peer import.** A feature reaching another business's private
- *    role. Contracts need no approval; everything else does.
+ * 3. **Private peer import.** A feature reaching another business's private
+ *    role. Contracts need nothing; everything else has to be published first,
+ *    and there is no list that can excuse it.
  *
  * All three judgements apply in every home.
  *
  * @param {object} graph
- * @param {readonly Array<{from: string, to: string, reason?: string}>} approved
  * @returns {{ pass: boolean, violations: Array<object> }}
  */
-export function roleRule(graph, approved = loadApprovedPeerImports()) {
+export function roleRule(graph) {
   const violations = [];
   const files = graph.files ?? [];
-  const fileSet = new Set(files);
 
   // 1. Duplicate live owner: same business, same role, both homes.
   const owners = new Map();
@@ -2007,8 +2014,13 @@ export function roleRule(graph, approved = loadApprovedPeerImports()) {
   }
 
   // 2. and 3. Role edges, judged in every home (see the comment inside the loop).
-  const approvals = new Map(approved.map((entry) => [pairKey(entry.from, entry.to), entry]));
-  const usedApprovals = new Set();
+  //
+  // There is no approval list any more. The baseline recorded which cross-business
+  // private imports were tolerated; once every one of them had a published module
+  // to read instead, the list had nothing left to excuse, and keeping it would
+  // have meant a new entry could always be added to make a new private import
+  // pass. A cross-business import of a private module is now simply the defect it
+  // always was, and the fix is to publish the symbol.
   for (const edge of graph.edges ?? []) {
     const from = classifyRole(edge.from);
     const to = classifyRole(edge.to);
@@ -2018,7 +2030,12 @@ export function roleRule(graph, approved = loadApprovedPeerImports()) {
     if (to.home === "outside") continue;
 
     const forbidden = ROLE_FORBIDDEN_TARGETS[from.role];
-    const uiReachesBusiness = from.role === "ui" && FEATURE_PRIVATE_ROLES.has(to.role);
+    // A published target is reachable from presentation: that is what a published
+    // component is for. The forbidden-kind rule still applies above it.
+    const uiReachesBusiness =
+      baseRole(from.role) === "ui" &&
+      !isPublishedRole(to.role) &&
+      FEATURE_PRIVATE_ROLES.has(baseRole(to.role));
     if (forbidden?.has(to.role) || uiReachesBusiness) {
       violations.push({
         kind: "role",
@@ -2038,19 +2055,20 @@ export function roleRule(graph, approved = loadApprovedPeerImports()) {
     // shell, the assembly and the conversation substrate each have their own
     // composition contract, and the one for their *kind* of dependency is
     // `ROLE_FORBIDDEN_TARGETS` above.
+    //
+    // A published target is the way across, so it is not judged here at all: the
+    // owner put it there for exactly this. The publication gate is what holds it
+    // to being a real surface — a published module that forwards, re-exports or
+    // reaches outward fails there rather than being excused here.
     if (
       from.business === null ||
-      !FEATURE_PRIVATE_ROLES.has(to.role) ||
+      isPublishedRole(to.role) ||
+      !FEATURE_PRIVATE_ROLES.has(baseRole(to.role)) ||
       to.business === null ||
       to.business === from.business
     )
       continue;
 
-    const key = pairKey(edge.from, edge.to);
-    if (approvals.has(key)) {
-      usedApprovals.add(key);
-      continue;
-    }
     violations.push({
       kind: "role",
       rule: "private-peer-import",
@@ -2060,33 +2078,9 @@ export function roleRule(graph, approved = loadApprovedPeerImports()) {
       to: edge.to,
       detail:
         `${edge.from}:${edge.line}: imports ${to.business}'s private ${to.role} (${edge.to}). ` +
-        `Consume its published contracts or add a reviewed entry to ` +
-        `scripts/lib/webui-peer-imports.json with the reason it is deliberate.`,
-    });
-  }
-
-  // A peer approval that no longer matches a measured edge is stale: the edge it
-  // excused was removed, so the exception has to go too.
-  for (const [key, entry] of approvals) {
-    if (usedApprovals.has(key)) continue;
-    if (!fileSet.has(entry.from) || !fileSet.has(entry.to)) {
-      violations.push({
-        kind: "role",
-        rule: "stale-peer-approval",
-        file: entry.from,
-        from: entry.from,
-        to: entry.to,
-        detail: `approved peer import ${key} names a file that no longer exists — delete the entry.`,
-      });
-      continue;
-    }
-    violations.push({
-      kind: "role",
-      rule: "stale-peer-approval",
-      file: entry.from,
-      from: entry.from,
-      to: entry.to,
-      detail: `approved peer import ${key} is no longer measured — delete the entry.`,
+        `Consume the owner's published contract instead: a \`.public.ts\` for a derivation ` +
+        `or interface, a \`.public.tsx\` for a component. There is no exception list — ` +
+        `publishing the symbol is the fix, and it is the only one.`,
     });
   }
 
@@ -2178,16 +2172,11 @@ export const rules = Object.freeze([
  *   nodeBuiltins: Array<object>,
  *   forbiddenCalls: Array<object>,
  *   roleViolations: Array<object>,
+ *   publicationViolations: Array<object>,
  * }}
  */
 export function evaluateGraph(graph, options = {}) {
-  // The approved-peer list is injectable so a fixture graph can state its own:
-  // entries that name files the graph does not contain are stale by construction
-  // and would fail every fixture that is not about them.
-  const approved = options.approvedPeerImports ?? loadApprovedPeerImports();
-  const results = rules.map((rule) =>
-    rule === roleRule ? rule(graph, approved) : rule(graph),
-  );
+  const results = rules.map((rule) => rule(graph));
   const direction = results[0].violations;
   const browserOnly = results[1].violations;
   const browserGlobals = results[2].violations;
@@ -2197,6 +2186,23 @@ export function evaluateGraph(graph, options = {}) {
   const unresolved = results[6].violations;
   const nonLiteralDynamic = results[7].violations;
   const cycles = results[8].violations;
+  // The publication gate judges a published module's own surface, so it runs
+  // over the file list rather than the graph: the edges it rejects are edges
+  // inside a module, and the graph only records edges between files.
+  //
+  // `options.sourceRoot` is how a caller that already knows where the package
+  // lives hands that in. A fixture graph without one supplies no reader, and a
+  // gate with nothing to read reports nothing rather than guessing a path and
+  // reading the wrong tree.
+  const publication = publicationRule({
+    files: graph.files ?? [],
+    ...(options.sourceRoot
+      ? {
+          absolute: (relative) => path.join(options.sourceRoot, relative),
+          readFile: (absolutePath) => readFileSync(absolutePath, "utf8"),
+        }
+      : {}),
+  });
   const violations = [
     ...direction,
     ...browserOnly,
@@ -2204,6 +2210,7 @@ export function evaluateGraph(graph, options = {}) {
     ...nodeBuiltins,
     ...forbiddenCalls,
     ...roleViolations,
+    ...publication.violations,
     ...unresolved,
     ...nonLiteralDynamic,
     ...cycles,
@@ -2228,6 +2235,7 @@ export function evaluateGraph(graph, options = {}) {
     nodeBuiltins,
     forbiddenCalls,
     roleViolations,
+    publicationViolations: publication.violations,
     sharedNodeBuiltins: nodeBuiltins,
     unresolved,
     nonLiteralDynamic,

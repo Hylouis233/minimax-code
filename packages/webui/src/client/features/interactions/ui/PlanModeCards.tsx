@@ -1,22 +1,20 @@
-// Plan mode cards — the plan delivery card and the two plan decisions.
+// Plan mode cards — the plan enter/decision surfaces that stay private to the
+// interactions business.
 //
-// The runtime raises plan mode on the same questionnaire channel as every other
-// interaction, and the request is recognised by `mode: "plan"` (see
-// `projection/interactions/plan-mode.ts`). Three distinct surfaces render for
-// that channel:
+// The transcript business consumes only `WebuiPlanDeliveryCard` (the response
+// surface of a plan turn), and that card is published as
+// `./PlanModeCards.public.tsx`. The two surfaces the interactions business
+// owns internally — `WebuiPlanReviewDecision` and `WebuiPlanEnterConfirmation`
+// — and the dispatch that picks between them (`WebuiPlanSurface`) sit here,
+// because no other screen mounts them.
 //
-//   * `plan-enter-confirmation`  — asked before plan mode starts.
-//   * `plan-delivery-card`       — the plan file itself: title, preview of the
-//                                  file body, and 执行 / 预览.
-//   * `plan-review-decision`     — "计划完成，实施计划？" with the three-way
-//                                  decision.
-//
-// The `data-testid` values are stable selectors pinned by
-// `webui-plan-mode.test.ts`. One deliberate difference from a file-preview
-// panel: 预览 expands the plan in place, because the composer has no route
-// into that panel to hand the path to.
+// The shared `WebuiPlanCardChrome` is a published type: it has to be the
+// private surface's contract for the chrome the public card carries, so the
+// private file imports it from the publication marker rather than redeclaring
+// it.
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
+
 import {
   WEBUI_PLAN_COPY,
   buildWebuiPlanApproveAnswers,
@@ -25,166 +23,30 @@ import {
   buildWebuiPlanSkipAnswers,
   isWebuiPlanReviewRequest,
   webuiPlanEnterOptions,
-  webuiPlanMarkdown,
-  webuiPlanReviewDescription,
-  webuiPlanSummary,
-  webuiPlanTitle,
 } from "../projection/plan-mode.js";
-import { WebuiMarkdown } from "../../transcript/ui/markdown.public.js";
 import {
   WebuiIconClose,
-  WebuiIconCommandPlan,
   WebuiIconMessageEdit,
 } from "../../../shell/icons.js";
 import type {
   WebuiQuestionnaireAnswer,
   WebuiQuestionnaireRequest,
 } from "../../../../shared/contracts/interactions.js";
+import {
+  WebuiPlanDeliveryCard,
+  type WebuiPlanCardChrome,
+} from "./PlanModeCards.public.js";
 
-/** Eye glyph for 预览: an outline eye in an 18px box. */
-function PlanEyeIcon({ className }: { readonly className?: string }): ReactElement {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true" className={className}>
-      <path
-        d="M2.25 9s2.5-4.25 6.75-4.25S15.75 9 15.75 9s-2.5 4.25-6.75 4.25S2.25 9 2.25 9Z"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinejoin="round"
-      />
-      <circle cx="9" cy="9" r="1.9" stroke="currentColor" strokeWidth="1.3" />
-    </svg>
-  );
-}
+// `WebuiPlanDeliveryCard` lives in the published sibling so the transcript
+// business reads the plan-delivery UI through the publication marker. The
+// private plan surfaces still live here; the test file asserts them through
+// this module.
+//
+// `WebuiPlanCardChrome` is exported for the public surface (`.public.tsx`)
+// to declare its prop. The interaction's own consumers do not name it
+// directly, so it is imported here purely for the published card's contract.
 
-/** Shared busy/error plumbing for every plan surface. */
-interface WebuiPlanCardChrome {
-  readonly busy?: boolean;
-  readonly error?: string;
-}
-
-function PlanCardError({ error }: { readonly error?: string }): ReactElement | null {
-  if (!error) return null;
-  return (
-    <p className="webui-plan-card-error" role="alert">
-      {error}
-    </p>
-  );
-}
-
-/**
- * The plan file card: title, an always-visible preview of the plan's summary
- * section, and the two actions. The preview is capped and fades out at the
- * bottom edge under a mask, and 预览 expands the whole file in place.
- */
-export function WebuiPlanDeliveryCard({
-  request,
-  onBuild,
-  onViewPlan,
-  chrome,
-}: {
-  readonly request: WebuiQuestionnaireRequest;
-  readonly onBuild: () => void;
-  /** Open the whole plan file in the workspace panel. */
-  readonly onViewPlan?: () => void;
-  readonly chrome?: WebuiPlanCardChrome;
-}): ReactElement {
-  const markdown = webuiPlanMarkdown(request);
-  const summary = webuiPlanSummary(markdown);
-  const title = webuiPlanTitle(markdown) || WEBUI_PLAN_COPY.deliveryTitle;
-  const description = webuiPlanReviewDescription(request);
-  const busy = chrome?.busy === true;
-  const [truncated, setTruncated] = useState(false);
-  const contentRef = useRef<HTMLDivElement | null>(null);
-  const summaryRef = useRef<HTMLDivElement | null>(null);
-
-  // The summary is scrollable only when it actually overflows its cap, which
-  // the stylesheet owns — read it off the element rather than repeating the
-  // number here, since a copy that drifts reports the wrong flag.
-  useLayoutEffect(() => {
-    const element = contentRef.current;
-    const box = summaryRef.current;
-    if (!element) return undefined;
-    const measure = () => {
-      const cap = box ? Number.parseFloat(getComputedStyle(box).maxHeight) : Number.POSITIVE_INFINITY;
-      if (!Number.isFinite(cap)) return;
-      setTruncated(element.scrollHeight + 24 > cap);
-    };
-    measure();
-    if (typeof ResizeObserver === "undefined") return undefined;
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    if (summaryRef.current) observer.observe(summaryRef.current);
-    return () => observer.disconnect();
-  }, [summary]);
-
-  return (
-    <section
-      className="webui-plan-delivery-card"
-      data-testid="plan-delivery-card"
-      data-request-id={request.id}
-    >
-      <div className="webui-plan-delivery-header" data-testid="plan-delivery-header">
-        <div className="webui-plan-delivery-heading">
-          <div className="webui-plan-delivery-icon" data-testid="plan-delivery-icon" aria-hidden="true">
-            <WebuiIconCommandPlan className="size-full" />
-          </div>
-          <div className="webui-plan-delivery-heading-text">
-            <h4 className="webui-plan-delivery-title" data-testid="plan-delivery-title" title={title}>
-              {title}
-            </h4>
-            {description ? (
-              <p className="webui-plan-review-description" data-testid="plan-review-description" role="status">
-                {description}
-              </p>
-            ) : null}
-          </div>
-        </div>
-        <div className="webui-plan-delivery-actions">
-          <button
-            type="button"
-            className="webui-plan-build-button"
-            data-testid="plan-build"
-            disabled={busy}
-            onClick={onBuild}
-          >
-            <span data-testid="plan-build-label">{WEBUI_PLAN_COPY.deliveryBuild}</span>
-          </button>
-          <button
-            type="button"
-            className="webui-plan-view-button"
-            data-testid="plan-view"
-            disabled={!onViewPlan}
-            onClick={() => onViewPlan?.()}
-          >
-            <span className="webui-plan-view-icon" data-testid="plan-view-icon" aria-hidden="true">
-              <PlanEyeIcon />
-            </span>
-            {/* The label stays 预览 whether or not the preview is open — the
-                view button reads the same either way, and switching
-                it to 执行 would duplicate the build action sitting next to it.
-                Open state is carried by aria-exppressed semantics. */}
-            <span data-testid="plan-view-label">{WEBUI_PLAN_COPY.deliveryView}</span>
-          </button>
-        </div>
-      </div>
-
-      {summary ? (
-        <div
-          className="webui-plan-delivery-summary"
-          data-testid="plan-delivery-summary"
-          data-summary-truncated={truncated ? "true" : "false"}
-          ref={summaryRef}
-        >
-          <div className="webui-plan-delivery-summary-content" data-testid="plan-delivery-summary-content" ref={contentRef}>
-            <WebuiMarkdown source={summary} />
-          </div>
-        </div>
-      ) : null}
-
-      <PlanCardError error={chrome?.error} />
-    </section>
-  );
-}
+export { WebuiPlanDeliveryCard, type WebuiPlanCardChrome };
 
 /**
  * "计划完成，实施计划？" — approve, ask for changes, or skip. The free-text row
@@ -305,7 +167,11 @@ export function WebuiPlanReviewDecision({
           </div>
         </div>
       </div>
-      <PlanCardError error={chrome?.error} />
+      {chrome?.error ? (
+        <p className="webui-plan-card-error" role="alert">
+          {chrome.error}
+        </p>
+      ) : null}
     </section>
   );
 }
@@ -356,7 +222,11 @@ export function WebuiPlanEnterConfirmation({
           ) : null}
         </div>
       </div>
-      <PlanCardError error={chrome?.error} />
+      {chrome?.error ? (
+        <p className="webui-plan-card-error" role="alert">
+          {chrome.error}
+        </p>
+      ) : null}
     </section>
   );
 }

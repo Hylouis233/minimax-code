@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest";
 import {
   TERMINAL_RESIZE_DEBOUNCE_MS,
   terminalResizeRequest,
-} from "../../src/client/features/terminal/projection/terminal-size.js";
+} from "../../src/client/features/terminal/projection/terminal-size.public.js";
 
 const MEASURED = { terminalId: "t1", cols: 120, rows: 40 } as const;
 

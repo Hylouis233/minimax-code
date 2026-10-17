@@ -42,7 +42,11 @@ import { isSearchEmpty } from "../projection/model-picker-search.js";
 import { toggleFavoriteId } from "../projection/model-favorites.js";
 import { WebuiModelMenuCluster } from "./ModelMenu.js";
 import { WebuiModelDraftEditor } from "./ModelDraftEditor.js";
-export { WebuiModelMenuList } from "./ModelMenu.js";
+// `WebuiModelMenuList` is NOT republished here. It lives in `ModelMenu.tsx` and
+// only the models business's own tests import it; forwarding it from a published
+// surface would make this module the publisher of a symbol nothing outside the
+// business needs, and a forwarding export is the escape the publication gate
+// exists to close.
 
 // Re-export so existing importers keep their import path stable.
 export type {

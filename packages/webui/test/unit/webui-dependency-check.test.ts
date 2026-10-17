@@ -35,6 +35,10 @@ import {
   toBaselineShape,
   touchesAmbiguousFile,
 } from "../../../../scripts/lib/webui-dependency-rules.mjs";
+import {
+  isPublicModulePath,
+  publicationRule,
+} from "../../../../scripts/lib/webui-publication.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../../../..");
@@ -1410,5 +1414,95 @@ describe("the gate runs and matches the frozen baseline", () => {
     expect(summary.staleEntries.map((entry: { from: string }) => entry.from)).toContain(
       "client/does-not-exist.ts",
     );
+  });
+});
+
+describe("V25 · what a published surface may contain", () => {
+  const publication = (source: string) => {
+    const root = mkdtempSync(path.join(os.tmpdir(), "webui-publication-"));
+    temporaryRoots.push(root);
+    const relative = "client/features/sessions/application/catalogue.public.ts";
+    const absolutePath = path.join(root, relative);
+    mkdirSync(path.dirname(absolutePath), { recursive: true });
+    writeFileSync(absolutePath, source);
+    return publicationRule({
+      files: [relative],
+      absolute: (p) => path.join(root, p),
+      readFile: (p) => readFileSync(p, "utf8"),
+    });
+  };
+
+  it("accepts a plain published derivation", () => {
+    const result = publication(
+      'import type { Thing } from "../../contracts/thing.js";\nexport interface Public { readonly thing: Thing }\nexport const derive = (t: Thing): number => t.n;\n',
+    );
+
+    expect(result.violations).toEqual([]);
+    expect(result.pass).toBe(true);
+  });
+
+  it("rejects export-star, which republishes whatever is added later", () => {
+    const result = publication('export * from "./catalogue.js";\n');
+
+    expect(result.pass).toBe(false);
+    expect(result.violations.map((v) => v.rule)).toContain("publication-export-star");
+  });
+
+  it("rejects a foreign re-export, which makes this business the publisher", () => {
+    const result = publication('export { sessions } from "../../other/contracts/sessions.js";\n');
+
+    expect(result.pass).toBe(false);
+    expect(result.violations.map((v) => v.rule)).toContain("publication-foreign-re-export");
+  });
+
+  it("rejects foreign namespace access, whose reach the gate cannot resolve", () => {
+    const result = publication('import * as other from "../../other/contracts/sessions.js";\nexport const x = other;\n');
+
+    expect(result.pass).toBe(false);
+    expect(result.violations.map((v) => v.rule)).toContain("publication-foreign-namespace");
+  });
+
+  it("rejects a default export, which names no symbol a consumer could be checked against", () => {
+    const result = publication("const thing = 1;\nexport default thing;\n");
+
+    expect(result.pass).toBe(false);
+    expect(result.violations.map((v) => v.rule)).toContain("publication-foreign-default");
+  });
+
+  it("rejects a dynamic import, whose edge no other judgement can see", () => {
+    const result = publication('export const load = () => import("./catalogue.js");\n');
+
+    expect(result.pass).toBe(false);
+    expect(result.violations.map((v) => v.rule)).toContain("publication-foreign-dynamic");
+  });
+
+  it("recognises both suffixes from the path, not from a hand-written list", () => {
+    // A list of published modules is a list that goes stale on the first rename,
+    // and a stale list is a gate that passes files it should reject. Both suffixes
+    // are recognised from the real path.
+    expect(isPublicModulePath("client/features/x/ui/Thing.public.tsx")).toBe(true);
+    expect(isPublicModulePath("client/features/x/ui/Thing.public.ts")).toBe(true);
+    expect(isPublicModulePath("client/features/x/ui/Thing.ts")).toBe(false);
+    // A file merely *named* public is not one.
+    expect(isPublicModulePath("client/features/x/ui/public.ts")).toBe(false);
+
+    // The layer classifier agrees, so a published projection keeps its layer.
+    expect(classifyLayers("client/features/workspace/projection/workspace-name.public.ts")).toEqual(
+      classifyLayers("client/features/workspace/projection/workspace-name.ts"),
+    );
+    expect(classifyLayers("client/features/goal/projection/goal-state.public.ts")).toEqual(
+      ["domain"],
+    );
+  });
+
+  it("does not read a comment as a declaration", () => {
+    // The gate is a bounded syntactic pass, so its own blindness has to be
+    // stated: a `.public` marker inside a comment must not be judged, and a
+    // commented-out re-export must not be rejected.
+    const result = publication(
+      '// export * from "./catalogue.js";\n/* export { x } from "../other/y.js"; */\nexport const ok = 1;\n',
+    );
+
+    expect(result.violations).toEqual([]);
   });
 });

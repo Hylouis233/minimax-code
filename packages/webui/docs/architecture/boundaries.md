@@ -20,9 +20,14 @@ cross-feature call through an approved public contract or command is not automat
 | `shared/` | leaf dependencies only | Wire contracts and shared values import neither execution side. |
 
 Within a layer, feature implementation is private by default. A feature may use another feature's
-public `contracts/`; any other peer edge needs an explicit reviewed entry in
-`scripts/lib/webui-peer-imports.json`, and an entry whose edge is gone fails the check, so an
-exception cannot outlive its reason.
+public `contracts/`, or a module that feature published as its surface: a `.public.ts` for a
+derivation or interface, a `.public.tsx` for a component. Everything else in another feature is
+private, and there is no exception list — a cross-business edge that reaches a private module is
+the defect it always was, and publishing the symbol is the fix.
+
+A published module is held to what a published surface may contain: every explicit export is
+public, no export-star, no foreign re-export, and no foreign namespace, default or dynamic access.
+That way a `.public` marker cannot become an alias for the private module next to it.
 
 A business that decides *when* another business's state moves is handed that business's published
 narrow contract, and the composition that holds the writer builds it. The interaction flow is the
@@ -53,8 +58,9 @@ reports zero violations today. It fails on:
 - the conversation substrate reaching feature implementation, the assembly or `client/platform/`;
   presentation or shell reaching the assembly or the platform adapters; `client/ui/` reaching any
   business at all;
-- a feature reaching another business's *private* role. A feature's `contracts/` is public and needs
-  no entry; anything else needs a reviewed entry in `scripts/lib/webui-peer-imports.json`.
+- a feature reaching another business's *private* role. A feature's `contracts/` and the modules it
+  publishes (`.public.ts` / `.public.tsx`) are public and need nothing further; anything else has to
+  be published first, and nothing excuses it.
 
 `pnpm check:webui-dependency` runs this over the source, so it sees `import type` edges that the
 metafile check cannot (type-only edges are erased from build output). Its exception baseline is

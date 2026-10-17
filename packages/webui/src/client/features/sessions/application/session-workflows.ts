@@ -13,7 +13,7 @@
 // unit-tested against a scripted port.
 
 import type { SessionPort, WebuiClientSessionCreator } from "../contracts/session-port.js";
-import type { WebuiComposerStore } from "../../../features/composer/application/composer-store.js";
+import type { WebuiComposerPurgeSlot } from "../../../features/composer/application/composer-store.public.js";
 import type { WebuiSessionScopeManager } from "../../../conversation/session-scope.js";
 import type {
   WebuiClientProject,
@@ -237,7 +237,7 @@ export function createWebuiSessionWorkflows(deps: {
    * meant drafts outlive the delete — a soft-loss this module must not keep as a
    * configuration, so the delete **cannot compile** without it.
    */
-  readonly composer: Pick<WebuiComposerStore, "purgeSlot">;
+  readonly composer: { readonly purgeSlot: WebuiComposerPurgeSlot };
   /**
    * The session scope. A delete is an accepted mutation, so it holds a
    * **settlement** lease until its outcome and the invalidation it owes are

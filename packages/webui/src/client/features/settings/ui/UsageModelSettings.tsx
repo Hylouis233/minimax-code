@@ -1,12 +1,12 @@
 import { useEffect, useState, type ReactElement } from "react";
 import { formatWebuiCredits, recordOf, textOf } from "../../../contracts/value-readers.js";
 import { useWebuiModelsWorkflows, useWebuiModelsWorkflowsState, useWebuiSettingsWorkflows, useWebuiSettingsWorkflowsState } from "../../../bindings/use-query-state.js";
-import { useWebuiAccountWorkflows, useWebuiAccountWorkflowsState } from "../../../features/account/bindings/use-account-workflows.js";
+import { useWebuiAccountWorkflows, useWebuiAccountWorkflowsState } from "../../../features/account/bindings/use-account-workflows.public.js";
 import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
-import { formatResetLabel, getActiveSourceBadge, type ProviderHeaderDraft } from "../../../features/models/projection/usage-settings.js";
+import { formatResetLabel, getActiveSourceBadge, type ProviderHeaderDraft } from "../../../features/models/projection/usage-settings.public.js";
 import { IconButton, RefreshIcon } from "../../../ui/form-atoms.js";
 import { ProviderFormPanel, type WebuiProviderFormCommands } from "../../../features/models/ui/ProviderFormPanel.public.js";
-import { useWebuiProviderEditor } from "../../../features/models/bindings/use-provider-editor.js";
+import { useWebuiProviderEditor } from "../../../features/models/bindings/use-provider-editor.public.js";
 import type { WebuiProviderEditorCommands } from "../../../features/models/contracts/provider-editor.js";
 import { unavailableWebuiProviderOutcome } from "../../../features/models/contracts/provider-outcome.js";
 import type { WebuiModelProviderView } from "../../../../shared/contracts/models.js";

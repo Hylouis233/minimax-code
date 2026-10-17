@@ -4,7 +4,8 @@ import { GENERIC_FILE_ROW_ORDER, GENERIC_RADIO_CONTRACT, GENERIC_SECTION_TEST_ID
 import { DESKTOP_SETTINGS_TABS, filterSettingsTabs, resolveThemePreference } from "../../src/client/features/settings/projection/settings-view.js";
 import { DisabledBillingActions, UsageModelSettings } from "../../src/client/features/settings/ui/UsageModelSettings.js";
 import { reorderModelIds } from "../../src/client/features/models/projection/model-reorder.js";
-import { formatResetLabel, getActiveSourceBadge, projectProviderHeaders } from "../../src/client/features/models/projection/usage-settings.js";
+import { formatResetLabel, getActiveSourceBadge } from "../../src/client/features/models/projection/usage-settings.public.js";
+import { projectProviderHeaders } from "../../src/client/features/models/projection/usage-settings.js";
 import { createWebuiBrowserDom } from "../../src/client/platform/browser-dom.js";
 
 describe("desktop settings registry", () => {

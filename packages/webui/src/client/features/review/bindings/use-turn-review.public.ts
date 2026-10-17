@@ -1,8 +1,24 @@
-// The turn-review binding: the React surface of the review owner.
+// The turn-review binding: the React surface of the review owner, published
+// as a public module.
 //
 // The owner lives on the application, so a card that mounts reads whatever the
 // owner already holds for that turn — including an answer a second surface asked
 // for — and its unmount does not take the answer with it.
+//
+// Two peers bind to this surface: the transcript's diff card subscribes to the
+// per-turn diff state, and the assistant body's footer asks whether the runtime
+// offers turn diffs at all. Neither consumer owns the concept of "the turn
+// diff", so neither may re-derive the hook, and both read through this
+// publication marker. Anything that lives only inside the review business —
+// a special error read, a secret re-render guard — stays in the private
+// bindings the owner wires internally; only the public hook surface leaves
+// the business.
+//
+// This module is `.public` because the transcript business needs the turn
+// diff hook (and its available query) to render the diff card and ask the
+// runtime capability question. The `.public` suffix is a publication marker;
+// the read-and-mutate lifecycle, the unmount-without-loss semantics, and the
+// subscription to the owner's read are all unchanged.
 
 import { useCallback, useEffect, useState } from "react";
 

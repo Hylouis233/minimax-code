@@ -15,7 +15,7 @@ import {
   resolveEffortOptions,
   thinkingDraftPatch,
   variantForEffort,
-} from "../../src/client/features/models/projection/thinking-control.js";
+} from "../../src/client/features/models/projection/thinking-control.public.js";
 import type { WebuiModelPickerEntry } from "../../src/client/features/models/contracts/model-view.js";
 import type { WebuiModelEntry } from "../../src/shared/contracts/models.js";
 

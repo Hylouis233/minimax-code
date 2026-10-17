@@ -32,6 +32,7 @@ import type { WebuiMentionRange } from "../contracts/composer-interactions.js";
 import type { WebuiRecordedTurn } from "../contracts/composer-turn.js";
 import type { WebuiComposerModes, WebuiComposerQueueState, WebuiComposerSnapshot, WebuiComposerStagingState } from "../contracts/composer-state.js";
 export type { WebuiComposerModes, WebuiComposerQueueState, WebuiComposerSnapshot, WebuiComposerStagingState } from "../contracts/composer-state.js";
+import type { WebuiComposerPurgeSlot } from "./composer-store.public.js";
 
 export interface WebuiComposerPersistence {
   readonly loadComposer: <T>(parse: (raw: string | null | undefined) => T) => T;
@@ -122,7 +123,7 @@ export interface WebuiComposerStore {
    * session workflow after a successful delete, so a removed session does not
    * re-emerge with a stale draft or replay history.
    */
-  readonly purgeSlot: (key: string) => void;
+  readonly purgeSlot: WebuiComposerPurgeSlot;
   /** The live queue mirror. */
   readonly readQueue: () => WebuiComposerQueueState;
   /** The staged attachments and url references. */

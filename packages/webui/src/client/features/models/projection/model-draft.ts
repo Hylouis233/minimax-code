@@ -11,7 +11,7 @@ import type {
   WebuiModelPickerDraft,
   WebuiModelPickerEntry,
 } from "../contracts/model-view.js";
-import { thinkingDraftPatch } from "./thinking-control.js";
+import { thinkingDraftPatch } from "./thinking-control.public.js";
 
 /**
  * What the user did to the row.

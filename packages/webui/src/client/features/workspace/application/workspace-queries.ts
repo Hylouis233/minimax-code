@@ -27,7 +27,7 @@ import {
   type WebuiWorkspaceEnvironmentOwner,
   type WebuiWorkspaceEnvironmentPort,
 } from "./workspace-environment-owner.js";
-import { createWebuiWorkspaceReviewOwner } from "../../review/application/workspace-review-owner.js";
+import { createWebuiWorkspaceReviewOwner } from "../../review/application/workspace-review-owner.public.js";
 import {
   createWebuiWorkspacePanelOwner,
   type WebuiWorkspacePanelOwner,

@@ -86,7 +86,11 @@ const graph = buildDependencyGraph({
   sourceDirectory: WEBUI_SOURCE_DIRECTORY,
   compilerOptionsFor,
 });
-const result = evaluateGraph(graph);
+// The publication gate reads the published modules themselves, so it is told
+// where the package's sources live rather than resolving paths twice.
+const result = evaluateGraph(graph, {
+  sourceRoot: path.join(root, "packages", "webui", "src"),
+});
 
 const { newViolations, staleEntries } = compareBaseline(
   result.direction,
@@ -159,7 +163,8 @@ const failed =
   result.browserGlobals.length > 0 ||
   result.nodeBuiltins.length > 0 ||
   result.forbiddenCalls.length > 0 ||
-  result.roleViolations.length > 0;
+  result.roleViolations.length > 0 ||
+  result.publicationViolations.length > 0;
 
 const summary = {
   ok: !failed,
@@ -176,6 +181,7 @@ const summary = {
   sharedNodeBuiltins: result.nodeBuiltins,
   forbiddenCalls: result.forbiddenCalls,
   roleViolations: result.roleViolations,
+  publicationViolations: result.publicationViolations,
   cycles: result.cycles.map((entry) => entry.canonical),
   newCycles: newCycles.map((entry) => entry.canonical),
   staleCycles: staleCycles.map((entry) => entry.canonical),
@@ -206,6 +212,7 @@ if (values.json) {
     `  structural exceptions: ${measuredStructural.length} (allowed ${(baseline.allowances ?? []).length})`,
   );
   lines.push(`  role violations: ${result.roleViolations.length}`);
+  lines.push(`  publication violations: ${result.publicationViolations.length}`);
   if (result.browserOnly.length) {
     lines.push("");
     lines.push(

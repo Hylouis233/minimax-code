@@ -7,7 +7,7 @@ import {
   selectWebuiWorktreeWorkspaces,
   webuiWorkspaceName,
   type WebuiWorktreeSourceSession,
-} from "../../src/client/features/sessions/projection/worktree-state.js";
+} from "../../src/client/features/sessions/projection/worktree-state.public.js";
 
 const session = (
   sessionId: string,

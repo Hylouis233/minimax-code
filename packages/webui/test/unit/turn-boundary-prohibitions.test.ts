@@ -267,7 +267,7 @@ describe("prohibition 6 — a workspace reader takes the resource it renders", (
       ["features/review/ui/ReviewSettingsPage.public.tsx", "useWebuiWorkspaceReview"],
       ["features/workspace/ui/WorkspaceArchiveView.tsx", "useWebuiWorkspaceArchive"],
       ["features/workspace/ui/WorkspaceCanvas.tsx", "useWebuiWorkspaceCanvas"],
-      ["features/workspace/ui/WebuiWorkspaceDirectoryBrowser.tsx", "useWebuiWorkspaceFiles"],
+      ["features/workspace/ui/WebuiWorkspaceDirectoryBrowser.public.tsx", "useWebuiWorkspaceFiles"],
       // The panel is the one surface whose presentation IS the composition.
       ["features/workspace/ui/WorkspacePanels.tsx", "useWebuiWorkspacePanelSurface"],
     ];

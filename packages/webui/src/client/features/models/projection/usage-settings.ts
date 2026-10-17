@@ -1,20 +1,19 @@
-import type { ProviderHeaderDraft } from "../contracts/provider-editor.js";
+// The header-row projection: a row stream's "kept" headers, "removed" headers,
+// and any error the projection rule trips on.
+//
+// The badge rule, the reset-after wording, and the row shape the settings
+// "用量与模型" page reads live on the publication marker
+// `./usage-settings.public.ts`, because the settings business renders those
+// rules without owning them. This module keeps the heading projection: a row
+// stream goes in, a `ProviderHeadersProjection` comes out, and no other
+// business needs to read it.
 
-export type { ProviderHeaderDraft };
+import type { ProviderHeaderDraft } from "../contracts/provider-editor.js";
 
 export interface ProviderHeadersProjection {
   readonly headers?: Readonly<Record<string, string>>;
   readonly removeHeaders?: readonly string[];
   readonly error?: "duplicate-name" | "missing-value";
-}
-
-export function getActiveSourceBadge(
-  loaded: boolean,
-  source: "token_plan" | "minimax_api_key" | undefined,
-  hasTokenPlan: boolean,
-): "使用中" | "未启用" | undefined {
-  if (!loaded || !hasTokenPlan || source === undefined) return undefined;
-  return source === "token_plan" ? "使用中" : "未启用";
 }
 
 /** Keep saved header values unless their row is renamed or removed. */
@@ -41,26 +40,4 @@ export function projectProviderHeaders(
     ...(Object.keys(headers).length ? { headers } : {}),
     ...(removeHeaders.length ? { removeHeaders } : {}),
   };
-}
-
-function formatRemainingTime(totalSeconds: number): string {
-  if (totalSeconds < 60) return `${totalSeconds}秒`;
-  const totalMinutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  if (totalMinutes < 60) return `${totalMinutes}分${seconds ? `${seconds}秒` : ""}`;
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  if (hours < 24) return `${hours}小时${minutes ? `${minutes}分` : ""}`;
-  const days = Math.floor(hours / 24);
-  const remainingHours = hours % 24;
-  return `${days}天${remainingHours ? `${remainingHours}小时` : ""}`;
-}
-
-/** `reset_after` wording, with its under-one-minute time-only branch. */
-export function formatResetLabel(resetAtMs: number | undefined, nowMs: number): string | undefined {
-  if (resetAtMs === undefined || !Number.isFinite(resetAtMs)) return undefined;
-  const remainingSeconds = Math.ceil((resetAtMs - nowMs) / 1000);
-  if (remainingSeconds <= 0) return undefined;
-  const time = formatRemainingTime(remainingSeconds);
-  return remainingSeconds < 60 ? time : `${time}后重置`;
 }

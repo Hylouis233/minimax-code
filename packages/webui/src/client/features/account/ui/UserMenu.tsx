@@ -14,13 +14,13 @@ import { useCallback, useEffect, useRef, useState, type ReactElement } from "rea
 import { createPortal } from "react-dom";
 import { WebuiIconBell, WebuiIconBrand, WebuiIconCommandUsage } from "../../../shell/icons.js";
 import { SigninClaimResult } from "@mavis/shared/daily-signin";
-import { SettingsModal } from "../../settings/ui/SettingsModal.js";
+import { SettingsModal } from "../../settings/ui/SettingsModal.public.js";
 import { AccountLoginDialog } from "./AccountLoginDialog.js";
 import type { MemoryHandoff } from "../../settings/contracts/memory-handoff.js";
 import type { WebuiVersionInfo } from "../../../../shared/contracts/version.js";
 import { evaluateOutsideClose } from "../../../projection/common/outside-close.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
-import { useWebuiAccountWorkflows, useWebuiAccountWorkflowsState } from "../bindings/use-account-workflows.js";
+import { useWebuiAccountWorkflows, useWebuiAccountWorkflowsState } from "../bindings/use-account-workflows.public.js";
 import { SIGNIN, SigninCard, formatSigninError, type SigninState } from "./UserMenuSignin.js";
 import { UsagePanel, type UsageState } from "./UserMenuUsage.js";
 

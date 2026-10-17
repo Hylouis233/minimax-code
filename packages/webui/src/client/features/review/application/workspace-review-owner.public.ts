@@ -1,11 +1,18 @@
-// The workspace-review owner.
+// The workspace-review owner, published as a public module.
 //
-// This was the review half of `application/workspace/workspace-queries.ts`, which
-// held it together with the file tree, file contents and the environment — three
-// concerns with different identities and different invalidation. Only the review
-// responsibility moved here: the summary, the per-snapshot file diffs and the
-// search, their snapshot identity, and the bounded retry a snapshot mismatch
-// earns.
+// The workspace business composes its five resources — file tree, file contents,
+// environment, review, archive, canvas — through `workspace-queries.ts`, and
+// the review half of that composition is this factory. Peer consumers cannot
+// reach into the review business to build the owner themselves: the factory,
+// its return type, and the invalidation surface are owned here, so the
+// workspace composer reads the review owner's public contract through the
+// publication marker instead of importing the review business's private
+// module.
+//
+// This module is `.public` because the workspace business needs to construct
+// the review owner for its composer without reaching past the review business.
+// The `.public` suffix is a publication marker; the rule list and the retry
+// window are unchanged, and the internal helpers stay inside the factory.
 //
 // Two rules the extraction had to keep, both visible in the code below:
 //

@@ -39,7 +39,7 @@ import {
   WebuiPlanReviewDecision,
   WebuiPlanSurface,
 } from "../../src/client/features/interactions/ui/PlanModeCards.js";
-import { WebuiInteractionPanel } from "../../src/client/features/interactions/ui/InteractionPanel.js";
+import { WebuiInteractionPanel } from "../../src/client/features/interactions/ui/InteractionPanel.public.js";
 import type {
   WebuiQuestionnaireRequest,
   WebuiQuestionnaireStep,

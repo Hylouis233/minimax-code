@@ -44,7 +44,7 @@ import { focusWebuiFileLine, webuiFileLineTargetId } from "../../../bindings/bro
 import {
   TERMINAL_RESIZE_DEBOUNCE_MS,
   terminalResizeRequest,
-} from "../../terminal/projection/terminal-size.js";
+} from "../../terminal/projection/terminal-size.public.js";
 import type { WebuiTerminalSize } from "../../terminal/contracts/terminal-port.js";
 import type { WebuiTerminalOwner } from "../../terminal/contracts/terminal-owner.js";
 import { WebuiIconAgent, WebuiIconCheck, WebuiIconChevronDown, WebuiIconClose, WebuiIconDiffFile, WebuiIconFile, WebuiIconFolder, WebuiIconRunLocation, WebuiIconSearch, WebuiIconSidebarToggle, WebuiIconWorkspaceCanvas, WebuiIconWorkspaceExpand, WebuiIconWorkspaceReview, WebuiIconWorkspaceTerminal } from "../../../shell/icons.js";

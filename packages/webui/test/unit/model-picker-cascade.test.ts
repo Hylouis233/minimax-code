@@ -108,7 +108,7 @@ describe("cascade — a model's own settings decide whether its row is worth des
     // still legitimately opens the settings tier, and a file-wide assertion on
     // `setTier("settings")` would forbid exactly the behaviour that replaced the
     // removed one.
-    const picker = readComponent("ModelPicker.tsx");
+    const picker = readComponent("ModelPicker.public.tsx");
     const handler = picker.slice(picker.indexOf("const handleSelectModel"));
     // The close is the workflow's decision (`closes: true` for a selection),
     // performed through the picker's one close seam.
@@ -181,7 +181,7 @@ describe("cascade — a click inside the fly-out finishes the selection", () => 
     // workflow asks for the close and the picker's `handleCloseFlyout` performs
     // it.
     expect(picker).toContain("close: onCloseMenu");
-    const composition = readComponent("ModelPicker.tsx");
+    const composition = readComponent("ModelPicker.public.tsx");
     expect(composition).toContain("onCloseMenu={interaction.close}");
     expect(composition).toContain("close,");
   });
@@ -311,7 +311,7 @@ describe("fly-out placement — one engine, so the tiers cannot disagree", () =>
 });
 
 describe("fly-out placement — the anchor is asked, not remembered", () => {
-  const picker = readComponent("ModelPicker.tsx");
+  const picker = readComponent("ModelPicker.public.tsx");
   const interaction = readFileSync(
     path.resolve(here, "../../src/client/features/models/bindings/use-model-picker-interaction.ts"),
     "utf8",
@@ -368,7 +368,7 @@ describe("fly-out placement — the anchor is asked, not remembered", () => {
 });
 
 describe("cascade — the shape the source has to keep", () => {
-  const picker = readComponent("ModelPicker.tsx");
+  const picker = readComponent("ModelPicker.public.tsx");
   const menu = readComponent("ModelMenu.tsx");
   const flyout = readComponent("ModelSettingsFlyout.tsx");
 

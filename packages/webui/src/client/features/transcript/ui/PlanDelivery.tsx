@@ -12,7 +12,7 @@ import { useCallback, useState, type ReactElement } from "react";
 
 import type { WebuiQuestionnaireRequest } from "../../../../shared/contracts/interactions.js";
 import { webuiPlanMarkdown, webuiPlanPath } from "../../interactions/contracts/plan-mode.js";
-import { WebuiPlanDeliveryCard } from "../../interactions/ui/PlanModeCards.js";
+import { WebuiPlanDeliveryCard } from "../../interactions/ui/PlanModeCards.public.js";
 
 export function WebuiTranscriptPlanDelivery({
   sessionId,

@@ -18,7 +18,7 @@
 // between a submenu and its trigger — belongs to this surface and moved with it.
 
 import { WebuiIconAttach, WebuiIconCommandGoal, WebuiIconCommandPlan, WebuiIconPlugins, WebuiIconSkillGeneric } from "../../../shell/icons.js";
-import type { WebuiComposerPluginSummary } from "../../../features/plugins/application/composer-catalogue.js";
+import type { WebuiComposerPluginSummary } from "../../../features/plugins/application/composer-catalogue.public.js";
 import type { WebuiSlashSkillSummary } from "./slash-palette.js";
 
 export type WebuiComposerMenu = "root" | "skills" | "plugins";
