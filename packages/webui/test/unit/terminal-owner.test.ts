@@ -122,3 +122,65 @@ describe("the terminal owner's watch registry", () => {
     await expect(owner.disposeAll()).resolves.toBeUndefined();
   });
 });
+
+describe("V29 · an absent bridge and an incompatible one are different failures", () => {
+  it("reports absent for an operation this host does not provide", async () => {
+    const owner = createWebuiTerminalOwner({ listTerminals: async () => [] });
+
+    expect(owner.support()).toEqual({
+      create: "absent",
+      list: "supported",
+      write: "absent",
+      resize: "absent",
+      dispose: "absent",
+      watch: "absent",
+    });
+    // Nothing is broken and nothing should be retried: the operation was never
+    // there to be refused.
+    expect(owner.support().create).not.toBe("incompatible");
+  });
+
+  it("reports incompatible for an operation this host provides and refuses", async () => {
+    const owner = createWebuiTerminalOwner({
+      listTerminals: async () => {
+        throw new Error("unknown operation ListTerminals");
+      },
+      createTerminal: async () => {
+        throw new Error("unknown operation CreateTerminal");
+      },
+    });
+
+    await expect(owner.refresh()).resolves.toBeUndefined();
+    expect(owner.support().list).toBe("incompatible");
+    // The refusal is what makes this observable, and it is reported rather than
+    // rendered as an empty roster: telling the user their shells had all exited
+    // would be worse than the failure.
+    expect(owner.getSnapshot().error).toContain("unknown operation");
+    await expect(owner.create("/tmp")).rejects.toThrow("unknown operation");
+    expect(owner.support().create).toBe("incompatible");
+    // The can* flags keep answering "may I", and they now answer it against what
+    // the host actually did rather than against what it declared.
+    expect(owner.canCreate).toBe(false);
+    expect(owner.support().write).toBe("absent");
+  });
+
+  it("keeps the roster honest when the host has no terminal service at all", async () => {
+    const owner = createWebuiTerminalOwner({});
+    await owner.refresh();
+    expect(owner.getSnapshot()).toEqual({ terminals: [], loading: false });
+    expect(owner.support().list).toBe("absent");
+  });
+
+  it("records a refused watch without keeping a disposer for a stream that never opened", () => {
+    const owner = createWebuiTerminalOwner({
+      watchTerminal: () => {
+        throw new Error("protocol mismatch");
+      },
+    });
+
+    expect(() => owner.attach("terminal-a", () => undefined)).toThrow("protocol mismatch");
+    expect(owner.support().watch).toBe("incompatible");
+    // Disposal still resolves: nothing is registered to release.
+    expect(() => owner.detachAll()).not.toThrow();
+  });
+});

@@ -6,6 +6,29 @@
 // `../application/terminal-owner.js`; a peer needs to *drive* a terminal and to
 // render its catalogue, not to build the owner.
 
+/**
+ * What this client can do with terminals, and *why* not when it cannot.
+ *
+ * `absent` and `incompatible` are different failures with different fixes. An
+ * absent bridge means this host has no terminal service at all — nothing is
+ * broken and nothing should be retried. An incompatible one means the service is
+ * there and speaks a different protocol, so the calls this client makes will be
+ * refused. Collapsing both into a single `false` left a host with a real
+ * mismatch looking like a host with no terminals, which is exactly the "a stub
+ * that looks supported" reading the plan rejected.
+ */
+export type WebuiTerminalSupport =
+  /** The operation is wired and has been called successfully at least once. */
+  | "supported"
+  /** This host does not provide the operation. Nothing to retry. */
+  | "absent"
+  /**
+   * The host provides a terminal service that refused this client's request.
+   * The roster keeps listing; the operations this client needs are unavailable
+   * until the versions agree.
+   */
+  | "incompatible";
+
 /** One terminal this client knows about, as the process half reports it. */
 export interface WebuiTerminalRecord {
   readonly terminalId: string;
@@ -19,6 +42,21 @@ export interface WebuiTerminalCatalogue {
   readonly error?: string;
 }
 
+/**
+ * The terminal bridge's reachability, as the owner has observed it.
+ *
+ * Derived from what the port actually did rather than declared up front, because
+ * only a call can tell an incompatible service from a missing one.
+ */
+export interface WebuiTerminalSupportReport {
+  readonly create: WebuiTerminalSupport;
+  readonly list: WebuiTerminalSupport;
+  readonly write: WebuiTerminalSupport;
+  readonly resize: WebuiTerminalSupport;
+  readonly dispose: WebuiTerminalSupport;
+  readonly watch: WebuiTerminalSupport;
+}
+
 /** The state before anyone has asked the runtime anything. */
 export const initialWebuiTerminalCatalogue: WebuiTerminalCatalogue = {
   terminals: [],
@@ -29,11 +67,25 @@ export interface WebuiTerminalOwner {
   readonly getSnapshot: () => WebuiTerminalCatalogue;
   readonly subscribe: (listener: () => void) => () => void;
 
+  /**
+   * "May I", read live rather than snapshotted at construction. A flag frozen at
+   * construction reports what the port declared; a flag frozen after the first
+   * refusal reports a capability the host does not actually have. Read it as a
+   * getter so a refused call is visible to the panel that asked.
+   */
   readonly canCreate: boolean;
   readonly canWrite: boolean;
   readonly canResize: boolean;
   readonly canDispose: boolean;
   readonly canWatch: boolean;
+
+  /**
+   * Why each operation is or is not available, as observed rather than declared.
+   * The `can*` flags above answer "may I"; this answers "and if not, is there
+   * something to fix" — which is the difference between a host with no terminal
+   * service and a host whose terminal service this client cannot talk to.
+   */
+  readonly support: () => WebuiTerminalSupportReport;
 
   /** Read the catalogue; a failure is recorded in the snapshot, not thrown. */
   readonly refresh: () => Promise<void>;

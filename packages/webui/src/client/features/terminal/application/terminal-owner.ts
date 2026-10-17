@@ -20,6 +20,8 @@ import {
   type WebuiTerminalCatalogue,
   type WebuiTerminalOwner,
   type WebuiTerminalRecord,
+  type WebuiTerminalSupport,
+  type WebuiTerminalSupportReport,
 } from "../contracts/terminal-owner.js";
 import type {
   TerminalPort,
@@ -32,6 +34,25 @@ export function createWebuiTerminalOwner(
   let snapshot: WebuiTerminalCatalogue = initialWebuiTerminalCatalogue;
   const listeners = new Set<() => void>();
   const watches = new Map<string, () => void>();
+
+  /**
+   * Reachability per operation. Seeded from what the port offers — a method that
+   * is not there is `absent`, full stop — and then *observed*: a call this host
+   * refuses moves its operation to `incompatible`. That is the distinction the
+   * contract asks for, and it can only be drawn by calling: a port that declares
+   * `createTerminal` and then refuses it is not the same as a port without one.
+   */
+  const support: Record<keyof WebuiTerminalSupportReport, WebuiTerminalSupport> = {
+    create: port.createTerminal === undefined ? "absent" : "supported",
+    list: port.listTerminals === undefined ? "absent" : "supported",
+    write: port.writeTerminal === undefined ? "absent" : "supported",
+    resize: port.resizeTerminal === undefined ? "absent" : "supported",
+    dispose: port.disposeTerminal === undefined ? "absent" : "supported",
+    watch: port.watchTerminal === undefined ? "absent" : "supported",
+  };
+  const markIncompatible = (operation: keyof WebuiTerminalSupportReport): void => {
+    support[operation] = "incompatible";
+  };
 
   const publish = (next: WebuiTerminalCatalogue): void => {
     snapshot = next;
@@ -60,6 +81,10 @@ export function createWebuiTerminalOwner(
         .filter((entry): entry is WebuiTerminalRecord => entry !== undefined);
       publish({ terminals, loading: false });
     } catch (reason) {
+      // The host offers the roster and refused to produce one: that is a version
+      // mismatch, not an empty terminal list. Reporting it as "no terminals"
+      // would tell the user their sessions' shells had all exited.
+      markIncompatible("list");
       publish({
         ...snapshot,
         loading: false,
@@ -71,17 +96,28 @@ export function createWebuiTerminalOwner(
   const create = async (workspaceDir: string): Promise<WebuiTerminalRecord | undefined> => {
     const createTerminal = port.createTerminal;
     if (!createTerminal) return undefined;
-    const created = await createTerminal({ workspaceDir });
+    const created = await createTerminal({ workspaceDir }).catch((reason: unknown) => {
+      markIncompatible("create");
+      throw reason;
+    });
     await refresh();
     return { terminalId: created.terminalId, status: created.status };
   };
 
   const write = async (terminalId: string, data: string): Promise<void> => {
-    await port.writeTerminal?.({ terminalId, data });
+    if (!port.writeTerminal) return;
+    await port.writeTerminal({ terminalId, data }).catch((reason: unknown) => {
+      markIncompatible("write");
+      throw reason;
+    });
   };
 
   const resize = async (request: WebuiTerminalSize): Promise<void> => {
-    await port.resizeTerminal?.(request);
+    if (!port.resizeTerminal) return;
+    await port.resizeTerminal(request).catch((reason: unknown) => {
+      markIncompatible("resize");
+      throw reason;
+    });
   };
 
   const disposeProcess = async (terminalId: string): Promise<void> => {
@@ -89,7 +125,11 @@ export function createWebuiTerminalOwner(
     // disposer that outlives its terminal would keep the panel's buffer growing.
     watches.get(terminalId)?.();
     watches.delete(terminalId);
-    await port.disposeTerminal?.({ terminalId });
+    if (!port.disposeTerminal) return;
+    await port.disposeTerminal({ terminalId }).catch((reason: unknown) => {
+      markIncompatible("dispose");
+      throw reason;
+    });
     await refresh();
   };
 
@@ -100,7 +140,16 @@ export function createWebuiTerminalOwner(
     const watch = port.watchTerminal;
     if (!watch) return () => undefined;
     watches.get(terminalId)?.();
-    const release = watch({ terminalId }, onFrame);
+    let release: () => void;
+    try {
+      release = watch({ terminalId }, onFrame);
+    } catch (reason) {
+      // The host offers the frame stream and refused to open it. That is a
+      // version mismatch, and it must not leave the previous watch's disposer in
+      // the map: the old one was already released above.
+      markIncompatible("watch");
+      throw reason;
+    }
     watches.set(terminalId, release);
     let released = false;
     return () => {
@@ -125,7 +174,14 @@ export function createWebuiTerminalOwner(
     // while disposal ends the client's processes too.
     detachAll();
     const known = snapshot.terminals.map((terminal) => terminal.terminalId);
-    for (const terminalId of known) await port.disposeTerminal?.({ terminalId });
+    for (const terminalId of known) {
+      await port.disposeTerminal?.({ terminalId }).catch((reason: unknown) => {
+        // Disposal is the client's end, so a refused terminal must not strand the
+        // rest: the remaining processes still get their dispose attempt.
+        markIncompatible("dispose");
+        console.error("[webui] terminal dispose failed during client disposal", reason);
+      });
+    }
     if (known.length > 0) await refresh();
   };
 
@@ -135,11 +191,25 @@ export function createWebuiTerminalOwner(
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    canCreate: port.createTerminal !== undefined,
-    canWrite: port.writeTerminal !== undefined,
-    canResize: port.resizeTerminal !== undefined,
-    canDispose: port.disposeTerminal !== undefined,
-    canWatch: port.watchTerminal !== undefined,
+    // The `can*` flags answer "may I"; `support` answers why not. A host that
+    // does not provide the operation is `absent`; a host that provides one and
+    // refuses it is `incompatible`, and only a call could have told them apart.
+    get canCreate() {
+      return support.create === "supported";
+    },
+    get canWrite() {
+      return support.write === "supported";
+    },
+    get canResize() {
+      return support.resize === "supported";
+    },
+    get canDispose() {
+      return support.dispose === "supported";
+    },
+    get canWatch() {
+      return support.watch === "supported";
+    },
+    support: () => ({ ...support }),
     refresh,
     create,
     write,
