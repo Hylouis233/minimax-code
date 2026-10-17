@@ -163,9 +163,9 @@ export interface WebuiSessionStore {
   /**
    * The guarded home→session transfer.
    *
-   * `migrateSession` below is the legacy unconditional move that the two
-   * production adoption sites still use; this one is the API the creation use
-   * case drives. It never overwrites a destination that already holds a record
+   * `migrateSession` below is the unconditional move the adoption sites use; this
+   * one is the API the creation use case drives. It never overwrites a
+   * destination that already holds a record
    * and never resurrects a purged id, and it reports every outcome — including
    * the ones that moved nothing — so a submission cannot be left unsettled by a
    * silent no-op.
@@ -470,9 +470,9 @@ export function createWebuiSessionStore(options?: {
       // A key this instance has purged is dead in the store, exactly as it is
       // for `updateSession`: carrying a record onto it would resurrect the
       // deleted session (the home→session adoption runs on its own schedule,
-      // so the session it names can be deleted before the migration lands).
-      // The source is deliberately left alone — a refused migration must not
-      // also clear the record the caller still owns.
+      // so the session it names can be deleted before the move lands).
+      // The source is deliberately left alone — a refused move must not also
+      // clear the record the caller still owns.
       if (disposed || fromKey === toKey || purged.has(toKey)) return;
       const state = sessions.get(fromKey);
       sessions.delete(fromKey);

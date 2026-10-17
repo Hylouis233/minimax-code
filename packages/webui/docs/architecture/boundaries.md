@@ -29,6 +29,31 @@ A published module is held to what a published surface may contain: every explic
 public, no export-star, no foreign re-export, and no foreign namespace, default or dynamic access.
 That way a `.public` marker cannot become an alias for the private module next to it.
 
+### Telling business logic from presentation derivation
+
+The question "is this business logic or presentation?" is answered by the directory the file is in,
+not by reading it:
+
+| Directory | Holds | A pure derivation here is a |
+| --- | --- | --- |
+| `features/<business>/application/` | The business's own state, reducers and workflows | not a derivation — this is where rules live |
+| `features/<business>/projection/` | Deriving a view model from what the business already knows | `domain` if the name is in `PROJECTION_DOMAIN`, `view` otherwise |
+| `features/<business>/bindings/` | React hooks that read an owner and dispatch its commands | not a derivation |
+| `features/<business>/ui/` | The business's own components | not a derivation |
+| `features/<business>/contracts/` | The capability port and view types other businesses may use | not a derivation |
+
+`projection/` is the one directory where the *layer* depends on the module rather than on where it
+sits, and the rule is deliberately explicit rather than inferred from the file's imports: a
+`domain` derivation carries a business rule (a normalisation, a classification, a decision about
+what counts as active), while a `view` derivation only reads and shapes (`model-picker-search`,
+`session-lookups`). Adding a projection means adding its basename to `PROJECTION_DOMAIN` in
+`scripts/lib/webui-dependency-rules.mjs` if it carries a rule — that list is the whole decision, and
+`classifyLayers` consults it for both the `features/*/projection/` and `client/projection/` spellings
+so the two layouts cannot drift.
+
+Presentation derivation outside a feature — `client/ui/`, `client/shell/` — has no business to carry a
+rule for, so it is never a `domain`.
+
 A business that decides *when* another business's state moves is handed that business's published
 narrow contract, and the composition that holds the writer builds it. The interaction flow is the
 worked example: it drives `WebuiInteractionPhaseIntents` (published from `features/turn/contracts/`)

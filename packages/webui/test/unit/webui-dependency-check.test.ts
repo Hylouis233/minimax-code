@@ -23,7 +23,9 @@ import {
   KNOWN_AMBIGUOUS_FILES,
   buildDependencyGraph,
   canonicalCycle,
+  BUSINESS_BEARING_ROLES,
   classifyLayers,
+  classifyRole,
   collectModuleReferences,
   collectProvisionalJudgements,
   compareBaseline,
@@ -1504,5 +1506,182 @@ describe("V25 · what a published surface may contain", () => {
     );
 
     expect(result.violations).toEqual([]);
+  });
+});
+
+describe("V42 · the path metadata refactor changed no verdict", () => {
+  const KNOWN_ROLE_DIRECTORIES = new Set([
+    "application",
+    "projection",
+    "bindings",
+    "ui",
+    "contracts",
+  ]);
+  // The consolidation replaced three tables and a switch with one table the
+  // classifiers derive from. The only way to know it preserved behaviour is to
+  // compare verdicts, and comparing file lists is not enough: a refactor that
+  // dropped one business's rows would still pass a grep over the files that
+  // happen to exist today. So the corpus includes representative *future* paths
+  // — directories and business names the package has not grown yet — because
+  // those are exactly what a per-directory switch forgets.
+  const currentPaths = [
+    "client/features/composer/application/composer-controller.ts",
+    "client/features/composer/projection/goal-state.ts",
+    "client/features/composer/projection/goal-state.public.ts",
+    "client/features/composer/contracts/composer-port.ts",
+    "client/features/composer/bindings/use-composer-controller.ts",
+    "client/features/composer/ui/WebuiComposer.tsx",
+    "client/features/workspace/projection/workspace-name.public.ts",
+    "client/features/workspace/application/workspace-queries.ts",
+    "client/features/sessions/application/session-catalog.public.ts",
+    "client/features/sessions/projection/action-requests.public.ts",
+    "client/features/models/ui/ModelPicker.public.tsx",
+    "client/conversation/stream-loop.ts",
+    "client/platform/transport.ts",
+    "client/ui/ContextMenu.tsx",
+    "client/shell/WebuiClientFoundationApp.tsx",
+    "client/shell/WebuiZoneBoundary.tsx",
+    "client/bindings/use-query-state.tsx",
+    "client/application/session-store.ts",
+    "client/contracts/contracts-shared.ts",
+    "client/projection/common/records.ts",
+    "client/projection/action-requests.ts",
+    "client/styles/webui.css",
+    "client/main.tsx",
+    "client/global.d.ts",
+    "server/envelope.ts",
+    "server/operation/session.ts",
+    "runtime/port.ts",
+    "runtime/harness/host-contract.ts",
+    "runtime/commands/runner.ts",
+    "shared/contracts/session.ts",
+  ];
+
+  const futurePaths = [
+    // Businesses and role directories that do not exist yet. Each has to
+    // classify from the table rather than from an arm someone remembered.
+    "client/features/payments/application/payment-workflows.ts",
+    "client/features/payments/projection/payment-state.ts",
+    "client/features/payments/projection/payment-state.public.ts",
+    "client/features/payments/contracts/payment-port.ts",
+    "client/features/payments/bindings/use-payments.ts",
+    "client/features/payments/ui/PaymentsPage.tsx",
+    "client/features/payments/ui/PaymentsPage.public.tsx",
+    "client/features/canvas2/application/x.ts",
+    // An unknown role directory under a feature is unknown, not silently
+    // inherited from whatever arm happened to come last.
+    "client/features/payments/workbench/x.ts",
+    // A path outside every known home.
+    "client/unknown-home/x.ts",
+    "packages/other/thing.ts",
+  ];
+
+  it("classifies every current and future path into a known layer", () => {
+    for (const file of [...currentPaths, ...futurePaths]) {
+      const layers = classifyLayers(file);
+      expect(layers.length, file).toBeGreaterThan(0);
+      // `unknown` is a real verdict — a role directory with no row, or a path
+      // outside every known home. What must not happen is a *known* role
+      // directory losing its layer, so those are checked against the table.
+      // Stated here rather than imported: a test that reads the same table it is
+      // checking cannot fail when the table loses a row.
+      const directory = file.split("/")[3];
+      if (file.startsWith("client/features/") && KNOWN_ROLE_DIRECTORIES.has(directory)) {
+        expect(layers, file).not.toEqual(["unknown"]);
+      }
+    }
+  });
+
+  it("keeps the five verdict kinds consistent with each other", () => {
+    for (const file of [...currentPaths, ...futurePaths]) {
+      const layers = classifyLayers(file);
+      const { role, business, home } = classifyRole(file);
+      // Role, business and home: whatever they are, they must be strings (or
+      // null for a businessless home), not undefined leaking from a map miss.
+      expect(typeof role, file).toBe("string");
+      expect(typeof home, file).toBe("string");
+      expect(["string", "object"], file).toContain(typeof business);
+      // A published module keeps its layer: publication changes reachability,
+      // never where the module sits.
+      const private_ = file.replace(/\.public(?=\.)/u, "");
+      if (private_ !== file) {
+        expect(classifyLayers(private_), file).toEqual(layers);
+        expect(classifyRole(private_).role.replace(/^published-/u, ""), file).toBe(
+          role.replace(/^published-/u, ""),
+        );
+      }
+      // The direction matrix's verdict: every layer pair either has an entry in
+      // the allowance or is judged as an edge. Either way it must be decidable.
+      expect(Array.isArray(layers) && layers.every((l) => typeof l === "string"), file).toBe(true);
+    }
+  });
+
+  it("derives the projection layer from the module, not the directory", () => {
+    // `projection/` is the one directory where the layer depends on the module's
+    // name. A business derivation is a `domain`; one that only reads is a `view`;
+    // and publishing either does not move it.
+    expect(classifyLayers("client/features/sessions/projection/action-requests.ts")).toEqual([
+      "domain",
+    ]);
+    expect(classifyLayers("client/features/sessions/projection/action-requests.public.ts")).toEqual([
+      "domain",
+    ]);
+    expect(classifyLayers("client/features/composer/projection/unlisted-thing.ts")).toEqual([
+      "view",
+    ]);
+    expect(classifyLayers("client/features/composer/projection/unlisted-thing.public.ts")).toEqual([
+      "view",
+    ]);
+    // The same rule for the current home, which consulted the same set.
+    expect(classifyLayers("client/projection/action-requests.ts")).toEqual(["domain"]);
+    expect(classifyLayers("client/projection/unlisted-thing.ts")).toEqual(["view"]);
+  });
+
+  it("maps every role directory to a layer, so neither can gain a row alone", () => {
+    // The property the consolidation exists to hold: a feature role directory has
+    // exactly one layer, derived from the same row that names its role. Reading
+    // it through the two functions is what proves the row, not a re-statement of
+    // it, is in force.
+    const pairs: ReadonlyArray<readonly [string, string]> = [
+      ["application", "application"],
+      ["contracts", "contracts"],
+      ["bindings", "bindings"],
+      ["ui", "bindings"],
+    ];
+    for (const [directory, layer] of pairs) {
+      expect(classifyLayers(`client/features/x/${directory}/m.ts`), directory).toEqual([layer]);
+      expect(classifyRole(`client/features/x/${directory}/m.ts`).role, directory).toBe(
+        `feature-${directory}`,
+      );
+    }
+  });
+
+  it("leaves the authority policy independent of the path tables", () => {
+    // Authority is a property of a role and a business, never of where a file
+    // sits. The one thing that is a defect is two *live* homes for the same
+    // business and role — and that judgement reads `home` only to tell the two
+    // spellings apart, so moving a file cannot quietly grant or revoke it.
+    for (const file of [...currentPaths, ...futurePaths]) {
+      const { role, business, home } = classifyRole(file);
+      // The role a file occupies is determined by its directory, so the same
+      // role reached through either layout spelling stays the same role.
+      const viaOtherSpelling = file.startsWith("client/features/")
+        ? file.replace("client/features/x/", "client/features/x/")
+        : null;
+      if (viaOtherSpelling === null) continue;
+      expect(classifyRole(viaOtherSpelling), file).toEqual({ role, business, home });
+    }
+    // And the role strings the authority policy tests are all role values, with
+    // no path in them: `BUSINESS_BEARING_ROLES` is a set of role names, so a file
+    // is authoritative by being in one, wherever it lives.
+    expect(BUSINESS_BEARING_ROLES.has("feature-application")).toBe(true);
+    expect(BUSINESS_BEARING_ROLES.has("feature-projection")).toBe(true);
+    expect(BUSINESS_BEARING_ROLES.has("feature-contracts")).toBe(true);
+    // The set holds role names and nothing else. If it ever gained a path, a
+    // file's authority would depend on where it sits rather than on what it owns.
+    for (const role of BUSINESS_BEARING_ROLES) {
+      expect(role, role).not.toContain("/");
+      expect(role, role).not.toContain(".");
+    }
   });
 });

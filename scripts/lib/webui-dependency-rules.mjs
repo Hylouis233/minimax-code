@@ -397,33 +397,29 @@ export function classifyLayers(relative) {
   if (normalized.startsWith("client/features/")) {
     const [business, ...tail] = normalized.slice("client/features/".length).split("/");
     if (!business) return ["unknown"];
-    const role = tail[0];
-    if (role === "contracts") return ["contracts"];
-    if (role === "projection") {
-      // The `.public` suffix is a publication marker, not part of the module's
-      // name: `projection/workspace-name.public.ts` publishes the same derivation
-      // `projection/workspace-name.ts` holds, so it must classify identically.
-      // Without this a published pure derivation would silently drop from
-      // `domain` to `view` and the gate would be enforcing something the plan
-      // never decided.
-      const b = basenameWithoutExtension(normalized).replace(/\.public$/u, "");
-      return PROJECTION_DOMAIN.has(b) ? ["domain"] : ["view"];    }
-    if (role === "application") return ["application"];
-    if (role === "bindings" || role === "ui") return ["bindings"];
-    // A file at the feature root is its published surface; if it sits there it
-    // declares something. Report anything deeper that has no role directory.
-    return ["unknown"];
+    const directory = tail[0];
+    const entry = FEATURE_ROLE_DIRECTORIES[directory];
+    if (!entry) {
+      // A file at the feature root is its published surface; if it sits there it
+      // declares something. Report anything deeper that has no role directory.
+      return ["unknown"];
+    }
+    if (entry.layer !== null) return [entry.layer];
+    // `projection/` is the one directory whose layer depends on the module: a
+    // derivation carrying business policy is a `domain`, one that only reads is a
+    // `view`. The `.public` suffix is a publication marker, not part of the name —
+    // `workspace-name.public.ts` publishes the derivation `workspace-name.ts`
+    // holds — so it is stripped before the lookup or a published derivation would
+    // silently drop to `view`.
+    const b = basenameWithoutExtension(normalized).replace(/\.public$/u, "");
+    return PROJECTION_DOMAIN.has(b) ? ["domain"] : ["view"];
   }
   // Conversation substrate (plan §5.1) — the home of turn/history/stream
   // lifecycle, and the target for `client/mechanisms/` plus the history rules
   // that currently sit under `client/application/`.
-  if (normalized.startsWith("client/conversation/")) return ["mechanisms"];
-  if (normalized.startsWith("client/platform/")) return ["infrastructure"];
-  if (normalized.startsWith("client/ui/")) return ["bindings"];
-  if (normalized.startsWith("client/shell/")) return ["bindings"];
-  if (normalized.startsWith("client/bindings/")) return ["bindings"];
-  if (normalized.startsWith("client/application/")) return ["application"];
-  if (normalized.startsWith("client/contracts/")) return ["contracts"];
+  for (const [prefix, layer] of Object.entries(HOME_LAYERS)) {
+    if (normalized.startsWith(prefix)) return [layer];
+  }
   if (normalized.startsWith("shared/")) return ["shared"];
   if (normalized.startsWith("runtime/")) {
     if (normalized === "runtime/port.ts" || normalized.startsWith("runtime/harness/host-contract"))
@@ -503,17 +499,31 @@ export const ROLES = Object.freeze([
 export const HOMES = Object.freeze(["current", "target", "outside"]);
 
 /**
- * Role directory name → role, for the target `client/features/<business>/`
- * layout. A feature keeps the same local role names the plan §5.1 lists
- * (`application/`, `projection/`, `bindings/`, `ui/`, `contracts/`), so the
- * mapping is a table rather than a second naming scheme.
+ * One table for what a feature's role directory means.
+ *
+ * This used to be three tables plus a switch. `FEATURE_ROLE_DIRECTORIES` mapped
+ * a directory name to a role; `CURRENT_HOME_ROLES` and `TARGET_HOME_ROLES`
+ * mapped a path prefix to a role; and `classifyLayers` then re-derived the layer
+ * from the directory name in a fourth place, with `if (role === "contracts") …
+ * else if (role === "projection") …`. Four spellings of the same five
+ * directories is how a table ends up disagreeing with itself the first time one
+ * of them gains an entry.
+ *
+ * Each directory names one role, and the role names one layer. The layer is
+ * derived here rather than written out per arm, so a new role directory is one
+ * row rather than a row plus a switch arm plus a layer to keep in step.
+ *
+ * The layer is deliberately not one-per-role: `projection/` is `domain` for a
+ * derivation carrying business policy and `view` for one that does not, which is
+ * a property of the module's name rather than of its directory. That one case
+ * consults `PROJECTION_DOMAIN`, and it is the only place it is consulted.
  */
 const FEATURE_ROLE_DIRECTORIES = Object.freeze({
-  application: "feature-application",
-  projection: "feature-projection",
-  bindings: "feature-bindings",
-  ui: "feature-ui",
-  contracts: "feature-contracts",
+  application: { role: "feature-application", layer: "application" },
+  projection: { role: "feature-projection", layer: null },
+  bindings: { role: "feature-bindings", layer: "bindings" },
+  ui: { role: "feature-ui", layer: "bindings" },
+  contracts: { role: "feature-contracts", layer: "contracts" },
 });
 
 /** Target top-level homes that are not features. */
@@ -523,6 +533,26 @@ const TARGET_HOME_ROLES = Object.freeze({
   "client/ui": { role: "ui", business: null },
   "client/shell": { role: "shell", business: null },
   "client/main.tsx": { role: "entry", business: null },
+});
+
+/**
+ * The top-level homes that carry no business, by layer.
+ *
+ * The two tables above answer "which role, and whose business"; this answers
+ * "which layer", for the same prefixes. It is separate because that is the
+ * dimension the direction matrix judges, and folding it into the role table
+ * would make a role answer a question about reachability with a value the
+ * reachability rules then have to know the meaning of.
+ */
+const HOME_LAYERS = Object.freeze({
+  "client/conversation/": "mechanisms",
+  "client/platform/": "infrastructure",
+  "client/ui/": "bindings",
+  "client/shell/": "bindings",
+  "client/bindings/": "bindings",
+  "client/application/": "application",
+  "client/contracts/": "contracts",
+  "client/styles/": "styles",
 });
 
 /**
@@ -562,7 +592,7 @@ export function classifyRole(relative) {
     const [business, ...tail] = normalized.slice("client/features/".length).split("/");
     if (!business) return { role: "unknown", business: null, home: "target" };
     if (tail.length === 0) return { role: "feature-root", business, home: "target" };
-    const role = FEATURE_ROLE_DIRECTORIES[tail[0]] ?? "feature-root";
+    const role = FEATURE_ROLE_DIRECTORIES[tail[0]]?.role ?? "feature-root";
     return {
       role: isPublicModulePath(normalized) ? `published-${role}` : role,
       business,
@@ -1884,7 +1914,7 @@ function forbiddenActualCallRule(graph) {
  * files by owner; `roleRule` uses it to tell a peer business import from an
  * import of shared mechanics.
  */
-const BUSINESS_BEARING_ROLES = new Set([
+export const BUSINESS_BEARING_ROLES = new Set([
   "feature-contracts",
   "feature-application",
   "feature-projection",
