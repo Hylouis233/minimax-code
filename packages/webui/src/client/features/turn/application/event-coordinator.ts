@@ -43,6 +43,7 @@ import type { WebuiProcessEventChannel } from "./event-channel.js";
 import type { WebuiSessionStore } from "../../../application/session-store.js";
 import type { WebuiApplicationSessionState } from "../../../application/state.js";
 import type { WebuiStreamLeaseController } from "./stream-lease-controller.js";
+import { readWebuiSessionFact, type WebuiSessionFact } from "./session-fact.js";
 
 /**
  * One session-record write, taken out of an event's command list.
@@ -267,7 +268,21 @@ export interface WebuiDomainEventRoutes {
    * invalidates the workspace git and review queries it affects.
    */
   readonly workspaceGitChanged: (payload: WebuiWorkspaceGitChangedPayload) => void;
+
+  /**
+   * A fact about a session's identity or presentation that another client or the
+   * CLI changed: it was created, renamed, re-modelled, switched to interaction
+   * mode, pinned or hidden.
+   *
+   * These are not turn effects, so they have no session stream to write into.
+   * They are catalogue facts, and the sessions owner is where the catalogue
+   * lives — routing them here is what makes this page agree with every other
+   * client about who exists and what they are named, instead of showing what it
+   * last loaded until the user reloaded the window.
+   */
+  readonly sessionFact: (fact: WebuiSessionFact) => void;
 }
+
 
 export interface WebuiEventCoordinatorDeps {
   readonly store: WebuiSessionStore;
@@ -358,6 +373,17 @@ export function createWebuiEventCoordinator(
     }
     const sessionId = eventSessionId(event);
     if (!sessionId) return;
+    // Session lifecycle facts are catalogue facts, not turn effects: this page's
+    // rail names sessions that another client or the CLI created, renamed,
+    // re-modelled or hid, and it must agree with them without waiting for a
+    // reload. They arrive on the same envelope as everything else and were
+    // previously dropped by the default branch, which is why the rail went stale
+    // whenever another window changed anything.
+    const fact = readWebuiSessionFact(event, sessionId);
+    if (fact) {
+      deps.routes.sessionFact(fact);
+      return;
+    }
     deps.routes.invalidatePending(sessionId);
     // The effect executor is the existing one; it walks the command list in
     // order, and its `set-*` commands land on this coordinator's store writers.

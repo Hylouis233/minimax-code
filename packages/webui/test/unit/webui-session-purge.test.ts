@@ -908,3 +908,87 @@ describe("V15 · a confirmed deletion settles through one teardown", () => {
     expect(snapshot.catalog.flat.ids).toEqual(["b"]);
   });
 });
+
+describe("V36 · this page can act on a session fact another client published", () => {
+  function factFixture() {
+    const store = createWebuiSessionStore({
+      catalog: createWebuiSessionCatalogFromPage(page("a", "b")),
+    });
+    store.updateSession("a", (current) => ({ ...current, sending: true }));
+    const composer = createWebuiComposerStore({
+      initial: { drafts: { a: "half-written" }, history: { a: ["earlier"] } },
+    });
+    const closeSession = vi.fn();
+    const invalidated = vi.fn();
+    const workflows = createWebuiSessionWorkflows({
+      store,
+      composer,
+      port: {
+        deleteSession: async () => ({ success: true }),
+        loadSessions: async () => page("a", "b"),
+        loadSessionTree: async () => ({ sessions: [], hasMore: false }),
+      } as unknown as Parameters<typeof createWebuiSessionWorkflows>[0]["port"],
+      deliveries: { closeSession },
+      sessionFactInvalidated: invalidated,
+    });
+    return { store, composer, workflows, closeSession, invalidated };
+  }
+
+  it("applies a rename to the entity the rail resolves from", () => {
+    const { store, workflows } = factFixture();
+    workflows.applyFact({ kind: "renamed", sessionId: "a", title: "CLI 起的名字" });
+
+    const session = store.getSnapshot().catalog.entities.get("a");
+    expect(session?.title).toBe("CLI 起的名字");
+    // The name resolves through the same page both views read, so the row
+    // updates without a reload.
+    expect(selectWebuiCatalogFlatPage(store.getSnapshot().catalog).sessions[0]?.title).toBe(
+      "CLI 起的名字",
+    );
+  });
+
+  it("re-reads the views that render a model or mode change, since the entity has no field for them", () => {
+    const { workflows, invalidated } = factFixture();
+    workflows.applyFact({ kind: "re-modelled", sessionId: "a", model: "gpt-5" });
+    workflows.applyFact({ kind: "interaction-mode", sessionId: "a", mode: "plan" });
+    workflows.applyFact({ kind: "pinned", sessionId: "a", pinned: true });
+
+    // The rail's record carries no model, mode or pinned field, so patching the
+    // entity would be inventing one. These are answered by re-reading.
+    expect(invalidated).toHaveBeenCalledTimes(3);
+  });
+
+  it("drops a hidden session from the catalogue without deleting it", () => {
+    const { store, workflows } = factFixture();
+    workflows.applyFact({ kind: "visibility", sessionId: "a", hidden: true });
+
+    expect(store.getSnapshot().catalog.flat.ids).toEqual(["b"]);
+    // Hidden is not gone: the session record stays, and a later unhide can put it
+    // back rather than having to re-read the whole page.
+    expect(store.getSnapshot().catalog.entities.has("a")).toBe(true);
+  });
+
+  it("settles an externally observed deletion exactly as a local one", () => {
+    const { store, composer, workflows, closeSession } = factFixture();
+    workflows.applyFact({ kind: "deleted", sessionId: "a" });
+
+    expect(closeSession).toHaveBeenCalledWith("a");
+    expect(store.getSnapshot().sessions.has("a")).toBe(false);
+    expect(composer.readDraft("a")).toBe("");
+    // And it settles once: a local delete arriving after the event does not
+    // repeat the teardown or issue a second request.
+    void workflows.remove("a");
+    expect(closeSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores a fact about a session this client never read", () => {
+    const { store, workflows, invalidated } = factFixture();
+    workflows.applyFact({ kind: "renamed", sessionId: "not-loaded", title: "别处建的" });
+
+    // The authoritative copy arrives with the next page of the catalogue.
+    // Synthesising an entity here would put a record in the rail that no read
+    // ever produced.
+    expect(store.getSnapshot().catalog.entities.has("not-loaded")).toBe(false);
+    expect(invalidated).not.toHaveBeenCalled();
+  });
+});

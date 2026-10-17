@@ -25,6 +25,7 @@ import {
   reduceWebuiCatalogFlatAppended,
   reduceWebuiCatalogFlatLoaded,
   reduceWebuiCatalogTreeLoaded,
+  hideWebuiCatalogSessions,
   removeWebuiCatalogSessions,
   setWebuiCatalogFlatError,
   setWebuiCatalogFlatLoading,
@@ -121,6 +122,25 @@ export const initialWebuiArchivedSessionsState: WebuiArchivedSessionsState = {
   sessions: [],
 };
 
+/**
+ * A session lifecycle fact, as another client or the CLI published it.
+ *
+ * Declared here as a structural shape rather than imported from the turn
+ * business: this is the sessions business's own read model being told what
+ * changed, and a sessions application module must not reach into a peer's
+ * application layer to learn the shape of its own catalogue update. The turn
+ * business publishes the same union from its decoder and this one accepts it,
+ * because the two describe the same fact from opposite ends.
+ */
+export type WebuiSessionLifecycleFact =
+  | { readonly kind: "created"; readonly sessionId: string }
+  | { readonly kind: "renamed"; readonly sessionId: string; readonly title: string }
+  | { readonly kind: "re-modelled"; readonly sessionId: string; readonly model?: string; readonly agentName?: string }
+  | { readonly kind: "interaction-mode"; readonly sessionId: string; readonly mode: string }
+  | { readonly kind: "visibility"; readonly sessionId: string; readonly hidden: boolean }
+  | { readonly kind: "pinned"; readonly sessionId: string; readonly pinned: boolean }
+  | { readonly kind: "deleted"; readonly sessionId: string };
+
 export interface WebuiSessionWorkflows {
   /** The archived-sessions read plus a subscription for its readers. */
   readonly getArchivedSnapshot: () => WebuiArchivedSessionsState;
@@ -150,6 +170,18 @@ export interface WebuiSessionWorkflows {
     sessionId: string,
     title: string,
   ) => Promise<{ readonly title?: string } | undefined>;
+
+  /**
+   * Apply a session lifecycle fact another client or the CLI published.
+   *
+   * The same catalogue patch a local action would make, reached from the wire
+   * instead: the rail has to agree with every other window about who exists and
+   * what they are named, without the user reloading. A fact about a session this
+   * client does not know is ignored rather than inserted — a `created` event from
+   * another client means the row belongs in the next page of the catalogue, and
+   * synthesizing one here would invent a session record this client never read.
+   */
+  readonly applyFact: (fact: WebuiSessionLifecycleFact) => void;
   readonly archive: (sessionId: string) => Promise<void>;
   readonly archiveMany: (sessionIds: readonly string[]) => Promise<void>;
   /** Delete one session and drop its entity. */
@@ -220,6 +252,13 @@ export function createWebuiSessionWorkflows(deps: {
    * and keeps reading frames for a session that no longer exists.
    */
   readonly deliveries?: { readonly closeSession: (sessionId: string) => void };
+  /**
+   * Re-read the views that render facts the rail entity does not carry — a
+   * session's model and its interaction mode live in the composer's controls and
+   * the transcript header, so a wire change to them is answered by a read, not by
+   * a patch to a record that has no field for them.
+   */
+  readonly sessionFactInvalidated?: (sessionId: string) => void;
   readonly port: QueryPort & MutationPort;
   /** Injected browser IO; absent means the import operation is not wired. */
   readonly importSession?: WebuiSessionImporter;
@@ -423,6 +462,58 @@ export function createWebuiSessionWorkflows(deps: {
     loadMore,
     setError: (message) => {
       commitCatalog((current) => setWebuiCatalogFlatError(current, message));
+    },
+    applyFact: (fact) => {
+      if (removedSessionIds.has(fact.sessionId)) return;
+      // A fact about a session this client has not read is not something to
+      // invent: the authoritative copy arrives with the next page of the
+      // catalogue, and fabricating an entity here would put a record in the rail
+      // that no read ever produced.
+      const known = store.getSnapshot().catalog.entities.has(fact.sessionId);
+      if (!known) return;
+      switch (fact.kind) {
+        case "renamed":
+          // The local rename patches the entity the same way; this is the wire
+          // reaching that same patch rather than reloading the page.
+          commitCatalog((current) =>
+            patchWebuiCatalogEntity(current, fact.sessionId, { title: fact.title }),
+          );
+          return;
+        case "re-modelled":
+          // The rail does not render a session's model, so there is nothing to
+          // patch here — but the fact still has to reach this page's routing, so
+          // it invalidates the reads that do show it (the composer's model list
+          // and this session's transcript header) rather than being dropped.
+          deps.sessionFactInvalidated?.(fact.sessionId);
+          return;
+        case "interaction-mode":
+          deps.sessionFactInvalidated?.(fact.sessionId);
+          return;
+        case "visibility":
+          // Hiding is a presentation fact about a session that still exists, so
+          // it filters the catalogue rather than deleting anything.
+          if (fact.hidden) {
+            commitCatalog((current) => hideWebuiCatalogSessions(current, [fact.sessionId]));
+          }
+          return;
+        case "pinned":
+          deps.sessionFactInvalidated?.(fact.sessionId);
+          return;
+        case "created":
+          // Known already: another client created something we can see. The
+          // catalogue's flat page is the authoritative list and will carry it on
+          // its own refresh, so there is nothing to patch and nothing to guess.
+          return;
+        case "deleted":
+          // Confirmed gone by another client. This is the same confirmation a
+          // local delete produced, so it takes the same teardown — including
+          // stopping the wire session, which `removedSessionIds` then keeps from
+          // being applied twice if the local delete also lands.
+          teardownDeletedSession(fact.sessionId);
+          return;
+        default:
+          return;
+      }
     },
     rename: async (sessionId, title) => {
       if (!port.updateSession) return undefined;

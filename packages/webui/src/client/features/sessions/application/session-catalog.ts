@@ -226,6 +226,46 @@ export function removeWebuiCatalogSessions(
 }
 
 /**
+ * Hide sessions from the rendered lists while keeping their records.
+ *
+ * Distinct from `removeWebuiCatalogSessions`, which is for a session that is gone.
+ * A session another client hid still exists and can be unhidden, so its entity
+ * stays: dropping it would make a later unhide a full re-read, and would lose
+ * the record the rail would need to show it again.
+ */
+export function hideWebuiCatalogSessions(
+  catalog: WebuiSessionCatalogState,
+  sessionIds: readonly string[],
+): WebuiSessionCatalogState {
+  const hidden = new Set(sessionIds);
+  if (hidden.size === 0) return catalog;
+  const ids = catalog.flat.ids.filter((id) => !hidden.has(id));
+  const nodes: WebuiCatalogTreeQueryNode[] = [];
+  let treeChanged = false;
+  for (const node of catalog.tree.nodes) {
+    if (hidden.has(node.sessionId)) {
+      treeChanged = true;
+      continue;
+    }
+    const childIds = node.childIds.filter((childId) => !hidden.has(childId));
+    if (childIds.length === node.childIds.length) {
+      nodes.push(node);
+      continue;
+    }
+    treeChanged = true;
+    nodes.push({ ...node, childIds });
+  }
+  const flatChanged = ids.length !== catalog.flat.ids.length;
+  if (!treeChanged && !flatChanged) return catalog;
+  // `entities` is deliberately carried over untouched.
+  return {
+    entities: catalog.entities,
+    flat: flatChanged ? { ...catalog.flat, ids } : catalog.flat,
+    tree: treeChanged ? { ...catalog.tree, nodes } : catalog.tree,
+  };
+}
+
+/**
  * Seed the catalog from a pre-loaded flat page (SSR snapshot / test seed), so
  * the first paint reads the same entity map the rail will keep using.
  */

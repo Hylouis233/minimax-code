@@ -569,6 +569,12 @@ export function createWebuiApplication(
       // mounted view arranges. It is resolved per event, so it cannot be missing
       // for the one event that mattered because a view was not on screen.
       workspaceGitChanged: (payload) => workspaceQueries.invalidateWorkspaceGit(payload),
+      // Another client or the CLI changed a session's identity or presentation.
+      // The sessions owner owns the catalogue those facts describe, so they go
+      // there rather than into a per-session turn effect that has no stream to
+      // write into. Installed permanently, like every route here, so the rail
+      // cannot go stale whenever no view happens to be mounted.
+      sessionFact: (fact) => sessionWorkflows.applyFact(fact),
     },
   });
   const turns = createWebuiTurnCoordinator({
@@ -624,6 +630,15 @@ export function createWebuiApplication(
     scope: sessionScope,
     // A committed delete also stops the wire session it was streaming on.
     deliveries,
+    // A model or interaction-mode change is answered by re-reading the views
+    // that render them, because the rail's session record has no field for
+    // either. The reads are interest-gated, so a session nobody is watching does
+    // not fan out a background request.
+    sessionFactInvalidated: (sessionId) => {
+      dirtyResources.delete(sessionId);
+      modelsWorkflows.loadModels(sessionId);
+      interactions.owner(sessionId).refresh();
+    },
   });
   const commandWorkflows = createWebuiCommandWorkflows({ port: slices.composer });
   /**

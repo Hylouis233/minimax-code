@@ -3782,6 +3782,7 @@
     "packages/webui/src/client/features/turn/application/event-coordinator.ts",
     "packages/webui/src/client/features/turn/application/execution-target.ts",
     "packages/webui/src/client/features/turn/application/queue-command.ts",
+    "packages/webui/src/client/features/turn/application/session-fact.ts",
     "packages/webui/src/client/features/turn/application/stream-frame-classify.ts",
     "packages/webui/src/client/features/turn/application/stream-lease-controller.ts",
     "packages/webui/src/client/features/turn/application/stream-loop-sink.ts",

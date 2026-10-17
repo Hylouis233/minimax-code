@@ -405,3 +405,53 @@ describe("rail search wiring in WebuiClientFoundationApp", () => {
     expect(region).toMatch(/<WebuiProjectList \{\.\.\.props\.projectList\}/u);
   });
 });
+
+describe("V28 · searching the rail observes, it does not probe", () => {
+  it("issues no request when the query text changes", () => {
+    // Observation is not treated as owning process lifetime. The rail's search is
+    // a filter over a page this client already read; making it a probe means every
+    // keystroke is a request whose answer the user cannot see, and a request per
+    // keystroke is what turns a search box into a load generator against the
+    // session service.
+    const hook = readFileSync(
+      new URL("../../src/client/shell/use-session-rail-actions.ts", import.meta.url),
+      "utf8",
+    );
+    const frame = readFileSync(
+      new URL("../../src/client/shell/WebuiClientFoundationApp.tsx", import.meta.url),
+      "utf8",
+    );
+
+    // No effect anywhere keys a load on the query.
+    expect(hook).not.toMatch(/useEffect\([^)]*railSearchQuery[^)]*(loadFlat|loadMore|refresh)/u);
+    for (const load of ["loadFlat", "loadMore", "refresh"]) {
+      // Any call to a loader must sit in code that has no access to the query.
+      const pattern = new RegExp(`sessionWorkflows\\.${load}`, "u");
+      expect(pattern.test(hook), `use-session-rail-actions calls ${load}`).toBe(false);
+      expect(pattern.test(frame), `foundation calls ${load}`).toBe(true);
+    }
+    // The one rail load is gated on having no page yet, not on what is typed.
+    expect(frame).toMatch(
+      /useEffect\(\(\) => \{\s*if \(!sessionWorkflows\.canLoadFlat \|\| sessionPage\) return;\s*void sessionWorkflows\.loadFlat\(\);\s*\}, \[sessionWorkflows, sessionPage\]\)/u,
+    );
+  });
+
+  it("treats more load-more requests as identities changing, not text changing", () => {
+    // "Load more" advances the catalogue's cursor, so the number of distinct
+    // probes is bounded by how many pages the catalogue has — not by how much the
+    // user typed. This asserts the shape that keeps it that way: pagination is
+    // gated on `hasMore`, and the filter never widens the request.
+    const frame = readFileSync(
+      new URL("../../src/client/shell/WebuiClientFoundationApp.tsx", import.meta.url),
+      "utf8",
+    );
+    const hook = readFileSync(
+      new URL("../../src/client/shell/use-session-rail-actions.ts", import.meta.url),
+      "utf8",
+    );
+    expect(frame).toMatch(/hasMore/u);
+    // The filter narrows what is rendered; it does not parameterize a request.
+    expect(hook).toMatch(/filterWebuiSessionsByQuery\(page\.sessions, railSearchQuery\)/u);
+    expect(hook).not.toMatch(/railSearchQuery[^\n]*(pageSize|limit|cursor|after)/u);
+  });
+});
