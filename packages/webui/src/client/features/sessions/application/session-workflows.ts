@@ -29,7 +29,7 @@ import {
   setWebuiCatalogFlatError,
   setWebuiCatalogFlatLoading,
 } from "./session-catalog.js";
-import type { WebuiSessionCatalogState } from "./session-catalog.js";
+import type { WebuiSessionCatalogState } from "./session-catalog.public.js";
 
 /** The catalog slice's reader/writer — a `WebuiSessionStore` satisfies it. */
 export interface WebuiSessionCatalogStore {

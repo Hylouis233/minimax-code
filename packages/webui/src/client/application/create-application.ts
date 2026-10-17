@@ -71,10 +71,7 @@ import {
 } from "../features/interactions/application/interaction-session-owners.js";
 import type { WebuiInteractionPortSlice } from "../features/interactions/application/interaction-coordinator.js";
 import { createWebuiInteractionPhaseIntents } from "../features/turn/contracts/interaction-phase-intents.js";
-import {
-  selectWebuiCatalogFlatPage,
-  selectWebuiCatalogTreePage,
-} from "../features/sessions/application/session-catalog.js";
+import { selectWebuiCatalogFlatPage, selectWebuiCatalogTreePage } from "../features/sessions/application/session-catalog.public.js";
 import { selectWebuiSessionAgentName, selectWebuiSessionLookups } from "../features/sessions/projection/session-lookups.js";
 import type { WebuiApplicationState } from "./state.js";
 import { WEBUI_HOME_SESSION_KEY } from "./state.js";

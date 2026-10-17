@@ -22,7 +22,7 @@
 import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { WebuiMarkdown } from "../../src/client/features/transcript/ui/markdown.js";
+import { WebuiMarkdown } from "../../src/client/features/transcript/ui/markdown.public.js";
 import { parseWebuiMessageFileReference } from "../../src/client/features/transcript/projection/message-file-reference.js";
 
 function render(source: string): string {

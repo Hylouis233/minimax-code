@@ -53,7 +53,6 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
   let interactionError: string | undefined;
   let commandOutput: string | undefined;
   let inspectionSessionId: string | undefined;
-  let timer: ReturnType<typeof setInterval> | undefined;
   let viewGeneration = 0;
   let lastSelectedSessionId = deps.readSelectedSessionId();
   let disposed = false;
@@ -272,7 +271,22 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
       const recordedTurn = deps.store.readRetry();
       const plan = planWebuiRetryResend({ refusal, recordedSession: recordedTurn?.session, session: sessionId, lastSubmittedText: recordedTurn?.message });
       if (plan.kind !== "resend") return;
-      await controller.submit({ ...input, draft: plan.message, forceTurn: true });
+      // The resend is observed like any other submission. Discarding its outcome
+      // meant a resend that landed on `needs-session` or `failed` did nothing the
+      // user could see: no draft to retry from, no reason on screen, and the
+      // recorded retry still advertising a message that never reached the runtime.
+      const outcome = await controller.submit({ ...input, draft: plan.message, forceTurn: true });
+      if (outcome.kind === "failed") {
+        interactionError = outcome.error;
+        publish();
+        return;
+      }
+      if (outcome.kind === "needs-session") {
+        // Nothing to send it to yet. The draft goes back where the user can
+        // choose a session and resend from there, rather than vanishing.
+        setDraft(outcome.draft);
+        publish();
+      }
     },
     removeQueued: ({ sessionId, itemId }) => queueCommands.remove({ sessionId, itemId, selectedSessionId: deps.readSelectedSessionId() }),
     selectSession: (sessionId) => {
@@ -285,18 +299,18 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
     attachView: (sessionId) => {
       const generation = ++viewGeneration;
       inspectionSessionId = sessionId;
-      if (timer) clearInterval(timer);
-      timer = undefined;
       if (sessionId) {
-        const refresh = (): void => {
-          if (disposed || generation !== viewGeneration) return;
-          void deps.refreshInspection(sessionId).catch((error: unknown) => {
-            if (generation !== viewGeneration) return;
-            interactionError = formatWebuiError(error);
-            publish();
-          });
-        };
-        refresh();
+        // One read on attach, not a policy. The model catalogue and the account
+        // status are the models and account businesses' own facts, and each
+        // owner invalidates its own answer when something changes it (a model
+        // selection, a provider edit, a credential change). A view-installed
+        // interval re-read other businesses' state on a timer, which made the
+        // composer's input rules depend on a poll nobody could audit or test.
+        void deps.refreshInspection(sessionId).catch((error: unknown) => {
+          if (generation !== viewGeneration) return;
+          interactionError = formatWebuiError(error);
+          publish();
+        });
         void deps.refreshPending(sessionId).then((outcome) => {
           if (!outcome.ok) throw new Error(outcome.error ?? "加载待处理请求失败");
         }).catch((error: unknown) => {
@@ -306,15 +320,12 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
         });
         deps.refreshGoal(sessionId).catch(() => undefined);
         deps.recoverTurn(sessionId);
-        timer = setInterval(refresh, 2_000);
       }
       publish();
       return () => {
         if (generation !== viewGeneration) return;
         viewGeneration += 1;
         inspectionSessionId = undefined;
-        if (timer) clearInterval(timer);
-        timer = undefined;
         publish();
       };
     },
@@ -332,8 +343,6 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
       if (disposed) return;
       disposed = true;
       viewGeneration += 1;
-      if (timer) clearInterval(timer);
-      timer = undefined;
       detachStore();
       listeners.clear();
       inspectionSessionId = undefined;

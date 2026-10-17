@@ -76,7 +76,7 @@ import {
   WebuiComposer,
 } from "../../src/client/features/composer/ui/WebuiComposer.js";
 import { planWebuiRetryResend, resendRecordedWebuiTurn } from "../../src/client/features/composer/application/turn-retry.js";
-import { OutputError } from "../../src/client/features/transcript/ui/OutputError.js";
+import { OutputError } from "../../src/client/features/transcript/ui/OutputError.public.js";
 import {
   buildWebuiComposerHandlers,
   submitWebuiTurn,

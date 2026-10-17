@@ -67,10 +67,7 @@ import type {
   WebuiWorkspaceSubagent,
 } from "../features/workspace/projection/workspace-progress.js";
 import type { WebuiProjectGroup } from "../features/sessions/projection/rail-groups.js";
-import {
-  selectWebuiCatalogFlatPage,
-  selectWebuiCatalogTreePage,
-} from "../features/sessions/application/session-catalog.js";
+import { selectWebuiCatalogFlatPage, selectWebuiCatalogTreePage } from "../features/sessions/application/session-catalog.public.js";
 import { WebuiPortSlicesProvider } from "../bindings/port-slices-context.js";
 import { WebuiApplicationProvider } from "../bindings/application-context.js";
 import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js";

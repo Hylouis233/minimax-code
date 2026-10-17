@@ -262,7 +262,7 @@ export function createCanvasNodeId(): string {
 // `view` must not read the ambient `globalThis` surface; WebCrypto is the same
 // object under either name, and the fallback keeps a context that ships without
 // it working. Same shape as `webuiClientRequestId` in
-// `client/features/sessions/projection/action-requests.ts`.
+// `client/features/sessions/projection/action-requests.public.ts`.
 function randomCanvasId(prefix: string): string {
   const webCrypto = typeof crypto !== "undefined" ? crypto : undefined;
   const unique = typeof webCrypto?.randomUUID === "function"

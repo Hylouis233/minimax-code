@@ -30,7 +30,7 @@ import {
   webuiPlanSummary,
   webuiPlanTitle,
 } from "../projection/plan-mode.js";
-import { WebuiMarkdown } from "../../transcript/ui/markdown.js";
+import { WebuiMarkdown } from "../../transcript/ui/markdown.public.js";
 import {
   WebuiIconClose,
   WebuiIconCommandPlan,

@@ -7,17 +7,8 @@
 
 import { describe, expect, it } from "vitest";
 
-import {
-  createWebuiSessionCatalogFromPage,
-  initialWebuiSessionCatalogState,
-  patchWebuiCatalogEntity,
-  reduceWebuiCatalogFlatAppended,
-  reduceWebuiCatalogFlatLoaded,
-  reduceWebuiCatalogTreeLoaded,
-  removeWebuiCatalogEntities,
-  selectWebuiCatalogFlatPage,
-  selectWebuiCatalogTreePage,
-} from "../../src/client/features/sessions/application/session-catalog.js";
+import { createWebuiSessionCatalogFromPage, patchWebuiCatalogEntity, reduceWebuiCatalogFlatAppended, reduceWebuiCatalogFlatLoaded, reduceWebuiCatalogTreeLoaded, removeWebuiCatalogEntities } from "../../src/client/features/sessions/application/session-catalog.js";
+import { initialWebuiSessionCatalogState, selectWebuiCatalogFlatPage, selectWebuiCatalogTreePage } from "../../src/client/features/sessions/application/session-catalog.public.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 import { createWebuiSessionWorkflows } from "../../src/client/features/sessions/application/session-workflows.js";
 import { createWebuiSessionScopeManager } from "../../src/client/conversation/session-scope.js";

@@ -8,8 +8,8 @@
     },
     {
       "from": "client/features/transcript/ui/MessageItem.tsx",
-      "to": "client/features/sessions/projection/action-requests.ts",
-      "reason": "The transcript's message actions build session commands (fork / edit / rewind). Those builders are the sessions business's command shape, filed under its projection until sessions publishes its public command surface; the entry goes when it does (T07)."
+      "to": "client/features/sessions/projection/action-requests.public.ts",
+      "reason": "Sessions publishes its action-request builders as a public module, so the transcript's message actions and the composer build session commands (fork / edit / rewind) through the owner's published command shape instead of a peer's private module. The `.public` suffix is a publication marker; the builders themselves are unchanged."
     },
     {
       "from": "client/features/sessions/application/session-workflows.ts",
@@ -37,17 +37,17 @@
       "reason": "The workspace composer composes the review owner: the panels read one snapshot, and the review half is a peer business's owner. T11's acceptance says compose T10's review APIs rather than reimplementing review policy, and the owner factory is what there is to compose; the entry goes when review publishes a composition contract."
     },
     {
-      "from": "client/features/review/ui/ReviewSettingsPage.tsx",
-      "to": "client/features/sessions/application/session-catalog.ts",
-      "reason": "The review settings page lists the sessions it can review, reading the sessions catalogue. Reviewed peer edge until Sessions publishes that read as a public contract (its owner moved into features/sessions in T07)."
+      "from": "client/features/review/ui/ReviewSettingsPage.public.tsx",
+      "to": "client/features/sessions/application/session-catalog.public.ts",
+      "reason": "The review settings page lists the sessions it can review. Sessions publishes the catalogue state shape and its page selectors as a public module, so the page resolves the same catalogue the rail renders instead of reaching into a peer's private application module. The `.public` suffix is a publication marker; the read is unchanged."
     },
     {
       "from": "client/features/workspace/ui/WorkspacePanels.tsx",
-      "to": "client/features/transcript/ui/markdown.tsx",
-      "reason": "The panel renders file and diff content through the transcript's markdown renderer. Reviewed peer edge until the transcript publishes it as a shared rendering contract."
+      "to": "client/features/transcript/ui/markdown.public.tsx",
+      "reason": "Transcript publishes its markdown renderer as a public presentation module, so the plan decision card and the workspace panel render through the owner's published renderer instead of a peer's private one. The `.public` suffix is a publication marker; the renderer and what it produces are unchanged."
     },
     {
-      "from": "client/features/review/ui/ReviewSettingsPage.tsx",
+      "from": "client/features/review/ui/ReviewSettingsPage.public.tsx",
       "to": "client/features/sessions/projection/worktree-state.ts",
       "reason": "The review settings page renders the worktree surface's grouping for the sessions it reviews. Reviewed peer edge until Sessions publishes that projection as a public contract."
     },
@@ -67,19 +67,14 @@
       "reason": "The same binding, asked only whether the runtime offers turn diffs at all, so the card can be hidden rather than rendered empty. Same edge and same retirement as the DiffCard entry: review publishes the capability read as a public contract and this goes with it (T10)."
     },
     {
-      "from": "client/features/models/ui/ProviderFormPanel.tsx",
-      "to": "client/features/settings/ui/settings-atoms.tsx",
-      "reason": "The provider form is built from the settings surfaces' presentation atoms (IconButton, the close and refresh glyphs). Before T03 the form sat in `client/components/models/`, a current home the peer rule does not judge; moving it into the models feature home makes the edge measurable, and T12 moved the atoms into the settings feature home and re-pointed this entry. Reviewed peer edge while those atoms are filed under the settings business: they carry no settings policy, so the entry goes when T18 relocates the reusable presentation mechanics to `client/ui/`, or when settings publishes them."
-    },
-    {
       "from": "client/features/settings/ui/SettingsModal.tsx",
       "to": "client/features/sessions/projection/worktree-state.ts",
       "reason": "The settings dialog renders the worktree surface's grouping for the archived-session settings page (the same projection the review settings page reads). Both files sat in current homes before T12 moved the dialog into the settings feature home, so the edge was not judged; reviewed peer edge until Sessions publishes the worktree projection as a public contract."
     },
     {
       "from": "client/features/settings/ui/SettingsModal.tsx",
-      "to": "client/features/review/ui/ReviewSettingsPage.tsx",
-      "reason": "The settings dialog composes the review business's settings page as one of its tabs. It is a Settings surface embedding a Review surface; reviewed peer edge until Review publishes that page as a public screen contract."
+      "to": "client/features/review/ui/ReviewSettingsPage.public.tsx",
+      "reason": "Review publishes its settings page as a public screen contract, so the settings dialog composes Review's published surface as one of its tabs instead of reaching into a peer's private component. The `.public` suffix is a publication marker; the page and the reads it performs are unchanged."
     },
     {
       "from": "client/features/settings/ui/SettingsModal.tsx",
@@ -88,8 +83,8 @@
     },
     {
       "from": "client/features/settings/ui/SettingsModal.tsx",
-      "to": "client/features/sessions/application/session-catalog.ts",
-      "reason": "The archived-session settings page lists sessions from the sessions catalogue, the same read the review settings page makes. Reviewed peer edge until Sessions publishes that read as a public contract (its owner moved into features/sessions in T07)."
+      "to": "client/features/sessions/application/session-catalog.public.ts",
+      "reason": "The archived-session settings page lists sessions from the sessions catalogue, the same read the review settings page makes. Sessions publishes that read as a public module; the `.public` suffix is a publication marker and the read is unchanged."
     },
     {
       "from": "client/features/settings/ui/UsageModelSettings.tsx",
@@ -103,8 +98,8 @@
     },
     {
       "from": "client/features/settings/ui/UsageModelSettings.tsx",
-      "to": "client/features/models/ui/ProviderFormPanel.tsx",
-      "reason": "The screen embeds the models business's provider form (provider CRUD is Models' duty, plan §5.6's models row, which this page renders rather than owns). Reviewed peer edge until Models publishes the form as a public surface."
+      "to": "client/features/models/ui/ProviderFormPanel.public.tsx",
+      "reason": "Models publishes its provider form as a public screen contract, so the settings screen embeds the provider CRUD Models owns rather than importing a peer's private component. The `.public` suffix is a publication marker; the form and its commands are unchanged."
     },
     {
       "from": "client/features/settings/ui/UsageModelSettings.tsx",
@@ -118,8 +113,8 @@
     },
     {
       "from": "client/features/interactions/ui/PlanModeCards.tsx",
-      "to": "client/features/transcript/ui/markdown.tsx",
-      "reason": "The plan decision card renders the plan text through the transcript's markdown renderer, the same shared rendering the workspace panel uses. Reviewed peer edge until the transcript publishes markdown as a shared rendering contract."
+      "to": "client/features/transcript/ui/markdown.public.tsx",
+      "reason": "Transcript publishes its markdown renderer as a public presentation module, so the plan decision card and the workspace panel render through the owner's published renderer instead of a peer's private one. The `.public` suffix is a publication marker; the renderer and what it produces are unchanged."
     },
     {
       "from": "client/features/composer/ui/ThinkingTrigger.tsx",
@@ -143,8 +138,8 @@
     },
     {
       "from": "client/features/composer/ui/WebuiComposer.tsx",
-      "to": "client/features/sessions/application/session-catalog.ts",
-      "reason": "The composer lists the child sessions of the session it composes for by resolving the sessions business's catalogue through its own selector; before T13 that list arrived as a page prop. Reviewed peer edge until Sessions publishes the catalogue read from its contracts."
+      "to": "client/features/sessions/application/session-catalog.public.ts",
+      "reason": "The composer lists the child sessions of the session it composes for by resolving the sessions business's catalogue through its own selector. Sessions publishes the catalogue state shape and its page selectors as a public module, so the composer reads the owner's published read model rather than a peer's private application module. The `.public` suffix is a publication marker; the read is unchanged."
     },
     {
       "from": "client/features/composer/ui/WebuiComposer.tsx",
@@ -163,18 +158,18 @@
     },
     {
       "from": "client/features/composer/ui/WebuiComposer.tsx",
-      "to": "client/features/goal/bindings/goal-owner.ts",
-      "reason": "The composer mounts the goal business's binding to reach its owner, because goal mode is entered from the composer while the owner is Goal's. Reviewed peer edge until Goal publishes a binding the shell can mount."
+      "to": "client/features/goal/bindings/goal-owner.public.ts",
+      "reason": "Goal publishes its owner bindings as a public module, so the composer mounts the goal business's own binding rather than reaching into a peer's private one. The `.public` suffix is a publication marker; the binding and the owner it reads are unchanged, and the owner stays the application's — a screen unmount still owns no goal state."
     },
     {
       "from": "client/features/composer/ui/WebuiComposer.tsx",
-      "to": "client/features/interactions/bindings/interaction-owner.ts",
-      "reason": "The composer mounts the interactions business's binding for the same reason as the goal one. Reviewed peer edge until interactions publishes a binding the shell can mount."
+      "to": "client/features/interactions/bindings/interaction-owner.public.ts",
+      "reason": "Interactions publishes its owner binding as a public module, so the composer mounts the interactions business's own binding rather than reaching into a peer's private one. The `.public` suffix is a publication marker; the binding is unchanged, and the owner stays the application's with no reader installed from a view."
     },
     {
       "from": "client/features/composer/ui/WebuiComposer.tsx",
-      "to": "client/features/turn/projection/stream-state.ts",
-      "reason": "The composer reads the turn stream state for its live-column phase decisions. Reviewed peer edge until turn publishes the state as a public contract."
+      "to": "client/features/turn/projection/stream-state.public.ts",
+      "reason": "The composer inspects a session's status to decide whether it is still running. Turn publishes that normalisation as a public module, so the composer reads the owner's published status contract instead of re-deriving the wire enum from a peer's private projection. The `.public` suffix is a publication marker; the rule is unchanged."
     },
     {
       "from": "client/features/composer/ui/WebuiComposer.tsx",
@@ -183,8 +178,8 @@
     },
     {
       "from": "client/features/composer/ui/WebuiComposer.tsx",
-      "to": "client/features/goal/ui/GoalBanner.tsx",
-      "reason": "The composer places the goal business's banner above its own field. Reviewed peer edge: the banner is Goal's surface; it goes when Goal publishes it."
+      "to": "client/features/goal/ui/GoalBanner.public.tsx",
+      "reason": "Goal publishes its banner as a public screen contract, so the composer places the goal business's published surface above its own field. The `.public` suffix is a publication marker; publishing the component does not transfer its business truth — the banner still renders the goal the Goal owner holds."
     },
     {
       "from": "client/features/composer/ui/WebuiComposer.tsx",
@@ -203,13 +198,13 @@
     },
     {
       "from": "client/features/composer/ui/WebuiComposer.tsx",
-      "to": "client/features/transcript/ui/OutputError.tsx",
-      "reason": "The composer renders the transcript's output-error surface under its field. Reviewed peer edge until the transcript publishes it as a shared surface."
+      "to": "client/features/transcript/ui/OutputError.public.tsx",
+      "reason": "Transcript publishes its output-error surface as a public screen contract, so the composer renders the transcript business's published surface under its field. The `.public` suffix is a publication marker; the component and what it renders are unchanged."
     },
     {
       "from": "client/features/composer/ui/WebuiComposer.tsx",
-      "to": "client/features/sessions/projection/action-requests.ts",
-      "reason": "The composer builds session commands (fork / edit / rewind) with the sessions business's builders, the same ones the transcript's message actions use. Reviewed peer edge until Sessions publishes the command shape."
+      "to": "client/features/sessions/projection/action-requests.public.ts",
+      "reason": "Sessions publishes its action-request builders as a public module, so the transcript's message actions and the composer build session commands (fork / edit / rewind) through the owner's published command shape instead of a peer's private module. The `.public` suffix is a publication marker; the builders themselves are unchanged."
     },
     {
       "from": "client/features/composer/ui/ComposerProjectRow.tsx",

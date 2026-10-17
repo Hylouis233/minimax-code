@@ -11,7 +11,7 @@ import {
 } from "../../src/client/features/transcript/ui/TranscriptSkeletons.js";
 import { WebuiActivityGroup, WebuiThinkingBlock, WebuiTurnProcess } from "../../src/client/features/transcript/ui/TranscriptPrimitives.js";
 import { WebuiAssistantBody } from "../../src/client/features/transcript/ui/AssistantBody.js";
-import { WebuiMarkdown } from "../../src/client/features/transcript/ui/markdown.js";
+import { WebuiMarkdown } from "../../src/client/features/transcript/ui/markdown.public.js";
 
 function countByClass(html: string, className: string): number {
   const re = new RegExp(`class="[^"]*\\b${className}\\b`, "g");

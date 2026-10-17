@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { WebuiReviewPanel, WebuiReviewWorkspacePicker } from "../../src/client/features/review/ui/ReviewSettingsPage.js";
+import { WebuiReviewPanel, WebuiReviewWorkspacePicker } from "../../src/client/features/review/ui/ReviewSettingsPage.public.js";
 import {
   initialWebuiReviewState,
   reduceWebuiReviewState,
@@ -317,7 +317,7 @@ describe("the chosen workspace reaches the review load", () => {
   /* The page has its own file, so the slice reads it directly and stops at the
    * picker — the page's own call is what these assertions are about. */
   const source = readFileSync(
-    fileURLToPath(new URL("../../src/client/features/review/ui/ReviewSettingsPage.tsx", import.meta.url)),
+    fileURLToPath(new URL("../../src/client/features/review/ui/ReviewSettingsPage.public.tsx", import.meta.url)),
     "utf8",
   );
   const page = source.slice(

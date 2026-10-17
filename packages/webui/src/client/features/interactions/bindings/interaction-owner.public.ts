@@ -9,7 +9,7 @@
 // standalone surface): a per-mount registry, so the surface keeps working rather
 // than silently reading through a second fence.
 
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo } from "react";
 
 import type { WebuiInteractionCoordinator } from "../application/interaction-coordinator.js";
 import { createWebuiInteractionSessionOwners } from "../application/interaction-session-owners.js";
@@ -40,19 +40,4 @@ export function useWebuiInteractionOwner(
   );
   const owners = application?.interactions ?? fallback;
   return owners.owner(webuiInteractionRecordKey(sessionId));
-}
-
-/**
- * Installs the fallback requester name the owners compose with. The session list
- * the surface renders is loaded after the application exists, so the reader is
- * installed rather than passed — and it is read when a request is composed, so a
- * later-loaded list stays authoritative.
- */
-export function useWebuiInteractionAgentNameReader(agentName: string | undefined): void {
-  const application = useWebuiApplicationOptional();
-  const latest = useRef(agentName);
-  latest.current = agentName;
-  useEffect(() => {
-    application?.interactions.setAgentNameReader(() => latest.current ?? "main");
-  }, [application]);
 }

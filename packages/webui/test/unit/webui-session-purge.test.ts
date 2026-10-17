@@ -23,13 +23,8 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  createWebuiSessionCatalogFromPage,
-  initialWebuiSessionCatalogState,
-  reduceWebuiCatalogFlatLoaded,
-  selectWebuiCatalogFlatPage,
-  removeWebuiCatalogSessions,
-} from "../../src/client/features/sessions/application/session-catalog.js";
+import { createWebuiSessionCatalogFromPage, reduceWebuiCatalogFlatLoaded, removeWebuiCatalogSessions } from "../../src/client/features/sessions/application/session-catalog.js";
+import { initialWebuiSessionCatalogState, selectWebuiCatalogFlatPage } from "../../src/client/features/sessions/application/session-catalog.public.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 import { createWebuiSessionScopeManager } from "../../src/client/conversation/session-scope.js";
 import {

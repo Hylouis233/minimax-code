@@ -1,6 +1,7 @@
 // The provider form's lifecycle conditions, pinned where they can go red.
 //
-// The split moved a branch's JSX into `features/models/ui/ProviderFormPanel.tsx`. What must stay
+// The split moved a branch's JSX into `features/models/ui/ProviderFormPanel.tsx`
+// (now published as `ProviderFormPanel.public.tsx`). What must stay
 // *unchanged* is not the file layout but the lifetime: every one of its conditions is a fact about
 // which module holds a declaration, so each is asserted against the source, where moving it back
 // turns the case red:
@@ -30,7 +31,7 @@ const accountOwner = readFileSync(
   ),
   "utf8",
 );
-const panel = read("models/ui/ProviderFormPanel.tsx");
+const panel = read("models/ui/ProviderFormPanel.public.tsx");
 
 /** The slice from one marker to the next, so an assertion cannot be satisfied from elsewhere. */
 const between = (text: string, from: string, to: string): string =>

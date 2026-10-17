@@ -16,7 +16,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { OutputError } from "../../src/client/features/transcript/ui/OutputError.js";
+import { OutputError } from "../../src/client/features/transcript/ui/OutputError.public.js";
 import { WebuiAssistantBody } from "../../src/client/features/transcript/ui/AssistantBody.js";
 import { WebuiClientFoundationApp } from "../../src/client/shell/WebuiClientFoundationApp.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";

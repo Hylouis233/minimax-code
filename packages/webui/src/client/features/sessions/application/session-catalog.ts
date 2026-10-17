@@ -8,69 +8,25 @@
 // two structures by hand and no rename can leave the flat list and the tree
 // disagreeing about a title.
 //
-// This module is deliberately pure: it holds the state shape and the reducers
-// that transform it, and the selectors that resolve a query result into the
-// page shapes the rail consumes. The store that owns the single writable copy
-// and the command surface over these reducers live in `application/` siblings,
-// exactly as the activity slice was split (`session-store.ts` writes it,
-// `unread.ts` names the changes).
+// This module is deliberately pure: it holds the reducers that transform the
+// catalogue. The state shape and the selectors that resolve a query result
+// into page shapes live in the published sibling `session-catalog.public.ts`,
+// which is what a peer business reads; the reducers stay here because a peer
+// reads sessions, it does not rewrite them. The store that owns the single
+// writable copy and the command surface over these reducers live in
+// `application/` siblings, exactly as the activity slice was split
+// (`session-store.ts` writes it, `unread.ts` names the changes).
 
 import type {
   WebuiClientSession,
   WebuiClientSessionPage,
   WebuiClientSessionTreePage,
 } from "../contracts/session-view.js";
-
-/** One tree query node: the root session id and its child session ids. */
-export interface WebuiCatalogTreeQueryNode {
-  readonly sessionId: string;
-  readonly childIds: readonly string[];
-}
-
-/**
- * The flat query result. Identifiers, not records: the records are in
- * `entities`. `loading` lives here rather than in the store snapshot's top
- * level because it is a fact about *this* query, and `error` is the
- * page-level load failure the rail renders.
- */
-export interface WebuiCatalogFlatQuery {
-  readonly ids: readonly string[];
-  readonly hasMore: boolean;
-  readonly nextCursor?: string;
-  readonly loading: boolean;
-  readonly error?: string;
-}
-
-/** The tree query result: root→child id relationships plus its own cursor. */
-export interface WebuiCatalogTreeQuery {
-  readonly nodes: readonly WebuiCatalogTreeQueryNode[];
-  readonly hasMore: boolean;
-  readonly nextCursor?: string;
-}
-
-export interface WebuiSessionCatalogState {
-  /** The one copy of each session record, keyed by session id. */
-  readonly entities: ReadonlyMap<string, WebuiClientSession>;
-  readonly flat: WebuiCatalogFlatQuery;
-  readonly tree: WebuiCatalogTreeQuery;
-}
-
-export const initialWebuiCatalogFlatQuery: WebuiCatalogFlatQuery = {
-  ids: [],
-  hasMore: false,
-  loading: false,
-};
-
-export const initialWebuiCatalogTreeQuery: WebuiCatalogTreeQuery = {
-  nodes: [],
-  hasMore: false,
-};
-
-export const initialWebuiSessionCatalogState: WebuiSessionCatalogState = {
-  entities: new Map(),
-  flat: initialWebuiCatalogFlatQuery,
-  tree: initialWebuiCatalogTreeQuery,
-};
+import {
+  initialWebuiSessionCatalogState,
+  type WebuiCatalogTreeQueryNode,
+  type WebuiSessionCatalogState,
+} from "./session-catalog.public.js";
 
 /**
  * Merge a batch of records into the entity map. Returns the *same* map when
@@ -266,48 +222,6 @@ export function removeWebuiCatalogSessions(
     entities: entities.entities,
     flat: flatChanged ? { ...catalog.flat, ids } : catalog.flat,
     tree: treeChanged ? { ...catalog.tree, nodes } : catalog.tree,
-  };
-}
-
-/** The flat page the rail renders, resolved from the entity map. */
-export function selectWebuiCatalogFlatPage(
-  catalog: WebuiSessionCatalogState,
-): WebuiClientSessionPage {
-  const sessions: WebuiClientSession[] = [];
-  for (const id of catalog.flat.ids) {
-    const entity = catalog.entities.get(id);
-    if (entity) sessions.push(entity);
-  }
-  return {
-    sessions,
-    hasMore: catalog.flat.hasMore,
-    ...(catalog.flat.nextCursor !== undefined
-      ? { nextCursor: catalog.flat.nextCursor }
-      : {}),
-  };
-}
-
-/** The tree page the rail renders, resolved from the entity map. */
-export function selectWebuiCatalogTreePage(
-  catalog: WebuiSessionCatalogState,
-): WebuiClientSessionTreePage {
-  const sessions: WebuiClientSessionTreePage["sessions"][number][] = [];
-  for (const node of catalog.tree.nodes) {
-    const session = catalog.entities.get(node.sessionId);
-    if (!session) continue;
-    const childSessions: WebuiClientSession[] = [];
-    for (const childId of node.childIds) {
-      const child = catalog.entities.get(childId);
-      if (child) childSessions.push(child);
-    }
-    sessions.push({ session, childSessions });
-  }
-  return {
-    sessions,
-    hasMore: catalog.tree.hasMore,
-    ...(catalog.tree.nextCursor !== undefined
-      ? { nextCursor: catalog.tree.nextCursor }
-      : {}),
   };
 }
 

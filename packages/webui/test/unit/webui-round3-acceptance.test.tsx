@@ -9,7 +9,7 @@ import {
   reduceWebuiDiffState,
 } from "../../src/client/features/review/projection/review-state.js";
 import { WebuiDiffCard } from "../../src/client/features/transcript/ui/DiffCard.js";
-import { WebuiGoalBanner } from "../../src/client/features/goal/ui/GoalBanner.js";
+import { WebuiGoalBanner } from "../../src/client/features/goal/ui/GoalBanner.public.js";
 import { WebuiInteractionPanel } from "../../src/client/features/interactions/ui/InteractionPanel.js";
 import { chunkWebuiWorkspaceReviewFileIds, WebuiDiffFileSection } from "../../src/client/features/workspace/ui/WorkspacePanels.js";
 import { projectWebuiUnifiedDiffLines } from "../../src/client/features/workspace/projection/panel-projection.js";
@@ -26,7 +26,7 @@ import {
   buildWebuiForkRequest,
   buildWebuiMessageForkRequest,
   buildWebuiRewindRequest,
-} from "../../src/client/features/sessions/projection/action-requests.js";
+} from "../../src/client/features/sessions/projection/action-requests.public.js";
 import {
   buildWebuiGoalEditPatch,
   buildWebuiGoalStatusPatch,

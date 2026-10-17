@@ -18,7 +18,7 @@ import typescript from "highlight.js/lib/languages/typescript";
 import toml from "highlight.js/lib/languages/ini";
 import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
-import { WebuiMarkdown } from "../../transcript/ui/markdown.js";
+import { WebuiMarkdown } from "../../transcript/ui/markdown.public.js";
 import type { WebuiFileDiffInfoView } from "../../../../shared/contracts/session.js";
 import type {
   WebuiWorkspaceEnvironment,

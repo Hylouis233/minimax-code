@@ -4,15 +4,15 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   isSafeWebuiMarkdownHref,
   WebuiMarkdown,
-} from "../../src/client/features/transcript/ui/markdown.js";
+} from "../../src/client/features/transcript/ui/markdown.public.js";
 import {
   applyFrameCursor,
   applyFrameData,
   initialWebuiStreamState,
   reduceWebuiStreamFrame,
   recogniseWebuiStreamPayload,
-  webuiSessionStatusType,
 } from "../../src/client/features/turn/projection/stream-state.js";
+import { webuiSessionStatusType } from "../../src/client/features/turn/projection/stream-state.public.js";
 import { __webuiProbeReduce } from "../../src/client/conversation/stream-instrumentation.js";
 
 const frame = (dataJson: string) => ({ dataJson });

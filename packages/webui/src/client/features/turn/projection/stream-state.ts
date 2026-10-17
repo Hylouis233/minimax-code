@@ -219,21 +219,6 @@ export function settleStaleWebuiSubscription(
   };
 }
 
-/**
- * Session lists carry `SessionStatusInfoView.statusType` as a numeric enum
- * (`Started` is 1), while early WebUI adapters supplied a status string.
- * Normalize both shapes so refresh recovery can recognize active sessions.
- */
-export function webuiSessionStatusType(value: unknown): string {
-  const status = recordValue(value);
-  const raw = status?.statusType ?? status?.type ?? value;
-  if (raw === 1 || raw === "1") return "started";
-  if (raw === 0 || raw === "0") return "idle";
-  if (raw === 2 || raw === "2") return "error";
-  if (raw === 3 || raw === "3") return "aborted";
-  return typeof raw === "string" ? raw.trim().toLowerCase() : "";
-}
-
 function text(value: Record<string, unknown>, keys: readonly string[]): string {
   for (const key of keys)
     if (typeof value[key] === "string") return value[key] as string;

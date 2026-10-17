@@ -4,7 +4,7 @@ import { describe, it, expect, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { OutputError } from "../../src/client/features/transcript/ui/OutputError.js";
+import { OutputError } from "../../src/client/features/transcript/ui/OutputError.public.js";
 
 describe("OutputError", () => {
   it("emits the desktop testids for the generic error variant", () => {

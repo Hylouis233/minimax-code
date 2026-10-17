@@ -264,7 +264,7 @@ describe("prohibition 6 — a workspace reader takes the resource it renders", (
     // types stop narrowing and every capability is everyone's again.
     const expectations: readonly [string, string][] = [
       ["features/composer/ui/WebuiComposer.tsx", "useWebuiWorkspaceFiles"],
-      ["features/review/ui/ReviewSettingsPage.tsx", "useWebuiWorkspaceReview"],
+      ["features/review/ui/ReviewSettingsPage.public.tsx", "useWebuiWorkspaceReview"],
       ["features/workspace/ui/WorkspaceArchiveView.tsx", "useWebuiWorkspaceArchive"],
       ["features/workspace/ui/WorkspaceCanvas.tsx", "useWebuiWorkspaceCanvas"],
       ["features/workspace/ui/WebuiWorkspaceDirectoryBrowser.tsx", "useWebuiWorkspaceFiles"],

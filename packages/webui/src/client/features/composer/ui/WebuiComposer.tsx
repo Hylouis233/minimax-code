@@ -88,11 +88,8 @@ import { type WebuiPermissionMode } from "../../../features/settings/contracts/s
 import {
   useWebuiGoalOwner,
   useWebuiGoalReaction,
-} from "../../../features/goal/bindings/goal-owner.js";
-import {
-  useWebuiInteractionAgentNameReader,
-  useWebuiInteractionOwner,
-} from "../../../features/interactions/bindings/interaction-owner.js";
+} from "../../../features/goal/bindings/goal-owner.public.js";
+import { useWebuiInteractionOwner } from "../../../features/interactions/bindings/interaction-owner.public.js";
 import { useComposerController } from "../bindings/use-composer-controller.js";
 import { useComposerLayout } from "../bindings/use-composer-layout.js";
 import { useComposerInput, useComposerSlashDismiss } from "../bindings/use-composer-input.js";
@@ -101,9 +98,9 @@ import {
   useWebuiApplicationOptional,
   useWebuiSessionStoreSnapshot,
 } from "../../../bindings/application-context.js";
-import { selectWebuiCatalogFlatPage } from "../../../features/sessions/application/session-catalog.js";
+import { selectWebuiCatalogFlatPage } from "../../../features/sessions/application/session-catalog.public.js";
 import { useWebuiAccountWorkflowsState } from "../../../features/account/bindings/use-account-workflows.js";
-import { webuiSessionStatusType } from "../../turn/projection/stream-state.js";
+import { webuiSessionStatusType } from "../../turn/projection/stream-state.public.js";
 
 import type {
   WebuiGoal,
@@ -124,7 +121,7 @@ import type {
 } from "../../../../shared/contracts/workspace.js";
 import type { WebuiUsageQuotaResult } from "../../../../shared/contracts/usage-quota.js";
 import { formatUsageResetLabel } from "../../../features/account/projection/usage.js";
-import { WebuiGoalBanner } from "../../../features/goal/ui/GoalBanner.js";
+import { WebuiGoalBanner } from "../../../features/goal/ui/GoalBanner.public.js";
 import { WebuiInteractionPanel } from "../../../features/interactions/ui/InteractionPanel.js";
 import { WebuiQueuePanel } from "./QueuePanel.js";
 import {
@@ -140,11 +137,11 @@ import {
 import {
   WebuiIconAttach,
 } from "../../../shell/icons.js";
-import { OutputError } from "../../../features/transcript/ui/OutputError.js";
+import { OutputError } from "../../../features/transcript/ui/OutputError.public.js";
 import { isTurnLive } from "../../turn/contracts/stream-state.js";
 import { evaluateComposerDismiss } from "../../../projection/common/outside-close.js";
 import {
-} from "../../../features/sessions/projection/action-requests.js";
+} from "../../../features/sessions/projection/action-requests.public.js";
 import { buildWebuiModelSelectionRequest } from "../../../features/models/contracts/model-selection.js";
 import {
   findWebuiMentionRange,
@@ -336,10 +333,6 @@ export function WebuiComposer({
   // constructing one, so an event re-reads and a reply commits whether or not
   // this view is mounted, and each session has its own fence.
   const interactionCoordinator = useWebuiInteractionOwner(sessionId);
-  // The fallback requester name is this surface's prop — the session list's
-  // answer for the session it is showing — so it is installed as the owners'
-  // reader rather than re-derived from a second source.
-  useWebuiInteractionAgentNameReader(agentName);
   // The goal owner is the application's, keyed by session: this component
   // reads the one for the session it is showing instead of constructing one, so a
   // goal event commits whether or not this view is mounted and each session has

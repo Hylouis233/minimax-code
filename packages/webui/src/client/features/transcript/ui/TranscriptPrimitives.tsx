@@ -14,7 +14,7 @@ import {
   WebuiIconDiffFile,
   WebuiIconDiffSummary,
 } from "../../../shell/icons.js";
-import { WebuiMarkdown } from "./markdown.js";
+import { WebuiMarkdown } from "./markdown.public.js";
 import {
   isWebuiEditTool,
   toolCallInputText,

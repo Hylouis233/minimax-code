@@ -4,8 +4,8 @@ import { useWebuiModelsWorkflows, useWebuiModelsWorkflowsState, useWebuiSettings
 import { useWebuiAccountWorkflows, useWebuiAccountWorkflowsState } from "../../../features/account/bindings/use-account-workflows.js";
 import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
 import { formatResetLabel, getActiveSourceBadge, type ProviderHeaderDraft } from "../../../features/models/projection/usage-settings.js";
-import { IconButton, RefreshIcon } from "./settings-atoms.js";
-import { ProviderFormPanel, type WebuiProviderFormCommands } from "../../../features/models/ui/ProviderFormPanel.js";
+import { IconButton, RefreshIcon } from "../../../ui/form-atoms.js";
+import { ProviderFormPanel, type WebuiProviderFormCommands } from "../../../features/models/ui/ProviderFormPanel.public.js";
 import { useWebuiProviderEditor } from "../../../features/models/bindings/use-provider-editor.js";
 import type { WebuiProviderEditorCommands } from "../../../features/models/contracts/provider-editor.js";
 import { unavailableWebuiProviderOutcome } from "../../../features/models/contracts/provider-outcome.js";

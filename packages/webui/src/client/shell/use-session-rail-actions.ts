@@ -24,7 +24,7 @@ import type {
   WebuiClientSession,
   WebuiClientSessionPage,
 } from "../features/sessions/contracts/session-view.js";
-import type { selectWebuiCatalogTreePage } from "../features/sessions/application/session-catalog.js";
+import type { selectWebuiCatalogTreePage } from "../features/sessions/application/session-catalog.public.js";
 import { sessionHash } from "../projection/common/router.js";
 import {
   useSessionRailOverlays,

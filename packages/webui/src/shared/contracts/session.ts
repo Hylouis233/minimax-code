@@ -19,7 +19,7 @@
 // | `WebuiSessionLookupResult` | The `{ session }` envelope from a lookup. | Runtime `getSession`. | `client/features/sessions/contracts/session-port.ts`; `server/operation/session.ts`. |
 // | `WebuiUpdateSessionRequest` | Request to set a session title. | Browser `client/platform/transport.ts` (`updateSession`). | `server/operation/session.ts`; runtime `updateSession`. |
 // | `WebuiUpdateSessionResult` | The updated `{ session }`. | Runtime `updateSession`. | `server/operation/session.ts`; `client/features/sessions/contracts/session-port.ts`. |
-// | `WebuiForkSessionRequest` | Request to fork a session. | Browser `client/platform/transport.ts`; built in `client/features/sessions/projection/action-requests.ts` (`forkSession`). | `server/operation/session.ts`; runtime `forkSession`. |
+// | `WebuiForkSessionRequest` | Request to fork a session. | Browser `client/platform/transport.ts`; built in `client/features/sessions/projection/action-requests.public.ts` (`forkSession`). | `server/operation/session.ts`; runtime `forkSession`. |
 // | `WebuiGetSessionForkOptionsRequest` | Request for fork options. | Browser `client/platform/transport.ts`. | `server/operation/session.ts`; runtime `getSessionForkOptions`. |
 // | `WebuiGetSessionForkOptionsResult` | Whether/where a session can be forked. | Runtime `getSessionForkOptions`. | `server/operation/session.ts`; `client/features/sessions/contracts/session-port.ts`; `client/features/transcript/ui/MessageItem.tsx`. |
 // | `WebuiForkSessionResult` | The forked session and its lineage ids. | Runtime `forkSession`. | `server/operation/session.ts`; `client/features/sessions/contracts/session-port.ts`. |
@@ -42,9 +42,9 @@
 // | `WebuiRewindPreviewFile` | One file action in a rewind preview turn. | Runtime `getSessionRewindPreview`. | unverified — nested in `WebuiRewindPreviewTurn.files`; no direct importer. |
 // | `WebuiRewindPreviewTurn` | One turn's file actions in a rewind preview. | Runtime `getSessionRewindPreview`. | unverified — nested in `WebuiGetSessionRewindPreviewResult.turns`; no direct importer. |
 // | `WebuiGetSessionRewindPreviewResult` | The rewind preview (turns and file actions). | Runtime `getSessionRewindPreview`. | `client/features/transcript/ui/MessageActions.tsx`; `client/features/transcript/ui/MessageItem.tsx`. |
-// | `WebuiRewindSessionRequest` | Request to rewind a session to a user message. | Browser `client/platform/transport.ts`; built in `client/features/sessions/projection/action-requests.ts`. | `server/operation/messages.ts`; runtime `rewindSession`. |
+// | `WebuiRewindSessionRequest` | Request to rewind a session to a user message. | Browser `client/platform/transport.ts`; built in `client/features/sessions/projection/action-requests.public.ts`. | `server/operation/messages.ts`; runtime `rewindSession`. |
 // | `WebuiRewindSessionResult` | Rewind outcome (revisions, deleted ids). | Runtime `rewindSession`. | `client/features/sessions/contracts/session-port.ts`; `server/operation/messages.ts`. |
-// | `WebuiEditSessionMessageRequest` | Request to edit a user message and rewind. | Browser `client/platform/transport.ts`; built in `client/features/sessions/projection/action-requests.ts`. | `server/operation/messages.ts`; runtime `editSessionMessage`. |
+// | `WebuiEditSessionMessageRequest` | Request to edit a user message and rewind. | Browser `client/platform/transport.ts`; built in `client/features/sessions/projection/action-requests.public.ts`. | `server/operation/messages.ts`; runtime `editSessionMessage`. |
 // | `WebuiEditSessionMessageResult` | Edit/rewind outcome. | Runtime `editSessionMessage`. | `client/features/sessions/contracts/session-port.ts`; `server/operation/messages.ts`. |
 export interface WebuiSessionListRequest {
   readonly name: string;

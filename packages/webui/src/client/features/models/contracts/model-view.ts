@@ -1,7 +1,7 @@
 // Browser-local model picker view types.
 //
 // `features/models/ui/ModelPicker.tsx` and
-// `features/sessions/projection/action-requests.ts` consume these; they are declared
+// `features/sessions/projection/action-requests.public.ts` consume these; they are declared
 // here so the projection layer can compose a selection request without importing the
 // React component.
 

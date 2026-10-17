@@ -37,13 +37,6 @@ export interface WebuiInteractionSessionOwners {
   readonly purge: (sessionId: string) => void;
   readonly dispose: () => void;
   readonly isDisposed: () => boolean;
-  /**
-   * The composition surface hands over the reader it derives the agent name
-   * from. The runtime's session list is loaded after the application is built,
-   * so the reader is installed rather than passed: it is read at the moment a
-   * request is composed, which is what keeps a later-loaded list authoritative.
-   */
-  readonly setAgentNameReader: (reader: (sessionId: string) => string) => void;
 }
 
 export function createWebuiInteractionSessionOwners(deps: {
@@ -66,7 +59,7 @@ export function createWebuiInteractionSessionOwners(deps: {
   readonly readAgentName?: (sessionId: string) => string;
 }): WebuiInteractionSessionOwners {
   const owners = new Map<string, WebuiInteractionCoordinator>();
-  let readAgentName = deps.readAgentName;
+  const readAgentName = deps.readAgentName;
   let disposed = false;
 
   return {
@@ -98,9 +91,6 @@ export function createWebuiInteractionSessionOwners(deps: {
       return owner;
     },
     sessions: () => [...owners.keys()],
-    setAgentNameReader: (reader) => {
-      readAgentName = reader;
-    },
     purge: (sessionId) => {
       owners.delete(sessionId);
     },

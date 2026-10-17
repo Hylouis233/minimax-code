@@ -99,7 +99,7 @@ describe("the two readers share it", () => {
       .sort();
     expect(readers).toEqual([
       "features/review/application/turn-review-owner.ts",
-      "features/review/ui/ReviewSettingsPage.tsx",
+      "features/review/ui/ReviewSettingsPage.public.tsx",
     ]);
   });
 

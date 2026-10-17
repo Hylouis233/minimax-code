@@ -15,7 +15,7 @@ import {
 } from "../../../features/sessions/projection/worktree-state.js";
 import { ToggleSwitch as Switch } from "../../../ui/ToggleSwitch.js";
 import { FolderIcon, SearchIcon } from "../../../ui/settings-glyphs.js";
-import { ReviewSettingsPage } from "../../../features/review/ui/ReviewSettingsPage.js";
+import { ReviewSettingsPage } from "../../../features/review/ui/ReviewSettingsPage.public.js";
 import { UsageModelSettings } from "./UsageModelSettings.js";
 import { PersonalizationSettings } from "./PersonalizationSettings.js";
 import type { MemoryHandoff } from "../contracts/memory-handoff.js";
@@ -33,7 +33,7 @@ import {
 } from "../../../features/account/bindings/use-account-workflows.js";
 import { useWebuiSessionStoreContext } from "../../../bindings/application-context.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
-import { selectWebuiCatalogFlatPage } from "../../../features/sessions/application/session-catalog.js";
+import { selectWebuiCatalogFlatPage } from "../../../features/sessions/application/session-catalog.public.js";
 import { DESKTOP_SETTINGS_TABS, resolveThemePreference, filterSettingsTabs } from "../projection/settings-view.js";
 import type { SettingsTabKey } from "../projection/settings-view.js";
 export const SETTINGS_GROUPS = [{ key: "preferences", label: "偏好" }, { key: "management", label: "管理" }, { key: "coding", label: "编码" }, { key: "archived", label: "归档" }] as const;

@@ -39,7 +39,7 @@ import type {
 } from "../contracts/provider-editor.js";
 import { textOf } from "../../../contracts/value-readers.js";
 import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
-import { CloseIcon, IconButton, RefreshIcon } from "../../settings/ui/settings-atoms.js";
+import { CloseIcon, IconButton, RefreshIcon } from "../../../ui/form-atoms.js";
 
 /**
  * The provider commands this panel invokes. They are `models`' rather than

@@ -37,7 +37,7 @@ import {
   buildWebuiMessageForkRequest,
   buildWebuiRewindRequest,
   webuiClientRequestId,
-} from "../../sessions/projection/action-requests.js";
+} from "../../sessions/projection/action-requests.public.js";
 
 /**
  * The single message renderer shared by persisted history and the live turn.

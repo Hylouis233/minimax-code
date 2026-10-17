@@ -3,7 +3,7 @@ import {
   createWebuiWorkspacePanelOwner,
 } from "../../src/client/features/workspace/application/workspace-panel-owner.js";
 import { parseWebuiMessageFileReference } from "../../src/client/features/transcript/projection/message-file-reference.js";
-import { WebuiMarkdown } from "../../src/client/features/transcript/ui/markdown.js";
+import { WebuiMarkdown } from "../../src/client/features/transcript/ui/markdown.public.js";
 import { mergeWorkspaceFileChildren, WebuiFilePreview } from "../../src/client/features/workspace/ui/WorkspacePanels.js";
 import { webuiFileLanguage } from "../../src/client/features/workspace/projection/panel-projection.js";
 import { createElement } from "react";
