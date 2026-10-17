@@ -105,7 +105,7 @@ export function ReviewSettingsPage({ workspaceDir, onOpenFileLine }: {
         dispatch({ type: "load-failed", reason: error instanceof Error ? error.message : String(error) });
       });
     return () => { cancelled = true; };
-  }, [dispatch, queries, snapshot, effectiveWorkspaceDir, tabId]);
+  }, [dispatch, queries, effectiveWorkspaceDir, tabId]);
 
   /* The snapshot id and the query are passed in rather than read back out of
    * state: reading a `useState` value from inside a setter callback is a type

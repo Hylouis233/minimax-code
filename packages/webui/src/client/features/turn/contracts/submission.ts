@@ -160,8 +160,9 @@ export type WebuiSubmissionAdmission =
  * That sequencing was the caller's to get right, and nothing in its type said so.
  *
  * The ticket is the whole protocol: the identity correlates the transition a
- * caller observes with the one the owner recorded, the admission says what the
- * owner concluded immediately, and the completion says what actually happened.
+ * caller observes with the one the owner recorded, admission says what the
+ * owner concluded immediately, creation reports a home session before its turn
+ * stream settles, and completion says how the submission ultimately ended.
  * No setter crosses this boundary — copying application setters into the ticket
  * would preserve exactly the leak that made it necessary.
  */
@@ -169,6 +170,8 @@ export interface WebuiSubmissionTicket {
   /** Monotonic and process-local: what a caller correlates its transition on. */
   readonly id: number;
   readonly admission: WebuiSubmissionAdmission;
+  /** Resolves when implicit home-session creation completes, before its turn stream settles. */
+  readonly creation: Promise<{ readonly sessionId: string; readonly selected: boolean } | undefined>;
   /**
    * Settles with what happened. **Never rejects** — a refusal is a value, so a
    * caller that only wants to know when it is done has no error path to forget.

@@ -121,6 +121,10 @@ export function submitWebuiTurn(
   const id = ++nextSubmissionId;
   const handlers = args.handlers;
   const { message, clientIntent, attachments } = wireIntentFor(args.intent);
+  let resolveCreation!: (created: { readonly sessionId: string; readonly selected: boolean } | undefined) => void;
+  const creation = new Promise<{ readonly sessionId: string; readonly selected: boolean } | undefined>((resolve) => {
+    resolveCreation = resolve;
+  });
 
   /**
    * The promise a caller observes. It never rejects: every failure below is
@@ -134,6 +138,7 @@ export function submitWebuiTurn(
       return ({ kind: "failed", error: formatWebuiError(error) });
     }
   })();
+  void completion.then(() => resolveCreation(undefined));
 
   async function runSubmission(): Promise<WebuiSubmissionCompletion> {
     // Nothing to submit is not a refusal: it never reached a decision. What
@@ -193,6 +198,7 @@ export function submitWebuiTurn(
       sessionId = outcome.sessionId;
       created = true;
       selectedAfterCreation = outcome.selected;
+      resolveCreation({ sessionId, selected: outcome.selected });
       handlers.onSessionCreated?.(sessionId, outcome.selected);
     }
     if (sessionId === undefined) return ({ kind: "failed", error: "No session to submit to" });
@@ -247,5 +253,5 @@ export function submitWebuiTurn(
     return { kind: "dispatched", sessionId, created, selected: selectedAfterCreation };
   }
 
-  return { id, admission: args.admission, completion };
+  return { id, admission: args.admission, creation, completion };
 }

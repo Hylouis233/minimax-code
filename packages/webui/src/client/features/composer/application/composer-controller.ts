@@ -53,6 +53,7 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
   let interactionError: string | undefined;
   let commandOutput: string | undefined;
   let inspectionSessionId: string | undefined;
+  let createdSession: WebuiComposerControllerSnapshot["createdSession"];
   let viewGeneration = 0;
   let lastSelectedSessionId = deps.readSelectedSessionId();
   let disposed = false;
@@ -71,6 +72,7 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
       canQueue: deps.canEnqueue && deps.readSelectedSessionId() !== undefined,
       canRunCommand: deps.commandWorkflows.canRunCommand,
       canRemoveQueued: deps.commandWorkflows.canRemoveQueued,
+      ...(createdSession ? { createdSession } : {}),
     };
     for (const listener of [...listeners]) listener();
   };
@@ -89,10 +91,10 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
     readonly planMode?: boolean;
     readonly createSessionWorkspaceDir?: string;
     readonly teamModeOff?: boolean;
-  }, clearStaging: () => void): Promise<WebuiSubmissionCompletion | undefined> => {
+  }, clearStaging: () => void): WebuiSubmissionTicket | undefined => {
     // Intent and data only. No setter crosses this boundary: the draft is
-    // consumed through the link the assembly installed on the command set, and
-    // the session, the queue and the selection all come back on the completion.
+    // consumed through the link the assembly installed on the command set. The
+    // ticket reports session creation separately from terminal turn completion.
     const ticket: WebuiSubmissionTicket | undefined = deps.turnCommandsFor(sessionId).send({
       message: turn.message,
       ...(turn.clientIntent ? { clientIntent: turn.clientIntent } : {}),
@@ -104,7 +106,7 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
       ...(turn.teamModeOff ? { teamModeOff: turn.teamModeOff } : {}),
       onAttachmentsSubmitted: clearStaging,
     });
-    return ticket === undefined ? Promise.resolve(undefined) : ticket.completion;
+    return ticket;
   }
 
   snapshot = {
@@ -115,6 +117,7 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
     canQueue: deps.canEnqueue && deps.readSelectedSessionId() !== undefined,
     canRunCommand: deps.commandWorkflows.canRunCommand,
     canRemoveQueued: deps.commandWorkflows.canRemoveQueued,
+    ...(createdSession ? { createdSession } : {}),
   };
   const detachStore = deps.store.subscribe(publish);
 
@@ -223,11 +226,9 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
       // reclaimed by the reply: the refresh is only allowed to apply if the
       // destination it was issued for is still the one it was captured against.
       const queueGeneration = sessionId ? queueCommands.captureDestination(sessionId) : undefined;
-      // Everything the submission used to report back through callbacks is on its
-      // completion now: the session it created, whether it may be selected, and
-      // whether it queued. Nothing here has to be in flight for the caller to
-      // learn any of it.
-      const operation = await queueView(sessionId, {
+      // The ticket reports home creation before the turn settles; completion
+      // later reports whether the submission dispatched or queued.
+      const ticket = queueView(sessionId, {
         message,
         ...(resolved.clientIntent ? { clientIntent: resolved.clientIntent } : {}),
         attachments: input.attachments,
@@ -235,6 +236,14 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
         ...(input.createSessionWorkspaceDir ? { createSessionWorkspaceDir: input.createSessionWorkspaceDir } : {}),
         ...(input.teamModeOff ? { teamModeOff: true } : {}),
       }, clearStaging);
+      if (!ticket) return { kind: "ignored" };
+      void ticket.creation.then((created) => {
+        if (!created) return;
+        if (created.selected) deps.selectCreatedSession(created.sessionId);
+        createdSession = { ticketId: ticket.id, ...created };
+        publish();
+      });
+      const operation = await ticket.completion;
       if (operation?.kind === "needs-session") return { kind: "needs-session", draft: input.draft };
       // A created session is named by the completion, and whether the view should
       // follow the user there is the use case's verdict, not something to guess.
@@ -244,7 +253,6 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
         operation.created === true
           ? operation
           : undefined;
-      if (created?.selected === true) deps.selectCreatedSession(created.sessionId);
       const settledSessionId = created?.sessionId ?? sessionId;
       if (operation?.kind === "queued") {
         if (settledSessionId) {

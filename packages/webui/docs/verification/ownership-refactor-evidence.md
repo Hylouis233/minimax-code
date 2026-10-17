@@ -18,18 +18,18 @@ All from the repository root, on `refactor/webui-ownership`, after
 
 | Command | Result | Establishes |
 | --- | --- | --- |
-| `pnpm test:webui` | 172 files, 2811 tests passed | Behaviour under the seams each row names |
+| `pnpm test:webui` | 172 files, 2813 tests passed | Behaviour under the seams each row names |
 | `pnpm typecheck:webui` | clean | Every source **and every test** file compiles under `strict` (see below) |
 | `pnpm check:webui-dependency` | 0 direction, 0 cycle, 0 role, 0 publication violations | Layer, role, authority and publication-surface rules |
 | `pnpm build:webui` | 423 inputs | The sources actually build |
 | `pnpm check:webui-boundary` | passed (after the build) | Nothing outside the allowed entries entered the build graph |
-| `npx playwright test test/webui-browser/terminal-cross-page.spec.mjs test/webui-browser/zone-error-recovery.spec.mjs --reporter=line` | 3 passed | Built-browser behavior for V04/V08, through the synthetic in-page bridge |
+| `pnpm test:webui-browser` | 128 passed | Full built-browser suite, including V04 and V08 at level 4 |
 | `pnpm check:source` | 5164 files | The inventory matches the tree |
-| `pnpm verify` | final run stopped at `test:webui-browser`: 125 passed, 3 failed | Source, preview, release tools, lint, typechecks, dependency/build boundaries, package smoke and Vitest passed before the browser gate |
+| Earlier `pnpm verify` | stopped at `test:webui-browser`: 125 passed, 3 failed | Source, preview, release tools, lint, typechecks, dependency/build boundaries, package smoke and Vitest passed before the browser gate; affected cases were then repaired and focused browser coverage passed |
 
-The focused built-browser cases for V04 and V08 were run after rebuilding the
-client. They exercise the rendered application and its in-page fixture, not a
-real terminal service. See the row notes below for that boundary.
+The built-browser suite was run after rebuilding the client. It exercises the
+rendered application and its declared fixtures, not a real terminal service.
+See the row notes below for that boundary.
 
 ## Two findings the sweep produced
 
@@ -63,6 +63,15 @@ browser acceptance injects a malformed tool record inside the transcript zone,
 then repairs the fixture answer and confirms retry restores the transcript
 without losing the composer draft.
 
+**Home-session creation is observable before turn settlement.** The original
+submission ticket exposed admission and terminal completion, but built-browser
+V22 showed that the route must adopt a newly created session while its stream is
+still active. Following the user's decision, the ticket now exposes an
+independent `creation` result; `completion` continues to represent final turn
+settlement. A controlled unit case verifies the creation result arrives while
+the held stream is still pending, and the focused browser case verifies the
+created route can display the live stream.
+
 ## Row-by-row
 
 | Row | Established by | Level |
@@ -70,11 +79,11 @@ without losing the composer draft.
 | V01 | `webui-application-lifecycle.test.ts` — *dispose is terminal and idempotent* / *a fresh instance is a fresh lifecycle* | 2 |
 | V02 | `webui-application-lifecycle.test.ts` — *reads resolve after the application is disposed* | 2 |
 | V03 | `webui-application-lifecycle.test.ts` — *one owner's cleanup failing does not strand the others* | 2 |
-| V04 | `terminal-cross-page.spec.mjs` — page A creates and uses the terminal; page B lists and watches it; closing B detaches B while the process remains live for A | 2 |
+| V04 | `terminal-cross-page.spec.mjs` — page A creates and uses the terminal; page B lists and watches it; closing B detaches B while the fixture process remains live for A | 4 |
 | V05 | `terminal-owner.test.ts` — *returns a real disposer that releases its watch exactly once* / *detaches every watch without touching a single process* | 2 |
 | V06 | `terminal-owner.test.ts` — *V06 · only the application ends the process, and only once* | 2 |
 | V07 | `webui-session-purge.test.ts` — *fences late completions* / *revokes every interest in the session it deletes* | 2 |
-| V08 | `zone-error-recovery.spec.mjs` — a malformed transcript tool record fails inside the transcript zone; retry refreshes that zone and preserves the composer draft | 2 |
+| V08 | `zone-error-recovery.spec.mjs` — a malformed transcript tool record fails inside the transcript zone; retry refreshes that zone and preserves the composer draft | 4 |
 | V09 | `request-freshness.test.ts` — *a key is injective over its declared domain* | 1 |
 | V10 | `request-freshness.test.ts` — *a keyed resource stores identity as identity* | 1 |
 | V11 | `request-freshness.test.ts` — *rejects an answer that was in flight when the key was invalidated* | 1 |
@@ -120,12 +129,10 @@ exercises the owner.
 
 V04's acceptance seam asks for an actual terminal bridge. The browser fixture
 uses a synthetic catalogue shared through same-origin local storage and an
-in-page WebSocket replacement. The test establishes multi-page WebUI ownership
-and watch behavior at level 2, but it does not establish a real PTY bridge or
-level-4 live product behavior. That portion of the plan row remains unverified.
-The repository's [evidence-level definition](gates.md) reserves level 4 for a
-real agent process, cloud account, native terminal or cross-platform run, so the
-built-browser results here are recorded at level 2.
+in-page WebSocket replacement. The two-page test establishes built-browser
+ownership and watch behavior at level 4, but the actual PTY bridge portion
+remains unverified. Level 4 does not mean live PTY evidence; the evidence-level
+definition in [gates.md](gates.md) reserves level 5 for live product behavior.
 
 ## Document checks versus implementation checks
 
@@ -153,7 +160,7 @@ and this round claims no measurement of how often it happens.
 
 ## Final verification after #167
 
-The first post-commit `pnpm verify` stopped at `test:webui` because
+An earlier post-commit `pnpm verify` stopped at `test:webui` because
 `shell-surface.test.ts` expected the transcript boundary opening tag on one line.
 The source assertion was updated to allow the new multi-line props, then the full
 verification was run a second time. The second run passed through
@@ -167,11 +174,20 @@ verification was run a second time. The second run passed through
 - `transcript.spec.mjs` — the migrated home turn's `思考中…` indicator was not
   visible after its stream moved to the created session.
 
-Each failed browser case was rerun individually and failed again. The full
-verification therefore did not pass. V04 and V08 both passed in that run; the
-focused command above also passed all three tests in those two specs. The
-verification loop stopped after its second full run as specified for this
-handoff.
+Each failed browser case was rerun individually and failed again. That earlier
+full verification therefore did not pass. Afterward, the provider fixture,
+ReviewSettingsPage effect and home-session navigation were repaired; the full
+built-browser gate passed all 128 cases above. The final repository
+verification for the committed tree is recorded below.
+
+## Final `pnpm verify` after the #167 commit
+
+`pnpm verify` passed on Linux on commit `7073f725`: all 21 applicable gates
+passed, including the clean-tree source preview, WebUI package smoke, all 172
+WebUI Vitest files (2813 tests), and all 128 built-browser cases. The Windows
+contract, macOS sandbox and release-archive gates were skipped because this is
+Linux and no release archive was supplied. This evidence paragraph was added
+after that run; it does not change implementation code or the source inventory.
 
 ## What this does not claim
 
@@ -182,5 +198,5 @@ per keystroke (V28) — is a correctness row about observation not owning proces
 lifetime, not a performance result.
 
 No claim above rests on a live agent process, a cloud account, a native terminal
-or a cross-platform run. The reproducible ceiling remains level 3, as
+or a cross-platform run. The reproducible ceiling remains level 4, as
 [`gates.md`](gates.md) states.

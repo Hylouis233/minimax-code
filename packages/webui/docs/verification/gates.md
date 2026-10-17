@@ -35,12 +35,14 @@ never proves a higher one.
 | 1 | Pure behaviour | Unit tests over projections, reducers and mechanisms — no DOM, no transport |
 | 2 | Assembled application behaviour | `test/unit/*application*`, `*workflows*`, `*commands*`, creation/adoption and lifecycle suites, with injected capabilities, storage and channel |
 | 3 | Real boundary behaviour | `test/integration/loopback-harness-path.test.ts`: a real service, real loopback socket, real envelope, dispatcher and registry, a real `watchEvents` delivery, drop-and-reconnect, and a close that refuses further connections |
-| 4 | Live product behaviour | A real agent process, cloud account, native terminal or cross-platform run |
+| 4 | Built-browser behaviour | `pnpm test:webui-browser`: rendered built client, navigation, multi-page interaction and recoverable zone failures against its declared fixture |
+| 5 | Live product behaviour | A real agent process, cloud account, native terminal or cross-platform run |
 
-The distribution's reproducible ceiling is level 3, and only partly: at level 3 the leaf host behind
+The distribution's reproducible ceiling is level 4, and only partly: at level 3 the leaf host behind
 the harness port is a scripted stand-in, because a live `CliSession` is not deterministic to drive
 from a test (ADR 0006 requires the stand-in). **No test in this repository proves that a real agent
-process answers.** Offline success never substitutes for the cloud, native-terminal or
+process answers.** Level 4 browser fixtures also do not establish a real terminal bridge. Offline
+success never substitutes for the cloud, native-terminal or
 cross-platform acceptance those boundaries need, and those runs are recorded separately when they
 happen.
 

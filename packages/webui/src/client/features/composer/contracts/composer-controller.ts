@@ -39,6 +39,7 @@ export interface WebuiComposerControllerSnapshot {
   readonly canQueue: boolean;
   readonly canRunCommand: boolean;
   readonly canRemoveQueued: boolean;
+  readonly createdSession?: { readonly ticketId: number; readonly sessionId: string; readonly selected: boolean };
 }
 
 /** View-facing commands. The mutable store remains private to application composition. */

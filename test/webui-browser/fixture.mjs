@@ -283,7 +283,7 @@ export function installFixtureTransport() {
     if (operation === "revealModelProviderApiKey") return "synthetic-revealed-key";
     if (operation === "testUserModelCandidate") return clone(candidateTestResult);
     if (operation === "saveUserModelProviderCandidate") return clone(candidateSaveResult);
-    if (operation === "discoverUserModelsCandidate") return clone(discoveredModels);
+    if (operation === "discoverUserModelsCandidate") return { ok: true, models: clone(discoveredModels) };
     if (["createUserModelProvider", "updateUserModelProvider", "deleteUserModelProvider"].includes(operation)) return { ok: true };
     return {};
   };

@@ -94,8 +94,8 @@ test("home turn migrates its live writer once to the newly created session", asy
   await expect.poll(() => page.evaluate(() => window.__fixture.requests.some((request) => request.operation === "sendMessage" && request.body.id === "created-C"))).toBe(true);
   await expect.poll(() => page.evaluate(() => window.__fixture.activeStreamSessionIds())).toContain("created-C");
   await expect.poll(() => page.evaluate(() => window.__fixture.activeStreamSessionIds())).not.toContain("__webui-home__");
-  await expect(page.getByText("思考中…")).toBeVisible();
   await expect.poll(() => page.evaluate(() => new URLSearchParams(location.hash.replace(/^#/u, "")).get("session"))).toBe("created-C");
+  await expect(page.getByText("思考中…")).toBeVisible();
   const createdTranscript = page.locator('[data-webui-transcript="created-C"]');
   await expect(createdTranscript).toBeVisible();
   await page.evaluate(() => window.__fixture.emitStream("created-C", { dataJson: JSON.stringify({ type: "agent_message", agent_message: { msg_id: "created-live-C", msg_content: "Transferred stream C synthetic" } }) }));

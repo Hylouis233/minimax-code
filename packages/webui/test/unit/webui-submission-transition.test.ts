@@ -110,6 +110,31 @@ describe("the ticket a submission returns", () => {
     expect(ticket!.id).toBeGreaterThan(0);
   });
 
+  it("reports home-session creation before the turn completion settles", async () => {
+    let releaseTurn: (() => void) | undefined;
+    const send = vi.fn(async () => {
+      await new Promise<void>((resolve) => { releaseTurn = resolve; });
+    });
+    const ticket = submitWebuiTurn({
+      intent: { kind: "ordinary", message: "hello" },
+      sessionId: undefined,
+      admission: DISPATCHING,
+      sending: false,
+      deps: { sendMessage: send },
+      submitTask: { submit: async () => ({ kind: "created", sessionId: "created", selected: true }) },
+      handlers: handlers(),
+    });
+
+    await expect(ticket!.creation).resolves.toEqual({ sessionId: "created", selected: true });
+    expect(send).toHaveBeenCalledTimes(1);
+    let completed = false;
+    void ticket!.completion.then(() => { completed = true; });
+    await Promise.resolve();
+    expect(completed).toBe(false);
+    releaseTurn!();
+    await expect(ticket!.completion).resolves.toMatchObject({ kind: "dispatched", sessionId: "created" });
+  });
+
   it("refuses a live turn it cannot queue onto, instead of dropping the input", async () => {
     const h = handlers();
     const { completion } = await submit({

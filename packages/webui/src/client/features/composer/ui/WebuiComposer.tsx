@@ -344,6 +344,13 @@ export function WebuiComposer({
   if (!composerController || !controllerSnapshot) {
     throw new Error("WebuiComposer requires the application-owned composer controller");
   }
+  const observedCreationTicketRef = useRef<number>();
+  useEffect(() => {
+    const created = controllerSnapshot.createdSession;
+    if (!created || observedCreationTicketRef.current === created.ticketId) return;
+    observedCreationTicketRef.current = created.ticketId;
+    if (isAttachedTo(sessionId)) onSessionCreated?.(created.sessionId, created.selected, teamModeOff);
+  }, [controllerSnapshot.createdSession, isAttachedTo, onSessionCreated, sessionId, teamModeOff]);
   // Sessions' published create command, read from its owner rather than relayed
   // through a prop. The composer's own command workflows and the substrate's
   // capability slice are the same: both are published by the assembly rather
