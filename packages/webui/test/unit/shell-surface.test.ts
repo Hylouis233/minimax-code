@@ -101,7 +101,7 @@ describe("shell surface wiring", () => {
     // composer, the transcript and the rail — losing an unsent draft because a
     // file tree failed to render. Each zone holds its own throw now.
     for (const zone of ["composer", "transcript", "workspace", "plugins"]) {
-      expect(shell).toContain(`<WebuiZoneBoundary zone="${zone}">`);
+      expect(shell).toMatch(new RegExp(`<WebuiZoneBoundary\\s+zone="${zone}"`));
     }
   });
 
