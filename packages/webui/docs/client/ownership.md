@@ -66,6 +66,22 @@ Four rules, each with a mechanism in `client/conversation/`:
   fields cannot overwrite each other. A selected destination is a separate cell with its own
   identity and generation, so a slow answer for an earlier selection is refused at the new one.
 
+Resource release retires cached detail, revisions, in-flight records and epoch subscriptions.
+A monotonic revision floor prevents a released and recreated key from accepting old tokens.
+Models releases obsolete epoch keys and projects an idle selected catalogue until its new identity
+is read; provider and preset keys that do not compose the moved epoch remain current. Current-epoch
+known-session caches stay with their owner until explicit session release, epoch retirement or
+application disposal. Authoritative deletion releases Transcript/Models/Review/Workspace detail,
+Goal/Interactions owners and deliveries. Compact deleted-ID fences remain until application teardown
+because the event stream provides no replay barrier; they are measured separately from live detail
+and interest counts. A late delivery handle for a deleted session is detached immediately.
+
+Manual retry uses the same delivery hold as ordinary send/resume. The application can close that
+observer during teardown even while its delivery promise remains pending; closing it never aborts
+the host turn. Rail observation uses unfiltered known session identities, including tree children,
+so search/disclosure changes do not manufacture fresh probes. Foreground inspection resumes once;
+the event channel's activity repair does not restart it.
+
 **Delivery detach is not execution abort.** Hiding or closing a view, or closing the browser
 connection, ends that client's observation — it does not stop the harness's turn. Only an explicit
 stop calls `abortSession`, and only an unstarted queued item is removable from the queue.
@@ -84,6 +100,10 @@ proposing to move this state to the server.
   surface (`runtime/terminal.ts`; one instance per service, ended in `service.close()`). Hiding a
   tab or closing the page releases delivery and the xterm attachment; the process survives until
   explicit disposal.
+  The panel renders the owner's availability verdict: known absence and unreadiness disable
+  creation with different explanations; an older handshake with no roster keeps the unverified
+  attempt path. Permission denial remains a call failure. The panel subscribes to catalogue changes
+  while retaining xterm presentation by terminal identity, so output updates do not recreate a watch.
 - **Team mode.** `createSession` carries `teamModeOff` as the only create-time team field
   (`shared/contracts/session.ts`). A session's team state is never read back from the server — there
   is no `teamMode` on the session view.

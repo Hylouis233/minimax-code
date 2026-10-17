@@ -71,6 +71,8 @@ export interface WebuiObservationScheduler {
   /** Mark one identity stale: a known change, or a reconnect. */
   readonly invalidate: (identity: string) => void;
   readonly invalidateAll: () => void;
+  /** Reconnect repair for activity without restarting a freshly resumed inspection. */
+  readonly invalidateActivity: () => void;
   /** Hidden page or no interest: stop scheduling. Accepted execution is untouched. */
   readonly setSuspended: (suspended: boolean) => void;
   readonly isSuspended: () => boolean;
@@ -260,6 +262,11 @@ export function createWebuiObservationScheduler(
         pump(state);
       }
       scheduleFreshness();
+    },
+    invalidateActivity: () => {
+      activity.freshAt.clear();
+      for (const [identity, request] of activity.interested) activity.queued.set(identity, request);
+      pump(activity);
     },
     setSuspended: (next) => {
       if (suspended === next) return;

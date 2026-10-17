@@ -99,7 +99,7 @@ export function createWebuiTerminalOwner(
    * retry. `not-ready` means the bridge is there and a companion it needs is not,
    * so the surface exists and will work later. Without a manifest — an older
    * service — the only thing this client can know is whether its own stub has the
-   * method, and that is the legacy attempt path, reported as `supported` and left
+   * method, and that is the legacy attempt path, reported as `unverified` and left
    * to the call to disprove.
    *
    * Read on every access rather than frozen at construction: a manifest arrives
@@ -167,6 +167,11 @@ export function createWebuiTerminalOwner(
 
   const refresh = async (): Promise<void> => {
     if (disposed) return;
+    const availability = seedSupport("list");
+    if (availability === "absent" || availability === "not-ready") {
+      publish({ ...snapshot, loading: false });
+      return;
+    }
     const list = port.listTerminals;
     if (!list) return;
     publish({ ...snapshot, loading: true, error: undefined });

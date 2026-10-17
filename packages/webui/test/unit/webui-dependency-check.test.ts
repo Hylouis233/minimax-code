@@ -12,7 +12,7 @@
 // `scripts/source-inventory.mjs` never sees them.
 
 import { afterAll, describe, expect, it } from "vitest";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -50,6 +50,41 @@ const realBaselinePath = path.join(
   repoRoot,
   "scripts/lib/webui-dependency-baseline.json",
 );
+
+describe("V42 frozen pre-refactor metadata and permissions", () => {
+  const oracle = JSON.parse(readFileSync(path.join(here, "../fixtures/path-metadata-f00.json"), "utf8")) as {
+    cases: { path: string; layers: string[]; role: string; business: string | null; home: string }[];
+    directions: { from: string; to: string; allowed: boolean }[];
+  };
+  it("preserves every current path and future/unknown classification with only the declared publication delta", () => {
+    const paths: string[] = [];
+    const sourceRoot = path.join(repoRoot, "packages/webui/src");
+    const walk = (directory: string): void => {
+      for (const entry of readdirSync(directory, { withFileTypes: true })) {
+        const filename = path.join(directory, entry.name);
+        if (entry.isDirectory()) walk(filename);
+        else if (/\.(?:ts|tsx|css)$/u.test(filename)) paths.push(path.relative(sourceRoot, filename));
+      }
+    };
+    walk(sourceRoot);
+    const recorded = new Set(oracle.cases.map((entry) => entry.path));
+    expect(paths.length).toBeGreaterThan(400);
+    expect(paths.filter((entry) => !recorded.has(entry))).toEqual([]);
+    for (const { path: filename, layers, role, business, home } of oracle.cases) {
+      expect([...classifyLayers(filename)].sort(), filename).toEqual(layers);
+      const expectedRole = /\.public\.tsx?$/u.test(filename) && filename.startsWith("client/features/")
+        ? `published-${role}` : role;
+      expect(classifyRole(filename), filename).toEqual({ role: expectedRole, business, home });
+    }
+  });
+  it("preserves the independent baseline permission matrix", () => {
+    expect(oracle.directions).toHaveLength(169);
+    expect(oracle.directions.some((entry) => entry.allowed)).toBe(true);
+    expect(oracle.directions.some((entry) => !entry.allowed)).toBe(true);
+    for (const { from, to, allowed } of oracle.directions)
+      expect(isAllowedEdge([from], [to]), `${from} -> ${to}`).toBe(allowed);
+  });
+});
 
 // Resolution options for the synthetic trees. Bundler resolution mirrors the
 // client program and maps the `.js` specifiers these fixtures use onto `.ts`

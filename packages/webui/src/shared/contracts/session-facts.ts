@@ -17,13 +17,15 @@
 //     index. The client routes each of them elsewhere, and they are written down
 //     with the reason so "not handled here" is a statement rather than an omission.
 //
-// The runtime publishes these names as literals (`type: "session.…"`) — it has no
-// catalogue type to import, and this package cannot be depended on from that side.
-// `test/unit/webui-session-fact-catalogue.test.ts` therefore derives the check from
-// the runtime's own source: it scans for literal event names and fails, with the
-// name, on any that is in neither list. That is what makes a newly added fact a
-// compile-and-test failure here instead of a silent gap, and it is the closest tie
-// available while the host publishes strings rather than a catalogue.
+// The host-derived union is generated from actual runtime event declarations.
+// WebUI typechecking first checks source freshness, and the decoder's partition
+// checks this union rather than a second hand-written list. Regenerating after a
+// new host fact therefore forces an explicit decoder decision before compilation.
+import type { HostPublishedEventType } from "./host-event-types.generated.js";
+
+// Compatibility with older hosts/TUI producers; these names are not emitted by
+// the current local-runtime-v2 tree. They remain explicit rather than widening to string.
+type LegacySessionFactType = "session.renamed" | "session.pinned_updated" | "rotation.completed";
 
 /** A session catalogue fact: something the runtime publishes about a session. */
 export const WEBUI_SESSION_FACT_TYPES = [
@@ -47,9 +49,10 @@ export const WEBUI_SESSION_FACT_TYPES = [
   "agent.updated",
   "rotation.completed",
   "content.retry.exceeded",
-] as const;
+] as const satisfies readonly WebuiSessionFactType[];
 
-export type WebuiSessionFactType = (typeof WEBUI_SESSION_FACT_TYPES)[number];
+export type WebuiSessionFactType = Exclude<HostPublishedEventType,
+  (typeof WEBUI_NON_CATALOGUE_SESSION_EVENTS)[number]["type"]> | LegacySessionFactType;
 
 /** One event name in the vocabulary that is not a session catalogue fact. */
 export interface WebuiNonCatalogueSessionEvent {
@@ -66,11 +69,11 @@ export interface WebuiNonCatalogueSessionEvent {
  * local session index. Listing them turns "the decoder does not answer for this" into
  * a claim with an owner.
  */
-export const WEBUI_NON_CATALOGUE_SESSION_EVENTS: readonly WebuiNonCatalogueSessionEvent[] = [
+export const WEBUI_NON_CATALOGUE_SESSION_EVENTS = [
   { type: "session.start", handledBy: "turn/application/effect-reducer" },
   { type: "session.finish", handledBy: "turn/application/effect-reducer" },
   { type: "session.abort", handledBy: "turn/application/effect-reducer" },
   { type: "session.error", handledBy: "turn/application/effect-reducer" },
   { type: "session.queue.updated", handledBy: "turn/application/event-coordinator" },
   { type: "session.discovered", handledBy: "the runtime's own session index, not the wire catalogue" },
-];
+] as const satisfies readonly WebuiNonCatalogueSessionEvent[];

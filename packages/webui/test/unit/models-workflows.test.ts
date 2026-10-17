@@ -29,6 +29,44 @@ import {
 
 const noStatusRefresh = async (): Promise<void> => {};
 
+it("V44 credentials retire catalogues without invalidating or reloading providers and presets", async () => {
+  const { createWebuiIdentityEpochs } = await import("../../src/client/application/identity-epochs.js");
+  const identityEpochs = createWebuiIdentityEpochs();
+  const listModels = vi.fn(async () => [{ providerId: "p", modelId: "m" }]);
+  const listUserModelProviders = vi.fn(async () => []);
+  const listProviderPresets = vi.fn(async () => [{ id: "preset" }]);
+  const w = createWebuiModelsWorkflows({
+    port: { listModels, listUserModelProviders, listProviderPresets },
+    refreshApiKeyStatus: noStatusRefresh, identityEpochs,
+  });
+  await w.loadModels("A"); await w.loadProviders(); await w.loadPresets();
+  const before = w.getSnapshot();
+  identityEpochs.advance("credentials");
+  const after = w.getSnapshot();
+  expect(after.models.status).toBe("idle");
+  expect(after.providers).toBe(before.providers);
+  expect(after.presets).toBe(before.presets);
+  expect(listModels).toHaveBeenCalledTimes(1);
+  expect(listUserModelProviders).toHaveBeenCalledTimes(1);
+  expect(listProviderPresets).toHaveBeenCalledTimes(1);
+  w.dispose();
+});
+
+it("V11 retires selected catalogue identity when account credentials change", async () => {
+  const { createWebuiIdentityEpochs } = await import("../../src/client/application/identity-epochs.js");
+  const identityEpochs = createWebuiIdentityEpochs();
+  const workflows = createWebuiModelsWorkflows({
+    port: { listModels: async () => [{ providerId: "p", modelId: "old" }] },
+    refreshApiKeyStatus: noStatusRefresh, identityEpochs,
+  });
+  await workflows.loadModels("A");
+  expect(workflows.getSnapshot().models.status).toBe("ready");
+  identityEpochs.advance("credentials");
+  expect(workflows.getSnapshot().models.status).toBe("idle");
+  expect(workflows.getSnapshot().models.value).toBeUndefined();
+  workflows.dispose();
+});
+
 const build = (
   port: Parameters<typeof createWebuiModelsWorkflows>[0]["port"],
   refreshApiKeyStatus = noStatusRefresh,

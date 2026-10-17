@@ -133,7 +133,10 @@ export function installFixtureTransport() {
   /** Operations the fixture deliberately answers with nothing, so a case can see
    *  what the client does with a runtime that does not know them. */
   const unanswered = new Set();
+  const responses = new Map();
+  const refusals = new Map();
   const responseFor = (operation, body) => {
+    if (responses.has(operation)) return clone(responses.get(operation));
     if (unanswered.has(operation)) return {};
     if (operation === "listSessions") {
       if (body?.onlyArchived) {
@@ -162,7 +165,7 @@ export function installFixtureTransport() {
       if (body?.before) return { messages: [{ msgId: `older-${body.before}`, role: "user", msgContent: "Older synthetic page", timestamp: 1_699_999_999_999 }], hasMore: false };
       return pages[body?.id] ?? { messages: [], hasMore: false };
     }
-    if (operation === "version") return { version: "browser-fixture" };
+    if (operation === "version") return { version: "browser-fixture", protocolVersion: 1 };
     if (operation === "listSkills") return { skills: [] };
     if (operation === "listPendingPermissions") return { requests: [] };
     if (operation === "getActiveTurn") return activeTurn;
@@ -326,6 +329,10 @@ export function installFixtureTransport() {
       const frame = JSON.parse(serialized);
       this.request = frame;
       requests.push({ operation: frame.operation, body: clone(frame.body ?? {}) });
+      if (refusals.has(frame.operation)) {
+        queueMicrotask(() => this.emit("message", { data: JSON.stringify({ protocolVersion: 1, kind: "error", requestId: frame.requestId, ...refusals.get(frame.operation) }) }));
+        return;
+      }
       if (frame.operation === "watchEvents") {
         this.isWatcher = true;
         // The real server registers its watcher when it *answers* the
@@ -440,6 +447,9 @@ export function installFixtureTransport() {
   window.__fixture = {
     requests,
     pending,
+    setResponse(operation, value) { responses.set(operation, clone(value)); },
+    refuseOperation(operation, code, message) { refusals.set(operation, { code, message }); },
+    setSessions(next) { sessions.splice(0, sessions.length, ...clone(next)); },
     delayNext(operation, condition) { delayed.push({ operation, condition }); },
     // Holds EVERY matching request, not just the next one. A session switch
     // fans out into several concurrent `getMessages` for the same session
@@ -565,6 +575,26 @@ export function installFixtureTransport() {
       }
       return true;
     },
+  };
+
+  // A scripted host broadcast shared by fixture pages. Each page still receives
+  // the fact through its production WebSocket ingress; no application store is patched.
+  const factsKey = `webui-browser:${window.__WEBUI_TEST_SERVER_ID__}:session-fact`;
+  const applyPublishedFact = ({ sessionId, patch, event }) => {
+    const session = sessions.find((entry) => entry.sessionId === sessionId);
+    if (session) Object.assign(session, clone(patch));
+    for (const item of tree.sessions) {
+      if (item.session.sessionId === sessionId) Object.assign(item.session, clone(patch));
+    }
+    window.__fixture.emitEvent(event);
+  };
+  window.addEventListener("storage", (event) => {
+    if (event.key === factsKey && event.newValue) applyPublishedFact(JSON.parse(event.newValue));
+  });
+  window.__fixture.publishSessionFact = (sessionId, patch, event) => {
+    const published = { sessionId, patch, event };
+    applyPublishedFact(published);
+    window.localStorage.setItem(factsKey, JSON.stringify(published));
   };
   window.WebSocket = FixtureWebSocket;
 }

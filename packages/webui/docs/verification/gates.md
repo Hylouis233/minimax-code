@@ -15,8 +15,8 @@ document: [`browser-suite.md`](browser-suite.md).
 | `pnpm build:webui` | The client and server bundles build, and prints input counts | A module that is written but not wired (counts do not move) |
 | `pnpm check:webui-boundary` | Nothing outside the allowed entries entered the build graph | A retired source path, the terminal renderer, a client module in the server bundle or vice versa, a forbidden internal reference |
 | `pnpm test:webui-package` | The packaged artefact runs as published | Packaging drift |
-| `pnpm test:webui` | The 171-file Vitest group (unit + integration) | Behaviour change, unregistered new test file |
-| `pnpm test:webui-browser` | The built client in a real browser against a deterministic in-page transport | Behaviour change in the built bundle |
+| `pnpm test:webui` | The registered WebUI Vitest group (unit + integration) | Behaviour change, unregistered new test file |
+| `pnpm test:webui-browser` | The built client in a real browser against deterministic transport, plus the declared production-host/native-PTY scenario | Behaviour change in the built bundle or native lifecycle |
 | `pnpm check:source` | `release/public-source.json` lists exactly the delivered files | A new, moved or deleted file without inventory regeneration |
 
 `pnpm check:webui-dependency` reads source; `pnpm check:webui-boundary` reads build output. Neither
@@ -38,13 +38,14 @@ never proves a higher one.
 | 4 | Built-browser behaviour | `pnpm test:webui-browser`: rendered built client, navigation, multi-page interaction and recoverable zone failures against its declared fixture |
 | 5 | Live product behaviour | A real agent process, cloud account, native terminal or cross-platform run |
 
-The distribution's reproducible ceiling is level 4, and only partly: at level 3 the leaf host behind
-the harness port is a scripted stand-in, because a live `CliSession` is not deterministic to drive
-from a test (ADR 0006 requires the stand-in). **No test in this repository proves that a real agent
-process answers.** Level 4 browser fixtures also do not establish a real terminal bridge. Offline
-success never substitutes for the cloud, native-terminal or
-cross-platform acceptance those boundaries need, and those runs are recorded separately when they
-happen.
+Deterministic loopback tests replace the leaf host, and deterministic browser tests replace the
+server transport. Their levels do not imply native execution. `real-host-loopback.test.ts` and
+`real-host-model-turn.test.ts` additionally use the production host; the latter controls only its
+external HTTP model endpoint. `native-runtime.spec.mjs` starts the production host/service in a
+separate process and verifies real native PTY ownership, output and exit events, providing level-5
+evidence for that local terminal path on the executing platform. These cases establish neither live
+account/provider authorization nor cloud or other-platform behavior. State the specific seam and
+platform instead of extending a green gate's conclusion to those boundaries.
 
 ## Comparison methods
 

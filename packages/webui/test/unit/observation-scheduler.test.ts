@@ -113,6 +113,20 @@ describe("V28 · identity, not object identity, decides what a probe costs", () 
 });
 
 describe("V31 · one scheduler, independent budgets, suspended when hidden", () => {
+  it("repairs activity reconnects without duplicating inspection after foreground restoration", async () => {
+    const { scheduler, advance } = harness();
+    let inspection = 0;
+    let activity = 0;
+    scheduler.setInspectionInterest([{ identity: "inspection:A", run: async () => { inspection += 1; } }]);
+    scheduler.setActivityInterest([{ identity: "turn:A", run: async () => { activity += 1; } }]);
+    await flush();
+    scheduler.setSuspended(true); advance(10000);
+    scheduler.setSuspended(false); await flush();
+    scheduler.invalidateActivity(); await flush();
+    expect(inspection).toBe(2);
+    expect(activity).toBe(3);
+    scheduler.dispose();
+  });
   it("keeps activity in flight at its own budget", async () => {
     const gated = createWebuiObservationScheduler({ activityBudget: 2 });
     const gates = [deferred(), deferred(), deferred()];

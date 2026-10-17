@@ -278,6 +278,7 @@
       "packages/webui/test/unit/goal-session-owners.test.ts",
       "packages/webui/test/unit/harness-host-slots.test.ts",
       "packages/webui/test/unit/harness-adapter-contracts.test.ts",
+      "packages/webui/test/unit/webui-host-event-generation.test.ts",
       "packages/webui/test/unit/home-adoption-transaction.test.ts",
       "packages/webui/test/unit/interaction-coordinator.test.ts",
       "packages/webui/test/unit/interaction-session-owners.test.ts",

@@ -13,6 +13,21 @@ import { createWebuiApplication } from "../../src/client/application/create-appl
 import type { WebuiClientSessionResumer } from "../../src/client/features/turn/contracts/execution-port.js";
 
 describe("session scope — selection is one lease among several", () => {
+  it("V16 measures released interests separately from replay-unsafe deletion fences", () => {
+    const scope = createWebuiSessionScopeManager();
+    for (let i = 0; i < 100; i += 1) {
+      const release = scope.acquire(`session-${i}`, "secondary", `tab-${i}`);
+      release();
+    }
+    expect(scope.retention()).toEqual({ sessions: 0, leases: 0, deletionFences: 0 });
+    for (let i = 0; i < 100; i += 1) {
+      scope.purge(`session-${i}`);
+      scope.acquire(`session-${i}`, "delivery", "late-attempt");
+    }
+    expect(scope.retention()).toEqual({ sessions: 0, leases: 0, deletionFences: 100 });
+    scope.dispose();
+    expect(scope.retention()).toEqual({ sessions: 0, leases: 0, deletionFences: 0 });
+  });
   it("activates the selected session's scope", () => {
     const scope = createWebuiSessionScopeManager();
     scope.select("A");

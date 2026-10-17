@@ -8,7 +8,8 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { createWebuiDeliveryDisposers } from "../../src/client/features/turn/application/delivery-disposers.js";
+import { createWebuiDeliveryDisposers, holdWebuiDelivery } from "../../src/client/features/turn/application/delivery-disposers.js";
+import { createWebuiSessionScopeManager } from "../../src/client/conversation/session-scope.js";
 import { createWebuiConversationTurnCommands } from "../../src/client/features/turn/application/turn-commands.js";
 import { createWebuiApplication } from "../../src/client/application/create-application.js";
 import type { WebuiClientSessionResumer } from "../../src/client/features/turn/contracts/execution-port.js";
@@ -19,6 +20,18 @@ function handle() {
 }
 
 describe("the delivery disposers", () => {
+  it("V15 refuses a delivery handle that arrives after authoritative session purge", () => {
+    const disposers = createWebuiDeliveryDisposers();
+    const scope = createWebuiSessionScopeManager();
+    const hold = holdWebuiDelivery(() => "deleted", disposers, scope);
+    scope.purge("deleted");
+    const late = handle();
+    hold.onDelivery(late.handle);
+    expect(late.closed).toHaveBeenCalledTimes(1);
+    expect(disposers.count()).toBe(0);
+    expect(scope.interested()).toEqual([]);
+    hold.release(); scope.dispose(); disposers.closeAll();
+  });
   it("tracks each attempt against its session and releases only its own", () => {
     const disposers = createWebuiDeliveryDisposers();
     const first = handle();

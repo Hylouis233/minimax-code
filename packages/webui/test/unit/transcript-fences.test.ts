@@ -23,6 +23,21 @@ const page = (...msgIds: string[]): WebuiClientMessagePage => ({
 });
 
 describe("a late page after a session switch is discarded", () => {
+  it("V15/V16 releases a deleted session's cached pages and fences late reads", async () => {
+    const store = createWebuiSessionStore();
+    let resolve!: (value: WebuiClientMessagePage) => void;
+    const read = vi.fn(() => new Promise<WebuiClientMessagePage>((done) => { resolve = done; }));
+    const owner = createWebuiTranscriptHistoryOwner({ transcript: createWebuiTranscriptHistoryWriter(store), loadMessages: read });
+    const pending = owner.loadPage("deleted");
+    owner.releaseSession("deleted");
+    resolve(page("late"));
+    await expect(pending).resolves.toEqual({ status: "stale" });
+    await expect(owner.ensurePage("deleted")).resolves.toBeUndefined();
+    await expect(owner.loadPage("deleted")).resolves.toEqual({ status: "stale" });
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(store.readSession("deleted").transcript.page.messages).toBeUndefined();
+    owner.dispose();
+  });
   it("discards it without writing anything for the session that left", async () => {
     let releaseA: (page: WebuiClientMessagePage) => void = () => undefined;
     const store = createWebuiSessionStore();

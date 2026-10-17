@@ -14,18 +14,12 @@
 //     exactly the applied names plus the deliberately-unapplied ones. Both directions
 //     are `AssertEmpty`, so a name added to the catalogue without a decision is a
 //     compile error and a name removed from either side is too.
-//   * **Derivation.** The runtime publishes these names as literals; it has no
-//     catalogue type to import, and this package cannot be depended on from that side.
-//     So this test reads the runtime's sources and collects every literal event name
-//     it produces, then requires each one to be in the catalogue or in the declared
-//     non-catalogue list. A new fact fails here with its name — which is the closest
-//     tie to the host available, and is stated as such rather than as a host
-//     catalogue this build does not have.
-
-import { readFileSync, readdirSync, statSync } from "node:fs";
-import path from "node:path";
+//   * **Derivation.** The generated union comes from the host's actual TypeScript
+//     declarations. The WebUI typecheck preflight checks it against the host;
+//     the production decoder's exact partition then requires every new decision.
 
 import { describe, expect, it } from "vitest";
+import { HOST_PUBLISHED_EVENT_TYPES } from "../../src/shared/contracts/host-event-types.generated.js";
 
 import {
   WEBUI_NON_CATALOGUE_SESSION_EVENTS,
@@ -52,28 +46,6 @@ type DecisionOutsideCatalogue = AssertEmpty<
   Exclude<AppliedNames | NotAppliedNames, WebuiSessionFactType>
 >;
 
-/** The runtime sources, scanned for the literal event names they publish. */
-function runtimeEventTypeLiterals(): readonly string[] {
-  const root = path.resolve(process.cwd(), "packages/local-runtime-v2/src");
-  const found = new Set<string>();
-  const pattern =
-    /\btype:\s*["']((?:session|message|agent|rotation|content|turn|stream|permission|questionnaire)\.[a-z_.]+)["']/gu;
-  const walk = (dir: string): void => {
-    for (const entry of readdirSync(dir)) {
-      const full = path.join(dir, entry);
-      if (statSync(full).isDirectory()) {
-        walk(full);
-        continue;
-      }
-      if (!entry.endsWith(".ts") || entry.endsWith(".test.ts")) continue;
-      const source = readFileSync(full, "utf8");
-      for (const match of source.matchAll(pattern)) found.add(match[1]!);
-    }
-  };
-  walk(root);
-  return [...found].sort();
-}
-
 describe("V36 · the session fact vocabulary is closed and derived", () => {
   it("partitions the catalogue between applied and deliberately unapplied", () => {
     // The aliases above are `never`: a name on one side only fails compilation here
@@ -88,13 +60,13 @@ describe("V36 · the session fact vocabulary is closed and derived", () => {
   });
 
   it("classifies every literal event name the runtime publishes", () => {
-    const literals = runtimeEventTypeLiterals();
+    const literals = HOST_PUBLISHED_EVENT_TYPES;
     // A scan that found nothing would pass vacuously; the runtime publishes twenty
     // names today, so an empty or tiny result means the fixture path or pattern broke.
     expect(literals.length).toBeGreaterThanOrEqual(15);
 
     const catalogue = new Set<string>(WEBUI_SESSION_FACT_TYPES);
-    const elsewhere = new Set(WEBUI_NON_CATALOGUE_SESSION_EVENTS.map((entry) => entry.type));
+    const elsewhere = new Set<string>(WEBUI_NON_CATALOGUE_SESSION_EVENTS.map((entry) => entry.type));
     const unclassified = literals.filter((type) => !catalogue.has(type) && !elsewhere.has(type));
 
     expect(

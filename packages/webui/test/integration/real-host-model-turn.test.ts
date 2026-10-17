@@ -44,13 +44,14 @@ interface Stub {
 }
 
 /** An OpenAI-completions endpoint that streams one scripted assistant message. */
-async function startStubServer(): Promise<Stub> {
+async function startStubServer(responseGate?: Promise<void>): Promise<Stub> {
   const requests: { url: string; authorization?: string; body: string }[] = [];
   const server: Server = createServer((req: IncomingMessage, res: ServerResponse) => {
     let body = "";
     req.on("data", (chunk: Buffer) => (body += chunk.toString("utf8")));
-    req.on("end", () => {
+    req.on("end", async () => {
       requests.push({ url: req.url ?? "", authorization: req.headers.authorization, body });
+      await responseGate;
       res.writeHead(200, {
         "content-type": "text/event-stream",
         "cache-control": "no-cache",
@@ -186,7 +187,9 @@ describe("real host, one turn against a controlled model service", () => {
   it(
     "runs a turn whose answer comes from the stub model and lands in the session history",
     async () => {
-      const stub = await startStubServer();
+      let releaseModel!: () => void;
+      const responseGate = new Promise<void>((resolve) => { releaseModel = resolve; });
+      const stub = await startStubServer(responseGate);
       stubs.push(stub);
 
       const dataDir = await mkdtemp(join(tmpdir(), "webui-real-host-turn-"));
@@ -267,6 +270,15 @@ describe("real host, one turn against a controlled model service", () => {
 
       const sent = await port.sendMessage({ id: sessionId as string, content: "hello stub" });
       expect(sent.ok).toBe(true);
+      // V23: the real host exposes an active turn while the external response
+      // is held, and an idle probe after delivery settles. This is an ordering
+      // observation, not an atomic snapshot/event barrier.
+      try {
+        await expect.poll(() => stub.requests.length).toBeGreaterThan(0);
+        const active = await port.getActiveTurn({ id: sessionId as string });
+        expect(active?.busyReason).toBe("turn");
+        expect(active?.turnId).toBeTruthy();
+      } finally { releaseModel(); }
       const frames: Record<string, unknown>[] = [];
       if (sent.ok)
         for await (const frame of sent.source)
@@ -294,6 +306,7 @@ describe("real host, one turn against a controlled model service", () => {
       const answer = messages.find((message) => message.role === "assistant");
       expect(answer?.msgContent).toBe(STUB_ANSWER);
       expect(answer?.finishReason).toBe("stop");
+      await expect.poll(() => port.getActiveTurn({ id: sessionId as string })).toBeUndefined();
     },
     120_000,
   );

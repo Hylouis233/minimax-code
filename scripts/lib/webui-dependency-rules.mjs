@@ -552,7 +552,6 @@ const HOME_LAYERS = Object.freeze({
   "client/bindings/": "bindings",
   "client/application/": "application",
   "client/contracts/": "contracts",
-  "client/styles/": "styles",
 });
 
 /**

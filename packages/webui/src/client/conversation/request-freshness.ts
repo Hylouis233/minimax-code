@@ -1,3 +1,5 @@
+import { isWebuiWireError } from "../../shared/envelope.js";
+
 // The request/freshness primitive.
 //
 // One cached read has to answer three questions that a state container plus a
@@ -209,6 +211,10 @@ export interface WebuiKeyedResource<T> {
   readonly isDisposed: () => boolean;
   /** How many resource keys hold an entry; a cardinality check, not a cache policy. */
   readonly size: () => number;
+  /** Retires one detail identity, including cached data and safe metadata. */
+  readonly release: (key: WebuiResourceKey) => void;
+  readonly retention: () => { readonly entries: number; readonly revisions: number;
+    readonly inFlight: number; readonly epochBindings: number; readonly listeners: number };
 }
 
 /**
@@ -292,6 +298,12 @@ function mutationError(reason: unknown): Error {
 export function classifyWebuiMutationFailure(reason: unknown): WebuiMutationFailureCategory {
   if (reason instanceof WebuiRefusedError) return "refused";
   if (reason instanceof WebuiRevisionConflictError) return "conflict";
+  if (isWebuiWireError(reason)) {
+    if (reason.code === "revision_conflict") return "conflict";
+    if (["permission_denied", "capability_unavailable", "runtime_rejected", "unknown_operation"].includes(reason.code)) return "refused";
+    // A malformed response or a harness exception may follow a committed write.
+    // Preserve the error and reconcile that unknown outcome instead of retrying.
+  }
   const name = reason instanceof Error ? reason.name : "";
   if (name === "TimeoutError" || name === "AbortError") return "timeout";
   return "transport";
@@ -350,10 +362,19 @@ export function createWebuiKeyedResource<T>(): WebuiKeyedResource<T> {
   const listeners = new Set<() => void>();
   let disposed = false;
 
+  // Released keys need no tombstone map: a scalar floor prevents a recreated
+  // identity from ever reusing a revision previously handed to that identity.
+  let unseenRevision = 0;
+
   const notify = (): void => {
     for (const listener of [...listeners]) listener();
   };
-  const revisionOf = (serialized: string): number => revisions.get(serialized) ?? 0;
+  const revisionOf = (serialized: string): number => revisions.get(serialized) ?? unseenRevision;
+  const captureRevision = (serialized: string): number => {
+    const revision = revisionOf(serialized);
+    if (!disposed) revisions.set(serialized, revision);
+    return revision;
+  };
 
   const commitToken = (token: WebuiCommitToken, state: WebuiResourceState<T>): boolean => {
     if (disposed) return false;
@@ -380,6 +401,7 @@ export function createWebuiKeyedResource<T>(): WebuiKeyedResource<T> {
   // One binding holds the keys one generation is responsible for, so an advance
   // retires exactly those and nothing else.
   const epochBindings = new Map<WebuiEpochBinding, Set<string>>();
+  const epochStops = new Map<WebuiEpochBinding, () => void>();
 
   const load = (
     key: WebuiResourceKey,
@@ -387,7 +409,7 @@ export function createWebuiKeyedResource<T>(): WebuiKeyedResource<T> {
   ): Promise<WebuiResourceLoadOutcome<T>> => {
     if (disposed) return Promise.resolve({ status: "disposed" });
     const serialized = serializeWebuiResourceKey(key);
-    const revision = revisionOf(serialized);
+    const revision = captureRevision(serialized);
     const joined = inFlight.get(serialized);
     // Coalescing is only sound when nothing that affects the answer changed. The
     // joined promise carries the *origin* request's outcome, which is the same
@@ -426,7 +448,7 @@ export function createWebuiKeyedResource<T>(): WebuiKeyedResource<T> {
     read: (key) => entries.get(serializeWebuiResourceKey(key)),
     capture: (key) => {
       const resource = serializeWebuiResourceKey(key);
-      return { resource, revision: revisionOf(resource), incarnation };
+      return { resource, revision: captureRevision(resource), incarnation };
     },
     commit: commitToken,
     load,
@@ -440,16 +462,20 @@ export function createWebuiKeyedResource<T>(): WebuiKeyedResource<T> {
         epochBindings.set(binding, keys);
         // Subscribed once per generation, not once per key, so N keys under one
         // generation cost one listener.
-        binding.subscribe(() => {
+        epochStops.set(binding, binding.subscribe(() => {
           for (const bound of [...(epochBindings.get(binding) ?? [])]) retire(bound);
-        });
+        }));
       }
       keys.add(serialized);
       return () => {
         const current = epochBindings.get(binding);
         if (!current) return;
         current.delete(serialized);
-        if (current.size === 0) epochBindings.delete(binding);
+        if (current.size === 0) {
+          epochBindings.delete(binding);
+          epochStops.get(binding)?.();
+          epochStops.delete(binding);
+        }
       };
     },
     revision: (key) => revisionOf(serializeWebuiResourceKey(key)),
@@ -460,12 +486,33 @@ export function createWebuiKeyedResource<T>(): WebuiKeyedResource<T> {
     dispose: () => {
       disposed = true;
       entries.clear();
+      revisions.clear();
       inFlight.clear();
       listeners.clear();
       epochBindings.clear();
+      for (const stop of epochStops.values()) stop();
+      epochStops.clear();
     },
     isDisposed: () => disposed,
     size: () => entries.size,
+    release: (key) => {
+      if (disposed) return;
+      const serialized = serializeWebuiResourceKey(key);
+      unseenRevision = Math.max(unseenRevision, revisionOf(serialized)) + 1;
+      entries.delete(serialized);
+      revisions.delete(serialized);
+      inFlight.delete(serialized);
+      for (const [binding, keys] of epochBindings) {
+        keys.delete(serialized);
+        if (keys.size === 0) {
+          epochBindings.delete(binding);
+          epochStops.get(binding)?.(); epochStops.delete(binding);
+        }
+      }
+      notify();
+    },
+    retention: () => ({ entries: entries.size, revisions: revisions.size, inFlight: inFlight.size,
+      epochBindings: epochBindings.size, listeners: listeners.size }),
   };
 }
 

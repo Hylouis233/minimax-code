@@ -163,6 +163,7 @@ test("关闭 and 跳过 both route through dismissQuestionnaire", async ({ page 
   await expect.poll(() =>
     page.evaluate(() => window.__fixture.requests.filter((r) => r.operation === "dismissQuestionnaire").length),
   ).toBe(2);
+  expect(await page.evaluate(() => window.__fixture.requests.filter(r => r.operation === "dismissQuestionnaire").at(-1).body.name)).toBe("synthetic-B");
   expect(await page.evaluate(() => window.__fixture.requests.some((r) => r.operation === "replyQuestionnaire"))).toBe(false);
 });
 

@@ -96,9 +96,11 @@ what each gate proves and what it cannot.
 | Anything file-level | `node scripts/source-inventory.mjs --write`, then `pnpm check:source` |
 | Before claiming done | `pnpm verify` — the same list CI runs, in the same order |
 
-The reproducible ceiling is evidence level 3: at that level the leaf host behind the harness port is a
-scripted stand-in, so no test here proves that a real agent process answers. Say which level a claim
-was established at, and name the boundary you did not exercise.
+Most deterministic suites use a scripted leaf behind the harness port (evidence level 3).
+The native browser scenario additionally runs the production runtime host, loopback service and
+real PTYs in isolated temporary data. It proves the terminal lifecycle on the executing platform;
+it does not prove external provider execution. Say which seam a claim exercises and name any
+remaining boundary. `docs/verification/browser-suite.md` describes both harnesses.
 
 There is no ESLint gate for this package (`pnpm lint` covers `packages/tui`), so typecheck and tests
 carry what a linter would otherwise catch.

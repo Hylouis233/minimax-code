@@ -30,11 +30,15 @@ import { buildWebuiStreamLoopSink } from "./stream-loop-sink.js";
 import { classifyStreamFrame } from "./stream-frame-classify.js";
 import type { WebuiSessionStore } from "../../../application/session-store.js";
 import { streamStateBundle } from "./stream-state-bundle.js";
+import { holdWebuiDelivery, type WebuiDeliveryDisposers } from "./delivery-disposers.js";
+import type { WebuiSessionScopeManager } from "../../../conversation/session-scope.js";
 
 export interface WebuiTurnCoordinatorDeps {
   readonly store: WebuiSessionStore;
   readonly resumeSession: WebuiClientSessionResumer;
   readonly loadMessages?: WebuiClientMessageLoader;
+  readonly deliveries?: WebuiDeliveryDisposers;
+  readonly scope?: WebuiSessionScopeManager;
   /** Injected for tests; production uses the mechanism's loop. */
   readonly runStreamLoop?: typeof runWebuiStreamLoop;
 }
@@ -55,6 +59,8 @@ export function createWebuiTurnCoordinator(
   const runStreamLoop = deps.runStreamLoop ?? runWebuiStreamLoop;
   return {
     retry: (sessionId) => {
+      if (deps.deliveries?.isDisposed() || deps.scope?.isDisposed()) return Promise.resolve(undefined);
+      const hold = holdWebuiDelivery(() => sessionId, deps.deliveries, deps.scope);
       const writer = store.createSessionWriter({ kind: "session", sessionId });
       const current = store.readSession(sessionId).stream;
       // Clear the refusal first, synchronously: the banner reads the phase, and
@@ -68,7 +74,7 @@ export function createWebuiTurnCoordinator(
       }));
       return runStreamLoop(
         {
-          resumeSession,
+          resumeSession: (request, onFrame) => resumeSession(request, onFrame, hold.onDelivery),
           ...(loadMessages ? { loadHistory: loadMessages } : {}),
           classify: classifyStreamFrame,
         },
@@ -81,7 +87,7 @@ export function createWebuiTurnCoordinator(
         // the record the same way, or a retried turn would seed itself
         // differently from a submitted one.
         buildWebuiStreamLoopSink(writer.setStream, streamStateBundle),
-      );
+      ).finally(hold.release);
     },
   };
 }

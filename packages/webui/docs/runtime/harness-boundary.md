@@ -47,3 +47,12 @@ Every operation has a descriptor in `server/operation/<domain>.ts`, a binding in
 `../architecture/layered-model.md` describes. The wire frames they arrive in are described there too.
 A capability the host does not offer is not an error: each capability port method is optional, and
 `undefined` means "this operation is not wired".
+## Published host event names
+
+`scripts/host-event-catalogue.mjs` reads host producer declarations with the TypeScript checker
+and generates `shared/contracts/host-event-types.generated.ts`. This is a WebUI adapter artefact;
+the generator does not modify host sources or redefine the WebUI DTOs.
+`pnpm --filter @mavis/webui gen:host-events` refreshes it after a reviewed producer change.
+Server typecheck checks freshness.
+The production session-fact decoder then requires every catalogue fact to have an applied route or
+an explicit unhandled rationale. A generated new name without that decision fails compilation.

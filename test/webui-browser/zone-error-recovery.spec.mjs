@@ -20,6 +20,58 @@ import { expect } from "@playwright/test";
 
 import { configureFixture, openApp, test } from "./harness.mjs";
 
+// Inject only a throwing child below each production zone boundary. This keeps
+// the built application/owners intact and requires no product debug switches.
+async function installRenderFault(page, zone) {
+  await page.addInitScript((name) => { window.__syntheticZoneFault = name; }, zone);
+  await page.route("**/client.js", async (route) => {
+    const response = await route.fetch();
+    const bundle = await response.text();
+    const start = bundle.indexOf("function WebuiZoneBoundary({");
+    expect(start).toBeGreaterThan(0);
+    const end = bundle.indexOf("\n// src/", start);
+    const original = bundle.slice(start, end);
+    const runtime = original.match(/(import_jsx_runtime\d+)\.jsx/u)?.[1];
+    expect(runtime).toBeTruthy();
+    expect(original.match(/\n      children\n/gu)).toHaveLength(1);
+    const changed = original.replace("\n      children\n", `\n      children: [(0, ${runtime}.jsx)(WebuiSyntheticZoneFault, { zone }), children]\n`);
+    const fault = `function WebuiSyntheticZoneFault({zone}) { if (window.__syntheticZoneFault === zone) throw new Error("synthetic zone render failure"); return null; }\n`;
+    await route.fulfill({ response, body: bundle.slice(0, start) + fault + changed + bundle.slice(end) });
+  });
+}
+
+for (const zone of ["workspace", "settings", "plugins"]) {
+  test(`V08 ${zone} render failure retries only its own presentation`, async ({ page }) => {
+    await installRenderFault(page, zone);
+    await openApp(page);
+    const composer = page.getByPlaceholder("输入消息…（输入 / 唤起命令）");
+    await composer.fill("retained draft across zone failure");
+    const watchBefore = await page.evaluate(() => window.__fixture.requests.filter(r => r.operation === "watchEvents").length);
+    if (zone === "workspace") {
+      await page.getByTestId("workspace-panel-controls").getByRole("button", { name: "工作区文件侧栏" }).click();
+    } else if (zone === "settings") {
+      await page.getByTestId("sidebar-user-menu-trigger").click();
+      await page.getByTestId("user-menu-settings").click();
+    } else {
+      await page.getByRole("button", { name: "插件", exact: true }).first().click();
+    }
+    const retry = page.getByTestId("webui-error-boundary-retry");
+    await expect(retry).toBeVisible();
+    await expect(page.locator("body")).not.toContainText("页面的一部分未能正常显示");
+    await page.evaluate(() => { window.__syntheticZoneFault = undefined; });
+    await retry.click();
+    await expect(retry).toHaveCount(0);
+    if (zone === "settings") await page.getByRole("button", { name: "返回" , exact: true }).click();
+    if (zone === "plugins") {
+      await page.locator('[data-webui-session-link="B"]').click({ position: { x: 20, y: 15 } });
+      await expect(composer).toBeVisible();
+      await page.locator('[data-webui-session-link="A"]').click({ position: { x: 20, y: 15 } });
+    }
+    await expect(composer).toHaveValue("retained draft across zone failure");
+    expect(await page.evaluate(() => window.__fixture.requests.filter(r => r.operation === "watchEvents").length)).toBe(watchBefore);
+  });
+}
+
 test("a zone failure is recoverable without losing the app", async ({ page }) => {
   await configureFixture(page, () => undefined);
   await openApp(page);

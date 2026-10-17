@@ -407,6 +407,12 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
    * rather than failing.
    */
   const terminalSlotsFull = terminals.length >= DESKTOP_TERMINAL_LIMIT;
+  const terminalSupport = terminalOwner?.support().create ?? "absent";
+  const terminalAvailability = terminalSupport === "absent" ? "当前服务未提供终端。"
+    : terminalSupport === "not-ready" ? "终端服务尚未就绪。"
+      : terminalSupport === "incompatible" ? "终端接口与当前页面不兼容，请检查服务版本。" : undefined;
+  const terminalCreateDisabled = terminalSlotsFull || !terminalOwner?.canCreate;
+  const terminalCreateReason = terminalAvailability ?? (terminalSlotsFull ? DESKTOP_COPY.terminalLimit : undefined);
   const createTerminal = (): void => {
     if (!activeWorkspace || !terminalOwner?.canCreate) return;
     if (terminalSlotsFull) {
@@ -573,6 +579,10 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
       return undefined;
     }
     const read = ++rosterRead.current;
+    const stop = terminalOwner.subscribe(() => {
+      syncTerminalsFromOwner(terminalOwner);
+      setTerminalError(terminalOwner.getSnapshot().error);
+    });
     // Not ready until the first answer lands, so a reload holding live PTYs does
     // not paint an empty list and invite a create that would exceed the limit.
     setTerminalsReady(false);
@@ -584,6 +594,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
       setTerminalsReady(true);
     });
     return () => {
+      stop();
       // Unmounting invalidates this read for the same reason switching does.
       if (rosterRead.current === read) rosterRead.current += 1;
     };
@@ -592,10 +603,10 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   // Process death is the panel's explicit dispose button or the application's
   // disposal.
   useEffect(() => () => { terminalStop.current?.(); terminalInstance.current?.dispose(); }, []);
+  const terminalTargetId = (terminals.find((candidate) => String(candidate.terminalId) === activeTerminalId) ?? terminals[0])?.terminalId;
   useEffect(() => {
-    const active = terminals.find((candidate) => String(candidate.terminalId) === activeTerminalId) ?? terminals[0];
-    if (!active || !terminalHost.current) return;
-    const terminalId = String(active.terminalId);
+    if (!terminalTargetId || !terminalHost.current) return;
+    const terminalId = String(terminalTargetId);
     const styles = getComputedStyle(terminalHost.current);
     const terminal = new Terminal({ cols: 80, rows: 24, convertEol: true, theme: { background: styles.getPropertyValue("--bg_default_secondary").trim(), foreground: styles.getPropertyValue("--terminal_foreground").trim(), cursor: styles.getPropertyValue("--terminal_cursor").trim() } });
     const fit = new FitAddon();
@@ -628,7 +639,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     // read through a ref: the owner is created once per mount by the binding and
     // its commands are stable, so a panel drag cannot re-run this effect and
     // rebuild a shell that is running.
-  }, [activeTerminalId, terminalOwner, terminals]);
+  }, [terminalTargetId, terminalOwner, tab]);
   // The label rule lives in the registry; the icon below is the host render
   // branch the registry is allowed to have.
   const tabLabel = (item: WorkspacePanelTab): string => webuiWorkspaceTabLabel(item);
@@ -723,7 +734,9 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
       {turnReviewFiles.length ? <div className="webui-turn-review-files">{turnReviewFiles.map((file) => <WebuiDiffFileSection key={file.file} file={file} selected={selectedReviewPath === file.file} />)}</div> : <p className="webui-turn-review-empty">本轮没有可审查的文件差异。</p>}
     </div> : null}
     {tab === "canvas" ? <WorkspaceCanvas sessionId={activeSessionId} /> : null}
-    {tab === "terminal" ? <div className="webui-terminal-empty">{!terminalsReady ? <><p>{DESKTOP_COPY.terminalLoading}</p></> : terminals.length === 0 ? <><strong>{DESKTOP_COPY.terminalEmptyTitle}</strong><p>{DESKTOP_COPY.terminalEmptyDescription}</p></> : <><div className="webui-terminal-tabs">{terminals.map((terminal, index) => <button type="button" key={String(terminal.terminalId)} className={`file-tab group/tab-close h-8 w-40 min-w-20 ${String(terminal.terminalId) === (activeTerminalId ?? String(terminals[0]?.terminalId)) ? "bg-bg_interaction_tertiary_selected" : ""}`} onClick={() => setActiveTerminalId(String(terminal.terminalId))}><span>#{index + 1}</span>{terminal.status === "exited" ? DESKTOP_COPY.terminalExited : DESKTOP_COPY.terminalLabel}<span className="file-tab-close opacity-0 group-hover/tab-close:opacity-100"><WebuiIconClose className="size-[14px]" /></span></button>)}</div><div ref={terminalHost} className="webui-xterm-host" />{terminalError ? <p role="alert">{terminalError}</p> : null}<div className="webui-terminal-actions"><button type="button" disabled={terminalSlotsFull} title={terminalSlotsFull ? DESKTOP_COPY.terminalLimit : undefined} onClick={createTerminal}>{DESKTOP_COPY.newTerminal}</button><button type="button" onClick={() => { const active = terminals.find((candidate) => String(candidate.terminalId) === (activeTerminalId ?? String(terminals[0]?.terminalId))); if (active && terminalOwner?.canDispose) void terminalOwner.disposeProcess(String(active.terminalId)).then(() => syncTerminalsFromOwner(terminalOwner)); }}>{DESKTOP_COPY.fileClose}</button></div></> }{terminalsReady && terminals.length === 0 ? <button type="button" disabled={terminalSlotsFull} title={terminalSlotsFull ? DESKTOP_COPY.terminalLimit : undefined} onClick={createTerminal}>{DESKTOP_COPY.newTerminal}</button> : null}</div> : null}
+    {tab === "terminal" && terminalAvailability ? <p role="status" data-webui-terminal-availability={terminalSupport}>{terminalAvailability}</p> : null}
+    {tab === "terminal" && terminalError && terminals.length === 0 ? <p role="alert">{terminalError}</p> : null}
+    {tab === "terminal" ? <div className="webui-terminal-empty">{!terminalsReady ? <><p>{DESKTOP_COPY.terminalLoading}</p></> : terminals.length === 0 ? <><strong>{DESKTOP_COPY.terminalEmptyTitle}</strong><p>{DESKTOP_COPY.terminalEmptyDescription}</p></> : <><div className="webui-terminal-tabs">{terminals.map((terminal, index) => <button type="button" key={String(terminal.terminalId)} className={`file-tab group/tab-close h-8 w-40 min-w-20 ${String(terminal.terminalId) === (activeTerminalId ?? String(terminals[0]?.terminalId)) ? "bg-bg_interaction_tertiary_selected" : ""}`} onClick={() => setActiveTerminalId(String(terminal.terminalId))}><span>#{index + 1}</span>{terminal.status === "exited" ? DESKTOP_COPY.terminalExited : DESKTOP_COPY.terminalLabel}<span className="file-tab-close opacity-0 group-hover/tab-close:opacity-100"><WebuiIconClose className="size-[14px]" /></span></button>)}</div><div ref={terminalHost} className="webui-xterm-host" />{terminalError ? <p role="alert">{terminalError}</p> : null}<div className="webui-terminal-actions"><button type="button" disabled={terminalCreateDisabled} title={terminalCreateReason} onClick={createTerminal}>{DESKTOP_COPY.newTerminal}</button><button type="button" onClick={() => { const active = terminals.find((candidate) => String(candidate.terminalId) === (activeTerminalId ?? String(terminals[0]?.terminalId))); if (active && terminalOwner?.canDispose) void terminalOwner.disposeProcess(String(active.terminalId)).then(() => syncTerminalsFromOwner(terminalOwner)); }}>{DESKTOP_COPY.fileClose}</button></div></> }{terminalsReady && terminals.length === 0 ? <button type="button" disabled={terminalCreateDisabled} title={terminalCreateReason} onClick={createTerminal}>{DESKTOP_COPY.newTerminal}</button> : null}</div> : null}
       </div>
       {hasFileWorkspace && fileTreeOpen ? <aside className="webui-workspace-file-tree-panel" aria-label="工作区文件树">
         <label className="webui-workspace-file-search"><WebuiIconSearch className="size-4" /><input aria-label="搜索文件" placeholder="搜索" value={fileSearch} onChange={(event) => setFileSearch(event.currentTarget.value)} /></label>

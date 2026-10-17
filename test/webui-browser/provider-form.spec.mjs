@@ -109,6 +109,35 @@ test("the custom tab lists the saved provider and its model row", async ({ page 
     .toBeGreaterThan(0);
 });
 
+test("V10 rapid model toggles serialize semantic intent without restoring stale rows", async ({ page }) => {
+  await configureFixture(page, () => {
+    window.__fixture.setModelProviders([{ providerId: "rapid", name: "Rapid", source: "user", kind: "apiKey", enabled: true, hasApiKey: true,
+      models: [{ modelId: "first", displayName: "First", enabled: true }, { modelId: "second", displayName: "Second", enabled: true }] }]);
+    window.__fixture.delayEvery("updateUserModelProvider", {});
+  });
+  await openCustomModels(page);
+  await page.getByRole("switch", { name: "禁用 First", exact: true }).click();
+  await page.getByRole("switch", { name: "禁用 Second", exact: true }).click();
+  const writes = () => page.evaluate(() => window.__fixture.requests.filter(r => r.operation === "updateUserModelProvider"));
+  await expect.poll(async () => (await writes()).length).toBe(1);
+  await page.evaluate(() => {
+    window.__fixture.setModelProviders([{ providerId: "rapid", name: "Rapid", source: "user", kind: "apiKey", enabled: true, hasApiKey: true,
+      models: [{ modelId: "first", displayName: "First", enabled: false }, { modelId: "second", displayName: "Second", enabled: true }] }]);
+    window.__fixture.resolve("updateUserModelProvider", {}, { ok: true });
+  });
+  await expect.poll(async () => (await writes()).length).toBe(2);
+  expect((await writes())[1].body.models.map(m => ({ modelId: m.modelId, enabled: m.enabled }))).toEqual([
+    { modelId: "first", enabled: false }, { modelId: "second", enabled: false },
+  ]);
+  await page.evaluate(() => {
+    window.__fixture.setModelProviders([{ providerId: "rapid", name: "Rapid", source: "user", kind: "apiKey", enabled: true, hasApiKey: true,
+      models: [{ modelId: "first", displayName: "First", enabled: false }, { modelId: "second", displayName: "Second", enabled: false }] }]);
+    window.__fixture.resolve("updateUserModelProvider", {}, { ok: true });
+  });
+  await expect(page.getByRole("switch", { name: "启用 First", exact: true })).toHaveAttribute("aria-checked", "false");
+  await expect(page.getByRole("switch", { name: "启用 Second", exact: true })).toHaveAttribute("aria-checked", "false");
+});
+
 test("a save stays refused until the draft is proven or the test is skipped", async ({ page }) => {
   await configureFixture(page, seedNewProviderSurface);
   await openCustomModels(page);

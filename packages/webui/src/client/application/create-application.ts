@@ -611,6 +611,8 @@ export function createWebuiApplication(
   const turns = createWebuiTurnCoordinator({
     store,
     ...deps.turns,
+    deliveries,
+    scope: sessionScope,
   });
   // The slice is cut once, here, from the port the composition root holds. A
   // caller of a conversation command never supplies a capability again.
@@ -678,6 +680,8 @@ export function createWebuiApplication(
     // its own observable state through its own command — this is the list of
     // owners a session has, which only the assembly knows.
     releaseOwners: (sessionId) => {
+      transcriptHistory.releaseSession(sessionId);
+      modelsWorkflows.releaseSession(sessionId);
       goals.purge(sessionId);
       interactions.purge(sessionId);
       turnReview.releaseSession(sessionId);

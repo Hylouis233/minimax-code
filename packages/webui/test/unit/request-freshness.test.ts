@@ -58,6 +58,32 @@ function fakeEpoch(token: string) {
 }
 
 describe("the seam the primitive replaces", () => {
+  it("V16 releases data, revision, in-flight and epoch metadata without reviving old tokens", async () => {
+    const resource = createWebuiKeyedResource<string>();
+    const epoch = fakeEpoch("epoch-0");
+    const pending = deferred<string>();
+    const key = { session: "released" };
+    resource.bindEpoch(epoch.binding, key);
+    const token = resource.capture(key);
+    const oldRead = resource.load(key, () => pending.promise);
+    expect(resource.retention()).toMatchObject({ entries: 1, revisions: 1, inFlight: 1, epochBindings: 1 });
+    resource.release(key);
+    expect(resource.retention()).toMatchObject({ entries: 0, revisions: 0, inFlight: 0, epochBindings: 0 });
+    const fresh = resource.capture(key);
+    expect(resource.commit(fresh, { status: "ready", value: "new" })).toBe(true);
+    expect(resource.commit(token, { status: "ready", value: "old" })).toBe(false);
+    pending.resolve("late");
+    expect((await oldRead).status).toBe("superseded");
+    expect(resource.read(key)?.value).toBe("new");
+    for (let index = 0; index < 100; index += 1) {
+      const item = { session: `detail-${index}` };
+      await resource.load(item, async () => "data");
+      resource.release(item);
+    }
+    expect(resource.retention()).toMatchObject({ entries: 1, revisions: 1, inFlight: 0, epochBindings: 0 });
+    resource.dispose();
+    expect(resource.retention()).toMatchObject({ entries: 0, revisions: 0, inFlight: 0, epochBindings: 0, listeners: 0 });
+  });
   it("lets a late answer for one key overwrite the field another key wrote", async () => {
     // The reproduction, written out rather than imported. It used to call
     // `query-store.ts`, which is retired; keeping the store alive to hold a

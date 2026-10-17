@@ -260,6 +260,34 @@ describe("stage 4 — the four call sites' handling through the coordinator", ()
     expect(invalidateSkills).not.toHaveBeenCalled();
   });
 
+  it("V13 rereads the real Composer cache after manager mutations without mounted UI", async () => {
+    const fake = makeChannel();
+    let generation = 0;
+    let refuse = false;
+    const pluginManagement = vi.fn(async (request: { action: string }) => {
+      if (request.action === "listInstalledPlugins") return { plugins: [{ name: `plugin-${generation}` }] };
+      if (refuse) throw new Error("mutation refused");
+      generation += 1;
+      return { ok: true };
+    });
+    const application = createWebuiApplication({ openEventChannel: () => fake.channel,
+      turns: { resumeSession: noopResumeSession }, turnCapabilities: { pluginManagement } as never });
+    const catalogue = application.composerPluginCatalogue;
+    expect((await catalogue.installedPlugins())[0]?.name).toBe("plugin-0");
+    const intents = ["installPlugin", "disablePlugin", "enablePlugin", "uninstallPlugin"] as const;
+    for (const action of intents) {
+      await application.pluginWorkflows.runIntent({ kind: action, pluginName: "demo" });
+      expect((await catalogue.installedPlugins())[0]?.name).toBe(`plugin-${generation}`);
+    }
+    const committed = await catalogue.installedPlugins();
+    const before = pluginManagement.mock.calls.filter(([r]) => r.action === "listInstalledPlugins").length;
+    refuse = true;
+    await expect(application.pluginWorkflows.installPlugin({ pluginName: "demo" })).rejects.toThrow("mutation refused");
+    expect(await catalogue.installedPlugins()).toBe(committed);
+    expect(pluginManagement.mock.calls.filter(([r]) => r.action === "listInstalledPlugins")).toHaveLength(before);
+    application.dispose();
+  });
+
   it("reconciles every interested session on a ready signal, then tells subscribers", () => {
     const listPendingPermissions = vi.fn(async () => ({ requests: [] }));
     const fake = makeChannel();

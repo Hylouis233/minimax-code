@@ -680,7 +680,7 @@ export function WebuiClientFoundationApp(
           })),
         );
       },
-      reconcileActivity: () => applicationRef.current.observations.invalidateAll(),
+      reconcileActivity: () => applicationRef.current.observations.invalidateActivity(),
     }),
     [],
   );
@@ -694,9 +694,18 @@ export function WebuiClientFoundationApp(
     update();
     return browserDom.listenForVisibilityChange(update);
   }, [browserDom]);
+  const activityPage = useMemo(() => {
+    const rows = new Map(page.sessions.map((session) => [session.sessionId, session]));
+    for (const node of treePage.sessions) {
+      rows.set(node.session.sessionId, node.session);
+      for (const child of node.childSessions) rows.set(child.sessionId, child);
+    }
+    return { sessions: [...rows.values()] };
+  }, [page, treePage]);
   const { sessionActivity, activityNow, activityProbeNonce } = useShellActivityWiring({
     sessionStore,
-    railPage,
+    // Search and disclosure change presentation, not the freshness of known sessions.
+    railPage: activityPage,
     selectedSessionId,
     ...activityWiring,
   });

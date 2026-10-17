@@ -12,6 +12,46 @@
 // detached observer and a cancelled turn are different things (ADR 0017).
 
 import type { WebuiDeliveryHandle } from "../contracts/execution-port.js";
+import type { WebuiSessionScopeManager } from "../../../conversation/session-scope.js";
+
+/** One attempt owns both its transport registration and its session interest. */
+export function holdWebuiDelivery(
+  sessionId: () => string,
+  deliveries?: WebuiDeliveryDisposers,
+  scope?: WebuiSessionScopeManager,
+): { readonly onDelivery: (handle: WebuiDeliveryHandle) => void; readonly release: () => void } {
+  let releaseHandle: (() => void) | undefined;
+  let releaseInterest: (() => void) | undefined;
+  let ended = false;
+  const holder = `attempt:${++nextHolder}`;
+  const release = (): void => {
+    releaseHandle?.(); releaseInterest?.();
+    releaseHandle = undefined; releaseInterest = undefined;
+  };
+  return {
+    onDelivery: (handle) => {
+      release();
+      if (ended || deliveries?.isDisposed() || scope?.isDisposed()) {
+        handle.close();
+        return;
+      }
+      const key = sessionId();
+      releaseInterest = scope?.acquire(key, "delivery", holder);
+      if (scope && !scope.isInterested(key)) {
+        releaseInterest?.(); releaseInterest = undefined;
+        handle.close();
+        return;
+      }
+      releaseHandle = deliveries?.track(key, { close: () => {
+        releaseInterest?.(); releaseInterest = undefined;
+        handle.close();
+      } });
+    },
+    release: () => { ended = true; release(); },
+  };
+}
+
+let nextHolder = 0;
 
 export interface WebuiDeliveryDisposers {
   /**

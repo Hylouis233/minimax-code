@@ -68,6 +68,38 @@ function appWithResume(resumeSession: WebuiClientSessionResumer) {
 }
 
 describe("the turn coordinator's manual retry", () => {
+  it("V07 detaches an active public retry on disposal without aborting the host", async () => {
+    const sessionId = "srt-dispose";
+    const store = createWebuiSessionStore();
+    store.updateSession(sessionId, (current) => ({ ...current,
+      stream: { ...current.stream, phase: "refused", cursor: "c1" } }));
+    const close = vi.fn();
+    const abortSession = vi.fn(async () => ({ success: true }));
+    let finish!: () => void;
+    let frame!: Parameters<WebuiClientSessionResumer>[1];
+    const resumeSession: WebuiClientSessionResumer = (_request, onFrame, onDelivery) => {
+      frame = onFrame;
+      onDelivery?.({ close });
+      return new Promise<void>((resolve) => { finish = resolve; });
+    };
+    const application = createWebuiApplication({
+      openEventChannel: () => channel, store, turns: { resumeSession },
+      turnCapabilities: { abortSession },
+    });
+    application.start();
+    const pending = application.turns.retry(sessionId);
+    expect(application.deliveries.count(sessionId)).toBe(1);
+    expect(application.sessionScope.kinds(sessionId)).toContain("delivery");
+    application.dispose(); application.dispose();
+    const after = store.readSession(sessionId);
+    frame({ cursor: "late", dataJson: JSON.stringify({ type: "agent_message", agent_message: { type: "assistant", content: "late" } }) });
+    finish(); await pending;
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(application.deliveries.count()).toBe(0);
+    expect(application.sessionScope.interested()).toEqual([]);
+    expect(store.readSession(sessionId)).toBe(after);
+    expect(abortSession).not.toHaveBeenCalled();
+  });
   it("clears the standing refusal and re-attaches from the recorded cursor", () => {
     const sessionId = seed("srt-cursor", {
       phase: "refused",
@@ -90,6 +122,7 @@ describe("the turn coordinator's manual retry", () => {
     // anywhere else would either replay the transcript or skip frames.
     expect(resumeSession).toHaveBeenCalledWith(
       { id: "srt-cursor", afterCursor: "c9" },
+      expect.any(Function),
       expect.any(Function),
     );
   });
@@ -124,6 +157,7 @@ describe("the turn coordinator's manual retry", () => {
         // No `afterCursor` (there was none), and the anchor is the newest
         // persisted message so the server replays from the recorded edge.
         expect.objectContaining({ id: "srt-nocursor", afterMsgId: "msg-user-3" }),
+        expect.any(Function),
         expect.any(Function),
       );
       const request = resumeSession.mock.calls[0]?.[0];

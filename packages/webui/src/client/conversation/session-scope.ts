@@ -66,11 +66,14 @@ export interface WebuiSessionScopeManager {
   /** Application disposal: revokes every browser lease. */
   readonly dispose: () => void;
   readonly isDisposed: () => boolean;
+  readonly retention: () => { readonly sessions: number; readonly leases: number; readonly deletionFences: number };
 }
 
 export function createWebuiSessionScopeManager(): WebuiSessionScopeManager {
   /** sessionId → holder key → kind. Insertion order is the interest order. */
   const leases = new Map<string, Map<string, WebuiSessionLeaseKind>>();
+  // No replay barrier proves a deleted id safe to reuse during this application.
+  const purged = new Set<string>();
   let selected: string | undefined;
   let disposed = false;
 
@@ -87,6 +90,7 @@ export function createWebuiSessionScopeManager(): WebuiSessionScopeManager {
   return {
     select: (sessionId) => {
       if (disposed) return;
+      if (sessionId !== undefined && purged.has(sessionId)) return;
       if (selected === sessionId) return;
       if (selected !== undefined) {
         release(selected, holderKey("selected-view", SELECTED_VIEW_HOLDER));
@@ -99,7 +103,7 @@ export function createWebuiSessionScopeManager(): WebuiSessionScopeManager {
     },
     selected: () => selected,
     acquire: (sessionId, kind, holderId) => {
-      if (!disposed) {
+      if (!disposed && !purged.has(sessionId)) {
         const key = holderKey(kind, holderId);
         const held = leases.get(sessionId) ?? new Map<string, WebuiSessionLeaseKind>();
         held.set(key, kind);
@@ -124,14 +128,19 @@ export function createWebuiSessionScopeManager(): WebuiSessionScopeManager {
     mayEvict: (sessionId) => !(leases.get(sessionId)?.size),
     purge: (sessionId) => {
       if (disposed) return;
+      purged.add(sessionId);
       leases.delete(sessionId);
       if (selected === sessionId) selected = undefined;
     },
     dispose: () => {
       disposed = true;
       leases.clear();
+      purged.clear();
       selected = undefined;
     },
     isDisposed: () => disposed,
+    retention: () => ({ sessions: leases.size,
+      leases: [...leases.values()].reduce((count, held) => count + held.size, 0),
+      deletionFences: purged.size }),
   };
 }

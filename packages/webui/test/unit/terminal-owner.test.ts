@@ -20,6 +20,21 @@ interface Trace {
   readonly releases: number[];
 }
 
+it("V19/V35 skips a known unavailable roster and reads after readiness changes", async () => {
+  let state: "absent" | "not-ready" | "supported" = "absent";
+  let reads = 0;
+  const owner = createWebuiTerminalOwner({ listTerminals: async () => { reads += 1; return []; } }, {
+    readCapabilities: () => ({ terminal: state }),
+  });
+  await owner.refresh();
+  state = "not-ready"; await owner.refresh();
+  expect(reads).toBe(0);
+  state = "supported"; await owner.refresh();
+  expect(reads).toBe(1);
+  expect(owner.support().list).toBe("supported");
+  owner.dispose();
+});
+
 function port(trace: Trace, terminals: string[] = ["terminal-a", "terminal-b"]) {
   let watches = 0;
   return {

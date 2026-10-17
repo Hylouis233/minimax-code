@@ -63,7 +63,7 @@ export type WebuiSessionFact =
  *
  * Adding a name here is a decision; removing one is a routing change.
  */
-export const WEBUI_SESSION_FACTS_NOT_APPLIED: readonly WebuiUnappliedSessionFact[] = [
+export const WEBUI_SESSION_FACTS_NOT_APPLIED = [
   // The host publishes these catalogue facts and the TUI consumes them; no client
   // route exists today. Each is named so "this page ignores it" is a recorded
   // decision, and so adding a route is a deletion here rather than a silent
@@ -77,7 +77,7 @@ export const WEBUI_SESSION_FACTS_NOT_APPLIED: readonly WebuiUnappliedSessionFact
   { type: "agent.updated", why: "same: the name a session shows is patched by the session's own fact" },
   { type: "rotation.completed", why: "credential rotation is the account owner's concern and invalidates its own reads" },
   { type: "content.retry.exceeded", why: "a content retry limit is turn progress; the turn's failure path settles it" },
-];
+] as const satisfies readonly WebuiUnappliedSessionFact[];
 
 /** One catalogue fact this client receives and deliberately does not apply. */
 export interface WebuiUnappliedSessionFact {
@@ -120,6 +120,13 @@ export const WEBUI_APPLIED_SESSION_FACTS = [
   "session.pinned_updated",
   "session.deleted",
 ] as const satisfies readonly WebuiSessionFactType[];
+
+type AssertNoUndecidedFact<T extends never> = T;
+type SessionFactPartition = AssertNoUndecidedFact<Exclude<WebuiSessionFactType,
+  (typeof WEBUI_APPLIED_SESSION_FACTS)[number] |
+  (typeof WEBUI_SESSION_FACTS_NOT_APPLIED)[number]["type"]>>;
+type SessionFactList = AssertNoUndecidedFact<Exclude<WebuiSessionFactType,
+  (typeof import("../../../../shared/contracts/session-facts.js").WEBUI_SESSION_FACT_TYPES)[number]>>;
 
 export function readWebuiSessionFact(
   event: WebuiRuntimeEvent,
@@ -181,10 +188,9 @@ export function readWebuiSessionFact(
       // facts it can apply, and `undefined` is what keeps every other route
       // working.
       //
-      // A fact that is neither applied nor named in `WEBUI_SESSION_FACTS_NOT_APPLIED`
-      // is therefore still dropped here — the row that asks for it to fail loudly
-      // wants the *host* catalogue to decide that, and the runtime publishes no such
-      // catalogue to derive from (see the repair report, V36).
+      // Current host catalogue additions fail the generated-source freshness gate,
+      // then the production partition above until a route is decided. Unknown
+      // event families from a different host version stay outside this decoder.
       return undefined;
   }
 }

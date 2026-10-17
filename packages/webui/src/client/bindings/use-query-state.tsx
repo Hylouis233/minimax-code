@@ -225,7 +225,8 @@ function settingsInitialSnapshot(): WebuiSettingsWorkflowsState {
 // `models` is its own owner: the catalogue, the selection and the
 // provider list have their own snapshot and their own commands, so a surface
 // that only needs models does not subscribe to the settings snapshot.
-const WebuiModelsWorkflowsContext = createContext<WebuiModelsWorkflows | undefined>(
+type WebuiModelsWorkflowsConsumer = Omit<WebuiModelsWorkflows, "dispose" | "releaseSession">;
+const WebuiModelsWorkflowsContext = createContext<WebuiModelsWorkflowsConsumer | undefined>(
   undefined,
 );
 
@@ -243,7 +244,7 @@ export function WebuiModelsWorkflowsProvider({
   );
 }
 
-export function useWebuiModelsWorkflows(): WebuiModelsWorkflows | undefined {
+export function useWebuiModelsWorkflows(): WebuiModelsWorkflowsConsumer | undefined {
   return useContext(WebuiModelsWorkflowsContext);
 }
 

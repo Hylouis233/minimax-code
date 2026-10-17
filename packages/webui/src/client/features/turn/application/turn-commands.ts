@@ -60,7 +60,7 @@ import { streamStateBundle } from "./stream-state-bundle.js";
 import type { WebuiSessionStore } from "../../../application/session-store.js";
 import { WEBUI_HOME_SESSION_KEY } from "../../../application/state.js";
 import type { WebuiTurnCapabilitySlice } from "./turn-capabilities.js";
-import type { WebuiDeliveryDisposers } from "./delivery-disposers.js";
+import { holdWebuiDelivery, type WebuiDeliveryDisposers } from "./delivery-disposers.js";
 import type { WebuiSessionScopeManager } from "../../../conversation/session-scope.js";
 import { stopWebuiTurn } from "./turn-coordinator.js";
 import {
@@ -421,20 +421,7 @@ export function createWebuiConversationTurnCommands(
     readonly onDelivery: (handle: { readonly close: () => void }) => void;
     readonly release: () => void;
   } => {
-    let releaseHandle: (() => void) | undefined;
-    let releaseInterest: (() => void) | undefined;
-    return {
-      onDelivery: (handle) => {
-        releaseHandle = context.deliveries?.track(recordKey(), handle);
-        releaseInterest = context.scope?.acquire(recordKey(), "delivery", `attempt:${recordKey()}`);
-      },
-      release: () => {
-        releaseHandle?.();
-        releaseInterest?.();
-        releaseHandle = undefined;
-        releaseInterest = undefined;
-      },
-    };
+    return holdWebuiDelivery(recordKey, context.deliveries, context.scope);
   };
   const loopDeps = (
     hold: { readonly onDelivery: (handle: { readonly close: () => void }) => void },

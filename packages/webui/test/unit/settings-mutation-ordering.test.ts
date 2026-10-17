@@ -14,6 +14,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createWebuiSettingsWorkflows } from "../../src/client/features/settings/application/settings-workflows.js";
+import { WebuiWireError } from "../../src/shared/envelope.js";
 
 const deferred = <T = void>() => {
   let resolve!: (value: T) => void;
@@ -30,6 +31,39 @@ function workflowsWith(port: Record<string, unknown>) {
 }
 
 describe("V09 · a write retires the reads that started before it", () => {
+  const cases = [
+    { name: "instructions", get: "getGlobalInstructions", set: "setGlobalInstructions", value: { content: "written" }, load: (w: ReturnType<typeof workflowsWith>) => w.loadInstructions(), save: (w: ReturnType<typeof workflowsWith>) => w.saveInstructions("written"), shown: (w: ReturnType<typeof workflowsWith>) => w.getSnapshot().instructions.value },
+    { name: "profile", get: "getUserProfile", set: "setUserProfile", value: { nickname: "written", occupation: "", moreAbout: "" }, load: (w: ReturnType<typeof workflowsWith>) => w.loadProfile(), save: (w: ReturnType<typeof workflowsWith>) => w.saveProfile({ nickname: "written", occupation: "", moreAbout: "" }), shown: (w: ReturnType<typeof workflowsWith>) => w.getSnapshot().profile.value },
+    { name: "memory content", get: "getAgentMemory", set: "setAgentMemory", value: { agentName: "main", path: "memory.md", exists: true, sizeBytes: 7, content: "written" }, load: (w: ReturnType<typeof workflowsWith>) => w.loadAgentMemory(true), save: (w: ReturnType<typeof workflowsWith>) => w.saveAgentMemory("written"), shown: (w: ReturnType<typeof workflowsWith>) => w.getSnapshot().agentMemoryContent.value },
+    { name: "memory settings", get: "getMemorySettings", set: "setMemorySettings", value: { enabled: false, proactive: false }, load: (w: ReturnType<typeof workflowsWith>) => w.loadMemorySettings(), save: (w: ReturnType<typeof workflowsWith>) => w.saveMemorySettings({ enabled: false, proactive: false }), shown: (w: ReturnType<typeof workflowsWith>) => w.getSnapshot().memorySettings.value },
+    { name: "model source", get: "getMiniMaxModelSource", set: "setMiniMaxModelSource", value: "minimax_api_key", load: (w: ReturnType<typeof workflowsWith>) => w.loadModelSource(), save: (w: ReturnType<typeof workflowsWith>) => w.setModelSource("minimax_api_key"), shown: (w: ReturnType<typeof workflowsWith>) => w.getSnapshot().modelSource.value },
+    { name: "permission mode", get: "getPermissionMode", set: "setPermissionMode", value: "auto", load: (w: ReturnType<typeof workflowsWith>) => w.loadPermissionMode(), save: (w: ReturnType<typeof workflowsWith>) => w.savePermissionMode("auto"), shown: (w: ReturnType<typeof workflowsWith>) => w.getSnapshot().permissionMode.value },
+  ];
+  it.each(cases)("keeps the committed $name write when an older read completes", async (entry) => {
+    const old = deferred<unknown>();
+    const read = vi.fn().mockImplementationOnce(() => old.promise).mockResolvedValue(entry.value);
+    const w = workflowsWith({ [entry.get]: read, [entry.set]: async () => entry.value });
+    const pending = entry.load(w);
+    await entry.save(w);
+    old.resolve(entry.value === "auto" ? "default" : entry.value === "minimax_api_key" ? "token_plan" : { content: "old" });
+    expect((await pending).status).toBe("superseded");
+    expect(entry.shown(w)).toEqual(entry.value);
+    w.dispose();
+  });
+
+  it("preserves a machine-readable refusal through the owner's policy decision", async () => {
+    const refusal = new WebuiWireError("permission_denied", "denied", "settings-write");
+    const write = vi.fn(async () => { throw refusal; });
+    const read = vi.fn(async () => ({ content: "committed" }));
+    const w = workflowsWith({ getGlobalInstructions: read, setGlobalInstructions: write });
+    await w.loadInstructions();
+    await expect(w.saveInstructions("new")).rejects.toBe(refusal);
+    expect(refusal.code).toBe("permission_denied");
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(w.getSnapshot().instructions.value?.content).toBe("committed");
+    w.dispose();
+  });
   it("reports an in-flight read as superseded and never lands it", async () => {
     const read = deferred<{ content: string }>();
     const port = {

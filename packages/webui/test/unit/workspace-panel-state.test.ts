@@ -307,7 +307,8 @@ describe("the terminal roster is read before it is shown", () => {
     // stated before the request instead of after it.
     expect(panelSource).toContain("const DESKTOP_TERMINAL_LIMIT = 5;");
     expect(panelSource).toContain("const terminalSlotsFull = terminals.length >= DESKTOP_TERMINAL_LIMIT;");
-    expect(panelSource).toContain("disabled={terminalSlotsFull}");
+    expect(panelSource).toContain("const terminalCreateDisabled = terminalSlotsFull || !terminalOwner?.canCreate;");
+    expect(panelSource).toContain("disabled={terminalCreateDisabled}");
     // One helper, not three copies of the create-then-catch dance.
     const createHandlers = panelSource.split("onClick={createTerminal}").length - 1;
     expect(createHandlers).toBe(2);

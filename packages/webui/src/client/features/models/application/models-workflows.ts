@@ -8,9 +8,8 @@
 // `settings` renders the page. The two owners hold their own state and their own
 // snapshot.
 //
-// The cached-read fence is not this module's either: `query-store.ts` holds the
-// one implementation of the snapshot, the listener set and the version guard, and
-// both owners read through it.
+// Keyed resources own request identities and commit fences. This owner projects
+// their values into its own snapshot and owns one identity-epoch subscription.
 //
 // One call crosses a boundary: writing a provider key is `models`' command, but
 // the api-key *status* it invalidates is `settings`' read, so this owner invokes
@@ -20,13 +19,13 @@
 //
 // Framework-free: no React, no DOM, no storage.
 
-import type { WebuiEpochKey, WebuiIdentityEpochs } from "../../../application/identity-epochs.js";
+import type { WebuiIdentityEpochs } from "../../../application/identity-epochs.js";
 import {
   runWebuiMutation,
   type WebuiMutationOutcome,
   createWebuiKeyedResource,
   idleWebuiResourceState,
-  type WebuiKeyedResource,
+  serializeWebuiResourceKey,
   type WebuiResourceKey,
   type WebuiResourceState,
 } from "../../../conversation/request-freshness.js";
@@ -112,6 +111,7 @@ export interface WebuiModelsWorkflows {
   readonly acquireModels: (sessionId?: string) => Promise<void>;
   /** Point the shown catalogue at a context, without issuing a read. */
   readonly selectCatalogue: (sessionId?: string) => void;
+  readonly releaseSession: (sessionId: string) => void;
   readonly selectModel: (request: {
     readonly providerId: string;
     readonly modelId: string;
@@ -258,41 +258,17 @@ export function createWebuiModelsWorkflows(deps: {
    * a different generation. Without that filter a credential write would retire
    * answers that only ever carried the configuration token.
    */
-  const bindingFor = <T>(
-    generation: WebuiEpochKey,
-    resource: WebuiKeyedResource<T>,
-    key: WebuiResourceKey,
-  ): (() => void) => {
-    const epochs = deps.identityEpochs;
-    if (!epochs) return () => undefined;
-    return resource.bindEpoch(
-      {
-        token: () => epochs.read(generation).token,
-        subscribe: (listener) =>
-          epochs.subscribe((advanced) => {
-            if (advanced.key === generation) listener();
-          }),
-      },
-      key,
-    );
-  };
-  // Rebound whenever the shown catalogue key changes, so the previous generation
-  // retires only the entries that still exist under its own key.
-  let releaseCatalogueEpochs: Array<() => void> = [];
+  const catalogueKeys = new Map<string, WebuiResourceKey>();
+  const providerKeys = new Map<string, WebuiResourceKey>();
+  const releasedSessions = new Set<string>();
   const bindCatalogueEpochs = (key: WebuiResourceKey): void => {
-    for (const release of releaseCatalogueEpochs) release();
-    releaseCatalogueEpochs = [
-      bindingFor("credentials", catalogue, key),
-      bindingFor("configuration", catalogue, key),
-    ];
+    catalogueKeys.set(serializeWebuiResourceKey(key), key);
   };
-  // The provider list carries only the configuration generation, and its key does
-  // not move, so this binding is installed once and released at disposal.
-  const releaseProviderEpoch = () => bindingFor("configuration", providerList, providerKey());
 
   // The owner's own snapshot: the projection below writes it, the React binding
   // subscribes to it. It holds no answer of its own — the keyed resources do.
   let state: WebuiModelsWorkflowsState = initialWebuiModelsWorkflowsState;
+  let disposed = false;
   const listeners = new Set<() => void>();
   const getSnapshot = (): WebuiModelsWorkflowsState => state;
   const subscribe = (listener: () => void): (() => void) => {
@@ -302,6 +278,7 @@ export function createWebuiModelsWorkflows(deps: {
   const set = (
     update: (current: WebuiModelsWorkflowsState) => WebuiModelsWorkflowsState,
   ): void => {
+    if (disposed) return;
     const next = update(state);
     if (next === state) return;
     state = next;
@@ -339,6 +316,22 @@ export function createWebuiModelsWorkflows(deps: {
   catalogue.subscribe(project);
   providerList.subscribe(project);
   presetList.subscribe(project);
+  const stopEpochs = deps.identityEpochs?.subscribe((advanced) => {
+    // One owner subscription, not one new subscription per periodic read. Only
+    // resources composing the advanced epoch retire; presets stay untouched.
+    for (const [serialized, key] of catalogueKeys) {
+      if (!(advanced.key in key)) continue;
+      catalogueKeys.delete(serialized);
+      catalogue.release(key);
+    }
+    if (advanced.key === "configuration") {
+      for (const key of providerKeys.values()) providerList.release(key);
+      providerKeys.clear();
+    }
+    shownCatalogueKey = catalogueKeyFor(shownSessionId);
+    bindCatalogueEpochs(shownCatalogueKey);
+    project();
+  });
 
   /** A capability the runtime does not expose is reported, never a success. */
   const unavailable = (
@@ -356,6 +349,7 @@ export function createWebuiModelsWorkflows(deps: {
    * answer while an unrelated key stays untouched.
    */
   const selectCatalogue = (sessionId?: string): void => {
+    if (disposed) return;
     shownSessionId = sessionId;
     shownCatalogueKey = catalogueKeyFor(sessionId);
     bindCatalogueEpochs(shownCatalogueKey);
@@ -369,6 +363,7 @@ export function createWebuiModelsWorkflows(deps: {
    * B's catalogue without B becoming what session A's view renders.
    */
   const acquireModels = async (sessionId?: string): Promise<void> => {
+    if (disposed || (sessionId !== undefined && releasedSessions.has(sessionId))) return;
     if (!port.listModels) {
       unavailable("models", "当前运行时不支持模型列表。");
       return;
@@ -376,13 +371,13 @@ export function createWebuiModelsWorkflows(deps: {
     const key = catalogueKeyFor(sessionId);
     // Bound for the same reason the shown key is: a credential or configuration
     // advance retires this answer too, and only the keys that carry that epoch.
-    releaseCatalogueEpochs.push(bindingFor("credentials", catalogue, key));
-    releaseCatalogueEpochs.push(bindingFor("configuration", catalogue, key));
+    bindCatalogueEpochs(key);
     await catalogue.load(key, () => port.listModels!(sessionId ? { sessionId } : undefined));
   };
 
   /** The foreground read: show this context's catalogue and read it. */
   const loadModels = async (sessionId?: string): Promise<void> => {
+    if (disposed || (sessionId !== undefined && releasedSessions.has(sessionId))) return;
     if (!port.listModels) {
       unavailable("models", "当前运行时不支持模型列表。");
       return;
@@ -412,6 +407,7 @@ export function createWebuiModelsWorkflows(deps: {
   };
 
   const loadProviders = async (): Promise<void> => {
+    if (disposed) return;
     if (!port.listUserModelProviders) {
       unavailable("providers", "当前运行时不支持自定义提供商。");
       return;
@@ -419,7 +415,9 @@ export function createWebuiModelsWorkflows(deps: {
     // Read, compose, then commit — one publication. Awaiting a plain load first would commit
     // the server's list on its own, and every subscriber would see this owner's newer intent
     // replaced by an answer that predates it for the length of a round trip.
-    const token = providerList.capture(providerKey());
+    const key = providerKey();
+    providerKeys.set(serializeWebuiResourceKey(key), key);
+    const token = providerList.capture(key);
     let answer: readonly WebuiModelProviderView[];
     try {
       answer = await port.listUserModelProviders();
@@ -786,10 +784,19 @@ export function createWebuiModelsWorkflows(deps: {
     loadPresets,
     upsertApiKey,
     refreshModels,
+    releaseSession: (sessionId: string) => {
+      for (const [serialized, key] of catalogueKeys) {
+        if (key.sessionId !== sessionId) continue;
+        catalogueKeys.delete(serialized); catalogue.release(key);
+      }
+      releasedSessions.add(sessionId);
+      project();
+    },
     dispose: () => {
-      for (const release of releaseCatalogueEpochs) release();
-      releaseCatalogueEpochs = [];
-      releaseProviderEpoch();
+      disposed = true;
+      stopEpochs?.();
+      catalogueKeys.clear(); providerKeys.clear(); releasedSessions.clear();
+      listeners.clear();
       catalogue.dispose();
       providerList.dispose();
       presetList.dispose();

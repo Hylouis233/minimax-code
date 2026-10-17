@@ -30,6 +30,7 @@ import { createWebuiPortSlices } from "./application/port-slices.js";
 import { createWebuiOpenEventChannel } from "./bindings/event-channel-adapter.js";
 import { WebuiApplicationProvider } from "./bindings/application-context.js";
 import { WebuiPortSlicesProvider } from "./bindings/port-slices-context.js";
+import { WEBUI_PROTOCOL_VERSION, WebuiWireError, WebuiErrorCode } from "../shared/envelope.js";
 
 declare const document: {
   getElementById(elementId: string): HTMLElement | null;
@@ -212,9 +213,23 @@ const browserCapabilities = {
 // the shell.
 const app = <WebuiClientRoot transport={transport} dataDir={runtimeConfig.dataDir} storage={browserCapabilities.storage} />;
 const currentRoute = route(location.pathname);
-root.render(
+const renderApplication = (): void => root.render(
   // The boundary wraps the app, not the 404: a 404 is a legitimate render and
   // must not offer a "retry" that reloads the same missing path.
   currentRoute === "404" ? <NotFound /> : <WebuiBrowserCapabilitiesProvider value={browserCapabilities}><WebuiErrorBoundary><ArchonPage>{app}</ArchonPage></WebuiErrorBoundary></WebuiBrowserCapabilitiesProvider>,
 );
+if (currentRoute === "404") renderApplication();
+else void transport.version().then((version) => {
+  if (version.protocolVersion !== WEBUI_PROTOCOL_VERSION) {
+    throw new WebuiWireError(WebuiErrorCode.protocolMismatch,
+      `WebUI protocol ${version.protocolVersion} is incompatible with client protocol ${WEBUI_PROTOCOL_VERSION}`);
+  }
+  renderApplication();
+}).catch((reason: unknown) => {
+  root.render(<WebuiStartupFallback
+    reason={reason instanceof Error ? reason.message : String(reason)}
+    detail="页面与服务未能建立兼容连接，请检查服务版本或连接后刷新重试。"
+    onReload={() => location.reload()}
+  />);
+});
 }

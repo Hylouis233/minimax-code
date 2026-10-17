@@ -39,6 +39,8 @@ import type {
   WebuiWatchEventsResult,
 } from "../../src/shared/contracts/stream.js";
 import type { WebuiSessionPage } from "../../src/shared/contracts/session.js";
+import { createWebuiWire, type WebuiSocket } from "../../src/client/platform/wire.js";
+import { createWebuiSettingsWorkflows } from "../../src/client/features/settings/application/settings-workflows.js";
 
 interface TestPort extends WebuiHarnessPort {
   /** Every harness method the run actually reached, in call order. */
@@ -104,6 +106,17 @@ function openClient(url: string): Client {
     ws.once("close", (code) => resolve({ code }));
   });
   return { ws, upgrade, closed };
+}
+
+/** Adapt the native ws event interface to the browser wire's narrow interface. */
+class LoopbackSocket implements WebuiSocket {
+  private readonly socket: WebSocket;
+  constructor(url: string) { this.socket = new WebSocket(url); }
+  addEventListener(type: "open" | "message" | "error" | "close", listener: (event: { data?: unknown }) => void): void {
+    this.socket.addEventListener(type, (event) => listener("data" in event ? { data: event.data } : {}));
+  }
+  send(data: string): void { this.socket.send(data); }
+  close(): void { this.socket.close(); }
 }
 
 /** Send one request frame and resolve with the next frame the server writes. */
@@ -235,6 +248,37 @@ describe("loopback to harness-port evidence", () => {
   afterEach(async () => {
     await service?.close();
     service = undefined;
+  });
+
+  it("V20 reconciles a committed mutation after the real socket loses its response, without retrying", async () => {
+    let content = "before";
+    let writes = 0;
+    let finish!: () => void;
+    const answer = () => ({ content, exists: true, path: "AGENTS.md", maxBytes: 32768 });
+    const port: WebuiHarnessPort = {
+      ...scriptedPort(),
+      getGlobalInstructions: async () => answer(),
+      setGlobalInstructions: async (request) => {
+        writes += 1;
+        content = request.content;
+        // The host committed, but the response is held past the client deadline.
+        await new Promise<void>((resolve) => { finish = resolve; });
+        return answer();
+      },
+    };
+    service = new WebuiService({ port, operations: createOperationRegistry(port), credential: { token: "lost-response-fixture" } });
+    const info = await service.start();
+    const wire = createWebuiWire({ websocketUrl: `ws://127.0.0.1:${info.tcpPort}`, token: info.credential.token, webSocket: LoopbackSocket, requestTimeoutMs: 100 });
+    const owner = createWebuiSettingsWorkflows({ port: {
+      getGlobalInstructions: () => wire.request("getGlobalInstructions", {}),
+      setGlobalInstructions: (request) => wire.request("setGlobalInstructions", request),
+    } });
+    try {
+      await owner.loadInstructions();
+      await expect(owner.saveInstructions("committed despite lost response")).rejects.toThrow("timed out");
+      expect(writes).toBe(1);
+      expect(owner.getSnapshot().instructions.value?.content).toBe("committed despite lost response");
+    } finally { finish?.(); owner.dispose(); }
   });
 
   it("covers authentication, dispatch, watchEvents, reconnect and shutdown", async () => {

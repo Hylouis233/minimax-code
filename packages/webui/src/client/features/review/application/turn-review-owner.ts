@@ -136,7 +136,7 @@ export function createWebuiTurnReviewOwner(deps: {
     if (releasedSessions.has(sessionId)) return;
     for (const [serialized, key] of [...askedKeys]) {
       if (key.sessionId !== sessionId) continue;
-      pages.invalidate(resourceKey(key));
+      pages.release(resourceKey(key));
       askedKeys.delete(serialized);
     }
     releasedSessions.add(sessionId);

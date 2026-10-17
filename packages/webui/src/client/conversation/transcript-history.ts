@@ -96,6 +96,7 @@ export interface WebuiTranscriptHistoryOwner {
    * same session, which used to cost a second page read on every switch.
    */
   readonly ensurePage: (sessionId: string) => Promise<WebuiClientMessagePage | undefined>;
+  readonly releaseSession: (sessionId: string) => void;
   /**
    * Fence the owner: no later page read commits, and the presentation slot stops
    * accepting a page for a session nothing presents. The assembly calls this on
@@ -117,11 +118,21 @@ export function createWebuiTranscriptHistoryOwner(deps: {
   const pages = createWebuiKeyedResource<WebuiClientMessagePage>();
   const presentation = createWebuiSelectedSlot<{ readonly sessionId: string }>();
   const incarnation = pages.capture({ sessionId: "", anchor: "head" }).incarnation;
+  pages.release({ sessionId: "", anchor: "head" });
+  const asked = new Map<string, Map<string, { sessionId: string; anchor: string }>>();
+  const releasedSessions = new Set<string>();
 
   const keyOf = (sessionId: string, cursor: string | undefined) => ({
     sessionId,
     anchor: cursor ?? "head",
   });
+  const remember = (sessionId: string, cursor: string | undefined) => {
+    const key = keyOf(sessionId, cursor);
+    const keys = asked.get(sessionId) ?? new Map<string, typeof key>();
+    keys.set(key.anchor, key);
+    asked.set(sessionId, keys);
+    return key;
+  };
 
   const selectSession = (sessionId: string | undefined): void => {
     if (presentation.identity() === sessionId) return;
@@ -155,9 +166,10 @@ export function createWebuiTranscriptHistoryOwner(deps: {
     cursor: string | undefined,
     mode: "join" | "fresh",
   ): Promise<WebuiTranscriptLoadOutcome> => {
+    if (releasedSessions.has(sessionId)) return { status: "stale" };
     if (!deps.loadMessages) return { status: "failed" };
     if (presentation.identity() !== sessionId) selectSession(sessionId);
-    const key = keyOf(sessionId, cursor);
+    const key = remember(sessionId, cursor);
     if (mode === "fresh") pages.invalidate(key);
     // Captured before the read: refused if the presentation has moved on.
     const presentationToken = presentation.capture();
@@ -235,7 +247,8 @@ export function createWebuiTranscriptHistoryOwner(deps: {
   const ensurePage = async (
     sessionId: string,
   ): Promise<WebuiClientMessagePage | undefined> => {
-    const key = keyOf(sessionId, undefined);
+    if (releasedSessions.has(sessionId)) return undefined;
+    const key = remember(sessionId, undefined);
     const cached = pages.read(key);
     if (cached?.status === "ready") return cached.value;
     if (!deps.loadMessages) return undefined;
@@ -250,6 +263,14 @@ export function createWebuiTranscriptHistoryOwner(deps: {
     selectSession,
     seed,
     ensurePage,
+    releaseSession: (sessionId) => {
+      for (const key of asked.get(sessionId)?.values() ?? []) pages.release(key);
+      asked.delete(sessionId);
+      // Authoritative deletions are replay-unsafe; retain only this compact
+      // fence until application disposal, never the session's cached pages.
+      releasedSessions.add(sessionId);
+      if (presentation.identity() === sessionId) presentation.select(undefined);
+    },
     loadPage: (sessionId) => load(sessionId, undefined, "join"),
     refreshPage: (sessionId) => load(sessionId, undefined, "fresh"),
     loadOlder: (sessionId, cursor) => load(sessionId, cursor, "fresh"),
@@ -261,6 +282,8 @@ export function createWebuiTranscriptHistoryOwner(deps: {
     dispose: () => {
       pages.dispose();
       presentation.dispose();
+      asked.clear();
+      releasedSessions.clear();
     },
   };
 }
