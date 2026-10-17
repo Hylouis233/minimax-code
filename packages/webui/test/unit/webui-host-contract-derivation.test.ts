@@ -55,6 +55,73 @@ type MismatchedResultNames = {
 }[Keys<WebuiRuntimeCliService>];
 
 /**
+ * Forwarded members whose declared result is `unknown`.
+ *
+ * The runtime itself declares `unknown` for these ten — the provider-mutation
+ * family, the permission-mode pair, `pluginManagement`, `upsertMiniMaxApiKey` and
+ * `refreshModels` — so no derivation from its declaration is more precise than
+ * `unknown`, and every comparison against `unknown` succeeds. They are named here so
+ * the set is countable, and so a *new* member declared `unknown` (the mirror used to
+ * declare 41 that way at once) fails this file by name instead of quietly making the
+ * result check above vacuous.
+ *
+ * Each has an explicit conversion at the adapter (`harness/result-conversion.ts`) and
+ * a WebUI-owned DTO in `shared/contracts/*`, which is where a field change is argued.
+ */
+type DeclaredUnknownResult = {
+  [K in Keys<WebuiRuntimeCliService>]: unknown extends ResultOf<WebuiRuntimeCliService[K]>
+    ? K
+    : never;
+}[Keys<WebuiRuntimeCliService>];
+
+const UNKNOWN_RESULT_NAMES = [
+  "pluginManagement",
+  "getPermissionMode",
+  "setPermissionMode",
+  "createUserModelProvider",
+  "updateUserModelProvider",
+  "testUserModelProvider",
+  "testUserModel",
+  "upsertMiniMaxApiKey",
+  "testUserModelCandidate",
+  "refreshModels",
+] as const satisfies readonly DeclaredUnknownResult[];
+
+/**
+ * Forwarded members whose declared request the runtime member would not accept.
+ *
+ * The input side of the same boundary, and where an open record shows what it costs:
+ * four of these are declared `Record<string, unknown>`, which is not assignable to a
+ * runtime member that requires fields, so the adapter was forwarding a shape it never
+ * proved. The plan's remedy is to derive each request type from the host input
+ * declaration, or to prove the client shape is accepted on the real host; until that
+ * lands the list is exact, so a ninth one cannot appear quietly.
+ */
+type FirstParamOf<M> = M extends (...args: infer A) => unknown
+  ? A extends [infer P, ...unknown[]]
+    ? P
+    : never
+  : never;
+type MismatchedRequestNames = {
+  [K in Keys<WebuiRuntimeCliService>]: K extends Keys<CliService>
+    ? [FirstParamOf<WebuiRuntimeCliService[K]>] extends [FirstParamOf<CliService[K]>]
+      ? never
+      : K
+    : never;
+}[Keys<WebuiRuntimeCliService>];
+
+const MISMATCHED_REQUEST_NAMES = [
+  "applyCanvas",
+  "replyPermission",
+  "replyQuestionnaire",
+  "createUserModelProvider",
+  "updateUserModelProvider",
+  "discoverUserModelsCandidate",
+  "saveUserModelProviderCandidate",
+  "testUserModelCandidate",
+] as const satisfies readonly MismatchedRequestNames[];
+
+/**
  * The two capabilities the WebUI's host adds on top of the runtime's service.
  * They are WebUI features, not a mirror of anything the runtime has.
  */
@@ -128,6 +195,23 @@ type MismatchedExtra = AssertEmpty<
   Exclude<(typeof MISMATCHED_RESULT_NAMES)[number], MismatchedResultNames>
 >;
 
+// The obligations the `unknown`-declared members used to escape, both exact in both
+// directions: no forwarded result may be declared `unknown` beyond the ten named
+// above, and no forwarded request may be one the runtime member would refuse beyond
+// the eight named above.
+type NoUnknownResults = AssertEmpty<
+  Exclude<DeclaredUnknownResult, (typeof UNKNOWN_RESULT_NAMES)[number]>
+>;
+type NoUnknownResultsExtra = AssertEmpty<
+  Exclude<(typeof UNKNOWN_RESULT_NAMES)[number], DeclaredUnknownResult>
+>;
+type NoMismatchedRequests = AssertEmpty<
+  Exclude<MismatchedRequestNames, (typeof MISMATCHED_REQUEST_NAMES)[number]>
+>;
+type NoMismatchedRequestsExtra = AssertEmpty<
+  Exclude<(typeof MISMATCHED_REQUEST_NAMES)[number], MismatchedRequestNames>
+>;
+
 describe("the WebUI host surface against the runtime it forwards to", () => {
   it("leaves no forwarded result for the assembly to assert about", () => {
     // The cast this list used to stand behind is gone, and the reason it can
@@ -142,9 +226,23 @@ describe("the WebUI host surface against the runtime it forwards to", () => {
     const extra: readonly WebuiOnlyExtra[] = [];
     const mismatchedMissing: readonly MismatchedMissing[] = [];
     const mismatchedExtra: readonly MismatchedExtra[] = [];
-    // Empty by construction: the four aliases above are `never`, so a name that
-    // stopped belonging — or started belonging — is a compile error here.
-    expect([missing, extra, mismatchedMissing, mismatchedExtra]).toHaveLength(4);
+    const unknownResults: readonly NoUnknownResults[] = [];
+    const unknownResultsExtra: readonly NoUnknownResultsExtra[] = [];
+    const mismatchedRequests: readonly NoMismatchedRequests[] = [];
+    const mismatchedRequestsExtra: readonly NoMismatchedRequestsExtra[] = [];
+    // Empty by construction: the eight aliases above are `never`, so a name that
+    // stopped belonging — or started belonging, or that was declared `unknown`, or
+    // that narrowed a request — is a compile error here.
+    expect([
+      missing,
+      extra,
+      mismatchedMissing,
+      mismatchedExtra,
+      unknownResults,
+      unknownResultsExtra,
+      mismatchedRequests,
+      mismatchedRequestsExtra,
+    ]).toHaveLength(8);
   });
 
   it("adds exactly two capabilities of its own", () => {

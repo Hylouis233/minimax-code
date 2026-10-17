@@ -8,6 +8,15 @@ export interface WebuiBrowserDom {
   readonly listenForPointerDown: (listener: (event: PointerEvent) => void, capture?: boolean) => () => void;
   readonly listenForKeyDown: (listener: (event: KeyboardEvent) => void) => () => void;
   readonly listenForStorageChange: (listener: () => void) => () => void;
+  /**
+   * Whether this page is currently hidden from the reader.
+   *
+   * A composition root that has no document answers `false` — a reader that does
+   * not exist yet is not a reader who has gone away.
+   */
+  readonly isPageHidden: () => boolean;
+  /** Fires when the page becomes visible or hidden. */
+  readonly listenForVisibilityChange: (listener: () => void) => () => void;
   readonly listenForContextWindowUsageChange: (listener: () => void) => () => void;
   readonly getElementById: (id: string) => HTMLElement | null;
   readonly getActiveElement: () => HTMLElement | null;
@@ -41,6 +50,8 @@ export function createWebuiBrowserDom(
       windowObject.addEventListener("storage", listener);
       return () => windowObject.removeEventListener("storage", listener);
     },
+    isPageHidden: () => documentObject?.visibilityState === "hidden",
+    listenForVisibilityChange: (listener) => listen("visibilitychange", () => listener()),
     listenForContextWindowUsageChange: (listener) => {
       if (!windowObject) return () => undefined;
       windowObject.addEventListener("webui-context-window-usage-change", listener);

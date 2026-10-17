@@ -12,6 +12,7 @@
 // directly at process start.
 import { WEBUI_PROTOCOL_VERSION } from "../../shared/envelope.js";
 import type { WebuiVersionInfo } from "../../shared/contracts/version.js";
+import { deriveWebuiCapabilityManifest } from "../../shared/capability-manifest.js";
 import type { WebuiHarnessPort } from "../port.js";
 import type { WebuiRuntimeHostHandle } from "./host-contract.js";
 import { createSessionsAdapter } from "./sessions.js";
@@ -28,7 +29,10 @@ export function createHarnessPortFromHost(
   handle: WebuiRuntimeHostHandle,
 ): WebuiHarnessPort {
   const host = handle;
-  const version: WebuiVersionInfo = {
+  // Filled in below, once the port exists: the manifest is a fact about what was
+  // actually wired, so it cannot be written before the thing it describes. The
+  // getter reads the binding, so the caller always sees the completed fact.
+  let version: WebuiVersionInfo = {
     version: host.appVersion ?? "unknown",
     protocolVersion: WEBUI_PROTOCOL_VERSION,
     ...(host.dataDir ? { dataDir: host.dataDir } : {}),
@@ -53,6 +57,14 @@ export function createHarnessPortFromHost(
       closed = true;
       await host.apiHost.close();
     },
+  };
+  // Derived from the assembled port rather than declared per feature: a
+  // capability is advertised because its members are wired, and a family whose
+  // companion is missing is reported `not-ready` instead of silently working
+  // halfway.
+  version = {
+    ...version,
+    capabilities: deriveWebuiCapabilityManifest(port as unknown as Readonly<Record<string, unknown>>),
   };
   const harnessPort: WebuiHarnessPort = {
     ...port,

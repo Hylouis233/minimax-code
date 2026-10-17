@@ -22,6 +22,7 @@
 // DOM — against scripted ports and in-memory stores.
 
 import { describe, expect, it, vi } from "vitest";
+import { createWebuiSessionComposerAccess } from "../../src/client/features/sessions/application/session-workflows.js";
 
 import { createWebuiSessionCatalogFromPage, reduceWebuiCatalogFlatLoaded, removeWebuiCatalogSessions } from "../../src/client/features/sessions/application/session-catalog.js";
 import { initialWebuiSessionCatalogState, selectWebuiCatalogFlatPage } from "../../src/client/features/sessions/application/session-catalog.public.js";
@@ -52,7 +53,7 @@ import type { WebuiStreamFrame } from "../../src/shared/contracts/stream.js";
  * required, so every construction supplies one; the cases below assert the
  * *other* teardown effects.
  */
-const purger = () => ({ purgeSlot: vi.fn() });
+const purger = () => createWebuiSessionComposerAccess({ purgeSlot: vi.fn() });
 
 function session(over: Partial<WebuiClientSession> & { sessionId: string }): WebuiClientSession {
   return { agentName: "main", createdAt: 1, updatedAt: 100, ...over };
@@ -269,7 +270,7 @@ describe("R7 · the delete workflow teardown", () => {
     });
     const workflows = createWebuiSessionWorkflows({
       store,
-      composer,
+      composer: createWebuiSessionComposerAccess(composer, { isStagedFor: () => true }),
       port: {
         deleteSession: async () => ({ success: true }),
         loadSessions: async () => page("b"),
@@ -305,7 +306,7 @@ describe("R7 · the delete workflow teardown", () => {
     scope.acquire("a", "delivery", "stream");
     const workflows = createWebuiSessionWorkflows({
       store,
-      composer,
+      composer: createWebuiSessionComposerAccess(composer, { isStagedFor: () => true }),
       scope,
       port: {
         deleteSession: async () => {
@@ -345,7 +346,7 @@ describe("R7 · the delete workflow teardown", () => {
     scope.acquire("a", "delivery", "stream");
     const workflows = createWebuiSessionWorkflows({
       store,
-      composer,
+      composer: createWebuiSessionComposerAccess(composer, { isStagedFor: () => true }),
       scope,
       port: {
         deleteSession: async () => ({ success: true }),
@@ -415,7 +416,7 @@ describe("R7 · the delete workflow teardown", () => {
     const composer = createWebuiComposerStore({ initial: { drafts: { a: "note" }, history: {} } });
     const workflows = createWebuiSessionWorkflows({
       store,
-      composer,
+      composer: createWebuiSessionComposerAccess(composer, { isStagedFor: () => true }),
       port: {
         deleteSession: async () => ({ success: true }),
         listArchivedSessions: async () => ({ sessions: [] }),
@@ -812,7 +813,7 @@ describe("a session delete invokes the composer's purge command", () => {
     });
     const workflows = createWebuiSessionWorkflows({
       store,
-      composer: { purgeSlot: (key: string) => purged.push(key) },
+      composer: createWebuiSessionComposerAccess({ purgeSlot: (key: string) => purged.push(key) }),
       port: {
         deleteSession: async () => ({ success: true }),
         loadSessions: async () => page("b"),
@@ -842,7 +843,7 @@ describe("V15 · a confirmed deletion settles through one teardown", () => {
     const closeSession = vi.fn();
     const workflows = createWebuiSessionWorkflows({
       store,
-      composer,
+      composer: createWebuiSessionComposerAccess(composer, { isStagedFor: () => true }),
       port: {
         deleteSession: async () => ({ success: true }),
         loadSessions: async () => page("b"),
@@ -910,19 +911,19 @@ describe("V15 · a confirmed deletion settles through one teardown", () => {
 });
 
 describe("V36 · this page can act on a session fact another client published", () => {
-  function factFixture() {
+  function factFixture(drafts: Record<string, string> = { a: "half-written" }) {
     const store = createWebuiSessionStore({
-      catalog: createWebuiSessionCatalogFromPage(page("a", "b")),
+      catalog: createWebuiSessionCatalogFromPage(page("a", "b", "c")),
     });
     store.updateSession("a", (current) => ({ ...current, sending: true }));
     const composer = createWebuiComposerStore({
-      initial: { drafts: { a: "half-written" }, history: { a: ["earlier"] } },
+      initial: { drafts, history: { a: ["earlier"] } },
     });
     const closeSession = vi.fn();
     const invalidated = vi.fn();
     const workflows = createWebuiSessionWorkflows({
       store,
-      composer,
+      composer: createWebuiSessionComposerAccess(composer, { isStagedFor: () => true }),
       port: {
         deleteSession: async () => ({ success: true }),
         loadSessions: async () => page("a", "b"),
@@ -962,23 +963,69 @@ describe("V36 · this page can act on a session fact another client published", 
     const { store, workflows } = factFixture();
     workflows.applyFact({ kind: "visibility", sessionId: "a", hidden: true });
 
-    expect(store.getSnapshot().catalog.flat.ids).toEqual(["b"]);
+    expect(store.getSnapshot().catalog.flat.ids).toEqual(["b", "c"]);
     // Hidden is not gone: the session record stays, and a later unhide can put it
     // back rather than having to re-read the whole page.
     expect(store.getSnapshot().catalog.entities.has("a")).toBe(true);
   });
 
-  it("settles an externally observed deletion exactly as a local one", () => {
+  it("settles an externally observed deletion's state, and retains the unsent input", () => {
     const { store, composer, workflows, closeSession } = factFixture();
     workflows.applyFact({ kind: "deleted", sessionId: "a" });
 
+    // The executable state goes exactly as a local delete would take it: the wire
+    // session stops, the record is dropped from the store, the catalogue drops the
+    // row.
     expect(closeSession).toHaveBeenCalledWith("a");
     expect(store.getSnapshot().sessions.has("a")).toBe(false);
-    expect(composer.readDraft("a")).toBe("");
+    // What differs is the input the user had not sent. Somebody else deleted the
+    // session; destroying their text along with it would be losing their work to a
+    // fact about the catalogue, so it is retained instead of purged.
+    expect(composer.readDraft("a")).toBe("half-written");
+    expect(workflows.retainedDeletionDrafts().map((entry) => entry.sessionId)).toEqual(["a"]);
     // And it settles once: a local delete arriving after the event does not
     // repeat the teardown or issue a second request.
     void workflows.remove("a");
     expect(closeSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("retires a retained draft when the user copies, transfers or discards it", () => {
+    const { composer, workflows } = factFixture({ a: "half-written", b: "b-text", c: "c-text" });
+    workflows.applyFact({ kind: "deleted", sessionId: "a" });
+
+    // Copying hands back the text and retires the notice: the user acted on it.
+    expect(workflows.copyRetainedDeletionDraft("a")).toBe("half-written");
+    expect(workflows.retainedDeletionDrafts()).toEqual([]);
+
+    // Discarding is the third way out, and it drops the record without writing.
+    workflows.applyFact({ kind: "deleted", sessionId: "b" });
+    workflows.discardRetainedDeletionDraft("b");
+    expect(workflows.retainedDeletionDrafts()).toEqual([]);
+
+    // A transfer puts the input into a slot and retires the record the same way.
+    workflows.applyFact({ kind: "deleted", sessionId: "c" });
+    const moved = workflows.transferRetainedDeletionDraft("c", "target");
+    expect(moved?.draft).toBe("c-text");
+    expect(composer.readDraft("target")).toBe("c-text");
+    expect(workflows.retainedDeletionDrafts()).toEqual([]);
+  });
+
+  it("retains nothing when the deleted session had no unsent input", () => {
+    const { workflows } = factFixture({});
+    // A session the user never typed into produces no notice: an empty bucket is
+    // not something to tell them about.
+    workflows.applyFact({ kind: "deleted", sessionId: "b" });
+    expect(workflows.retainedDeletionDrafts()).toEqual([]);
+  });
+
+  it("keeps a local delete's own semantics: the slot goes with the task", async () => {
+    const { store, composer, workflows } = factFixture();
+    // The user asked for this one, so the composer slot is part of what they
+    // ended — the opposite of the external case above, on purpose.
+    await workflows.remove("a");
+    expect(store.getSnapshot().sessions.has("a")).toBe(false);
+    expect(composer.readDraft("a")).toBe("");
+    expect(workflows.retainedDeletionDrafts()).toEqual([]);
   });
 
   it("ignores a fact about a session this client never read", () => {

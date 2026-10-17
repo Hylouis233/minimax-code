@@ -32,6 +32,7 @@
 import type { WebuiIdentityEpochs } from "../../../application/identity-epochs.js";
 import { createWebuiSnapshotStore } from "../../../application/snapshot-store.js";
 import {
+  runWebuiMutation,
   createWebuiKeyedResource,
   idleWebuiResourceState,
   webuiResourceMessage,
@@ -372,6 +373,86 @@ export function createWebuiSettingsWorkflows(deps: {
 
   /** A provider change can add or remove models, so the model list is stale. */
 
+
+  /**
+   * One write chain per resource.
+   *
+   * Same-resource writes serialize; different resources stay independent. Without
+   * this, two saves of one field raced: the later response could land first, and
+   * the earlier one then overwrote it with the value the user had already
+   * replaced.
+   */
+  const writeChains = new Map<string, Promise<unknown>>();
+  const serializeWrite = <T>(name: string, run: () => Promise<T>): Promise<T> => {
+    const previous = writeChains.get(name) ?? Promise.resolve();
+    const next = previous.catch(() => undefined).then(run);
+    writeChains.set(
+      name,
+      next.catch(() => undefined),
+    );
+    return next;
+  };
+
+  /** The last value this owner committed for one read, for restoring it. */
+  const committed = new Map<string, WebuiResourceState<unknown>>();
+
+  /**
+   * One settings write, with the ordering the resource contract requires.
+   *
+   *   1. **Write-start retirement.** A read that started before this write
+   *      describes a state this write is replacing, so its answer must not land
+   *      on top: freshness advances first.
+   *   2. **Serialize.** Another write to the same resource queues behind this one.
+   *   3. **Known success** advances the configuration generation and commits the
+   *      runtime's own answer.
+   *   4. **Known rejection** leaves the last committed value exactly as it was —
+   *      the write did not happen, and showing a change that did not happen is
+   *      worse than showing the old one.
+   *   5. **Unknown outcome** (a lost response, a timeout) reconciles by re-reading
+   *      under the same request identity: the write may have landed, so the only
+   *      honest next thing is to find out rather than to retry it blindly.
+   */
+  const saveWithCommit = <T>(options: {
+    readonly name: string;
+    readonly resource: WebuiKeyedResource<T>;
+    readonly key: WebuiResourceKey;
+    readonly write: () => Promise<T>;
+    readonly reconcile: () => Promise<unknown>;
+  }): Promise<T> =>
+    serializeWrite(options.name, async () => {
+      options.resource.invalidate(options.key);
+      const outcome = await runWebuiMutation(options.write);
+      if (outcome.status === "settled") {
+        afterConfigurationWrite();
+        options.resource.commit(options.resource.capture(options.key), {
+          status: "ready",
+          value: outcome.value,
+        });
+        committed.set(options.name, { status: "ready", value: outcome.value });
+        set((current) => ({ ...current, revision: current.revision + 1 }));
+        return outcome.value;
+      }
+      const error =
+        outcome.error instanceof Error ? outcome.error : new Error(String(outcome.error));
+      if (outcome.category === "refused" || outcome.category === "conflict") {
+        // The runtime answered. The committed value is still the truth, and it is
+        // put back explicitly so no surface is left showing the intent.
+        const previous = committed.get(options.name);
+        if (previous) {
+          // Stored by name, restored into the resource that owns that name.
+          options.resource.commit(
+            options.resource.capture(options.key),
+            previous as WebuiResourceState<T>,
+          );
+        }
+        throw error;
+      }
+      // Unknown: reconcile, then report. Never an automatic retry — a mutation
+      // whose response was lost may have taken effect.
+      await options.reconcile().catch(() => undefined);
+      throw error;
+    });
+
   const loadInstructions = (): Promise<WebuiResourceLoadOutcome<WebuiGlobalInstructionsView>> => {
     if (!port.getGlobalInstructions) {
       unavailable("instructions", "当前运行时不支持自定义指令读写。");
@@ -382,13 +463,17 @@ export function createWebuiSettingsWorkflows(deps: {
     );
   };
 
-  const saveInstructions = async (content: string): Promise<WebuiGlobalInstructionsView> => {
-    if (!port.setGlobalInstructions) throw new Error("当前运行时不支持自定义指令读写。");
-    const value = await port.setGlobalInstructions({ content });
-    afterConfigurationWrite();
-    instructions.commit(instructions.capture({ read: "instructions" }), { status: "ready", value });
-    set((current) => ({ ...current, revision: current.revision + 1 }));
-    return value;
+  const saveInstructions = (content: string): Promise<WebuiGlobalInstructionsView> => {
+    if (!port.setGlobalInstructions) {
+      return Promise.reject(new Error("当前运行时不支持自定义指令读写。"));
+    }
+    return saveWithCommit({
+      name: "instructions",
+      resource: instructions,
+      key: { read: "instructions" },
+      write: () => port.setGlobalInstructions!({ content }),
+      reconcile: () => loadInstructions(),
+    });
   };
 
   const loadProfile = (): Promise<WebuiResourceLoadOutcome<WebuiUserProfileView>> => {
@@ -399,13 +484,17 @@ export function createWebuiSettingsWorkflows(deps: {
     return readInto("profile", profile, { read: "profile" }, "profile", () => port.getUserProfile!());
   };
 
-  const saveProfile = async (fields: WebuiUserProfileFields): Promise<WebuiUserProfileView> => {
-    if (!port.setUserProfile) throw new Error("当前运行时不支持「关于你」读写。");
-    const value = await port.setUserProfile(fields);
-    afterConfigurationWrite();
-    profile.commit(profile.capture({ read: "profile" }), { status: "ready", value });
-    set((current) => ({ ...current, revision: current.revision + 1 }));
-    return value;
+  const saveProfile = (fields: WebuiUserProfileFields): Promise<WebuiUserProfileView> => {
+    if (!port.setUserProfile) {
+      return Promise.reject(new Error("当前运行时不支持「关于你」读写。"));
+    }
+    return saveWithCommit({
+      name: "profile",
+      resource: profile,
+      key: { read: "profile" },
+      write: () => port.setUserProfile!(fields),
+      reconcile: () => loadProfile(),
+    });
   };
 
   /**
@@ -440,24 +529,39 @@ export function createWebuiSettingsWorkflows(deps: {
         );
   };
 
-  const saveAgentMemory = async (content: string): Promise<WebuiAgentMemoryView> => {
-    if (!port.setAgentMemory) throw new Error("当前运行时不支持长期记忆读写。");
-    const value = await port.setAgentMemory({ content });
-    afterConfigurationWrite();
-    // The write answers with the body it committed, so both identities are
-    // refreshed from it: a summary still showing the pre-write size would be
-    // reporting a file state that no longer exists.
-    memoryContent.commit(
-      memoryContent.capture({ read: "agentMemory", content: true }),
-      { status: "ready", value },
-    );
-    memorySummary.commit(
-      memorySummary.capture({ read: "agentMemory", content: false }),
-      { status: "ready", value: { ...value, content: undefined } },
-    );
-    set((current) => ({ ...current, revision: current.revision + 1 }));
-    return value;
-  };
+  const saveAgentMemory = (content: string): Promise<WebuiAgentMemoryView> =>
+    // Two request identities are refreshed from one write, so the chain helper's
+    // single-resource commit does not fit: the write is serialized and the
+    // outcome handled here, with both identities committed from the answer.
+    serializeWrite("agentMemory", async () => {
+      if (!port.setAgentMemory) throw new Error("当前运行时不支持长期记忆读写。");
+      const contentKey = { read: "agentMemory", content: true };
+      const summaryKey = { read: "agentMemory", content: false };
+      memoryContent.invalidate(contentKey);
+      memorySummary.invalidate(summaryKey);
+      const outcome = await runWebuiMutation(() => port.setAgentMemory!({ content }));
+      if (outcome.status === "settled") {
+        const value = outcome.value;
+        afterConfigurationWrite();
+        // The write answers with the body it committed, so both identities are
+        // refreshed from it: a summary still showing the pre-write size would be
+        // reporting a file state that no longer exists.
+        memoryContent.commit(memoryContent.capture(contentKey), { status: "ready", value });
+        memorySummary.commit(memorySummary.capture(summaryKey), {
+          status: "ready",
+          value: { ...value, content: undefined },
+        });
+        committed.set("agentMemory", { status: "ready", value });
+        set((current) => ({ ...current, revision: current.revision + 1 }));
+        return value;
+      }
+      const error =
+        outcome.error instanceof Error ? outcome.error : new Error(String(outcome.error));
+      if (outcome.category !== "refused" && outcome.category !== "conflict") {
+        await loadAgentMemory(true).catch(() => undefined);
+      }
+      throw error;
+    });
 
   const loadMemorySettings = (): Promise<WebuiResourceLoadOutcome<WebuiMemorySettingsView>> => {
     if (!port.getMemorySettings) {
@@ -469,19 +573,20 @@ export function createWebuiSettingsWorkflows(deps: {
     );
   };
 
-  const saveMemorySettings = async (patch: {
+  const saveMemorySettings = (patch: {
     readonly enabled?: boolean;
     readonly proactive?: boolean;
   }): Promise<WebuiMemorySettingsView> => {
-    if (!port.setMemorySettings) throw new Error("当前运行时不支持记忆开关。");
-    const value = await port.setMemorySettings(patch);
-    afterConfigurationWrite();
-    memorySettings.commit(memorySettings.capture({ read: "memorySettings" }), {
-      status: "ready",
-      value,
+    if (!port.setMemorySettings) {
+      return Promise.reject(new Error("当前运行时不支持记忆开关。"));
+    }
+    return saveWithCommit({
+      name: "memorySettings",
+      resource: memorySettings,
+      key: { read: "memorySettings" },
+      write: () => port.setMemorySettings!(patch),
+      reconcile: () => loadMemorySettings(),
     });
-    set((current) => ({ ...current, revision: current.revision + 1 }));
-    return value;
   };
 
   /** A provider mutation refreshes the provider list and marks models stale. */
@@ -507,11 +612,16 @@ export function createWebuiSettingsWorkflows(deps: {
   };
 
   const setModelSource = async (source: WebuiModelSource): Promise<void> => {
-    if (!port.setMiniMaxModelSource) throw new Error("当前运行时不支持切换模型来源。");
-    const value = await port.setMiniMaxModelSource(source);
-    afterConfigurationWrite();
-    modelSource.commit(modelSource.capture({ read: "modelSource" }), { status: "ready", value });
-    set((current) => ({ ...current, revision: current.revision + 1 }));
+    if (!port.setMiniMaxModelSource) {
+      throw new Error("当前运行时不支持切换模型来源。");
+    }
+    await saveWithCommit({
+      name: "modelSource",
+      resource: modelSource,
+      key: { read: "modelSource" },
+      write: () => port.setMiniMaxModelSource!(source),
+      reconcile: () => loadModelSource(),
+    });
   };
 
   const loadVersion = (): Promise<WebuiResourceLoadOutcome<WebuiVersionInfo>> => {
@@ -549,17 +659,24 @@ export function createWebuiSettingsWorkflows(deps: {
     });
   };
 
-  const savePermissionMode = async (mode: WebuiPermissionMode): Promise<WebuiPermissionMode> => {
-    if (!port.setPermissionMode) throw new Error("当前运行时不支持授权模式读写。");
-    const answer = readWebuiPermissionMode(await port.setPermissionMode({ mode }));
-    if (!answer) throw new Error("运行时返回了不支持的授权模式");
-    permissionMode.commit(permissionMode.capture({ read: "permissionMode" }), {
-      status: "ready",
-      value: answer,
+  const savePermissionMode = (mode: WebuiPermissionMode): Promise<WebuiPermissionMode> =>
+    saveWithCommit({
+      name: "permissionMode",
+      resource: permissionMode,
+      key: { read: "permissionMode" },
+      write: async () => {
+        if (!port.setPermissionMode) throw new Error("当前运行时不支持授权模式读写。");
+        const answer = readWebuiPermissionMode(await port.setPermissionMode({ mode }));
+        if (!answer) throw new Error("运行时返回了不支持的授权模式");
+        return answer;
+      },
+      reconcile: () => loadPermissionMode(),
+      // The permission preference has its own generation semantics: this write
+      // does not advance the configuration epoch, so the commit must not be
+      // retired by one. `saveWithCommit` advances it after a settled write; for
+      // this resource that advance is harmless (it is not bound to the epoch) and
+      // keeps one ordering rule for every settings write.
     });
-    set((current) => ({ ...current, revision: current.revision + 1 }));
-    return answer;
-  };
 
   return {
     getSnapshot,

@@ -30,8 +30,6 @@ import type {
   WebuiModelProviderView,
   WebuiSaveUserModelProviderCandidateRequest,
   WebuiTestUserModelCandidateRequest,
-  WebuiUpdateUserModelProviderRequest,
-  WebuiUserModelInput,
 } from "../../../../shared/contracts/models.js";
 import type {
   WebuiProviderEditor,
@@ -60,13 +58,23 @@ export interface WebuiProviderFormCommands {
     body: WebuiSaveUserModelProviderCandidateRequest,
   ) => Promise<unknown>;
   readonly deleteProvider: (providerId: string) => Promise<unknown>;
-  readonly updateProvider: (
-    body: WebuiUpdateUserModelProviderRequest,
-  ) => Promise<unknown>;
-  readonly patchProviderModels: (
-    providerId: string,
-    models: readonly WebuiModelProviderModelEntry[],
-  ) => void;
+  /**
+   * The two semantic mutations this panel asks for.
+   *
+   * Neither takes a model array: the panel says what the user meant, and the
+   * Models owner resolves it against the list it currently holds. Replacing these
+   * with a generic array update is what let a toggle send a list built from
+   * rendered props over a list the owner had already changed.
+   */
+  readonly setProviderModelEnabled: (intent: {
+    readonly providerId: string;
+    readonly modelId: string;
+    readonly enabled: boolean;
+  }) => Promise<unknown>;
+  readonly reorderProviderModels: (intent: {
+    readonly providerId: string;
+    readonly orderedModelIds: readonly string[];
+  }) => Promise<unknown>;
 }
 
 /**
@@ -89,17 +97,6 @@ export interface WebuiProviderFormPanelProps {
 
 function providerModels(provider?: WebuiModelProviderView): readonly WebuiModelProviderModelEntry[] {
   return provider?.models ?? [];
-}
-
-/**
- * A model reorder or toggle writes the rows it read back as model inputs. The
- * spread keeps every field the runtime sent, so a write never erases a model's
- * configuration on the way through the editor.
- */
-function toModelInputs(
-  rows: readonly WebuiModelProviderModelEntry[],
-): readonly WebuiUserModelInput[] {
-  return rows.map((row) => ({ ...row, modelId: row.modelId }));
 }
 
 function ProviderPresetPicker({ presets, selected, selectedName, onSelect }: { readonly presets: readonly Record<string, unknown>[]; readonly selected: string; readonly selectedName: string; readonly onSelect: (preset?: Record<string, unknown>) => void }): ReactElement {
@@ -162,14 +159,18 @@ export function ProviderFormPanel({
       if (!editor.getSnapshot().error) setProviderPendingDelete(undefined);
     };
     const toggleModel = async (providerId: string, model: WebuiModelProviderModelEntry, enabled: boolean) => {
-      const nextModels = providerModels(providers.find((provider) => provider.providerId === providerId)).map((candidate) =>
-        candidate.modelId === model.modelId ? { ...candidate, enabled } : candidate,
-      );
-      // Show the toggle immediately; the owner reloads the truth after the write
-      // and rolls the patch back if the write fails.
-      commands.patchProviderModels(providerId, nextModels);
-      try { await commands.updateProvider({ providerId, models: toModelInputs(nextModels) }); }
-      catch (error) { setProviderActionError(error instanceof Error ? error.message : String(error)); }
+      // The intent, not the array: the owner applies it to its own pending
+      // projection and serializes the write per provider, so a toggle cannot
+      // resurrect a list that a newer local change has already replaced.
+      const outcome = await commands.setProviderModelEnabled({
+        providerId,
+        modelId: textOf(model.modelId),
+        enabled,
+      });
+      if (outcome && typeof outcome === "object" && "status" in outcome && outcome.status === "failed") {
+        const failure = outcome as { readonly error?: unknown };
+        setProviderActionError(failure.error instanceof Error ? failure.error.message : String(failure.error));
+      }
     };
   return <>
       {providers.length === 0 ? <p>暂未添加自定义模型</p> : providers.map((provider) => {
@@ -188,11 +189,17 @@ export function ProviderFormPanel({
             const over = event.over?.id; const active = event.active.id;
             if (!over || active === over) return;
             const orderedIds = reorderModelIds(ids, String(active), String(over));
-            const nextModels = orderedIds.map((modelId) => models[ids.indexOf(modelId)]).filter((model): model is WebuiModelProviderModelEntry => model !== undefined);
-            // Optimistic like the toggle: the row moves at once, the write
-            // follows, and a failure reloads the truth.
-            commands.patchProviderModels(id, nextModels);
-            await commands.updateProvider({ providerId: id, models: toModelInputs(nextModels) });
+            // Ordered identities again: the owner resolves them against what it
+            // holds, so the row moves at once and the write carries the owner's
+            // own view rather than this render's array.
+            const outcome = await commands.reorderProviderModels({
+              providerId: id,
+              orderedModelIds: orderedIds,
+            });
+            if (outcome && typeof outcome === "object" && "status" in outcome && outcome.status === "failed") {
+              const failure = outcome as { readonly error?: unknown };
+              setProviderActionError(failure.error instanceof Error ? failure.error.message : String(failure.error));
+            }
           }}><SortableContext items={ids} strategy={verticalListSortingStrategy}><div className="w-full rounded-[16px] bg-bg_grouped_tertiary p-1">{models.map((model, index) => <SortableModelRow key={ids[index]} id={ids[index]!} model={model} onTest={() => void commands.testModel({ providerId: id, modelId: textOf(model.modelId) })} onToggle={(enabled) => void toggleModel(id, model, enabled)} />)}</div></SortableContext></DndContext> : null}
         </div>;
       })}

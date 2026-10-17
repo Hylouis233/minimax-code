@@ -100,6 +100,19 @@ export interface WebuiUnreadController {
    * One probe per visible session, applied as each answer lands. Returns a
    * cancel that drops answers arriving after the caller's effect has torn down.
    */
+  /**
+   * Apply one session's probe answer.
+   *
+   * The scheduler owns *when* a session is probed, so the answer has to be
+   * appliable on its own: a caller that probed one identity must be able to hand
+   * back exactly that identity's result without going through the list-shaped
+   * entry point.
+   */
+  readonly applyActiveTurn: (
+    sessionId: string,
+    active: WebuiActiveTurnResult,
+    at: number,
+  ) => void;
   readonly probeActiveTurns: (args: {
     readonly sessions: readonly { readonly sessionId: string }[];
     readonly probe: WebuiActiveTurnProbe;
@@ -170,6 +183,9 @@ export function createWebuiUnreadController(
           activeSessionId ? { activeSessionId } : {},
         ),
       );
+    },
+    applyActiveTurn: (sessionId, active, at) => {
+      store.updateActivity((current) => applyWebuiActiveTurn(current, sessionId, active, at));
     },
     probeActiveTurns: (args) => {
       let cancelled = false;

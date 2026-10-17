@@ -14,6 +14,10 @@
 
 import type { SessionPort, WebuiClientSessionCreator } from "../contracts/session-port.js";
 import type { WebuiComposerPurgeSlot } from "../../../features/composer/application/composer-store.public.js";
+import type {
+  WebuiComposerAttachment,
+  WebuiComposerUrlReference,
+} from "../../../features/composer/contracts/composer-interactions.js";
 import type { WebuiSessionScopeManager } from "../../../conversation/session-scope.js";
 import type {
   WebuiClientProject,
@@ -117,6 +121,108 @@ export interface WebuiProjectsState {
   readonly error?: string;
 }
 
+/**
+ * The unsent input a composer slot holds.
+ *
+ * Draft text is per slot; staged attachments and URL references belong to the
+ * slot the user is composing in, so they are read for the session that is
+ * selected. Both travel together because they are one submission's input.
+ */
+export interface WebuiUnsentComposerInput {
+  readonly draft: string;
+  readonly attachments: readonly WebuiComposerAttachment[];
+  readonly urlReferences: readonly WebuiComposerUrlReference[];
+}
+
+/**
+ * The unsent input one externally deleted session left behind.
+ *
+ * Retained in the sessions business because losing it is the sessions business's
+ * fault: the deletion was somebody else's, and the text was the user's. The title
+ * is carried so the notice can say which task it came from.
+ */
+export interface WebuiRetainedDeletionDraft extends WebuiUnsentComposerInput {
+  readonly sessionId: string;
+}
+
+/** The composer capabilities a delete reads, structurally. */
+export interface WebuiComposerInputSource {
+  readonly purgeSlot: WebuiComposerPurgeSlot;
+  /** The draft for one slot key. Absent means this deployment has no drafts. */
+  readonly readDraft?: (key: string) => string;
+  /** The staged attachments and references of the slot being composed in. */
+  readonly readStaging?: () => {
+    readonly attachments: readonly WebuiComposerAttachment[];
+    readonly urlReferences: readonly WebuiComposerUrlReference[];
+  };
+  readonly setDraft?: (key: string, text: string) => void;
+  readonly setStaging?: (
+    next: Partial<{
+      readonly attachments: readonly WebuiComposerAttachment[];
+      readonly urlReferences: readonly WebuiComposerUrlReference[];
+    }>,
+  ) => void;
+}
+
+/**
+ * Builds the delete's view of the composer from the composer store.
+ *
+ * Here rather than inline in the assembly because two callers need the same
+ * translation: the application, and any test that deletes a session. Keeping it
+ * in the sessions business is deliberate — the question it answers ("what input
+ * does this slot still hold?") is the one a deletion has to answer, and the
+ * composer store's own API is not the sessions business's vocabulary.
+ *
+ * `isStagedFor` says whether the staged attachments belong to the slot being
+ * read. Staging is the *current* slot's, so retaining another session's
+ * attachments would be attributing the user's files to the wrong task.
+ */
+export function createWebuiSessionComposerAccess(
+  source: WebuiComposerInputSource,
+  options: {
+    readonly homeKey?: string;
+    readonly isStagedFor?: (sessionId: string) => boolean;
+  } = {},
+): WebuiSessionComposerAccess {
+  const isStagedFor = options.isStagedFor ?? (() => false);
+  return {
+    purgeSlot: source.purgeSlot,
+    readUnsent: (sessionId) => {
+      const draft = source.readDraft?.(sessionId) ?? "";
+      const staged = isStagedFor(sessionId) ? source.readStaging?.() : undefined;
+      return {
+        draft,
+        attachments: staged?.attachments ?? [],
+        urlReferences: staged?.urlReferences ?? [],
+      };
+    },
+    writeUnsent: (sessionId, input) => {
+      source.setDraft?.(sessionId ?? options.homeKey ?? "", input.draft);
+      if (input.attachments.length === 0 && input.urlReferences.length === 0) return;
+      source.setStaging?.({
+        attachments: input.attachments,
+        urlReferences: input.urlReferences,
+      });
+    },
+  };
+}
+
+/** What a delete needs from the composer: its slot purge, and the input it holds. */
+export interface WebuiSessionComposerAccess {
+  /** The published purge command the delete already depended on. */
+  readonly purgeSlot: WebuiComposerPurgeSlot;
+  /**
+   * The unsent input for one slot. A delete reads it before it fences the slot,
+   * so an externally deleted session's text can be retained instead of dropped.
+   */
+  readonly readUnsent: (sessionId: string) => WebuiUnsentComposerInput;
+  /** Put retained input back into a slot, for an explicit transfer. */
+  readonly writeUnsent: (
+    sessionId: string | undefined,
+    input: WebuiUnsentComposerInput,
+  ) => void;
+}
+
 export const initialWebuiArchivedSessionsState: WebuiArchivedSessionsState = {
   status: "idle",
   sessions: [],
@@ -145,6 +251,29 @@ export interface WebuiSessionWorkflows {
   /** The archived-sessions read plus a subscription for its readers. */
   readonly getArchivedSnapshot: () => WebuiArchivedSessionsState;
   readonly subscribeArchived: (listener: () => void) => () => void;
+  /**
+   * Unsent input an externally deleted session still holds.
+   *
+   * A session the user did not delete themselves can vanish because another
+   * client or the CLI removed it. The text and attachments that were staged for it
+   * are the user's, not the catalogue's, so they are retained here rather than
+   * dropped with the session: the notice that reports the deletion reads this list
+   * until the user copies the text, transfers it to another task, or discards it.
+   */
+  readonly retainedDeletionDrafts: () => readonly WebuiRetainedDeletionDraft[];
+  readonly subscribeRetainedDrafts: (listener: () => void) => () => void;
+  /** The text to copy, and the record retires because the user acted on it. */
+  readonly copyRetainedDeletionDraft: (sessionId: string) => string | undefined;
+  /**
+   * Hand the retained input to a task. With no target it goes to the composer's
+   * current slot, which is where "continue this elsewhere" starts; the record
+   * retires either way, because transferring is the user acting on it.
+   */
+  readonly transferRetainedDeletionDraft: (
+    sessionId: string,
+    targetSessionId?: string,
+  ) => WebuiUnsentComposerInput | undefined;
+  readonly discardRetainedDeletionDraft: (sessionId: string) => void;
   readonly canLoadArchived: boolean;
   readonly loadArchived: () => Promise<void>;
   /** Delete one archived session and refresh the archived list. */
@@ -233,11 +362,14 @@ export interface WebuiSessionWorkflows {
 export function createWebuiSessionWorkflows(deps: {
   readonly store: WebuiSessionCatalogStore;
   /**
-   * The composer's published purge command. It used to be optional, and absent
-   * meant drafts outlive the delete — a soft-loss this module must not keep as a
-   * configuration, so the delete **cannot compile** without it.
+   * The composer's published purge command plus the unsent input it holds. It
+   * used to be optional, and absent meant drafts outlive the delete — a soft-loss
+   * this module must not keep as a configuration, so the delete **cannot compile**
+   * without it. Reading and writing the input is here for the same reason: a
+   * deletion is the moment the sessions business has to decide what happens to
+   * text the user had not sent.
    */
-  readonly composer: { readonly purgeSlot: WebuiComposerPurgeSlot };
+  readonly composer: WebuiSessionComposerAccess;
   /**
    * The session scope. A delete is an accepted mutation, so it holds a
    * **settlement** lease until its outcome and the invalidation it owes are
@@ -252,6 +384,16 @@ export function createWebuiSessionWorkflows(deps: {
    * and keeps reading frames for a session that no longer exists.
    */
   readonly deliveries?: { readonly closeSession: (sessionId: string) => void };
+  /**
+   * Every dependent owner's per-session release, composed by the assembly.
+   *
+   * A session's disappearance has to reach the owners that were created for it —
+   * its goal, its pending permissions and questionnaire, the review of its turns
+   * and the workspace resources scoped to it. This module knows *when* they must
+   * release; which owners exist and how each releases itself is the assembly's
+   * knowledge, and each owner keeps its own command.
+   */
+  readonly releaseOwners?: (sessionId: string) => void;
   /**
    * Re-read the views that render facts the rail entity does not carry — a
    * session's model and its interaction mode live in the composer's controls and
@@ -330,6 +472,58 @@ export function createWebuiSessionWorkflows(deps: {
   // number of deletions.
   const removedSessionIds = new Set<string>();
 
+  /**
+   * Unsent input retained from sessions somebody else deleted.
+   *
+   * A bounded bucket, like the deletion fence beside it: the record is retired by
+   * the user copying, transferring or discarding it, and cleared when the page is
+   * torn down. That is the same boundedness exception the plan accepts for
+   * tombstones — bounded by user action rather than by a quota — and it is stated
+   * rather than implied.
+   */
+  const retainedDrafts = new Map<string, WebuiRetainedDeletionDraft>();
+  const retainedListeners = new Set<() => void>();
+  const notifyRetained = (): void => {
+    for (const listener of [...retainedListeners]) listener();
+  };
+  const retainUnsentInput = (sessionId: string): void => {
+    const input = composer.readUnsent(sessionId);
+    if (input.draft === "" && input.attachments.length === 0 && input.urlReferences.length === 0) {
+      // Nothing of the user's was unsent for this session, so there is nothing to
+      // retain and no notice to raise.
+      return;
+    }
+    retainedDrafts.set(sessionId, { sessionId, ...input });
+    notifyRetained();
+  };
+  const dropRetained = (sessionId: string): void => {
+    if (!retainedDrafts.delete(sessionId)) return;
+    notifyRetained();
+  };
+  const copyRetainedDeletionDraft = (sessionId: string): string | undefined => {
+    const retained = retainedDrafts.get(sessionId);
+    if (!retained) return undefined;
+    // Copying is the user acting on it: the notice has done its job, and keeping
+    // the record would mean asking them to dismiss something already handled.
+    dropRetained(sessionId);
+    return retained.draft;
+  };
+  const transferRetainedDeletionDraft = (
+    sessionId: string,
+    targetSessionId?: string,
+  ): WebuiUnsentComposerInput | undefined => {
+    const retained = retainedDrafts.get(sessionId);
+    if (!retained) return undefined;
+    const input: WebuiUnsentComposerInput = {
+      draft: retained.draft,
+      attachments: retained.attachments,
+      urlReferences: retained.urlReferences,
+    };
+    composer.writeUnsent(targetSessionId, input);
+    dropRetained(sessionId);
+    return input;
+  };
+
   const dropRemovedEntities = (
     state: WebuiSessionCatalogState,
   ): WebuiSessionCatalogState =>
@@ -373,18 +567,37 @@ export function createWebuiSessionWorkflows(deps: {
    * The order is the fence first: `removedSessionIds` before any state changes,
    * so a stream frame, a lifecycle event or a catalog load already in flight
    * writes nothing from the moment this runs.
+   *
+   * The two origins differ in exactly one place: **what happens to input the user
+   * had not sent.** A local delete is the user ending the task, so the composer
+   * slot goes with it — that is what they asked for. An external deletion is
+   * somebody else ending it, so the unsent text and attachments are retained for
+   * the user to copy, transfer or discard; destroying them because another client
+   * deleted a session would be losing the user's work to a fact about the
+   * catalogue.
    */
-  const teardownDeletedSession = (sessionId: string): void => {
+  const teardownDeletedSession = (
+    sessionId: string,
+    origin: "local" | "external",
+  ): void => {
     removedSessionIds.add(sessionId);
+    // Read before anything is released: the input belongs to a slot this teardown
+    // is about to fence.
+    if (origin === "external") retainUnsentInput(sessionId);
     // The wire session stops before the interest that could reopen it is
     // released: revoking the lease alone leaves the delivery loop reading frames
     // for a session the server no longer has.
     deps.deliveries?.closeSession(sessionId);
     store.purgeSession(sessionId);
-    composer.purgeSlot(sessionId);
+    if (origin === "local") composer.purgeSlot(sessionId);
     // Every browser interest in the deleted session goes with it, including a
     // delivery lease on a stream that can no longer commit.
     deps.scope?.purge(sessionId);
+    // The dependent owners: each releases its own observable state through its own
+    // command. Disposing the session record and the catalogue is not teardown —
+    // a per-session goal, a pending permission, a review of a deleted task and a
+    // canvas document would each outlive the session they describe.
+    deps.releaseOwners?.(sessionId);
     commitCatalog((current) => removeWebuiCatalogSessions(current, [sessionId]));
     dropRemovedArchivedRows();
   };
@@ -500,16 +713,20 @@ export function createWebuiSessionWorkflows(deps: {
           deps.sessionFactInvalidated?.(fact.sessionId);
           return;
         case "created":
-          // Known already: another client created something we can see. The
-          // catalogue's flat page is the authoritative list and will carry it on
-          // its own refresh, so there is nothing to patch and nothing to guess.
+          // Another client or the CLI created something this page can see. The
+          // flat page is the authoritative list, so the row is not synthesised
+          // here — but the fact still has to *cause* the repair rather than wait
+          // for one: a session that exists everywhere else and not here is
+          // exactly the stale catalogue this route exists to prevent. The reload
+          // runs through the same removal fence and request guards as any other.
+          void loadFlat();
           return;
         case "deleted":
           // Confirmed gone by another client. This is the same confirmation a
           // local delete produced, so it takes the same teardown — including
           // stopping the wire session, which `removedSessionIds` then keeps from
           // being applied twice if the local delete also lands.
-          teardownDeletedSession(fact.sessionId);
+          teardownDeletedSession(fact.sessionId, "external");
           return;
         default:
           return;
@@ -557,7 +774,7 @@ export function createWebuiSessionWorkflows(deps: {
       // The delete has committed, so every slice that could still describe a
       // live session goes. Local and externally observed deletion converge on
       // this one teardown, so neither order can leave a half-deleted session.
-      teardownDeletedSession(sessionId);
+      teardownDeletedSession(sessionId, "local");
       await refresh();
       if (archived.status !== "idle") await loadArchived();
       settle?.();
@@ -585,7 +802,7 @@ export function createWebuiSessionWorkflows(deps: {
       }
       // Deleting from the archived page removes the same session the rail
       // could still be showing, so it takes the same teardown as `remove`.
-      teardownDeletedSession(sessionId);
+      teardownDeletedSession(sessionId, "local");
       await loadArchived();
     },
     unarchive: async (sessionId) => {
@@ -660,12 +877,24 @@ export function createWebuiSessionWorkflows(deps: {
         }
       }
     },
+    retainedDeletionDrafts: () => [...retainedDrafts.values()],
+    subscribeRetainedDrafts: (listener) => {
+      retainedListeners.add(listener);
+      return () => retainedListeners.delete(listener);
+    },
+    copyRetainedDeletionDraft,
+    transferRetainedDeletionDraft,
+    discardRetainedDeletionDraft: dropRetained,
     dispose: () => {
       if (disposed) return;
       disposed = true;
       projectRequestVersion += 1;
       if (projects.loading) setProjects({ ...projects, loading: false });
       projectListeners.clear();
+      // A retained draft is retained for a notice on this page; the page going
+      // away is the end of the retention the plan accepts.
+      retainedDrafts.clear();
+      retainedListeners.clear();
     },
   };
 }

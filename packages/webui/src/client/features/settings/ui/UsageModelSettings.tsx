@@ -45,8 +45,8 @@ const NO_PROVIDER_COMMANDS: WebuiProviderFormCommands = {
   testCandidate: async () => unavailableWebuiProviderOutcome("当前运行时不支持模型测试。"),
   saveCandidate: async () => undefined,
   deleteProvider: async () => undefined,
-  updateProvider: async () => undefined,
-  patchProviderModels: () => {},
+  setProviderModelEnabled: async () => ({ status: "failed", category: "refused", error: new Error("当前运行时不支持修改提供商。") }),
+  reorderProviderModels: async () => ({ status: "failed", category: "refused", error: new Error("当前运行时不支持修改提供商。") }),
 };
 
 export function UsageModelSettings({ sessionId }: Props): ReactElement {

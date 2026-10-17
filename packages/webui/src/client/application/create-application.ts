@@ -15,9 +15,16 @@
 // a source of duplicated state.
 
 import { createWebuiPortSlices, type WebuiPortSlices } from "./port-slices.js";
-import { createWebuiSessionWorkflows } from "../features/sessions/application/session-workflows.js";
+import {
+  createWebuiSessionComposerAccess,
+  createWebuiSessionWorkflows,
+} from "../features/sessions/application/session-workflows.js";
 import { createWebuiCommandWorkflows } from "../features/composer/application/command-workflows.js";
 import { createWebuiComposerController } from "../features/composer/application/composer-controller.js";
+import {
+  createWebuiObservationScheduler,
+  type WebuiObservationScheduler,
+} from "./observation-scheduler.js";
 import {
   submitWebuiGoal,
   type WebuiGoalOwnerCapability,
@@ -363,6 +370,12 @@ export interface WebuiApplication {
   /** The plan-review reply workflow. */
   readonly planReviewWorkflow: ReturnType<typeof createWebuiPlanReviewWorkflow>;
   /**
+   * The application's observation scheduler: the two bounded periodic read
+   * classes. A surface registers interest in an identity; it never installs its
+   * own timer.
+   */
+  readonly observations: WebuiObservationScheduler;
+  /**
    * The one active-turn probe: a same-session probe from two views collapses to
    * one round trip, and absent means the host predates the operation — the
    * rail's own condition, not a second probe.
@@ -397,6 +410,14 @@ export interface WebuiApplication {
   readonly onChannelReady: (listener: () => void) => () => void;
   /** Tear down: detach the coordinator, dispose the store, close the channel. */
   readonly dispose: () => void;
+  /**
+   * What failed while disposing, by owner label. Empty before disposal and for a
+   * clean one; unchanged by a second disposal.
+   */
+  readonly disposalFailures: () => readonly {
+    readonly label: string;
+    readonly reason: unknown;
+  }[];
 }
 
 export function createWebuiApplication(
@@ -607,7 +628,13 @@ export function createWebuiApplication(
   // can reach which port" is decided here rather than by which port a component
   // happened to be handed.
   const slices = deps.slices ?? createWebuiPortSlices(deps.turnCapabilities ?? {});
-  const terminalOwner = createWebuiTerminalOwner(slices.workspace);
+  // The terminal owner reads the handshake's capability manifest when asked, so a
+  // host that declares no terminal bridge is reported absent rather than offered,
+  // and a bridge that is not ready says so. The reader is lazy because the
+  // handshake is read by the settings owner, which is built below.
+  const terminalOwner = createWebuiTerminalOwner(slices.workspace, {
+    readCapabilities: () => settingsWorkflows.getSnapshot().runtimeVersion.value?.capabilities,
+  });
   const transcriptCommands: WebuiTranscriptCommands = {
     ...(slices.sessions.getSessionForkOptions
       ? { getSessionForkOptions: (request) => slices.sessions.getSessionForkOptions!(request) }
@@ -627,9 +654,16 @@ export function createWebuiApplication(
   };
   const sessionWorkflows = createWebuiSessionWorkflows({
     store,
-    // A delete clears the composer slot's draft and history, so a fresh session
-    // does not inherit the deleted session's text.
-    composer,
+    // What a delete needs from the composer: its slot purge, plus the input the
+    // slot holds. A *local* delete is the user ending the task, so the slot goes
+    // with it; an externally observed deletion retains the unsent text and
+    // attachments instead, and only this seam can read them before the slot is
+    // fenced.
+    composer: createWebuiSessionComposerAccess(composer, {
+      homeKey: WEBUI_COMPOSER_HOME_KEY,
+      // Staged attachments belong to the slot the user is composing in.
+      isStagedFor: (sessionId) => readActiveSessionId() === sessionId,
+    }),
     port: slices.sessions,
     ...(deps.sessionImport ? { importSession: deps.sessionImport } : {}),
     ...(deps.sessionExport ? { exportSession: deps.sessionExport } : {}),
@@ -638,13 +672,25 @@ export function createWebuiApplication(
     scope: sessionScope,
     // A committed delete also stops the wire session it was streaming on.
     deliveries,
+    // And it reaches the owners that were created for that session. Each releases
+    // its own observable state through its own command — this is the list of
+    // owners a session has, which only the assembly knows.
+    releaseOwners: (sessionId) => {
+      goals.purge(sessionId);
+      interactions.purge(sessionId);
+      turnReview.releaseSession(sessionId);
+      workspaceQueries.releaseSession(sessionId);
+    },
     // A model or interaction-mode change is answered by re-reading the views
     // that render them, because the rail's session record has no field for
     // either. The reads are interest-gated, so a session nobody is watching does
     // not fan out a background request.
     sessionFactInvalidated: (sessionId) => {
       dirtyResources.delete(sessionId);
-      modelsWorkflows.loadModels(sessionId);
+      // Acquisition, not selection: another client changing a session's model is a
+      // fact about that session, and repairing it must not move what this page is
+      // looking at.
+      void modelsWorkflows.acquireModels(sessionId);
       interactions.owner(sessionId).refresh();
     },
   });
@@ -665,6 +711,9 @@ export function createWebuiApplication(
       ...(owner.patchGoal ? { patchGoal: owner.patchGoal } : {}),
     };
   };
+  // The application's observation scheduler: one place owns the two bounded
+  // periodic reads, and the surfaces below contribute interest rather than timers.
+  const observations = createWebuiObservationScheduler();
   composerController = createWebuiComposerController({
     store: composer,
     readSelectedSessionId: readActiveSessionId,
@@ -699,6 +748,8 @@ export function createWebuiApplication(
     refreshPending: (sessionId) => interactions.owner(sessionId).refresh(),
     refreshGoal: async (sessionId) => { await goals.owner(sessionId).refreshGoal(); },
     recoverTurn: (sessionId) => turnCommandsFor(sessionId).recover(),
+    // The scheduler owns when this runs; the composer only says it is interested.
+    observations,
     refreshInspection: async (sessionId) => {
       await Promise.all([modelsWorkflows.loadModels(sessionId), accountWorkflows.loadAccount(sessionId)]);
     },
@@ -838,9 +889,19 @@ export function createWebuiApplication(
   const lifecycleState = (): WebuiApplicationLifecycleState => lifecycle;
   let channel: WebuiProcessEventChannel | undefined;
   let detach: (() => void) | undefined;
+  /**
+   * Owners that failed while ending, in the order they were ended.
+   *
+   * Kept on the instance rather than only printed: "the application is gone" and
+   * "the application is gone and two owners did not end cleanly" are different
+   * states, and a caller that wants to know which one it is should not have to
+   * read a console.
+   */
+  const disposalFailures: { readonly label: string; readonly reason: unknown }[] = [];
 
   return {
     state: () => lifecycle,
+    disposalFailures: () => disposalFailures,
     start: (options) => {
       // A disposed instance is terminal: no hydration, no ingress, no second
       // life through the same object.
@@ -901,6 +962,7 @@ export function createWebuiApplication(
     composerPluginCatalogue,
     activeTurnProbe,
     planReviewWorkflow,
+    observations,
     versionCells,
     identityEpochs,
     reconcile: (sessionId) => {
@@ -924,10 +986,17 @@ export function createWebuiApplication(
       // last-but-one either way, so a failing cleanup above it cannot leave the
       // application half-alive with writers still accepted — the failure is
       // reported, the rest of the teardown still runs.
+      /** What went wrong while ending owners, kept past the disposal call. */
+      disposalFailures.length = 0;
       const shutDown = (label: string, end: () => void): void => {
         try {
           end();
         } catch (reason) {
+          // One owner's failure does not stop the others: the loop below still
+          // runs every step. The failure is kept rather than only printed, so a
+          // disposal that went wrong anywhere is inspectable after the fact
+          // instead of surviving as a line in a console nobody reads.
+          disposalFailures.push({ label, reason });
           console.error(`[webui] ${label} cleanup failed during application disposal`, reason);
         }
       };
@@ -958,6 +1027,9 @@ export function createWebuiApplication(
       shutDown("turn review owner", () => turnReview.dispose());
       shutDown("transcript history owner", () => transcriptHistory.dispose());
       shutDown("composer plugin catalogue", () => composerPluginCatalogue.dispose());
+      // After the owners it was scheduling: the scheduler holds no owner, only the
+      // interest that pointed at them, and it stops issuing work before they go.
+      shutDown("observation scheduler", () => observations.dispose());
       // Observation only. The browser page ends its watches here; the PTYs are
       // the service's, and a page that merely listed a terminal has no rights
       // over its process. Explicit close (`disposeProcess`) and service shutdown
@@ -971,6 +1043,17 @@ export function createWebuiApplication(
         channel?.close?.();
         channel = undefined;
       });
+      if (disposalFailures.length > 0) {
+        // Every owner had its turn; the failures are reported together, with the
+        // labels, so the summary names what went wrong rather than the first thing
+        // that did.
+        console.error(
+          `[webui] application disposal finished with ${disposalFailures.length} failure(s): ${disposalFailures
+            .map((failure) => failure.label)
+            .join(", ")}`,
+          disposalFailures,
+        );
+      }
     },
   };
 }

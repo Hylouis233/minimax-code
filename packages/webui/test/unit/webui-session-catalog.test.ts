@@ -6,6 +6,7 @@
 // surface against a scripted port.
 
 import { describe, expect, it } from "vitest";
+import { createWebuiSessionComposerAccess } from "../../src/client/features/sessions/application/session-workflows.js";
 
 import { createWebuiSessionCatalogFromPage, patchWebuiCatalogEntity, reduceWebuiCatalogFlatAppended, reduceWebuiCatalogFlatLoaded, reduceWebuiCatalogTreeLoaded, removeWebuiCatalogEntities } from "../../src/client/features/sessions/application/session-catalog.js";
 import { initialWebuiSessionCatalogState, selectWebuiCatalogFlatPage, selectWebuiCatalogTreePage } from "../../src/client/features/sessions/application/session-catalog.public.js";
@@ -21,7 +22,7 @@ import { selectWebuiSessionAgentName, selectWebuiSessionLookups } from "../../sr
  * command, not an optional). These cases are about the catalog, so the purger is a
  * no-op.
  */
-const purger = () => ({ purgeSlot: () => undefined });
+const purger = () => createWebuiSessionComposerAccess({ purgeSlot: () => undefined });
 
 function session(
   over: Partial<WebuiClientSession> & { sessionId: string },

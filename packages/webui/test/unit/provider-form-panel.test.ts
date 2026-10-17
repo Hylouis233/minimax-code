@@ -108,8 +108,12 @@ describe("the panel keeps the reset boundary", () => {
   });
 
   it("invokes the provider commands it is handed, and owns none of them", () => {
-    expect(panel).toContain("commands.patchProviderModels(");
-    expect(panel).toContain("commands.updateProvider(");
+    expect(panel).toContain("commands.setProviderModelEnabled(");
+    expect(panel).toContain("commands.reorderProviderModels(");
+    // Intent, never a replacement array: an array built from rendered props is
+    // exactly what could resurrect a list the owner had already changed.
+    expect(panel).not.toContain("commands.patchProviderModels(");
+    expect(panel).not.toContain("toModelInputs(");
     // The draft's write/test/delete commands are the editor's, so the panel no longer
     // names them: it calls the editor, and the editor is what sends them.
     expect(panel).not.toContain("commands.saveCandidate(");

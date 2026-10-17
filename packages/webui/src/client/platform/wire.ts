@@ -22,10 +22,12 @@ import type {
 } from "../../shared/operation-names.js";
 import {
   decodeWebuiServerFrame,
+  WEBUI_ANONYMOUS_REQUEST_ID,
   WebuiErrorCode,
   WebuiWireError,
   type WebuiFrameRejectionReason,
 } from "../../shared/envelope.js";
+import { decodeWebuiOperationResult } from "../../shared/operation-codecs.js";
 import {
   createWebuiEventChannel,
   type WebuiClientEventWatcher,
@@ -189,10 +191,20 @@ export function createWebuiWire({
         handlers.invalidFrame?.(session, decoded.reason);
         return;
       }
-      // An unrelated named response belongs to another request on another socket.
-      // Dropping it is the only correct action: it is not an error, and settling
-      // this request with it would answer the wrong question.
-      if (decoded.frame.requestId !== requestId) return;
+      if (decoded.frame.requestId !== requestId) {
+        // A refusal the service could not attribute belongs to the socket it
+        // arrived on, and this socket carries exactly one request: the read that
+        // failed to establish the identity is exactly the read this client must
+        // be told about. Dropping it would leave the caller waiting for a timeout
+        // while the answer was already on the wire.
+        const attributable =
+          decoded.frame.kind === "error" &&
+          decoded.frame.requestId === WEBUI_ANONYMOUS_REQUEST_ID;
+        // Any other identity belongs to another request on another socket.
+        // Dropping it is the only correct action: it is not an error, and
+        // settling this request with it would answer the wrong question.
+        if (!attributable) return;
+      }
       handlers.frame(session, decoded.frame);
     });
     ws.addEventListener("close", () => handlers.closed?.(session));
@@ -228,10 +240,20 @@ export function createWebuiWire({
             return;
           }
           if (frame.kind !== "response") return;
+          // The body is judged before it is committed: a frame that is a valid
+          // envelope but not this operation's result is a wire refusal, not a
+          // value for a caller to discover a missing field in later.
+          let decoded: OperationSpec[K]["response"];
+          try {
+            decoded = decodeWebuiOperationResult(operation, frame.body);
+          } catch (error) {
+            fail(session, error instanceof Error ? error : new Error(String(error)));
+            return;
+          }
           settled = true;
           clearTimeout(timeout);
           session.close();
-          resolve(frame.body as OperationSpec[K]["response"]);
+          resolve(decoded);
         },
         invalidFrame: (session, reason) => fail(session, rejectionError(reason, operation)),
         closed: (session) =>

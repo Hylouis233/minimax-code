@@ -32,8 +32,14 @@ export interface WebuiTurnSendIntent {
   readonly clientIntent?: string;
   readonly planMode?: boolean;
   readonly attachments?: readonly WebuiAttachmentInput[];
-  /** Tell the composer its staged attachments were consumed. */
-  readonly onAttachmentsSubmitted?: () => void;
+  /**
+   * There is deliberately no staging-clear callback here.
+   *
+   * Staging is the composer's own input, so *it* consumes it, on the admission the
+   * turn owner just decided. A callback on the intent made the caller responsible
+   * for a business write whose timing it could not see — and every caller that
+   * forgot it leaked staged files into a submission that had already happened.
+   */
   readonly createSessionWorkspaceDir?: string;
   readonly teamModeOff?: boolean;
 }

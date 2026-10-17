@@ -58,6 +58,14 @@ export interface WebuiWorkspaceCanvasOwner {
     sessionId: string,
     operation: CanvasOperation,
   ) => Promise<boolean>;
+  /**
+   * Release one session's canvas state.
+   *
+   * A deleted session's document is not a document any more, and an in-flight read
+   * for it must not land afterwards: the sequence advances, so the answer that
+   * was coming has nobody left to commit to.
+   */
+  readonly release: (sessionId: string) => void;
   readonly dispose: () => void;
 }
 
@@ -79,6 +87,16 @@ export function createWebuiWorkspaceCanvasOwner(deps: {
     if (next === state) return;
     state = next;
     for (const listener of [...listeners]) listener();
+  };
+
+  /**
+   * Drop the session's canvas: supersede its in-flight read, then clear the entry
+   * if it is the one on screen. The next session's read starts from idle rather
+   * than inheriting a document that belonged to a session that no longer exists.
+   */
+  const release = (sessionId: string): void => {
+    readSeq += 1;
+    set((current) => (current.sessionId === sessionId ? initialWebuiWorkspaceCanvasState : current));
   };
 
   const read = (sessionId: string): void => {
@@ -153,6 +171,7 @@ export function createWebuiWorkspaceCanvasOwner(deps: {
     canApply: port.applyCanvas !== undefined,
     read,
     apply,
+    release,
     dispose: () => {
       listeners.clear();
     },

@@ -15,6 +15,17 @@
 
 export const WEBUI_PROTOCOL_VERSION = 1 as const;
 
+/**
+ * The identity the service puts on a refusal it could not attribute to a request.
+ *
+ * It is a protocol fact, not an absence: a frame whose request could not be read
+ * (malformed, or refused before the identity was established) is answered on the
+ * socket it arrived on with this identity. A one-request socket can therefore
+ * attribute such a refusal to its own pending request instead of dropping it and
+ * waiting for a timeout.
+ */
+export const WEBUI_ANONYMOUS_REQUEST_ID = "anonymous" as const;
+
 export type WebuiEnvelopeKind = "request" | "response" | "error" | "event";
 
 export interface WebuiRequestFrame {
@@ -232,10 +243,14 @@ export function decodeWebuiServerFrame(text: string): WebuiFrameDecode {
  */
 export class WebuiWireError extends Error {
   readonly code: WebuiWireErrorCode;
-  /** The request this refusal answers, or `"anonymous"` for one that could not be attributed. */
+  /** The request this refusal answers, or {@link WEBUI_ANONYMOUS_REQUEST_ID} for one that could not be attributed. */
   readonly requestId: string;
 
-  constructor(code: WebuiWireErrorCode, message: string, requestId = "anonymous") {
+  constructor(
+    code: WebuiWireErrorCode,
+    message: string,
+    requestId: string = WEBUI_ANONYMOUS_REQUEST_ID,
+  ) {
     super(message);
     this.name = "WebuiWireError";
     this.code = code;

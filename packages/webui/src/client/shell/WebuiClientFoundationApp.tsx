@@ -41,6 +41,7 @@ import {
 import { ConversationUsageBanner } from "../features/account/ui/ConversationUsageBanner.js";
 import { PluginCatalogue } from "../features/plugins/ui/PluginCatalogue.js";
 import { WebuiComposer } from "../features/composer/ui/WebuiComposer.js";
+import { WebuiExternalDeletionNotice } from "../features/sessions/ui/ExternalDeletionDraftNotice.public.js";
 import { WebuiSessionTranscript } from "../features/transcript/ui/SessionTranscript.js";
 import { SessionRailRegion } from "../features/sessions/ui/SessionRailRegion.js";
 import { useSessionRailState } from "../features/sessions/bindings/use-session-rail-state.js";
@@ -175,7 +176,7 @@ function requireApplication(
 export function WebuiClientFoundationApp(
   props: WebuiClientFoundationAppProps,
 ): ReactElement {
-  const { storage: browserStorage } = useWebuiBrowserCapabilities();
+  const { storage: browserStorage, dom: browserDom } = useWebuiBrowserCapabilities();
   // One application, assembled and owned by the composition root.
   // The shell adopts that instance — its store, its composer owner and its
   // lifetime — and builds nothing of its own; a missing one is an assembly
@@ -240,6 +241,13 @@ export function WebuiClientFoundationApp(
   // through `transport` and then patch onto two structures by hand. The shell
   // submits a workflow and holds no transport call for session entities.
   const sessionWorkflows = application.sessionWorkflows;
+  // The retained drafts an externally deleted session left behind: the notice below
+  // reads them until the user copies, transfers or discards one.
+  const retainedDeletionDrafts = useSyncExternalStore(
+    sessionWorkflows.subscribeRetainedDrafts,
+    sessionWorkflows.retainedDeletionDrafts,
+    sessionWorkflows.retainedDeletionDrafts,
+  );
   const projectState = useSessionRailState(sessionWorkflows);
   const projectRecords = projectState.projects;
   // The one workspace query owner: it caches the workspace file tree, file
@@ -642,22 +650,50 @@ export function WebuiClientFoundationApp(
       seed: (sessions: Parameters<typeof application.unread.seed>[0]) =>
         applicationRef.current.unread.seed(sessions),
       hydrate: (id: string | undefined) => applicationRef.current.unread.hydrate(id),
-      probeActiveTurns: (
-        sessions: Parameters<typeof application.unread.probeActiveTurns>[0]["sessions"],
-      ) => {
+      // Interest, and the probe per identity the scheduler issues from it. The
+      // shared probe already deduplicates a same-session probe, so one request per
+      // visible session is one round trip per newly interesting session — and none
+      // at all when only the search text changed.
+      setActivityInterest: (sessions: readonly { readonly sessionId: string }[]) => {
         const probe = applicationRef.current.activeTurnProbe;
-        // No probe, no re-probe: the assembly builds one only when the host can
+        // No probe, no interest: the assembly builds one only when the host can
         // answer it.
-        if (!probe) return () => undefined;
-        return applicationRef.current.unread.probeActiveTurns({
-          sessions,
-          probe,
-          now: () => Date.now(),
-        });
+        if (!probe) {
+          applicationRef.current.observations.setActivityInterest([]);
+          return;
+        }
+        applicationRef.current.observations.setActivityInterest(
+          sessions.map((session) => ({
+            identity: `turn:${session.sessionId}`,
+            run: (signal) =>
+              probe
+                .probe(session.sessionId)
+                .then((active) => {
+                  if (!signal.isCurrent()) return;
+                  applicationRef.current.unread.applyActiveTurn(
+                    session.sessionId,
+                    active,
+                    Date.now(),
+                  );
+                })
+                .catch(() => undefined),
+          })),
+        );
       },
+      reconcileActivity: () => applicationRef.current.observations.invalidateAll(),
     }),
     [],
   );
+  // A hidden page has no reader, so periodic business reads stop; returning
+  // re-establishes freshness rather than waking up to stale answers. Accepted Turn
+  // execution and delivery are untouched by this — they are not observations.
+  useEffect(() => {
+    const update = (): void => {
+      applicationRef.current.observations.setSuspended(browserDom.isPageHidden());
+    };
+    update();
+    return browserDom.listenForVisibilityChange(update);
+  }, [browserDom]);
   const { sessionActivity, activityNow, activityProbeNonce } = useShellActivityWiring({
     sessionStore,
     railPage,
@@ -862,6 +898,24 @@ export function WebuiClientFoundationApp(
                 className="w-full max-w-[743px] justify-center rounded-lg border border-border_default bg-bg_default_secondary px-spacing_8 py-spacing_4"
               />}
               composerAndTranscript={<>
+                <WebuiExternalDeletionNotice
+                  drafts={retainedDeletionDrafts}
+                  onCopy={(sessionId) => {
+                    const text = sessionWorkflows.copyRetainedDeletionDraft(sessionId);
+                    if (text === undefined) return;
+                    // Copying is the user's act, so the record retires whether or
+                    // not this browser exposes a clipboard to write to.
+                    if (typeof navigator !== "undefined" && navigator.clipboard) {
+                      void navigator.clipboard.writeText(text).catch(() => undefined);
+                    }
+                  }}
+                  onTransfer={(sessionId) => {
+                    sessionWorkflows.transferRetainedDeletionDraft(sessionId);
+                  }}
+                  onDiscard={(sessionId) => {
+                    sessionWorkflows.discardRetainedDeletionDraft(sessionId);
+                  }}
+                />
                 <Composer><WebuiZoneBoundary zone="composer"><WebuiComposer
                   sessionId={selectedSessionId}
                   sessionStatus={selectedSession?.status}

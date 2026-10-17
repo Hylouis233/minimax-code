@@ -14,6 +14,7 @@
 
 import {
   createWebuiKeyedResource,
+  serializeWebuiResourceKey,
   type WebuiCommitToken,
 } from "../../../conversation/request-freshness.js";
 import {
@@ -50,6 +51,15 @@ export interface WebuiTurnReviewOwner {
    * activity group, which otherwise infers success from edit-tool output) asks
    * here instead of holding a copy of the capability.
    */
+  /**
+   * Release one session's turn diffs.
+   *
+   * The turn is the session's, so a session that is gone cannot have a diff any
+   * surface should still be reading: the session is fenced and its cached states
+   * are dropped. A later read for it refuses rather than re-asking a runtime for
+   * a turn that no longer exists.
+   */
+  readonly releaseSession: (sessionId: string) => void;
   readonly supportsQueries: () => boolean;
   readonly subscribe: (listener: () => void) => () => void;
   /**
@@ -107,7 +117,37 @@ export function createWebuiTurnReviewOwner(deps: {
     return landed;
   };
 
+  /** Sessions this owner has released; a released session is never re-asked. */
+  const releasedSessions = new Set<string>();
+  /**
+   * The keys this owner has asked about.
+   *
+   * Tracked because a release has to supersede exactly one session's in-flight and
+   * cached answers, and the resource keys are opaque strings by the time the
+   * primitive holds them. The owner knows which session each key names, so it
+   * keeps that mapping rather than asking the primitive to decode its own keys.
+   */
+  const askedKeys = new Map<string, WebuiTurnReviewKey>();
+  const recordAsked = (key: WebuiTurnReviewKey): void => {
+    askedKeys.set(serializeWebuiResourceKey(resourceKey(key)), key);
+  };
+
+  const releaseSession = (sessionId: string): void => {
+    if (releasedSessions.has(sessionId)) return;
+    for (const [serialized, key] of [...askedKeys]) {
+      if (key.sessionId !== sessionId) continue;
+      pages.invalidate(resourceKey(key));
+      askedKeys.delete(serialized);
+    }
+    releasedSessions.add(sessionId);
+    notify();
+  };
+
   const load = async (key: WebuiTurnReviewKey): Promise<WebuiTurnReviewOutcome> => {
+    // A released session is not re-asked: the runtime no longer has the session,
+    // so a read would be a request whose answer nothing may show.
+    if (releasedSessions.has(key.sessionId)) return { status: "stale" };
+    recordAsked(key);
     const resource = resourceKey(key);
     const getTurnDiff = deps.port.getTurnDiff;
     if (!getTurnDiff) {
@@ -133,6 +173,9 @@ export function createWebuiTurnReviewOwner(deps: {
     key: WebuiTurnReviewKey,
     action: "revert" | "reapply",
   ): Promise<WebuiTurnReviewOutcome> => {
+    // Same fence as a read: reverting a deleted session's turn would be a
+    // mutation aimed at something the runtime no longer has.
+    if (releasedSessions.has(key.sessionId)) return { status: "stale" };
     const resource = resourceKey(key);
     const handler =
       action === "revert" ? deps.port.revertTurnDiff : deps.port.reapplyTurnDiff;
@@ -174,6 +217,7 @@ export function createWebuiTurnReviewOwner(deps: {
       pages.invalidate(resourceKey(key));
       notify();
     },
+    releaseSession,
     supportsQueries: () => deps.port.getTurnDiff !== undefined,
     subscribe: (listener) => {
       listeners.add(listener);

@@ -22,6 +22,8 @@
 
 import type { WebuiEpochKey, WebuiIdentityEpochs } from "../../../application/identity-epochs.js";
 import {
+  runWebuiMutation,
+  type WebuiMutationOutcome,
   createWebuiKeyedResource,
   idleWebuiResourceState,
   type WebuiKeyedResource,
@@ -94,7 +96,22 @@ export interface WebuiModelsWorkflows {
   readonly canReadPresets: boolean;
   readonly canUpsertApiKey: boolean;
 
+  /**
+   * Read the catalogue for one context **and show it**: the foreground read a
+   * view asks for when the user arrives at a session.
+   */
   readonly loadModels: (sessionId?: string) => Promise<void>;
+  /**
+   * Read the catalogue for one context without changing which one is shown.
+   *
+   * The distinction is the whole point: several readers acquire this resource —
+   * a background fact about some session, a post-write refresh — and acquisition
+   * must never decide what the visible reader is looking at. A background read
+   * for session B used to select B, so refreshing one view changed another's.
+   */
+  readonly acquireModels: (sessionId?: string) => Promise<void>;
+  /** Point the shown catalogue at a context, without issuing a read. */
+  readonly selectCatalogue: (sessionId?: string) => void;
   readonly selectModel: (request: {
     readonly providerId: string;
     readonly modelId: string;
@@ -104,14 +121,31 @@ export interface WebuiModelsWorkflows {
 
   readonly loadProviders: () => Promise<void>;
   /**
-   * Apply an optimistic local patch to one provider's `models` list, so a
-   * toggle or a reorder shows immediately. The reload that follows the write is
-   * the truth, and a failed write rolls the patch back by reloading.
+   * Turn one of a provider's models on or off.
+   *
+   * Semantic intent, not a replacement array. The caller says *what the user
+   * meant*; this owner captures it, applies it to the projection it is currently
+   * holding for that provider, and serializes the write behind any other pending
+   * change to the same provider. The version this replaces took a whole model
+   * array built from rendered props, so a toggle could resurrect a list that was
+   * already stale and a later reload could not tell which edits were newer.
    */
-  readonly patchProviderModels: (
-    providerId: string,
-    models: readonly WebuiModelProviderModelEntry[],
-  ) => void;
+  readonly setProviderModelEnabled: (intent: {
+    readonly providerId: string;
+    readonly modelId: string;
+    readonly enabled: boolean;
+  }) => Promise<WebuiMutationOutcome<void>>;
+  /**
+   * Reorder one provider's models to the given identities.
+   *
+   * Ordered identities rather than a reordered array of rows: the owner resolves
+   * them against its current pending projection, and an identity it no longer
+   * holds is ignored instead of being dropped silently from the write.
+   */
+  readonly reorderProviderModels: (intent: {
+    readonly providerId: string;
+    readonly orderedModelIds: readonly string[];
+  }) => Promise<WebuiMutationOutcome<void>>;
   readonly createProvider: (
     body: WebuiCreateUserModelProviderRequest,
   ) => Promise<unknown>;
@@ -197,6 +231,8 @@ export function createWebuiModelsWorkflows(deps: {
   // Which catalogue key the snapshot shows. Switching it is not a re-key of the
   // stored answers: they stay under the keys they were read for.
   let shownCatalogueKey: WebuiResourceKey = {};
+  /** The context the shown catalogue belongs to, for a later acquisition. */
+  let shownSessionId: string | undefined;
 
   const providerKey = (): WebuiResourceKey => ({
     configuration: deps.identityEpochs?.configuration().token ?? null,
@@ -312,15 +348,46 @@ export function createWebuiModelsWorkflows(deps: {
     set((current) => ({ ...current, [field]: { status: "error", error } }));
   };
 
+  /**
+   * Point the shown catalogue at a context.
+   *
+   * Selection is a view decision, so it is its own command: the generations are
+   * bound to the key that is shown, and a later epoch advance retires exactly that
+   * answer while an unrelated key stays untouched.
+   */
+  const selectCatalogue = (sessionId?: string): void => {
+    shownSessionId = sessionId;
+    shownCatalogueKey = catalogueKeyFor(sessionId);
+    bindCatalogueEpochs(shownCatalogueKey);
+    project();
+  };
+
+  /**
+   * Read one context's catalogue without selecting it.
+   *
+   * The answer lands under its own key, so a caller asking about session B gets
+   * B's catalogue without B becoming what session A's view renders.
+   */
+  const acquireModels = async (sessionId?: string): Promise<void> => {
+    if (!port.listModels) {
+      unavailable("models", "当前运行时不支持模型列表。");
+      return;
+    }
+    const key = catalogueKeyFor(sessionId);
+    // Bound for the same reason the shown key is: a credential or configuration
+    // advance retires this answer too, and only the keys that carry that epoch.
+    releaseCatalogueEpochs.push(bindingFor("credentials", catalogue, key));
+    releaseCatalogueEpochs.push(bindingFor("configuration", catalogue, key));
+    await catalogue.load(key, () => port.listModels!(sessionId ? { sessionId } : undefined));
+  };
+
+  /** The foreground read: show this context's catalogue and read it. */
   const loadModels = async (sessionId?: string): Promise<void> => {
     if (!port.listModels) {
       unavailable("models", "当前运行时不支持模型列表。");
       return;
     }
-    shownCatalogueKey = catalogueKeyFor(sessionId);
-    // The shown key is the one the generations are bound to: a later advance
-    // retires exactly this answer, and an unrelated key stays untouched.
-    bindCatalogueEpochs(shownCatalogueKey);
+    selectCatalogue(sessionId);
     await catalogue.load(shownCatalogueKey, () =>
       port.listModels!(sessionId ? { sessionId } : undefined),
     );
@@ -350,6 +417,12 @@ export function createWebuiModelsWorkflows(deps: {
       return;
     }
     await providerList.load(providerKey(), () => port.listUserModelProviders!());
+    // A successful read is the committed baseline: it is what a known rejection
+    // restores, and what an intent composes against when nothing is pending.
+    const providers = providerList.read(providerKey())?.value ?? [];
+    for (const provider of providers) {
+      committedModels.set(provider.providerId, provider.models);
+    }
   };
 
   /** A provider mutation refreshes the provider list and marks models stale. */
@@ -363,15 +436,40 @@ export function createWebuiModelsWorkflows(deps: {
     await loadProviders();
   };
 
-  const patchProviderModels = (
+  /**
+   * What this owner currently intends for each provider's model list.
+   *
+   * The pending projection is the owner's, not a rendered prop's: an intent
+   * captured while an earlier write is still in flight composes with that
+   * intent, which is what stops a slow response from erasing a newer local
+   * decision.
+   */
+  const pendingModels = new Map<string, readonly WebuiModelProviderModelEntry[]>();
+  /** One write chain per provider; different providers stay independent. */
+  const providerWriteChains = new Map<string, Promise<unknown>>();
+  /** The last value the runtime confirmed, per provider, for a known rejection. */
+  const committedModels = new Map<string, readonly WebuiModelProviderModelEntry[]>();
+
+  const modelsOfProvider = (providerId: string): readonly WebuiModelProviderModelEntry[] | undefined =>
+    pendingModels.get(providerId) ??
+    committedModels.get(providerId) ??
+    providerList.read(providerKey())?.value?.find((provider) => provider.providerId === providerId)?.models;
+
+  /**
+   * Show one provider's pending list.
+   *
+   * The list it sits in is passed in rather than re-read: freshness has already
+   * advanced by the time the intent is shown (the write retired the reads that
+   * started before it), and a read taken after that advance describes a state this
+   * write is replacing. The projection is where a surface reads the value, so the
+   * commit still goes through the resource and the next successful read is still
+   * the truth.
+   */
+  const showProviderModels = (
+    providers: readonly WebuiModelProviderView[],
     providerId: string,
     models: readonly WebuiModelProviderModelEntry[],
   ): void => {
-    const entry = providerList.read(providerKey());
-    const providers = entry?.value;
-    if (!providers) return;
-    // The optimistic patch goes through the resource, so the reload that follows
-    // is the truth and the patched value never becomes a second source.
     providerList.commit(providerList.capture(providerKey()), {
       status: "ready",
       value: providers.map((provider) =>
@@ -379,6 +477,120 @@ export function createWebuiModelsWorkflows(deps: {
       ),
     });
   };
+
+  /** The provider rows this owner is currently projecting, if it has any. */
+  const projectedProviders = (): readonly WebuiModelProviderView[] | undefined =>
+    providerList.read(providerKey())?.value;
+
+  /**
+   * Apply one captured intent against the current pending projection and write it.
+   *
+   * The projection is read *inside* the serialized step, so two intents captured
+   * in either order compose, and the write always carries the owner's latest
+   * intent for that provider rather than whichever array a caller happened to hold.
+   */
+  const writeProviderIntent = (
+    providerId: string,
+    transform: (
+      current: readonly WebuiModelProviderModelEntry[],
+    ) => readonly WebuiModelProviderModelEntry[] | undefined,
+  ): Promise<WebuiMutationOutcome<void>> => {
+    const update = port.updateUserModelProvider;
+    if (!update) {
+      return Promise.resolve({
+        status: "failed",
+        category: "refused",
+        error: new Error("当前运行时不支持自定义提供商。"),
+      });
+    }
+    const run = async (): Promise<WebuiMutationOutcome<void>> => {
+      const current = modelsOfProvider(providerId);
+      if (!current) {
+        return {
+          status: "failed",
+          category: "refused",
+          error: new Error("提供商当前不可用，无法修改其模型。"),
+        };
+      }
+      const desired = transform(current);
+      if (!desired) return { status: "settled", value: undefined };
+      pendingModels.set(providerId, desired);
+      // The rows the intent is shown in, taken before freshness advances: a read
+      // taken after the retire would be describing the state this write replaces.
+      const providers = projectedProviders() ?? [];
+      // A read that started before this write described a state this write is
+      // replacing, so its answer must not land on top: freshness advances first,
+      // then the intent is shown.
+      providerList.invalidate(providerKey());
+      if (providers.length > 0) showProviderModels(providers, providerId, desired);
+      const outcome = await runWebuiMutation<void>(async () => {
+        await update({
+          providerId,
+          models: desired.map((model) => ({
+            modelId: model.modelId,
+            ...(model.enabled === undefined ? {} : { enabled: model.enabled }),
+          })) as WebuiUpdateUserModelProviderRequest["models"],
+        });
+      });
+      if (outcome.status === "settled") {
+        committedModels.set(providerId, desired);
+        pendingModels.delete(providerId);
+        // The reload is the truth; a refusal or an unknown outcome is not. A
+        // refresh that fails is not a failed write, so it cannot turn a settled
+        // mutation into a rejection.
+        await loadProviders().catch(() => undefined);
+        await loadModels().catch(() => undefined);
+        return outcome;
+      }
+      if (outcome.category === "refused" || outcome.category === "conflict") {
+        // The runtime decided, so the pending intent is wrong: drop it and put the
+        // last committed value back rather than leaving a change on screen that
+        // did not happen.
+        pendingModels.delete(providerId);
+        const committed = committedModels.get(providerId);
+        const rows = projectedProviders();
+        if (committed && rows) showProviderModels(rows, providerId, committed);
+        else await loadProviders();
+        return outcome;
+      }
+      // Transport failure, timeout or a lost response: the write may or may not
+      // have landed, so the intent stays pending and the answer is reconciled by
+      // re-reading under the same intent instead of being retried blindly.
+      await loadProviders();
+      return outcome;
+    };
+    const previous = providerWriteChains.get(providerId) ?? Promise.resolve();
+    const queued = previous.catch(() => undefined).then(run);
+    providerWriteChains.set(
+      providerId,
+      queued.catch(() => undefined),
+    );
+    return queued;
+  };
+
+  const setProviderModelEnabled = (intent: {
+    readonly providerId: string;
+    readonly modelId: string;
+    readonly enabled: boolean;
+  }): Promise<WebuiMutationOutcome<void>> =>
+    writeProviderIntent(intent.providerId, (current) =>
+      current.map((model) =>
+        model.modelId === intent.modelId ? { ...model, enabled: intent.enabled } : model,
+      ),
+    );
+
+  const reorderProviderModels = (intent: {
+    readonly providerId: string;
+    readonly orderedModelIds: readonly string[];
+  }): Promise<WebuiMutationOutcome<void>> =>
+    writeProviderIntent(intent.providerId, (current) => {
+      const byId = new Map(current.map((model) => [model.modelId, model]));
+      const ordered = intent.orderedModelIds
+        .map((modelId) => byId.get(modelId))
+        .filter((model): model is WebuiModelProviderModelEntry => model !== undefined);
+      if (ordered.length !== current.length) return undefined;
+      return ordered;
+    });
 
   const createProvider = async (body: WebuiCreateUserModelProviderRequest): Promise<unknown> => {
     if (!port.createUserModelProvider) throw new Error("当前运行时不支持自定义提供商。");
@@ -485,7 +697,9 @@ export function createWebuiModelsWorkflows(deps: {
   const refreshModels = async (): Promise<unknown> => {
     if (!port.refreshModels) throw new Error("当前运行时不支持刷新模型。");
     const result = await port.refreshModels();
-    await loadModels();
+    // A refresh is acquisition, not selection: the user did not ask to look at a
+    // different context by asking for fresher data.
+    await acquireModels(shownSessionId);
     return result;
   };
 
@@ -498,9 +712,12 @@ export function createWebuiModelsWorkflows(deps: {
     canReadPresets: port.listProviderPresets !== undefined,
     canUpsertApiKey: port.upsertMiniMaxApiKey !== undefined,
     loadModels,
+    acquireModels,
+    selectCatalogue,
+    setProviderModelEnabled,
+    reorderProviderModels,
     selectModel,
     loadProviders,
-    patchProviderModels,
     createProvider,
     updateProvider,
     deleteProvider,

@@ -199,6 +199,10 @@ describe("prohibition 5 — a submit carries intent, never a setter", () => {
       "onSessionCreated",
       "onNeedsSession",
       "onQueued",
+      // The staging setter left the public intent: staging is the composer's own
+      // input and it consumes it, so a caller-supplied callback cannot reappear
+      // here without failing this assertion.
+      "onAttachmentsSubmitted",
       "setDraft",
       "setSending",
       "setRefusal",

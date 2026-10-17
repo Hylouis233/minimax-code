@@ -77,8 +77,8 @@ describe("a provider change", () => {
   });
 });
 
-describe("an optimistic provider patch stays the owner's", () => {
-  it("shows the patched models at once and the reload is the truth", async () => {
+describe("a provider mutation is the owner's, applied by intent", () => {
+  it("applies a toggle to its own pending list at once, and the reload is the truth", async () => {
     let providers: readonly WebuiModelProviderView[] = [
       providerRow({ providerId: "a", models: [modelRow("m1", true)] }),
     ];
@@ -96,11 +96,22 @@ describe("an optimistic provider patch stays the owner's", () => {
     });
 
     await workflows.loadProviders();
-    workflows.patchProviderModels("a", [modelRow("m1", false)]);
+    const pending = workflows.setProviderModelEnabled({
+      providerId: "a",
+      modelId: "m1",
+      enabled: false,
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    // The owner shows its own intent straight away; the caller never assembled the
+    // array it would have sent.
+    expect(workflows.getSnapshot().providers.value?.[0]?.models[0]?.enabled).toBe(false);
+
+    await pending;
     expect(workflows.getSnapshot().providers.value?.[0]?.models[0]?.enabled).toBe(false);
   });
 
-  it("reloads the truth when the write fails", async () => {
+  it("puts the last committed list back when the write is refused", async () => {
     const workflows = build({
       listUserModelProviders: async () => [
         providerRow({ providerId: "a", models: [modelRow("m1", true)] }),
@@ -109,8 +120,14 @@ describe("an optimistic provider patch stays the owner's", () => {
     });
 
     await workflows.loadProviders();
-    workflows.patchProviderModels("a", [modelRow("m1", false)]);
-    await expect(workflows.updateProvider({ providerId: "a" })).rejects.toThrow("nope");
+    const outcome = await workflows.setProviderModelEnabled({
+      providerId: "a",
+      modelId: "m1",
+      enabled: false,
+    });
+
+    expect(outcome.status).toBe("failed");
+    // The write did not happen, so what is on screen is what is committed.
     expect(workflows.getSnapshot().providers.value?.[0]?.models[0]?.enabled).toBe(true);
   });
 });

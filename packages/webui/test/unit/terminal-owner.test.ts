@@ -11,6 +11,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createWebuiTerminalOwner } from "../../src/client/features/terminal/application/terminal-owner.js";
+import { deriveWebuiCapabilityManifest } from "../../src/shared/capability-manifest.js";
 import type { WebuiTerminalFrame } from "../../src/shared/contracts/terminal.js";
 
 interface Trace {
@@ -311,5 +312,52 @@ describe("V04 · V26 · a PTY belongs to the service, not to the page that opene
     // Every command is refused at the fence rather than sent to the service.
     expect(trace.calls.some((entry) => entry.startsWith("create:") || entry.startsWith("write:"))).toBe(false);
     expect(owner.getSnapshot().terminals).toEqual([]);
+  });
+});
+
+describe("V19/V29 · what the handshake declares decides more than the port's shape", () => {
+  it("calls a family the service declared supported supported, without probing", () => {
+    const trace = newTrace();
+    const owner = createWebuiTerminalOwner(port(trace), {
+      readCapabilities: () => deriveWebuiCapabilityManifest({
+        listTerminals: () => undefined,
+        createTerminal: () => undefined,
+        disposeTerminal: () => undefined,
+        watchTerminal: () => undefined,
+        writeTerminal: () => undefined,
+        resizeTerminal: () => undefined,
+      }),
+    });
+
+    expect(owner.support().create).not.toBe("incompatible");
+    // Nothing was asked of the port: the declaration answered the question.
+    expect(trace.calls).toEqual([]);
+  });
+
+  it("distinguishes a bridge that is not ready from one that is absent", () => {
+    const owner = createWebuiTerminalOwner(port(newTrace()), {
+      // A roster with no frame stream lists terminals nobody can use.
+      readCapabilities: () => deriveWebuiCapabilityManifest({
+        listTerminals: () => undefined,
+        createTerminal: () => undefined,
+        disposeTerminal: () => undefined,
+      }),
+    });
+    expect(owner.support().list).toBe("not-ready");
+
+    const gone = createWebuiTerminalOwner(port(newTrace()), {
+      readCapabilities: () => deriveWebuiCapabilityManifest({}),
+    });
+    expect(gone.support().list).toBe("absent");
+  });
+
+  it("keeps the historical attempt path when the service sent no manifest", async () => {
+    const trace = newTrace();
+    // No manifest: an older service, so neither support nor absence is fabricated
+    // here — the port's presence keeps the attempt available, and only a refusal
+    // that actually came back makes an operation incompatible.
+    const owner = createWebuiTerminalOwner(port(trace));
+    expect(owner.support().create).not.toBe("incompatible");
+    expect(owner.support().create).not.toBe("absent");
   });
 });

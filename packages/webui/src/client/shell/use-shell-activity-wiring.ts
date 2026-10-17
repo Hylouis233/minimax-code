@@ -60,11 +60,16 @@ export interface UseShellActivityWiringOptions {
   readonly seed: (sessions: readonly ShellActivitySessionRow[]) => void;
   readonly hydrate: (sessionId: string | undefined) => void;
   /**
-   * Runs the shared, deduplicated active-turn probe for the given rows. The
-   * caller closes over the probe the assembly built, which keeps its type out
-   * of this module.
+   * Declares which rows the rail is interested in.
+   *
+   * Interest, not work: the application's scheduler compares the *identity set*
+   * and issues a probe only for an identity that is newly interesting, so a
+   * refresh that only changes the search text costs nothing. The caller closes
+   * over the probe the assembly built, which keeps its type out of this module.
    */
-  readonly probeActiveTurns: (sessions: readonly ShellActivityProbeRow[]) => () => void;
+  readonly setActivityInterest: (sessions: readonly ShellActivityProbeRow[]) => void;
+  /** A reconnect: nothing observed while the stream was down can be trusted. */
+  readonly reconcileActivity: () => void;
 }
 
 export interface ShellActivityWiring {
@@ -85,7 +90,8 @@ export function useShellActivityWiring(
     markRead,
     seed,
     hydrate,
-    probeActiveTurns,
+    setActivityInterest,
+    reconcileActivity,
   } = options;
 
   const sessionActivity = useSyncExternalStore(
@@ -150,11 +156,18 @@ export function useShellActivityWiring(
     hydrate(selectedSessionId);
   }, [hydrate, selectedSessionId]);
   useEffect(() => {
-    // Once per list change, for every visible row. Not once per event: the
-    // stream already answers for turns it saw, and the reconnect nonce is the
-    // only other moment a re-probe is warranted.
-    return probeActiveTurns(railPage.sessions);
-  }, [probeActiveTurns, railPage, activityProbeNonce]);
+    // The interest set, not a probe per page object: the scheduler reads the
+    // identities in it and issues work only for the ones that are newly
+    // interesting, which is what makes a search keystroke cost zero probes.
+    setActivityInterest(railPage.sessions);
+  }, [setActivityInterest, railPage]);
+  useEffect(() => {
+    // Once per reconnect. Not once per event: the stream already answers for the
+    // turns it saw, and a reconnect is the only other moment that invalidates
+    // what the rail believes.
+    if (activityProbeNonce === 0) return;
+    reconcileActivity();
+  }, [reconcileActivity, activityProbeNonce]);
 
   return { sessionActivity, activityNow, activityProbeNonce };
 }

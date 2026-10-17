@@ -17,6 +17,11 @@
 
 import type { WebuiTerminalFrame } from "../../../../shared/contracts/terminal.js";
 import {
+  readWebuiCapability,
+  type WebuiCapabilityState,
+  type WebuiCapabilityView,
+} from "../../../../shared/capability-manifest.js";
+import {
   initialWebuiTerminalCatalogue,
   type WebuiTerminalCatalogue,
   type WebuiTerminalOwner,
@@ -31,29 +36,80 @@ import type {
 
 export function createWebuiTerminalOwner(
   port: Partial<TerminalPort>,
+  deps: {
+    /**
+     * The handshake's capability manifest, read when a reachability question is
+     * asked. Absent (or answering `undefined`) is an older service: unknown.
+     */
+    readonly readCapabilities?: () => WebuiCapabilityView;
+  } = {},
 ): WebuiTerminalOwner {
   let snapshot: WebuiTerminalCatalogue = initialWebuiTerminalCatalogue;
   const listeners = new Set<() => void>();
   const watches = new Map<string, () => void>();
 
   /**
-   * Reachability per operation. Seeded from what the port offers — a method that
-   * is not there is `absent`, full stop — and then *observed*: a call this host
-   * refuses moves its operation to `incompatible`. That is the distinction the
-   * contract asks for, and it can only be drawn by calling: a port that declares
-   * `createTerminal` and then refuses it is not the same as a port without one.
+   * The operations this host has refused when called. Kept apart from the seed
+   * because it is *observed* rather than declared, and it outranks the seed: a
+   * port that offers `createTerminal` and then refuses it is not the same as a
+   * port whose service has no terminal bridge.
    */
-  const support: Record<keyof WebuiTerminalSupportReport, WebuiTerminalSupport> = {
-    create: port.createTerminal === undefined ? "absent" : "supported",
-    list: port.listTerminals === undefined ? "absent" : "supported",
-    write: port.writeTerminal === undefined ? "absent" : "supported",
-    resize: port.resizeTerminal === undefined ? "absent" : "supported",
-    dispose: port.disposeTerminal === undefined ? "absent" : "supported",
-    watch: port.watchTerminal === undefined ? "absent" : "supported",
-  };
+  const refused = new Set<keyof WebuiTerminalSupportReport>();
   const markIncompatible = (operation: keyof WebuiTerminalSupportReport): void => {
-    support[operation] = "incompatible";
+    refused.add(operation);
   };
+
+  /**
+   * Reachability per operation, read live.
+   *
+   * Two sources, in order of authority:
+   *
+   *   1. what this client *observed* — a refused call, which only calling can
+   *      establish;
+   *   2. what the service *declared* in its handshake manifest, when it sent one.
+   *
+   * The declaration is what makes absence and unreadiness different answers.
+   * `absent` means the service has no terminal bridge at all: there is nothing to
+   * retry. `not-ready` means the bridge is there and a companion it needs is not,
+   * so the surface exists and will work later. Without a manifest — an older
+   * service — the only thing this client can know is whether its own stub has the
+   * method, and that is the legacy attempt path, reported as `supported` and left
+   * to the call to disprove.
+   *
+   * Read on every access rather than frozen at construction: a manifest arrives
+   * with the handshake, and readiness is re-evaluated on reconnect.
+   */
+  const declaredFamily = (): WebuiCapabilityState | "unknown" =>
+    readWebuiCapability(deps.readCapabilities?.(), "terminal");
+  const seedSupport = (operation: keyof WebuiTerminalSupportReport): WebuiTerminalSupport => {
+    const present =
+      operation === "create"
+        ? port.createTerminal !== undefined
+        : operation === "list"
+          ? port.listTerminals !== undefined
+          : operation === "write"
+            ? port.writeTerminal !== undefined
+            : operation === "resize"
+              ? port.resizeTerminal !== undefined
+              : operation === "dispose"
+                ? port.disposeTerminal !== undefined
+                : port.watchTerminal !== undefined;
+    if (refused.has(operation)) return "incompatible";
+    const declared = declaredFamily();
+    if (declared === "absent") return "absent";
+    // Not-ready is a fact about the family, so it applies to the operations the
+    // bridge actually offers: one it does not offer stays absent.
+    if (declared === "not-ready") return present ? "not-ready" : "absent";
+    return present ? "supported" : "absent";
+  };
+  const supportReport = (): WebuiTerminalSupportReport => ({
+    create: seedSupport("create"),
+    list: seedSupport("list"),
+    write: seedSupport("write"),
+    resize: seedSupport("resize"),
+    dispose: seedSupport("dispose"),
+    watch: seedSupport("watch"),
+  });
 
   let disposed = false;
 
@@ -206,21 +262,21 @@ export function createWebuiTerminalOwner(
     // does not provide the operation is `absent`; a host that provides one and
     // refuses it is `incompatible`, and only a call could have told them apart.
     get canCreate() {
-      return support.create === "supported";
+      return seedSupport("create") === "supported";
     },
     get canWrite() {
-      return support.write === "supported";
+      return seedSupport("write") === "supported";
     },
     get canResize() {
-      return support.resize === "supported";
+      return seedSupport("resize") === "supported";
     },
     get canDispose() {
-      return support.dispose === "supported";
+      return seedSupport("dispose") === "supported";
     },
     get canWatch() {
-      return support.watch === "supported";
+      return seedSupport("watch") === "supported";
     },
-    support: () => ({ ...support }),
+    support: supportReport,
     refresh,
     create,
     write,

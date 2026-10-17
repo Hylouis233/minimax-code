@@ -23,6 +23,13 @@ export type WebuiTerminalSupport =
   /** This host does not provide the operation. Nothing to retry. */
   | "absent"
   /**
+   * The host has the bridge and a companion it needs is missing, so the surface
+   * is real and will not work yet. Distinct from `absent` on purpose: one is a
+   * feature the deployment does not have, the other is a feature that is not
+   * finished starting, and a surface says different things about them.
+   */
+  | "not-ready"
+  /**
    * The host provides a terminal service that refused this client's request.
    * The roster keeps listing; the operations this client needs are unavailable
    * until the versions agree.

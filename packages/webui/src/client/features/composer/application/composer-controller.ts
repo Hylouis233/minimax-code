@@ -2,6 +2,7 @@ import type { WebuiGoal } from "../../../../shared/contracts/goal.js";
 import type { WebuiComposerController, WebuiComposerControllerSnapshot, WebuiComposerSubmitOutcome } from "../contracts/composer-controller.js";
 import type { WebuiComposerStore } from "./composer-store.js";
 import type { WebuiComposerSubmitIntent } from "../contracts/composer-controller.js";
+import type { WebuiComposerStagingState } from "../contracts/composer-state.js";
 import type { WebuiRunCommandRequest, WebuiCommandWorkflows } from "./command-workflows.js";
 import type { WebuiConversationTurnCommands } from "../../turn/contracts/turn-commands.js";
 import type { WebuiSubmissionCompletion, WebuiSubmissionTicket } from "../../turn/contracts/submission.js";
@@ -11,6 +12,7 @@ import { planWebuiRetryResend } from "./turn-retry.js";
 import { formatWebuiError } from "../../../contracts/value-readers.js";
 import { createWebuiComposerQueueCommands } from "./composer-queue.js";
 import { shouldRecordWebuiComposerSubmission } from "../projection/composer-state.js";
+import type { WebuiComposerObservationSink } from "../contracts/composer-observations.js";
 
 export interface WebuiComposerControllerDeps {
   readonly store: WebuiComposerStore;
@@ -41,6 +43,15 @@ export interface WebuiComposerControllerDeps {
   readonly refreshGoal: (sessionId: string) => Promise<void>;
   readonly recoverTurn: (sessionId: string) => void;
   readonly refreshInspection: (sessionId: string) => Promise<void>;
+  /**
+   * The application's observation scheduler.
+   *
+   * The composer contributes *interest* in an inspection identity; it does not own
+   * a timer. Attaching used to run one immediate read and detaching dropped the
+   * only reason the model and account facts were fresh at all, which made their
+   * freshness depend on a rendered attachment rather than on a policy.
+   */
+  readonly observations?: WebuiComposerObservationSink;
   readonly clearHomeTurn: () => void;
 }
 
@@ -78,6 +89,43 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
   };
   const keyNow = (): string => deps.readSelectedSessionId() ?? HOME_KEY;
   const setDraft = (text: string): void => deps.store.setDraft(keyNow(), text);
+
+  /**
+   * What one submission consumed, captured before it crossed any await.
+   *
+   * The identity is *the slot and the revisions that were submitted*, not whatever
+   * happens to be selected when the work finishes. Everything a completion does to
+   * the input goes through this: a user who switches sessions or types during a
+   * command must not have another slot cleared, and a newer edit in the same slot
+   * must survive the older completion.
+   */
+  interface CapturedInput {
+    readonly key: string;
+    readonly draftRevision: number;
+    /** The staged value that was submitted; its identity is the consumption token. */
+    readonly staging: WebuiComposerStagingState;
+  }
+  const captureInput = (): CapturedInput => {
+    const key = keyNow();
+    return {
+      key,
+      draftRevision: deps.store.readSlotRevision(key),
+      staging: deps.store.readStaging(),
+    };
+  };
+  /**
+   * Clear the submitted slot's draft — and only while it is still the revision
+   * that was submitted. Newer typing is never removed by an older completion.
+   */
+  const consumeDraft = (captured: CapturedInput): void => {
+    if (deps.store.readSlotRevision(captured.key) !== captured.draftRevision) return;
+    deps.store.setDraft(captured.key, "");
+  };
+  /** Clear staging only while the staged value submitted is still the staged value. */
+  const consumeStaging = (captured: CapturedInput): void => {
+    if (deps.store.readStaging() !== captured.staging) return;
+    deps.store.setStaging({ attachments: [], urlReferences: [] });
+  };
   const queueCommands = createWebuiComposerQueueCommands({
     store: deps.store,
     workflows: deps.commandWorkflows,
@@ -91,10 +139,12 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
     readonly planMode?: boolean;
     readonly createSessionWorkspaceDir?: string;
     readonly teamModeOff?: boolean;
-  }, clearStaging: () => void): WebuiSubmissionTicket | undefined => {
-    // Intent and data only. No setter crosses this boundary: the draft is
-    // consumed through the link the assembly installed on the command set. The
-    // ticket reports session creation separately from terminal turn completion.
+  }, captured: CapturedInput): WebuiSubmissionTicket | undefined => {
+    // Intent and data only — no setter crosses this boundary. The draft is
+    // consumed through the link the assembly installed on the command set, and the
+    // *staging* is consumed here, by its owner, on the admission the owner just
+    // decided: admission is synchronous, so clearing on it preserves the timing the
+    // mid-flight callback had while removing the caller-supplied business setter.
     const ticket: WebuiSubmissionTicket | undefined = deps.turnCommandsFor(sessionId).send({
       message: turn.message,
       ...(turn.clientIntent ? { clientIntent: turn.clientIntent } : {}),
@@ -104,8 +154,10 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
         ? { createSessionWorkspaceDir: turn.createSessionWorkspaceDir }
         : {}),
       ...(turn.teamModeOff ? { teamModeOff: turn.teamModeOff } : {}),
-      onAttachmentsSubmitted: clearStaging,
     });
+    if (ticket && (ticket.admission.kind === "dispatching" || ticket.admission.kind === "queued")) {
+      consumeStaging(captured);
+    }
     return ticket;
   }
 
@@ -160,6 +212,9 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
       }
       if (resolved.kind === "submit-goal") {
         if (!input.goalEnabled) return { kind: "ignored" };
+        // Captured before the goal command awaits: the completion below clears the
+        // slot that was submitted, whatever is selected by then.
+        const captured = captureInput();
         goalSubmitting = true;
         publish();
         try {
@@ -177,7 +232,10 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
             input.onSessionCreated?.(createdId, selected);
           });
           deps.store.setModes({ goal: readWebuiComposerGoalModeAfterSubmit(result.goal) });
-          setDraft("");
+          // The draft is what the goal submission consumed. The staged input is
+          // *not* consumed here: a goal or a command is not the message those
+          // attachments belong to, so it stays staged for the send that is.
+          consumeDraft(captured);
           publish();
           return { kind: "goal-updated", sessionId: result.sessionId, ...(createdSessionId ? { createdSessionId } : {}) };
         } catch (error) {
@@ -191,6 +249,7 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
       }
       if (resolved.kind === "run-command") {
         if (!deps.commandWorkflows.canRunCommand) return { kind: "ignored" };
+        const captured = captureInput();
         commandRunning = true;
         publish();
         try {
@@ -204,7 +263,7 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
           const result = await deps.commandWorkflows.runCommand(request);
           const output = typeof result.output === "string" ? result.output : JSON.stringify(result.data ?? result, null, 2);
           commandOutput = output;
-          setDraft("");
+          consumeDraft(captured);
           publish();
           return { kind: "command-completed", output };
         } catch (error) {
@@ -220,7 +279,9 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
       if (resolved.clientIntent === "plan-entry") deps.store.setModes({ goal: false, plan: true });
       const message = (resolved.message ?? input.draft).trim();
       deps.store.setRetry({ session: sessionId, message });
-      const clearStaging = (): void => deps.store.setStaging({ attachments: [], urlReferences: [] });
+      // The ordinary path's capture: one identity for the queue refresh, the
+      // staging consumption the submission performs, and the completion below.
+      const captured = captureInput();
       // Captured *before* the submission, not just before the refresh. A user who
       // switches sessions while an enqueue is in flight must not have the mirror
       // reclaimed by the reply: the refresh is only allowed to apply if the
@@ -235,7 +296,7 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
         ...(input.planMode ? { planMode: true } : {}),
         ...(input.createSessionWorkspaceDir ? { createSessionWorkspaceDir: input.createSessionWorkspaceDir } : {}),
         ...(input.teamModeOff ? { teamModeOff: true } : {}),
-      }, clearStaging);
+      }, captured);
       if (!ticket) return { kind: "ignored" };
       void ticket.creation.then((created) => {
         if (!created) return;
@@ -307,18 +368,29 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
     attachView: (sessionId) => {
       const generation = ++viewGeneration;
       inspectionSessionId = sessionId;
+      // Inspection is an interest, not a one-off: the scheduler re-reads the model
+      // catalogue and the account status on the foreground freshness budget while
+      // this view is attached, and stops when it detaches or the page is hidden.
+      // Detaching does not cancel an accepted Turn delivery; only observation.
+      deps.observations?.setInspectionInterest(
+        sessionId
+          ? [
+              {
+                identity: `inspection:${sessionId}`,
+                run: async (signal) => {
+                  try {
+                    await deps.refreshInspection(sessionId);
+                  } catch (error) {
+                    if (generation !== viewGeneration || !signal.isCurrent()) return;
+                    interactionError = formatWebuiError(error);
+                    publish();
+                  }
+                },
+              },
+            ]
+          : [],
+      );
       if (sessionId) {
-        // One read on attach, not a policy. The model catalogue and the account
-        // status are the models and account businesses' own facts, and each
-        // owner invalidates its own answer when something changes it (a model
-        // selection, a provider edit, a credential change). A view-installed
-        // interval re-read other businesses' state on a timer, which made the
-        // composer's input rules depend on a poll nobody could audit or test.
-        void deps.refreshInspection(sessionId).catch((error: unknown) => {
-          if (generation !== viewGeneration) return;
-          interactionError = formatWebuiError(error);
-          publish();
-        });
         void deps.refreshPending(sessionId).then((outcome) => {
           if (!outcome.ok) throw new Error(outcome.error ?? "加载待处理请求失败");
         }).catch((error: unknown) => {
@@ -334,6 +406,9 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
         if (generation !== viewGeneration) return;
         viewGeneration += 1;
         inspectionSessionId = undefined;
+        // The view that was interested is gone, so the identity leaves the
+        // scheduler's interest set and its queued work is dropped.
+        deps.observations?.setInspectionInterest([]);
         publish();
       };
     },

@@ -124,6 +124,16 @@ export interface WebuiWorkspaceQueries {
   /** The panel/tab owner, for a surface whose presentation *is* the composition. */
   readonly panel: WebuiWorkspacePanelOwner;
   /**
+   * Release every workspace resource scoped to one session.
+   *
+   * Cross-resource by nature — the session is not a workspace concept, so no
+   * single resource contract owns this — which is why it lives on the root beside
+   * the git fan-out. A deleted session's canvas document is released with it; a
+   * resource keyed by workspace or tab rather than by session keeps its state,
+   * because nothing about it became false.
+   */
+  readonly releaseSession: (sessionId: string) => void;
+  /**
    * One workspace-git signal, the owners it names. This is the one place a fact
    * about one resource reaches another, which is why it belongs to the root and
    * not to any of the five.
@@ -261,6 +271,9 @@ export function createWebuiWorkspaceQueries(deps: {
     readCanvas: canvas.read,
     applyCanvas: canvas.apply,
   };
+  const releaseSession = (sessionId: string): void => {
+    canvas.release(sessionId);
+  };
   const dispose = (): void => {
     files.dispose();
     archive.dispose();
@@ -284,6 +297,7 @@ export function createWebuiWorkspaceQueries(deps: {
     archive: archiveCommands,
     canvas: canvasCommands,
     panel,
+    releaseSession,
     invalidateWorkspaceGit,
     dispose,
   };

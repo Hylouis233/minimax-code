@@ -544,7 +544,6 @@ export function createWebuiConversationTurnCommands(
         intent: toSubmissionIntent(intent),
         admission: decision,
         attachments: intent.attachments,
-        onAttachmentsSubmitted: intent.onAttachmentsSubmitted,
         // The UI submits intent only. The execution owner reads the canonical
         // target at invocation time so a stale render cannot choose send vs queue.
         sending: admission.turnLive && decision.kind !== "unsupported" && decision.kind !== "needs-session",
