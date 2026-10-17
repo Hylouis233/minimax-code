@@ -40,7 +40,6 @@ import type {
   WebuiDeliverySink,
 } from "../../shared/contracts/delivery.js";
 import type { WebuiStreamFrame } from "../../shared/contracts/stream.js";
-import { isWebuiLeaseGenerationCurrent } from "./stream-lease.js";
 
 /**
  * Every callback the loop can make, named for the failure report.

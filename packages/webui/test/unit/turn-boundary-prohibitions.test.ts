@@ -41,6 +41,7 @@ const TURN_MODULES = [
   "features/sessions/application/session-commands.ts",
   "features/turn/application/stream-state-bundle.ts",
   "features/turn/application/stream-lease-controller.ts",
+  "features/turn/application/stream-lease.ts",
   "conversation/stream-loop.ts",
   "conversation/stream-lease.ts",
 ];
@@ -101,6 +102,11 @@ describe("prohibition 2 — turn's rules are filed inside turn", () => {
       { symbol: "function buildWebuiStreamLoopSink", owner: "features/turn/application/stream-loop-sink.ts" },
       { symbol: "function nextWebuiLeaseGeneration", owner: "conversation/stream-lease.ts" },
       { symbol: "function isWebuiLeaseGenerationCurrent", owner: "conversation/stream-lease.ts" },
+      // The aggregate transforms are Turn's, not the mechanism's: a claim writes
+      // the session's subscription and a scoped release compares against it, so
+      // the module that knows that record is the one that owns these.
+      { symbol: "function claimWebuiLease", owner: "features/turn/application/stream-lease.ts" },
+      { symbol: "function releaseWebuiSubscription", owner: "features/turn/application/stream-lease.ts" },
     ];
     const modules = clientModules();
     for (const { symbol, owner } of declarations) {

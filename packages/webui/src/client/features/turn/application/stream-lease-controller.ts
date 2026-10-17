@@ -7,15 +7,13 @@
 
 import type { WebuiStreamState } from "../projection/stream-state.js";
 import type { WebuiSessionStore } from "../../../application/session-store.js";
+import { isWebuiLeaseGenerationCurrent } from "../../../conversation/stream-lease.js";
 import {
   claimWebuiLease,
-  isWebuiLeaseGenerationCurrent,
   releaseWebuiLease,
-} from "../../../conversation/stream-lease.js";
-import type {
-  WebuiLeaseOwner,
-  WebuiLeaseReleaseScope,
-} from "../../../conversation/stream-lease.js";
+  type WebuiLeaseOwner,
+  type WebuiLeaseReleaseScope,
+} from "./stream-lease.js";
 
 export interface WebuiStreamLeaseController {
   /** Claim the session's stream; returns the generation the claimant owns. */

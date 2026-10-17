@@ -1,22 +1,19 @@
-// The stream lease's generation counter in
-// `client/conversation/stream-lease.ts`.
+// The stream lease: one generation counter (the mechanism) and the Turn-owned
+// claim/release transitions.
 //
-// These pin the property the module's own header states: there is exactly one
+// These pin the property the two modules' headers state: there is exactly one
 // counter. Two claim paths stamp the same `lastClaimedGeneration` field — the
-// lease's `claimWebuiLease` and the loop sink's `claim`, which
-// receives its number through the injected `streamState` bundle — and
-// `isWebuiLeaseGenerationCurrent` compares only the number. With two counters
-// both starting at 0 and incrementing independently the numbers overlap, so a
-// superseded claim answers "I am current". These tests fail if a second counter
-// is reintroduced.
+// Turn owner's `claimWebuiLease` and the loop sink's `claim`, which receives its
+// number through the injected `streamState` bundle — and
+// `isWebuiLeaseGenerationCurrent` compares only the number. With two counters both
+// starting at 0 and incrementing independently the numbers overlap, so a
+// superseded claim answers "I am current". These tests fail if a second counter is
+// reintroduced, whichever of the two modules it is reintroduced into.
 
 import { describe, expect, it } from "vitest";
 
-import {
-  claimWebuiLease,
-  isWebuiLeaseGenerationCurrent,
-  nextWebuiLeaseGeneration,
-} from "../../src/client/conversation/stream-lease.js";
+import { isWebuiLeaseGenerationCurrent, nextWebuiLeaseGeneration } from "../../src/client/conversation/stream-lease.js";
+import { claimWebuiLease } from "../../src/client/features/turn/application/stream-lease.js";
 import { streamStateBundle } from "../../src/client/features/turn/application/stream-state-bundle.js";
 import { initialWebuiStreamState } from "../../src/client/features/turn/projection/stream-state.js";
 import type { WebuiStreamState } from "../../src/client/features/turn/contracts/stream-state.js";

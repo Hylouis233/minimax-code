@@ -65,7 +65,7 @@ import type { WebuiWorkspaceProgressState } from "../contracts/stream-state.js";
 import { claimWebuiSubscriptionTurn, decideWebuiSessionStart, matchesWebuiTerminalTurn, type WebuiStreamState } from "../projection/stream-state.js";
 import {
   releaseWebuiSubscription,
-} from "../../../conversation/stream-lease.js";
+} from "./stream-lease.js";
 import { projectWebuiThreadGoalMessage } from "../../../projection/common/goal-message.js";
 
 /** The slice of component state the reducer mutates. Workspace progress

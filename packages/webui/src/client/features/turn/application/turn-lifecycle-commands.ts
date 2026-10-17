@@ -11,7 +11,7 @@
 import {
   initialWebuiStreamState,
 } from "../projection/stream-state.js";
-import { releaseWebuiSubscription } from "../../../conversation/stream-lease.js";
+import { releaseWebuiSubscription } from "./stream-lease.js";
 import type { WebuiStreamWriteTarget } from "./stream-phase-commands.js";
 import type { WebuiTurnLifecycleCommands } from "../contracts/turn-command-views.js";
 

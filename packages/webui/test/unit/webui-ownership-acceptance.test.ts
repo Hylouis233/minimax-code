@@ -106,20 +106,22 @@ describe("V41 · the delivery mechanism imports nothing from Turn", () => {
     }
   });
 
-  it("the lease it implements against reaches only contracts, never Turn's implementation", () => {
-    // A feature's `contracts/` is its published surface, so the lease may name
-    // Turn's contracts — that is the arrangement working. What it may not reach
-    // is Turn's application or presentation layer, which is where its stream
-    // state, reducers and factories live and where the coupling would come from.
+  it("the lease it implements against reaches only shared types, never Turn at all", () => {
+    // The mechanism's lease is generation bookkeeping: a counter and "is this
+    // still the newest claim". It needs no business vocabulary to say that, so it
+    // imports nothing from Turn — not its implementation, and not its contracts
+    // either. Naming a business aggregate in the mechanism was the remaining half
+    // of the coupling this row exists to keep out: the aggregate's claim and
+    // scoped release live in `features/turn/application/stream-lease.ts`, which is
+    // where the business transform belongs.
     const lease = read("conversation/stream-lease.ts");
-    for (const specifier of importSpecifiers(lease)) {
-      expect(specifier.includes("/contracts/") || !specifier.includes("features/"), specifier).toBe(
-        true,
-      );
-      expect(specifier.includes("turn/application/"), specifier).toBe(false);
-      expect(specifier.includes("turn/ui/"), specifier).toBe(false);
-      expect(specifier.includes("turn/bindings/"), specifier).toBe(false);
-    }
+    const specifiers = importSpecifiers(lease);
+    expect(specifiers).toEqual([]);
+    // And no business vocabulary in the source at all — not as a type, not as a
+    // helper. A comment may name where the transform now lives; the code may not
+    // name the aggregate.
+    expect(lease).not.toContain("WebuiStreamState");
+    expect(lease).not.toContain("WebuiStreamSubscription");
   });
 });
 
