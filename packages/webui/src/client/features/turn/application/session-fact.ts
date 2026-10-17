@@ -1,5 +1,6 @@
 import { recordValue } from "../../../contracts/value-readers.js";
 import type { WebuiRuntimeEvent } from "../../../../shared/contracts/stream.js";
+import type { WebuiSessionFactType } from "../../../../shared/contracts/session-facts.js";
 
 /**
  * A session lifecycle fact, as the runtime publishes it.
@@ -80,7 +81,8 @@ export const WEBUI_SESSION_FACTS_NOT_APPLIED: readonly WebuiUnappliedSessionFact
 
 /** One catalogue fact this client receives and deliberately does not apply. */
 export interface WebuiUnappliedSessionFact {
-  readonly type: string;
+  /** A name from the closed catalogue, so a typo here is a compile error. */
+  readonly type: WebuiSessionFactType;
   /** Why applying it is not this client's job. Read by this file's tests and a reader. */
   readonly why: string;
 }
@@ -99,6 +101,26 @@ export interface WebuiUnappliedSessionFact {
  * `title: ""` because a payload did not mention a title erases a name on the
  * strength of an event that never carried one.
  */
+/**
+ * The catalogue facts this decoder applies, one per `switch` case below.
+ *
+ * Stated as data because the partition has to be checkable: every name in the closed
+ * catalogue is either here or in `WEBUI_SESSION_FACTS_NOT_APPLIED`, and `case` labels
+ * cannot be enumerated. `test/unit/webui-session-fact-catalogue.test.ts` asserts that
+ * partition in both directions, so a fact added to the catalogue without a decision
+ * fails compilation rather than being received in silence.
+ */
+export const WEBUI_APPLIED_SESSION_FACTS = [
+  "session.created",
+  "session.renamed",
+  "session.title_updated",
+  "session.model_updated",
+  "session.interaction_mode.changed",
+  "session.visibility_updated",
+  "session.pinned_updated",
+  "session.deleted",
+] as const satisfies readonly WebuiSessionFactType[];
+
 export function readWebuiSessionFact(
   event: WebuiRuntimeEvent,
   sessionId: string,

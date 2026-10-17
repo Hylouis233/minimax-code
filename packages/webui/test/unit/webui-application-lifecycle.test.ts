@@ -572,3 +572,47 @@ describe("V02 · independent owners' pending IO cannot commit after disposal", (
     await expect(application.composerPluginCatalogue.installedPlugins()).rejects.toThrow();
   });
 });
+
+
+describe("V03 · a failure while ending owners strands nothing", () => {
+  it("runs every remaining step, keeps the failure, and survives a second disposal", () => {
+    const recorder = recordingStorage({});
+    let closes = 0;
+    const application = createWebuiApplication({
+      openEventChannel: (): WebuiProcessEventChannel => ({
+        subscribe: () => () => {
+          // The ingress detach is the *first* step of disposal, so a failure here is
+          // the worst case for the ordering rule: everything after it must still run.
+          throw new Error("detach failed");
+        },
+        close: () => {
+          closes += 1;
+        },
+      }),
+      unreadStorage: recorder.storage,
+      turns: { resumeSession: (async () => {}) as unknown as WebuiClientSessionResumer },
+    });
+    application.start({ initialSessionId: SESSION });
+
+    expect(() => application.dispose()).not.toThrow();
+
+    // The fence was installed before any cleanup ran, so the instance is terminal
+    // even though an owner failed.
+    expect(application.state()).toBe("disposed");
+    // The last step still ran: the failure did not strand the owners behind it.
+    expect(closes).toBe(1);
+    // And the failure is kept with its owner's label, not only printed.
+    expect(application.disposalFailures().map((failure) => failure.label)).toEqual([
+      "event ingress",
+    ]);
+    expect(application.disposalFailures()[0]?.reason).toBeInstanceOf(Error);
+
+    // A second disposal runs nothing again and does not lose the record.
+    const writesBefore = recorder.calls.filter((call) => call.startsWith("write")).length;
+    application.dispose();
+    expect(closes).toBe(1);
+    expect(application.disposalFailures()).toHaveLength(1);
+    // Nothing was persisted by either disposal pass.
+    expect(recorder.calls.filter((call) => call.startsWith("write"))).toHaveLength(writesBefore);
+  });
+});
