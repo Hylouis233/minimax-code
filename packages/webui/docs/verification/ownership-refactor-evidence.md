@@ -25,7 +25,7 @@ All from the repository root, on `refactor/webui-ownership`, after
 | `pnpm check:webui-boundary` | passed (after the build) | Nothing outside the allowed entries entered the build graph |
 | `npx playwright test test/webui-browser/terminal-cross-page.spec.mjs test/webui-browser/zone-error-recovery.spec.mjs --reporter=line` | 3 passed | Built-browser behavior for V04/V08, through the synthetic in-page bridge |
 | `pnpm check:source` | 5164 files | The inventory matches the tree |
-| `pnpm verify` | see "Known flake" below | The full CI set, in order |
+| `pnpm verify` | final run stopped at `test:webui-browser`: 125 passed, 3 failed | Source, preview, release tools, lint, typechecks, dependency/build boundaries, package smoke and Vitest passed before the browser gate |
 
 The focused built-browser cases for V04 and V08 were run after rebuilding the
 client. They exercise the rendered application and its in-page fixture, not a
@@ -150,6 +150,28 @@ last change predates the baseline), it passes in isolation on repeated runs, and
 the next full run passed 172/172. It is recorded here rather than suppressed: a
 cleanup race that lost a `pnpm verify` is worth the next person knowing about,
 and this round claims no measurement of how often it happens.
+
+## Final verification after #167
+
+The first post-commit `pnpm verify` stopped at `test:webui` because
+`shell-surface.test.ts` expected the transcript boundary opening tag on one line.
+The source assertion was updated to allow the new multi-line props, then the full
+verification was run a second time. The second run passed through
+`test:webui` (172 files, 2812 tests), but `test:webui-browser` finished with
+125 passed and these three failures:
+
+- `provider-form.spec.mjs` — editing a provider did not populate the discovered
+  model names in the model-name field.
+- `settings-account-tab.spec.mjs` — `ReviewSettingsPage` hit
+  `Maximum update depth exceeded` before the review page appeared.
+- `transcript.spec.mjs` — the migrated home turn's `思考中…` indicator was not
+  visible after its stream moved to the created session.
+
+Each failed browser case was rerun individually and failed again. The full
+verification therefore did not pass. V04 and V08 both passed in that run; the
+focused command above also passed all three tests in those two specs. The
+verification loop stopped after its second full run as specified for this
+handoff.
 
 ## What this does not claim
 
