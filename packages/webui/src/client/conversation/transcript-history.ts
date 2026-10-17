@@ -96,6 +96,12 @@ export interface WebuiTranscriptHistoryOwner {
    * same session, which used to cost a second page read on every switch.
    */
   readonly ensurePage: (sessionId: string) => Promise<WebuiClientMessagePage | undefined>;
+  /**
+   * Fence the owner: no later page read commits, and the presentation slot stops
+   * accepting a page for a session nothing presents. The assembly calls this on
+   * teardown; a view never does.
+   */
+  readonly dispose: () => void;
 }
 
 export type WebuiTranscriptLoadOutcome =
@@ -252,5 +258,9 @@ export function createWebuiTranscriptHistoryOwner(deps: {
       handle.token.incarnation === incarnation &&
       pages.revision(keyOf(handle.sessionId, handle.cursor)) ===
         handle.token.revision,
+    dispose: () => {
+      pages.dispose();
+      presentation.dispose();
+    },
   };
 }

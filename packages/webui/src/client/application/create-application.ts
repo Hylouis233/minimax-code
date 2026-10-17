@@ -928,16 +928,22 @@ export function createWebuiApplication(
       // the application's end rather than a component unmount.
       shutDown("account owner", () => accountWorkflows.dispose());
       shutDown("session owner", () => sessionWorkflows.dispose());
-      // The terminal owner's disposer is the client's own end: its watches stop
-      // and the PTYs it created are killed here rather than left running for a
-      // page that is going away. Fire-and-forget because this disposal is
-      // synchronous; the requests are already on their way, so a rejection is
-      // reported rather than thrown at a caller that cannot act on it.
-      void Promise.resolve()
-        .then(() => terminalOwner.disposeAll())
-        .catch((reason: unknown) => {
-          console.error("[webui] terminal owner cleanup failed during application disposal", reason);
-        });
+      // Every independent read owner below was built by this assembly, so this
+      // assembly ends it. They are listed individually rather than swept: an
+      // owner that can still commit or notify after the application is gone is a
+      // lifetime defect whether or not a view happened to be looking at it, and a
+      // single shared teardown would hide which family was missed next time.
+      shutDown("models owner", () => modelsWorkflows.dispose());
+      shutDown("settings owner", () => settingsWorkflows.dispose());
+      shutDown("workspace owners", () => workspaceQueries.dispose());
+      shutDown("turn review owner", () => turnReview.dispose());
+      shutDown("transcript history owner", () => transcriptHistory.dispose());
+      shutDown("composer plugin catalogue", () => composerPluginCatalogue.dispose());
+      // Observation only. The browser page ends its watches here; the PTYs are
+      // the service's, and a page that merely listed a terminal has no rights
+      // over its process. Explicit close (`disposeProcess`) and service shutdown
+      // are the two ways a process ends.
+      shutDown("terminal owner", () => terminalOwner.dispose());
       channelReadyListeners.clear();
       dirtyResources.clear();
       shutDown("composer controller", () => composerController?.dispose());

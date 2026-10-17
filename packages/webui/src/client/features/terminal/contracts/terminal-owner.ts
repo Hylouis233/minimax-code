@@ -105,8 +105,17 @@ export interface WebuiTerminalOwner {
   ) => () => void;
   /** Release every watch (a view going away). Processes stay alive. */
   readonly detachAll: () => void;
-  /** End every watch and every process; the application calls this on disposal. */
-  readonly disposeAll: () => Promise<void>;
+  /**
+   * Fence the page's observation and nothing else: every watch is released and
+   * the owner stops publishing. Processes are **not** touched — a terminal this
+   * page merely listed belongs to the service, and an explicit `disposeProcess`
+   * or the service's own shutdown is the only thing that ends a process.
+   *
+   * Synchronous on purpose: a page teardown installs its fence before any
+   * asynchronous cleanup, so a create that resolves afterwards cannot repopulate
+   * a dead page's catalogue or reattach its watch.
+   */
+  readonly dispose: () => void;
 }
 
 /** The resize request the owner forwards, named here so peers need one import. */

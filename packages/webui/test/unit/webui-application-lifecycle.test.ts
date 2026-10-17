@@ -13,6 +13,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createWebuiApplication } from "../../src/client/application/create-application.js";
+import { createWebuiPortSlices } from "../../src/client/application/port-slices.js";
 import { createWebuiIdentityEpochs } from "../../src/client/application/identity-epochs.js";
 import type { WebuiProcessEventChannel } from "../../src/client/features/turn/application/event-channel.js";
 import type { WebuiRuntimeEvent } from "../../src/shared/contracts/stream.js";
@@ -487,5 +488,87 @@ describe("reads resolve after the application is disposed", () => {
     expect(() => application.sessionWorkflows.getArchivedSnapshot()).not.toThrow();
     expect(() => application.workspaceQueries.getSnapshot()).not.toThrow();
     expect(() => application.turnReview.read({ sessionId: SESSION })).not.toThrow();
+  });
+});
+
+describe("V02 · independent owners' pending IO cannot commit after disposal", () => {
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    let reject!: (reason: unknown) => void;
+    const promise = new Promise<T>((ok, no) => {
+      resolve = ok;
+      reject = no;
+    });
+    return { promise, resolve, reject };
+  }
+
+  it("fences Models, Settings, Plugins, Transcript, Review and Workspace late answers", async () => {
+    const models = deferred<readonly never[]>();
+    const instructions = deferred<never>();
+    const plugins = deferred<never>();
+    const reviewDiff = deferred<never>();
+    const files = deferred<readonly never[]>();
+    const history = deferred<never>();
+
+    const application = createWebuiApplication({
+      openEventChannel: () => scriptedChannel().channel,
+      loadMessages: (() => history.promise) as never,
+      slices: createWebuiPortSlices({
+        listModels: () => models.promise,
+        getGlobalInstructions: () => instructions.promise,
+        pluginManagement: () => plugins.promise,
+        listWorkspaceFileTree: () => files.promise,
+      } as never),
+      turnReview: { getTurnDiff: () => reviewDiff.promise } as never,
+      turns: { resumeSession: (async () => {}) as unknown as WebuiClientSessionResumer },
+    });
+    application.start({ initialSessionId: SESSION });
+
+    // Every independent owner built by the assembly, watched the way a mounted
+    // surface watches it.
+    const notifications = { models: 0, settings: 0, plugins: 0, transcript: 0, review: 0, workspace: 0 };
+    application.modelsWorkflows.subscribe(() => { notifications.models += 1; });
+    application.settingsWorkflows.subscribe(() => { notifications.settings += 1; });
+    application.workspaceQueries.subscribe(() => { notifications.workspace += 1; });
+    application.turnReview.subscribe(() => { notifications.review += 1; });
+    application.store.subscribe(() => { notifications.transcript += 1; });
+
+    const pending = Promise.all([
+      application.modelsWorkflows.loadModels(SESSION),
+      application.settingsWorkflows.loadInstructions(),
+      application.composerPluginCatalogue.installedPlugins(),
+      application.turnReview.load({ sessionId: SESSION, turnId: "turn-1" }),
+      application.transcriptHistory.loadPage(SESSION),
+      Promise.resolve(application.workspaceQueries.files.loadFileTree("/repo")),
+    ]);
+    // The answers are in flight when the application goes away.
+    application.dispose();
+    const settledAtDisposal = { ...notifications };
+
+    models.resolve([]);
+    instructions.resolve({} as never);
+    plugins.resolve({} as never);
+    reviewDiff.resolve({} as never);
+    files.resolve([]);
+    history.resolve({} as never);
+    const outcomes = await pending;
+
+    // No owner published after teardown: a late commit would have notified a
+    // subscriber that had already unmounted, and re-populated a read model the
+    // disposal was supposed to fence. The counts below are whatever the in-flight
+    // reads had already published while the application was alive.
+    expect(notifications).toEqual(settledAtDisposal);
+    expect(settledAtDisposal.models).toBeGreaterThan(0);
+    // Each read settled with an outcome that says why it is not shown, rather
+    // than a value.
+    expect(application.modelsWorkflows.getSnapshot().models.status).not.toBe("ready");
+    expect(application.settingsWorkflows.getSnapshot().instructions.status).not.toBe("ready");
+    const transcriptOutcome = outcomes[4] as { readonly status: string };
+    const reviewOutcome = outcomes[3] as { readonly status: string };
+    expect(transcriptOutcome.status).toBe("stale");
+    expect(reviewOutcome.status).toBe("stale");
+    // A read started after the disposal is refused at the owner, not sent on a
+    // socket nobody is reading.
+    await expect(application.composerPluginCatalogue.installedPlugins()).rejects.toThrow();
   });
 });

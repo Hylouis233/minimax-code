@@ -53,6 +53,12 @@ export interface WebuiTurnReviewOwner {
   readonly supportsQueries: () => boolean;
   readonly subscribe: (listener: () => void) => () => void;
   /**
+   * Fence the owner: a diff read that lands after teardown cannot commit or
+   * notify, and no later mutation announcement reaches a listener. The assembly
+   * owns this owner's life; a card never ends it.
+   */
+  readonly dispose: () => void;
+  /**
    * Settled mutations, for the families they affect. The workspace review
    * family is the caller's — a mutation commits once, then invokes the affected
    * owners' explicit invalidation commands — so this owner announces rather
@@ -176,6 +182,11 @@ export function createWebuiTurnReviewOwner(deps: {
     subscribeMutations: (listener) => {
       mutationListeners.add(listener);
       return () => mutationListeners.delete(listener);
+    },
+    dispose: () => {
+      pages.dispose();
+      listeners.clear();
+      mutationListeners.clear();
     },
   };
 }

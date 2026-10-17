@@ -78,17 +78,16 @@ describe("the terminal owner's watch registry", () => {
     expect(trace.calls.filter((entry) => entry.startsWith("dispose:"))).toEqual([]);
   });
 
-  it("ends the watches and the processes it knows about on disposal", async () => {
+  it("ends the watches and no process at all on disposal", async () => {
     const trace = newTrace();
     const owner = createWebuiTerminalOwner(port(trace));
     await owner.refresh();
     owner.attach("terminal-a", () => undefined);
-    await owner.disposeAll();
+    owner.dispose();
     expect(trace.releases).toEqual([1]);
-    expect(trace.calls.filter((entry) => entry.startsWith("dispose:")).sort()).toEqual([
-      "dispose:terminal-a",
-      "dispose:terminal-b",
-    ]);
+    // `port(trace)` lists `terminal-a` and `terminal-b`, and neither is this
+    // page's to end: observing a process is not owning it.
+    expect(trace.calls.filter((entry) => entry.startsWith("dispose:"))).toEqual([]);
   });
 
   it("releases a terminal's watch before asking the port to dispose it", async () => {
@@ -119,7 +118,7 @@ describe("the terminal owner's watch registry", () => {
     expect(owner.canCreate).toBe(false);
     expect(owner.canWatch).toBe(false);
     expect(owner.attach("terminal-a", () => undefined)).toBeTypeOf("function");
-    await expect(owner.disposeAll()).resolves.toBeUndefined();
+    expect(() => owner.dispose()).not.toThrow();
   });
 });
 
@@ -279,17 +278,38 @@ describe("V04 · V26 · a PTY belongs to the service, not to the page that opene
     expect(trace.calls.filter((entry) => entry.startsWith("dispose:"))).toEqual([]);
   });
 
-  it("V06 · only the application ends the process, and only once", async () => {
+  it("V06 · an explicit close ends exactly its target, and disposal ends only observation", async () => {
     const { trace, owner } = serviceHarness();
     await owner.create("/repo");
+    await owner.create("/repo");
     owner.attach("terminal-1", () => undefined);
-    await owner.disposeAll();
-    const disposals = trace.calls.filter((entry) => entry.startsWith("dispose:"));
-    expect(disposals.length).toBeGreaterThan(0);
-    // Disposal is terminal: a second call ends nothing twice.
-    await owner.disposeAll();
-    expect(trace.calls.filter((entry) => entry.startsWith("dispose:")).length).toBe(
-      disposals.length,
-    );
+    // The explicit close is the only process command this test expects: one
+    // target, one disposal.
+    const closed = trace.calls.filter((entry) => entry.startsWith("dispose:"));
+    await owner.disposeProcess("terminal-1");
+    expect(trace.calls.filter((entry) => entry.startsWith("dispose:"))).toEqual([
+      ...closed,
+      "dispose:terminal-1",
+    ]);
+    // Page teardown adds no process command: the other terminal stays the
+    // service's, and the watch is released.
+    const beforeDispose = trace.calls.filter((entry) => entry.startsWith("dispose:")).length;
+    owner.dispose();
+    expect(trace.calls.filter((entry) => entry.startsWith("dispose:")).length).toBe(beforeDispose);
+    // Disposal is terminal and idempotent.
+    owner.dispose();
+    expect(trace.calls.filter((entry) => entry.startsWith("dispose:")).length).toBe(beforeDispose);
+  });
+
+  it("fences the page: a create landing after disposal does not reach a dead owner", async () => {
+    const trace = newTrace();
+    const owner = createWebuiTerminalOwner(port(trace));
+    owner.dispose();
+    expect(await owner.create("/repo")).toBeUndefined();
+    await owner.refresh();
+    await owner.write("terminal-a", "ls\n");
+    // Every command is refused at the fence rather than sent to the service.
+    expect(trace.calls.some((entry) => entry.startsWith("create:") || entry.startsWith("write:"))).toBe(false);
+    expect(owner.getSnapshot().terminals).toEqual([]);
   });
 });

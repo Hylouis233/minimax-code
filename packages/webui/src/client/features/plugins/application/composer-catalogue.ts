@@ -47,6 +47,24 @@ function text(row: Record<string, unknown>, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
+/**
+ * The creator's surface: the published read catalogue plus the application's
+ * teardown.
+ *
+ * `dispose` is deliberately **not** on `WebuiComposerPluginCatalogue`. That
+ * published type is what the composer renders, and a rendering peer has no
+ * business ending the owner's life; the assembly built the catalogue and is the
+ * only thing that can fence it.
+ */
+export interface WebuiComposerPluginCatalogueOwner extends WebuiComposerPluginCatalogue {
+  /**
+   * Fence the cache: no later read start reaches the runtime, an in-flight read
+   * cannot repopulate a slot, and a reader that asks afterwards settles with a
+   * refusal instead of a stale answer.
+   */
+  readonly dispose: () => void;
+}
+
 export function createWebuiComposerPluginCatalogue(deps: {
   readonly actions: WebuiPluginActions;
   /** The port's own `listSkills`, absent on a runtime that predates it. */
@@ -59,8 +77,11 @@ export function createWebuiComposerPluginCatalogue(deps: {
       readonly description?: string;
     }[];
   }>;
-}): WebuiComposerPluginCatalogue {
+}): WebuiComposerPluginCatalogueOwner {
   const { actions } = deps;
+  let disposed = false;
+  const disposedRead = (): Promise<never> =>
+    Promise.reject(new Error("组件已释放：插件目录在应用销毁后不可再读。"));
   // Separate maps, separate keys: the two readers below must not share a slot.
   //
   // Each map is a cache with no clock, so something has to say when a slot went
@@ -75,6 +96,7 @@ export function createWebuiComposerPluginCatalogue(deps: {
     available: actions.available,
 
     installedPlugins: () => {
+      if (disposed) return disposedRead();
       const key = `installed:${COMPOSER_PLUGIN_LIMIT}`;
       const started = pluginReads.get(key);
       if (started) return started;
@@ -95,6 +117,11 @@ export function createWebuiComposerPluginCatalogue(deps: {
           // stay empty until the page reloaded.
           pluginReads.delete(key);
           throw reason;
+        })
+        .finally(() => {
+          // A read that started before teardown does not re-enter the cache
+          // afterwards: the fence is the dispose, not the consumer's goodwill.
+          if (disposed) pluginReads.delete(key);
         });
       pluginReads.set(key, request);
       return request;
@@ -109,6 +136,7 @@ export function createWebuiComposerPluginCatalogue(deps: {
     },
 
     runtimeSkills: (agentName) => {
+      if (disposed) return disposedRead();
       const listSkills = deps.listSkills;
       if (!listSkills) {
         return Promise.reject(new Error("技能目录暂不可用"));
@@ -121,9 +149,21 @@ export function createWebuiComposerPluginCatalogue(deps: {
         .catch((reason: unknown) => {
           skillReads.delete(key);
           throw reason;
+        })
+        .finally(() => {
+          // Same fence as the plugin slot: a read in flight across teardown does
+          // not re-enter the cache afterwards.
+          if (disposed) skillReads.delete(key);
         });
       skillReads.set(key, request);
       return request;
+    },
+
+    dispose: () => {
+      if (disposed) return;
+      disposed = true;
+      pluginReads.clear();
+      skillReads.clear();
     },
   };
 }

@@ -11,8 +11,9 @@
 // `attach` returns a real disposer, and `detachAll` releases every watch without
 // touching a process. What stays presentation: the xterm instance, the fit
 // observer, the resize debounce and the caret. Nothing here reads the DOM, and
-// nothing here kills a PTY because a view unmounted: process death is
-// `disposeProcess` or `disposeAll`, both explicit.
+// nothing here kills a PTY because a view unmounted: the process is
+// `disposeProcess` or the service's own shutdown, and `dispose` only ends this
+// page's observation.
 
 import type { WebuiTerminalFrame } from "../../../../shared/contracts/terminal.js";
 import {
@@ -54,7 +55,13 @@ export function createWebuiTerminalOwner(
     support[operation] = "incompatible";
   };
 
+  let disposed = false;
+
   const publish = (next: WebuiTerminalCatalogue): void => {
+    // A fenced owner has no page to tell: a create or a roster read that lands
+    // after teardown must not repopulate a catalogue nothing renders, and must
+    // not notify a listener the page already dropped.
+    if (disposed) return;
     snapshot = next;
     for (const listener of listeners) listener();
   };
@@ -71,6 +78,7 @@ export function createWebuiTerminalOwner(
   };
 
   const refresh = async (): Promise<void> => {
+    if (disposed) return;
     const list = port.listTerminals;
     if (!list) return;
     publish({ ...snapshot, loading: true, error: undefined });
@@ -94,6 +102,7 @@ export function createWebuiTerminalOwner(
   };
 
   const create = async (workspaceDir: string): Promise<WebuiTerminalRecord | undefined> => {
+    if (disposed) return undefined;
     const createTerminal = port.createTerminal;
     if (!createTerminal) return undefined;
     const created = await createTerminal({ workspaceDir }).catch((reason: unknown) => {
@@ -105,6 +114,7 @@ export function createWebuiTerminalOwner(
   };
 
   const write = async (terminalId: string, data: string): Promise<void> => {
+    if (disposed) return;
     if (!port.writeTerminal) return;
     await port.writeTerminal({ terminalId, data }).catch((reason: unknown) => {
       markIncompatible("write");
@@ -113,6 +123,7 @@ export function createWebuiTerminalOwner(
   };
 
   const resize = async (request: WebuiTerminalSize): Promise<void> => {
+    if (disposed) return;
     if (!port.resizeTerminal) return;
     await port.resizeTerminal(request).catch((reason: unknown) => {
       markIncompatible("resize");
@@ -121,6 +132,7 @@ export function createWebuiTerminalOwner(
   };
 
   const disposeProcess = async (terminalId: string): Promise<void> => {
+    if (disposed) return;
     // The watch is released first: the frame stream belongs to the process, and a
     // disposer that outlives its terminal would keep the panel's buffer growing.
     watches.get(terminalId)?.();
@@ -137,6 +149,7 @@ export function createWebuiTerminalOwner(
     terminalId: string,
     onFrame: (frame: WebuiTerminalFrame) => void,
   ): (() => void) => {
+    if (disposed) return () => undefined;
     const watch = port.watchTerminal;
     if (!watch) return () => undefined;
     watches.get(terminalId)?.();
@@ -168,21 +181,19 @@ export function createWebuiTerminalOwner(
     watches.clear();
   };
 
-  const disposeAll = async (): Promise<void> => {
-    // End every watch AND every process, which is what the contract says this
-    // is for: a view going away calls `detachAll` and leaves the PTYs running,
-    // while disposal ends the client's processes too.
+  /**
+   * Fence the page: stop observing, stop publishing, never touch a process.
+   *
+   * This is the whole process-ownership policy in one function. The service owns
+   * the PTYs, so a page that goes away releases what it *observed* — its watches
+   * — and nothing else. A terminal this page only listed can be in use by another
+   * page, or outlive the page entirely because a create response was lost.
+   */
+  const dispose = (): void => {
+    if (disposed) return;
+    disposed = true;
     detachAll();
-    const known = snapshot.terminals.map((terminal) => terminal.terminalId);
-    for (const terminalId of known) {
-      await port.disposeTerminal?.({ terminalId }).catch((reason: unknown) => {
-        // Disposal is the client's end, so a refused terminal must not strand the
-        // rest: the remaining processes still get their dispose attempt.
-        markIncompatible("dispose");
-        console.error("[webui] terminal dispose failed during client disposal", reason);
-      });
-    }
-    if (known.length > 0) await refresh();
+    listeners.clear();
   };
 
   return {
@@ -217,6 +228,6 @@ export function createWebuiTerminalOwner(
     disposeProcess,
     attach,
     detachAll,
-    disposeAll,
+    dispose,
   };
 }
