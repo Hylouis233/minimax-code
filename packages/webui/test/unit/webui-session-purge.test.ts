@@ -825,3 +825,86 @@ describe("a session delete invokes the composer's purge command", () => {
     expect(purged).toEqual(["a", "b"]);
   });
 });
+
+describe("V15 · a confirmed deletion settles through one teardown", () => {
+  function deleteFixture(options: {
+    readonly port?: Record<string, unknown>;
+    readonly deliveries?: { closeSession: (sessionId: string) => void };
+    readonly scope?: boolean;
+  } = {}) {
+    const store = createWebuiSessionStore({
+      catalog: createWebuiSessionCatalogFromPage(page("a", "b")),
+    });
+    store.updateSession("a", (current) => ({ ...current, sending: true }));
+    const composer = createWebuiComposerStore({
+      initial: { drafts: { a: "half-written" }, history: { a: ["earlier"] } },
+    });
+    const closeSession = vi.fn();
+    const workflows = createWebuiSessionWorkflows({
+      store,
+      composer,
+      port: {
+        deleteSession: async () => ({ success: true }),
+        loadSessions: async () => page("b"),
+        loadSessionTree: async () => ({ sessions: [], hasMore: false }),
+        ...(options.port ?? {}),
+      } as unknown as Parameters<typeof createWebuiSessionWorkflows>[0]["port"],
+      deliveries: { closeSession: options.deliveries ? closeSession : closeSession },
+      ...(options.scope
+        ? { scope: createWebuiSessionScopeManager() }
+        : {}),
+    });
+    return { store, composer, workflows, closeSession };
+  }
+
+  it("stops the wire session the deleted session was streaming on", async () => {
+    // Revoking the browser's interest in a session is not the same as stopping
+    // the delivery loop reading frames for it: the loop holds the socket, and it
+    // would keep delivering against a session the server no longer has.
+    const { workflows, closeSession } = deleteFixture();
+    await workflows.remove("a");
+    expect(closeSession).toHaveBeenCalledWith("a");
+  });
+
+  it("does not stop a wire session the delete failed on", async () => {
+    const { workflows, closeSession } = deleteFixture({
+      port: {
+        deleteSession: async () => {
+          throw new Error("server refused");
+        },
+      },
+    });
+    await expect(workflows.remove("a")).rejects.toThrow("server refused");
+    // Nothing was confirmed gone, so the session keeps its stream.
+    expect(closeSession).not.toHaveBeenCalled();
+  });
+
+  it("deletes a confirmed-gone session once, whichever route asks", async () => {
+    const deleteSession = vi.fn(async () => ({ success: true }));
+    const { workflows, closeSession } = deleteFixture({
+      port: { deleteSession },
+    });
+
+    await workflows.remove("a");
+    // The archived page and the rail are two views of one catalogue: the second
+    // route must settle for both rather than issuing a redundant mutation for a
+    // session the server already dropped.
+    await workflows.remove("a");
+    await workflows.removeArchived("a");
+
+    expect(deleteSession).toHaveBeenCalledTimes(1);
+    expect(closeSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops the session's slices once even when the delete arrives twice", async () => {
+    const { store, composer, workflows } = deleteFixture();
+    await workflows.remove("a");
+    await workflows.remove("a");
+
+    const snapshot = store.getSnapshot();
+    expect(snapshot.sessions.has("a")).toBe(false);
+    expect(snapshot.catalog.entities.has("a")).toBe(false);
+    expect(composer.readDraft("a")).toBe("");
+    expect(snapshot.catalog.flat.ids).toEqual(["b"]);
+  });
+});

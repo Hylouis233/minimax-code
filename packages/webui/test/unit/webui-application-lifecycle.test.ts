@@ -401,3 +401,91 @@ describe("the reconciliation entry point", () => {
     expect(listPendingPermissions).not.toHaveBeenCalled();
   });
 });
+
+describe("one owner's cleanup failing does not strand the others", () => {
+  it("still fences the store and reports the failure", () => {
+    // The event channel is host-facing, so its close is the realistic place for a
+    // cleanup to throw. A throw there must not leave the application accepting
+    // writes, and must not propagate at a caller that cannot act on it.
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const opened = scriptedChannel();
+      const application = createWebuiApplication({
+        openEventChannel: () => ({
+          ...opened.channel,
+          close: () => {
+            opened.channel.close();
+            throw new Error("host channel close failed");
+          },
+        }),
+        turns: { resumeSession: (async () => {}) as unknown as WebuiClientSessionResumer },
+      });
+      application.start({ initialSessionId: SESSION });
+      expect(() => application.dispose()).not.toThrow();
+
+      // Everything ran: the ingress it was observing is closed, and the store is
+      // fenced, so a late write cannot land on a disposed application.
+      expect(opened.closes()).toBe(1);
+      expect(application.store.isDisposed()).toBe(true);
+      application.store.updateSession(OTHER, (current) => ({ ...current, sending: true }));
+      expect(application.store.readSession(OTHER).sending).toBe(false);
+      expect(errors).toHaveBeenCalled();
+    } finally {
+      errors.mockRestore();
+    }
+  });
+
+  it("keeps dispose terminal after a failed cleanup", () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const opened = scriptedChannel();
+      const application = createWebuiApplication({
+        openEventChannel: () => ({
+          ...opened.channel,
+          close: () => {
+            throw new Error("host channel close failed");
+          },
+        }),
+        turns: { resumeSession: (async () => {}) as unknown as WebuiClientSessionResumer },
+      });
+      application.start({ initialSessionId: SESSION });
+      application.dispose();
+      // Disposal is fenced before any cleanup runs, so a retrying caller cannot
+      // start a second teardown — including after one of them threw.
+      expect(() => application.dispose()).not.toThrow();
+      expect(() => application.dispose()).not.toThrow();
+      expect(application.state()).toBe("disposed");
+      expect(opened.listenerCount()).toBe(0);
+      expect(application.start()).toBe(false);
+    } finally {
+      errors.mockRestore();
+    }
+  });
+});
+
+describe("reads resolve after the application is disposed", () => {
+  it("answers every business read instead of throwing", () => {
+    const { application } = makeApplication();
+    application.start({ initialSessionId: SESSION });
+    const before = application.reads.stream(SESSION);
+    application.dispose();
+
+    // A read that outlives disposal is a reader that has not been told yet, not
+    // a programming error: it must still answer, and answer from the last
+    // committed snapshot rather than from a torn one. A hook that threw here
+    // would replace a recoverable error with a fatal one during teardown.
+    expect(() => application.reads.stream(SESSION)).not.toThrow();
+    expect(application.reads.stream(SESSION)).toEqual(before);
+    expect(() => application.reads.transcriptPage(SESSION)).not.toThrow();
+    expect(() => application.getSnapshot()).not.toThrow();
+    // Models, Settings, Plugins, Transcript, Review and Workspace all publish a
+    // read model, and each surface holds one across the disposal that unmounts it.
+    expect(() => application.modelsWorkflows.getSnapshot()).not.toThrow();
+    expect(() => application.settingsWorkflows.getSnapshot()).not.toThrow();
+    expect(() => application.pluginWorkflows.getSnapshot()).not.toThrow();
+    expect(() => application.accountWorkflows.getSnapshot()).not.toThrow();
+    expect(() => application.sessionWorkflows.getArchivedSnapshot()).not.toThrow();
+    expect(() => application.workspaceQueries.getSnapshot()).not.toThrow();
+    expect(() => application.turnReview.read({ sessionId: SESSION })).not.toThrow();
+  });
+});

@@ -213,6 +213,13 @@ export function createWebuiSessionWorkflows(deps: {
    * session's remaining browser interests at the commit point.
    */
   readonly scope?: WebuiSessionScopeManager;
+  /**
+   * The delivery disposers. A delete that commits must also stop the wire
+   * session it was streaming on: the lease revocation below releases the
+   * browser's *interest*, but the loop holding the socket is a separate thing
+   * and keeps reading frames for a session that no longer exists.
+   */
+  readonly deliveries?: { readonly closeSession: (sessionId: string) => void };
   readonly port: QueryPort & MutationPort;
   /** Injected browser IO; absent means the import operation is not wired. */
   readonly importSession?: WebuiSessionImporter;
@@ -319,6 +326,31 @@ export function createWebuiSessionWorkflows(deps: {
   };
 
   /**
+   * The one teardown for a session that is confirmed gone, whichever route
+   * noticed. Local delete, archived-page delete and externally observed deletion
+   * all converge here, so "the session is gone" has one meaning in this client
+   * rather than three that can drift apart.
+   *
+   * The order is the fence first: `removedSessionIds` before any state changes,
+   * so a stream frame, a lifecycle event or a catalog load already in flight
+   * writes nothing from the moment this runs.
+   */
+  const teardownDeletedSession = (sessionId: string): void => {
+    removedSessionIds.add(sessionId);
+    // The wire session stops before the interest that could reopen it is
+    // released: revoking the lease alone leaves the delivery loop reading frames
+    // for a session the server no longer has.
+    deps.deliveries?.closeSession(sessionId);
+    store.purgeSession(sessionId);
+    composer.purgeSlot(sessionId);
+    // Every browser interest in the deleted session goes with it, including a
+    // delivery lease on a stream that can no longer commit.
+    deps.scope?.purge(sessionId);
+    commitCatalog((current) => removeWebuiCatalogSessions(current, [sessionId]));
+    dropRemovedArchivedRows();
+  };
+
+  /**
    * The one write path into the catalog. Composing the fence here rather than
    * at each call site is what makes "a removed session stays removed" a
    * property of the workflow instead of a rule each new load has to remember.
@@ -417,6 +449,10 @@ export function createWebuiSessionWorkflows(deps: {
     },
     remove: async (sessionId) => {
       if (!port.deleteSession) return;
+      // A session this client has already torn down is not deleted twice: the
+      // second request would be a redundant mutation for a session the server
+      // no longer has, and a second refresh over a catalog that already dropped it.
+      if (removedSessionIds.has(sessionId)) return;
       // The settlement lease outlives the view that asked for the delete: the
       // session cannot be evicted while the mutation it owes is in flight.
       const settle = deps.scope?.acquire(sessionId, "settlement", `delete:${sessionId}`);
@@ -428,19 +464,9 @@ export function createWebuiSessionWorkflows(deps: {
         throw error;
       }
       // The delete has committed, so every slice that could still describe a
-      // live session goes: the session fence first (so a stream frame or event
-      // that arrives from here on writes nothing), then the application-store
-      // record and activity, then the composer slot's draft and history, then
-      // the catalog entity. `removedSessionIds` keeps the entity out of every
-      // later merge, including the `refresh()` below.
-      removedSessionIds.add(sessionId);
-      store.purgeSession(sessionId);
-      composer.purgeSlot(sessionId);
-      // Every browser interest in the deleted session goes with it, including a
-      // delivery lease on a stream that can no longer commit.
-      deps.scope?.purge(sessionId);
-      commitCatalog((current) => removeWebuiCatalogSessions(current, [sessionId]));
-      dropRemovedArchivedRows();
+      // live session goes. Local and externally observed deletion converge on
+      // this one teardown, so neither order can leave a half-deleted session.
+      teardownDeletedSession(sessionId);
       await refresh();
       if (archived.status !== "idle") await loadArchived();
       settle?.();
@@ -456,6 +482,9 @@ export function createWebuiSessionWorkflows(deps: {
     loadArchived,
     removeArchived: async (sessionId) => {
       if (!port.deleteSession) return;
+      // The same fence as `remove`: the archived page and the rail are two views
+      // of one catalogue, so a delete from either settles for both.
+      if (removedSessionIds.has(sessionId)) return;
       const settle = deps.scope?.acquire(sessionId, "settlement", `delete:${sessionId}`);
       try {
         await port.deleteSession({ id: sessionId });
@@ -465,12 +494,7 @@ export function createWebuiSessionWorkflows(deps: {
       }
       // Deleting from the archived page removes the same session the rail
       // could still be showing, so it takes the same teardown as `remove`.
-      removedSessionIds.add(sessionId);
-      store.purgeSession(sessionId);
-      composer.purgeSlot(sessionId);
-      deps.scope?.purge(sessionId);
-      commitCatalog((current) => removeWebuiCatalogSessions(current, [sessionId]));
-      dropRemovedArchivedRows();
+      teardownDeletedSession(sessionId);
       await loadArchived();
     },
     unarchive: async (sessionId) => {

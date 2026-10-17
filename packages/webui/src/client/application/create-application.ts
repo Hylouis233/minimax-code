@@ -622,6 +622,8 @@ export function createWebuiApplication(
     // A delete is an accepted mutation: it holds a settlement lease and revokes
     // the deleted session's interests.
     scope: sessionScope,
+    // A committed delete also stops the wire session it was streaming on.
+    deliveries,
   });
   const commandWorkflows = createWebuiCommandWorkflows({ port: slices.composer });
   /**
@@ -882,31 +884,53 @@ export function createWebuiApplication(
     },
     dispose: () => {
       if (lifecycle === "disposed") return;
-      detach?.();
-      detach = undefined;
+      // Fence first: whatever a later step throws, this application is now
+      // disposed and a second `dispose` must be a no-op.
+      lifecycle = "disposed";
+      // One owner throwing must not strand the others. The store is fenced
+      // last-but-one either way, so a failing cleanup above it cannot leave the
+      // application half-alive with writers still accepted — the failure is
+      // reported, the rest of the teardown still runs.
+      const shutDown = (label: string, end: () => void): void => {
+        try {
+          end();
+        } catch (reason) {
+          console.error(`[webui] ${label} cleanup failed during application disposal`, reason);
+        }
+      };
+      shutDown("event ingress", () => {
+        detach?.();
+        detach = undefined;
+      });
       // Close what this client is observing before fencing the store: the
       // attempt's frames can no longer reach a snapshot, and the host turn keeps
       // running.
-      deliveries.closeAll();
-      sessionScope.dispose();
-      goals.dispose();
-      interactions.dispose();
+      shutDown("delivery", () => deliveries.closeAll());
+      shutDown("session scope", () => sessionScope.dispose());
+      shutDown("goal owners", () => goals.dispose());
+      shutDown("interaction owners", () => interactions.dispose());
       // The account owner runs the login and OAuth-status polls, so its end is
       // the application's end rather than a component unmount.
-      accountWorkflows.dispose();
-      sessionWorkflows.dispose();
+      shutDown("account owner", () => accountWorkflows.dispose());
+      shutDown("session owner", () => sessionWorkflows.dispose());
       // The terminal owner's disposer is the client's own end: its watches stop
       // and the PTYs it created are killed here rather than left running for a
       // page that is going away. Fire-and-forget because this disposal is
-      // synchronous; the requests are already on their way.
-      void terminalOwner.disposeAll();
+      // synchronous; the requests are already on their way, so a rejection is
+      // reported rather than thrown at a caller that cannot act on it.
+      void Promise.resolve()
+        .then(() => terminalOwner.disposeAll())
+        .catch((reason: unknown) => {
+          console.error("[webui] terminal owner cleanup failed during application disposal", reason);
+        });
       channelReadyListeners.clear();
       dirtyResources.clear();
-      composerController?.dispose();
-      store.dispose();
-      channel?.close?.();
-      channel = undefined;
-      lifecycle = "disposed";
+      shutDown("composer controller", () => composerController?.dispose());
+      shutDown("session store", () => store.dispose());
+      shutDown("event channel", () => {
+        channel?.close?.();
+        channel = undefined;
+      });
     },
   };
 }
