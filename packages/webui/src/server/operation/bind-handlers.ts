@@ -118,13 +118,6 @@ import {
   type WebuiOperationPort,
 } from "./binding-mechanism.js";
 
-import {
-  toRuntimeCreateProviderRequest,
-  toRuntimeDiscoverCandidateRequest,
-  toRuntimeSaveCandidateRequest,
-  toRuntimeUpdateProviderRequest,
-} from "./provider-input.js";
-
 /**
  * The mechanism — the port view, the capability groups, the declaration helper
  * and the executor — lives in `./binding-mechanism.js` (the generic half and
@@ -598,14 +591,14 @@ export const WEBUI_OPERATION_BINDINGS = {
     "createUserModelProvider",
   )({
     operation: createUserModelProviderOperation,
-    args: (body) => [toRuntimeCreateProviderRequest(body)],
+    args: (body) => [body],
     result: identity,
   }),
   updateUserModelProvider: bind("providers")("updateUserModelProvider")(
     "updateUserModelProvider",
   )({
     operation: updateUserModelProviderOperation,
-    args: (body) => [toRuntimeUpdateProviderRequest(body)],
+    args: (body) => [body],
     result: identity,
   }),
   deleteUserModelProvider: bind("providers")("deleteUserModelProvider")(
@@ -631,14 +624,14 @@ export const WEBUI_OPERATION_BINDINGS = {
     "discoverUserModelsCandidate",
   )({
     operation: discoverUserModelsCandidateOperation,
-    args: (body) => [toRuntimeDiscoverCandidateRequest(body)],
+    args: (body) => [body],
     result: identity,
   }),
   saveUserModelProviderCandidate: bind("providers")("saveUserModelProviderCandidate")(
     "saveUserModelProviderCandidate",
   )({
     operation: saveUserModelProviderCandidateOperation,
-    args: (body) => [toRuntimeSaveCandidateRequest(body)],
+    args: (body) => [body],
     result: identity,
   }),
   listProviderPresets: bind("providers")("listProviderPresets")("listProviderPresets")({

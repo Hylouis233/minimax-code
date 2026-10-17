@@ -83,9 +83,15 @@ import type {
   WebuiWorkspaceReviewSummary,
 } from "../shared/contracts/review.js";
 import type { WebuiCanvasDocument } from "../shared/contracts/canvas.js";
-import type { WebuiModelEntry, WebuiSkillEntry } from "../shared/contracts/models.js";
+import type {
+  WebuiCreateUserModelProviderRequest,
+  WebuiDiscoverUserModelsCandidateRequest,
+  WebuiModelEntry,
+  WebuiSaveUserModelProviderCandidateRequest,
+  WebuiSkillEntry,
+  WebuiUpdateUserModelProviderRequest,
+} from "../shared/contracts/models.js";
 import type { WebuiHostPrerequisiteFacts } from "../shared/capability-manifest.js";
-import type { WebuiHostRequest } from "./harness/host-contract.js";
 import type { WebuiVersionInfo } from "../shared/contracts/version.js";
 import type { WebuiUsageQuotaResult } from "../shared/contracts/usage-quota.js";
 import type {
@@ -264,13 +270,13 @@ export interface WebuiHarnessPort {
     readonly sessionId?: string;
   }): Promise<Record<string, unknown>>;
   listUserModelProviders(): Promise<readonly Record<string, unknown>[]>;
-  createUserModelProvider(request: WebuiHostRequest<"createUserModelProvider">): Promise<unknown>;
-  updateUserModelProvider(request: WebuiHostRequest<"updateUserModelProvider">): Promise<unknown>;
+  createUserModelProvider(request: WebuiCreateUserModelProviderRequest): Promise<unknown>;
+  updateUserModelProvider(request: WebuiUpdateUserModelProviderRequest): Promise<unknown>;
   deleteUserModelProvider(providerId: string): Promise<unknown>;
   testUserModelProvider(request: { readonly providerId: string; readonly apiKey?: string }): Promise<unknown>;
   testUserModel(request: { readonly providerId: string; readonly modelId: string }): Promise<unknown>;
-  discoverUserModelsCandidate(request: WebuiHostRequest<"discoverUserModelsCandidate">): Promise<unknown>;
-  saveUserModelProviderCandidate(request: WebuiHostRequest<"saveUserModelProviderCandidate">): Promise<unknown>;
+  discoverUserModelsCandidate(request: WebuiDiscoverUserModelsCandidateRequest): Promise<unknown>;
+  saveUserModelProviderCandidate(request: WebuiSaveUserModelProviderCandidateRequest): Promise<unknown>;
   listProviderPresets(): Promise<readonly Record<string, unknown>[]>;
   getMiniMaxApiKeyStatus(): Promise<Record<string, unknown>>;
   upsertMiniMaxApiKey(request: { readonly apiKey: string; readonly saveAndUse?: boolean }): Promise<unknown>;

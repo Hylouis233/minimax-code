@@ -4,6 +4,12 @@
 // bodies are unchanged, only the module boundary moved.
 import type { WebuiHarnessPort } from "../port.js";
 import type { WebuiRuntimeHostHandle } from "./host-contract.js";
+import {
+  toRuntimeCreateProviderRequest,
+  toRuntimeDiscoverCandidateRequest,
+  toRuntimeSaveCandidateRequest,
+  toRuntimeUpdateProviderRequest,
+} from "./provider-input.js";
 import { requireCliService } from "./requirements.js";
 import {
   asText,
@@ -62,11 +68,11 @@ export function createModelsPluginsAdapter(
     },
 
     async createUserModelProvider(request) {
-      return requireCliService(host).createUserModelProvider(request);
+      return requireCliService(host).createUserModelProvider(toRuntimeCreateProviderRequest(request));
     },
 
     async updateUserModelProvider(request) {
-      return requireCliService(host).updateUserModelProvider(request);
+      return requireCliService(host).updateUserModelProvider(toRuntimeUpdateProviderRequest(request));
     },
 
     async deleteUserModelProvider(providerId) {
@@ -82,11 +88,11 @@ export function createModelsPluginsAdapter(
     },
 
     async discoverUserModelsCandidate(request) {
-      return requireCliService(host).discoverUserModelsCandidate(request);
+      return requireCliService(host).discoverUserModelsCandidate(toRuntimeDiscoverCandidateRequest(request));
     },
 
     async saveUserModelProviderCandidate(request) {
-      return requireCliService(host).saveUserModelProviderCandidate(request);
+      return requireCliService(host).saveUserModelProviderCandidate(toRuntimeSaveCandidateRequest(request));
     },
 
     async listProviderPresets() {

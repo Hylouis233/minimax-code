@@ -13,6 +13,11 @@
  *
  * The target types are read off `CliService` instead of transcribed: the runtime owns them,
  * and a copy here is a copy that drifts.
+ *
+ * This lives in the harness, not in the server: the server's job is network validation,
+ * dispatch and wire projection, and knowing the concrete host request layout is not part of it.
+ * The port stays the WebUI's own seam — its inputs are WebUI DTOs — and the adaptation to the
+ * host's shapes happens here, applied at the one place that builds the port (`adapter.ts`).
  */
 
 import type { CliService } from "@mavis/local-runtime-v2/cli-service";

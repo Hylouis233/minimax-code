@@ -92,6 +92,20 @@ interface WorkspaceFileTree {
 }
 
 class ScriptedHarnessPort implements WebuiHarnessPort {
+  /**
+   * The host services this scripted harness holds. Answered as a fact rather than inferred
+   * from the methods below, which is the distinction the availability derivation rests on: a
+   * scripted port can expose a wrapper and still have no host behind it.
+   */
+  readHostPrerequisites = () => ({
+    accountLogin: false,
+    accountSignin: true,
+    accountUsage: true,
+    accountSignOut: true,
+    canvasDocuments: true,
+    canvasWrites: true,
+  });
+
   /** Recorded so a test can assert the command reached the port, not a runner. */
   readonly commandsRun: Array<{ readonly command: string; readonly input?: string }> = [];
   async runCommand(request: { readonly command: string; readonly input?: string }): Promise<
