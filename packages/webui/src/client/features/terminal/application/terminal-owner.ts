@@ -16,6 +16,7 @@
 // page's observation.
 
 import type { WebuiTerminalFrame } from "../../../../shared/contracts/terminal.js";
+import { isWebuiWireError, WebuiErrorCode } from "../../../../shared/envelope.js";
 import {
   readWebuiCapability,
   type WebuiCapabilityState,
@@ -55,7 +56,30 @@ export function createWebuiTerminalOwner(
    * port whose service has no terminal bridge.
    */
   const refused = new Set<keyof WebuiTerminalSupportReport>();
-  const markIncompatible = (operation: keyof WebuiTerminalSupportReport): void => {
+  /**
+   * The failures that say something about the *bridge* rather than about this call.
+   *
+   * A protocol or envelope mismatch, an operation this host does not implement and a
+   * capability the host reports unavailable or not ready are verdicts about the
+   * bridge. A permission denial, a busy terminal or a transport failure is a verdict
+   * about the call, and marking the operation incompatible for one of those retires a
+   * surface that would have worked on the next attempt.
+   */
+  const INCOMPATIBLE_CODES: ReadonlySet<string> = new Set([
+    WebuiErrorCode.protocolMismatch,
+    WebuiErrorCode.invalidEnvelope,
+    WebuiErrorCode.unknownOperation,
+    WebuiErrorCode.capabilityUnavailable,
+    WebuiErrorCode.capabilityNotReady,
+  ]);
+  const markIncompatible = (
+    operation: keyof WebuiTerminalSupportReport,
+    reason?: unknown,
+  ): void => {
+    if (reason !== undefined) {
+      const code = isWebuiWireError(reason) ? reason.code : undefined;
+      if (code === undefined || !INCOMPATIBLE_CODES.has(code)) return;
+    }
     refused.add(operation);
   };
 
@@ -64,9 +88,11 @@ export function createWebuiTerminalOwner(
    *
    * Two sources, in order of authority:
    *
-   *   1. what this client *observed* — a refused call, which only calling can
-   *      establish;
-   *   2. what the service *declared* in its handshake manifest, when it sent one.
+   *   1. what this client *observed* — a refusal that says something about the
+   *      bridge rather than about the call it answered;
+   *   2. what the service *declared* in its handshake manifest, when it sent one;
+   *   3. with no manifest at all, an unverified attempt: an older service is not an
+   *      absent one, and it is not a supported one either.
    *
    * The declaration is what makes absence and unreadiness different answers.
    * `absent` means the service has no terminal bridge at all: there is nothing to
@@ -100,8 +126,14 @@ export function createWebuiTerminalOwner(
     // Not-ready is a fact about the family, so it applies to the operations the
     // bridge actually offers: one it does not offer stays absent.
     if (declared === "not-ready") return present ? "not-ready" : "absent";
+    // No manifest: an older service. The attempt stays available, and the state says
+    // so instead of claiming support.
+    if (declared === "unknown") return present ? "unverified" : "absent";
     return present ? "supported" : "absent";
   };
+  /** Whether an operation may be called: supported, or an unverified legacy attempt. */
+  const attemptable = (state: WebuiTerminalSupport): boolean =>
+    state === "supported" || state === "unverified";
   const supportReport = (): WebuiTerminalSupportReport => ({
     create: seedSupport("create"),
     list: seedSupport("list"),
@@ -148,7 +180,7 @@ export function createWebuiTerminalOwner(
       // The host offers the roster and refused to produce one: that is a version
       // mismatch, not an empty terminal list. Reporting it as "no terminals"
       // would tell the user their sessions' shells had all exited.
-      markIncompatible("list");
+      markIncompatible("list", reason);
       publish({
         ...snapshot,
         loading: false,
@@ -162,7 +194,7 @@ export function createWebuiTerminalOwner(
     const createTerminal = port.createTerminal;
     if (!createTerminal) return undefined;
     const created = await createTerminal({ workspaceDir }).catch((reason: unknown) => {
-      markIncompatible("create");
+      markIncompatible("create", reason);
       throw reason;
     });
     await refresh();
@@ -173,7 +205,7 @@ export function createWebuiTerminalOwner(
     if (disposed) return;
     if (!port.writeTerminal) return;
     await port.writeTerminal({ terminalId, data }).catch((reason: unknown) => {
-      markIncompatible("write");
+      markIncompatible("write", reason);
       throw reason;
     });
   };
@@ -182,7 +214,7 @@ export function createWebuiTerminalOwner(
     if (disposed) return;
     if (!port.resizeTerminal) return;
     await port.resizeTerminal(request).catch((reason: unknown) => {
-      markIncompatible("resize");
+      markIncompatible("resize", reason);
       throw reason;
     });
   };
@@ -195,7 +227,7 @@ export function createWebuiTerminalOwner(
     watches.delete(terminalId);
     if (!port.disposeTerminal) return;
     await port.disposeTerminal({ terminalId }).catch((reason: unknown) => {
-      markIncompatible("dispose");
+      markIncompatible("dispose", reason);
       throw reason;
     });
     await refresh();
@@ -216,7 +248,7 @@ export function createWebuiTerminalOwner(
       // The host offers the frame stream and refused to open it. That is a
       // version mismatch, and it must not leave the previous watch's disposer in
       // the map: the old one was already released above.
-      markIncompatible("watch");
+      markIncompatible("watch", reason);
       throw reason;
     }
     watches.set(terminalId, release);
@@ -258,23 +290,25 @@ export function createWebuiTerminalOwner(
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    // The `can*` flags answer "may I"; `support` answers why not. A host that
-    // does not provide the operation is `absent`; a host that provides one and
-    // refuses it is `incompatible`, and only a call could have told them apart.
+    // The `can*` flags answer "may I"; `support` answers why not, and the two are
+    // deliberately not the same question. `unverified` — no manifest, an older service
+    // — permits the attempt while claiming nothing, so it answers yes here and not
+    // "supported" there. `absent`, `not-ready` and `incompatible` answer no: there is
+    // nothing to retry, or the surface exists and cannot serve this call.
     get canCreate() {
-      return seedSupport("create") === "supported";
+      return attemptable(seedSupport("create"));
     },
     get canWrite() {
-      return seedSupport("write") === "supported";
+      return attemptable(seedSupport("write"));
     },
     get canResize() {
-      return seedSupport("resize") === "supported";
+      return attemptable(seedSupport("resize"));
     },
     get canDispose() {
-      return seedSupport("dispose") === "supported";
+      return attemptable(seedSupport("dispose"));
     },
     get canWatch() {
-      return seedSupport("watch") === "supported";
+      return attemptable(seedSupport("watch"));
     },
     support: supportReport,
     refresh,

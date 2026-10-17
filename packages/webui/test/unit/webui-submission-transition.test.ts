@@ -46,7 +46,6 @@ function handlers() {
     resetStreamForTurn: vi.fn(),
     setRefusal: vi.fn(),
     setSending: vi.fn(),
-    onDraftChange: vi.fn(),
     onNeedsSession: vi.fn(),
     onSessionCreated: vi.fn(),
     onQueued: vi.fn(),
@@ -177,7 +176,6 @@ describe("the ticket a submission returns", () => {
     });
     expect(completion).toEqual({ kind: "busy", reason: "creating" });
     expect(h.setSending).not.toHaveBeenCalled();
-    expect(h.onDraftChange).not.toHaveBeenCalled();
   });
 
   it("asks for a session through the handler it always called", async () => {
@@ -323,7 +321,9 @@ describe("the ticket a submission returns", () => {
     expect(enqueueMessage).toHaveBeenCalledWith(
       expect.objectContaining({ content: "the original words" }),
     );
-    expect(h.onDraftChange).toHaveBeenCalledTimes(1);
+    // The draft is not Turn's to clear: the composer consumes the input it captured,
+    // on the admission this command returns.
+    expect(h.onSessionCreated).not.toHaveBeenCalled();
   });
 
   it("reports each intent kind's own admission rather than one shared default", async () => {

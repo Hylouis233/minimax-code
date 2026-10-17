@@ -56,7 +56,6 @@ export interface WebuiComposerSubmitHandlers {
   readonly setRefusal: (refusal: string | undefined) => void;
   readonly readStream?: () => WebuiStreamState;
   readonly setSending: (sending: boolean) => void;
-  readonly onDraftChange: (next: string) => void;
   readonly onNeedsSession?: (draft: string) => void;
   readonly onQueued?: () => void;
 }

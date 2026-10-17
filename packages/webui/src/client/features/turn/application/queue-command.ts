@@ -21,7 +21,6 @@ export interface WebuiQueueTurnArgs {
   readonly clientIntent?: string;
   readonly attachments?: readonly WebuiAttachmentInput[];
   readonly enqueueMessage?: WebuiClientMessageEnqueuer;
-  readonly onDraftChange: (next: string) => void;
   readonly onQueued?: () => void;
   /** Records a user-visible refusal from a failed enqueue. */
   readonly setRefusal: (refusal: string) => void;
@@ -41,7 +40,6 @@ export async function queueWebuiTurn(args: WebuiQueueTurnArgs): Promise<void> {
       ...(args.clientIntent ? { clientIntent: args.clientIntent } : {}),
       ...(args.attachments?.length ? { attachments: args.attachments } : {}),
     });
-    args.onDraftChange("");
     args.onQueued?.();
   } catch (error) {
     args.setRefusal(formatWebuiError(error));

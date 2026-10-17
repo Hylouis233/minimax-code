@@ -1498,6 +1498,38 @@ describe("V25 · what a published surface may contain", () => {
     expect(violations.map((v) => v.kind)).toContain("foreign-namespace");
   });
 
+  it("resolves a workspace alias, so a bare specifier cannot reach a peer's module", () => {
+    // The same reach as the relative case above, written with the alias the build
+    // understands. Reading the specifier's *shape* instead of its target let this form
+    // through with no violation while the relative form was rejected.
+    const violations = findPublicationViolations(
+      'import * as models from "@models/token-plan";\nexport const x = models;\n',
+      {
+        ownerBusiness: "settings",
+        businessOf: (relative) => (relative.includes("/models/") ? "models" : "settings"),
+        resolveSpecifier: (specifier) =>
+          specifier === "@models/token-plan"
+            ? "client/features/models/application/token-plan.ts"
+            : null,
+      },
+    );
+
+    expect(violations.map((v) => v.kind)).toContain("foreign-namespace");
+  });
+
+  it("leaves a specifier the resolver cannot place alone, so npm packages are not peers", () => {
+    const violations = findPublicationViolations(
+      'import * as react from "react";\nexport const x = react;\n',
+      {
+        ownerBusiness: "settings",
+        businessOf: () => "settings",
+        resolveSpecifier: () => null,
+      },
+    );
+
+    expect(violations).toEqual([]);
+  });
+
   it("treats an unresolvable relative import as foreign, so a gap fails closed", () => {
     const violations = findPublicationViolations(
       'import * as mystery from "./mystery.js";\nexport const x = mystery;\n',

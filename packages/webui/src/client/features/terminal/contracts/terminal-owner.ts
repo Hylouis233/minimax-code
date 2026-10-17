@@ -30,6 +30,14 @@ export type WebuiTerminalSupport =
    */
   | "not-ready"
   /**
+   * No manifest arrived, so nothing declared this family either way.
+   *
+   * The attempt is still allowed — an older service is not an absent one — but the
+   * state is not `supported`: nothing has established that it works, and calling it
+   * supported is how a control gets offered on the strength of a browser stub.
+   */
+  | "unverified"
+  /**
    * The host provides a terminal service that refused this client's request.
    * The roster keeps listing; the operations this client needs are unavailable
    * until the versions agree.

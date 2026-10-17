@@ -1985,14 +1985,12 @@ describe("WebUI composer app-to-helper seam", () => {
     const resetStreamForTurn = vi.fn();
     const setRefusal = vi.fn();
     const setSending = vi.fn();
-    const onDraftChange = vi.fn();
     const onNeedsSession = vi.fn();
     const handlers = buildWebuiComposerHandlers({
       createSink,
       resetStreamForTurn,
       setRefusal,
       setSending,
-      onDraftChange,
       onNeedsSession,
     });
     // Every field is the same function reference. A regression that
@@ -2002,7 +2000,6 @@ describe("WebUI composer app-to-helper seam", () => {
     expect(handlers.resetStreamForTurn).toBe(resetStreamForTurn);
     expect(handlers.setRefusal).toBe(setRefusal);
     expect(handlers.setSending).toBe(setSending);
-    expect(handlers.onDraftChange).toBe(onDraftChange);
     expect(handlers.onNeedsSession).toBe(onNeedsSession);
   });
 
@@ -2028,7 +2025,6 @@ describe("WebUI composer app-to-helper seam", () => {
       buildWebuiComposerHandlers({
         ...handlerWrites,
         setSending: () => undefined,
-        onDraftChange: () => undefined,
       }),
     );
     const final = getState();
@@ -2066,7 +2062,6 @@ describe("WebUI composer app-to-helper seam", () => {
       buildWebuiComposerHandlers({
         ...handlerWrites,
         setSending: () => undefined,
-        onDraftChange: () => undefined,
         onSessionCreated,
       }),
     );
@@ -2110,7 +2105,6 @@ describe("WebUI composer app-to-helper seam", () => {
       buildWebuiComposerHandlers({
         ...handlerWrites,
         setSending: () => undefined,
-        onDraftChange: () => undefined,
         onSessionCreated,
       }),
     );
@@ -2147,7 +2141,6 @@ describe("WebUI composer app-to-helper seam", () => {
       buildWebuiComposerHandlers({
         ...handlerWrites,
         setSending: () => undefined,
-        onDraftChange: () => undefined,
         onSessionCreated,
       }),
     );
@@ -2207,7 +2200,6 @@ describe("WebUI composer app-to-helper seam", () => {
       buildWebuiComposerHandlers({
         ...handlerWrites,
         setSending: () => undefined,
-        onDraftChange: () => undefined,
       }),
     );
 
@@ -2239,7 +2231,6 @@ describe("WebUI composer app-to-helper seam", () => {
       buildWebuiComposerHandlers({
         ...handlerWrites,
         setSending: () => undefined,
-        onDraftChange: () => undefined,
       }),
     );
 
@@ -2295,7 +2286,6 @@ describe("WebUI composer app-to-helper seam", () => {
       status: "queued",
       position: 1,
     }));
-    const onDraftChange = vi.fn();
     const onQueued = vi.fn();
     await submitTurn(
       {
@@ -2308,7 +2298,6 @@ describe("WebUI composer app-to-helper seam", () => {
       buildWebuiComposerHandlers({
         ...handlerWrites,
         setSending: () => undefined,
-        onDraftChange,
         onQueued,
       }),
     );
@@ -2316,7 +2305,6 @@ describe("WebUI composer app-to-helper seam", () => {
       id: "s",
       content: "second turn",
     });
-    expect(onDraftChange).toHaveBeenCalledWith("");
     expect(onQueued).toHaveBeenCalledOnce();
     expect(getState().phase).toBe("idle");
   });
@@ -2835,7 +2823,6 @@ describe("WebUI composer transcriptIncomplete", () => {
       buildWebuiComposerHandlers({
         ...handlerWrites,
         setSending: () => undefined,
-        onDraftChange: () => undefined,
       }),
     );
     const final = getState();

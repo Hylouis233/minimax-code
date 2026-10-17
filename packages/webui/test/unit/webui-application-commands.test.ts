@@ -67,7 +67,6 @@ function commandHandlers(
     resetStreamForTurn: () => undefined,
     setRefusal: () => undefined,
     setSending: () => undefined,
-    onDraftChange: () => undefined,
     ...overrides,
   };
 }
@@ -370,18 +369,15 @@ describe("the unread controller command surface", () => {
 describe("the queue command", () => {
   it("enqueues, clears the draft and refreshes the panel", async () => {
     const enqueueMessage = vi.fn(async () => ({}));
-    const onDraftChange = vi.fn();
     const onQueued = vi.fn();
     await queueWebuiTurn({
       sessionId: "s1",
       message: "hello",
       enqueueMessage,
-      onDraftChange,
       onQueued,
       setRefusal: vi.fn(),
     });
     expect(enqueueMessage).toHaveBeenCalledWith({ id: "s1", content: "hello" });
-    expect(onDraftChange).toHaveBeenCalledWith("");
     expect(onQueued).toHaveBeenCalled();
   });
 
@@ -393,16 +389,13 @@ describe("the queue command", () => {
       enqueueMessage: vi.fn(async () => {
         throw new Error("queue refused");
       }),
-      onDraftChange: vi.fn(),
       setRefusal,
     });
     expect(setRefusal).toHaveBeenCalledWith("queue refused");
   });
 
   it("is a no-op without an enqueuer", async () => {
-    const onDraftChange = vi.fn();
-    await queueWebuiTurn({ sessionId: "s1", message: "x", onDraftChange, setRefusal: vi.fn() });
-    expect(onDraftChange).not.toHaveBeenCalled();
+    await queueWebuiTurn({ sessionId: "s1", message: "x", setRefusal: vi.fn() });
   });
 });
 
@@ -666,6 +659,35 @@ describe("the assembled composer controller", () => {
     app.dispose();
   });
 
+  it("V22 · clears the revision it submitted, and leaves typing that came after it", async () => {
+    const sendMessage = vi.fn(async () => undefined);
+    const app = createWebuiApplication({
+      openEventChannel: () => ({ subscribe: () => () => undefined, close: () => undefined }),
+      turns: { resumeSession: vi.fn(async () => undefined) },
+      turnCapabilities: { sendMessage: sendMessage as never, enqueueMessage: vi.fn(async () => undefined) as never },
+    });
+    app.start({ initialSessionId: "s1" });
+    app.composerController.setDraft("the first words", "s1");
+
+    const pending = app.composerController.submit({
+      draft: "the first words",
+      sending: false,
+      goalEnabled: true,
+      agentName: "main",
+    });
+    // Consumed on the admission, early, and only for the revision that was submitted.
+    expect(app.composer.readDraft("s1")).toBe("");
+
+    // The user types again while the turn is being admitted and delivered.
+    app.composerController.setDraft("the second words", "s1");
+    await pending;
+
+    // Nothing about the older submission's completion removes newer input: the clear
+    // was the captured revision's, and this is not it.
+    expect(app.composer.readDraft("s1")).toBe("the second words");
+    app.dispose();
+  });
+
   it("resolves a questionnaire requester from its target child session", async () => {
     const catalog = reduceWebuiCatalogTreeLoaded(
       createWebuiSessionCatalogFromPage({ sessions: [], hasMore: false }),
@@ -695,7 +717,6 @@ describe("the assembled composer controller", () => {
 describe("the send command", () => {
   it("routes to the queue when a turn is already in flight", async () => {
     const enqueueMessage = vi.fn(async () => ({}));
-    const onDraftChange = vi.fn();
     const writer = {
       kind: "session" as const,
       createSink: vi.fn(() => noopSink),

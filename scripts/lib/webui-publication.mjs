@@ -76,8 +76,21 @@ export function publicModuleKind(normalized) {
  * @returns {boolean}
  */
 function isForeignAccess(specifier, context) {
-  if (!specifier.startsWith(".")) return false;
   const { ownerBusiness, businessOf, resolveSpecifier } = context;
+  const relative = specifier.startsWith(".");
+  if (!relative) {
+    // A bare specifier is not automatically out of scope: a workspace alias can point
+    // at a peer's published module exactly as a relative path can, and returning early
+    // here is what let `@models/...` reach a foreign module with no violation. The
+    // resolver has the answer, so ask it — and only when it cannot say (an npm package,
+    // a node builtin) is the specifier left alone.
+    if (!resolveSpecifier) return false;
+    const aliased = resolveSpecifier(specifier);
+    if (!aliased) return false;
+    const aliasedBusiness = businessOf ? businessOf(aliased) : null;
+    if (aliasedBusiness === null) return false;
+    return aliasedBusiness !== ownerBusiness;
+  }
   if (!resolveSpecifier || !businessOf) return true;
   const target = resolveSpecifier(specifier);
   if (!target) return true;

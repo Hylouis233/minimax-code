@@ -220,14 +220,21 @@ describe("prohibition 5 — a submit carries intent, never a setter", () => {
     expect(ticket.slice(0, ticket.indexOf("\n}"))).not.toMatch(/set[A-Z]/u);
   });
 
-  it("clears the draft through a link the assembly installs, not through a caller", () => {
-    // The one business write a submission makes is wired once at the composition
-    // root. A per-send setter would put the caller's draft writer back on the
-    // boundary this prohibition exists to keep closed.
+  it("leaves draft consumption to the composer, on both sides of the boundary", () => {
+    // Consuming the submitted input is the composer's, because only the composer holds
+    // the identity the input was captured under. A writer installed at the composition
+    // root — or handed in per send — clears a slot without knowing whether it is still
+    // the revision that was submitted, which is how newer typing got erased. The
+    // positive half is in the controller; the negative half is here.
     const application = read("application/create-application.ts");
-    expect(application).toContain("clearDraft:");
+    expect(application).not.toContain("clearDraft");
+    expect(application).not.toContain("onDraftChange");
     const context = read("features/turn/application/turn-commands.ts");
-    expect(context).toMatch(/readonly clearDraft\?: \(sessionId: string \| undefined\) => void/u);
+    expect(context).not.toContain("clearDraft");
+    expect(context).not.toContain("onDraftChange");
+    const controller = read("features/composer/application/composer-controller.ts");
+    expect(controller).toContain("consumeDraft(captured)");
+    expect(controller).toContain("consumeMovedDraft(created.sessionId, message)");
   });
 });
 

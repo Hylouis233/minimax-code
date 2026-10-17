@@ -276,7 +276,6 @@ describe("retry re-sends the recorded input and never aborts", () => {
           resetStreamForTurn: () => undefined,
           setRefusal: () => undefined,
           setSending: () => undefined,
-          onDraftChange: () => undefined,
         }),
       });
       inFlight = ticket?.completion;

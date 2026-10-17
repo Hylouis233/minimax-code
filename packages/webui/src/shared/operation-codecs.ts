@@ -31,6 +31,10 @@
 import { WebuiErrorCode, WebuiWireError } from "./envelope.js";
 import type { WebuiSkillEntry } from "./contracts/models.js";
 import type { WebuiVersionInfo } from "./contracts/version.js";
+import type {
+  WebuiCapabilityManifest,
+  WebuiCapabilityState,
+} from "./capability-manifest.js";
 import type { OperationSpec, WebuiUnaryOperationName } from "./operation-names.js";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -99,10 +103,38 @@ export type WebuiOperationResultCodecs = {
   readonly [K in WebuiUnaryOperationName]?: (body: unknown) => OperationSpec[K]["response"];
 };
 
+
+/**
+ * The handshake's capability manifest, as it survives the wire.
+ *
+ * Reconstructed rather than passed through, because the two halves have different
+ * rules. The **family names** are open: a newer service may advertise one this build
+ * has never heard of, and dropping it would make the next version's manifest
+ * unreadable here. The **states** are a closed set, so an entry carrying a state this
+ * build does not know is left out rather than failing the handshake — an additive
+ * field must not be able to break an older client's boot.
+ *
+ * Dropping the field entirely was the bug: the service sent a manifest, this codec
+ * rebuilt the body without it, and every consumer downstream saw a service that had
+ * declared nothing.
+ */
+function readCapabilityManifest(
+  value: unknown,
+): { readonly capabilities: WebuiCapabilityManifest } | undefined {
+  if (!isRecord(value)) return undefined;
+  const capabilities: Record<string, WebuiCapabilityState> = {};
+  for (const [name, state] of Object.entries(value)) {
+    if (state === "supported" || state === "absent" || state === "not-ready") {
+      capabilities[name] = state;
+    }
+  }
+  return { capabilities };
+}
+
 export const webuiOperationResultCodecs: WebuiOperationResultCodecs = {
   version: (body) => {
     if (!isRecord(body)) throw malformed("version", "the body is not an object");
-    const { version, protocolVersion, dataDir } = body;
+    const { version, protocolVersion, dataDir, capabilities } = body;
     if (typeof version !== "string") throw malformed("version", "`version` is not a string");
     if (typeof protocolVersion !== "number") {
       throw malformed("version", "`protocolVersion` is not a number");
@@ -111,6 +143,7 @@ export const webuiOperationResultCodecs: WebuiOperationResultCodecs = {
       version,
       protocolVersion,
       ...(typeof dataDir === "string" ? { dataDir } : {}),
+      ...(readCapabilityManifest(capabilities) ?? {}),
     };
   },
   getMiniMaxModelSource: (body) => {

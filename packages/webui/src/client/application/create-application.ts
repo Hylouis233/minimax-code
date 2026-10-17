@@ -538,14 +538,10 @@ export function createWebuiApplication(
       // use case, which reserves the admission, transfers the home record under
       // its guards and answers whether the created session may be selected.
       taskSessions: taskSessionWorkflows,
-      // The one business write a submission performs on the caller's behalf: the
-      // draft it consumed. Installed here rather than passed per send, which is
-      // what lets the public submit intent carry no setters at all.
-      clearDraft: (targetSessionId) =>
-        composer.setDraft(
-          targetSessionId ?? readActiveSessionId() ?? WEBUI_COMPOSER_HOME_KEY,
-          "",
-        ),
+      // No draft writer crosses into Turn: the composer consumes the input it
+      // captured, on the admission the turn owner returns, and a link installed here
+      // would clear a slot without knowing whether it was still the submitted
+      // revision — which is how newer typing in that slot was erased.
     });
   /**
    * The one reconciliation entry point: the same owner routes the event path
@@ -586,6 +582,11 @@ export function createWebuiApplication(
       // The application's own reconciliation first, then the surfaces that
       // subscribed: a reconnect is a possible observation gap, not a barrier.
       channelReady: () => {
+        // The handshake facts first: the manifest this client decides availability
+        // from arrives with the version, and a service that restarted with a different
+        // bridge must not keep the previous connection's answer. Reading it is what
+        // makes readiness a live question rather than a boot-time one.
+        void settingsWorkflows.loadVersion();
         for (const sessionId of sessionScope.interested()) {
           dirtyResources.delete(sessionId);
           reconcileSession(sessionId);

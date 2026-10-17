@@ -44,6 +44,10 @@ function scriptedChannel() {
     emit: (event: WebuiRuntimeEvent) => {
       for (const listener of [...listeners]) listener(event);
     },
+    /** The server accepted the subscription: a reconnect, not a first connect. */
+    ready: () => {
+      for (const listener of [...ready]) listener();
+    },
     listenerCount: () => listeners.size,
     closes: () => closes,
   };
@@ -614,5 +618,37 @@ describe("V03 · a failure while ending owners strands nothing", () => {
     expect(application.disposalFailures()).toHaveLength(1);
     // Nothing was persisted by either disposal pass.
     expect(recorder.calls.filter((call) => call.startsWith("write"))).toHaveLength(writesBefore);
+  });
+});
+
+describe("R2 · the handshake facts are re-read when the connection returns", () => {
+  it("re-reads the version, so readiness is a live answer rather than a boot-time one", async () => {
+    const opened: ReturnType<typeof scriptedChannel>[] = [];
+    let versionReads = 0;
+    const application = createWebuiApplication({
+      openEventChannel: () => {
+        const fake = scriptedChannel();
+        opened.push(fake);
+        return fake.channel;
+      },
+      slices: createWebuiPortSlices({
+        version: async () => {
+          versionReads += 1;
+          return { version: "1.0.0", protocolVersion: 1, capabilities: { terminal: "absent" } };
+        },
+      } as never),
+      turns: { resumeSession: (async () => {}) as unknown as WebuiClientSessionResumer },
+    });
+    application.start({ initialSessionId: SESSION });
+
+    // A reconnect is a possible observation gap *and* a possible restart on the other
+    // side: a service that came back with a different bridge must not keep the previous
+    // connection's capability answer.
+    opened[0]!.ready();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(versionReads).toBeGreaterThanOrEqual(1);
+
+    application.dispose();
   });
 });

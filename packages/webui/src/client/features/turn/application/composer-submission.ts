@@ -45,7 +45,6 @@ export function buildWebuiComposerHandlers(
     setRefusal: args.setRefusal,
     ...(args.readStream ? { readStream: args.readStream } : {}),
     setSending: args.setSending,
-    onDraftChange: args.onDraftChange,
     onNeedsSession: args.onNeedsSession,
     onSessionCreated: args.onSessionCreated,
     onQueued: args.onQueued,
@@ -214,7 +213,6 @@ export function submitWebuiTurn(
         ...(clientIntent ? { clientIntent } : {}),
         ...(attachments.length ? { attachments } : {}),
         enqueueMessage: args.enqueueMessage,
-        onDraftChange: handlers.onDraftChange,
         onQueued: handlers.onQueued,
         setRefusal: (next) => {
           refusal = next;
@@ -227,7 +225,6 @@ export function submitWebuiTurn(
     }
     if (!args.deps.sendMessage) return ({ kind: "unsupported", missing: "transport" });
     handlers.setSending(true);
-    handlers.onDraftChange("");
     handlers.resetStreamForTurn();
     let claimed: number | undefined;
     try {

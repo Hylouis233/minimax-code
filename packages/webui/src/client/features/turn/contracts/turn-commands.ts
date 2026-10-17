@@ -6,7 +6,6 @@ import type {
 } from "./turn-command-views.js";
 
 export interface WebuiComposerTurnCallbacks {
-  readonly onDraftChange: (next: string) => void;
   readonly onNeedsSession?: (draft: string) => void;
   /**
    * The session a first message created, with the use case's selection decision: the transfer and the

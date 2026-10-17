@@ -11,6 +11,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createWebuiTerminalOwner } from "../../src/client/features/terminal/application/terminal-owner.js";
+import { WebuiErrorCode, WebuiWireError } from "../../src/shared/envelope.js";
 import { deriveWebuiCapabilityManifest } from "../../src/shared/capability-manifest.js";
 import type { WebuiTerminalFrame } from "../../src/shared/contracts/terminal.js";
 
@@ -129,7 +130,11 @@ describe("V29 · an absent bridge and an incompatible one are different failures
 
     expect(owner.support()).toEqual({
       create: "absent",
-      list: "supported",
+      // No manifest arrived, so nothing established that this works: the port offers
+      // the operation and the state says exactly that — an attempt is allowed, and
+      // nothing claims it works. Calling it `supported` is how a control gets offered
+      // on the strength of a browser stub.
+      list: "unverified",
       write: "absent",
       resize: "absent",
       dispose: "absent",
@@ -138,15 +143,23 @@ describe("V29 · an absent bridge and an incompatible one are different failures
     // Nothing is broken and nothing should be retried: the operation was never
     // there to be refused.
     expect(owner.support().create).not.toBe("incompatible");
+    // The attempt stays available even though support is not claimed.
+    expect(owner.canCreate).toBe(false);
   });
 
   it("reports incompatible for an operation this host provides and refuses", async () => {
     const owner = createWebuiTerminalOwner({
       listTerminals: async () => {
-        throw new Error("unknown operation ListTerminals");
+        throw new WebuiWireError(
+          WebuiErrorCode.unknownOperation,
+          "unknown operation ListTerminals",
+        );
       },
       createTerminal: async () => {
-        throw new Error("unknown operation CreateTerminal");
+        throw new WebuiWireError(
+          WebuiErrorCode.unknownOperation,
+          "unknown operation CreateTerminal",
+        );
       },
     });
 
@@ -164,6 +177,28 @@ describe("V29 · an absent bridge and an incompatible one are different failures
     expect(owner.support().write).toBe("absent");
   });
 
+  it("does not retire the surface for a failure that is not about the bridge", async () => {
+    // A permission denial, a busy terminal or a transport failure answers a *call*.
+    // Marking the operation incompatible for one of those retires a surface that would
+    // have worked on the next attempt — and it was doing so for every failure.
+    const owner = createWebuiTerminalOwner({
+      listTerminals: async () => {
+        throw new WebuiWireError(WebuiErrorCode.runtimeRejected, "permission denied");
+      },
+      createTerminal: async () => {
+        throw new Error("socket closed before the response");
+      },
+    });
+
+    await expect(owner.refresh()).resolves.toBeUndefined();
+    expect(owner.support().list).not.toBe("incompatible");
+    expect(owner.support().list).toBe("unverified");
+    await expect(owner.create("/tmp")).rejects.toThrow("socket closed");
+    expect(owner.support().create).toBe("unverified");
+    // Still attemptable: nothing about the bridge was decided.
+    expect(owner.canCreate).toBe(true);
+  });
+
   it("keeps the roster honest when the host has no terminal service at all", async () => {
     const owner = createWebuiTerminalOwner({});
     await owner.refresh();
@@ -174,7 +209,7 @@ describe("V29 · an absent bridge and an incompatible one are different failures
   it("records a refused watch without keeping a disposer for a stream that never opened", () => {
     const owner = createWebuiTerminalOwner({
       watchTerminal: () => {
-        throw new Error("protocol mismatch");
+        throw new WebuiWireError(WebuiErrorCode.protocolMismatch, "protocol mismatch");
       },
     });
 

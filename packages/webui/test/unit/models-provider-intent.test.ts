@@ -72,18 +72,31 @@ describe("V10 · provider intent is the owner's, not the caller's array", () => 
     expect(settled.map((model) => model.enabled)).toEqual([true, true]);
   });
 
-  it("serializes two writes to one provider and keeps the later intent", async () => {
+  it("shows a second intent at once while the first write is still in flight", async () => {
     const order: string[] = [];
+    let inFlight = 0;
+    let maxInFlight = 0;
     const first = deferred<unknown>();
-    let models = [provider([{ modelId: "m1", enabled: false }, { modelId: "m2", enabled: false }])];
+    let models = [
+      provider([{ modelId: "m1", enabled: false }, { modelId: "m2", enabled: false }]),
+    ];
     const workflows = workflowsWith({
-      // A live runtime reflects the write it accepted; a fixture that keeps
-      // serving the pre-write list would test a reload that never happens.
       listUserModelProviders: async () => models,
       updateUserModelProvider: (body: { models: readonly { modelId: string; enabled?: boolean }[] }) => {
         order.push(body.models.map((model) => `${model.modelId}:${model.enabled}`).join(","));
         models = [provider(body.models)];
-        return order.length === 1 ? first.promise : Promise.resolve({ success: true });
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        const done = (): void => {
+          inFlight -= 1;
+        };
+        return order.length === 1 ? first.promise.then((value) => {
+          done();
+          return value;
+        }) : Promise.resolve({ success: true }).then((value) => {
+          done();
+          return value;
+        });
       },
       listModels: async () => [],
     });
@@ -92,13 +105,24 @@ describe("V10 · provider intent is the owner's, not the caller's array", () => 
     const one = workflows.setProviderModelEnabled({ providerId: "p1", modelId: "m1", enabled: true });
     const two = workflows.setProviderModelEnabled({ providerId: "p1", modelId: "m2", enabled: true });
     await flush();
-    // Only the first write is in flight; the second waits.
-    expect(order).toHaveLength(1);
+
+    // Both intents are on screen before either write has answered — the point of
+    // separating the captured intent from the serialized write. Applying it inside the
+    // queue instead left the second change invisible until the first write settled.
+    const shown = workflows.getSnapshot().providers.value?.[0]?.models ?? [];
+    expect(shown.map((model) => model.enabled)).toEqual([true, true]);
+    // And the writes to one provider never overlap.
+    expect(maxInFlight).toBe(1);
 
     first.resolve({ success: true });
     await one;
     await two;
-    expect(order).toEqual(["m1:true,m2:false", "m1:true,m2:true"]);
+    expect(maxInFlight).toBe(1);
+    // Whatever each write carried, the owner converged on the last intent.
+    expect(workflows.getSnapshot().providers.value?.[0]?.models.map((m) => m.enabled)).toEqual([
+      true,
+      true,
+    ]);
   });
 
   it("does not serialize across providers", async () => {

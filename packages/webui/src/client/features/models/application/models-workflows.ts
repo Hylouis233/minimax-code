@@ -503,54 +503,68 @@ export function createWebuiModelsWorkflows(deps: {
         error: new Error("当前运行时不支持自定义提供商。"),
       });
     }
+
+    // Captured and published *now*, before the write queue is consulted: what the user
+    // asked for is the owner's current intent the moment they ask for it. Composing the
+    // intent inside the serialized step instead meant a second toggle waited behind the
+    // first write — one write in flight, the display still showing the old list for the
+    // second change, and a user watching their own edit not appear.
+    const current = modelsOfProvider(providerId);
+    if (!current) {
+      return Promise.resolve({
+        status: "failed",
+        category: "refused",
+        error: new Error("提供商当前不可用，无法修改其模型。"),
+      });
+    }
+    const intent = transform(current);
+    if (!intent) return Promise.resolve({ status: "settled", value: undefined });
+    pendingModels.set(providerId, intent);
+    // The rows the intent is shown in, taken before freshness advances: a read taken
+    // after the retire would be describing the state this write replaces.
+    const providers = projectedProviders() ?? [];
+    // A read that started before this write described a state this write is replacing,
+    // so its answer must not land on top: freshness advances first, then the intent is
+    // shown.
+    providerList.invalidate(providerKey());
+    if (providers.length > 0) showProviderModels(providers, providerId, intent);
+
     const run = async (): Promise<WebuiMutationOutcome<void>> => {
-      const current = modelsOfProvider(providerId);
-      if (!current) {
-        return {
-          status: "failed",
-          category: "refused",
-          error: new Error("提供商当前不可用，无法修改其模型。"),
-        };
-      }
-      const desired = transform(current);
-      if (!desired) return { status: "settled", value: undefined };
-      pendingModels.set(providerId, desired);
-      // The rows the intent is shown in, taken before freshness advances: a read
-      // taken after the retire would be describing the state this write replaces.
-      const providers = projectedProviders() ?? [];
-      // A read that started before this write described a state this write is
-      // replacing, so its answer must not land on top: freshness advances first,
-      // then the intent is shown.
-      providerList.invalidate(providerKey());
-      if (providers.length > 0) showProviderModels(providers, providerId, desired);
+      // What this write carries is the intent at the moment the queue reaches it, so an
+      // intent captured while an earlier write was in flight is the one sent — not the
+      // one that happened to be current when the command was issued.
+      const sent = pendingModels.get(providerId) ?? intent;
       const outcome = await runWebuiMutation<void>(async () => {
         await update({
           providerId,
-          models: desired.map((model) => ({
+          models: sent.map((model) => ({
             modelId: model.modelId,
             ...(model.enabled === undefined ? {} : { enabled: model.enabled }),
           })) as WebuiUpdateUserModelProviderRequest["models"],
         });
       });
       if (outcome.status === "settled") {
-        committedModels.set(providerId, desired);
-        pendingModels.delete(providerId);
-        // The reload is the truth; a refusal or an unknown outcome is not. A
-        // refresh that fails is not a failed write, so it cannot turn a settled
-        // mutation into a rejection.
+        committedModels.set(providerId, sent);
+        // Only this intent is retired: a newer one captured while the write was in
+        // flight is what the owner will send next, and dropping it here is exactly how
+        // an earlier answer erased a later decision.
+        if (pendingModels.get(providerId) === sent) pendingModels.delete(providerId);
+        // The reload is the truth; a refusal or an unknown outcome is not. A refresh
+        // that fails is not a failed write, so it cannot turn a settled mutation into
+        // a rejection.
         await loadProviders().catch(() => undefined);
         await loadModels().catch(() => undefined);
         return outcome;
       }
       if (outcome.category === "refused" || outcome.category === "conflict") {
-        // The runtime decided, so the pending intent is wrong: drop it and put the
-        // last committed value back rather than leaving a change on screen that
-        // did not happen.
-        pendingModels.delete(providerId);
+        // The runtime decided, so this intent is wrong: drop it and put the last
+        // committed value back rather than leaving a change on screen that did not
+        // happen.
+        if (pendingModels.get(providerId) === sent) pendingModels.delete(providerId);
         const committed = committedModels.get(providerId);
         const rows = projectedProviders();
         if (committed && rows) showProviderModels(rows, providerId, committed);
-        else await loadProviders();
+        else await loadProviders().catch(() => undefined);
         return outcome;
       }
       // Transport failure, timeout or a lost response: the write may or may not have

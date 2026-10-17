@@ -126,6 +126,21 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
     if (deps.store.readStaging() !== captured.staging) return;
     deps.store.setStaging({ attachments: [], urlReferences: [] });
   };
+
+  /**
+   * Clear a slot that now holds the submitted text because it was *moved* there.
+   *
+   * A submission that creates a session transfers the home record under the use case's
+   * guards, so the input ends up in a slot the capture never named and the captured
+   * revision cannot guard it. The identity that survives the move is the text: it is
+   * cleared where it still reads exactly as it was submitted, and left alone the moment
+   * the user has typed something else.
+   */
+  const consumeMovedDraft = (key: string, submitted: string): void => {
+    if (submitted.length === 0) return;
+    if (deps.store.readDraft(key) !== submitted) return;
+    deps.store.setDraft(key, "");
+  };
   const queueCommands = createWebuiComposerQueueCommands({
     store: deps.store,
     workflows: deps.commandWorkflows,
@@ -156,6 +171,11 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
       ...(turn.teamModeOff ? { teamModeOff: turn.teamModeOff } : {}),
     });
     if (ticket && (ticket.admission.kind === "dispatching" || ticket.admission.kind === "queued")) {
+      // The draft and the staged input are consumed by the same rule, on the same
+      // admission: the exact revision that was submitted, cleared early because a
+      // dispatch is not proof the host accepted it, and never the *current* slot's
+      // contents, which the user may have replaced while the send was in flight.
+      consumeDraft(captured);
       consumeStaging(captured);
     }
     return ticket;
@@ -301,6 +321,10 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
       void ticket.creation.then((created) => {
         if (!created) return;
         if (created.selected) deps.selectCreatedSession(created.sessionId);
+        // The home record was moved into the created session, so the submitted text is
+        // in that slot now: clearing only the slot it was captured in would leave the
+        // input sitting in the session it was sent to.
+        consumeMovedDraft(created.sessionId, message);
         createdSession = { ticketId: ticket.id, ...created };
         publish();
       });
