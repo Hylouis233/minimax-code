@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   createWebuiWorkspacePanelOwner,
@@ -272,5 +273,44 @@ describe("the panel owner holds the panel state per session", () => {
     owner.dispatch("A", { type: "close-panel" });
     owner.setProgressPanelOpen("A", true);
     expect(owner.stateFor("A").progressPanelOpen).toBe(true);
+  });
+});
+
+describe("the terminal roster is read before it is shown", () => {
+  const panelSource = readFileSync(
+    new URL("../../src/client/features/workspace/ui/WorkspacePanels.tsx", import.meta.url),
+    "utf8",
+  );
+
+  it("does not paint an empty roster before the first answer lands", () => {
+    // On a reload whose sessions still hold PTYs, an empty first paint reads as
+    // "all my terminals exited" and offers a create button that would exceed the
+    // limit. The panel waits for the roster instead.
+    expect(panelSource).toContain("terminalsReady");
+    expect(panelSource).toContain("{!terminalsReady ? <><p>{DESKTOP_COPY.terminalLoading}</p>");
+    // The standalone create button lives outside the ready/not-ready branch, so
+    // it is gated explicitly: offering it before the roster lands is what invites
+    // the create that exceeds the limit.
+    expect(panelSource).toContain("terminalsReady && terminals.length === 0");
+  });
+
+  it("drops a roster read that a later read has superseded", () => {
+    // Switching workspaces starts a second read. The first resolving late would
+    // otherwise overwrite the newer answer with the previous workspace's
+    // terminals — a stale roster that looks live.
+    expect(panelSource).toContain("const read = ++rosterRead.current;");
+    expect(panelSource).toContain("if (rosterRead.current !== read) return;");
+  });
+
+  it("says the limit rather than discovering it through a refused create", () => {
+    // The panel knows the rule the process half enforces, so a full set is
+    // stated before the request instead of after it.
+    expect(panelSource).toContain("const DESKTOP_TERMINAL_LIMIT = 5;");
+    expect(panelSource).toContain("const terminalSlotsFull = terminals.length >= DESKTOP_TERMINAL_LIMIT;");
+    expect(panelSource).toContain("disabled={terminalSlotsFull}");
+    // One helper, not three copies of the create-then-catch dance.
+    const createHandlers = panelSource.split("onClick={createTerminal}").length - 1;
+    expect(createHandlers).toBe(2);
+    expect(panelSource).not.toContain("terminalOwner.create(activeWorkspace).then");
   });
 });

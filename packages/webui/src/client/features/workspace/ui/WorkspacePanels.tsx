@@ -79,7 +79,14 @@ export {
   chunkWebuiWorkspaceReviewFileIds,
   WEBUI_WORKSPACE_REVIEW_DIFF_BATCH_SIZE,
 };
-const DESKTOP_COPY = { environment: "环境信息", progress: "进度", progressEmpty: "跟踪较长任务的进度", newTerminal: "新建终端", terminalLimit: "最多可以打开 5 个终端", terminalLabel: "终端", terminalExited: "已退出", terminalEmptyTitle: "还没有终端", terminalEmptyDescription: "可直接在右侧面板中启动当前工作区的 Shell。", fileClose: "关闭", changes: "变更", commit: "提交或推送", openTerminal: "打开终端", unsupported: "WebUI 尚未接入此操作" } as const;
+const DESKTOP_COPY = { environment: "环境信息", progress: "进度", progressEmpty: "跟踪较长任务的进度", newTerminal: "新建终端", terminalLimit: "最多可以打开 5 个终端", terminalLabel: "终端", terminalExited: "已退出", terminalEmptyTitle: "还没有终端", terminalEmptyDescription: "可直接在右侧面板中启动当前工作区的 Shell。", terminalLoading: "正在读取终端…", fileClose: "关闭", changes: "变更", commit: "提交或推送", openTerminal: "打开终端", unsupported: "WebUI 尚未接入此操作" } as const;
+
+/**
+ * How many PTYs the process half admits, per `runtime/terminal.ts`. The panel
+ * checks it before asking, so a full set is stated rather than discovered by a
+ * refused request.
+ */
+const DESKTOP_TERMINAL_LIMIT = 5;
 
 const FILE_CODE_LANGUAGES = {
   bash,
@@ -371,8 +378,49 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   const syncTerminalsFromOwner = (owner: WebuiTerminalOwner | undefined): void => {
     setTerminals(owner?.getSnapshot().terminals ?? []);
   };
+  /**
+   * Whether the roster has been read at least once for the current workspace.
+   *
+   * Without it the panel paints an empty terminal list on the first render and
+   * then swaps in the real one a moment later. On a reload whose sessions already
+   * hold PTYs that reads as "all my terminals exited" and offers a create button
+   * that would exceed the limit — a flicker that misreports state, in the one
+   * moment the user is deciding whether their shells survived.
+   */
+  const [terminalsReady, setTerminalsReady] = useState(false);
+  /**
+   * Monotonic read counter. Each roster read takes the next number and only
+   * applies if it is still the newest: switching workspaces quickly starts a
+   * second read, and the first one resolving late would otherwise overwrite the
+   * newer answer with the previous workspace's terminals.
+   */
+  const rosterRead = useRef(0);
   const [activeTerminalId, setActiveTerminalId] = useState<string>();
   const [terminalError, setTerminalError] = useState<string>();
+  /**
+   * The process half's limit, as the panel needs it.
+   *
+   * The client could learn the count only by attempting a create and being
+   * refused, which reads to the user as a malfunction. The panel knows the rule
+   * (`runtime/terminal.ts`), so it says so before the request instead of after
+   * it — and it checks the count it already has, so the button explains itself
+   * rather than failing.
+   */
+  const terminalSlotsFull = terminals.length >= DESKTOP_TERMINAL_LIMIT;
+  const createTerminal = (): void => {
+    if (!activeWorkspace || !terminalOwner?.canCreate) return;
+    if (terminalSlotsFull) {
+      setTerminalError(DESKTOP_COPY.terminalLimit);
+      return;
+    }
+    void terminalOwner
+      .create(activeWorkspace)
+      .then((created) => {
+        if (created) setActiveTerminalId(created.terminalId);
+        syncTerminalsFromOwner(terminalOwner);
+      })
+      .catch((error: unknown) => setTerminalError(error instanceof Error ? error.message : String(error)));
+  };
   const terminalHost = useRef<HTMLDivElement>(null);
   const terminalInstance = useRef<Terminal>();
   const terminalStop = useRef<(() => void) | undefined>();
@@ -521,10 +569,24 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   useEffect(() => {
     if (!terminalOwner) {
       setTerminals([]);
+      setTerminalsReady(true);
       return undefined;
     }
-    void terminalOwner.refresh().then(() => syncTerminalsFromOwner(terminalOwner));
-    return undefined;
+    const read = ++rosterRead.current;
+    // Not ready until the first answer lands, so a reload holding live PTYs does
+    // not paint an empty list and invite a create that would exceed the limit.
+    setTerminalsReady(false);
+    void terminalOwner.refresh().then(() => {
+      // A superseded read must not apply: its answer describes a workspace the
+      // user has already left.
+      if (rosterRead.current !== read) return;
+      syncTerminalsFromOwner(terminalOwner);
+      setTerminalsReady(true);
+    });
+    return () => {
+      // Unmounting invalidates this read for the same reason switching does.
+      if (rosterRead.current === read) rosterRead.current += 1;
+    };
   }, [terminalOwner, activeTab?.id, activeWorkspace]);
   // A view going away releases its watch and its xterm; it never kills a PTY.
   // Process death is the panel's explicit dispose button or the application's
@@ -661,7 +723,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
       {turnReviewFiles.length ? <div className="webui-turn-review-files">{turnReviewFiles.map((file) => <WebuiDiffFileSection key={file.file} file={file} selected={selectedReviewPath === file.file} />)}</div> : <p className="webui-turn-review-empty">本轮没有可审查的文件差异。</p>}
     </div> : null}
     {tab === "canvas" ? <WorkspaceCanvas sessionId={activeSessionId} /> : null}
-    {tab === "terminal" ? <div className="webui-terminal-empty">{terminals.length === 0 ? <><strong>{DESKTOP_COPY.terminalEmptyTitle}</strong><p>{DESKTOP_COPY.terminalEmptyDescription}</p></> : <><div className="webui-terminal-tabs">{terminals.map((terminal, index) => <button type="button" key={String(terminal.terminalId)} className={`file-tab group/tab-close h-8 w-40 min-w-20 ${String(terminal.terminalId) === (activeTerminalId ?? String(terminals[0]?.terminalId)) ? "bg-bg_interaction_tertiary_selected" : ""}`} onClick={() => setActiveTerminalId(String(terminal.terminalId))}><span>#{index + 1}</span>{terminal.status === "exited" ? DESKTOP_COPY.terminalExited : DESKTOP_COPY.terminalLabel}<span className="file-tab-close opacity-0 group-hover/tab-close:opacity-100"><WebuiIconClose className="size-[14px]" /></span></button>)}</div><div ref={terminalHost} className="webui-xterm-host" />{terminalError ? <p role="alert">{terminalError}</p> : null}<div className="webui-terminal-actions"><button type="button" onClick={() => { if (!activeWorkspace || !terminalOwner?.canCreate) return; void terminalOwner.create(activeWorkspace).then((created) => { if (created) setActiveTerminalId(created.terminalId); syncTerminalsFromOwner(terminalOwner); }).catch((error: unknown) => setTerminalError(error instanceof Error ? error.message : String(error))); }}>{DESKTOP_COPY.newTerminal}</button><button type="button" onClick={() => { const active = terminals.find((candidate) => String(candidate.terminalId) === (activeTerminalId ?? String(terminals[0]?.terminalId))); if (active && terminalOwner?.canDispose) void terminalOwner.disposeProcess(String(active.terminalId)).then(() => syncTerminalsFromOwner(terminalOwner)); }}>{DESKTOP_COPY.fileClose}</button></div></> }{terminals.length === 0 ? <button type="button" onClick={() => { if (!activeWorkspace || !terminalOwner?.canCreate) return; void terminalOwner.create(activeWorkspace).then((created) => { if (created) setActiveTerminalId(created.terminalId); syncTerminalsFromOwner(terminalOwner); }).catch((error: unknown) => setTerminalError(error instanceof Error ? error.message : String(error))); }}>{DESKTOP_COPY.newTerminal}</button> : null}</div> : null}
+    {tab === "terminal" ? <div className="webui-terminal-empty">{!terminalsReady ? <><p>{DESKTOP_COPY.terminalLoading}</p></> : terminals.length === 0 ? <><strong>{DESKTOP_COPY.terminalEmptyTitle}</strong><p>{DESKTOP_COPY.terminalEmptyDescription}</p></> : <><div className="webui-terminal-tabs">{terminals.map((terminal, index) => <button type="button" key={String(terminal.terminalId)} className={`file-tab group/tab-close h-8 w-40 min-w-20 ${String(terminal.terminalId) === (activeTerminalId ?? String(terminals[0]?.terminalId)) ? "bg-bg_interaction_tertiary_selected" : ""}`} onClick={() => setActiveTerminalId(String(terminal.terminalId))}><span>#{index + 1}</span>{terminal.status === "exited" ? DESKTOP_COPY.terminalExited : DESKTOP_COPY.terminalLabel}<span className="file-tab-close opacity-0 group-hover/tab-close:opacity-100"><WebuiIconClose className="size-[14px]" /></span></button>)}</div><div ref={terminalHost} className="webui-xterm-host" />{terminalError ? <p role="alert">{terminalError}</p> : null}<div className="webui-terminal-actions"><button type="button" disabled={terminalSlotsFull} title={terminalSlotsFull ? DESKTOP_COPY.terminalLimit : undefined} onClick={createTerminal}>{DESKTOP_COPY.newTerminal}</button><button type="button" onClick={() => { const active = terminals.find((candidate) => String(candidate.terminalId) === (activeTerminalId ?? String(terminals[0]?.terminalId))); if (active && terminalOwner?.canDispose) void terminalOwner.disposeProcess(String(active.terminalId)).then(() => syncTerminalsFromOwner(terminalOwner)); }}>{DESKTOP_COPY.fileClose}</button></div></> }{terminalsReady && terminals.length === 0 ? <button type="button" disabled={terminalSlotsFull} title={terminalSlotsFull ? DESKTOP_COPY.terminalLimit : undefined} onClick={createTerminal}>{DESKTOP_COPY.newTerminal}</button> : null}</div> : null}
       </div>
       {hasFileWorkspace && fileTreeOpen ? <aside className="webui-workspace-file-tree-panel" aria-label="工作区文件树">
         <label className="webui-workspace-file-search"><WebuiIconSearch className="size-4" /><input aria-label="搜索文件" placeholder="搜索" value={fileSearch} onChange={(event) => setFileSearch(event.currentTarget.value)} /></label>

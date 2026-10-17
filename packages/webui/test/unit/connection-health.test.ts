@@ -198,3 +198,36 @@ describe("the transport's watcher reporting", () => {
     expect(isWebuiEventChannelDegraded()).toBe(false);
   });
 });
+
+describe("V23 · a manual reconnect does not outlive the client that asked for it", () => {
+  it("opens no new socket once the channel has been released", async () => {
+    // The 250ms reconnect is a timer this client scheduled. Disposing the
+    // application must cancel it: a socket opening after the client is gone is
+    // a request against a disposed application, and nothing would ever close it.
+    const { transport, sockets } = watchEventsHarness();
+    const unsubscribe = transport.watchEvents(() => undefined, () => undefined);
+    accept(sockets[0]!);
+
+    sockets[0]!.close();
+    // The reconnect is now pending.
+    unsubscribe();
+
+    await new Promise((resolve) => setTimeout(resolve, 320));
+
+    expect(sockets).toHaveLength(1);
+  });
+
+  it("leaves no degradation behind for a client that released the channel", () => {
+    const { transport, sockets } = watchEventsHarness();
+    const unsubscribe = transport.watchEvents(() => undefined);
+    accept(sockets[0]!);
+    sockets[0]!.close();
+    expect(isWebuiEventChannelDegraded()).toBe(true);
+
+    unsubscribe();
+
+    // The socket is dead and will not be reopened, so the client must not keep
+    // reporting a degraded channel it is no longer listening on.
+    expect(isWebuiEventChannelDegraded()).toBe(false);
+  });
+});
