@@ -96,11 +96,22 @@ describe("shell surface wiring", () => {
     expect(startNewTask).toContain('dispatchShellSurface({ type: "show-conversation" })');
   });
 
+  it("gives each business zone its own recovery boundary", () => {
+    // One root boundary meant a throw in the workspace panel unmounted the
+    // composer, the transcript and the rail — losing an unsent draft because a
+    // file tree failed to render. Each zone holds its own throw now.
+    for (const zone of ["composer", "transcript", "workspace", "plugins"]) {
+      expect(shell).toContain(`<WebuiZoneBoundary zone="${zone}">`);
+    }
+  });
+
   it("gates the marketplace on the surface rather than a separate boolean", () => {
     // A second flag is how the two got out of step: the gate read `open`, the
     // area came from elsewhere, and nothing tied either to navigation.
     expect(shell).toContain('from "../features/shell/projection/shell-surface.js"');
-    expect(shell).toContain("pluginManagementArea ? <PluginCatalogue");
+    // The plugin management area renders inside its own recovery zone, so a
+    // throw in the marketplace does not take the rail and the composer with it.
+    expect(shell).toContain('pluginManagementArea ? <WebuiZoneBoundary zone="plugins"><PluginCatalogue');
     expect(shell).not.toContain("setPluginManagementOpen");
     expect(shell).not.toContain("setPluginManagementArea");
   });

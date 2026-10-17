@@ -125,3 +125,73 @@ describe("WebuiErrorBoundaryFallback", () => {
     expect(markup).toContain("重试");
   });
 });
+
+describe("V08 · a zone failure is recoverable without losing the app", () => {
+  it("holds the throw in one zone while its siblings keep rendering", () => {
+    // React does not run boundaries under `renderToStaticMarkup`, so the zone's
+    // guarantee is driven at the level the zone owns: the boundary catches, and
+    // the region outside it is a separate tree that never sees the throw. What
+    // distinguishes this from a root boundary is the *scope* — which is exactly
+    // what the composition asserts.
+    const failed = caughtBoundary(new Error("workspace panel exploded"));
+    const zone = renderToStaticMarkup(<>{failed.render()}</>);
+
+    expect(zone).toContain("webui-error-boundary");
+    expect(zone).toContain("workspace panel exploded");
+    // A sibling zone is a different boundary instance with no error, so it
+    // renders its own children rather than the fallback.
+    const sibling = new WebuiErrorBoundary({ children: createElement("span", null, "composer") });
+    expect(sibling.state.error).toBeUndefined();
+    expect(renderToStaticMarkup(<>{sibling.render()}</>)).toContain("composer");
+    expect(renderToStaticMarkup(<>{sibling.render()}</>)).not.toContain("webui-error-boundary");
+  });
+
+  it("renders the zone's own copy, so a broken panel names itself", () => {
+    const instance = new WebuiErrorBoundary({
+      children: createElement("span", null, "workspace"),
+      title: "工作区面板出现错误",
+      detail: "工作区面板未能正常显示。应用已保留其余状态，可以重试恢复。",
+      presentation: "panel",
+    });
+    instance.state = WebuiErrorBoundary.getDerivedStateFromError(new Error("boom"));
+    const markup = renderToStaticMarkup(<>{instance.render()}</>);
+    expect(markup).toContain("工作区面板出现错误");
+    expect(markup).toContain("boom");
+  });
+
+  it("keeps a zone fallback inside its region instead of taking the screen", () => {
+    // The root fallback is `min-h-screen`. Inside a column, that pushes the rest
+    // of the app off the viewport — recovering from one panel by losing sight of
+    // the others is not recovery — so the zone presentation drops it.
+    const panel = new WebuiErrorBoundary({
+      children: createElement("span", null, "workspace"),
+      presentation: "panel",
+    });
+    panel.state = WebuiErrorBoundary.getDerivedStateFromError(new Error("boom"));
+    const page = new WebuiErrorBoundary({ children: createElement("span", null, "app") });
+    page.state = WebuiErrorBoundary.getDerivedStateFromError(new Error("boom"));
+
+    expect(renderToStaticMarkup(<>{panel.render()}</>)).not.toContain("min-h-screen");
+    expect(renderToStaticMarkup(<>{page.render()}</>)).toContain("min-h-screen");
+  });
+
+  it("recovers a zone by retrying it, running the zone's own reset", () => {
+    const onReset = vi.fn();
+    const instance = new WebuiErrorBoundary({
+      children: createElement("span", null, "workspace"),
+      onReset,
+    });
+    instance.state = WebuiErrorBoundary.getDerivedStateFromError(new Error("boom"));
+
+    const setState = vi.spyOn(instance, "setState").mockImplementation(() => undefined);
+    instance.resetErrorBoundary();
+
+    expect(setState).toHaveBeenCalledWith({ error: undefined });
+    expect(onReset).toHaveBeenCalledTimes(1);
+    setState.mockRestore();
+    // With the error cleared the zone is a pass-through again: the children mount
+    // once more, which is what re-establishes their effects.
+    instance.state = { error: undefined };
+    expect(renderToStaticMarkup(<>{instance.render()}</>)).toContain("workspace");
+  });
+});

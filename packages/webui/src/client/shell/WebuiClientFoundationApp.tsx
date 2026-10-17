@@ -110,6 +110,7 @@ import { useWorkspacePanelSession } from "./use-workspace-panel-session.js";
 import { useNewTaskWorkspace } from "./use-new-task-workspace.js";
 import { useShellActivityWiring } from "./use-shell-activity-wiring.js";
 import { useSessionRailActions } from "./use-session-rail-actions.js";
+import { WebuiZoneBoundary } from "./WebuiZoneBoundary.js";
 
 export interface WebuiClientFoundationAppProps {
   // Non-method props only (seed / UI / SSR). The capability methods the shell
@@ -825,7 +826,7 @@ export function WebuiClientFoundationApp(
             data-webui-shell-region="surface"
             className="relative flex min-h-0 min-w-0 flex-1 flex-row"
           >
-            {pluginManagementArea ? <PluginCatalogue initialArea={pluginManagementArea} onChatWithAgent={async (name) => {
+            {pluginManagementArea ? <WebuiZoneBoundary zone="plugins"><PluginCatalogue initialArea={pluginManagementArea} onChatWithAgent={async (name) => {
               // Plugin-chat creation is the same completion policy as the composer's
               // and the goal path's: it goes through the task use case, so the
               // admission reservation, the guarded transfer and the catalogue
@@ -839,7 +840,7 @@ export function WebuiClientFoundationApp(
               // that started the creation is still current.
               if (outcome.selected) application.select(outcome.sessionId);
               handleSessionCreatedViewEffect(outcome.sessionId, outcome.selected, teamModeOff);
-            }} /> : <>
+            }} /></WebuiZoneBoundary> : <>
             <ConversationSurface
               home={homeMode}
               title={selectedSession?.title}
@@ -861,7 +862,7 @@ export function WebuiClientFoundationApp(
                 className="w-full max-w-[743px] justify-center rounded-lg border border-border_default bg-bg_default_secondary px-spacing_8 py-spacing_4"
               />}
               composerAndTranscript={<>
-                <Composer><WebuiComposer
+                <Composer><WebuiZoneBoundary zone="composer"><WebuiComposer
                   sessionId={selectedSessionId}
                   sessionStatus={selectedSession?.status}
                   sessionLayout={!homeMode}
@@ -883,8 +884,8 @@ export function WebuiClientFoundationApp(
                   onSelectSession={handleSelectComposerSession}
                   onOpenPluginManagement={openPluginManagement}
                   onSessionCreated={handleSessionCreatedViewEffect}
-                /></Composer>
-                {selectedSessionId && loadMessages ? <Transcript><WebuiSessionTranscript
+                /></WebuiZoneBoundary></Composer>
+                {selectedSessionId && loadMessages ? <Transcript><WebuiZoneBoundary zone="transcript"><WebuiSessionTranscript
                   sessionId={selectedSessionId}
                   workspaceDir={selectedSession?.workspaceDir}
                   onOpenFile={({ sessionId, workspaceDir, reference }) => dispatchWorkspacePanel({ type: "open-file", sessionId, workspaceDir, path: reference.path, ...(reference.lineStart !== undefined ? { lineStart: reference.lineStart } : {}), ...(reference.lineEnd !== undefined ? { lineEnd: reference.lineEnd } : {}) })}
@@ -893,14 +894,14 @@ export function WebuiClientFoundationApp(
                   transcriptCommands={transcriptCommands}
                   answerPlanBuild={planReviewWorkflow.answerPlanBuild}
                   onOpenPlanFile={({ sessionId: planSessionId, path, content }) => dispatchWorkspacePanel({ type: "open-plan-file", sessionId: planSessionId, workspaceDir: selectedSession?.workspaceDir ?? "", path, content })}
-                /></Transcript> : null}
+                /></WebuiZoneBoundary></Transcript> : null}
               </>}
               progressPanel={progressPanelContent}
-              workspacePanel={workspacePanel.open ? <WebuiWorkspacePanel
+              workspacePanel={workspacePanel.open ? <WebuiZoneBoundary zone="workspace"><WebuiWorkspacePanel
                 state={workspacePanel} dispatch={dispatchWorkspacePanel} sessionId={selectedSessionId}
                 workspaceDir={selectedSession?.workspaceDir} workspaceFileUrl={workspacePort.workspaceFileUrl}
                 terminal={terminalOwner} onClose={() => dispatchWorkspacePanel({ type: "close-panel" })}
-              /> : undefined}
+              /></WebuiZoneBoundary> : undefined}
             />
             </>}
           </main>

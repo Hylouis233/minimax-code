@@ -18,6 +18,14 @@ export interface WebuiErrorBoundaryProps {
   /** Runs alongside the state reset, for a host that also wants to re-run a
    *  data fetch on retry. */
   readonly onReset?: () => void;
+  /**
+   * `panel` renders the recoverable state as a region inside a layout instead of
+   * as the whole page. The root boundary owns the screen; a per-zone boundary
+   * owns a column or a pane, and a `min-h-screen` fallback there would push the
+   * rest of the app off the viewport — recovering from one broken panel by
+   * losing sight of the others is not recovery.
+   */
+  readonly presentation?: "page" | "panel";
 }
 
 const COPY = {
@@ -36,20 +44,27 @@ export function WebuiErrorBoundaryFallback({
   detail = COPY.detail,
   retryLabel = COPY.retry,
   onRetry,
+  presentation = "page",
 }: {
   readonly error: Error;
   readonly title?: string;
   readonly detail?: string;
   readonly retryLabel?: string;
   readonly onRetry: () => void;
+  readonly presentation?: "page" | "panel";
 }): ReactElement {
+  const page = presentation === "page";
   return (
     <section
       role="alert"
       data-testid="webui-error-boundary"
-      className="mx-auto flex min-h-screen max-w-xl flex-col items-center justify-center gap-spacing_8 p-spacing_24 text-center"
+      className={
+        page
+          ? "mx-auto flex min-h-screen max-w-xl flex-col items-center justify-center gap-spacing_8 p-spacing_24 text-center"
+          : "flex h-full min-h-0 w-full flex-col items-center justify-center gap-spacing_4 overflow-auto p-spacing_8 text-center"
+      }
     >
-      <h1 data-testid="webui-error-boundary-title" className="text-2xl font-semibold">{title}</h1>
+      <h1 data-testid="webui-error-boundary-title" className={page ? "text-2xl font-semibold" : "text-base font-medium"}>{title}</h1>
       <p data-testid="webui-error-boundary-detail" className="text-text_default_secondary">{detail}</p>
       {/* The message is shown, not just logged: a user who cannot describe the
           failure to support has nothing to report, and this is the only place
@@ -123,6 +138,7 @@ export class WebuiErrorBoundary extends Component<
         title={this.props.title}
         detail={this.props.detail}
         retryLabel={this.props.retryLabel}
+        presentation={this.props.presentation}
         onRetry={this.resetErrorBoundary}
       />
     );

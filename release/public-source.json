@@ -3863,6 +3863,7 @@
     "packages/webui/src/client/shell/StartupFallback.tsx",
     "packages/webui/src/client/shell/WebuiClientFoundationApp.tsx",
     "packages/webui/src/client/shell/WebuiErrorBoundary.tsx",
+    "packages/webui/src/client/shell/WebuiZoneBoundary.tsx",
     "packages/webui/src/client/shell/icons.tsx",
     "packages/webui/src/client/shell/use-new-task-workspace.ts",
     "packages/webui/src/client/shell/use-selected-session.ts",
