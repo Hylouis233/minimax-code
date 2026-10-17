@@ -17,7 +17,7 @@ export interface WebuiErrorBoundaryProps {
   readonly retryLabel?: string;
   /** Runs alongside the state reset, for a host that also wants to re-run a
    *  data fetch on retry. */
-  readonly onReset?: () => void;
+  readonly onReset?: () => void | Promise<unknown>;
   /**
    * `panel` renders the recoverable state as a region inside a layout instead of
    * as the whole page. The root boundary owns the screen; a per-zone boundary
@@ -125,8 +125,13 @@ export class WebuiErrorBoundary extends Component<
    * transition — two copies would drift.
    */
   resetErrorBoundary = (): void => {
-    this.setState({ error: undefined });
-    this.props.onReset?.();
+    const reset = (): void => this.setState({ error: undefined });
+    const result = this.props.onReset?.();
+    if (result && typeof (result as Promise<unknown>).then === "function") {
+      void (result as Promise<unknown>).then(reset, reset);
+      return;
+    }
+    reset();
   };
 
   render(): ReactNode {

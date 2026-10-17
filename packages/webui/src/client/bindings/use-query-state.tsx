@@ -12,6 +12,7 @@
 import {
   createContext,
   useContext,
+  useMemo,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
@@ -118,18 +119,36 @@ export function useWebuiWorkspaceCanvas():
   return useWebuiWorkspaceResource("canvas");
 }
 
-/** The panel's composed surface: every resource, because the panel combines them. */
+/**
+ * The panel's composed surface: every resource, because the panel combines them.
+ *
+ * Merging is memoized on the context value, and that is load-bearing rather than
+ * an optimisation. The panel puts this object in effect dependency lists — the
+ * environment read re-runs when `queries` changes — and a merge that rebuilt a
+ * fresh object on every render would make that effect depend on itself: the
+ * effect calls `loadEnvironment`, the owner publishes, the snapshot subscriber
+ * re-renders, the merge produces a new object, and the effect runs again until
+ * React gives up with `Maximum update depth exceeded`. The failure is not
+ * confined to the panel: the root error boundary catches it and the whole
+ * application is replaced by the recovery copy, so every screen goes blank.
+ *
+ * The sibling hooks above avoid this without memoizing, because each returns an
+ * object the context already owns and can therefore hand out with a stable
+ * identity. Only this one merges, so only this one has to hold the identity.
+ */
 export function useWebuiWorkspacePanelSurface(): WebuiWorkspaceComposedPanel | undefined {
   const queries = useContext(WebuiWorkspaceQueriesContext);
-  if (!queries) return undefined;
-  return {
-    ...queries.files,
-    ...queries.environment,
-    ...queries.review,
-    ...queries.archive,
-    ...queries.canvas,
-    panel: queries.panel,
-  };
+  return useMemo(() => {
+    if (!queries) return undefined;
+    return {
+      ...queries.files,
+      ...queries.environment,
+      ...queries.review,
+      ...queries.archive,
+      ...queries.canvas,
+      panel: queries.panel,
+    };
+  }, [queries]);
 }
 
 /** The owner for imperative query commands, or `undefined` with no provider. */

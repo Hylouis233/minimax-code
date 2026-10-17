@@ -39,7 +39,12 @@ export function projectWebuiTranscriptMessages(
   streamMessages: readonly WebuiStreamMessage[],
   preferStreamUpdates = true,
 ): readonly WebuiClientMessage[] {
-  const messages = [...(page.messages ?? [])];
+  // A malformed persisted row must not make transcript projection escape its
+  // presentation boundary and replace the whole application.
+  const messages = (page.messages ?? []).filter(
+    (message): message is WebuiClientMessage =>
+      message !== null && typeof message === "object" && typeof message.msgId === "string",
+  );
   const indexById = new Map(messages.map((message, index) => [message.msgId, index]));
   const refreshIndexes = (from: number) => {
     for (let index = from; index < messages.length; index += 1)

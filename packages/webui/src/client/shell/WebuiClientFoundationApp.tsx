@@ -885,7 +885,10 @@ export function WebuiClientFoundationApp(
                   onOpenPluginManagement={openPluginManagement}
                   onSessionCreated={handleSessionCreatedViewEffect}
                 /></WebuiZoneBoundary></Composer>
-                {selectedSessionId && loadMessages ? <Transcript><WebuiZoneBoundary zone="transcript"><WebuiSessionTranscript
+                {selectedSessionId && loadMessages ? <Transcript><WebuiZoneBoundary
+                  zone="transcript"
+                  onReset={() => application.transcriptHistory.refreshPage(selectedSessionId)}
+                ><WebuiSessionTranscript
                   sessionId={selectedSessionId}
                   workspaceDir={selectedSession?.workspaceDir}
                   onOpenFile={({ sessionId, workspaceDir, reference }) => dispatchWorkspacePanel({ type: "open-file", sessionId, workspaceDir, path: reference.path, ...(reference.lineStart !== undefined ? { lineStart: reference.lineStart } : {}), ...(reference.lineEnd !== undefined ? { lineEnd: reference.lineEnd } : {}) })}

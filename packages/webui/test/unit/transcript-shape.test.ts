@@ -141,6 +141,15 @@ describe("WEBUI_HISTORICAL_FIELD_TABLE — every populated field on the historic
 });
 
 describe("live transcript timeline merge", () => {
+  it("drops malformed history rows before indexing message identities", () => {
+    const messages = projectWebuiTranscriptMessages(
+      { messages: [null, { role: "user", msgContent: "missing identity" }, { msgId: "valid", role: "user" }] as unknown as WebuiClientMessage[] },
+      [],
+    );
+
+    expect(messages).toEqual([{ msgId: "valid", role: "user" }]);
+  });
+
   it("inserts a streamed assistant turn before a later queued user already present in history", () => {
     const messages = projectWebuiTranscriptMessages(
       {

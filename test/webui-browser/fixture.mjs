@@ -118,6 +118,15 @@ export function installFixtureTransport() {
   };
   const requests = [];
   const sockets = new Set();
+  // Synthetic PTY records are shared by same-origin fixture pages through
+  // local storage, rather than being held by the socket that created them.
+  const terminalStoreKey = `webui-browser:${window.__WEBUI_TEST_SERVER_ID__}:terminals`;
+  const terminalSequenceKey = `${terminalStoreKey}:sequence`;
+  const readTerminals = () => {
+    const stored = window.localStorage.getItem(terminalStoreKey);
+    return stored ? JSON.parse(stored) : [];
+  };
+  const writeTerminals = (value) => window.localStorage.setItem(terminalStoreKey, JSON.stringify(value));
 
   const clone = (value) => JSON.parse(JSON.stringify(value));
   const matches = (body, condition) => Object.entries(condition).every(([key, value]) => body?.[key] === value);
@@ -167,9 +176,59 @@ export function installFixtureTransport() {
       return { ...clone(turnDiff), success: true };
     }
     if (operation === "getWorkspaceReviewSummary") return clone(workspaceReviewSummary);
+    // The synthetic terminal bridge stores process records in same-origin local
+    // storage, NOT in the socket that created them: `listTerminals` answers from this
+    // catalogue long after the creating page's socket is gone, which is the
+    // whole point of the row. A fixture that kept the catalogue on the socket
+    // would make every terminal vanish with the page that opened it, and the
+    // cross-page assertion would then be asserting the fixture rather than the
+    // client. The runtime's own shape is reproduced exactly — `{terminalId,
+    // status, output}` per `server/operation/handlers/terminal.ts` — because a
+    // roster that answered `{}` would only be testing the client's tolerance.
+    if (operation === "createTerminal") {
+      const sequence = Number(window.localStorage.getItem(terminalSequenceKey) ?? "0") + 1;
+      window.localStorage.setItem(terminalSequenceKey, String(sequence));
+      const terminalId = `term-${sequence}`;
+      const terminals = readTerminals();
+      terminals.push({
+        terminalId,
+        status: "running",
+        // The synthetic process returns a banner so the client can distinguish
+        // an opened terminal from an empty xterm host.
+        output: `synthetic shell ${terminalId}\r\n$ `,
+      });
+      writeTerminals(terminals);
+      return { terminalId, status: "running" };
+    }
+    if (operation === "listTerminals")
+      return readTerminals().map(({ terminalId, status, output }) => ({ terminalId, status, output }));
+    if (operation === "writeTerminal") {
+      // The echo is what makes a written byte observable in the browser: the
+      // client sends it, and only a process that answers with it can prove the
+      // write reached the PTY rather than being swallowed by the owner.
+      const terminals = readTerminals();
+      const terminal = terminals.find((entry) => entry.terminalId === body?.terminalId);
+      if (!terminal) return {};
+      terminal.output += `${String(body?.data ?? "")}`;
+      writeTerminals(terminals);
+      return { success: true };
+    }
+    if (operation === "resizeTerminal") return { success: true };
+    if (operation === "disposeTerminal") {
+      const terminals = readTerminals();
+      const index = terminals.findIndex((entry) => entry.terminalId === body?.terminalId);
+      if (index >= 0) terminals.splice(index, 1);
+      writeTerminals(terminals);
+      // The watcher's frame source ends with the process, exactly as the
+      // runtime's async iterable does. A watch left open over a dead terminal
+      // would keep a client's buffer growing and would hide the difference
+      // between "the terminal ended" and "the watch was released".
+      for (const socket of [...sockets])
+        if (socket.isTerminalWatch && socket.request?.body?.terminalId === body?.terminalId && !socket.closed) socket.close();
+      return { success: true };
+    }
     // The workspace file tree. The panel renders it on open, so an unanswered
     // read is not an option: the runtime answers an array of nodes.
-    if (operation === "listTerminals") return [];
     if (operation === "listWorkspaceFileTree")
       return [
         { path: "a.ts", name: "a.ts", type: "file", size: 120, modifiedAt: 1_700_000_000_000 },
@@ -280,6 +339,30 @@ export function installFixtureTransport() {
             }),
           }),
         );
+        return;
+      }
+      if (frame.operation === "watchTerminal") {
+        // The terminal watch is a stream of `WebuiTerminalFrame`s, and unlike a
+        // turn stream it stays open for the life of the process. It is marked
+        // separately from `isStream` so `disposeTerminal` can end exactly the
+        // watchers of one process, and so `emitTerminalFrame` can reach the
+        // socket watching a given terminal even while other streams are open.
+        this.isTerminalWatch = true;
+        const terminalId = frame.body?.terminalId;
+        const known = readTerminals().find((entry) => entry.terminalId === terminalId);
+        // The real bridge refuses to watch a terminal it does not have. A
+        // fixture that answered every watch would let a client attach to a
+        // process that never existed and the roster assertion would prove
+        // nothing about ids being real.
+        if (!known) {
+          queueMicrotask(() => this.respond(frame, { ok: false, error: "unknown terminal" }));
+          return;
+        }
+        this.respond(frame, { stream: true });
+        // The backlog the client missed while it was not watching. A PTY that
+        // only spoke to whoever happened to be attached would drop output across
+        // the very navigation this row is about.
+        this.streamFrame({ terminalId, data: known.output, exited: false });
         return;
       }
       if (["sendMessage", "resumeSession"].includes(frame.operation)) {
@@ -430,6 +513,53 @@ export function installFixtureTransport() {
       return [...sockets]
         .filter((socket) => socket.isStream && !socket.closed)
         .map((socket) => socket.request?.body?.id);
+    },
+    /** The PTY processes the runtime currently holds. */
+    terminals() {
+      return readTerminals().map(({ terminalId, status, output }) => ({ terminalId, status, output }));
+    },
+    /** Which terminals have at least one live watcher attached right now. */
+    watchedTerminalIds() {
+      return [...sockets]
+        .filter((socket) => socket.isTerminalWatch && !socket.closed)
+        .map((socket) => socket.request?.body?.terminalId);
+    },
+    /**
+     * Push one `WebuiTerminalFrame` to every watcher of `terminalId`.
+     *
+     * Sent to all watchers rather than the first: two panels watching one PTY
+     * is the cross-page shape, and a fixture that fed only one of them would
+     * let the other look broken when it is the fixture that is.
+     */
+    emitTerminalFrame(terminalId, frame) {
+      const delivered = [];
+      for (const socket of sockets) {
+        if (!socket.isTerminalWatch || socket.closed) continue;
+        if (socket.request?.body?.terminalId !== terminalId) continue;
+        socket.streamFrame({ terminalId, data: "", exited: false, ...frame });
+        delivered.push(terminalId);
+      }
+      return delivered.length;
+    },
+    /**
+     * End a process the way a shell that exits does: the roster keeps the row
+     * with `exited`, and the watchers get a final frame then a closed stream.
+     * The row staying behind is what `WebuiTerminalRecord.status` exists for.
+     */
+    exitTerminal(terminalId) {
+      const terminals = readTerminals();
+      const terminal = terminals.find((entry) => entry.terminalId === terminalId);
+      if (!terminal) return false;
+      terminal.status = "exited";
+      terminal.output += "\r\n[process exited]\r\n";
+      writeTerminals(terminals);
+      for (const socket of [...sockets]) {
+        if (!socket.isTerminalWatch || socket.closed) continue;
+        if (socket.request?.body?.terminalId !== terminalId) continue;
+        socket.streamFrame({ terminalId, data: "\r\n[process exited]\r\n", exited: true });
+        socket.close();
+      }
+      return true;
     },
   };
   window.WebSocket = FixtureWebSocket;
