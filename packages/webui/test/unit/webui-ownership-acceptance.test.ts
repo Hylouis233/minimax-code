@@ -17,6 +17,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
+import type { WebuiAccountWorkflows } from "../../src/client/features/account/application/account-workflows.js";
+import type { WebuiAccountWorkflowsConsumer } from "../../src/client/features/account/bindings/use-account-workflows.public.js";
+
 const here = fileURLToPath(new URL(".", import.meta.url));
 const clientRoot = `${here}../../src/client/`;
 const read = (relative: string): string => readFileSync(`${clientRoot}${relative}`, "utf8");
@@ -122,6 +125,73 @@ describe("V41 · the delivery mechanism imports nothing from Turn", () => {
     // name the aggregate.
     expect(lease).not.toContain("WebuiStreamState");
     expect(lease).not.toContain("WebuiStreamSubscription");
+  });
+});
+
+describe("V30 · the two lifetime composition seams are dependencies, not constructions", () => {
+  it("Workspace composes the review resource it is handed instead of building one", () => {
+    // The peer-import plan's entry 13 said "construct at the lifetime site and
+    // hand Workspace a semantic interface". The corrective slice here is the
+    // difference between importing a peer's *factory* (a second construction site
+    // for one owner) and importing its *interface* (a resource to compose).
+    const source = read("features/workspace/application/workspace-queries.ts");
+    // The interface may be reached — it is the published surface — but the
+    // factory may not: a value import of it is what made Workspace a second
+    // construction site for the review owner.
+    expect(source).toMatch(/import type \{ WebuiWorkspaceReviewOwner \}/u);
+    expect(source).not.toMatch(/import\s*\{[^}]*createWebuiWorkspaceReviewOwner/u);
+    expect(source).toContain("readonly review: WebuiWorkspaceReviewOwner;");
+    expect(source).toContain("const review = deps.review;");
+    // And it composes the interface, not the resource that carries teardown: the
+    // life of the owner belongs to whoever built it.
+    expect(source).not.toContain("WebuiWorkspaceReviewResource");
+  });
+
+  it("the composition root builds that resource once and fences it", () => {
+    const application = read("application/create-application.ts");
+    expect(application).toContain("const workspaceReview = createWebuiWorkspaceReviewOwner({");
+    expect(application).toContain("review: workspaceReview,");
+    expect(application).toContain('shutDown("workspace review resource", () => workspaceReview.dispose());');
+  });
+
+  it("the interaction owners take Sessions' commands instead of composing them", () => {
+    // Peer-import plan entry 29: compose the session-scoped semantic commands at
+    // the existing lifetime seam and inject them, the way Turn's phase intents
+    // already are. An owner registry that built them itself was reaching into a
+    // peer's factory and supplying its own writer.
+    const source = read("features/interactions/application/interaction-session-owners.ts");
+    expect(source).toContain("readonly commandsFor: (sessionId: string) => WebuiInteractionCommands;");
+    expect(source).toContain("const commands = deps.commandsFor(sessionId);");
+    for (const specifier of importSpecifiers(source)) {
+      // The interface may be reached; the factory may not.
+      expect(specifier, specifier).not.toContain("/sessions/application/session-commands.js");
+    }
+    const application = read("application/create-application.ts");
+    expect(application).toContain("commandsFor: (sessionId) =>");
+  });
+});
+
+describe("ST1 · a published binding does not carry the owner's life", () => {
+  it("narrows Account's consumer surface so teardown is not reachable", () => {
+    // `peer-imports-plan.md` requires the account binding's consumer type to omit
+    // disposal while keeping instance identity. Publishing the full owner made the
+    // edge legal without performing that authority correction.
+    type HasDispose<T> = "dispose" extends keyof T ? true : false;
+    // The owner does carry teardown — that is what the narrowing is against.
+    const ownerCarriesTeardown: HasDispose<WebuiAccountWorkflows> = true;
+    // And the consumer type does not. This is a compile-time assertion: if
+    // `dispose` appeared on the published surface, `false` would not be assignable
+    // and this file would not compile.
+    const consumerDoesNot: HasDispose<WebuiAccountWorkflowsConsumer> = false;
+    expect(ownerCarriesTeardown).toBe(true);
+    expect(consumerDoesNot).toBe(false);
+
+    const binding = read("features/account/bindings/use-account-workflows.public.tsx");
+    expect(binding).toContain('Omit<WebuiAccountWorkflows, "dispose">');
+    expect(binding).toContain("useWebuiAccountWorkflows(): WebuiAccountWorkflowsConsumer | undefined");
+    // A forwarding object would be a different fix: the instance a consumer
+    // receives must be the one the root built.
+    expect(binding).not.toContain("WebuiAccountWorkflowsConsumer = {");
   });
 });
 

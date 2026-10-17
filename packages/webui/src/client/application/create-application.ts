@@ -27,6 +27,8 @@ import { WEBUI_COMPOSER_HOME_KEY } from "../features/composer/application/compos
 import { createWebuiTurnLifecycleCommands } from "../features/turn/application/turn-lifecycle-commands.js";
 import { createWebuiTerminalOwner } from "../features/terminal/application/terminal-owner.js";
 import { createWebuiWorkspaceQueries } from "../features/workspace/application/workspace-queries.js";
+import { createWebuiWorkspaceReviewOwner } from "../features/review/application/workspace-review-owner.public.js";
+import { createWebuiInteractionCommands } from "../features/sessions/application/session-commands.public.js";
 import { createWebuiAccountWorkflows } from "../features/account/application/account-workflows.js";
 import { createWebuiModelsWorkflows } from "../features/models/application/models-workflows.js";
 import { createWebuiSettingsWorkflows } from "../features/settings/application/settings-workflows.js";
@@ -429,6 +431,12 @@ export function createWebuiApplication(
       createWebuiInteractionPhaseIntents({
         setStream: store.createSessionWriter({ kind: "session", sessionId }).setStream,
       }),
+    // Same split for the interaction writers: Sessions publishes the commands,
+    // the assembly composes them for the session it is building an owner for.
+    commandsFor: (sessionId) =>
+      createWebuiInteractionCommands(
+        store.createInteractionWriter({ kind: "session", sessionId }),
+      ),
     ...(deps.interactionsPort ? { port: deps.interactionsPort } : {}),
     readAgentName,
   });
@@ -701,7 +709,17 @@ export function createWebuiApplication(
       lifecycle.setTurnSending(false);
     },
   });
-  const workspaceQueries = createWebuiWorkspaceQueries({ port: slices.workspace });
+  // The review resource is built once, here, and handed to Workspace. Two
+  // construction sites for one owner would mean two owners.
+  const workspaceReview = createWebuiWorkspaceReviewOwner({ port: slices.workspace });
+  const workspaceQueries = createWebuiWorkspaceQueries({
+    port: slices.workspace,
+    // Composed here, at the lifetime seam, and handed over as the semantic
+    // interface: Workspace owns the git/review coordination, not the review
+    // owner's construction. A peer that built it would be a second construction
+    // site for one owner, which is the caller-pair this seam replaces.
+    review: workspaceReview,
+  });
   const accountWorkflows = createWebuiAccountWorkflows({
     port: slices.account,
     identityEpochs,
@@ -936,6 +954,7 @@ export function createWebuiApplication(
       shutDown("models owner", () => modelsWorkflows.dispose());
       shutDown("settings owner", () => settingsWorkflows.dispose());
       shutDown("workspace owners", () => workspaceQueries.dispose());
+      shutDown("workspace review resource", () => workspaceReview.dispose());
       shutDown("turn review owner", () => turnReview.dispose());
       shutDown("transcript history owner", () => transcriptHistory.dispose());
       shutDown("composer plugin catalogue", () => composerPluginCatalogue.dispose());

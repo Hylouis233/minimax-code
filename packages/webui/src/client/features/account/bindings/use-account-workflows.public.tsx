@@ -44,6 +44,18 @@ const WebuiAccountWorkflowsContext = createContext<WebuiAccountWorkflows | undef
   undefined,
 );
 
+/**
+ * What a peer surface may do with the account owner.
+ *
+ * Reading its state and submitting its named commands, and nothing about its
+ * life: `dispose` is the composition root's, because the root built the owner and
+ * is the only thing that can end it. Publishing the whole owner made teardown
+ * reachable from any surface that mounted the handle — legal by shape, wrong by
+ * authority — and narrowing here is what corrects it without a forwarding object
+ * and without changing the instance a consumer receives.
+ */
+export type WebuiAccountWorkflowsConsumer = Omit<WebuiAccountWorkflows, "dispose">;
+
 export function WebuiAccountWorkflowsProvider({
   workflows,
   children,
@@ -58,7 +70,7 @@ export function WebuiAccountWorkflowsProvider({
   );
 }
 
-export function useWebuiAccountWorkflows(): WebuiAccountWorkflows | undefined {
+export function useWebuiAccountWorkflows(): WebuiAccountWorkflowsConsumer | undefined {
   return useContext(WebuiAccountWorkflowsContext);
 }
 

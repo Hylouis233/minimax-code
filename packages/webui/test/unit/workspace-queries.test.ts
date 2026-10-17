@@ -10,8 +10,21 @@ import { describe, expect, it } from "vitest";
 import type { WebuiWorkspaceArchiveListing } from "../../src/shared/contracts/workspace.js";
 
 import { createWebuiWorkspaceQueries } from "../../src/client/features/workspace/application/workspace-queries.js";
+import { createWebuiWorkspaceReviewOwner } from "../../src/client/features/review/application/workspace-review-owner.public.js";
+import type { WebuiWorkspaceQueryPort } from "../../src/client/features/workspace/application/workspace-queries.js";
 import type { WebuiWorkspaceFileContent } from "../../src/shared/contracts/workspace.js";
 import type { WebuiWorkspaceReviewSummary } from "../../src/shared/contracts/review.js";
+
+/**
+ * Workspace composes the review resource it is handed, so a test supplies one
+ * the same way the composition root does. Building it here keeps every existing
+ * fixture about the resource under test rather than about the seam.
+ */
+const webuiWorkspaceQueries = (deps: { readonly port: WebuiWorkspaceQueryPort }) =>
+  createWebuiWorkspaceQueries({
+    port: deps.port,
+    review: createWebuiWorkspaceReviewOwner({ port: deps.port }),
+  });
 
 function deferred<T>(): {
   readonly promise: Promise<T>;
@@ -41,7 +54,7 @@ describe("the workspace query owner discards a superseded response", () => {
     const first = deferred<WebuiWorkspaceFileContent>();
     const second = deferred<WebuiWorkspaceFileContent>();
     let call = 0;
-    const queries = createWebuiWorkspaceQueries({
+    const queries = webuiWorkspaceQueries({
       port: {
         readWorkspaceFile: () => {
           const pending = call === 0 ? first : second;
@@ -66,7 +79,7 @@ describe("the workspace query owner discards a superseded response", () => {
 
   it("drops a tree answer for a workspace the owner has left", async () => {
     const first = deferred<readonly { path: string; name: string; type: "file" }[]>();
-    const queries = createWebuiWorkspaceQueries({
+    const queries = webuiWorkspaceQueries({
       port: { listWorkspaceFileTree: () => first.promise as never },
     });
 
@@ -84,7 +97,7 @@ describe("the workspace query owner discards a superseded response", () => {
 
 describe("the workspace query owner invalidates exactly what a mutation affects", () => {
   it("bumps the environment and review revisions for the mutated workspace", async () => {
-    const queries = createWebuiWorkspaceQueries({
+    const queries = webuiWorkspaceQueries({
       port: {
         mutateWorkspaceGit: async () => ({}),
         getWorkspaceEnvironment: async () => ({
@@ -107,7 +120,7 @@ describe("the workspace query owner invalidates exactly what a mutation affects"
   });
 
   it("leaves another workspace's review alone when a git signal names one", async () => {
-    const queries = createWebuiWorkspaceQueries({
+    const queries = webuiWorkspaceQueries({
       port: { getWorkspaceReviewSummary: async () => summary("snap-1") },
     });
 
@@ -125,7 +138,7 @@ describe("the workspace query owner invalidates exactly what a mutation affects"
 describe("a closed tab releases its file slot", () => {
   it("drops the content and refuses the read that was still in flight", async () => {
     const pending = deferred<WebuiWorkspaceFileContent>();
-    const queries = createWebuiWorkspaceQueries({
+    const queries = webuiWorkspaceQueries({
       port: { readWorkspaceFile: () => pending.promise },
     });
 
@@ -143,7 +156,7 @@ describe("a closed tab releases its file slot", () => {
     const first = deferred<WebuiWorkspaceFileContent>();
     const second = deferred<WebuiWorkspaceFileContent>();
     let call = 0;
-    const queries = createWebuiWorkspaceQueries({
+    const queries = webuiWorkspaceQueries({
       port: {
         readWorkspaceFile: () => {
           const pending = call === 0 ? first : second;
@@ -180,7 +193,7 @@ describe("the archive owner drops a listing nobody is looking at", () => {
     const first = deferred<WebuiWorkspaceArchiveListing>();
     const second = deferred<WebuiWorkspaceArchiveListing>();
     let call = 0;
-    const queries = createWebuiWorkspaceQueries({
+    const queries = webuiWorkspaceQueries({
       port: {
         readWorkspaceArchive: () => {
           const pending = call === 0 ? first : second;
@@ -206,7 +219,7 @@ describe("the archive owner drops a listing nobody is looking at", () => {
   });
 
   it("records an extract outcome the owner holds, not the view", async () => {
-    const queries = createWebuiWorkspaceQueries({
+    const queries = webuiWorkspaceQueries({
       port: {
         readWorkspaceArchive: async () => listing("a.zip"),
         extractWorkspaceArchive: async () => ({ extracted: ["a.txt"] }) as never,
@@ -226,7 +239,7 @@ describe("the canvas owner keeps one document per session", () => {
     const first = deferred<never>();
     const second = deferred<never>();
     let call = 0;
-    const queries = createWebuiWorkspaceQueries({
+    const queries = webuiWorkspaceQueries({
       port: {
         readCanvas: () => {
           const pending = call === 0 ? first : second;
@@ -249,7 +262,7 @@ describe("the canvas owner keeps one document per session", () => {
   });
 
   it("reports a refused operation and keeps the stored document", async () => {
-    const queries = createWebuiWorkspaceQueries({
+    const queries = webuiWorkspaceQueries({
       port: {
         readCanvas: async () => doc("A"),
         applyCanvas: async () => {
@@ -275,7 +288,7 @@ describe("the canvas owner keeps one document per session", () => {
 describe("inline content supersedes a read that is still in flight", () => {
   it("keeps the inline bytes when the earlier read answers late", async () => {
     const pending = deferred<WebuiWorkspaceFileContent>();
-    const queries = createWebuiWorkspaceQueries({
+    const queries = webuiWorkspaceQueries({
       port: { readWorkspaceFile: () => pending.promise },
     });
 
@@ -298,7 +311,7 @@ describe("inline content supersedes a read that is still in flight", () => {
 
   it("still reports a read failure that arrived before the inline content", async () => {
     const pending = deferred<WebuiWorkspaceFileContent>();
-    const queries = createWebuiWorkspaceQueries({
+    const queries = webuiWorkspaceQueries({
       port: { readWorkspaceFile: () => pending.promise },
     });
 
@@ -318,7 +331,7 @@ describe("inline content supersedes a read that is still in flight", () => {
 
 describe("a git signal matches a workspace by its alias too", () => {
   it("invalidates the environment and review held under the alias path", async () => {
-    const queries = createWebuiWorkspaceQueries({
+    const queries = webuiWorkspaceQueries({
       port: {
         getWorkspaceEnvironment: async () => ({
           isGitRepo: true, changedFiles: 0, insertions: 0, deletions: 0, lineStatsStatus: "ready",
@@ -345,7 +358,7 @@ describe("a git signal matches a workspace by its alias too", () => {
   });
 
   it("invalidates the review when the alias is the one the panel holds", async () => {
-    const queries = createWebuiWorkspaceQueries({
+    const queries = webuiWorkspaceQueries({
       port: { getWorkspaceReviewSummary: async () => summary("snap-1") },
     });
 
@@ -359,7 +372,7 @@ describe("a git signal matches a workspace by its alias too", () => {
 
 describe("a burst of git signals", () => {
   it("invalidates the review once per signal and the environment once", async () => {
-    const queries = createWebuiWorkspaceQueries({
+    const queries = webuiWorkspaceQueries({
       port: {
         getWorkspaceEnvironment: async () => ({
           isGitRepo: true, changedFiles: 0, insertions: 0, deletions: 0, lineStatsStatus: "ready",
@@ -391,7 +404,7 @@ describe("a burst of git signals", () => {
 
   it("leaves a workspace the burst did not name alone", async () => {
     let otherReloads = 0;
-    const queries = createWebuiWorkspaceQueries({
+    const queries = webuiWorkspaceQueries({
       port: {
         getWorkspaceEnvironment: async () => {
           otherReloads += 1;

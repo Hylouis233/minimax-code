@@ -14,6 +14,7 @@ import { useMemo } from "react";
 import type { WebuiInteractionCoordinator } from "../application/interaction-coordinator.js";
 import { createWebuiInteractionSessionOwners } from "../application/interaction-session-owners.js";
 import { createWebuiInteractionPhaseIntents } from "../../turn/contracts/interaction-phase-intents.js";
+import { createWebuiInteractionCommands } from "../../sessions/application/session-commands.public.js";
 import { WEBUI_HOME_SESSION_KEY } from "../../../application/state.js";
 import { useWebuiApplicationOptional, useWebuiSessionStoreContext } from "../../../bindings/application-context.js";
 
@@ -35,6 +36,12 @@ export function useWebuiInteractionOwner(
           createWebuiInteractionPhaseIntents({
             setStream: store.createSessionWriter({ kind: "session", sessionId }).setStream,
           }),
+        // The fallback composes the same pair the assembly does: Sessions'
+        // published commands, built for the session this owner is being made for.
+        commandsFor: (sessionId) =>
+          createWebuiInteractionCommands(
+            store.createInteractionWriter({ kind: "session", sessionId }),
+          ),
       }),
     [store],
   );

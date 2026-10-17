@@ -58,7 +58,20 @@ import {
   formatArchiveSize,
 } from "../../src/client/features/workspace/projection/archive-projection.js";
 import { createWebuiWorkspaceQueries } from "../../src/client/features/workspace/application/workspace-queries.js";
+import { createWebuiWorkspaceReviewOwner } from "../../src/client/features/review/application/workspace-review-owner.public.js";
+import type { WebuiWorkspaceQueryPort } from "../../src/client/features/workspace/application/workspace-queries.js";
 import { WebuiWorkspaceQueriesProvider } from "../../src/client/bindings/use-query-state.js";
+
+/**
+ * Workspace composes the review resource it is handed, so a test supplies one
+ * the same way the composition root does. Building it here keeps every existing
+ * fixture about the resource under test rather than about the seam.
+ */
+const webuiWorkspaceQueries = (deps: { readonly port: WebuiWorkspaceQueryPort }) =>
+  createWebuiWorkspaceQueries({
+    port: deps.port,
+    review: createWebuiWorkspaceReviewOwner({ port: deps.port }),
+  });
 
 /** Fixtures live in the OS temp dir; nothing is written into the repo tree. */
 let workspace = "";
@@ -856,7 +869,7 @@ describe("workspace archive view", () => {
     // owner has not read anything yet and the view paints the loading notice.
     const markup = renderToStaticMarkup(
       createElement(WebuiWorkspaceQueriesProvider, {
-        queries: createWebuiWorkspaceQueries({
+        queries: webuiWorkspaceQueries({
           port: {
             readWorkspaceArchive: () =>
               new Promise<WebuiWorkspaceArchiveListing>(() => undefined),

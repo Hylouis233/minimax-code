@@ -27,7 +27,7 @@ import {
   type WebuiWorkspaceEnvironmentOwner,
   type WebuiWorkspaceEnvironmentPort,
 } from "./workspace-environment-owner.js";
-import { createWebuiWorkspaceReviewOwner } from "../../review/application/workspace-review-owner.public.js";
+import type { WebuiWorkspaceReviewOwner } from "../../review/application/workspace-review-owner.public.js";
 import {
   createWebuiWorkspacePanelOwner,
   type WebuiWorkspacePanelOwner,
@@ -154,10 +154,19 @@ export const initialWebuiWorkspaceQueriesState: WebuiWorkspaceQueriesState = {
 
 export function createWebuiWorkspaceQueries(deps: {
   readonly port: WebuiWorkspaceQueryPort;
+  /**
+   * The review resource, composed at the lifetime seam.
+   *
+   * Workspace keeps the git/review coordination, but it does not **build** the
+   * review owner: the composition root constructs it and hands over the semantic
+   * interface, so this module composes an existing resource instead of importing
+   * a peer's factory and becoming a second construction site for it.
+   */
+  readonly review: WebuiWorkspaceReviewOwner;
 }): WebuiWorkspaceQueries {
   const { port } = deps;
   const files = createWebuiWorkspaceFilesOwner({ port });
-  const review = createWebuiWorkspaceReviewOwner({ port });
+  const review = deps.review;
   const archive = createWebuiWorkspaceArchiveOwner({ port });
   const canvas = createWebuiWorkspaceCanvasOwner({ port });
   const panel = createWebuiWorkspacePanelOwner();

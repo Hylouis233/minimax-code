@@ -70,17 +70,32 @@ export interface WebuiWorkspaceReviewOwner {
   }) => void;
 }
 
+/**
+ * The review resource plus its life, which is the composition root's.
+ *
+ * `dispose` is deliberately not on `WebuiWorkspaceReviewOwner`: Workspace composes
+ * the review resource and a settings page renders it, and neither is what built
+ * it. The root installed it and the root fences it.
+ */
+export interface WebuiWorkspaceReviewResource extends WebuiWorkspaceReviewOwner {
+  readonly dispose: () => void;
+}
+
 export function createWebuiWorkspaceReviewOwner(deps: {
   readonly port: WebuiWorkspaceReviewPort;
-}): WebuiWorkspaceReviewOwner {
+}): WebuiWorkspaceReviewResource {
   let state: WebuiWorkspaceReviewState = initialWebuiWorkspaceReviewState;
   const listeners = new Set<() => void>();
+  let disposed = false;
   const versions = new Map<string, number>();
   /** Snapshot ids a stale review already retried for a tab, so a stale loop
    *  cannot spin: one retry per (tab, snapshot). */
   const retriedSnapshots = new Set<string>();
 
   const notify = (): void => {
+    // A fenced owner has no view left to tell, and a late answer must not
+    // republish the state a teardown was ending.
+    if (disposed) return;
     for (const listener of [...listeners]) listener();
   };
   const set = (update: (current: WebuiWorkspaceReviewState) => WebuiWorkspaceReviewState): void => {
@@ -328,6 +343,13 @@ export function createWebuiWorkspaceReviewOwner(deps: {
       return () => {
         listeners.delete(listener);
       };
+    },
+    dispose: () => {
+      if (disposed) return;
+      disposed = true;
+      listeners.clear();
+      versions.clear();
+      retriedSnapshots.clear();
     },
     canReview: deps.port.getWorkspaceReviewSummary !== undefined,
     canSearchDiffs: deps.port.searchWorkspaceReviewDiffs !== undefined,

@@ -119,6 +119,11 @@ composer disposition, contract re-file, baseline conformance), the architecture 
 architecture spec, the decision record, the development board and its ticket manifest, the v1 scope,
 the pending-decision list, the capability-gap investigation and the large-file decomposition plan.
 
+The ownership refactor's acceptance-evidence report was removed for the same reason once it had been
+superseded: it recorded one run's outputs and results, which is execution material rather than
+durable guidance about the tree. What a reader needs from it — which gate proves what, and at which
+evidence level — is [`verification/gates.md`](verification/gates.md).
+
 Two generated indexes were retired with them, together with their generators and gates: the
 exported-declaration surface (`pnpm check:webui-commands`) and the business-navigation table that
 was written into `packages/webui/AGENTS.md` (`pnpm check:webui-business-navigation`). Neither was

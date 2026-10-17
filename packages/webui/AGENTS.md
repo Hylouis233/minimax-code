@@ -29,8 +29,14 @@ forbidden edge, including `import type` edges that the build erases.
 Identity is always legal, so each row reads "these targets, plus the same layer". Four consequences
 decide most arguments:
 
-- **A business publishes through `contracts/`.** Another business imports those declarations, never
-  its `application/` or `ui/`.
+- **A business publishes through a module it owns.** A peer imports its `contracts/` declarations, and
+  additionally any `*.public.ts` / `*.public.tsx` module — an owner-role module whose marker publishes
+  **every** explicit export to eligible peers, so a later export is a public-interface change that gets
+  ordinary review. Nothing else is reachable: a peer never imports another business's plain
+  `application/`, `ui/` or `projection/` module. Publication carries visibility only, never authority:
+  layer, browser/runtime, command-writer and lifecycle rules apply to a published module exactly as
+  they do to a private one, and a binding published for a peer still must not hand it the owner's
+  teardown. `docs/architecture/boundaries.md` states the rule and the gate implements it.
 - **The browser never reaches the Node side.** No client layer lists `server/`, `runtime/` or
   `runtime-port`; a client module importing `runtime/port.ts` is a violation, and the fix is a client
   contract or a shared DTO.

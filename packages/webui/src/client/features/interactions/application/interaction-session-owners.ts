@@ -20,7 +20,7 @@
 // exists.
 
 import type { WebuiSessionStore } from "../../../application/session-store.js";
-import { createWebuiInteractionCommands } from "../../sessions/application/session-commands.public.js";
+import type { WebuiInteractionCommands } from "../../sessions/application/session-commands.public.js";
 import type { WebuiInteractionPhaseIntents } from "../../turn/contracts/interaction-phase-intents.js";
 import {
   createWebuiInteractionCoordinator,
@@ -41,6 +41,16 @@ export interface WebuiInteractionSessionOwners {
 
 export function createWebuiInteractionSessionOwners(deps: {
   readonly store: WebuiSessionStore;
+  /**
+   * This session's interaction writers, composed by the assembly.
+   *
+   * Injected for the same reason the phase intents are: the commands are Sessions'
+   * published contract, and the composition that knows the store is what builds
+   * them for the session it is creating an owner for. Building them here meant an
+   * owner registry reaching into a peer business's factory and supplying its own
+   * writer — the caller-pair this seam exists to remove.
+   */
+  readonly commandsFor: (sessionId: string) => WebuiInteractionCommands;
   /**
    * The phase intents this owner drives, per session. Injected rather than built
    * here: the intents are turn's published contract, and
@@ -67,10 +77,9 @@ export function createWebuiInteractionSessionOwners(deps: {
       const existing = owners.get(sessionId);
       if (existing) return existing;
       // The narrow writers: this session's interaction slice and its stream
-      // phase, and nothing else in the record.
-      const commands = createWebuiInteractionCommands(
-        deps.store.createInteractionWriter({ kind: "session", sessionId }),
-      );
+      // phase, and nothing else in the record. Both come from the assembly, which
+      // is what holds the store these slices live in.
+      const commands = deps.commandsFor(sessionId);
       const streams = deps.readPhaseIntents(sessionId);
       // The fence is this session's: a reply for this session cannot fence
       // another session's pending read, and the converse holds too.
