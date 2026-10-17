@@ -2224,8 +2224,25 @@ export function evaluateGraph(graph, options = {}) {
   // lives hands that in. A fixture graph without one supplies no reader, and a
   // gate with nothing to read reports nothing rather than guessing a path and
   // reading the wrong tree.
+  //
+  // The foreign-access judgement needs two facts the graph already holds: which
+  // business owns a path (`classifyRole`, the same classifier every other rule
+  // uses) and where one of a module's specifiers resolves to. Both are derived
+  // here rather than re-implemented in the gate, so the publication rule and the
+  // direction rules cannot disagree about what "the same business" means.
+  const resolvedByFile = new Map();
+  for (const reference of graph.references ?? []) {
+    let resolved = resolvedByFile.get(reference.from);
+    if (!resolved) {
+      resolved = new Map();
+      resolvedByFile.set(reference.from, resolved);
+    }
+    resolved.set(reference.specifier, reference.to);
+  }
   const publication = publicationRule({
     files: graph.files ?? [],
+    businessOf: (relative) => classifyRole(relative).business,
+    resolveSpecifier: (from, specifier) => resolvedByFile.get(from)?.get(specifier) ?? null,
     ...(options.sourceRoot
       ? {
           absolute: (relative) => path.join(options.sourceRoot, relative),

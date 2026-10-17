@@ -38,6 +38,7 @@ import {
   touchesAmbiguousFile,
 } from "../../../../scripts/lib/webui-dependency-rules.mjs";
 import {
+  findPublicationViolations,
   isPublicModulePath,
   publicationRule,
 } from "../../../../scripts/lib/webui-publication.mjs";
@@ -90,7 +91,11 @@ function evaluateFixture(
     compilerOptions: { ...options, baseUrl: options.baseUrl ?? sourceRoot },
     files: absoluteFiles,
   });
-  return { graph, result: evaluateGraph(graph) };
+  // `sourceRoot` is returned so a caller that needs the publication gate to
+  // actually read a module's source (the foreign-access judgement) can evaluate
+  // the same graph with a reader attached; the default evaluation stays
+  // reader-less so existing fixtures keep their exact meaning.
+  return { graph, result: evaluateGraph(graph), sourceRoot };
 }
 
 function runCli(args: string[]) {
@@ -1461,6 +1466,64 @@ describe("V25 · what a published surface may contain", () => {
     expect(result.violations.map((v) => v.rule)).toContain("publication-foreign-namespace");
   });
 
+  it("accepts a namespace import of the module's own business, which is ordinary composition", () => {
+    // The accepted rule restricts *foreign* access; owner-private implementation
+    // imports stay legal. A blanket syntax ban reported this too, so the gate did
+    // not implement the policy it claimed to.
+    const violations = findPublicationViolations(
+      'import * as own from "./catalogue-private.js";\nexport const x = own.value;\n',
+      {
+        ownerBusiness: "sessions",
+        businessOf: (relative) => (relative.includes("/sessions/") ? "sessions" : "other"),
+        resolveSpecifier: (specifier) =>
+          specifier === "./catalogue-private.js"
+            ? "client/features/sessions/application/catalogue-private.ts"
+            : null,
+      },
+    );
+
+    expect(violations).toEqual([]);
+  });
+
+  it("still rejects that same namespace import when it resolves into another business", () => {
+    const violations = findPublicationViolations(
+      'import * as other from "../../other/contracts/sessions.js";\nexport const x = other;\n',
+      {
+        ownerBusiness: "sessions",
+        businessOf: (relative) => (relative.includes("/other/") ? "other" : "sessions"),
+        resolveSpecifier: () => "client/features/other/contracts/sessions.ts",
+      },
+    );
+
+    expect(violations.map((v) => v.kind)).toContain("foreign-namespace");
+  });
+
+  it("treats an unresolvable relative import as foreign, so a gap fails closed", () => {
+    const violations = findPublicationViolations(
+      'import * as mystery from "./mystery.js";\nexport const x = mystery;\n',
+      {
+        ownerBusiness: "sessions",
+        businessOf: () => "sessions",
+        resolveSpecifier: () => null,
+      },
+    );
+
+    expect(violations.map((v) => v.kind)).toContain("foreign-namespace");
+  });
+
+  it("accepts a dynamic import of the module's own business", () => {
+    const violations = findPublicationViolations(
+      'export const load = () => import("./catalogue-private.js");\n',
+      {
+        ownerBusiness: "sessions",
+        businessOf: () => "sessions",
+        resolveSpecifier: () => "client/features/sessions/application/catalogue-private.ts",
+      },
+    );
+
+    expect(violations).toEqual([]);
+  });
+
   it("rejects a default export, which names no symbol a consumer could be checked against", () => {
     const result = publication("const thing = 1;\nexport default thing;\n");
 
@@ -1491,6 +1554,37 @@ describe("V25 · what a published surface may contain", () => {
     );
     expect(classifyLayers("client/features/goal/projection/goal-state.public.ts")).toEqual(
       ["domain"],
+    );
+  });
+
+  it("distinguishes foreign access through the real gate, not only the syntax pass", () => {
+    // The end-to-end half of SP10: the evaluator derives the publication rule's
+    // business classification from the same `classifyRole` every other rule uses
+    // and from the real module resolution, so a published module may reach its own
+    // private implementation by namespace while reaching a peer's stays rejected.
+    // Both fixtures are judged with the reader attached, which is how the CLI runs
+    // the gate.
+    const evaluateWithSource = (files: Record<string, string>) => {
+      const { graph, sourceRoot } = evaluateFixture(files);
+      return evaluateGraph(graph, { sourceRoot });
+    };
+
+    const sameBusiness = evaluateWithSource({
+      "client/features/sessions/application/catalogue.public.ts":
+        'import * as own from "./catalogue-internal.js";\nexport const names = own.names;\n',
+      "client/features/sessions/application/catalogue-internal.ts":
+        "export const names: readonly string[] = [];\n",
+    });
+    expect(sameBusiness.publicationViolations.map((entry) => entry.rule)).toEqual([]);
+
+    const foreign = evaluateWithSource({
+      "client/features/sessions/application/catalogue.public.ts":
+        'import * as other from "../../models/projection/token-plan-model.public.js";\nexport const isTokenPlan = other.isTokenPlanModel;\n',
+      "client/features/models/projection/token-plan-model.public.ts":
+        "export const isTokenPlanModel = (id: string): boolean => id.length > 0;\n",
+    });
+    expect(foreign.publicationViolations.map((entry) => entry.rule)).toContain(
+      "publication-foreign-namespace",
     );
   });
 

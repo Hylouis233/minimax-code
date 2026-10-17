@@ -50,6 +50,46 @@ export function publicModuleKind(normalized) {
 }
 
 /**
+ * Whether an import of `specifier` from a published module reaches *another
+ * business*, which is what the namespace and dynamic restrictions are about.
+ *
+ * The accepted rule restricts foreign access: reaching a peer's surface by a name
+ * the gate cannot resolve to a symbol. It explicitly keeps owner-private
+ * implementation imports legal, so a published module may reach its own private
+ * sibling by namespace or by a literal dynamic import — that is ordinary
+ * composition inside one business, not a peer's interface being republished.
+ * A blanket syntax ban (which is what this used to be) reported both, so the gate
+ * no longer matched the policy it claimed to implement.
+ *
+ * The judgement is deliberately conservative where it cannot see: a relative
+ * module it cannot resolve is treated as foreign, so a resolution failure fails
+ * closed rather than granting access. A bare (non-relative) specifier is a
+ * package or host import, not a peer business, so the layer rules judge it and
+ * this one does not.
+ *
+ * @param {string} specifier the import specifier as written
+ * @param {{
+ *   ownerBusiness: string | null,
+ *   businessOf: ((relativePath: string) => string | null) | null,
+ *   resolveSpecifier: ((specifier: string) => string | null) | null,
+ * }} context
+ * @returns {boolean}
+ */
+function isForeignAccess(specifier, context) {
+  if (!specifier.startsWith(".")) return false;
+  const { ownerBusiness, businessOf, resolveSpecifier } = context;
+  if (!resolveSpecifier || !businessOf) return true;
+  const target = resolveSpecifier(specifier);
+  if (!target) return true;
+  const targetBusiness = businessOf(target);
+  // A target with no business is not a peer's surface: `shared/`, a leaf
+  // contract under `client/contracts/`, and the generic UI home all resolve to
+  // `business: null`, and reaching them by namespace is the layer rules' business.
+  if (targetBusiness === null) return false;
+  return targetBusiness !== ownerBusiness;
+}
+
+/**
  * Read the statements a published module may not contain.
  *
  * This is a bounded syntactic pass, not a parser. The gate needs to recognise a
@@ -65,7 +105,12 @@ export function publicModuleKind(normalized) {
  * @param {string} sourceText
  * @returns {Array<{kind: string, detail: string, index: number}>}
  */
-export function findPublicationViolations(sourceText) {
+export function findPublicationViolations(sourceText, options = {}) {
+  const context = {
+    ownerBusiness: options.ownerBusiness ?? null,
+    businessOf: options.businessOf ?? null,
+    resolveSpecifier: options.resolveSpecifier ?? null,
+  };
   const violations = [];
   const withoutComments = sourceText
     .replace(/\/\*[\s\S]*?\*\//gu, " ")
@@ -92,6 +137,7 @@ export function findPublicationViolations(sourceText) {
 
   const namespaceRe = /import\s+\*\s+as\s+(\w+)\s+from\s*["']([^"']+)["']/gu;
   for (const match of withoutComments.matchAll(namespaceRe)) {
+    if (!isForeignAccess(match[2], context)) continue;
     violations.push({
       kind: "foreign-namespace",
       detail: `import * as ${match[1]} from "${match[2]}" reaches a peer's surface by a name this gate cannot resolve.`,
@@ -110,6 +156,7 @@ export function findPublicationViolations(sourceText) {
 
   const dynamicRe = /\bimport\s*\(\s*["']([^"']+)["']\s*\)/gu;
   for (const match of withoutComments.matchAll(dynamicRe)) {
+    if (!isForeignAccess(match[1], context)) continue;
     violations.push({
       kind: "foreign-dynamic",
       detail: `import("${match[1]}") is resolved at runtime, so the edge it creates is invisible to every other judgement in this gate.`,
@@ -136,7 +183,7 @@ export function findPublicationViolations(sourceText) {
  *   to the layer rules as well as the syntactic ones.
  * @returns {{pass: boolean, violations: Array<object>}}
  */
-export function publicationRule({ files, readFile, absolute, classifyImport }) {
+export function publicationRule({ files, readFile, absolute, classifyImport, businessOf, resolveSpecifier }) {
   const violations = [];
   for (const file of files) {
     if (!isPublicModulePath(file)) continue;
@@ -149,7 +196,15 @@ export function publicationRule({ files, readFile, absolute, classifyImport }) {
       // from reporting every module as clean or dirty.
       continue;
     }
-    for (const violation of findPublicationViolations(source)) {
+    // The module's own business, and how to resolve one of its specifiers to a
+    // source path. Both come from the caller because the role classifier lives in
+    // `webui-dependency-rules.mjs` and this module must not import it back.
+    const ownerBusiness = businessOf ? businessOf(file) : null;
+    for (const violation of findPublicationViolations(source, {
+      ownerBusiness,
+      businessOf: businessOf ?? null,
+      resolveSpecifier: resolveSpecifier ? (specifier) => resolveSpecifier(file, specifier) : null,
+    })) {
       violations.push({
         kind: "role",
         rule: `publication-${violation.kind}`,

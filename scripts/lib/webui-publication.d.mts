@@ -31,7 +31,23 @@ export interface PublicationViolation {
   readonly index: number;
 }
 
-export function findPublicationViolations(sourceText: string): PublicationViolation[];
+/**
+ * How the caller lets the gate tell a peer's surface from this module's own
+ * implementation: which business owns a path, and where a specifier resolves.
+ *
+ * `resolveSpecifier` returning `null` means "not resolved", which the gate treats
+ * as foreign — a failure to resolve must not grant access.
+ */
+export interface PublicationForeignAccessContext {
+  readonly ownerBusiness?: string | null;
+  readonly businessOf?: ((relativePath: string) => string | null) | null;
+  readonly resolveSpecifier?: ((specifier: string) => string | null) | null;
+}
+
+export function findPublicationViolations(
+  sourceText: string,
+  options?: PublicationForeignAccessContext,
+): PublicationViolation[];
 
 /**
  * The specifiers a published module imports, in source order.
@@ -71,6 +87,16 @@ export interface PublicationRuleOptions {
     from: string,
     to: string,
   ) => PublicationImportJudgement;
+  /**
+   * Which business owns a path. The role classifier lives in the dependency
+   * rules, so it is injected rather than imported back into this module.
+   */
+  readonly businessOf?: (relativePath: string) => string | null;
+  /**
+   * Where a published module's specifier resolves to, as a `src`-relative path,
+   * or `null` when it does not resolve. `null` is judged foreign.
+   */
+  readonly resolveSpecifier?: (from: string, specifier: string) => string | null;
 }
 
 /** Judge every published module in a file list. */
