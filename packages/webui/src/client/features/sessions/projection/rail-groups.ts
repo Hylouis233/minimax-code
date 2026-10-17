@@ -11,7 +11,7 @@
 // from here and `session-rail-search.test.ts` drives them directly.
 
 import type { WebuiClientSession } from "../contracts/session-view.js";
-import { workspaceProjectName } from "../../workspace/projection/workspace-name.js";
+import { workspaceProjectName } from "../../workspace/projection/workspace-name.public.js";
 
 export const PROJECT_SESSION_BATCH_SIZE = 6;
 

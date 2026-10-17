@@ -17,7 +17,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { evaluateOutsideClose } from "../../../projection/common/outside-close.js";
-import { workspaceProjectName } from "../../../features/workspace/projection/workspace-name.js";
+import { workspaceProjectName } from "../../../features/workspace/projection/workspace-name.public.js";
 import { WebuiWorkspaceDirectoryBrowser } from "../../../features/workspace/ui/WebuiWorkspaceDirectoryBrowser.js";
 import { WebuiIconCheck, WebuiIconFolder } from "../../../shell/icons.js";
 

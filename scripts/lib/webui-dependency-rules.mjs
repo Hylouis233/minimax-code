@@ -396,7 +396,13 @@ export function classifyLayers(relative) {
     const role = tail[0];
     if (role === "contracts") return ["contracts"];
     if (role === "projection") {
-      const b = basenameWithoutExtension(normalized);
+      // The `.public` suffix is a publication marker, not part of the module's
+      // name: `projection/workspace-name.public.ts` publishes the same derivation
+      // `projection/workspace-name.ts` holds, so it must classify identically.
+      // Without this a published pure derivation would silently drop from
+      // `domain` to `view` and the gate would be enforcing something the plan
+      // never decided.
+      const b = basenameWithoutExtension(normalized).replace(/\.public$/u, "");
       return PROJECTION_DOMAIN.has(b) ? ["domain"] : ["view"];
     }
     if (role === "application") return ["application"];

@@ -3818,7 +3818,7 @@
     "packages/webui/src/client/features/workspace/projection/media-preview.ts",
     "packages/webui/src/client/features/workspace/projection/panel-projection.ts",
     "packages/webui/src/client/features/workspace/projection/workspace-file-tree.ts",
-    "packages/webui/src/client/features/workspace/projection/workspace-name.ts",
+    "packages/webui/src/client/features/workspace/projection/workspace-name.public.ts",
     "packages/webui/src/client/features/workspace/projection/workspace-panel-state.ts",
     "packages/webui/src/client/features/workspace/projection/workspace-progress.ts",
     "packages/webui/src/client/features/workspace/ui/WebuiWorkspaceDirectoryBrowser.tsx",

@@ -36,7 +36,7 @@ import type {
   WebuiClientProject,
 } from "../contracts/session-view.js";
 import { formatWebuiUnreadBadge } from "../../../projection/common/unread-badge.js";
-import { workspaceProjectName } from "../../workspace/projection/workspace-name.js";
+import { workspaceProjectName } from "../../workspace/projection/workspace-name.public.js";
 import { ProjectList } from "./ProjectList.js";
 import { RailContextMenu } from "./rail-context-menu.js";
 import { RailViewTabs } from "./rail-view-tabs.js";

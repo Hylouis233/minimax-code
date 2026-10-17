@@ -18,13 +18,13 @@
     },
     {
       "from": "client/features/sessions/ui/SessionRail.tsx",
-      "to": "client/features/workspace/projection/workspace-name.ts",
-      "reason": "The rail labels a project by its workspace name, which the Workspace business derives. Reviewed peer edge until Workspace publishes the name projection."
+      "to": "client/features/workspace/projection/workspace-name.public.ts",
+      "reason": "Workspace publishes the project-name rule as a public module, so the rail and the composer's project row read the owner's derivation instead of a peer's private module. The `.public` suffix is a publication marker; the rule itself is unchanged."
     },
     {
       "from": "client/features/sessions/projection/rail-groups.ts",
-      "to": "client/features/workspace/projection/workspace-name.ts",
-      "reason": "Same read as the rail's, now from the grouping rule itself: T07 moved the project grouping into the sessions projection, so the name derivation is called where the group is built instead of in the surface that renders it. Reviewed peer edge until Workspace publishes the name projection; it then replaces the rail's entry too, since both readers take the published form."
+      "to": "client/features/workspace/projection/workspace-name.public.ts",
+      "reason": "Workspace publishes the project-name rule as a public module, so the rail and the composer's project row read the owner's derivation instead of a peer's private module. The `.public` suffix is a publication marker; the rule itself is unchanged."
     },
     {
       "from": "client/features/account/ui/UserMenu.tsx",
@@ -213,8 +213,8 @@
     },
     {
       "from": "client/features/composer/ui/ComposerProjectRow.tsx",
-      "to": "client/features/workspace/projection/workspace-name.ts",
-      "reason": "The composer's project row labels the workspace with the workspace business's name derivation; T13 moved that row out of WebuiComposer into its own unit and the edge moved with it. Reviewed peer edge until Workspace publishes the name projection."
+      "to": "client/features/workspace/projection/workspace-name.public.ts",
+      "reason": "Workspace publishes the project-name rule as a public module, so the rail and the composer's project row read the owner's derivation instead of a peer's private module. The `.public` suffix is a publication marker; the rule itself is unchanged."
     },
     {
       "from": "client/features/composer/ui/ContextUsageIndicator.tsx",
