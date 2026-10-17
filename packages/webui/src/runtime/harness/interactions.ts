@@ -67,7 +67,23 @@ export function createInteractionsAdapter(
     },
 
     async replyQuestionnaire(request) {
-      return requireCliService(host).replyQuestionnaire(request);
+      return requireCliService(host).replyQuestionnaire({
+        name: request.name,
+        requestId: request.requestId,
+        schemaVersion: request.schemaVersion,
+        // Rebuilt per answer rather than forwarded: the wire's arrays are readonly and its
+        // shape is the panel's, while the runtime's own answer type is mutable and narrower.
+        // Forwarding the wire object type-checks only while the two happen to overlap.
+        answers: request.answers.map((answer) => ({
+          stepId: answer.stepId,
+          ...(answer.selectedOptionIds === undefined
+            ? {}
+            : { selectedOptionIds: [...answer.selectedOptionIds] }),
+          ...(answer.selectedOther === undefined ? {} : { selectedOther: answer.selectedOther }),
+          ...(answer.otherText === undefined ? {} : { otherText: answer.otherText }),
+          ...(answer.skipped === undefined ? {} : { skipped: answer.skipped }),
+        })),
+      });
     },
 
     async dismissQuestionnaire(request) {

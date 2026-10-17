@@ -416,16 +416,26 @@ export function createWebuiModelsWorkflows(deps: {
       unavailable("providers", "当前运行时不支持自定义提供商。");
       return;
     }
-    await providerList.load(providerKey(), () => port.listUserModelProviders!());
-    // A successful read is the committed baseline: it is what a known rejection
-    // restores, and what an intent composes against when nothing is pending.
-    const providers = providerList.read(providerKey())?.value ?? [];
-    for (const provider of providers) {
+    // Read, compose, then commit — one publication. Awaiting a plain load first would commit
+    // the server's list on its own, and every subscriber would see this owner's newer intent
+    // replaced by an answer that predates it for the length of a round trip.
+    const token = providerList.capture(providerKey());
+    let answer: readonly WebuiModelProviderView[];
+    try {
+      answer = await port.listUserModelProviders();
+    } catch (reason) {
+      providerList.commit(token, {
+        status: "error",
+        error: reason instanceof Error ? reason.message : String(reason),
+      });
+      return;
+    }
+    // A successful read is the committed baseline: it is what a known rejection restores, and
+    // what an intent composes against when nothing is pending.
+    for (const provider of answer) {
       committedModels.set(provider.providerId, provider.models);
     }
-    // The answer is the committed baseline; what is *shown* also carries the intents this
-    // owner has not retired yet.
-    overlayPendingIntents();
+    providerList.commit(token, { status: "ready", value: shownRows(answer) });
   };
 
   /** A provider mutation refreshes the provider list and marks models stale. */
@@ -458,15 +468,40 @@ export function createWebuiModelsWorkflows(deps: {
     committedModels.get(providerId) ??
     providerList.read(providerKey())?.value?.find((provider) => provider.providerId === providerId)?.models;
 
+  /** One provider's list replaced, leaving its neighbours alone. */
+  const withProviderModels = (
+    providers: readonly WebuiModelProviderView[],
+    providerId: string,
+    models: readonly WebuiModelProviderModelEntry[],
+  ): readonly WebuiModelProviderView[] =>
+    providers.map((provider) =>
+      provider.providerId === providerId ? { ...provider, models } : provider,
+    );
+
   /**
-   * Show one provider's pending list.
+   * The rows as this owner shows them: an answer with the intents it has not retired applied.
    *
-   * The list it sits in is passed in rather than re-read: freshness has already
-   * advanced by the time the intent is shown (the write retired the reads that
-   * started before it), and a read taken after that advance describes a state this
-   * write is replacing. The projection is where a surface reads the value, so the
-   * commit still goes through the resource and the next successful read is still
-   * the truth.
+   * Composed *before* the commit rather than after it. The commit is what notifies, so a
+   * subscriber shown the server's baseline first has seen the obsolete list, however briefly,
+   * and then sees the intent come back — a public state that says the change was lost and then
+   * that it was not. Composition happens first; there is one publication.
+   */
+  const shownRows = (
+    providers: readonly WebuiModelProviderView[],
+  ): readonly WebuiModelProviderView[] => {
+    let shown = providers;
+    for (const [id, models] of pendingModels) shown = withProviderModels(shown, id, models);
+    return shown;
+  };
+
+  /**
+   * Show one provider's restored list together with the intents this owner still holds.
+   *
+   * The list it sits in is passed in rather than re-read: freshness has already advanced by
+   * the time the intent is shown (the write retired the reads that started before it), and a
+   * read taken after that advance describes a state this write is replacing. The projection is
+   * where a surface reads the value, so the commit still goes through the resource and the
+   * next successful read is still the truth.
    */
   const showProviderModels = (
     providers: readonly WebuiModelProviderView[],
@@ -475,34 +510,7 @@ export function createWebuiModelsWorkflows(deps: {
   ): void => {
     providerList.commit(providerList.capture(providerKey()), {
       status: "ready",
-      value: providers.map((provider) =>
-        provider.providerId === providerId ? { ...provider, models } : provider,
-      ),
-    });
-  };
-
-  /**
-   * Show what this owner still intends, on top of whatever the server just answered.
-   *
-   * Called after every commit of a server list, because a reload answers the *write that
-   * triggered it* and an intent captured after that write began is newer than the
-   * answer. Without this overlay the earlier write's own reload removed the later intent
-   * from the screen while its write was still pending — the display disagreeing with what
-   * the owner was about to send.
-   */
-  const overlayPendingIntents = (): void => {
-    if (pendingModels.size === 0) return;
-    const rows = projectedProviders();
-    if (!rows || rows.length === 0) return;
-    let overlaid = rows;
-    for (const [id, models] of pendingModels) {
-      overlaid = overlaid.map((provider) =>
-        provider.providerId === id ? { ...provider, models } : provider,
-      );
-    }
-    providerList.commit(providerList.capture(providerKey()), {
-      status: "ready",
-      value: overlaid,
+      value: shownRows(withProviderModels(providers, providerId, models)),
     });
   };
 
@@ -591,10 +599,10 @@ export function createWebuiModelsWorkflows(deps: {
         if (pendingModels.get(providerId) === sent) pendingModels.delete(providerId);
         const committed = committedModels.get(providerId);
         const rows = projectedProviders();
+        // Intents this owner still holds are not this provider's refusal: `showProviderModels`
+        // publishes the restored baseline and them together, in one state.
         if (committed && rows) showProviderModels(rows, providerId, committed);
         else await loadProviders().catch(() => undefined);
-        // Intents this owner still holds are not this provider's refusal: they stay shown.
-        overlayPendingIntents();
         return outcome;
       }
       // Transport failure, timeout or a lost response: the write may or may not have
@@ -603,8 +611,8 @@ export function createWebuiModelsWorkflows(deps: {
       // intent with it: the owner still holds what it will send next, and a display
       // showing the server's answer while the intent differs is the contradiction this
       // protocol exists to remove.
+      // The reload already publishes the answer composed with what is still intended.
       await loadProviders().catch(() => undefined);
-      overlayPendingIntents();
       return outcome;
     };
     const previous = providerWriteChains.get(providerId) ?? Promise.resolve();

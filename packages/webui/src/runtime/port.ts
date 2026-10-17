@@ -84,6 +84,7 @@ import type {
 } from "../shared/contracts/review.js";
 import type { WebuiCanvasDocument } from "../shared/contracts/canvas.js";
 import type { WebuiModelEntry, WebuiSkillEntry } from "../shared/contracts/models.js";
+import type { WebuiHostPrerequisiteFacts } from "../shared/capability-manifest.js";
 import type { WebuiHostRequest } from "./harness/host-contract.js";
 import type { WebuiVersionInfo } from "../shared/contracts/version.js";
 import type { WebuiUsageQuotaResult } from "../shared/contracts/usage-quota.js";
@@ -277,6 +278,15 @@ export interface WebuiHarnessPort {
   getMiniMaxModelSource(): Promise<"token_plan" | "minimax_api_key">;
   setMiniMaxModelSource(request: { readonly source: "token_plan" | "minimax_api_key" }): Promise<"token_plan" | "minimax_api_key">;
   /** Wire records are validated only as objects; the harness adapter owns field conversion. */
+  /**
+   * Which host services this harness actually has behind it.
+   *
+   * The port says what it can be asked for; this says which of those answers will work. A
+   * harness forwards to optional host services, and `requireHostSlot` refuses at invocation —
+   * so the fact belongs here, next to the refusal, rather than being inferred from a method's
+   * presence.
+   */
+  readHostPrerequisites?(): WebuiHostPrerequisiteFacts;
   testUserModelCandidate(request: Record<string, unknown>): Promise<unknown>;
   revealModelProviderApiKey(request: { readonly providerId: string }): Promise<string>;
   startCodexOAuthLogin(request?: Record<string, unknown>): Promise<unknown>;

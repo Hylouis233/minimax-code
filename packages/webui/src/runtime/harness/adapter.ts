@@ -65,12 +65,28 @@ export function createHarnessPortFromHost(
     // `runtime-port` instead of importing the runtime implementation beside it.
     runCommand: (request) => runWebuiCommand(port, request),
     importSessionTransferWorkflow: (input) => importWebuiSessionTransfer(port, input),
+    /**
+     * Which optional host services are behind this harness, as of this call.
+     *
+     * The same lookups the call sites make (`requireHostSlot(host.beginAccountLogin, ...)`):
+     * answered here so the handshake can report what a call would find, and answered per call
+     * so a host that gains or loses a service does not need a rebuilt manifest.
+     */
+    readHostPrerequisites: () => ({
+      accountLogin: host.beginAccountLogin !== undefined,
+      accountSignin: host.getSigninPanel !== undefined,
+      accountUsage: host.getUsageQuota !== undefined,
+      accountSignOut: host.signOutAccount !== undefined,
+      canvasDocuments: host.cliService?.readCanvas !== undefined,
+      canvasWrites: host.cliService?.applyCanvas !== undefined,
+    }),
   };
-  // Availability is not decided here. This object says what the harness *can* forward;
-  // whether an operation was registered and bound is a fact about the service, and the
-  // service derives the handshake's answer from its registry
-  // (`server/service.ts` -> `deriveWebuiCapabilityManifestFromRegistry`). A wrapper
-  // around a host service that is not there forwards happily, and advertising a family
-  // from its mere presence is how a surface gets offered for a call that cannot work.
+
+  // Availability is not decided here. This object says what the harness *can* forward and
+  // which host services stand behind it; whether an operation was registered and bound is a
+  // fact about the service, and the service derives the handshake's answer from its registry
+  // and these facts (`server/service.ts`). A wrapper around a host service that is not there
+  // forwards happily, and advertising a family from its mere presence is how a surface gets
+  // offered for a call that cannot work.
   return harnessPort;
 }

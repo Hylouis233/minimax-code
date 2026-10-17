@@ -76,10 +76,39 @@ export type WebuiCapabilityManifest = Readonly<Record<string, WebuiCapabilitySta
  * The second list is prerequisites rather than proof of existence: a terminal roster
  * whose frame stream is not wired is `not-ready`, not `absent`.
  */
+/**
+ * The host facts a family depends on, by the key an adapter reports them under.
+ *
+ * A registered operation is not a working capability: the assembled harness forwards to host
+ * services that may not be there, and `requireHostSlot` refuses at invocation time. These keys
+ * name what the family's operations actually call, so availability can be answered from the
+ * same fact the call site checks rather than from the wrapper's presence.
+ */
+export const WEBUI_HOST_PREREQUISITES = [
+  "accountLogin",
+  "accountSignin",
+  "accountUsage",
+  "accountSignOut",
+  "canvasDocuments",
+  "canvasWrites",
+] as const;
+
+export type WebuiHostPrerequisite = (typeof WEBUI_HOST_PREREQUISITES)[number];
+
+/** What an adapter reports: one answer per prerequisite, false when the host slot is absent. */
+export type WebuiHostPrerequisiteFacts = Readonly<Record<WebuiHostPrerequisite, boolean>>;
+
 export const WEBUI_CAPABILITY_REGISTRY_PROOFS: Readonly<
   Record<
     WebuiCapabilityName,
-    { readonly operations: readonly string[]; readonly ready?: readonly string[] }
+    {
+      readonly operations: readonly string[];
+      /** Facts every one of which must hold for the family to work at all. */
+      readonly hostPrerequisites?: readonly WebuiHostPrerequisite[];
+      /** Facts that only part of the surface depends on: without them it is `not-ready`. */
+      readonly optionalHostPrerequisites?: readonly WebuiHostPrerequisite[];
+      readonly ready?: readonly string[];
+    }
   >
 > = {
   sessions: { operations: ["listSessions", "updateSession", "deleteSession"] },
@@ -89,7 +118,10 @@ export const WEBUI_CAPABILITY_REGISTRY_PROOFS: Readonly<
     operations: ["listPendingPermissions", "replyPermission"],
     ready: ["getPendingQuestionnaire", "replyQuestionnaire"],
   },
-  workspace: { operations: ["listWorkspaceFileTree", "getWorkspaceEnvironment"] },
+  workspace: {
+    operations: ["listWorkspaceFileTree", "getWorkspaceEnvironment"],
+    optionalHostPrerequisites: ["canvasDocuments", "canvasWrites"],
+  },
   terminal: {
     operations: ["listTerminals", "createTerminal", "disposeTerminal"],
     ready: ["watchTerminal", "writeTerminal", "resizeTerminal"],
@@ -97,7 +129,12 @@ export const WEBUI_CAPABILITY_REGISTRY_PROOFS: Readonly<
   models: { operations: ["listModels", "selectModel"] },
   plugins: { operations: ["pluginManagement"] },
   settings: { operations: ["getGlobalInstructions", "getPermissionMode"] },
-  account: { operations: ["getAccountStatus", "beginAccountLogin"] },
+  account: {
+    operations: ["getAccountStatus", "beginAccountLogin"],
+    // The login dialog is the half of this family that needs a host service; without it the
+    // operation is registered, forwards, and refuses with `capability_unavailable`.
+    hostPrerequisites: ["accountLogin"],
+  },
   commands: { operations: ["runCommand"] },
 };
 
@@ -127,6 +164,7 @@ export interface WebuiOperationAvailability {
  */
 export function deriveWebuiCapabilityManifestFromBindings(
   availability: (operation: string) => WebuiOperationAvailability,
+  hostFacts: Partial<WebuiHostPrerequisiteFacts> = {},
   extensions: readonly string[] = [],
 ): WebuiCapabilityManifest {
   const manifest: Record<string, WebuiCapabilityState> = {};
@@ -141,7 +179,35 @@ export function deriveWebuiCapabilityManifestFromBindings(
       continue;
     }
     const ready = proof.ready ?? [];
-    manifest[name] = ready.every(wired) ? "supported" : "not-ready";
+    if (!ready.every(wired)) {
+      manifest[name] = "not-ready";
+      continue;
+    }
+    // The host facts decide the rest. An unanswered fact is *unproven*, not fine: a family
+    // whose required host service nobody reported on is the family that advertises a surface
+    // and refuses every call, which is exactly what this derivation exists to stop.
+    const required = proof.hostPrerequisites ?? [];
+    const optional = proof.optionalHostPrerequisites ?? [];
+    let state: WebuiCapabilityState = "supported";
+    for (const key of required) {
+      const fact = hostFacts[key];
+      if (fact === false) {
+        state = "absent";
+        break;
+      }
+      if (fact === undefined) state = "not-ready";
+    }
+    if (state === "supported") {
+      for (const key of optional) {
+        const fact = hostFacts[key];
+        if (fact === false) {
+          state = "not-ready";
+          break;
+        }
+        if (fact === undefined) state = "not-ready";
+      }
+    }
+    manifest[name] = state;
   }
   for (const name of extensions) manifest[name] = "supported";
   return manifest;

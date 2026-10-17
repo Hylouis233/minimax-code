@@ -172,6 +172,50 @@ describe("V10 · provider intent is the owner's, not the caller's array", () => 
     ]);
   });
 
+  it("never publishes the obsolete list while a newer intent is pending", async () => {
+    // The snapshot test above asks where the owner ends up; this one asks what it ever
+    // published. A commit is a notification, so a baseline committed first and repaired
+    // afterwards is a public state that says the newer change was lost — visible to every
+    // subscriber for the length of a round trip, whatever the eventual answer is.
+    const resolutions: ((value: unknown) => void)[] = [];
+    let served = [provider([{ modelId: "m1", enabled: false }, { modelId: "m2", enabled: false }])];
+    const workflows = workflowsWith({
+      listUserModelProviders: async () => served,
+      updateUserModelProvider: (body: { models: readonly { modelId: string; enabled?: boolean }[] }) =>
+        new Promise((resolve) => {
+          const accepted = [provider(body.models)];
+          resolutions.push((value) => {
+            served = accepted;
+            resolve(value);
+          });
+        }),
+      listModels: async () => [],
+    });
+    await workflows.loadProviders();
+
+    const one = workflows.setProviderModelEnabled({ providerId: "p1", modelId: "m1", enabled: true });
+    const two = workflows.setProviderModelEnabled({ providerId: "p1", modelId: "m2", enabled: true });
+    await flush();
+
+    const published: boolean[][] = [];
+    const unsubscribe = workflows.subscribe(() => {
+      const rows = workflows.getSnapshot().providers.value ?? [];
+      published.push(rows.flatMap((entry) => entry.models.map((model) => model.enabled === true)));
+    });
+
+    // The first write settles; its own reload answers with a list that predates the second
+    // intent.
+    resolutions[0]!({ success: true });
+    await flush();
+    resolutions[1]!({ success: true });
+    await one;
+    await two;
+    unsubscribe();
+
+    expect(published.length).toBeGreaterThan(0);
+    for (const shown of published) expect(shown).toEqual([true, true]);
+  });
+
   it("does not serialize across providers", async () => {
     const order: string[] = [];
     const gate = deferred<unknown>();

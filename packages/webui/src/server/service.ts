@@ -27,7 +27,10 @@ import {
 } from "./credentials.js";
 import { WEBUI_PROTOCOL_VERSION } from "../shared/envelope.js";
 import { VERSION_OPERATION_NAME } from "../shared/operation-names.js";
-import { deriveWebuiCapabilityManifestFromBindings } from "../shared/capability-manifest.js";
+import {
+  deriveWebuiCapabilityManifestFromBindings,
+  type WebuiCapabilityManifest,
+} from "../shared/capability-manifest.js";
 import { WEBUI_OPERATION_BINDINGS } from "./operation/bind-handlers.js";
 import type { WebuiHarnessPort } from "../runtime/port.js";
 import type { WebuiTerminalProcessPort } from "../runtime/port.js";
@@ -62,7 +65,8 @@ function withRegistryDerivedAvailability(
   const entry = operations.get(VERSION_OPERATION_NAME);
   if (!entry) return operations;
   const wired = port as unknown as Readonly<Record<string, unknown>>;
-  const capabilities = deriveWebuiCapabilityManifestFromBindings((operation) => {
+  const derive = (): WebuiCapabilityManifest =>
+    deriveWebuiCapabilityManifestFromBindings((operation) => {
     // Registered is the registry's answer: it holds the table-driven bindings *and* the
     // bespoke handlers this service adds on top (`runCommand`, the transfer import), so
     // the question "does this service answer it" is the registry's to answer.
@@ -73,11 +77,14 @@ function withRegistryDerivedAvailability(
     // bespoke handler does its own checking, so registration is the whole answer there.
     if (binding === undefined) return { declared: true, wired: true };
     return { declared: true, wired: typeof wired[binding.method] === "function" };
-  });
+  }, port.readHostPrerequisites?.() ?? {});
   const wrapped: WebuiOperationRegistryEntry["handle"] = async (...call) => {
     const answer = await entry.handle(...call);
     if (!("body" in answer)) return answer;
-    return { ...answer, body: { ...(answer.body as object), capabilities } };
+    // Computed here rather than at construction: the facts come from the harness, and a host
+    // that gains or loses an optional service changes what this service can do. A manifest
+    // frozen at startup would keep claiming the old answer until the process restarted.
+    return { ...answer, body: { ...(answer.body as object), capabilities: derive() } };
   };
   return new Map(operations).set(VERSION_OPERATION_NAME, { ...entry, handle: wrapped });
 }

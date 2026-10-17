@@ -820,6 +820,40 @@ describe("WebUI service", () => {
     ws.close();
   });
 
+  it("does not advertise a family whose host service is absent", async () => {
+    // The failure this exists to stop: the operation is registered, the wrapper exists, and
+    // the host service behind it does not — every call refuses with `capability_unavailable`
+    // while the handshake says `supported`. The fact comes from the harness, which is where
+    // the refusal happens.
+    port.readHostPrerequisites = () => ({
+      accountLogin: false,
+      accountSignin: true,
+      accountUsage: true,
+      accountSignOut: true,
+      canvasDocuments: true,
+      canvasWrites: true,
+    });
+    const { url } = await bootService();
+    const { ws, upgrade } = openClient(url);
+    await upgrade;
+    const response = await requestOnce(ws, {
+      protocolVersion: WEBUI_PROTOCOL_VERSION,
+      kind: "request",
+      requestId: "req-version-prereq",
+      operation: "version",
+      body: undefined,
+    });
+    if (!isWebuiFrame(response) || response.kind !== "response") {
+      throw new Error("expected a version response frame");
+    }
+    const body = response.body as { capabilities?: Record<string, string> };
+    expect(body.capabilities?.account).toBe("absent");
+    // Unrelated families are unaffected: this is a fact about one host service, not a
+    // blanket downgrade when any optional slot is missing.
+    expect(body.capabilities?.commands).toBe("supported");
+    ws.close();
+  });
+
   it("answers availability from what this service bound, not from the harness's shape", async () => {
     // The evidence the handshake carries is derived from the binding table and the port
     // behind it. `runCommand` is a real port member here, so the command family is
