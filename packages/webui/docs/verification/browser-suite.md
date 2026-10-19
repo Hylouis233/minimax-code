@@ -42,7 +42,7 @@ deliberately reused server a known id that matches the run. CI never reuses eith
 
 ## Layout
 
-The suite lives beside its code, in `test/webui-browser/`: one `*.spec.mjs` per surface, plus
+The suite lives in `packages/webui/test/browser/`: one `*.spec.mjs` per surface, plus
 `harness.mjs` (page helpers — fixture configuration, session switching, stream emission, selectors)
 and `fixture.mjs` (the deterministic in-page transport). Run the directory rather than a hand-kept
 list: Playwright collects every spec in it.

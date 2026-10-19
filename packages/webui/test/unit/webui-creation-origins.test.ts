@@ -15,7 +15,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createWebuiApplication } from "../../src/client/application/create-application.js";
-import { createWebuiApplicationFixture } from "../support/application-fixture.js";
+import { createWebuiApplicationFixture } from "./support/application-fixture.js";
 import { createWebuiPortSlices } from "../../src/client/application/port-slices.js";
 import { WEBUI_HOME_SESSION_KEY } from "../../src/client/application/state.js";
 import { WEBUI_COMPOSER_HOME_KEY } from "../../src/client/features/composer/application/composer-history.js";

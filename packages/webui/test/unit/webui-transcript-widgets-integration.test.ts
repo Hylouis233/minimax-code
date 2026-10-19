@@ -8,7 +8,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { WebuiClientFoundationApp } from "../../src/client/shell/WebuiClientFoundationApp.js";
-import { shellElement } from "../support/shell-fixture.js";
+import { shellElement } from "./support/shell-fixture.js";
 import type { WebuiClientMessage, WebuiClientMessagePage } from "../../src/client/features/transcript/contracts/message-view.js";
 
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";

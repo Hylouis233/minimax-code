@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { installFixtureTransport } from "./fixture.mjs";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../dist-webui/client");
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../dist-webui/client");
 const port = 4179;
 const serverId = process.env.WEBUI_BROWSER_SERVER_ID ?? randomUUID();
 const server = createServer(async (request, response) => {

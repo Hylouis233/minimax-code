@@ -59,7 +59,7 @@ import {
   readSessionIdFromHash,
   subscribeToSessionHash,
 } from "../../src/client/shell/WebuiClientFoundationApp.js";
-import { shellElement } from "../support/shell-fixture.js";
+import { shellElement } from "./support/shell-fixture.js";
 import type {WebuiClientMessageEnqueuer} from "../../src/client/features/composer/contracts/command-port.js";
 import type {WebuiClientMessageSender, WebuiClientSessionResumer} from "../../src/client/features/turn/contracts/execution-port.js";
 import type { WebuiClientMessageLoader } from "../../src/client/features/transcript/contracts/message-view.js";

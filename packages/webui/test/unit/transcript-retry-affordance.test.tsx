@@ -22,7 +22,7 @@ import { WebuiClientFoundationApp } from "../../src/client/shell/WebuiClientFoun
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 import { WebuiApplicationProvider } from "../../src/client/bindings/application-context.js";
 import { createWebuiPortSlices } from "../../src/client/application/port-slices.js";
-import { createWebuiApplicationFixture } from "../support/application-fixture.js";
+import { createWebuiApplicationFixture } from "./support/application-fixture.js";
 import { projectMessageParts } from "../../src/client/features/transcript/projection/message-parts.js";
 import type { WebuiClientMessage } from "../../src/client/features/transcript/contracts/message-view.js";
 

@@ -86,6 +86,9 @@ test("V31/V34 inspection and authorization progress through a saturated activity
   await expect(page.locator("[data-webui-model-selector]").getByRole("button").first()).toBeEnabled();
   await expect.poll(() => requestCount(page, "getAccountStatus")).toBeGreaterThan(0);
   const initialModels = await sessionModels(page);
+  await expect.poll(() => page.evaluate(() => window.__fixture.replies.filter(
+    reply => reply.operation === "listModels" && reply.requestBody.sessionId === "A",
+  ).length)).toBe(initialModels);
   const initialAccount = await requestCount(page, "getAccountStatus");
   expect(initialModels).toBeGreaterThan(0);
   await page.clock.runFor(1_000);
@@ -96,6 +99,9 @@ test("V31/V34 inspection and authorization progress through a saturated activity
   });
   await page.clock.runFor(1_100);
   await expect.poll(() => sessionModels(page)).toBe(initialModels + 1);
+  await expect.poll(() => page.evaluate(() => window.__fixture.replies.filter(
+    reply => reply.operation === "listModels" && reply.requestBody.sessionId === "A",
+  ).length)).toBeGreaterThan(initialModels);
   await expect.poll(() => requestCount(page, "getAccountStatus")).toBe(initialAccount + 1);
   const picker = page.locator("[data-webui-model-selector]");
   await picker.getByRole("button").first().click();

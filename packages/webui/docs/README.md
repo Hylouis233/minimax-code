@@ -11,9 +11,9 @@ below.
 
 ## Authority order
 
-1. **The source and its tests.** `packages/webui/src`, `packages/webui/test` and `test/webui-browser`
-   establish executable behavior. Verify documented behavior against them; an ADR or prose page does
-   not override the current implementation.
+1. **The source and its tests.** `packages/webui/src` and `packages/webui/test` (unit, integration,
+   browser and gate suites) establish executable behavior. Verify documented behavior against them;
+   an ADR or prose page does not override the current implementation.
 2. **Decisions.** [`adr/`](adr/) records the rationale and intended constraints. Treat a decision as
    current only where the source still implements it; update or retire records when that intent changes.
 3. **This directory.** Description, reference material and open items, kept aligned with the source.
@@ -60,7 +60,7 @@ facets as directed there. The repository glossary is `CONTEXT.md` at the reposit
 | Document | Owns | Read it when |
 | --- | --- | --- |
 | [`verification/gates.md`](verification/gates.md) | The gates, what each proves, the evidence levels, and the comparison methods | You are about to claim work is verified |
-| [`verification/browser-suite.md`](verification/browser-suite.md) | The built-client browser suite: fixture, determinism, server behaviour | You are changing or debugging `test/webui-browser/` |
+| [`verification/browser-suite.md`](verification/browser-suite.md) | The built-client browser suite: fixture, determinism, server behaviour | You are changing or debugging `test/browser/` |
 | [`known-gaps.md`](known-gaps.md) | Capabilities the WebUI does not have, verified against the tree | Something looks missing and you want to know whether it is known |
 | [`open-questions.md`](open-questions.md) | Decisions deliberately left to the operator | You are about to pick a behaviour nobody has picked |
 | [`releasing.md`](releasing.md) | The npm preview release of `@fectivnfy112358/minimax-code-web` | You are changing packaging or the publish workflow |

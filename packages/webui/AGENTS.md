@@ -113,8 +113,10 @@ carry what a linter would otherwise catch.
 
 ## Tests
 
-- Unit suites are `packages/webui/test/unit/*.test.ts(x)`; integration suites are
-  `packages/webui/test/integration/*.test.ts`.
+- Unit suites are in `packages/webui/test/unit/`; integration suites are in
+  `packages/webui/test/integration/`; Playwright browser suites are in
+  `packages/webui/test/browser/`; tests for verification gates are in
+  `packages/webui/test/gates/`.
 - **Register every new Vitest file** in the `webui` group of `test/vitest-suites.json`. It is an
   explicit list, not a glob: an unregistered file never runs.
 - **No DOM framework.** Do not add jsdom, happy-dom or `@testing-library/*`, and do not change the
@@ -126,7 +128,7 @@ carry what a linter would otherwise catch.
   and reads as manufactured coverage. When you touch a validator, pin its message text with
   `assert.deepEqual` — `webui-service.test.ts` checks error codes only, so a changed message or a
   relaxed predicate is otherwise invisible.
-- **The browser suite** is `test/webui-browser/`, one `*.spec.mjs` per surface. Import `test` from
+- **The browser suite** is `test/browser/`, one `*.spec.mjs` per surface. Import `test` from
   `./harness.mjs`, not from `@playwright/test`: the harness registers the run-id assertion, so a spec
   cannot omit it. `docs/verification/browser-suite.md` has the fixture, determinism and server
   behaviour.

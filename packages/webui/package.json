@@ -15,7 +15,7 @@
     "check:host-events": "node scripts/host-event-catalogue.mjs",
     "typecheck:server": "pnpm check:host-events && tsc -p tsconfig.server.json --noEmit",
     "typecheck:client": "tsc -p tsconfig.client.json --noEmit",
-    "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
+    "typecheck:test": "node --max-old-space-size=4096 ../../node_modules/typescript/bin/tsc -p tsconfig.test.json --noEmit",
     "build:styles": "node ../../scripts/build-webui-styles.mjs",
     "test": "node ../../scripts/run-vitest-suite.mjs webui"
   },
