@@ -4066,6 +4066,7 @@
     "packages/webui/test/integration/loopback-harness-path.test.ts",
     "packages/webui/test/integration/real-host-loopback.test.ts",
     "packages/webui/test/integration/real-host-model-turn.test.ts",
+    "packages/webui/test/integration/remove-real-host-data-dir.ts",
     "packages/webui/test/unit/account-login.test.ts",
     "packages/webui/test/unit/account-menu-panels.test.ts",
     "packages/webui/test/unit/account-workflows.test.ts",

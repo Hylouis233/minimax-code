@@ -21,7 +21,7 @@
 // isolated path reached the host, so a run can never fall back to the operator's
 // own `~/.minimax` without failing.
 import { once } from "node:events";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -37,6 +37,7 @@ import {
   createOperationRegistry,
 } from "../../src/server/index.js";
 import { WEBUI_PROTOCOL_VERSION } from "../../src/shared/envelope.js";
+import { removeRealHostDataDir } from "./remove-real-host-data-dir.js";
 
 const CREDENTIAL_TOKEN = "real-host-loopback-token";
 
@@ -126,14 +127,7 @@ async function bootRealHost(): Promise<Booted> {
     close: async () => {
       await service.close().catch(() => undefined);
       await assembled.host.apiHost.close().catch(() => undefined);
-      // The real host may finish its last filesystem callback just after close
-      // resolves. Retry transient ENOTEMPTY/EBUSY while removing the isolated dir.
-      await rm(dataDir, {
-        recursive: true,
-        force: true,
-        maxRetries: 10,
-        retryDelay: 100,
-      });
+      await removeRealHostDataDir(dataDir);
     },
   };
   booted.push(entry);

@@ -33,7 +33,7 @@
 // The host-failure path is asserted too: a runtime rejection has to reach the
 // caller as a rejection, not as a fabricated success.
 import { execFileSync } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -43,6 +43,7 @@ import type {
   WebuiGoalCreateRequest,
   WebuiGoalPatchRequest,
 } from "../../src/shared/contracts/goal.js";
+import { removeRealHostDataDir } from "./remove-real-host-data-dir.js";
 
 interface Booted {
   readonly dataDir: string;
@@ -128,7 +129,7 @@ async function bootPort(options: { readonly git?: boolean } = {}) {
     port: createHarnessPortFromHost(assembled.host),
     close: async () => {
       await assembled.host.apiHost.close().catch(() => undefined);
-      await rm(dataDir, { recursive: true, force: true });
+      await removeRealHostDataDir(dataDir);
     },
   };
 }

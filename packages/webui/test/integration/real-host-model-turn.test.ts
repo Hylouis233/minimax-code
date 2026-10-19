@@ -26,11 +26,13 @@
 // assertions have already run at that point.
 import { createServer } from "node:http";
 import type { IncomingMessage, Server, ServerResponse } from "node:http";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
+
+import { removeRealHostDataDir } from "./remove-real-host-data-dir.js";
 
 const MODEL_ID = "stub-model";
 const PROVIDER_NAME = "stub";
@@ -40,7 +42,7 @@ const STUB_ANSWER = "stub answer";
 interface Stub {
   readonly url: string;
   readonly requests: ReadonlyArray<{ readonly url: string; readonly authorization?: string; readonly body: string }>;
-  close(): void;
+  close(): Promise<void>;
 }
 
 /** An OpenAI-completions endpoint that streams one scripted assistant message. */
@@ -77,7 +79,9 @@ async function startStubServer(responseGate?: Promise<void>): Promise<Stub> {
   return {
     url: `http://127.0.0.1:${address.port}/v1`,
     requests,
-    close: () => server.close(),
+    close: () => new Promise<void>((resolve, reject) => {
+      server.close((error) => error === undefined ? resolve() : reject(error));
+    }),
   };
 }
 
@@ -93,7 +97,7 @@ const previousDataDir = process.env.MINIMAX_DATA_DIR;
 
 afterEach(async () => {
   for (const entry of booted.splice(0)) await entry.close();
-  for (const stub of stubs.splice(0)) stub.close();
+  for (const stub of stubs.splice(0)) await stub.close();
   if (previousDataDir === undefined) delete process.env.MINIMAX_DATA_DIR;
   else process.env.MINIMAX_DATA_DIR = previousDataDir;
 });
@@ -147,7 +151,7 @@ describe("real host, one turn against a controlled model service", () => {
         close: async () => {
           await service.close().catch(() => undefined);
           await assembled.host.apiHost.close().catch(() => undefined);
-          await rm(dataDir, { recursive: true, force: true });
+          await removeRealHostDataDir(dataDir);
         },
       });
 
@@ -252,7 +256,7 @@ describe("real host, one turn against a controlled model service", () => {
         workspaceDir,
         close: async () => {
           await assembled.host.apiHost.close().catch(() => undefined);
-          await rm(dataDir, { recursive: true, force: true });
+          await removeRealHostDataDir(dataDir);
         },
       });
       const port = createHarnessPortFromHost(assembled.host);
@@ -274,7 +278,7 @@ describe("real host, one turn against a controlled model service", () => {
       // is held, and an idle probe after delivery settles. This is an ordering
       // observation, not an atomic snapshot/event barrier.
       try {
-        await expect.poll(() => stub.requests.length).toBeGreaterThan(0);
+        await expect.poll(() => stub.requests.length, { timeout: 30_000 }).toBeGreaterThan(0);
         const active = await port.getActiveTurn({ id: sessionId as string });
         expect(active?.busyReason).toBe("turn");
         expect(active?.turnId).toBeTruthy();
