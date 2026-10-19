@@ -924,6 +924,13 @@ export function createWebuiApplication(
       // unread restore drops the count for the session being opened rather than
       // raising the badge the user is looking at.
       if (initialSessionId !== undefined) selectSession(initialSessionId);
+      // The home slot is a catalogue context like any other, and `select` only
+      // points at its key — nothing read it. `refreshInspection` needs a
+      // sessionId and `loadModels` had only the settings panel as a caller, so a
+      // boot that landed on the new-task screen left the composer's Model picker
+      // holding an empty catalogue and therefore rendering it disabled until the
+      // user opened a conversation. Read whichever context `select` just chose.
+      void modelsWorkflows.loadModels(initialSessionId);
       unread.hydrate(initialSessionId ?? readActiveSessionId());
       channel = deps.openEventChannel();
       detach = events.attach(channel);
