@@ -369,7 +369,7 @@ export function WebuiClientFoundationApp(
   const [dismissedUsageNoticeKey, setDismissedUsageNoticeKey] = useState<
     string | undefined
   >();
-  // The rail's own state (collapse, search, pins/stars/project names) and its
+  // The rail's own state (collapse, search, pins and project names) and its
   // row actions live in `./use-session-rail-actions.js`; it is called below,
   // once the session it acts on is resolved.
   // The selected slot's live stream, read through the application's published
@@ -583,7 +583,6 @@ export function WebuiClientFoundationApp(
     railPage,
     railTreePage,
     pinnedSessions,
-    starredSessions,
     pinnedProjects,
     projectNames,
     onRenameProject: handleRenameProject,
@@ -591,7 +590,6 @@ export function WebuiClientFoundationApp(
     onArchiveProject: handleArchiveProject,
     onRenameSession: handleRenameSession,
     onToggleSessionPin: handleToggleSessionPin,
-    onToggleSessionStar: handleToggleSessionStar,
     onArchiveSession: handleArchiveSession,
     onForkSession: handleForkSession,
     onCopySession: handleCopySession,
@@ -629,16 +627,14 @@ export function WebuiClientFoundationApp(
   // subscription covers every row); and `getActiveTurn` repairs what the stream
   // never delivered.
   // The activity slice lives on a single application store, not in component
-  // state. The shell subscribes to the slice; the application unread controller
-  // owns the writes and the hydration ordering.
+  // state. The shell subscribes to the slice; the application activity
+  // controller owns its writes.
   // The activity slice, the reconnect nonce and every reaction that keeps them
   // current live in `./use-shell-activity-wiring.js`.
   // The wiring's capabilities are stable for the component's whole life: they
   // read the application through a ref, so the hook's effects run when the
   // session, the rail page or the reconnect nonce changes — not on every render.
-  // A fresh closure per render made the unread restore re-run on every render,
-  // which the browser caught as `Maximum update depth exceeded` from the store's
-  // own notification (the `session-activity` probes exist for the same reason).
+  // Stable wiring keeps activity probes from re-running on every render.
   const applicationRef = useRef(application);
   applicationRef.current = application;
   const activityWiring = useMemo(
@@ -646,10 +642,8 @@ export function WebuiClientFoundationApp(
       onChannelReady: (listener: () => void) =>
         applicationRef.current.onChannelReady(listener),
       select: (id: string | undefined) => applicationRef.current.select(id),
-      markRead: (id: string) => applicationRef.current.unread.markRead(id),
-      seed: (sessions: Parameters<typeof application.unread.seed>[0]) =>
-        applicationRef.current.unread.seed(sessions),
-      hydrate: (id: string | undefined) => applicationRef.current.unread.hydrate(id),
+      seed: (sessions: Parameters<typeof application.sessionActivity.seed>[0]) =>
+        applicationRef.current.sessionActivity.seed(sessions),
       // Interest, and the probe per identity the scheduler issues from it. The
       // shared probe already deduplicates a same-session probe, so one request per
       // visible session is one round trip per newly interesting session — and none
@@ -670,7 +664,7 @@ export function WebuiClientFoundationApp(
                 .probe(session.sessionId)
                 .then((active) => {
                   if (!signal.isCurrent()) return;
-                  applicationRef.current.unread.applyActiveTurn(
+                  applicationRef.current.sessionActivity.applyActiveTurn(
                     session.sessionId,
                     active,
                     Date.now(),
@@ -733,7 +727,7 @@ export function WebuiClientFoundationApp(
         }
       : undefined;
 
-  // The application's selection, the unread controller's reactions and the
+  // The application's selection, the activity controller's reactions and the
   // clock tick live in `./use-shell-activity-wiring.js`.
 
   // The panel's per-session state and its writers live in
@@ -833,10 +827,10 @@ export function WebuiClientFoundationApp(
                 projectRecords, projectLoadError: projectState.error, query: railSearchQuery,
                 loading, onLoadMore: loadMore, selectedSessionId, activity: sessionActivity,
                 now: activityNow, onCreateTaskInProject: (project) => startNewTask(project.workspaceDir),
-                error: pageError, pinnedSessions, starredSessions, pinnedProjects, projectNames,
+                error: pageError, pinnedSessions, pinnedProjects, projectNames,
                 onRenameProject: handleRenameProject, onToggleProjectPin: handleToggleProjectPin,
                 onArchiveProject: handleArchiveProject, onRenameSession: handleRenameSession,
-                onToggleSessionPin: handleToggleSessionPin, onToggleSessionStar: handleToggleSessionStar,
+                onToggleSessionPin: handleToggleSessionPin,
                 onArchiveSession: handleArchiveSession, onForkSession: handleForkSession,
                 onCopySession: handleCopySession, onExportSession: handleExportSession,
                 onDeleteSession: handleDeleteSession,

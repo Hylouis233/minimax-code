@@ -114,8 +114,13 @@ export function WebuiIconChevronDown({ className }: WebuiIconProps): ReactElemen
   );
 }
 
-/** Filled disclosure arrow used by expandable rows in the sidebar. */
+/** Outline disclosure chevron used by pinned and project section headers. */
 export function WebuiIconSessionDisclosure({ className }: WebuiIconProps): ReactElement {
+  return <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true" className={className}><path d="m4.25 2.5 3.5 3.5-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+}
+
+/** Filled disclosure arrow retained for expandable parent-session rows. */
+export function WebuiIconSessionTreeDisclosure({ className }: WebuiIconProps): ReactElement {
   return <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true" className={className}><path d="M4.25 2.75 8 6l-3.75 3.25v-6.5Z" fill="currentColor" /></svg>;
 }
 
@@ -226,6 +231,15 @@ export function WebuiIconFolder({ className }: WebuiIconProps): ReactElement {
   );
 }
 
+/** Sidebar conversation glyph used by individually pinned sessions. */
+export function WebuiIconSession({ className }: WebuiIconProps): ReactElement {
+  return (
+    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
+      <path d="M10 2.2c-4.31 0-7.8 3.12-7.8 6.97 0 1.53.56 2.94 1.51 4.08L3.1 17.6l4.49-1.57c.76.25 1.57.39 2.41.39 4.31 0 7.8-3.12 7.8-6.97S14.31 2.2 10 2.2Z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 /** Project/session row action — the horizontal more-actions glyph. */
 export function WebuiIconMore({ className }: WebuiIconProps): ReactElement {
   return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}><path d="M2.90039 6.75C3.53534 6.75021 4.0498 7.26539 4.0498 7.90039C4.04959 8.53521 3.53521 9.04959 2.90039 9.0498C2.26539 9.0498 1.75021 8.53534 1.75 7.90039C1.75 7.26526 2.26526 6.75 2.90039 6.75ZM7.90039 6.75C8.53534 6.75021 9.0498 7.26539 9.0498 7.90039C9.04959 8.53521 8.53521 9.04959 7.90039 9.0498C7.26539 9.0498 6.75021 8.53534 6.75 7.90039C6.75 7.26526 7.26526 6.75 7.90039 6.75ZM12.9004 6.75C13.5353 6.75021 14.0498 7.26539 14.0498 7.90039C14.0496 8.53521 13.5352 9.04959 12.9004 9.0498C12.2654 9.0498 11.7502 8.53534 11.75 7.90039C11.75 7.26526 12.2653 6.75 12.9004 6.75Z" fill="currentColor" /></svg>;
@@ -234,72 +248,6 @@ export function WebuiIconMore({ className }: WebuiIconProps): ReactElement {
 /** Project row action — the create-task plus glyph. */
 export function WebuiIconProjectAdd({ className }: WebuiIconProps): ReactElement {
   return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}><path d="M8 3C8.27614 3 8.5 3.22386 8.5 3.5V7.5H12.5C12.7761 7.5 13 7.72386 13 8C13 8.27614 12.7761 8.5 12.5 8.5H8.5V12.5C8.5 12.7761 8.27614 13 8 13C7.72386 13 7.5 12.7761 7.5 12.5V8.5H3.5C3.22386 8.5 3 8.27614 3 8C3 7.72386 3.22386 7.5 3.5 7.5H7.5V3.5C7.5 3.22386 7.72386 3 8 3Z" fill="currentColor" /></svg>;
-}
-
-/**
- * The five-pointed star, outline until starred and a solid fill after.
- *
- * The one glyph in this file that shows *state* rather than the action its
- * button performs, and deliberately so. The pin's two states are a pin and a
- * slashed pin because a slash means "remove" across this whole icon
- * vocabulary; nobody reads a filled star as "un-star", and the outline/filled
- * pair is what Gmail, Mail and Notion all use. Reusing the pin's convention
- * here would have made the rail internally consistent and externally wrong.
- *
- * `currentColor` rather than a literal, because the filled star is yellow and
- * that yellow is a token which flips with the theme (`--text_status_banana`).
- * Ten vertices: five points alternating with five notches.
- */
-export function WebuiIconSessionStar({
-  className,
-  starred = false,
-}: WebuiIconProps & { starred?: boolean }): ReactElement {
-  return starred ? (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      aria-hidden="true"
-      data-webui-star="filled"
-      className={className}
-    >
-      <path d="M8 1.6L9.7 6.05L14.47 6.3L10.76 9.3L12 13.9L8 11.3L4 13.9L5.24 9.3L1.53 6.3L6.3 6.05Z" fill="currentColor" />
-    </svg>
-  ) : (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      aria-hidden="true"
-      data-webui-star="outline"
-      className={className}
-    >
-      <path
-        d="M8 1.6L9.7 6.05L14.47 6.3L10.76 9.3L12 13.9L8 11.3L4 13.9L5.24 9.3L1.53 6.3L6.3 6.05Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-/**
- * The persistent "this row is a favourite" mark.
- *
- * Same argument as the pin's mark, and the same place: the star button only
- * exists while the row is hovered, so without this a starred session is
- * invisible everywhere except the tab the reader has to go and open.
- */
-export function WebuiIconSessionStarMark({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}>
-      <path d="M8 1.6L9.7 6.05L14.47 6.3L10.76 9.3L12 13.9L8 11.3L4 13.9L5.24 9.3L1.53 6.3L6.3 6.05Z" fill="currentColor" />
-    </svg>
-  );
 }
 
 /**
@@ -361,6 +309,15 @@ export function WebuiIconContextFeedback({ className }: WebuiIconProps): ReactEl
 
 export function WebuiIconContextExport({ className }: WebuiIconProps): ReactElement {
   return <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className={className}><path d="M9.25 2.43701C9.52624 2.43701 9.75 2.66077 9.75 2.93701V9.21973H12.0918L10.5312 7.65918C10.3561 7.48413 10.3561 7.20313 10.5312 7.02808C10.7063 6.85303 10.9873 6.85303 11.1624 7.02808L14.0624 9.92808C14.2375 10.1031 14.2375 10.3842 14.0624 10.5592L11.1624 13.4592C10.9873 13.6342 10.7063 13.6342 10.5312 13.4592C10.3561 13.2842 10.3561 13.0031 10.5312 12.8281L12.0918 11.2676H9.75V17.563C9.75 17.8392 9.52624 18.063 9.25 18.063C8.97376 18.063 8.75 17.8392 8.75 17.563V11.2676H6.4082L7.9688 12.8281C8.1439 13.0031 8.1439 13.2842 7.9688 13.4592C7.79373 13.6342 7.5127 13.6342 7.33764 13.4592L4.43726 10.5592C4.26212 10.3842 4.26212 10.1031 4.43726 9.92808L7.33764 7.02808C7.5127 6.85303 7.79373 6.85303 7.9688 7.02808C8.1439 7.20313 8.1439 7.48413 7.9688 7.65918L6.4082 9.21973H8.75V2.93701C8.75 2.66077 8.97376 2.43701 9.25 2.43701Z" fill="currentColor" /><path d="M2.4375 14.0625C2.71484 14.0625 2.9375 14.2852 2.9375 14.5625V16.25C2.9375 16.5566 3.19336 16.8125 3.5 16.8125H16.5C16.8066 16.8125 17.0625 16.5566 17.0625 16.25V14.5625C17.0625 14.2852 17.2852 14.0625 17.5625 14.0625C17.8398 14.0625 18.0625 14.2852 18.0625 14.5625V16.25C18.0625 17.3184 17.1934 18.1875 16.125 18.1875H3.875C2.80664 18.1875 1.9375 17.3184 1.9375 16.25V14.5625C1.9375 14.2852 2.16016 14.0625 2.4375 14.0625Z" fill="currentColor" /></svg>;
+}
+
+/** Down arrow into a tray — import a conversation file into the local session list. */
+export function WebuiIconSessionImport({ className }: WebuiIconProps): ReactElement {
+  return (
+    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
+      <path d="M10 2.75v8m0 0-3-3m3 3 3-3M3.5 12.25v2.5c0 .83.67 1.5 1.5 1.5h10c.83 0 1.5-.67 1.5-1.5v-2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
 
 export function WebuiIconContextTrash({ className }: WebuiIconProps): ReactElement {

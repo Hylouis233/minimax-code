@@ -61,11 +61,9 @@ describe("the shell keeps its startup duties", () => {
   });
 
   it("leaves the lifecycle to the entry", () => {
-    // One construct, one start, one dispose per boot, and the start carries the
-    // route so unread hydration sees the selected session before its first write.
+    // One construct, one start and one dispose per boot.
     expect(main).toContain("application.start({ initialSessionId:");
     expect(main).toContain("application.dispose()");
-    expect(main).toContain("unreadStorage:");
   });
 
   it("leaves the error boundary at the composition root", () => {

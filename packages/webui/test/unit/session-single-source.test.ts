@@ -1,7 +1,7 @@
 // The single session state source.
 //
 // The `sessions` owner holds the session store (the single writable copy), the
-// catalog read model, unread hydration ordering, and the per-session context-window
+// catalog read model, per-session activity ownership, and the context-window
 // consumption published for the composer's ring. This file is a **check** rather
 // than a description: these are the assertions, so a second copy introduced later
 // fails here rather than being noticed in review.
@@ -22,8 +22,8 @@ const flat = (text: string): string => text.replace(/\s+/gu, " ");
  * Every `client/**` module, as a path relative to `client/`.
  *
  * Recursive on purpose, and rooted at the whole client rather than one layer: the
- * unread controller now lives in `features/sessions/application/unread.ts`, so a
- * walker that only saw `application/**` would pass *because it could no longer
+ * activity controller lives in `features/sessions/application`, so a walker
+ * that only saw `application/**` would pass *because it could no longer
  * find* the second constructor — the exact failure this suite exists to catch.
  */
 const appModules = (): string[] => {
@@ -49,17 +49,13 @@ describe("the session state source is single", () => {
     expect(holders).toEqual(["application/session-store.ts"]);
   });
 
-  it("constructs the unread controller in exactly one module", () => {
+  it("constructs the session activity controller in exactly one module", () => {
     const callers = appModules().filter((name) =>
-      read(name).includes("createWebuiUnreadController("),
+      read(name).includes("createWebuiSessionActivityController("),
     );
-    // The module that defines it, plus the composition root that creates it.
-    // Paths are relative to `client/`, so each owner's home is part of the
-    // expected value: the store stays in the application layer (it owns the
-    // state container), while the unread controller belongs to Sessions.
     expect(callers.sort()).toEqual([
       "application/create-application.ts",
-      "features/sessions/application/unread.ts",
+      "features/sessions/application/session-activity-controller.ts",
     ]);
   });
 

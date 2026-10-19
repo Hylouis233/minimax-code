@@ -15,13 +15,13 @@ import { describe, expect, it } from "vitest";
 import { createWebuiEventCoordinator } from "../../src/client/features/turn/application/event-coordinator.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 import { createWebuiStreamLeaseController } from "../../src/client/features/turn/application/stream-lease-controller.js";
-import { createWebuiUnreadController } from "../../src/client/features/sessions/application/unread.js";
+import { createWebuiSessionActivityController } from "../../src/client/features/sessions/application/session-activity-controller.js";
 import { createWebuiGoalSessionOwners } from "../../src/client/features/goal/application/goal-session-owners.js";
 
 function coordinator() {
   const store = createWebuiSessionStore();
   const leases = createWebuiStreamLeaseController(store);
-  const unread = createWebuiUnreadController({ store });
+  const activity = createWebuiSessionActivityController(store);
   // The permanent goal route, installed exactly as the assembly installs it: the
   // owner is the application's, so a goal event commits with nothing registered.
   const goals = createWebuiGoalSessionOwners({ store });
@@ -29,8 +29,7 @@ function coordinator() {
   const events = createWebuiEventCoordinator({
     store,
     leases,
-    readActiveSessionId: () => store.getSelectedSessionId(),
-    unread,
+    activity,
     routes: {
       setGoal: (sessionId, goal) => goals.owner(sessionId).applyGoal(goal),
       refreshGoal: (sessionId) => goals.owner(sessionId).refreshGoal(),

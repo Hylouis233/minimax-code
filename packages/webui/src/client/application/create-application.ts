@@ -90,9 +90,9 @@ import {
 } from "../features/turn/application/turn-coordinator.js";
 import type { WebuiTurnCoordinatorDeps } from "../features/turn/application/turn-coordinator.js";
 import {
-  createWebuiUnreadController,
-  type WebuiUnreadController,
-} from "../features/sessions/application/unread.js";
+  createWebuiSessionActivityController,
+  type WebuiSessionActivityController,
+} from "../features/sessions/application/session-activity-controller.js";
 import {
   createWebuiComposerStore,
   type WebuiComposerStore,
@@ -175,18 +175,8 @@ export interface WebuiApplicationDeps {
   readonly turnReview?: WebuiTurnReviewPort;
   readonly loadMessages?: WebuiClientMessageLoader;
   /**
-   * The unread storage adapter (`platform/storage.ts`), injected because
-   * the application layer may not import infrastructure. Absent degrades to a
-   * no-op: hydration completes immediately against no stored counts, which is
-   * the correct behaviour for SSR and unit tests.
-   */
-  readonly unreadStorage?: {
-    readonly read?: () => Readonly<Record<string, number>>;
-    readonly write?: (counts: Readonly<Record<string, number>>) => void;
-  };
-  /**
    * The new-task workspace's persisted "no project" choice
-   * (`platform/storage.ts`), injected for the same reason as `unreadStorage`.
+   * (`platform/storage.ts`), injected because the application may not import infrastructure.
    * Absent reads as "nothing was ever cleared" and drops the write, which is
    * what a host with no storage (SSR, unit tests) means.
    */
@@ -222,7 +212,7 @@ export interface WebuiApplicationDeps {
   readonly slices?: WebuiPortSlices;
   /**
    * The session-file import the session workflows submit through. Injected for
-   * the same reason as `unreadStorage`: the application layer may not import
+   * because the application layer may not import
    * `platform/`.
    */
   readonly sessionImport?: Parameters<typeof createWebuiSessionWorkflows>[0]["importSession"];
@@ -274,14 +264,11 @@ export interface WebuiApplication {
    */
   readonly state: () => WebuiApplicationLifecycleState;
   /**
-   * Hydrate persisted browser state for `initialSessionId`, install the
-   * assembly's routes and open the one event ingress.
+   * Install the assembly's routes and open the one event ingress.
    *
    * Idempotent while started, and a refusal (returning `false`, opening
    * nothing) after disposal. The initial selection is passed in rather than
-   * read later, because the route has to be known *before* unread hydration:
-   * `hydrate` drops the stored count for the session being opened, so an
-   * unread value hydrated without it is the badge the user was about to read.
+   * read later, so the application store has the right selection before ingress.
    */
   readonly start: (options?: WebuiApplicationStart) => boolean;
   /** The current application snapshot; stable until something changes. */
@@ -336,8 +323,8 @@ export interface WebuiApplication {
   readonly transcriptHistory: WebuiTranscriptHistoryOwner;
   /** Message actions exposed to transcript UI as application commands. */
   readonly transcriptCommands: WebuiTranscriptCommands;
-  /** The one owner of unread hydration ordering. */
-  readonly unread: WebuiUnreadController;
+  /** The one owner of per-session activity writes. */
+  readonly sessionActivity: WebuiSessionActivityController;
   /** The one owner of composer drafts and input history. */
   readonly composer: WebuiComposerStore;
   readonly composerController: WebuiComposerController;
@@ -480,17 +467,7 @@ export function createWebuiApplication(
   };
   const readActiveSessionId =
     deps.readActiveSessionId ?? (() => store.getSelectedSessionId());
-  // The one unread controller: hydration ordering and the single persistence
-  // writer. It is *not* hydrated here: hydration is the one thing that reads
-  // persisted browser state, so it belongs to `start`, after the initial route
-  // is known. `recordEvent` stays gated on the hydration flag, and the ingress
-  // is opened after hydration in the same call, so the ordering guarantee is
-  // unchanged.
-  const unread = createWebuiUnreadController({
-    store,
-    ...(deps.unreadStorage?.read ? { read: deps.unreadStorage.read } : {}),
-    ...(deps.unreadStorage?.write ? { write: deps.unreadStorage.write } : {}),
-  });
+  const sessionActivity = createWebuiSessionActivityController(store);
   const composer = deps.composer ?? createWebuiComposerStore();
   // The two fence cells. Created once per application, because the coordinator
   // that uses one is constructed on every render and a counter living in it
@@ -557,8 +534,7 @@ export function createWebuiApplication(
   const events = createWebuiEventCoordinator({
     store,
     leases,
-    readActiveSessionId,
-    unread,
+    activity: sessionActivity,
     // The permanent routes, installed here — before `start` opens ingress —
     // and outside anything a view can replace, so no surface can displace them.
     routes: {
@@ -921,8 +897,7 @@ export function createWebuiApplication(
       if (lifecycle === "started") return true;
       const initialSessionId = options?.initialSessionId;
       // Order matters: the route the caller booted at is applied first, so the
-      // unread restore drops the count for the session being opened rather than
-      // raising the badge the user is looking at.
+      // route the caller booted at is applied before model reads.
       if (initialSessionId !== undefined) selectSession(initialSessionId);
       // The home slot is a catalogue context like any other, and `select` only
       // points at its key — nothing read it. `refreshInspection` needs a
@@ -931,7 +906,6 @@ export function createWebuiApplication(
       // holding an empty catalogue and therefore rendering it disabled until the
       // user opened a conversation. Read whichever context `select` just chose.
       void modelsWorkflows.loadModels(initialSessionId);
-      unread.hydrate(initialSessionId ?? readActiveSessionId());
       channel = deps.openEventChannel();
       detach = events.attach(channel);
       lifecycle = "started";
@@ -965,7 +939,7 @@ export function createWebuiApplication(
     turnReview,
     transcriptHistory,
     transcriptCommands,
-    unread,
+    sessionActivity,
     composer,
     composerController,
     portSlices: slices,

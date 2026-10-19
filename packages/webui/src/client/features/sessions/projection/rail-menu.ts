@@ -13,7 +13,6 @@ export type WebuiRailMenuSubject = "session" | "child-session" | "project";
 /** The state a label may depend on. */
 export interface WebuiRailMenuState {
   readonly pinned: boolean;
-  readonly starred: boolean;
   readonly archived: boolean;
 }
 
@@ -48,8 +47,6 @@ export const WEBUI_RAIL_MENU: Readonly<Record<WebuiRailMenuSubject, readonly Web
     { kind: "item", key: "delete", label: "删除", danger: true },
   ],
   session: [
-    { kind: "item", key: "pin", label: (state) => (state.pinned ? "取消置顶" : "置顶") },
-    { kind: "item", key: "star", label: (state) => (state.starred ? "取消收藏" : "收藏") },
     { kind: "item", key: "rename", label: "重命名" },
     { kind: "item", key: "archive", label: (state) => (state.archived ? "取消归档" : "归档") },
     { kind: "divider", key: "fork-divider" },

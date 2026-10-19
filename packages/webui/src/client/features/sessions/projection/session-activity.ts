@@ -43,12 +43,6 @@ export interface WebuiSessionActivity {
   readonly lastActivityAt: number;
   /** Present only while a turn holds the session. */
   readonly busy?: WebuiSessionBusy;
-  /**
-   * Turns that finished while the user was looking elsewhere. `undefined` and
-   * `0` both mean "nothing waiting"; the rail treats them identically, so a
-   * read session carries no key rather than a zero.
-   */
-  readonly unread?: number;
 }
 
 export type WebuiSessionActivityMap = Readonly<Record<string, WebuiSessionActivity>>;
@@ -130,7 +124,6 @@ export function seedWebuiSessionActivity(
     next[session.sessionId] = {
       lastActivityAt: session.updatedAt,
       ...(current?.busy ? { busy: current.busy } : {}),
-      ...(current?.unread ? { unread: current.unread } : {}),
     };
     changed = true;
   }
@@ -146,7 +139,6 @@ export function seedWebuiSessionActivity(
 export function reduceWebuiSessionActivity(
   previous: WebuiSessionActivityMap,
   event: WebuiRuntimeEvent,
-  options: { readonly activeSessionId?: string } = {},
 ): WebuiSessionActivityMap {
   if (!ACTIVITY_EVENT_TYPES.has(event.type)) return previous;
   const sessionId = readWebuiEventSessionId(event);
@@ -169,7 +161,6 @@ export function reduceWebuiSessionActivity(
       [sessionId]: {
         lastActivityAt,
         busy,
-        ...(current?.unread ? { unread: current.unread } : {}),
       },
     };
   }
@@ -182,18 +173,10 @@ export function reduceWebuiSessionActivity(
       // for the probe to clear.
       return { ...previous, [sessionId]: { lastActivityAt } };
     }
-    // A finished turn counts as unread only for a session the user is not
-    // sitting in. The open session is the one place where "3 new turns" is
-    // noise rather than news, and a badge over the row being read is the
-    // fastest way to make the badge stop being read at all.
-    const unread =
-      event.type === "session.finish" && options.activeSessionId !== sessionId
-        ? (current.unread ?? 0) + 1
-        : current.unread;
-    if (!current.busy && current.lastActivityAt === lastActivityAt && unread === current.unread) {
+    if (!current.busy && current.lastActivityAt === lastActivityAt) {
       return previous;
     }
-    return { ...previous, [sessionId]: { lastActivityAt, ...(unread ? { unread } : {}) } };
+    return { ...previous, [sessionId]: { lastActivityAt } };
   }
 
   // `session.status_updated` and friends: activity, no change of busy state.
@@ -203,62 +186,8 @@ export function reduceWebuiSessionActivity(
     [sessionId]: {
       lastActivityAt,
       ...(current?.busy ? { busy: current.busy } : {}),
-      ...(current?.unread ? { unread: current.unread } : {}),
     },
   };
-}
-
-/**
- * Clear a session's unread count -- the user opened it.
- *
- * Drops the key rather than storing a zero so a read session and a session that
- * never ran are the same object, and so the stored map only ever holds sessions
- * that are actually waiting.
- */
-export function markWebuiSessionRead(
-  previous: WebuiSessionActivityMap,
-  sessionId: string,
-): WebuiSessionActivityMap {
-  const current = previous[sessionId];
-  if (!current?.unread) return previous;
-  const { unread: _unread, ...rest } = current;
-  return { ...previous, [sessionId]: rest };
-}
-
-/**
- * Re-apply stored counts to a freshly built map.
- *
- * Restored on top of the seeded state rather than merged into it, so a count
- * survives the list refresh that would otherwise rebuild the map around
- * `updatedAt` alone. Sessions the user currently has open are dropped: the
- * open transcript already shows them.
- */
-export function applyWebuiUnreadCounts(
-  previous: WebuiSessionActivityMap,
-  counts: Readonly<Record<string, number>>,
-  activeSessionId?: string,
-): WebuiSessionActivityMap {
-  const entries = Object.entries(counts).filter(
-    ([sessionId, count]) => count > 0 && sessionId !== activeSessionId,
-  );
-  if (entries.length === 0) return previous;
-  const next = { ...previous };
-  for (const [sessionId, count] of entries) {
-    const current = next[sessionId];
-    // The restored count is a floor, not an answer. It was written by an
-    // earlier run of this same code and can only be as fresh as the last
-    // successful write, whereas the live value has been counting events since.
-    // Overwriting with it would let a badge shrink on its own the moment the
-    // rail re-rendered -- and a write that failed (quota, private mode) makes
-    // that guaranteed rather than merely possible, because what is on disk is
-    // then permanently behind.
-    const live = current?.unread ?? 0;
-    next[sessionId] = {
-      ...(current ?? { lastActivityAt: 0 }),
-      unread: live > count ? live : count,
-    };
-  }
-  return next;
 }
 
 /**
@@ -285,16 +214,13 @@ export function applyWebuiActiveTurn(
   if (current?.busy?.turnId === busy.turnId && current.busy.busyReason === busy.busyReason) {
     return previous;
   }
-  // Only `busy` is the probe's to write. Carrying `unread` across matters: this
-  // answer is asked on a timer and can land after the turn it describes has
-  // already finished, so rebuilding the entry without it would read as "the
-  // user went back and looked".
+  // Only `busy` is the probe's to write; its answer can land after the turn it
+  // describes has already finished, so preserve the newer activity timestamp.
   return {
     ...previous,
     [sessionId]: {
       lastActivityAt: current?.lastActivityAt ?? 0,
       busy,
-      ...(current?.unread ? { unread: current.unread } : {}),
     },
   };
 }

@@ -1,4 +1,4 @@
-// The rail's overlay state: the stars and pins of sessions, and the pins
+// The rail's overlay state: the pins of sessions, and the pins
 // and names of projects.
 //
 // It used to live in the shell's rail hook, which read the platform storage
@@ -15,8 +15,8 @@
 // whole map, and the state starts from what storage already holds.
 import { useCallback, useState } from "react";
 
-/** The three per-session overlays the rail keeps for each row. */
-export type WebuiSessionOverlayKind = "stars" | "pins" | "archives";
+/** The per-session overlay retained by the rail. */
+export type WebuiSessionOverlayKind = "pins";
 
 /** What the overlays need from browser storage, satisfied by that adapter. */
 export interface WebuiRailOverlayStorage {
@@ -38,12 +38,11 @@ export interface WebuiRailOverlayStorage {
 
 export interface SessionRailOverlays {
   readonly pinnedSessions: Record<string, boolean>;
-  readonly starredSessions: Record<string, boolean>;
   readonly pinnedProjects: Record<string, boolean>;
   readonly projectNames: Record<string, string>;
-  /** Toggle one session's star or pin and take the persisted map as truth. */
+  /** Toggle one session's pin and take the persisted map as truth. */
   readonly toggleSessionOverlay: (
-    kind: Extract<WebuiSessionOverlayKind, "stars" | "pins">,
+    kind: WebuiSessionOverlayKind,
     sessionId: string,
   ) => void;
   readonly toggleProjectPin: (projectKey: string) => void;
@@ -57,9 +56,6 @@ export function useSessionRailOverlays(
   const [pinnedSessions, setPinnedSessions] = useState<Record<string, boolean>>(
     () => storage.readSessionOverlay("pins"),
   );
-  const [starredSessions, setStarredSessions] = useState<Record<string, boolean>>(
-    () => storage.readSessionOverlay("stars"),
-  );
   const [pinnedProjects, setPinnedProjects] = useState<Record<string, boolean>>(
     () => storage.readProjectPins(),
   );
@@ -67,10 +63,9 @@ export function useSessionRailOverlays(
     () => storage.readProjectNames(),
   );
   const toggleSessionOverlay = useCallback(
-    (kind: "stars" | "pins", sessionId: string) => {
+    (kind: WebuiSessionOverlayKind, sessionId: string) => {
       const toggled = storage.toggleSessionOverlay(kind, sessionId);
-      if (kind === "pins") setPinnedSessions(toggled);
-      else setStarredSessions(toggled);
+      setPinnedSessions(toggled);
     },
     [storage],
   );
@@ -88,7 +83,6 @@ export function useSessionRailOverlays(
   );
   return {
     pinnedSessions,
-    starredSessions,
     pinnedProjects,
     projectNames,
     toggleSessionOverlay,

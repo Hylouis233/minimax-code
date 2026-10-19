@@ -12,8 +12,8 @@
 //      submits.
 //
 //   2. **A delete left state behind.** Removing a session dropped its catalog
-//      entity and nothing else: the session record, its activity entry (unread
-//      badge + busy hint) and the composer slot's draft and history all
+//      entity and nothing else: the session record, its activity entry (busy
+//      hint and last activity time) and the composer slot's draft and history all
 //      survived, and a load already in flight could put the entity straight
 //      back. `purgeSession` / `purgeSlot` and the workflow's delete fence close
 //      that hole.
@@ -93,7 +93,7 @@ describe("R7 · the session store's purge", () => {
     store.updateSession("s1", (current) => ({ ...current, sending: true }));
     store.updateActivity((current): WebuiSessionActivityMap => ({
       ...current,
-      s1: { lastActivityAt: 5, unread: 2 },
+      s1: { lastActivityAt: 5 },
     }));
     const listener = vi.fn();
     store.subscribe(listener);
@@ -263,7 +263,7 @@ describe("R7 · the delete workflow teardown", () => {
     store.updateSession("a", (current) => ({ ...current, sending: true }));
     store.updateActivity((current): WebuiSessionActivityMap => ({
       ...current,
-      a: { lastActivityAt: 3, unread: 1 },
+      a: { lastActivityAt: 3 },
     }));
     const composer = createWebuiComposerStore({
       initial: { drafts: { a: "half-written" }, history: { a: ["earlier"] } },
@@ -296,7 +296,7 @@ describe("R7 · the delete workflow teardown", () => {
     store.updateSession("a", (current) => ({ ...current, sending: true }));
     store.updateActivity((current): WebuiSessionActivityMap => ({
       ...current,
-      a: { lastActivityAt: 3, unread: 1 },
+      a: { lastActivityAt: 3 },
     }));
     const composer = createWebuiComposerStore({
       initial: { drafts: { a: "half-written" }, history: { a: ["earlier"] } },
@@ -322,7 +322,7 @@ describe("R7 · the delete workflow teardown", () => {
     // Nothing was purged: a refused delete leaves the session exactly as it was.
     const snapshot = store.getSnapshot();
     expect(snapshot.sessions.get("a")?.sending).toBe(true);
-    expect(snapshot.activity.a).toEqual({ lastActivityAt: 3, unread: 1 });
+    expect(snapshot.activity.a).toEqual({ lastActivityAt: 3 });
     expect(composer.readDraft("a")).toBe("half-written");
     expect(composer.readHistory("a")).toEqual(["earlier"]);
     expect(snapshot.catalog.entities.has("a")).toBe(true);

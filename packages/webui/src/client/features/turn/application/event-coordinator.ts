@@ -289,24 +289,17 @@ export interface WebuiEventCoordinatorDeps {
   /** The permanent owner routes. See `WebuiDomainEventRoutes`. */
   readonly routes: WebuiDomainEventRoutes;
   readonly leases: WebuiStreamLeaseController;
-  readonly readActiveSessionId: () => string | undefined;
-  /**
-   * The unread controller, which owns the activity reduction and gates counted
-   * events on hydration. The coordinator routes every event to it instead of
-   * reducing the activity map itself, so there is one implementation of the
-   * activity write path.
-   */
-  readonly unread: WebuiActivityIngress;
+  /** The session activity controller owns the per-session activity reduction. */
+  readonly activity: WebuiActivityIngress;
 }
 
 /**
  * The activity ingress the coordinator routes events to. A
- * `WebuiUnreadController` satisfies it structurally.
+ * `WebuiSessionActivityController` satisfies it structurally.
  */
 export interface WebuiActivityIngress {
   readonly recordEvent: (
     event: WebuiRuntimeEvent,
-    activeSessionId: string | undefined,
   ) => void;
 }
 
@@ -322,7 +315,7 @@ export interface WebuiEventCoordinator {
 export function createWebuiEventCoordinator(
   deps: WebuiEventCoordinatorDeps,
 ): WebuiEventCoordinator {
-  const { store, leases, readActiveSessionId, unread } = deps;
+  const { store, leases, activity } = deps;
   let unsubscribe: (() => void) | undefined;
 
   const handlersFor = (sessionId: string): WebuiEffectHandlers => ({
@@ -347,11 +340,7 @@ export function createWebuiEventCoordinator(
 
   const handleEvent = (event: WebuiRuntimeEvent): void => {
     if (store.isDisposed()) return;
-    const activeSessionId = readActiveSessionId();
-    // The unread controller owns the activity reduction, and accepts a counted
-    // event only once hydration has completed — one write path, not the shell's
-    // effect plus the coordinator's.
-    unread.recordEvent(event, activeSessionId);
+    activity.recordEvent(event);
     // A workspace-git event carries no session id. It is routed to the
     // application-wide invalidation hook, not a per-session effect, so the
     // workspace panels' git and review queries are invalidated through the

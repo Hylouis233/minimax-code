@@ -20,7 +20,7 @@
 
 import { expect } from "@playwright/test";
 
-import { openApp, test } from "./harness.mjs";
+import { configureFixture, openApp, test } from "./harness.mjs";
 
 const SESSION_PINS = "mavis-webui-session-pins:v1";
 const PROJECT_PINS = "mavis-webui-project-pins:v1";
@@ -57,10 +57,6 @@ function rowOf(page, sessionId) {
   return page.locator(`div:has(> [data-webui-session-link="${sessionId}"])`);
 }
 
-function pinMark(page, sessionId) {
-  return sessionRow(page, sessionId).locator('[data-webui-pin-mark="true"]');
-}
-
 /**
  * The state of the pin glyph in a row's action button, read from the clip path
  * the glyph actually references.
@@ -82,43 +78,14 @@ async function pinButtonLabel(page, sessionId) {
   return rowOf(page, sessionId).locator(".webui-rail-action").first().getAttribute("aria-label");
 }
 
-test("the mark is still there while the row is hovered", async ({ page }) => {
-  await seedPins(page, { sessions: { A: true } });
-  await openApp(page, "#session=A");
-  await expect(pinMark(page, "A")).toBeVisible();
-
-  await rowOf(page, "A").hover();
-  // The strip is `opacity: 0` until now, and `position: absolute` over the
-  // row's right-hand end. Asserting it is actually shown makes the next line
-  // mean something: without this, the hover could be a no-op and the mark
-  // would pass for the wrong reason.
-  await expect(rowOf(page, "A").locator(".webui-session-row-actions")).toHaveCSS("opacity", "1");
-
-  // Wrong when: the mark was rendered inside that strip to begin with. It is
-  // then a second hover affordance, not a standing one -- the row says nothing
-  // until the pointer arrives, which is the state this change started from.
-  await expect(pinMark(page, "A")).toBeVisible();
-});
-
-test("a pinned row shows its pin without being hovered", async ({ page }) => {
+test("a pinned session row has one pin action and no duplicate pin marker", async ({ page }) => {
   await seedPins(page, { sessions: { A: true } });
   await openApp(page, "#session=A");
 
-  // No hover anywhere in this test, on purpose. That is the whole claim: the
-  // mark is standing, not an affordance that appears when the pointer arrives.
-  // Wrong when: the mark is emitted but hidden, or lives inside the hover-only
-  // action strip, in which case the row claims nothing until you point at it.
-  await expect(pinMark(page, "A")).toBeVisible();
-  await expect(pinMark(page, "A").locator("svg")).toBeVisible();
-});
-
-test("a row that is not pinned shows no mark", async ({ page }) => {
-  await seedPins(page, { sessions: { A: true } });
-  await openApp(page, "#session=A");
-
-  // The other half. A rail that marks every row passes the test above.
-  await expect(pinMark(page, "A")).toBeVisible();
-  await expect(pinMark(page, "B")).toHaveCount(0);
+  const row = rowOf(page, "A");
+  await row.hover();
+  await expect(row.locator('[data-webui-pin-mark="true"]')).toHaveCount(0);
+  await expect(row.locator('.webui-rail-action[aria-label^="取消置顶"]')).toHaveCount(1);
 });
 
 test("the pin button offers the unpin glyph on a pinned row", async ({ page }) => {
@@ -166,36 +133,167 @@ test("two pinned rows each get their own clip path", async ({ page }) => {
   }
 });
 
-test("a pinned project shows its pin next to the folder", async ({ page }) => {
+test("a pinned project row keeps the folder icon without an extra pin glyph", async ({ page }) => {
   await seedPins(page, { projects: { [WORKSPACE]: true } });
   await openApp(page, "#session=A");
 
   const projectRow = page.locator(`[data-webui-project-link="${WORKSPACE}"]`);
-  await expect(projectRow.locator('[data-webui-project-pin-mark="true"]')).toBeVisible();
-  // And the negative, in the same render: a project mark that ignores its flag
-  // would pass the assertion above on a rail that draws one unconditionally.
-  await expect(
-    page.locator('[data-webui-project-pin-mark="true"]'),
-  ).toHaveCount(1);
+  await expect(projectRow.locator("svg").first()).toBeVisible();
+  await expect(projectRow.locator('[data-webui-project-pin-mark="true"]')).toHaveCount(0);
 });
 
-test("a pinned child row shows its mark once the parent is expanded", async ({ page }) => {
-  await seedPins(page, { sessions: { C: true } });
+test("section chevrons follow their labels and project folders match pinned session icon size and color", async ({ page }) => {
+  await seedPins(page, { sessions: { A: true } });
   await openApp(page, "#session=A");
 
-  // Closed first: the child row does not exist yet, so a mark assertion before
-  // the click would be asserting on an absent element.
-  await expect(sessionRow(page, "C")).toHaveCount(0);
+  const headers = page.locator('[data-webui-rail-section-header="true"]');
+  await expect(headers).toHaveCount(2);
+  for (const header of await headers.all()) {
+    const alignment = await header.evaluate((element) => {
+      const label = element.querySelector("span").getBoundingClientRect();
+      const icon = element.querySelector("svg").getBoundingClientRect();
+      return {
+        gap: Math.round(icon.left - label.right),
+        marginLeft: getComputedStyle(element.querySelector("svg")).marginLeft,
+      };
+    });
+    expect(alignment.gap).toBe(8);
+    expect(alignment.marginLeft).toBe("0px");
+  }
+
+  const iconStyles = await page.evaluate(() => {
+    const pinned = document.querySelector(".webui-pinned-session-card > svg");
+    const folder = document.querySelector(".webui-project-card > .webui-project-folder-icon");
+    const pinnedStyle = getComputedStyle(pinned);
+    const folderStyle = getComputedStyle(folder);
+    return {
+      pinnedSize: [pinnedStyle.width, pinnedStyle.height],
+      folderSize: [folderStyle.width, folderStyle.height],
+      pinnedColor: pinnedStyle.color,
+      folderColor: folderStyle.color,
+    };
+  });
+  expect(iconStyles.folderSize).toEqual(iconStyles.pinnedSize);
+  expect(iconStyles.folderColor).toBe(iconStyles.pinnedColor);
+});
+
+test("repeatedly collapsing the pinned section keeps the session page mounted", async ({ page }) => {
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  const pinnedProjects = Object.fromEntries(
+    Array.from({ length: 24 }, (_, index) => [`/synthetic/project-${index}`, true]),
+  );
+  await seedPins(page, { sessions: { A: true }, projects: pinnedProjects });
+  await configureFixture(page, () => {
+    window.__fixture.setProjects([
+      {
+        projectId: 1,
+        projectKind: "workspace",
+        workspaceDir: "/synthetic/workspace",
+        pinned: false,
+        hidden: false,
+        orderIndex: 0,
+        recentAtMs: 1_700_000_000_001,
+        latestActivityAtMs: 1_700_000_000_001,
+        sessionCount: 2,
+      },
+      ...Array.from({ length: 80 }, (_, index) => ({
+        projectId: index + 2,
+        projectKind: "workspace",
+        workspaceDir: `/synthetic/project-${index}`,
+        pinned: false,
+        hidden: false,
+        orderIndex: index + 1,
+        recentAtMs: 1_700_000_000_000 - index,
+        latestActivityAtMs: 1_700_000_000_000 - index,
+        sessionCount: 0,
+      })),
+    ]);
+  });
+  await openApp(page, "#session=A");
+
+  const pinnedHeader = page.locator('[data-webui-rail-section-id="pinned"]');
+  for (let index = 0; index < 20; index += 1) {
+    await pinnedHeader.click();
+  }
+
+  await expect(page.locator('[data-webui-session-link="A"]')).toBeVisible();
+  await expect(page.getByPlaceholder("输入消息…（输入 / 唤起命令）")).toBeVisible();
+  expect(pageErrors).toEqual([]);
+});
+
+test("a child row becomes visible once its parent is expanded", async ({ page }) => {
+  await openApp(page, "#session=A");
+
+  // Closed first: the child row stays mounted for its collapse transition but
+  // is hidden and inert until its parent is expanded.
+  await expect(sessionRow(page, "C")).toBeHidden();
 
   await page.locator(".webui-session-disclosure").first().click();
 
-  // This is the row shape the unit suite cannot reach. Child rows render only
-  // when `childrenExpanded` is set, and that is internal `useState` with no
-  // prop -- a node-environment `renderToStaticMarkup` has no way to open. So the
-  // unit test asserts the call site in the source and this one opens it for
-  // real.
+  // This is the row shape the unit suite cannot reach. `childrenExpanded` is
+  // internal `useState` with no prop, so this opens it through the real control.
   await expect(sessionRow(page, "C")).toBeVisible();
-  await expect(pinMark(page, "C")).toBeVisible();
-  // The parent's own state is untouched by the child's.
-  await expect(pinMark(page, "A")).toHaveCount(0);
+});
+
+test("left rail expanders share the pinned animation and parent rows keep their filled disclosure", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await openApp(page, "#session=A");
+
+  const pinnedContent = page.locator('[data-webui-pinned-section="true"]').locator("xpath=..");
+  const projectContent = page.locator('[data-webui-project-sessions="/synthetic/workspace"]').locator("xpath=..");
+  const childDisclosure = page.locator(".webui-session-disclosure").first();
+  const childContent = page.locator('[data-webui-project-child-sessions="A"]').locator("xpath=..");
+
+  const pinnedTransition = await pinnedContent.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return [style.transitionProperty, style.transitionDuration, style.transitionTimingFunction];
+  });
+  const projectTransition = await projectContent.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return [style.transitionProperty, style.transitionDuration, style.transitionTimingFunction];
+  });
+  expect(projectTransition).toEqual(pinnedTransition);
+  expect(await childContent.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return [style.transitionProperty, style.transitionDuration, style.transitionTimingFunction];
+  })).toEqual(pinnedTransition);
+
+  const disclosurePath = await childDisclosure.locator("path").getAttribute("d");
+  expect(disclosurePath).toBe("M4.25 2.75 8 6l-3.75 3.25v-6.5Z");
+
+  await childDisclosure.click();
+  await expect(childContent).toHaveAttribute("aria-hidden", "false");
+  await expect(page.locator('[data-webui-session-link="C"]')).toBeVisible();
+
+  await childDisclosure.click();
+  await expect(childContent).toHaveAttribute("aria-hidden", "true");
+  await expect(page.locator('[data-webui-session-link="C"]')).toBeHidden();
+});
+
+test("projects show six rows initially and reveal the next batch with 更多", async ({ page }) => {
+  await configureFixture(page, () => {
+    window.__fixture.setProjects(Array.from({ length: 8 }, (_, index) => ({
+      projectId: index + 1,
+      projectKind: "workspace",
+      workspaceDir: `/synthetic/project-${index}`,
+      pinned: false,
+      hidden: false,
+      orderIndex: index,
+      recentAtMs: 1_700_000_000_000 - index,
+      latestActivityAtMs: 1_700_000_000_000 - index,
+      sessionCount: 0,
+    })));
+  });
+  await openApp(page, "#session=A");
+
+  const projectRows = page.locator('[data-webui-projects-section] [data-webui-project-link]');
+  await expect(projectRows).toHaveCount(6);
+  const more = page.locator('[data-webui-projects-section]').getByRole("button", { name: "显示更多项目" });
+  await expect(more).toHaveText("更多");
+  await more.click();
+  await expect(projectRows).toHaveCount(8);
+  await expect(more).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Load more" })).toHaveCount(0);
 });

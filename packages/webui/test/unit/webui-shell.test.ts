@@ -26,10 +26,7 @@ import {
 } from "../../src/client/ui/ContextMenu.js";
 import { placeWebuiContextMenu } from "../../src/client/projection/common/context-menu.js";
 import { WebuiInteractionPanel } from "../../src/client/features/interactions/ui/InteractionPanel.public.js";
-import {
-  WebuiProjectList,
-  WebuiSessionList,
-} from "../../src/client/features/sessions/ui/SessionRail.js";
+import { WebuiProjectList } from "../../src/client/features/sessions/ui/SessionRail.js";
 import {
   groupWebuiSessionsByWorkspace,
   resolveDefaultExpandedProjectKey,
@@ -388,23 +385,6 @@ describe("WebUI shell", () => {
     expect(readSessionIdFromHash("#session=session+with+spaces")).toBe(
       "session with spaces",
     );
-    const html = renderToStaticMarkup(
-      createElement(WebuiSessionList, {
-        page: {
-          sessions: [
-            {
-              sessionId: "session-1",
-              agentName: "agent",
-              createdAt: 1,
-              updatedAt: 2,
-            },
-          ],
-          hasMore: false,
-        },
-        loading: false,
-      }),
-    );
-    expect(html).toContain('href="#session=session-1"');
   });
 
   it("projects every persisted message facet independently", () => {
@@ -665,41 +645,6 @@ describe("WebUI shell", () => {
     expect(html).toContain('data-webui-message-list="true"');
   });
 
-  it("renders newest sessions without a competing timestamp and falls back when title is absent", () => {
-    const html = renderToStaticMarkup(
-      createElement(WebuiSessionList, {
-        page: {
-          sessions: [
-            {
-              sessionId: "older-id",
-              agentName: "older-agent",
-              createdAt: 1000,
-              updatedAt: 2000,
-            },
-            {
-              sessionId: "newer-id",
-              agentName: "newer-agent",
-              title: "Named session",
-              createdAt: 3000,
-              updatedAt: 4000,
-            },
-          ],
-          hasMore: false,
-        },
-        loading: false,
-      }),
-    );
-    expect(html.indexOf("Named session")).toBeLessThan(
-      html.indexOf("older-agent"),
-    );
-    expect(html).toContain("older-agent");
-    expect(html).not.toContain(new Date(2000).toLocaleString());
-    expect(html).toContain('data-webui-session-list="true"');
-    // The row's component class is on the anchor, which only exists once there
-    // is a session to render.
-    expect(html).toMatch(/webui-session-card/u);
-  });
-
   it("projects the desktop's project-first rail from session workspaces", () => {
     const sessions = [
       {
@@ -934,51 +879,6 @@ describe("WebUI shell", () => {
     }
   });
 
-  it("shows the bound working directory without offering a directory edit control", () => {
-    const html = renderToStaticMarkup(
-      createElement(WebuiSessionList, {
-        page: {
-          sessions: [
-            {
-              sessionId: "session-1",
-              agentName: "agent",
-              createdAt: 1,
-              updatedAt: 2,
-              workspaceDir: "/tmp/project",
-            },
-          ],
-          hasMore: false,
-        },
-        loading: false,
-      }),
-    );
-    expect(html).toContain("/tmp/project");
-    expect(html).not.toMatch(/edit.*directory|change.*directory/iu);
-  });
-
-  it("renders a legitimate empty shared-history state", () => {
-    const html = renderToStaticMarkup(
-      createElement(WebuiSessionList, {
-        page: { sessions: [], hasMore: false },
-        loading: false,
-      }),
-    );
-    // Chinese, like the rest of the rail. The running and unread views override
-    // this with their own, and "no sessions yet" is false in both of them.
-    expect(html).toContain("暂无会话");
-  });
-
-  it("lets a view name its own empty state", () => {
-    const html = renderToStaticMarkup(
-      createElement(WebuiSessionList, {
-        page: { sessions: [], hasMore: false },
-        loading: false,
-        emptyLabel: "没有未读会话",
-      }),
-    );
-    expect(html).toContain("没有未读会话");
-    expect(html).not.toContain("暂无会话");
-  });
 });
 
 /**
@@ -1166,11 +1066,8 @@ describe("WebUI shell — desktop anatomy", () => {
     // from 6 to 7. The rail import row joined them when session import
     // shipped: it opens a file picker that posts to /session-import, so it is
     // bound rather than a placeholder, and the count moved from 7 to 8. The
-    // three rail view tabs joined them when the project/running/unread switch
-    // shipped: each one changes the list, so they are bound rather than
-    // decorative, and the count moved from 8 to 11. The favourites tab joined
-    // them when starring shipped: it swaps the rail to the starred set, so it
-    // is bound on the same terms, and the count moved from 11 to 12.
+    // the retired rail view tabs and session-favourites control are absent;
+    // the remaining controls are backed by their current actions.
     const html = renderShell();
     const controlTags: string[] = [];
     const re = /<(button|div|a|input|textarea|select)\b[^>]*>/gu;
@@ -1185,7 +1082,7 @@ describe("WebUI shell — desktop anatomy", () => {
         !/(?:^|\s)disabled(?:=|\s|>)/u.test(tag) &&
         !/aria-disabled="true"/u.test(tag),
     );
-    expect(operable).toHaveLength(12);
+    expect(operable).toHaveLength(8);
     expect(html).toMatch(/data-testid="composer-add-menu"/u);
     expect(html).toMatch(/data-webui-sidebar-toggle="true"/u);
     expect(html).toMatch(/data-webui-nav-item="新建任务"/u);
@@ -1198,17 +1095,7 @@ describe("WebUI shell — desktop anatomy", () => {
     expect(html).toMatch(/data-webui-nav-item="导入会话"/u);
     expect(html).toMatch(/data-webui-session-import-input="true"/u);
     expect(html).not.toMatch(/data-webui-nav-item="导入会话"[^>]*\sdisabled/u);
-    // Same for the view tabs. A tab that is operable but does nothing is
-    // the exact shape this test exists to catch, so every one is asserted by
-    // name and none of them may be disabled. A view added to the rail without
-    // being added here would sail past this contract.
-    for (const view of ["projects", "running", "unread", "stars"]) {
-      expect(html, view).toMatch(new RegExp(`data-webui-rail-view="${view}"`, "u"));
-      expect(html, view).not.toMatch(
-        new RegExp(`data-webui-rail-view="${view}"[^>]*\\sdisabled`, "u"),
-      );
-    }
-    expect(html).toMatch(/data-webui-rail-view="projects"[^>]*aria-selected="true"/u);
+    expect(html).not.toMatch(/data-webui-rail-view(?:-active)?=/u);
   });
 
   it("lets the composer take a draft before a session exists", () => {

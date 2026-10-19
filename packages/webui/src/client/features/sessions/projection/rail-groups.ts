@@ -14,6 +14,7 @@ import type { WebuiClientSession } from "../contracts/session-view.js";
 import { workspaceProjectName } from "../../workspace/projection/workspace-name.public.js";
 
 export const PROJECT_SESSION_BATCH_SIZE = 6;
+export const PROJECT_GROUP_BATCH_SIZE = 6;
 
 export interface WebuiProjectGroup {
   readonly key: string;

@@ -1,6 +1,6 @@
 /**
  * The rail's own state and affordances: collapse, session search, the
- * per-session and per-project overlays (pins, stars, project names), and the
+ * per-session and per-project overlays (pins and project names), and the
  * row actions the list dispatches.
  *
  * Extracted from `WebuiClientFoundationApp.tsx`. Everything here changes when
@@ -87,7 +87,6 @@ export interface SessionRailActions {
   readonly railPage: WebuiClientSessionPage;
   readonly railTreePage: WebuiRailTreePage | undefined;
   readonly pinnedSessions: Record<string, boolean>;
-  readonly starredSessions: Record<string, boolean>;
   readonly pinnedProjects: Record<string, boolean>;
   readonly projectNames: Record<string, string>;
   readonly onRenameProject: (project: WebuiProjectGroup) => void;
@@ -95,7 +94,6 @@ export interface SessionRailActions {
   readonly onArchiveProject: (project: WebuiProjectGroup) => void;
   readonly onRenameSession: (session: WebuiClientSession) => void;
   readonly onToggleSessionPin: (session: WebuiClientSession) => void;
-  readonly onToggleSessionStar: (session: WebuiClientSession) => void;
   readonly onArchiveSession: (session: WebuiClientSession) => void;
   readonly onForkSession: (session: WebuiClientSession, createIsolatedWorktree: boolean) => void;
   readonly onCopySession: (session: WebuiClientSession, value: "workspaceDir" | "sessionId") => void;
@@ -117,7 +115,7 @@ export function useSessionRailActions({
   // The overlay state itself belongs to Sessions and is read through that
   // feature's own binding; this hook keeps the rail's UI state and actions.
   const overlays = useSessionRailOverlays(storage);
-  const { pinnedSessions, starredSessions, pinnedProjects, projectNames } = overlays;
+  const { pinnedSessions, pinnedProjects, projectNames } = overlays;
   const [railCollapsed, setRailCollapsed] = useState(false);
   // Rail session search. `railSearchOpen` mirrors whether the input is
   // showing; `railSearchQuery` is the live filter. The query filters only the
@@ -149,7 +147,7 @@ export function useSessionRailActions({
   // Child sessions live on the tree page rather than the flat page, so the
   // query has to be applied there too or a match on a child would not show.
   // A node whose children are all filtered out is dropped, and a tree that
-  // loses every node falls back to the flat list rather than rendering empty.
+  // loses every node falls back to the session page rather than rendering empty.
   const railTreePage = useMemo(() => {
     if (treePage.sessions.length === 0) return undefined;
     if (!railSearchQuery.trim()) return treePage;
@@ -185,9 +183,6 @@ export function useSessionRailActions({
   };
   const handleToggleSessionPin = (session: WebuiClientSession) => {
     overlays.toggleSessionOverlay("pins", session.sessionId);
-  };
-  const handleToggleSessionStar = (session: WebuiClientSession) => {
-    overlays.toggleSessionOverlay("stars", session.sessionId);
   };
   const handleArchiveSession = (session: WebuiClientSession) => {
     void workflows.archive(session.sessionId).catch(fail);
@@ -294,7 +289,6 @@ export function useSessionRailActions({
     railPage,
     railTreePage,
     pinnedSessions,
-    starredSessions,
     pinnedProjects,
     projectNames,
     onRenameProject: handleRenameProject,
@@ -302,7 +296,6 @@ export function useSessionRailActions({
     onArchiveProject: handleArchiveProject,
     onRenameSession: handleRenameSession,
     onToggleSessionPin: handleToggleSessionPin,
-    onToggleSessionStar: handleToggleSessionStar,
     onArchiveSession: handleArchiveSession,
     onForkSession: handleForkSession,
     onCopySession: handleCopySession,

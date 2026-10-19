@@ -57,7 +57,7 @@ function accountTab(page) {
  * The row's hover action strip is absolutely positioned over the right-hand end
  * of the row and, at `opacity: 0`, still takes the hit -- so a centre click
  * lands on the star button and Playwright refuses it as intercepted. Same trap
- * `rail-star.spec.mjs` documents for right-clicks.
+ * the project rail uses for its context actions.
  */
 function clickSessionRow(page, sessionId) {
   return page.locator(`[data-webui-session-link="${sessionId}"]`).click({ position: { x: 40, y: 16 } });

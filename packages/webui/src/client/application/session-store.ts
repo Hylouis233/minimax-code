@@ -188,7 +188,7 @@ export interface WebuiSessionStore {
   /**
    * Drop every server-derived slice for one session id: the session record
    * (stream + sending + permissions + questionnaire + goal + transcript) and
-   * the activity entry (unread badge + busy hint). The catalog slice is
+   * the activity entry (busy hint and last activity time). The catalog slice is
    * updated separately, by the delete workflow that owns it. Idempotent, and a
    * no-op after `dispose` — a successful delete, a delete followed by a late
    * completion and a recovery retry that lands on a removed session all share

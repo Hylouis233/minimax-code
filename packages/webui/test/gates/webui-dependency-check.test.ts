@@ -268,7 +268,6 @@ describe("layer matrix", () => {
     expect(classifyLayers("client/contracts/value-readers.ts")).toEqual(["contracts"]);
     expect(classifyLayers("client/projection/common/paths.ts")).toEqual(["view"]);
     expect(classifyLayers("client/projection/common/router.ts")).toEqual(["view"]);
-    expect(classifyLayers("client/features/sessions/projection/rail-buckets.ts")).toEqual(["view"]);
     expect(classifyLayers("client/features/composer/ui/slash-palette.ts")).toEqual(["bindings"]);
     expect(classifyLayers("client/features/transcript/ui/markdown.tsx")).toEqual(["bindings"]);
     expect(classifyLayers("client/shell/icons.tsx")).toEqual(["bindings"]);

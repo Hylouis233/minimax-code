@@ -15,7 +15,7 @@
 // reads sessions, it does not rewrite them. The store that owns the single
 // writable copy and the command surface over these reducers live in
 // `application/` siblings, exactly as the activity slice was split
-// (`session-store.ts` writes it, `unread.ts` names the changes).
+// (`session-store.ts` writes it, the activity controller names the changes).
 
 import type {
   WebuiClientSession,

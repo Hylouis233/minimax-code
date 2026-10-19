@@ -1,34 +1,49 @@
 import type { MouseEvent, ReactElement } from "react";
 
 import {
+  WebuiIconContextArchive,
+  WebuiIconContextPin,
   WebuiIconFolder,
   WebuiIconMore,
   WebuiIconProjectAdd,
-  WebuiIconSessionPinMark,
+  WebuiIconSession,
+  WebuiIconSessionDisclosure,
 } from "../../../shell/icons.js";
 import type {
   WebuiClientSession,
   WebuiClientSessionPage,
 } from "../contracts/session-view.js";
+import { sessionHash } from "../../../projection/common/router.js";
 import type { WebuiSessionActivityMap } from "../projection/session-activity.js";
 import type { WebuiProjectGroup } from "../projection/rail-groups.js";
 import {
   PROJECT_SESSION_BATCH_SIZE,
   sortWebuiProjectSessionIds,
+  sessionLabel,
 } from "../projection/rail-groups.js";
 import { ProjectExpansion } from "./project-expansion.js";
+import { SessionActivityMeta } from "./session-activity-meta.js";
 
 /** Project rows consume rail-owned display state and return named view actions. */
 export function ProjectList({
   projects,
+  pinnedProjectGroups,
+  pinnedSessions,
+  pinnedSessionState,
+  pinnedProjects,
+  pinnedSectionExpanded,
+  projectSectionExpanded,
+  projectLoading,
+  hasMoreProjects,
+  visibleProjectCount,
+  onTogglePinnedSection,
+  onToggleProjectSection,
+  onShowMoreProjects,
   page,
   sessionsById,
   childrenByParentId,
   selectedSessionId,
   projectNames,
-  pinnedProjects,
-  pinnedSessions,
-  starredSessions,
   activity,
   now,
   expandedProjects,
@@ -41,25 +56,32 @@ export function ProjectList({
   onToggleChildren,
   onShowMore,
   onToggleSessionPin,
-  onToggleSessionStar,
   onArchiveSession,
   onSessionContextMenu,
   onRenameProject,
   onToggleProjectPin,
   onArchiveProject,
+  error,
+  projectLoadError,
 }: {
   readonly projects: readonly WebuiProjectGroup[];
+  readonly pinnedProjectGroups: readonly WebuiProjectGroup[];
+  readonly pinnedSessions: readonly WebuiClientSession[];
+  readonly pinnedSessionState?: Readonly<Record<string, boolean>>;
+  readonly pinnedProjects?: Readonly<Record<string, boolean>>;
+  readonly pinnedSectionExpanded: boolean;
+  readonly projectSectionExpanded: boolean;
+  readonly projectLoading: boolean;
+  readonly hasMoreProjects: boolean;
+  readonly visibleProjectCount: number;
+  readonly onTogglePinnedSection: () => void;
+  readonly onToggleProjectSection: () => void;
+  readonly onShowMoreProjects: () => void;
   readonly page: WebuiClientSessionPage;
   readonly sessionsById: ReadonlyMap<string, WebuiClientSession>;
-  readonly childrenByParentId: ReadonlyMap<
-    string,
-    readonly WebuiClientSession[]
-  >;
+  readonly childrenByParentId: ReadonlyMap<string, readonly WebuiClientSession[]>;
   readonly selectedSessionId?: string;
   readonly projectNames?: Readonly<Record<string, string>>;
-  readonly pinnedProjects?: Readonly<Record<string, boolean>>;
-  readonly pinnedSessions?: Readonly<Record<string, boolean>>;
-  readonly starredSessions?: Readonly<Record<string, boolean>>;
   readonly activity?: WebuiSessionActivityMap;
   readonly now?: number;
   readonly expandedProjects: ReadonlySet<string>;
@@ -75,7 +97,6 @@ export function ProjectList({
   readonly onToggleChildren: (sessionId: string) => void;
   readonly onShowMore: (projectKey: string) => void;
   readonly onToggleSessionPin?: (session: WebuiClientSession) => void;
-  readonly onToggleSessionStar?: (session: WebuiClientSession) => void;
   readonly onArchiveSession?: (session: WebuiClientSession) => void;
   readonly onSessionContextMenu: (
     event: MouseEvent<HTMLElement>,
@@ -85,24 +106,22 @@ export function ProjectList({
   readonly onRenameProject?: (project: WebuiProjectGroup) => void;
   readonly onToggleProjectPin?: (project: WebuiProjectGroup) => void;
   readonly onArchiveProject?: (project: WebuiProjectGroup) => void;
+  readonly error?: string;
+  readonly projectLoadError?: string;
 }): ReactElement {
-  return (
+  const renderProjects = (items: readonly WebuiProjectGroup[]) => (
     <ul className="space-y-px" data-webui-project-list-items="true">
-      {projects.map((project) => {
+      {items.map((project) => {
         const expanded = expandedProjects.has(project.key);
         const projectName = projectNames?.[project.key] ?? project.name;
         const orderedSessionIds = sortWebuiProjectSessionIds(
           page.sessions,
-          pinnedSessions ?? {},
-          project.sessionIds,
+          pinnedSessionState ?? {},
+          project.sessionIds.filter((sessionId) => !pinnedSessionState?.[sessionId]),
         );
         const visibleSessionCount =
-          visibleProjectSessionCounts[project.key] ??
-          PROJECT_SESSION_BATCH_SIZE;
-        const visibleSessionIds = orderedSessionIds.slice(
-          0,
-          visibleSessionCount,
-        );
+          visibleProjectSessionCounts[project.key] ?? PROJECT_SESSION_BATCH_SIZE;
+        const visibleSessionIds = orderedSessionIds.slice(0, visibleSessionCount);
         return (
           <li key={project.key}>
             <div className="webui-project-row group/project">
@@ -116,20 +135,9 @@ export function ProjectList({
                 onContextMenu={(event) => onOpenProjectMenu(event, project)}
                 data-webui-project-link={project.key}
                 title={project.workspaceDir}
-                className="webui-project-card text-left text-text_default_secondary"
+                className="webui-project-card text-left text-text_default_primary"
               >
-                <WebuiIconFolder className="flex-shrink-0" />
-                {(pinnedProjects?.[project.key] ?? project.pinned) ? (
-                  <span
-                    className="webui-project-pin-mark"
-                    data-webui-project-pin-mark="true"
-                    title="已置顶"
-                    aria-label="已置顶"
-                    role="img"
-                  >
-                    <WebuiIconSessionPinMark />
-                  </span>
-                ) : null}
+                <WebuiIconFolder className="webui-project-folder-icon flex-shrink-0" />
                 <span className="min-w-0 flex-1 truncate text-sm leading-5">
                   {projectName}
                 </span>
@@ -175,12 +183,10 @@ export function ProjectList({
               selectedSessionId={selectedSessionId}
               activity={activity}
               now={now}
-              pinnedSessions={pinnedSessions}
-              starredSessions={starredSessions}
+              pinnedSessions={pinnedSessionState}
               onToggleChildren={onToggleChildren}
               onShowMore={() => onShowMore(project.key)}
               onToggleSessionPin={onToggleSessionPin}
-              onToggleSessionStar={onToggleSessionStar}
               onArchiveSession={onArchiveSession}
               onSessionContextMenu={onSessionContextMenu}
             />
@@ -188,5 +194,175 @@ export function ProjectList({
         );
       })}
     </ul>
+  );
+
+  return (
+    <div className="webui-project-sections">
+      <RailSectionHeader
+        label="置顶"
+        expanded={pinnedSectionExpanded}
+        onToggle={onTogglePinnedSection}
+        testId="pinned"
+      />
+      <div
+        className="webui-project-section-content"
+        data-webui-section-expanded={pinnedSectionExpanded ? "true" : "false"}
+        aria-hidden={!pinnedSectionExpanded}
+      >
+        <div className="webui-project-section-content-inner" data-webui-pinned-section="true">
+          {pinnedSessions.length > 0 ? (
+            <ul className="space-y-px" data-webui-pinned-sessions="true">
+              {pinnedSessions.map((session) => (
+                <li key={session.sessionId}>
+                  <div
+                    className="webui-pinned-session-row group/session"
+                    data-webui-session-active={
+                      selectedSessionId === session.sessionId ? "true" : "false"
+                    }
+                  >
+                    <a
+                      href={sessionHash(session.sessionId)}
+                      data-webui-session-link={session.sessionId}
+                      data-webui-session-active={
+                        selectedSessionId === session.sessionId ? "true" : "false"
+                      }
+                      title={session.workspaceDir ?? undefined}
+                      onContextMenu={(event) => onSessionContextMenu(event, session)}
+                      className="webui-pinned-session-card text-text_default_primary"
+                    >
+                      <WebuiIconSession className="flex-shrink-0" />
+                      <span className="min-w-0 flex-1 truncate">
+                        {sessionLabel(session)}
+                      </span>
+                      <SessionActivityMeta
+                        session={session}
+                        activity={activity}
+                        now={now}
+                      />
+                    </a>
+                    <div className="webui-session-row-actions">
+                      {onToggleSessionPin ? (
+                        <button
+                          type="button"
+                          aria-label={`取消置顶：${sessionLabel(session)}`}
+                          title="取消置顶"
+                          className="webui-rail-action"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            onToggleSessionPin(session);
+                          }}
+                        >
+                          <WebuiIconContextPin pinned />
+                        </button>
+                      ) : null}
+                      {onArchiveSession ? (
+                        <button
+                          type="button"
+                          aria-label={`归档：${sessionLabel(session)}`}
+                          title="归档"
+                          className="webui-rail-action"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            onArchiveSession(session);
+                          }}
+                        >
+                          <WebuiIconContextArchive />
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        aria-label={`${sessionLabel(session)} 更多操作`}
+                        title="更多操作"
+                        className="webui-rail-action"
+                        onClick={(event) => onSessionContextMenu(event, session)}
+                      >
+                        <WebuiIconMore />
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {renderProjects(pinnedProjectGroups)}
+        </div>
+      </div>
+
+      <RailSectionHeader
+        label="项目"
+        expanded={projectSectionExpanded}
+        onToggle={onToggleProjectSection}
+        testId="projects"
+      />
+      <div
+        className="webui-project-section-content"
+        data-webui-section-expanded={projectSectionExpanded ? "true" : "false"}
+        aria-hidden={!projectSectionExpanded}
+      >
+        <div className="webui-project-section-content-inner" data-webui-projects-section="true">
+          {error ? (
+            <p role="alert" className="px-1 pb-1 text-text_default_secondary text-size_12 leading-line_height_16">
+              Unable to load projects: {error}
+            </p>
+          ) : null}
+          {projectLoadError ? (
+            <p role="alert" className="px-1 pb-1 text-text_default_secondary text-size_12 leading-line_height_16">
+              Unable to load project list: {projectLoadError}
+            </p>
+          ) : null}
+          {!error && projects.length === 0 ? (
+            <p className="webui-project-empty">
+              <WebuiIconFolder aria-hidden="true" />
+              <span>{pinnedProjectGroups.length > 0 ? "项目已全部置顶" : "暂无项目"}</span>
+            </p>
+          ) : (
+            <>
+              {renderProjects(projects.slice(0, visibleProjectCount))}
+              {hasMoreProjects ? (
+                <div className="px-1 pt-px">
+                  <button
+                    type="button"
+                    className="webui-project-session-more text-text_default_secondary"
+                    onClick={onShowMoreProjects}
+                    disabled={projectLoading}
+                    aria-label="显示更多项目"
+                  >
+                    {projectLoading ? "加载中…" : "更多"}
+                  </button>
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RailSectionHeader({
+  label,
+  expanded,
+  onToggle,
+  testId,
+}: {
+  readonly label: string;
+  readonly expanded: boolean;
+  readonly onToggle: () => void;
+  readonly testId: string;
+}): ReactElement {
+  return (
+    <button
+      type="button"
+      className="webui-project-section-toggle text-text_default_tertiary"
+      aria-expanded={expanded}
+      data-webui-rail-section-header="true"
+      data-webui-rail-section-id={testId}
+      onClick={onToggle}
+    >
+      <span>{label}</span>
+      <WebuiIconSessionDisclosure className={expanded ? "is-expanded" : undefined} />
+    </button>
   );
 }

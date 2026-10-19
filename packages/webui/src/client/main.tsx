@@ -4,7 +4,6 @@ import { WebuiClientFoundationApp } from "./shell/WebuiClientFoundationApp.js";
 // The composition root may read the platform layer; the shell and the rail may
 // not, so the label is resolved here and injected.
 import { teamModeCopy } from "./platform/team-mode.js";
-export { WebuiSessionList } from "./features/sessions/ui/SessionRail.js";
 export { WebuiSessionTranscript } from "./features/transcript/ui/SessionTranscript.js";
 export {
   WebuiClientFoundationApp,
@@ -38,6 +37,88 @@ declare const document: {
   readonly body: HTMLElement;
 };
 declare const location: { readonly host: string; readonly pathname: string; readonly hash: string; href: string; reload(): void };
+
+const WEBUI_STALL_DIAGNOSTIC_PREFIX = "[WEBUI-STALL-DIAG]";
+
+function installWebuiStallDiagnostics(): void {
+  const startedAt = performance.now();
+  const bootKey = "webui:stall-diagnostic-boot";
+  const now = Date.now();
+  let bootCount = 1;
+  try {
+    const previous = JSON.parse(sessionStorage.getItem(bootKey) ?? "null") as
+      | { readonly startedAt?: number; readonly count?: number }
+      | null;
+    if (previous?.startedAt && now - previous.startedAt < 60_000) {
+      bootCount = (previous.count ?? 0) + 1;
+    }
+    sessionStorage.setItem(
+      bootKey,
+      JSON.stringify({ startedAt: bootCount === 1 ? now : previous?.startedAt, count: bootCount }),
+    );
+  } catch {
+    // Diagnostics must not make startup depend on browser storage availability.
+  }
+
+  console.info(`${WEBUI_STALL_DIAGNOSTIC_PREFIX} boot`, {
+    bootCountIn60s: bootCount,
+    hasSessionRoute: new URLSearchParams(location.hash.replace(/^#/u, "")).has("session"),
+    online: navigator.onLine,
+  });
+  if (bootCount >= 3) {
+    console.warn(`${WEBUI_STALL_DIAGNOSTIC_PREFIX} repeated-document-start`, {
+      bootCountIn60s: bootCount,
+    });
+  }
+
+  window.addEventListener("error", (event) => {
+    console.error(`${WEBUI_STALL_DIAGNOSTIC_PREFIX} window-error`, {
+      message: event.message,
+      source: event.filename,
+      line: event.lineno,
+      column: event.colno,
+      error: event.error,
+    });
+  });
+  window.addEventListener("unhandledrejection", (event) => {
+    console.error(`${WEBUI_STALL_DIAGNOSTIC_PREFIX} unhandled-rejection`, event.reason);
+  });
+
+  if (
+    typeof PerformanceObserver !== "undefined" &&
+    PerformanceObserver.supportedEntryTypes.includes("longtask")
+  ) {
+    let lastLongTaskLogAt = 0;
+    const observer = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        if (entry.duration < 250 || entry.startTime - lastLongTaskLogAt < 5_000) continue;
+        lastLongTaskLogAt = entry.startTime;
+        console.warn(`${WEBUI_STALL_DIAGNOSTIC_PREFIX} long-task`, {
+          durationMs: Math.round(entry.duration),
+          pageAgeMs: Math.max(0, Math.round(entry.startTime - startedAt)),
+        });
+      }
+    });
+    observer.observe({ type: "longtask", buffered: true });
+  }
+
+  let previousTick = startedAt;
+  let lastEventLoopStallLogAt = startedAt;
+  window.setInterval(() => {
+    const tick = performance.now();
+    const delayMs = tick - previousTick - 1_000;
+    previousTick = tick;
+    if (delayMs >= 1_500 && tick - lastEventLoopStallLogAt >= 5_000) {
+      lastEventLoopStallLogAt = tick;
+      console.warn(`${WEBUI_STALL_DIAGNOSTIC_PREFIX} event-loop-stall`, {
+        delayMs: Math.round(delayMs),
+        pageAgeMs: Math.round(tick - startedAt),
+      });
+    }
+  }, 1_000);
+}
+
+installWebuiStallDiagnostics();
 
 const rootElement = document.getElementById("webui-root");
 interface WebuiRuntimeConfig {
@@ -97,16 +178,8 @@ function WebuiClientRoot({
         // route commits for any session, mounted or not.
         goalPort: slices.goal,
         interactionsPort: slices.interactions,
-        // The same storage adapter the shell used to inject by hand, so the
-        // production boot persists and restores unread counts exactly as the
-        // fixture assembly always did.
-        unreadStorage: {
-          read: storage.readUnreadCounts,
-          write: storage.writeUnreadCounts,
-        },
         // The persisted "no project" choice the new-task workspace reads and
-        // writes. The use case owns the decision and the host owns the storage,
-        // so it arrives the same way the unread counts do.
+        // writes. The use case owns the decision and the host owns the storage.
         workspacePreference: {
           readNoProjectFlag: storage.readNoProjectFlag,
           writeNoProjectFlag: storage.writeNoProjectFlag,

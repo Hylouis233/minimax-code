@@ -1,14 +1,5 @@
 // Browser storage IO.
 //
-// The browser persistence half of the former session-unread module: the
-// storage key, the read that validates every stored value, and the write that
-// keeps only positive counts. It decides no unread business rule — the badge
-// format lives in `projection/common/unread-badge.ts` and the ordering lives with the
-// commands that call this module — it only reads and writes what it is given.
-//
-// Every access is wrapped: storage may be absent (SSR, private mode) or throw
-// on quota, and a failure degrades to "no counts" rather than taking the rail
-// down with it.
 
 import { isNoProjectFlag } from "./no-project.js";
 import {
@@ -17,7 +8,6 @@ import {
   type TeamModeSessionChoices,
 } from "./team-mode.js";
 
-export const SESSION_UNREAD_STORAGE_KEY = "mavis-session-unread";
 export const MODEL_FAVORITES_KEY = "webui:model-favorites:v1";
 export const NO_PROJECT_STORAGE_KEY = "mavis-no-project";
 export const TEAM_MODE_STORAGE_KEY = "mavis-team-mode";
@@ -50,8 +40,6 @@ export interface WebuiBrowserStorage {
     serialize: (state: T, keepKeys?: readonly string[]) => string,
     keepKeys?: readonly string[],
   ) => void;
-  readonly readUnreadCounts: () => Record<string, number>;
-  readonly writeUnreadCounts: (counts: Readonly<Record<string, number>>) => void;
   /**
    * The rail's browser-local overlays. Declared here as part of the adapter's
    * own surface; the sessions feature states the subset it needs in
@@ -146,8 +134,6 @@ export function createWebuiBrowserStorage(
         // Draft/history persistence is best-effort; the live composer keeps working.
       }
     },
-    readUnreadCounts: () => readWebuiUnreadCounts(storage),
-    writeUnreadCounts: (counts) => writeWebuiUnreadCounts(counts, storage),
     // The rail's overlays. The keys and the stored format stay in this module,
     // while the rail's binding reads them through the interface in
     // `features/sessions/bindings/use-session-rail-overlays.ts`, which this
@@ -164,54 +150,6 @@ export function createWebuiBrowserStorage(
   return browserStorage;
 }
 
-export function readWebuiUnreadCounts(
-  storage: Storage | undefined,
-): Record<string, number> {
-  // `storage` is a **required** argument on purpose. It used to default to
-  // `getWebuiBrowserStorage()`, which meant an explicit `undefined` — exactly
-  // what `createWebuiBrowserStorage(undefined)` hands down — silently fell back
-  // to the page's ambient `localStorage`. An adapter built with no storage then
-  // read and wrote the ambient one anyway, so the empty adapter above stopped
-  // meaning "no storage". A caller that does want the ambient store asks for it
-  // by name (`getWebuiBrowserStorage()`).
-  if (!storage) return {};
-  try {
-    const raw = storage.getItem(SESSION_UNREAD_STORAGE_KEY);
-    if (!raw) return {};
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return {};
-    const counts: Record<string, number> = {};
-    for (const [sessionId, value] of Object.entries(parsed as Record<string, unknown>)) {
-      // A stored value is only a count if it is a finite non-negative integer.
-      // Anything else -- an object, a string, a negative, a float -- is dropped
-      // rather than coerced, because `unread: NaN` would render a row that
-      // claims to be waiting on nothing.
-      if (typeof value === "number" && Number.isSafeInteger(value) && value > 0) {
-        counts[sessionId] = value;
-      }
-    }
-    return counts;
-  } catch {
-    return {};
-  }
-}
-
-export function writeWebuiUnreadCounts(
-  counts: Readonly<Record<string, number>>,
-  storage: Storage | undefined,
-): void {
-  // Same required argument as `readWebuiUnreadCounts`: an explicit `undefined`
-  // must mean "no storage" rather than re-acquiring the ambient one.
-  if (!storage) return;
-  try {
-    const entries = Object.entries(counts).filter(([, count]) => count > 0);
-    if (entries.length === 0) storage.removeItem(SESSION_UNREAD_STORAGE_KEY);
-    else storage.setItem(SESSION_UNREAD_STORAGE_KEY, JSON.stringify(Object.fromEntries(entries)));
-  } catch {
-    // Storage unavailable or over quota; the in-memory count still shows.
-  }
-}
-
 // ---------------------------------------------------------------------------
 // The rail's overlay flags. They live here rather than in the sessions feature's
 // rail component (`features/sessions/ui/LeftRail.tsx`): browser storage IO
@@ -220,7 +158,6 @@ export function writeWebuiUnreadCounts(
 // ---------------------------------------------------------------------------
 
 export const WEBUI_SESSION_OVERLAY_KEYS = {
-  stars: "mavis-webui-session-stars:v1",
   pins: "mavis-webui-session-pins:v1",
   archives: "mavis-webui-session-archives:v1",
 } as const;
@@ -230,7 +167,7 @@ export const WEBUI_PROJECT_OVERLAY_KEYS = {
   names: "mavis-webui-project-names:v1",
 } as const;
 
-export type WebuiSessionOverlay = "stars" | "pins" | "archives";
+export type WebuiSessionOverlay = "pins" | "archives";
 
 export function readSessionOverlay(kind: WebuiSessionOverlay, storage: WebuiBrowserStorage): Record<string, boolean> {
   try {

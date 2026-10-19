@@ -7,7 +7,6 @@ import {
 import {
   createWebuiBrowserStorage,
   getWebuiBrowserStorage,
-  readWebuiUnreadCounts,
 } from "../../src/client/platform/storage.js";
 
 beforeEach(() => {
@@ -60,11 +59,10 @@ describe("team mode lock contract", () => {
   it("uses isolated v1 localStorage overlays for session row state", () => {
     localStorage.clear();
     const storage = createWebuiBrowserStorage(localStorage);
-    expect(toggleSessionOverlay("stars", "s1", storage)).toEqual({ s1: true });
     expect(toggleSessionOverlay("pins", "s1", storage)).toEqual({ s1: true });
     expect(toggleSessionOverlay("archives", "s1", storage)).toEqual({ s1: true });
-    expect(readSessionOverlay("stars", storage)).toEqual({ s1: true });
-    expect(toggleSessionOverlay("stars", "s1", storage)).toEqual({});
+    expect(readSessionOverlay("pins", storage)).toEqual({ s1: true });
+    expect(toggleSessionOverlay("pins", "s1", storage)).toEqual({});
   });
 
   it("routes generic preferences through the injected storage adapter", () => {
@@ -85,44 +83,6 @@ describe("team mode lock contract", () => {
     expect(empty.getItem("ambient-sentinel")).toBeNull();
     empty.setItem("ambient-sentinel", "changed");
     expect(localStorage.getItem("ambient-sentinel")).toBe("present");
-  });
-
-  it("keeps an empty adapter's unread reads, writes and removes off ambient localStorage", () => {
-    // The unread helpers used to default their storage argument to
-    // `getWebuiBrowserStorage()`. An explicit `undefined` — what this adapter
-    // passes — therefore re-acquired the ambient store, so the empty adapter
-    // read the page's counts and wrote its own into the page's key. The
-    // sentinel pins all three access kinds.
-    localStorage.setItem("mavis-session-unread", JSON.stringify({ ambient: 7 }));
-    const empty = createWebuiBrowserStorage(undefined);
-
-    // Read: no ambient counts leak in.
-    expect(empty.readUnreadCounts()).toEqual({});
-
-    // Write: nothing lands in the ambient key.
-    empty.writeUnreadCounts({ injected: 4 });
-    expect(localStorage.getItem("mavis-session-unread")).toBe(
-      JSON.stringify({ ambient: 7 }),
-    );
-
-    // Remove: an empty count set removes the key it was given, and that key is
-    // no storage at all, so the ambient entry survives.
-    empty.writeUnreadCounts({});
-    expect(localStorage.getItem("mavis-session-unread")).toBe(
-      JSON.stringify({ ambient: 7 }),
-    );
-
-    // The ambient path itself still works when a caller asks for it by name —
-    // this is a narrowed default, not a removed capability.
-    expect(readWebuiUnreadCounts(getWebuiBrowserStorage())).toEqual({ ambient: 7 });
-  });
-
-  it("persists unread counts through the injected storage adapter", () => {
-    const backing = createWebuiMemoryStorage();
-    const storage = createWebuiBrowserStorage(backing);
-    storage.writeUnreadCounts({ sessionA: 2, sessionB: 0 });
-    expect(storage.readUnreadCounts()).toEqual({ sessionA: 2 });
-    expect(localStorage.getItem("mavis-session-unread")).toBeNull();
   });
 
   it("treats a denied localStorage getter as unavailable", () => {

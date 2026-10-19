@@ -1,11 +1,8 @@
 // The application lifecycle: constructed → started → disposed.
 //
-// The seam is the assembled application's own public lifecycle, driven with
-// injected storage and a scripted channel: what a host can observe is the order
-// of its IO, the number of ingress links it opens, and what a disposed instance
-// refuses. The fixtures below assert exactly that, plus the ordering rule — the
-// initial route reaches unread hydration before the first persistence write, so
-// opening a session never restores its own badge.
+// The seam is the assembled application's own public lifecycle, driven with a
+// scripted channel: what a host can observe is the ingress count and what a
+// disposed instance refuses.
 //
 // No DOM: these are the framework-free assembly's guarantees, and the built
 // client's boot is covered by the browser suite.
@@ -119,32 +116,8 @@ function scriptedChannel() {
   };
 }
 
-/** The order of the storage calls, so hydration-before-write is observable. */
-function recordingStorage(seed: Readonly<Record<string, number>>) {
-  const calls: string[] = [];
-  const written: Record<string, number>[] = [];
-  return {
-    calls,
-    written,
-    storage: {
-      read: () => {
-        calls.push("read");
-        return seed;
-      },
-      write: (counts: Readonly<Record<string, number>>) => {
-        calls.push(`write:${JSON.stringify(counts)}`);
-        written.push({ ...counts });
-      },
-    },
-  };
-}
-
 function makeApplication(options: {
   readonly channels?: ReturnType<typeof scriptedChannel>[];
-  readonly storage?: {
-    readonly read: () => Readonly<Record<string, number>>;
-    readonly write: (counts: Readonly<Record<string, number>>) => void;
-  };
   readonly turnCapabilities?: Record<string, unknown>;
   readonly interactionsPort?: Record<string, unknown>;
   readonly goalPort?: Record<string, unknown>;
@@ -156,7 +129,6 @@ function makeApplication(options: {
       opened.push(fake);
       return fake.channel;
     },
-    ...(options.storage ? { unreadStorage: options.storage } : {}),
     ...(options.turnCapabilities
       ? { turnCapabilities: options.turnCapabilities as never }
       : {}),
@@ -172,17 +144,11 @@ function makeApplication(options: {
 describe("construction is dormant", () => {
   it("opens no ingress and touches no persisted state", () => {
     const opened: ReturnType<typeof scriptedChannel>[] = [];
-    const recorder = recordingStorage({ [OTHER]: 3 });
-    const { application } = makeApplication({
-      channels: opened,
-      storage: recorder.storage,
-    });
+    const { application } = makeApplication({ channels: opened });
 
     expect(application.state()).toBe("constructed");
     expect(opened).toHaveLength(0);
-    expect(recorder.calls).toEqual([]);
-    // The ingress is the only thing construction could have opened, and the
-    // storage adapter is the only thing it could have read: both are untouched.
+    // Construction opens no event ingress.
     application.dispose();
   });
 
@@ -197,33 +163,7 @@ describe("construction is dormant", () => {
   });
 });
 
-describe("start hydrates the route before the first write", () => {
-  it("reads persisted counts, drops the open session's own badge, then persists", () => {
-    const recorder = recordingStorage({ [SESSION]: 4, [OTHER]: 2 });
-    const { application, opened } = makeApplication({ storage: recorder.storage });
-
-    expect(application.start({ initialSessionId: SESSION })).toBe(true);
-
-    // The read happens before any write, and the write that follows carries the
-    // other session's count only: the session being opened is excluded, which is
-    // the rule the ordering exists for.
-    expect(recorder.calls[0]).toBe("read");
-    expect(recorder.written[0]).toEqual({ [OTHER]: 2 });
-    expect(application.unread.isHydrated()).toBe(true);
-    expect(opened).toHaveLength(1);
-    expect(application.state()).toBe("started");
-    application.dispose();
-  });
-
-  it("keeps the stored badge when the route names no session", () => {
-    const recorder = recordingStorage({ [SESSION]: 4 });
-    const { application } = makeApplication({ storage: recorder.storage });
-    application.start();
-    // With no open session there is nothing to exclude, so the restore keeps it.
-    expect(recorder.written[0]).toEqual({ [SESSION]: 4 });
-    application.dispose();
-  });
-
+describe("start installs the event ingress", () => {
   it("installs the ingress exactly once across repeated starts", () => {
     const { application, opened } = makeApplication();
     expect(application.start()).toBe(true);
@@ -234,25 +174,6 @@ describe("start hydrates the route before the first write", () => {
     application.dispose();
   });
 
-  it("does not accept counted events before hydration", () => {
-    // The gate is the hydration flag, not the channel: a counted event that
-    // arrives against an un-hydrated map would be counted from zero and then
-    // overwritten by the restore.
-    const recorder = recordingStorage({ [OTHER]: 5 });
-    const { application, opened } = makeApplication({ storage: recorder.storage });
-    application.start({ initialSessionId: SESSION });
-    const activityBefore = application.store.getSnapshot().activity;
-    opened[0]?.emit({
-      type: "session.finish",
-      payload: { sessionId: OTHER },
-      timestamp: 1,
-      source: "test",
-    } as never);
-    // Hydrated, so the event is accepted — asserted so the case cannot pass by
-    // the channel being inert.
-    expect(application.store.getSnapshot().activity).not.toBe(activityBefore);
-    application.dispose();
-  });
 });
 
 describe("dispose is terminal and idempotent", () => {
@@ -308,18 +229,6 @@ describe("a fresh instance is a fresh lifecycle", () => {
     second.application.dispose();
   });
 
-  it("hydrates its own storage on start, not the previous instance's", () => {
-    const first = recordingStorage({ [OTHER]: 1 });
-    const firstApp = makeApplication({ storage: first.storage });
-    firstApp.application.start({ initialSessionId: SESSION });
-    firstApp.application.dispose();
-
-    const second = recordingStorage({ [OTHER]: 7 });
-    const secondApp = makeApplication({ storage: second.storage });
-    secondApp.application.start({ initialSessionId: SESSION });
-    expect(second.written[0]).toEqual({ [OTHER]: 7 });
-    secondApp.application.dispose();
-  });
 });
 
 describe("the entry's boot shape", () => {
@@ -646,7 +555,6 @@ describe("V02 · independent owners' pending IO cannot commit after disposal", (
 
 describe("V03 · a failure while ending owners strands nothing", () => {
   it("runs every remaining step, keeps the failure, and survives a second disposal", () => {
-    const recorder = recordingStorage({});
     let closes = 0;
     const application = createWebuiApplication({
       openEventChannel: (): WebuiProcessEventChannel => ({
@@ -659,7 +567,6 @@ describe("V03 · a failure while ending owners strands nothing", () => {
           closes += 1;
         },
       }),
-      unreadStorage: recorder.storage,
       turns: { resumeSession: (async () => {}) as unknown as WebuiClientSessionResumer },
     });
     application.start({ initialSessionId: SESSION });
@@ -678,12 +585,9 @@ describe("V03 · a failure while ending owners strands nothing", () => {
     expect(application.disposalFailures()[0]?.reason).toBeInstanceOf(Error);
 
     // A second disposal runs nothing again and does not lose the record.
-    const writesBefore = recorder.calls.filter((call) => call.startsWith("write")).length;
     application.dispose();
     expect(closes).toBe(1);
     expect(application.disposalFailures()).toHaveLength(1);
-    // Nothing was persisted by either disposal pass.
-    expect(recorder.calls.filter((call) => call.startsWith("write"))).toHaveLength(writesBefore);
   });
 });
 

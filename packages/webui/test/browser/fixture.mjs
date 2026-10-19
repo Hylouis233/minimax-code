@@ -18,7 +18,7 @@ export function installFixtureTransport() {
   // `WebuiProjectList` groups `page.sessions` under the records here, so an
   // empty answer renders no project row, no session row, and no search box.
   // Returning `[]` is a valid server answer and a useless fixture.
-  const projects = [
+  let projects = [
     {
       projectId: 1,
       projectKind: "workspace",
@@ -457,6 +457,7 @@ export function installFixtureTransport() {
     setResponse(operation, value) { responses.set(operation, clone(value)); },
     refuseOperation(operation, code, message) { refusals.set(operation, { code, message }); },
     setSessions(next) { sessions.splice(0, sessions.length, ...clone(next)); },
+    setProjects(next) { projects = clone(next); },
     delayNext(operation, condition) { delayed.push({ operation, condition }); },
     // Holds EVERY matching request, not just the next one. A session switch
     // fans out into several concurrent `getMessages` for the same session

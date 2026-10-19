@@ -8,11 +8,10 @@
 //
 //   * a no-op event channel, so a markup fixture opens nothing;
 //   * the caller's store when it seeds a catalogue, otherwise a fresh one;
-//   * no unread storage unless the fixture asks for it, so a fixture that wants
-//     restore/persist behaviour supplies the adapter it means to measure.
+//   * no ambient browser storage or runtime activity is accessed during render.
 //
 // It returns a **dormant** application: constructing performs no IO. A fixture
-// that needs the ingress, hydration or the lifecycle states calls `start()`.
+// that needs the ingress or lifecycle states calls `start()`.
 
 import { createWebuiApplication } from "../../../src/client/application/create-application.js";
 import type {
@@ -29,10 +28,6 @@ export const inertEventChannel = () => ({ subscribe: () => () => undefined });
 
 export interface ApplicationFixtureOptions {
   readonly store?: WebuiSessionStore;
-  readonly unreadStorage?: {
-    readonly read?: () => Readonly<Record<string, number>>;
-    readonly write?: (counts: Readonly<Record<string, number>>) => void;
-  };
   readonly loadMessages?: (args: { readonly sessionId: string }) => Promise<unknown>;
   /**
    * The per-business port slices the assembly hands its owners. A fixture that
@@ -63,7 +58,6 @@ export function createWebuiApplicationFixture(
   return createWebuiApplication({
     openEventChannel: inertEventChannel,
     ...(options.store ? { store: options.store } : {}),
-    ...(options.unreadStorage ? { unreadStorage: options.unreadStorage } : {}),
     ...(options.slices ? { slices: options.slices } : {}),
     ...(options.turnCapabilities ? { turnCapabilities: options.turnCapabilities } : {}),
     ...(options.goalPort ? { goalPort: options.goalPort } : {}),
@@ -71,7 +65,7 @@ export function createWebuiApplicationFixture(
   });
 }
 
-/** Builds and starts one, for a fixture that needs the ingress or hydration. */
+/** Builds and starts one, for a fixture that needs the ingress. */
 export function startWebuiApplicationFixture(
   options: ApplicationFixtureOptions = {},
   start?: WebuiApplicationStart,

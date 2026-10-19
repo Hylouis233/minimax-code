@@ -265,7 +265,7 @@ describe("WebUI compiled stylesheet", () => {
   it("emits every component class the new shell references", () => {
     // The new shell's markup carries `.webui-button-primary`,
     // `.webui-button-secondary`, `.webui-textarea`, `.webui-input`, `.webui-nav-item`,
-    // `.webui-session-card`, and `.webui-empty-state`, and the @layer
+    // and `.webui-empty-state`, and the @layer
     // components block in `shell.css` emits the matching styles. The component
     // classes only carry meaning if Tailwind actually compiles them — assert each
     // one lands in the output rather than silently degrading to a no-op.
@@ -276,7 +276,6 @@ describe("WebUI compiled stylesheet", () => {
       /\.webui-textarea\s*\{/u,
       /\.webui-nav-item\s*\{/u,
       /\.webui-nav-item\[data-webui-nav-active="true"\]\s*\{/u,
-      /\.webui-session-card\s*\{/u,
       /\.webui-empty-state\s*\{/u,
       /\.webui-transcript-empty-state\s*\{/u,
       /\.webui-input:focus-visible/u,

@@ -27,7 +27,6 @@ const flat = (text: string): string => text.replace(/\s+/gu, " ");
 
 const state = (over: Partial<WebuiRailMenuState> = {}): WebuiRailMenuState => ({
   pinned: false,
-  starred: false,
   archived: false,
   ...over,
 });
@@ -73,23 +72,19 @@ describe("the rail menu is declared once", () => {
     ]);
   });
 
-  it("switches a label on the state it names", () => {
+  it("keeps session pinning on the row toggle and labels remaining stateful actions", () => {
     const labels = (subject: "session" | "project", s: WebuiRailMenuState): string[] =>
       webuiRailMenuFor(subject, s).map((entry) =>
         typeof entry.label === "string" ? entry.label : String(entry.label?.(s)),
       );
-    expect(labels("session", state({ pinned: true }))).toContain("取消置顶");
-    expect(labels("session", state())).toContain("置顶");
-    expect(labels("session", state({ starred: true, archived: true }))).toEqual(
-      expect.arrayContaining(["取消收藏", "取消归档"]),
-    );
+    expect(labels("session", state({ pinned: true }))).not.toContain("取消置顶");
+    expect(labels("session", state())).not.toContain("置顶");
+    expect(labels("session", state({ archived: true }))).toContain("取消归档");
     expect(labels("project", state({ pinned: true }))).toContain("取消置顶项目");
   });
 
   it("keeps the render order the two builders had", () => {
     expect(webuiRailMenuFor("session", state()).map((entry) => entry.key)).toEqual([
-      "pin",
-      "star",
       "rename",
       "archive",
       "fork-divider",

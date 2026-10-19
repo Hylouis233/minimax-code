@@ -1,7 +1,7 @@
 import type { ChangeEvent, ComponentProps, ReactElement, ReactNode, RefObject } from "react";
 import { WebuiProjectList } from "./SessionRail.js";
 import { RailRow } from "./RailRow.js";
-import { WebuiIconContextExport, WebuiIconNewTask, WebuiIconPlugins, WebuiIconRemote, WebuiIconSites } from "../../../shell/icons.js";
+import { WebuiIconContextExport, WebuiIconNewTask, WebuiIconPlugins, WebuiIconRemote, WebuiIconSessionImport, WebuiIconSites } from "../../../shell/icons.js";
 
 type ProjectListProps = ComponentProps<typeof WebuiProjectList>;
 
@@ -36,8 +36,6 @@ export function SessionRailRegion(props: {
       {!props.collapsed ? <>
         <div className="flex-shrink-0 px-4 pb-px" data-webui-rail-fixed-row="true">
           <RailRow label="新建任务" icon={<WebuiIconNewTask className="flex-shrink-0" />} active={props.homeMode && !props.pluginManagementOpen} onSelect={props.startNewTask} />
-          <input ref={props.importInputRef} type="file" accept=".json,application/json" data-webui-session-import-input="true" aria-label="导入会话文件" className="webui-composer-hidden-file-input" onChange={props.onImportPicked} />
-          <RailRow label="导入会话" icon={<WebuiIconContextExport className="flex-shrink-0" />} active={false} inert={props.importBusy} onSelect={props.openImportPicker} />
         </div>
         {props.searchOpen ? <div className="flex-shrink-0 px-4 pb-px pt-1" data-webui-rail-fixed-row="true">
           <input
@@ -51,6 +49,8 @@ export function SessionRailRegion(props: {
         <div className="relative min-h-0 flex-1">
           <div className="webui-rail-scroll h-full overflow-x-hidden overflow-y-auto px-4">
             <div className="space-y-px pb-2">
+              <input ref={props.importInputRef} type="file" accept=".json,application/json" data-webui-session-import-input="true" aria-label="导入会话文件" className="webui-composer-hidden-file-input" onChange={props.onImportPicked} />
+              <RailRow label="导入会话" icon={<WebuiIconSessionImport className="flex-shrink-0" />} active={false} inert={props.importBusy} onSelect={props.openImportPicker} />
               <RailRow label="插件" icon={<WebuiIconPlugins />} active={props.pluginManagementOpen} onSelect={props.openPlugins} />
               <RailRow label="网站" icon={<WebuiIconSites />} inert />
               <RailRow label="远程" icon={<WebuiIconRemote />} inert />
