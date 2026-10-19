@@ -54,9 +54,11 @@ nothing from `packages/tui` (ADR 0003) and does not drive the CLI binary (ADR 00
 | `src/shared/` | Cross-process wire contracts and shared constants | Imports either execution side |
 
 `src/client/` compiles under `tsconfig.client.json`; `src/server/`, `src/runtime/` and `src/shared/`
-under `tsconfig.server.json`. The client bundle and the server bundle are separate esbuild entries
-(`scripts/build-webui.mjs`) with one metafile, so `pnpm check:webui-boundary` can prove that no client
-module reached the server bundle or vice versa.
+under `tsconfig.server.json`. `scripts/build-webui.mjs` builds separate client and server outputs,
+then combines their metafile inputs for `pnpm check:webui-boundary`. That boundary gate checks the
+combined build graph's allowed inputs and required entries; it does not retain per-output input
+membership. `pnpm check:webui-dependency` enforces client/server import direction from source,
+including type-only imports, while `pnpm typecheck:webui` checks the package's TypeScript programs.
 
 The request path, end to end:
 

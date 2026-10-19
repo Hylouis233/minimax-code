@@ -11,7 +11,7 @@
 // they are erased from build output — and it proves an input is *present*, not
 // that its dependency *direction* is legal. The layer matrix and the allowed
 // edges are ADR 0014's; the caller-role rules and the checks that enforce them
-// are documented in `packages/webui/docs/architecture.md`.
+// are documented in `packages/webui/docs/architecture/boundaries.md`.
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { builtinModules } from "node:module";

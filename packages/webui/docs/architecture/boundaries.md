@@ -62,8 +62,11 @@ and never sees Turn's stream state or the factories that need Turn's transforms.
 Hard rules:
 
 - **Never import `packages/tui`** (ADR 0003). Read it as a specification, compose the equivalent here.
-- No client module in the server bundle and no server module in the client bundle —
-  `pnpm check:webui-boundary` enforces this from the build graph.
+- Client and server source must keep their dependency direction. `pnpm check:webui-dependency`
+  enforces this against the resolved source graph, including type-only imports. The separate esbuild
+  outputs are combined into one metafile input set, so `pnpm check:webui-boundary` does not check
+  per-output client/server membership; it checks the combined graph's allowed inputs and required
+  entries.
 - **One module, one path.** When a file moves, repoint every importer (including relative `../`
   specifiers, which a naive grep misses) and delete any `export * from` shim.
 - Application modules own business RPCs and writable state. Components must not call transport
