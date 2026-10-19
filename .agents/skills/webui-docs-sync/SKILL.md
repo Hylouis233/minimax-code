@@ -1,9 +1,9 @@
 ---
-name: webui-docs-maintainer
-description: Audit and update `packages/webui` documentation and its `AGENTS.md` against the current source and tests. Use for documentation drift, stale architecture decisions, or developer-guide updates; not for implementing WebUI product changes or drafting a new architecture plan.
+name: webui-docs-sync
+description: Synchronize `packages/webui` documentation and its `AGENTS.md` with the current source, tests, and decisions. Use for documentation drift, stale architecture records, or developer-guide updates; not for implementing WebUI product changes or drafting a new architecture plan.
 ---
 
-# WebUI documentation maintainer
+# WebUI documentation sync
 
 Keep the WebUI documentation useful as a guide to the checked-out implementation. Make documentation changes only unless the user separately asks for product-code work.
 

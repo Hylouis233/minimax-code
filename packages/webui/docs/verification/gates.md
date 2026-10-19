@@ -11,19 +11,23 @@ document: [`browser-suite.md`](browser-suite.md).
 | Gate | Proves | Fails on |
 | --- | --- | --- |
 | `pnpm typecheck:webui` | Every source file and every test file compiles under `strict`: the server/runtime/shared config, the client config, and one test program whose `include` is the whole `test/` and `src/` tree | A port member without its stub, a missing binding, a wrong DTO, a test fixture that no longer matches the signature it calls |
-| `pnpm check:webui-dependency` | Import direction and role ownership over the source, including `import type` edges | A forbidden direction, a role violation, a business holding one role in two homes, a stale peer-import exception |
+| `pnpm check:webui-dependency` | Import direction and role ownership over the resolved source graph, including `import type` edges | A forbidden direction, a role violation, a business holding one role in two homes, a private cross-business import, or an unclassified source |
 | `pnpm build:webui` | The client and server bundles build, and prints input counts | A module that is written but not wired (counts do not move) |
-| `pnpm check:webui-boundary` | Nothing outside the allowed entries entered the build graph | A retired source path, the terminal renderer, a client module in the server bundle or vice versa, a forbidden internal reference |
+| `pnpm check:webui-boundary` | The combined client/server build graph contains required entries and inputs within declared package roots; direct WebUI workspace imports use exported subpaths; the artifact integrity record matches current inputs and outputs | A retired source path, the terminal renderer, a private direct workspace import, a forbidden internal reference, or a stale/modified build artifact |
 | `pnpm test:webui-package` | The packaged artefact runs as published | Packaging drift |
 | `pnpm test:webui` | The registered WebUI Vitest group (unit + integration) | Behaviour change, unregistered new test file |
 | `pnpm test:webui-browser` | The built client in a real browser against deterministic transport, plus the declared production-host/native-PTY scenario | Behaviour change in the built bundle or native lifecycle |
 | `pnpm check:source` | `release/public-source.json` lists exactly the delivered files | A new, moved or deleted file without inventory regeneration |
 
-`pnpm check:webui-dependency` reads source; `pnpm check:webui-boundary` reads build output. Neither
-substitutes for the other: type-only edges are erased from the metafile, and an input's presence says
-nothing about the direction it points. The dependency check's exception baseline is
-`scripts/lib/webui-dependency-baseline.json`; the gate fails both on a new violation and on an entry
-that is no longer violated. `../architecture/boundaries.md` states the rules those two gates enforce.
+`pnpm check:webui-dependency` reads the resolved source graph; `pnpm check:webui-boundary` reads the
+combined esbuild metafile. The dependency check enforces import direction, including type-only edges,
+while the boundary check validates the aggregate build inputs and artifact integrity. Because the
+build script merges client and server metafile inputs, the boundary check does not independently
+attribute each input to a particular output. The dependency check rejects new direction violations
+and stale baseline entries; the current direction baseline is empty. Its separate structural
+allowance records the non-literal runtime import described in
+[`../architecture/boundaries.md`](../architecture/boundaries.md). That document states the rules these
+gates enforce.
 
 ## Evidence levels
 
@@ -96,8 +100,7 @@ evidence:
 (`scripts/lib/webui-boundary.mjs`): both entry points present; no retired source path
 (`packages/local-runtime/src/http/`, `packages/local-runtime-v2/src/http/` and the rest of
 `scripts/lib/retired-sources.mjs`); no terminal renderer (`packages/tui/src/tui`); no forbidden
-internal hosts or embedded credentials in the inputs it reads from disk; no server-side call back
-into the CLI entry points; and every bundled file either inside `packages/webui`, an exported subpath
-of a workspace package declared in `release/extraction.json`, or a third-party dependency under
-`node_modules/`. The script is the authority for this list; extend it there, with its own test, rather
-than in prose.
+internal hosts or embedded credentials in the inputs it reads from disk; no CLI entry module in the
+combined inputs; no unapproved direct workspace import from WebUI source; and build inputs within
+WebUI, declared workspace package roots, or `node_modules/`. The script is the authority for this
+list; extend it there, with its own test, rather than in prose.
