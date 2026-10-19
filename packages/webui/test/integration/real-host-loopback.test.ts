@@ -126,7 +126,14 @@ async function bootRealHost(): Promise<Booted> {
     close: async () => {
       await service.close().catch(() => undefined);
       await assembled.host.apiHost.close().catch(() => undefined);
-      await rm(dataDir, { recursive: true, force: true });
+      // The real host may finish its last filesystem callback just after close
+      // resolves. Retry transient ENOTEMPTY/EBUSY while removing the isolated dir.
+      await rm(dataDir, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      });
     },
   };
   booted.push(entry);

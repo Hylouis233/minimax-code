@@ -117,6 +117,7 @@ export function installFixtureTransport() {
     totals: { files: 1, additions: 2, deletions: 1 },
   };
   const requests = [];
+  const replies = [];
   const sockets = new Set();
   // Synthetic PTY records are shared by same-origin fixture pages through
   // local storage, rather than being held by the socket that created them.
@@ -430,6 +431,11 @@ export function installFixtureTransport() {
     }
     respond(request, body) {
       if (this.closed) return;
+      replies.push({
+        operation: request.operation,
+        requestBody: clone(request.body ?? {}),
+        body: body === undefined ? undefined : clone(body),
+      });
       this.emit("message", { data: JSON.stringify({ protocolVersion: 1, kind: "response", requestId: request.requestId, body }) });
     }
     streamFrame(body) {
@@ -446,6 +452,7 @@ export function installFixtureTransport() {
 
   window.__fixture = {
     requests,
+    replies,
     pending,
     setResponse(operation, value) { responses.set(operation, clone(value)); },
     refuseOperation(operation, code, message) { refusals.set(operation, { code, message }); },
