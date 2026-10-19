@@ -23,6 +23,7 @@ Treat `.agents/skills/webui-development/` as part of the maintained guidance, no
 
 | Changed fact or decision | Development skill references to inspect | Evidence to read |
 | --- | --- | --- |
+| How to modify business code, place components, coordinate owners or maintain runtime resources | `references/business-maintenance.md`, relevant `SKILL.md` routing | Current owner/caller paths, operating rules, lifecycle implementations and approved decisions |
 | Business homes, dependency direction, public surfaces | `references/architecture.md`, relevant `SKILL.md` guidance | Real importers, owner modules and dependency-rule implementation |
 | State ownership, submission, resource identity or lifetime | `references/ownership.md` | Commands, producers/consumers, leaf-owner implementations and corresponding tests |
 | Wire contracts, capability availability or runtime resources | `references/runtime.md` | Operation declarations/registration, bindings, adapters and close paths |

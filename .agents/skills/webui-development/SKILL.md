@@ -13,6 +13,8 @@ Locate the repository from the working directory; the original checkout is `/hom
 
 For the changed use case, identify its resource identity, state owner, command, binding, rendered surface and verification seam. Trace one real caller through implementation before choosing a home. Directory names and passing dependency gates alone do not prove ownership. If an explicitly approved design conflicts with the tree, surface that conflict before redesigning it.
 
+For business-code changes, follow [Business maintenance](references/business-maintenance.md): choose the change type, locate the owner, implement through its command and lifecycle, and verify the affected consumer. It includes component placement, prohibited shortcuts and runtime maintenance.
+
 ## Load the relevant reference
 
 | Task | Read |
