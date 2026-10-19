@@ -27,6 +27,7 @@ Repository development skills are available under [`.agents/skills`](.agents/ski
 | [cli-guide](.agents/skills/cli-guide/SKILL.md) | Navigate TUI, exec, ACP and their runtime boundary |
 | [cross-layer-drift-sweep](.agents/skills/cross-layer-drift-sweep/SKILL.md) | Check renames, defaults and contracts across consumers |
 | [webui-docs-sync](.agents/skills/webui-docs-sync/SKILL.md) | Synchronize WebUI documentation with source, tests and decisions |
+| [webui-development](.agents/skills/webui-development/SKILL.md) | Develop WebUI features and components with consistent architecture, design tokens and interaction styles |
 | [webui-gate-audit](.agents/skills/webui-gate-audit/SKILL.md) | Review WebUI verification gates against current architecture and source |
 | [testing-workflow](.agents/skills/testing-workflow/SKILL.md) | Select focused checks and the required delivery gates |
 | [verify-all-runtime-sinks](.agents/skills/verify-all-runtime-sinks/SKILL.md) | Verify alternate runtime paths, caches and artifacts |
