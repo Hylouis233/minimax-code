@@ -211,7 +211,7 @@ const browserCapabilities = {
 // The transport is the module-scope instance; the application, its store and
 // the port slices are built by the root below, once per mount, and provided to
 // the shell.
-const app = <WebuiClientRoot transport={transport} dataDir={runtimeConfig.dataDir} storage={browserCapabilities.storage} />;
+const app = <WebuiClientRoot transport={transport} dataDir={runtimeConfig.dataDir} storage={browserCapabilities.storage} initialSessionId={sessionId} />;
 const currentRoute = route(location.pathname);
 const renderApplication = (): void => root.render(
   // The boundary wraps the app, not the 404: a 404 is a legitimate render and
