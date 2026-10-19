@@ -10,4 +10,4 @@ pnpm test:webui-browser   # installs the pinned Chromium revision when missing
 
 How the fixture works, what the suite proves and what it does not, and which environment variables
 change its server behaviour are documented in
-[`packages/webui/docs/verification/browser-suite.md`](../../packages/webui/docs/verification/browser-suite.md).
+[`../../docs/verification/browser-suite.md`](../../docs/verification/browser-suite.md).

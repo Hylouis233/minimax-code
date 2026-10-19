@@ -15,7 +15,7 @@ process.env.WEBUI_BROWSER_SERVER_ID = serverId;
 const reuseExistingServer = !process.env.CI && process.env.WEBUI_BROWSER_REUSE === "1";
 
 export default defineConfig({
-  testDir: "./test/webui-browser",
+  testDir: "./packages/webui/test/browser",
   outputDir: process.env.WEBUI_BROWSER_OUTPUT_DIR ?? "/tmp/minimax-webui-browser-results",
   fullyParallel: false,
   workers: 1,
@@ -34,7 +34,7 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command: "node test/webui-browser/server.mjs",
+    command: "node packages/webui/test/browser/server.mjs",
     url: "http://127.0.0.1:4179/health",
     reuseExistingServer,
     env: { ...process.env, WEBUI_BROWSER_SERVER_ID: serverId },

@@ -4,12 +4,12 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { createWebuiRuntimeHost } from "../../src/runtime/assembly.js";
-import { createHarnessPortFromHost } from "../../src/runtime/harness/adapter.js";
-import { WebuiTerminalManager } from "../../src/runtime/terminal.js";
-import { WebuiService, createOperationRegistry } from "../../src/server/index.js";
+import { createWebuiRuntimeHost } from "../../../src/runtime/assembly.js";
+import { createHarnessPortFromHost } from "../../../src/runtime/harness/adapter.js";
+import { WebuiTerminalManager } from "../../../src/runtime/terminal.js";
+import { WebuiService, createOperationRegistry } from "../../../src/server/index.js";
 
-const root = fileURLToPath(new URL("../../../../", import.meta.url));
+const root = fileURLToPath(new URL("../../../../../", import.meta.url));
 const directory = await mkdtemp(path.join(tmpdir(), "webui-native-"));
 const workspaceDir = path.join(directory, "workspace");
 const clientDir = path.join(directory, "client");

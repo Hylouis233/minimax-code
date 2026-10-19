@@ -14,15 +14,15 @@
 // It returns a **dormant** application: constructing performs no IO. A fixture
 // that needs the ingress, hydration or the lifecycle states calls `start()`.
 
-import { createWebuiApplication } from "../../src/client/application/create-application.js";
+import { createWebuiApplication } from "../../../src/client/application/create-application.js";
 import type {
   WebuiApplication,
   WebuiApplicationStart,
-} from "../../src/client/application/create-application.js";
-import type { WebuiPortSlices } from "../../src/client/application/port-slices.js";
-import type { WebuiTurnCapabilityPort } from "../../src/client/features/turn/application/turn-capabilities.js";
-import type { GoalPort } from "../../src/client/features/goal/contracts/goal-port.js";
-import type { WebuiSessionStore } from "../../src/client/application/session-store.js";
+} from "../../../src/client/application/create-application.js";
+import type { WebuiPortSlices } from "../../../src/client/application/port-slices.js";
+import type { WebuiTurnCapabilityPort } from "../../../src/client/features/turn/application/turn-capabilities.js";
+import type { GoalPort } from "../../../src/client/features/goal/contracts/goal-port.js";
+import type { WebuiSessionStore } from "../../../src/client/application/session-store.js";
 
 /** A channel that accepts one listener and never emits: SSR-shaped hosts. */
 export const inertEventChannel = () => ({ subscribe: () => () => undefined });

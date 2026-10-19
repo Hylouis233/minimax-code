@@ -22,7 +22,7 @@ import {
   WebuiSessionList,
 } from "../../src/client/features/sessions/ui/SessionRail.js";
 import { WebuiClientFoundationApp } from "../../src/client/shell/WebuiClientFoundationApp.js";
-import { shellElement } from "../support/shell-fixture.js";
+import { shellElement } from "./support/shell-fixture.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 import { createWebuiSessionCatalogFromPage } from "../../src/client/features/sessions/application/session-catalog.js";
 import { formatWebuiUnreadBadge } from "../../src/client/projection/common/unread-badge.js";

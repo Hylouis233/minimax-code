@@ -9,11 +9,11 @@
 import { createElement } from "react";
 import type { ReactElement } from "react";
 
-import { WebuiApplicationProvider } from "../../src/client/bindings/application-context.js";
-import { WebuiClientFoundationApp } from "../../src/client/shell/WebuiClientFoundationApp.js";
-import type { WebuiSessionStore } from "../../src/client/application/session-store.js";
-import { createWebuiPortSlices } from "../../src/client/application/port-slices.js";
-import type { WebuiPortSliceSource } from "../../src/client/application/port-slices.js";
+import { WebuiApplicationProvider } from "../../../src/client/bindings/application-context.js";
+import { WebuiClientFoundationApp } from "../../../src/client/shell/WebuiClientFoundationApp.js";
+import type { WebuiSessionStore } from "../../../src/client/application/session-store.js";
+import { createWebuiPortSlices } from "../../../src/client/application/port-slices.js";
+import type { WebuiPortSliceSource } from "../../../src/client/application/port-slices.js";
 import { createWebuiApplicationFixture } from "./application-fixture.js";
 import type { ApplicationFixtureOptions } from "./application-fixture.js";
 
