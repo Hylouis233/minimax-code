@@ -47,6 +47,7 @@ Every operation has a descriptor in `server/operation/<domain>.ts`, a binding in
 `../architecture/layered-model.md` describes. The wire frames they arrive in are described there too.
 A capability the host does not offer is not an error: each capability port method is optional, and
 `undefined` means "this operation is not wired".
+
 ## Published host event names
 
 `scripts/host-event-catalogue.mjs` reads host producer declarations with the TypeScript checker

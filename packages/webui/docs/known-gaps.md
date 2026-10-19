@@ -4,7 +4,7 @@ Capabilities the WebUI does not have, verified against the tree. Each entry says
 how, and what remains unverified. "Not implemented" and "not decided" are different states and are
 kept apart here; the undecided ones are also in `open-questions.md`.
 
-Last verified: 2026-10-16, against `webui` at `130d7072`. This list covers capabilities; open
+Last verified: 2026-10-19, against `webui` at `33016455`. This list covers capabilities; open
 decisions are in [`open-questions.md`](open-questions.md).
 
 ## 1. Connector and App tools depend on a beta feature, and on the model finding them

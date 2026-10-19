@@ -181,17 +181,21 @@ models-plugins, account) plus two derived methods that are runtime logic reading
 `runCommand` (the slash-command interpreter) and `importSessionTransferWorkflow`. Exposing them as port
 methods is what keeps `server/` depending on `runtime-port` instead of importing runtime code.
 
-The one cast left in the boot path is deliberate and stated: the runtime's `cliService` returns its own
-view types while `WebuiRuntimeCliService` declares the WebUI's wire projections of the same results, and
-the two disagree on 40 members. The cast marks where an explicit runtime→wire conversion is still
-outstanding rather than hiding it in a mirrored type (see [`../known-gaps.md`](../known-gaps.md)).
+The host assignment in `runtime/assembly.ts` is checked against the actual runtime factory return type.
+`runtime/harness/host-contract.ts` derives host requests and results from public `CliService` methods;
+the adapters convert those results into independently owned WebUI DTOs at
+`runtime/harness/result-conversion.ts`. Methods whose upstream result is explicitly `unknown` still
+need bounded runtime conversion; `test/unit/webui-host-contract-derivation.test.ts` pins that set and
+requires zero request or result assignability mismatches. See
+[`../runtime/harness-boundary.md`](../runtime/harness-boundary.md).
 
 The WebUI declares its own harness identity: `runtimeOwnerKind: "webui"` resolves a dedicated policy
-row in the harness, six cells different from the terminal client's — it hosts its own scheduler and
-cron, is not a restricted runtime, opens the memory feature and the feature bundle, and cannot execute
-terminal control sequences. Identity is not access control: enabling memory, cron or Computer Use for
-a browser client gives an agent in that browser the ability to act on this machine, which is why the
-service binds loopback and admits by host, origin and credential (ADR 0004).
+row in the harness, six cells different from the terminal client's. The row enables scheduler-host and
+cron capabilities, marks the runtime unrestricted, enables the memory feature and feature bundle, and
+disables terminal control sequences. The WebUI does not currently provide its own scheduled-task
+surface (see [`../known-gaps.md`](../known-gaps.md)). Identity is not access control: enabling memory,
+cron or Computer Use for a browser client gives an agent in that browser the ability to act on this
+machine, which is why the service binds loopback and admits by host, origin and credential (ADR 0004).
 
 ## 8. The browser application
 
@@ -297,9 +301,10 @@ A change that breaks one of these is a design change, not a refactor:
 
 1. **Import direction is decided by layer, and the layer by the directory.** `pnpm check:webui-dependency`
    enforces it, including `import type` edges the build erases.
-2. **A business is reachable only through its `contracts/`.** A peer call into another business's
-   `application/`, `projection/`, `bindings/` or `ui/` needs a reviewed entry, and an entry whose edge is
-   gone fails the check, so an exception cannot outlive its reason.
+2. **A business is reachable only through its published surface.** A peer imports that business's
+   `contracts/` or an explicitly published `.public.ts` / `.public.tsx` module. Other
+   `application/`, `projection/`, `bindings/` and `ui/` modules remain private; the dependency check
+   enforces the rule and rejects a public marker that re-exports foreign implementation.
 3. **One module, one path.** A moved file gets every importer repointed — including relative `../`
    specifiers — and no `export * from` shim is left behind.
 4. **Presentation holds no write authority.** A component dispatches a command to the application owner

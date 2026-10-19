@@ -66,3 +66,12 @@ The corrections that invalidated earlier drafts of this work are recorded in thi
 ADR's own history and in the `webui` row's code comments; the row itself — its thirteen
 cells and the six that differ from `tui` — is documented in
 `packages/webui/docs/runtime/owner-identity.md`.
+
+## Implementation status (2026-10-19)
+
+The deferred client-side declaration and WebUI-level integration check described above have since
+landed. `packages/webui/src/runtime/assembly.ts` forwards the declared `webui` identity and assigns
+the host using the runtime factory's actual return type; `test/integration/real-host-loopback.test.ts`
+and `test/webui-browser/native-runtime.spec.mjs` exercise the production host path. The separate
+`loopback-harness-path.test.ts` keeps a scripted stand-in behind the port. The earlier consequence
+bullets record the scope at the time of this decision, not current outstanding work.

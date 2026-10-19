@@ -23,7 +23,8 @@ This repository is single-context:
 
 ```
 /
-├── AGENTS.md                        ← agent rules and the skills index
+├── AGENTS.md                        ← agent rules
+├── CONTRIBUTING.md                  ← contributor workflows and the skills index
 ├── CONTEXT.md                       ← the glossary — the only domain-language file
 └── packages/webui/docs/
     ├── README.md                    ← index and reading order
@@ -33,9 +34,9 @@ This repository is single-context:
     └── reference/                   ← generated and machine-read lists
 ```
 
-The log's numbering is the decision order: the highest number is the newest. A decision that is later
-replaced records that in its own `Status:` line and stays in the log as the record of what was chosen
-then; a decision that is no longer in force at all is retired, which its README explains.
+The log's numbering is the decision order: the highest number is the newest. A decision that is
+partly amended or remains relevant as history can record that status in its own `Status:` line. Retire
+a decision that is no longer in force, as described in [`../README.md`](../README.md).
 
 ## Use the glossary's vocabulary
 

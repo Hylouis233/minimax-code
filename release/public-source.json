@@ -7,6 +7,7 @@
     ".agents/skills/retro/SKILL.md",
     ".agents/skills/testing-workflow/SKILL.md",
     ".agents/skills/verify-all-runtime-sinks/SKILL.md",
+    ".agents/skills/webui-docs-maintainer/SKILL.md",
     ".eslintrc.cjs",
     ".gitattributes",
     ".github/CODEOWNERS",

@@ -71,6 +71,12 @@ home. Worked example of what a business owns: `docs/client/ownership.md`.
 `docs/runtime/harness-boundary.md` states what the port and the registry must agree on;
 `test/integration/loopback-harness-path.test.ts` is the level-3 evidence for the new operation.
 
+**Changing runtime host events.** After reviewing a producer change, run
+`pnpm --filter @mavis/webui gen:host-events` to refresh the generated event-name catalogue. Route each
+new catalogue fact in the production session-fact decoder or record an explicit unhandled rationale;
+server typecheck checks generated-file freshness and rejects an unaccounted fact. The generator does
+not edit host sources or WebUI DTOs. Details: `docs/runtime/harness-boundary.md`.
+
 **Changing styles or bundled assets.** `src/client/styles/*.css` and `tailwind.config.cjs` are the
 source; `pnpm build:webui` compiles the stylesheet that both the dev server and the built client
 serve. `webui-design-tokens.test.ts` hard-asserts the semantic tokens and named component classes, so

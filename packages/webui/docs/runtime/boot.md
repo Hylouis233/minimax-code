@@ -73,6 +73,6 @@ session transfer · the terminal process manager (one per service) · the six sl
 | Packaged service | `runtime/index.ts` + `server/index.ts` | The runtime's public entry and the server build entry. `scripts/build-webui.mjs` bundles both. |
 | npm preview package | `release/webui-npm/` | See [`../releasing.md`](../releasing.md). |
 
-The dev launcher forwards `process.env` verbatim and constructs the host with only `dataDir` and
-`appVersion`, which is why the mcode-tools broker environment is not injected by a launcher — see
-[`../known-gaps.md`](../known-gaps.md).
+The dev launcher forwards `process.env` verbatim and constructs the host with `dataDir` and
+`appVersion`. The mcode-tools broker environment is prepared by the runtime assembly and passed to
+the embedded child entry; it is not supplied by the launcher.

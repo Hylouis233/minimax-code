@@ -12,15 +12,16 @@ below.
 ## Authority order
 
 1. **The source and its tests.** `packages/webui/src`, `packages/webui/test` and `test/webui-browser`
-   are the only executable truth. Every claim here cites a file that carries it.
-2. **Decisions.** [`adr/`](adr/) holds the architecture decision log. Those decisions outrank this
-   prose, and a document here that contradicts one is wrong until the decision is replaced.
-3. **This directory.** Description, reference material and open items.
+   establish executable behavior. Verify documented behavior against them; an ADR or prose page does
+   not override the current implementation.
+2. **Decisions.** [`adr/`](adr/) records the rationale and intended constraints. Treat a decision as
+   current only where the source still implements it; update or retire records when that intent changes.
+3. **This directory.** Description, reference material and open items, kept aligned with the source.
 
 `packages/webui/AGENTS.md` sits beside this directory and is the *operating* guide — commands, gates,
 conventions and the edit order for common changes. Read it before changing code; read this directory
-when you need to know what the system is. The repository glossary is `CONTEXT.md` at the repository
-root.
+when you need to know what the system is. For structural work, read the architecture design and its
+facets as directed there. The repository glossary is `CONTEXT.md` at the repository root.
 
 ## Architecture
 
@@ -111,7 +112,7 @@ Planning, migration and audit documents for this package were removed once their
 had become a false statement about the current tree (a plan still saying "implementation has not
 started" after the implementation shipped, a ledger still naming pre-migration paths), and repository
 policy keeps review material and verification reports outside the tree. What survives is here, in
-[`adr/`](adr/), and in git history — the `webui` branch's commits of 2026-09-21 through 2026-10-16.
+[`adr/`](adr/), and in git history — the `webui` branch's commits of 2026-09-21 through 2026-10-19.
 
 Retired: the TUI-harness migration plan and its review brief, the runtime-layer plan, the client
 identity plan, the business-reorganization and cohesion plans with their ledgers (substrate matrix,

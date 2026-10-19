@@ -11,8 +11,8 @@ semantics:
 
 | Cell | `tui` | `webui` | Why |
 | --- | --- | --- | --- |
-| `wiring.schedulerHost` | false | true | The WebUI hosts its own scheduler |
-| `wiring.cronService` | false | true | Cron is reachable without the Electron owner |
+| `wiring.schedulerHost` | false | true | The runtime host exposes scheduler capability; the WebUI currently has no scheduled-task surface |
+| `wiring.cronService` | false | true | The runtime host exposes cron capability without the Electron owner |
 | `execution.restricted` | true | false | The WebUI is not a restricted runtime |
 | `execution.memoryFeature` | false | true | The memory collection opens for this client |
 | `execution.mavisFeatureBundle` | false | true | Same class of feature bundle as the terminal client |
