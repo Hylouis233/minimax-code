@@ -41,6 +41,53 @@ it("selects the visible model catalogue without turning background acquisition i
   application.dispose();
 });
 
+it("reads the session-less catalogue at start so the new-task composer can pick a model", async () => {
+  // The home slot is a context like any other, and `selectCatalogue` points at
+  // its key — but nothing ever *read* it. `refreshInspection` needs a sessionId
+  // and `loadModels` only had the settings panel as a caller, so booting
+  // straight into the new-task screen left the composer's Model picker with an
+  // empty catalogue and rendered it disabled.
+  const listModels = vi.fn(async (request?: { readonly sessionId?: string }) => [
+    { providerId: "fixture", modelId: request?.sessionId ?? "home" },
+  ]);
+  const application = createWebuiApplication({
+    openEventChannel: () => scriptedChannel().channel,
+    slices: createWebuiPortSlices({ listModels } as never),
+    turns: { resumeSession: (async () => {}) as unknown as WebuiClientSessionResumer },
+  });
+
+  application.start();
+  // `start` is synchronous and the read is not, so let the load settle.
+  await Promise.resolve();
+  await Promise.resolve();
+
+  expect(listModels).toHaveBeenCalled();
+  // The session-less read carries no `sessionId`: the home context asks for
+  // the runtime-wide catalogue, not some session's.
+  expect(listModels.mock.calls.every((call) => call[0] === undefined)).toBe(true);
+  expect(application.modelsWorkflows.getSnapshot().models.value?.[0]?.modelId).toBe("home");
+  application.dispose();
+});
+
+it("reads the route's own catalogue at start when the route names a session", async () => {
+  const listModels = vi.fn(async (request?: { readonly sessionId?: string }) => [
+    { providerId: "fixture", modelId: request?.sessionId ?? "home" },
+  ]);
+  const application = createWebuiApplication({
+    openEventChannel: () => scriptedChannel().channel,
+    slices: createWebuiPortSlices({ listModels } as never),
+    turns: { resumeSession: (async () => {}) as unknown as WebuiClientSessionResumer },
+  });
+
+  application.start({ initialSessionId: SESSION });
+  await Promise.resolve();
+  await Promise.resolve();
+
+  expect(listModels).toHaveBeenCalledWith({ sessionId: SESSION });
+  expect(application.modelsWorkflows.getSnapshot().models.value?.[0]?.modelId).toBe(SESSION);
+  application.dispose();
+});
+
 function scriptedChannel() {
   const listeners = new Set<(event: WebuiRuntimeEvent) => void>();
   const ready = new Set<() => void>();
