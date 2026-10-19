@@ -52,7 +52,7 @@ const realBaselinePath = path.join(
 );
 
 describe("V42 frozen pre-refactor metadata and permissions", () => {
-  const oracle = JSON.parse(readFileSync(path.join(here, "../fixtures/path-metadata-f00.json"), "utf8")) as {
+  const oracle = JSON.parse(readFileSync(path.join(here, "./fixtures/path-metadata-f00.json"), "utf8")) as {
     cases: { path: string; layers: string[]; role: string; business: string | null; home: string }[];
     directions: { from: string; to: string; allowed: boolean }[];
   };

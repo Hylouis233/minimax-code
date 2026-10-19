@@ -2,7 +2,7 @@
 //
 // The module is plain JavaScript, so its rule shapes live here instead of
 // being inherited as `any` at every TypeScript call site — the dependency
-// test (`packages/webui/test/unit/webui-dependency-check.test.ts`) drives
+// test (`packages/webui/test/gates/webui-dependency-check.test.ts`) drives
 // `publicationRule` and `isPublicModulePath` through this declaration, and
 // `scripts/check-webui-dependency.mjs` runs the same rule against the
 // resolved file list.

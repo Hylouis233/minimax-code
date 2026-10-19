@@ -15,7 +15,7 @@ document: [`browser-suite.md`](browser-suite.md).
 | `pnpm build:webui` | The client and server bundles build, and prints input counts | A module that is written but not wired (counts do not move) |
 | `pnpm check:webui-boundary` | The combined client/server build graph contains required entries and inputs within declared package roots; direct WebUI workspace imports use exported subpaths; the artifact integrity record matches current inputs and outputs | A retired source path, the terminal renderer, a private direct workspace import, a forbidden internal reference, or a stale/modified build artifact |
 | `pnpm test:webui-package` | The packaged artefact runs as published | Packaging drift |
-| `pnpm test:webui` | The registered WebUI Vitest group (unit + integration) | Behaviour change, unregistered new test file |
+| `pnpm test:webui` | The registered WebUI Vitest group (unit, integration and verification-gate tests) | Behaviour change, unregistered new test file |
 | `pnpm test:webui-browser` | The built client in a real browser against deterministic transport, plus the declared production-host/native-PTY scenario | Behaviour change in the built bundle or native lifecycle |
 | `pnpm check:source` | `release/public-source.json` lists exactly the delivered files | A new, moved or deleted file without inventory regeneration |
 

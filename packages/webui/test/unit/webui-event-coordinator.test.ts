@@ -8,7 +8,7 @@
 // goal banner frozen on whatever `getGoal()` returned when the session opened.
 //
 // This is the deterministic half of that fix; the browser half lives in
-// `test/webui-browser/workspace-progress-live.spec.mjs`.
+// `test/browser/workspace-progress-live.spec.mjs`.
 
 import { describe, expect, it } from "vitest";
 

@@ -1,7 +1,7 @@
 // Types for `webui-boundary.mjs`, the pure WebUI build-boundary rules.
 // The module is plain JavaScript, so its rule shapes live here instead of
 // being inherited as `any` at every TypeScript call site — the boundary test
-// (`packages/webui/test/unit/webui-boundary-check.test.ts`) drives all six
+// (`packages/webui/test/gates/webui-boundary-check.test.ts`) drives all six
 // rules through this declaration, and `scripts/check-webui-boundary.mjs` runs
 // the same `rules` array against the built metafile.
 //

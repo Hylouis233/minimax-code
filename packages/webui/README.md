@@ -40,9 +40,8 @@ Vite serves the browser client from `src/client/` and proxies `/ws`, `/session-t
 | `src/server/` | Network ingress: authentication, envelope validation, dispatch, wire projection, static assets |
 | `src/runtime/` | Harness capability adaptation and every Node-side process resource |
 | `src/shared/` | Cross-process wire contracts and shared constants |
-| `test/` | Vitest unit and integration suites |
+| `test/` | All WebUI tests, grouped into `unit/`, `integration/`, `browser/` and `gates/` |
 | `docs/` | Architecture, client, runtime, design, verification, reference and the decision log |
-| `../../test/webui-browser/` | The built-client browser suite |
 
 [`docs/architecture/module-map.md`](docs/architecture/module-map.md) maps the client's businesses and
 their roles; [`docs/architecture/layered-model.md`](docs/architecture/layered-model.md) explains how a

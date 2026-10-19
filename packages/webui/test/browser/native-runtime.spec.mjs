@@ -5,12 +5,12 @@ import { fileURLToPath } from "node:url";
 import { expect } from "@playwright/test";
 import { test } from "./harness.mjs";
 
-const root = fileURLToPath(new URL("../../", import.meta.url));
+const root = fileURLToPath(new URL("../../../../", import.meta.url));
 let child;
 let ready;
 let logs = "";
 test.beforeAll(async () => {
-  child = fork(path.join(root, "packages/webui/test/integration/native-browser-host.ts"), [], {
+  child = fork(path.join(root, "packages/webui/test/browser/support/native-browser-host.ts"), [], {
     execArgv: ["--import", path.join(root, "packages/webui/node_modules/tsx/dist/loader.mjs")],
     env: { ...process.env, TSX_TSCONFIG_PATH: path.join(root, "tsconfig.standalone.json"), SHELL: "/bin/sh" },
     stdio: ["ignore", "pipe", "pipe", "ipc"],

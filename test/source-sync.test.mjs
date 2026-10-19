@@ -1015,11 +1015,12 @@ test('Windows contract profile selects focused gates', () => {
   }
 });
 
-test('source inventory rejects unregistered, missing and duplicate first-party test gates', () => {
+test('Vitest inventory rejects missing registrations and allows the WebUI Playwright suite', () => {
   const existing = 'packages/example/src/existing.test.ts';
   const omitted = 'packages/example/test/omitted.spec.tsx';
   const missing = 'packages/example/test/missing.test.ts';
-  const files = [existing, omitted, 'third_party/vendor/vendor.test.ts', 'test/release.test.mjs'];
+  const browser = 'packages/webui/test/browser/sample.spec.mjs';
+  const files = [existing, omitted, browser, 'third_party/vendor/vendor.test.ts', 'test/release.test.mjs'];
   assert.deepEqual(suiteInventoryViolations(files, { capability: [existing, existing, missing] }), [
     `${existing}: duplicate Vitest registration`,
     `${missing}: registered Vitest file is missing`,
