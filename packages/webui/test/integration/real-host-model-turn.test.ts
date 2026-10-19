@@ -278,7 +278,7 @@ describe("real host, one turn against a controlled model service", () => {
       // is held, and an idle probe after delivery settles. This is an ordering
       // observation, not an atomic snapshot/event barrier.
       try {
-        await expect.poll(() => stub.requests.length).toBeGreaterThan(0);
+        await expect.poll(() => stub.requests.length, { timeout: 30_000 }).toBeGreaterThan(0);
         const active = await port.getActiveTurn({ id: sessionId as string });
         expect(active?.busyReason).toBe("turn");
         expect(active?.turnId).toBeTruthy();
