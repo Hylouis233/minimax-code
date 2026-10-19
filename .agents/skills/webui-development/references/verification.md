@@ -4,6 +4,12 @@ Read current `packages/webui/AGENTS.md`, `docs/verification/gates.md`, `docs/ver
 
 ## Select checks
 
+Reuse passing gate evidence: before starting a check, inspect results for the same commit, gate and
+platform. Run each applicable check once for unchanged inputs; after a passing `pnpm verify`, do not
+repeat its constituent checks for reassurance. Rerun when relevant source, configuration or generated
+inputs change, a result failed or did not finish, the required platform is uncovered, or CI requires
+the newer commit. If one gate needs a rerun, target that gate instead of repeating the full suite.
+
 | Change | Focused verification, followed by applicable delivery gates |
 | --- | --- |
 | TypeScript source/tests | `pnpm typecheck:webui` (client, server and tests) |

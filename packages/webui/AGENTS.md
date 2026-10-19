@@ -92,6 +92,13 @@ does not make it publishable.
 Run the gates that bear on the change; name them when you report. `docs/verification/gates.md` states
 what each gate proves and what it cannot.
 
+**Reuse passing gate evidence.** Before starting a gate, check whether it has already passed for the
+same commit, gate and platform. Run each applicable gate once for unchanged inputs; after a passing
+`pnpm verify`, do not rerun its constituent gates just for reassurance. Rerun only when relevant
+source, configuration or generated inputs have changed, the prior result failed or did not finish,
+the needed platform is not covered, or CI requires a result for a newer commit. When only one gate
+needs a rerun, run that gate instead of repeating the full suite.
+
 | Change | Run |
 | --- | --- |
 | Any TypeScript change | `pnpm typecheck:webui` — it covers every source and every test file, so a test fixture that no longer matches its signature fails here |
