@@ -93,7 +93,7 @@ function extensionIdOf(worker: Worker): string {
  * hard-coded, because a different path means a different id and a hard-coded
  * one would silently stop matching the allowlist.
  */
-async function launchWithExtension(): Promise<{
+async function launchWithExtension(channel: "msedge" | "chromium"): Promise<{
   context: BrowserContext;
   worker: Worker;
   extensionId: string;
@@ -102,10 +102,10 @@ async function launchWithExtension(): Promise<{
   const profileDir = await mkdtemp(join(tmpdir(), "webui-bridge-real-"));
   const context = await chromium.launchPersistentContext(profileDir, {
     headless: true,
-    // The bundled Chromium is the browser the extension is probed against; the
-    // default channel does not load an unpacked extension's service worker the
-    // same way.
-    channel: "chromium",
+    // "chromium" is the bundled browser and "msedge" is the installed Edge.
+    // The extension is one package for both, and the only thing that differs
+    // is the browser it runs in — which is exactly what this suite measures.
+    channel,
     args: [
       `--disable-extensions-except=${extensionDist}`,
       `--load-extension=${extensionDist}`,
@@ -228,70 +228,59 @@ async function waitForConnected(
   );
 }
 
-test.describe("the browser bridge, against a real Chrome", () => {
+/**
+ * The browsers the extension is exercised against.
+ *
+ * Edge and Chrome are both installed on this machine, and the extension is one
+ * package for both, so the acceptance runs against each.
+ */
+const BROWSERS = ["chromium", "msedge"] as const;
+
+test.describe("the browser bridge, against a real browser", () => {
   test.beforeAll(async () => {
     await buildExtension();
   });
 
-  // The happy path does not complete in this harness yet, and the reason is
-  // not established: the extension never opens a connection to the bridge, and
-  // it records no failure of its own, so the new service worker is either not
-  // starting or is starting without the origin it was given. The refusal test
-  // below passes, so the host's refusal is proven against a real browser; what
-  // is missing is the other half.
-  //
-  // It is marked `fixme` rather than deleted so the gap stays visible and the
-  // test runs as soon as it can.
-  test("the extension completes the handshake once it can prove the installation key", async () => {
-    // The happy path does not complete in this harness yet, and the reason is
-    // not established: the extension never opens a connection to the bridge, and
-    // it records no failure of its own, so the new service worker is either not
-    // starting or is starting without the origin it was given. The refusal test
-    // below passes, so the host's refusal is proven against a real browser; what
-    // is missing is the other half.
-    //
-    // It is marked fixme rather than deleted so the gap stays visible and the
-    // test runs as soon as it can.
-    test.setTimeout(180_000);
-    const { context, worker: launched, extensionId, profileDir } = await launchWithExtension();
-    let worker = launched;
-    const started = await startBridge(extensionId);
-    try {
-      const view = await started.bridge.readInstallationKey("chrome");
-      expect(view).toBeDefined();
+  for (const browser of BROWSERS) {
+    test(`the extension completes the handshake in ${browser} once it can prove the installation key`, async () => {
+      test.setTimeout(180_000);
+      const { context, worker, extensionId, profileDir } = await launchWithExtension(browser);
+      const started = await startBridge(extensionId);
+      try {
+        const view = await started.bridge.readInstallationKey("chrome");
+        expect(view).toBeDefined();
 
-      await provision(worker, context, extensionId, started.origin, view!.key);
-      await waitForConnected(started.bridge, true, worker);
-      // The extension records its own last failure; when the handshake does
-      // not complete, that is where the reason is.
-      // The host is the authority: it is the host that decides a surface is
-      // connected, not the extension's own belief that it connected.
-      expect(started.bridge.snapshot().surfaces.chrome.connected).toBe(true);
-      expect(started.bridge.snapshot().surfaces.chrome.enabled).toBe(true);
-    } finally {
-      await started.close();
-      await context.close();
-      await rm(profileDir, { recursive: true, force: true });
-    }
-  });
+        await provision(worker, context, extensionId, started.origin, view!.key);
+        await waitForConnected(started.bridge, true, worker);
 
-  test("an extension that cannot prove the installation key is refused", async () => {
-    test.setTimeout(180_000);
-    const { context, worker: launched, extensionId, profileDir } = await launchWithExtension();
-    let worker = launched;
-    const started = await startBridge(extensionId);
-    try {
-      // The same extension, connected to the same host, but with no key.
-      await provision(worker, context, extensionId, started.origin, undefined);
-      await waitForConnected(started.bridge, false, worker);
+        // The host is the authority: it is the host that decides a surface is
+        // connected, not the extension's own belief that it connected.
+        expect(started.bridge.snapshot().surfaces.chrome.connected).toBe(true);
+        expect(started.bridge.snapshot().surfaces.chrome.enabled).toBe(true);
+      } finally {
+        await started.close();
+        await context.close();
+        await rm(profileDir, { recursive: true, force: true });
+      }
+    });
 
-      // It must not have been admitted, and the host must not have handed it a
-      // credential.
-      expect(started.bridge.snapshot().surfaces.chrome.connected).toBe(false);
-    } finally {
-      await started.close();
-      await context.close();
-      await rm(profileDir, { recursive: true, force: true });
-    }
-  });
+    test(`an extension that cannot prove the installation key is refused in ${browser}`, async () => {
+      test.setTimeout(180_000);
+      const { context, worker, extensionId, profileDir } = await launchWithExtension(browser);
+      const started = await startBridge(extensionId);
+      try {
+        // The same extension, connected to the same host, but with no key.
+        await provision(worker, context, extensionId, started.origin, undefined);
+        await waitForConnected(started.bridge, false, worker);
+
+        // It must not have been admitted, and the host must not have handed it a
+        // credential.
+        expect(started.bridge.snapshot().surfaces.chrome.connected).toBe(false);
+      } finally {
+        await started.close();
+        await context.close();
+        await rm(profileDir, { recursive: true, force: true });
+      }
+    });
+  }
 });

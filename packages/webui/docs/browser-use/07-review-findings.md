@@ -364,10 +364,20 @@ options page told the person to *"Reconnect the extension to pair with the
 host"* — a manual step that a person can get wrong and that nothing checks.
 The options page now asks the worker to reconnect, and the worker answers.
 
+**Both browsers.** Edge *is* installed on this machine
+(`/usr/bin/microsoft-edge`, 151.0.4129.107) — an earlier note in this
+document said otherwise, and that was wrong. The acceptance therefore runs
+against **both** the bundled Chromium and the installed Edge, and all four
+cases pass: the handshake completes in each, and an unprovisioned peer is
+refused in each.
+
 **What this means for the claims.** The external path is demonstrated working
-against a **real Chrome**, and the security property is demonstrated against
-one too. Edge is not installed on this machine, so the parity claim remains a
-design claim, and ticket #193 stays open for that reason alone.
+against **two real browsers**, and the security property is demonstrated
+against both. What is *not* established is Edge's DevTools domain parity with
+Chrome's — ADR 0019 decision 6 forbids claiming identical CDP domains across
+surfaces, and the extension's `chrome.debugger` subset was not dispatched
+against a live tab. Ticket #193 stays open for that reason and for the store
+builds, not because Edge is unavailable.
 
 ## What this document does not establish
 

@@ -265,14 +265,19 @@ a pairing credential. See [`04-pairing-credentials.md`](04-pairing-credentials.m
 Read this section before citing the matrix. Each line is a gap in the evidence, not a known limitation
 of the product.
 
-- **Edge was not measured.** No Edge binary was installed on the validation host and no Edge probe was
-  run. Every Edge cell above is `required` or `not measured`. **There is no evidence here for Edge
-  parity with Chrome**, and none may be claimed until an Edge probe produces its own
-  `cdp-evidence.json`. ADR 0019 decision 6 already forbids claiming identical CDP domains across
-  surfaces; nothing in this document strengthens that.
-- **Chrome's extension `chrome.debugger` domain subset was not exercised.** No extension was loaded
-  during the probe. The subset behaviour is documented by the vendor and recorded in the ADR's research
-  findings; it was not verified here.
+- **The isolated surface's CDP matrix was measured on Chromium only.** The probe ran against the
+  bundled Chromium, not against Edge, so the isolated surface's cells describe that browser. Edge
+  *was* exercised for the **extension** path — see the real-browser acceptance below — but the
+  isolated surface's command matrix was not re-measured against it.
+- **The extension path is measured in both Chrome and Edge.** The real-browser acceptance
+  (`packages/webui/test/browser/browser-bridge-real-browser.spec.ts`) loads the built extension into
+  each browser in turn and proves the same two things in each: the handshake completes once the
+  extension can prove the installation key, and an extension that cannot is refused and receives no
+  credential. That is evidence about the **bridge**, not about Edge's CDP domain list.
+- **Chrome's extension `chrome.debugger` domain subset was not exercised against a live tab.** The
+  extension was loaded and the handshake run, but no DevTools command was dispatched to a real page.
+  The subset behaviour is documented by the vendor and recorded in the ADR's research findings; it was
+  not verified here.
 - **A real logged-in external browser was not exercised.** Every measurement used a fresh headless
   profile with synthetic `data:` pages. No account, session or user content was involved, and nothing
   here demonstrates support for a logged-in external browser. The ADR says this explicitly about the
