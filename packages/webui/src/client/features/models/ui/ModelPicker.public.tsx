@@ -93,6 +93,7 @@ export function WebuiModelPicker({
 }: ModelPickerProps): ReactElement {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<PickerView>("panel");
+  const [isViewTransitioning, setIsViewTransitioning] = useState(false);
   /**
    * The catalogue as it was when the popup opened.
    *
@@ -109,13 +110,18 @@ export function WebuiModelPicker({
 
   const close = useCallback(() => {
     setOpen(false);
-    setView("panel");
+    // The dropdown keeps this popup mounted while its exit animation runs.
+    // Preserve the current view during that window; resetting to the panel
+    // here makes an outside dismissal flash the first-level content before
+    // the popup disappears. `handleOpen` starts the next visit at the panel.
+    setIsViewTransitioning(false);
     setDraft({});
   }, []);
 
   const handleOpen = useCallback(() => {
     setGroups(groupModelsByProvider(models));
     setView("panel");
+    setIsViewTransitioning(false);
     setOpen(true);
   }, [models]);
 
@@ -135,6 +141,7 @@ export function WebuiModelPicker({
     escapeRef.current = false;
     if (wasEscape && view === "list") {
       setView("panel");
+      setIsViewTransitioning(true);
       return;
     }
     close();
@@ -245,7 +252,10 @@ export function WebuiModelPicker({
           groups={groups}
           selected={selected}
           onSelect={handleSelectModel}
-          onBack={() => setView("panel")}
+          onBack={() => {
+            setView("panel");
+            setIsViewTransitioning(true);
+          }}
         />
       );
     }
@@ -253,7 +263,10 @@ export function WebuiModelPicker({
       <WebuiModelPanel
         model={selected}
         draft={draft}
-        onOpenList={() => setView("list")}
+        onOpenList={() => {
+          setView("list");
+          setIsViewTransitioning(true);
+        }}
         onEffortChange={handleEffortChange}
         onResetEffort={handleResetEffort}
         onContextLimitChange={handleContextLimitChange}
@@ -281,18 +294,22 @@ export function WebuiModelPicker({
         // one the skeleton's trigger props name — `id` below is this id, so
         // there is one id and not two that could disagree.
         labelledBy={triggerId}
-        // Above the trigger, right-aligned to it, eight pixels of air: where
+        // Above the trigger, centred on it, twelve pixels of air: where
         // the panel has always opened. `flip` opens it downwards when there is
         // no room above, so a trigger near the top of the window still shows
         // its panel.
         side="top"
-        align="end"
-        offset={8}
+        align="center"
+        offset={12}
+        placementKey={view}
         collision="flip"
         className="webui-model-menu"
         popupDataAttributes={{
           "data-webui-model-menu": "true",
           "data-webui-model-view": view,
+          "data-webui-model-transitioning": isViewTransitioning
+            ? "true"
+            : "false",
         }}
         trigger={(triggerProps) => {
           // The popup is measured against this button by default, and every

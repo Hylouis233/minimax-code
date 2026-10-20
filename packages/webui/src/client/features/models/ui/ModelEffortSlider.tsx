@@ -27,6 +27,8 @@ export interface WebuiModelEffortSliderProps {
   readonly scale: WebuiEffortScale;
   /** The level the model is on now. */
   readonly value: string;
+  /** A switch has only its two end states, so it uses a shorter rail. */
+  readonly binary: boolean;
   /** Called once, when the drag ends on a level. */
   readonly onCommit: (value: string) => void;
 }
@@ -44,6 +46,7 @@ const TRAVEL = "calc(var(--spacing_20) + (100% - var(--spacing_40)) *";
 export function WebuiModelEffortSlider({
   scale,
   value,
+  binary,
   onCommit,
 }: WebuiModelEffortSliderProps): ReactElement {
   const railRef = useRef<HTMLDivElement | null>(null);
@@ -54,6 +57,7 @@ export function WebuiModelEffortSlider({
   const index = effortStopIndex(scale, preview ?? value);
   const ratio = effortStopRatio(Math.max(index, 0), total);
   const position = `${TRAVEL} ${ratio})`;
+  const fillWidth = ratio === 0 ? "0px" : position;
 
   /** The stop under a pointer, as the nearest one. */
   const stopAt = useCallback(
@@ -118,6 +122,7 @@ export function WebuiModelEffortSlider({
       className="webui-model-effort-slider"
       data-webui-model-effort-slider="true"
       data-disabled={scale.disabled ? "true" : "false"}
+      data-binary={binary ? "true" : "false"}
     >
       <div
         ref={railRef}
@@ -128,7 +133,7 @@ export function WebuiModelEffortSlider({
         onPointerCancel={handlePointerCancel}
       >
         <div className="webui-model-effort-track" />
-        <div className="webui-model-effort-fill" style={{ width: position }} />
+        <div className="webui-model-effort-fill" style={{ width: fillWidth }} />
         {scale.stops.map((stop, at) => (
           <span
             key={stop.value}

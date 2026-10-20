@@ -97,14 +97,22 @@
     display: flex;
     align-items: center;
     gap: var(--spacing_4);
-    height: 32px;
+    height: 36px;
     max-width: 244px;
-    padding: 0 var(--spacing_8);
-    border-radius: 10px;
+    padding: 0 var(--spacing_12);
+    border-radius: var(--radius_full);
+    background: transparent;
     color: var(--text_default_primary);
     font-size: var(--size_14);
     line-height: var(--line_height_20);
     transition: background-color 120ms ease;
+  }
+  .webui-model-selector-trigger:focus:not(:focus-visible) {
+    outline: none;
+  }
+  .webui-model-selector-trigger:focus-visible {
+    outline: 2px solid var(--border_accent);
+    outline-offset: 2px;
   }
   .webui-model-selector-trigger:hover:not(:disabled) {
     background-color: var(--bg_interaction_tertiary_hover);
@@ -128,23 +136,46 @@
    */
   .webui-model-menu {
     display: flex;
-    width: min(400px, calc(100vw - 32px));
+    width: min(350px, calc(100vw - 32px));
     max-height: min(520px, calc(100dvh - 112px));
     flex-direction: column;
-    padding: var(--spacing_16);
-    border-radius: var(--radius_16);
+    padding: var(--spacing_12) var(--spacing_16);
+    border-radius: var(--radius_20);
     overflow: hidden;
+  }
+  .webui-model-menu:has([data-webui-model-list="true"]) {
+    padding: var(--spacing_12) var(--spacing_6);
   }
   .webui-model-popup {
     display: flex;
     min-height: 0;
     flex-direction: column;
   }
+  .webui-model-menu[data-webui-model-transitioning="true"][data-webui-model-view="list"] .webui-model-list {
+    animation: webui-model-list-enter 160ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .webui-model-menu[data-webui-model-transitioning="true"][data-webui-model-view="panel"] .webui-model-panel {
+    animation: webui-model-panel-enter 160ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  @keyframes webui-model-list-enter {
+    from { opacity: 0; transform: translateX(10px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes webui-model-panel-enter {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .webui-model-menu[data-webui-model-transitioning="true"] .webui-model-list,
+    .webui-model-menu[data-webui-model-transitioning="true"] .webui-model-panel {
+      animation: none;
+    }
+  }
   /* ---- the panel state ---- */
   .webui-model-panel {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing_12);
+    gap: var(--spacing_8);
   }
   .webui-model-panel-head {
     position: relative;
@@ -168,7 +199,7 @@
     align-items: center;
     justify-content: center;
     border: 0;
-    border-radius: var(--radius_8);
+    border-radius: var(--radius_full);
     background: transparent;
     color: var(--icon_default_tertiary);
   }
@@ -189,13 +220,13 @@
     justify-content: center;
     gap: var(--spacing_4);
     border: 0;
-    border-radius: var(--radius_8);
+    border-radius: var(--radius_full);
     background: transparent;
     padding: var(--spacing_4);
     color: var(--text_default_primary);
     font: inherit;
-    font-size: var(--size_14);
-    line-height: var(--line_height_20);
+    font-size: var(--size_16);
+    line-height: var(--line_height_22);
   }
   .webui-model-panel-model:hover {
     background: var(--bg_interaction_tertiary_hover);
@@ -266,12 +297,16 @@
     cursor: pointer;
     touch-action: none;
   }
+  .webui-model-effort-slider[data-binary="true"] .webui-model-effort-rail {
+    width: min(320px, 100%);
+    margin-inline: auto;
+  }
   .webui-model-effort-track {
     position: absolute;
     top: 50%;
     right: 0;
     left: 0;
-    height: var(--spacing_20);
+    height: var(--spacing_32);
     transform: translateY(-50%);
     border-radius: 999px;
     background: var(--bg_grouped_tertiary);
@@ -280,7 +315,7 @@
     position: absolute;
     top: 50%;
     left: 0;
-    height: var(--spacing_20);
+    height: var(--spacing_32);
     transform: translateY(-50%);
     border-radius: 999px;
     background: var(--bg_interaction_accent_focus_blue);
@@ -322,13 +357,14 @@
     min-height: 0;
     flex: 1 1 auto;
     flex-direction: column;
-    gap: var(--spacing_16);
+    gap: var(--spacing_12);
   }
   .webui-model-list-head {
     display: flex;
     flex: 0 0 auto;
     align-items: center;
     justify-content: space-between;
+    padding: 0 var(--spacing_8);
   }
   .webui-model-list-back {
     display: flex;
@@ -352,14 +388,14 @@
   }
   .webui-model-list-title {
     color: var(--text_default_tertiary);
-    font-size: var(--size_12);
-    line-height: var(--line_height_16);
+    font-size: var(--size_16);
+    line-height: var(--line_height_22);
   }
   .webui-model-list-groups {
     display: flex;
     min-height: 0;
     flex-direction: column;
-    gap: var(--spacing_16);
+    gap: var(--spacing_12);
     overflow-y: auto;
     scrollbar-width: none;
     -ms-overflow-style: none;
@@ -370,7 +406,7 @@
   .webui-model-list-group {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing_2);
+    gap: var(--spacing_4);
   }
   /* The group's name and, under it, the identifier it answers to. A group
    * header is two lines because the second line is the part that tells two
@@ -383,29 +419,29 @@
   }
   .webui-model-list-group-name {
     color: var(--text_default_primary);
-    font-size: var(--size_14);
-    line-height: var(--line_height_20);
-    font-weight: 600;
+    font-size: var(--size_16);
+    line-height: var(--line_height_22);
+    font-weight: var(--weight_regular);
   }
   .webui-model-list-group-subtitle {
     color: var(--text_default_tertiary);
-    font-size: var(--size_12);
-    line-height: var(--line_height_16);
+    font-size: var(--size_14);
+    line-height: var(--line_height_20);
   }
   .webui-model-list-row {
     display: flex;
     width: 100%;
-    min-height: var(--spacing_32);
+    min-height: var(--spacing_40);
     align-items: center;
     gap: var(--spacing_8);
     border: 0;
-    border-radius: var(--radius_8);
+    border-radius: var(--radius_16);
     background: transparent;
     padding: 0 var(--spacing_8);
     color: var(--text_default_primary);
     font: inherit;
-    font-size: var(--size_14);
-    line-height: var(--line_height_20);
+    font-size: var(--size_16);
+    line-height: var(--line_height_22);
     text-align: left;
   }
   .webui-model-list-row:hover {

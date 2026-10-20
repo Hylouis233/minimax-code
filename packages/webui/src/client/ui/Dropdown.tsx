@@ -166,6 +166,8 @@ export interface WebuiDropdownProps {
   readonly width?: WebuiDropdownWidth;
   /** The gap between the trigger and the popup. */
   readonly offset?: number;
+  /** Re-measure placement when the caller swaps content with a different size. */
+  readonly placementKey?: string | number;
   /**
    * The anchor, as a rectangle.
    *
@@ -241,6 +243,7 @@ export function WebuiDropdown({
   align = "start",
   width = "content",
   offset = 4,
+  placementKey,
   anchorRect,
   anchorElementRef,
   placement,
@@ -416,7 +419,7 @@ export function WebuiDropdown({
       stopScroll();
       stopObserve?.();
     };
-  }, [dom, mounted, place]);
+  }, [dom, mounted, place, placementKey]);
 
   const handleTriggerClick = useCallback(() => {
     if (open) onClose();

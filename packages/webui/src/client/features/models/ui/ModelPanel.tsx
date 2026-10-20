@@ -27,6 +27,7 @@ import {
   currentEffortValue,
   effortResetOption,
   effortScaleFor,
+  isBinaryEffort,
 } from "../projection/effort-scale.js";
 import { effortLabel } from "../projection/thinking-control.public.js";
 import { WebuiModelEffortSlider } from "./ModelEffortSlider.js";
@@ -154,6 +155,7 @@ export function WebuiModelPanel({
       <WebuiModelEffortSlider
         scale={scale}
         value={level}
+        binary={isBinaryEffort(model)}
         onCommit={onEffortChange}
       />
     </div>
