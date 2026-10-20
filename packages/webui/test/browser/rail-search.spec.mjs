@@ -77,7 +77,11 @@ test("the rail orders sessions newest first", async ({ page }) => {
   // would satisfy a set comparison and quietly stop being predictable to look
   // at. (The view-sorting unit test already fell into a version of this: a
   // fixture whose two timestamps moved together made every ordering pass.)
-  expect(await visibleSessionIds(page)).toEqual(["B", "A"]);
+  //
+  // C is the child session the fixture hangs under A. The rail draws a child
+  // after its parent, so the newest-first rule still holds: B (newer than A)
+  // comes first, A carries its child, and C follows the parent it belongs to.
+  expect(await visibleSessionIds(page)).toEqual(["B", "A", "C"]);
 });
 
 test("a title substring narrows the rail to the one session", async ({ page }) => {
