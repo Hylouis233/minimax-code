@@ -235,7 +235,8 @@
       "packages/browser-extension/test/protocol.test.ts",
       "packages/browser-extension/test/pairing.test.ts",
       "packages/browser-extension/test/bridge-client.test.ts",
-      "packages/browser-extension/test/input.test.ts"
+      "packages/browser-extension/test/input.test.ts",
+      "packages/browser-extension/test/cdp.test.ts"
     ],
     "status-contract": [
       "packages/tui/test/unit/tui-build-mode-contract.test.ts"
