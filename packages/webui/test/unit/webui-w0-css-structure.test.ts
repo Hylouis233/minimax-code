@@ -652,48 +652,37 @@ describe("W0 · structural declarations W5 must preserve", () => {
     );
   });
 
-  it("keeps the model picker switch on its 40x20 track", () => {
+  it("keeps the base toggle switch's 40x20 track, and leaves the picker out of it", () => {
     // The base rule sizes the track with `flex: 0 0 40px`, which is the width
-    // in a row container. The model detail column is `flex-direction: column`,
-    // so that basis lands on the main axis and turns the 20px track into a
-    // 40px circle. The column-scoped override is what keeps it a pill; the base
-    // rule stays untouched for the settings switches.
+    // in a row container. The model picker's settings column needed a
+    // column-scoped override to keep the 20px track from stretching into a
+    // 40px circle — and that column is gone: the panel owns the thinking level
+    // now, and it owns it with a slider rather than a switch. The base rule
+    // stays untouched for the settings switches.
     const base = winning(".webui-toggle-switch");
     expect(declaration(base.body, "width")).toBe("40px");
     expect(declaration(base.body, "height")).toBe("20px");
     expect(declaration(base.body, "flex")).toBe("0 0 40px");
 
-    const inColumn = winning(
-      ".webui-model-detail-row .webui-toggle-switch",
-    );
-    expect(declaration(inColumn.body, "flex")).toBe("0 0 auto");
-    expect(declaration(inColumn.body, "align-self")).toBe("flex-start");
+    expect(
+      shellRules.filter((rule) => rule.selector.includes(".webui-model-detail-row")),
+    ).toHaveLength(0);
   });
 
-  it("hides the scrollbar on both model picker panels without losing scroll", () => {
-    // Both columns overflow; a visible bar cuts into the menu's rounded frame.
-    // The rules only remove the bar — `overflow-y: auto` stays on both, so the
-    // content still scrolls.
-    for (const selector of [
-      ".webui-model-menu-list",
-      ".webui-model-menu-detail",
-    ]) {
-      const body = winning(selector).body;
-      expect(declaration(body, "overflow-y")).toBe("auto");
-    }
-
-    const hidden = winning(
-      ".webui-model-menu-list, .webui-model-menu-detail",
-    );
-    expect(declaration(hidden.body, "scrollbar-width")).toBe("none");
+  it("hides the scrollbar on the model picker's list without losing scroll", () => {
+    // The picker is ONE popup with two states, so it has ONE scrolling list.
+    // A visible bar cuts into the popup's rounded frame; the rule only removes
+    // the bar — `overflow-y: auto` stays, so the content still scrolls.
+    const body = winning(".webui-model-list-groups").body;
+    expect(declaration(body, "overflow-y")).toBe("auto");
+    expect(declaration(body, "scrollbar-width")).toBe("none");
 
     const webkit = shellRules.filter(
       (rule) =>
         rule.selector.includes("::-webkit-scrollbar") &&
-        rule.selector.includes(".webui-model-menu-list"),
+        rule.selector.includes(".webui-model-list-groups"),
     );
     expect(webkit).toHaveLength(1);
-    expect(webkit[0]?.selector).toContain(".webui-model-menu-detail");
     expect(webkit[0]?.body).toMatch(/display:\s*none/u);
   });
 

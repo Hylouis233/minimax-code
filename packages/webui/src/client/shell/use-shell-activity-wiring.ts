@@ -52,8 +52,6 @@ export interface UseShellActivityWiringOptions {
   readonly selectedSessionId: string | undefined;
   /** Fires when the channel is ready again, so the rail can re-probe. */
   readonly onChannelReady: (listener: () => void) => () => void;
-  /** Follows the route the shell resolved; the application keeps the one record. */
-  readonly select: (sessionId: string | undefined) => void;
   readonly seed: (sessions: readonly ShellActivitySessionRow[]) => void;
   /**
    * Declares which rows the rail is interested in.
@@ -82,7 +80,6 @@ export function useShellActivityWiring(
     railPage,
     selectedSessionId,
     onChannelReady,
-    select,
     seed,
     setActivityInterest,
     reconcileActivity,
@@ -113,10 +110,6 @@ export function useShellActivityWiring(
       }),
     [onChannelReady],
   );
-  // The application's selection follows the route the shell resolved.
-  useEffect(() => {
-    select(selectedSessionId);
-  }, [select, selectedSessionId]);
   // The age labels are a function of the clock, not of the data. Without a tick
   // they would freeze at whatever they read when the last event arrived, and
   // every row would agree on how long ago "now" was.

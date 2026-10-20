@@ -87,6 +87,11 @@ styled with the same names the token file declares.
   row of outlined suggestion chips.
 - The emphasis colour is the bright blue from the ramp, used sparingly: a link, the accent bar on a
   card, small badges.
+- The model picker opens one popup with two states, and it is the only place a thinking level is
+  set. The panel names the level in the accent blue above the model name, the model name opens the
+  catalogue grouped by provider, and the level is a blue rail with a white thumb whose stops are the
+  model's own. A white thumb on a blue rail is the only such control in the client, and it stays
+  that way: a second control for the same state is a second thing to disagree with the first.
 - Density is low: menu rows sit around 13–14px with 12–14px gaps, and the composer is surrounded by
   empty space.
 - The settings pages share one skeleton: `client/ui/settings-layout.tsx` renders the page column

@@ -1048,6 +1048,15 @@
       "home": "target"
     },
     {
+      "path": "client/features/models/projection/effort-scale.ts",
+      "layers": [
+        "view"
+      ],
+      "role": "feature-projection",
+      "business": "models",
+      "home": "target"
+    },
+    {
       "path": "client/features/models/projection/model-draft.ts",
       "layers": [
         "view"
@@ -1156,7 +1165,34 @@
       "home": "target"
     },
     {
+      "path": "client/features/models/ui/ModelEffortSlider.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "models",
+      "home": "target"
+    },
+    {
+      "path": "client/features/models/ui/ModelListPanel.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "models",
+      "home": "target"
+    },
+    {
       "path": "client/features/models/ui/ModelMenu.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "models",
+      "home": "target"
+    },
+    {
+      "path": "client/features/models/ui/ModelPanel.tsx",
       "layers": [
         "bindings"
       ],

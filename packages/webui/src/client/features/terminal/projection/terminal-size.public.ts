@@ -23,9 +23,9 @@
  *     reported" and leave the new one at the default.
  *
  * The observer and the timers that feed these rules live in
- * `components/workspace/WorkspacePanels.tsx`, in the same split
- * `model-picker-hover.ts` uses: the decision is data, the scheduling belongs
- * to the surface that owns the clock. The workspace panel reads both the
+ * `components/workspace/WorkspacePanels.tsx`, in the same split the model
+ * picker's scale used: the decision is data, the scheduling belongs to the
+ * surface that owns the clock. The workspace panel reads both the
  * debounce window and the report-decision rule through this module so the
  * terminals business owns the rule for "what counts as a worth-sending
  * report", even though the panel is the one dragging the slider.

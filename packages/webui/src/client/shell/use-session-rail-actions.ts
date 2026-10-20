@@ -68,7 +68,7 @@ export interface UseSessionRailActionsOptions {
   readonly workflows: WebuiRailWorkflows;
   readonly selectedSessionId: string | undefined;
   readonly selectedSession: WebuiClientSession | undefined;
-  readonly setSelectedSessionId: (sessionId: string | undefined) => void;
+  readonly selectSession: (sessionId: string | undefined) => void;
   readonly setPageError: (message: string) => void;
 }
 
@@ -109,7 +109,7 @@ export function useSessionRailActions({
   workflows,
   selectedSessionId,
   selectedSession,
-  setSelectedSessionId,
+  selectSession,
   setPageError,
 }: UseSessionRailActionsOptions): SessionRailActions {
   // The overlay state itself belongs to Sessions and is read through that
@@ -202,7 +202,7 @@ export function useSessionRailActions({
       .then((forked) => {
         const id = forked?.sessionId;
         if (id) {
-          setSelectedSessionId(id);
+          selectSession(id);
           if (typeof window !== "undefined")
             window.history.replaceState(
               null,
@@ -247,7 +247,7 @@ export function useSessionRailActions({
           workspaceDir: selectedSession?.workspaceDir,
         });
         await refreshRail();
-        setSelectedSessionId(result.sessionId);
+        selectSession(result.sessionId);
         if (typeof window !== "undefined") {
           window.history.replaceState(
             null,
@@ -267,7 +267,7 @@ export function useSessionRailActions({
       .remove(session.sessionId)
       .then(() => {
         if (selectedSessionId === session.sessionId) {
-          setSelectedSessionId(undefined);
+          selectSession(undefined);
           if (typeof window !== "undefined")
             window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
         }

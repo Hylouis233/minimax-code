@@ -23,8 +23,8 @@ export interface WebuiModelPickerEntry {
    *
    * `default_value` is the runtime's own statement that a `switchable` model
    * has an on/off thinking switch, and it arrives here whether or not the
-   * variant list does. `resolveEffortOptions` reads it so the brain icon does
-   * not depend on a second field surviving the trip.
+   * variant list does. `resolveEffortOptions` reads it so the panel's control
+   * does not depend on a second field surviving the trip.
    */
   readonly thinkingConfig?: {
     readonly mode?: string;
@@ -42,38 +42,22 @@ export interface WebuiModelPickerDraft {
 }
 
 /**
- * One provider's rows in the picker, or the favourites section that repeats
- * starred rows above them.
+ * One provider's rows in the picker.
  *
- * Moved here from `features/models/ui/ModelPicker.tsx` so the pure picker
- * projections (`features/models/projection/model-favorites.ts`,
- * `features/models/projection/model-picker-search.ts`) can consume it without
- * importing a React component.
+ * Moved here so the picker's projection (`features/models/projection/model-picker-rows.ts`)
+ * can compose a group without importing a React component.
  */
 export interface WebuiModelProviderGroup {
   /**
-   * Stable identity for the group: the provider id, or `FAVORITES_SECTION_ID`
-   * for the starred section. This is what React keys on and what the search
-   * filter keeps order by — NOT `label`, because two providers are free to
+   * Stable identity for the group: the provider id.
+   *
+   * This is what React keys on — NOT `label`, because two providers are free to
    * share a display name and keying on it would make the second one a
    * duplicate-key render.
    */
   readonly id: string;
   readonly label: string;
   readonly models: readonly WebuiModelPickerEntry[];
-  /**
-   * The provider each row really belongs to, keyed by `modelKey` — set only on
-   * a section that is not the model's own provider, which today means the
-   * favourites section.
-   *
-   * A starred model is listed TWICE on purpose: it stays where the catalogue
-   * put it, under the provider that owns it, and it is also repeated at the top
-   * because that is what a shortlist is for. The repeat is the only part that
-   * needs explaining, so every repeated row says which provider it came from.
-   * Without it, a favourites list of eight rows from five providers is eight
-   * names with no way to tell a deprecated model from a different vendor's.
-   */
-  readonly modelOriginLabels?: Readonly<Record<string, string>>;
 }
 
 export interface WebuiModelSelectionRequest {

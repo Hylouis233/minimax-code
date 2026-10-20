@@ -8,7 +8,6 @@ import {
   type TeamModeSessionChoices,
 } from "./team-mode.js";
 
-export const MODEL_FAVORITES_KEY = "webui:model-favorites:v1";
 export const NO_PROJECT_STORAGE_KEY = "mavis-no-project";
 export const TEAM_MODE_STORAGE_KEY = "mavis-team-mode";
 export const TEAM_MODE_SESSION_STORAGE_KEY = "mavis-team-mode:sessions:v1";
@@ -26,8 +25,6 @@ export interface WebuiBrowserStorage {
   readonly getItem: (key: string) => string | null;
   readonly setItem: (key: string, value: string) => void;
   readonly removeItem: (key: string) => void;
-  readonly readFavoriteModels: (normalize: (value: unknown) => string[]) => string[];
-  readonly writeFavoriteModels: (ids: readonly string[], normalize: (value: unknown) => string[]) => void;
   readonly readNoProjectFlag: () => boolean;
   readonly writeNoProjectFlag: (value: boolean) => void;
   readonly readTeamModeOff: () => boolean;
@@ -62,15 +59,6 @@ export interface WebuiBrowserStorage {
 export function createWebuiBrowserStorage(
   storage: Storage | undefined,
 ): WebuiBrowserStorage {
-  const readFavoriteModels = (normalize: (value: unknown) => string[]): string[] => {
-    if (!storage) return [];
-    try {
-      const raw = storage.getItem(MODEL_FAVORITES_KEY);
-      return raw ? normalize(JSON.parse(raw)) : [];
-    } catch {
-      return [];
-    }
-  };
   const readTeamChoices = (): TeamModeSessionChoices => {
     if (!storage) return {};
     return parseTeamModeSessionChoices(storage.getItem(TEAM_MODE_SESSION_STORAGE_KEY));
@@ -84,15 +72,6 @@ export function createWebuiBrowserStorage(
     },
     removeItem: (key) => {
       try { storage?.removeItem(key); } catch { /* Preferences are best-effort. */ }
-    },
-    readFavoriteModels,
-    writeFavoriteModels: (ids, normalize) => {
-      if (!storage) return;
-      try {
-        storage.setItem(MODEL_FAVORITES_KEY, JSON.stringify(normalize(ids)));
-      } catch {
-        // Preferences are best-effort; the in-memory selection remains usable.
-      }
     },
     readNoProjectFlag: () => {
       if (!storage) return false;

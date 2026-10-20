@@ -1,22 +1,22 @@
 /**
- * The composer's thinking trigger.
+ * The model's thinking contract, as the controls read it.
  *
- * A brain icon beside the send button that answers ONE question — is thinking
- * on — and, for a model with a depth scale, a second control beside it that
- * answers a different one: which level. Two questions, two controls, because
- * the brain cannot ask which depth the user wants; a clickable brain would have
- * to guess one, and a guess presented as a control is worse than no control.
+ * The wire carries a model's thinking in two fields, and they are not the same
+ * question: `thinking.effort` is a DEPTH (`low`, `medium`, `high`), and the
+ * wire VARIANT is a SWITCH (`"thinking"`, or empty for the non-thinking
+ * variant). A model with a depth scale is changed through the effort; a
+ * two-state model is changed through the variant, because it has no depth to
+ * record.
  *
- * The interesting part is the THREE-valued `isThinkingOn`. A colour is a
- * claim, and there is a case where this process cannot support any claim at
- * all: the wire contract says an empty effort means "no override, the engine
- * picks", and the engine never reports back which level it chose. So the empty
- * case is `null`, not `false` — a blue brain next to the word "Default" would
- * assert a state nothing here can verify. `null` renders in the neutral colour
- * and lets the LABEL carry the truth; colour reinforces, text decides.
+ * Which of the two a model has is a fact about the MODEL CONTRACT, not about
+ * the control that shows it — and it used to be answered twice: once for the
+ * cascade's fly-out and once for the composer's brain icon. Two answers to one
+ * question is how a control ends up claiming a level the model cannot honour,
+ * so the answer lives here once and every surface reads it from here.
  *
- * The model target reports `effortOptions` plus `thinking.effort` /
- * `variant`; a single `thinking` string is not what this wire carries.
+ * The panel that shows the scale is the models feature's own; the composer's
+ * chip names the level beside the model name, and names it in the interface's
+ * language rather than the wire's.
  */
 
 import type {
@@ -48,68 +48,37 @@ export function thinkingControlShape(
 }
 
 /**
- * Is thinking ON — `true` / `false` / `null` for "this process cannot say".
+ * The Chinese label for one wire level.
  *
- *   - an absent or empty record is the ENGINE's default and is `null`;
- *   - a record the model does not offer is `null` too, because the record does
- *     not describe this model — a cross-model leftover, not a state;
- *   - a recorded DEPTH (low / medium / high / …) counts as ON. It is a request
- *     FOR thinking, and treating it as off would grey the control while the
- *     engine is visibly reasoning. Only an explicit "off" is off.
+ * The wire speaks English (`low`, `medium`, `high`) and the interface speaks
+ * Chinese, so the translation lives here rather than in the runtime: the
+ * runtime's levels are its own, and a client that printed them raw would put
+ * `high` next to 「模型」. A level this table does not know is shown as it
+ * arrived — a name we cannot translate is still better than a wrong one.
  */
-export function isThinkingOn(
-  options: readonly string[],
-  recorded: string | undefined,
-): boolean | null {
-  const value = (recorded ?? "").trim();
-  if (value === "") return null;
-  if (!options.includes(value)) return null;
-  return value !== "off";
-}
+const EFFORT_LABELS: Readonly<Record<string, string>> = {
+  default: "默认",
+  off: "关闭",
+  on: "开启",
+  minimal: "极简",
+  low: "低",
+  medium: "中",
+  high: "高",
+  max: "最高",
+};
 
-/** The whole of a model entry's thinking state, as the controls read it. */
-export interface ThinkingState {
-  /** The wire variant: `"thinking"`, `""` for the non-thinking variant. */
-  readonly variant?: string;
-  /** The recorded depth, or `null` for an explicit "engine decides". */
-  readonly thinkingEffort?: string | null;
-}
-
-/**
- * Is thinking ON, reading the field that actually carries the answer.
- *
- * The switch's state is the WIRE VARIANT, not the effort. A two-state model has
- * no depth to record, so an on/off commit writes `variant: "thinking"` or
- * `variant: ""` and deliberately leaves `thinking.effort` alone — reading the
- * effort here therefore read a field the toggle never writes, and the control
- * sat in `unstated` for the whole life of the session no matter how many times
- * it was pressed.
- *
- * A present variant is a STATEMENT, so it is never `null`: the runtime always
- * reports one for a selected model, falling back to the model's declared
- * default. Only a model that reports no variant at all falls through to the
- * effort, and that keeps the three-valued verdict intact — an absent record is
- * still the engine's choice rather than a confident "off".
- *
- * `options` narrows the effort fallback, so a cross-model leftover ("high" on a
- * switch) still reads as `null` instead of as "on".
- */
-export function resolveThinkingVerdict(
-  options: readonly string[],
-  state: ThinkingState,
-): boolean | null {
-  if (state.variant !== undefined) return state.variant === "thinking";
-  return isThinkingOn(options, state.thinkingEffort ?? undefined);
+/** The label one level is shown with. */
+export function effortLabel(value: string): string {
+  return EFFORT_LABELS[value] ?? value;
 }
 
 /**
  * The level word the model chip carries, for a DEPTH model. `""` for none.
  *
- * The chip names the level beside the model name, in the muted colour: "High" is
- * a POSITION on a scale, and an on/off colour cannot express one. Which is also
- * why this is empty for a binary model — there the brain's blue already answers
- * "on", and 「开启」 in the chip restated what the glyph beside it says, two
- * controls apart in the same toolbar.
+ * The chip names the level beside the model name, in the muted colour: a level
+ * is a POSITION on a scale, and a colour cannot express one. Which is also why
+ * this is empty for a binary model — there the level is a switch, and it is
+ * named by the panel that owns the switch.
  *
  * Empty for an absent record and for a record the model does not offer: a level
  * the target cannot honour is not a level to print.
@@ -121,45 +90,7 @@ export function chipLevelLabel(
   if (thinkingControlShape(options) !== "radiogroup") return "";
   const value = (recorded ?? "").trim();
   if (value === "" || !options.includes(value)) return "";
-  return value;
-}
-
-/** The accent token a brain should wear, given a three-valued verdict. */
-export type BrainTone = "on" | "off" | "unstated";
-/**
- * Map the verdict to a tone.
- *
- * A named mapping rather than a ternary at the call site, because the mistake
- * this guards against is collapsing `null` into `false`: that renders an
- * unstated state as a confidently-off one, which is the exact claim the
- * three-valued return exists to avoid.
- */
-export function brainTone(thinkingOn: boolean | null): BrainTone {
-  if (thinkingOn === null) return "unstated";
-  return thinkingOn ? "on" : "off";
-}
-
-/**
- * What the brain says on hover: the ACTION a press performs.
- *
- * 「关闭思考」 / 「开启思考」, not a statement of what currently is. The state is
- * already carried twice over without the title — the glyph's colour
- * (`brainTone`) and `aria-pressed` — so 「已开启思考 · 点击关闭」 spent two
- * clauses restating a third time what the user could see, and the leading 「已」
- * made the title answer a question nobody asked. A toggle's tooltip earns its
- * place by saying what the click will do.
- *
- * The unstated case reads as 「开启思考」 for the same reason: the neutral colour
- * already declines to claim a state, and what the control offers is the press.
- * An unstated verdict is a state the toggle acts on, not a third position.
- *
- * One string per tone, and the tone is the whole input: the caller used to pass
- * the action separately, which said the same thing twice and could disagree with
- * the tone it was derived from. A depth model renders no brain at all — its
- * level is named on the model chip — so there is no level to append here.
- */
-export function brainHoverLabel(tone: BrainTone): string {
-  return tone === "on" ? "关闭思考" : "开启思考";
+  return effortLabel(value);
 }
 
 /**
@@ -169,12 +100,11 @@ export function brainHoverLabel(tone: BrainTone): string {
  * model that reports switchable thinking is treated as a binary off/on toggle,
  * so the picker surfaces the control without the runtime having to fill the
  * list. `default_value` counts as the runtime's own statement that a switch
- * exists, which keeps the brain icon from depending on the variant list
- * arriving intact.
+ * exists, which keeps the control from depending on the variant list arriving
+ * intact.
  *
- * It lives here rather than beside the picker because two surfaces read it —
- * the cascade's fly-out and the composer's trigger — and because the option list
- * is what `variantForEffort` and `thinkingDraftPatch` are defined against.
+ * It lives here rather than beside the picker because the option list is what
+ * `variantForEffort` and `thinkingDraftPatch` are defined against.
  */
 export function resolveEffortOptions(
   model: WebuiModelPickerEntry,
@@ -193,8 +123,8 @@ export function resolveEffortOptions(
     const hasOn = variants.some((variant) => variant && variant !== "none-thinking");
     // `default_value` is the runtime's own statement that this model has a
     // thinking switch, and it reaches the client on `thinkingConfig` even when
-    // the variant list does not. Trusting it means the brain icon does not
-    // depend on a second field arriving intact.
+    // the variant list does not. Trusting it means the control does not depend
+    // on a second field arriving intact.
     const declaredSwitch = model.thinkingConfig?.default_value !== undefined;
     if ((hasOff && hasOn) || declaredSwitch) return ["off", "on"];
   }
@@ -224,15 +154,11 @@ export function variantForEffort(
  * than about the control that reported it:
  *
  *   * `default` — the user asked for no override, so `thinkingEffort` is `null`
- *     and the engine picks. `null` is not "off"; the two are different claims
- *     and the composer's brain renders them in different colours.
+ *     and the engine picks. `null` is not "off"; the two are different claims.
  *   * `off` / `on` — a binary model carries this in the wire `variant`, which
  *     `variantForEffort` supplies, so the patch adds nothing.
  *   * anything else — a level (`low`, `high`, `max`), carried by
  *     `thinking.effort`.
- *
- * The cascade's fly-out and the composer's trigger each used to spell this out,
- * and the copies were the same three branches.
  */
 export function thinkingDraftPatch(
   model: WebuiModelPickerEntry,
@@ -248,4 +174,3 @@ export function thinkingDraftPatch(
         : { thinkingEffort: option }),
   };
 }
-

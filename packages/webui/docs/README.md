@@ -84,7 +84,8 @@ logic against a shared harness-event corpus. ADR 0019 records the accepted Brows
 the decisions and remaining design questions for Browser Use. ADR 0019 is the sole decision record
 for that feature. ADR 0020 records the accepted Mini App view, the runtime seams it needs, the
 desktop capabilities it deliberately drops, and the contract-baseline question it leaves open; it
-is the sole decision record for Mini App hosting. A new decision takes the next free number.
+is the sole decision record for Mini App hosting. ADR 0021 records the model picker as one popup
+with two states, and the cascade it replaces. A new decision takes the next free number.
 
 | Retired | Was | Why it is not in the log | Where the live facts are |
 | --- | --- | --- | --- |

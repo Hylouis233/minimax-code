@@ -111,6 +111,24 @@ export interface WebuiModelsWorkflows {
   readonly acquireModels: (sessionId?: string) => Promise<void>;
   /** Point the shown catalogue at a context, without issuing a read. */
   readonly selectCatalogue: (sessionId?: string) => void;
+  /**
+   * One context's catalogue, read from the entry that belongs to it.
+   *
+   * The snapshot shows the catalogue that is SELECTED, which is a different
+   * fact from "the catalogue of the session on screen". A view that renders the
+   * selected one has to trust that the selection followed it, and when it did
+   * not, the view rendered another session's models — or none, because the
+   * rebind had not been read yet. Asking for a session's own entry removes the
+   * question: the key carries the session, so one session's catalogue can never
+   * be rendered as another's.
+   *
+   * The last good answer stands in while the next read is in flight, so a
+   * caller that renders this value does not empty the list for the length of a
+   * round trip.
+   */
+  readonly readModelsFor: (
+    sessionId?: string,
+  ) => WebuiResourceState<readonly WebuiModelEntry[]>;
   readonly releaseSession: (sessionId: string) => void;
   readonly selectModel: (request: {
     readonly providerId: string;
@@ -228,6 +246,20 @@ export function createWebuiModelsWorkflows(deps: {
   const providerList = createWebuiKeyedResource<readonly WebuiModelProviderView[]>();
   const presetList = createWebuiKeyedResource<readonly Record<string, unknown>[]>();
   const PRESETS_KEY: WebuiResourceKey = {};
+  /**
+   * The last good catalogue per key.
+   *
+   * A read replaces its entry with a loading state, and a catalogue that empties
+   * itself while it reloads is what made the picker look like it had no models:
+   * the chip fell back to the literal "Model" and the trigger went inert, and a
+   * page reload was the only thing that brought the list back. The last answer
+   * for the SAME key is the best known answer while the next one is in flight,
+   * so it is kept here and projected in its place.
+   *
+   * The key carries the credential and configuration generations, so an epoch
+   * advance changes the key and the retained answer is not reused under it.
+   */
+  const retainedCatalogues = new Map<string, readonly WebuiModelEntry[]>();
   // Which catalogue key the snapshot shows. Switching it is not a re-key of the
   // stored answers: they stay under the keys they were read for.
   let shownCatalogueKey: WebuiResourceKey = {};
@@ -300,6 +332,31 @@ export function createWebuiModelsWorkflows(deps: {
   };
 
   /**
+   * The catalogue as a reader should see it: the entry's own state, with the
+   * last good value standing in while a read is in flight.
+   *
+   * The state stays honest — a read that is running still reads as running, and
+   * a failure still reads as a failure — but the VALUE it carries is the last
+   * answer rather than nothing. A reader that renders the value keeps showing
+   * the models it had while the next answer is on its way, instead of emptying
+   * the list for the length of a round trip.
+   */
+  const retainedCatalogue = (
+    key: WebuiResourceKey,
+    entry: WebuiResourceState<readonly WebuiModelEntry[]> | undefined,
+  ): WebuiResourceState<readonly WebuiModelEntry[]> | undefined => {
+    if (!entry) return undefined;
+    const serialized = serializeWebuiResourceKey(key);
+    if (entry.status === "ready" && entry.value) {
+      retainedCatalogues.set(serialized, entry.value);
+      return entry;
+    }
+    const retained = retainedCatalogues.get(serialized);
+    if (!retained) return entry;
+    return { ...entry, value: retained };
+  };
+
+  /**
    * The snapshot is a projection of the keyed entries, not a second store: it
    * shows the entry for the key that is currently selected and the entries for
    * the provider and preset keys. A commit for another key changes that key's
@@ -308,7 +365,9 @@ export function createWebuiModelsWorkflows(deps: {
   const project = (): void => {
     set((current) => ({
       ...current,
-      models: catalogue.read(shownCatalogueKey) ?? idleWebuiResourceState(),
+      models:
+        retainedCatalogue(shownCatalogueKey, catalogue.read(shownCatalogueKey)) ??
+        idleWebuiResourceState(),
       providers: providerList.read(providerKey()) ?? idleWebuiResourceState(),
       presets: presetList.read(PRESETS_KEY) ?? idleWebuiResourceState(),
     }));
@@ -354,6 +413,19 @@ export function createWebuiModelsWorkflows(deps: {
     shownCatalogueKey = catalogueKeyFor(sessionId);
     bindCatalogueEpochs(shownCatalogueKey);
     project();
+  };
+
+  /**
+   * One context's catalogue, read from the entry that belongs to it.
+   *
+   * The entry is keyed by the session, so this is the answer FOR that session
+   * rather than the answer that happens to be shown.
+   */
+  const readModelsFor = (
+    sessionId?: string,
+  ): WebuiResourceState<readonly WebuiModelEntry[]> => {
+    const key = catalogueKeyFor(sessionId);
+    return retainedCatalogue(key, catalogue.read(key)) ?? idleWebuiResourceState();
   };
 
   /**
@@ -768,6 +840,7 @@ export function createWebuiModelsWorkflows(deps: {
     loadModels,
     acquireModels,
     selectCatalogue,
+    readModelsFor,
     setProviderModelEnabled,
     reorderProviderModels,
     selectModel,
@@ -788,6 +861,9 @@ export function createWebuiModelsWorkflows(deps: {
       for (const [serialized, key] of catalogueKeys) {
         if (key.sessionId !== sessionId) continue;
         catalogueKeys.delete(serialized); catalogue.release(key);
+        // The retained answer belongs to the released session, so it goes with it:
+        // a released session's models must not be projected for anyone.
+        retainedCatalogues.delete(serialized);
       }
       releasedSessions.add(sessionId);
       project();
@@ -796,6 +872,7 @@ export function createWebuiModelsWorkflows(deps: {
       disposed = true;
       stopEpochs?.();
       catalogueKeys.clear(); providerKeys.clear(); releasedSessions.clear();
+      retainedCatalogues.clear();
       listeners.clear();
       catalogue.dispose();
       providerList.dispose();
