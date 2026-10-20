@@ -33,6 +33,7 @@ import { join } from "node:path";
 import type {
   WebuiBrowserImageFrame,
   WebuiBrowserInputCommand,
+  WebuiBrowserSurface,
   WebuiBrowserTargetState,
 } from "../../../shared/contracts/browser.js";
 import { WEBUI_BROWSER_RESTRICTED_COMMANDS } from "../../../shared/contracts/browser.js";
@@ -76,7 +77,15 @@ export interface WebuiBrowserTargetChange {
 
 /** The surface every browser provider implements. */
 export interface WebuiBrowserSurfaceProvider {
-  readonly surface: "isolated-chromium";
+  /**
+   * Which surface this provider drives.
+   *
+   * The isolated Chromium, or one of the external browsers reached through the
+   * bridge. The type is the surface rather than the literal it used to be,
+   * because the bridge's provider is a provider of exactly this shape and
+   * narrowing it would have made the external path unreachable by construction.
+   */
+  readonly surface: WebuiBrowserSurface;
   /**
    * The identity of this browser instance.
    *

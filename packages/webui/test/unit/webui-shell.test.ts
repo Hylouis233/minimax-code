@@ -230,7 +230,9 @@ describe("WebUI shell", () => {
     expect(markup).toContain("画布");
     expect(markup).toContain("终端");
     expect(markup).not.toContain('data-webui-progress-panel="true"');
-    expect(markup).not.toContain("浏览器");
+    // The browser panel is a supported add-menu tab now: it is mounted by the
+    // browser business's published host, and the menu offers it.
+    expect(markup).toContain("浏览器");
     expect(markup).not.toContain("Mini App");
   });
 

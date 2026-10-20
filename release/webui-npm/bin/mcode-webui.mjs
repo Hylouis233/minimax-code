@@ -44,6 +44,9 @@ const terminal = new WebuiTerminalManager();
 const browserBridge = new BrowserBridgeServer({ host: "127.0.0.1", dev: true });
 await browserBridge.start();
 const browser = createBrowserAdapter(assembled.host, {}, browserBridge);
+// The bridge's pairings follow the switches, so the persisted authorization has
+// to reach them before the service starts serving.
+await browser.initialize();
 const service = new WebuiService({
   port,
   operations: createOperationRegistry(port, terminal, browser?.port),

@@ -442,7 +442,8 @@
       "packages/webui/test/unit/browser-panel-view.test.tsx",
       "packages/webui/test/integration/browser-use-real-input.test.ts",
       "packages/webui/test/unit/browser-bridge-server.test.ts",
-      "packages/webui/test/unit/browser-bridge-upgrade.test.ts"
+      "packages/webui/test/unit/browser-bridge-upgrade.test.ts",
+      "packages/webui/test/unit/browser-workspace-panel.test.tsx"
     ]
   }
 }

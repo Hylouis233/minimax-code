@@ -445,6 +445,15 @@
       "home": "target"
     },
     {
+      "path": "client/features/browser/ui/BrowserPanelHost.public.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "browser",
+      "home": "target"
+    },
+    {
       "path": "client/features/browser/ui/browser.css",
       "layers": [
         "bindings"

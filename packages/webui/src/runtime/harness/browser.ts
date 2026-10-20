@@ -27,6 +27,7 @@ import {
   WebuiBrowserService,
   type WebuiBrowserServiceOptions,
 } from "../browser/browser-service.js";
+import type { WebuiBrowserSurfaceProvider } from "../browser/isolated-chromium/provider.js";
 import type { WebuiBrowserPort } from "../port.js";
 import type { WebuiRuntimeHostHandle } from "./host-contract.js";
 import { requireCliService, requireDataDir } from "./requirements.js";
@@ -43,9 +44,27 @@ import { requireCliService, requireDataDir } from "./requirements.js";
  * assembles the bridge and hands it in. Structural typing is what lets the two
  * meet without an import in either direction.
  */
-export type WebuiBrowserBridge = Required<
-  Pick<WebuiBrowserServiceOptions, "createBridgeProvider">
->;
+export interface WebuiBrowserBridge {
+  /**
+   * The provider for a live extension session, or `undefined` when no
+   * extension of that kind is connected.
+   *
+   * The bridge is a server-side object and the runtime may not import it, so
+   * the two meet structurally: the composition root hands the bridge in and
+   * the adapter reads this member. The member is named after what the bridge
+   * exposes, so the two cannot drift apart.
+   */
+  createProvider(
+    surface: "edge" | "chrome",
+  ): WebuiBrowserSurfaceProvider | undefined;
+  /** Turns a surface's pairing on and mints its credential. */
+  enableSurface?(surface: "edge" | "chrome"): Promise<void>;
+  /**
+   * Turns a surface's pairing off: the credential is revoked, the sessions are
+   * closed and the old credential is refused from then on.
+   */
+  disableSurface?(surface: "edge" | "chrome"): Promise<void>;
+}
 
 /**
  * The browser adapter and the handle that releases it.
@@ -64,6 +83,14 @@ export interface WebuiBrowserAdapterBinding {
    * The bridge's own lifetime belongs to whoever constructed it.
    */
   readonly browserBridge?: WebuiBrowserBridge;
+  /**
+   * Applies the persisted authorization to the bridge.
+   *
+   * The composition root calls this once, after the adapter is built and
+   * before the service starts serving. Until it runs, the bridge's pairings do
+   * not know which switches are on.
+   */
+  initialize(): Promise<void>;
   /** Releases every provider the browser service started. */
   close(): Promise<void>;
 }
@@ -97,11 +124,23 @@ export function createBrowserAdapter(
       write: (input) => setBrowserAuthorization.call(cliService, input),
     },
     dataDir: host.dataDir ?? requireDataDir(host),
-    ...(bridge ? { createBridgeProvider: bridge.createBridgeProvider } : {}),
+    ...(bridge
+      ? {
+          // The service asks asynchronously and the bridge answers
+          // synchronously; the adapter is where the two meet.
+          createBridgeProvider: async (surface: "edge" | "chrome") =>
+            bridge.createProvider(surface),
+          bridge: {
+            enableSurface: bridge.enableSurface?.bind(bridge),
+            disableSurface: bridge.disableSurface?.bind(bridge),
+          },
+        }
+      : {}),
     ...overrides,
   });
 
   return {
+    initialize: () => service.initialize(),
     port: {
       getAuthorization: () => service.readAuthorization(),
       setAuthorization: (input) => service.writeAuthorization(input),

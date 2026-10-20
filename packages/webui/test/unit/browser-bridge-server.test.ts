@@ -52,6 +52,11 @@ async function startHarness(): Promise<Harness> {
     env: { MAVIS_BROWSER_EDGE_EXTENSION_IDS: EDGE_EXTENSION_ID },
   });
   await bridge.start();
+  // The bridge does not switch a surface on by itself: the browser switches
+  // own the pairings, and the service is where the two meet. A test switches
+  // on exactly the surfaces its environment configures, which is what the
+  // persisted switches do in a running host.
+  await bridge.enableSurface("edge");
   const httpServer = createServer();
   const wsServer = new WebuiWebSocketServer({
     maxMessageBytes: 256 * 1024,
@@ -253,6 +258,64 @@ describe("WebUI browser bridge — the providers it lends to the browser service
     client.socket.terminate();
   });
 
+  it("drops an extension frame whose generation the announcement moved past", async () => {
+    const harness = await startHarness();
+    const client = await pairEdge(harness);
+    const provider = harness.bridge.createProvider("edge")!;
+    announceTarget(client, 7);
+    await settle();
+
+    const received: WebuiBrowserImageFrame[] = [];
+    await provider.startImageStream(TARGET_ID, (frame) => received.push(frame));
+    // A frame produced for the page the tab was on before the announcement
+    // moved on. Relabelling it with the announcement's generation would put
+    // the previous page on screen as the current one, so it is dropped.
+    client.socket.send(
+      JSON.stringify({
+        kind: "frame",
+        frame: {
+          browserId: BROWSER_ID,
+          targetId: TARGET_ID,
+          generation: 1,
+          data: "c3RhbGU=",
+          format: "png",
+          sequence: 4,
+        },
+      }),
+    );
+    await settle();
+
+    expect(received).toHaveLength(0);
+  });
+
+  it("holds no credential and admits no session for a surface that is off", async () => {
+    const harness = await startHarness();
+    // The surface is on because the harness switched it on, the way a
+    // switched-on browser would.
+    const on = harness.bridge.snapshot().surfaces.edge;
+    expect(on.enabled).toBe(true);
+
+    // Turning it off revokes the credential, closes the session and refuses
+    // the old credential from then on. The other surface is untouched: the two
+    // browsers' authorizations are independent.
+    await harness.bridge.disableSurface("edge");
+    const off = harness.bridge.snapshot().surfaces.edge;
+    expect(off.enabled).toBe(false);
+    expect(harness.bridge.createProvider("edge")).toBeUndefined();
+
+    // A fresh session is refused: the pairing holds no credential to answer a
+    // challenge with.
+    const client = connectClient(`ws://127.0.0.1:${harness.port}${WEBUI_BROWSER_BRIDGE_PATH}`, {
+      origin: `chrome-extension://${EDGE_EXTENSION_ID}/`,
+    });
+    await client.opened;
+    client.socket.send(
+      JSON.stringify({ kind: "hello", browser: "edge", browserId: "edge-1", extensionVersion: "1.0.0" }),
+    );
+    await settle();
+    expect(harness.bridge.createProvider("edge")).toBeUndefined();
+  });
+
   it("delivers an extension frame to startImageStream with the announced identity", async () => {
     const harness = await startHarness();
     const client = await pairEdge(harness);
@@ -268,9 +331,9 @@ describe("WebUI browser bridge — the providers it lends to the browser service
         frame: {
           browserId: BROWSER_ID,
           targetId: TARGET_ID,
-          // The frame's own generation is deliberately behind the
-          // announcement's; the host's own record of the page wins.
-          generation: 1,
+          // The frame's generation matches the announcement's, so it belongs to
+          // the page the tab is on now.
+          generation: 7,
           data: "aW1hZ2U=",
           format: "png",
           sequence: 3,

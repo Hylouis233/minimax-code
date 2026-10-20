@@ -85,12 +85,25 @@ describe("the registry answers for the whole closed set", () => {
 
   it("offers the add menu in one order, and only where a menu entry exists", () => {
     const menu = webuiWorkspaceAddMenu();
-    expect(menu.map((entry) => entry.kind)).toEqual(["review", "terminal", "canvas", "files"]);
-    expect(menu.map((entry) => entry.label)).toEqual(["变更", "终端", "画布", "查看文件"]);
+    expect(menu.map((entry) => entry.kind)).toEqual([
+      "review",
+      "terminal",
+      "canvas",
+      "browser",
+      "files",
+    ]);
+    expect(menu.map((entry) => entry.label)).toEqual([
+      "变更",
+      "终端",
+      "画布",
+      "浏览器",
+      "查看文件",
+    ]);
     expect(menu.map((entry) => entry.opens)).toEqual([
       { type: "open-workspace-review" },
       { type: "open-tab", kind: "terminal" },
       { type: "open-tab", kind: "canvas" },
+      { type: "open-tab", kind: "browser" },
       { type: "open-tab", kind: "files" },
     ]);
     // Every menu entry names a declared kind, and the order names each one once.

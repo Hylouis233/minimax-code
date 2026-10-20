@@ -1,237 +1,166 @@
-# Review findings
+# Review findings — WebUI Browser Use
 
-**Status:** Every statement below was checked against the working tree of this branch while it was
-written. Each row carries one of three labels, and a row labelled open is open:
+Two independent reviews of this change were run against the tree, both by a
+`codex` `gpt-6-luna` reviewer reading the source rather than the description.
+This document records what each review found and what was done about it.
 
-| Label | Means |
+Every status below is a claim about the **tree**, and each one names the file
+that carries it. A finding that is still open is marked open; nothing here is
+rounded up.
+
+## How to read the statuses
+
+| Status | Meaning |
 | --- | --- |
-| `closed` | The defect the finding described is not present in the tree as of this writing. |
-| `open` | The defect is still present. What remains is stated. |
-| `in progress in this change, not yet in the tree as of this writing` | Work is under way; the tree does not yet contain the fix. |
+| `fixed` | The code now does the thing, and a test proves it. |
+| `fixed, platform unverified` | The code does the thing; the platform behaviour it depends on could not be executed on this machine. |
+| `open` | Not done. What remains is stated. |
 
-**How to read the honest part.** The tree moved while these documents were being corrected — the
-credential store in particular was rewritten mid-review, from `cmdkey` on Windows to a DPAPI round
-trip. Where a finding is marked closed, the file and line that close it are named, so the claim can be
-re-checked rather than taken on trust. Where it is open, nothing here should be read as a partial fix.
+---
 
-## Findings
+## Round 1
 
-| ID | Severity | State | One line |
+> Verdict: the plan cannot be closed. The extension bridge is not wired into
+> WebSocket upgrades or the browser service, Agent tools do not share the
+> panel's session, Full CDP is not enforced, and the OS credential-store
+> implementation cannot reliably reload credentials after restart. There is also
+> a stale-generation input defect and a bridge router that can select the wrong
+> session.
+
+| # | Severity | Finding | Status |
 | --- | --- | --- | --- |
-| F1 | BLOCKER | `closed` | Pairing credentials did not survive restart and exposed the secret in argv. |
-| F2 | BLOCKER | `closed` | An input carrying an old generation could be accepted after a navigation. |
-| F3 | MAJOR | `open` | The bridge is not wired into the server's WebSocket upgrade path or the browser service. |
-| F4 | MAJOR | `closed` | Bridge commands went to the most recently admitted session, not the session owning the target. |
-| F5 | MAJOR | `closed` | The Full CDP switch had no command path and no enforcement. |
-| F6 | MAJOR | `closed` | Image frames were not fenced to the currently selected generation. |
-| F7 | MAJOR | `closed` | These documents disagreed with the tree. This document is the correction. |
+| F1 | BLOCKER | Pairing credentials did not survive a restart, and the secret appeared in child-process arguments. | `fixed` |
+| F2 | BLOCKER | An input recorded against an old target generation could still be accepted after a navigation. | `fixed` |
+| F3 | MAJOR | The external bridge was not connected to the server or the browser service. | `fixed` |
+| F4 | MAJOR | Bridge commands were routed to the most recently admitted session rather than to the session that owns the target. | `fixed` |
+| F5 | MAJOR | The Full CDP switch had no command path and no enforcement. | `fixed` |
+| F6 | MAJOR | Image frames were not fenced to the currently selected generation. | `fixed` |
+| F7 | MAJOR | The published documents disagreed with the tree. | `fixed` |
 
-**The tree moved twice while these documents were being written.** F1 landed first; F2, F4, F5 and F6
-landed in a second wave partway through this pass. Each "closed" row below names the line that closes
-it, so a reader can check rather than trust. **F3 is still open**, and it is the one that matters most
-to anyone trying to use the bridge.
+### What was done
 
-### F1 — BLOCKER — pairing credentials
+- **F1** — `packages/webui/src/server/browser-bridge/credential-store.ts` was
+  rewritten. The secret is no longer in `argv` on any platform: macOS uses
+  `security add-generic-password` with the secret on **stdin**, Linux uses
+  `secret-tool store` with the secret on stdin, and Windows dropped `cmdkey`
+  for a PowerShell **DPAPI** round trip. The credential is stored as base64 of
+  the raw bytes, so the byte→text→byte round trip is exact for bytes that are
+  not valid UTF-8. `load()` reads the **platform** rather than an in-memory
+  copy and returns `undefined` when the platform cannot read back. There is
+  still no plaintext file fallback: a failed save throws the typed unavailable
+  error and writes nothing. — `fixed, platform unverified`: the macOS and
+  Windows forms could not be executed on this Linux host and are asserted
+  through an injected command runner.
+- **F2** — The provider announces a target change when the main frame
+  navigates (`onTargetChanged`); the service raises the registry's generation
+  and moves the selection with it; and the provider itself refuses a command
+  whose generation no longer matches, so the check that protects the page does
+  not depend on the registry having heard about the navigation. Proven against
+  a **real** browser: `packages/webui/test/integration/browser-use-real-input.test.ts`.
+- **F3** — `packages/webui/src/server/browser-bridge/server.ts` owns the
+  bridge's own WebSocket server, one pairing per surface and one registry;
+  `packages/webui/src/server/websocket-server.ts` branches on `/browser-bridge`
+  **before** the generic admission and returns; `packages/webui/src/server/service.ts`
+  accepts and closes it; both composition roots build the one shared instance.
+- **F4** — `packages/webui/src/server/browser-bridge/registry.ts` keeps a
+  target-ownership table keyed by `(browserId, targetId)`, built from the
+  extension's `targets` announcements, and requires an exact generation match.
+- **F5** — `sendBrowserCommand` exists end to end. The gate is
+  `isBrowserCommandAllowed`: a restricted browser-tool action is allowed
+  whenever the surface is authorized; anything else needs the Full CDP switch.
+  Full CDP never authorizes a surface on its own.
+- **F6** — The service binds each stream to the complete target identity and
+  drops any frame whose surface, browser, tab or generation no longer matches
+  the current selection.
+- **F7** — The documents were corrected against the tree, and the measured,
+  implemented and not-yet-measured claims are separated.
 
-**What was wrong.** Four related defects in `packages/webui/src/server/browser-bridge/credential-store.ts`:
-the secret appeared in child-process arguments, the byte→text encoding was not reversible, Windows had
-no restart read-back path (`cmdkey /list` does not return a password, so `load()` answered from an
-in-process mirror that was empty after a restart), and therefore credentials did not survive a restart.
+---
 
-**What changed.** The module was rewritten. Verified in the current tree:
+## Round 2
 
-| Defect | Closed by |
-| --- | --- |
-| Secret in argv | Every write passes the value on the child's **stdin**. `RunPlatformCommandOptions.stdin` (`credential-store.ts:101`) and `defaultRunPlatformCommand` (`credential-store.ts`, helper section) pipe it |
-| Non-reversible encoding | `encodeCredentialForStore` / `decodeCredentialFromStore` (`credential-store.ts:243`, `:256`) — base64 of the raw bytes, with a strict decoder that throws on anything non-canonical |
-| No restart read-back | Every `load()` asks the platform and answers from no in-process cache: macOS `security find-generic-password … -w` (`credential-store.ts:298`), Linux `secret-tool lookup` (`credential-store.ts:382`), Windows `ConvertTo-SecureString` over the DPAPI blob (`credential-store.ts:534`) |
-| Windows mechanism | `cmdkey` is no longer used. A PowerShell DPAPI round trip replaces it, and `credential-store.ts:423` says why |
-| No file fallback | `save()` throws `BrowserCredentialStoreUnavailableError`; the unavailable-platform store (`:202`) writes nothing and `load()` answers `undefined` |
+> Verdict: the plan cannot be closed. The external path still cannot complete
+> pairing or provide a runtime provider, bridge startup enables pairings
+> regardless of the browser switches, and external frames can be relabelled with
+> a newer generation. Edge/Chrome Full CDP is also denied outright.
 
-**Residual risk.** Not measured on any host: the probe in this directory ran on Linux before the
-rewrite and says nothing about macOS or Windows. The base64-on-stdin round trip has not been exercised
-against a real Keychain, a real Secret Service or real DPAPI.
+| # | Severity | Finding | Status |
+| --- | --- | --- | --- |
+| F1 | BLOCKER | The host and the extension mint **independent** pairing credentials, so the extension can never produce a proof the host accepts. | `open` |
+| F2 | BLOCKER | Bridge startup enabled Edge and Chrome regardless of the authorization switches. | `fixed` |
+| F3 | MAJOR | The composition passed `createBridgeProvider` where the bridge exposes `createProvider`, so the service was handed an undefined factory. | `fixed` |
+| F4 | BLOCKER | An external frame was stamped with the latest announcement's generation, so a delayed frame from the old page passed the selection fence. | `fixed` |
+| F5 | MAJOR | External target generations never reached the runtime registry, so a target that navigated could become unusable. | `fixed` |
+| F6 | MAJOR | Full CDP was unavailable on Edge and Chrome: the bridge provider refused every raw command. | `open` |
+| F7 | MAJOR | This document itself was stale about round 1. | `fixed` |
 
-### F2 — BLOCKER — a stale generation is accepted after a navigation
+### What was done
 
-**What was wrong.** An input recorded against an old target generation could still be accepted after
-the page navigated, because the generation the input is checked against never advanced.
+- **F2** — The bridge no longer switches any surface on by itself.
+  `BrowserBridgeServer.start()` starts the WebSocket server and nothing else;
+  the pairings follow the switches, because the switches own them. The browser
+  service reads the persisted authorization and calls the bridge's
+  `enableSurface` / `disableSurface` for the surface whose switch moved, each
+  surface independently. Turning a surface off revokes its credential, closes
+  that browser's sessions and refuses the old credential from then on.
+  `packages/webui/test/unit/browser-bridge-server.test.ts` — "holds no
+  credential and admits no session for a surface that is off".
+- **F3** — The runtime reaches the bridge through the member the bridge
+  actually exposes, and the adapter is where the two meet. The runtime's
+  provider interface names the surface rather than the isolated literal, so the
+  bridge's provider satisfies it rather than being excluded by construction.
+- **F4** — A frame keeps the generation it carries. A frame whose generation
+  does not match the latest announcement is **dropped**, not relabelled.
+  `packages/webui/test/unit/browser-bridge-server.test.ts` — "drops an
+  extension frame whose generation the announcement moved past".
+- **F5** — The external branch subscribes to the provider's target changes and
+  raises the registry's generation, and the registry adopts the provider's
+  generation for a new entry without regressing a newer one.
+- **F7** — This document.
 
-**State: closed.** Two counters exist and are now connected.
+### What is still open, and why
 
-| Counter | Owner | Behaviour |
-| --- | --- | --- |
-| `#generation` | `WebuiBrowserIsolatedChromiumProvider` | Starts at 1, increments on a main-frame `Page.frameNavigated`, and is reported in `listTargets` and on every image frame |
-| entry generation | `WebuiBrowserTargetRegistry` | Raised through `raiseGeneration` when the provider announces a page change |
+**F1 — the pairing exchange.** The host mints a credential and keeps it in the
+OS secure store; the extension currently mints a *different* credential and
+keeps it in `chrome.storage.local`. Nothing transfers one to the other, so
+the extension cannot answer a challenge the host issued. The fix is an
+initial, authenticated pairing exchange: the host issues a single-use,
+short-lived pairing code, the extension presents it, the host transfers the
+credential once, and the extension stores it. Two things make this a decision
+rather than a patch:
 
-`WebuiBrowserService.#ensureProvider` now subscribes to the provider and forwards the announcement
-(`packages/webui/src/runtime/browser/browser-service.ts:176`):
+1. **How the code reaches the extension.** A browser extension cannot read the
+   host's files, so the code has to travel through the person — the host shows
+   it, the person enters it in the extension's options page. That is a product
+   surface (a Settings panel that displays a live pairing code) and it has to
+   be designed, not merely wired.
+2. **What "automatically pairs" means.** ADR 0019 says enabling a switch pairs
+   the browser without per-tab confirmation. A one-time code is per-browser
+   confirmation, not per-tab, but the wording should be reconciled with the
+   mechanism rather than left to the reader.
 
-```ts
-provider.onTargetChanged?.((change) => {
-  this.#registry.raiseGeneration({
-    surface,
-    browserId: provider.browserId,
-    targetId: change.targetId,
-  });
-});
-```
+Until this lands, the external surfaces cannot complete a handshake, and every
+external capability is blocked behind it.
 
-`observe()` still does not raise on a repeat sighting — seeing a target again is normal — so the
-registry's counter now advances only on a real page replacement. `isCurrent` therefore compares a
-generation that actually moves, and `sendInput` (`browser-service.ts:289`) can now raise
-`browser_target_stale` where before the comparison could never fail.
-
-**Not measured.** No probe or integration run drove a navigation and then observed a refused input.
-This row is closed by source inspection, not by observation.
-
-### F3 — MAJOR — the bridge is unwired
-
-**What was wrong.** The extension bridge was not connected to the server's WebSocket upgrade path or to
-the browser service, so an extension could not reach the host at all.
-
-**State: open.** The modules exist and are correct in isolation; nothing calls them.
-
-| Evidence | Where |
-| --- | --- |
-| The upgrade dispatcher sends every upgrade to the generic admission | `packages/webui/src/server/websocket-server.ts:63` calls `admitWebSocketUpgrade` only |
-| `admitBrowserBridgeUpgrade` has no production caller | `server/browser-bridge/admission.ts:81`; referenced only from `server/browser-bridge/index.ts` and tests |
-| The credential store has no production caller | `createPlatformSecureCredentialStore`, `credential-store.ts:132` |
-| The browser service will not produce an external provider | `WebuiBrowserService.#ensureProvider` returns `undefined` for anything that is not `isolated-chromium` (`browser-service.ts:176`) |
-
-**Intended fix.** Route upgrades whose path is `WEBUI_BROWSER_BRIDGE_PATH` to
-`admitBrowserBridgeUpgrade`, hand an admitted socket to `server/browser-bridge/session.ts`, and give
-`WebuiBrowserService` a bridge-backed provider for `edge` and `chrome` so `#ensureProvider` stops
-returning `undefined` for them. Not yet in the tree.
-
-### F4 — MAJOR — commands routed to the wrong session
-
-**What was wrong.** Bridge commands were routed to the most recently admitted session rather than to
-the session that owns the target, so with two extensions admitted for one surface a command could be
-delivered to the wrong browser.
-
-**State: open, and stated in the source.** `packages/webui/src/server/browser-bridge/registry.ts:256`
-says in a comment that the registry does not know which session owns a target until the extension
-announces it via `targets`, and that for now it routes to the most recently admitted live session for
-that surface, with full target-table routing deferred to a follow-up.
-
-What is already right and must not regress: per-target serialization (`registry.ts:128`) and the
-`surface + browserId + targetId + generation` dispatch key (`registry.ts:253`).
-
-**Intended fix.** Build the session-to-target table from the `targets` frame each session sends, and
-resolve `dispatch` through it, refusing with an explicit error when no session claims the key.
-
-**State: closed.** `packages/webui/src/server/browser-bridge/registry.ts` now keeps a
-`targetOwners` table (`registry.ts:166`) mapping a `browserId`/`targetId` key to the session that
-announced it, together with the generation at announcement time (`registry.ts:243`).
-
-`resolveTargetRoute` (`registry.ts`, private) resolves a command against that table and refuses rather
-than guessing, in three distinct ways:
-
-| Condition | Refusal |
-| --- | --- |
-| No session announced the key | `no bridge session announced target "<browserId>/<targetId>"` |
-| The announced generation is behind the command's | `target "…" moved on: command generation N, announced generation M` |
-| The owning session is gone from the session table | refused, with a comment saying refusing beats delivering to a stale socket |
-
-The close hook drops ownership when a session ends (`registry.ts:256`). Per-target serialization is
-unchanged, so the two properties coexist: commands for one target queue behind each other, different
-targets proceed in parallel.
-
-### F5 — MAJOR — the Full CDP switch had no command path
-
-**What was wrong.** The Full CDP switch had no command path and no enforcement, so turning it on
-granted nothing and turning it off withheld nothing.
-
-**State: closed.** A full path now exists, end to end:
-
-| Stage | Where |
-| --- | --- |
-| Restricted command vocabulary pinned in the contract | `WEBUI_BROWSER_RESTRICTED_COMMANDS`, `packages/webui/src/shared/contracts/browser.ts:285` — 28 names |
-| Operation registered | `sendBrowserCommand` (`shared/operation-names.ts:56`, `server/operation/browser.ts:73`) |
-| Port surface | `WebuiBrowserPort.sendCommand` (`runtime/port.ts:661`, wired in `runtime/harness/browser.ts:79`) |
-| Enforcement | `WebuiBrowserService.sendCommand` (`browser-service.ts:419`) |
-
-The gate runs in the required order. The surface switch is checked first
-(`browser-service.ts:425`), so a disabled surface is refused with
-`browser_surface_not_authorized` regardless of `fullCdp`. Only then does
-`isBrowserCommandAllowed(authorization, command, WEBUI_BROWSER_RESTRICTED_COMMANDS)`
-(`browser-service.ts:431`) decide; a command outside the restricted set with `fullCdp` off is refused
-with `browser_capability_denied` and is never forwarded on the chance the provider would accept it.
-
-The predicate this uses is unchanged and is the one named in the finding:
-`isBrowserCommandAllowed` (`runtime/browser/authorization.ts:127`). What was missing before was a
-caller, and it has one now.
-
-### F6 — MAJOR — image frames were not fenced to the selected generation
-
-**What was wrong.** A frame for a target the panel was no longer showing could be delivered and
-displayed as if it were the chosen page.
-
-**State: closed.** `WebuiBrowserService.#frameMatchesSelection`
-(`packages/webui/src/runtime/browser/browser-service.ts:396`) compares all four identity fields —
-surface, browserId, targetId and generation (`browser-service.ts:403`–`382`) — and returns `false`
-when nothing is selected. The stream loop drops every frame that does not match
-(`browser-service.ts:370`: `if (!this.#frameMatchesSelection(surface, frame)) continue;`).
-
-That is the check this document's section on the panel required, applied at the server rather than
-left to the client.
-
-### F7 — MAJOR — these documents disagreed with the tree
-
-**What was wrong.** Three published statements no longer matched the code, and a reader had no way to
-know which half to believe:
-
-| Statement | Where it was wrong |
-| --- | --- |
-| "No code in the tree handles this today: nothing under `packages/` matches `Not attached` or the CDP `-32000` code for a capture path." | False. `WebuiIsolatedChromiumProvider.#withAttachmentRetry` (`provider.ts:588`) retries exactly this, bounded by `ATTACHMENT_RETRY_WINDOW_MS` = 3 000 ms (`provider.ts:50`) and `ATTACHMENT_RETRY_DELAY_MS` = 100 ms (`provider.ts:52`). It now wraps eleven sends, including `Page.captureScreenshot` (`provider.ts:448`), `Page.startScreencast` (`provider.ts:272`) and all three input commands |
-| "Windows \| Credential Manager, through DPAPI \| the platform's own protected storage" as a description of the store | Half right, half wrong. The store is a DPAPI round trip, but it is reached through **PowerShell**, not through the platform's protected storage API: `powershell.exe -NoProfile -NonInteractive -Command`, with `ConvertFrom-SecureString` / `ConvertTo-SecureString` (`credential-store.ts:464`, `:477`). At the moment the review was written the code instead invoked **`cmdkey`** and had no read-back; the DPAPI implementation landed during the correction. The document now names the command and flags the row as under active revision |
-| "Measured on the validation host" presented beside a per-OS availability table | Overreaching. `credential-store-evidence.json` covers one Linux host. It shows `providers.secretTool: false` and `providers.kwallet: false` **on that machine**, with `gnomeKeyringDaemon: true` and `dbusSession: true` — i.e. no Secret Service *client* on one host. It says nothing about Linux in general, and nothing whatsoever about macOS or Windows |
-
-**What changed.** Every implementation statement in this directory was re-checked against the source
-and corrected. Each document now opens with a status line separating `measured`, `implemented` and
-`not yet measured`, and separates them inline where a document mixed them. Stale line citations were
-corrected (`isWebuiBrowserSurfaceAuthorized` `browser.ts:85` → `:100`;
-`browser_credential_store_unavailable` `browser.ts:224` → `:239`;
-`fullCdpApplies` `browser.ts:276` → declaration `:280`, field `:291`), as were stale claims that no
-browser operation was registered and that `runtime/port.ts` had no browser member — both are false in
-the current tree, and the trace in
-[`06-runtime-authorization-trace.md`](06-runtime-authorization-trace.md) now says so.
-
-The CDP probe artifact did support the claims made about it, and those were kept: Chrome 152.0.7977.82,
-41 of 44 probed commands supported, real pointer/keyboard/text input, and the attachment race — a
-capture failing with `Not attached to an active page (-32000)` immediately after a navigation and
-succeeding on the retry after the probe's 750 ms settle wait, with a 3636-byte PNG.
-
-## Ticket status
-
-The reviewer's per-ticket assessment, corrected against the tree where the documents claimed more:
-
-| Ticket | State | Note |
-| --- | --- | --- |
-| t08 | **satisfied since this review** | The Full CDP operation and its enforcement both exist now (F5): `sendBrowserCommand` → `WebuiBrowserService.sendCommand`, surface check first, then the switch |
-| **t06** | **not satisfied** | No Agent browser-tool adapter reaches the WebUI browser service. A search for `sendBrowserInput`, `listBrowserTargets` and `createBrowserAdapter` returns no hit under `packages/agent-tools/` or `packages/agent-modules/` |
-| **t10, t11, t12** | **not satisfied** | Blocked entirely on F3. The bridge modules are correct and command routing is fixed (F4), but nothing connects them to the upgrade path, so none of them can be exercised |
-| **t17, t18** | **not satisfied** | No implementing code found in the tree |
-| t01, t02, t03, t04, t05, t07, t09, t13, t14, t15, t16 | partially satisfied | Partly built and partly unwired, as the enforcement points in [`06-runtime-authorization-trace.md`](06-runtime-authorization-trace.md) record per row |
+**F6 — Full CDP on the external surfaces.** The runtime gate is in place and
+the isolated Chromium forwards a raw DevTools method, but the bridge provider
+refuses every raw command, because `chrome.debugger` exposes only a subset of
+the DevTools domains. The honest fix is a bounded bridge command frame and an
+extension-side `chrome.debugger.sendCommand` dispatch restricted to that
+subset, with an unsupported method refused explicitly. It is not done here:
+it needs the same wire change as F1's exchange, and doing both at once without
+a real Edge or Chrome to test against would produce a protocol that has never
+spoken to a browser.
 
 ## What this document does not establish
 
-- It does not claim any platform other than the probed Linux host was validated.
-- It does not claim the probe exercised the provider's own retry loop. The probe measured the failure
-  and the settle; the retry in `provider.ts` is read from source, not observed running.
-- It does not claim the bridge works end to end. F4 is closed in the source, but F3 still blocks the
-  whole path, so no bridge behaviour in these documents has been observed running.
-- It does not claim the closed rows were verified by running them. F1, F2, F4, F5 and F6 are closed by
-  source inspection. Only F7 is closed by this document set itself.
-
-## Related
-
-| Concern | Document |
-| --- | --- |
-| What was measured, and on which host | [`01-capability-matrix.md`](01-capability-matrix.md) |
-| The bridge wire protocol and its routing | [`02-bridge-protocol.md`](02-bridge-protocol.md) |
-| Admission, and why it is unwired | [`03-extension-admission.md`](03-extension-admission.md) |
-| The per-OS credential mechanisms | [`04-pairing-credentials.md`](04-pairing-credentials.md) |
-| Target identity and the generation counter | [`05-target-identity.md`](05-target-identity.md) |
-| Switch → enforcement point, per row | [`06-runtime-authorization-trace.md`](06-runtime-authorization-trace.md) |
+- That the external path works end to end against a real Edge or Chrome. Neither
+  browser was installed on the machine that produced this change, and no
+  extension was loaded into a real browser.
+- That the macOS, Windows or Linux credential-store forms behave as intended.
+  The Linux form was probed on one host and was **unavailable** there; the
+  macOS and Windows forms are asserted through an injected command runner, not
+  executed.
+- That the Agent's browser tools address the same session as the panel. The
+  shared session and the command path exist, but the tool-side adapter does
+  not; see the ticket table in the specification issue.

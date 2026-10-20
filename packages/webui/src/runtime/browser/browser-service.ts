@@ -82,6 +82,17 @@ export interface WebuiBrowserServiceOptions {
   readonly createBridgeProvider?: (
     surface: "edge" | "chrome",
   ) => Promise<WebuiBrowserSurfaceProvider | undefined>;
+  /**
+   * The bridge's pairing lifecycle.
+   *
+   * The switches own the pairings: turning Edge on mints Edge's credential and
+   * turning Edge off revokes it and closes Edge's sessions. The service is
+   * where the two meet, because the service is where the switches live.
+   */
+  readonly bridge?: {
+    enableSurface?(surface: "edge" | "chrome"): Promise<void>;
+    disableSurface?(surface: "edge" | "chrome"): Promise<void>;
+  };
   /** The Chrome executable the isolated browser should use. */
   readonly chromePath?: string;
 }
@@ -97,6 +108,8 @@ export class WebuiBrowserService {
   readonly #providers = new Map<WebuiBrowserSurface, WebuiBrowserSurfaceProvider>();
   /** The target the panel is currently showing, per surface. */
   readonly #selected = new Map<WebuiBrowserSurface, WebuiBrowserTargetId>();
+  /** Which external surfaces the service has turned on, per surface. */
+  readonly #bridgeSurfaces = new Map<"edge" | "chrome", boolean>();
   /** The frame subscribers, per surface. */
   readonly #frameSubscribers = new Map<
     WebuiBrowserSurface,
@@ -130,7 +143,47 @@ export class WebuiBrowserService {
     return written;
   }
 
+  /**
+   * Applies the persisted authorization to the bridge.
+   *
+   * The bridge must start in the state the switches say, not in a state of its
+   * own choosing: a pairing that is on while the switch is off would admit an
+   * extension the person never authorized.
+   */
+  async initialize(): Promise<void> {
+    await this.#applyAuthorization(await this.readAuthorization());
+  }
+
+  /**
+   * Turns a surface's pairing on or off to match the switch.
+   *
+   * Each surface is handled on its own: turning Edge on must not enable
+   * Chrome, and turning one off must leave the other alone.
+   */
+  async #applyBridgeAuthorization(
+    authorization: WebuiBrowserAuthorization,
+  ): Promise<void> {
+    const bridge = this.#options.bridge;
+    if (!bridge) return;
+    for (const surface of ["edge", "chrome"] as const) {
+      const wanted = authorization[surface];
+      const current = this.#bridgeSurfaces.get(surface) ?? false;
+      if (wanted === current) continue;
+      try {
+        if (wanted) await bridge.enableSurface?.(surface);
+        else await bridge.disableSurface?.(surface);
+        this.#bridgeSurfaces.set(surface, wanted);
+      } catch {
+        // A surface whose credential store cannot be reached stays off, and the
+        // bridge reports that through its own snapshot. Failing the whole
+        // authorization write would leave the switches and the pairings
+        // disagreeing in a way the person cannot see.
+      }
+    }
+  }
+
   async #applyAuthorization(authorization: WebuiBrowserAuthorization): Promise<void> {
+    await this.#applyBridgeAuthorization(authorization);
     for (const surface of ["isolated-chromium", "edge", "chrome"] as const) {
       const usable = isBrowserSurfaceUsable(authorization, surface);
       const provider = this.#providers.get(surface);
@@ -164,7 +217,21 @@ export class WebuiBrowserService {
       // terminated and restarted, and a cached provider would keep addressing
       // the session that went away.
       if (!this.#options.createBridgeProvider) return undefined;
-      return (await this.#options.createBridgeProvider(surface)) ?? undefined;
+      const provider = (await this.#options.createBridgeProvider(surface)) ?? undefined;
+      if (!provider) return undefined;
+      // The external provider learns a target's new generation from the
+      // extension's announcements. The registry has to hear about it, or a
+      // target that navigated would keep offering the generation the person
+      // was looking at before the navigation — and the input recorded against
+      // it would look current when it is not.
+      provider.onTargetChanged?.((change) => {
+        this.#registry.raiseGeneration({
+          surface,
+          browserId: provider.browserId,
+          targetId: change.targetId,
+        });
+      });
+      return provider;
     }
     const create =
       this.#options.createIsolatedProvider ??
@@ -259,6 +326,7 @@ export class WebuiBrowserService {
         title: target.title,
         url: target.url,
         status: target.status,
+        generation: target.id.generation,
       });
       states.push({
         ...identity,

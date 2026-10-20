@@ -229,7 +229,20 @@ export class BrowserBridgeServer {
   }
 
   /**
-   * Switch every surface on, minting one credential per browser.
+   * Starts the bridge's WebSocket server.
+   *
+   * The bridge does **not** switch any surface on. The switches own that: the
+   * browser service reads the persisted authorization and enables exactly the
+   * surfaces whose switch is on. A bridge that enabled every surface on start
+   * would hold credentials and admit extensions for browsers the person had
+   * never authorized.
+   */
+  async start(): Promise<void> {
+    // Nothing to enable here: the surfaces follow the switches.
+  }
+
+  /**
+   * Turns one surface's pairing on and mints its credential.
    *
    * A surface whose credential store cannot be reached is left OFF rather than
    * failing the host's boot: the service must still serve the page and report
@@ -237,15 +250,26 @@ export class BrowserBridgeServer {
    * Off is the fail-closed branch — an off pairing refuses to issue a
    * challenge, so no extension can prove anything it was not issued.
    */
-  async start(): Promise<void> {
-    for (const surface of WEBUI_BRIDGE_BROWSER_SURFACES) {
-      try {
-        await this.registry.enableSurface(surface);
-        this.#credentialFailures.delete(surface);
-      } catch (error) {
-        this.#credentialFailures.set(surface, describe(error));
-      }
+  async enableSurface(surface: WebuiBridgeBrowserSurface): Promise<void> {
+    try {
+      await this.registry.enableSurface(surface);
+      this.#credentialFailures.delete(surface);
+    } catch (error) {
+      this.#credentialFailures.set(surface, describe(error));
+      throw error;
     }
+  }
+
+  /**
+   * Turns one surface's pairing off.
+   *
+   * The credential is revoked, that browser's sessions are closed and the old
+   * credential is refused from then on. The other surface is untouched: the
+   * two browsers' authorizations are independent.
+   */
+  async disableSurface(surface: WebuiBridgeBrowserSurface): Promise<void> {
+    await this.registry.disableSurface(surface);
+    this.#credentialFailures.delete(surface);
   }
 
   /** Per-surface state for diagnostics. Carries no credential material. */
@@ -434,16 +458,20 @@ export class BrowserBridgeServer {
   #onFrame(state: BridgeSurfaceState, image: WebuiBrowserBridgeImageFrame): void {
     const listeners = state.frameListeners.get(image.targetId);
     if (!listeners || listeners.size === 0) return;
+    // The frame keeps the generation it carries. It is NOT relabelled with the
+    // announcement's generation: a frame that was produced for the previous
+    // page would then be presented as the current one, and the service's
+    // selection fence — which compares the whole identity — would let it
+    // through. A frame whose generation does not match the announcement is
+    // dropped instead.
+    const announced = state.targets.get(image.targetId);
+    if (announced && announced.generation !== image.generation) return;
     const frame: WebuiBrowserImageFrame = {
       target: {
         surface: state.surface,
         browserId: state.browserId || image.browserId,
         targetId: image.targetId,
-        // The announcement is the host's own record of which page this tab is
-        // on, so it wins over the generation the frame carries. A frame for a
-        // tab that has not been announced yet falls back to the frame's own
-        // generation, which is still better than reporting the unset value.
-        generation: state.targets.get(image.targetId)?.generation ?? image.generation,
+        generation: image.generation,
       },
       data: image.data,
       format: image.format,

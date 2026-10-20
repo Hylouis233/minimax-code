@@ -72,6 +72,13 @@ async function startHarness(options?: {
     env: options?.env ?? { MAVIS_BROWSER_EDGE_EXTENSION_IDS: KNOWN_EDGE_ID },
   });
   await bridge.start();
+  // The bridge does not switch a surface on by itself: the browser switches
+  // own the pairings, and the service is where the two meet. A test switches
+  // on exactly the surfaces its environment configures, which is what the
+  // persisted switches do in a running host.
+  const configuredEnv = options?.env ?? { MAVIS_BROWSER_EDGE_EXTENSION_IDS: KNOWN_EDGE_ID };
+  if (configuredEnv.MAVIS_BROWSER_EDGE_EXTENSION_IDS) await bridge.enableSurface("edge");
+  if (configuredEnv.MAVIS_BROWSER_CHROME_EXTENSION_IDS) await bridge.enableSurface("chrome");
   const httpServer = createServer();
   const wsServer = attachBridge(httpServer, bridge);
   await new Promise<void>((resolve) => {
