@@ -34,7 +34,18 @@ export const PERSONALIZATION_SECTION_HINTS = {
  * full-width 80px button in a row's control slot reads as the row's primary
  * action rather than as the action it is. The `min-width` is what a centred
  * action like 退出登录 wants; a two-character action does not.
+ *
+ * The variant's class name is spelled out rather than composed, because the
+ * stylesheet's component layer is pruned against the sources that use it: a
+ * class name that only ever appears inside a template literal is a class the
+ * build drops.
  */
+const SETTINGS_BUTTON_VARIANT_CLASSES = {
+  gray: "webui-mavis-button-gray",
+  black: "webui-mavis-button-black",
+  danger: "webui-mavis-button-danger",
+} as const;
+
 export function SettingsButton({
   children,
   variant = "gray",
@@ -43,14 +54,16 @@ export function SettingsButton({
   onClick,
   testId,
   type = "button",
+  className,
 }: {
   readonly children: ReactNode;
-  readonly variant?: "gray" | "black" | "danger";
-  readonly size?: "regular" | "compact";
+  readonly variant?: keyof typeof SETTINGS_BUTTON_VARIANT_CLASSES;
+  readonly size?: "regular" | "compact" | "header";
   readonly disabled?: boolean;
   readonly onClick?: () => void;
   readonly testId?: string;
   readonly type?: "button" | "submit";
+  readonly className?: string;
 }): ReactElement {
   return (
     <button
@@ -58,7 +71,7 @@ export function SettingsButton({
       disabled={disabled}
       onClick={onClick}
       data-testid={testId}
-      className={`webui-mavis-button webui-mavis-button-${variant}${size === "compact" ? " webui-mavis-button-compact" : ""}`}
+      className={`webui-mavis-button ${SETTINGS_BUTTON_VARIANT_CLASSES[variant]}${size === "compact" ? " webui-mavis-button-compact" : ""}${size === "header" ? " webui-mavis-button-header" : ""}${className ? ` ${className}` : ""}`}
     >
       {children}
     </button>
@@ -81,6 +94,8 @@ export function SettingsDialog({
   onClose,
   testId,
   width = "narrow",
+  variant = "default",
+  dismissOnMaskClick = false,
 }: {
   readonly title: string;
   readonly children: ReactNode;
@@ -88,22 +103,48 @@ export function SettingsDialog({
   readonly onClose: () => void;
   readonly testId?: string;
   readonly width?: "narrow" | "wide";
+  /**
+   * `preview` drops the frame: the surface is the preview itself. The account
+   * page's share preview is the image it is about to save, and a card around a
+   * card would say something the Desktop does not.
+   */
+  readonly variant?: "default" | "preview";
+  /**
+   * Whether a click on the scrim closes the dialog.
+   *
+   * The dialogs that carry a close button in their header do not need this:
+   * they say how to leave. A preview that shows the image it is about to save
+   * has no such button, so the scrim is the way out — clicking anywhere
+   * outside the preview dismisses it.
+   */
+  readonly dismissOnMaskClick?: boolean;
 }): ReactElement {
   return (
-    <div className="webui-settings-dialog-mask">
+    <div
+      className={`webui-settings-dialog-mask${variant === "preview" ? " is-overlay" : ""}`}
+      onClick={
+        dismissOnMaskClick
+          ? (event) => {
+              if (event.target === event.currentTarget) onClose();
+            }
+          : undefined
+      }
+    >
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
         data-testid={testId}
-        className={`webui-settings-dialog-surface${width === "wide" ? " is-wide" : ""}`}
+        className={`webui-settings-dialog-surface${width === "wide" ? " is-wide" : ""}${variant === "preview" ? " is-preview" : ""}`}
       >
-        <header className="webui-settings-dialog-header">
-          <h3>{title}</h3>
-          <button type="button" aria-label="关闭" onClick={onClose}>
-            ×
-          </button>
-        </header>
+        {variant === "preview" ? null : (
+          <header className="webui-settings-dialog-header">
+            <h3>{title}</h3>
+            <button type="button" aria-label="关闭" onClick={onClose}>
+              ×
+            </button>
+          </header>
+        )}
         <div className="webui-settings-dialog-body">{children}</div>
         {footer ? <footer className="webui-settings-dialog-footer">{footer}</footer> : null}
       </div>

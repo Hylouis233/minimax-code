@@ -193,6 +193,15 @@
       "home": "current"
     },
     {
+      "path": "client/contracts/browser-drawing.ts",
+      "layers": [
+        "contracts"
+      ],
+      "role": "contracts-shared",
+      "business": null,
+      "home": "current"
+    },
+    {
       "path": "client/contracts/transport.ts",
       "layers": [
         "contracts"
@@ -1750,6 +1759,24 @@
       "home": "target"
     },
     {
+      "path": "client/features/settings/projection/usage-report.ts",
+      "layers": [
+        "view"
+      ],
+      "role": "feature-projection",
+      "business": "settings",
+      "home": "target"
+    },
+    {
+      "path": "client/features/settings/ui/AccountUsageSettings.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "settings",
+      "home": "target"
+    },
+    {
       "path": "client/features/settings/ui/GlobalInstructionsSection.tsx",
       "layers": [
         "bindings"
@@ -1804,6 +1831,15 @@
       "home": "target"
     },
     {
+      "path": "client/features/settings/ui/UsageHeatmap.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "settings",
+      "home": "target"
+    },
+    {
       "path": "client/features/settings/ui/UsageModelSettings.tsx",
       "layers": [
         "bindings"
@@ -1823,6 +1859,24 @@
     },
     {
       "path": "client/features/settings/ui/UserProfileSection.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "settings",
+      "home": "target"
+    },
+    {
+      "path": "client/features/settings/ui/account-usage-glyphs.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "settings",
+      "home": "target"
+    },
+    {
+      "path": "client/features/settings/ui/account-usage-share-image.ts",
       "layers": [
         "bindings"
       ],
@@ -3478,6 +3532,15 @@
       "home": "outside"
     },
     {
+      "path": "runtime/usage-summary-projection.ts",
+      "layers": [
+        "runtime"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
       "path": "runtime/workspace-archive.ts",
       "layers": [
         "runtime"
@@ -3956,6 +4019,15 @@
     },
     {
       "path": "shared/contracts/account-billing.ts",
+      "layers": [
+        "shared"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
+      "path": "shared/contracts/account-usage.ts",
       "layers": [
         "shared"
       ],

@@ -111,6 +111,8 @@ import {
   listResetCardsOperation,
   useResetCardOperation,
   queryResetCardFlowsOperation,
+  getAccountUsageSummaryOperation,
+  getAccountProfileOperation,
 } from "./account.js";
 
 import {
@@ -572,6 +574,16 @@ export const WEBUI_OPERATION_BINDINGS = {
   queryResetCardFlows: bind("account")("queryResetCardFlows")("queryResetCardFlows")({
     operation: queryResetCardFlowsOperation,
     args: (body) => [body],
+    result: identity,
+  }),
+  getAccountUsageSummary: bind("account")("getAccountUsageSummary")("getAccountUsageSummary")({
+    operation: getAccountUsageSummaryOperation,
+    args: () => [],
+    result: identity,
+  }),
+  getAccountProfile: bind("account")("getAccountProfile")("getAccountProfile")({
+    operation: getAccountProfileOperation,
+    args: () => [],
     result: identity,
   }),
   getSigninPanel: bind("account")("getSigninPanel")("getSigninPanel")({

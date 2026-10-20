@@ -90,6 +90,12 @@ export interface WebuiAssembledHost extends WebuiRuntimeHostHandle {
   readonly queryResetCardFlows: NonNullable<
     WebuiRuntimeHostHandle["queryResetCardFlows"]
   >;
+  readonly getAccountUsageSummary: NonNullable<
+    WebuiRuntimeHostHandle["getAccountUsageSummary"]
+  >;
+  readonly getAccountProfile: NonNullable<
+    WebuiRuntimeHostHandle["getAccountProfile"]
+  >;
   readonly getSigninPanel: NonNullable<WebuiRuntimeHostHandle["getSigninPanel"]>;
   readonly claimSignin: NonNullable<WebuiRuntimeHostHandle["claimSignin"]>;
   readonly beginAccountLogin: NonNullable<
@@ -166,6 +172,8 @@ export type WebuiRuntimeHostFactory = (
     | "listResetCards"
     | "useResetCard"
     | "queryResetCardFlows"
+    | "getAccountUsageSummary"
+    | "getAccountProfile"
     | "getSigninPanel"
     | "claimSignin"
     | "beginAccountLogin"
@@ -339,6 +347,8 @@ export async function createWebuiRuntimeHost(
     | "listResetCards"
     | "useResetCard"
     | "queryResetCardFlows"
+    | "getAccountUsageSummary"
+    | "getAccountProfile"
     | "getSigninPanel"
     | "claimSignin"
     | "beginAccountLogin"
@@ -439,6 +449,8 @@ export async function createWebuiRuntimeHost(
       readonly size?: number;
       readonly createTimeMs?: number;
     }) => authSession.usageQuota.queryResetCardFlows(request),
+    getAccountUsageSummary: () => authSession.usageQuota.getUsageSummary(),
+    getAccountProfile: () => authSession.usageQuota.getAccountProfile(),
     getSigninPanel: () => dailyCheckin.getSigninPanel(),
     claimSignin: () => dailyCheckin.claimSignin(),
     beginAccountLogin: () => accountLogin.begin(),

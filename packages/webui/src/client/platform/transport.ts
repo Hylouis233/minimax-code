@@ -69,6 +69,8 @@ import {
   LIST_RESET_CARDS_OPERATION_NAME,
   USE_RESET_CARD_OPERATION_NAME,
   QUERY_RESET_CARD_FLOWS_OPERATION_NAME,
+  GET_ACCOUNT_USAGE_SUMMARY_OPERATION_NAME,
+  GET_ACCOUNT_PROFILE_OPERATION_NAME,
   GET_USER_PROFILE_OPERATION_NAME,
   GET_WORKSPACE_ENVIRONMENT_OPERATION_NAME,
   GET_WORKSPACE_REVIEW_FILE_CONTENT_OPERATION_NAME,
@@ -254,6 +256,8 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
     useResetCard: (body) => request(USE_RESET_CARD_OPERATION_NAME, body ?? {}),
     queryResetCardFlows: (body) =>
       request(QUERY_RESET_CARD_FLOWS_OPERATION_NAME, body ?? {}),
+    getAccountUsageSummary: () => request(GET_ACCOUNT_USAGE_SUMMARY_OPERATION_NAME, {}),
+    getAccountProfile: () => request(GET_ACCOUNT_PROFILE_OPERATION_NAME, {}),
     getSigninPanel: () => request(GET_SIGNIN_PANEL_OPERATION_NAME, {}),
     claimSignin: () => request(CLAIM_SIGNIN_OPERATION_NAME, {}),
     getAccountStatus: (body) => request(GET_ACCOUNT_STATUS_OPERATION_NAME, body ?? {}),

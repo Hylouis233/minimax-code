@@ -77,6 +77,10 @@ export const SET_CREDIT_FALLBACK_OPERATION_NAME = "setCreditFallback" as const;
 export const LIST_RESET_CARDS_OPERATION_NAME = "listResetCards" as const;
 export const USE_RESET_CARD_OPERATION_NAME = "useResetCard" as const;
 export const QUERY_RESET_CARD_FLOWS_OPERATION_NAME = "queryResetCardFlows" as const;
+// The account page's calendar and profile: the lifetime token usage and the
+// signed-in account's public profile.
+export const GET_ACCOUNT_USAGE_SUMMARY_OPERATION_NAME = "getAccountUsageSummary" as const;
+export const GET_ACCOUNT_PROFILE_OPERATION_NAME = "getAccountProfile" as const;
 export const GET_SIGNIN_PANEL_OPERATION_NAME = "getSigninPanel" as const;
 export const CLAIM_SIGNIN_OPERATION_NAME = "claimSignin" as const;
 export const GET_ACCOUNT_STATUS_OPERATION_NAME = "getAccountStatus" as const;
@@ -213,6 +217,10 @@ import type {
   WebuiResetCardListResult,
   WebuiResetCardUseResult,
 } from "./contracts/account-billing.js";
+import type {
+  WebuiAccountProfileView,
+  WebuiUsageSummaryView,
+} from "./contracts/account-usage.js";
 import type {
   WebuiAccountLoginView,
   WebuiClaimSigninView,
@@ -507,6 +515,14 @@ export interface OperationSpec {
       readonly createTimeMs?: number;
     };
     response: WebuiResetCardFlowsResult;
+  };
+  getAccountUsageSummary: {
+    request: Record<string, never>;
+    response: WebuiUsageSummaryView;
+  };
+  getAccountProfile: {
+    request: Record<string, never>;
+    response: WebuiAccountProfileView;
   };
   getSigninPanel: { request: Record<string, never>; response: WebuiSigninPanelView };
   claimSignin: { request: Record<string, never>; response: WebuiClaimSigninView };

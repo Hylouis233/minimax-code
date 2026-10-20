@@ -102,6 +102,10 @@ import type {
   WebuiResetCardUseResult,
 } from "../shared/contracts/account-billing.js";
 import type {
+  WebuiAccountProfileView,
+  WebuiUsageSummaryView,
+} from "../shared/contracts/account-usage.js";
+import type {
   WebuiAccountLoginView,
   WebuiClaimSigninView,
   WebuiSigninPanelView,
@@ -453,6 +457,13 @@ export interface WebuiHarnessPort {
     readonly size?: number;
     readonly createTimeMs?: number;
   }): Promise<WebuiResetCardFlowsResult>;
+  /**
+   * The account page's calendar: the lifetime token usage and the signed-in
+   * account's public profile. Same seam as the account-billing surface above —
+   * the assembly supplies the client.
+   */
+  getAccountUsageSummary(): Promise<WebuiUsageSummaryView>;
+  getAccountProfile(): Promise<WebuiAccountProfileView>;
   /**
    * Auth invalidation is owned by the auth context reader, not the
    * harness. The assembly supplies the invalidator alongside the host,

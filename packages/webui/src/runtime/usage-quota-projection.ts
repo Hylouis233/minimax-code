@@ -30,6 +30,11 @@ export interface ProjectedMembership {
   readonly willRenewal?: boolean;
   readonly purchasedCredits?: string;
   readonly freeCredits?: string;
+  /**
+   * The personal workspace's name. The Desktop reads the account's phone
+   * number from this field, so the account page masks it the same way.
+   */
+  readonly workspaceName?: string;
 }
 
 /** Reads the fields the usage panel derives `hasTokenPlan`/credits from. */
@@ -85,6 +90,7 @@ export function projectPersonalWorkspace(
       willRenewal?: boolean;
       purchasedCredits?: string;
       freeCredits?: string;
+      workspaceName?: string;
     }
   | undefined {
   const data = asRecord(body.data);
@@ -99,6 +105,7 @@ export function projectPersonalWorkspace(
     const workspaceId = readWorkspaceId(workspace.workspace_id);
     if (workspaceId === undefined) continue;
     const membership = projectMembership(workspace);
+    const workspaceName = readString(workspace, undefined, "workspace_name");
     return {
       workspaceId,
       ...(membership.opGroupId ? { opGroupId: membership.opGroupId } : {}),
@@ -116,6 +123,7 @@ export function projectPersonalWorkspace(
       ...(membership.willRenewal !== undefined ? { willRenewal: membership.willRenewal } : {}),
       ...(membership.purchasedCredits !== undefined ? { purchasedCredits: membership.purchasedCredits } : {}),
       ...(membership.freeCredits !== undefined ? { freeCredits: membership.freeCredits } : {}),
+      ...(workspaceName !== undefined ? { workspaceName } : {}),
     };
   }
   return undefined;
@@ -141,6 +149,7 @@ export function mergeMembership(
   const willRenewal = scoped.willRenewal ?? personal.willRenewal;
   const purchasedCredits = scoped.purchasedCredits ?? personal.purchasedCredits;
   const freeCredits = scoped.freeCredits ?? personal.freeCredits;
+  const workspaceName = personal.workspaceName ?? scoped.workspaceName;
   return {
     ...(hasTokenPlan !== undefined ? { hasTokenPlan } : {}),
     ...(opGroupId ? { opGroupId } : {}),
@@ -153,6 +162,7 @@ export function mergeMembership(
     ...(willRenewal !== undefined ? { willRenewal } : {}),
     ...(purchasedCredits !== undefined ? { purchasedCredits } : {}),
     ...(freeCredits !== undefined ? { freeCredits } : {}),
+    ...(workspaceName !== undefined ? { workspaceName } : {}),
   };
 }
 

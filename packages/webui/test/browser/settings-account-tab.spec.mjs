@@ -9,10 +9,11 @@
 //    `disabled` on a `<button>` is not a style, it is the browser refusing the
 //    click, so "the flag is gone" and "the panel opens" are different facts and
 //    only the second one is the feature. The panel also renders through a
-//    `key`-ed branch, and the one action it offers is gated on a capability
-//    that comes off the real transport rather than off the fixture — which is
-//    what makes "the button is operable" worth asserting instead of merely
-//    "the button exists".
+//    `key`-ed branch, and the account page it renders is the ported one: the
+//    profile block, the three headline numbers, the usage calendar and the
+//    "分享" action. The 分享 preview is what the unit suite cannot reach —
+//    it is a portal over the whole screen, and "the button opens a preview"
+//    is only observable here.
 //
 // 2. The boundary. `main.tsx` now wraps the app in `WebuiErrorBoundary`, and
 //    `webui-error-boundary.test.tsx` drives the component directly with a child
@@ -80,6 +81,17 @@ function signOutButton(page) {
 }
 
 /**
+ * The account page the ported branch renders.
+ *
+ * The account tab no longer carries a settings section of its own — the
+ * "账户信息 / 退出登录" row was removed — so the page is located by the
+ * element it actually is: the ported account page.
+ */
+function accountPanel(page) {
+  return page.locator('[data-testid="account-usage-settings"]');
+}
+
+/**
  * Opens settings the way a user does: user menu, then 设置.
  *
  * The menu item rather than a prop or a hash, because the route to the modal is
@@ -90,10 +102,6 @@ async function openSettings(page) {
   await page.locator('[data-testid="sidebar-user-menu-trigger"]').click();
   await page.locator('[data-testid="user-menu-settings"]').click();
   await expect(settingsDialog(page)).toBeVisible();
-}
-
-function accountPanel(page) {
-  return page.locator(".webui-settings-page .webui-settings-section");
 }
 
 test("the account tab is enabled where the unfinished tabs are still disabled", async ({ page }) => {
@@ -156,35 +164,50 @@ test("clicking the account tab shows the account panel", async ({ page }) => {
   // The content header follows the active tab, so it is what proves the click
   // reached the component state rather than only the button's own class list.
   await expect(page.locator(".webui-settings-content-header h2")).toHaveText("账户");
+
+  // The ported account page: the profile block, the three headline numbers and
+  // the usage calendar. The fixture transport reports no usage, so the numbers
+  // read as the Desktop's own empty reading ("--") rather than as a failure --
+  // a missing answer is a runtime fact, not a rendering defect.
   await expect(accountPanel(page)).toBeVisible();
-  await expect(accountPanel(page).locator("h3")).toHaveText("账户");
-  // The one row the panel has. Its description is the account email, which the
-  // fixture transport does not report, so only the row's own presence is
-  // asserted -- an empty email is a runtime fact, not a failure.
-  await expect(accountPanel(page).getByText("账户信息")).toBeVisible();
-  await expect(signOutButton(page)).toBeVisible();
+  await expect(page.locator('[data-testid="account-usage-profile"]')).toBeVisible();
+  await expect(page.locator('[data-testid="account-usage-metrics"]')).toBeVisible();
+  await expect(page.locator('[data-testid="account-usage-metric"]')).toHaveCount(3);
+  await expect(page.locator('[data-testid="account-usage-activity"]')).toBeVisible();
+  await expect(accountPanel(page).getByText("Token 用量")).toBeVisible();
+
+  // The "账户信息 / 退出登录" row is gone: the account tab is the ported page
+  // and nothing else. Asserted rather than assumed, because a leftover row
+  // would be the one thing in this tab that no longer has a Desktop
+  // counterpart.
+  await expect(signOutButton(page)).toHaveCount(0);
+  await expect(accountPanel(page).getByText("账户信息")).toHaveCount(0);
   await expect(page.locator('[data-testid="webui-error-boundary"]')).toHaveCount(0);
 });
 
-test("the account panel's sign-out button is operable, not a dead end", async ({ page }) => {
+test("the account panel's 分享 action opens the share preview", async ({ page }) => {
   await openApp(page, "#session=A");
   await openSettings(page);
   await accountTab(page).click();
 
-  // `disabled={!signOut}`, and `signOut` is bound off the transport that
-  // `main.tsx` builds from the runtime config -- NOT off the in-page fixture,
-  // which only replaces `WebSocket`. So an enabled button here is a real
-  // capability reaching the panel. If it ever renders disabled, this PR ships
-  // an account tab whose only action can never fire, and that is worth a loud
-  // failure rather than a silent one.
-  await expect(signOutButton(page)).toBeEnabled();
+  // The action lives in the settings header, next to the tab title, the way
+  // the Desktop puts it in the account page's own top-right corner.
+  const share = page.locator('[data-testid="account-usage-share-button"]');
+  await expect(share).toBeVisible();
+  await expect(share).toBeEnabled();
 
-  // ...and it is wired, not merely enabled. A click has to reach the transport.
-  await signOutButton(page).click();
-  await expect.poll(() => page.evaluate(() => window.__fixture.requests.some((request) => request.operation === "signOut"))).toBe(true);
-  // `handleSignOut` closes the modal on success, so the modal leaving is the
-  // observable half of a completed sign-out.
-  await expect(settingsDialog(page)).toHaveCount(0);
+  // ...and it is wired, not merely enabled: the click has to open the
+  // preview, which is a portal over the whole screen.
+  await share.click();
+  await expect(page.locator('[data-testid="account-usage-share-preview"]')).toBeVisible();
+  await expect(page.locator('[data-testid="account-usage-share-card"]')).toBeVisible();
+
+  // The preview carries no close button of its own, so the scrim is the way
+  // out: a click outside the card dismisses it. The click has to land on the
+  // scrim itself, which is why the position is the corner rather than the
+  // centre — the centre of the scrim is the card.
+  await page.locator(".webui-settings-dialog-mask").click({ position: { x: 8, y: 8 } });
+  await expect(page.locator('[data-testid="account-usage-share-preview"]')).toHaveCount(0);
 });
 
 test("the boundary did not break the healthy app around it", async ({ page }) => {

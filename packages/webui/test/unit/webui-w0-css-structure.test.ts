@@ -826,6 +826,15 @@ describe("W0 · stacking order", () => {
       // and the composer overlay (20) and the workspace panel controls (50),
       // and it stays under the model/workspace menus (70) and the dialog
       // bands (100+).
+      // 121 is the band just above the 120 dialog scrim: the context menu's
+      // submenu.
+      // 130 is `.webui-account-usage-cell-tip`, the account page's calendar
+      // tooltip. It is rendered through a portal so it is not clipped by the
+      // calendar's scroll container, which means it is compared against
+      // everything else at the root of the document: it has to clear the
+      // settings dialog's own 120 scrim — the account page draws the calendar
+      // inside that dialog — while staying far below the portal-rendered
+      // 1400, which is the shell's ceiling.
       // 140 is `.webui-memory-confirm-mask`, the 删除记忆 confirmation. It is a
       // second modal stacked on the memory manager rather than part of it, so it
       // has to sit above that dialog's own 120 scrim while staying far below the
@@ -835,7 +844,7 @@ describe("W0 · stacking order", () => {
       // the fork, rewind-preview and goal-clear dialogs. It mounts outside the
       // shell's stacking context, so it cannot join the 100-121 in-shell
       // dialog band and has to clear all of it.
-      1, 2, 4, 20, 40, 45, 50, 60, 70, 80, 100, 110, 111, 120, 121, 140, 1400,
+      1, 2, 4, 20, 40, 45, 50, 60, 70, 80, 100, 110, 111, 120, 121, 130, 140, 1400,
     ]);
   });
 });

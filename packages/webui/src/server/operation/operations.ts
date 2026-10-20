@@ -46,6 +46,8 @@ export {
   listResetCardsOperation,
   useResetCardOperation,
   queryResetCardFlowsOperation,
+  getAccountUsageSummaryOperation,
+  getAccountProfileOperation,
 } from "./account.js";
 export type {
   WebuiOperation,
@@ -167,6 +169,8 @@ export function createOperationRegistry(
   registerOperation(registry, entry("listResetCards"));
   registerOperation(registry, entry("useResetCard"));
   registerOperation(registry, entry("queryResetCardFlows"));
+  registerOperation(registry, entry("getAccountUsageSummary"));
+  registerOperation(registry, entry("getAccountProfile"));
   registerOperation(registry, entry("getSigninPanel"));
   registerOperation(registry, entry("claimSignin"));
   registerOperation(registry, entry("beginAccountLogin"));

@@ -204,6 +204,8 @@ const ACCOUNT_KEYS = [
   "listResetCards",
   "useResetCard",
   "queryResetCardFlows",
+  "getAccountUsageSummary",
+  "getAccountProfile",
   "getSigninPanel",
   "claimSignin",
   "beginAccountLogin",

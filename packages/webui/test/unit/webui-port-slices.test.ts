@@ -74,7 +74,8 @@ const EXPECTED: Record<
   ],
   account: [
     "getUsageQuota", "getCreditFallback", "setCreditFallback", "listResetCards",
-    "useResetCard", "queryResetCardFlows", "getSigninPanel", "claimSignin",
+    "useResetCard", "queryResetCardFlows", "getAccountUsageSummary",
+    "getAccountProfile", "getSigninPanel", "claimSignin",
     "beginAccountLogin", "getAccountLoginStatus", "cancelAccountLogin",
     "getAccountStatus", "signOut",
   ],

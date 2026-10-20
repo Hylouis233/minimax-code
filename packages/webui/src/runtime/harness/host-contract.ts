@@ -594,6 +594,16 @@ export interface WebuiRuntimeHostHandle {
     import("../../shared/contracts/account-billing.js").WebuiResetCardFlowsResult
   >;
   /**
+   * The account page's calendar and profile. Backed by `usage-quota.ts`
+   * (cloud), supplied by the assembly alongside the host.
+   */
+  readonly getAccountUsageSummary?: () => Promise<
+    import("../../shared/contracts/account-usage.js").WebuiUsageSummaryView
+  >;
+  readonly getAccountProfile?: () => Promise<
+    import("../../shared/contracts/account-usage.js").WebuiAccountProfileView
+  >;
+  /**
    * Daily check-in status/claim. Backed by `check-in.ts` (cloud), supplied
    * by the assembly alongside the host.
    */

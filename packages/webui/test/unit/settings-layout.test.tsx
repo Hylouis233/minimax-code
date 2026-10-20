@@ -34,6 +34,8 @@ const PAGE_SOURCES = [
   "../../src/client/features/settings/ui/MemorySection.tsx",
   "../../src/client/features/settings/ui/UsageModelSettings.tsx",
   "../../src/client/features/settings/ui/UsageResetCards.tsx",
+  "../../src/client/features/settings/ui/AccountUsageSettings.tsx",
+  "../../src/client/features/settings/ui/UsageHeatmap.tsx",
   "../../src/client/features/review/ui/ReviewSettingsPage.public.tsx",
 ];
 

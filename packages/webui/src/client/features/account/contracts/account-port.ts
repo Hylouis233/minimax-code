@@ -16,6 +16,10 @@ import type {
   WebuiResetCardListResult,
   WebuiResetCardUseResult,
 } from "../../../../shared/contracts/account-billing.js";
+import type {
+  WebuiAccountProfileView,
+  WebuiUsageSummaryView,
+} from "../../../../shared/contracts/account-usage.js";
 import type { WebuiUsageQuotaResult } from "../../../../shared/contracts/usage-quota.js";
 
 export interface AccountPort {
@@ -44,6 +48,10 @@ export interface AccountPort {
     readonly size?: number;
     readonly createTimeMs?: number;
   }) => Promise<WebuiResetCardFlowsResult>;
+  /** The account page's calendar: the lifetime token usage. */
+  readonly getAccountUsageSummary?: () => Promise<WebuiUsageSummaryView>;
+  /** The account page's profile: the display name, the avatar, the phone. */
+  readonly getAccountProfile?: () => Promise<WebuiAccountProfileView>;
   readonly getSigninPanel?: () => Promise<WebuiSigninPanelView>;
   readonly claimSignin?: () => Promise<WebuiClaimSigninView>;
   /** Account login (device authorization) and its polling/cancel pair.

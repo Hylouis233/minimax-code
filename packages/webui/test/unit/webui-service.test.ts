@@ -469,6 +469,13 @@ class ScriptedHarnessPort implements WebuiHarnessPort {
   async queryResetCardFlows() {
     return { flows: [] };
   }
+  async getAccountUsageSummary() {
+    return { days: [] };
+  }
+
+  async getAccountProfile() {
+    return {};
+  }
 
   async getSigninPanel() {
     return { scene: 0, days: [] };
@@ -3917,6 +3924,12 @@ describe("WebUI shutdown order (criterion 7)", () => {
       async queryResetCardFlows() {
         return { flows: [] };
       },
+      async getAccountUsageSummary() {
+        return { days: [] };
+      },
+      async getAccountProfile() {
+        return {};
+      },
       async getSigninPanel() {
         return { scene: 0, days: [] };
       },
@@ -4324,6 +4337,12 @@ describe("WebUI shutdown order (criterion 7)", () => {
       },
       async queryResetCardFlows() {
         return { flows: [] };
+      },
+      async getAccountUsageSummary() {
+        return { days: [] };
+      },
+      async getAccountProfile() {
+        return {};
       },
       async getSigninPanel() {
         return { scene: 0, days: [] };

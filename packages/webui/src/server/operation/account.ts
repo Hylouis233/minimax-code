@@ -18,7 +18,9 @@ import {
   CANCEL_ACCOUNT_LOGIN_OPERATION_NAME,
   CLAIM_SIGNIN_OPERATION_NAME,
   GET_ACCOUNT_LOGIN_STATUS_OPERATION_NAME,
+  GET_ACCOUNT_PROFILE_OPERATION_NAME,
   GET_ACCOUNT_STATUS_OPERATION_NAME,
+  GET_ACCOUNT_USAGE_SUMMARY_OPERATION_NAME,
   GET_CREDIT_FALLBACK_OPERATION_NAME,
   GET_SIGNIN_PANEL_OPERATION_NAME,
   GET_USAGE_QUOTA_OPERATION_NAME,
@@ -301,11 +303,34 @@ export const queryResetCardFlowsOperation: WebuiOperation<
   },
 };
 
+export const getAccountUsageSummaryOperation: WebuiOperation<
+  Record<string, never>,
+  import("../../shared/contracts/account-usage.js").WebuiUsageSummaryView
+> = {
+  name: GET_ACCOUNT_USAGE_SUMMARY_OPERATION_NAME,
+  validate: (body) => {
+    if (body === null || typeof body !== "object" || Array.isArray(body) || Object.keys(body).length !== 0)
+      return { ok: false, code: WebuiErrorCode.invalidBody, message: "getAccountUsageSummary body must be an empty object" };
+    return { ok: true, body: {} };
+  },
+};
+
+export const getAccountProfileOperation: WebuiOperation<
+  Record<string, never>,
+  import("../../shared/contracts/account-usage.js").WebuiAccountProfileView
+> = {
+  name: GET_ACCOUNT_PROFILE_OPERATION_NAME,
+  validate: (body) => {
+    if (body === null || typeof body !== "object" || Array.isArray(body) || Object.keys(body).length !== 0)
+      return { ok: false, code: WebuiErrorCode.invalidBody, message: "getAccountProfile body must be an empty object" };
+    return { ok: true, body: {} };
+  },
+};
+
 /**
  * Reads a positive integer field. `"invalid"` separates "not a number" from
  * "absent", so an absent field stays absent in the validated body.
- */
-function readPositiveInteger(
+ */function readPositiveInteger(
   value: unknown,
 ): number | undefined | "invalid" {
   if (value === undefined) return undefined;

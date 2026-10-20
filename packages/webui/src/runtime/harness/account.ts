@@ -19,6 +19,8 @@ export function createAccountAdapter(
   | "listResetCards"
   | "useResetCard"
   | "queryResetCardFlows"
+  | "getAccountUsageSummary"
+  | "getAccountProfile"
   | "getSigninPanel"
   | "claimSignin"
   | "beginAccountLogin"
@@ -75,6 +77,22 @@ export function createAccountAdapter(
         "the account billing client",
       );
       return queryResetCardFlows.call(host, request);
+    },
+
+    async getAccountUsageSummary() {
+      const getAccountUsageSummary = requireHostSlot(
+        host.getAccountUsageSummary,
+        "the account usage client",
+      );
+      return getAccountUsageSummary.call(host);
+    },
+
+    async getAccountProfile() {
+      const getAccountProfile = requireHostSlot(
+        host.getAccountProfile,
+        "the account usage client",
+      );
+      return getAccountProfile.call(host);
     },
 
     async getSigninPanel() {

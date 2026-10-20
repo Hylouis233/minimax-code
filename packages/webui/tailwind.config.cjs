@@ -577,6 +577,10 @@ tailwindConfig.theme.backgroundColor = {
   ...tailwindConfig.theme.backgroundColor,
   ...surfaceFillsFrom(tailwindConfig.theme.textColor, "text_"),
   ...surfaceFillsFrom(tailwindConfig.theme.borderColor, "border_"),
+  // The `icon_*` family is a surface fill too: the account page's usage heat
+  // map draws its four usage buckets in `bg-icon_default_accent`, and a fill
+  // that only exists as a text colour would leave the busiest days uncolored.
+  ...surfaceFillsFrom(tailwindConfig.theme.textColor, "icon_"),
 };
 
 module.exports = tailwindConfig;

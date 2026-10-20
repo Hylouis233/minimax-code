@@ -27,6 +27,10 @@
 import { webuiFirstPartySignatureHeaders } from "./signing.js";
 
 import type {
+  WebuiAccountProfileView,
+  WebuiUsageSummaryView,
+} from "../shared/contracts/account-usage.js";
+import type {
   WebuiCreditFallbackView,
   WebuiResetCardFlowsResult,
   WebuiResetCardListResult,
@@ -44,6 +48,10 @@ import {
   projectResetCardList,
   projectResetCardUse,
 } from "./reset-card-projection.js";
+import {
+  projectAccountProfile,
+  projectUsageSummary,
+} from "./usage-summary-projection.js";
 import {
   asRecord,
   finiteNumber,
@@ -90,6 +98,9 @@ const OPEN_PLATFORM_ORIGINS: Readonly<Record<string, Readonly<Record<string, str
 const USER_EXTRA_INFO_PATH = "/matrix/api/v1/user/get_user_extra_info";
 const MEMBERSHIP_INFO_PATH = "/matrix/api/v1/commerce/get_membership_info";
 const USER_INFO_PATH = "/v1/api/user/info";
+// The account page's profile read: the display name, the avatar and the
+// registration time the Desktop's account page renders.
+const USER_PROFILE_PATH = "/matrix/api/v1/user/profile";
 // The panel's own quota endpoint: returns used/total percent per
 // window (`"96%"` / `"100%"`) plus count-based video rows. The sibling
 // `/v1/api/openplatform/coding_plan/remains` reports *remaining* percent and
@@ -104,6 +115,14 @@ const TOKEN_PLAN_CREDIT_FALLBACK_PATH = "/backend/account/token_plan_credit/fall
 const RESET_CARD_LIST_PATH = "/backend/account/reset_card/list";
 const RESET_CARD_USE_PATH = "/backend/account/reset_card/use";
 const RESET_CARD_FLOWS_PATH = "/backend/account/reset_card/flows";
+// The account page's calendar: the cumulative token total, the busiest day and
+// one entry per day for the last 365 days. It lives on the same open-platform
+// origin as the quota endpoint above; the path and the query were read out of
+// the Desktop renderer bundle.
+const USAGE_SUMMARY_PATH = "/backend/account/token_plan/usage_summary";
+/** The Desktop asks for the text models of the last 365 days. */
+const USAGE_SUMMARY_HEATMAP_DAYS = 365;
+const USAGE_SUMMARY_TOKEN_TYPE = 5;
 /** The Desktop pages the reset-card list and the history 20 rows at a time. */
 const RESET_CARD_PAGE_SIZE = 20;
 const DEFAULT_TIMEOUT_MS = 3_000;
@@ -152,6 +171,8 @@ interface BillingContext {
   readonly willRenewal?: boolean;
   readonly purchasedCredits?: string;
   readonly freeCredits?: string;
+  /** The personal workspace's name — the account's phone number. */
+  readonly workspaceName?: string;
 }
 
 interface CacheEntry<V> {
@@ -363,6 +384,45 @@ export class UsageQuotaClient {
     return { flows: projectResetCardFlows(body) };
   }
 
+  /**
+   * The account page's calendar: the lifetime token total, the busiest day and
+   * one entry per day. The Desktop asks the same endpoint for the same window,
+   * so this is the same seam rather than a new one.
+   */
+  async getUsageSummary(): Promise<WebuiUsageSummaryView> {
+    const token = await this.requireBillingToken();
+    const billing = await this.resolveBillingContext(token, false);
+    const body = await this.openPlatformRequest(USAGE_SUMMARY_PATH, {
+      method: "GET",
+      token,
+      opGroupId: billing.opGroupId,
+      query: {
+        token_type: USAGE_SUMMARY_TOKEN_TYPE,
+        heatmap_days: USAGE_SUMMARY_HEATMAP_DAYS,
+      },
+    });
+    return projectUsageSummary(body);
+  }
+
+  /**
+   * The account page's profile: the display name, the avatar and the
+   * registration time the calendar's first column depends on.
+   *
+   * The phone number comes from the personal workspace, which is a different
+   * endpoint; a failed workspace read degrades to no phone instead of failing
+   * the whole profile.
+   */
+  async getAccountProfile(): Promise<WebuiAccountProfileView> {
+    const token = await this.requireBillingToken();
+    const [body, workspaceName] = await Promise.all([
+      this.getMatrixJson(USER_PROFILE_PATH, token, "account profile request"),
+      this.resolveBillingContext(token, false)
+        .then((billing) => billing.workspaceName)
+        .catch(() => undefined),
+    ]);
+    return projectAccountProfile(body, { phone: workspaceName });
+  }
+
   /** Resolves the account identity required by the identity and check-in UI. */
   async resolveAccountIdentity(accessToken: string): Promise<UsageQuotaAccountIdentity> {
     const key = accessToken;
@@ -448,6 +508,7 @@ export class UsageQuotaClient {
         willRenewal?: boolean;
         purchasedCredits?: string;
         freeCredits?: string;
+        workspaceName?: string;
         }
       | undefined;
     try {
@@ -484,6 +545,7 @@ export class UsageQuotaClient {
       ...(personalWorkspace.willRenewal !== undefined ? { willRenewal: personalWorkspace.willRenewal } : {}),
       ...(personalWorkspace.purchasedCredits !== undefined ? { purchasedCredits: personalWorkspace.purchasedCredits } : {}),
       ...(personalWorkspace.freeCredits !== undefined ? { freeCredits: personalWorkspace.freeCredits } : {}),
+      ...(personalWorkspace.workspaceName !== undefined ? { workspaceName: personalWorkspace.workspaceName } : {}),
     };
     try {
       const scoped = await this.postMatrixJson(
@@ -669,6 +731,47 @@ export class UsageQuotaClient {
         ...webuiFirstPartySignatureHeaders({ pathWithSearch, nowMs: requestTime, body }),
       },
       body,
+      signal,
+    });
+    if (response.status === 401 || response.status === 403) {
+      throw new UsageQuotaAuthError(response.status);
+    }
+    if (!response.ok) {
+      throw new Error(`Usage quota ${operation} failed with HTTP ${response.status}`);
+    }
+    const responseBody = asRecord(await response.json());
+    if (!responseBody) throw new Error(`Usage quota ${operation} returned an invalid response`);
+    assertSuccessfulResponse(responseBody, operation);
+    return responseBody;
+  }
+
+  /**
+   * A matrix read that answers with a body. The matrix endpoints are signed
+   * with the same `yy` / `x-timestamp` / `x-signature` triple the POST path
+   * uses, so only the method differs.
+   */
+  private async getMatrixJson(
+    pathname: string,
+    token: UsageQuotaTokenContext,
+    operation: string,
+  ): Promise<Record<string, unknown>> {
+    const origin = MATRIX_ORIGINS[this.options.region]?.[this.options.buildEnv];
+    if (!origin) throw new Error(`Usage quota ${operation} unavailable outside prod origins`);
+    const requestTime = this.now();
+    const url = buildMatrixUrl(pathname, origin, requestTime, token.realUserID, {
+      region: this.options.region,
+      timezoneOffsetSeconds: this.timezoneOffsetSeconds(),
+    });
+    const pathWithSearch = `${url.pathname}${url.search}`;
+    const signal = AbortSignal.timeout(this.timeoutMs);
+    const response = await this.fetchImpl(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "MiniMaxCode",
+        Authorization: `Bearer ${token.accessToken}`,
+        ...webuiFirstPartySignatureHeaders({ pathWithSearch, nowMs: requestTime }),
+      },
       signal,
     });
     if (response.status === 401 || response.status === 403) {

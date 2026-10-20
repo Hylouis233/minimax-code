@@ -33,6 +33,10 @@ import type {
   WebuiResetCardOutcome,
   WebuiResetCardView,
 } from "../../../../shared/contracts/account-billing.js";
+import type {
+  WebuiAccountProfileView,
+  WebuiUsageSummaryView,
+} from "../../../../shared/contracts/account-usage.js";
 import type { WebuiUsageQuotaResult } from "../../../../shared/contracts/usage-quota.js";
 
 /** The transport methods this owner drives. Absent means "not wired". */
@@ -45,6 +49,8 @@ export type WebuiAccountPortSlice = Pick<
   | "listResetCards"
   | "useResetCard"
   | "queryResetCardFlows"
+  | "getAccountUsageSummary"
+  | "getAccountProfile"
   | "getSigninPanel"
   | "claimSignin"
   | "beginAccountLogin"
@@ -126,11 +132,34 @@ export interface WebuiAccountCredentialStatusState {
   readonly error?: string;
 }
 
+/**
+ * The account page's calendar: the lifetime token usage the account page's
+ * three headline numbers and its heat map are drawn from.
+ */
+export interface WebuiAccountUsageSummaryState {
+  readonly status: "idle" | "loading" | "ready" | "error";
+  readonly summary?: WebuiUsageSummaryView;
+  readonly error?: string;
+}
+
+/**
+ * The account page's profile: the display name, the avatar, the contact the
+ * account page shows and the registration time the heat map's first column
+ * depends on.
+ */
+export interface WebuiAccountProfileState {
+  readonly status: "idle" | "loading" | "ready" | "error";
+  readonly profile?: WebuiAccountProfileView;
+  readonly error?: string;
+}
+
 export interface WebuiAccountWorkflowsState {
   readonly account: WebuiAccountRecordState;
   readonly apiKeyStatus: WebuiAccountCredentialStatusState;
   readonly codexOAuth: WebuiAccountCredentialStatusState;
   readonly usage: WebuiUsageQuotaState;
+  readonly usageSummary: WebuiAccountUsageSummaryState;
+  readonly profile: WebuiAccountProfileState;
   readonly creditFallback: WebuiCreditFallbackState;
   readonly resetCards: WebuiResetCardState;
   readonly signin: WebuiSigninState;
@@ -166,6 +195,14 @@ export const initialWebuiCreditFallbackState: WebuiCreditFallbackState = {
   status: "idle",
   resolved: false,
   saving: false,
+};
+
+export const initialWebuiAccountUsageSummaryState: WebuiAccountUsageSummaryState = {
+  status: "idle",
+};
+
+export const initialWebuiAccountProfileState: WebuiAccountProfileState = {
+  status: "idle",
 };
 
 /**
@@ -248,6 +285,8 @@ export const initialWebuiAccountWorkflowsState: WebuiAccountWorkflowsState = {
   apiKeyStatus: initialWebuiAccountCredentialStatusState,
   codexOAuth: initialWebuiAccountCredentialStatusState,
   usage: initialWebuiUsageQuotaState,
+  usageSummary: initialWebuiAccountUsageSummaryState,
+  profile: initialWebuiAccountProfileState,
   creditFallback: initialWebuiCreditFallbackState,
   resetCards: initialWebuiResetCardState,
   signin: initialWebuiSigninState,
@@ -274,6 +313,13 @@ export interface WebuiAccountWorkflows {
   readonly loadAccount: (sessionId?: string) => Promise<void>;
   /** Read the usage quota. `forceRefresh` asks the runtime to bypass its cache. */
   readonly loadUsage: (forceRefresh?: boolean) => Promise<boolean>;
+  /**
+   * Read the account page's calendar. A superseded answer is dropped, like
+   * every other read this owner drives.
+   */
+  readonly loadAccountUsageSummary: () => Promise<void>;
+  /** Read the account page's profile. */
+  readonly loadAccountProfile: () => Promise<void>;
   /**
    * Read the credit-fallback switch. A superseded answer is dropped, like
    * every other read this owner drives.
@@ -621,6 +667,63 @@ export function createWebuiAccountWorkflows(deps: {
         account: { ...current.account, status: "error", error: message(reason) },
       }));
     }
+  };
+
+  /**
+   * The account page's two reads. They are separate because the page renders
+   * them separately: a failed calendar must not hide the profile, and a failed
+   * profile must not hide the calendar.
+   */
+  const loadAccountPageRead = async <T>(
+    key: "usageSummary" | "profile",
+    field: "summary" | "profile",
+    read: (() => Promise<T>) | undefined,
+    unavailableMessage: string,
+  ): Promise<void> => {
+    if (!read) {
+      set((current) => ({
+        ...current,
+        [key]: { status: "error", error: unavailableMessage },
+      }));
+      return;
+    }
+    const version = bump(key);
+    set((current) => ({
+      ...current,
+      [key]: { ...current[key], status: "loading" },
+    }));
+    try {
+      const value = await read();
+      if (disposed || !isCurrent(key, version)) return;
+      set((current) => ({
+        ...current,
+        [key]: { status: "ready", [field]: value },
+      }));
+    } catch (reason) {
+      if (disposed || !isCurrent(key, version)) return;
+      set((current) => ({
+        ...current,
+        [key]: { status: "error", error: message(reason) },
+      }));
+    }
+  };
+
+  const loadAccountUsageSummary = async (): Promise<void> => {
+    await loadAccountPageRead(
+      "usageSummary",
+      "summary",
+      port.getAccountUsageSummary,
+      "当前运行时不支持用量统计。",
+    );
+  };
+
+  const loadAccountProfile = async (): Promise<void> => {
+    await loadAccountPageRead(
+      "profile",
+      "profile",
+      port.getAccountProfile,
+      "当前运行时不支持账户资料。",
+    );
   };
 
   const loadCreditFallback = async (): Promise<void> => {
@@ -1104,6 +1207,8 @@ export function createWebuiAccountWorkflows(deps: {
     dispose,
     loadAccount,
     loadUsage,
+    loadAccountUsageSummary,
+    loadAccountProfile,
     loadCreditFallback,
     setCreditFallback,
     loadResetCards,

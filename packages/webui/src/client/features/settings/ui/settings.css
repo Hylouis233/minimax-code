@@ -312,6 +312,33 @@
   .webui-settings-dialog-mask { position: fixed; inset: 0; z-index: 120; display: flex; align-items: center; justify-content: center; background: var(--utility_scrim); animation: webui-overlay-enter 160ms ease-out both; }
   .webui-settings-dialog-surface { display: flex; width: min(420px, calc(100vw - 32px)); max-height: calc(100vh - 64px); overflow: hidden; flex-direction: column; gap: var(--spacing_12); border: 1px solid var(--border_default); border-radius: var(--radius_16); background: var(--bg_grouped_secondary); padding: var(--spacing_16); color: var(--text_default_primary); outline: none; }
   .webui-settings-dialog-surface.is-wide { width: min(560px, calc(100vw - 32px)); }
+  /* The preview variant. The account page's share preview shows the image it
+   * is about to save, so the surface is the preview: no header, no frame, no
+   * padding of its own — the preview card carries the rounded corners the
+   * Desktop gives it. */
+  .webui-settings-dialog-surface.is-preview { width: auto; max-height: none; border: 0; border-radius: 0; background: transparent; padding: 0; box-shadow: none; }
+  .webui-settings-dialog-surface.is-preview .webui-settings-dialog-body { overflow: visible; }
+  /* The preview variant sits on the Desktop's overlay, not on the shell's
+   * scrim. The shell's scrim is white at 50%, which is what a dialog over the
+   * shell wants; the share preview is a white card, and a white card on a
+   * white scrim is not a card. The Desktop's own preview mask is the 25%
+   * black overlay, and the card is legible against it. */
+  .webui-settings-dialog-mask.is-overlay { background: var(--utility_overlay); }
+  /* The share preview's card: the Desktop's own 10px halo in the theme's
+   * shadow token. */
+  .webui-account-usage-share-card { box-shadow: 0 0 10px 0 var(--shadow_default); }
+  /* The calendar cell's tooltip. The Desktop draws it above the cell, in the
+   * shell's tooltip colours: the day in the assist type, the day's tokens
+   * under it in the small type with tabular figures.
+   *
+   * It is rendered through a portal, so it is compared against everything else
+   * at the root of the document: it has to clear the settings dialog's own 120
+   * scrim — the account page draws the calendar inside that dialog — and the
+   * share preview's 120 scrim, and it stays far below the portal-rendered
+   * 1400 message dialog, which is the shell's ceiling. 130 is that band. */
+  .webui-account-usage-cell-tip { position: fixed; z-index: 130; display: flex; transform: translate(-50%, -100%); flex-direction: column; gap: 6px; border-radius: var(--radius_4); background: rgb(0 0 0 / 85%); padding: 8px 10px; color: var(--text_default_inverted_static); pointer-events: none; }
+  .webui-account-usage-cell-tip-date { font-size: 11px; line-height: 16px; opacity: .6; }
+  .webui-account-usage-cell-tip-value { font-size: 12px; line-height: 16px; font-variant-numeric: tabular-nums; }
   .webui-settings-dialog-header { display: flex; width: 100%; flex: none; align-items: center; justify-content: space-between; gap: var(--spacing_12); }
   .webui-settings-dialog-header h3 { display: flex; min-width: 0; align-items: center; gap: var(--spacing_4); margin: 0; color: var(--text_default_primary); font-size: var(--size_14); font-weight: var(--weight_medium); line-height: var(--line_height_20); }
   .webui-settings-dialog-header button { display: flex; width: 26px; height: 26px; flex: none; align-items: center; justify-content: center; border: 0; border-radius: var(--radius_8); background: var(--bg_interaction_tertiary_default); color: var(--text_default_tertiary); cursor: pointer; transition: background-color 120ms ease, color 120ms ease; }
@@ -572,6 +599,16 @@
    * button and steps the type down one notch, so the action reads as an
    * action. */
   .webui-mavis-button-compact { min-width: 0; height: 30px; padding: 0 var(--spacing_8); font-size: var(--size_12); }
+  /* The settings header's action size. The account page's 分享 sits in the
+   * header next to the title, the way the Desktop puts it in the top-right of
+   * its account page: a 30px button on the secondary surface, carrying the
+   * icon and the label as one row.
+   *
+   * The geometry is the Desktop's own, read off the live page: 30px tall,
+   * 4px/12px of padding, 13px type on an 18.57px line, and no minimum width --
+   * the Desktop's action button is 72px wide because of what it says, not
+   * because of a floor. */
+  .webui-mavis-button-header { min-width: 0; height: 30px; padding: 4px var(--spacing_12); font-size: 13px; line-height: 18.57px; font-weight: 430; }
   .webui-mavis-button:disabled { opacity: .45; cursor: default; }
   /* The section save button, declared from the token layer rather than measured
    * off a capture.
