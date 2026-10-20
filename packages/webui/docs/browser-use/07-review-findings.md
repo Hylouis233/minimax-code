@@ -319,6 +319,28 @@ tested without a DOM renderer — the client test environment has none.
 - **N4** — The stale claims in this document and in
   `03-extension-admission.md` are corrected.
 
+## Round 5 — found by probing the real browser
+
+No review round caught this one, because every test of the extension runs
+against its **TypeScript source**. A probe against a real Chrome shows the
+gap: the extension **registers** — the service worker is created and the
+extension id is `ijoijfjbpmfdebiopnbodncfgdjmgjce` — but the manifest points
+`background.service_worker` at `src/background/service-worker.ts`.
+
+**A browser extension runtime executes JavaScript only.** The worker therefore
+registers and then cannot run, and the extension as packaged cannot drive a
+browser at all. The evidence is in
+`.plan/board/validation/extension-load-evidence.json`; the probe is
+`.plan/board/validation/probe-extension-load.mjs`.
+
+The fix is a build step: bundle the extension's TypeScript to JavaScript and
+point the manifest at the built output. Until that lands, every claim about
+the external path is a claim about the **source**, not about a browser.
+
+This is the kind of gap that only a real browser finds, and it is the reason
+the programme's evidence says "not yet measured" for the external surfaces
+rather than claiming they work.
+
 ## What this document does not establish
 
 - That the external path works end to end against a real Edge or Chrome. Neither
