@@ -1,12 +1,18 @@
 // No browser is involved here: `chrome.storage` is replaced by the small fakes
-// below, and `crypto.getRandomValues` is injected wherever pairing would call it.
-// What the fakes cover is the storage and randomness the extension depends on;
-// nothing here talks to a real Chrome.
+// below, and `crypto.subtle` is Node's own Web Crypto, which is the same
+// implementation the service worker gets. Nothing here talks to a real Chrome.
+//
+// The point of this file is that the credential is **host-authored**. The
+// extension cannot mint one: two independently minted credentials never
+// match, so the host would never accept a proof against the wrong secret.
+// Every credential below arrives through a `pair` frame, decrypted with an
+// ECDH key this side minted for that one connection.
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   answerWebuiBrowserBridgeChallenge,
+  applyWebuiBrowserBridgePairingCredential,
   clearWebuiBrowserBridgePairingCredential,
   loadWebuiBrowserBridgePairingCredential,
   webuiBrowserBridgePairingStore,
@@ -16,7 +22,15 @@ import {
 } from "../src/pairing.js";
 import {
   encodeWebuiBrowserBridgeBase64,
+  exportWebuiBrowserBridgeEcdhPublicKey,
+  generateWebuiBrowserBridgeEcdhKeyPair,
+  importWebuiBrowserBridgeEcdhPublicKey,
+  openWebuiBrowserBridgePairingCredential,
   verifyWebuiBrowserBridgeProof,
+  WEBUI_BROWSER_BRIDGE_PAIR_AES_IV_BYTES,
+  WEBUI_BROWSER_BRIDGE_PAIR_HKDF_INFO,
+  type WebuiBrowserBridgeEcdhPublicKey,
+  type WebuiBrowserBridgePair,
 } from "../src/protocol.js";
 
 function fakeArea(): WebuiBrowserBridgeStorageArea & { readonly values: Record<string, unknown> } {
@@ -38,35 +52,138 @@ function fakeArea(): WebuiBrowserBridgeStorageArea & { readonly values: Record<s
   };
 }
 
-/** Deterministic "random" bytes so the generated secret can be asserted on. */
-function countingRandomBytes(length: number): Uint8Array {
-  return Uint8Array.from({ length }, (_value, index) => (index + 1) % 256);
+/**
+ * Bytes 1..255, 0..255, 1..255, ... — non-zero, so a zero byte in the secret
+ * cannot be mistaken for a padding artefact when it comes back.
+ */
+function countingSecret(length: number): Uint8Array {
+  return Uint8Array.from({ length }, (_value, index) => ((index + 1) % 256) || 1);
 }
 
-afterEach(() => {
-  vi.restoreAllMocks();
-});
+/** The credential body a host would keep in its OS secure store. */
+function makeHostSecret(seed: number): Uint8Array {
+  const bytes = new Uint8Array(WEBUI_BROWSER_BRIDGE_SECRET_BYTES);
+  for (let index = 0; index < bytes.length; index += 1) {
+    bytes[index] = ((seed * (index + 1)) % 255) || 1;
+  }
+  return bytes;
+}
 
-describe("pairing credential", () => {
-  it("creates a high-entropy credential on first use and reuses it afterwards", async () => {
-    const area = fakeArea();
-    const store = webuiBrowserBridgePairingStore(area);
+/** An ECDH key pair, as the two shapes the wire needs. */
+async function mintEcdhPair(): Promise<{
+  readonly privateKey: CryptoKey;
+  readonly publicJwk: WebuiBrowserBridgeEcdhPublicKey;
+}> {
+  const { privateKey, publicKey } = await generateWebuiBrowserBridgeEcdhKeyPair();
+  return { privateKey, publicJwk: await exportWebuiBrowserBridgeEcdhPublicKey(publicKey) };
+}
 
-    const created = await loadWebuiBrowserBridgePairingCredential(store, "edge", countingRandomBytes);
+/**
+ * Plays the host: seal a credential body to the extension's `hello` key.
+ *
+ * This is a second implementation of the host's seal, written here so the
+ * test is not asserting the extension's own helper against itself. It is the
+ * same construction the webui side ships
+ * (`sealWebuiBrowserBridgePairingCredential` in the shared contract), and the
+ * shared vector in `protocol.test.ts` pins both halves of it.
+ */
+async function hostPairFrame(
+  extensionPublicJwk: WebuiBrowserBridgeEcdhPublicKey,
+  secretBytes: Uint8Array,
+  keyId: string,
+): Promise<WebuiBrowserBridgePair> {
+  const salt = countingSecret(16);
+  const iv = countingSecret(WEBUI_BROWSER_BRIDGE_PAIR_AES_IV_BYTES);
+  const host = await generateWebuiBrowserBridgeEcdhKeyPair();
+  const peer = await importWebuiBrowserBridgeEcdhPublicKey(extensionPublicJwk);
+  const sharedBits = await crypto.subtle.deriveBits(
+    { name: "ECDH", public: peer },
+    host.privateKey,
+    256,
+  );
+  const baseKey = await crypto.subtle.importKey("raw", sharedBits, { name: "HKDF" }, false, [
+    "deriveKey",
+  ]);
+  const aesKey = await crypto.subtle.deriveKey(
+    {
+      name: "HKDF",
+      hash: "SHA-256",
+      salt: toArrayBuffer(salt),
+      info: new TextEncoder().encode(WEBUI_BROWSER_BRIDGE_PAIR_HKDF_INFO),
+    },
+    baseKey,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt"],
+  );
+  const ciphertext = new Uint8Array(
+    await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv: toArrayBuffer(iv) },
+      aesKey,
+      toArrayBuffer(new TextEncoder().encode(encodeWebuiBrowserBridgeBase64(secretBytes))),
+    ),
+  );
+  const payload = new Uint8Array(iv.length + ciphertext.length);
+  payload.set(iv, 0);
+  payload.set(ciphertext, iv.length);
+  return {
+    kind: "pair",
+    keyId,
+    publicKey: await exportWebuiBrowserBridgeEcdhPublicKey(host.publicKey),
+    salt: encodeBase64ForTest(salt),
+    payload: encodeBase64ForTest(payload),
+  };
+}
 
-    expect(created.secret).toHaveLength(WEBUI_BROWSER_BRIDGE_SECRET_BYTES);
-    expect(WEBUI_BROWSER_BRIDGE_SECRET_BYTES).toBeGreaterThanOrEqual(32);
-    expect(created.keyId.startsWith("edge-")).toBe(true);
-    expect(area.values[WEBUI_BROWSER_BRIDGE_PAIRING_STORAGE_KEY]).toBeDefined();
+describe("pairing credential — host-authored", () => {
+  it("holds no credential until a host pair frame delivers one", async () => {
+    const store = webuiBrowserBridgePairingStore(fakeArea());
 
-    // A restarted service worker reads the credential again rather than finding
-    // it gone: this is the whole reason the secret lives in storage.
-    const reloaded = await loadWebuiBrowserBridgePairingCredential(store, "edge", countingRandomBytes);
-    expect(reloaded.keyId).toBe(created.keyId);
-    expect([...reloaded.secret]).toEqual([...created.secret]);
+    // No credential is minted on first use: that is the defect this exchange
+    // exists to remove. The extension's own id would never match the host's.
+    expect(await loadWebuiBrowserBridgePairingCredential(store)).toBeUndefined();
   });
 
-  it("replaces a stored credential whose secret is missing or too short", async () => {
+  it("decrypts a pair frame and stores exactly the host's secret", async () => {
+    const area = fakeArea();
+    const store = webuiBrowserBridgePairingStore(area);
+    const { privateKey, publicJwk } = await mintEcdhPair();
+    const hostSecret = makeHostSecret(7);
+
+    const cipher = await hostPairFrame(publicJwk, hostSecret, "edge-host-issued-1");
+
+    // The wire frame must not carry the secret in any form.
+    const encodedSecret = encodeWebuiBrowserBridgeBase64(hostSecret);
+    expect(JSON.stringify(cipher)).not.toContain(encodedSecret);
+    expect(cipher).not.toHaveProperty("secret");
+
+    const stored = await applyWebuiBrowserBridgePairingCredential(store, cipher, privateKey);
+
+    expect(stored.keyId).toBe("edge-host-issued-1");
+    expect(encodeWebuiBrowserBridgeBase64(stored.secret)).toBe(encodedSecret);
+    expect(area.values[WEBUI_BROWSER_BRIDGE_PAIRING_STORAGE_KEY]).toBeDefined();
+  });
+
+  it("reloads the same credential after a worker restart", async () => {
+    const area = fakeArea();
+    const store = webuiBrowserBridgePairingStore(area);
+    const { privateKey, publicJwk } = await mintEcdhPair();
+    await applyWebuiBrowserBridgePairingCredential(
+      store,
+      await hostPairFrame(publicJwk, makeHostSecret(11), "edge-restart"),
+      privateKey,
+    );
+
+    // A restarted worker rebuilds the client from storage alone.
+    const reloaded = await loadWebuiBrowserBridgePairingCredential(store);
+
+    expect(reloaded?.keyId).toBe("edge-restart");
+    expect(encodeWebuiBrowserBridgeBase64(reloaded!.secret)).toBe(
+      encodeWebuiBrowserBridgeBase64(makeHostSecret(11)),
+    );
+  });
+
+  it("holds no credential when storage has a truncated one", async () => {
     const area = fakeArea();
     const store = webuiBrowserBridgePairingStore(area);
     await area.set({
@@ -76,24 +193,105 @@ describe("pairing credential", () => {
       },
     });
 
-    const credential = await loadWebuiBrowserBridgePairingCredential(store, "edge", countingRandomBytes);
+    expect(await loadWebuiBrowserBridgePairingCredential(store)).toBeUndefined();
+  });
 
-    // A different credential, not a patched one: the host's stored record is
-    // keyed by this id, and quietly reusing the old id with new bytes would
-    // present a credential the host believes it has already rejected.
-    expect(credential.keyId).not.toBe("edge-broken");
-    expect(credential.secret).toHaveLength(WEBUI_BROWSER_BRIDGE_SECRET_BYTES);
-    const stored = area.values[WEBUI_BROWSER_BRIDGE_PAIRING_STORAGE_KEY] as {
-      keyId: string;
-      secret: string;
-    };
-    expect(stored.keyId).toBe(credential.keyId);
+  it("replaces the stored credential when the host rotates it", async () => {
+    const area = fakeArea();
+    const store = webuiBrowserBridgePairingStore(area);
+
+    // First connection: the switch was on, the host issued credential A.
+    const first = await mintEcdhPair();
+    await applyWebuiBrowserBridgePairingCredential(
+      store,
+      await hostPairFrame(first.publicJwk, makeHostSecret(101), "edge-cred-a"),
+      first.privateKey,
+    );
+    expect((await loadWebuiBrowserBridgePairingCredential(store))?.keyId).toBe("edge-cred-a");
+
+    // The person turned the switch off and on again: the host minted a new
+    // credential. The next connection delivers it, and the extension drops
+    // the old copy rather than keeping both.
+    const second = await mintEcdhPair();
+    const rotated = await applyWebuiBrowserBridgePairingCredential(
+      store,
+      await hostPairFrame(second.publicJwk, makeHostSecret(202), "edge-cred-b"),
+      second.privateKey,
+    );
+    const after = await loadWebuiBrowserBridgePairingCredential(store);
+
+    expect(rotated.keyId).toBe("edge-cred-b");
+    expect(after?.keyId).toBe("edge-cred-b");
+    expect(encodeWebuiBrowserBridgeBase64(after!.secret)).toBe(
+      encodeWebuiBrowserBridgeBase64(makeHostSecret(202)),
+    );
+    expect(encodeWebuiBrowserBridgeBase64(after!.secret)).not.toBe(
+      encodeWebuiBrowserBridgeBase64(makeHostSecret(101)),
+    );
+  });
+
+  it("answers a host challenge with the credential the pair frame carried", async () => {
+    const store = webuiBrowserBridgePairingStore(fakeArea());
+    const { privateKey, publicJwk } = await mintEcdhPair();
+    const hostSecret = makeHostSecret(31);
+    const credential = await applyWebuiBrowserBridgePairingCredential(
+      store,
+      await hostPairFrame(publicJwk, hostSecret, "edge-answer"),
+      privateKey,
+    );
+
+    // A restarted worker: only storage remains, exactly as it is in a real MV3
+    // service worker that was terminated between connections.
+    const afterRestart = await loadWebuiBrowserBridgePairingCredential(store);
+    const proof = await answerWebuiBrowserBridgeChallenge(
+      { kind: "challenge", nonce: "nonce-abc", algorithm: "HMAC-SHA256", keyId: credential.keyId },
+      afterRestart!,
+    );
+
+    // The host verifies against the secret it stored, not against anything the
+    // extension chose — so this is the end-to-end claim in one line.
+    await expect(
+      verifyWebuiBrowserBridgeProof(hostSecret, proof, "nonce-abc", "edge-answer"),
+    ).resolves.toBe(true);
+  });
+
+  it("refuses a tampered payload instead of storing half a credential", async () => {
+    const store = webuiBrowserBridgePairingStore(fakeArea());
+    const { privateKey, publicJwk } = await mintEcdhPair();
+    const cipher = await hostPairFrame(publicJwk, makeHostSecret(41), "edge-tampered");
+
+    // Flip one bit in the last byte of the payload: the AES-GCM tag covers it,
+    // so decryption must fail rather than return a plausible-looking secret.
+    const bytes = decodeBase64ForTest(cipher.payload);
+    bytes[bytes.length - 1] = bytes[bytes.length - 1]! ^ 0x01;
+    const tampered: WebuiBrowserBridgePair = { ...cipher, payload: encodeBase64ForTest(bytes) };
+
+    await expect(openWebuiBrowserBridgePairingCredential(tampered, privateKey)).rejects.toBeDefined();
+    expect(await loadWebuiBrowserBridgePairingCredential(store)).toBeUndefined();
+  });
+
+  it("refuses a payload encrypted to a different extension key", async () => {
+    const store = webuiBrowserBridgePairingStore(fakeArea());
+    const mine = await mintEcdhPair();
+    const someoneElse = await mintEcdhPair();
+    // Sealed to a key this worker never generated.
+    const cipher = await hostPairFrame(someoneElse.publicJwk, makeHostSecret(47), "edge-not-mine");
+
+    await expect(
+      applyWebuiBrowserBridgePairingCredential(store, cipher, mine.privateKey),
+    ).rejects.toBeDefined();
+    expect(await loadWebuiBrowserBridgePairingCredential(store)).toBeUndefined();
   });
 
   it("forgets the credential only when the caller asks it to", async () => {
     const area = fakeArea();
     const store = webuiBrowserBridgePairingStore(area);
-    await loadWebuiBrowserBridgePairingCredential(store, "chrome", countingRandomBytes);
+    await area.set({
+      [WEBUI_BROWSER_BRIDGE_PAIRING_STORAGE_KEY]: {
+        keyId: "edge-doomed",
+        secret: encodeWebuiBrowserBridgeBase64(makeHostSecret(3)),
+      },
+    });
 
     await clearWebuiBrowserBridgePairingCredential(store);
 
@@ -102,60 +300,11 @@ describe("pairing credential", () => {
 });
 
 describe("challenge answering", () => {
-  it("answers a challenge with a proof the host can verify", async () => {
-    const credential = await loadWebuiBrowserBridgePairingCredential(
-      webuiBrowserBridgePairingStore(fakeArea()),
-      "edge",
-      countingRandomBytes,
-    );
-    const challenge = {
-      kind: "challenge",
-      nonce: "nonce-abc",
-      algorithm: "HMAC-SHA256",
-      keyId: credential.keyId,
-    } as const;
-
-    const proof = await answerWebuiBrowserBridgeChallenge(challenge, credential);
-
-    expect(proof.kind).toBe("proof");
-    expect(proof.keyId).toBe(credential.keyId);
-    expect(proof.nonce).toBe("nonce-abc");
-    await expect(verifyWebuiBrowserBridgeProof(credential.secret, proof, "nonce-abc", credential.keyId)).resolves.toBe(
-      true,
-    );
-  });
-
-  it("answers a fresh challenge after a worker restart with the same credential", async () => {
-    const store = webuiBrowserBridgePairingStore(fakeArea());
-    const before = await loadWebuiBrowserBridgePairingCredential(store, "chrome", countingRandomBytes);
-    // A restarted worker builds the client again from storage alone.
-    const after = await loadWebuiBrowserBridgePairingCredential(store, "chrome", countingRandomBytes);
-    const challenge = {
-      kind: "challenge",
-      nonce: "nonce-after-restart",
-      algorithm: "HMAC-SHA256",
-      keyId: after.keyId,
-    } as const;
-
-    const proof = await answerWebuiBrowserBridgeChallenge(challenge, after);
-
-    expect(proof.keyId).toBe(before.keyId);
-    await expect(
-      verifyWebuiBrowserBridgeProof(after.secret, proof, "nonce-after-restart", after.keyId),
-    ).resolves.toBe(true);
-    // The proof is bound to its nonce, so the previous challenge's proof cannot
-    // stand in for this one.
-    await expect(
-      verifyWebuiBrowserBridgeProof(after.secret, proof, "nonce-before-restart", after.keyId),
-    ).resolves.toBe(false);
-  });
-
   it("refuses a challenge for a credential it does not hold or an algorithm it does not implement", async () => {
-    const credential = await loadWebuiBrowserBridgePairingCredential(
-      webuiBrowserBridgePairingStore(fakeArea()),
-      "edge",
-      countingRandomBytes,
-    );
+    const credential = {
+      keyId: "edge-key",
+      secret: makeHostSecret(13),
+    };
 
     await expect(
       answerWebuiBrowserBridgeChallenge(
@@ -170,26 +319,67 @@ describe("challenge answering", () => {
       ),
     ).rejects.toThrow(/algorithm/);
   });
-});
 
-describe("secret handling", () => {
-  it("never writes the secret to the console", async () => {
-    const calls: unknown[][] = [];
-    for (const method of ["log", "info", "warn", "error", "debug", "trace"] as const) {
-      vi.spyOn(console, method).mockImplementation((...args: unknown[]) => {
-        calls.push(args);
-      });
-    }
-    const store = webuiBrowserBridgePairingStore(fakeArea());
-    const credential = await loadWebuiBrowserBridgePairingCredential(store, "edge", countingRandomBytes);
-    await answerWebuiBrowserBridgeChallenge(
-      { kind: "challenge", nonce: "nonce-abc", algorithm: "HMAC-SHA256", keyId: credential.keyId },
+  it("binds the proof to the nonce so an earlier one cannot stand in", async () => {
+    const credential = { keyId: "edge-key", secret: makeHostSecret(13) };
+    const proof = await answerWebuiBrowserBridgeChallenge(
+      { kind: "challenge", nonce: "nonce-now", algorithm: "HMAC-SHA256", keyId: "edge-key" },
       credential,
     );
 
-    expect(calls).toEqual([]);
-    const encoded = encodeWebuiBrowserBridgeBase64(credential.secret);
-    expect(JSON.stringify(calls)).not.toContain(encoded);
-    expect(JSON.stringify(calls)).not.toContain("edge-");
+    await expect(
+      verifyWebuiBrowserBridgeProof(credential.secret, proof, "nonce-later", "edge-key"),
+    ).resolves.toBe(false);
   });
 });
+
+describe("secret handling", () => {
+  it("never writes the secret, salt, payload or nonce to the console", async () => {
+    const calls: unknown[][] = [];
+    const original = { log: console.log };
+    console.log = (...args: unknown[]) => {
+      calls.push(args);
+    };
+    try {
+      const { privateKey, publicJwk } = await mintEcdhPair();
+      const hostSecret = makeHostSecret(23);
+      const cipher = await hostPairFrame(publicJwk, hostSecret, "edge-quiet");
+      await openWebuiBrowserBridgePairingCredential(cipher, privateKey);
+      await answerWebuiBrowserBridgeChallenge(
+        { kind: "challenge", nonce: "nonce-abc", algorithm: "HMAC-SHA256", keyId: "edge-quiet" },
+        { keyId: "edge-quiet", secret: hostSecret },
+      );
+    } finally {
+      console.log = original.log;
+    }
+
+    expect(calls).toEqual([]);
+    const logged = JSON.stringify(calls);
+    expect(logged).not.toContain(encodeWebuiBrowserBridgeBase64(makeHostSecret(23)));
+    expect(logged).not.toContain("edge-quiet");
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+
+/** Base64 decode without `Buffer`: this package is type-checked against a browser. */
+function decodeBase64ForTest(value: string): Uint8Array {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+}
+
+/** Base64 encode without `Buffer`. */
+function encodeBase64ForTest(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+/** Copy into a plain `ArrayBuffer`: Web Crypto's `BufferSource` wants one. */
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
+}

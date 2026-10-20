@@ -16,9 +16,11 @@ import { createWebuiBrowserBridgeImageStream } from "../images.js";
 import { createWebuiBrowserBridgeInputDispatcher } from "../input.js";
 import {
   answerWebuiBrowserBridgeChallenge,
+  applyWebuiBrowserBridgePairingCredential,
   loadWebuiBrowserBridgePairingCredential,
   webuiBrowserBridgePairingStore,
   type WebuiBrowserBridgeBrowserName,
+  type WebuiBrowserBridgePairingCredential,
 } from "../pairing.js";
 import type {
   WebuiBrowserBridgeClientFrame,
@@ -73,6 +75,13 @@ async function startBridge(): Promise<void> {
     return;
   }
   const browserId = await resolveBrowserId();
+  // Read any pre-existing credential so a reconnect of an already-paired
+  // browser doesn't wait for a `pair` round-trip it has nothing to learn
+  // from. The host still sends a fresh pair on each `hello`, but the
+  // extension only overwrites storage when that pair arrives — see
+  // `applyPairCredential` below.
+  let credential: WebuiBrowserBridgePairingCredential | undefined =
+    await loadWebuiBrowserBridgePairingCredential(pairingStore);
   const targets = createWebuiBrowserBridgeTargetRegistry({
     browserId,
     tabs: chrome.tabs,
@@ -157,11 +166,34 @@ async function startBridge(): Promise<void> {
     browserId,
     extensionVersion: chrome.runtime.getManifest().version,
     origin,
-    answerChallenge: async (challenge) =>
-      answerWebuiBrowserBridgeChallenge(
-        challenge,
-        await loadWebuiBrowserBridgePairingCredential(pairingStore, browser),
-      ),
+    /**
+     * The credential is held in a worker-local slot and replaced by every
+     * `pair` frame. The host is authoritative: each connection it sends the
+     * encrypted credential afresh, and the extension stores it. A surface
+     * that was off and on again therefore lands at this side without any
+     * operator action.
+     */
+    applyPairCredential: async (cipher, ownPrivateKey) => {
+      // The ECDH private key is per-connection and lives only for this call;
+      // after the secret has been written to storage nothing else needs it.
+      credential = await applyWebuiBrowserBridgePairingCredential(
+        pairingStore,
+        cipher,
+        ownPrivateKey,
+      );
+    },
+    answerChallenge: async (challenge) => {
+      // Storage is the source of truth on every challenge, and the local slot
+      // is only a fast path: a worker restart reloads from storage and a
+      // `pair` overwrites both.
+      const current = credential ?? (await loadWebuiBrowserBridgePairingCredential(pairingStore));
+      if (!current) {
+        throw new Error(
+          "browser bridge: host issued a challenge before delivering a pairing credential",
+        );
+      }
+      return answerWebuiBrowserBridgeChallenge(challenge, current);
+    },
     onStatus: (status) => {
       if (status !== "connected") return;
       void publishTargets().catch(report);

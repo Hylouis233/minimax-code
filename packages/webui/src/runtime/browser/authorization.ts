@@ -19,6 +19,7 @@
 import {
   isWebuiBrowserSurfaceAuthorized,
   WEBUI_BROWSER_AUTHORIZATION_DEFAULT,
+  WEBUI_BROWSER_RESTRICTED_COMMANDS,
   type WebuiBrowserAuthorization,
   type WebuiBrowserError,
   type WebuiBrowserSurface,
@@ -112,6 +113,19 @@ export function isBrowserSurfaceUsable(
   surface: WebuiBrowserSurface,
 ): boolean {
   return isWebuiBrowserSurfaceAuthorized(authorization, surface);
+}
+
+/**
+ * Whether a command is one of the restricted browser-tool actions.
+ *
+ * Distinct from `isBrowserCommandAllowed`, which also answers "yes, when Full
+ * CDP is on". The Agent's browser-tool path asks this one: its declared
+ * capability is the restricted set, so a raw DevTools method is not something
+ * it can carry out even on a host where Full CDP is authorized for the
+ * explicit path.
+ */
+export function isRestrictedBrowserCommand(command: string): boolean {
+  return WEBUI_BROWSER_RESTRICTED_COMMANDS.includes(command as never);
 }
 
 /**

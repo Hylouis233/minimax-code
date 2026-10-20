@@ -17,13 +17,17 @@
 // protocol exists to make impossible.
 
 import {
+  exportWebuiBrowserBridgeEcdhPublicKey,
+  generateWebuiBrowserBridgeEcdhKeyPair,
   parseWebuiBrowserBridgeHostFrame,
   webuiBrowserBridgeError,
   webuiBrowserBridgeUrl,
   type WebuiBrowserBridgeChallenge,
   type WebuiBrowserBridgeClientFrame,
+  type WebuiBrowserBridgeEcdhPublicKey,
   type WebuiBrowserBridgeError,
   type WebuiBrowserBridgeHostFrame,
+  type WebuiBrowserBridgePair,
   type WebuiBrowserBridgeProof,
 } from "./protocol.js";
 
@@ -113,6 +117,25 @@ export interface WebuiBrowserBridgeClientOptions {
   /** The loopback origin the bridge is served from, without the bridge path. */
   readonly origin: string;
   readonly answerChallenge: (challenge: WebuiBrowserBridgeChallenge) => Promise<WebuiBrowserBridgeProof>;
+  /**
+   * Decrypts and stores the host's credential.
+   *
+   * Called once per connection, on the worker's end, when the host sends a
+   * `pair` frame. The client never looks at the secret itself — keeping the
+   * raw bytes out of the bridge state is the point — so this is the whole of
+   * the extension's side of the transfer.
+   *
+   * The host sends a `pair` on every `hello`, so a credential that was
+   * rotated by a switch off/on reaches here without anyone doing anything.
+   * When the host sends none (its own surface is off, or it does not
+   * recognise the id) this is never called and `answerChallenge` has to fall
+   * back to whatever storage holds — or report that it holds nothing, rather
+   * than hanging.
+   */
+  readonly applyPairCredential: (
+    cipher: WebuiBrowserBridgePair,
+    ownPrivateKey: CryptoKey,
+  ) => Promise<void>;
   readonly createSocket?: WebuiBrowserBridgeSocketFactory;
   readonly clock?: WebuiBrowserBridgeClock;
   readonly random?: () => number;
@@ -309,6 +332,18 @@ export class WebuiBrowserBridgeClient {
 
   private openSocket(): void {
     if (this.status === "stopped" || this.status === "connecting" || this.status === "connected") return;
+    // An ephemeral key pair per connection. The private half never leaves this
+    // closure, so a captured `pair` from one connection has no value on the
+    // next — and a worker that is terminated leaves no key behind to leak.
+    // It is minted before `onOpen` can send `hello`, which is what carries
+    // the public key the host needs to build the cipher.
+    let handshake:
+      | { readonly privateKey: CryptoKey; readonly publicKey: WebuiBrowserBridgeEcdhPublicKey }
+      | undefined;
+    const ready: Promise<void> = (async () => {
+      const { privateKey, publicKey } = await generateWebuiBrowserBridgeEcdhKeyPair();
+      handshake = { privateKey, publicKey: await exportWebuiBrowserBridgeEcdhPublicKey(publicKey) };
+    })();
     let socket: WebuiBrowserBridgeSocket;
     try {
       socket = this.createSocket(webuiBrowserBridgeUrl(this.options.origin));
@@ -322,16 +357,48 @@ export class WebuiBrowserBridgeClient {
     socket.setHandlers({
       onOpen: () => {
         if (this.socket !== socket) return;
-        socket.send(
-          JSON.stringify({
-            kind: "hello",
-            browser: this.options.browser,
-            browserId: this.options.browserId,
-            extensionVersion: this.options.extensionVersion,
-          }),
+        // The key pair is what `hello` carries, so the greeting waits for it
+        // rather than going out without one.
+        void ready.then(
+          () => {
+            if (this.socket !== socket || !handshake) return;
+            socket.send(
+              JSON.stringify({
+                kind: "hello",
+                browser: this.options.browser,
+                browserId: this.options.browserId,
+                extensionVersion: this.options.extensionVersion,
+                publicKey: handshake.publicKey,
+              }),
+            );
+          },
+          (cause: unknown) => {
+            this.options.onError?.(this.asError(cause));
+            socket.close();
+            if (this.socket === socket) this.socket = undefined;
+            this.handleDropped();
+          },
         );
       },
-      onMessage: (data) => this.handleMessage(socket, data),
+      onMessage: (data) => {
+        const keyPair = handshake;
+        if (!keyPair) {
+          // A frame before the handshake is ready is a protocol violation: the
+          // host cannot answer a hello that has not gone out.
+          this.options.onError?.(
+            webuiBrowserBridgeError(
+              "browser_pairing_rejected",
+              "browser bridge: host spoke before the extension's hello",
+              false,
+            ),
+          );
+          socket.close();
+          if (this.socket === socket) this.socket = undefined;
+          this.handleDropped();
+          return;
+        }
+        this.handleMessage(socket, data, keyPair);
+      },
       onClose: () => {
         if (this.socket !== socket) return;
         this.socket = undefined;
@@ -340,7 +407,11 @@ export class WebuiBrowserBridgeClient {
     });
   }
 
-  private handleMessage(socket: WebuiBrowserBridgeSocket, data: string): void {
+  private handleMessage(
+    socket: WebuiBrowserBridgeSocket,
+    data: string,
+    handshake: { readonly privateKey: CryptoKey; readonly publicKey: WebuiBrowserBridgeEcdhPublicKey },
+  ): void {
     if (this.socket !== socket) return;
     const parsed = parseWebuiBrowserBridgeHostFrame(data);
     if (!parsed.ok) {
@@ -360,6 +431,10 @@ export class WebuiBrowserBridgeClient {
     }
     const frame = parsed.frame;
     switch (frame.kind) {
+      case "pair": {
+        void this.applyPair(frame, socket, handshake);
+        return;
+      }
       case "challenge": {
         void this.answerChallenge(frame, socket);
         return;
@@ -377,6 +452,30 @@ export class WebuiBrowserBridgeClient {
       default: {
         void this.options.onHostFrame?.(frame);
       }
+    }
+  }
+
+  /**
+   * Decrypts and stores the host's `pair` frame.
+   *
+   * Order in the wire protocol is `pair` then `challenge`: this method runs
+   * before the challenge reaches the answerer. If the decryption fails — a
+   * tampered payload, a cipher that came from a different key — we report it
+   * and close the socket rather than carry on against a credential we cannot
+   * verify.
+   */
+  private async applyPair(
+    frame: WebuiBrowserBridgePair,
+    socket: WebuiBrowserBridgeSocket,
+    handshake: { readonly privateKey: CryptoKey; readonly publicKey: WebuiBrowserBridgeEcdhPublicKey },
+  ): Promise<void> {
+    try {
+      await this.options.applyPairCredential(frame, handshake.privateKey);
+    } catch (cause) {
+      this.options.onError?.(this.asError(cause));
+      socket.close();
+      if (this.socket === socket) this.socket = undefined;
+      this.handleDropped();
     }
   }
 

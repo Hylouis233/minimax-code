@@ -202,3 +202,75 @@ supporting these decisions are kept here with the decision record.
 The two handoff documents supplied during this decision review record the MVP behavior and earlier
 WebUI research. They are research records, not implementation evidence. Current implementation
 claims must be checked against the source.
+
+## Amendments
+
+Implementation and three independent reviews of this decision record raised
+questions the original text did not settle. These are the answers, recorded
+here because they change how the bridge is built rather than only how it is
+documented.
+
+### A1 — How the extension obtains the host's pairing credential
+
+The decision above says pairing is automatic: enabling a browser's switch pairs
+the browser's installed extension without per-tab confirmation. It does not say
+how the two sides come to hold the same secret, and the first implementation
+left that open — the host minted a credential and the extension minted a
+different one, so the handshake could never complete.
+
+The answer is a **credential exchange over the existing socket**, with the
+credential encrypted to a key the extension generates for that connection:
+
+- The extension generates an **ephemeral** ECDH P-256 key pair when it
+  connects and sends the public key in its `hello` frame. Nothing about the
+  key is stored, so there is no long-term key to manage, rotate or leak.
+- The host, when the surface's pairing is enabled and the extension's id is on
+  the surface's allowlist, encrypts the credential to that public key and
+  sends it in a `pair` frame: ECDH P-256, then HKDF-SHA256, then AES-256-GCM.
+  The secret never crosses the wire in the clear.
+- The extension decrypts it, stores it in `chrome.storage.local`, and answers
+  the challenge with it.
+
+This keeps the "automatic" property: there is no code for the person to
+carry and no options page to configure. The alternative — a one-time pairing
+code the person copied from the host into the extension — was considered and
+rejected, because it puts the credential in the clear on the wire and adds a
+surface the person has to use correctly.
+
+**What this does not establish.** The extension's identity is established by
+its origin being on the allowlist, and a local process can put any `Origin`
+header it likes on a loopback socket. The exchange protects the credential
+*in transit*; it does not turn the allowlist into a cryptographic identity. A
+host that must defend against a local attacker needs a stronger anchor than an
+origin allowlist — a per-installation pre-shared key, or the native-messaging
+route this record already lists in its research findings. That is a product
+decision, and it is recorded here rather than left implicit.
+
+### A2 — What "the enabled state survives a restart" means for the credential
+
+The decision above says each browser's enabled state and authorization survive
+WebUI and browser restarts. The first implementation read that as "the switch
+is still on" and minted a **fresh** credential on every start, which quietly
+contradicted the first half of the sentence: the extension still held the old
+secret, so the two could not talk.
+
+The answer is that the two paths are different on purpose:
+
+- **Startup restores.** The host re-adopts the credential the OS secure store
+  already holds, because the extension kept its copy across the restart.
+- **A user toggle rotates.** Turning a switch off revokes the credential and
+  removes it from the store, so the next enable finds nothing to restore and
+  mints a fresh one. This is the "turning it on later establishes a fresh
+  pairing" behaviour the decision above asks for.
+
+### A3 — The target selection is scoped to the Agent run
+
+The decision above says the Agent run owns the target selection and the panel
+follows the active run's target. The first implementation held one selection
+per surface, which is a host-wide selection: two runs looking at different
+tabs of the same browser would fight over it, and the panel would show
+whichever selection was written last.
+
+The selection is therefore carried by the run that made it. What the panel
+shows when no run is active — the last selection the run made, or nothing — is
+a product decision that the implementation records rather than guessing.

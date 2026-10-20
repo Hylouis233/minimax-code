@@ -627,6 +627,12 @@ export interface WebuiTerminalProcessPort {
  * `watchFrames` is the delivery stream: the operation handler drives it and
  * the WebSocket server frames what it yields, the same way the terminal's
  * output is framed.
+ *
+ * Everything that touches a *selection* takes the run it belongs to. The
+ * selection is scoped to the run (ADR 0019), so a port method that asked about
+ * "the selected target" without naming a run would be asking about a target
+ * that may belong to somebody else. `runId` is the Agent session id; the panel
+ * sends the active run's, and the panel with no active run sends none.
  */
 export interface WebuiBrowserPort {
   /** The four authorization switches, as they stand. */
@@ -638,10 +644,16 @@ export interface WebuiBrowserPort {
   setAuthorization(
     input: Partial<WebuiBrowserAuthorization>,
   ): Promise<WebuiBrowserAuthorization>;
-  /** Every target of one surface. */
-  listTargets(surface: WebuiBrowserSurface): Promise<WebuiBrowserTargetList>;
-  /** Selects the target the panel shows for a surface. */
-  selectTarget(target: WebuiBrowserTargetId): Promise<WebuiBrowserTargetState>;
+  /** Every target of one surface, with this run's selection marked. */
+  listTargets(
+    surface: WebuiBrowserSurface,
+    runId?: string,
+  ): Promise<WebuiBrowserTargetList>;
+  /** Selects the target one run shows on a surface. */
+  selectTarget(
+    target: WebuiBrowserTargetId,
+    runId?: string,
+  ): Promise<WebuiBrowserTargetState>;
   /**
    * Forwards one input command.
    *
@@ -649,7 +661,10 @@ export interface WebuiBrowserPort {
    * target it was aimed at: an input aimed at a target that has since been
    * replaced is refused rather than delivered to the new page.
    */
-  sendInput(command: WebuiBrowserInputCommand): Promise<{ readonly accepted: true }>;
+  sendInput(
+    command: WebuiBrowserInputCommand,
+    runId?: string,
+  ): Promise<{ readonly accepted: true }>;
   /**
    * Runs one browser command.
    *
@@ -663,9 +678,10 @@ export interface WebuiBrowserPort {
     command: string,
     params?: Record<string, unknown>,
   ): Promise<{ readonly accepted: true; readonly result?: unknown }>;
-  /** The live image stream of one surface. */
+  /** The live image stream of one surface, fenced to one run's selection. */
   watchFrames(
     surface: WebuiBrowserSurface,
+    runId?: string,
     signal?: AbortSignal,
   ): AsyncIterable<WebuiBrowserImageFrame>;
   /** What each surface can offer right now. */

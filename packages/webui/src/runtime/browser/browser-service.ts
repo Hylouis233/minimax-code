@@ -14,6 +14,16 @@
 // panel and the Agent on the same browser session: there is one session, and
 // both sides address it here.
 //
+// The **selection** is scoped to the run that made it, per surface (ADR 0019:
+// the Agent run owns the target selection, and the panel follows the active
+// run's target). A run is the Agent session id; the panel before any run is
+// active has one selection of its own, named `WEBUI_BROWSER_NO_RUN_ID` rather
+// than left as an empty string, because "no run" is a real caller and not a
+// missing argument. Two concurrent runs on one surface therefore have two
+// selections: neither overwrites the other, each run's tools act on its own
+// target, and each stream carries only the frames of the target its own run
+// selected.
+//
 // A surface that is not authorized is refused before anything is attempted, so
 // "you did not switch this on" is distinguishable from "the browser broke".
 
@@ -52,6 +62,17 @@ import {
  * many *targets* a stream may carry, not on how much image data it may hold.
  */
 const WEBUI_BROWSER_FRAME_QUEUE_LIMIT = 32;
+
+/**
+ * The run whose selection the panel is showing when no run is active.
+ *
+ * The panel can select a target before any run exists — the person is pointing
+ * at a page, and nothing is driving it yet — so the selection needs an owner
+ * even then. A named run rather than an absent one keeps the key space total:
+ * every selection read and write can ask for a run and get an answer, and there
+ * is never a second, host-wide "current target" beside it.
+ */
+export const WEBUI_BROWSER_NO_RUN_ID = "webui-browser-no-run";
 
 /** How the service reads and writes the authorization. */
 export interface WebuiBrowserAuthorizationStore {
@@ -121,18 +142,41 @@ export class WebuiBrowserService {
   readonly #options: WebuiBrowserServiceOptions;
   readonly #registry = new WebuiBrowserTargetRegistry();
   readonly #providers = new Map<WebuiBrowserSurface, WebuiBrowserSurfaceProvider>();
-  /** The target the panel is currently showing, per surface. */
-  readonly #selected = new Map<WebuiBrowserSurface, WebuiBrowserTargetId>();
+  /**
+   * The target each run has selected, per surface and then per run.
+   *
+   * Nested rather than flattened into one key because both halves are the
+   * scope: a surface alone would let two runs overwrite each other's selection,
+   * and a run alone would let one run select on two surfaces at once.
+   */
+  readonly #selected = new Map<WebuiBrowserSurface, Map<string, WebuiBrowserTargetId>>();
   /** Which external surfaces the service has turned on, per surface. */
   readonly #bridgeSurfaces = new Map<"edge" | "chrome", boolean>();
-  /** The frame subscribers, per surface. */
+  /** The frame subscribers, per surface and then per run. */
   readonly #frameSubscribers = new Map<
     WebuiBrowserSurface,
-    Set<(frame: WebuiBrowserImageFrame) => void>
+    Map<string, Set<(frame: WebuiBrowserImageFrame) => void>>
   >();
 
   constructor(options: WebuiBrowserServiceOptions) {
     this.#options = options;
+  }
+
+  /** The per-run selections of one surface, created on first use. */
+  #runSelections(surface: WebuiBrowserSurface): Map<string, WebuiBrowserTargetId> {
+    const existing = this.#selected.get(surface);
+    if (existing) return existing;
+    const created = new Map<string, WebuiBrowserTargetId>();
+    this.#selected.set(surface, created);
+    return created;
+  }
+
+  /** What one run has selected on one surface, if it has selected anything. */
+  #selectionOf(
+    surface: WebuiBrowserSurface,
+    runId: string,
+  ): WebuiBrowserTargetId | undefined {
+    return this.#selected.get(surface)?.get(runId);
   }
 
   /** The current authorization, normalised so a missing key is off. */
@@ -288,13 +332,15 @@ export class WebuiBrowserService {
         targetId: change.targetId,
       });
       // The panel follows the *tab*, and a navigation replaces the page behind
-      // the tab rather than changing which tab is shown. The selection
-      // therefore moves to the new generation: otherwise the panel would show
-      // nothing at all after a navigation, and a frame from the previous page
-      // would still look current to it.
-      const selected = this.#selected.get(surface);
-      if (selected && raised && selected.targetId === change.targetId) {
-        this.#selected.set(surface, raised.id);
+      // the tab rather than changing which tab is shown. Every run that has
+      // selected this tab therefore moves to the new generation: otherwise a
+      // run's tools would refuse its own page as stale, and a frame from the
+      // previous page would still look current to that run's stream.
+      const selections = this.#selected.get(surface);
+      if (selections && raised) {
+        for (const [runId, selected] of [...selections]) {
+          if (selected.targetId === change.targetId) selections.set(runId, raised.id);
+        }
       }
     });
     return provider;
@@ -334,8 +380,11 @@ export class WebuiBrowserService {
     return await this.#ensureProvider(surface);
   }
 
-  /** Every target of one surface. */
-  async listTargets(surface: WebuiBrowserSurface): Promise<WebuiBrowserTargetList> {
+  /** Every target of one surface, as the run sees them. */
+  async listTargets(
+    surface: WebuiBrowserSurface,
+    runId: string = WEBUI_BROWSER_NO_RUN_ID,
+  ): Promise<WebuiBrowserTargetList> {
     const authorization = await this.readAuthorization();
     if (!isBrowserSurfaceUsable(authorization, surface)) {
       throw browserOperationError(
@@ -351,7 +400,10 @@ export class WebuiBrowserService {
         true,
       );
     }
-    const selected = this.#selected.get(surface);
+    // This run's own selection, and only that one: marking the flag from a
+    // different run's selection is how the panel ends up showing one page while
+    // the Agent drives another.
+    const selected = this.#selectionOf(surface, runId);
     const states: WebuiBrowserTargetState[] = [];
     for (const target of await provider.listTargets()) {
       const identity = this.#registry.observe({
@@ -365,16 +417,17 @@ export class WebuiBrowserService {
       });
       states.push({
         ...identity,
-        selected: selected
-          ? isSameWebuiBrowserTarget(selected, identity.id)
-          : identity.id.targetId === target.id.targetId,
+        selected: selected ? isSameWebuiBrowserTarget(selected, identity.id) : false,
       });
     }
     return { surface, targets: states };
   }
 
-  /** Selects the target the panel shows for a surface. */
-  async selectTarget(target: WebuiBrowserTargetId): Promise<WebuiBrowserTargetState> {
+  /** Selects the target one run shows on a surface. */
+  async selectTarget(
+    target: WebuiBrowserTargetId,
+    runId: string = WEBUI_BROWSER_NO_RUN_ID,
+  ): Promise<WebuiBrowserTargetState> {
     const authorization = await this.readAuthorization();
     if (!isBrowserSurfaceUsable(authorization, target.surface)) {
       throw browserOperationError(
@@ -395,7 +448,7 @@ export class WebuiBrowserService {
         "The browser target has been replaced; select it again.",
       );
     }
-    this.#selected.set(target.surface, target);
+    this.#runSelections(target.surface).set(runId, target);
     return { ...known, selected: true };
   }
 
@@ -406,8 +459,19 @@ export class WebuiBrowserService {
    * command is reported as malformed even when its target is also wrong: the
    * two are different mistakes and a caller that fixed only one would be sent
    * round again.
+   *
+   * The run id is carried so the caller and the service agree on *whose* input
+   * this is, but it deliberately does not fence the delivery: the command names
+   * its own target, and a fence here would race the panel's own selection write
+   * — a click that lands while the previous `selectBrowserTarget` is still in
+   * flight would be refused for aiming at the page the person is looking at.
+   * The fence that matters is the registry's: a target that has moved on is
+   * refused.
    */
-  async sendInput(command: WebuiBrowserInputCommand): Promise<{ readonly accepted: true }> {
+  async sendInput(
+    command: WebuiBrowserInputCommand,
+    _runId: string = WEBUI_BROWSER_NO_RUN_ID,
+  ): Promise<{ readonly accepted: true }> {
     const validated = validateBrowserInputCommand(command);
     const authorization = await this.readAuthorization();
     if (!isBrowserSurfaceUsable(authorization, validated.target.surface)) {
@@ -435,14 +499,20 @@ export class WebuiBrowserService {
   }
 
   /**
-   * The live image stream of one surface.
+   * The live image stream of one surface, for one run.
    *
    * The stream is an async iterable so the server frames it the same way it
    * frames the terminal's output: the operation handler drives it and the
    * WebSocket server writes what it yields.
+   *
+   * It carries the frames of the target *this run* selected. Two runs on one
+   * surface watch two streams, and each is fenced against its own run's
+   * selection below — so a frame belonging to the other run's target is never
+   * delivered, whatever the provider hands the stream.
    */
   async *watchFrames(
     surface: WebuiBrowserSurface,
+    runId: string = WEBUI_BROWSER_NO_RUN_ID,
     signal?: AbortSignal,
   ): AsyncIterable<WebuiBrowserImageFrame> {
     const authorization = await this.readAuthorization();
@@ -460,7 +530,7 @@ export class WebuiBrowserService {
         true,
       );
     }
-    const selected = this.#selected.get(surface);
+    const selected = this.#selectionOf(surface, runId);
     const targetId = selected?.targetId;
     if (!selected || !targetId) {
       throw browserOperationError(
@@ -488,9 +558,14 @@ export class WebuiBrowserService {
       else queue[queue.length - 1] = frame;
       notify?.();
     };
-    const subscribers = this.#frameSubscribers.get(surface) ?? new Set();
+    const runs = this.#frameSubscribers.get(surface) ?? new Map<
+      string,
+      Set<(frame: WebuiBrowserImageFrame) => void>
+    >();
+    const subscribers = runs.get(runId) ?? new Set<(frame: WebuiBrowserImageFrame) => void>();
     subscribers.add(deliver);
-    this.#frameSubscribers.set(surface, subscribers);
+    runs.set(runId, subscribers);
+    this.#frameSubscribers.set(surface, runs);
 
     await provider.startImageStream(targetId, deliver);
     try {
@@ -498,11 +573,12 @@ export class WebuiBrowserService {
         while (queue.length > 0) {
           const frame = queue.shift();
           if (!frame) continue;
-          // A frame belongs to the panel only while it names the page the
-          // panel is showing. A frame that arrives after the selection moved,
-          // or after the page behind the target was replaced, would put a
-          // different page on screen than the one the person chose.
-          if (!this.#frameMatchesSelection(surface, frame)) continue;
+          // A frame belongs to the panel only while it names the page this
+          // run's panel is showing. A frame that arrives after that selection
+          // moved, after the page behind the target was replaced, or that
+          // belongs to another run's target would put a different page on
+          // screen than the one the person chose.
+          if (!this.#frameMatchesSelection(surface, runId, frame)) continue;
           yield frame;
         }
         await Promise.race([
@@ -515,6 +591,7 @@ export class WebuiBrowserService {
       }
     } finally {
       subscribers.delete(deliver);
+      if (subscribers.size === 0) runs.delete(runId);
       // Cancelling the stream releases the provider-side resources it held:
       // the screencast is stopped, not merely ignored.
       await provider.stopImageStream(targetId).catch(() => undefined);
@@ -522,17 +599,19 @@ export class WebuiBrowserService {
   }
 
   /**
-   * Whether a frame still describes the page the panel is showing.
+   * Whether a frame still describes the page one run is showing.
    *
-   * The comparison is against the *current* selection, not the one the stream
-   * started with: the person can select another tab while the stream is
-   * running, and a frame from the tab they left must not appear.
+   * The comparison is against *that run's* current selection, not the one the
+   * stream started with and not another run's: a run can select another tab
+   * while the stream is running, another run can select a different tab on the
+   * same surface, and a frame from either must not appear.
    */
   #frameMatchesSelection(
     surface: WebuiBrowserSurface,
+    runId: string,
     frame: WebuiBrowserImageFrame,
   ): boolean {
-    const selected = this.#selected.get(surface);
+    const selected = this.#selectionOf(surface, runId);
     if (!selected) return false;
     return (
       selected.surface === frame.target.surface &&
@@ -556,6 +635,74 @@ export class WebuiBrowserService {
     command: string,
     params: Record<string, unknown> = {},
   ): Promise<{ readonly accepted: true; readonly result?: unknown }> {
+    await this.#authorizeCommand(surface, command);
+    const provider = await this.#commandProvider(surface);
+    return { accepted: true, result: await provider.sendCommand(command, params) };
+  }
+
+  /**
+   * Runs one browser command against the target this run selected on the
+   * surface.
+   *
+   * This is the path the Agent's browser tools take. A tool call names an
+   * action, not a target: the page the run is looking at is the selected
+   * target of the surface, so that is what the command acts on. The run id is
+   * therefore not optional here — a tool call always belongs to a run, and a
+   * selection belonging to somebody else is not a substitute. A surface where
+   * this run has selected nothing is refused rather than given one: defaulting
+   * to the first tab would let a run drive a page nobody chose, which is the
+   * exact split this service exists to prevent.
+   *
+   * The resolved target travels back with the result so a caller can say which
+   * page it acted on; it is the registry's current view of that target, not a
+   * second identity the service keeps.
+   */
+  async sendCommandToSelection(
+    surface: WebuiBrowserSurface,
+    runId: string,
+    command: string,
+    params: Record<string, unknown> = {},
+    signal?: AbortSignal,
+  ): Promise<{
+    readonly accepted: true;
+    readonly target: WebuiBrowserTargetId;
+    readonly result?: unknown;
+  }> {
+    // Authorization and the command gate come first, before the selection is
+    // looked at: a surface that is switched off is refused before anything is
+    // attempted, so the refusal names the switch rather than the selection.
+    await this.#authorizeCommand(surface, command);
+    const selected = this.#selectionOf(surface, runId);
+    if (!selected) {
+      throw browserOperationError(
+        "browser_target_unknown",
+        "No browser target is selected for this surface.",
+      );
+    }
+    if (!this.#registry.isCurrent(selected)) {
+      throw browserOperationError(
+        "browser_target_stale",
+        "The selected browser target has been replaced; select it again.",
+      );
+    }
+    const provider = await this.#commandProvider(surface);
+    return {
+      accepted: true,
+      target: selected,
+      result: await awaitAbortableCommand(provider.sendCommand(command, params), signal),
+    };
+  }
+
+  /**
+   * The gate both command paths make: the surface must be authorized, and the
+   * command must be a restricted browser-tool action or permitted by Full CDP.
+   *
+   * Refusing here rather than at the provider is what keeps "you did not switch
+   * this on" and "the browser broke" apart, and what keeps a command outside
+   * the restricted set from being forwarded on the chance that the provider
+   * would accept it.
+   */
+  async #authorizeCommand(surface: WebuiBrowserSurface, command: string): Promise<void> {
     const authorization = await this.readAuthorization();
     if (!isBrowserSurfaceUsable(authorization, surface)) {
       throw browserOperationError(
@@ -569,6 +716,12 @@ export class WebuiBrowserService {
         `The command "${command}" needs Full CDP access, which is not authorized.`,
       );
     }
+  }
+
+  /** The provider that may carry out a command on an authorized surface. */
+  async #commandProvider(
+    surface: WebuiBrowserSurface,
+  ): Promise<WebuiBrowserSurfaceProvider> {
     const provider = await this.#ensureProvider(surface);
     if (!provider) {
       throw browserOperationError(
@@ -577,8 +730,7 @@ export class WebuiBrowserService {
         true,
       );
     }
-    const result = await provider.sendCommand(command, params);
-    return { accepted: true, result };
+    return provider;
   }
 
   /** The capability matrix, as the surface can offer it right now. */
@@ -621,6 +773,47 @@ export class WebuiBrowserService {
       await this.#stopProvider(surface, provider);
     }
   }
+}
+
+/**
+ * Awaits one command, or refuses it when the caller's signal aborts.
+ *
+ * A command already handed to a provider cannot be recalled, so the honest
+ * thing to do on abort is to stop *reporting* it: the caller learns the call was
+ * cancelled instead of a result that describes a page it no longer owns. The
+ * cancellation keeps the browser vocabulary's own code so the caller can tell
+ * "the run was cancelled" from "the command was refused".
+ */
+async function awaitAbortableCommand(
+  call: Promise<unknown>,
+  signal?: AbortSignal,
+): Promise<unknown> {
+  if (!signal) return await call;
+  const cancelled = () =>
+    browserOperationError(
+      "browser_operation_cancelled",
+      "The browser command was cancelled before it reported a result.",
+    );
+  if (signal.aborted) {
+    // The call is still in flight; its later failure must not surface as an
+    // unhandled rejection next to the refusal the caller is waiting for.
+    void call.catch(() => undefined);
+    throw cancelled();
+  }
+  return await new Promise<unknown>((resolve, reject) => {
+    const onAbort = () => reject(cancelled());
+    signal.addEventListener("abort", onAbort, { once: true });
+    call.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error);
+      },
+    );
+  });
 }
 
 /**

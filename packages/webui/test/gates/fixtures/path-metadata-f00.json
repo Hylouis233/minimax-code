@@ -400,6 +400,15 @@
       "home": "target"
     },
     {
+      "path": "client/features/browser/bindings/use-browser-run.public.ts",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-bindings",
+      "business": "browser",
+      "home": "target"
+    },
+    {
       "path": "client/features/browser/contracts/browser-panel.ts",
       "layers": [
         "contracts"
@@ -3443,6 +3452,15 @@
     },
     {
       "path": "runtime/browser/target-registry.ts",
+      "layers": [
+        "runtime"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
+      "path": "runtime/browser/tool-adapter.ts",
       "layers": [
         "runtime"
       ],

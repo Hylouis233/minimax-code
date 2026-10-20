@@ -62,18 +62,30 @@ export {
 } from "./pairing.js";
 
 export {
+  generateWebuiBrowserBridgeEcdhKeyPair,
+  importWebuiBrowserBridgeEcdhPublicKey,
+  exportWebuiBrowserBridgeEcdhPublicKey,
+  sealWebuiBrowserBridgePairingCredential,
+  openWebuiBrowserBridgePairingCredential,
   signWebuiBrowserBridgeProof,
   verifyWebuiBrowserBridgeProof,
-  WEBUI_BROWSER_BRIDGE_PATH,
-  WEBUI_BROWSER_BRIDGE_SIGNATURE_ALGORITHM,
   webuiBrowserBridgeProofMaterial,
+  WEBUI_BROWSER_BRIDGE_PATH,
+  WEBUI_BROWSER_BRIDGE_PAIR_HKDF_INFO,
+  WEBUI_BROWSER_BRIDGE_PAIR_HKDF_SALT_BYTES,
+  WEBUI_BROWSER_BRIDGE_PAIR_AES_IV_BYTES,
+  WEBUI_BROWSER_BRIDGE_SIGNATURE_ALGORITHM,
   type WebuiBrowserBridgeChallenge,
   type WebuiBrowserBridgeClientFrame,
+  type WebuiBrowserBridgeEcdhPublicKey,
   type WebuiBrowserBridgeHostFrame,
   type WebuiBrowserBridgeImageFrame,
   type WebuiBrowserBridgeInputCommand,
+  type WebuiBrowserBridgePair,
+  type WebuiBrowserBridgePairCipher,
   type WebuiBrowserBridgeProof,
   type WebuiBrowserBridgeTarget,
+  type WebuiBrowserBridgeCryptoKey,
 } from "../../shared/contracts/browser-bridge.js";
 
 export {

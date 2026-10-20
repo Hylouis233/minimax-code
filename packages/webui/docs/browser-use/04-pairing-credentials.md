@@ -12,8 +12,9 @@ The per-OS mechanisms below are `implemented`. Credential-store **availability**
 Linux host and is negative there — and that result is about that host alone.
 
 A pairing credential is what proves the thing connecting to `/browser-bridge` is the extension the user
-paired, and not another browser on the same loopback interface. This document owns where that
-credential lives, how it rotates, and what happens when the platform offers nowhere safe to put it.
+paired, and not another browser on the same loopback interface. This document owns who authors that
+credential and how it reaches the extension, where it lives, how it rotates, and what happens when the
+platform offers nowhere safe to put it.
 
 ## The store, per OS — what the code actually does
 
@@ -142,6 +143,59 @@ implementation; the repository rule is that a dependency is added only with a re
 > pairing cannot currently be exercised end to end from this host. See
 > [`07-review-findings.md`](07-review-findings.md), finding F3.
 
+## Who authors the credential — `implemented`
+
+**The host authors the credential and delivers it to the extension. The extension
+never mints one.**
+
+This is the load-bearing decision. If both sides minted their own credential,
+they would be different values and the host would reject every proof the
+extension sent — which is exactly the defect the transfer exists to remove. The
+extension has no long-term key of its own either: the only key it holds is the
+ECDH pair it generates **for one connection** and discards when that connection
+ends, so there is nothing to manage, rotate or leak.
+
+```mermaid
+sequenceDiagram
+    participant H as Host pairing
+    participant E as Extension worker
+    E->>E: generate ephemeral ECDH P-256 key pair (never stored)
+    E->>H: hello { browser, browserId, extensionVersion, publicKey }
+    H->>H: load the credential from the OS secure store
+    H->>H: seal it to publicKey — ECDH, HKDF-SHA256, AES-256-GCM
+    H->>E: pair { keyId, publicKey, salt, payload }
+    E->>E: open the payload, write { keyId, secret } to chrome.storage.local
+    H->>E: challenge { nonce, algorithm, keyId }
+    E->>E: HMAC-SHA256 over nonce + " " + keyId
+    E->>H: proof { keyId, nonce, signature }
+```
+
+| Requirement | Where it is enforced |
+| --- | --- |
+| The secret never crosses the wire in the clear | Only the two public keys, the salt and the encrypted payload cross. The `pair` frame declares no secret field at all, and carries the credential's key id in the clear — which is not secret, and which the challenge needs. |
+| The host sends `pair` only when the surface's pairing holds a credential | `BrowserBridgePairing.sealCredentialForExtension` returns `{ kind: "off" }` when `current` is undefined, and the session sends no frame. |
+| The host sends `pair` on **every** `hello` | The session gates on `hello` rather than on construction, so a credential rotated by a switch off/on reaches the extension without anyone doing anything. |
+| `pair` leaves before `challenge` | The session sends them in that order inside one flow; the extension has the credential by the time the challenge arrives. |
+| The extension **replaces** its stored credential, it does not merge | `applyWebuiBrowserBridgePairingCredential` writes `{ keyId, secret }` unconditionally, so the host's copy is authoritative. |
+| The host refuses to pair without a usable public key | A structural check in the session refuses anything that is not a P-256 JWK, and an absent field is read as an older extension. |
+| An older extension is reported, not hung | With no `publicKey` the host still sends `challenge`, so the extension's proof is simply wrong and the session closes. |
+| The extension survives a host that sends no `pair` | With nothing in storage and no `pair`, `answerChallenge` throws "host issued a challenge before delivering a pairing credential" rather than hanging. |
+| The credential is never logged | The session never logs a frame body, the extension never calls `console`, and no error message carries a secret, the salt, the payload or the nonce. |
+
+The cipher itself, the exact wire shapes and the cross-implementation vector are
+in [`02-bridge-protocol.md`](02-bridge-protocol.md).
+
+### Where each side keeps it
+
+| Side | Location | Why |
+| --- | --- | --- |
+| Host | The OS secure credential store, per-OS, as the table above | The ADR forbids a plaintext file fallback; there is none. |
+| Extension | `chrome.storage.local`, never `chrome.storage.sync` | `sync` would replicate the secret to a signed-in Google account outside this browser. |
+
+Nothing is written anywhere else. The extension reads storage on every
+connection rather than caching the secret in a module variable, because an MV3
+service worker is terminated at will.
+
 ## One credential per browser
 
 Each browser receives a **distinct, high-entropy** credential.
@@ -172,10 +226,10 @@ stateDiagram-v2
 
 | Transition | Effect |
 | --- | --- |
-| Off → on | A **fresh** credential is created and stored; pairing happens automatically with **no second user confirmation** |
+| Off → on | A **fresh** credential is created and stored; pairing happens automatically with **no second user confirmation** — the next connection the extension makes is handed the credential |
 | On → off | Immediate revocation: the server credential is destroyed, active sockets are closed, and **every copy** of the old credential is rejected from that moment |
 | On, extension disconnects | The credential is not invalidated. Background reconnect continues while the switch is on |
-| Off → on again | A different credential from the first one; the old one stays revoked |
+| Off → on again | A different credential from the first one; the old one stays revoked. The extension picks the new one up on its next connect and drops the old copy |
 
 The enabled state and the authorization of each browser survive WebUI and browser restarts. That is
 `implemented`: `createBrowserAdapter` (`packages/webui/src/runtime/harness/browser.ts:54`) reads and
@@ -204,7 +258,8 @@ either — see [`06-runtime-authorization-trace.md`](06-runtime-authorization-tr
 
 | Rule | Detail |
 | --- | --- |
-| Never logged | A credential, a secret or a signature is not written to a log, an error message, a crash report or a diagnostic dump |
+| Never logged | A credential, a secret, a salt, a payload, a nonce or a signature is not written to a log, an error message, a crash report or a diagnostic dump |
+| Written to exactly one place | The OS secure credential store on the host, `chrome.storage.local` on the extension. Nowhere else, ever. |
 | Never replaced by the per-start token | The per-start WebUI connection token is not a pairing credential and must not be reused as one |
 | Never echoed in a refusal | An admission failure reports *which* check failed, never the value presented |
 | Proofs are not secrets | A proof is bound to a single-use nonce and is useless once that nonce is spent; it is still treated as sensitive material in transit and is not persisted |

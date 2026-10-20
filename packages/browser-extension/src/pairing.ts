@@ -4,11 +4,20 @@
 // HMAC over that nonce, so a proof lifted off the loopback socket is useless
 // against the next connection, and the secret itself never travels at all.
 //
+// The credential is **host-authored**. The browser-extension does not mint
+// one of its own, because two independently minted credentials never match:
+// the host would never accept a proof against the wrong secret. Instead, the
+// host delivers its credential, encrypted under an ECDH key the extension
+// mints per connection, in a `pair` frame — and **that** is the credential
+// the extension stores in `chrome.storage.local`. A re-enable on the host
+// side means a fresh credential that arrives on the next connect and
+// replaces the stored one.
+//
 // The secret lives in `chrome.storage.local` — not `storage.sync`, which would
 // replicate it to a signed-in Google account outside this browser. It is read
 // from storage on every connection rather than cached in a module variable,
-// because an MV3 service worker is terminated at will and must still be able to
-// answer a challenge after it restarts.
+// because an MV3 service worker is terminated at will and must still be able
+// to answer a challenge after it restarts.
 //
 // The WebUI per-start connection token is never read here. That credential is
 // the WebUI's own, and borrowing it would make the bridge's admission
@@ -17,9 +26,11 @@
 import {
   decodeWebuiBrowserBridgeBase64,
   encodeWebuiBrowserBridgeBase64,
+  openWebuiBrowserBridgePairingCredential,
   signWebuiBrowserBridgeProof,
   WEBUI_BROWSER_BRIDGE_SIGNATURE_ALGORITHM,
   type WebuiBrowserBridgeChallenge,
+  type WebuiBrowserBridgePair,
   type WebuiBrowserBridgeProof,
 } from "./protocol.js";
 
@@ -84,29 +95,51 @@ export function webuiBrowserBridgeRandomBytes(length: number): Uint8Array {
 }
 
 /**
- * The credential for this browser, created on first use.
+ * The credential for this browser, **as stored**.
  *
- * A stored credential whose bytes are missing or too short is replaced rather
- * than repaired: half a credential is not a credential, and the host would reject
- * it with a pairing error the person cannot act on.
+ * Returns `undefined` when storage has no credential or holds one whose
+ * bytes are missing or too short. The credential is host-authored: this
+ * function never mints one, because two independently-minted credentials
+ * never match and the host would never accept a proof against the wrong
+ * secret. The `pair` frame is the only path that puts credentials here.
+ *
+ * A stored credential whose bytes are missing or too short returns
+ * `undefined` rather than being repaired: half a credential is not a
+ * credential, and the host would reject it with a pairing error the person
+ * cannot act on.
  */
 export async function loadWebuiBrowserBridgePairingCredential(
   store: WebuiBrowserBridgePairingStore,
-  browser: WebuiBrowserBridgeBrowserName,
-  randomBytes: (length: number) => Uint8Array = webuiBrowserBridgeRandomBytes,
-): Promise<WebuiBrowserBridgePairingCredential> {
+): Promise<WebuiBrowserBridgePairingCredential | undefined> {
   const stored = await store.read();
-  const credential = readStoredCredential(stored);
-  if (credential) return credential;
-  const credentialToStore: WebuiBrowserBridgePairingCredential = {
-    keyId: `${browser}-${encodeWebuiBrowserBridgeBase64(randomBytes(9)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "")}`,
-    secret: randomBytes(WEBUI_BROWSER_BRIDGE_SECRET_BYTES),
+  return readStoredCredential(stored);
+}
+
+/**
+ * Decrypts and stores a host-authored credential.
+ *
+ * Called by the client when a `pair` frame arrives. The host's credential
+ * is authoritative: any prior stored value is replaced. The decryption is
+ * the symmetric counterpart of the host's seal, with the same `info`,
+ * salt, and AES-GCM IV handling; any tamper fails the AES-GCM auth and
+ * rejects the frame, so a captured or rogue `pair` cannot read as a valid
+ * credential.
+ */
+export async function applyWebuiBrowserBridgePairingCredential(
+  store: WebuiBrowserBridgePairingStore,
+  cipher: WebuiBrowserBridgePair,
+  ownPrivateKey: CryptoKey,
+): Promise<WebuiBrowserBridgePairingCredential> {
+  const secret = await openWebuiBrowserBridgePairingCredential(cipher, ownPrivateKey);
+  const credential: WebuiBrowserBridgePairingCredential = {
+    keyId: cipher.keyId,
+    secret,
   };
   await store.write({
-    keyId: credentialToStore.keyId,
-    secret: encodeWebuiBrowserBridgeBase64(credentialToStore.secret),
+    keyId: credential.keyId,
+    secret: encodeWebuiBrowserBridgeBase64(credential.secret),
   });
-  return credentialToStore;
+  return credential;
 }
 
 /**

@@ -5,13 +5,16 @@ import { describe, expect, it } from "vitest";
 
 import {
   isWebuiBrowserBridgeInputCommand,
+  openWebuiBrowserBridgePairingCredential,
   parseWebuiBrowserBridgeHostFrame,
   verifyWebuiBrowserBridgeProof,
   webuiBrowserBridgeProofMaterial,
   webuiBrowserBridgeUrl,
+  WEBUI_BROWSER_BRIDGE_PAIR_HKDF_INFO,
   WEBUI_BROWSER_BRIDGE_PATH,
   WEBUI_BROWSER_BRIDGE_SIGNATURE_ALGORITHM,
   signWebuiBrowserBridgeProof,
+  type WebuiBrowserBridgeEcdhPublicKey,
   type WebuiBrowserBridgeProof,
 } from "../src/protocol.js";
 
@@ -25,6 +28,102 @@ import {
  */
 const TEST_SECRET = new TextEncoder().encode("webui-browser-bridge-test-secret");
 const TEST_SIGNATURE = "xb7/GT5s+ScVsaiLkh+eRRndKi5oPQwqQMqU3aX8Znc=";
+
+/* -------------------------------------------------------------------------- */
+/* The pairing-transfer vector                                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A fixed P-256 pair per side, a fixed salt, a fixed IV and a fixed plaintext.
+ *
+ * The host suite asserts the same numbers against the same key pair, salt and
+ * plaintext. Two hand-written implementations of the same construction — one
+ * running on Node, one in a service worker — agree only because this string
+ * is the tie-breaker: change the `info`, the curve, the salt length or the
+ * plaintext encoding on either side and exactly one suite fails.
+ */
+const VECTOR_HOST_PUBLIC: WebuiBrowserBridgeEcdhPublicKey = {
+  kty: "EC",
+  crv: "P-256",
+  x: "XKwRVe-iSDOdOSBcT7wi5-6UDoXhSi_sJIva2FRwf-A",
+  y: "JOmNw0lXPLULOJ02rq1ElmxknaPEkcoSGN7aHuVzYZk",
+};
+
+const VECTOR_EXTENSION_PRIVATE_JWK = {
+  kty: "EC",
+  crv: "P-256",
+  x: "E97C62Slhb6xSK8jBY_vKNp_bXdZdUyq2z16I_ozyCA",
+  y: "-h7QnrdbdOmS5Wgxe8VSGJWBLpsptMBSCKmLKYcockY",
+  d: "1xQC1vkpguxZrUo9vhBkgX76gSaP3yiIv7YjgJUa4CA",
+} as const;
+
+const VECTOR_SALT = "AAECAwQFBgcICQoLDA0ODw==";
+const VECTOR_PLAINTEXT = "ABEiM0RVZneImaq7zN3u/w==";
+const VECTOR_PAYLOAD =
+  "EBESExQVFhcYGRobrpzg8LW2dZC7oVrnYW8vU8zfjg8p/FNAc/YdMgkvUx7+O5ceWIULAw==";
+/** The secret the plaintext above encodes. */
+const VECTOR_SECRET_HEX = "00112233445566778899aabbccddeeff";
+
+describe("browser bridge pairing transfer vector", () => {
+  it("pins the agreed HKDF info and the byte layout", () => {
+    expect(WEBUI_BROWSER_BRIDGE_PAIR_HKDF_INFO).toBe("webui-browser-bridge-pair-v1");
+  });
+
+  it("opens the exact payload the host produced", async () => {
+    const privateKey = await crypto.subtle.importKey(
+      "jwk",
+      { ...VECTOR_EXTENSION_PRIVATE_JWK, key_ops: ["deriveBits"] },
+      { name: "ECDH", namedCurve: "P-256" },
+      true,
+      ["deriveBits"],
+    );
+
+    const secret = await openWebuiBrowserBridgePairingCredential(
+      { publicKey: VECTOR_HOST_PUBLIC, salt: VECTOR_SALT, payload: VECTOR_PAYLOAD },
+      privateKey,
+    );
+
+    expect(hexOf(secret)).toBe(VECTOR_SECRET_HEX);
+    // The plaintext on the wire is `base64(secret)`, not the raw bytes.
+    expect(encodeBase64(secret)).toBe(VECTOR_PLAINTEXT);
+  });
+
+  it("refuses a payload one bit away from the vector", async () => {
+    const privateKey = await crypto.subtle.importKey(
+      "jwk",
+      { ...VECTOR_EXTENSION_PRIVATE_JWK, key_ops: ["deriveBits"] },
+      { name: "ECDH", namedCurve: "P-256" },
+      true,
+      ["deriveBits"],
+    );
+    const bytes = decodeBase64(VECTOR_PAYLOAD);
+    bytes[bytes.length - 1] = bytes[bytes.length - 1]! ^ 0x01;
+
+    await expect(
+      openWebuiBrowserBridgePairingCredential(
+        { publicKey: VECTOR_HOST_PUBLIC, salt: VECTOR_SALT, payload: encodeBase64(bytes) },
+        privateKey,
+      ),
+    ).rejects.toBeDefined();
+  });
+
+  it("refuses a salt that is not the one the host chose", async () => {
+    const privateKey = await crypto.subtle.importKey(
+      "jwk",
+      { ...VECTOR_EXTENSION_PRIVATE_JWK, key_ops: ["deriveBits"] },
+      { name: "ECDH", namedCurve: "P-256" },
+      true,
+      ["deriveBits"],
+    );
+
+    await expect(
+      openWebuiBrowserBridgePairingCredential(
+        { publicKey: VECTOR_HOST_PUBLIC, salt: "AAECAwQFBgcICQoLDA0ODxA", payload: VECTOR_PAYLOAD },
+        privateKey,
+      ),
+    ).rejects.toBeDefined();
+  });
+});
 
 describe("browser bridge protocol", () => {
   it("signs the shared test vector", async () => {
@@ -152,4 +251,62 @@ describe("host frame parsing", () => {
     expect(isWebuiBrowserBridgeInputCommand({ kind: "text", targetId: "", generation: 2, text: "hi" })).toBe(false);
     expect(isWebuiBrowserBridgeInputCommand({ kind: "scroll", targetId: "tab-7", generation: 2 })).toBe(false);
   });
+
+  it("parses a pair frame and rejects one missing a field it cannot open", () => {
+    const frame = {
+      kind: "pair",
+      keyId: "edge-1",
+      publicKey: VECTOR_HOST_PUBLIC,
+      salt: VECTOR_SALT,
+      payload: VECTOR_PAYLOAD,
+    };
+    expect(parseWebuiBrowserBridgeHostFrame(JSON.stringify(frame))).toMatchObject({ ok: true });
+
+    // A `pair` without the host's public key cannot be decrypted, and saying
+    // so at parse time is what stops the handshake hanging on it.
+    expect(
+      parseWebuiBrowserBridgeHostFrame(JSON.stringify({ ...frame, publicKey: undefined })),
+    ).toMatchObject({ ok: false, reason: "pair public key is missing or not a P-256 JWK" });
+    expect(
+      parseWebuiBrowserBridgeHostFrame(
+        JSON.stringify({ ...frame, publicKey: { kty: "RSA", crv: "P-256", x: "a", y: "b" } }),
+      ),
+    ).toMatchObject({ ok: false });
+    expect(parseWebuiBrowserBridgeHostFrame(JSON.stringify({ ...frame, salt: "" }))).toMatchObject({
+      ok: false,
+      reason: "pair has no salt",
+    });
+    expect(parseWebuiBrowserBridgeHostFrame(JSON.stringify({ ...frame, payload: "" }))).toMatchObject({
+      ok: false,
+      reason: "pair has no payload",
+    });
+    expect(parseWebuiBrowserBridgeHostFrame(JSON.stringify({ ...frame, keyId: "" }))).toMatchObject({
+      ok: false,
+      reason: "pair has no key id",
+    });
+  });
 });
+
+/* -------------------------------------------------------------------------- */
+
+/** Base64 without `Buffer` — this package is type-checked against a browser. */
+function encodeBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+/** Base64 decode without `Buffer`. */
+function decodeBase64(value: string): Uint8Array {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+}
+
+/** Hex, so a byte comparison in a failure message is readable. */
+function hexOf(bytes: Uint8Array): string {
+  let out = "";
+  for (const byte of bytes) out += byte.toString(16).padStart(2, "0");
+  return out;
+}

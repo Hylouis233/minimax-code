@@ -27,6 +27,7 @@ import {
   type WebuiBrowserImageFrame,
   type WebuiBrowserSurface,
   type WebuiBrowserTargetId,
+  type WebuiBrowserTargetList,
   type WebuiBrowserTargetState,
 } from "../../../../shared/contracts/browser.js";
 import {
@@ -198,6 +199,22 @@ export function reduceWebuiBrowserPanelState(
       return { ...next, status: deriveStatus(next) };
     }
 
+    case "run-changed": {
+      // A run's selection is that run's. When the active run changes, the panel
+      // stops claiming to show the previous run's target: the frames stay
+      // buffered per tab (so a new run that picks the same tab shows it at
+      // once), but the selection, the marked tabs and the "what moved on" note
+      // are cleared and wait for the new run's own answer.
+      if (state.selectedTarget === undefined && state.targetChange === undefined) return state;
+      const next: WebuiBrowserPanelState = {
+        ...state,
+        selectedTarget: undefined,
+        targetChange: undefined,
+        targets: markSelection(state.targets, undefined),
+      };
+      return { ...next, status: deriveStatus(next) };
+    }
+
     case "frame": {
       const frame = event.frame;
       if (!isUsableWebuiBrowserTargetId(frame.target)) return dropped(state);
@@ -254,6 +271,22 @@ export function selectWebuiBrowserSelectedTarget(
   const selected = state.selectedTarget;
   if (!selected) return undefined;
   return state.targets.find((candidate) => isSameWebuiBrowserTarget(candidate.id, selected));
+}
+
+/**
+ * The target a run has selected, as the host's target list reports it.
+ *
+ * The service marks exactly one target per run, so this is how the panel learns
+ * which page the *active run* is driving without the run having to announce it —
+ * and `undefined` when that run has selected nothing, which is the answer for a
+ * panel that is showing a browser with no run behind it. Reading the flag
+ * instead of the panel's own selection is what makes the panel follow the run
+ * rather than keep showing whatever it happened to be showing.
+ */
+export function selectedWebuiBrowserRunTarget(
+  list: WebuiBrowserTargetList,
+): WebuiBrowserTargetId | undefined {
+  return list.targets.find((target) => target.selected)?.id;
 }
 
 /** Whether the surface the panel is showing is authorized to be shown at all. */

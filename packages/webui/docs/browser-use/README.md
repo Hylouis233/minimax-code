@@ -11,11 +11,12 @@ status line of its own:
 
 Where a document mixes the three, they are separated inline rather than merged into one sentence.
 
-**Read [`07-review-findings.md`](07-review-findings.md) before anything else.** An independent review
-found that this document set disagreed with the tree in three places, and that one claim overreached its
-evidence. That document records all seven findings and states, for each, whether it is closed or still
-open. **Six of the seven are now closed in the tree; F3 — the bridge is not wired into the server's
-WebSocket upgrade path — is still open**, and it blocks every external surface.
+**Read [`07-review-findings.md`](07-review-findings.md) before anything else.** Three independent
+reviews of this change have run against the source, and they raised **twenty findings** between them.
+That document records every one and states, for each, whether it is closed or still open. **Seventeen
+are closed in the tree.** The three that remain open are the Agent-tool adapter, the run-scoped target
+selection, and the credential exchange between the host and the extension — each with the reason it is
+open, and each recorded in the decision record's amendments.
 
 The decision record for this programme is
 [`../adr/0019-webui-browser-use-surfaces-and-external-browser-bridge.md`](../adr/0019-webui-browser-use-surfaces-and-external-browser-bridge.md).
@@ -24,9 +25,9 @@ what was actually measured, what was deliberately not measured, and the exact wi
 the Agent's browser tools and the extension must agree on.
 
 Nothing here describes shipped, released behavior. The isolated-Chromium surface has a provider, a
-service and a panel path in this branch, but the external bridge has no production caller and several
-authorization checks are still open; where a document states a rule that has no implementing code, it
-says so in place rather than in a footnote.
+service and a panel path in this branch, and the extension bridge is wired into the server's upgrade
+path, but the external handshake cannot yet complete and three review findings remain open; where a
+document states a rule that has no implementing code, it says so in place rather than in a footnote.
 
 ## Implementation status was re-checked against the tree
 
@@ -42,7 +43,7 @@ still says something is not implemented, that is because it is not — the per-r
 | `packages/webui/src/runtime/browser/browser-service.ts` | `implemented` — owns authorization, providers and the registry | `06` |
 | `packages/webui/src/runtime/browser/isolated-chromium/provider.ts` | `implemented` — including the attachment retry | `01` |
 | `packages/webui/src/server/browser-bridge/credential-store.ts` | `implemented`, rewritten mid-review; per-OS mechanisms under active revision | `04` |
-| `packages/webui/src/server/browser-bridge/admission.ts`, `pairing.ts`, `session.ts`, `registry.ts`, `reconnect.ts` | `implemented`; target-ownership routing fixed (F4), but the whole module is still **unwired** (F3) | `02`, `03` |
+| `packages/webui/src/server/browser-bridge/admission.ts`, `pairing.ts`, `session.ts`, `registry.ts`, `reconnect.ts` | `implemented` and **wired** into the server's upgrade path and the browser service; target-ownership routing fixed (F4) | `02`, `03` |
 | `packages/webui/src/shared/operation-names.ts` | `implemented` — eight browser operations registered, including `sendBrowserCommand` (F5) | `06` |
 | `packages/browser-extension/` | `implemented` — MV3 service worker, `chrome.storage.local` credential, Web Crypto signing | `02`, `04` |
 
@@ -50,15 +51,17 @@ The *measurements* in these documents were never affected by the tree moving. Th
 artifacts, not from the source. What moved was the implementation status, and that is what this pass
 corrected.
 
-The tree moved **twice** while this pass was running:
+The tree moved through **three review waves** while this pass was running:
 
 1. `packages/webui/src/server/browser-bridge/credential-store.ts` was rewritten from `cmdkey` to a DPAPI
-   round trip. [`04-pairing-credentials.md`](04-pairing-credentials.md) is written against the version in
-   the tree and flags the platform mechanisms as under active revision.
+   round trip, with the secret on stdin rather than in `argv`.
 2. `browser-service.ts` and `server/browser-bridge/registry.ts` gained the fixes for F2, F4, F5 and F6.
+3. The bridge stopped switching surfaces on by itself, the runtime started reaching it through the
+   member it actually exposes, external frames stopped being relabelled, and a host restart started
+   restoring its pairing credential instead of rotating it.
 
-Every line number cited in these documents was re-verified after the second wave. **F3 was still open at
-that point and still is** — see [`07-review-findings.md`](07-review-findings.md).
+Every line number cited in these documents was re-verified after each wave. The findings that are still
+open are listed in [`07-review-findings.md`](07-review-findings.md).
 
 ## Documents
 
@@ -70,7 +73,7 @@ that point and still is** — see [`07-review-findings.md`](07-review-findings.m
 | [`04-pairing-credentials.md`](04-pairing-credentials.md) | Credential lifecycle, the per-OS secure store on each platform, and the explicit-failure rule when no store exists | You implement pairing, credential storage, revocation or re-enable |
 | [`05-target-identity.md`](05-target-identity.md) | The three-part target identity and its generation, what invalidates a generation, and how a stale reference is rejected | You work with targets, input forwarding, tab selection or run scoping |
 | [`06-runtime-authorization-trace.md`](06-runtime-authorization-trace.md) | Each of the four authorization switches traced to the place it must be enforced, with the current implementation status of each check | You implement an authorization check, or you are auditing whether one exists |
-| [`07-review-findings.md`](07-review-findings.md) | The independent review's seven findings, what was done about each, and which are still open | You want to know what is known to be broken, or what has been corrected |
+| [`07-review-findings.md`](07-review-findings.md) | All twenty findings from three independent review rounds, what was done about each, and which three are still open | You want to know what is known to be broken, or what has been corrected |
 
 ## How to read these documents
 

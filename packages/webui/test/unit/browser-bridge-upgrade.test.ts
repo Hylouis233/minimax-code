@@ -19,6 +19,9 @@ import { WebSocket } from "ws";
 import {
   BrowserBridgeServer,
   createInMemorySecureCredentialStore,
+  exportWebuiBrowserBridgeEcdhPublicKey,
+  generateWebuiBrowserBridgeEcdhKeyPair,
+  type WebuiBrowserBridgeEcdhPublicKey,
 } from "../../src/server/browser-bridge/index.js";
 import { WebuiWebSocketServer } from "../../src/server/websocket-server.js";
 import { WEBUI_BROWSER_BRIDGE_PATH } from "../../src/shared/contracts/browser-bridge.js";
@@ -185,6 +188,12 @@ function connectClient(port: number, headers: Record<string, string>) {
   return { socket, frames, opened, waitFor };
 }
 
+/** A public key for tests that don't care about pairing, just about the wire shape. */
+async function bogusClientPublicKey(): Promise<WebuiBrowserBridgeEcdhPublicKey> {
+  const { publicKey } = await generateWebuiBrowserBridgeEcdhKeyPair();
+  return exportWebuiBrowserBridgeEcdhPublicKey(publicKey);
+}
+
 /** Connect, answer the challenge with the pairing's own secret, wait for ready. */
 async function pairExtension(
   harness: Harness & { readonly bridge: BrowserBridgeServer },
@@ -195,7 +204,13 @@ async function pairExtension(
   const client = connectClient(harness.port, { origin: `chrome-extension://${extensionId}/` });
   await client.opened;
   client.socket.send(
-    JSON.stringify({ kind: "hello", browser: surface, browserId, extensionVersion: "1.0.0" }),
+    JSON.stringify({
+      kind: "hello",
+      browser: surface,
+      browserId,
+      extensionVersion: "1.0.0",
+      publicKey: await bogusClientPublicKey(),
+    }),
   );
   const pairing = harness.bridge.pairings.get(surface);
   if (!pairing) throw new Error(`no pairing for ${surface}`);
@@ -247,6 +262,18 @@ describe("WebUI browser bridge — the dedicated upgrade branch", () => {
       origin: `chrome-extension://${KNOWN_EDGE_ID}/`,
     });
     await client.opened;
+    // A hello with a valid public key kicks the gated handshake. The
+    // extension on this side is a fake that just answers the challenge —
+    // the point of the test is what the host does with a WRONG proof.
+    client.socket.send(
+      JSON.stringify({
+        kind: "hello",
+        browser: "edge",
+        browserId: "edge-bogus",
+        extensionVersion: "1.0.0",
+        publicKey: await bogusClientPublicKey(),
+      }),
+    );
     const challenge = await client.waitFor<{ nonce: string; keyId: string }>("challenge");
     client.socket.send(
       JSON.stringify({

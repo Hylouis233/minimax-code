@@ -16,10 +16,12 @@
 import { randomBytes } from "node:crypto";
 
 import {
+  sealWebuiBrowserBridgePairingCredential,
   signWebuiBrowserBridgeProof,
   verifyWebuiBrowserBridgeProof,
   WEBUI_BROWSER_BRIDGE_SIGNATURE_ALGORITHM,
   type WebuiBrowserBridgeChallenge,
+  type WebuiBrowserBridgeEcdhPublicKey,
   type WebuiBrowserBridgeProof,
 } from "../../shared/contracts/browser-bridge.js";
 import type { WebuiBridgeBrowserSurface } from "../../shared/contracts/browser.js";
@@ -240,6 +242,56 @@ export class BrowserBridgePairing {
       );
     }
     return signWebuiBrowserBridgeProof(current.secret, nonce, current.keyId);
+  }
+
+  /**
+   * The current `keyId`, or `undefined` when the surface is off.
+   *
+   * Surfaced separately from `keyId` for callers that want it alongside the
+   * cipher without juggling the `undefined` case twice.
+   */
+  currentKeyId(): string | undefined {
+    return this.current?.keyId;
+  }
+
+  /**
+   * Encrypts the current credential for delivery to the extension.
+   *
+   * Returns `undefined` when the surface is off: a switch that is off has
+   * no credential, and the existing admission path already refuses to
+   * accept connections in that state, so the session can skip this and
+   * proceed to refuse the handshake.
+   *
+   * The cipher carries the host's ephemeral public key as well as the
+   * encrypted credential, so the extension can derive the same AES key on
+   * its side. The `randomBytes` override is for tests that pin the salt
+   * and IV exactly.
+   */
+  async sealCredentialForExtension(
+    peerPublicKey: WebuiBrowserBridgeEcdhPublicKey,
+    options: { readonly randomBytes?: (length: number) => Uint8Array } = {},
+  ): Promise<
+    | { readonly kind: "off" }
+    | {
+        readonly kind: "sealed";
+        readonly keyId: string;
+        readonly publicKey: WebuiBrowserBridgeEcdhPublicKey;
+        readonly salt: string;
+        readonly payload: string;
+      }
+  > {
+    const current = this.current;
+    if (!current) return { kind: "off" };
+    const cipher = await sealWebuiBrowserBridgePairingCredential(current.secret, peerPublicKey, {
+      randomBytes: options.randomBytes,
+    });
+    return {
+      kind: "sealed",
+      keyId: current.keyId,
+      publicKey: cipher.publicKey,
+      salt: cipher.salt,
+      payload: cipher.payload,
+    };
   }
 
   /**

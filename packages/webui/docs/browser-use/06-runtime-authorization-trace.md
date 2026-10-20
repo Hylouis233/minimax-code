@@ -62,9 +62,9 @@ no provider existed at all.
 | Release | `packages/webui/src/runtime/lifecycle.ts:22` | `closeBrowserProvider` releases it in the close order |
 
 `browserUseTooling` is a **readiness statement**, not an authorization decision. It is true exactly
-when a provider object exists, and says nothing about which switch is on. The composition roots still
-call `createWebuiRuntimeHost({ dataDir, appVersion })` with no `browserProvider`, so this seam receives
-`undefined` and its browser fields stay absent.
+when a provider object exists, and says nothing about which switch is on. Both composition roots now
+pass a `browserProvider` — the WebUI's own tool adapter, built over the browser service — so the
+adoption seam receives one. The switches are still read on the service's own path, not here.
 
 **The owned browser service** — the one this trace is about. `createBrowserAdapter`
 (`packages/webui/src/runtime/harness/browser.ts:54`) builds a `WebuiBrowserService` from the host's
@@ -106,9 +106,9 @@ Five enforcement points. "Required check" is the rule; "Code today" is what exis
 | --- | --- |
 | Required check | The surface switch for the selected surface is on, and the requested action is in the restricted command set (or the Full CDP gate is on, for anything outside it) |
 | Refusal | `browser_surface_not_authorized`, `browser_capability_denied` |
-| Code today | **The restricted vocabulary exists; the authorization does not.** The action names and their input contracts are declared in `packages/agent-tools/src/desktop/builtin-browser-defs.ts` — `LOCAL_BROWSER_ACTION_NAMES` at line 744 (24 names) and `LOCAL_BROWSER_ACTION_INPUT_CONTRACTS` at line 714. The actions are implemented over a CDP send in `packages/browser-core/src/browser-actions.ts`. **No switch is read anywhere on that path.** |
-| Reachability from this client | **None — and this is the part that is easy to get wrong.** The WebUI *does* now have a browser port (`WebuiBrowserPort`, `runtime/port.ts:632`), a browser adapter (`runtime/harness/browser.ts:54`) and seven registered browser operations (`shared/operation-names.ts:51`–`57`). But every consumer of those operations is inside `packages/webui` — the client transport and the operation registry. A repository-wide search for `sendBrowserInput`, `listBrowserTargets` and `createBrowserAdapter` returns no hit under `packages/agent-tools/` or `packages/agent-modules/`. **No Agent browser-tool adapter reaches the WebUI browser service**, so nothing on the Agent side reads the switches |
-| Isolated-surface provider | `packages/tui/src/runtime/browser/headless-chrome-provider.ts` with `headless-chrome-transport.ts` and `headless-cdp-connection.ts`. This is the working isolated-Chromium surface that exists in this repository; it is not adopted by WebUI |
+| Code today | **Implemented.** The restricted vocabulary is declared in `packages/agent-tools/src/desktop/builtin-browser-defs.ts` — `LOCAL_BROWSER_ACTION_NAMES` at line 744 (24 names) and `LOCAL_BROWSER_ACTION_INPUT_CONTRACTS` at line 714. The WebUI's tool adapter (`packages/webui/src/runtime/browser/tool-adapter.ts`) implements `LocalBrowserAdapter` over the browser service: `getCapabilities()` declares exactly the restricted set, and `execute` forwards the action to the service, which reads the surface switch and the Full CDP gate. An action outside the restricted set is refused with `browser_capability_denied` even when Full CDP is on, because the tool path is the restricted path. |
+| Reachability from this client | **Reachable.** The WebUI has a browser port (`WebuiBrowserPort`, `runtime/port.ts`), a browser adapter (`runtime/harness/browser.ts`) and the registered browser operations. The adapter is handed to the runtime host as the `browserProvider` by both composition roots, and the service is the one place the switch is read — so the Agent's tools and the panel address the same session by construction rather than by convention. The service's `sendCommandToSelection` runs the action against the **selected** target of the surface, and refuses when there is no selection rather than defaulting to one |
+| Isolated-surface provider | The WebUI's own: `packages/webui/src/runtime/browser/isolated-chromium/provider.ts` with `cdp-connection.ts`. The repository also has a TUI-side provider (`packages/tui/src/runtime/browser/headless-chrome-provider.ts`); the WebUI does not adopt it, because the WebUI's provider is the one the panel's live image stream and the tool adapter share |
 
 ### 4. Bridge admission
 

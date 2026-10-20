@@ -25,6 +25,7 @@ import type { WebSocket, RawData } from "ws";
 import {
   type WebuiBrowserBridgeChallenge,
   type WebuiBrowserBridgeClientFrame,
+  type WebuiBrowserBridgeEcdhPublicKey,
   type WebuiBrowserBridgeHostFrame,
   type WebuiBrowserBridgeImageFrame,
   type WebuiBrowserBridgeInputCommand,
@@ -140,6 +141,8 @@ export class BrowserBridgeSession extends EventEmitter {
   private activeChallenge: WebuiBrowserBridgeChallenge | undefined;
   /** Whether the session has been fully admitted. */
   private admitted = false;
+  /** The hello frame the extension opens with, cached so the pairing can run. */
+  private helloFrame: { readonly publicKey?: WebuiBrowserBridgeEcdhPublicKey } | undefined;
   /** Why the session closed, captured for `closed` emission. */
   private closeReason: BrowserBridgeSessionCloseReason | undefined;
   /** The set of command ids awaiting an `input-result` reply. */
@@ -171,7 +174,61 @@ export class BrowserBridgeSession extends EventEmitter {
       if (!this.closeReason) this.closeReason = { kind: "host_error", error: error.message };
       this.teardown();
     });
-    this.startChallenge();
+    // The challenge is gated on the extension's `hello`: a `pair` frame has
+    // to leave ahead of it, and that needs the extension's public key.
+  }
+
+  /**
+   * Boots the post-hello handshake.
+   *
+   * The session is constructed on the upgrade, but `pair` and `challenge`
+   * wait until the extension's `hello` arrives so the host can build an ECDH
+   * cipher the extension can actually open.
+   */
+  beginHelloGatedHandshake(): void {
+    void this.sendPairAndChallenge();
+  }
+
+  /**
+   * Sends the pairing transfer (if any) and then the challenge.
+   *
+   * Order matters: a `pair` frame carries the host's credential, which is
+   * what the extension answers the challenge against. Reversing the order
+   * would leave the extension signing with a credential it does not yet
+   * have.
+   */
+  private async sendPairAndChallenge(): Promise<void> {
+    const hello = this.helloFrame;
+    if (!hello) return;
+    if (this.closeReason) return;
+    try {
+      if (hello.publicKey) {
+        const sealed = await this.pairing.sealCredentialForExtension(hello.publicKey);
+        if (sealed.kind === "sealed") {
+          this.sendFrameOrClose({
+            kind: "pair",
+            keyId: sealed.keyId,
+            publicKey: sealed.publicKey,
+            salt: sealed.salt,
+            payload: sealed.payload,
+          });
+          if (this.closeReason) return;
+        }
+        // `off`: the surface's pairing has no credential. The host sends no
+        // `pair` frame, so the extension cannot complete the handshake —
+        // admission already refused the connection, and the session will
+        // close once `issueChallenge` is asked.
+      }
+      const challenge = await this.pairing.issueChallenge();
+      this.activeChallenge = challenge;
+      this.sendFrameOrClose(challenge);
+    } catch (error) {
+      if (error instanceof PairingSwitchedOffError) {
+        this.close({ kind: "switched_off" });
+        return;
+      }
+      this.close({ kind: "host_error", error: errorMessage(error) });
+    }
   }
 
   /**
@@ -245,29 +302,6 @@ export class BrowserBridgeSession extends EventEmitter {
   /* Wire protocol                                                          */
   /* ---------------------------------------------------------------------- */
 
-  private startChallenge(): void {
-    this.issueChallengeFromPairing()
-      .then((challenge) => {
-        this.activeChallenge = challenge;
-        try {
-          this.sendFrame(challenge);
-        } catch (error) {
-          this.close({ kind: "host_error", error: errorMessage(error) });
-        }
-      })
-      .catch((error: unknown) => {
-        if (error instanceof PairingSwitchedOffError) {
-          this.close({ kind: "switched_off" });
-        } else {
-          this.close({ kind: "host_error", error: errorMessage(error) });
-        }
-      });
-  }
-
-  private async issueChallengeFromPairing(): Promise<WebuiBrowserBridgeChallenge> {
-    return this.pairing.issueChallenge();
-  }
-
   private async handleMessage(data: RawData, _isBinary: boolean): Promise<void> {
     const text = messageToText(data);
     if (text === undefined) {
@@ -286,8 +320,15 @@ export class BrowserBridgeSession extends EventEmitter {
         await this.handleProof(frame);
         break;
       case "hello":
-        // Hello is informational; the host doesn't enforce a particular
-        // surface here because the pairing already binds a browser.
+        // Capture the public key once. A second `hello` is ignored: the
+        // session's identity is the first one, and any later frame would
+        // either say the same thing or be a downgrade.
+        if (!this.helloFrame) {
+          this.helloFrame = {
+            publicKey: isEcdhPublicKey(frame.publicKey) ? frame.publicKey : undefined,
+          };
+          this.beginHelloGatedHandshake();
+        }
         break;
       case "targets":
         this.emit(
@@ -408,6 +449,20 @@ export class BrowserBridgeSession extends EventEmitter {
     this.socket.send(text);
   }
 
+  /**
+   * Same as `sendFrame`, but a throw on a closed socket closes the session
+   * with a host error rather than escaping into an unhandled rejection.
+   * Used for the gated handshake path so a race against a peer that closed
+   * straight after `hello` ends in a clean teardown.
+   */
+  private sendFrameOrClose(frame: WebuiBrowserBridgeHostFrame): void {
+    try {
+      this.sendFrame(frame);
+    } catch (error) {
+      this.close({ kind: "host_error", error: errorMessage(error) });
+    }
+  }
+
   /* ---------------------------------------------------------------------- */
   /* Lifecycle                                                              */
   /* ---------------------------------------------------------------------- */
@@ -525,3 +580,24 @@ function describeClose(reason: BrowserBridgeSessionCloseReason): string {
 
 // Reference symbols that would otherwise be elided by tree-shaking.
 void BridgeOperationError;
+
+/**
+ * Whether `value` is a structurally valid ECDH public-key JWK.
+ *
+ * Validation is structural rather than the full JOSE one — `webcrypto`'s own
+ * `importKey` would catch the rest, but doing it here turns "host refuses to
+ * pair without a public key" from a negative inference into an explicit
+ * branch in the right place.
+ */
+function isEcdhPublicKey(value: unknown): value is WebuiBrowserBridgeEcdhPublicKey {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    candidate.kty === "EC" &&
+    candidate.crv === "P-256" &&
+    typeof candidate.x === "string" &&
+    candidate.x.length > 0 &&
+    typeof candidate.y === "string" &&
+    candidate.y.length > 0
+  );
+}

@@ -15,6 +15,23 @@ export const WEBUI_BROWSER_BRIDGE_PATH = "/browser-bridge";
 /** The only signature scheme the bridge admits. */
 export const WEBUI_BROWSER_BRIDGE_SIGNATURE_ALGORITHM = "HMAC-SHA256" as const;
 
+/** The HKDF `info` literal the pair cipher is keyed with. */
+export const WEBUI_BROWSER_BRIDGE_PAIR_HKDF_INFO = "webui-browser-bridge-pair-v1" as const;
+
+/** The HKDF salt and AES-GCM IV lengths, in bytes. */
+export const WEBUI_BROWSER_BRIDGE_PAIR_HKDF_SALT_BYTES = 16;
+export const WEBUI_BROWSER_BRIDGE_PAIR_AES_IV_BYTES = 12;
+
+/** A P-256 ECDH public key, as JWK, for the pairing transfer. */
+export interface WebuiBrowserBridgeEcdhPublicKey {
+  readonly kty: "EC";
+  readonly crv: "P-256";
+  /** Base64url (no padding) of the raw x coordinate. */
+  readonly x: string;
+  /** Base64url (no padding) of the raw y coordinate. */
+  readonly y: string;
+}
+
 /** The external browsers this extension bridges. */
 export type WebuiBrowserBridgeBrowser = "edge" | "chrome";
 
@@ -42,6 +59,28 @@ export interface WebuiBrowserBridgeProof {
    * the wire saying the same thing.
    */
   readonly algorithm?: typeof WEBUI_BROWSER_BRIDGE_SIGNATURE_ALGORITHM;
+}
+
+/**
+ * The credential-transfer frame the host sends before the challenge.
+ *
+ * The host's authoritative credential arrives here on every connect, so a
+ * switch that went off and on again — the only way the credential could
+ * change — reaches the extension without anyone doing anything.
+ */
+export interface WebuiBrowserBridgePair {
+  readonly kind: "pair";
+  readonly keyId: string;
+  /**
+   * The host's ephemeral P-256 ECDH public key. Required because both
+   * halves of the ECDH shared secret depend on it; without it the extension
+   * cannot derive the same AES key the host used.
+   */
+  readonly publicKey: WebuiBrowserBridgeEcdhPublicKey;
+  /** Base64 of the 16-byte HKDF salt the host generated for this connection. */
+  readonly salt: string;
+  /** `base64( iv || aes-gcm-ciphertext )` — the ciphertext already carries its tag. */
+  readonly payload: string;
 }
 
 export interface WebuiBrowserBridgeTarget {
@@ -94,6 +133,12 @@ export type WebuiBrowserBridgeClientFrame =
       readonly browser: WebuiBrowserBridgeBrowser;
       readonly browserId: string;
       readonly extensionVersion: string;
+      /**
+       * The extension's ephemeral P-256 ECDH public key for this connection.
+       * Always set by the current extension build; the host refuses to pair
+       * without it.
+       */
+      readonly publicKey: WebuiBrowserBridgeEcdhPublicKey;
     }
   | WebuiBrowserBridgeProof
   | { readonly kind: "targets"; readonly targets: readonly WebuiBrowserBridgeTarget[] }
@@ -107,6 +152,7 @@ export type WebuiBrowserBridgeClientFrame =
   | { readonly kind: "pong"; readonly nonce: string };
 
 export type WebuiBrowserBridgeHostFrame =
+  | WebuiBrowserBridgePair
   | WebuiBrowserBridgeChallenge
   | { readonly kind: "ready"; readonly sessionId: string }
   | {
@@ -229,6 +275,142 @@ export function decodeWebuiBrowserBridgeBase64(value: string): Uint8Array {
   return bytes;
 }
 
+/**
+ * Copies bytes into a plain `ArrayBuffer`.
+ *
+ * Web Crypto's `BufferSource` is declared over `ArrayBuffer`, but a
+ * `Uint8Array` is generic over its buffer and a view's buffer might be a
+ * `SharedArrayBuffer`. Copying into a buffer this function owns removes the
+ * question rather than casting it away.
+ */
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Pairing transfer: ECDH P-256 + HKDF-SHA256 + AES-256-GCM (extension side)  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Generates an ephemeral P-256 ECDH key pair for one connection.
+ *
+ * The private half leaves scope at end of call: there is no longer-lived key
+ * to store or leak, and a fresh handshake produces a fresh shared secret that
+ * cannot be replayed from a previously captured `pair` frame.
+ */
+export function generateWebuiBrowserBridgeEcdhKeyPair(): Promise<{
+  readonly privateKey: CryptoKey;
+  readonly publicKey: CryptoKey;
+}> {
+  // `ECDH` over `P-256` with `deriveBits`. The 256-bit output is exactly the
+  // width the HKDF then expands into an AES-256 key — anything else would
+  // either widen the KDF or shrink the cipher, and both are gratuitous.
+  return crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, [
+    "deriveBits",
+  ]);
+}
+
+/** Imports a peer ECDH public key from a wire-format JWK. */
+export async function importWebuiBrowserBridgeEcdhPublicKey(
+  jwk: WebuiBrowserBridgeEcdhPublicKey,
+): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    "jwk",
+    { ...jwk, ext: true, key_ops: [] },
+    { name: "ECDH", namedCurve: "P-256" },
+    true,
+    [],
+  );
+}
+
+/** Exports the wire-format P-256 ECDH public key (no `d`, no `key_ops`). */
+export async function exportWebuiBrowserBridgeEcdhPublicKey(
+  publicKey: CryptoKey,
+): Promise<WebuiBrowserBridgeEcdhPublicKey> {
+  const jwk = await crypto.subtle.exportKey("jwk", publicKey);
+  if (jwk.kty !== "EC" || jwk.crv !== "P-256") {
+    throw new Error(`browser bridge: unexpected ECDH JWK shape (kty=${jwk.kty}, crv=${jwk.crv})`);
+  }
+  if (typeof jwk.x !== "string" || typeof jwk.y !== "string") {
+    throw new Error("browser bridge: ECDH JWK is missing x/y");
+  }
+  return { kty: "EC", crv: "P-256", x: jwk.x, y: jwk.y };
+}
+
+/**
+ * Derives an AES-GCM key from the ECDH shared secret.
+ *
+ * Same construction as the host: `HKDF-SHA256` over the shared bits, with
+ * the salt the host generated and the agreed `info`. A divergence between
+ * the two sides is what the cross-implementation test vector catches.
+ */
+async function deriveWebuiBrowserBridgePairAesKey(
+  sharedBits: ArrayBuffer,
+  salt: Uint8Array,
+  subtle: SubtleCrypto,
+): Promise<CryptoKey> {
+  const baseKey = await subtle.importKey("raw", sharedBits, { name: "HKDF" }, false, ["deriveKey"]);
+  return subtle.deriveKey(
+    {
+      name: "HKDF",
+      hash: "SHA-256",
+      salt: toArrayBuffer(salt),
+      info: new TextEncoder().encode(WEBUI_BROWSER_BRIDGE_PAIR_HKDF_INFO),
+    },
+    baseKey,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
+/**
+ * Opens a `pair` frame.
+ *
+ * Returns the secret **bytes** — the `chrome.storage.local` write stores the
+ * bytes themselves, not their base64 form, so a re-load on the next connect
+ * produces the exact value the host expects the proof against.
+ *
+ * A one-byte change in the ciphertext or IV is a GCM auth failure and this
+ * throws — which is what we want: a tampered frame cannot read as a valid
+ * credential.
+ */
+export async function openWebuiBrowserBridgePairingCredential(
+  cipher: Pick<WebuiBrowserBridgePair, "publicKey" | "salt" | "payload">,
+  ownPrivateKey: CryptoKey,
+  subtle: SubtleCrypto = crypto.subtle,
+): Promise<Uint8Array> {
+  const salt = decodeWebuiBrowserBridgeBase64(cipher.salt);
+  const payloadBytes = decodeWebuiBrowserBridgeBase64(cipher.payload);
+  if (payloadBytes.length < WEBUI_BROWSER_BRIDGE_PAIR_AES_IV_BYTES + 16) {
+    throw new Error("browser bridge: pair payload is too short to be a valid AES-GCM frame");
+  }
+  const iv = payloadBytes.subarray(0, WEBUI_BROWSER_BRIDGE_PAIR_AES_IV_BYTES);
+  const ciphertext = payloadBytes.subarray(WEBUI_BROWSER_BRIDGE_PAIR_AES_IV_BYTES);
+  const peerPublic = await importWebuiBrowserBridgeEcdhPublicKey(cipher.publicKey);
+  const sharedBits = await subtle.deriveBits(
+    { name: "ECDH", public: peerPublic },
+    ownPrivateKey,
+    256,
+  );
+  const aesKey = await deriveWebuiBrowserBridgePairAesKey(sharedBits, salt, subtle);
+  const plain = new Uint8Array(
+    await subtle.decrypt(
+      { name: "AES-GCM", iv: toArrayBuffer(iv) },
+      aesKey,
+      toArrayBuffer(ciphertext),
+    ),
+  );
+  // Plaintext is `base64(secretBytes)`; decode so we store the raw secret.
+  const decoded = decodeWebuiBrowserBridgeBase64(new TextDecoder().decode(plain));
+  if (decoded.length === 0) {
+    throw new Error("browser bridge: pair plaintext is empty");
+  }
+  return decoded;
+}
+
 function constantTimeEqual(left: string, right: string): boolean {
   if (left.length !== right.length) return false;
   let difference = 0;
@@ -287,6 +469,21 @@ export function parseWebuiBrowserBridgeHostFrame(raw: string): WebuiBrowserBridg
       }
       return { ok: true, frame: candidate as unknown as WebuiBrowserBridgeHostFrame };
     }
+    case "pair": {
+      if (typeof candidate.keyId !== "string" || candidate.keyId.length === 0) {
+        return { ok: false, reason: "pair has no key id" };
+      }
+      if (!isWebuiBrowserBridgeEcdhPublicKey(candidate.publicKey)) {
+        return { ok: false, reason: "pair public key is missing or not a P-256 JWK" };
+      }
+      if (typeof candidate.salt !== "string" || candidate.salt.length === 0) {
+        return { ok: false, reason: "pair has no salt" };
+      }
+      if (typeof candidate.payload !== "string" || candidate.payload.length === 0) {
+        return { ok: false, reason: "pair has no payload" };
+      }
+      return { ok: true, frame: candidate as unknown as WebuiBrowserBridgeHostFrame };
+    }
     case "ready": {
       if (typeof candidate.sessionId !== "string") return { ok: false, reason: "ready has no session id" };
       return { ok: true, frame: candidate as unknown as WebuiBrowserBridgeHostFrame };
@@ -309,6 +506,20 @@ export function parseWebuiBrowserBridgeHostFrame(raw: string): WebuiBrowserBridg
     default:
       return { ok: false, reason: `unknown frame kind ${String(candidate.kind)}` };
   }
+}
+
+/** Whether a value is a structurally valid P-256 ECDH public-key JWK. */
+function isWebuiBrowserBridgeEcdhPublicKey(value: unknown): value is WebuiBrowserBridgeEcdhPublicKey {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    candidate.kty === "EC" &&
+    candidate.crv === "P-256" &&
+    typeof candidate.x === "string" &&
+    candidate.x.length > 0 &&
+    typeof candidate.y === "string" &&
+    candidate.y.length > 0
+  );
 }
 
 /** Whether an input command has the shape the wire protocol declares. */

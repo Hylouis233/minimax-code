@@ -430,15 +430,15 @@ export interface OperationSpec {
     response: WebuiBrowserAuthorization;
   };
   listBrowserTargets: {
-    request: { readonly surface: WebuiBrowserSurface };
+    request: { readonly surface: WebuiBrowserSurface; readonly runId?: string };
     response: WebuiBrowserTargetList;
   };
   selectBrowserTarget: {
-    request: { readonly target: WebuiBrowserTargetId };
+    request: { readonly target: WebuiBrowserTargetId; readonly runId?: string };
     response: WebuiBrowserTargetState;
   };
   sendBrowserInput: {
-    request: WebuiBrowserInputCommand;
+    request: WebuiBrowserInputCommand & { readonly runId?: string };
     response: { readonly accepted: true };
   };
   sendBrowserCommand: {
@@ -446,7 +446,7 @@ export interface OperationSpec {
     response: { readonly accepted: true; readonly result?: unknown };
   };
   watchBrowserFrames: {
-    request: { readonly surface: WebuiBrowserSurface };
+    request: { readonly surface: WebuiBrowserSurface; readonly runId?: string };
     response: WebuiBrowserFrameStreamEnvelope;
   };
   listBrowserCapabilities: {

@@ -110,6 +110,18 @@ export interface WebuiBrowserInputReceipt {
   readonly accepted: boolean;
 }
 
+/**
+ * Which run the panel is acting for.
+ *
+ * The selection belongs to a run (ADR 0019), so every request that reads or
+ * writes one says which run: the panel sends the active run's id, and sends
+ * none when no run is active — which the service reads as the panel's own
+ * selection rather than as another run's.
+ */
+export interface WebuiBrowserRunScope {
+  readonly runId?: string;
+}
+
 export interface BrowserPort {
   /** The four switches as they stand. Absent means "never read". */
   readonly getBrowserAuthorization?: () => Promise<WebuiBrowserAuthorization>;
@@ -124,22 +136,32 @@ export interface BrowserPort {
   readonly setBrowserAuthorization?: (
     change: WebuiBrowserAuthorizationChange,
   ) => Promise<WebuiBrowserAuthorization>;
-  readonly listBrowserTargets?: (request: {
-    readonly surface: WebuiBrowserSurface;
-  }) => Promise<WebuiBrowserTargetList>;
-  /** Moves the panel's selection to one target, bound to its generation. */
-  readonly selectBrowserTarget?: (request: {
-    readonly target: WebuiBrowserTargetId;
-  }) => Promise<WebuiBrowserTargetState>;
+  /**
+   * Every target of one surface, with the named run's selection marked.
+   *
+   * The flag is the run's own: it is how the panel learns which target the
+   * active run is driving without the run having to announce it.
+   */
+  readonly listBrowserTargets?: (
+    request: WebuiBrowserRunScope & { readonly surface: WebuiBrowserSurface },
+  ) => Promise<WebuiBrowserTargetList>;
+  /** Moves one run's selection to a target, bound to its generation. */
+  readonly selectBrowserTarget?: (
+    request: WebuiBrowserRunScope & { readonly target: WebuiBrowserTargetId },
+  ) => Promise<WebuiBrowserTargetState>;
   /**
    * Delivers one already-validated command.
    *
    * The command arrives validated rather than as a DOM event: the panel that
    * converts a pointer press into this shape is the only place that knows what
    * the user aimed at, and a host that accepted raw input would have to guess.
+   *
+   * The run is a request field rather than part of the command: it says whose
+   * input this is, and the command itself keeps exactly the shape the runtime
+   * validates.
    */
   readonly sendBrowserInput?: (
-    command: WebuiBrowserInputCommand,
+    request: WebuiBrowserRunScope & { readonly command: WebuiBrowserInputCommand },
   ) => Promise<WebuiBrowserInputReceipt>;
   /**
    * Runs one browser command.
@@ -152,12 +174,16 @@ export interface BrowserPort {
   ) => Promise<{ readonly accepted: true; readonly result?: unknown }>;
 
   /**
-   * The live image stream for one surface. Returns the disposer, matching
-   * `TerminalPort.watchTerminal`, because the subscription outlives the render
-   * that opened it and something has to close it when the panel goes away.
+   * The live image stream for one surface, carrying the named run's own target.
+   *
+   * Returns the disposer, matching `TerminalPort.watchTerminal`, because the
+   * subscription outlives the render that opened it and something has to close
+   * it when the panel goes away. Switching runs closes this one and opens the
+   * active run's: a frame belonging to another run's target is not this
+   * stream's to show.
    */
   readonly watchBrowserFrames?: (
-    request: { readonly surface: WebuiBrowserSurface },
+    request: WebuiBrowserRunScope & { readonly surface: WebuiBrowserSurface },
     onFrame: (frame: WebuiBrowserImageFrame) => void,
   ) => () => void;
   readonly listBrowserCapabilities?: () => Promise<WebuiBrowserCapabilityList>;

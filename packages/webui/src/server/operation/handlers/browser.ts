@@ -19,6 +19,7 @@ import {
   listBrowserTargetsOperation,
   readBrowserCommand,
   readBrowserInputCommand,
+  readBrowserRunId,
   readBrowserSurface,
   readBrowserTarget,
   selectBrowserTargetOperation,
@@ -60,6 +61,7 @@ export function createBrowserHandlerEntries(
   ) => ({
     body: await browser.listTargets(
       readBrowserSurface(body as Record<string, unknown>),
+      readBrowserRunId(body as Record<string, unknown>),
     ),
   });
 
@@ -69,6 +71,7 @@ export function createBrowserHandlerEntries(
   ) => ({
     body: await browser.selectTarget(
       readBrowserTarget(body as Record<string, unknown>),
+      readBrowserRunId(body as Record<string, unknown>),
     ),
   });
 
@@ -78,6 +81,7 @@ export function createBrowserHandlerEntries(
   ) => ({
     body: await browser.sendInput(
       readBrowserInputCommand(body as Record<string, unknown>),
+      readBrowserRunId(body as Record<string, unknown>),
     ),
   });
 
@@ -102,6 +106,7 @@ export function createBrowserHandlerEntries(
       // cast is the same one the terminal watcher makes.
       source: browser.watchFrames(
         readBrowserSurface(body as Record<string, unknown>),
+        readBrowserRunId(body as Record<string, unknown>),
         context.signal,
       ) as unknown as AsyncIterable<Record<string, unknown>>,
     },

@@ -164,6 +164,12 @@ function createHarness(options: { respondWith?: boolean; respondEverySocket?: bo
       }
       return socket;
     },
+    // These tests never exercise the pair path: they drive the client straight
+    // at a challenge. The credential store is a no-op that records the
+    // `pair` frames it is handed so a test can assert one arrived without
+    // this file taking on the ECDH round trip (the extension pairing suite
+    // covers that, on both sides of the cipher).
+    applyPairCredential: async () => {},
     answerChallenge: async (challenge: WebuiBrowserBridgeChallenge) => ({
       kind: "proof",
       keyId: challenge.keyId,
@@ -186,8 +192,11 @@ function challenge(nonce: string): WebuiBrowserBridgeHostFrame {
 
 async function connect(harness: Harness, nonce = "nonce-1"): Promise<FakeSocket> {
   harness.client.start();
-  const socket = harness.sockets[harness.sockets.length - 1];
+  const socket = harness.sockets[harness.sockets.length - 1]!;
   socket.open();
+  // The client's greeting waits on the ephemeral key pair, which is a Web
+  // Crypto call; the host cannot speak before it, so the fake host waits too.
+  await waitFor(() => socket.frames("hello").length > 0);
   socket.receive(challenge(nonce));
   await waitFor(() => socket.frames("proof").length > 0);
   socket.receive({ kind: "ready", sessionId: "session-1" });
@@ -218,14 +227,26 @@ describe("reconnect schedule", () => {
 });
 
 describe("pairing over the bridge", () => {
-  it("greets the host and answers its challenge before it reports ready", async () => {
+  it("greets the host with an ephemeral key and answers its challenge before it reports ready", async () => {
     const harness = createHarness();
     const socket = await connect(harness);
 
     expect(harness.client.connected).toBe(true);
-    expect(socket.frames("hello")).toEqual([
-      { kind: "hello", browser: "edge", browserId: "browser-1", extensionVersion: "0.1.0" },
-    ]);
+    const hello = socket.frames("hello");
+    // Exactly one greeting, and it carries the P-256 key the host needs to
+    // deliver the credential. The coordinates are per-connection, so they are
+    // asserted for shape rather than for value.
+    expect(hello).toHaveLength(1);
+    expect(hello[0]).toMatchObject({
+      kind: "hello",
+      browser: "edge",
+      browserId: "browser-1",
+      extensionVersion: "0.1.0",
+      publicKey: { kty: "EC", crv: "P-256" },
+    });
+    const publicKey = (hello[0] as { publicKey: { x: string; y: string } }).publicKey;
+    expect(publicKey.x.length).toBeGreaterThan(0);
+    expect(publicKey.y.length).toBeGreaterThan(0);
     const proof = socket.frames("proof")[0];
     if (proof?.kind !== "proof") throw new Error("expected a proof frame");
     await expect(verifyWebuiBrowserBridgeProof(SECRET, proof, "nonce-1", KEY_ID)).resolves.toBe(true);
@@ -351,8 +372,9 @@ describe("operation deadline", () => {
     release();
 
     await harness.clock.advanceTo(1_000);
-    const replacement = harness.sockets[harness.sockets.length - 1];
+    const replacement = harness.sockets[harness.sockets.length - 1]!;
     replacement.open();
+    await waitFor(() => replacement.frames("hello").length > 0);
     replacement.receive(challenge("nonce-2"));
     await waitFor(() => replacement.frames("proof").length > 0);
     replacement.receive({ kind: "ready", sessionId: "session-2" });

@@ -157,6 +157,14 @@ export type WebuiBrowserPanelEvent =
   | { readonly type: "authorization-loaded"; readonly authorization: WebuiBrowserAuthorization }
   | { readonly type: "capabilities-loaded"; readonly entries: readonly WebuiBrowserCapabilityEntry[] }
   | { readonly type: "surface-changed"; readonly surface: WebuiBrowserSurface }
+  /**
+   * The run whose selection the panel is showing changed.
+   *
+   * The panel follows the active run (ADR 0019), so a run taking over means the
+   * previous run's selection stops being the panel's — the event carries no
+   * target because the new run's answer arrives with the next target list.
+   */
+  | { readonly type: "run-changed" }
   | { readonly type: "targets-requested" }
   | {
       readonly type: "targets-loaded";

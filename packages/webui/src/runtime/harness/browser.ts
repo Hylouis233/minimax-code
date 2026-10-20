@@ -1,17 +1,23 @@
 // The browser adapter.
 //
-// The WebUI does not own the browser: the runtime host does, and this adapter
-// is the seam between the two. It reads and writes the four authorization
-// switches through the host's configuration capability — so the switches
-// survive a restart, which is what "the enabled state survives a WebUI
-// restart" requires — and it owns the browser service that holds the
+// The WebUI does not own the browser: the runtime host is on the other side of
+// this seam, and this adapter is what binds the two. It reads and writes the
+// four authorization switches through the host's configuration capability — so
+// the switches survive a restart, which is what "the enabled state survives a
+// WebUI restart" requires — and it owns the browser service that holds the
 // providers.
 //
-// The adapter is created once per host and handed to the operation registry.
-// When the host cannot answer the authorization at all, no adapter is
-// returned and the browser operations stay unregistered: an operation that
-// exists but cannot be answered is worse than one that is absent, because the
-// surface offers a control the host would refuse forever.
+// The host is attached late. The host is what *takes* the browser provider, so
+// the provider has to exist before the host does, while the browser service
+// reads its switches *through* the host: the two cannot both be constructed
+// first. The store below therefore resolves the host when it is read, which is
+// what breaks the cycle, and the composition root attaches the host as soon as
+// the assembly hands it back.
+//
+// When the attached host cannot answer the authorization at all, no port is
+// exposed: the browser operations then stay unregistered, which is better than
+// an operation that exists and refuses forever, because the surface would offer
+// a control the host would never answer.
 
 import type {
   WebuiBrowserAuthorization,
@@ -25,12 +31,15 @@ import type {
 } from "../../shared/contracts/browser.js";
 import {
   WebuiBrowserService,
+  type WebuiBrowserAuthorizationStore,
   type WebuiBrowserServiceOptions,
 } from "../browser/browser-service.js";
 import type { WebuiBrowserSurfaceProvider } from "../browser/isolated-chromium/provider.js";
+import { createWebuiBrowserToolAdapter } from "../browser/tool-adapter.js";
+import type { WebuiBrowserAdapter } from "../browser-provider.js";
 import type { WebuiBrowserPort } from "../port.js";
 import type { WebuiRuntimeHostHandle } from "./host-contract.js";
-import { requireCliService, requireDataDir } from "./requirements.js";
+import { requireCliService } from "./requirements.js";
 
 /**
  * The extension bridge the adapter is wired to.
@@ -81,7 +90,24 @@ export interface WebuiBrowserBridge {
  * that outlived its service would be a browser nobody can switch off.
  */
 export interface WebuiBrowserAdapterBinding {
-  readonly port: WebuiBrowserPort;
+  /**
+   * The port the browser operations bind to.
+   *
+   * Absent until a runtime host that can answer the browser authorization has
+   * been attached — and still absent after one that cannot, which is what keeps
+   * the browser operations unregistered rather than bound to a port that would
+   * refuse every call.
+   */
+  readonly port: WebuiBrowserPort | undefined;
+  /**
+   * The Agent's browser tools, over this same service.
+   *
+   * Both faces of the one browser session live here because they must be the
+   * same service: a tool adapter built from anything else would drive a second
+   * browser, and the panel would show the first. The composition root hands
+   * this member to the runtime host as its browser provider.
+   */
+  readonly toolAdapter: WebuiBrowserAdapter;
   /**
    * The bridge this adapter was wired to, when one was supplied.
    *
@@ -90,6 +116,15 @@ export interface WebuiBrowserAdapterBinding {
    * The bridge's own lifetime belongs to whoever constructed it.
    */
   readonly browserBridge?: WebuiBrowserBridge;
+  /**
+   * Attaches the runtime host the authorization switches are read through.
+   *
+   * Called once, by the composition root, right after the runtime host has been
+   * created. Attaching decides whether a port exists at all, so it is the first
+   * moment at which "this host has no browser surface" can be told apart from
+   * "the host is not here yet".
+   */
+  attachHost(host: WebuiRuntimeHostHandle): void;
   /**
    * Applies the persisted authorization to the bridge.
    *
@@ -102,35 +137,36 @@ export interface WebuiBrowserAdapterBinding {
   close(): Promise<void>;
 }
 
+/** What the adapter needs before it has a host. */
+export interface CreateBrowserAdapterOptions {
+  /** The directory the isolated browser keeps its profile under. */
+  readonly dataDir: string;
+  /** Overrides for the service, used by tests to supply a fake provider. */
+  readonly overrides?: Partial<WebuiBrowserServiceOptions>;
+  /** The extension bridge the service borrows external browsers through. */
+  readonly bridge?: WebuiBrowserBridge;
+}
+
 /**
- * Builds the browser adapter, or nothing when the host cannot answer it.
+ * Builds the browser adapter, before its runtime host exists.
  *
- * "Nothing" is the honest answer for a host without the browser
- * configuration: the browser operations then stay unregistered and the
- * handshake reports the browser capability family as absent.
- *
- * The Edge and Chrome surfaces are the person's own browsers, reached through
- * the extension bridge. `bridge` is what makes them resolve: without it the
+ * `bridge` is what makes the Edge and Chrome surfaces resolve: without it the
  * service has no way to reach them, and `createProvider` answering "nothing is
  * paired" is what keeps "you may not use this surface" distinguishable from
  * "the extension is not connected right now".
  */
 export function createBrowserAdapter(
-  host: WebuiRuntimeHostHandle,
-  overrides: Partial<WebuiBrowserServiceOptions> = {},
-  bridge?: WebuiBrowserBridge,
-): WebuiBrowserAdapterBinding | undefined {
-  const cliService = host.cliService;
-  if (!cliService) return undefined;
-  const { getBrowserAuthorization, setBrowserAuthorization } = cliService;
-  if (!getBrowserAuthorization || !setBrowserAuthorization) return undefined;
-
+  options: CreateBrowserAdapterOptions,
+): WebuiBrowserAdapterBinding {
+  let host: WebuiRuntimeHostHandle | undefined;
+  let port: WebuiBrowserPort | undefined;
+  const bridge = options.bridge;
   const service = new WebuiBrowserService({
     authorization: {
-      read: () => getBrowserAuthorization.call(cliService),
-      write: (input) => setBrowserAuthorization.call(cliService, input),
+      read: async () => browserAuthorizationStore(host).read(),
+      write: async (input) => browserAuthorizationStore(host).write(input),
     },
-    dataDir: host.dataDir ?? requireDataDir(host),
+    dataDir: options.dataDir,
     ...(bridge
       ? {
           // The service asks asynchronously and the bridge answers
@@ -144,28 +180,79 @@ export function createBrowserAdapter(
           },
         }
       : {}),
-    ...overrides,
+    ...options.overrides,
   });
 
   return {
-    initialize: () => service.initialize(),
-    port: {
-      getAuthorization: () => service.readAuthorization(),
-      setAuthorization: (input) => service.writeAuthorization(input),
-      listTargets: (surface: WebuiBrowserSurface) => service.listTargets(surface),
-      selectTarget: (target: WebuiBrowserTargetId) => service.selectTarget(target),
-      sendInput: (command: WebuiBrowserInputCommand) => service.sendInput(command),
-      sendCommand: (
-        surface: WebuiBrowserSurface,
-        command: string,
-        params?: Record<string, unknown>,
-      ) => service.sendCommand(surface, command, params ?? {}),
-      watchFrames: (surface: WebuiBrowserSurface, signal?: AbortSignal) =>
-        service.watchFrames(surface, signal),
-      listCapabilities: () => service.listCapabilities(),
+    get port() {
+      return port;
     },
-    close: () => service.close(),
+    toolAdapter: createWebuiBrowserToolAdapter({ browser: service }),
     ...(bridge ? { browserBridge: bridge } : {}),
+    attachHost: (next: WebuiRuntimeHostHandle) => {
+      host = next;
+      // Whether a port exists is decided here and only here: the answer comes
+      // with the host, so a host without the browser surface leaves the
+      // operations unregistered instead of bound to a port that refuses all.
+      port = canAnswerBrowserAuthorization(next)
+        ? createBrowserPort(service)
+        : undefined;
+    },
+    initialize: () => service.initialize(),
+    close: () => service.close(),
+  };
+}
+
+/** The port the browser operations bind to. One object per service. */
+function createBrowserPort(service: WebuiBrowserService): WebuiBrowserPort {
+  return {
+    getAuthorization: () => service.readAuthorization(),
+    setAuthorization: (input) => service.writeAuthorization(input),
+    listTargets: (surface: WebuiBrowserSurface, runId?: string) =>
+      service.listTargets(surface, runId),
+    selectTarget: (target: WebuiBrowserTargetId, runId?: string) =>
+      service.selectTarget(target, runId),
+    sendInput: (command: WebuiBrowserInputCommand, runId?: string) =>
+      service.sendInput(command, runId),
+    sendCommand: (
+      surface: WebuiBrowserSurface,
+      command: string,
+      params?: Record<string, unknown>,
+    ) => service.sendCommand(surface, command, params ?? {}),
+    watchFrames: (surface: WebuiBrowserSurface, runId?: string, signal?: AbortSignal) =>
+      service.watchFrames(surface, runId, signal),
+    listCapabilities: () => service.listCapabilities(),
+  };
+}
+
+/** Whether a host can answer the browser authorization switches at all. */
+function canAnswerBrowserAuthorization(host: WebuiRuntimeHostHandle): boolean {
+  const cliService = host.cliService;
+  return Boolean(
+    cliService?.getBrowserAuthorization && cliService.setBrowserAuthorization,
+  );
+}
+
+/**
+ * The attached host's authorization store.
+ *
+ * Fails closed rather than answering "nothing is authorized": the switches
+ * decide what a browser may do, so a host that cannot report them must stop the
+ * call rather than be read as a host that granted nothing — which would report a
+ * missing capability as a deliberate refusal.
+ */
+function browserAuthorizationStore(
+  host: WebuiRuntimeHostHandle | undefined,
+): WebuiBrowserAuthorizationStore {
+  const cliService = host?.cliService;
+  const get = cliService?.getBrowserAuthorization;
+  const set = cliService?.setBrowserAuthorization;
+  if (!cliService || !get || !set) {
+    throw new Error("runtime host does not expose the browser authorization");
+  }
+  return {
+    read: () => get.call(cliService),
+    write: (input) => set.call(cliService, input),
   };
 }
 

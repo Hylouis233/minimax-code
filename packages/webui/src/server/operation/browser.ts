@@ -139,7 +139,27 @@ function validateSurface(
   ) {
     return invalidBody(`${operation} body requires a known browser surface`);
   }
-  return { ok: true, body: result.body };
+  return validateRunId(operation, result.body);
+}
+
+/**
+ * Accepts an optional `runId` on a body that already passed its own rules.
+ *
+ * The wire frame carries no session id, so the client says which run it is
+ * acting for in the body. It is optional because the panel may be showing a
+ * browser with no run active, and it is checked when present because the
+ * selection is keyed by it: a `runId` that is not a non-empty string would key
+ * the service's map by something that is not a run.
+ */
+function validateRunId(
+  operation: string,
+  body: Record<string, unknown>,
+): WebuiOperationValidation<Record<string, unknown>> {
+  const runId = body.runId;
+  if (runId !== undefined && (typeof runId !== "string" || runId.length === 0)) {
+    return invalidBody(`${operation} body requires a non-empty runId`);
+  }
+  return { ok: true, body };
 }
 
 function validateTarget(
@@ -164,7 +184,7 @@ function validateTarget(
   ) {
     return invalidBody(`${operation} body requires a complete target identity`);
   }
-  return { ok: true, body: result.body };
+  return validateRunId(operation, result.body);
 }
 
 /**
@@ -186,7 +206,7 @@ function validateInputCommand(
   if (!isRecord(result.body.target)) {
     return invalidBody(`${operation} body requires a target`);
   }
-  return { ok: true, body: result.body };
+  return validateRunId(operation, result.body);
 }
 
 /**
@@ -227,7 +247,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export function readBrowserInputCommand(
   body: Record<string, unknown>,
 ): WebuiBrowserInputCommand {
-  return body as unknown as WebuiBrowserInputCommand;
+  // `runId` is the envelope's field, not the command's: leaving it on would
+  // smuggle a wire concern into the runtime's own input contract, where the
+  // provider and the validator would both have to know about it.
+  const { runId: _runId, ...command } = body;
+  return command as unknown as WebuiBrowserInputCommand;
+}
+
+/**
+ * The run a validated body acts for, or `undefined` when the panel has no run
+ * active.
+ *
+ * Absent is a real answer rather than a missing argument: the service reads it
+ * as the no-run selection, which is the panel's own.
+ */
+export function readBrowserRunId(body: Record<string, unknown>): string | undefined {
+  const runId = body.runId;
+  return typeof runId === "string" && runId.length > 0 ? runId : undefined;
 }
 
 /** The target a validated body carries, as the runtime expects it. */

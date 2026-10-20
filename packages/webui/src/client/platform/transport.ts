@@ -232,7 +232,15 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
     setBrowserAuthorization: (body) => request(SET_BROWSER_AUTHORIZATION_OPERATION_NAME, body),
     listBrowserTargets: (body) => request(LIST_BROWSER_TARGETS_OPERATION_NAME, body),
     selectBrowserTarget: (body) => request(SELECT_BROWSER_TARGET_OPERATION_NAME, body),
-    sendBrowserInput: (body) => request(SEND_BROWSER_INPUT_OPERATION_NAME, body),
+    // The run is an envelope field on the wire, not part of the command: the
+    // runtime validates the command shape and knows nothing about which run sent
+    // it. The panel's `runId` is therefore folded in here, where the boundary
+    // between the port's request and the operation's body already lives.
+    sendBrowserInput: (body) =>
+      request(SEND_BROWSER_INPUT_OPERATION_NAME, {
+        ...body.command,
+        ...(body.runId ? { runId: body.runId } : {}),
+      }),
     sendBrowserCommand: (body) => request(SEND_BROWSER_COMMAND_OPERATION_NAME, body),
     watchBrowserFrames: (body, onFrame) =>
       watchBrowserFrames(WATCH_BROWSER_FRAMES_OPERATION_NAME, body, onFrame),

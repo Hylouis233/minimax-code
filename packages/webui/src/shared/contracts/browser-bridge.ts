@@ -18,9 +18,23 @@
 // Pairing is challenge-response rather than a shared bearer token: the secret
 // never crosses the wire in a form that could be replayed from a packet
 // capture, and a captured proof is useless because it is bound to a fresh
-// nonce. The one thing the secret does cross the wire in is the *initial*
-// pairing, and only once, over the loopback interface, to establish a
-// credential that then lives in the OS secure store.
+// nonce. The credential itself travels from host to extension on every
+// connect, encrypted to an ECDH key the extension mints for that one
+// connection and derives a shared key from, so the secret bytes never cross
+// the loopback socket in the clear.
+
+/**
+ * The Web Crypto `CryptoKey` type.
+ *
+ * Reached here as the result type of `crypto.subtle.generateKey`, which
+ * Node and `lib.dom` declare with the same name and the same shape. Picking
+ * it up from the runtime call avoids relying on whichever global `CryptoKey`
+ * happens to be in scope on whichever side is type-checking the file.
+ */
+export type WebuiBrowserBridgeCryptoKey = Extract<
+  Awaited<ReturnType<typeof crypto.subtle.generateKey>>,
+  { readonly privateKey: unknown }
+>["privateKey"];
 
 /** The dedicated path the bridge listens on. It is not the WebUI's own path. */
 export const WEBUI_BROWSER_BRIDGE_PATH = "/browser-bridge";
@@ -32,6 +46,25 @@ export const WEBUI_BROWSER_BRIDGE_PATH = "/browser-bridge";
  * against a different challenge or a different key.
  */
 export const WEBUI_BROWSER_BRIDGE_SIGNATURE_ALGORITHM = "HMAC-SHA256" as const;
+
+/**
+ * The HKDF `info` for the pairing transfer.
+ *
+ * Both sides must derive byte-identical AES keys from the same ECDH shared
+ * secret, so this string is shared literally. A change on either side is a
+ * protocol break and is caught by the cross-implementation vector.
+ */
+export const WEBUI_BROWSER_BRIDGE_PAIR_HKDF_INFO = "webui-browser-bridge-pair-v1" as const;
+
+/** A P-256 ECDH public key, as JWK, for the pairing transfer. */
+export interface WebuiBrowserBridgeEcdhPublicKey {
+  readonly kty: "EC";
+  readonly crv: "P-256";
+  /** Base64url (no padding) of the raw x coordinate. */
+  readonly x: string;
+  /** Base64url (no padding) of the raw y coordinate. */
+  readonly y: string;
+}
 
 /**
  * The separator between the nonce and the key id in the signed material.
@@ -80,6 +113,13 @@ export type WebuiBrowserBridgeClientFrame =
       readonly browser: "edge" | "chrome";
       readonly browserId: string;
       readonly extensionVersion: string;
+      /**
+       * An ephemeral P-256 ECDH public key the host uses to deliver the
+       * pairing credential. Always set by the current extension build;
+       * optional on the type so an older frame remains parseable, and the
+       * host refuses to pair without it.
+       */
+      readonly publicKey?: WebuiBrowserBridgeEcdhPublicKey;
     }
   | WebuiBrowserBridgeProof
   | { readonly kind: "targets"; readonly targets: readonly WebuiBrowserBridgeTarget[] }
@@ -92,8 +132,31 @@ export type WebuiBrowserBridgeClientFrame =
     }
   | { readonly kind: "pong"; readonly nonce: string };
 
+/**
+ * The credential-transfer frame the host sends to the extension.
+ *
+ * Sent **before** the challenge on every `hello`, because the extension needs
+ * the credential to answer the challenge: the host's credential is the only
+ * one the host will accept a proof against.
+ */
+export interface WebuiBrowserBridgePair {
+  readonly kind: "pair";
+  /** Which credential this frame carries — not secret, the extension needs it. */
+  readonly keyId: string;
+  /**
+   * The host's ephemeral P-256 ECDH public key. Required because the
+   * extension needs both sides' public keys to derive the shared secret.
+   */
+  readonly publicKey: WebuiBrowserBridgeEcdhPublicKey;
+  /** Base64 of the 16-byte HKDF salt the host generated for this connection. */
+  readonly salt: string;
+  /** `base64( iv || aes-gcm-ciphertext )` — `aes-gcm-ciphertext` carries its tag. */
+  readonly payload: string;
+}
+
 /** The host frames: what the host says to the extension. */
 export type WebuiBrowserBridgeHostFrame =
+  | WebuiBrowserBridgePair
   | WebuiBrowserBridgeChallenge
   | { readonly kind: "ready"; readonly sessionId: string }
   | {
@@ -254,6 +317,20 @@ function encodeBase64(bytes: Uint8Array): string {
 }
 
 /**
+ * Decodes base64 into bytes, without `Buffer`.
+ *
+ * Same rationale as `encodeBase64`: run in both Node and a browser service
+ * worker, neither of which want a `Buffer` dependency on one side and the
+ * global on the other.
+ */
+function decodeBase64(value: string): Uint8Array {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+}
+
+/**
  * Compares two strings without leaking where they differ.
  *
  * The length difference is not hidden — it is observable in the length itself —
@@ -269,4 +346,215 @@ function constantTimeEqual(left: string, right: string): boolean {
     difference |= leftBytes[index]! ^ rightBytes[index]!;
   }
   return difference === 0;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Pairing transfer: ECDH P-256 + HKDF-SHA256 + AES-256-GCM                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The default salts and IVs lengths in bytes.
+ *
+ * Pinned so the test vector's payload is byte-for-byte reproducible: a
+ * regression that tweaks these changes the payload and breaks both suites at
+ * once, which is the only thing keeping the two hand-written implementations
+ * honest.
+ */
+export const WEBUI_BROWSER_BRIDGE_PAIR_HKDF_SALT_BYTES = 16;
+export const WEBUI_BROWSER_BRIDGE_PAIR_AES_IV_BYTES = 12;
+
+/**
+ * Generates an ephemeral P-256 key pair on the curve ECDH admits. Returns the
+ * key in the `CryptoKey` shape so the caller can `deriveBits`. The pair is
+ * extractable so the public side can be exported as a JWK for the wire.
+ */
+export function generateWebuiBrowserBridgeEcdhKeyPair(): Promise<{
+  readonly privateKey: WebuiBrowserBridgeCryptoKey;
+  readonly publicKey: WebuiBrowserBridgeCryptoKey;
+}> {
+  return crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, [
+    "deriveBits",
+  ]);
+}
+
+/**
+ * Imports an extension's ECDH public key from its JWK form.
+ */
+export async function importWebuiBrowserBridgeEcdhPublicKey(
+  jwk: WebuiBrowserBridgeEcdhPublicKey,
+): Promise<WebuiBrowserBridgeCryptoKey> {
+  return crypto.subtle.importKey(
+    "jwk",
+    { ...jwk, ext: true, key_ops: [] },
+    { name: "ECDH", namedCurve: "P-256" },
+    true,
+    [],
+  );
+}
+
+/**
+ * Exports an ECDH public key as the wire-format JWK (no `d`, no `key_ops`).
+ */
+export async function exportWebuiBrowserBridgeEcdhPublicKey(
+  publicKey: WebuiBrowserBridgeCryptoKey,
+): Promise<WebuiBrowserBridgeEcdhPublicKey> {
+  const jwk = await crypto.subtle.exportKey("jwk", publicKey);
+  if (jwk.kty !== "EC" || jwk.crv !== "P-256") {
+    throw new Error(`browser bridge: unexpected ECDH JWK shape (kty=${jwk.kty}, crv=${jwk.crv})`);
+  }
+  if (typeof jwk.x !== "string" || typeof jwk.y !== "string") {
+    throw new Error("browser bridge: ECDH JWK is missing x/y");
+  }
+  return { kty: "EC", crv: "P-256", x: jwk.x, y: jwk.y };
+}
+
+/**
+ * Derives a 256-bit AES-GCM key from an ECDH shared secret.
+ *
+ * Inputs (in order): the 32-byte shared secret from `ECDH`, a 16-byte salt,
+ * the shared `info` string. The `info` literal is part of the wire protocol
+ * and lives in this contract module so it cannot drift between copies.
+ */
+async function deriveWebuiBrowserBridgePairAesKey(
+  sharedBits: ArrayBuffer,
+  salt: Uint8Array,
+): Promise<WebuiBrowserBridgeCryptoKey> {
+  const baseKey = await crypto.subtle.importKey(
+    "raw",
+    sharedBits,
+    { name: "HKDF" },
+    false,
+    ["deriveKey"],
+  );
+  return crypto.subtle.deriveKey(
+    { name: "HKDF", hash: "SHA-256", salt: toArrayBuffer(salt), info: toArrayBuffer(new TextEncoder().encode(WEBUI_BROWSER_BRIDGE_PAIR_HKDF_INFO)) },
+    baseKey,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
+/**
+ * Derives an AES-GCM key from `ECDH(privateKey, peerPublicKey)`.
+ *
+ * On **both** sides: the encryption side uses `ECDH(host_priv, ext_pub)` and
+ * the decryption side uses `ECDH(ext_priv, host_pub)`. With the same salt
+ * and `info` they land on the same bytes.
+ */
+async function deriveWebuiBrowserBridgePairAesKeyFromKeyPairs(
+  ownPrivateKey: WebuiBrowserBridgeCryptoKey,
+  peerPublicKey: WebuiBrowserBridgeCryptoKey,
+  salt: Uint8Array,
+): Promise<WebuiBrowserBridgeCryptoKey> {
+  const sharedBits = await crypto.subtle.deriveBits(
+    { name: "ECDH", public: peerPublicKey },
+    ownPrivateKey,
+    256,
+  );
+  return deriveWebuiBrowserBridgePairAesKey(sharedBits, salt);
+}
+
+export interface WebuiBrowserBridgePairCipher {
+  readonly publicKey: WebuiBrowserBridgeEcdhPublicKey;
+  readonly salt: string;
+  readonly payload: string;
+}
+
+/**
+ * Encrypts `secretBytes` to the extension's ECDH public key.
+ *
+ * The result carries the **host's** ephemeral public key as well, because the
+ * extension needs both public keys to derive the same shared secret.
+ *
+ * `randomBytes` and `hostKeyPair` are injectable: the cross-implementation
+ * vector needs a fixed salt, IV and host key so both sides reproduce the same
+ * payload byte for byte. Production calls with no override get
+ * `crypto.getRandomValues` and a fresh `crypto.subtle.generateKey`.
+ */
+export async function sealWebuiBrowserBridgePairingCredential(
+  secretBytes: Uint8Array,
+  peerPublicKeyJwk: WebuiBrowserBridgeEcdhPublicKey,
+  options: {
+    readonly randomBytes?: (length: number) => Uint8Array;
+    readonly hostKeyPair?: {
+      readonly privateKey: WebuiBrowserBridgeCryptoKey;
+      readonly publicKey: WebuiBrowserBridgeCryptoKey;
+    };
+  } = {},
+): Promise<WebuiBrowserBridgePairCipher> {
+  const random = options.randomBytes ?? defaultRandomBytes;
+  const salt = random(WEBUI_BROWSER_BRIDGE_PAIR_HKDF_SALT_BYTES);
+  const iv = random(WEBUI_BROWSER_BRIDGE_PAIR_AES_IV_BYTES);
+  const host = options.hostKeyPair ?? (await generateWebuiBrowserBridgeEcdhKeyPair());
+  const hostPublicJwk = await exportWebuiBrowserBridgeEcdhPublicKey(host.publicKey);
+  const peerPublic = await importWebuiBrowserBridgeEcdhPublicKey(peerPublicKeyJwk);
+  const aesKey = await deriveWebuiBrowserBridgePairAesKeyFromKeyPairs(
+    host.privateKey,
+    peerPublic,
+    salt,
+  );
+  // Plaintext is base64 of the credential bytes — one self-contained string,
+  // not raw, so the encrypted side does not rely on a particular encoding
+  // around the secret.
+  const plaintextBytes = new TextEncoder().encode(encodeBase64(secretBytes));
+  const ciphertext = new Uint8Array(
+    await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv: toArrayBuffer(iv) },
+      aesKey,
+      toArrayBuffer(plaintextBytes),
+    ),
+  );
+  const payloadBytes = new Uint8Array(iv.length + ciphertext.length);
+  payloadBytes.set(iv, 0);
+  payloadBytes.set(ciphertext, iv.length);
+  return {
+    publicKey: hostPublicJwk,
+    salt: encodeBase64(salt),
+    payload: encodeBase64(payloadBytes),
+  };
+}
+
+/**
+ * Opens a `pair` frame.
+ *
+ * Returns the secret bytes — the **bytes**, not the base64 — so the caller can
+ * store them directly. Throws on a tampered payload: a one-byte change in the
+ * ciphertext or IV is a GCM auth failure and the call rejects, which is
+ * what we want.
+ */
+export async function openWebuiBrowserBridgePairingCredential(
+  cipher: { readonly publicKey: WebuiBrowserBridgeEcdhPublicKey; readonly salt: string; readonly payload: string },
+  ownPrivateKey: WebuiBrowserBridgeCryptoKey,
+): Promise<Uint8Array> {
+  const salt = decodeBase64(cipher.salt);
+  const payloadBytes = decodeBase64(cipher.payload);
+  if (payloadBytes.length < WEBUI_BROWSER_BRIDGE_PAIR_AES_IV_BYTES + 16) {
+    throw new Error("browser bridge: pair payload is too short to be a valid AES-GCM frame");
+  }
+  const iv = payloadBytes.subarray(0, WEBUI_BROWSER_BRIDGE_PAIR_AES_IV_BYTES);
+  const ciphertext = payloadBytes.subarray(WEBUI_BROWSER_BRIDGE_PAIR_AES_IV_BYTES);
+  const peerPublic = await importWebuiBrowserBridgeEcdhPublicKey(cipher.publicKey);
+  const aesKey = await deriveWebuiBrowserBridgePairAesKeyFromKeyPairs(
+    ownPrivateKey,
+    peerPublic,
+    salt,
+  );
+  const plain = new Uint8Array(
+    await crypto.subtle.decrypt({ name: "AES-GCM", iv: toArrayBuffer(iv) }, aesKey, toArrayBuffer(ciphertext)),
+  );
+  // The plaintext is `base64(secretBytes)`; decode it so the extension stores
+  // the raw secret rather than its base64.
+  const decoded = decodeBase64(new TextDecoder().decode(plain));
+  if (decoded.length === 0) {
+    throw new Error("browser bridge: pair plaintext is empty");
+  }
+  return decoded;
+}
+
+/** Reads bytes via `crypto.getRandomValues`. The default entropy source. */
+function defaultRandomBytes(length: number): Uint8Array {
+  const bytes = new Uint8Array(length);
+  crypto.getRandomValues(bytes);
+  return bytes;
 }

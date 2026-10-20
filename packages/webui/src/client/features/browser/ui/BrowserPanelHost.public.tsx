@@ -28,6 +28,7 @@ import type {
   WebuiBrowserTargetId,
 } from "../../../../shared/contracts/browser.js";
 import { useWebuiPortSlice } from "../../../bindings/port-slices-context.js";
+import { useWebuiBrowserRunId } from "../bindings/use-browser-run.public.js";
 import {
   applyWebuiBrowserAuthorizationChange,
   prepareWebuiBrowserInputCommand,
@@ -38,6 +39,7 @@ import type { WebuiBrowserInputIntent } from "../contracts/browser-panel.js";
 import {
   initialWebuiBrowserPanelState,
   reduceWebuiBrowserPanelState,
+  selectedWebuiBrowserRunTarget,
 } from "../projection/browser-state.js";
 import { BrowserAuthorizationSwitches } from "./BrowserAuthorizationSwitches.public.js";
 import { BrowserPanel } from "./BrowserPanel.public.js";
@@ -59,11 +61,20 @@ export interface BrowserPanelHostProps {
    * than discovering it by calling.
    */
   readonly port?: BrowserPort;
+  /**
+   * The run whose selection the panel is showing, when the host knows it.
+   *
+   * Normally left out: the panel reads the active run itself (ADR 0019 — the
+   * panel follows the active run's target), so a caller that happens to know it
+   * does not have to keep saying so.
+   */
+  readonly runId?: string;
 }
 
 export function BrowserPanelHost({
   surface: surfaceProp,
   port: portProp,
+  runId: runIdProp,
 }: BrowserPanelHostProps): ReactElement {
   const slice = useWebuiPortSlice("browser");
   const port = portProp ?? slice;
@@ -72,6 +83,9 @@ export function BrowserPanelHost({
     initialWebuiBrowserPanelState,
   );
   const surface = surfaceProp ?? state.surface;
+  const activeRunId = useWebuiBrowserRunId();
+  const runId = runIdProp ?? activeRunId;
+  const runScope = useMemo(() => (runId ? { runId } : {}), [runId]);
 
   // The surface the effects last ran for. The frame stream is re-opened when
   // the surface changes, and the previous subscription has to be closed first —
@@ -79,17 +93,33 @@ export function BrowserPanelHost({
   // a screencast running for a surface nobody is looking at.
   const subscribedSurface = useRef<WebuiBrowserSurface | undefined>(undefined);
 
+  // The run the stream was opened for. The stream carries one run's target, so
+  // the active run changing means the old one has to be closed and the new one's
+  // opened — otherwise the panel would keep showing the previous run's page.
+  const subscribedRunId = useRef<string | undefined>(undefined);
+
+  // The run the panel is on, kept where a read that is still in flight can see
+  // it. The effect below is what moves it, so it is current before any read for
+  // the new run starts.
+  const currentRunId = useRef(runId);
+
   const refreshTargets = useCallback(
     async (next: WebuiBrowserSurface) => {
       if (!port?.listBrowserTargets) return;
+      const askedFor = runId;
       try {
-        const list = await port.listBrowserTargets({ surface: next });
-        dispatch({ type: "targets-loaded", list });
+        const list = await port.listBrowserTargets({ surface: next, ...runScope });
+        // The list answers for the run that asked for it. One that lands after
+        // the active run moved on is the previous run's selection, and taking it
+        // would put the panel back on a page nobody is following.
+        if (askedFor !== currentRunId.current) return;
+        dispatch({ type: "targets-loaded", list, selected: selectedWebuiBrowserRunTarget(list) });
       } catch (error) {
+        if (askedFor !== currentRunId.current) return;
         dispatch({ type: "failed", error: toBrowserError(error) });
       }
     },
-    [port],
+    [port, runId, runScope],
   );
 
   useEffect(() => {
@@ -122,6 +152,15 @@ export function BrowserPanelHost({
     }
   }, [surface, state.surface]);
 
+  // The panel follows the active run. A run's selection belongs to that run, so
+  // when the active run changes the previous one is forgotten rather than shown
+  // as if it were still the run's target — and this runs before the read below,
+  // so the new run's own selection is what arrives next.
+  useEffect(() => {
+    currentRunId.current = runId;
+    dispatch({ type: "run-changed" });
+  }, [runId]);
+
   useEffect(() => {
     if (!port?.listBrowserTargets) return;
     void refreshTargets(surface);
@@ -129,34 +168,38 @@ export function BrowserPanelHost({
 
   useEffect(() => {
     if (!port?.watchBrowserFrames) return;
-    if (subscribedSurface.current === surface) return;
+    if (subscribedSurface.current === surface && subscribedRunId.current === runId) return;
     subscribedSurface.current = surface;
-    const stop = port.watchBrowserFrames({ surface }, (frame) => {
+    subscribedRunId.current = runId;
+    const stop = port.watchBrowserFrames({ surface, ...runScope }, (frame) => {
       dispatch({ type: "frame", frame });
     });
     return () => {
       stop();
       subscribedSurface.current = undefined;
+      subscribedRunId.current = undefined;
     };
-  }, [port, surface]);
+  }, [port, runScope, surface, runId]);
 
   const onSelectTarget = useCallback(
     (target: WebuiBrowserTargetId) => {
       dispatch({ type: "target-selected", target });
-      void port?.selectBrowserTarget?.({ target }).catch((error: unknown) => {
+      void port?.selectBrowserTarget?.({ target, ...runScope }).catch((error: unknown) => {
         dispatch({ type: "failed", error: toBrowserError(error) });
       });
     },
-    [port],
+    [port, runScope],
   );
 
   const onSendInput = useCallback(
     (command: WebuiBrowserInputCommand) => {
-      void port?.sendBrowserInput?.(command).catch((error: unknown) => {
-        dispatch({ type: "failed", error: toBrowserError(error) });
-      });
+      void port
+        ?.sendBrowserInput?.({ command, ...runScope })
+        .catch((error: unknown) => {
+          dispatch({ type: "failed", error: toBrowserError(error) });
+        });
     },
-    [port],
+    [port, runScope],
   );
 
   const onRejected = useCallback((error: WebuiBrowserError) => {

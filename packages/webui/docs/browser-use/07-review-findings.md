@@ -163,8 +163,8 @@ spoken to a browser.
 | # | Severity | Finding | Status |
 | --- | --- | --- | --- |
 | N1 | BLOCKER | Startup minted a **new** host credential instead of loading the persisted one, so a restarted host and the extension held different secrets. | `fixed` |
-| N2 | BLOCKER | The Agent's browser tools never reach the browser service. | `open` |
-| N3 | MAJOR | The target selection is per surface, not per Agent run. | `open` |
+| N2 | BLOCKER | The Agent's browser tools never reach the browser service. | `fixed` |
+| N3 | MAJOR | The target selection is per surface, not per Agent run. | `fixed` |
 | N4 | MAJOR | Full CDP is denied on the external surfaces. | `open` |
 | N5 | MAJOR | The frame queue was unbounded. | `fixed` |
 | N6 | MAJOR | This document set still said the bridge was not wired. | `fixed` |
@@ -182,6 +182,17 @@ spoken to a browser.
   `packages/webui/test/unit/browser-bridge-pairing.test.ts` — "keeps the
   credential the extension still holds when the host restarts" and "mints a
   fresh credential when the surface was switched off in between".
+- **N1 (the pairing exchange)** — The host and the extension now share a
+  credential. The extension generates an ephemeral P-256 ECDH key pair per
+  connection and sends the public key in its `hello`; the host replies with a
+  `pair` frame carrying the credential encrypted to it (ECDH → HKDF-SHA256 →
+  AES-256-GCM) together with the host's own ephemeral public key, the HKDF
+  salt and the ciphertext. The extension decrypts it, stores it in
+  `chrome.storage.local` and answers the challenge with it. The secret never
+  crosses the wire in the clear, and no person has to carry a code. Both sides
+  pin the same derivation vector, so the two implementations cannot drift.
+  The decision and its limits are recorded in the ADR's amendments.
+- **N2, N3** — See above.
 - **N5** — The stream keeps the **newest frame per target** and nothing else. A
   live stream pushes a frame per visual change, and a client that reads
   slowly would otherwise accumulate every one of them; a frame that is already
@@ -193,22 +204,32 @@ spoken to a browser.
 
 ### What is still open, and why
 
-**N2 — the Agent's browser tools do not reach the service.** The shared
-session, the restricted command set and the `sendBrowserCommand` operation
-exist and the panel uses them, but the tool-side adapter — the thing that
-turns a browser tool call into a restricted command against that same service
-— does not. Until it does, the tools and the panel are two callers of one
-service but only the panel is wired. This is a new adapter rather than a
-correction, and the isolated browser's own tool surface is the natural place
-to put it.
+**N2 — the Agent's browser tools now reach the service.**
+`packages/webui/src/runtime/browser/tool-adapter.ts` implements
+`LocalBrowserAdapter` over the browser service. `getCapabilities()` declares
+exactly the restricted command set, and `execute` forwards the action to the
+service, which reads the surface switch and the Full CDP gate — so there is
+one place where the authorization is decided, and the tool path does not carry
+a second notion of it. An action outside the restricted set is refused with
+`browser_capability_denied` **even when Full CDP is on**, because the tool
+path is the restricted path by construction.
 
-**N3 — the selection is per surface, not per Agent run.** ADR 0019 scopes the
-target selection to the Agent run: the panel follows the active run's target,
-so a run that selects a tab changes what the panel shows. The selection is
-currently held per surface by the browser service. Making it run-scoped means
-carrying the run identity into the service and into the selection, and
-deciding what the panel shows when no run is active. It is a design change
-rather than a bug, and it is recorded here rather than half-built.
+The ordering problem was real: the runtime host takes the browser provider as
+an *input*, and the browser service needs the host for the authorization
+switches. The service is therefore constructed against a store that resolves
+the host at read time, and the composition root attaches the host once the
+runtime is assembled. A host that cannot answer the authorization leaves the
+port absent, so the browser operations stay unregistered rather than bound to
+a port that refuses everything.
+
+**N3 — the selection is now scoped to the run.** The service's selection is
+keyed by `(surface, runId)`, where the run is the Agent session id. The tool
+path passes `ctx.sessionId`; the panel path sends the active run's session id
+in the operation body, because the wire frame carries none. Two runs on the
+same surface keep their own selections, each run's image stream shows its own
+target's frames, and a run with no selection is refused rather than falling
+back to another run's. The no-run selection is a named thing, not an empty
+string, and it is what the panel shows when no run is active.
 
 **N4 — Full CDP on the external surfaces.** The runtime gate is in place and
 the isolated Chromium forwards a raw DevTools method, but the bridge provider

@@ -16,6 +16,7 @@ import {
   initialWebuiBrowserPanelState,
   reduceWebuiBrowserPanelState,
   selectWebuiBrowserFrame,
+  selectedWebuiBrowserRunTarget,
   webuiBrowserFrameDataUrl,
 } from "../../src/client/features/browser/projection/browser-state.js";
 import {
@@ -209,6 +210,110 @@ describe("the panel's status", () => {
 
     expect(state.status).toBe("error");
     expect(state.error?.code).toBe("browser_pairing_rejected");
+  });
+});
+
+/** A target list, as the host's read for one run returns it. */
+function listOf(
+  targets: readonly WebuiBrowserTargetId[],
+  selected?: WebuiBrowserTargetId,
+): WebuiBrowserTargetList {
+  return {
+    surface: "isolated-chromium",
+    targets: targets.map((id) => ({
+      id,
+      title: "Example",
+      url: "https://example.test/",
+      status: "open" as const,
+      selected: selected !== undefined && webuiBrowserFrameKey(id) === webuiBrowserFrameKey(selected),
+    })),
+  };
+}
+
+/**
+ * The panel follows the active run (ADR 0019).
+ *
+ * The selection belongs to a run, so these are the decisions the projection
+ * makes when runs take over from each other: whose target is marked, and what
+ * the panel shows while it waits for the new run's answer.
+ */
+describe("following the active run", () => {
+  const first = target({ targetId: "tab-1" });
+  const second = target({ targetId: "tab-2" });
+
+  it("reads the run's own selected flag rather than the panel's memory", () => {
+    // The list is what the service answered for the run the panel asked as. A
+    // run that has selected nothing answers with nothing selected.
+    expect(selectedWebuiBrowserRunTarget(listOf([first, second], second))).toEqual(second);
+    expect(selectedWebuiBrowserRunTarget(listOf([first, second]))).toBeUndefined();
+  });
+
+  it("marks the active run's target and follows it when the run changes", () => {
+    const showingFirst = reduceWebuiBrowserPanelState(
+      reduceWebuiBrowserPanelState(initialWebuiBrowserPanelState, {
+        type: "targets-loaded",
+        list: listOf([first, second], first),
+        selected: first,
+      }),
+      { type: "frame", frame: frame({ target: first }) },
+    );
+    expect(showingFirst.targets.map((entry) => entry.selected)).toEqual([true, false]);
+
+    // The next read is for the run that took over, and its answer is tab-2.
+    const following = reduceWebuiBrowserPanelState(showingFirst, {
+      type: "targets-loaded",
+      list: listOf([first, second], second),
+      selected: second,
+    });
+    expect(following.selectedTarget).toEqual(second);
+    expect(following.targets.map((entry) => entry.selected)).toEqual([false, true]);
+  });
+
+  it("forgets the previous run's target when the active run changes", () => {
+    const showingFirst = reduceWebuiBrowserPanelState(
+      reduceWebuiBrowserPanelState(initialWebuiBrowserPanelState, {
+        type: "targets-loaded",
+        list: listOf([first, second], first),
+        selected: first,
+      }),
+      { type: "frame", frame: frame({ target: first }) },
+    );
+
+    // Between the two runs' answers the panel claims no target: showing the
+    // previous run's page as if it were the new run's is the disagreement the
+    // ADR names. The buffered frames stay — they are per tab, not per run.
+    const between = reduceWebuiBrowserPanelState(showingFirst, { type: "run-changed" });
+    expect(between.selectedTarget).toBeUndefined();
+    expect(between.targets.every((entry) => !entry.selected)).toBe(true);
+    expect(Object.keys(between.frames)).toHaveLength(1);
+
+    // A new run that picks the same tab shows it at once, without a new frame.
+    const resumed = reduceWebuiBrowserPanelState(between, {
+      type: "targets-loaded",
+      list: listOf([first, second], first),
+      selected: first,
+    });
+    expect(selectWebuiBrowserFrame(resumed)?.target).toEqual(first);
+  });
+
+  it("shows nothing selected while the active run has selected nothing", () => {
+    // The panel with no run behind it: the no-run list has no selected target,
+    // and the panel must not keep the previous run's selection in its place.
+    const previous = reduceWebuiBrowserPanelState(
+      reduceWebuiBrowserPanelState(initialWebuiBrowserPanelState, {
+        type: "targets-loaded",
+        list: listOf([first, second], first),
+        selected: first,
+      }),
+      { type: "run-changed" },
+    );
+    const idle = reduceWebuiBrowserPanelState(previous, {
+      type: "targets-loaded",
+      list: listOf([first, second]),
+    });
+
+    expect(idle.selectedTarget).toBeUndefined();
+    expect(idle.targets.every((entry) => !entry.selected)).toBe(true);
   });
 });
 

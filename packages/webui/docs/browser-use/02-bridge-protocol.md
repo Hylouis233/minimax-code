@@ -9,10 +9,10 @@
 | `not yet measured` | An open question. Not a denial and not a promise. | Nothing |
 
 **The protocol is implemented on both sides and unwired end to end.** Both the host contract and the
-extension carry the frames, the challenge/proof and the reconnect ladder. No extension has connected:
-`admitBrowserBridgeUpgrade` has no production caller (finding F3) and bridge commands are routed to the
-most recently admitted session rather than to the session owning the target (finding F4). See
-[`07-review-findings.md`](07-review-findings.md).
+extension carry the frames, the credential transfer, the challenge/proof and the reconnect ladder. No
+extension has connected: `admitBrowserBridgeUpgrade` has no production caller (finding F3) and bridge
+commands are routed to the most recently admitted session rather than to the session owning the target
+(finding F4). See [`07-review-findings.md`](07-review-findings.md).
 
 The bridge is the only way this process reaches the person's own browser. It is a WebSocket on
 loopback, but it is **not** the WebUI's own WebSocket: it has its own path, its own admission and its
@@ -33,7 +33,7 @@ extension is the only side that answers one.
 
 | `kind` | Carries |
 | --- | --- |
-| `hello` | `browser` (`edge` or `chrome`), `browserId`, `extensionVersion` |
+| `hello` | `browser` (`edge` or `chrome`), `browserId`, `extensionVersion`, and the per-connection `publicKey` |
 | `proof` | `keyId`, echoed `nonce`, base64 `signature` — the answer to the outstanding challenge |
 | `targets` | The targets the extension can reach, each with `browserId`, `targetId`, `title`, `url`, `generation` |
 | `frame` | One `WebuiBrowserBridgeImageFrame`: `browserId`, `targetId`, `generation`, base64 `data`, `format`, `sequence` |
@@ -44,11 +44,33 @@ extension is the only side that answers one.
 
 | `kind` | Carries |
 | --- | --- |
+| `pair` | `keyId`, `publicKey`, base64 `salt`, base64 `payload` — the host's credential, encrypted |
 | `challenge` | `nonce`, `algorithm`, `keyId` |
 | `ready` | `sessionId` — the bridge session is admitted |
 | `input` | `commandId` and a `WebuiBrowserBridgeInputCommand` |
 | `ping` | `nonce` |
 | `closed` | `reason` |
+
+### The exact wire shapes of the exchange
+
+`publicKey` on `hello` is the extension's per-connection ECDH public key:
+
+```ts
+{ kty: "EC", crv: "P-256", x: string, y: string }   // base64url, unpadded
+```
+
+`pair` carries the host's own ephemeral public key alongside the cipher, because
+both halves of the ECDH shared secret depend on it:
+
+```ts
+interface WebuiBrowserBridgePair {
+  kind: "pair";
+  keyId: string;                                        // not secret; the challenge names it
+  publicKey: { kty: "EC"; crv: "P-256"; x: string; y: string };
+  salt: string;                                         // base64 of 16 HKDF salt bytes
+  payload: string;                                      // base64( iv || aes-gcm-ciphertext )
+}
+```
 
 Every target-bearing message on the bridge carries a `generation`
 (`WebuiBrowserBridgeTarget`, `WebuiBrowserBridgeImageFrame`, and each `WebuiBrowserBridgeInputCommand`
@@ -90,25 +112,88 @@ attached debugger cannot produce an image frame at all; the extension captures t
   [`01-capability-matrix.md`](01-capability-matrix.md) applies to the isolated provider only. It has no
   analogue on this path.
 
-## Pairing: challenge and proof
+## Pairing: the credential transfer, then challenge and proof
 
-Pairing is challenge-response rather than a shared bearer token, so the secret never crosses the wire
-in a form that could be replayed from a packet capture, and a captured proof is useless because it is
-bound to a fresh nonce. The one time the secret crosses the wire is the *initial* pairing, once, over
-loopback, to establish a credential that then lives in the OS secure store — see
-[`04-pairing-credentials.md`](04-pairing-credentials.md).
+The credential is **host-authored**. The extension does not mint one: two
+independently minted credentials never match, and the host would reject a proof
+made with the wrong one. Instead the host delivers its credential, encrypted to
+a key the extension mints for that one connection.
+
+Pairing after that is challenge-response rather than a shared bearer token, so a
+proof lifted off the loopback socket is useless against the next connection, and
+a captured proof is useless because it is bound to a fresh nonce.
 
 ```mermaid
 sequenceDiagram
     participant H as Host bridge
     participant E as Extension
+    E->>E: generate ephemeral ECDH P-256 key pair
+    E->>H: hello { browser, browserId, extensionVersion, publicKey }
+    H->>H: seal the credential to publicKey (HKDF-SHA256 + AES-256-GCM)
+    H->>E: pair { keyId, publicKey, salt, payload }
+    E->>E: open the payload, store { keyId, secret }
     H->>E: challenge { nonce, algorithm, keyId }
-    E->>E: compute HMAC-SHA256 over nonce + " " + keyId
+    E->>E: HMAC-SHA256 over nonce + " " + keyId
     E->>H: proof { keyId, nonce, signature }
     H->>H: constant-time compare, nonce and keyId must match
     H->>E: ready { sessionId }
-    Note over H,E: hello carries browser, browserId, extensionVersion
 ```
+
+`pair` is sent **before** `challenge`, because the extension needs the credential
+to answer the challenge: the host's is the only one it will accept a proof
+against. The host sends `pair` on **every** `hello`, so a credential that was
+rotated — the surface's switch going off and on again — reaches the extension
+with nobody doing anything.
+
+### The cipher — `implemented`
+
+| Step | Value | Pinned as |
+| --- | --- | --- |
+| Agreement | ECDH, `P-256`, ephemeral on both sides | `generateWebuiBrowserBridgeEcdhKeyPair` |
+| Key derivation | HKDF-SHA256 → 256-bit AES key | `WEBUI_BROWSER_BRIDGE_PAIR_HKDF_INFO` |
+| HKDF `info` | `"webui-browser-bridge-pair-v1"`, ASCII, identical on both sides | `WEBUI_BROWSER_BRIDGE_PAIR_HKDF_INFO` |
+| HKDF salt | 16 random bytes from the host, sent in the clear | `WEBUI_BROWSER_BRIDGE_PAIR_HKDF_SALT_BYTES` |
+| Encryption | AES-256-GCM, 12 random bytes of IV | `WEBUI_BROWSER_BRIDGE_PAIR_AES_IV_BYTES` |
+| Plaintext | `base64(secretBytes)` — one self-contained string | — |
+| Payload | `base64( iv ‖ ciphertext )`; the ciphertext already carries its 16-byte GCM tag | — |
+
+The only bytes that cross the wire are the two public keys, the salt and the
+encrypted payload. The `pair` frame carries the credential's **key id** in the
+clear, which is not secret and which the challenge needs.
+
+A mismatch in the `info`, the curve, the salt width or the plaintext encoding is
+a protocol break, not something to fall back from — the shared vector below is
+what catches it.
+
+### Pinned cross-implementation vector for the transfer
+
+Both packages assert this exact payload. The host computes it in
+`packages/webui/test/unit/browser-bridge-pairing.test.ts`; the extension opens
+it in `packages/browser-extension/test/protocol.test.ts`. A change to the
+construction on either side breaks exactly one suite.
+
+| Input | Value |
+| --- | --- |
+| Host private key, P-256 JWK | `x` `XKwRVe-iSDOdOSBcT7wi5-6UDoXhSi_sJIva2FRwf-A`, `y` `JOmNw0lXPLULOJ02rq1ElmxknaPEkcoSGN7aHuVzYZk`, `d` `JGSt5D3d1wIlUCrVHgcNvnsFK8uMWG_YUCcHFsySgd0` |
+| Extension private key, P-256 JWK | `x` `E97C62Slhb6xSK8jBY_vKNp_bXdZdUyq2z16I_ozyCA`, `y` `-h7QnrdbdOmS5Wgxe8VSGJWBLpsptMBSCKmLKYcockY`, `d` `1xQC1vkpguxZrUo9vhBkgX76gSaP3yiIv7YjgJUa4CA` |
+| Salt, base64 | `AAECAwQFBgcICQoLDA0ODw==` (bytes `00 01 … 0f`) |
+| IV, base64 | `EBESExQVFhcYGRob` (bytes `10 11 … 1b`) |
+| Plaintext (`base64(secret)`) | `ABEiM0RVZneImaq7zN3u/w==` |
+| Secret, hex | `00112233445566778899aabbccddeeff` |
+| **Expected payload, base64** | `EBESExQVFhcYGRobrpzg8LW2dZC7oVrnYW8vU8zfjg8p/FNAc/YdMgkvUx7+O5ceWIULAw==` |
+
+These are published test constants, not credentials.
+
+### Backward compatibility is explicit
+
+| Case | Behaviour |
+| --- | --- |
+| `hello` with no `publicKey` (an older extension) | The host does not pair and sends no `pair` frame. It still sends `challenge`, so the extension's proof is simply wrong and the session closes — a reported failure, not a silent hang. |
+| A `publicKey` that is not a P-256 JWK | Same: refused by a structural check, no `pair`. |
+| The host sends no `pair` (its surface is off) | The extension has no credential to sign with and reports that the handshake cannot complete. |
+| The surface's switch is off | The host holds no credential and sends no `pair`; the existing admission already refuses the connection. |
+
+## Challenge and proof
 
 The algorithm is pinned as `WEBUI_BROWSER_BRIDGE_SIGNATURE_ALGORITHM` = `"HMAC-SHA256"`.
 
@@ -154,15 +239,18 @@ dynamic `import("node:crypto")`, both of which are Node-only, while the extensio
 
 | Concern | Host contract | Extension |
 | --- | --- | --- |
-| HMAC | `crypto.subtle.importKey` + `crypto.subtle.sign` (`contracts/browser-bridge.ts:182`, `:189`) | `crypto.subtle` too (`packages/browser-extension/src/protocol.ts:165`) |
-| Base64 | `encodeBase64` via `btoa` (`contracts/browser-bridge.ts:247`) | `encodeWebuiBrowserBridgeBase64` (`packages/browser-extension/src/protocol.ts:209`) |
-| Constant-time compare | `constantTimeEqual`, a hand-rolled XOR-accumulate loop (`contracts/browser-bridge.ts:263`) | the same shape (`protocol.ts:205`) |
-| `Buffer` / `node:crypto` | not used | not used |
+| HMAC | `crypto.subtle.importKey` + `crypto.subtle.sign` | `crypto.subtle` too (`packages/browser-extension/src/protocol.ts`) |
+| Base64 | `encodeBase64` via `btoa` (`contracts/browser-bridge.ts`) | `encodeWebuiBrowserBridgeBase64` (`packages/browser-extension/src/protocol.ts`) |
+| Constant-time compare | `constantTimeEqual`, a hand-rolled XOR-accumulate loop | the same shape |
+| ECDH + HKDF + AES-GCM | `sealWebuiBrowserBridgePairingCredential` / `openWebuiBrowserBridgePairingCredential` | `openWebuiBrowserBridgePairingCredential` (`protocol.ts`) |
+| `Buffer` / `node:crypto` | not used for any of the above | not used |
 
-Neither module references `Buffer` or `node:crypto` for signing. The byte-for-byte parity requirement
-still stands, and the test vector above — not the encoding call — is what pins the two together.
+Neither module references `Buffer` or `node:crypto` for signing or for the
+transfer. The byte-for-byte parity requirement still stands, and the two test
+vectors above — not the encoding call — are what pin the two implementations
+together.
 
-`verifyWebuiBrowserBridgeProof` (`contracts/browser-bridge.ts:218`) refuses in three ways before it
+`verifyWebuiBrowserBridgeProof` (`contracts/browser-bridge.ts`) refuses in three ways before it
 compares: a `keyId` that is not the expected one, a `nonce` that is not the outstanding one, and an
 `algorithm` that is present and is not the one the host issued. An **absent** `algorithm` is treated as
 the older extension and accepted; a *different* one is refused. The length comparison then happens
@@ -213,9 +301,9 @@ does not make it impossible.
 The consequence for this protocol: the connection lifecycle must tolerate a worker restart, and a
 restart is not distinguishable on the wire from any other disconnect. It is therefore handled by the
 same path as any other disconnect: the reconnect ladder for an in-flight operation, the 30 s
-background ladder otherwise, and never a target switch. A restarted worker re-sends `hello` and
-answers a fresh challenge; the credential it answers with is the one in extension local storage, which
-survives the worker.
+background ladder otherwise, and never a target switch. A restarted worker mints a fresh ephemeral
+ECDH key, re-sends `hello`, receives a fresh `pair`, stores the credential it recovered in extension
+local storage — which survives the worker — and answers the fresh challenge.
 
 No probe observed a worker restart. This row states a requirement, not a measurement.
 

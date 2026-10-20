@@ -10,6 +10,7 @@ import type {
   WebuiBrowserAuthorization,
   WebuiBrowserImageFrame,
   WebuiBrowserInputCommand,
+  WebuiBrowserTargetId,
   WebuiBrowserTargetState,
 } from "../../src/shared/contracts/browser.js";
 
@@ -21,6 +22,10 @@ import type {
  * therefore enough to prove the *decisions*: that a disabled surface is never
  * reached, that a stale target is refused before the provider is asked, and
  * that the input reaches the same provider the panel's frames come from.
+ *
+ * Tabs and frame handlers are keyed per target rather than held singly, because
+ * two runs on one surface may be watching two different tabs at the same time —
+ * the case the run-scoped selection exists for.
  */
 class RecordingProvider implements WebuiBrowserSurfaceProvider {
   readonly surface = "isolated-chromium" as const;
@@ -32,8 +37,17 @@ class RecordingProvider implements WebuiBrowserSurfaceProvider {
   readonly targetChangeListeners = new Set<
     (change: { targetId: string; generation: number }) => void
   >();
+  /** The tabs this browser has, in listing order. */
+  readonly tabIds: readonly string[];
+  /** One frame handler per open stream, keyed by the tab it watches. */
+  readonly frameHandlers = new Map<string, (frame: WebuiBrowserImageFrame) => void>();
+  /** The most recently opened stream's handler. */
   frameHandler: ((frame: WebuiBrowserImageFrame) => void) | undefined;
   closed = false;
+
+  constructor(tabIds: readonly string[] = ["tab-1"]) {
+    this.tabIds = tabIds;
+  }
 
   onTargetChanged(
     listener: (change: { targetId: string; generation: number }) => void,
@@ -45,9 +59,9 @@ class RecordingProvider implements WebuiBrowserSurfaceProvider {
   }
 
   /** Announces that the page behind the target was replaced. */
-  announceTargetChange(generation: number): void {
+  announceTargetChange(generation: number, targetId = "tab-1"): void {
     for (const listener of this.targetChangeListeners) {
-      listener({ targetId: "tab-1", generation });
+      listener({ targetId, generation });
     }
   }
 
@@ -59,20 +73,18 @@ class RecordingProvider implements WebuiBrowserSurfaceProvider {
   }
 
   async listTargets(): Promise<readonly WebuiBrowserTargetState[]> {
-    return [
-      {
-        id: {
-          surface: this.surface,
-          browserId: this.browserId,
-          targetId: "tab-1",
-          generation: 1,
-        },
-        title: "Example",
-        url: "https://example.test",
-        status: "open",
-        selected: true,
+    return this.tabIds.map((targetId) => ({
+      id: {
+        surface: this.surface,
+        browserId: this.browserId,
+        targetId,
+        generation: 1,
       },
-    ];
+      title: "Example",
+      url: "https://example.test",
+      status: "open" as const,
+      selected: true,
+    }));
   }
 
   async startImageStream(
@@ -80,22 +92,24 @@ class RecordingProvider implements WebuiBrowserSurfaceProvider {
     onFrame: (frame: WebuiBrowserImageFrame) => void,
   ): Promise<void> {
     this.startedStreams.push(targetId);
+    this.frameHandlers.set(targetId, onFrame);
     this.frameHandler = onFrame;
   }
 
   /**
-   * Pushes one frame.
+   * Pushes one frame down one tab's stream.
    *
    * The frame is pushed on demand rather than on subscription, so a test can
    * decide *when* it arrives — which is the whole point of the fencing: a
-   * frame that arrives after the panel moved on has to be dropped.
+   * frame that arrives after the panel moved on has to be dropped, and a frame
+   * that belongs to another run's tab must be dropped too.
    */
-  pushFrame(generation: number): void {
-    this.frameHandler?.({
+  pushFrame(generation: number, targetId = "tab-1"): void {
+    this.frameHandlers.get(targetId)?.({
       target: {
         surface: this.surface,
         browserId: this.browserId,
-        targetId: "tab-1",
+        targetId,
         generation,
       },
       data: "AAAA",
@@ -106,6 +120,7 @@ class RecordingProvider implements WebuiBrowserSurfaceProvider {
 
   async stopImageStream(targetId: string): Promise<void> {
     this.stoppedStreams.push(targetId);
+    this.frameHandlers.delete(targetId);
   }
 
   async sendInput(command: WebuiBrowserInputCommand): Promise<void> {
@@ -119,12 +134,13 @@ class RecordingProvider implements WebuiBrowserSurfaceProvider {
 
 function createService(
   initial: WebuiBrowserAuthorization,
+  tabIds: readonly string[] = ["tab-1"],
 ): {
   service: WebuiBrowserService;
   provider: RecordingProvider;
   state: { authorization: WebuiBrowserAuthorization };
 } {
-  const provider = new RecordingProvider();
+  const provider = new RecordingProvider(tabIds);
   const state = { authorization: initial };
   const options: WebuiBrowserServiceOptions = {
     authorization: {
@@ -138,6 +154,25 @@ function createService(
     createIsolatedProvider: async () => provider,
   };
   return { service: new WebuiBrowserService(options), provider, state };
+}
+
+/** A tab identity at the generation the fake provider lists it under. */
+function tab(targetId: string, generation = 1): WebuiBrowserTargetId {
+  return {
+    surface: "isolated-chromium",
+    browserId: "browser-1",
+    targetId,
+    generation,
+  };
+}
+
+/** The target the named run currently has selected, as the list reports it. */
+async function selectedTargetOf(
+  service: WebuiBrowserService,
+  runId?: string,
+): Promise<string | undefined> {
+  const list = await service.listTargets("isolated-chromium", runId);
+  return list.targets.find((target) => target.selected)?.id.targetId;
 }
 
 const ALL_OFF: WebuiBrowserAuthorization = {
@@ -440,16 +475,11 @@ describe("browser service", () => {
       isolatedChromium: true,
     });
     await service.listTargets("isolated-chromium");
-    await service.selectTarget({
-      surface: "isolated-chromium",
-      browserId: "browser-1",
-      targetId: "tab-1",
-      generation: 1,
-    });
+    await service.selectTarget(tab("tab-1"), "run-panel");
 
     const controller = new AbortController();
     const received: WebuiBrowserImageFrame[] = [];
-    const stream = service.watchFrames("isolated-chromium", controller.signal);
+    const stream = service.watchFrames("isolated-chromium", "run-panel", controller.signal);
     const consumer = (async () => {
       for await (const frame of stream) {
         received.push(frame);
@@ -473,16 +503,11 @@ describe("browser service", () => {
       isolatedChromium: true,
     });
     await service.listTargets("isolated-chromium");
-    await service.selectTarget({
-      surface: "isolated-chromium",
-      browserId: "browser-1",
-      targetId: "tab-1",
-      generation: 1,
-    });
+    await service.selectTarget(tab("tab-1"), "run-panel");
 
     const controller = new AbortController();
     const received: WebuiBrowserImageFrame[] = [];
-    const stream = service.watchFrames("isolated-chromium", controller.signal);
+    const stream = service.watchFrames("isolated-chromium", "run-panel", controller.signal);
     const consumer = (async () => {
       for await (const frame of stream) {
         received.push(frame);
@@ -503,3 +528,197 @@ describe("browser service", () => {
     await service.close();
   });
 });
+
+/**
+ * The selection belongs to the run that made it (ADR 0019), so these are the
+ * decisions two concurrent runs force on the service: neither may overwrite the
+ * other's selection, each stream must carry only its own run's target, and the
+ * panel with no run behind it must still have somewhere to put its own.
+ */
+describe("run-scoped selection", () => {
+  const TWO_TABS: WebuiBrowserAuthorization = {
+    ...ALL_OFF,
+    isolatedChromium: true,
+  };
+
+  it("keeps two runs' selections apart on one surface", async () => {
+    const { service } = createService(TWO_TABS, ["tab-1", "tab-2"]);
+    await service.listTargets("isolated-chromium", "run-a");
+    await service.listTargets("isolated-chromium", "run-b");
+
+    await service.selectTarget(tab("tab-1"), "run-a");
+    await service.selectTarget(tab("tab-2"), "run-b");
+
+    // Neither write cleared the other: the second selection did not become the
+    // surface's one true selection.
+    expect(await selectedTargetOf(service, "run-a")).toBe("tab-1");
+    expect(await selectedTargetOf(service, "run-b")).toBe("tab-2");
+    await service.close();
+  });
+
+  it("reports one run's selected flag to that run only", async () => {
+    const { service } = createService(TWO_TABS, ["tab-1", "tab-2"]);
+    await service.listTargets("isolated-chromium", "run-a");
+    await service.selectTarget(tab("tab-2"), "run-a");
+
+    // The panel asks as the run it is following, so the flag it reads is that
+    // run's selection and not the other run's.
+    expect(await selectedTargetOf(service, "run-a")).toBe("tab-2");
+    expect(await selectedTargetOf(service, "run-b")).toBeUndefined();
+    await service.close();
+  });
+
+  it("keeps the no-run selection separate from every run's", async () => {
+    const { service } = createService(TWO_TABS, ["tab-1", "tab-2"]);
+    await service.listTargets("isolated-chromium");
+    await service.selectTarget(tab("tab-1"));
+
+    // The person pointing at a page before any run exists owns that selection.
+    expect(await selectedTargetOf(service)).toBe("tab-1");
+    expect(await selectedTargetOf(service, "run-a")).toBeUndefined();
+
+    await service.selectTarget(tab("tab-2"), "run-a");
+    // A run's selection does not disturb the panel's own, and the other way
+    // round: they are different runs' selections, not two writers of one.
+    expect(await selectedTargetOf(service, "run-a")).toBe("tab-2");
+    expect(await selectedTargetOf(service)).toBe("tab-1");
+    await service.close();
+  });
+
+  it("refuses a run's command when that run has selected nothing", async () => {
+    const { service, provider } = createService(TWO_TABS, ["tab-1", "tab-2"]);
+    await service.listTargets("isolated-chromium", "run-a");
+    // Another run's selection is not this run's to act on.
+    await service.selectTarget(tab("tab-1"), "run-b");
+
+    await expect(
+      service.sendCommandToSelection("isolated-chromium", "run-a", "reload"),
+    ).rejects.toMatchObject({ code: "browser_target_unknown" });
+    expect(provider.commands).toHaveLength(0);
+    await service.close();
+  });
+
+  it("gives each run's stream only that run's target's frames", async () => {
+    const { service, provider } = createService(TWO_TABS, ["tab-1", "tab-2"]);
+    await service.listTargets("isolated-chromium", "run-a");
+    await service.listTargets("isolated-chromium", "run-b");
+    await service.selectTarget(tab("tab-1"), "run-a");
+    await service.selectTarget(tab("tab-2"), "run-b");
+
+    const first = collectFrames(service, "run-a");
+    const second = collectFrames(service, "run-b");
+    await waitForStreams(provider, 2);
+
+    provider.pushFrame(1, "tab-1");
+    provider.pushFrame(1, "tab-2");
+    await settleFrames();
+
+    expect(first.frames.map((frame) => frame.target.targetId)).toEqual(["tab-1"]);
+    expect(second.frames.map((frame) => frame.target.targetId)).toEqual(["tab-2"]);
+    await stop(service, [first, second]);
+  });
+
+  it("drops a frame that belongs to another run's target", async () => {
+    const { service, provider } = createService(TWO_TABS, ["tab-1", "tab-2"]);
+    await service.listTargets("isolated-chromium", "run-a");
+    await service.listTargets("isolated-chromium", "run-b");
+    await service.selectTarget(tab("tab-1"), "run-a");
+    await service.selectTarget(tab("tab-2"), "run-b");
+
+    const first = collectFrames(service, "run-a");
+    const second = collectFrames(service, "run-b");
+    await waitForStreams(provider, 2);
+
+    // The provider hands run A's stream a frame of run B's tab. Keeping the
+    // streams apart is the service's job, not the provider's, so the fence is
+    // against this run's own selection and the foreign frame is dropped.
+    provider.frameHandlers.get("tab-1")?.({
+      target: {
+        surface: "isolated-chromium",
+        browserId: "browser-1",
+        targetId: "tab-2",
+        generation: 1,
+      },
+      data: "QlRSQVk=",
+      format: "jpeg",
+      sequence: 1,
+    });
+    await settleFrames();
+
+    expect(first.frames).toHaveLength(0);
+    expect(second.frames).toHaveLength(0);
+    await stop(service, [first, second]);
+  });
+
+  it("moves every run's selection with the tab its page navigated", async () => {
+    const { service, provider } = createService(TWO_TABS, ["tab-1", "tab-2"]);
+    await service.listTargets("isolated-chromium", "run-a");
+    await service.listTargets("isolated-chromium", "run-b");
+    await service.selectTarget(tab("tab-1"), "run-a");
+    await service.selectTarget(tab("tab-2"), "run-b");
+
+    // The tab run A is on navigated, and so did the tab run B is on. Each run's
+    // selection follows *its own* tab to the new generation — otherwise run A's
+    // tools would refuse its own page as stale, and its stream would drop every
+    // frame of it.
+    provider.announceTargetChange(2);
+    provider.announceTargetChange(2, "tab-2");
+
+    const forA = await service.listTargets("isolated-chromium", "run-a");
+    expect(forA.targets.find((target) => target.selected)?.id).toEqual(
+      tab("tab-1", 2),
+    );
+    const forB = await service.listTargets("isolated-chromium", "run-b");
+    expect(forB.targets.find((target) => target.selected)?.id).toEqual(
+      tab("tab-2", 2),
+    );
+    await service.close();
+  });
+});
+
+/** One open stream, plus what it has delivered so far. */
+interface OpenStream {
+  readonly controller: AbortController;
+  readonly frames: WebuiBrowserImageFrame[];
+}
+
+/** Starts one run's stream and drains it in the background. */
+function collectFrames(service: WebuiBrowserService, runId: string): OpenStream {
+  const controller = new AbortController();
+  const stream: OpenStream = { controller, frames: [] };
+  void (async () => {
+    for await (const frame of service.watchFrames(
+      "isolated-chromium",
+      runId,
+      controller.signal,
+    )) {
+      stream.frames.push(frame);
+      if (stream.frames.length >= 1) break;
+    }
+  })().catch(() => undefined);
+  return stream;
+}
+
+async function waitForStreams(
+  provider: RecordingProvider,
+  count: number,
+): Promise<void> {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    if (provider.startedStreams.length >= count) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
+/** Gives the streams long enough to have yielded what was pushed. */
+async function settleFrames(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 50));
+}
+
+async function stop(
+  service: WebuiBrowserService,
+  streams: readonly OpenStream[],
+): Promise<void> {
+  for (const stream of streams) stream.controller.abort();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  await service.close();
+}
