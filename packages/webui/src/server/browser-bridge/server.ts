@@ -87,7 +87,18 @@ export interface WebuiBridgeSurfaceProvider {
   ): Promise<void>;
   stopImageStream(targetId: string): Promise<void>;
   sendInput(command: WebuiBrowserInputCommand): Promise<void>;
-  sendCommand(command: string, params: Record<string, unknown>): Promise<void>;
+  /**
+   * Runs one browser command against a target.
+   *
+   * The target is named rather than implied: the provider is lent to the
+   * runtime, and the runtime is the only party that knows which page the run
+   * is looking at.
+   */
+  sendCommand(
+    target: { readonly targetId: string; readonly generation: number },
+    command: string,
+    params: Record<string, unknown>,
+  ): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -659,12 +670,92 @@ class BridgeProvider implements WebuiBridgeSurfaceProvider {
    * only honest answer: the raw DevTools capability belongs to the isolated
    * Chromium this process launches and owns.
    */
-  async sendCommand(command: string, _params: Record<string, unknown>): Promise<void> {
+  /**
+   * Runs one browser command against the extension's browser.
+   *
+   * A **restricted browser-tool action** is mapped to the DevTools command
+   * that implements it. A **raw DevTools method** is forwarded as-is — the
+   * runtime has already decided whether the Full CDP switch allows it, and
+   * this class does not keep a second opinion about that.
+   *
+   * An action the extension cannot perform is refused with a reason. It is not
+   * approximated: a click that landed somewhere else would be worse than a
+   * refusal.
+   */
+  async sendCommand(
+    target: { readonly targetId: string; readonly generation: number },
+    command: string,
+    params: Record<string, unknown>,
+  ): Promise<void> {
+    const wire = this.#wireCommand(target, command, params);
+    if (!wire) {
+      throw new WebuiBridgeOperationError(
+        "browser_capability_denied",
+        `The ${this.surface} surface cannot perform "${command}"; ` +
+          "it is driven through the extension's debugger, and this action is not one it performs.",
+      );
+    }
+    const outcome = await this.#registry.dispatchCdp({
+      target: {
+        surface: this.surface,
+        browserId: this.#state.browserId,
+        targetId: wire.targetId,
+        generation: wire.generation,
+      },
+      method: wire.method,
+      params: wire.params,
+    });
+    if (outcome.kind === "accepted") return;
+    if (outcome.kind === "timeout") {
+      throw new WebuiBridgeOperationError(
+        "browser_operation_timeout",
+        `The ${this.surface} surface did not answer the command "${command}" in time.`,
+      );
+    }
     throw new WebuiBridgeOperationError(
-      "browser_capability_denied",
-      `The ${this.surface} surface does not accept raw DevTools commands ("${command}"); ` +
-        "it is driven through the extension's restricted debugger subset.",
+      outcome.unsupported ? "browser_capability_denied" : "browser_provider_failed",
+      outcome.reason,
     );
+  }
+
+  /**
+   * The DevTools command a browser-tool action maps to.
+   *
+   * The action names are the ones the restricted set uses; each is mapped to
+   * the command that implements it, and an action with no mapping is refused
+   * rather than guessed at.
+   */
+  #wireCommand(
+    target: { readonly targetId: string; readonly generation: number },
+    command: string,
+    params: Record<string, unknown>,
+  ):
+    | { readonly targetId: string; readonly generation: number; readonly method: string; readonly params: Record<string, unknown> }
+    | undefined {
+    const base = {
+      targetId: target.targetId,
+      generation: target.generation,
+    };
+    switch (command) {
+      case "navigate": {
+        const url = params.url;
+        if (typeof url !== "string" || url.length === 0) return undefined;
+        return { ...base, method: "Page.navigate", params: { url } };
+      }
+      case "reload":
+        return { ...base, method: "Page.reload", params: {} };
+      case "back":
+      case "forward":
+        // The history is read first, so the navigation is a decision rather
+        // than an offset the extension would have to guess.
+        return { ...base, method: "Page.getNavigationHistory", params: {} };
+      case "get_dom":
+        return { ...base, method: "DOM.getDocument", params: { depth: -1 } };
+      default:
+        // Not a browser-tool action: a raw DevTools method, which the runtime
+        // has already authorized.
+        return { ...base, method: command, params };
+    }
   }
 
   /**

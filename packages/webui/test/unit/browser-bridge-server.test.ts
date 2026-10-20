@@ -241,20 +241,24 @@ describe("WebUI browser bridge — the providers it lends to the browser service
     expect(harness.bridge.createProvider("edge")).toBeUndefined();
   });
 
-  it("refuses a raw DevTools command instead of silently succeeding", async () => {
+  it("forwards a raw DevTools command rather than refusing it", async () => {
     const harness = await startHarness();
     const client = await pairEdge(harness);
     const provider = harness.bridge.createProvider("edge");
     expect(provider).toBeDefined();
 
-    await expect(
-      provider!.sendCommand("Page.navigate", { url: "https://example.com/" }),
-    ).rejects.toMatchObject({ code: "browser_capability_denied" });
-    // The refusal says WHY, so an operator is not left guessing at a
-    // capability switch that would not help.
-    await expect(
-      provider!.sendCommand("Page.navigate", { url: "https://example.com/" }),
-    ).rejects.toThrow(/does not accept raw DevTools commands/u);
+    // The runtime decides whether a raw DevTools method is allowed — the
+    // Full CDP switch — and the provider does not keep a second opinion
+    // about that. What it must not do is refuse the command on the surface's
+    // own authority, because that would make the Full CDP switch a lie.
+    const outcome = await provider!
+      .sendCommand(
+        { targetId: "tab-1", generation: 1 },
+        "Page.navigate",
+        { url: "https://example.com/" },
+      )
+      .catch((error: unknown) => error);
+    expect(outcome).not.toMatchObject({ code: "browser_capability_denied" });
     client.socket.terminate();
   });
 

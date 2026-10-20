@@ -77,7 +77,7 @@ describe.skipIf(!available)("the browser input path, against a real page", () =>
 
   /** The field's centre, in page coordinates. */
   async function fieldCentre(): Promise<{ x: number; y: number }> {
-    const result = (await provider.sendCommand("Runtime.evaluate", {
+    const result = (await provider.sendCommand(await pageTarget(), "Runtime.evaluate", {
       expression:
         "(() => { const r = document.getElementById('field').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()",
       returnByValue: true,
@@ -86,8 +86,25 @@ describe.skipIf(!available)("the browser input path, against a real page", () =>
     return { x: value?.x ?? 0, y: value?.y ?? 0 };
   }
 
+  /**
+   * The identity of the page the provider is driving.
+   *
+   * It is the provider's own selected target, read back from the provider, so
+   * the command is aimed at the page the test is actually looking at.
+   */
+  async function pageTarget(): Promise<{
+    surface: "isolated-chromium";
+    browserId: string;
+    targetId: string;
+    generation: number;
+  }> {
+    const selected = (await provider.listTargets()).find((entry) => entry.selected);
+    if (!selected) throw new Error("the provider reported no selected target");
+    return selected.id;
+  }
+
   async function readFieldValue(): Promise<string> {
-    const result = (await provider.sendCommand("Runtime.evaluate", {
+    const result = (await provider.sendCommand(await pageTarget(), "Runtime.evaluate", {
       expression: "document.getElementById('field').value",
       returnByValue: true,
     })) as { result?: { value?: unknown } } | undefined;
@@ -95,7 +112,7 @@ describe.skipIf(!available)("the browser input path, against a real page", () =>
   }
 
   async function navigate(url: string): Promise<void> {
-    await provider.sendCommand("Page.navigate", { url });
+    await provider.sendCommand(await pageTarget(), "Page.navigate", { url });
     // The renderer is swapped during a navigation; a command issued into that
     // window fails with "Not attached to an active page", so the test waits
     // for the page to settle before it asserts anything about it.

@@ -335,3 +335,32 @@ No probe observed a worker restart. This row states a requirement, not a measure
 | Who may connect, and what is refused | [`03-extension-admission.md`](03-extension-admission.md) |
 | Where the credential that answers the challenge lives | [`04-pairing-credentials.md`](04-pairing-credentials.md) |
 | Target identity and generation over the bridge | [`05-target-identity.md`](05-target-identity.md) |
+
+## DevTools commands on the bridge
+
+A raw DevTools command travels as two frames:
+
+- **host → extension**: `{ kind: "cdp"; commandId; targetId; generation; method; params }`
+- **extension → host**: `{ kind: "cdp-result"; commandId; accepted; result?; error?; unsupported? }`
+
+The order is the same as the credential exchange and for the same reason: the
+**proof comes before the thing being asked for**. The host only sends a `cdp`
+frame once its own gate has decided the command is allowed — the surface is
+authorized, and the command is either a restricted browser-tool action or
+permitted by the Full CDP switch.
+
+The extension decides the rest. `chrome.debugger` exposes only a **subset** of
+the DevTools domains, so the extension keeps an explicit list of the commands
+it will send (`WEBUI_BROWSER_BRIDGE_CDP_COMMANDS` in
+`packages/browser-extension/src/cdp.ts`) and refuses anything outside it —
+**before** it makes any browser call. A refusal carries `unsupported: true`, so
+the host can tell "the extension will never run this" apart from "this
+failed", which are different things to a caller.
+
+A browser that refuses a command the list allows comes back as a plain
+refusal with the browser's own message. Chrome's answer is the authority; the
+list is a pre-filter, not a substitute for it.
+
+A command that names a target no session announced, or one whose generation the
+announcement moved past, is refused by the host before it is sent — the same
+ownership check and the same per-target serialization the input path uses.

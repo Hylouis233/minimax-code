@@ -48,6 +48,7 @@ class RecordingProvider implements WebuiBrowserSurfaceProvider {
   }
 
   async sendCommand(
+    _target: unknown,
     command: string,
     params: Record<string, unknown>,
   ): Promise<unknown> {

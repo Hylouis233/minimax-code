@@ -280,6 +280,10 @@ function validateCommand(
   if (params !== undefined && !isRecord(params)) {
     return invalidBody(`${operation} body requires params to be an object`);
   }
+  const runId = result.body.runId;
+  if (runId !== undefined && (typeof runId !== "string" || runId.length === 0)) {
+    return invalidBody(`${operation} body requires a runId to be a non-empty string`);
+  }
   return { ok: true, body: result.body };
 }
 
@@ -320,12 +324,16 @@ export function readBrowserCommand(body: Record<string, unknown>): {
   readonly surface: WebuiBrowserSurface;
   readonly command: string;
   readonly params: Record<string, unknown>;
+  readonly runId?: string;
 } {
   const params = body.params;
   return {
     surface: body.surface as WebuiBrowserSurface,
     command: String(body.command),
     params: isRecord(params) ? params : {},
+    ...(typeof body.runId === "string" && body.runId.length > 0
+      ? { runId: body.runId }
+      : {}),
   };
 }
 

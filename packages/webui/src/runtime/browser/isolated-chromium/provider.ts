@@ -34,6 +34,7 @@ import type {
   WebuiBrowserImageFrame,
   WebuiBrowserInputCommand,
   WebuiBrowserSurface,
+  WebuiBrowserTargetId,
   WebuiBrowserTargetState,
 } from "../../../shared/contracts/browser.js";
 import { WEBUI_BROWSER_RESTRICTED_COMMANDS } from "../../../shared/contracts/browser.js";
@@ -124,6 +125,7 @@ export interface WebuiBrowserSurfaceProvider {
    * and refuses explicitly when it cannot.
    */
   sendCommand(
+    target: WebuiBrowserTargetId,
     command: string,
     params: Record<string, unknown>,
   ): Promise<unknown>;
@@ -401,9 +403,19 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
    * when the Full CDP switch is on; the runtime enforces that.
    */
   async sendCommand(
+    target: WebuiBrowserTargetId,
     command: string,
     params: Record<string, unknown>,
   ): Promise<unknown> {
+    // The isolated Chromium drives one page, so the target is checked rather
+    // than used: a command aimed at another tab is refused rather than sent
+    // to the wrong page.
+    if (target.targetId !== this.#pageTargetId) {
+      throw browserOperationError(
+        "browser_target_unknown",
+        "The isolated Chromium has no such target.",
+      );
+    }
     const connection = this.#connection;
     const sessionId = this.#pageSessionId;
     if (!connection || !sessionId) {

@@ -109,8 +109,18 @@ export function createBrowserHandlerEntries(
     body,
   ) => {
     const command = readBrowserCommand(body as Record<string, unknown>);
+    // A command that names a run acts on that run's page. One that does not
+    // acts on the no-run selection — the one the panel makes when no Agent run
+    // is active.
     return {
-      body: await browser.sendCommand(command.surface, command.command, command.params),
+      body: command.runId
+        ? await browser.sendCommandToSelection(
+            command.surface,
+            command.runId,
+            command.command,
+            command.params,
+          )
+        : await browser.sendCommand(command.surface, command.command, command.params),
     };
   };
 

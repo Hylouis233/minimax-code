@@ -444,7 +444,8 @@
       "packages/webui/test/unit/browser-bridge-server.test.ts",
       "packages/webui/test/unit/browser-bridge-upgrade.test.ts",
       "packages/webui/test/unit/browser-workspace-panel.test.tsx",
-      "packages/webui/test/unit/browser-tool-adapter.test.ts"
+      "packages/webui/test/unit/browser-tool-adapter.test.ts",
+      "packages/webui/test/unit/browser-bridge-cdp.test.ts"
     ]
   }
 }

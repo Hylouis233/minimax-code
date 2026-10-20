@@ -66,6 +66,7 @@ class RecordingProvider implements WebuiBrowserSurfaceProvider {
   }
 
   async sendCommand(
+    _target: unknown,
     command: string,
     params: Record<string, unknown>,
   ): Promise<void> {
@@ -418,6 +419,14 @@ describe("browser service", () => {
       isolatedChromium: true,
       fullCdp: true,
     });
+    // A command acts on a page, so a page has to be selected first.
+    await service.listTargets("isolated-chromium");
+    await service.selectTarget({
+      surface: "isolated-chromium",
+      browserId: "browser-1",
+      targetId: "tab-1",
+      generation: 1,
+    });
     await service.sendCommand("isolated-chromium", "Network.setCookies", {
       name: "a",
     });
@@ -430,6 +439,13 @@ describe("browser service", () => {
     const { service, provider } = createService({
       ...ALL_OFF,
       isolatedChromium: true,
+    });
+    await service.listTargets("isolated-chromium");
+    await service.selectTarget({
+      surface: "isolated-chromium",
+      browserId: "browser-1",
+      targetId: "tab-1",
+      generation: 1,
     });
     await service.sendCommand("isolated-chromium", "reload");
     expect(provider.commands.map((entry) => entry.command)).toEqual(["reload"]);

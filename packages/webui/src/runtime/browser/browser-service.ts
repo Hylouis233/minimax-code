@@ -761,7 +761,16 @@ export class WebuiBrowserService {
   ): Promise<{ readonly accepted: true; readonly result?: unknown }> {
     await this.#authorizeCommand(surface, command);
     const provider = await this.#commandProvider(surface);
-    return { accepted: true, result: await provider.sendCommand(command, params) };
+    // The host path has no run, so it acts on the no-run selection — the one
+    // the panel makes when no Agent run is active.
+    const target = this.#selectionOf(surface, WEBUI_BROWSER_NO_RUN_ID);
+    if (!target) {
+      throw browserOperationError(
+        "browser_target_unknown",
+        `No browser target is selected for the "${surface}" surface.`,
+      );
+    }
+    return { accepted: true, result: await provider.sendCommand(target, command, params) };
   }
 
   /**
@@ -813,7 +822,10 @@ export class WebuiBrowserService {
     return {
       accepted: true,
       target: selected,
-      result: await awaitAbortableCommand(provider.sendCommand(command, params), signal),
+      result: await awaitAbortableCommand(
+        provider.sendCommand(selected, command, params),
+        signal,
+      ),
     };
   }
 

@@ -140,6 +140,20 @@ export type WebuiBrowserBridgeClientFrame =
       readonly accepted: boolean;
       readonly error?: string;
     }
+  | {
+      readonly kind: "cdp-result";
+      readonly commandId: string;
+      readonly accepted: boolean;
+      readonly result?: unknown;
+      readonly error?: string;
+      /**
+       * Whether the method is outside the extension's supported subset.
+       *
+       * It is reported separately because it means the command will never work,
+       * which is a different thing from a failure that might.
+       */
+      readonly unsupported?: boolean;
+    }
   | { readonly kind: "pong"; readonly nonce: string };
 
 /**
@@ -175,6 +189,20 @@ export type WebuiBrowserBridgeHostFrame =
       readonly command: WebuiBrowserBridgeInputCommand;
     }
   | { readonly kind: "ping"; readonly nonce: string }
+  | {
+      /**
+       * A raw DevTools command for a tab the extension drives.
+       *
+       * It is sent only when the Full CDP switch is on; the runtime decides
+       * that, and the extension refuses a method outside its supported subset.
+       */
+      readonly kind: "cdp";
+      readonly commandId: string;
+      readonly targetId: string;
+      readonly generation: number;
+      readonly method: string;
+      readonly params: Record<string, unknown>;
+    }
   | { readonly kind: "closed"; readonly reason: string };
 
 /** One target the extension reports. */

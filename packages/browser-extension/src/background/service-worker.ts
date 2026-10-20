@@ -13,7 +13,11 @@ import {
   WebuiBrowserBridgeClient,
 } from "../bridge-client.js";
 import { createWebuiBrowserBridgeImageStream } from "../images.js";
-import { createWebuiBrowserBridgeInputDispatcher } from "../input.js";
+import {
+  WEBUI_BROWSER_BRIDGE_DEBUGGER_VERSION,
+  createWebuiBrowserBridgeInputDispatcher,
+} from "../input.js";
+import { createWebuiBrowserBridgeCdpDispatcher } from "../cdp.js";
 import {
   answerWebuiBrowserBridgeChallengeWithStoredSecrets,
   applyWebuiBrowserBridgePairingCredential,
@@ -119,6 +123,13 @@ async function startBridge(): Promise<void> {
     generations,
   });
   const input = createWebuiBrowserBridgeInputDispatcher({ targets, debugger: chrome.debugger });
+  // The DevTools path shares the input dispatcher's debugger, so the extension
+  // has one attach/send path rather than two that could disagree about what is
+  // attached to which tab.
+  const cdp = createWebuiBrowserBridgeCdpDispatcher({
+    debugger: chrome.debugger,
+    version: WEBUI_BROWSER_BRIDGE_DEBUGGER_VERSION,
+  });
   const images = createWebuiBrowserBridgeImageStream({
     browserId,
     capture: chrome.tabs,
@@ -177,6 +188,54 @@ async function startBridge(): Promise<void> {
         // re-establishes the session but never re-delivers the command.
         void bridge
           .runOperation(async () => resultFrame(frame.commandId, await input.dispatch(frame.command)))
+          .catch(report);
+        return;
+      }
+      case "cdp": {
+        // A raw DevTools command, sent only when the host's Full CDP switch is
+        // on. The extension still decides whether it will run it: a method
+        // outside its supported subset is refused with a reason, and the
+        // refusal is reported as *unsupported* so the host can tell it apart
+        // from a command that merely failed.
+        void bridge
+          .runOperation(async () => {
+            const target = await targets.lookup(frame.targetId);
+            if (!target) {
+              return {
+                kind: "cdp-result",
+                commandId: frame.commandId,
+                accepted: false,
+                error: `target ${frame.targetId} is not open`,
+              } as const;
+            }
+            if (target.generation !== frame.generation) {
+              return {
+                kind: "cdp-result",
+                commandId: frame.commandId,
+                accepted: false,
+                error: `target ${frame.targetId} was replaced before the command arrived`,
+              } as const;
+            }
+            const outcome = await cdp.dispatch(
+              { tabId: target.tabId },
+              frame.method,
+              frame.params,
+            );
+            return outcome.accepted
+              ? ({
+                  kind: "cdp-result",
+                  commandId: frame.commandId,
+                  accepted: true,
+                  result: outcome.result,
+                } as const)
+              : ({
+                  kind: "cdp-result",
+                  commandId: frame.commandId,
+                  accepted: false,
+                  error: outcome.error,
+                  ...(outcome.unsupported ? { unsupported: true } : {}),
+                } as const);
+          })
           .catch(report);
         return;
       }

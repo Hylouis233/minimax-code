@@ -50,8 +50,25 @@ const MAX_INFLIGHT_COMMANDS = 32;
 
 /** The shape of a single command's outcome. */
 export type BrowserBridgeCommandOutcome =
-  | { readonly kind: "accepted"; readonly commandId: string }
-  | { readonly kind: "rejected"; readonly commandId: string; readonly reason: string }
+  | {
+      readonly kind: "accepted";
+      readonly commandId: string;
+      /** The command's result, when the command produced one. */
+      readonly result?: unknown;
+    }
+  | {
+      readonly kind: "rejected";
+      readonly commandId: string;
+      readonly reason: string;
+      /**
+       * Whether the command is one the peer will never run.
+       *
+       * It is reported separately from a failure that might, because the two
+       * mean different things to a caller: an unsupported command is a dead
+       * end, and a failure may not be.
+       */
+      readonly unsupported?: boolean;
+    }
   | { readonly kind: "timeout"; readonly commandId: string; readonly reason: string };
 
 /** Frames the host receives from the extension, exposed via the session. */
@@ -164,6 +181,8 @@ export class BrowserBridgeSession extends EventEmitter {
   >();
   /** Ping nonce → resolver. A pong answers the latest ping. */
   private readonly pendingPings = new Map<string, () => void>();
+  /** The counter behind the DevTools command ids. */
+  private cdpCommandCounter = 0;
 
   constructor(options: BrowserBridgeSessionOptions) {
     super();
@@ -281,6 +300,116 @@ export class BrowserBridgeSession extends EventEmitter {
   }
 
   /**
+   * Send a raw DevTools command and wait for the extension's reply.
+   *
+   * The deadline, the in-flight cap and the retry policy are the ones the
+   * input path uses: a command is a command, and the only difference is what
+   * the extension does with it. A refusal is terminal — the extension has
+   * spoken, and there is nothing to recover by asking again.
+   */
+  async sendCdp(
+    command: {
+      readonly targetId: string;
+      readonly generation: number;
+      readonly method: string;
+      readonly params: Record<string, unknown>;
+    },
+    options?: { readonly deadlineMs?: number },
+  ): Promise<BrowserBridgeCommandOutcome> {
+    const commandId = this.nextCdpCommandId();
+    if (!this.admitted) {
+      return { kind: "timeout", commandId, reason: "session is not yet admitted" };
+    }
+    if (this.inflight.size >= MAX_INFLIGHT_COMMANDS) {
+      return {
+        kind: "rejected",
+        commandId,
+        reason: "too many in-flight commands on this session",
+      };
+    }
+    const deadline = options?.deadlineMs ?? this.operationDeadlineMs;
+    const deadlineAt = this.now() + deadline;
+    const result = await withBridgeOperationRetry<BrowserBridgeCommandOutcome>(
+      (attempt) => this.singleCdpAttempt(commandId, command, attempt, deadlineAt),
+      { deadlineMs: deadline, now: this.now, sleep: this.sleep },
+    );
+    if (result.kind === "timeout" && result.commandId === commandId) {
+      return { kind: "timeout", commandId, reason: result.reason };
+    }
+    return result;
+  }
+
+  private nextCdpCommandId(): string {
+    this.cdpCommandCounter += 1;
+    return `cdp-${this.cdpCommandCounter}`;
+  }
+
+  private async singleCdpAttempt(
+    commandId: string,
+    command: {
+      readonly targetId: string;
+      readonly generation: number;
+      readonly method: string;
+      readonly params: Record<string, unknown>;
+    },
+    _attempt: number,
+    deadlineAt: number,
+  ): Promise<
+    | { readonly kind: "success"; readonly value: BrowserBridgeCommandOutcome }
+    | { readonly kind: "transient"; readonly message: string }
+    | { readonly kind: "terminal"; readonly reason: "refused" | "cancelled" | "unknown"; readonly message: string }
+  > {
+    const remaining = deadlineAt - this.now();
+    if (remaining <= 0) {
+      return { kind: "terminal", reason: "unknown", message: "deadline already elapsed" };
+    }
+    try {
+      this.sendFrame({ kind: "cdp", commandId, ...command });
+    } catch (error) {
+      return { kind: "transient", message: errorMessage(error) };
+    }
+    const outcome = await new Promise<BrowserBridgeCommandOutcome>((resolve, reject) => {
+      this.inflight.set(commandId, { resolve, reject, deadline: deadlineAt });
+    });
+    if (outcome.kind === "rejected") {
+      return { kind: "terminal", reason: "refused", message: outcome.reason };
+    }
+    if (outcome.kind === "timeout") {
+      return { kind: "terminal", reason: "unknown", message: outcome.reason };
+    }
+    return { kind: "success", value: outcome };
+  }
+
+  private async handleCdpResult(
+    frame: {
+      readonly kind: "cdp-result";
+      readonly commandId: string;
+      readonly accepted: boolean;
+      readonly result?: unknown;
+      readonly error?: string;
+      readonly unsupported?: boolean;
+    },
+  ): Promise<void> {
+    const pending = this.inflight.get(frame.commandId);
+    if (!pending) return;
+    this.inflight.delete(frame.commandId);
+    if (frame.accepted) {
+      pending.resolve({
+        kind: "accepted",
+        commandId: frame.commandId,
+        result: frame.result,
+      });
+      return;
+    }
+    pending.resolve({
+      kind: "rejected",
+      commandId: frame.commandId,
+      reason: frame.error ?? "the extension refused the command",
+      ...(frame.unsupported ? { unsupported: true } : {}),
+    });
+  }
+
+  /**
    * Send a `closed` frame and terminate the underlying socket with the
    * given reason. Idempotent.
    */
@@ -340,6 +469,9 @@ export class BrowserBridgeSession extends EventEmitter {
         break;
       case "input-result":
         await this.handleInputResult(frame);
+        break;
+      case "cdp-result":
+        await this.handleCdpResult(frame);
         break;
       case "pong":
         this.handlePong(frame.nonce);

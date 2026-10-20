@@ -67,6 +67,25 @@ export interface BrowserBridgeRegistryOptions {
 export type BrowserBridgeDispatch = (input: WebuiBrowserInputCommand) => Promise<BrowserBridgeCommandOutcome>;
 
 /**
+ * A raw DevTools command aimed at a target.
+ *
+ * It names the target the same way an input command does, so the routing, the
+ * ownership check and the per-target serialization are the same ones — a
+ * DevTools command must not be able to reach a tab that an input command
+ * could not.
+ */
+export interface WebuiBrowserCdpCommand {
+  readonly target: {
+    readonly surface: WebuiBridgeBrowserSurface;
+    readonly browserId: string;
+    readonly targetId: string;
+    readonly generation: number;
+  };
+  readonly method: string;
+  readonly params: Record<string, unknown>;
+}
+
+/**
  * The session count cap per surface. Multiple sessions are tolerated (e.g.
  * two Edge windows pairing at once), but a runaway extension cannot open
  * thousands of sockets without bound.
@@ -78,7 +97,14 @@ const MAX_SESSIONS_PER_SURFACE = 16;
  * structurally identical objects would NOT match in a Map, so we normalize
  * to a string here. The same input → the same string → the same queue.
  */
-function targetKey(input: WebuiBrowserInputCommand): string | undefined {
+function targetKey(input: {
+  readonly target: {
+    readonly surface: string;
+    readonly browserId: string;
+    readonly targetId: string;
+    readonly generation: number;
+  };
+}): string | undefined {
   const surface = input.target.surface;
   if (surface !== "edge" && surface !== "chrome") return undefined;
   return `${surface}\u0000${input.target.browserId}\u0000${input.target.targetId}\u0000${input.target.generation}`;
@@ -301,6 +327,47 @@ export class BrowserBridgeRegistry extends EventEmitter {
    * whichever browser answered fastest, which is how a command aimed at one
    * tab ends up in another browser entirely.
    */
+  /**
+   * Dispatch a raw DevTools command.
+   *
+   * The routing, the ownership check and the per-target serialization are the
+   * input path's: a DevTools command must not be able to reach a tab that an
+   * input command could not, and two DevTools commands against one tab must
+   * not interleave.
+   */
+  async dispatchCdp(input: WebuiBrowserCdpCommand): Promise<BrowserBridgeCommandOutcome> {
+    const key = targetKey(input);
+    const commandId = `cdp-${input.method}`;
+    if (!key) {
+      return {
+        kind: "rejected",
+        commandId,
+        reason: "the command did not name a bridge surface",
+      };
+    }
+    const route = this.resolveTargetRoute(input);
+    if (!route.ok) {
+      return { kind: "rejected", commandId, reason: route.reason };
+    }
+    const session = route.session;
+    const wire = {
+      targetId: input.target.targetId,
+      generation: input.target.generation,
+      method: input.method,
+      params: input.params,
+    };
+    const previous = this.queues.get(key) ?? Promise.resolve();
+    const next = previous.then(async () => session.sendCdp(wire));
+    this.queues.set(key, next.catch(() => undefined));
+    try {
+      return await next;
+    } finally {
+      if (this.queues.get(key) === next) {
+        this.queues.delete(key);
+      }
+    }
+  }
+
   async dispatch(input: WebuiBrowserInputCommand): Promise<BrowserBridgeCommandOutcome> {
     const key = targetKey(input);
     if (!key) {
@@ -349,8 +416,25 @@ export class BrowserBridgeRegistry extends EventEmitter {
    * those is knowable now, so none of them is reported as a timeout the
    * caller might retry into a different browser.
    */
-  private resolveTargetRoute(input: WebuiBrowserInputCommand): TargetRoute {
-    const { surface, browserId, targetId, generation } = input.target;
+  private resolveTargetRoute(input: {
+    readonly target: {
+      readonly surface: string;
+      readonly browserId: string;
+      readonly targetId: string;
+      readonly generation: number;
+    };
+  }): TargetRoute {
+    const { browserId, targetId, generation } = input.target;
+    const surface =
+      input.target.surface === "edge" || input.target.surface === "chrome"
+        ? input.target.surface
+        : undefined;
+    if (!surface) {
+      return {
+        ok: false,
+        reason: `the command named the unsupported surface "${input.target.surface}"`,
+      };
+    }
     const ownership = this.targetOwners.get(ownershipKey(browserId, targetId));
     if (!ownership) {
       return {

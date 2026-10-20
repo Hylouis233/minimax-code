@@ -678,6 +678,19 @@ export interface WebuiBrowserPort {
     command: string,
     params?: Record<string, unknown>,
   ): Promise<{ readonly accepted: true; readonly result?: unknown }>;
+  /**
+   * Runs one browser command against the target a **run** selected.
+   *
+   * The run id is not optional: a command that belongs to a run must act on
+   * that run's page, and a selection belonging to somebody else is not a
+   * substitute.
+   */
+  sendCommandToSelection(
+    surface: WebuiBrowserSurface,
+    runId: string,
+    command: string,
+    params?: Record<string, unknown>,
+  ): Promise<{ readonly accepted: true; readonly result?: unknown }>;
   /** The live image stream of one surface, fenced to one run's selection. */
   watchFrames(
     surface: WebuiBrowserSurface,
