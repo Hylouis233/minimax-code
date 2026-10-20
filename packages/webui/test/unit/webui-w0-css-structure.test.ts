@@ -477,6 +477,7 @@ describe("W0 · stylesheet composition", () => {
       "../features/transcript/ui/transcript.css",
       "../features/sessions/ui/sessions.css",
       "../features/workspace/ui/workspace.css",
+      "../features/browser/ui/browser.css",
       "../features/goal/ui/goal.css",
       "../features/account/ui/account.css",
       "../features/transcript/ui/transcript-widgets.css",
@@ -736,7 +737,7 @@ describe("W0 · at-rules and animations W5/W6 must not remove", () => {
     // asked for reduced motion. The exact list is the point -- adding an
     // animated rule without registering its override here is the same defect,
     // in the other direction.
-    expect(reducedMotion).toHaveLength(11);
+    expect(reducedMotion).toHaveLength(12);
     for (const rule of reducedMotion)
       expect(rule.body).toMatch(/(?:animation|transition):\s*none/u);
 
@@ -755,6 +756,9 @@ describe("W0 · at-rules and animations W5/W6 must not remove", () => {
       // carries the same motion, so it carries the same override.
       ".webui-dropdown-popup, .webui-dropdown-popup.is-leaving, .webui-dropdown-surface",
       ".webui-message-actions",
+      // The model menu's list and panel slide in during the transition, so a
+      // reader who asked for reduced motion would otherwise watch both move.
+      ".webui-model-menu[data-webui-model-transitioning=\"true\"] .webui-model-list, .webui-model-menu[data-webui-model-transitioning=\"true\"] .webui-model-panel",
       // Added with the project-first rail: the section that holds a project's
       // sessions opens and closes by transitioning its height, so a reader who
       // asked for reduced motion would otherwise watch the section slide.
@@ -848,6 +852,9 @@ describe("W0 · at-rules and animations W5/W6 must not remove", () => {
       "webui-dropdown-out-reverse",
       "webui-menu-enter",
       "webui-modal-enter",
+      // The model menu's list and panel each slide in from their own side.
+      "webui-model-list-enter",
+      "webui-model-panel-enter",
       "webui-overlay-enter",
       "webui-panel-enter-right",
       "webui-popover-enter",
