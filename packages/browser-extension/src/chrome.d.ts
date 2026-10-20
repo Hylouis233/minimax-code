@@ -70,6 +70,20 @@ declare const chrome: {
     readonly onInstalled: WebuiBrowserExtensionEvent<
       (details: { reason: string; previousVersion?: string }) => void
     >;
+    /**
+     * The options page asking the worker to reconnect.
+     *
+     * A Manifest V3 service worker is lazy, so the page has to wake it
+     * explicitly once the person has pasted the installation key.
+     */
+    readonly onMessage: WebuiBrowserExtensionEvent<
+      (
+        message: unknown,
+        sender: unknown,
+        sendResponse: (response: unknown) => void,
+      ) => boolean | undefined
+    >;
+    sendMessage(message: unknown): Promise<unknown>;
     getManifest(): { version: string };
   };
   readonly storage: {

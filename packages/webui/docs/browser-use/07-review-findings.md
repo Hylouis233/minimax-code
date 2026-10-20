@@ -352,18 +352,22 @@ connected, and no credential crosses to the peer. That is the security property
 that matters, and it is now established against a real browser rather than a
 synthetic peer.
 
-**What it does not yet prove.** The happy path — the same extension, with the
-installation key provisioned, completing the handshake — does **not** complete
-in the harness, and the reason is not established. The extension never opens a
-connection, and it records no failure of its own, so the service worker that
-should answer the challenge is either not starting after the reload or is
-starting without the origin it was given. The test is marked `fixme` rather
-than deleted, so the gap stays visible and the test runs as soon as it can.
+**What it now proves — both halves.** The happy path **passes**: the
+extension completes the handshake once it can prove the installation key, and
+the host reports the surface as connected. The refusal **passes**: the same
+extension without the key is refused, and no credential crosses to the peer.
 
-**What this means for the claims.** The external path is **not** yet
-demonstrated working in a real browser. Ticket #193 stays open, and the
-capability matrix records the external surfaces as *not measured* rather than
-*working*.
+**The defect it found.** A Manifest V3 service worker is **lazy** — it starts
+on an event and is torn down when it goes idle. Saving the installation key
+did not wake it, so the extension sat there configured but unconnected, and the
+options page told the person to *"Reconnect the extension to pair with the
+host"* — a manual step that a person can get wrong and that nothing checks.
+The options page now asks the worker to reconnect, and the worker answers.
+
+**What this means for the claims.** The external path is demonstrated working
+against a **real Chrome**, and the security property is demonstrated against
+one too. Edge is not installed on this machine, so the parity claim remains a
+design claim, and ticket #193 stays open for that reason alone.
 
 ## What this document does not establish
 

@@ -16,6 +16,7 @@
 //     truncated paste would otherwise be stored and then fail at handshake
 //     time as an opaque "installation key does not match".
 
+import { WEBUI_BROWSER_BRIDGE_RECONNECT_MESSAGE } from "./protocol.js";
 import {
   clearWebuiBrowserBridgeInstallationKey,
   saveWebuiBrowserBridgeInstallationKey,
@@ -63,8 +64,26 @@ async function onSave(): Promise<void> {
   // Clear the field immediately: the key is in storage, and leaving it in the
   // DOM is the one place this page could leak it.
   input.value = "";
-  say("Saved. Reconnect the extension to pair with the host.");
   await renderStored();
+
+  // Wake the worker so the extension pairs now.
+  //
+  // A Manifest V3 service worker is lazy: it starts on an event and is torn
+  // down when it goes idle. Saving the key does not wake it, so without this
+  // the extension would sit there configured but unconnected — and the person
+  // would have to reload the extension by hand to find out.
+  try {
+    const reply = await chrome.runtime.sendMessage({ type: WEBUI_BROWSER_BRIDGE_RECONNECT_MESSAGE });
+    if (reply && typeof reply === "object" && (reply as { ok?: unknown }).ok === true) {
+      say("Saved. Connecting to the WebUI…");
+      return;
+    }
+    say(
+      "Saved. The extension could not be woken to connect — reload the extension and try again.",
+    );
+  } catch {
+    say("Saved. The extension could not be woken to connect — reload the extension and try again.");
+  }
 }
 
 async function onClear(): Promise<void> {

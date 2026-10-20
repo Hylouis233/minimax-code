@@ -12,6 +12,14 @@
 /** The dedicated path the bridge listens on. It is not the WebUI's own path. */
 export const WEBUI_BROWSER_BRIDGE_PATH = "/browser-bridge";
 
+/**
+ * The options page's request to reconnect.
+ *
+ * A Manifest V3 service worker is lazy, so saving the installation key does
+ * not by itself start it. The page sends this and the worker reconnects.
+ */
+export const WEBUI_BROWSER_BRIDGE_RECONNECT_MESSAGE = "webui-bridge-reconnect";
+
 /** The only signature scheme the bridge admits. */
 export const WEBUI_BROWSER_BRIDGE_SIGNATURE_ALGORITHM = "HMAC-SHA256" as const;
 

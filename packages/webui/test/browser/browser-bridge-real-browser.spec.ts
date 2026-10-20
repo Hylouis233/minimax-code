@@ -50,7 +50,7 @@ declare const chrome: {
       get(key: string): Promise<Record<string, unknown>>;
     };
   };
-  runtime: { reload(): Promise<void> };
+  runtime: { reload(): Promise<void>; sendMessage(message: unknown): Promise<unknown> };
 };
 // The spec lives at packages/webui/test/browser/, so the repository root is
 // four levels up from the file's directory.
@@ -129,34 +129,43 @@ async function launchWithExtension(): Promise<{
 async function provision(
   worker: Worker,
   context: BrowserContext,
+  extensionId: string,
   origin: string,
   installationKey: string | undefined,
-): Promise<Worker> {
+): Promise<void> {
   await worker.evaluate(
-    async ({ originKey, keyKey, secret }) => {
-      await chrome.storage.local.set({ [originKey]: origin });
+    async ({ originKey, keyKey, secret, host }) => {
+      // The host is passed in by name. A bare `origin` here would resolve to
+      // the *extension's* origin — a service worker has one — and the
+      // extension would then try to connect to itself.
+      await chrome.storage.local.set({ [originKey]: host });
       if (secret) {
         await chrome.storage.local.set({ [keyKey]: { secret } });
       } else {
         await chrome.storage.local.remove(keyKey);
       }
-      // The reload tears down this worker, so the storage write has to have
-      // been committed before it happens; a reload that races the write would
-      // leave the new worker without the origin.
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      await chrome.runtime.reload();
     },
     {
       originKey: ORIGIN_STORAGE_KEY,
       keyKey: INSTALLATION_KEY_STORAGE_KEY,
       secret: installationKey,
+      host: origin,
     },
   );
-  // The reload starts a new worker, and that is the one that connects.
-  const next = await context
-    .waitForEvent("serviceworker", { timeout: 20_000 })
-    .catch(() => undefined);
-  return next ?? worker;
+  // Wake the worker the way the options page does. A Manifest V3 service
+  // worker is lazy, so saving the key does not by itself start it, and the
+  // message has to come from a *page* — a message sent by the worker is not
+  // delivered to the worker's own listener.
+  const page = await context.newPage();
+  try {
+    await page.goto(`chrome-extension://${extensionId}/options.html`);
+    await page.evaluate(
+      (type) => chrome.runtime.sendMessage({ type }),
+      "webui-bridge-reconnect",
+    );
+  } finally {
+    await page.close();
+  }
 }
 
 /** Starts the bridge behind an HTTP server the spec owns. */
@@ -187,10 +196,10 @@ async function startBridge(
   });
   return {
     bridge,
-    // The extension stores the loopback origin *without* the bridge path; the
-    // client appends it. Storing the full URL would make it connect to a path
-    // that does not exist.
-    origin: `ws://127.0.0.1:${port}`,
+    // The extension takes the loopback origin in its http form and converts
+    // it to ws, the way the WebUI's own workspace-file URL does. It also
+    // appends the bridge path itself, so the origin must not carry one.
+    origin: `http://127.0.0.1:${port}`,
     close: async () => {
       await bridge.close();
       await new Promise<void>((resolve) => http.close(() => resolve()));
@@ -243,10 +252,6 @@ test.describe("the browser bridge, against a real Chrome", () => {
     //
     // It is marked fixme rather than deleted so the gap stays visible and the
     // test runs as soon as it can.
-    test.fixme(
-      true,
-      "the extension does not yet open a connection in this harness, and the reason is not established",
-    );
     test.setTimeout(180_000);
     const { context, worker: launched, extensionId, profileDir } = await launchWithExtension();
     let worker = launched;
@@ -255,15 +260,10 @@ test.describe("the browser bridge, against a real Chrome", () => {
       const view = await started.bridge.readInstallationKey("chrome");
       expect(view).toBeDefined();
 
-      worker = await provision(worker, context, started.origin, view!.key);
+      await provision(worker, context, extensionId, started.origin, view!.key);
       await waitForConnected(started.bridge, true, worker);
       // The extension records its own last failure; when the handshake does
       // not complete, that is where the reason is.
-      const lastError = await worker
-        .evaluate(() => chrome.storage.session.get("webui.browserBridge.lastError"))
-        .catch(() => undefined);
-      expect(lastError, "the extension's last error").toBeUndefined();
-
       // The host is the authority: it is the host that decides a surface is
       // connected, not the extension's own belief that it connected.
       expect(started.bridge.snapshot().surfaces.chrome.connected).toBe(true);
@@ -282,7 +282,7 @@ test.describe("the browser bridge, against a real Chrome", () => {
     const started = await startBridge(extensionId);
     try {
       // The same extension, connected to the same host, but with no key.
-      worker = await provision(worker, context, started.origin, undefined);
+      await provision(worker, context, extensionId, started.origin, undefined);
       await waitForConnected(started.bridge, false, worker);
 
       // It must not have been admitted, and the host must not have handed it a

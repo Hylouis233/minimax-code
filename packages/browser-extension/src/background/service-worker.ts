@@ -25,6 +25,7 @@ import {
   type WebuiBrowserBridgeInstallationKey,
   type WebuiBrowserBridgePairingCredential,
 } from "../pairing.js";
+import { WEBUI_BROWSER_BRIDGE_RECONNECT_MESSAGE } from "../protocol.js";
 import type {
   WebuiBrowserBridgeClientFrame,
   WebuiBrowserBridgeError,
@@ -58,11 +59,32 @@ const installationKeyStore = webuiBrowserBridgeInstallationKeyStore(chrome.stora
 const generations = webuiBrowserBridgeTargetGenerationStore(chrome.storage.session);
 
 let starting: Promise<void> | undefined;
+/** The live client, so a reconnect can stop it rather than leave it running. */
+let currentBridge: WebuiBrowserBridgeClient | undefined;
 
 function start(): Promise<void> {
   starting ??= startBridge();
   return starting;
 }
+
+/**
+ * Reconnects the bridge.
+ *
+ * A Manifest V3 service worker is **lazy**: it starts on an event and is torn
+ * down when it goes idle. After the person pastes the installation key
+ * nothing wakes it, so the extension would sit there configured but
+ * unconnected until some unrelated browser event happened to start it again.
+ * The options page asks for a reconnect instead, and this is what answers.
+ */
+async function reconnect(): Promise<void> {
+  currentBridge?.stop();
+  currentBridge = undefined;
+  starting = undefined;
+  await start();
+}
+
+/** The options page's request to reconnect. */
+const RECONNECT_MESSAGE = WEBUI_BROWSER_BRIDGE_RECONNECT_MESSAGE;
 
 async function startBridge(): Promise<void> {
   const browser = detectBrowser();
@@ -218,6 +240,7 @@ async function startBridge(): Promise<void> {
   });
 
   bridge.start();
+  currentBridge = bridge;
   void publishTargets().catch(report);
 }
 
@@ -273,5 +296,33 @@ function sleep(ms: number): Promise<void> {
 chrome.runtime.onStartup.addListener(() => {
   void start();
 });
+
+/**
+ * The options page asks for a reconnect once the person has pasted the key.
+ *
+ * The reply tells the page whether the reconnect happened, so the page can say
+ * something true rather than "saved" and leave the person wondering.
+ */
+chrome.runtime.onMessage.addListener(
+  (message: unknown, _sender: unknown, sendResponse: (response: unknown) => void) => {
+    if (
+      typeof message !== "object" ||
+      message === null ||
+      (message as { type?: unknown }).type !== RECONNECT_MESSAGE
+    ) {
+      return undefined;
+    }
+    void reconnect().then(
+      () => sendResponse({ ok: true }),
+      (error: unknown) =>
+        sendResponse({
+          ok: false,
+          message: error instanceof Error ? error.message : String(error),
+        }),
+    );
+    // The reply is asynchronous, so the channel has to stay open.
+    return true;
+  },
+);
 
 void start().catch(report);
