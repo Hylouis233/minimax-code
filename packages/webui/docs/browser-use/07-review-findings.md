@@ -291,6 +291,15 @@ external surfaces are **not** safe against an attacker who can reach loopback,
 and the switch that enables them should be understood as enabling them for
 **the person's browser**, not as a boundary against a local process.
 
+### A residual gap the N2 fix left behind
+
+The panel opens its image stream once per `(surface, runId)`. If it opens the
+stream **before** the run has selected anything, the service refuses it —
+which is the required behaviour — and the panel then shows no live frames
+until the surface or the run changes. The client would need to re-subscribe
+after the first successful selection. This is recorded here rather than left
+for someone to discover.
+
 ### N2, N3, N4
 
 - **N2** — The stream now follows the run's current selection: a selection
