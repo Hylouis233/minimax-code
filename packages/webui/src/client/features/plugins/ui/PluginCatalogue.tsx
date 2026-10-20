@@ -5,6 +5,7 @@ import {
   useWebuiPluginWorkflowsState,
 } from "../../../bindings/use-query-state.js";
 import { WebuiIconAgent } from "../../../shell/icons.js";
+import { WebuiDropdown } from "../../../ui/Dropdown.js";
 import {
   readWebuiPluginRow as read,
   type WebuiPluginRow as Row,
@@ -309,40 +310,48 @@ export function PluginCatalogue({
           {managementOpen ? (
             <>
               <h1>管理</h1>
-              <div className="webui-plugin-create-anchor webui-plugin-management-create-anchor">
+              <WebuiDropdown
+                open={createMenuOpen}
+                onOpen={() => setCreateMenuOpen(true)}
+                onClose={() => setCreateMenuOpen(false)}
+                role="menu"
+                ariaLabel="创建"
+                wrapperClassName="webui-plugin-create-anchor webui-plugin-management-create-anchor"
+                className="webui-plugin-create-menu"
+                // The menu hung off the anchor's right edge (`right: 0`).
+                align="end"
+                trigger={(triggerProps) => { const { ref, ...rest } = triggerProps; return (
+                  <button
+                    type="button"
+                    {...rest}
+                    ref={ref}
+                    className="webui-plugin-create-trigger"
+                  >
+                    ＋ 创建
+                  </button>
+                ); }}
+              >
                 <button
-                  type="button"
-                  className="webui-plugin-create-trigger"
-                  aria-expanded={createMenuOpen}
-                  onClick={() => setCreateMenuOpen((open) => !open)}
+                  onClick={() => {
+                    attachPluginImportDialog();
+                    setPluginImportDialog(true);
+                    setCreateMenuOpen(false);
+                    setPluginUrl("");
+                    setPluginPreview(undefined);
+                  }}
                 >
-                  ＋ 创建
+                  从 Git 仓库导入插件
                 </button>
-                {createMenuOpen ? (
-                  <div className="webui-plugin-create-menu">
-                    <button
-                      onClick={() => {
-                        attachPluginImportDialog();
-                        setPluginImportDialog(true);
-                        setCreateMenuOpen(false);
-                        setPluginUrl("");
-                        setPluginPreview(undefined);
-                      }}
-                    >
-                      从 Git 仓库导入插件
-                    </button>
-                    <button onClick={() => openCreate("skills")}>
-                      录入技能
-                    </button>
-                    <button onClick={() => openCreate("mcp")}>
-                      添加 MCP server
-                    </button>
-                    <button onClick={() => openCreate("agents")}>
-                      创建 Agent
-                    </button>
-                  </div>
-                ) : null}
-              </div>
+                <button onClick={() => openCreate("skills")}>
+                  录入技能
+                </button>
+                <button onClick={() => openCreate("mcp")}>
+                  添加 MCP server
+                </button>
+                <button onClick={() => openCreate("agents")}>
+                  创建 Agent
+                </button>
+              </WebuiDropdown>
             </>
           ) : (
             <>

@@ -98,22 +98,13 @@
     color: var(--icon_default_primary);
     opacity: 0.4;
   }
+  /* The menu's own content layout only. The surface — background, border,
+   * radius, shadow, z-index, placement and the enter/exit motion — is the shared
+   * dropdown's (`.webui-dropdown-popup` in `styles/dropdown.css`), which also
+   * measures the trigger and places the panel in viewport coordinates. */
   .webui-user-menu-popover {
-    position: absolute;
-    bottom: calc(100% + 4px);
-    left: 4px;
-    z-index: 110;
     width: 244px;
-    border: 1px solid var(--border_default);
-    border-radius: 12px;
-    background-color: var(--bg_grouped_secondary_elevated);
-    box-shadow: 0 0 10px var(--shadow_default);
     padding: 4px;
-    transform-origin: bottom left;
-    animation: webui-menu-enter 150ms cubic-bezier(.2, .7, .2, 1) both;
-  }
-  .webui-user-menu-anchor-collapsed .webui-user-menu-popover {
-    left: 48px;
   }
   .webui-user-menu-uid {
     display: flex;
@@ -189,6 +180,10 @@
   .webui-user-menu-usage-anchor {
     position: relative;
   }
+  /* A hover fly-out, so it is not a dropdown — but it is the same surface:
+   * the background, border, radius, shadow and motion come from
+   * `webui-dropdown-surface` in `styles/dropdown.css`, and only this panel's
+   * own box and typography stay here. */
   .webui-user-menu-usage-panel {
     position: absolute;
     top: -176px;
@@ -196,10 +191,6 @@
     z-index: 111;
     width: 222px;
     min-height: 154px;
-    border: 1px solid var(--border_default);
-    border-radius: 12px;
-    background-color: var(--bg_grouped_secondary_elevated);
-    box-shadow: 0 0 20px var(--shadow_default);
     padding: 12px;
     color: var(--text_default_primary);
     font-size: 12px;
@@ -359,11 +350,27 @@
   .webui-user-menu-signin-anchor {
     position: relative;
   }
+  /* A positioning shell only: the check-in card inside carries its own
+   * artwork, corner clip and shadow, so it deliberately does not take the
+   * generic surface. What it does share with the dropdowns is the entrance
+   * motion, so this fly-out opens with the shared keyframes instead of a hard
+   * cut.
+   *
+   * The reduced-motion guard is restated here rather than inherited from the
+   * shell-wide rule in `styles/index.css`: this panel is rendered inside the
+   * account menu popup, which the dropdown skeleton portals to `document.body`,
+   * so it sits outside `[data-webui-shell]` and that rule never matches it. */
   .webui-user-menu-signin-panel {
     position: absolute;
     top: -84px;
     left: calc(100% + 11px);
     z-index: 111;
+    animation: webui-dropdown-in 140ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .webui-user-menu-signin-panel {
+      animation: none;
+    }
   }
   .signin-card-container {
     width: 339px;

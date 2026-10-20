@@ -98,7 +98,7 @@ export function WebuiPlanDeliveryCard({
       <div className="webui-plan-delivery-header" data-testid="plan-delivery-header">
         <div className="webui-plan-delivery-heading">
           <div className="webui-plan-delivery-icon" data-testid="plan-delivery-icon" aria-hidden="true">
-            <WebuiIconCommandPlan className="size-full" />
+            <WebuiIconCommandPlan className="h-full w-full" />
           </div>
           <div className="webui-plan-delivery-heading-text">
             <h4 className="webui-plan-delivery-title" data-testid="plan-delivery-title" title={title}>

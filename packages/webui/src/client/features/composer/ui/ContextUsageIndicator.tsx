@@ -16,15 +16,13 @@ import type { WebuiUsageQuotaResult } from "../../../../shared/contracts/usage-q
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { breakdownSegmentPercent, breakdownShareLabel, breakdownSwatchStyle, contextBreakdownRows, drawableBreakdownRows } from "../projection/context-breakdown.js";
 import {
-  contextUsagePopoverStyle,
   positionContextUsagePopover,
-  sameContextUsagePlacement,
-  type ContextUsagePlacement,
 } from "../projection/context-usage-popover.js";
-import { readUsageNumber } from "../../transcript/contracts/message-stream.js";
+import { readContextWindowUsage } from "../contracts/context-usage.js";
 import { isTokenPlanModel } from "../../models/projection/token-plan-model.public.js";
 import { formatUsageResetLabel } from "../../account/projection/usage.public.js";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactElement } from "react";
+import { WebuiDropdown, type WebuiDropdownPlacementArgs } from "../../../ui/Dropdown.js";
+import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
 
 export function ContextUsageIndicator({ usage, usageQuota, planModel }: {
   readonly usage?: Record<string, unknown>;
@@ -42,60 +40,23 @@ export function ContextUsageIndicator({ usage, usageQuota, planModel }: {
   // because of something they did a minute ago.
   const [breakdownOpen, setBreakdownOpen] = useState(false);
   const anchorRef = useRef<HTMLDivElement | null>(null);
-  const surfaceRef = useRef<HTMLDivElement | null>(null);
-  const [placement, setPlacement] = useState<ContextUsagePlacement | undefined>(undefined);
   /**
-   * Place the panel from the ring's rectangle rather than from CSS offsets.
+   * The panel's own placement rule.
    *
-   * It was `position: absolute` with `right: -4px` and `bottom: calc(100% + 8px)`,
-   * which reads as "anchored to the ring" and is not. Those offsets resolve
-   * against the nearest POSITIONED ancestor, and the session column above the
-   * composer is `overflow: hidden` — so a 480px panel right-aligned to a ring
-   * about a third of the way across that column reaches past the column's own
-   * left edge and the clip silently takes the rest. On a 240px rail that is a
-   * panel missing its heading, its figures and the label of every plan meter.
+   * The shared skeleton places the panel against the ring's rectangle and
+   * supplies the surface, the motion and the dismissal; WHAT the rule says is
+   * the composer's business, and it is not the general one: the panel opens
+   * ABOVE the ring with its right edges aligned, never below, and it is
+   * clamped into the viewport rather than flipped.
    *
-   * `fixed` is the fix for THAT, and it is the same fix `flyout-position.ts`
-   * gives the model fly-out for the same reason: an overlay has to escape the
-   * surface that happens to contain it. It is not the whole fix — the composer
-   * also sits inside a stacking context that the rail outranks, which no amount
-   * of measuring from here can reach. See the overlay's own rule in the sheet.
-   *
-   * Measured on every render while open, because the panel is its own worst
-   * witness: opening the disclosure adds six rows and a taller panel, which moves
-   * the top edge and can push the last row off screen if the placement was frozen
-   * at the closed height. `sameContextUsagePlacement` is what makes measuring
-   * that often free.
+   * The rule lives in `projection/context-usage-popover.ts` and is pure, so it
+   * can be tested against real numbers instead of a screenshot.
    */
-  const measurePanel = useCallback(() => {
-    const anchor = anchorRef.current;
-    const surface = surfaceRef.current;
-    if (!anchor || !surface) return;
-    const rect = surface.getBoundingClientRect();
-    setPlacement((current) => {
-      const next = positionContextUsagePopover({
-        anchor: anchor.getBoundingClientRect(),
-        surface: { width: rect.width, height: rect.height },
-        viewport: { width: window.innerWidth, height: window.innerHeight },
-      });
-      return sameContextUsagePlacement(current, next) ? current : next;
-    });
-  }, []);
-  useLayoutEffect(() => {
-    if (open) measurePanel();
-  });
-  useEffect(() => {
-    if (!open) return undefined;
-    // The ring is in a column that scrolls, and the panel is fixed, so without
-    // this it would stay put while the composer moved out from under it.
-    window.addEventListener("scroll", measurePanel, true);
-    window.addEventListener("resize", measurePanel);
-    return () => {
-      window.removeEventListener("scroll", measurePanel, true);
-      window.removeEventListener("resize", measurePanel);
-    };
-  }, [open, measurePanel]);
-  useEffect(() => {
+  const placePanel = useCallback(
+    ({ anchor, surface, viewport }: WebuiDropdownPlacementArgs) =>
+      positionContextUsagePopover({ anchor, surface, viewport }),
+    [],
+  );  useEffect(() => {
     const refresh = () => setEnabled(storage.getItem("webui-context-window-usage") !== "false");
     const stopStorage = dom.listenForStorageChange(refresh);
     const stopPreferenceChange = dom.listenForContextWindowUsageChange(refresh);
@@ -111,33 +72,36 @@ export function ContextUsageIndicator({ usage, usageQuota, planModel }: {
   // again. A pointer crossing the ring now gets the ring's NAME and nothing
   // else, which is the only question a pointer can usefully ask about a
   // progress ring, and the click is what says "show me the numbers".
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!anchorRef.current?.contains(event.target as Node | null)) setOpen(false);
-    };
-    // `pointerdown` rather than `click` so the press that lands outside also
-    // dismisses the panel instead of being swallowed by whatever is underneath.
-    return dom.listenForPointerDown(onPointerDown, true);
-  }, [dom, open]);
-  if (!enabled || !usage) return null;
-  // The runtime protocol's names, not invented ones — see
+  // The dismissal — an outside press and Escape — belongs to the shared
+  // skeleton now, which reads the press before the click reaches whatever was
+  // underneath.
+  if (!enabled || !usage) return null;  // The runtime protocol's names, not invented ones — see
   // `server/projections/context-snapshot.ts`, which is the other half of this
   // read. The snake_case spellings are the wire's, so they are the primary
   // keys; the camelCase ones stay accepted because `WebuiUsageQuotaResult` and
   // the quota rows already publish that vocabulary, and a readout that renders
   // from one shape and not the other is a readout that half the time is blank.
-  const used = readUsageNumber(usage, "total_tokens", "usedTokens", "used_tokens");
-  const limit = readUsageNumber(
-    usage,
-    "context_window",
-    "contextWindowTokens",
-    "context_window_tokens",
-  );
-  if (used === undefined || used < 0 || limit === undefined || limit <= 0) return null;
-  const percent = Math.min(100, Math.max(0, Math.round(used / limit * 100)));
+  // The numbers are read through the one helper that knows every spelling the
+  // runtime's usage travels in — see `readContextWindowUsage` for why the
+  // spellings differ and what reading only one of them cost.
+  const { used, limit } = readContextWindowUsage(usage);
+  // The ring appears as soon as the session HAS context. A single token spent
+  // is a spent window: the ring is the statement "this session has context,
+  // and here is how much of the window it is", and a ring that waited for the
+  // session to be "big enough" answered the reader's question by staying
+  // silent. A session with no usage record at all still shows nothing —
+  // there is no window to be partly full.
+  if (used === undefined || used < 0) return null;
+  // The window is a SEPARATE fact. A model whose window the runtime does not
+  // know still has a spent window, and "we spent this much, and the window is
+  // unknown" is a fact the readout can carry — so the ring is there, and it
+  // says so instead of claiming a percentage it cannot compute.
+  const windowKnown = limit !== undefined && limit > 0;
+  const percent = windowKnown ? Math.min(100, Math.max(0, Math.round(used / limit * 100))) : 0;
   const circumference = 2 * Math.PI * 7;
-  const label = `${percent}% · ${formatContextTokens(used)} / ${formatContextTokens(limit)} tokens`;
+  const label = windowKnown
+    ? `${percent}% · ${formatContextTokens(used)} / ${formatContextTokens(limit)} tokens`
+    : `${formatContextTokens(used)} tokens · 窗口大小未知`;
   // Always all six categories, in the reference's fixed order, with a dash for
   // whatever the engine did not report. See `features/composer/projection/context-breakdown.ts`
   // for why a missing category is a dash and not `0.0%`.
@@ -170,66 +134,45 @@ export function ContextUsageIndicator({ usage, usageQuota, planModel }: {
       className="webui-context-usage-anchor"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      onKeyDown={(event) => {
-        if (event.key === "Escape") setOpen(false);
-      }}
     >
-      <button
-        type="button"
-        className="webui-context-usage-trigger"
-        aria-label={`上下文窗口使用 ${label}`}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        title={`上下文窗口 ${label}`}
-        data-testid="composer-context-usage"
-        onClick={() => {
-          setOpen((value) => !value);
+      <WebuiDropdown
+        open={open}
+        onOpen={() => {
+          setOpen(true);
           setBreakdownOpen(false);
         }}
-      >
-        <svg viewBox="0 0 18 18" aria-hidden="true">
-          <circle className="webui-context-usage-track" cx="9" cy="9" r="7" />
-          <circle
-            className="webui-context-usage-value"
-            cx="9"
-            cy="9"
-            r="7"
-            style={{
-              strokeDasharray: circumference,
-              strokeDashoffset: circumference * (1 - percent / 100),
-            }}
-          />
-        </svg>
-      </button>
-      {/*
-        The hover label, and it is the WHOLE of what hovering produces. A ring
-        with no name is the one control in the toolbar that says nothing about
-        what it measures; naming it costs one line, and the alternative — the
-        full panel under the pointer — costs a panel over the transcript on
-        every pass towards the send button.
-
-        The name only, not the percentage: the panel is one click away and
-        already opens on this control, so a tooltip carrying figures would be a
-        second readout of the same ring at a different size. `aria-hidden`
-        because the button's own label already announces it, and a bubble that
-        duplicates what assistive technology was just told is read twice.
-      */}
-      <span
-        className="webui-context-usage-label"
-        aria-hidden="true"
-        data-webui-context-usage-label={hovered && !open ? "true" : "false"}
-      >
-        上下文窗口
-      </span>
-      <div
-        ref={surfaceRef}
-        className={`webui-context-usage-popover${open ? " is-open" : ""}`}
+        onClose={() => setOpen(false)}
         role="dialog"
-        aria-label="上下文窗口使用情况"
-        aria-hidden={!open}
-        style={placement ? contextUsagePopoverStyle(placement) : undefined}
+        ariaLabel="上下文窗口使用情况"
+        className="webui-context-usage-popover"
+        anchorElementRef={anchorRef}
+        placement={placePanel}
+        trigger={(triggerProps) => (
+          <button
+            type="button"
+            className="webui-context-usage-trigger"
+            aria-label={`上下文窗口使用 ${label}`}
+            title={`上下文窗口 ${label}`}
+            data-testid="composer-context-usage"
+            {...triggerProps}
+          >
+            <svg viewBox="0 0 18 18" aria-hidden="true">
+              <circle className="webui-context-usage-track" cx="9" cy="9" r="7" />
+              <circle
+                className="webui-context-usage-value"
+                cx="9"
+                cy="9"
+                r="7"
+                style={{
+                  strokeDasharray: circumference,
+                  strokeDashoffset: circumference * (1 - percent / 100),
+                }}
+              />
+            </svg>
+          </button>
+        )}
       >
-          {/*
+        {/*
             The heading is the panel's own disclosure control. The panel opens
             showing how full the window is and how much of the plan is left —
             the two things a glance is for — and the six-category split stays
@@ -252,7 +195,7 @@ export function ContextUsageIndicator({ usage, usageQuota, planModel }: {
           >
             <span>上下文窗口</span>
             <span className="webui-context-usage-heading-value">
-              {percent}%
+              {windowKnown ? `${percent}%` : "—"}
               <span
                 aria-hidden="true"
                 className={`webui-context-usage-chevron${breakdownOpen ? " is-open" : ""}`}
@@ -269,17 +212,23 @@ export function ContextUsageIndicator({ usage, usageQuota, planModel }: {
             aria-label="上下文窗口使用量"
             aria-valuemin={0}
             aria-valuemax={100}
-            aria-valuenow={percent}
+            // A bar with no `aria-valuenow` is the indeterminate form: the
+            // window is unknown, so there is no share of it to report.
+            {...(windowKnown ? { "aria-valuenow": percent } : {})}
           >
             {componentsTotal > 0 ? drawableRows.map((row) => (
               <span
                 key={row.kind}
                 className="webui-context-usage-bar-segment"
-                style={{ width: `${breakdownSegmentPercent(row, limit)}%`, ...breakdownSwatchStyle(row) }}
+                style={{ width: `${breakdownSegmentPercent(row, limit ?? 0)}%`, ...breakdownSwatchStyle(row) }}
               />
             )) : <span style={{ width: `${percent}%` }} />}
           </div>
-          <div className="webui-context-usage-tokens">{formatContextTokens(used)} / {formatContextTokens(limit)} tokens</div>
+          <div className="webui-context-usage-tokens">
+            {windowKnown
+              ? `${formatContextTokens(used)} / ${formatContextTokens(limit)} tokens`
+              : `${formatContextTokens(used)} tokens · 窗口大小未知`}
+          </div>
           {/*
             Hidden rather than unmounted, so the bar's segment widths above and
             the panel's height do not both jump on the first open. `hidden` is
@@ -339,7 +288,27 @@ export function ContextUsageIndicator({ usage, usageQuota, planModel }: {
               }) : <div className="webui-context-usage-tokens">当前套餐没有可显示的限额</div>}
             </>
           ) : null}
-      </div>
+      </WebuiDropdown>
+      {/*
+        The hover label, and it is the WHOLE of what hovering produces. A ring
+        with no name is the one control in the toolbar that says nothing about
+        what it measures; naming it costs one line, and the alternative — the
+        full panel under the pointer — costs a panel over the transcript on
+        every pass towards the send button.
+
+        The name only, not the percentage: the panel is one click away and
+        already opens on this control, so a tooltip carrying figures would be a
+        second readout of the same ring at a different size. `aria-hidden`
+        because the button's own label already announces it, and a bubble that
+        duplicates what assistive technology was just told is read twice.
+      */}
+      <span
+        className="webui-context-usage-label"
+        aria-hidden="true"
+        data-webui-context-usage-label={hovered && !open ? "true" : "false"}
+      >
+        上下文窗口
+      </span>
     </div>
   );
 }

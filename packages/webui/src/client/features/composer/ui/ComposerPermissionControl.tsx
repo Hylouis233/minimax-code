@@ -5,13 +5,14 @@
 // here now, together with the one glyph-per-mode helper, so what the control
 // can say is defined beside the control.
 //
-// Two pieces deliberately stayed with the composer and arrive as props: the
-// open flag and the wrap ref, because the composer's dismiss group coordinates
-// this surface with the `+` menu and the mention range in one listener, and the
-// trigger's click also closes those. The control therefore reports the intent
-// (`onToggleRequest`, `onClose`) instead of owning that coordination.
+// The open flag and the intent stay with the composer, because the trigger's
+// click also closes the composer's other surfaces. The dismissal does not: the
+// popover is a `WebuiDropdown`, so the shared skeleton owns the outside press
+// and the Escape — the same way it does for every other dropdown in the client.
 
-import type { ReactElement, Ref } from "react";
+import type { ReactElement } from "react";
+
+import { WebuiDropdown } from "../../../ui/Dropdown.js";
 
 import type { WebuiPermissionMode } from "../../../features/settings/contracts/settings-port.js";
 import type { WebuiIconProps } from "../../../shell/icons.js";
@@ -72,8 +73,6 @@ export interface WebuiComposerPermissionControlProps {
   readonly busy: boolean;
   readonly unavailable: boolean;
   readonly menuOpen: boolean;
-  /** The wrap the composer's dismiss group tests containment against. */
-  readonly wrapRef: Ref<HTMLDivElement>;
   /** The trigger was pressed: the composer closes the other surfaces and toggles. */
   readonly onToggleRequest: () => void;
   readonly onClose: () => void;
@@ -85,30 +84,39 @@ export function WebuiComposerPermissionControl({
   busy,
   unavailable,
   menuOpen,
-  wrapRef,
   onToggleRequest,
   onClose,
   onChangeMode,
 }: WebuiComposerPermissionControlProps) {
   return (
-    <div className="webui-composer-permission-wrap" ref={wrapRef}>
-      <button
-        type="button"
-        className={`webui-composer-permission-button${mode === "bypassPermissions" ? " webui-composer-permission-button--warning" : ""}`}
-        aria-label={mode ? `授权模式：${PERMISSION_MODE_OPTION[mode].label}` : "授权模式"}
-        aria-haspopup="menu"
-        aria-expanded={menuOpen}
-        disabled={unavailable || busy || !mode}
-        title={unavailable ? "授权模式当前不可用" : undefined}
-        data-testid="composer-permission-mode"
-        onClick={onToggleRequest}
-      >
-        {mode ? <PermissionModeIcon mode={mode} /> : <WebuiIconPermissionRequest className="webui-composer-permission-icon" />}
-        <span>{mode ? PERMISSION_MODE_OPTION[mode].label : unavailable ? "授权不可用" : "读取授权模式…"}</span>
-        <WebuiIconChevronDown className="webui-composer-permission-chevron" />
-      </button>
-      {menuOpen ? <div className="webui-composer-permission-menu" role="menu" aria-label={PERMISSION_MODE_QUESTION} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); onClose(); } }}>
-        <div className="webui-composer-permission-header">
+    <WebuiDropdown
+      open={menuOpen}
+      onOpen={onToggleRequest}
+      onClose={onClose}
+      role="menu"
+      ariaLabel={PERMISSION_MODE_QUESTION}
+      side="top"
+      align="start"
+      offset={8}
+      wrapperClassName="webui-composer-permission-wrap"
+      className="webui-composer-permission-menu"
+      trigger={(triggerProps) => (
+        <button
+          type="button"
+          {...triggerProps}
+          className={`webui-composer-permission-button${mode === "bypassPermissions" ? " webui-composer-permission-button--warning" : ""}`}
+          aria-label={mode ? `授权模式：${PERMISSION_MODE_OPTION[mode].label}` : "授权模式"}
+          disabled={unavailable || busy || !mode}
+          title={unavailable ? "授权模式当前不可用" : undefined}
+          data-testid="composer-permission-mode"
+        >
+          {mode ? <PermissionModeIcon mode={mode} /> : <WebuiIconPermissionRequest className="webui-composer-permission-icon" />}
+          <span>{mode ? PERMISSION_MODE_OPTION[mode].label : unavailable ? "授权不可用" : "读取授权模式…"}</span>
+          <WebuiIconChevronDown className="webui-composer-permission-chevron" />
+        </button>
+      )}
+    >
+      <div className="webui-composer-permission-header">
           <span className="webui-composer-permission-question">{PERMISSION_MODE_QUESTION}</span>
           <a
             className="webui-composer-permission-learn-more"
@@ -142,7 +150,6 @@ export function WebuiComposerPermissionControl({
             </button>
           );
         })}
-      </div> : null}
-    </div>
+    </WebuiDropdown>
   );
 }

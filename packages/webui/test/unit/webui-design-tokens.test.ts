@@ -6,7 +6,7 @@
 // semantic tokens with light and dark bindings on a `.light` / `.dark` class.
 
 import { describe, it, expect, beforeAll } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -56,6 +56,40 @@ function declarationsFor(block: string): Set<string> {
   let match;
   while ((match = regex.exec(block)) !== null) names.add(match[1]);
   return names;
+}
+
+/** A `className` attribute, in the three shapes the client writes. */
+const CLASS_NAME_ATTRIBUTE =
+  /className\s*=\s*(?:"([^"]*)"|\{`([^`]*)`\}|\{'([^']*)'\})/gu;
+
+/**
+ * The class name itself, without the variant prefixes.
+ *
+ * A source token reads `hover:size-4`; the same class in the compiled
+ * stylesheet reads `hover\:size-4`, and a rule that also carries a
+ * pseudo-class reads `hover\:size-4:hover`. All three name the base utility
+ * `size-4`, and that is what the comparison is about.
+ */
+function normalizeSizeClass(token: string): string {
+  const unescaped = token.replace(/\\(.)/gu, "$1");
+  const segments = unescaped.split(":");
+  const utility = [...segments].reverse().find((segment) => segment.startsWith("size-"));
+  return utility ?? unescaped;
+}
+
+/** Every TypeScript source file under the client tree. */
+function clientSourceFiles(): string[] {
+  const root = path.join(packageDir, "src/client");
+  const files: string[] = [];
+  const walk = (directory: string): void => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const filename = path.join(directory, entry.name);
+      if (entry.isDirectory()) walk(filename);
+      else if (/\.(?:ts|tsx)$/u.test(filename)) files.push(filename);
+    }
+  };
+  walk(root);
+  return files;
 }
 
 let tokens: string;
@@ -210,6 +244,52 @@ describe("WebUI compiled stylesheet", () => {
   it("keeps the dynamically selected review diff row backgrounds in the compiled CSS", () => {
     expect(compiled).toMatch(/\.webui-turn-review-line--addition\s*\{[^}]*background:\s*var\(--bg_status_positive\)/u);
     expect(compiled).toMatch(/\.webui-turn-review-line--deletion\s*\{[^}]*background:\s*var\(--bg_status_error\)/u);
+  });
+
+  it("has no size utility in the client source that the design system does not define", () => {
+    // `tailwind.config.cjs` replaces Tailwind's `size` scale with the token
+    // scale (`size_12` … `size_64`) and adds the numeric scale under
+    // `theme.extend.spacing.size`. Neither carries `full`, so `size-full` is
+    // not a class this project has: the Tailwind build drops it, and a
+    // dropped class is a no-op that says nothing. The element it was meant to
+    // size keeps whatever size it had — an avatar whose picture stops
+    // covering its frame, for instance, which reads as a second circle
+    // behind the first rather than as a missing class.
+    //
+    // Tailwind only emits the classes the content scan finds, so the compiled
+    // stylesheet is the honest list of what this project actually has. Every
+    // `size-*` class the source names has to be on it.
+    const compiledSizeClasses = new Set(
+      [...compiled.matchAll(/\.([^\s,{}<>]+)/gu)]
+        .map((match) => match[1])
+        .filter((selector) => selector.includes("size-"))
+        .map((selector) => normalizeSizeClass(selector)),
+    );
+
+    const missing: string[] = [];
+    for (const file of clientSourceFiles()) {
+      const source = readFileSync(file, "utf8");
+      for (const match of source.matchAll(CLASS_NAME_ATTRIBUTE)) {
+        const value = match[1] ?? match[2] ?? match[3] ?? "";
+        for (const token of value.split(/\s+/u)) {
+          if (!token.startsWith("size-") && !/:size-/u.test(token)) continue;
+          if (/[$}{]/u.test(token)) continue; // a class name built at runtime
+          const normalized = normalizeSizeClass(token);
+          if (!compiledSizeClasses.has(normalized)) {
+            missing.push(`${path.relative(packageDir, file)}: ${normalized}`);
+          }
+        }
+      }
+    }
+
+    if (missing.length > 0) {
+      throw new Error(
+        `the client source names ${missing.length} size utility(ies) this design system ` +
+          `does not define, so Tailwind drops them and they render as no-ops:\n` +
+          missing.sort().join("\n"),
+      );
+    }
+    expect(missing.length).toBe(0);
   });
 
   it("closes every var(--name) reference against a definition in the same stylesheet", () => {

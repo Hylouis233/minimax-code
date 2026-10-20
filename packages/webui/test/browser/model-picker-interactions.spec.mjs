@@ -2,6 +2,11 @@ import { expect } from "@playwright/test";
 
 import { configureFixture, openApp, test } from "./harness.mjs";
 
+// The menu and its fly-out are shared-skeleton popups, so they render into the
+// portal at the end of the document: they hang off the trigger in viewport
+// coordinates rather than out of the selector's box. Their markers are
+// therefore found from the page, not from inside `[data-webui-model-selector]`.
+// What still lives under the selector is the trigger that opens the menu.
 function setPickerModels() {
   window.__fixture.setModels([
     {
@@ -33,8 +38,8 @@ test("hover opens the settings fly-out after a delay and outside pointer closes 
   const menu = page.getByRole("dialog");
   const row = menu.getByRole("option", { name: /Fixture Configurable/ });
   await row.hover();
-  await expect(selector.locator('[data-webui-model-tier="settings"]')).toBeVisible();
-  await expect(selector.locator('[data-webui-model-flyout="tier-one"]')).toBeVisible();
+  await expect(page.locator('[data-webui-model-tier="settings"]')).toBeVisible();
+  await expect(page.locator('[data-webui-model-flyout="tier-one"]')).toBeVisible();
   if (process.env.WEBUI_DECOMPOSITION_SCREENSHOT) {
     await page.screenshot({ path: process.env.WEBUI_DECOMPOSITION_SCREENSHOT });
   }
@@ -50,9 +55,9 @@ test("keyboard activates a row immediately and search focus retracts its fly-out
   const search = menu.getByRole("searchbox", { name: "搜索模型" });
   await search.focus();
   await search.press("ArrowDown");
-  await expect(selector.locator('[data-webui-model-tier="settings"]')).toBeVisible();
+  await expect(page.locator('[data-webui-model-tier="settings"]')).toBeVisible();
   await menu.getByRole("option", { name: /Fixture Configurable/ }).focus();
   await search.focus();
-  await expect(selector.locator('[data-webui-model-tier="list"]')).toBeVisible();
-  await expect(selector.locator('[data-webui-model-flyout="tier-one"]')).toHaveCount(0);
+  await expect(page.locator('[data-webui-model-tier="list"]')).toBeVisible();
+  await expect(page.locator('[data-webui-model-flyout="tier-one"]')).toHaveCount(0);
 });

@@ -89,6 +89,44 @@ in-process tick loop and its `<dataDir>/webui/scheduled-tasks.sqlite` store are 
 `cronService` for this client, but nothing in the browser surfaces them, and no plan exists to
 restore the removed surface (the retirement decision is in the branch history).
 
+## 8. Browser Use has an adoption seam but no WebUI provider or panel
+
+The runtime can adopt a host-supplied provider (`src/runtime/browser-provider.ts`), and the runtime
+assembly accepts that provider. Both the development WebUI entry point
+(`scripts/run-webui-server.mjs`) and the packaged production entry point
+(`release/webui-npm/bin/mcode-webui.mjs`) currently create the runtime without one. The client has no
+browser panel, and Settings has no Browser Use authorization controls. Therefore the accepted
+direction in [ADR 0019](adr/0019-webui-browser-use-surfaces-and-external-browser-bridge.md) is not
+implemented. ADR 0019 is the sole record of its decisions and remaining design questions.
+
+## 9. The Mini App capability is not reachable from this client
+
+The runtime owns a Mini App service — a supervisor, a node runtime that spawns the Mini App's own
+process, a plugin package reader, and a session Mini App lifecycle. None of it is reachable from
+the WebUI:
+
+- `local-runtime-v2/src/service/miniapp/composition.ts` returns no options unless the runtime owner
+  kind is `electron`, so in the WebUI process the Mini App supervisor is never initialized and
+  `miniappAvailable` is false.
+- `CliService` has no Mini App method, so there is no client entry for the capability the runtime
+  already owns in `application/session/process-local-miniapp-application.ts`.
+- The client has no Mini App view, no proxy, and no page bridge.
+
+The Mini App contract in this repository is also one generation behind the implementation shipped
+in the desktop client: `packages/shared/src/miniapp-surface.ts` here is 54 lines against 1267
+there, and this repository's runtime has no credential guard on the Mini App's own HTTP server.
+The newer contract is in neither this repository nor the public upstream tree, so it does not
+arrive by synchronization. The accepted direction for this client is in
+[ADR 0020](adr/0020-webui-miniapp-view-and-runtime-seams.md), including the contract-baseline
+question it leaves open.
+
+The owner-kind gate is also decided in the wrong place. The runtime owner policy resolves once per
+host and drives the other owner-derived service gates — cron, channels, the scheduler — from its
+cells, while the Mini App gate compares the raw kind string inside its own service
+(`local-runtime-v2/src/service/miniapp/composition.ts`). That is why §2 lists it as a branch no
+change to this client's row can reach. The accepted shape moves the Mini App service into the
+policy as a wiring cell this client's row carries.
+
 ## Reported as missing, and actually correct
 
 - **The thirteen runtime-owner cells are not read by this package.** That is expected: they are

@@ -29,9 +29,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   CONTEXT_POPOVER_EDGE_OFFSET,
-  contextUsagePopoverStyle,
   positionContextUsagePopover,
-  sameContextUsagePlacement,
 } from "../../src/client/features/composer/projection/context-usage-popover.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -40,6 +38,9 @@ const clientDir = path.resolve(here, "../../src/client");
 function readClient(relative: string): string {
   return readFileSync(path.join(clientDir, relative), "utf8");
 }
+
+/** The shared skeleton, which places the panel and owns its dismissal. */
+const dropdown = readClient("ui/Dropdown.tsx");
 
 /** A 1209x1235 window, the size the bug was reported at. */
 const VIEWPORT = { width: 1209, height: 1235 };
@@ -140,29 +141,25 @@ describe("context-usage panel — placed from the ring, not from CSS offsets", (
     expect(placement.left).toBe(8);
   });
 
-  it("emits fixed left/top and nothing else", () => {
+  it("emits fixed left/top, the side it opened on, and nothing else", () => {
     // `fixed` is what escapes the column's `overflow: hidden`. `right`/`bottom`
     // must NOT reappear: with a viewport-sized panel they would win over a
     // measured `left` and put it back against the window edge.
-    expect(contextUsagePopoverStyle({ left: 112, top: 928 })).toEqual({
-      position: "fixed",
-      left: "112px",
-      top: "928px",
+    //
+    // The style itself is the shared skeleton's now — it writes the measured
+    // `left`/`top` as inline styles on the popup, and the popup is `fixed` —
+    // so what this file asserts is the RULE's arithmetic, and the sheet's
+    // `position: fixed` is asserted above.
+    //
+    // The side is part of the answer because the shared layer needs it: the
+    // motion slides the panel the way it came, and this panel always comes up
+    // from below the ring.
+    const placement = positionContextUsagePopover({
+      anchor: RING,
+      surface: PANEL,
+      viewport: VIEWPORT,
     });
-  });
-
-  it("treats an unchanged measurement as no change at all", () => {
-    // The measure runs on every render while the panel is open, so without this
-    // each measurement would schedule a render that measures again.
-    const a = { left: 112, top: 928 };
-    const b = { left: 112, top: 928 };
-
-    expect(sameContextUsagePlacement(a, b)).toBe(true);
-    expect(sameContextUsagePlacement(a, a)).toBe(true);
-    expect(sameContextUsagePlacement(a, { left: 112, top: 700 })).toBe(false);
-    expect(sameContextUsagePlacement(undefined, undefined)).toBe(true);
-    expect(sameContextUsagePlacement(a, undefined)).toBe(false);
-    expect(sameContextUsagePlacement(undefined, a)).toBe(false);
+    expect(placement).toEqual({ left: 112, top: 928, side: "top" });
   });
 });
 
@@ -184,7 +181,16 @@ describe("context-usage panel — the shape the source has to keep", () => {
   const popoverRule = css.slice(start, css.indexOf("}", start) + 1);
 
   it("is positioned fixed, so the column's overflow cannot clip it", () => {
-    expect(popoverRule).toMatch(/\.webui-context-usage-popover \{ position: fixed;/u);
+    // The panel is a dropdown now, so the `fixed` that escapes the column's
+    // `overflow: hidden` is stated by the shared layer rather than by the
+    // panel's own rule — and the panel's own rule says nothing about where it
+    // is, which is the property that actually matters: a second `position` or
+    // an offset in the feature sheet would fight the measured placement.
+    const shared = readClient("styles/dropdown.css");
+    const sharedStart = shared.indexOf(".webui-dropdown-popup {");
+    const sharedRule = shared.slice(sharedStart, shared.indexOf("}", sharedStart) + 1);
+    expect(sharedRule).toMatch(/\.webui-dropdown-popup \{\s*position: fixed;/u);
+    expect(popoverRule).not.toContain("position:");
   });
 
   it("has an overlay that outranks the rail, because the panel is inside it", () => {
@@ -217,17 +223,23 @@ describe("context-usage panel — the shape the source has to keep", () => {
   });
 
   it("takes its coordinates from a measurement of the ring and the panel", () => {
-    expect(indicator).toContain("anchor: anchor.getBoundingClientRect()");
-    expect(indicator).toContain("surface: { width: rect.width, height: rect.height }");
-    expect(indicator).toContain("viewport: { width: window.innerWidth, height: window.innerHeight }");
-    expect(indicator).toContain("style={placement ? contextUsagePopoverStyle(placement) : undefined}");
+    // The panel is placed by the shared skeleton, which measures the anchor
+    // and the panel and hands both to the placement rule. The rule is this
+    // file's — the same one, unchanged, that these cases have always tested.
+    expect(indicator).toContain("positionContextUsagePopover({ anchor, surface, viewport })");
+    expect(indicator).toContain("placement={placePanel}");
+    expect(indicator).toContain("anchorElementRef={anchorRef}");
   });
 
   it("re-measures while open, and follows the ring when the column scrolls", () => {
-    // The panel is fixed and the composer is not, so a scroll that moves one and
-    // not the other leaves the panel pointing at nothing.
-    expect(indicator).toMatch(/useLayoutEffect\(\(\) => \{\s*if \(open\) measurePanel\(\);/u);
-    expect(indicator).toContain('window.addEventListener("scroll", measurePanel, true)');
-    expect(indicator).toContain('window.addEventListener("resize", measurePanel)');
+    // The panel grows by six rows when the disclosure opens, so the placement
+    // has to follow the panel's own size; and the ring is in a column that
+    // scrolls, so the placement has to follow the ring. Both are the shared
+    // skeleton's now, and the skeleton's scroll listener is a capture-phase
+    // one, so it hears the column's scroll and not only the window's.
+    expect(indicator).not.toContain("measurePanel");
+    expect(dropdown).toContain("dom.observeSize(popup, place)");
+    expect(dropdown).toContain("dom.listenForScroll(place)");
+    expect(dropdown).toContain("dom.listenForResize(place)");
   });
 });

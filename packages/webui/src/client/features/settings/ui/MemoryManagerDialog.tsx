@@ -17,6 +17,7 @@ import { basenamePath } from "../../../projection/common/paths.js";
 import type { WebuiAgentMemoryView, WebuiMemorySettingsView } from "../../../../shared/contracts/personalization.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
+import { WebuiDropdown } from "../../../ui/Dropdown.js";
 import {
   formatMemoryTimestamp,
   isMemorySaveable,
@@ -301,35 +302,34 @@ export function MemoryManagerDialog({
         <div className="webui-personalization-header">
           <h3>记忆摘要</h3>
           <div className="webui-memory-manager-header-actions">
-            <button
-              type="button"
-              aria-label="更多操作"
-              aria-haspopup="menu"
-              aria-expanded={menuOpen}
-              data-testid="agent-memory-menu"
-              className="webui-settings-icon-button"
-              onClick={() => setMenuOpen((open) => !open)}
+            <WebuiDropdown
+              open={menuOpen}
+              onOpen={() => setMenuOpen(true)}
+              onClose={() => setMenuOpen(false)}
+              role="menu"
+              ariaLabel="记忆操作"
+              testId="agent-memory-menu-panel"
+              // The menu hangs off the right edge of the ⋯ button, which is
+              // what `align="end"` says.
+              align="end"
+              className="webui-memory-manager-menu"
+              trigger={(triggerProps) => { const { ref, ...rest } = triggerProps; return (
+                <button
+                  type="button"
+                  {...rest}
+                  ref={ref}
+                  aria-label="更多操作"
+                  data-testid="agent-memory-menu"
+                  className="webui-settings-icon-button"
+                >
+                  <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <circle cx="3" cy="8" r="1.4" />
+                    <circle cx="8" cy="8" r="1.4" />
+                    <circle cx="13" cy="8" r="1.4" />
+                  </svg>
+                </button>
+              ); }}
             >
-              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                <circle cx="3" cy="8" r="1.4" />
-                <circle cx="8" cy="8" r="1.4" />
-                <circle cx="13" cy="8" r="1.4" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              aria-label="关闭"
-              data-testid="agent-memory-close"
-              className="webui-settings-icon-button"
-              onClick={onClose}
-            >
-              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="m4 4 8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
-              </svg>
-            </button>
-          </div>
-          {menuOpen ? (
-            <div role="menu" aria-label="记忆操作" data-testid="agent-memory-menu-panel" className="webui-memory-manager-menu">
               {onCreateInSession ? (
                 <button type="button" role="menuitem" data-testid="agent-memory-create-in-session" onClick={handoff}>
                   <svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" className="webui-memory-manager-menu-icon">
@@ -357,8 +357,19 @@ export function MemoryManagerDialog({
                 </svg>
                 删除记忆
               </button>
-            </div>
-          ) : null}
+            </WebuiDropdown>
+            <button
+              type="button"
+              aria-label="关闭"
+              data-testid="agent-memory-close"
+              className="webui-settings-icon-button"
+              onClick={onClose}
+            >
+              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="m4 4 8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
         </div>
         {loading ? (
           <p data-testid="agent-memory-loading" className="webui-personalization-meta">

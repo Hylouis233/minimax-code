@@ -86,7 +86,9 @@
   .webui-file-code .hljs-title, .webui-file-code .hljs-title.function_, .webui-file-code .hljs-function, .webui-file-code .hljs-section { color: var(--text_label_accent_default); }
   .webui-file-code .hljs-type, .webui-file-code .hljs-built_in, .webui-file-code .hljs-title.class_ { color: var(--text_label_danger_secondary_default); }
   .webui-file-code .hljs-attr, .webui-file-code .hljs-variable, .webui-file-code .hljs-property { color: var(--text_default_secondary); }
-  .webui-workspace-add-menu { position: absolute; top: calc(100% + 4px); left: 0; z-index: 20; display: flex; min-width: 198px; flex-direction: column; gap: 2px; padding: 4px; border: 1px solid var(--border_default); border-radius: 14px; background: var(--bg_grouped_secondary_elevated); box-shadow: 0 8px 24px rgb(0 0 0 / 12%); color: var(--text_default_primary); }
+  /* The add menu's surface and its placement come from the shared dropdown
+   * layer (`.webui-dropdown-popup`); this rule only says what the menu holds. */
+  .webui-workspace-add-menu { display: flex; min-width: 198px; flex-direction: column; gap: 2px; padding: 4px; color: var(--text_default_primary); }
   .webui-workspace-add-menu button { width: 100%; min-height: 34px; justify-content: flex-start; gap: var(--spacing_8); border-radius: 8px; padding: 0 10px; color: inherit; font-size: var(--size_14); text-align: left; white-space: nowrap; }
   .webui-workspace-add-menu button:hover { background: var(--bg_interaction_tertiary_hover); }
   .webui-workspace-add-menu button svg { color: var(--icon_default_secondary); }
@@ -504,7 +506,9 @@
      the border. A padding override is decided by the cascade and does not
      depend on that. */
   .webui-memory-manager-surface .webui-personalization-header { position: relative; padding-right: 0; }
-  .webui-memory-manager-menu { position: absolute; z-index: 1; top: calc(100% + var(--spacing_4)); right: var(--spacing_16); display: flex; min-width: 168px; flex-direction: column; border: 1px solid var(--border_default); border-radius: var(--radius_8); background: var(--bg_grouped_secondary); padding: var(--spacing_4); box-shadow: 0 8px 24px rgb(0 0 0 / 28%); }
+  /* 记忆操作's surface and its hang off the ⋯ button's right edge come from the
+   * shared dropdown layer; this rule only says what the menu holds. */
+  .webui-memory-manager-menu { display: flex; min-width: 168px; flex-direction: column; padding: var(--spacing_4); }
   .webui-memory-manager-menu button { display: flex; align-items: center; gap: var(--spacing_8); border: 0; border-radius: var(--radius_4); background: transparent; padding: var(--spacing_8) var(--spacing_12); color: var(--text_default_primary); font-size: var(--size_14); text-align: left; }
   .webui-memory-manager-menu button:hover:not(:disabled) { background: var(--bg_interaction_tertiary_hover); }
   .webui-memory-manager-menu button:disabled { opacity: 0.4; }

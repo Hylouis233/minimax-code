@@ -14,7 +14,6 @@ import {
   useCallback,
   useEffect,
   useId,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -36,18 +35,11 @@ import type {
   WebuiComposerPluginCatalogue,
   WebuiComposerPluginSummary,
 } from "../../../features/plugins/application/composer-catalogue.public.js";
-import { projectWebuiMessageToStreamMessage, readUsageNumber } from "../../../features/transcript/contracts/message-stream.js";
-import { latestContextUsage, readContextUsageSnapshot } from "../contracts/context-usage.js";
+import { readContextUsageFromPage } from "../contracts/context-usage.js";
 import { readWebuiComposerSubmitGate } from "../projection/submission-gate.js";
 import {
   type WebuiComposerSeed,
 } from "../projection/seed-application.js";
-import {
-  contextUsagePopoverStyle,
-  positionContextUsagePopover,
-  sameContextUsagePlacement,
-  type ContextUsagePlacement,
-} from "../projection/context-usage-popover.js";
 import {
   breakdownSegmentPercent,
   breakdownShareLabel,
@@ -65,7 +57,6 @@ import {
   useWebuiSessionPermissions,
   useWebuiSessionQuestionnaire,
   useWebuiSessionState,
-  useWebuiTranscriptHistoryOwner,
 } from "../../../bindings/use-session-state.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { ContextUsageIndicator } from "./ContextUsageIndicator.js";
@@ -89,7 +80,7 @@ import {
 import { useWebuiInteractionOwner } from "../../../features/interactions/bindings/interaction-owner.public.js";
 import { useComposerController } from "../bindings/use-composer-controller.js";
 import { useComposerLayout } from "../bindings/use-composer-layout.js";
-import { useComposerInput, useComposerSlashDismiss } from "../bindings/use-composer-input.js";
+import { useComposerInput } from "../bindings/use-composer-input.js";
 import { useComposerAttachments } from "../bindings/use-composer-attachments.js";
 import {
   useWebuiApplicationOptional,
@@ -97,7 +88,6 @@ import {
 } from "../../../bindings/application-context.js";
 import { selectWebuiCatalogFlatPage } from "../../../features/sessions/application/session-catalog.public.js";
 import { useWebuiAccountWorkflowsState } from "../../../features/account/bindings/use-account-workflows.public.js";
-import { webuiSessionStatusType } from "../../turn/projection/stream-state.public.js";
 
 import type {
   WebuiGoal,
@@ -136,7 +126,7 @@ import {
 } from "../../../shell/icons.js";
 import { OutputError } from "../../../features/transcript/ui/OutputError.public.js";
 import { isTurnLive } from "../../turn/contracts/stream-state.js";
-import { evaluateComposerDismiss } from "../../../projection/common/outside-close.js";
+import { WebuiDropdown } from "../../../ui/Dropdown.js";
 import {
 } from "../../../features/sessions/projection/action-requests.public.js";
 import { buildWebuiModelSelectionRequest } from "../../../features/models/contracts/model-selection.js";
@@ -144,6 +134,7 @@ import {
   findWebuiMentionRange,
   findWebuiSlashRange,
   insertWebuiMention,
+  removeWebuiSlashToken,
   replaceWebuiSlashToken,
   webuiTextAttachmentDataUrl,
 } from "../projection/composer-interactions.js";
@@ -207,7 +198,6 @@ function flattenWorkspaceFiles(files: readonly WebuiWorkspaceFile[]): readonly {
 
 export function WebuiComposer({
   sessionId,
-  sessionStatus,
   sessionLayout = false,
   usageQuota,
   agentName,
@@ -229,7 +219,6 @@ export function WebuiComposer({
   favoritesStorage,
 }: {
   readonly sessionId?: string;
-  readonly sessionStatus?: unknown;
   readonly sessionLayout?: boolean;
   readonly usageQuota?: WebuiUsageQuotaResult;
   readonly agentName: string;
@@ -293,7 +282,7 @@ export function WebuiComposer({
 }): ReactElement {
 
   const { dom } = useWebuiBrowserCapabilities();
-  const { stream, sending } = useWebuiSessionState(sessionId);
+  const { stream, sending, transcript } = useWebuiSessionState(sessionId);
   const turnCommands = useWebuiSessionCommands(sessionId);
   // The per-session effects registry the shell provides. The composer registers
   // this session's event handlers here so the application event coordinator —
@@ -460,36 +449,35 @@ export function WebuiComposer({
   const editingGoalDraftRef = useRef(false);
   const textareaRef = composerInput.textareaRef;
   const composerRegionRef = useRef<HTMLDivElement | null>(null);
-  // The permission popover's own container: the trigger button plus the popover
-  // body. Distinct from `composerRegionRef` on purpose — the popover is a
-  // dropdown hinged to the footer button, so "inside" means "inside this wrap",
-  // not "anywhere in the composer".
-  const permissionWrapRef = useRef<HTMLDivElement | null>(null);
-  // The `+` menu's own container: the attach button plus the panel it opens.
-  // Distinct from `composerRegionRef` on purpose — a dropdown hinged to that
-  // button dismisses on any other click, the textarea included.
-  const composerAddWrapRef = useRef<HTMLDivElement | null>(null);
+  // The composer's input box — the frame the textarea and the staging row sit
+  // in. The mention list and the command palette hang off it, because it is
+  // the box a reader sees; a caret has no rectangle to measure.
+  const composerInputContainerRef = useRef<HTMLDivElement | null>(null);
   // The workspace picker's own container: the 选择文件夹 trigger plus whichever
   // panel it has open (the 最近 list or the directory browser). The picker has
   // to be judged against THIS, not `composerRegionRef` — see the effect below.
   const fieldId = useId();
-  const contextUsage = stream.contextUsage ?? stream.messages.at(-1)?.contextUsage;
-  // Context inspection joins the transcript's history read. This used to issue
-  // its own `getMessages` for the session, so every switch paid a second page
-  // read whose only product was `contextSnapshot`.
-  const transcriptHistory = useWebuiTranscriptHistoryOwner();
-  useEffect(() => {
-    if (!sessionId || webuiSessionStatusType(sessionStatus) === "started") return;
-    let cancelled = false;
-    void transcriptHistory?.ensurePage(sessionId).then((page) => {
-      if (cancelled || !page) return;
-      const snapshot = readContextUsageSnapshot(page.contextSnapshot);
-      const fromMessages = latestContextUsage((page.messages ?? []).map(projectWebuiMessageToStreamMessage));
-      const contextUsage = snapshot ?? fromMessages;
-      if (contextUsage) turnCommands?.lifecycle.setContextUsage(contextUsage);
-    }).catch(() => undefined);
-    return () => { cancelled = true; };
-  }, [sessionId, sessionStatus, transcriptHistory, turnCommands]);
+  // The session's context-window reading, and the two records that own half of
+  // it each.
+  //
+  //   - the LIVE turn's own reading — the snapshot the runtime attaches to a
+  //     frame. It is the fresher one while a turn runs, and the only one that
+  //     carries the per-category breakdown.
+  //   - the HISTORY's reading — the transcript page's context snapshot. It is
+  //     what a reloaded session has, and the transcript's own record of it.
+  //
+  // The readout reads both and writes neither. It used to read the history and
+  // WRITE it into the live turn's record, and that copy was the bug: a turn
+  // starting again reset the record and took the reading with it; a page read
+  // that lost its race with a refresh left nothing to write and nothing to
+  // retry it, so the ring stayed blank for the rest of the session's life with
+  // no error anywhere; and the write replaced the live snapshot's breakdown
+  // with the history's plainer one. Reading the owners has no copy to lose —
+  // the ring follows the live turn while one runs, and the page whenever the
+  // transcript commits it.
+  const liveContextUsage = stream.contextUsage ?? stream.messages.at(-1)?.contextUsage;
+  const historyContextUsage = readContextUsageFromPage(transcript.page);
+  const contextUsage = liveContextUsage ?? historyContextUsage;
 
   useEffect(() => {
     let cancelled = false;
@@ -794,71 +782,22 @@ export function WebuiComposer({
   // refs to `draft` and the current range so the listener always sees the
   // latest values without re-attaching on every keystroke.
   const slashPanelOpen = commandRange !== undefined;
-  useComposerSlashDismiss({
-    listenForPointerDown: dom.listenForPointerDown,
-    regionRef: composerRegionRef,
-    draft,
-    range: commandRange,
-    enabled: slashPanelOpen && Boolean(composerMenu || permissionMenuOpen || mentionRange),
-    onDraftChange,
-  });
-  useEffect(() => {
-    if (!composerMenu && !permissionMenuOpen && !mentionRange) return undefined;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!(event.target instanceof Node)) return;
-      // The three surfaces share this listener but NOT their container: the
-      // `+` menu and the mention list are anchored to the textarea and stay
-      // open while the caret moves inside the composer, while the permission
-      // popover is a dropdown hinged to the footer button and dismisses on any
-      // other click, the textarea included. Judging all three against the
-      // composer region is what made the popover un-dismissable from inside
-      // the composer. The decision itself lives in `evaluateComposerDismiss`;
-      // see that function for the full rule.
-      const dismiss = evaluateComposerDismiss({
-        permissionMenuOpen,
-        insidePermissionWrap: permissionWrapRef.current?.contains(event.target) === true,
-        addMenuOpen: Boolean(composerMenu),
-        insideAddWrap: composerAddWrapRef.current?.contains(event.target) === true,
-        insideComposerRegion: composerRegionRef.current?.contains(event.target) === true,
-      });
-      if (!dismiss.closeComposerMenu && !dismiss.closePermissionMenu && !dismiss.closeMentionRange) {
-        return;
-      }
-      if (dismiss.closeComposerMenu) setComposerMenu(undefined);
-      if (dismiss.closePermissionMenu) setPermissionMenuOpen(false);
-      if (dismiss.closeMentionRange) setMentionRange(undefined);
-    };
-    return dom.listenForPointerDown(onPointerDown);
-  }, [composerMenu, dom, permissionMenuOpen, mentionRange]);
+  // The `+` menu, the permission popover, the mention list and the command
+  // palette are all dropdowns now: the shared skeleton dismisses them on a
+  // press outside the region they belong to and on Escape. The mention list and
+  // the palette have no trigger of their own — a keystroke in the textarea
+  // opens them — so they name the composer's region as the place a press
+  // inside is not a dismissal, and the composer still owns their cursors.
   // The workspace picker's outside-close listener moved with the row itself
   // (ComposerProjectRow), which owns that container and its two flags.
-  // Flip the popover below the composer when there isn't enough room above
-  // for the full 320px cap. The measurement runs in `useLayoutEffect` so the
-  // first paint already shows the correct placement — a normal `useEffect`
-  // would let the panel render above, then re-render below, producing a
-  // visible "jump" the moment the user types `/`.
-  const [slashPanelBelow, setSlashPanelBelow] = useState(false);
-  useLayoutEffect(() => {
-    if (!slashPanelOpen) {
-      setSlashPanelBelow(false);
-      return;
-    }
-    const region = composerRegionRef.current;
-    if (!region) return;
-    const measure = () => {
-      const rect = region.getBoundingClientRect();
-      // Leave headroom of `28px` (= composer top + 24px footer padding + 4px
-      // breathing) so the panel never clips into the viewport top edge.
-      const availableAbove = Math.max(0, rect.top - 28);
-      const needsFlip = availableAbove < 280;
-      setSlashPanelBelow(needsFlip);
-    };
-    measure();
-    window.addEventListener("resize", measure);
-    return () => {
-      window.removeEventListener("resize", measure);
-    };
-  }, [slashPanelOpen, slashSkills.length]);
+  //
+  // Which side the palette opens on is NOT decided here. The palette's own
+  // height decides it, and its height is only known where it is measured and
+  // placed — the placement rule, which is handed the panel's measured size and
+  // the viewport and answers with the side that has room for it. A guess made
+  // here is a guess about a number this file does not have, and a wrong guess
+  // put the palette below the input box with its rows running off the bottom
+  // of the screen.
   // Attachment acquisition, the seed decision and the wire projection are one
   // responsibility; the store owns the staged state, this binding owns the flow.
   const { addFiles, removeAttachment, attachmentWire } = useComposerAttachments({
@@ -1184,7 +1123,7 @@ export function WebuiComposer({
         >
           <div className="message-input-home-container flex flex-col items-center gap-1.5 rounded-[20px] bg-bg_default_scrim pb-2">
             <div className="w-full rounded-[20px] border border-border_default bg-bg_grouped_secondary_elevated p-3 webui-composer-card">
-              <div className="message-input-container relative transition-colors">
+              <div ref={composerInputContainerRef} className="message-input-container relative transition-colors">
                 <label className="sr-only" htmlFor={`${fieldId}-content`}>
                   Message
                 </label>
@@ -1288,29 +1227,47 @@ export function WebuiComposer({
                   commandIndex={commandIndex}
                   onCommandIndexChange={setCommandIndex}
                   onChooseCommand={chooseCommand}
-                  commandPanelBelow={slashPanelBelow}
+                  anchorRef={composerInputContainerRef}
+                  dismissRegionRef={composerRegionRef}
+                  onDismissMention={() => setMentionRange(undefined)}
+                  onDismissCommand={() => {
+                    if (!commandRange) return;
+                    onDraftChange(removeWebuiSlashToken(draft, commandRange));
+                  }}
                 />
               </div>
               <div
                 className="flex w-full items-center gap-3 px-3 pt-1"
                 data-webui-composer-toolbar="true"
               >
-                <div className="webui-composer-add-wrap" ref={composerAddWrapRef}>
-                <button
-                  type="button"
-                  aria-label="添加附件或技能"
-                  aria-expanded={Boolean(composerMenu)}
-                  aria-haspopup="menu"
-                  data-testid="composer-add-menu"
-                  className="webui-icon-button text-icon_default_tertiary"
-                  onClick={() => {
+                <WebuiDropdown
+                  open={composerMenu !== undefined}
+                  onOpen={() => {
                     setPermissionMenuOpen(false);
                     setMentionRange(undefined);
-                    setComposerMenu((current) => current ? undefined : "root");
+                    setComposerMenu("root");
                   }}
+                  onClose={() => setComposerMenu(undefined)}
+                  role="presentation"
+                  triggerHasPopup="menu"
+                  side="top"
+                  align="start"
+                  offset={8}
+                  collision="clamp"
+                  wrapperClassName="webui-composer-add-wrap"
+                  className="webui-composer-menu-stack"
+                  trigger={(triggerProps) => (
+                    <button
+                      type="button"
+                      {...triggerProps}
+                      aria-label="添加附件或技能"
+                      data-testid="composer-add-menu"
+                      className="webui-icon-button text-icon_default_tertiary"
+                    >
+                      <WebuiIconAttach />
+                    </button>
+                  )}
                 >
-                  <WebuiIconAttach />
-                </button>
         <WebuiComposerMenus
           menu={composerMenu}
           onMenuChange={setComposerMenu}
@@ -1328,13 +1285,12 @@ export function WebuiComposer({
           onInsertSkill={(name) => { insertAtCaret(`/${name}`); textareaRef.current?.focus(); }}
           onInsertPlugin={(name) => { insertAtCaret(`@${name}`); textareaRef.current?.focus(); }}
         />
-                </div>
+                </WebuiDropdown>
                 <WebuiComposerPermissionControl
                   mode={permissionMode}
                   busy={permissionBusy}
                   unavailable={permissionUnavailable}
                   menuOpen={permissionMenuOpen}
-                  wrapRef={permissionWrapRef}
                   onToggleRequest={() => {
                     setComposerMenu(undefined);
                     setMentionRange(undefined);

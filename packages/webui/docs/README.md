@@ -39,6 +39,7 @@ facets as directed there. The repository glossary is `CONTEXT.md` at the reposit
 | [`client/ownership.md`](client/ownership.md) | Businesses, roles, application lifetime, interest leases, generation and freshness fences | You are changing client state, ownership or a business workflow |
 | [`client/submission.md`](client/submission.md) | Creation origins, guarded adoption, the submission decision and completion vocabulary | You are touching send, queue, goal submission or session creation |
 | [`client/composer.md`](client/composer.md) | The Composer's per-field contract | You are changing the input area or its state |
+| [`client/floating-surfaces.md`](client/floating-surfaces.md) | The shared dropdown skeleton: the surface, the motion, the dismissal, the anchor and the placement rules | You are adding a menu, a panel, a list or a fly-out |
 | [`client/transcript-rendering.md`](client/transcript-rendering.md) | Markdown rendering contracts: highlighting, line numbers, file references, math | You are changing transcript markdown |
 
 ## Runtime
@@ -79,7 +80,11 @@ modules, application-owned lifetimes) and ADR 0017 (temporal ownership) describe
 stands; ADR 0018 records the last ownership programme and the observation decision (whose evidence is
 [`adr/observation-architecture.md`](adr/observation-architecture.md)). ADR 0010 sets the build
 (esbuild artifact, Vite as dev server only); ADR 0011 lets the WebUI re-implement TUI projection
-logic against a shared harness-event corpus. A new decision takes the next free number.
+logic against a shared harness-event corpus. ADR 0019 records the accepted Browser Use surfaces and
+the decisions and remaining design questions for Browser Use. ADR 0019 is the sole decision record
+for that feature. ADR 0020 records the accepted Mini App view, the runtime seams it needs, the
+desktop capabilities it deliberately drops, and the contract-baseline question it leaves open; it
+is the sole decision record for Mini App hosting. A new decision takes the next free number.
 
 | Retired | Was | Why it is not in the log | Where the live facts are |
 | --- | --- | --- | --- |

@@ -1,44 +1,46 @@
 /**
  * Outside-close policy catalogue.
  *
- * Six WebUI surfaces close themselves when an interaction happens outside
+ * Seven WebUI surfaces close themselves when an interaction happens outside
  * the surface's container. The implementations vary across components
- * today; this module captures the six existing behaviours as data so the
+ * today; this module captures the seven existing behaviours as data so the
  * truth table lives in one place and a future refactor (e.g. unifying
  * pointerdown + mousedown into a single hook) can read from it without
  * rebuilding the matrix.
  *
- * No runtime change: this module is documentation + a pure evaluation
- * function. The components continue to attach their listeners
- * directly; the policy table pins the contract.
+ * No runtime change for most of them: this module is documentation + a pure
+ * evaluation function. The policy table pins the contract, whoever implements
+ * it.
+ *
+ * Most of the surfaces below are `WebuiDropdown`s
+ * (`client/ui/Dropdown.tsx`), and the shared skeleton is what implements their
+ * row: it listens to pointerdown and to Escape, and closes the popup when the
+ * press lands outside the trigger and the popup. The one surface that is not
+ * a dropdown — the directory browser under the workspace picker — still
+ * attaches its own listener, and its row says so.
  *
  * Pointer-event vocabulary:
  *
  *   `pointerdown` — the modern, fire-and-forget pointer event. Fires for
- *                    mouse, touch, pen. Used by UserMenu, ModelPicker,
- *                    SessionComposer's permission popover, workspace picker
- *                    and slash-popover.
- *   `mousedown`    — the legacy mouse-only event. Used by ContextMenu;
- *                    kept because ContextMenu's own listener is `mousedown`.
- *   `keydown`      — keyboard event. Used by UserMenu and ContextMenu
- *                    for the Escape key, and by the composer for the
- *                    permission popover; the `pointerdown`-only surfaces
- *                    (ModelPicker, workspace picker, slash-popover) do NOT
- *                    listen to keyboard — the regex-driven dismiss in
- *                    slash-popover is triggered by the input change, and
- *                    ModelPicker is dismissed by the click that opens
- *                    another picker / blurs the textarea.
+ *                    mouse, touch, pen. Used by every dropdown in the client.
+ *   `mousedown`    — the legacy mouse-only event. No surface subscribes to it
+ *                    any more: the context menu used to, and it is a dropdown
+ *                    now.
+ *   `keydown`      — keyboard event. Every dropdown in the client listens for
+ *                    Escape, at the document level, so it closes wherever the
+ *                    focus is.
  *
  * Truth table — every (event, target-relationship-to-container) cell:
  *
- *   | surface        | pointerdown outside | pointerdown inside | mousedown outside | Escape |
- *   |----------------|---------------------|--------------------|-------------------|--------|
- *   | userMenu       | close               | ignore             | (n/a — pointer)   | close  |
- *   | modelPicker    | close               | ignore             | (n/a — pointer)   | (n/a)  |
- *   | permissionMenu | close               | ignore             | (n/a — pointer)   | close  |
- *   | workspacePicker| close               | ignore             | (n/a — pointer)   | (n/a)  |
- *   | slashPopover   | close (clear draft) | ignore             | (n/a — pointer)   | (n/a)  |
- *   | contextMenu    | (n/a — mousedown)   | (n/a — mousedown)  | close             | close  |
+ *   | surface        | pointerdown outside | pointerdown inside | Escape |
+ *   |----------------|---------------------|--------------------|--------|
+ *   | userMenu       | close               | ignore             | close  |
+ *   | modelPicker    | close               | ignore             | close  |
+ *   | permissionMenu | close               | ignore             | close  |
+ *   | composerMenu   | close               | ignore             | close  |
+ *   | mentionList    | close               | ignore             | close  |
+ *   | slashPopover   | close (clear draft) | ignore             | close  |
+ *   | contextMenu    | close               | ignore             | close  |
  *
  * Every cell maps to `evaluateOutsideClose(...) === true | false | null`
  * (null = event not subscribed by this surface; the component never
@@ -46,10 +48,10 @@
  *
  * "Container" is per-surface and the difference is load-bearing:
  * `permissionMenu`'s and `workspacePicker`'s containers are their own
- * trigger-and-body wraps, while `slashPopover`'s is the whole composer
- * region. All three therefore answer "ignore" for an inside click, but
- * they answer it for DIFFERENT clicks — the permission popover and the
- * workspace picker dismiss on a textarea click, the slash popover does
+ * trigger-and-body wraps, while `mentionList`'s and `slashPopover`'s are the
+ * whole composer region. All of them therefore answer "ignore" for an inside
+ * click, but they answer it for DIFFERENT clicks — the permission popover
+ * dismisses on a textarea click, the mention list and the command palette do
  * not. Reusing one ref for both shapes is what made those panels stick.
  */
 
@@ -58,6 +60,7 @@ export type WebuiOutsideCloseSurface =
   | "modelPicker"
   | "permissionMenu"
   | "composerMenu"
+  | "mentionList"
   | "workspacePicker"
   | "slashPopover"
   | "contextMenu";
@@ -90,14 +93,15 @@ export const WEBUI_OUTSIDE_CLOSE_POLICIES: {
     usesContainerContains: true,
     onEscape: true,
     notes:
-      "UserMenu listens to pointerdown + keydown; Escape closes; the keydown does not check inside-ness (Escape is a global key).",
+      "UserMenu is a WebuiDropdown: the shared skeleton listens to pointerdown + keydown; Escape closes; the keydown does not check inside-ness (Escape is a global key).",
   },
   modelPicker: {
     surface: "modelPicker",
-    subscribedKinds: ["pointerdown"],
+    subscribedKinds: ["pointerdown", "keydown"],
     usesContainerContains: true,
+    onEscape: true,
     notes:
-      "ModelPicker listens to pointerdown only; no Escape handler — closing is triggered by an outside click that hits another surface or by re-clicking the trigger.",
+      "The model picker is a WebuiDropdown: the shared skeleton listens to pointerdown + keydown. Its own container is the trigger's wrapper, and the picker is placed against the trigger in viewport coordinates. Escape does not simply close it: the panel steps DOWN one level (settings → list → closed), and the picker's settings FLY-OUT is a second dropdown of its own whose dismissal RETRACTS the fly-out rather than closing the panel. The two share one Escape keypress, so the first handler to claim it answers and the other stays quiet — the panel is the one that registered first, because the fly-out can only exist while the panel does. A press inside the panel is NOT 'ignore' for the fly-out: it retracts the fly-out, which is why the fly-out answers 'close' there and the panel answers 'ignore'.",
   },
   permissionMenu: {
     surface: "permissionMenu",
@@ -105,36 +109,46 @@ export const WEBUI_OUTSIDE_CLOSE_POLICIES: {
     usesContainerContains: true,
     onEscape: true,
     notes:
-      "Permission popover listens to pointerdown only at the document level; its container is the trigger-and-popover wrap, NOT the composer region, so a click on the textarea or any other footer control also dismisses it. Escape is handled by the composer's own onKeyDown (textarea and popover), not by a document-level listener — so Escape only closes it when focus is inside the composer.",
+      "Permission popover is a WebuiDropdown: the shared skeleton listens to pointerdown at the document level and closes when the press lands outside the trigger and the popup — so a click on the textarea or any other footer control dismisses it. Escape is handled by the skeleton at the document level, so it closes wherever the focus is.",
   },
   composerMenu: {
     surface: "composerMenu",
-    subscribedKinds: ["pointerdown"],
+    subscribedKinds: ["pointerdown", "keydown"],
     usesContainerContains: true,
+    onEscape: true,
     notes:
-      "The composer's `+` menu (attach / skills / plugins / goal / plan) listens to pointerdown only; its container is the trigger-and-panel wrap, NOT the composer region, so a click on the textarea or any other footer control also dismisses it. Escape is handled by the panel's own onKeyDown.",
+      "The composer's `+` menu (attach / skills / plugins / goal / plan) is a WebuiDropdown: the shared skeleton listens to pointerdown and closes when the press lands outside the trigger and the panel — so a click on the textarea or any other footer control dismisses it. Escape is handled by the skeleton.",
+  },
+  mentionList: {
+    surface: "mentionList",
+    subscribedKinds: ["pointerdown", "keydown"],
+    usesContainerContains: true,
+    onEscape: true,
+    notes:
+      "The mention list is a WebuiDropdown in its triggerless shape: a keystroke in the textarea opens it, so it has no trigger to hang from. It names the composer's region as the place a press inside is NOT a dismissal — a press in the text, in the attachments or on the send button is the user still working — and closes when the press lands clear of that region. Escape closes it and the caret keeps the focus, because the caret is where the user already was.",
   },
   workspacePicker: {
     surface: "workspacePicker",
     subscribedKinds: ["pointerdown"],
     usesContainerContains: true,
     notes:
-      "Workspace picker (the 选择文件夹 bar under the composer) listens to pointerdown only; its container is its own wrap — trigger pill plus the menu or the directory-browser dialog — so any other click dismisses it. No Escape handler: Escape was never wired for this surface.",
+      "The workspace picker's DIRECTORY BROWSER listens to pointerdown only; its container is its own wrap — the trigger pill plus the browser dialog — so any other click dismisses it. No Escape handler: Escape was never wired for this surface. The picker's other half — the 最近 list — is a WebuiDropdown, and the shared skeleton dismisses that one.",
   },
   slashPopover: {
     surface: "slashPopover",
-    subscribedKinds: ["pointerdown"],
-    usesContainerContains: true,
-    notes:
-      "Slash popover listens to pointerdown only; no Escape handler — the composer input change handler drops the '/xxx' segment when the regex no longer matches.",
-  },
-  contextMenu: {
-    surface: "contextMenu",
-    subscribedKinds: ["mousedown", "keydown"],
+    subscribedKinds: ["pointerdown", "keydown"],
     usesContainerContains: true,
     onEscape: true,
     notes:
-      "ContextMenu listens to mousedown (NOT pointerdown — desktop parity) + keydown; Escape closes.",
+      "The command palette is a WebuiDropdown in its triggerless shape: a `/` in the textarea opens it. It names the composer's region as the place a press inside is NOT a dismissal, and closing it cancels the invocation — the `/xxx` token is dropped from the draft, exactly as Escape drops it.",
+  },
+  contextMenu: {
+    surface: "contextMenu",
+    subscribedKinds: ["pointerdown", "keydown"],
+    usesContainerContains: true,
+    onEscape: true,
+    notes:
+      "The context menu is a WebuiDropdown in its triggerless shape: the anchor is the point the menu opens at, not a trigger. The shared skeleton listens to pointerdown and to keydown; Escape closes it. It used to listen to `mousedown` for desktop parity — the skeleton reads `pointerdown`, which fires for mouse, touch and pen alike and always before the click does.",
   },
 } as const;
 
@@ -153,16 +167,21 @@ export const WEBUI_OUTSIDE_CLOSE_POLICIES: {
  *   | userMenu       | keydown     | other   | (any)  | ignore     |
  *   | modelPicker    | pointerdown | (any)   | true   | ignore     |
  *   | modelPicker    | pointerdown | (any)   | false  | close      |
+ *   | modelPicker    | keydown     | Escape  | (any)  | close      |
  *   | permissionMenu | pointerdown | (any)   | true   | ignore     |
  *   | permissionMenu | pointerdown | (any)   | false  | close      |
  *   | permissionMenu | keydown     | Escape  | (any)  | close      |
  *   | permissionMenu | keydown     | other   | (any)  | ignore     |
- *   | workspacePicker | pointerdown | (any)  | true   | ignore     |
- *   | workspacePicker | pointerdown | (any)  | false  | close      |
+ *   | composerMenu   | pointerdown | (any)   | true   | ignore     |
+ *   | composerMenu   | pointerdown | (any)   | false  | close      |
+ *   | mentionList    | pointerdown | (any)   | true   | ignore     |
+ *   | mentionList    | pointerdown | (any)   | false  | close      |
+ *   | workspacePicker| pointerdown | (any)  | true   | ignore     |
+ *   | workspacePicker| pointerdown | (any)  | false  | close      |
  *   | slashPopover   | pointerdown | (any)   | true   | ignore     |
  *   | slashPopover   | pointerdown | (any)   | false  | close      |
- *   | contextMenu    | mousedown   | (any)   | true   | ignore     |
- *   | contextMenu    | mousedown   | (any)   | false  | close      |
+ *   | contextMenu    | pointerdown | (any)   | true   | ignore     |
+ *   | contextMenu    | pointerdown | (any)   | false  | close      |
  *   | contextMenu    | keydown     | Escape  | (any)  | close      |
  *
  * Events the surface does NOT subscribe to return `null` (the component
@@ -189,77 +208,4 @@ export function evaluateOutsideClose(args: {
   // the surface container; ignore when the user clicked inside.
   if (args.insideContainer) return "ignore";
   return "close";
-}
-
-/**
- * Which of the composer's three dismissible surfaces a single `pointerdown`
- * closes.
- *
- * `SessionComposer` drives three surfaces from ONE document-level
- * `pointerdown` listener — the `+` attachment menu (`composerMenu`), the
- * permission popover (`permissionMenu`) and the `@` mention list
- * (`mentionRange`) — but they do not share a container, and that is the whole
- * point of this function:
- *
- *   - `composerMenu` and `mentionRange` are anchored to the textarea / `+`
- *     trigger. They stay open while the pointer moves around inside the
- *     composer region, because the caret moving is not a dismissal.
- *   - `permissionMenu` is a dropdown hinged to the footer button. Its
- *     container is its own wrap, so ANY other click dismisses it — including
- *     a click on the textarea, which is the case that used to get stuck.
- *
- * Collapsing this into the region test (`inside the region → ignore`) is what
- * made the popover un-dismissable from anywhere inside the composer. Keep the
- * wrap check separate.
- *
- * Returned as three independent booleans because the caller feeds three
- * separate setters; a single `shouldClose` invites a caller to apply the
- * region rule to all three and reintroduce the bug this split prevents.
- */
-export function evaluateComposerDismiss(input: {
-  readonly permissionMenuOpen: boolean;
-  readonly insidePermissionWrap: boolean;
-  readonly addMenuOpen: boolean;
-  readonly insideAddWrap: boolean;
-  readonly insideComposerRegion: boolean;
-}): {
-  readonly closeComposerMenu: boolean;
-  readonly closePermissionMenu: boolean;
-  readonly closeMentionRange: boolean;
-} {
-  // Two anchored dropdowns first: while either is open the click is judged
-  // against its OWN trigger-and-body wrap, never against the region. A region
-  // test would swallow every click in the composer and leave the panel stuck.
-  const anchored = input.permissionMenuOpen
-    ? { surface: "permissionMenu" as const, inside: input.insidePermissionWrap }
-    : input.addMenuOpen
-      ? { surface: "composerMenu" as const, inside: input.insideAddWrap }
-      : undefined;
-  if (anchored) {
-    const closes = evaluateOutsideClose({
-      surface: anchored.surface,
-      kind: "pointerdown",
-      insideContainer: anchored.inside,
-    }) === "close";
-    return {
-      closeComposerMenu: closes,
-      closePermissionMenu: closes,
-      closeMentionRange: closes,
-    };
-  }
-  if (input.insideComposerRegion) {
-    // Caret moved within the composer: the region-anchored surface stays.
-    return {
-      closeComposerMenu: false,
-      closePermissionMenu: false,
-      closeMentionRange: false,
-    };
-  }
-  // A pointerdown clear of the composer dismisses everything at once, which is
-  // the long-standing behaviour for all three.
-  return {
-    closeComposerMenu: true,
-    closePermissionMenu: true,
-    closeMentionRange: true,
-  };
 }

@@ -15,6 +15,8 @@ const skipped = new Set([
   "dist",
   WEBUI_DIST_DIRECTORY,
   ".cache",
+  // Local development plans are workspace material, not part of the published source projection.
+  ".plan",
   ".pnpm-store",
   ".turbo",
   ".idea",

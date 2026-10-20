@@ -69,12 +69,20 @@ describe("the session state source is single", () => {
     expect(shell).not.toMatch(/useState<WebuiClientSessionPage/u);
   });
 
-  it("reads the context-window consumption from the store and writes it back there", () => {
+  it("reads the context-window consumption from the records that own it, and writes it to neither", () => {
     const composer = flat(read("features/composer/ui/WebuiComposer.tsx"));
-    // Read: the stream slice the application store owns.
+    // Read: the live turn's own reading, on the stream slice the application
+    // store owns...
     expect(composer).toContain("stream.contextUsage");
-    // Write: the one lifecycle command, so the store stays the single writable copy.
-    expect(composer).toContain("lifecycle.setContextUsage(");
+    // ...and the history's reading, on the transcript page the same store
+    // owns.
+    expect(composer).toContain("readContextUsageFromPage(transcript.page)");
+    // Write: none. A history reading written onto the live turn's record was
+    // the record's second, unowned fact: a turn starting again reset it, and a
+    // page read that lost its race with a refresh left the ring blank with
+    // nothing to retry it.
+    expect(composer).not.toContain("lifecycle.setContextUsage(");
+    expect(composer).not.toMatch(/setContextUsage/u);
     // The ring takes it as a value; it holds no usage state of its own.
     expect(composer).toContain("<ContextUsageIndicator usage={contextUsage}");
     expect(composer).not.toMatch(/useState<WebuiContextUsage/u);

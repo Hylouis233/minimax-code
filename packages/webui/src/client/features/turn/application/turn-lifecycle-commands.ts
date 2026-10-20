@@ -31,8 +31,6 @@ export function createWebuiTurnLifecycleCommands(
         processingStartedAtMs: Date.now(),
       })),
     clearStream: () => setStream(() => initialWebuiStreamState),
-    setContextUsage: (contextUsage) =>
-      setStream((current) => ({ ...current, contextUsage })),
     setStreamRefusal: (refusal) => setStream((current) => ({ ...current, refusal })),
     setTurnSending: (sending) => setSending(sending),
     releaseStreamSubscription: (generation) =>

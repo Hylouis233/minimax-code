@@ -62,6 +62,16 @@ export function mergeOlderTranscriptPage(
         ),
         nextCursor: olderPage.nextCursor,
         hasMore: olderPage.hasMore,
+        // The page's context snapshot belongs to the SESSION, not to the page
+        // of messages: it says how much of the context window the session has
+        // spent, and it is the reading a reloaded session's ring is drawn from.
+        // An older page carries no snapshot of its own, and dropping the
+        // session's one while merging it in took the reading away from every
+        // reader of the page — the composer's ring went blank the moment the
+        // user scrolled up.
+        ...(current.page.contextSnapshot
+          ? { contextSnapshot: current.page.contextSnapshot }
+          : {}),
       },
     },
   };

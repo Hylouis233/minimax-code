@@ -24,23 +24,30 @@
  * of "which level is this model on" is a contradiction waiting to happen rather
  * than a second view.
  *
- * The container is an `aria-live="polite"` region so a keyboard user hears the
- * controls appear. When a model has nothing to describe, the empty state prints
- * the MODEL NAME before the sentence — announcing the bare sentence would leave
- * a screen-reader user asking which model it was about.
+ * The surface, the motion and the dismissal belong to the shared dropdown
+ * skeleton: the fly-out is a `WebuiDropdown` with no trigger — a row opens it by
+ * hover, not by a click — so it hangs off the row in viewport coordinates, takes
+ * the one surface every other popup in the client takes, and closes on Escape
+ * through `onRetract`. What this file still owns is the placement rule and the
+ * controls.
+ *
+ * The content is an `aria-live="polite"` region so a keyboard user hears the
+ * controls appear. It is a region of its own rather than the popup root, because
+ * the rows are ordered by `order` and that only means something to a flex
+ * container for its OWN children — a wrapper with a box of its own would put the
+ * context sizes back below the thinking control. When a model has nothing to
+ * describe, the empty state prints the MODEL NAME before the sentence —
+ * announcing the bare sentence would leave a screen-reader user asking which
+ * model it was about.
  */
-import {
-  useCallback,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type ReactElement,
-  type RefObject,
-} from "react";
+import type { ReactElement } from "react";
 
 import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
 import {
-  flyoutStyle,
+  WebuiDropdown,
+  type WebuiDropdownPlacement,
+} from "../../../ui/Dropdown.js";
+import {
   positionFlyout,
   type FlyoutRect,
 } from "../../../projection/common/flyout-position.js";
@@ -53,13 +60,6 @@ function formatContextWindow(value: number): string {
   return String(value);
 }
 
-/** The inline placement a measured fly-out is rendered with. */
-type FlyoutStyle = {
-  readonly position: "fixed";
-  readonly left: string;
-  readonly top: string;
-};
-
 /**
  * Where the fly-out is anchored, resolved AT MEASURE TIME.
  *
@@ -69,112 +69,43 @@ type FlyoutStyle = {
  * outlives the node it was captured from, so the next measure reads a detached
  * node's all-zero rect and places the panel against the viewport's origin.
  *
- * Asked from a layout effect the same lookup answers correctly, because by then
- * the commit that remounted the row has attached its ref. So the anchor is
- * asked, not remembered.
+ * Asked from the shared skeleton's layout effect the same lookup answers
+ * correctly, because by then the commit that remounted the row has attached its
+ * ref. So the anchor is asked, not remembered.
  *
  * Asking is necessary and not sufficient. The row's ID is derived from the model
  * and the group rendering it, so a commit can rename the row outright — which
  * is what switching a two-state model's thinking off does to its own row — and
- * then there is no id to look up. `reconcileFocusedRow` in `ModelPicker.tsx`
- * keeps that id pointing at a row that exists; this contract only says that
- * `undefined` here means "no row to measure", and the panel is then not placed.
+ * then there is no id to look up. `reconcileFocusedRow` in the picker's
+ * interaction binding keeps that id pointing at a row that exists; this
+ * contract only says that `undefined` here means "no row to measure", and the
+ * panel is then not placed.
  */
 export type FlyoutAnchor = () => FlyoutRect | undefined;
 
-/** Two placements that render identically, compared by value not identity. */
-function sameStyle(
-  a: FlyoutStyle | undefined,
-  b: FlyoutStyle | undefined,
-): boolean {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  return a.position === b.position && a.left === b.left && a.top === b.top;
-}
-
 /**
- * Measure an anchor and keep the placement in sync with both of them.
+ * Where the fly-out goes, unchanged: the shared `positionFlyout` engine's own
+ * answer — right, then left, then below the row, aligned to its top, clamped
+ * into the viewport.
  *
- * The SURFACE is measured rather than declared. It used to be two constants,
- * and a constant is only right while the surface's contents are fixed — but the
- * context sizes are listed inline now, so the surface is as tall as the model
- * happens to have options: a model with four sizes is a different height from
- * one with two, and neither matches the number a constant froze at. A clamp
- * computed against a stale height lets the bottom of the list fall off screen,
- * which is how a model with a long option list loses its own options.
+ * Stated as the skeleton's placement rule rather than computed in an effect here,
+ * because the skeleton is what measures the surface. A measure of this
+ * component's own would run against a popup the skeleton had not placed yet, and
+ * the flip and the clamp are the two rules that are easy to get subtly wrong and
+ * impossible to eyeball in a screenshot — so they stay in the one pure function,
+ * with the measured `surface` handed to it.
  *
- * `ResizeObserver` on the surface is what keeps that honest as the fly-out
- * follows the cursor from one model to the next. Re-measuring on scroll and
- * resize is still needed because the anchor is a row inside a scrolling list: a
- * placement computed once would leave the fly-out pointing at wherever the row
- * used to be. `getBoundingClientRect` is viewport-space, which is what
- * `positionFlyout` takes, and is also why the surface is `fixed` — an
- * `absolute` fly-out would be clipped by the list's own `overflow-y: auto`.
+ * Module level, so its identity never changes: the skeleton re-asks it on every
+ * scroll, resize and size change, and a fresh closure per render would hand it a
+ * rule to re-read for nothing.
  */
-function useFlyoutPlacement(
-  anchor: FlyoutAnchor | undefined,
-  surfaceRef: RefObject<HTMLElement | null>,
-): FlyoutStyle | undefined {
-  const [style, setStyle] = useState<FlyoutStyle | undefined>(undefined);
-
-  /**
-   * The placement currently applied, so a re-measure is free.
-   *
-   * `useState` compares by identity and `flyoutStyle` builds a fresh object on
-   * every call, so an unguarded `setStyle` would schedule a render for a
-   * measurement that changed nothing — and the layout effect below measures on
-   * every render, which would spin. Comparing the two numbers that reach the
-   * screen is what makes "measure again" safe to run unconditionally.
-   */
-  const applied = useRef<FlyoutStyle | undefined>(undefined);
-
-  const measure = useCallback(() => {
-    const surface = surfaceRef.current;
-    const anchorRect = anchor && surface ? anchor() : undefined;
-    const next = (() => {
-      if (!anchorRect || !surface) return undefined;
-      const rect = surface.getBoundingClientRect();
-      return flyoutStyle(
-        positionFlyout({
-          anchor: anchorRect,
-          surface: { width: rect.width, height: rect.height },
-          viewport: { width: window.innerWidth, height: window.innerHeight },
-        }),
-      );
-    })();
-    if (sameStyle(applied.current, next)) return;
-    applied.current = next;
-    setStyle(next);
-  }, [anchor, surfaceRef]);
-
-  // Re-measure after EVERY render, not only when the anchor's identity changes.
-  // The list moves under a panel that is still anchored to the same row — a
-  // catalogue refresh relayouts the whole menu — and the row's rect is the one
-  // thing that says where the panel belongs. Nothing else reports that move:
-  // the observers below watch the SURFACE, the scroll and resize listeners
-  // watch the window, and none of them see a sibling shifting.
-  useLayoutEffect(measure);
-
-  useLayoutEffect(() => {
-    measure();
-    const surface = surfaceRef.current;
-    if (!anchor || !surface) return undefined;
-    // Following the cursor from row to row changes the surface's HEIGHT without
-    // changing the anchor, so the observer is on the surface, not the anchor.
-    const observer =
-      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
-    observer?.observe(surface);
-    window.addEventListener("scroll", measure, true);
-    window.addEventListener("resize", measure);
-    return () => {
-      observer?.disconnect();
-      window.removeEventListener("scroll", measure, true);
-      window.removeEventListener("resize", measure);
-    };
-  }, [anchor, measure, surfaceRef]);
-
-  return style;
-}
+const placeFlyout: WebuiDropdownPlacement = ({ anchor, surface, viewport }) => {
+  const { left, top, side } = positionFlyout({ anchor, surface, viewport });
+  // The side the fly-out opened on, in the shared layer's words, so the motion
+  // slides the way it came: a panel that opened to the right of its row comes
+  // from the right, not from above.
+  return { left, top, side: side === "below" ? "bottom" : side };
+};
 
 export interface ModelSettingsFlyoutProps {
   readonly model: WebuiModelPickerEntry | undefined;
@@ -237,9 +168,9 @@ export function ModelSettingsFlyout({
   onContextChange,
   onRetract,
 }: ModelSettingsFlyoutProps): ReactElement | null {
-  const surfaceRef = useRef<HTMLDivElement | null>(null);
-  const style = useFlyoutPlacement(anchor, surfaceRef);
-
+  // No model to describe is no fly-out at all, so reaching this component at all
+  // means it is open: there is no trigger to open it and nothing to close it
+  // but `onRetract`, which the caller wires to the shared skeleton's dismissal.
   if (!model) return null;
 
   const isBinary =
@@ -297,55 +228,115 @@ export function ModelSettingsFlyout({
   })();
 
   return (
-    <div
-      ref={surfaceRef}
-      className="webui-model-flyout"
-      data-webui-model-flyout="tier-one"
-      data-webui-model-preview={preview ? "true" : "false"}
-      style={style}
+    <WebuiDropdown
+      open
+      // Nothing opens this popup — a row opens it by hover — and nothing but a
+      // press outside or an Escape closes it, both of which mean the same thing
+      // here: back to the list, keeping the position it was built up in.
+      onOpen={() => undefined}
+      onClose={onRetract}
       role="dialog"
-      aria-label={`${model.displayName ?? model.modelId} 的设置`}
-      aria-live="polite"
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          // Back to the list. There is no tier left to retract, so the whole
-          // fly-out goes and the list keeps its position — a second press can
-          // still close the menu from where the user built it up.
-          event.stopPropagation();
-          onRetract();
-        }
+      ariaLabel={`${model.displayName ?? model.modelId} 的设置`}
+      className="webui-model-flyout"
+      // The markers name the SURFACE, and the surface is the popup root: the
+      // stylesheet's `[data-webui-model-preview]` rule and the browser cases
+      // both find the fly-out by what it is, not by a wrapper inside it.
+      popupDataAttributes={{
+        "data-webui-model-flyout": "tier-one",
+        "data-webui-model-preview": preview ? "true" : "false",
       }}
+      // The row, asked when the skeleton measures: by then a commit that
+      // remounted the row has attached its ref.
+      anchorRect={() => anchor?.()}
+      placement={placeFlyout}
     >
-      {effortOptions.length > 0 ? (
-        <div className="webui-model-detail-row webui-model-setting-effort">
-          <span className="webui-model-detail-label">{effortLabel}</span>
-          {isBinary ? (
-            <ToggleSwitch
-              checked={thinkingOn}
-              label={effortLabel}
-              data-webui-model-thinking-toggle="true"
-              className="webui-model-thinking-toggle"
-              onChange={() => onThinkingChange(thinkingOn ? "off" : "on")}
-            />
-          ) : (
+      {/*
+        The live region is this element, not the popup root. `order` only
+        reaches a flex container's own children, so the rows stay direct
+        children of the column they are ordered in — the region and the layout
+        are one element because they cannot be two.
+      */}
+      <div className="webui-model-flyout-content" aria-live="polite">
+        {effortOptions.length > 0 ? (
+          <div className="webui-model-detail-row webui-model-setting-effort">
+            <span className="webui-model-detail-label">{effortLabel}</span>
+            {isBinary ? (
+              <ToggleSwitch
+                checked={thinkingOn}
+                label={effortLabel}
+                data-webui-model-thinking-toggle="true"
+                className="webui-model-thinking-toggle"
+                onChange={() => onThinkingChange(thinkingOn ? "off" : "on")}
+              />
+            ) : (
+              <div
+                role="radiogroup"
+                aria-label={effortLabel}
+                className="webui-model-effort-group"
+              >
+                {effortOptions.map((option) => {
+                  const active = currentEffort === option;
+                  return (
+                    <button
+                      key={option}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      className="webui-model-effort-option"
+                      onClick={() => onThinkingChange(option)}
+                    >
+                      {option}
+                      {active ? (
+                        <span
+                          aria-hidden="true"
+                          className="webui-model-context-tick"
+                        >
+                          ✓
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ) : null}
+        {contextOptions.length > 0 ? (
+          <div className="webui-model-detail-row webui-model-setting-context">
+            <span className="webui-model-detail-label">上下文窗口</span>
+            {/*
+              The sizes, in place. NOT a collapsed row that opens a second
+              fly-out: the surface already says which model it describes, so a
+              row restating the current value, a chevron over it, and then a
+              panel carrying the same sizes were three ways to answer one
+              question — and the panel was a floating surface landing back over
+              the model list it was describing.
+            */}
             <div
-              role="radiogroup"
-              aria-label={effortLabel}
-              className="webui-model-effort-group"
+              role="listbox"
+              aria-label="上下文窗口"
+              className="webui-model-context-group"
             >
-              {effortOptions.map((option) => {
-                const active = currentEffort === option;
+              {contextOptions.map((value) => {
+                const selected = currentWindow === value;
                 return (
                   <button
-                    key={option}
+                    key={value}
                     type="button"
-                    role="radio"
-                    aria-checked={active}
-                    className="webui-model-effort-option"
-                    onClick={() => onThinkingChange(option)}
+                    role="option"
+                    aria-selected={selected}
+                    className={`webui-model-context-option ${selected ? "is-active" : ""}`}
+                    data-webui-model-context-option={String(value)}
+                    onClick={() => onContextChange(value)}
                   >
-                    {option}
-                    {active ? (
+                    <span className="webui-model-context-value">
+                      {formatContextWindow(value)}
+                    </span>
+                    {model.contextWindowOptionHints?.[String(value)] ===
+                    "higher_usage" ? (
+                      <span className="webui-model-context-hint">用量较高</span>
+                    ) : null}
+                    {selected ? (
                       <span
                         aria-hidden="true"
                         className="webui-model-context-tick"
@@ -357,67 +348,19 @@ export function ModelSettingsFlyout({
                 );
               })}
             </div>
-          )}
-        </div>
-      ) : null}
-      {contextOptions.length > 0 ? (
-        <div className="webui-model-detail-row webui-model-setting-context">
-          <span className="webui-model-detail-label">上下文窗口</span>
-          {/*
-            The sizes, in place. NOT a collapsed row that opens a second
-            fly-out: the surface already says which model it describes, so a
-            row restating the current value, a chevron over it, and then a
-            panel carrying the same sizes were three ways to answer one
-            question — and the panel was a floating surface landing back over
-            the model list it was describing.
-          */}
-          <div
-            role="listbox"
-            aria-label="上下文窗口"
-            className="webui-model-context-group"
-          >
-            {contextOptions.map((value) => {
-              const selected = currentWindow === value;
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  role="option"
-                  aria-selected={selected}
-                  className={`webui-model-context-option ${selected ? "is-active" : ""}`}
-                  data-webui-model-context-option={String(value)}
-                  onClick={() => onContextChange(value)}
-                >
-                  <span className="webui-model-context-value">
-                    {formatContextWindow(value)}
-                  </span>
-                  {model.contextWindowOptionHints?.[String(value)] === "higher_usage" ? (
-                    <span className="webui-model-context-hint">用量较高</span>
-                  ) : null}
-                  {selected ? (
-                    <span
-                      aria-hidden="true"
-                      className="webui-model-context-tick"
-                    >
-                      ✓
-                    </span>
-                  ) : null}
-                </button>
-              );
-            })}
           </div>
-        </div>
-      ) : null}
-      {effortOptions.length === 0 && contextOptions.length === 0 ? (
-        <div className="webui-model-detail-empty">
-          <div className="webui-model-detail-empty-title">
-            {model.displayName ?? model.modelId}
+        ) : null}
+        {effortOptions.length === 0 && contextOptions.length === 0 ? (
+          <div className="webui-model-detail-empty">
+            <div className="webui-model-detail-empty-title">
+              {model.displayName ?? model.modelId}
+            </div>
+            <div className="webui-model-detail-empty-hint">
+              这个模型没有可调设置。
+            </div>
           </div>
-          <div className="webui-model-detail-empty-hint">
-            这个模型没有可调设置。
-          </div>
-        </div>
-      ) : null}
-    </div>
+        ) : null}
+      </div>
+    </WebuiDropdown>
   );
 }

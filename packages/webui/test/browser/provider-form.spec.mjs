@@ -88,11 +88,17 @@ function lastRequestBody(page, operation) {
 
 /** Fills a new provider the way a user would, stopping short of the connection test. */
 async function fillNewProvider(page, dialog) {
-  await dialog.getByRole("button", { name: "提供商" }).click();
-  await dialog.locator('[role="listbox"][aria-label="提供商列表"]').getByRole("option", { name: /其他/ }).click();
+  // The provider field is a combobox: it shows the selection and searches in
+  // the same box, so it is typed into rather than opened by a button.
+  await dialog.getByRole("combobox", { name: "提供商" }).click();
+  // The popup is portaled out of the dialog, so it is addressed from the page.
+  await page.locator('[role="listbox"][aria-label="提供商列表"]').getByRole("option", { name: /其他/ }).click();
   await dialog.getByLabel("提供商名称").fill("Synthetic Draft");
   await dialog.getByLabel("接口地址").fill("https://draft.example/v1");
   await dialog.getByLabel("API Key").fill("sk-draft-synthetic");
+  // The form is a list of model cards, not one textarea of ids: a row is added
+  // first, and every model carries its own fields.
+  await dialog.getByRole("button", { name: "添加模型" }).click();
   await dialog.getByLabel("模型名称").fill("draft-model");
 }
 
@@ -138,6 +144,52 @@ test("V10 rapid model toggles serialize semantic intent without restoring stale 
   await expect(page.getByRole("switch", { name: "启用 Second", exact: true })).toHaveAttribute("aria-checked", "false");
 });
 
+test("the provider picker closes when the pointer lands outside it", async ({ page }) => {
+  await configureFixture(page, seedNewProviderSurface);
+  await openCustomModels(page);
+
+  await customPanel(page).getByRole("button", { name: "添加模型" }).click();
+  const dialog = formDialog(page);
+  await dialog.getByRole("combobox", { name: "提供商" }).click();
+
+  const listbox = page.locator('[role="listbox"][aria-label="提供商列表"]');
+  await expect(listbox).toBeVisible();
+  // The popup carries the shared surface.
+  await expect(listbox).toHaveClass(/webui-dropdown-popup/);
+
+  // A press outside the trigger and the popup closes it, and it is gone once
+  // the exit animation has run.
+  await page.mouse.click(6, 6);
+  await expect(listbox).toHaveCount(0);
+});
+
+test.describe("with motion allowed", () => {
+  test.use({ reducedMotion: "no-preference" });
+
+  test("the provider picker animates in and out", async ({ page }) => {
+    await configureFixture(page, seedNewProviderSurface);
+    await openCustomModels(page);
+
+    await customPanel(page).getByRole("button", { name: "添加模型" }).click();
+    const dialog = formDialog(page);
+    await dialog.getByRole("combobox", { name: "提供商" }).click();
+
+    const listbox = page.locator('[role="listbox"][aria-label="提供商列表"]');
+    await expect(listbox).toBeVisible();
+    // The shared surface carries the motion, so every popup in the client
+    // opens and closes the same way.
+    expect(await listbox.evaluate((node) => getComputedStyle(node).animationName)).toBe("webui-dropdown-in");
+
+    await page.mouse.click(6, 6);
+    // While it is fading out it is still mounted, and it carries the exit
+    // animation rather than the entrance one.
+    await expect
+      .poll(() => listbox.evaluate((node) => getComputedStyle(node).animationName).catch(() => "gone"))
+      .toBe("webui-dropdown-out");
+    await expect(listbox).toHaveCount(0);
+  });
+});
+
 test("a save stays refused until the draft is proven or the test is skipped", async ({ page }) => {
   await configureFixture(page, seedNewProviderSurface);
   await openCustomModels(page);
@@ -181,6 +233,39 @@ test("a proven draft saves the candidate the editor built, and the form closes",
   await expect(dialog).toHaveCount(0);
 });
 
+test("each model carries its own limits, reasoning levels and attachments", async ({ page }) => {
+  await configureFixture(page, seedNewProviderSurface);
+  await openCustomModels(page);
+
+  await customPanel(page).getByRole("button", { name: "添加模型" }).click();
+  const dialog = formDialog(page);
+  await fillNewProvider(page, dialog);
+
+  // The fields Desktop's model card carries, filled on the model they belong to.
+  await dialog.getByLabel("上下文窗口").fill("128000");
+  await dialog.getByLabel("最大输出 Token").fill("8000");
+  await dialog.getByLabel("推理等级").fill("low");
+  await dialog.getByLabel("推理等级").press("Enter");
+  await dialog.getByLabel("推理等级").fill("high");
+  await dialog.getByLabel("推理等级").press("Enter");
+  await dialog.getByLabel("图片").check();
+
+  await dialog.getByLabel("跳过连通检测").check();
+  await dialog.getByRole("button", { name: "保存" }).click();
+  await expect.poll(() => lastRequestBody(page, "saveUserModelProviderCandidate")).toBeTruthy();
+  const saved = await lastRequestBody(page, "saveUserModelProviderCandidate");
+  expect(saved.candidate.models).toEqual([
+    {
+      modelId: "draft-model",
+      displayName: "draft-model",
+      limit: { context: 128000, output: 8000 },
+      effortOptions: ["low", "high"],
+      attachment: true,
+      modalities: { input: ["text", "image"], output: ["text"] },
+    },
+  ]);
+});
+
 test("an edit writes with the revision the read reported, and offers discovery with it", async ({ page }) => {
   await configureFixture(page, seedProviderSurface);
   await openCustomModels(page);
@@ -207,7 +292,10 @@ test("an edit writes with the revision the read reported, and offers discovery w
     expectedRevision: "rev-1",
     baseUrl: "https://synthetic.example/v1",
   });
-  await expect(dialog.getByLabel("模型名称")).toHaveValue("discovered-1\ndiscovered-2");
+  const modelNames = dialog.getByLabel("模型名称");
+  await expect(modelNames).toHaveCount(2);
+  await expect(modelNames.nth(0)).toHaveValue("discovered-1");
+  await expect(modelNames.nth(1)).toHaveValue("discovered-2");
 
   await dialog.getByRole("button", { name: "连通检测" }).click();
   await expect.poll(() => lastRequestBody(page, "testUserModelCandidate")).toBeTruthy();

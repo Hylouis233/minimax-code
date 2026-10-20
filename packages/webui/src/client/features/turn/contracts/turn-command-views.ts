@@ -48,8 +48,6 @@ export interface WebuiTurnLifecycleCommands {
    * composer (New Task), so the previous session's turn cannot bleed through.
    */
   readonly clearStream: () => void;
-  /** Apply the history-derived context snapshot without exposing the stream writer. */
-  readonly setContextUsage: (contextUsage: Record<string, unknown>) => void;
   /** Record or clear the refusal banner's message. */
   readonly setStreamRefusal: (refusal: string | undefined) => void;
   /** The `sending` indicator the composer renders from. */

@@ -67,6 +67,7 @@ import {
   useWebuiWorkspaceQueriesState,
 } from "../../../bindings/use-query-state.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
+import { WebuiDropdown } from "../../../ui/Dropdown.js";
 import { webuiFileLanguage, projectWebuiUnifiedDiffLines, isWorkspaceArchivePath, isWorkspaceHtmlPath } from "../projection/panel-projection.js";
 import type { WebuiTodo } from "../projection/panel-projection.js";
 // `mergeWorkspaceFileChildren`, `chunkWebuiWorkspaceReviewFileIds` and
@@ -678,20 +679,29 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
             <button type="button" aria-label={`${tabLabel(item)} ${DESKTOP_COPY.fileClose}`} onClick={() => dispatch({ type: "close-tab", tabId: item.id })}><WebuiIconClose className="size-3" /></button>
           </div>)}
         </div>
-        <div className="webui-workspace-add-anchor">
-          <button type="button" className="webui-workspace-add-trigger" aria-label="添加标签" aria-haspopup="menu" aria-expanded={state.addMenuOpen} onClick={() => dispatch({ type: "toggle-add-menu" })}>+</button>
-          {state.addMenuOpen ? <div className="webui-workspace-add-menu" role="menu" aria-label="添加工作区标签">
-            {webuiWorkspaceAddMenu().map((entry) => {
-              // Bound to a const so the discriminated union narrows in the branch below.
-              const opens = entry.opens;
-              return opens.type === "open-workspace-review"
-                ? (sessionId && workspaceDir
-                    ? <button key={entry.kind} type="button" role="menuitem" onClick={() => dispatch({ type: "open-workspace-review", sessionId, workspaceDir })}>{addMenuGlyph(entry.kind)}<span>{entry.label}</span></button>
-                    : null)
-                : <button key={entry.kind} type="button" role="menuitem" onClick={() => dispatch({ type: "open-tab", kind: opens.kind, sessionId, workspaceDir })}>{addMenuGlyph(entry.kind)}<span>{entry.label}</span></button>;
-            })}
-          </div> : null}
-        </div>
+        <WebuiDropdown
+          open={state.addMenuOpen}
+          // The reducer only knows how to toggle, so closing is the toggle it
+          // already owns — guarded, because the skeleton calls `onClose` for a
+          // press that landed outside whether or not the menu was up.
+          onOpen={() => dispatch({ type: "toggle-add-menu" })}
+          onClose={() => { if (state.addMenuOpen) dispatch({ type: "toggle-add-menu" }); }}
+          role="menu"
+          ariaLabel="添加工作区标签"
+          wrapperClassName="webui-workspace-add-anchor"
+          className="webui-workspace-add-menu"
+          trigger={(triggerProps) => { const { ref, ...rest } = triggerProps; return <button type="button" {...rest} ref={ref} className="webui-workspace-add-trigger" aria-label="添加标签">+</button>; }}
+        >
+          {webuiWorkspaceAddMenu().map((entry) => {
+            // Bound to a const so the discriminated union narrows in the branch below.
+            const opens = entry.opens;
+            return opens.type === "open-workspace-review"
+              ? (sessionId && workspaceDir
+                  ? <button key={entry.kind} type="button" role="menuitem" onClick={() => dispatch({ type: "open-workspace-review", sessionId, workspaceDir })}>{addMenuGlyph(entry.kind)}<span>{entry.label}</span></button>
+                  : null)
+              : <button key={entry.kind} type="button" role="menuitem" onClick={() => dispatch({ type: "open-tab", kind: opens.kind, sessionId, workspaceDir })}>{addMenuGlyph(entry.kind)}<span>{entry.label}</span></button>;
+          })}
+        </WebuiDropdown>
       </div>
       <div className="webui-workspace-panel-actions">
         <button type="button" aria-label={state.expanded ? "收起面板" : "展开面板"} aria-pressed={state.expanded} onClick={() => dispatch({ type: "toggle-expanded" })}><WebuiIconWorkspaceExpand className="size-[18px]" /></button>

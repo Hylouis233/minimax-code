@@ -2,7 +2,6 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Keyboar
 import { findWebuiMentionRange, removeWebuiSlashToken, type WebuiMentionRange, type WebuiSlashRange } from "../projection/composer-interactions.js";
 import { resolveWebuiComposerEnterAction } from "../projection/composer-state.js";
 import { shouldRecallWebuiHistory, startWebuiHistoryBrowse, stepWebuiHistoryBrowse, type WebuiHistoryBrowse } from "../application/composer-history.js";
-import { evaluateOutsideClose } from "../../../projection/common/outside-close.js";
 
 export interface ComposerInputKeyOptions {
   readonly draft: string;
@@ -179,35 +178,4 @@ export function useComposerInput(draft: string, sessionId?: string): ComposerInp
     historyBrowse, setHistoryBrowse, setPendingCaret: (value) => { pendingCaret.current = value; },
     edit, updateCaret, applyHistoryDraft, handleKeyDown,
   };
-}
-
-export function useComposerSlashDismiss(input: {
-  readonly listenForPointerDown: (listener: (event: PointerEvent) => void) => () => void;
-  readonly regionRef: RefObject<HTMLElement>;
-  readonly draft: string;
-  readonly range: WebuiSlashRange | undefined;
-  readonly enabled: boolean;
-  readonly onDraftChange: (draft: string) => void;
-}): void {
-  const draftRef = useRef(input.draft);
-  const rangeRef = useRef(input.range);
-  useEffect(() => {
-    draftRef.current = input.draft;
-    rangeRef.current = input.range;
-  });
-  useEffect(() => {
-    if (!input.enabled) return undefined;
-    const onPointerDown = (event: PointerEvent): void => {
-      const range = rangeRef.current;
-      const region = input.regionRef.current;
-      if (!range || !region || !(event.target instanceof Node)) return;
-      if (evaluateOutsideClose({
-        surface: "slashPopover",
-        kind: "pointerdown",
-        insideContainer: region.contains(event.target),
-      }) !== "close") return;
-      input.onDraftChange(removeWebuiSlashToken(draftRef.current, range));
-    };
-    return input.listenForPointerDown(onPointerDown);
-  }, [input.enabled, input.listenForPointerDown, input.onDraftChange, input.regionRef]);
 }

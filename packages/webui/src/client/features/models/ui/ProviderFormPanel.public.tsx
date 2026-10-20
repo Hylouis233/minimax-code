@@ -16,7 +16,7 @@
 // write will actually send. The editor and its commands arrive as props — the provider CRUD
 // is `models`' duty, not `settings`'.
 
-import { useState, type Dispatch, type ReactElement, type SetStateAction } from "react";
+import { useRef, useState, type Dispatch, type ReactElement, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -35,16 +35,32 @@ import type {
   WebuiProviderEditor,
   WebuiProviderEditorSnapshot,
 } from "../contracts/provider-editor.js";
+import {
+  WEBUI_MODEL_ATTACHMENT_MODALITIES,
+  WEBUI_MODEL_PROVIDER_APIS,
+  type ProviderModelDraft,
+  type ProviderModelPatch,
+} from "../contracts/provider-editor.js";
 import { textOf } from "../../../contracts/value-readers.js";
 import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
+import { WebuiDropdown } from "../../../ui/Dropdown.js";
 import { CloseIcon, IconButton, RefreshIcon } from "../../../ui/form-atoms.js";
+
+/** The attachment modalities, in Desktop's own words. */
+const ATTACHMENT_LABELS: Readonly<
+  Record<(typeof WEBUI_MODEL_ATTACHMENT_MODALITIES)[number], string>
+> = {
+  image: "图片",
+  pdf: "PDF",
+  video: "视频",
+  audio: "音频",
+};
 
 /**
  * The provider commands this panel invokes. They are `models`' rather than
  * `settings`'; the parent hands over the workflows object's members, which is the wiring
  * boundary this panel declares and no longer owns around.
- */
-export interface WebuiProviderFormCommands {
+ */export interface WebuiProviderFormCommands {
   readonly canManageProviders: boolean;
   readonly loadProviders: () => Promise<void>;
   readonly loadPresets: () => Promise<void>;
@@ -99,26 +115,93 @@ function providerModels(provider?: WebuiModelProviderView): readonly WebuiModelP
   return provider?.models ?? [];
 }
 
+/**
+ * The provider picker.
+ *
+ * Desktop's own shape: one field that is both the selection and the search —
+ * it shows the chosen provider, and typing in it filters the list. The suffix
+ * icon says which of the two it is doing (a magnifier while the list is open,
+ * a chevron while it is closed), and `其他` is pinned to the bottom of the list
+ * behind a divider rather than scrolling with the presets.
+ */
 function ProviderPresetPicker({ presets, selected, selectedName, onSelect }: { readonly presets: readonly Record<string, unknown>[]; readonly selected: string; readonly selectedName: string; readonly onSelect: (preset?: Record<string, unknown>) => void }): ReactElement {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  /** The field's visible frame — the anchor the popup hangs off. */
+  const frameRef = useRef<HTMLDivElement | null>(null);
   const visible = presets.filter((preset) => `${textOf(preset.name)} ${textOf(preset.providerId)}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
-  return <div className="webui-provider-picker" data-testid="settings-provider-preset-picker">
-    <button type="button" aria-label="提供商" aria-expanded={open} className="webui-provider-picker-trigger" onClick={() => { setOpen((value) => !value); setQuery(""); }}>
-      <span>{selectedName || <span className="webui-provider-picker-placeholder">请选择提供商</span>}</span>
-      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="7.8" cy="7.8" r="5.5" stroke="currentColor" /><path d="m12 12 4 4" stroke="currentColor" strokeLinecap="round" /></svg>
-    </button>
-    {open ? <div className="webui-provider-picker-menu" role="listbox" aria-label="提供商列表">
-      <label className="webui-provider-picker-search"><input autoFocus aria-label="搜索提供商" placeholder="搜索提供商..." value={query} onChange={(event) => setQuery(event.target.value)} /><svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="8" cy="8" r="5.5" stroke="currentColor" /><path d="m12 12 4 4" stroke="currentColor" strokeLinecap="round" /></svg></label>
-      <div className="webui-provider-picker-options">{visible.length ? visible.map((preset) => {
+  // `其他` is the value the field carries once it is chosen, so the field has to
+  // show the word and not the marker.
+  const label = selected === "__other__" ? "其他" : selectedName;
+  return <WebuiDropdown
+    open={open}
+    onOpen={() => { setOpen(true); setQuery(""); }}
+    onClose={() => { setOpen(false); setQuery(""); }}
+    role="listbox"
+    ariaLabel="提供商列表"
+    width="content"
+    wrapperClassName="webui-provider-picker"
+    className="webui-provider-picker-menu"
+    testId="settings-provider-preset-picker"
+    // The popup hangs off the FIELD'S FRAME, not off the text cursor inside
+    // it: the frame is the box the reader sees, and it is what the list has
+    // to line up with. The input keeps the skeleton's trigger ref, so Escape
+    // returns the focus to the field the reader was typing in.
+    anchorElementRef={frameRef}
+    trigger={(triggerProps) => {
+      const { ref, ...inputProps } = triggerProps;
+      return <div ref={frameRef} className={`webui-provider-picker-trigger${open ? " webui-provider-picker-trigger-open" : ""}`}>
+      <input
+        {...inputProps}
+        ref={ref}
+        role="combobox"
+        aria-label="提供商"
+        aria-autocomplete="list"
+        autoComplete="off"
+        placeholder="请选择提供商"
+        value={open ? query || label : label}
+        onFocus={(event) => {
+          // The field shows the selection until it is typed into, so the first
+          // keystroke replaces it rather than appending to it. Opening is the
+          // trigger's own business: the skeleton toggles it on the click, and
+          // opening it here as well would cancel that toggle.
+          event.currentTarget.select();
+        }}
+        onKeyDown={(event) => {
+          triggerProps.onKeyDown(event);
+          if (event.key === "ArrowDown" || event.key === "Enter") {
+            event.preventDefault();
+            if (!open) {
+              setOpen(true);
+              setQuery("");
+            }
+          }
+        }}
+        onChange={(event) => {
+          setOpen(true);
+          setQuery(event.target.value);
+        }}
+      />
+      <span className="webui-provider-picker-suffix" data-state={open ? "search" : "arrow"}>
+        {open
+          ? <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.75" stroke="currentColor" strokeWidth="1.5" /><path d="m13 13 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
+          : <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="m4 6 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+      </span>
+    </div>;
+    }}
+  >
+    <div className="webui-provider-picker-options" onMouseDown={(event) => event.preventDefault()}>
+      {visible.length ? visible.map((preset) => {
         const id = textOf(preset.providerId);
         const name = textOf(preset.name) || id;
         const iconUrl = textOf(preset.iconUrl);
-        return <button key={id} type="button" role="option" aria-selected={selected === id} className="webui-provider-picker-option" onClick={() => { onSelect(preset); setOpen(false); setQuery(""); }}><span className="webui-provider-picker-icon">{iconUrl ? <img src={iconUrl} alt="" /> : name.slice(0, 1)}</span><span>{name}</span>{selected === id ? <span className="webui-provider-picker-check" aria-hidden="true">✓</span> : null}</button>;
-      }) : <p className="webui-provider-picker-empty" role="status">没有匹配的提供商</p>}</div>
-      <div className="webui-provider-picker-other"><button type="button" role="option" aria-selected={selected === "__other__"} onClick={() => { onSelect(); setOpen(false); setQuery(""); }}><span aria-hidden="true">＋</span>其他</button></div>
-    </div> : null}
-  </div>;
+        return <button key={id} type="button" role="option" aria-selected={selected === id} className="webui-provider-picker-option" onClick={() => { onSelect(preset); setOpen(false); setQuery(""); }}><span className="webui-provider-picker-icon">{iconUrl ? <img src={iconUrl} alt="" /> : name.slice(0, 1)}</span><span className="webui-provider-picker-option-name">{name}</span>{selected === id ? <span className="webui-provider-picker-check" aria-hidden="true">✓</span> : null}</button>;
+      }) : <p className="webui-provider-picker-empty" role="status">没有匹配的提供商</p>}
+    </div>
+    <div className="webui-provider-picker-other">
+      <button type="button" role="option" aria-selected={selected === "__other__"} data-testid="settings-provider-other-option" onMouseDown={(event) => event.preventDefault()} onClick={() => { onSelect(); setOpen(false); setQuery(""); }}><span className="webui-provider-picker-other-icon" aria-hidden="true">＋</span><span>其他</span></button>
+    </div>
+  </WebuiDropdown>;
 }
 
 export function ProviderFormPanel({
@@ -135,11 +218,20 @@ export function ProviderFormPanel({
   const {
     open: showProviderForm, editingProviderId: editingProvider,
     name: draftName, baseUrl: draftBaseUrl, apiKey: draftApiKey,
-    modelIdText: draftModelId, apiFormat: draftApiFormat,
+    models: draftModels, apiFormat: draftApiFormat,
     headers: draftHeaders, tested: draftTested, skipConnectionTest: skipTest,
     busy: formBusy, error: formError,
   } = snapshot;
   const [selectedPresetId, setSelectedPresetId] = useState<string>();
+  const [apiFormatOpen, setApiFormatOpen] = useState(false);
+  // The API formats the runtime accepts, plus whatever a saved provider carries
+  // if this build does not know it: an edit must not silently rewrite it.
+  const apiFormatOptions = WEBUI_MODEL_PROVIDER_APIS.includes(
+    draftApiFormat as (typeof WEBUI_MODEL_PROVIDER_APIS)[number],
+  )
+    ? WEBUI_MODEL_PROVIDER_APIS
+    : [draftApiFormat, ...WEBUI_MODEL_PROVIDER_APIS];
+  const hasModelId = draftModels.some((model) => model.modelId.trim().length > 0);
 
     // Opening is the editor's: it seeds the draft from the view (including the
     // header rows, which start blank over their persisted names because the read
@@ -207,18 +299,86 @@ export function ProviderFormPanel({
       {showProviderForm && portalTarget ? createPortal(<div role="dialog" aria-modal="true" aria-label={editingProvider ? "编辑提供商" : "添加模型"} className="webui-provider-dialog-backdrop"><form className="webui-provider-form" onSubmit={(event) => { event.preventDefault(); void editor.save(); }}>
         <header className="webui-provider-form-header"><h3>{editingProvider ? "编辑提供商" : "添加模型"}</h3><button type="button" aria-label="关闭" onClick={() => editor.close()}><CloseIcon /></button></header>
         <div className="webui-provider-form-body">
-          {!editingProvider ? <div className="webui-provider-form-provider-grid"><label className="webui-provider-form-field">提供商<ProviderPresetPicker presets={presets} selected={selectedPresetId ?? ""} selectedName={selectedPresetId && selectedPresetId !== "__other__" ? draftName : ""} onSelect={(preset) => { if (!preset) { setSelectedPresetId("__other__"); editor.changeField("name", ""); editor.changeField("baseUrl", ""); editor.changeField("apiFormat", "openai-completions"); editor.changeField("modelIdText", ""); return; } setSelectedPresetId(textOf(preset.providerId)); editor.changeField("name", textOf(preset.name)); editor.changeField("baseUrl", textOf(preset.baseUrl)); editor.changeField("apiFormat", textOf(preset.apiFormat)); editor.changeField("modelIdText", ""); }} /></label>{selectedPresetId === "__other__" ? <label className="webui-provider-form-field">提供商名称<input aria-label="提供商名称" value={draftName} onChange={(event) => editor.changeField("name", event.target.value)} required /></label> : null}</div> : null}
+          {!editingProvider ? <div className="webui-provider-form-provider-grid"><label className="webui-provider-form-field">提供商<ProviderPresetPicker presets={presets} selected={selectedPresetId ?? ""} selectedName={selectedPresetId && selectedPresetId !== "__other__" ? draftName : ""} onSelect={(preset) => { if (!preset) { setSelectedPresetId("__other__"); editor.changeField("name", ""); editor.changeField("baseUrl", ""); editor.changeField("apiFormat", "openai-completions"); editor.clearModels(); return; } setSelectedPresetId(textOf(preset.providerId)); editor.changeField("name", textOf(preset.name)); editor.changeField("baseUrl", textOf(preset.baseUrl)); editor.changeField("apiFormat", textOf(preset.apiFormat)); editor.clearModels(); }} /></label>{selectedPresetId === "__other__" ? <label className="webui-provider-form-field">提供商名称<input aria-label="提供商名称" value={draftName} onChange={(event) => editor.changeField("name", event.target.value)} required /></label> : null}</div> : null}
           {editingProvider ? <label className="webui-provider-form-field">提供商名称<input value={draftName} onChange={(event) => editor.changeField("name", event.target.value)} required /></label> : null}
-          <div className="webui-provider-form-provider-grid"><label className="webui-provider-form-field">API 格式<input value={draftApiFormat} onChange={(event) => editor.changeField("apiFormat", event.target.value)} /></label><label className="webui-provider-form-field">接口地址<input value={draftBaseUrl} onChange={(event) => editor.changeField("baseUrl", event.target.value)} required />{editingProvider && providers.find((provider) => provider.providerId === editingProvider)?.configRevision ? <button type="button" disabled={!snapshot.canDiscover || formBusy} onClick={() => void editor.discover()}>自动获取</button> : null}</label></div>
-          <label className="webui-provider-form-field">API Key<input type="password" value={draftApiKey} onChange={(event) => editor.changeField("apiKey", event.target.value)} placeholder={editingProvider ? "留空保留原值" : ""} required={!editingProvider} /></label>
-          <label className="webui-provider-form-field">模型名称<textarea value={draftModelId} onChange={(event) => editor.changeField("modelIdText", event.target.value)} required /></label>
+          <div className="webui-provider-form-provider-grid"><div className="webui-provider-form-field"><span>API 格式</span><WebuiDropdown open={apiFormatOpen} onOpen={() => setApiFormatOpen(true)} onClose={() => setApiFormatOpen(false)} role="listbox" ariaLabel="API 格式" width="match" wrapperClassName="webui-provider-format" className="webui-provider-format-menu" trigger={(triggerProps) => { const buttonProps = triggerProps; return <button type="button" {...buttonProps} aria-label="API 格式" className="webui-provider-format-trigger"><span>{draftApiFormat}</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="m4 6 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></button>; }}>{apiFormatOptions.map((option) => <button key={option} type="button" role="option" aria-selected={draftApiFormat === option} className="webui-provider-format-option" onClick={() => { editor.changeField("apiFormat", option); setApiFormatOpen(false); }}>{option}</button>)}</WebuiDropdown></div><label className="webui-provider-form-field">接口地址<input aria-label="接口地址" placeholder="https://api.example.com/v1" value={draftBaseUrl} onChange={(event) => editor.changeField("baseUrl", event.target.value)} required /></label></div>
+          <label className="webui-provider-form-field">API Key<input type="password" aria-label="API Key" placeholder={editingProvider ? "留空保留原值" : "请输入API Key"} value={draftApiKey} onChange={(event) => editor.changeField("apiKey", event.target.value)} required={!editingProvider} /></label>
+          <div className="webui-provider-form-models">
+            <div className="webui-provider-form-models-header"><span className="text-[14px] font-medium leading-5 text-text_default_primary">模型</span><div className="webui-provider-form-models-actions"><button type="button" className="webui-provider-form-add-model" onClick={() => editor.addModel()}>添加模型</button><button type="button" className="webui-provider-form-discover" disabled={!snapshot.canDiscover || formBusy} onClick={() => void editor.discover()}>自动获取</button></div></div>
+            {draftModels.length ? draftModels.map((model, index) => <ProviderModelCard key={model.id} model={model} index={index} busy={formBusy} onChange={(patch) => editor.changeModel(model.id, patch)} onTest={() => void editor.testModel(model.id)} onRemove={() => editor.removeModel(model.id)} />) : <p className="webui-provider-form-models-empty">请至少添加一个模型</p>}
+          </div>
           <div className="webui-provider-form-headers"><div className="text-[13px] font-medium leading-5 text-text_default_primary">自定义 Headers</div>{draftHeaders.map((header) => <div key={header.id} className="webui-provider-form-header-row"><input aria-label="Header 名称" placeholder="Header 名称" value={header.name} onChange={(event) => editor.setHeaders(draftHeaders.map((item) => item.id === header.id ? { ...item, name: event.target.value } : item))} /><input aria-label="Header 值" placeholder={header.persistedName ? "留空保留原值" : "Header 值"} value={header.value} onChange={(event) => editor.setHeaders(draftHeaders.map((item) => item.id === header.id ? { ...item, value: event.target.value } : item))} /><IconButton label="移除 Header" onClick={() => editor.removeHeader(header.id)}><path d="M9.80273 1.80527C10.605 1.80541 11.2549 2.45615 11.2549 3.2584V4.35606H14.666C14.9422 4.35606 15.166 4.57991 15.166 4.85606C15.1658 5.132 14.942 5.35606 14.666 5.35606H12.8096L12.7861 5.68027L12.3281 11.9645C12.2362 13.2214 11.1891 14.1948 9.92871 14.1949H5.99414C4.72231 14.1949 3.67 13.2045 3.59277 11.9352L3.21387 5.67442L3.19434 5.35606H1.33301C1.05715 5.3559 0.833241 5.1319 0.833008 4.85606C0.833008 4.58001 1.057 4.35622 1.33301 4.35606H4.74512V3.2584C4.74512 2.45607 5.39591 1.80527 6.19824 1.80527H9.80273ZM4.21191 5.61387L4.59082 11.8746C4.63603 12.6162 5.25109 13.1949 5.99414 13.1949H9.92871C10.6649 13.1948 11.2761 12.6263 11.3301 11.8922L11.7891 5.60801L11.8076 5.35606H4.19629L4.21191 5.61387ZM6.19824 2.80527C5.9482 2.80527 5.74512 3.00835 5.74512 3.2584V4.35606H10.2549V3.2584C10.2549 3.00844 10.0527 2.80541 9.80273 2.80527H6.19824Z" /></IconButton></div>)}<button type="button" className="webui-provider-form-add-header" onClick={() => editor.addHeader()}>＋ 添加 Header</button></div>
           {formError ? <p role="alert" className="webui-provider-form-error">{formError}</p> : null}
         </div>
-        <footer className="webui-provider-form-actions"><label><input type="checkbox" checked={skipTest} onChange={(event) => editor.setSkipConnectionTest(event.target.checked)} />跳过连通检测</label><span /><button type="button" disabled={formBusy || !draftModelId.trim()} onClick={() => void editor.test()}>连通检测</button><button type="button" disabled={formBusy} onClick={() => editor.close()}>取消</button><button type="submit" disabled={formBusy || (!draftTested && !skipTest)}>{formBusy ? "加载中…" : "保存"}</button></footer>
+        <footer className="webui-provider-form-actions"><label><input type="checkbox" checked={skipTest} onChange={(event) => editor.setSkipConnectionTest(event.target.checked)} />跳过连通检测</label><span /><button type="button" disabled={formBusy || !hasModelId} onClick={() => void editor.test()}>连通检测</button><button type="button" disabled={formBusy} onClick={() => editor.close()}>取消</button><button type="submit" disabled={formBusy || (!draftTested && !skipTest)}>{formBusy ? "加载中…" : "保存"}</button></footer>
       </form></div>, portalTarget) : null}
       {providerPendingDelete ? <div role="dialog" aria-modal="true" aria-label={`删除供应商${textOf(providerPendingDelete.name)}`} className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(0,0,0,0.25)]"><div className="w-[480px] overflow-clip rounded-[20px] bg-bg_grouped_secondary p-6" style={{ boxShadow: "0 4px 10px 0 rgba(0,0,0,0.04)" }}><div className="flex flex-col gap-6"><div className="flex flex-col gap-4"><div className="flex items-center justify-between"><h3 className="text-[18px] font-medium leading-[26px] text-text_default_primary">删除供应商"{textOf(providerPendingDelete.name)}"吗？</h3><button type="button" aria-label="关闭" className="flex size-[22px] items-center justify-center text-icon_default_tertiary hover:text-icon_default_secondary" onClick={() => setProviderPendingDelete(undefined)}><CloseIcon /></button></div><p className="text-[14px] leading-5 text-text_default_secondary">删除后将移除该供应商下的所有模型选项。</p></div>{formError ? <p role="alert">{formError}</p> : null}<div className="flex justify-end gap-4"><button type="button" disabled={formBusy} className="h-9 min-w-[68px] rounded-[8px] px-4" onClick={() => setProviderPendingDelete(undefined)}>取消</button><button type="button" disabled={formBusy} className="h-9 min-w-[68px] rounded-[8px] bg-bg_status_error px-4" onClick={() => void confirmDeleteProvider()}>{formBusy ? "删除中…" : "删除"}</button></div></div></div></div> : null}
   </>;
+}
+
+/**
+ * One model card: the model name, the limits, the reasoning levels and the
+ * attachments it takes.
+ *
+ * Desktop's own card, transcribed: a header carrying the model's number and its
+ * own connectivity probe, and a bordered body holding one field per row.
+ */
+function ProviderModelCard({ model, index, busy, onChange, onTest, onRemove }: { readonly model: ProviderModelDraft; readonly index: number; readonly busy: boolean; readonly onChange: (patch: ProviderModelPatch) => void; readonly onTest: () => void; readonly onRemove: () => void }): ReactElement {
+  return <div className="webui-provider-form-model">
+    <div className="webui-provider-form-model-header">
+      <span className="text-[13px] font-medium leading-5 text-text_default_primary">模型 {String(index + 1).padStart(2, "0")}</span>
+      <div className="webui-provider-form-model-tools">
+        <IconButton label="测试模型连通性" disabled={busy || !model.modelId.trim()} onClick={onTest} viewBox="0 0 20 20" svgFill="none"><RefreshIcon /></IconButton>
+        <IconButton label="移除模型" disabled={busy} onClick={onRemove}><path d="M9.80273 1.80527C10.605 1.80541 11.2549 2.45615 11.2549 3.2584V4.35606H14.666C14.9422 4.35606 15.166 4.57991 15.166 4.85606C15.1658 5.132 14.942 5.35606 14.666 5.35606H12.8096L12.7861 5.68027L12.3281 11.9645C12.2362 13.2214 11.1891 14.1948 9.92871 14.1949H5.99414C4.72231 14.1949 3.67 13.2045 3.59277 11.9352L3.21387 5.67442L3.19434 5.35606H1.33301C1.05715 5.3559 0.833241 5.1319 0.833008 4.85606C0.833008 4.58001 1.057 4.35622 1.33301 4.35606H4.74512V3.2584C4.74512 2.45607 5.39591 1.80527 6.19824 1.80527H9.80273ZM4.21191 5.61387L4.59082 11.8746C4.63603 12.6162 5.25109 13.1949 5.99414 13.1949H9.92871C10.6649 13.1948 11.2761 12.6263 11.3301 11.8922L11.7891 5.60801L11.8076 5.35606H4.19629L4.21191 5.61387ZM6.19824 2.80527C5.9482 2.80527 5.74512 3.00835 5.74512 3.2584V4.35606H10.2549V3.2584C10.2549 3.00844 10.0527 2.80541 9.80273 2.80527H6.19824Z" /></IconButton>
+      </div>
+    </div>
+    <div className="webui-provider-form-model-body">
+      <label className="webui-provider-form-field">模型名称<input aria-label="模型名称" value={model.modelId} onChange={(event) => onChange({ modelId: event.target.value })} /></label>
+      <div className="webui-provider-form-provider-grid">
+        <label className="webui-provider-form-field">上下文窗口<input aria-label="上下文窗口" inputMode="numeric" placeholder="留空按供应商默认值处理" value={model.contextLimit} onChange={(event) => onChange({ contextLimit: event.target.value })} /></label>
+        <label className="webui-provider-form-field">最大输出 Token<input aria-label="最大输出 Token" inputMode="numeric" placeholder="留空按供应商默认值处理" value={model.maxOutputTokens} onChange={(event) => onChange({ maxOutputTokens: event.target.value })} /></label>
+      </div>
+      <div className="webui-provider-form-field">
+        <span>推理等级</span>
+        <EffortOptionsField value={model.effortOptions} onChange={(effortOptions) => onChange({ effortOptions })} />
+        <p className="webui-provider-form-hint">请确保输入模型原生支持的推理等级，留空按供应商默认值处理。</p>
+      </div>
+      <div className="webui-provider-form-field">
+        <span>支持的附件</span>
+        <AttachmentField value={model.modalities} onChange={(modalities) => onChange({ modalities })} />
+        <p className="webui-provider-form-hint">所选附件将默认直接发送给模型处理，请确保模型原生支持。其余类型由平台工具处理，需消耗平台积分。</p>
+      </div>
+      {model.error ? <p role="alert" className="webui-provider-form-error">{model.error}</p> : null}
+    </div>
+  </div>;
+}
+
+/**
+ * The reasoning levels of one model, as Desktop's tag input: a level is
+ * committed with Enter and appears as a chip that can be taken away again.
+ */
+function EffortOptionsField({ value, onChange }: { readonly value: readonly string[]; readonly onChange: (next: readonly string[]) => void }): ReactElement {
+  const [text, setText] = useState("");
+  const commit = () => {
+    const level = text.trim();
+    if (!level || value.includes(level)) {
+      setText("");
+      return;
+    }
+    onChange([...value, level]);
+    setText("");
+  };
+  return <div className="webui-provider-form-effort">
+    {value.map((level) => <span key={level} className="webui-provider-form-chip">{level}<button type="button" aria-label={`移除 ${level}`} onClick={() => onChange(value.filter((item) => item !== level))}>×</button></span>)}
+    <input aria-label="推理等级" placeholder="输入档位后按 Enter，如 low、high、max" value={text} onChange={(event) => setText(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); commit(); } }} onBlur={commit} />
+  </div>;
+}
+
+/** The attachment modalities one model takes, as Desktop's multiple selection. */
+function AttachmentField({ value, onChange }: { readonly value: readonly string[]; readonly onChange: (next: readonly string[]) => void }): ReactElement {
+  return <div className="webui-provider-form-attachments">
+    {WEBUI_MODEL_ATTACHMENT_MODALITIES.map((modality) => <label key={modality} className="webui-provider-form-attachment"><input type="checkbox" checked={value.includes(modality)} onChange={(event) => onChange(event.target.checked ? [...value, modality] : value.filter((item) => item !== modality))} />{ATTACHMENT_LABELS[modality]}</label>)}
+  </div>;
 }
 
 function SortableModelRow({ id, model, onTest, onToggle }: { readonly id: string; readonly model: WebuiModelProviderModelEntry; readonly onTest: () => void; readonly onToggle: (enabled: boolean) => void }): ReactElement {

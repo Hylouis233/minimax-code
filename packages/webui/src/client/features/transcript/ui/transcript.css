@@ -30,22 +30,20 @@
   .webui-context-usage-track, .webui-context-usage-value { fill: none; stroke-width: 2; }
   .webui-context-usage-track { stroke: var(--border_light); }
   .webui-context-usage-value { stroke: var(--text_default_accent); stroke-linecap: round; transition: stroke-dashoffset 180ms ease; }
-  /* `fixed`, not `absolute`, and NOT offset by `right`/`bottom`. Those offsets
-   * resolve against the nearest POSITIONED ancestor, not against the ring, and
-   * the session column above the composer is `overflow: hidden`: a 480px panel
-   * right-aligned to a ring a third of the way across that column reaches past
-   * the column's own left edge and the clip silently takes the rest. `left`/`top`
-   * are measured instead; see `projection/context-usage-popover.ts`.
-   *
-   * The 60 here is only ever compared INSIDE the composer's overlay, which is
-   * itself a stacking context — the panel cannot outrank the rail from in there,
-   * and the rule that lets it is the overlay's own.
+  /* The panel is a dropdown now: the shared layer places it against the ring
+   * in viewport coordinates and gives it the surface and the motion, so this
+   * rule says only what the panel itself needs. What it must NOT say is a
+   * `position` or a `right`/`bottom` offset — those resolve against the
+   * nearest POSITIONED ancestor, not against the ring, and the session column
+   * above the composer is `overflow: hidden`: a 480px panel right-aligned to a
+   * ring a third of the way across that column reaches past the column's own
+   * left edge and the clip silently takes the rest. The coordinates are
+   * measured instead; see `projection/context-usage-popover.ts`.
    *
    * `width` stays on `100vw` rather than the column: the panel is free to sit
    * over the rail, which is what makes it a panel rather than a card. */
-  .webui-context-usage-popover { position: fixed; z-index: 60; width: min(480px, calc(100vw - 32px)); max-height: min(70vh, 520px); overflow: auto; padding: 16px 18px; border: 1px solid var(--border_default); border-radius: 18px; background: var(--bg_grouped_secondary_elevated); box-shadow: 0 8px 24px rgb(0 0 0 / 10%); color: var(--text_default_primary); opacity: 0; pointer-events: none; transform: translateY(5px) scale(.99); transform-origin: bottom right; visibility: hidden; transition: opacity 150ms cubic-bezier(.2, .7, .2, 1), transform 150ms cubic-bezier(.2, .7, .2, 1), visibility 150ms step-end; }
+  .webui-context-usage-popover { width: min(480px, calc(100vw - 32px)); max-height: min(70vh, 520px); overflow: auto; padding: 16px 18px; color: var(--text_default_primary); transform-origin: bottom right; }
   .webui-context-usage-popover::before { position: absolute; top: -10px; right: 0; left: 0; height: 10px; content: ""; }
-  .webui-context-usage-popover.is-open { opacity: 1; pointer-events: auto; transform: translateY(0) scale(1); visibility: visible; transition: opacity 150ms cubic-bezier(.2, .7, .2, 1), transform 150ms cubic-bezier(.2, .7, .2, 1), visibility 0s; }
   .webui-context-usage-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: var(--size_14); line-height: 20px; }
   /* The heading doubles as the panel's disclosure control, so it is a real
    * button and has to be reset as one: a native button brings a border, a
@@ -80,7 +78,10 @@
   .webui-context-usage-quota-bar { height: 4px; overflow: hidden; border-radius: 999px; background: var(--border_light); }
   .webui-context-usage-quota-bar span { display: block; height: 100%; border-radius: inherit; background: var(--text_default_accent); transition: width 180ms ease; }
   .webui-context-usage-reset { color: var(--text_default_tertiary); font-size: var(--size_12); line-height: 16px; }
-  @media (prefers-reduced-motion: reduce) { .webui-context-usage-chevron, .webui-context-usage-popover, .webui-context-usage-label, .webui-context-usage-bar span, .webui-context-usage-quota-bar span { transition: none; } }
+  /* The popover's own motion is the shared dropdown surface's now, and the
+   * shared surface's own reduced-motion override covers it; what is left here
+   * is what still transitions in this surface's own rules. */
+  @media (prefers-reduced-motion: reduce) { .webui-context-usage-chevron, .webui-context-usage-label, .webui-context-usage-bar span, .webui-context-usage-quota-bar span { transition: none; } }
 
   @media (prefers-reduced-motion: reduce) { .webui-thinking-label { transition: none; } }
 

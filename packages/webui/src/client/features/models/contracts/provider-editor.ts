@@ -35,6 +35,70 @@ export interface ProviderHeaderDraft {
 }
 
 /**
+ * The API formats the runtime accepts, in the order Desktop's form offers them.
+ *
+ * A mirror of `MODEL_PROVIDER_APIS` in `local-runtime-v2`'s model-system
+ * identity module. The runtime validates the field on write and refuses an
+ * unknown value, so the form offers exactly the values it will accept; a saved
+ * provider carrying a format this build does not know keeps its value (the form
+ * adds it to the options rather than silently rewriting it).
+ */
+export const WEBUI_MODEL_PROVIDER_APIS = [
+  "anthropic-messages",
+  "openai-completions",
+  "openai-responses",
+  "google-generative-ai",
+] as const;
+
+/**
+ * The attachment modalities the form offers, in Desktop's own order.
+ *
+ * `text` is deliberately absent: every model takes text, so the runtime adds it
+ * back (Desktop does the same in its own normalization) and the user only picks
+ * what is on top of text.
+ */
+export const WEBUI_MODEL_ATTACHMENT_MODALITIES = ["image", "pdf", "video", "audio"] as const;
+
+/**
+ * One editable model row.
+ *
+ * Desktop's form is a list of model cards, not one textarea of ids: every model
+ * carries its own context window, output budget, reasoning levels and supported
+ * attachments, and the write sends one entry per card. The two limits stay as
+ * typed text (the inputs are free-typed) and the levels as the list the user
+ * picked; the editor normalizes both when it builds the candidate.
+ */
+export interface ProviderModelDraft {
+  readonly id: string;
+  readonly modelId: string;
+  /** The name the model is shown under; Desktop keeps the saved one and falls back to the id. */
+  readonly displayName: string;
+  /** The context window, as typed. Digits only; empty means "the runtime decides". */
+  readonly contextLimit: string;
+  /** The output budget, as typed. Digits only; empty means "the runtime decides". */
+  readonly maxOutputTokens: string;
+  readonly effortOptions: readonly string[];
+  /** The attachment modalities the user picked, without the implicit `text`. */
+  readonly modalities: readonly string[];
+  /** `discovered` for a model the endpoint listed; absent for a hand-written one. */
+  readonly configurationSource?: "discovered";
+  /** The message of a failed connection test for this row. */
+  readonly error?: string;
+  /** Whether this row passed a connection test against the current draft. */
+  readonly tested: boolean;
+}
+
+/** The fields one model row accepts. Absent fields keep their current value. */
+export interface ProviderModelPatch {
+  readonly modelId?: string;
+  readonly displayName?: string;
+  readonly contextLimit?: string;
+  readonly maxOutputTokens?: string;
+  readonly effortOptions?: readonly string[];
+  readonly modalities?: readonly string[];
+}
+
+/**
  * The Models commands the editor drives. Structurally the provider CRUD members
  * of the models workflow, so the composition passes the workflow itself rather
  * than a second hand-built object.
@@ -75,8 +139,8 @@ export interface WebuiProviderEditorSnapshot {
   readonly baseUrl: string;
   readonly apiKey: string;
   readonly apiFormat: string;
-  /** The model ids as typed, one per line. */
-  readonly modelIdText: string;
+  /** The editable model rows, in the order they will be written. */
+  readonly models: readonly ProviderModelDraft[];
   readonly headers: readonly ProviderHeaderDraft[];
   readonly skipConnectionTest: boolean;
   /** True while an operation is in flight; the form disables its controls on it. */
@@ -86,7 +150,7 @@ export interface WebuiProviderEditorSnapshot {
   /** Whether the *current* draft passed a connection test. */
   readonly tested: boolean;
   readonly canManageProviders: boolean;
-  /** Whether the saved provider's revision is known, so discovery can be offered. */
+  /** Whether discovery can be offered — it can, on a new provider and on a saved one. */
   readonly canDiscover: boolean;
   /** The revision a write must carry; absent for a new provider. */
   readonly configRevision?: string;
@@ -110,14 +174,28 @@ export interface WebuiProviderEditor {
    */
   readonly openExisting: (provider: import("../../../../shared/contracts/models.js").WebuiModelProviderView) => Promise<void>;
   readonly changeField: (
-    field: "name" | "baseUrl" | "apiKey" | "apiFormat" | "modelIdText",
+    field: "name" | "baseUrl" | "apiKey" | "apiFormat",
     value: string,
   ) => void;
+  /** Append a blank model row. */
+  readonly addModel: () => void;
+  /** Drop a model row and everything the write would have carried for it. */
+  readonly removeModel: (id: string) => void;
+  /** Drop every model row — what picking another preset does. */
+  readonly clearModels: () => void;
+  /** Change one model row's fields. */
+  readonly changeModel: (id: string, patch: ProviderModelPatch) => void;
   readonly setHeaders: (rows: readonly ProviderHeaderDraft[]) => void;
   readonly addHeader: () => void;
   readonly removeHeader: (id: string) => void;
   readonly setSkipConnectionTest: (skip: boolean) => void;
+  /**
+   * Test every model row that carries an id, one call per row — the shape
+   * Desktop's form has when each card owns its own connectivity probe.
+   */
   readonly test: () => Promise<void>;
+  /** Test one model row and report the answer on that row. */
+  readonly testModel: (id: string) => Promise<void>;
   readonly discover: () => Promise<void>;
   readonly save: () => Promise<void>;
   readonly remove: () => Promise<void>;

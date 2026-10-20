@@ -2911,6 +2911,15 @@
       "home": "current"
     },
     {
+      "path": "client/projection/common/dropdown-placement.ts",
+      "layers": [
+        "view"
+      ],
+      "role": "projection-common",
+      "business": null,
+      "home": "current"
+    },
+    {
       "path": "client/projection/common/event-kinds.ts",
       "layers": [
         "view"
@@ -3127,6 +3136,15 @@
       "home": "target"
     },
     {
+      "path": "client/styles/dropdown.css",
+      "layers": [
+        "unknown"
+      ],
+      "role": "styles",
+      "business": null,
+      "home": "current"
+    },
+    {
       "path": "client/styles/index.css",
       "layers": [
         "unknown"
@@ -3155,6 +3173,15 @@
     },
     {
       "path": "client/ui/ContextMenu.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "ui",
+      "business": null,
+      "home": "target"
+    },
+    {
+      "path": "client/ui/Dropdown.tsx",
       "layers": [
         "bindings"
       ],

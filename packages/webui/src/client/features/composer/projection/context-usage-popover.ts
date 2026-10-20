@@ -49,6 +49,15 @@ export type PopoverAnchorRect = OverlayRect;
 export interface ContextUsagePlacement {
   readonly left: number;
   readonly top: number;
+  /**
+   * The side the panel opened on.
+   *
+   * The panel opens ABOVE the ring, always: the ring is at the bottom of the
+   * composer and the panel is a tall one. The shared layer needs the side for
+   * the motion, which has to slide the panel the way it came — up from below,
+   * not down from above.
+   */
+  readonly side: "top";
 }
 
 /** Space kept between the panel and the viewport edge, in px. */
@@ -82,6 +91,10 @@ export const CONTEXT_POPOVER_EDGE_OFFSET = 4;
  * (`right: -4px`), and it is the better answer besides: the ring is the last
  * control in its row, so the panel grows away from the composer's other
  * controls instead of over them.
+ *
+ * The panel is a dropdown, so the shared skeleton places it: it measures the
+ * anchor and the panel and hands both to this rule. The rule answers "where",
+ * and the skeleton's surface answers "whether" and "how it looks".
  */
 export function positionContextUsagePopover(args: {
   readonly anchor: PopoverAnchorRect;
@@ -97,6 +110,7 @@ export function positionContextUsagePopover(args: {
   const { anchor, surface, viewport } = args;
 
   return {
+    side: "top",
     left: Math.round(
       overlayAxisStart(
         anchor.left + anchor.width + edgeOffset - surface.width,
@@ -114,40 +128,4 @@ export function positionContextUsagePopover(args: {
       ),
     ),
   };
-}
-
-/**
- * The inline style for a placed panel.
- *
- * `fixed`, for the reason the module doc gives. `visibility` and opacity are
- * left to CSS — this answers "where", not "whether" — and so is the entry
- * transform, which the sheet animates.
- */
-export function contextUsagePopoverStyle(placement: ContextUsagePlacement): {
-  readonly position: "fixed";
-  readonly left: string;
-  readonly top: string;
-} {
-  return {
-    position: "fixed",
-    left: `${placement.left}px`,
-    top: `${placement.top}px`,
-  };
-}
-
-/**
- * Two placements that would render identically.
- *
- * The measure runs on every render while the panel is open — it has to, because
- * the panel's own height changes when the disclosure opens — and `useState`
- * compares by identity, so without this each measurement would schedule a render
- * that produces another measurement.
- */
-export function sameContextUsagePlacement(
-  a: ContextUsagePlacement | undefined,
-  b: ContextUsagePlacement | undefined,
-): boolean {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  return a.left === b.left && a.top === b.top;
 }

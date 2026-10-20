@@ -196,7 +196,10 @@ export function UsagePanel({
   readonly onLogin?: () => void;
 }): ReactElement {
   return (
-    <div className="webui-user-menu-usage-panel" role="dialog" aria-label="用量">
+    // The shared surface, not the shared skeleton: this panel opens on hover,
+    // focus or click and cannot be dismissed from inside itself, so it needs no
+    // trigger and no outside-press handling — only the shared look and motion.
+    <div className="webui-user-menu-usage-panel webui-dropdown-surface" role="dialog" aria-label="用量">
       {state.status === "loading" ? <UsageSkeleton animated /> : null}
       {state.status === "idle" ? <UsageSkeleton /> : null}
       {state.status === "error" ? (

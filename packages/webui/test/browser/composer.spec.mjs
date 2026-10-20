@@ -69,6 +69,77 @@ test("typing / opens the slash palette; filtering and Escape behave", async ({ p
   await expect(input).toHaveValue("");
 });
 
+test("the composer's popups are placed by the shared layer, inside the viewport", async ({ page }) => {
+  // A popup that is not placed is a popup that is somewhere else: the shared
+  // layer places it against the composer, and a class of its own that claims a
+  // `position` takes the placement away. It then falls into the page flow —
+  // a viewport below the reader, where the `+` button's menu used to go, so
+  // that the button did nothing at all and the palette ran off the bottom of
+  // the screen with its last rows out of reach.
+  const placement = async (label, selector) => {
+    const popup = page.locator(selector);
+    await expect(popup, label).toBeVisible();
+    const box = await popup.evaluate((node) => {
+      const rect = node.getBoundingClientRect();
+      return {
+        position: getComputedStyle(node).position,
+        top: rect.top,
+        bottom: rect.bottom,
+        left: rect.left,
+        right: rect.right,
+        height: window.innerHeight,
+        width: window.innerWidth,
+      };
+    });
+    // Placed by the shared layer, in the viewport's coordinates.
+    expect(box.position, `${label} is positioned by the shared layer`).toBe("fixed");
+    expect(box.top, `${label} is inside the viewport`).toBeGreaterThanOrEqual(0);
+    expect(box.bottom, `${label} is inside the viewport`).toBeLessThanOrEqual(box.height);
+    expect(box.left, `${label} is inside the viewport`).toBeGreaterThanOrEqual(0);
+    expect(box.right, `${label} is inside the viewport`).toBeLessThanOrEqual(box.width);
+  };
+
+  await openApp(page, "#session=A");
+
+  // The `+` menu: it opens above the button it belongs to. The popup and the
+  // menu's own content wrapper share a class, so the popup is named by both.
+  await page.locator('[data-testid="composer-add-menu"]').click();
+  await placement("the + menu", ".webui-dropdown-popup.webui-composer-menu-stack");
+  await page.keyboard.press("Escape");
+
+  // The slash palette: it opens above the input box, in the room there is.
+  const input = composer(page);
+  await input.click();
+  await input.pressSequentially("/");
+  await placement("the slash palette", '[data-webui-command-menu="true"]');
+  await input.press("Escape");
+});
+
+test("the workspace picker opens above its row, inside the viewport", async ({ page }) => {
+  // The project row lives on the home surface, and its list is the tallest
+  // popup in the composer: opened downwards on a short window it ran off the
+  // bottom of the screen with its last rows out of reach.
+  await openApp(page, "#");
+  const row = page.locator('[data-webui-workspace-picker="true"]').first();
+  await expect(row).toBeVisible();
+  await row.click();
+
+  const popup = page.locator(".webui-dropdown-popup.webui-workspace-picker-menu");
+  await expect(popup).toBeVisible();
+  const box = await popup.evaluate((node) => {
+    const rect = node.getBoundingClientRect();
+    return {
+      position: getComputedStyle(node).position,
+      top: rect.top,
+      bottom: rect.bottom,
+      height: window.innerHeight,
+    };
+  });
+  expect(box.position).toBe("fixed");
+  expect(box.top).toBeGreaterThanOrEqual(0);
+  expect(box.bottom).toBeLessThanOrEqual(box.height);
+});
+
 test("↑ recalls committed inputs; a manual edit exits the browse", async ({ page }) => {
   await openApp(page, "#session=A");
 

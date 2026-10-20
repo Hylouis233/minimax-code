@@ -14,28 +14,67 @@
   .webui-provider-form-field textarea { height: 88px; resize: vertical; padding: 9px 12px; }
   .webui-provider-form-field input:focus, .webui-provider-form-field textarea:focus { border-color: var(--border_accent); }
   .webui-provider-picker { position: relative; min-width: 0; }
+  /* The field is both the selection and the search: it shows the chosen
+     provider, and typing in it filters the list. */
   .webui-provider-picker-trigger { display: flex; width: 100%; height: 40px; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid var(--border_default); border-radius: 8px; background: transparent; padding: 0 12px; color: var(--text_default_primary); text-align: left; }
-  .webui-provider-picker-trigger > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .webui-provider-picker-trigger svg { flex: 0 0 auto; color: var(--icon_default_tertiary); }
-  .webui-provider-picker-placeholder { color: var(--text_default_quaternary); }
-  .webui-provider-picker-menu { position: absolute; top: calc(100% + 4px); left: 0; z-index: 120; display: flex; width: min(444px, calc(100vw - 48px)); max-height: 356px; flex-direction: column; overflow: hidden; border: 1px solid var(--border_light); border-radius: 12px; background: var(--bg_default_primary); padding: 4px; box-shadow: 0 8px 24px rgb(0 0 0 / 12%); }
-  .webui-provider-picker-search { display: flex; height: 40px; flex: 0 0 auto; align-items: center; gap: 8px; border: 1px solid var(--border_default); border-radius: 8px; padding: 0 12px; color: var(--icon_default_tertiary); }
-  .webui-provider-picker-search input { min-width: 0; flex: 1; border: 0; background: transparent; color: var(--text_default_primary); font: inherit; outline: 0; }
-  .webui-provider-picker-search input::placeholder { color: var(--text_default_quaternary); }
-  .webui-provider-picker-options { min-height: 0; overflow-y: auto; padding: 4px 0; }
-  .webui-provider-picker-option { display: flex; width: 100%; min-height: 40px; align-items: center; gap: 10px; border: 0; border-radius: 8px; background: transparent; padding: 4px 12px; color: var(--text_default_primary); font-size: 14px; text-align: left; }
+  .webui-provider-picker-trigger-open { border-color: var(--border_accent); }
+  .webui-provider-picker-trigger > input { min-width: 0; flex: 1; border: 0; background: transparent; color: var(--text_default_primary); font: inherit; outline: none; }
+  .webui-provider-picker-trigger > input::placeholder { color: var(--text_default_quaternary); }
+  .webui-provider-picker-suffix { display: flex; width: 20px; height: 20px; flex: 0 0 20px; align-items: center; justify-content: center; color: var(--icon_default_tertiary); }
+  /* The popup's placement and its surface are the shared skeleton's; this
+     states only the list's own width and padding. */
+  .webui-provider-picker-menu { width: 356px; max-width: calc(100vw - 48px); padding: 4px; }
+  .webui-provider-picker-options { min-height: 0; max-height: 256px; overflow-y: auto; padding: 4px 0; }
+  /* The API format: the same skeleton, with a trigger that shows the choice
+     rather than a field that searches for it. */
+  .webui-provider-format { width: 100%; }
+  .webui-provider-format-trigger { display: flex; width: 100%; height: 40px; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid var(--border_default); border-radius: 8px; background: transparent; padding: 0 12px; color: var(--text_default_primary); font: inherit; font-size: 14px; text-align: left; }
+  .webui-provider-format-trigger:focus-visible { border-color: var(--border_accent); outline: none; }
+  .webui-provider-format-trigger > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .webui-provider-format-trigger > svg { flex: 0 0 auto; color: var(--icon_default_tertiary); }
+  .webui-provider-format-menu { padding: 4px; }
+  .webui-provider-format-option { display: flex; width: 100%; height: 32px; align-items: center; border: 0; border-radius: 8px; background: transparent; padding: 0 12px; color: var(--text_default_primary); font: inherit; font-size: 14px; text-align: left; }
+  .webui-provider-format-option:hover, .webui-provider-format-option[aria-selected="true"] { background: var(--bg_interaction_tertiary_hover); }
+  .webui-provider-picker-option { display: flex; width: 100%; height: 36px; align-items: center; gap: 8px; border: 0; border-radius: 8px; background: transparent; padding: 0 12px; color: var(--text_default_primary); font-size: 14px; text-align: left; }
   .webui-provider-picker-option:hover, .webui-provider-picker-option[aria-selected="true"] { background: var(--bg_interaction_tertiary_hover); }
-  .webui-provider-picker-icon { display: flex; width: 28px; height: 28px; flex: 0 0 28px; align-items: center; justify-content: center; overflow: hidden; border: 1px solid var(--border_default); border-radius: 7px; background: var(--bg_default_primary); font-size: 14px; }
-  .webui-provider-picker-icon img { width: 18px; height: 18px; object-fit: contain; }
-  .webui-provider-picker-check { margin-left: auto; color: var(--icon_default_primary); }
+  .webui-provider-picker-option-name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* The provider's mark in its own bordered tile, as Desktop draws it. */
+  .webui-provider-picker-icon { display: flex; width: 24px; height: 24px; flex: 0 0 24px; align-items: center; justify-content: center; overflow: hidden; border: 1px solid var(--border_default); border-radius: 6px; background: var(--text_default_inverted_static); color: var(--text_default_primary); font-size: 12px; }
+  .webui-provider-picker-icon img { width: 16px; height: 16px; border-radius: 3px; object-fit: contain; }
+  .webui-provider-picker-check { display: flex; width: 16px; height: 16px; flex: 0 0 16px; align-items: center; justify-content: center; color: var(--icon_default_primary); }
   .webui-provider-picker-empty { margin: 0; padding: 12px; color: var(--text_default_quaternary); font-size: 14px; line-height: 20px; }
-  .webui-provider-picker-other { flex: 0 0 auto; border-top: 1px solid var(--border_light); padding-top: 4px; }
-  .webui-provider-picker-other button { display: flex; width: 100%; height: 32px; align-items: center; gap: 8px; border: 0; border-radius: 8px; background: transparent; padding: 0 12px; color: var(--text_default_secondary); font-size: 14px; text-align: left; }
+  /* `其他` is pinned below the list, behind a divider. */
+  .webui-provider-picker-other { flex: 0 0 auto; margin-top: 4px; border-top: 1px solid var(--border_default); padding: 4px 0; }
+  .webui-provider-picker-other button { display: flex; width: 100%; height: 32px; align-items: center; gap: 8px; border: 0; border-radius: 8px; background: transparent; padding: 0 12px; color: var(--text_default_secondary); font-size: 14px; line-height: 20px; text-align: left; }
   .webui-provider-picker-other button:hover { background: var(--bg_interaction_tertiary_hover); }
+  .webui-provider-picker-other-icon { display: flex; width: 24px; height: 24px; flex: 0 0 24px; align-items: center; justify-content: center; }
   .webui-provider-form-headers { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; }
   .webui-provider-form-header-row { display: flex; align-items: center; gap: 8px; }
   .webui-provider-form-header-row input { height: 36px; min-width: 0; flex: 1; border: 1px solid var(--border_default); border-radius: 8px; background: transparent; padding: 0 10px; color: var(--text_default_primary); }
   .webui-provider-form-add-header { width: fit-content; height: 32px; border: 1px solid var(--border_default); border-radius: 8px; background: transparent; padding: 0 10px; color: var(--text_default_secondary); }
+  /* The model list: one card per model, each carrying its own fields. */
+  .webui-provider-form-models { display: flex; flex-direction: column; gap: 12px; padding-top: 8px; }
+  .webui-provider-form-models-header { display: flex; min-height: 32px; align-items: center; justify-content: space-between; gap: 12px; }
+  .webui-provider-form-models-actions { display: flex; align-items: center; gap: 8px; }
+  .webui-provider-form-add-model { height: 32px; border: 1px solid var(--border_default); border-radius: 8px; background: transparent; padding: 0 12px; color: var(--text_default_secondary); font-size: 13px; }
+  .webui-provider-form-discover { height: 32px; border: 0; border-radius: 8px; background: transparent; padding: 0 8px; color: var(--text_default_accent); font-size: 13px; }
+  .webui-provider-form-discover:disabled { opacity: .55; }
+  .webui-provider-form-models-empty { margin: 0; color: var(--text_default_tertiary); font-size: 13px; }
+  .webui-provider-form-model { display: flex; flex-direction: column; gap: 10px; }
+  .webui-provider-form-model-header { display: flex; height: 32px; align-items: center; justify-content: space-between; padding: 0 4px; }
+  .webui-provider-form-model-tools { display: flex; align-items: center; gap: 4px; }
+  .webui-provider-form-model-body { display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--border_light); border-radius: 16px; background: var(--bg_grouped_secondary); padding: 12px; }
+  .webui-provider-form-hint { margin: 0; color: var(--text_default_tertiary); font-size: 12px; line-height: 18px; }
+  .webui-provider-form-effort { display: flex; min-height: 40px; flex-wrap: wrap; align-items: center; gap: 6px; border: 1px solid var(--border_default); border-radius: 8px; background: var(--bg_default_primary); padding: 4px 8px; }
+  .webui-provider-form-effort:focus-within { border-color: var(--border_accent); }
+  .webui-provider-form-effort input { height: 30px; min-width: 120px; flex: 1; border: 0; background: transparent; padding: 0 4px; color: var(--text_default_primary); font: inherit; outline: none; }
+  .webui-provider-form-chip { display: inline-flex; height: 24px; align-items: center; gap: 4px; border-radius: 6px; background: var(--bg_interaction_tertiary_default); padding: 0 4px 0 8px; color: var(--text_default_primary); font-size: 12px; }
+  .webui-provider-form-chip button { display: flex; width: 16px; height: 16px; align-items: center; justify-content: center; border: 0; border-radius: 4px; background: transparent; color: var(--icon_default_tertiary); font-size: 13px; line-height: 1; }
+  .webui-provider-form-chip button:hover { background: var(--bg_interaction_tertiary_hover); color: var(--icon_default_secondary); }
+  .webui-provider-form-attachments { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+  .webui-provider-form-attachment { display: flex; align-items: center; gap: 6px; color: var(--text_default_primary); font-size: 14px; }
+  .webui-provider-form-field select { width: 100%; min-width: 0; height: 40px; border: 1px solid var(--border_default); border-radius: 8px; background: var(--bg_default_primary); padding: 0 12px; color: var(--text_default_primary); font: inherit; outline: none; }
+  .webui-provider-form-field select:focus { border-color: var(--border_accent); }
   .webui-provider-form-error { margin: 0; color: var(--text_status_error); font-size: 12px; }
   .webui-provider-form-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; border-top: 1px solid var(--border_light); margin-top: 16px; padding-top: 16px; }
   .webui-provider-form-actions > label { display: flex; align-items: center; gap: 8px; color: var(--text_default_secondary); font-size: 14px; }
@@ -254,26 +293,38 @@
     padding: var(--spacing_8);
     overflow: visible;
   }
-  /* The fly-out is `position: fixed` and placed by the shared
-   * `positionFlyout` engine, so it escapes this list's own `overflow-y: auto`.
-   * It is NOT a child of the menu: a nested surface would be clipped by the
-   * very scrolling container it needs to escape.
+  /* The fly-out is a shared-surface popup: the skeleton hangs it off the row it
+   * describes, in the viewport, and gives it the surface, the motion and the
+   * dismissal. `positionFlyout` is what says WHERE — right of the row, then left,
+   * then below — and it is handed the MEASURED surface, which is why the panel is
+   * as tall as the model happens to have context options rather than the height a
+   * constant froze at: a clamp computed against a stale height lets the bottom of
+   * the list fall off screen, which is how a model with a long option list loses
+   * its own options.
    *
-   * `min-width` rather than `width`: the surface is MEASURED for its clamp and
-   * flip, and a model with two context sizes is legitimately narrower than one
-   * with five. The floor keeps a two-size list from collapsing to a column of
-   * digits. */
+   * It escapes this list's own `overflow-y: auto` by being a PORTAL rather than a
+   * child: a fixed-position child of a fixed-position ancestor — the composer is
+   * one — is placed against that ancestor's box, not the viewport's, so a portal
+   * is what makes "against the viewport" true at all.
+   *
+   * The live region and the layout are one element (`.webui-model-flyout-content`
+   * below) rather than the popup root: the two context sizes ride above the
+   * thinking control by `order`, and `order` only reaches a flex container's own
+   * children, so the region cannot also be a wrapper around them. The shared
+   * surface owns the border, the radius, the fill, the shadow and the `opacity`
+   * of a previewed model's fly-out.
+   *
+   * `min-width` rather than `width`: a model with two context sizes is
+   * legitimately narrower than one with five, and the floor keeps a two-size list
+   * from collapsing to a column of digits. */
   .webui-model-flyout {
-    z-index: 70;
+    min-width: 176px;
+  }
+  .webui-model-flyout-content {
     display: flex;
     flex-direction: column;
     gap: var(--spacing_8);
-    min-width: 176px;
     padding: var(--spacing_8);
-    border: 1px solid var(--border_default);
-    border-radius: var(--radius_12);
-    background: var(--bg_grouped_secondary_elevated);
-    box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
     color: var(--text_default_primary);
   }
   /* A preview describes a model the user has not picked. The options stay

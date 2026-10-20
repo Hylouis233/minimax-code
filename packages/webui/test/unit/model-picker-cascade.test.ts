@@ -333,20 +333,23 @@ describe("fly-out placement — the anchor is asked, not remembered", () => {
   it("reads the anchor at measure time rather than off a captured element", () => {
     // A captured element outlives the node it was captured from, and a
     // detached node's rect is all zeros — which places the panel against the
-    // viewport's origin. Asked from the layout effect, the same lookup is
-    // correct because the commit has already attached the new element.
-    expect(flyout).toContain("anchor && surface ? anchor() : undefined");
+    // viewport's origin. The fly-out therefore hands the shared skeleton a
+    // RESOLVER, and the skeleton asks it from the layout effect that measures,
+    // by which point the commit that remounted the row has attached its ref.
+    expect(flyout).toContain("anchorRect={() => anchor?.()}");
     expect(flyout).not.toContain("anchor.element");
   });
 
-  it("re-measures on every render, and only re-renders when it moved", () => {
+  it("leaves re-measurement to the skeleton that places the popup", () => {
     // The list can shift under a panel still anchored to the same row, and
-    // nothing else reports that: the ResizeObserver watches the SURFACE, the
-    // scroll and resize listeners watch the window. So the measure runs after
-    // every render — which is only safe because it compares before setting
-    // state, or the two would feed each other.
-    expect(flyout).toContain("useLayoutEffect(measure)");
-    expect(flyout).toContain("if (sameStyle(applied.current, next)) return;");
+    // nothing else reports that. The shared skeleton re-places on every render,
+    // on scroll, on resize and on the popup's own size change, and writes only
+    // when the numbers changed — so what the fly-out must NOT do is re-derive
+    // any of it locally, and a second copy of that loop is how the two drift
+    // apart.
+    expect(flyout).not.toContain("useLayoutEffect");
+    expect(flyout).not.toContain("ResizeObserver");
+    expect(flyout).not.toContain("sameStyle");
   });
 
   it("re-points the row ID during render, before the fly-out measures", () => {
@@ -388,24 +391,27 @@ describe("cascade — the shape the source has to keep", () => {
     expect(readComponent("ModelDraftEditor.tsx")).toContain("ModelSettingsFlyout");
   });
 
-  it("drives its one surface through the one placement hook", () => {
-    // Counted as "one definition, one call site" so a second copy of the
-    // flip/clamp math is caught. With the third tier gone there is exactly one
-    // caller left, and the count is what says so.
-    expect(flyout.match(/function useFlyoutPlacement\(/gu) ?? []).toHaveLength(1);
-    expect(flyout.match(/= useFlyoutPlacement\(/gu) ?? []).toHaveLength(1);
-    // And the hook itself delegates to the one shared arithmetic module.
+  it("drives its one surface through the one placement engine", () => {
+    // Counted as "one call site" so a second copy of the flip/clamp math is
+    // caught. With the third tier gone there is exactly one caller left, and the
+    // count is what says so. What places the popup is the shared skeleton now;
+    // what says WHERE is still the one shared arithmetic module, asked of it as
+    // a placement rule rather than computed in an effect of this file's own.
+    expect(flyout).not.toContain("useFlyoutPlacement");
     expect(flyout.match(/positionFlyout\(/gu) ?? []).toHaveLength(1);
+    expect(flyout).toContain("placement={placeFlyout}");
   });
 
   it("measures the surface instead of declaring its size", () => {
     // The context sizes are inline, so the fly-out is as tall as the model
     // happens to have options. A frozen height means the clamp is computed
     // against a size that is not the one on screen, and a model with a long
-    // option list loses its own options off the bottom of the viewport.
+    // option list loses its own options off the bottom of the viewport. The
+    // size the rule is handed comes from the measurement the skeleton does.
     expect(flyout).not.toMatch(/const TIER_(ONE|TWO)_(WIDTH|HEIGHT)/u);
-    expect(flyout).toContain("ResizeObserver");
-    expect(flyout).toContain("surface.getBoundingClientRect()");
+    expect(flyout).toMatch(
+      /positionFlyout\(\{ anchor, surface, viewport \}\)/u,
+    );
   });
 
   it("lists the context sizes in place, not behind a third fly-out", () => {

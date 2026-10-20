@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createWebuiProviderEditor,
+  type WebuiProviderEditor,
   type WebuiProviderEditorCommands,
 } from "../../src/client/features/models/application/provider-editor.js";
 import type {
@@ -23,6 +24,16 @@ import type {
   WebuiProviderSaveOutcome,
   WebuiProviderTestOutcome,
 } from "../../src/client/features/models/contracts/provider-outcome.js";
+
+/** Add a model row and give it an id — what the form's "添加模型" does. */
+function addModel(editor: WebuiProviderEditor, modelId: string): string {
+  editor.addModel();
+  const snapshot = editor.getSnapshot();
+  const row = snapshot.models[snapshot.models.length - 1];
+  if (!row) throw new Error("the editor added no model row");
+  editor.changeModel(row.id, { modelId });
+  return row.id;
+}
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -125,7 +136,9 @@ describe("opening a draft", () => {
     expect(snapshot.open).toBe(true);
     expect(snapshot.editingProviderId).toBeUndefined();
     expect(snapshot.configRevision).toBeUndefined();
-    expect(snapshot.canDiscover).toBe(false);
+    // Discovery is offered on a new provider too — the runtime's create branch
+    // asks the endpoint with the key the provider would be created with.
+    expect(snapshot.canDiscover).toBe(true);
     expect(snapshot.baseUrl).toBe("");
     expect(snapshot.apiFormat).toBe("openai-completions");
     expect(snapshot.tested).toBe(false);
@@ -141,7 +154,7 @@ describe("opening a draft", () => {
     expect(snapshot.configRevision).toBe("rev-9");
     expect(snapshot.canDiscover).toBe(true);
     expect(snapshot.apiKey).toBe("sk-revealed");
-    expect(snapshot.modelIdText).toBe("m1");
+    expect(snapshot.models.map((model) => model.modelId)).toEqual(["m1"]);
     // A saved row is a blank value carrying its persisted name: untouched, it
     // means "keep the stored value".
     expect(snapshot.headers).toEqual([
@@ -168,7 +181,7 @@ describe("test validity", () => {
     const editor = createWebuiProviderEditor({ commands });
     editor.openNew();
     editor.changeField("baseUrl", "https://example.test");
-    editor.changeField("modelIdText", "m1");
+    addModel(editor, "m1");
     await editor.test();
     expect(editor.getSnapshot().tested).toBe(true);
     editor.changeField("baseUrl", "https://other.test");
@@ -181,7 +194,7 @@ describe("test validity", () => {
     const editor = createWebuiProviderEditor({ commands });
     editor.openNew();
     editor.changeField("baseUrl", "https://example.test");
-    editor.changeField("modelIdText", "m1");
+    addModel(editor, "m1");
     const pending = editor.test();
     // The user edits while the probe is in flight: the answer describes the
     // candidate that no longer exists.
@@ -202,7 +215,7 @@ describe("test validity", () => {
     const editor = createWebuiProviderEditor({ commands });
     editor.openNew();
     editor.changeField("baseUrl", "https://example.test");
-    editor.changeField("modelIdText", "m1");
+    addModel(editor, "m1");
     await editor.test();
     expect(editor.getSnapshot().error).toBe("bad key");
     expect(editor.getSnapshot().tested).toBe(false);
@@ -224,7 +237,7 @@ describe("saving", () => {
     const editor = createWebuiProviderEditor({ commands });
     editor.openNew();
     editor.changeField("baseUrl", "https://example.test");
-    editor.changeField("modelIdText", "m1");
+    addModel(editor, "m1");
     await editor.save();
     expect(calls.save).toEqual([]);
     editor.setSkipConnectionTest(true);
@@ -286,6 +299,119 @@ describe("saving", () => {
   });
 });
 
+describe("the model rows", () => {
+  it("carries each model's own limits, levels and attachments in the candidate", async () => {
+    const { commands, calls } = harness();
+    const editor = createWebuiProviderEditor({ commands });
+    editor.openNew();
+    editor.changeField("baseUrl", "https://example.test");
+    const id = addModel(editor, "m1");
+    editor.changeModel(id, {
+      contextLimit: "128000",
+      maxOutputTokens: "8000",
+      effortOptions: ["low", "high"],
+      modalities: ["image"],
+    });
+    editor.setSkipConnectionTest(true);
+    await editor.save();
+    expect(calls.save).toHaveLength(1);
+    expect(calls.save[0]?.candidate.models).toEqual([
+      {
+        modelId: "m1",
+        displayName: "m1",
+        limit: { context: 128000, output: 8000 },
+        effortOptions: ["low", "high"],
+        attachment: true,
+        modalities: { input: ["text", "image"], output: ["text"] },
+      },
+    ]);
+  });
+
+  it("seeds a saved provider's models with what they were stored with", async () => {
+    const { commands } = harness();
+    const editor = createWebuiProviderEditor({ commands });
+    await editor.openExisting(
+      savedProvider({
+        models: [
+          {
+            providerId: "p1",
+            modelId: "m1",
+            modelConfigId: "m1",
+            displayName: "M One",
+            enabled: true,
+            selected: false,
+            contextLimit: 128000,
+            maxOutputTokens: 8000,
+            effortOptions: ["low", "high"],
+            modalities: { input: ["text", "image"], output: ["text"] },
+          },
+        ],
+      }),
+    );
+    expect(editor.getSnapshot().models[0]).toMatchObject({
+      modelId: "m1",
+      displayName: "M One",
+      contextLimit: "128000",
+      maxOutputTokens: "8000",
+      effortOptions: ["low", "high"],
+      modalities: ["image"],
+    });
+  });
+
+  it("leaves a limit out when the field is not a positive number", async () => {
+    const { commands, calls } = harness();
+    const editor = createWebuiProviderEditor({ commands });
+    editor.openNew();
+    editor.changeField("baseUrl", "https://example.test");
+    const id = addModel(editor, "m1");
+    editor.changeModel(id, { contextLimit: "abc", maxOutputTokens: "0" });
+    editor.setSkipConnectionTest(true);
+    await editor.save();
+    expect(calls.save[0]?.candidate.models?.[0]).not.toHaveProperty("limit");
+  });
+
+  it("adds and removes model rows", () => {
+    const { commands } = harness();
+    const editor = createWebuiProviderEditor({ commands });
+    editor.openNew();
+    expect(editor.getSnapshot().models).toEqual([]);
+    editor.addModel();
+    const row = editor.getSnapshot().models[0];
+    expect(row).toBeDefined();
+    editor.removeModel(row!.id);
+    expect(editor.getSnapshot().models).toEqual([]);
+  });
+
+  it("reports a failed probe on the row that failed", async () => {
+    const { commands } = harness({
+      testCandidate: async () => ({
+        outcome: "refusal",
+        code: "harness_error",
+        message: "bad key",
+      }),
+    });
+    const editor = createWebuiProviderEditor({ commands });
+    editor.openNew();
+    editor.changeField("baseUrl", "https://example.test");
+    const id = addModel(editor, "m1");
+    await editor.testModel(id);
+    expect(editor.getSnapshot().models[0]?.error).toBe("bad key");
+    expect(editor.getSnapshot().tested).toBe(false);
+  });
+
+  it("probes every row that carries an id", async () => {
+    const { commands, calls } = harness();
+    const editor = createWebuiProviderEditor({ commands });
+    editor.openNew();
+    editor.changeField("baseUrl", "https://example.test");
+    addModel(editor, "m1");
+    addModel(editor, "m2");
+    await editor.test();
+    expect(calls.test.map((call) => call.modelId)).toEqual(["m1", "m2"]);
+    expect(editor.getSnapshot().tested).toBe(true);
+  });
+});
+
 describe("discovery", () => {
   it("needs the saved revision and sends it", async () => {
     const discovered: WebuiDiscoverUserModelsCandidateRequest[] = [];
@@ -309,7 +435,7 @@ describe("discovery", () => {
       { providerId: "p1", expectedRevision: "rev-9", baseUrl: "https://example.test/v1" },
     ]);
     // The discovered ids replace the draft's list and the draft is unproven again.
-    expect(editor.getSnapshot().modelIdText).toBe("m1\nm2");
+    expect(editor.getSnapshot().models.map((model) => model.modelId)).toEqual(["m1", "m2"]);
     expect(editor.getSnapshot().tested).toBe(false);
   });
 });

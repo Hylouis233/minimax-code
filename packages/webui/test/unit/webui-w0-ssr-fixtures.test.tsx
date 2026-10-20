@@ -382,6 +382,35 @@ describe("WebUI transcript page merging", () => {
     ]);
   });
 
+  it("keeps the session's context snapshot while merging an older page in", () => {
+    // The snapshot says how much of the context window the SESSION has spent,
+    // and the composer's ring is drawn from it. An older page carries no
+    // snapshot of its own, so a merge that rebuilt the page from the older
+    // half alone took the reading away from every reader of the page — the
+    // ring went blank the moment the user scrolled up.
+    const base = state("A", 1, ["newer"], false);
+    const current: WebuiOwnedTranscriptState = {
+      ...base,
+      page: {
+        ...base.page,
+        contextSnapshot: {
+          status: "live",
+          usage: { total_tokens: 1200, context_window: 20000 },
+        },
+      },
+    };
+    const result = mergeOlderTranscriptPage(current, {
+      messages: [{ msgId: "older" }],
+      nextCursor: "cursor-older",
+      hasMore: true,
+    }, "cursor-a");
+
+    expect(result.state.page.contextSnapshot).toEqual({
+      status: "live",
+      usage: { total_tokens: 1200, context_window: 20000 },
+    });
+  });
+
   it("keeps the no-progress error and disables further pagination", () => {
     const current = state("A", 1, ["newer"], true);
     const result = mergeOlderTranscriptPage(current, {

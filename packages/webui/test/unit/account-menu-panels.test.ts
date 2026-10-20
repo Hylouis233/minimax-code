@@ -46,8 +46,13 @@ describe("dismissal stays with the menu (LC-8)", () => {
   });
 
   it("routes the outside pointer and Escape through the shared rule", () => {
-    const dismissals = shell.match(/evaluateOutsideClose\(\{/gu) ?? [];
-    expect(dismissals).toHaveLength(2);
+    // The menu is a `WebuiDropdown` now: the shared skeleton owns the outside
+    // press and the Escape, so the menu itself no longer attaches a listener
+    // or asks the policy table. The rule it used to follow is the one the
+    // skeleton implements — a press outside closes, Escape closes.
+    expect(shell).toContain("WebuiDropdown");
+    expect(shell).not.toMatch(/evaluateOutsideClose\(\{/u);
+    expect(shell).not.toMatch(/listenForPointerDown|listenForKeyDown/u);
     expect(shell).not.toContain('surface: "userMenuSignin"');
   });
 });

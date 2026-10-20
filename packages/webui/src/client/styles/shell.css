@@ -54,21 +54,15 @@
     background-color: var(--text_default_tertiary);
   }
 
+  /* The context menu is a dropdown now: the shared layer places it at the
+   * pointer, gives it the surface and the motion, and dismisses it. What is
+   * left here is the menu's own box — its width, its rows and its rhythm. */
   .webui-context-menu {
-    position: fixed;
-    z-index: 120;
     display: flex;
     width: 208px;
     flex-direction: column;
     gap: 1px;
-    border: .5px solid var(--border_light);
-    border-radius: 12px;
-    background: var(--bg_grouped_secondary_elevated);
     padding: 6px;
-    box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
-    color: var(--text_default_primary);
-    transform-origin: top left;
-    animation: webui-menu-enter 140ms cubic-bezier(.2, .7, .2, 1) both;
   }
   .webui-context-menu-item-wrap { position: relative; }
   .webui-context-menu-item {
@@ -93,6 +87,9 @@
   .webui-context-menu-item-label { min-width: 0; flex: 1; white-space: nowrap; }
   .webui-context-menu-chevron { flex: 0 0 16px; }
   .webui-context-menu-divider { height: 1px; margin: 5px 8px; background: var(--border_light); }
+  /* The submenu is a fly-out that opens on hover rather than on a click, so it
+   * is not a dropdown — but it is the same surface, and it says so by carrying
+   * the shared surface class. What is left here is its own box. */
   .webui-context-menu-submenu {
     position: absolute;
     top: -7px;
@@ -102,15 +99,18 @@
     width: 190px;
     flex-direction: column;
     gap: 1px;
-    border: .5px solid var(--border_light);
-    border-radius: 12px;
-    background: var(--bg_grouped_secondary_elevated);
     padding: 6px;
-    box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
-    transform-origin: top left;
-    animation: webui-menu-enter 140ms cubic-bezier(.2, .7, .2, 1) both;
   }
-  .webui-model-menu,
+  /* The model menu is a dropdown now: the shared layer places it against the
+   * trigger, gives it the surface and the motion and dismisses it. What is
+   * left here is only what the list itself needs — and NOT the positioning:
+   * the popup is placed in viewport coordinates, so a `right`/`bottom` offset
+   * here would fight the placement instead of describing the panel. */
+  .webui-model-menu {
+    display: flex;
+    min-width: 220px;
+    flex-direction: column;
+  }
   .webui-workspace-menu {
     position: absolute;
     right: 0;

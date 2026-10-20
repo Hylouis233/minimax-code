@@ -9,20 +9,15 @@
     box-shadow: 0 0 10px 0 var(--shadow_default);
   }
 
+  /* The surface — the background, the border, the radius, the shadow and the
+   * motion — belongs to the shared dropdown layer. What is left here is the
+   * content's own box. The mention list is still the composer's own surface
+   * (it hangs off the caret, not off a trigger), so it keeps its own. */
   .webui-composer-menu,
-  .webui-composer-permission-menu,
   .webui-composer-mention-menu {
-    position: absolute;
-    z-index: 80;
     min-width: 220px;
     max-width: min(360px, calc(100vw - 32px));
     padding: 6px;
-    border: 1px solid var(--webui-color-border-default, #e6e6e6);
-    border-radius: 14px;
-    background: var(--webui-color-bg-primary, #fff);
-    box-shadow: 0 8px 28px rgb(0 0 0 / 12%);
-    transform-origin: bottom left;
-    animation: webui-menu-enter 150ms cubic-bezier(.2, .7, .2, 1) both;
   }
 
   /* The `+` trigger's wrap: the button plus the panel it opens. It is the
@@ -40,9 +35,6 @@
    * the panel grow over the `+` and the permission pill as soon as anything
    * below the card changed height. */
   .webui-composer-menu {
-    bottom: calc(100% + var(--spacing_8));
-    left: 0;
-    right: auto;
     max-height: min(420px, calc(100dvh - 112px));
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -51,11 +43,16 @@
   /* Keep the root menu mounted beside its active flyout, matching the
    * hover navigation. The stack is also the shared pointer/focus surface, so
    * moving between the root and submenu does not collapse the flyout. */
+  /* The stack is the dropdown's popup: the shared layer places it against the
+   * `+` button and gives it the surface and the motion.
+   *
+   * It declares NO position of its own. The shared layer's `position: fixed`
+   * is what puts it on screen: a `position: relative` here would win the
+   * cascade over the shared rule, and the popup would then be laid out in the
+   * page flow — at the bottom of the document, a viewport-height below where
+   * the reader is looking — with the shared placement's `top`/`left` added to
+   * it as an offset. The panel was there all along, off screen. */
   .webui-composer-menu-stack {
-    position: absolute;
-    z-index: 80;
-    bottom: calc(100% + var(--spacing_8));
-    left: 0;
     width: max-content;
   }
 
@@ -227,8 +224,6 @@
    * glyph, and trailing check are the whole selection signal, so a grey
    * background would compete with the row hover. */
   .webui-composer-permission-menu {
-    bottom: 40px;
-    left: 0;
     min-width: 320px;
     max-width: min(360px, calc(100vw - 32px));
     padding: var(--spacing_6);
@@ -321,10 +316,10 @@
     color: var(--text_status_warning);
   }
 
+  /* The mention list is a dropdown now: the shared layer places it against
+   * the composer's input box and gives it the surface and the motion, so what
+   * is left here is only the list's own box. */
   .webui-composer-mention-menu {
-    right: auto;
-    bottom: calc(100% + 8px);
-    left: 0;
     width: min(360px, calc(100vw - 32px));
     max-height: 320px;
     overflow-y: auto;
@@ -601,39 +596,34 @@
     color: var(--text_default_tertiary);
     opacity: 0.55;
   }
+  /* The directory browser keeps the shared `.webui-workspace-menu` panel, which
+   * is still anchored to this row. The recent list is a dropdown now: the
+   * shared layer gives it the surface and the placement, and this says only
+   * what the list itself needs. */
   .webui-workspace-menu {
     right: auto;
     left: 0;
     min-width: 220px;
   }
+  .webui-workspace-picker-menu {
+    display: flex;
+    min-width: 220px;
+    max-width: 320px;
+    max-height: 320px;
+    flex-direction: column;
+    overflow-y: auto;
+    padding: var(--spacing_4);
+  }
+  /* The command palette is a dropdown now: the shared layer places it against
+   * the composer's input box and gives it the surface and the motion. Which
+   * side it opens on is the placement rule's own decision — it is made from
+   * the panel's measured height and the viewport, because those are the two
+   * numbers that say whether it fits. What is left here is the list's own box. */
   .webui-command-menu {
-    position: absolute;
-    right: var(--spacing_12);
-    bottom: calc(100% + var(--spacing_8));
-    left: var(--spacing_12);
-    z-index: 80;
     display: flex;
     flex-direction: column;
     overflow-y: auto;
     padding: var(--spacing_4);
-    border: 1px solid var(--border_default);
-    border-radius: var(--radius_12);
-    background: var(--bg_default_primary);
-    box-shadow: 0 8px 24px var(--shadow_default);
-    max-height: 320px;
-    transform-origin: bottom center;
-    animation: webui-menu-enter 150ms cubic-bezier(.2, .7, .2, 1) both;
-  }
-  /* Flip variant: when the composer is too close to the viewport top, the
-   * popover cannot fit above without clipping content. The composer measures
-   * available space and toggles `data-webui-command-menu-placement="below"`
-   * so the panel sits below the composer instead. The cap matches the
-   * above-composer cap so the panel never grows taller than 320px regardless
-   * of placement, keeping the popover a focused UI element instead of
-   * dominating the page. */
-  .webui-command-menu[data-webui-command-menu-placement="below"] {
-    top: calc(100% + var(--spacing_8));
-    bottom: auto;
     max-height: 320px;
   }
 

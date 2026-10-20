@@ -180,19 +180,13 @@
     background: var(--text_default_primary);
     color: var(--text_default_inverted);
   }
+  /* Surface and placement come from the shared dropdown layer; this rule only
+   * says what the create menu holds. */
   .webui-plugin-create-menu {
-    position: absolute;
-    top: 42px;
-    right: 0;
-    z-index: 20;
     display: flex;
     min-width: 180px;
     flex-direction: column;
-    border: 1px solid var(--border_default);
-    border-radius: 10px;
-    background: var(--bg_default_primary);
     padding: 5px;
-    box-shadow: 0 8px 24px rgb(0 0 0 / 14%);
   }
   .webui-plugin-create-menu button {
     border: 0;

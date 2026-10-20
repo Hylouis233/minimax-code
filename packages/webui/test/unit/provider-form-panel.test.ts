@@ -94,6 +94,35 @@ describe("the parent keeps the lifetime", () => {
   });
 });
 
+describe("the form carries every model field", () => {
+  it("gives every model its own row instead of one field for the whole form", () => {
+    const form = between(panel, "webui-provider-form-body", "webui-provider-form-actions");
+    expect(form).toContain("webui-provider-form-models");
+    expect(form).toContain("editor.addModel()");
+    expect(form).toContain("editor.removeModel(");
+    expect(form).toContain("editor.changeModel(");
+    expect(form).toContain("editor.testModel(");
+    // Picking another preset drops the models the previous one carried.
+    expect(form).toContain("editor.clearModels()");
+    // The API format is a choice among the formats the runtime accepts, and it
+    // is a dropdown like every other one in the client.
+    expect(form).toContain("webui-provider-format-menu");
+    expect(form).toContain('aria-label="API 格式"');
+    expect(form).toContain("WebuiDropdown");
+  });
+
+  it("carries the limits, the reasoning levels and the attachments", () => {
+    expect(panel).toContain("上下文窗口");
+    expect(panel).toContain("最大输出 Token");
+    expect(panel).toContain("推理等级");
+    expect(panel).toContain("支持的附件");
+    expect(panel).toContain("WEBUI_MODEL_ATTACHMENT_MODALITIES");
+    // The textarea of ids is gone: one id belongs to one row now.
+    expect(panel).not.toContain("modelIdText");
+    expect(panel).not.toContain("<textarea");
+  });
+});
+
 describe("the panel keeps the reset boundary", () => {
   it("LC-6 keeps ProviderPresetPicker inside the form's conditional", () => {
     // Its `open`/`query` reset when the enclosing subtree unmounts, which is today's behaviour.

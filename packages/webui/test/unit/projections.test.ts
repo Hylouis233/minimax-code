@@ -41,11 +41,17 @@ describe("WebUI server projections", () => {
   });
 
   it("projects the latest context usage and compaction state", () => {
-    // The message shape is the runtime protocol's, not a shape invented here:
-    // `usage: { total_tokens, context_window }`. This test used to write
+    // The message shape is the one a PERSISTED session message actually has:
+    // the session message's view spells its usage `totalTokens` /
+    // `contextWindow`. This test used to write
     // `contextUsage: { contextWindowTokens, usedTokens }`, which pinned a shape
     // no message in the database has ever had — so it passed green while the
-    // composer's context readout rendered nowhere.
+    // composer's context readout rendered nowhere. It then pinned the
+    // snake_case pair instead, which pinned the PROTOCOL's spelling rather
+    // than the stored one, and the readout was still nowhere.
+    //
+    // The stored spelling is the one the session message's view publishes, so
+    // that is what this fixture carries.
     expect(
       projectContextSnapshot({
         active: false,
@@ -54,7 +60,7 @@ describe("WebUI server projections", () => {
           { kind: "compaction", timestamp: 2 },
           {
             rawJson: JSON.stringify({
-              usage: { context_window: 100, total_tokens: 40 },
+              usage: { contextWindow: 100, totalTokens: 40 },
             }),
           },
         ],
@@ -67,19 +73,54 @@ describe("WebUI server projections", () => {
     });
   });
 
-  it("reads the snake_case protocol fields, not camelCase lookalikes", () => {
-    // A guard with teeth: an implementation that accepted only
-    // `usedTokens` / `contextWindowTokens` would still pass the test above if
-    // the fixture carried both spellings, so the fixture carries only the ones
-    // the wire actually has.
-    expect(
-      projectContextSnapshot({
-        active: false,
-        messages: [
-          { rawJson: JSON.stringify({ usage: { total_tokens: 7, context_window: 70 } }) },
-        ],
-      }),
-    ).toMatchObject({ status: "live", window: 70, usedTokens: 7 });
+  it("reads the stored camelCase spelling and publishes the protocol's names", () => {
+    // The two spellings arrive from two different places and neither is wrong
+    // on its own: the runtime PROTOCOL fixes `total_tokens` /
+    // `context_window` on the wire, and the persisted session message carries
+    // the same two numbers as `totalTokens` / `contextWindow`. A projection
+    // that read only one of them answered half the sessions with a usage
+    // record whose fields it could not see.
+    //
+    // It publishes the protocol's names either way, so the client reads ONE
+    // shape and the two cannot drift apart again.
+    const camelCase = projectContextSnapshot({
+      active: false,
+      messages: [
+        { rawJson: JSON.stringify({ usage: { totalTokens: 7, contextWindow: 70 } }) },
+      ],
+    });
+    expect(camelCase).toMatchObject({ status: "live", window: 70, usedTokens: 7 });
+    expect(camelCase.usage).toMatchObject({ total_tokens: 7, context_window: 70 });
+
+    const snakeCase = projectContextSnapshot({
+      active: false,
+      messages: [
+        { rawJson: JSON.stringify({ usage: { total_tokens: 7, context_window: 70 } }) },
+      ],
+    });
+    expect(snakeCase).toMatchObject({ status: "live", window: 70, usedTokens: 7 });
+    expect(snakeCase.usage).toMatchObject({ total_tokens: 7, context_window: 70 });
+  });
+
+  it("keeps the usage record's own fields while normalising its names", () => {
+    // The breakdown reads `components` off the record; a rename must not take
+    // them with it.
+    const snapshot = projectContextSnapshot({
+      active: false,
+      messages: [
+        {
+          rawJson: JSON.stringify({
+            usage: { totalTokens: 7, contextWindow: 70, components: [{ kind: "MESSAGES", tokens: 4 }] },
+          }),
+        },
+      ],
+    });
+
+    expect(snapshot.usage).toMatchObject({
+      totalTokens: 7,
+      total_tokens: 7,
+      components: [{ kind: "MESSAGES", tokens: 4 }],
+    });
   });
 
   it("reports empty rather than a fabricated zero for a turn that reported no usage", () => {

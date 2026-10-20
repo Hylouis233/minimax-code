@@ -17,13 +17,40 @@
 // does not depend on `pnpm build:styles` having run.
 
 import { describe, it, expect, beforeAll } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { SKELETON_CONTENT_MAX_WIDTH_PX } from "../../src/client/features/transcript/ui/TranscriptSkeletons.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const stylesDir = path.resolve(here, "../../src/client/styles");
+const clientDir = path.resolve(here, "../../src/client");
+
+/**
+ * The class names the shared dropdown is given by its call sites.
+ *
+ * A popup is the shared layer's element: it is `position: fixed` and the
+ * placement writes its `top`/`left`. The class a call site adds is the popup's
+ * own class, so a rule that places it takes the placement away — and the
+ * popup falls back into the page flow, a viewport below the reader.
+ *
+ * The list is read from the call sites rather than written out here, so a new
+ * popup is covered the moment it is written.
+ */
+function dropdownPopupClasses(): string[] {
+  const classes = new Set<string>();
+  const files = readdirSync(clientDir, { recursive: true, encoding: "utf8" })
+    .filter((entry) => entry.endsWith(".tsx"))
+    .map((entry) => path.join(clientDir, entry));
+  for (const file of files) {
+    const source = readFileSync(file, "utf8");
+    for (const match of source.matchAll(/<WebuiDropdown\b([\s\S]*?)\/>/gu)) {
+      const className = match[1].match(/\bclassName="([^"]+)"/u);
+      if (className) classes.add(className[1]);
+    }
+  }
+  return [...classes];
+}
 
 interface CssRule {
   readonly selector: string;
@@ -439,6 +466,9 @@ describe("W0 · stylesheet composition", () => {
     expect(imports).toEqual([
       "./tokens.css",
       "./shell.css",
+      // The shared dropdown surface: the look, the motion and the shape every
+      // floating popup in the client shares.
+      "./dropdown.css",
       "../features/plugins/ui/plugins.css",
       "../features/settings/ui/settings.css",
       "../features/models/ui/models.css",
@@ -689,17 +719,19 @@ describe("W0 · structural declarations W5 must preserve", () => {
   });
 
   it("rounds both composer menus instead of squaring the touching corners", () => {
-    // Squaring the seam made the flyout a right-angle panel. Both menus now
-    // keep the base 14px radius, so the seam rules must stay gone.
+    // Squaring the seam made the flyout a right-angle panel. Both menus keep a
+    // radius, so the seam rules must stay gone.
     const squaring = shellRules.filter((rule) =>
       rule.selector.includes("[data-webui-open-submenu]"),
     );
     expect(squaring).toEqual([]);
 
-    const menu = winning(
-      ".webui-composer-menu, .webui-composer-permission-menu, .webui-composer-mention-menu",
-    );
-    expect(declaration(menu.body, "border-radius")).toBe("14px");
+    // The radius is the shared dropdown surface's now — the composer menus are
+    // dropdowns, so they declare no radius of their own.
+    const menu = winning(".webui-composer-menu, .webui-composer-mention-menu");
+    expect(declaration(menu.body, "border-radius")).toBeUndefined();
+    const surface = winning(".webui-dropdown-popup");
+    expect(declaration(surface.body, "border-radius")).toBe("12px");
   });
 });
 
@@ -715,7 +747,7 @@ describe("W0 · at-rules and animations W5/W6 must not remove", () => {
     // asked for reduced motion. The exact list is the point -- adding an
     // animated rule without registering its override here is the same defect,
     // in the other direction.
-    expect(reducedMotion).toHaveLength(9);
+    expect(reducedMotion).toHaveLength(11);
     for (const rule of reducedMotion)
       expect(rule.body).toMatch(/(?:animation|transition):\s*none/u);
 
@@ -724,9 +756,15 @@ describe("W0 · at-rules and animations W5/W6 must not remove", () => {
       ".message-animate-in",
       ".signin-card-collapsing, .signin-day-claimed-animation",
       // Added with the context-usage indicator: the chevron, the hover label,
-      // the popover, the bar fill and the quota bar fill all transition in
-      // their base rules.
-      ".webui-context-usage-chevron, .webui-context-usage-popover, .webui-context-usage-label, .webui-context-usage-bar span, .webui-context-usage-quota-bar span",
+      // the bar fill and the quota bar fill all transition in their base rules.
+      // The popover is NOT among them any more: its motion is the shared
+      // dropdown surface's, and that surface disables its own.
+      ".webui-context-usage-chevron, .webui-context-usage-label, .webui-context-usage-bar span, .webui-context-usage-quota-bar span",
+      // The shared dropdown surface: it enters and leaves with an animation, so
+      // a reader who asked for reduced motion would otherwise watch every
+      // popup in the client slide. The fly-out surface is the same sheet: it
+      // carries the same motion, so it carries the same override.
+      ".webui-dropdown-popup, .webui-dropdown-popup.is-leaving, .webui-dropdown-surface",
       ".webui-message-actions",
       // Added with the project-first rail: the section that holds a project's
       // sessions opens and closes by transitioning its height, so a reader who
@@ -744,7 +782,55 @@ describe("W0 · at-rules and animations W5/W6 must not remove", () => {
       // Renamed from `.webui-settings-toggle span` when the toggle became the
       // shared `.webui-toggle-switch` control.
       ".webui-toggle-switch, .webui-toggle-switch > span",
+      // Added with the account menu's daily check-in fly-out, which now enters
+      // with the shared surface's motion. It is rendered through a portal, so
+      // the shell-wide override in `index.css` — which is scoped to
+      // `[data-webui-shell] *` — does not reach it.
+      ".webui-user-menu-signin-panel",
     ]);
+  });
+
+  it("keeps the shared surface's motion off the content", () => {
+    // The shared surface used to enter with `translateY(-4px) scale(.98)`, and
+    // that is what a reader saw as the TEXT moving: every label inside the
+    // popup was drawn at 98% for the length of the animation and then drawn at
+    // 100% again, so the words squashed and straightened themselves. The
+    // motion slides, and a slide never changes the content's size.
+    const steps = shellRules.filter((rule) =>
+      rule.context.some((entry) => entry.startsWith("@keyframes webui-dropdown-")),
+    );
+    expect(steps.length).toBeGreaterThan(0);
+    for (const step of steps) {
+      expect(step.body).not.toMatch(/scale\(/u);
+    }
+  });
+
+  it("lets no popup class claim a position of its own", () => {
+    // The shared layer owns the placement: the popup is `position: fixed` and
+    // the placement writes its `top`/`left`. A popup class that declares a
+    // position wins the cascade over that rule, and the popup stops being
+    // placed at all — it falls back into the page flow, a viewport below the
+    // reader, with the placement's coordinates added to it as an offset. The
+    // panel was on screen the whole time, off screen.
+    //
+    // A class that styles a CHILD of the popup (a submenu, a row) may place
+    // that child; the rule checked here is the one that styles the popup
+    // element itself.
+    const popupClasses = dropdownPopupClasses();
+    expect(popupClasses.length).toBeGreaterThan(0);
+    for (const className of popupClasses) {
+      const own = shellRules.filter((rule) =>
+        rule.selector.split(",").map((part) => part.trim()).includes(`.${className}`),
+      );
+      for (const rule of own) {
+        for (const property of ["position", "top", "left", "right", "bottom", "z-index"]) {
+          expect(
+            declaration(rule.body, property),
+            `${className} declares ${property} in "${rule.selector}"`,
+          ).toBeUndefined();
+        }
+      }
+    }
   });
 
   it("keeps every keyframe animation the shell references", () => {
@@ -764,6 +850,13 @@ describe("W0 · at-rules and animations W5/W6 must not remove", () => {
       "message-appear",
       "signin-card-collapse",
       "signin-day-claimed",
+      "webui-dropdown-in",
+      // The shared surface's slide, and the slide for a popup that opened on
+      // the other side: one slide cannot be right for a panel that comes down
+      // from above its trigger and a panel that comes up from below it.
+      "webui-dropdown-in-reverse",
+      "webui-dropdown-out",
+      "webui-dropdown-out-reverse",
       "webui-menu-enter",
       "webui-modal-enter",
       "webui-overlay-enter",
@@ -818,14 +911,20 @@ describe("W0 · stacking order", () => {
       // it stay above the drawer: 45 (`.webui-progress-panel-motion`) and 50
       // (`.webui-workspace-panel-controls`) are siblings of the panel, not
       // children — the controls only render while the panel is closed — and
-      // 60 (`.webui-context-usage-popover`) keeps the clearance the note below
-      // describes. 45 and 50 in particular are not a band the drawer has to
-      // join: they are the collapsed-state affordances, and 40 landing below
-      // both leaves that ordering intact.
-      // 60 is `.webui-context-usage-popover`: it has to clear the transcript
-      // and the composer overlay (20) and the workspace panel controls (50),
-      // and it stays under the model/workspace menus (70) and the dialog
-      // bands (100+).
+      // 60 (`.webui-session-composer-overlay` and the hover bubbles) keeps
+      // the clearance the note below describes. 45 and 50 in particular are
+      // not a band the drawer has to join: they are the collapsed-state
+      // affordances, and 40 landing below both leaves that ordering intact.
+      // 60 is the composer's own overlay and the band the hover bubbles sit
+      // in (`.webui-context-usage-label`, `.webui-thinking-label`,
+      // `.webui-settings-info-hint-bubble`): they have to clear the transcript
+      // and the workspace panel controls (50), and they stay under the menus
+      // (70) and the dialog bands (100+). The context-usage POPOVER is not
+      // among them any more — it is a dropdown, portalled to the document root
+      // and layered by the shared surface at 120.
+      // 80 is gone: it was the composer's own menu band, and the composer
+      // menus, the command palette and the mention list are dropdowns now —
+      // placed and layered by the shared surface at 120.
       // 121 is the band just above the 120 dialog scrim: the context menu's
       // submenu.
       // 130 is `.webui-account-usage-cell-tip`, the account page's calendar
@@ -844,7 +943,7 @@ describe("W0 · stacking order", () => {
       // the fork, rewind-preview and goal-clear dialogs. It mounts outside the
       // shell's stacking context, so it cannot join the 100-121 in-shell
       // dialog band and has to clear all of it.
-      1, 2, 4, 20, 40, 45, 50, 60, 70, 80, 100, 110, 111, 120, 121, 130, 140, 1400,
+      1, 2, 4, 20, 40, 45, 50, 60, 70, 100, 110, 111, 120, 121, 130, 140, 1400,
     ]);
   });
 });

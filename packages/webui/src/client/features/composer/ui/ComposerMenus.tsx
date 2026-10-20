@@ -62,14 +62,18 @@ export function WebuiComposerMenus({
   onInsertSkill,
   onInsertPlugin,
 }: WebuiComposerMenusProps) {
-  if (!menu) return null;
+  // The panel is mounted by the shared dropdown, which keeps it mounted for
+  // the length of the exit animation. So `menu` may already be `undefined`
+  // while the panel is still on screen, fading out: the root panel stays, and
+  // the submenu is simply gone. Hovering a panel that is on its way out must
+  // not re-open the menu, which is why every handler below checks `menu`.
   return (
     <div
       className="webui-composer-menu-stack"
       data-webui-composer-menu-stack="true"
       data-webui-open-submenu={menu === "root" ? undefined : menu}
       onMouseLeave={() => {
-        if (menu !== "root") onMenuChange("root");
+        if (menu && menu !== "root") onMenuChange("root");
       }}
       onKeyDown={(event) => {
         if (event.key === "Escape") {
@@ -111,12 +115,12 @@ export function WebuiComposerMenus({
       }}
     >
       <div className="webui-composer-menu" role="menu" aria-label="添加附件或技能" data-webui-composer-menu="root">
-        <button type="button" role="menuitem" onMouseEnter={() => { if (menu !== "root") onMenuChange("root"); }} onFocus={() => { if (menu !== "root") onMenuChange("root"); }} onClick={() => { onMenuChange(undefined); onAttach(); }}><WebuiIconAttach className="webui-composer-menu-icon" />添加文件或图片</button>
+        <button type="button" role="menuitem" onMouseEnter={() => { if (menu && menu !== "root") onMenuChange("root"); }} onFocus={() => { if (menu && menu !== "root") onMenuChange("root"); }} onClick={() => { onMenuChange(undefined); onAttach(); }}><WebuiIconAttach className="webui-composer-menu-icon" />添加文件或图片</button>
         <button type="button" role="menuitem" aria-haspopup="menu" aria-expanded={menu === "skills"} data-webui-composer-submenu-trigger="skills" onMouseEnter={() => onMenuChange("skills")} onFocus={() => onMenuChange("skills")} onClick={() => onMenuChange("skills")}><WebuiIconSkillGeneric className="webui-composer-menu-icon" />技能 <span aria-hidden="true">›</span></button>
         <button type="button" role="menuitem" aria-haspopup="menu" aria-expanded={menu === "plugins"} data-webui-composer-submenu-trigger="plugins" onMouseEnter={() => onMenuChange("plugins")} onFocus={() => onMenuChange("plugins")} onClick={() => onMenuChange("plugins")}><WebuiIconPlugins className="webui-composer-menu-icon" />插件 <span aria-hidden="true">›</span></button>
         <div role="separator" />
-        <button type="button" role="menuitem" onMouseEnter={() => { if (menu !== "root") onMenuChange("root"); }} onFocus={() => { if (menu !== "root") onMenuChange("root"); }} onClick={() => { onMenuChange(undefined); onGoal(); }}><WebuiIconCommandGoal className="webui-composer-menu-icon" />目标</button>
-        <button type="button" role="menuitem" onMouseEnter={() => { if (menu !== "root") onMenuChange("root"); }} onFocus={() => { if (menu !== "root") onMenuChange("root"); }} onClick={() => { onMenuChange(undefined); onPlan(); }}><WebuiIconCommandPlan className="webui-composer-menu-icon" />计划</button>
+        <button type="button" role="menuitem" onMouseEnter={() => { if (menu && menu !== "root") onMenuChange("root"); }} onFocus={() => { if (menu && menu !== "root") onMenuChange("root"); }} onClick={() => { onMenuChange(undefined); onGoal(); }}><WebuiIconCommandGoal className="webui-composer-menu-icon" />目标</button>
+        <button type="button" role="menuitem" onMouseEnter={() => { if (menu && menu !== "root") onMenuChange("root"); }} onFocus={() => { if (menu && menu !== "root") onMenuChange("root"); }} onClick={() => { onMenuChange(undefined); onPlan(); }}><WebuiIconCommandPlan className="webui-composer-menu-icon" />计划</button>
       </div>
       {menu === "skills" ? (
         <div className="webui-composer-menu" role="menu" aria-label="技能" data-webui-composer-menu="skills" data-webui-composer-submenu="skills">

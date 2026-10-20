@@ -193,6 +193,21 @@ The typed boundary through which the browser asks for one group of capabilities.
 Its methods describe available IO rather than permission to own business state.
 _Avoid_: interface, API, adapter
 
+**Browser Use**:
+A capability through which an Agent can inspect and operate a browser target. A person using the
+client may also operate that same target.
+_Avoid_: browser automation (too broad; may mean unrelated test automation)
+
+**Browser target**:
+The browser page or session selected for Browser Use. Its origin may be an isolated browser or a
+user's existing browser; its identity is distinct from the WebUI Agent session.
+_Avoid_: tab (a target may outlive or span a tab)
+
+**Browser surface**:
+A client-facing way to view or select a Browser Use target, such as the isolated-browser panel or an
+external-browser connection.
+_Avoid_: browser target (the surface is how the target is reached, not the target itself)
+
 **Capability slice**:
 The subset of capability methods supplied to a business owner. Presentation
 receives the owner's commands and read model instead of its capability slice.
@@ -474,6 +489,26 @@ A reusable instruction set the runtime can load. The composer's slash palette li
 the runtime's skills; plugin management manages them.
 _Avoid_: prompt, template, recipe
 
+**Mini App**:
+A plugin that ships a first-party web page and serves that page from a process of its own. The
+client hosts the page as a view; the Mini App's own code owns everything inside it.
+_Avoid_: mini program, app, widget
+
+**Mini App view**:
+The client area that renders a Mini App's page. It is either a view inside the workspace panel or
+the whole content of a browser tab opened for one Mini App.
+_Avoid_: surface (that word names a client identity here), pane, frame
+
+**Mini App bridge**:
+The page-facing API a Mini App page uses to call the client hosting it: appending a draft to the
+composer, running or answering an agent turn, and reading the host's window state.
+_Avoid_: API, interface, plugin API
+
+**Mini App process**:
+The local process that serves one Mini App's page on a loopback port. The client hosts its output
+and does not own its state.
+_Avoid_: runtime (that names the harness side), server, container
+
 ### Runtime ownership
 
 **Runtime owner**:
@@ -485,6 +520,13 @@ _Avoid_: daemon, server, backend instance
 Not to be confused with the **WebUI runtime**, which is a module group inside the
 WebUI service rather than a running instance. A process has one runtime owner and
 one WebUI runtime; the words name different things.
+
+**Runtime owner policy**:
+The descriptor a runtime owner kind resolves to: the wiring and execution decisions the harness
+applies for that owner. It is resolved once per host, and an owner-derived service gate reads a
+cell of it rather than comparing the kind itself.
+_Avoid_: owner row, profile, mode — and do not use it for the kind string (that is the
+**runtime owner**)
 
 **surface**:
 The value a client declares to identify which interface it is, from the fixed set

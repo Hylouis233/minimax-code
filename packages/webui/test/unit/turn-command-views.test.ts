@@ -9,10 +9,15 @@
 //
 // This file is the disposition record in executable form. `DISPOSITION` below
 // is the complete enumeration of the writer commands that existed before the
-// regroup, each assigned to exactly one view — including `clearStream` and
-// `setContextUsage` — and the assertions check that the published views are
-// exactly that partition: nothing dropped, nothing duplicated, and no member
-// reachable from a view it does not belong to.
+// regroup, each assigned to exactly one view — including `clearStream` — and
+// the assertions check that the published views are exactly that partition:
+// nothing dropped, nothing duplicated, and no member reachable from a view it
+// does not belong to.
+//
+// `RETIRED` records the one command that was later withdrawn from a view, and
+// why. It is checked too: a command that was retired on purpose must stay
+// retired, and its return has to be a deliberate act rather than a copy that
+// found its way back.
 //
 // Interface *counts* are deliberately not asserted: what matters is that each
 // member has one home and that the homes are disjoint.
@@ -39,12 +44,10 @@ const DISPOSITION: readonly {
   // Turn lifecycle: opening, clearing, recording and closing a turn's stream.
   // `resetStreamForTurn` opens one; `clearStream` clears the slice for New Task
   // (it is a whole-slice reset, not a phase move, so it is not in the phase
-  // view); `setContextUsage` is the snapshot a loaded turn carries onto the
-  // slice; `setStreamRefusal` records its failure; `setTurnSending` is the
+  // view); `setStreamRefusal` records its failure; `setTurnSending` is the
   // submit-lifecycle flag; `releaseStreamSubscription` closes its lease.
   { view: "turn-lifecycle", member: "resetStreamForTurn" },
   { view: "turn-lifecycle", member: "clearStream" },
-  { view: "turn-lifecycle", member: "setContextUsage" },
   { view: "turn-lifecycle", member: "setStreamRefusal" },
   { view: "turn-lifecycle", member: "setTurnSending" },
   { view: "turn-lifecycle", member: "releaseStreamSubscription" },
@@ -58,6 +61,29 @@ const DISPOSITION: readonly {
 
 const membersFor = (view: string): string[] =>
   DISPOSITION.filter((entry) => entry.view === view).map((entry) => entry.member);
+
+/**
+ * The commands that were withdrawn from a view, and what withdrew them.
+ *
+ * `setContextUsage` applied a HISTORY-derived context snapshot to the LIVE
+ * turn's record. That put a fact the turn did not produce into the record that
+ * owns the turn, and the record is reset every time a turn starts — so the
+ * reading was lost with it, and a read that lost its race with a page refresh
+ * left the composer's ring blank with nothing to retry it. The reading now
+ * comes from the record that owns it (the live turn while one runs, the
+ * transcript page otherwise), so there is nothing for this command to write.
+ */
+const RETIRED: readonly {
+  readonly view: "turn-lifecycle";
+  readonly member: string;
+  readonly because: string;
+}[] = [
+  {
+    view: "turn-lifecycle",
+    member: "setContextUsage",
+    because: "a history reading does not belong on the live turn's record",
+  },
+];
 
 /** One writer over one cell, so a view's writes can be observed directly. */
 function cell() {
@@ -113,12 +139,21 @@ describe("every writer command is enumerated and assigned to one view", () => {
     expect(published.sort()).toEqual([...all].sort());
   });
 
-  it("assigns clearStream and setContextUsage, and to the lifecycle view", () => {
-    const { lifecycle } = views();
-    // Explicit, not incidental: both are whole-slice / extra-field writes that
-    // the phase view's single-field rule cannot hold.
+  it("assigns clearStream to the lifecycle view, and keeps it out of the phase view", () => {
+    const { phase, lifecycle } = views();
+    // Explicit, not incidental: it is a whole-slice write that the phase
+    // view's single-field rule cannot hold.
     expect(Object.keys(lifecycle)).toContain("clearStream");
-    expect(Object.keys(lifecycle)).toContain("setContextUsage");
+    expect(phase).not.toHaveProperty("clearStream");
+  });
+
+  it("keeps the retired commands retired", () => {
+    const { phase, lifecycle, interaction } = views();
+    for (const entry of RETIRED) {
+      expect(lifecycle).not.toHaveProperty(entry.member);
+      expect(phase).not.toHaveProperty(entry.member);
+      expect(interaction).not.toHaveProperty(entry.member);
+    }
   });
 });
 

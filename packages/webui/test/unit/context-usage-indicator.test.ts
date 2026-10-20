@@ -12,6 +12,11 @@ import { describe, expect, it } from "vitest";
 
 const RELATIVE = "src/client/features/composer/ui/ContextUsageIndicator.tsx";
 const source = readFileSync(fileURLToPath(new URL("../../" + RELATIVE, import.meta.url)), "utf8");
+/** The shared skeleton, which places the panel and owns its dismissal. */
+const dropdown = readFileSync(
+  fileURLToPath(new URL("../../src/client/ui/Dropdown.tsx", import.meta.url)),
+  "utf8",
+);
 
 describe("the indicator keeps its four pieces of state", () => {
   it("holds the opted-in flag, hover, open and the breakdown disclosure", () => {
@@ -32,11 +37,16 @@ describe("the popover's placement keeps its listeners and its cleanup", () => {
     expect(source).toContain("positionContextUsagePopover({");
   });
 
-  it("subscribes to scroll and resize in a layout effect and removes both", () => {
-    expect(source).toContain('window.addEventListener("scroll", measurePanel, true);');
-    expect(source).toContain('window.addEventListener("resize", measurePanel);');
-    expect(source).toContain('window.removeEventListener("scroll", measurePanel, true);');
-    expect(source).toContain('window.removeEventListener("resize", measurePanel);');
+  it("follows the ring when the column scrolls, through the shared skeleton", () => {
+    // The panel is fixed and the composer is not, so a scroll that moves one
+    // and not the other leaves the panel pointing at nothing. The subscription
+    // is the shared skeleton's now — and the skeleton's scroll listener is a
+    // capture-phase one, so it hears the scroll of the column the ring is in
+    // and not only the window's.
+    expect(source).not.toContain('window.addEventListener("scroll"');
+    expect(source).not.toContain('window.addEventListener("resize"');
+    expect(dropdown).toContain("dom.listenForScroll(place)");
+    expect(dropdown).toContain("dom.listenForResize(place)");
   });
 });
 

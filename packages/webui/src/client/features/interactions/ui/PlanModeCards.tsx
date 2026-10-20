@@ -93,7 +93,7 @@ export function WebuiPlanReviewDecision({
           disabled={busy}
           onClick={() => submit(buildWebuiPlanSkipAnswers())}
         >
-          <WebuiIconClose className="size-full" />
+          <WebuiIconClose className="h-full w-full" />
         </button>
       </header>
       <div className="webui-plan-review-body">

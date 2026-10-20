@@ -4,8 +4,6 @@ import type {
   WebuiModelPickerEntry,
   WebuiModelProviderGroup,
 } from "../contracts/model-view.js";
-import { evaluateOutsideClose } from "../../../projection/common/outside-close.js";
-import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import {
   isPreview,
   rowHasFlyout,
@@ -24,7 +22,15 @@ import {
 import type { FlyoutAnchor } from "../ui/ModelSettingsFlyout.js";
 import type { FlyoutRect } from "../../../projection/common/flyout-position.js";
 
-/** Owns the model picker's disposable pointer, focus, cascade and anchor attachment. */
+/**
+ * Owns the model picker's disposable hover, focus, cascade and anchor
+ * attachment.
+ *
+ * Not its dismissal: the menu and the settings fly-out are `WebuiDropdown`s and
+ * the shared skeleton is what closes them on a press outside and on Escape. What
+ * stays here is what those two answers MEAN for this picker — `onEscape` walks
+ * back out one tier at a time rather than closing the menu on the first press.
+ */
 export function useModelPickerInteraction({
   models,
   groups,
@@ -34,11 +40,9 @@ export function useModelPickerInteraction({
   readonly groups: readonly WebuiModelProviderGroup[];
   readonly selected: WebuiModelPickerEntry | undefined;
 }) {
-  const { dom } = useWebuiBrowserCapabilities();
   const [open, setOpen] = useState(false);
   const [focusedRow, setFocusedRow] = useState<FocusedRow | undefined>();
   const [tier, setTier] = useState<CascadeTier>("list");
-  const rootRef = useRef<HTMLDivElement | null>(null);
   const rowElements = useRef(new Map<string, HTMLElement>());
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const modelsRef = useRef(models);
@@ -69,24 +73,6 @@ export function useModelPickerInteraction({
   }, [clearPendingHover, open]);
 
   useEffect(() => clearPendingHover, [clearPendingHover]);
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const handler = (event: PointerEvent) => {
-      if (!rootRef.current) return;
-      const insideContainer = rootRef.current.contains(event.target as Node);
-      if (
-        evaluateOutsideClose({
-          surface: "modelPicker",
-          kind: "pointerdown",
-          insideContainer,
-        }) === "close"
-      ) {
-        setOpen(false);
-      }
-    };
-    return dom.listenForPointerDown(handler);
-  }, [dom, open]);
 
   const focusedModel = useMemo<WebuiModelPickerEntry | undefined>(() => {
     const key = focused?.key ?? (selected ? modelKey(selected) : undefined);
@@ -211,7 +197,6 @@ export function useModelPickerInteraction({
     focusedKey,
     isPreviewing,
     flyoutAnchor,
-    rootRef,
     toggle: openOrToggle,
     close,
     retract,

@@ -27,14 +27,45 @@ export function projectContextSnapshot(input: {
   // The runtime protocol's names, not invented ones. `total_tokens` is what the
   // turn CONSUMED against `context_window`, which is what the readout's
   // percentage is; the wire has no separate "used" field to prefer.
-  const window = numberValue(usage.context_window);
-  const usedTokens = numberValue(usage.total_tokens);
+  //
+  // BOTH spellings are read, because the two names arrive from two different
+  // places and neither one is wrong on its own: the runtime protocol fixes
+  // `total_tokens` / `context_window` (`agent-core/src/protocol/agent-message.ts`),
+  // and the persisted session message carries the same two numbers under the
+  // camelCase names its own view uses (`totalTokens` / `contextWindow`).
+  // Reading only the snake_case pair is what made a RELOADED session show no
+  // context readout at all: the page answered with a usage record, every
+  // field of it under a name this projection did not look at, and the panel
+  // had nothing to draw.
+  const window = numberValue(usage.context_window) ?? numberValue(usage.contextWindow);
+  const usedTokens = numberValue(usage.total_tokens) ?? numberValue(usage.totalTokens);
   return {
     status: input.active ? "stale" : "live",
-    usage,
+    // The snapshot publishes the protocol's names whatever the record it was
+    // read from spelled them, so the client reads ONE shape and the two
+    // spellings cannot drift apart again.
+    usage: normalisedUsage(usage, usedTokens, window),
     ...(window === undefined ? {} : { window }),
     ...(usedTokens === undefined ? {} : { usedTokens }),
     compaction: compaction ?? { state: "never" },
+  };
+}
+
+/**
+ * The usage record with the protocol's names spelled out.
+ *
+ * The record's own fields are kept: the breakdown reads `components` off it,
+ * and a record that carried them must not lose them to a rename.
+ */
+function normalisedUsage(
+  usage: Record<string, unknown>,
+  usedTokens: number | undefined,
+  window: number | undefined,
+): Record<string, unknown> {
+  return {
+    ...usage,
+    ...(usedTokens === undefined ? {} : { total_tokens: usedTokens }),
+    ...(window === undefined ? {} : { context_window: window }),
   };
 }
 

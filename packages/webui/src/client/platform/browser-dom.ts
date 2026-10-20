@@ -14,7 +14,46 @@ export interface WebuiBrowserDom {
   readonly listenForMouseDown: (listener: (event: MouseEvent) => void) => () => void;
   readonly listenForPointerDown: (listener: (event: PointerEvent) => void, capture?: boolean) => () => void;
   readonly listenForKeyDown: (listener: (event: KeyboardEvent) => void) => () => void;
+  /**
+   * The viewport was resized.
+   *
+   * A floating popup placed against a trigger has to follow it when the
+   * viewport changes, so the listener is part of the platform rather than
+   * something a component reaches for `window` directly.
+   */
+  readonly listenForResize: (listener: () => void) => () => void;
+  /**
+   * Something scrolled.
+   *
+   * The listener is registered in the capture phase, so it also hears the
+   * scroll of any scrolling container — a popup anchored inside a scrollable
+   * region moves with it.
+   */
+  readonly listenForScroll: (listener: () => void) => () => void;
   readonly listenForStorageChange: (listener: () => void) => () => void;
+  /**
+   * The viewport's size.
+   *
+   * A floating popup is placed inside the viewport, so the size of that
+   * viewport is part of the placement arithmetic. It belongs to the platform
+   * for the same reason the resize listener does: a component that reaches
+   * for `window.innerWidth` directly is a component that cannot be placed
+   * against anything but a browser.
+   */
+  readonly viewportSize: () => { readonly width: number; readonly height: number };
+  /**
+   * Watch an element's size.
+   *
+   * A floating popup is placed against a measured size, and a popup whose
+   * content changes size after it opened needs to be placed again — a panel
+   * that grows by six rows when its disclosure opens moves its own edges.
+   * Re-rendering does not report that, because the popup's content re-renders
+   * without the popup's owner re-rendering.
+   *
+   * A platform that has no `ResizeObserver` answers with a no-op: the popup
+   * keeps the placement it was given.
+   */
+  readonly observeSize: (element: Element, listener: () => void) => () => void;
   /**
    * Whether this page is currently hidden from the reader.
    *
@@ -77,10 +116,32 @@ export function createWebuiBrowserDom(
     listenForMouseDown: (listener) => listen("mousedown", listener),
     listenForPointerDown: (listener, capture) => listen("pointerdown", listener, capture),
     listenForKeyDown: (listener) => listen("keydown", listener),
+    listenForResize: (listener) => {
+      if (!windowObject) return () => undefined;
+      windowObject.addEventListener("resize", listener);
+      return () => windowObject.removeEventListener("resize", listener);
+    },
+    listenForScroll: (listener) => {
+      if (!windowObject) return () => undefined;
+      // Capture phase: a scroll inside any container reaches the window too,
+      // and a popup anchored in that container has to follow it.
+      windowObject.addEventListener("scroll", listener, true);
+      return () => windowObject.removeEventListener("scroll", listener, true);
+    },
     listenForStorageChange: (listener) => {
       if (!windowObject) return () => undefined;
       windowObject.addEventListener("storage", listener);
       return () => windowObject.removeEventListener("storage", listener);
+    },
+    viewportSize: () => ({
+      width: windowObject?.innerWidth ?? 0,
+      height: windowObject?.innerHeight ?? 0,
+    }),
+    observeSize: (element, listener) => {
+      if (typeof ResizeObserver === "undefined") return () => undefined;
+      const observer = new ResizeObserver(() => listener());
+      observer.observe(element);
+      return () => observer.disconnect();
     },
     isPageHidden: () => documentObject?.visibilityState === "hidden",
     listenForVisibilityChange: (listener) => listen("visibilitychange", () => listener()),

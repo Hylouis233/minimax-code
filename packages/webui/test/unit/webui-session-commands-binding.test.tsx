@@ -124,7 +124,7 @@ describe("the binding's command set", () => {
     expect(typeof commands.stop).toBe("function");
     // The two views come from the same owner, so a component holds no writer.
     expect(typeof commands.phase.settleStoppedStream).toBe("function");
-    expect(typeof commands.lifecycle.setContextUsage).toBe("function");
+    expect(typeof commands.lifecycle.clearStream).toBe("function");
   });
 
   it("hands out nothing at all when the host has no application", () => {

@@ -25,6 +25,10 @@ terminal client, so it is a hard dependency on that asset. `titleSafetyBypass: t
 it carries today's effective value so the identity change does not silently change title generation,
 and whether it is permanent is an open question ([`../open-questions.md`](../open-questions.md)).
 
+A seventh wiring cell is the accepted direction but is not implemented: ADR 0020 records the Mini
+App service as a cell of this table, so that the Mini App gate stops being a kind comparison of its
+own and this row can reach it. The table above still describes the row as it stands today.
+
 ## Two smaller facts the row system carries
 
 - `RuntimeOwnerRow` has three states, not two: `absent` (no kind declared), a declared kind, and

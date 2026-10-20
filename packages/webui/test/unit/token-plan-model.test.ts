@@ -18,6 +18,10 @@ import {
   MINIMAX_API_PROVIDER_ID,
   isTokenPlanModel,
 } from "../../src/client/features/models/projection/token-plan-model.public.js";
+import {
+  readContextUsageFromPage,
+  readContextWindowUsage,
+} from "../../src/client/features/composer/contracts/context-usage.js";
 
 // The client imports no `@mavis/*` module and the package boundary check keeps
 // it that way, so these three are mirrored rather than imported. A mirror with
@@ -35,6 +39,9 @@ const indicatorPath = path.resolve(
   "../../src/client/features/composer/ui/ContextUsageIndicator.tsx",
 );
 const composerPath = path.resolve(here, "../../src/client/features/composer/ui/WebuiComposer.tsx");
+/** The shared skeleton, which opens the panel and owns its dismissal. */
+const dropdownPath = path.resolve(here, "../../src/client/ui/Dropdown.tsx");
+const dropdown = readFileSync(dropdownPath, "utf8");
 
 describe("token plan model — the mirrored provider ids", () => {
   it("still equals the ones @mavis/config exports", () => {
@@ -97,6 +104,81 @@ describe("token plan model — whose usage the plan pays for", () => {
   });
 });
 
+describe("context window usage — the numbers, whichever way they are spelled", () => {
+  it("reads the protocol's snake_case pair", () => {
+    expect(
+      readContextWindowUsage({ total_tokens: 120, context_window: 2000 }),
+    ).toEqual({ used: 120, limit: 2000 });
+  });
+
+  it("reads the stored camelCase pair", () => {
+    // This is the shape a PERSISTED session message's usage actually has, and
+    // reading only the snake_case pair is what left the composer's readout
+    // blank for every session the user opened.
+    expect(
+      readContextWindowUsage({ totalTokens: 120, contextWindow: 2000 }),
+    ).toEqual({ used: 120, limit: 2000 });
+  });
+
+  it("reads the live snapshot's pair", () => {
+    expect(
+      readContextWindowUsage({ usedTokens: 120, contextWindowTokens: 2000 }),
+    ).toEqual({ used: 120, limit: 2000 });
+  });
+
+  it("reads a zero as a zero, not as no data", () => {
+    // A session that has produced context and spent none of it yet still has
+    // a window to report on, and a zero is a reading.
+    expect(
+      readContextWindowUsage({ total_tokens: 0, context_window: 2000 }),
+    ).toEqual({ used: 0, limit: 2000 });
+  });
+
+  it("reports an unknown window as unknown, and keeps the spent amount", () => {
+    // A model whose window the runtime does not know still has a spent
+    // window, and the readout can carry that fact.
+    expect(readContextWindowUsage({ totalTokens: 120 })).toEqual({
+      used: 120,
+      limit: undefined,
+    });
+  });
+
+  it("reports no data for a record with no numbers in it", () => {
+    expect(readContextWindowUsage(undefined)).toEqual({ used: undefined, limit: undefined });
+    expect(readContextWindowUsage({ components: [] })).toEqual({ used: undefined, limit: undefined });
+  });
+});
+
+describe("context window usage — read from the page that owns it", () => {
+  it("prefers the page's context snapshot", () => {
+    // The server's snapshot names the window the runtime billed against, and
+    // it is the richer half of the page.
+    expect(
+      readContextUsageFromPage({
+        contextSnapshot: { status: "live", usage: { total_tokens: 120, context_window: 2000 } },
+        messages: [],
+      }),
+    ).toEqual({ total_tokens: 120, context_window: 2000 });
+  });
+
+  it("falls back to the newest message that reported usage", () => {
+    // A page without a snapshot still carries the reading on its messages.
+    expect(
+      readContextUsageFromPage({
+        messages: [
+          { msgId: "m1", role: "assistant", usage: { totalTokens: 10, contextWindow: 2000 } },
+          { msgId: "m2", role: "assistant", usage: { totalTokens: 120, contextWindow: 2000 } },
+        ],
+      }),
+    ).toEqual({ totalTokens: 120, contextWindow: 2000 });
+  });
+
+  it("reports nothing for a page that carries no reading at all", () => {
+    expect(readContextUsageFromPage(undefined)).toBeUndefined();
+    expect(readContextUsageFromPage({ messages: [] })).toBeUndefined();
+  });
+});
+
 describe("context panel — what the plan section is bound to", () => {
   const indicatorSource = readFileSync(indicatorPath, "utf8");
 
@@ -137,7 +219,15 @@ describe("context panel — hover names it, click opens it", () => {
   });
 
   it("opens on the click and toggles on a second one", () => {
-    expect(indicator).toMatch(/onClick=\{\(\) => \{\s*setOpen\(\(value\) => !value\);/u);
+    // The ring is the trigger, and the shared skeleton owns the toggle: its
+    // trigger's click opens a closed dropdown and closes an open one. The
+    // indicator's own job is to say what opening means — the panel opens
+    // folded, every time.
+    expect(indicator).toContain("<WebuiDropdown");
+    expect(indicator).toContain("onOpen={() => {");
+    expect(indicator).toContain("onClose={() => setOpen(false)}");
+    expect(dropdown).toContain("if (open) onClose();");
+    expect(dropdown).toContain("else onOpen();");
   });
 
   it("carries a hover label naming the ring, hidden from assistive tech", () => {
@@ -155,10 +245,15 @@ describe("context panel — hover names it, click opens it", () => {
   });
 
   it("dismisses on Escape and on a press outside", () => {
-    expect(indicator).toContain('if (event.key === "Escape") setOpen(false)');
-    // `pointerdown` in the CAPTURE phase: the press that lands outside has to
-    // dismiss the panel rather than being handed to whatever is underneath.
-    expect(indicator).toContain("dom.listenForPointerDown(onPointerDown, true)");
+    // The dismissal belongs to the shared skeleton: it reads the press before
+    // the click reaches whatever was underneath, and Escape closes the panel
+    // and returns the focus to the ring that opened it. The indicator keeps no
+    // listener of its own, because a second one would close the panel twice.
+    expect(indicator).not.toContain("listenForPointerDown");
+    expect(indicator).not.toContain("onKeyDown");
+    expect(dropdown).toContain("dom.listenForPointerDown");
+    expect(dropdown).toContain('if (event.key !== "Escape") return;');
+    expect(dropdown).toContain("triggerRef.current?.focus?.();");
   });
 });
 
@@ -177,7 +272,7 @@ describe("context panel — the six-category split is folded until asked for", (
     // Otherwise a glance at the panel lands on six rows because of something
     // the user did a minute ago and has since stopped caring about.
     expect(indicator).toMatch(
-      /setOpen\(\(value\) => !value\);\s*setBreakdownOpen\(false\);/u,
+      /onOpen=\{\(\) => \{\s*setOpen\(true\);\s*setBreakdownOpen\(false\);/u,
     );
   });
   it("puts the disclosure on the heading row, with a chevron that states it", () => {
