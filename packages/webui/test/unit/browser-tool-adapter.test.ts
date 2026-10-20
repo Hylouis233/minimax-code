@@ -26,12 +26,14 @@ import { WEBUI_BROWSER_RESTRICTED_COMMANDS } from "../../src/shared/contracts/br
  *
  * The service decides whether a browser may be touched at all and the adapter
  * only translates a tool call, so a provider that records its calls is enough
- * to prove the decisions that matter: which command reached the browser, and
- * which refusals kept the browser untouched.
+ * to prove the decisions that matter: which browser received the command, and
+ * which refusals left every browser untouched. One instance per surface, so a
+ * test can see that a run was driven on the browser the person pointed at and
+ * not on the one this process owns.
  */
 class RecordingProvider implements WebuiBrowserSurfaceProvider {
-  readonly surface = "isolated-chromium" as const;
-  readonly browserId = "browser-1";
+  readonly surface: WebuiBrowserSurface;
+  readonly browserId: string;
   readonly commands: { command: string; params: Record<string, unknown> }[] = [];
   /** The tabs this browser has, so two runs can hold different selections. */
   readonly tabIds: readonly string[];
@@ -39,7 +41,9 @@ class RecordingProvider implements WebuiBrowserSurfaceProvider {
   neverSettle = false;
   closed = false;
 
-  constructor(tabIds: readonly string[] = ["tab-1"]) {
+  constructor(surface: WebuiBrowserSurface, tabIds: readonly string[] = ["tab-1"]) {
+    this.surface = surface;
+    this.browserId = surface === "isolated-chromium" ? "browser-1" : `${surface}-browser`;
     this.tabIds = tabIds;
   }
 
@@ -105,20 +109,60 @@ const OTHER_TARGET: WebuiBrowserTargetId = {
   targetId: "tab-2",
 };
 
-function createService(authorization: WebuiBrowserAuthorization, tabIds?: readonly string[]): {
+/** A tab of the Edge session the bridge lends the service. */
+const EDGE_TARGET: WebuiBrowserTargetId = {
+  surface: "edge",
+  browserId: "edge-browser",
+  targetId: "tab-edge",
+  generation: 1,
+};
+
+/**
+ * A service whose stores and providers a test can reach.
+ *
+ * `edge` is absent unless the test asks for it, because "the bridge lends Edge
+ * a session" is a fact about the host, not a default.
+ */
+function createService(
+  authorization: WebuiBrowserAuthorization,
+  options: {
+    /** The isolated Chromium's tabs. */
+    readonly isolatedTabs?: readonly string[];
+    /** When given, the bridge lends Edge a session with these tabs. */
+    readonly edgeTabs?: readonly string[];
+  } = {},
+): {
   service: WebuiBrowserService;
+  /** The isolated Chromium's provider. */
   provider: RecordingProvider;
+  /** Edge's provider, when the bridge had one to lend. */
+  edge: RecordingProvider | undefined;
+  /** The switches as the service reads them; a host may change them itself. */
+  state: { authorization: WebuiBrowserAuthorization };
 } {
-  const provider = new RecordingProvider(tabIds);
-  const options: WebuiBrowserServiceOptions = {
+  const provider = new RecordingProvider(
+    "isolated-chromium",
+    options.isolatedTabs ?? ["tab-1"],
+  );
+  const edge = options.edgeTabs
+    ? new RecordingProvider("edge", options.edgeTabs)
+    : undefined;
+  const state = { authorization };
+  const serviceOptions: WebuiBrowserServiceOptions = {
     authorization: {
-      read: async () => authorization,
-      write: async (input) => ({ ...authorization, ...input }),
+      read: async () => state.authorization,
+      write: async (input) => {
+        state.authorization = { ...state.authorization, ...input };
+        return state.authorization;
+      },
     },
     dataDir: "/tmp/webui-browser-tool-adapter-test",
     createIsolatedProvider: async () => provider,
+    ...(edge
+      ? { createBridgeProvider: async (surface) => (surface === "edge" ? edge : undefined) }
+      : {}),
   };
-  return { service: new WebuiBrowserService(options), provider };
+  return { service: new WebuiBrowserService(serviceOptions), provider, edge, state };
 }
 
 /**
@@ -127,14 +171,15 @@ function createService(authorization: WebuiBrowserAuthorization, tabIds?: readon
  *
  * The selection is the run's, not the tool's: an Agent browser-tool call acts
  * on the selected target of *its own run*, so a test that skipped this would be
- * testing the refusal path.
+ * testing the refusal path. The surface follows the target, so a run that
+ * selected in Edge is set up in Edge.
  */
 async function selectRunTarget(
   service: WebuiBrowserService,
   runId: string,
   target: WebuiBrowserTargetId = SELECTED_TARGET,
 ): Promise<void> {
-  await service.listTargets("isolated-chromium", runId);
+  await service.listTargets(target.surface, runId);
   await service.selectTarget(target, runId);
 }
 
@@ -159,11 +204,14 @@ const TOOL_CONTEXT = toolContextOf("run-a");
  * A command surface that records instead of driving a browser.
  *
  * Used for the surface rule alone: which surface a tool call lands on is a
- * decision the adapter makes before the service is involved, and asserting it
- * through a real browser would be an expensive way to read one argument.
+ * decision the adapter makes before a browser is involved, and asserting it
+ * through a real browser would be an expensive way to read one argument. What
+ * the run is working on is answered here, so the adapter has to ask.
  */
-function recordingCommandSurface(): {
+function recordingCommandSurface(surfaceOf: (runId: string) => WebuiBrowserSurface | undefined): {
   browser: WebuiBrowserToolCommandSurface;
+  /** The runs the adapter asked about, in order. */
+  asked: string[];
   calls: {
     surface: WebuiBrowserSurface;
     runId: string;
@@ -172,6 +220,7 @@ function recordingCommandSurface(): {
     signal?: AbortSignal;
   }[];
 } {
+  const asked: string[] = [];
   const calls: {
     surface: WebuiBrowserSurface;
     runId: string;
@@ -180,8 +229,13 @@ function recordingCommandSurface(): {
     signal?: AbortSignal;
   }[] = [];
   return {
+    asked,
     calls,
     browser: {
+      selectionSurfaceOf: (runId) => {
+        asked.push(runId);
+        return surfaceOf(runId);
+      },
       sendCommandToSelection: async (surface, runId, command, params, signal) => {
         calls.push({ surface, runId, command, params, signal });
         return { accepted: true as const, target: SELECTED_TARGET, result: "done" };
@@ -262,13 +316,44 @@ describe("Agent browser-tool adapter", () => {
   });
 
   it("refuses a surface that is not authorized before reaching the browser", async () => {
-    const { service, provider } = createService({ ...ALL_OFF, fullCdp: true });
-    await selectRunTarget(service, "run-a").catch(() => undefined);
+    const { service, provider, edge, state } = createService(
+      { ...ALL_OFF, edge: true },
+      { edgeTabs: ["tab-edge"] },
+    );
+    await selectRunTarget(service, "run-a", EDGE_TARGET);
+    // The switch changes under the running service, which is what a host that
+    // reloads its configuration does. The run still holds the selection it
+    // made, so the tool path still knows which surface it meant — and the
+    // authorization gate still refuses it.
+    state.authorization = { ...state.authorization, edge: false };
     const adapter = createWebuiBrowserToolAdapter({ browser: service });
 
     await expect(
-      adapter.execute(TOOL_CONTEXT, "navigate", { url: "https://example.test" }),
+      adapter.execute(TOOL_CONTEXT, "reload", {}),
     ).rejects.toMatchObject({ code: "browser_surface_not_authorized" });
+    expect(edge?.commands).toHaveLength(0);
+    expect(provider.commands).toHaveLength(0);
+    await service.close();
+  });
+
+  it("refuses rather than driving another browser after its surface was switched off", async () => {
+    const { service, provider, edge } = createService(
+      { ...ALL_OFF, isolatedChromium: true, edge: true },
+      { isolatedTabs: ["tab-1"], edgeTabs: ["tab-edge"] },
+    );
+    await selectRunTarget(service, "run-a", EDGE_TARGET);
+    await service.writeAuthorization({ edge: false });
+    const adapter = createWebuiBrowserToolAdapter({ browser: service });
+
+    // The run still holds the selection it made on Edge, and Edge is still the
+    // surface it is working on — but the switch is off, so the authorization
+    // gate refuses it by name. What must not happen is the call landing on the
+    // isolated Chromium instead: that is a browser the person never pointed
+    // this run at.
+    await expect(adapter.execute(TOOL_CONTEXT, "reload", {})).rejects.toMatchObject({
+      code: "browser_surface_not_authorized",
+    });
+    expect(edge?.commands).toHaveLength(0);
     expect(provider.commands).toHaveLength(0);
     await service.close();
   });
@@ -309,13 +394,17 @@ describe("Agent browser-tool adapter", () => {
     await service.close();
   });
 
-  it("acts on the isolated Chromium unless the run is on another surface", async () => {
-    const { browser, calls } = recordingCommandSurface();
+  it("asks the service which surface the calling run is working on", async () => {
+    // The tool context carries no surface, and the runtime cannot be asked for
+    // one. The service holds the answer — it is the state the panel wrote when
+    // the person picked a target — so the adapter asks and acts on that.
+    const { browser, asked, calls } = recordingCommandSurface(() => "edge");
     const adapter = createWebuiBrowserToolAdapter({ browser });
     await adapter.execute(TOOL_CONTEXT, "reload", {});
+    expect(asked).toEqual(["run-a"]);
     expect(calls).toEqual([
       {
-        surface: "isolated-chromium",
+        surface: "edge",
         runId: "run-a",
         command: "reload",
         params: {},
@@ -324,31 +413,93 @@ describe("Agent browser-tool adapter", () => {
     ]);
   });
 
-  it("takes the surface from the tool context when one names it", async () => {
-    const { browser, calls } = recordingCommandSurface();
-    const adapter = createWebuiBrowserToolAdapter({
-      browser,
-      defaultSurface: "edge",
-      // The tool context carries no surface today, so a caller that knows which
-      // surface its run is on supplies it here rather than the adapter guessing.
-      resolveSurface: () => "chrome",
+  it("refuses when the run has no surface to act on, rather than choosing one", async () => {
+    const { browser, calls } = recordingCommandSurface(() => undefined);
+    const adapter = createWebuiBrowserToolAdapter({ browser });
+
+    await expect(adapter.execute(TOOL_CONTEXT, "reload", {})).rejects.toMatchObject({
+      code: "browser_target_unknown",
     });
-    await adapter.execute(TOOL_CONTEXT, "reload", {});
-    expect(calls[0]?.surface).toBe("chrome");
+    // A browser chosen here would be one the run never pointed at.
+    expect(calls).toHaveLength(0);
   });
 
   it("names the calling run as the selection the command acts on", async () => {
     // The run is the tool context's session, and the selection belongs to it
     // (ADR 0019): the adapter passing no run would be asking about whichever
     // selection happened to be there.
-    const { browser, calls } = recordingCommandSurface();
+    const { browser, asked, calls } = recordingCommandSurface(() => "isolated-chromium");
     const adapter = createWebuiBrowserToolAdapter({ browser });
     await adapter.execute(toolContextOf("run-b"), "reload", {});
+    expect(asked).toEqual(["run-b"]);
     expect(calls[0]?.runId).toBe("run-b");
   });
 
+  it("acts on the surface the run selected, not on the isolated Chromium", async () => {
+    const { service, provider, edge } = createService(
+      { ...ALL_OFF, isolatedChromium: true, edge: true },
+      { isolatedTabs: ["tab-1"], edgeTabs: ["tab-edge"] },
+    );
+    // The person pointed the panel at Edge and selected a tab there. The
+    // isolated Chromium is authorized and connected too, so a default would
+    // have found a browser to drive — the wrong one, and the split ADR 0019
+    // exists to prevent.
+    await selectRunTarget(service, "run-a", EDGE_TARGET);
+    const adapter = createWebuiBrowserToolAdapter({ browser: service });
+
+    await adapter.execute(TOOL_CONTEXT, "reload", {});
+
+    expect(edge?.commands).toEqual([{ command: "reload", params: {} }]);
+    expect(provider.commands).toHaveLength(0);
+    await service.close();
+  });
+
+  it("follows the run to the surface it selected last", async () => {
+    const { service, provider, edge } = createService(
+      { ...ALL_OFF, isolatedChromium: true, edge: true },
+      { isolatedTabs: ["tab-1"], edgeTabs: ["tab-edge"] },
+    );
+    // The run worked in the isolated Chromium, and the person then moved the
+    // panel to Edge and selected a tab there. The last choice is the one the
+    // panel is showing, so it is the one the Agent's tools act on.
+    await selectRunTarget(service, "run-a", SELECTED_TARGET);
+    await selectRunTarget(service, "run-a", EDGE_TARGET);
+    const adapter = createWebuiBrowserToolAdapter({ browser: service });
+
+    await adapter.execute(TOOL_CONTEXT, "reload", {});
+
+    expect(edge?.commands).toHaveLength(1);
+    expect(provider.commands).toHaveLength(0);
+    await service.close();
+  });
+
+  it("refuses a run that has selected nothing on any surface", async () => {
+    const { service, provider, edge } = createService(
+      { ...ALL_OFF, isolatedChromium: true, edge: true },
+      { isolatedTabs: ["tab-1"], edgeTabs: ["tab-edge"] },
+    );
+    // Both browsers are authorized, connected and have a tab. Nothing is
+    // selected, so there is no browser this run is working on.
+    await service.listTargets("isolated-chromium", "run-a");
+    await service.listTargets("edge", "run-a");
+    const adapter = createWebuiBrowserToolAdapter({ browser: service });
+
+    const refusal = await adapter.execute(TOOL_CONTEXT, "reload", {}).then(
+      () => undefined,
+      (error: unknown) => error,
+    );
+
+    // The refusal carries the browser's own code, so the run is told to select a
+    // page rather than shown a browser failure nobody can act on.
+    expect(refusal).toBeInstanceOf(WebuiBrowserOperationError);
+    expect(refusal).toMatchObject({ code: "browser_target_unknown" });
+    expect(provider.commands).toHaveLength(0);
+    expect(edge?.commands).toHaveLength(0);
+    await service.close();
+  });
+
   it("acts on the calling run's own selected target, not another run's", async () => {
-    const { service, provider } = createService(SURFACE_AUTHORIZED, ["tab-1", "tab-2"]);
+    const { service, provider } = createService(SURFACE_AUTHORIZED, { isolatedTabs: ["tab-1", "tab-2"] });
     // Two runs, one surface, two different pages.
     await selectRunTarget(service, "run-a", SELECTED_TARGET);
     await selectRunTarget(service, "run-b", OTHER_TARGET);
@@ -369,7 +520,7 @@ describe("Agent browser-tool adapter", () => {
   });
 
   it("refuses a run that has selected nothing rather than using another's", async () => {
-    const { service, provider } = createService(SURFACE_AUTHORIZED, ["tab-1", "tab-2"]);
+    const { service, provider } = createService(SURFACE_AUTHORIZED, { isolatedTabs: ["tab-1", "tab-2"] });
     await selectRunTarget(service, "run-b", OTHER_TARGET);
     const adapter = createWebuiBrowserToolAdapter({ browser: service });
 

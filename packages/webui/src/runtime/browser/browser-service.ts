@@ -24,6 +24,12 @@
 // target, and each stream carries only the frames of the target its own run
 // selected.
 //
+// The selection is also how a tool call learns which browser to act on. The
+// Agent's tool context carries no surface, so the adapter asks the service which
+// surface this run has selected on, and is refused when the run has selected
+// nowhere. The answer is read out of the same state the panel wrote, which is
+// what stops the tool path and the panel from naming different browsers.
+//
 // A surface that is not authorized is refused before anything is attempted, so
 // "you did not switch this on" is distinguishable from "the browser broke".
 
@@ -73,6 +79,19 @@ const WEBUI_BROWSER_FRAME_QUEUE_LIMIT = 32;
  * is never a second, host-wide "current target" beside it.
  */
 export const WEBUI_BROWSER_NO_RUN_ID = "webui-browser-no-run";
+
+/**
+ * What one run has selected on one surface, and when it made that choice.
+ *
+ * The order is not a second selection — the target beside it is the one the run
+ * has — it only says which of a run's surfaces was chosen last, which is what
+ * answers "which browser is this run working on" for a run that has followed the
+ * panel from one surface to another.
+ */
+interface WebuiBrowserRunSelection {
+  readonly target: WebuiBrowserTargetId;
+  readonly order: number;
+}
 
 /** How the service reads and writes the authorization. */
 export interface WebuiBrowserAuthorizationStore {
@@ -149,7 +168,12 @@ export class WebuiBrowserService {
    * scope: a surface alone would let two runs overwrite each other's selection,
    * and a run alone would let one run select on two surfaces at once.
    */
-  readonly #selected = new Map<WebuiBrowserSurface, Map<string, WebuiBrowserTargetId>>();
+  readonly #selected = new Map<
+    WebuiBrowserSurface,
+    Map<string, WebuiBrowserRunSelection>
+  >();
+  /** How many selections have been made; orders the run's own writes. */
+  #selectionOrder = 0;
   /** Which external surfaces the service has turned on, per surface. */
   readonly #bridgeSurfaces = new Map<"edge" | "chrome", boolean>();
   /** The frame subscribers, per surface and then per run. */
@@ -163,10 +187,12 @@ export class WebuiBrowserService {
   }
 
   /** The per-run selections of one surface, created on first use. */
-  #runSelections(surface: WebuiBrowserSurface): Map<string, WebuiBrowserTargetId> {
+  #runSelections(
+    surface: WebuiBrowserSurface,
+  ): Map<string, WebuiBrowserRunSelection> {
     const existing = this.#selected.get(surface);
     if (existing) return existing;
-    const created = new Map<string, WebuiBrowserTargetId>();
+    const created = new Map<string, WebuiBrowserRunSelection>();
     this.#selected.set(surface, created);
     return created;
   }
@@ -176,7 +202,43 @@ export class WebuiBrowserService {
     surface: WebuiBrowserSurface,
     runId: string,
   ): WebuiBrowserTargetId | undefined {
-    return this.#selected.get(surface)?.get(runId);
+    return this.#selected.get(surface)?.get(runId)?.target;
+  }
+
+  /**
+   * The surface one run is working on, or `undefined` when it has selected
+   * nothing anywhere.
+   *
+   * The Agent's tool context carries no surface, so this is where a tool call
+   * learns which browser it is allowed to touch. The answer is derived from the
+   * run's own selections — the same state the panel wrote when the person picked
+   * a target — rather than from a default the tool path invented, so a run that
+   * has selected a target on `edge` acts on `edge` and one that has selected
+   * nowhere is refused instead of being handed a browser nobody chose.
+   *
+   * A run that has selected on more than one surface is working on the one it
+   * chose last: that is the surface the person moved to, and the older selection
+   * stays as it is for that surface until the run chooses again or its target
+   * goes stale.
+   *
+   * Switching the isolated surface off stops its provider, which forgets that
+   * surface's selections, so a run whose own browser was switched off is
+   * reported as having selected nowhere. A bridged surface keeps its selection —
+   * its provider is deliberately not cached, so there is nothing to tear down —
+   * and the call that follows is refused by the authorization gate instead,
+   * which names the switch rather than the selection. Either way no browser is
+   * driven.
+   */
+  selectionSurfaceOf(runId: string): WebuiBrowserSurface | undefined {
+    let newest: { readonly surface: WebuiBrowserSurface; readonly order: number } | undefined;
+    for (const [surface, runs] of this.#selected) {
+      const selection = runs.get(runId);
+      if (!selection) continue;
+      if (!newest || selection.order > newest.order) {
+        newest = { surface, order: selection.order };
+      }
+    }
+    return newest?.surface;
   }
 
   /** The current authorization, normalised so a missing key is off. */
@@ -335,11 +397,15 @@ export class WebuiBrowserService {
       // the tab rather than changing which tab is shown. Every run that has
       // selected this tab therefore moves to the new generation: otherwise a
       // run's tools would refuse its own page as stale, and a frame from the
-      // previous page would still look current to that run's stream.
+      // previous page would still look current to that run's stream. The order
+      // is carried over because a navigation is not the run choosing a
+      // different surface.
       const selections = this.#selected.get(surface);
       if (selections && raised) {
-        for (const [runId, selected] of [...selections]) {
-          if (selected.targetId === change.targetId) selections.set(runId, raised.id);
+        for (const [runId, selection] of [...selections]) {
+          if (selection.target.targetId === change.targetId) {
+            selections.set(runId, { ...selection, target: raised.id });
+          }
         }
       }
     });
@@ -448,7 +514,10 @@ export class WebuiBrowserService {
         "The browser target has been replaced; select it again.",
       );
     }
-    this.#runSelections(target.surface).set(runId, target);
+    this.#runSelections(target.surface).set(runId, {
+      target,
+      order: (this.#selectionOrder += 1),
+    });
     return { ...known, selected: true };
   }
 
@@ -509,6 +578,12 @@ export class WebuiBrowserService {
    * surface watch two streams, and each is fenced against its own run's
    * selection below — so a frame belonging to the other run's target is never
    * delivered, whatever the provider hands the stream.
+   *
+   * The stream follows the run's selection for as long as it runs: a run may
+   * select another tab while this stream is open, and the fence alone would
+   * leave the panel on a screencast of a tab the person moved away from. Each
+   * pass therefore re-reads the selection and moves the provider-side stream
+   * onto whatever it names now.
    */
   async *watchFrames(
     surface: WebuiBrowserSurface,
@@ -531,8 +606,11 @@ export class WebuiBrowserService {
       );
     }
     const selected = this.#selectionOf(surface, runId);
-    const targetId = selected?.targetId;
-    if (!selected || !targetId) {
+    if (!selected) {
+      // Streaming nothing would leave the panel showing a browser it cannot
+      // watch, so a run that has not selected anything is refused here and the
+      // caller is told to select first. The stream below follows the selection
+      // once it exists; this is only about the starting point.
       throw browserOperationError(
         "browser_target_unknown",
         "No browser target is selected for this surface.",
@@ -567,9 +645,14 @@ export class WebuiBrowserService {
     runs.set(runId, subscribers);
     this.#frameSubscribers.set(surface, runs);
 
-    await provider.startImageStream(targetId, deliver);
+    // The target the provider-side stream is attached to right now. It moves
+    // with the run's selection, so `finally` releases whichever target the
+    // stream ended up on rather than the one it opened with.
+    let streaming: string | undefined = selected.targetId;
+    await provider.startImageStream(streaming, deliver);
     try {
       while (!signal?.aborted) {
+        streaming = await this.#followSelection(surface, runId, provider, deliver, streaming);
         while (queue.length > 0) {
           const frame = queue.shift();
           if (!frame) continue;
@@ -594,8 +677,49 @@ export class WebuiBrowserService {
       if (subscribers.size === 0) runs.delete(runId);
       // Cancelling the stream releases the provider-side resources it held:
       // the screencast is stopped, not merely ignored.
-      await provider.stopImageStream(targetId).catch(() => undefined);
+      if (streaming) await provider.stopImageStream(streaming).catch(() => undefined);
     }
+  }
+
+  /**
+   * Moves one stream onto the target its run has selected now, and reports the
+   * target it is attached to afterwards.
+   *
+   * A run selects a target again and again while a stream runs, and the stream
+   * has to follow: the person pointed at another tab, so the panel has to show
+   * that tab. Re-reading the selection on every pass is what makes the stream
+   * follow it, and the provider-side stream is restarted rather than reused —
+   * the screencast is per target, so a stream left attached to the old one
+   * would show a page nobody is looking at and never show the new one.
+   *
+   * The old target's resources are released by stopping its stream before the
+   * new one starts: a screencast left running for a tab the person moved away
+   * from is a leak, and the provider holds it until it is told to let go.
+   *
+   * A new *generation* of the same target is not a retarget. The page behind the
+   * tab was replaced while the tab stayed the one the run selected, so the
+   * screencast follows it on its own and only the fence below has anything to
+   * say about it.
+   *
+   * A selection that disappeared while the stream ran — the surface's provider
+   * was stopped, which forgets the surface's selections — stops the stream and
+   * starts nothing. There is no longer a target this stream may carry.
+   */
+  async #followSelection(
+    surface: WebuiBrowserSurface,
+    runId: string,
+    provider: WebuiBrowserSurfaceProvider,
+    deliver: (frame: WebuiBrowserImageFrame) => void,
+    streaming: string | undefined,
+  ): Promise<string | undefined> {
+    const wanted = this.#selectionOf(surface, runId)?.targetId;
+    if (wanted === streaming) return streaming;
+    if (streaming !== undefined) {
+      await provider.stopImageStream(streaming).catch(() => undefined);
+    }
+    if (wanted === undefined) return undefined;
+    await provider.startImageStream(wanted, deliver);
+    return wanted;
   }
 
   /**

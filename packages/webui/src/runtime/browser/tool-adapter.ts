@@ -19,6 +19,14 @@
 // adapter *declares* the restricted set as its capability, so accepting a raw
 // DevTools method here would contradict that declaration and silently widen the
 // Agent's tools on a host that authorized a different path.
+//
+// Which surface a call lands on is not a decision it makes at all. The tool
+// context carries no surface and the runtime cannot be asked for one, so the
+// adapter asks the service which surface the calling run has selected on — the
+// state the panel wrote when the person picked a target. A run that has selected
+// nothing is refused rather than sent to the isolated Chromium, which is the
+// browser this process owns: defaulting to it would put the Agent on a browser
+// the person is not looking at, which is the split this adapter exists to close.
 
 import {
   WEBUI_BROWSER_RESTRICTED_COMMANDS,
@@ -36,27 +44,26 @@ const WEBUI_BROWSER_TOOL_PROVIDER = "webui-browser";
 const WEBUI_BROWSER_TOOL_CAPABILITY_VERSION = 1;
 
 /**
- * The surface a tool call acts on when nothing says otherwise.
- *
- * The isolated Chromium, because it is the browser this process launches and
- * owns: a run that reached the WebUI has a browser available without the person
- * pairing an extension, and it is not the person's own machine.
- */
-const WEBUI_BROWSER_TOOL_DEFAULT_SURFACE: WebuiBrowserSurface = "isolated-chromium";
-
-/**
  * The service, as this adapter uses it.
  *
  * Declared structurally rather than imported from the service class: what an
- * adapter needs is the one method that answers "run this on the selected page",
- * and a structural declaration is what lets a test drive the adapter without
- * standing up a browser. `WebuiBrowserService` satisfies it as it stands.
+ * adapter needs is the two methods that answer "which browser is this run on"
+ * and "run this on the selected page", and a structural declaration is what
+ * lets a test drive the adapter without standing up a browser.
+ * `WebuiBrowserService` satisfies it as it stands.
  *
  * The run id is part of the question rather than an argument the service could
  * do without: the selection belongs to the run that made it, so a call without
  * one would be asking about a target that may not be this run's.
  */
 export interface WebuiBrowserToolCommandSurface {
+  /**
+   * The surface one run is working on, from that run's own selections.
+   *
+   * `undefined` when the run has selected nothing anywhere, which is the
+   * adapter's cue to refuse rather than to choose a browser.
+   */
+  selectionSurfaceOf(runId: string): WebuiBrowserSurface | undefined;
   sendCommandToSelection(
     surface: WebuiBrowserSurface,
     runId: string,
@@ -71,37 +78,24 @@ export interface WebuiBrowserToolCommandSurface {
 }
 
 /**
- * The tool context and the action, as the runtime's own adapter contract
- * declares them.
+ * The tool action, as the runtime's own adapter contract declares it.
  *
  * Read off the contract rather than named from `@mavis/agent-tools`: that
  * package is not this package's dependency, and `WebuiBrowserAdapter` already
  * *is* the runtime's `LocalBrowserAdapter`, reached through the option the
  * runtime host factory takes.
  */
-type WebuiBrowserToolContext = Parameters<WebuiBrowserAdapter["execute"]>[0];
 type WebuiBrowserToolAction = Parameters<WebuiBrowserAdapter["execute"]>[1];
 
 export interface CreateWebuiBrowserToolAdapterOptions {
-  /** The browser service this adapter acts through. */
+  /**
+   * The browser service this adapter acts through.
+   *
+   * It is the only thing that knows which surface the calling run is on, and it
+   * answers from that run's own selections — the panel's selections, which the
+   * person made.
+   */
   readonly browser: WebuiBrowserToolCommandSurface;
-  /**
-   * The surface a tool call acts on when the context does not name one.
-   *
-   * The tool context carries no surface today — `LocalRuntimeToolContext` has no
-   * such member — so this is the surface every call lands on, and it is a
-   * parameter rather than a constant so a host that does learn which surface a
-   * run is on has somewhere to say so.
-   */
-  readonly defaultSurface?: WebuiBrowserSurface;
-  /**
-   * Reads the surface off the tool context, when a caller supplies one.
-   *
-   * Absent today, and deliberately not faked: a surface invented from whatever
-   * happens to be connected would put the Agent's tools on a browser the run
-   * never chose.
-   */
-  readonly resolveSurface?: (ctx: WebuiBrowserToolContext) => WebuiBrowserSurface | undefined;
 }
 
 /**
@@ -133,7 +127,14 @@ export function createWebuiBrowserToolAdapter(
       interactiveTakeover: true,
     }),
     /**
-     * Runs one browser-tool action on the selected target of the surface.
+     * Runs one browser-tool action on the selected target of the surface this
+     * run is working on.
+     *
+     * The surface is the run's own, read back from the service, and the run is
+     * the Agent session the tool call belongs to. Two runs driving one surface
+     * act on the target each of them selected, never on each other's, and a run
+     * that selected on `edge` acts on `edge` rather than on the browser this
+     * process happens to own.
      *
      * The provider's own result is returned, not the service's envelope: the
      * runtime's browser tools shape what they get from it — a `screenshot` is
@@ -144,7 +145,8 @@ export function createWebuiBrowserToolAdapter(
      * A refused call is not caught. The service's code (`browser_surface_not_authorized`,
      * `browser_target_unknown`, `browser_capability_denied`, …) travels to the
      * Agent as the tool's error code, which is how a run learns whether to ask
-     * the person to switch something on or to try something else.
+     * the person to select a page or to switch something on or to try something
+     * else.
      */
     execute: async (ctx, action: WebuiBrowserToolAction, input, signal) => {
       if (!isRestrictedBrowserCommand(action)) {
@@ -153,16 +155,23 @@ export function createWebuiBrowserToolAdapter(
           `The browser action "${action}" is not in the restricted command set.`,
         );
       }
-      const surface =
-        options.resolveSurface?.(ctx) ??
-        options.defaultSurface ??
-        WEBUI_BROWSER_TOOL_DEFAULT_SURFACE;
       // The run is the Agent session the tool call belongs to, and it owns the
       // selection: two runs driving one surface act on the target each of them
       // selected, never on each other's.
+      const runId = ctx.sessionId;
+      const surface = options.browser.selectionSurfaceOf(runId);
+      if (!surface) {
+        // There is no surface to act on that the run chose, and no honest
+        // default: the isolated Chromium is a browser the person never pointed
+        // at. The run has to be given a target first.
+        throw browserOperationError(
+          "browser_target_unknown",
+          "This run has not selected a browser target, so there is no browser to act on.",
+        );
+      }
       const { result } = await options.browser.sendCommandToSelection(
         surface,
-        ctx.sessionId,
+        runId,
         action,
         input,
         signal,
