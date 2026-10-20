@@ -101,6 +101,7 @@ export async function runTuiCli(dependencies: RunTuiCliDependencies = {}): Promi
   try {
     (dependencies.configureNetworkProxy ?? configureTuiNetworkProxy)({
       environment: processRef.env,
+      writeWarning: (message) => processRef.stderr.write(`${message}\n`),
     });
     const createProgram = dependencies.createProgram ?? createTuiProgram;
     await createProgram({
@@ -221,7 +222,17 @@ async function formatTuiCliError(error: unknown): Promise<string> {
     return diagnostic;
   }
 
-  const { buildMcodePackageManagerCommand } = await import('../update/install-source.js');
+  const { buildMcodePackageManagerCommand, resolveMcodeNpmPrefixInstall } =
+    await import('../update/install-source.js');
+  if (resolveMcodeNpmPrefixInstall()) {
+    return [
+      'MCode could not load its native SQLite dependency.',
+      'The Node runtime recorded by this installation no longer loads it (for example after a Homebrew Node upgrade).',
+      'Reinstall with the original installer to repair this installation.',
+      '',
+      `Original error: ${diagnostic}`,
+    ].join('\n');
+  }
   const command = buildMcodePackageManagerCommand('npm-global', MINIMAX_CODE_VERSION);
   return [
     'MCode could not load its native SQLite dependency.',

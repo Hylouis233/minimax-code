@@ -66,6 +66,7 @@ export function createTuiApp(options: CreateTuiAppOptions): TuiApp {
     tui,
     terminalNotifications,
     terminalTitle,
+    terminalProgramStatus,
     themeController,
     openExternalTarget,
     writeClipboardText,
@@ -274,7 +275,6 @@ export function createTuiApp(options: CreateTuiAppOptions): TuiApp {
       );
     },
     ...delegationFlow.permissionResolvers(liveRunId),
-    agentStatusLineItems: options.statusLineItems,
     stopTurn: () => {
       void abortLiveTurn();
     },
@@ -816,6 +816,7 @@ export function createTuiApp(options: CreateTuiAppOptions): TuiApp {
     isStarted: () => started,
     isStopped: () => stopped,
     setTerminalTitle: (title) => terminalTitle.update(title),
+    setProgramStatus: (programStatus) => terminalProgramStatus.update(programStatus),
     terminalTitle: options.terminalTitle,
     connection: () => stateStore.snapshot().connection,
     liveRunId,
@@ -873,6 +874,7 @@ export function createTuiApp(options: CreateTuiAppOptions): TuiApp {
     stopped = true;
     terminalNotifications.dispose();
     terminalTitle.dispose();
+    terminalProgramStatus.dispose();
     const bashStopped = bashFlow.stop();
     detachInputFlow();
     composerDraft.abortClipboardRead();
@@ -923,6 +925,7 @@ export function createTuiApp(options: CreateTuiAppOptions): TuiApp {
     suspended = true;
     terminalNotifications.setActive(false);
     terminalTitle.setActive(false);
+    terminalProgramStatus.setActive(false);
     renderer.stop();
     await terminal.drainOutput?.();
     await draftLifecycle?.suspend();
@@ -933,6 +936,7 @@ export function createTuiApp(options: CreateTuiAppOptions): TuiApp {
     renderer.start();
     terminalNotifications.setActive(true);
     terminalTitle.setActive(true);
+    terminalProgramStatus.setActive(true);
     updateChrome(controller.snapshot());
     runtimeEventFlow.restart();
     tui.requestRender(true);
@@ -955,6 +959,7 @@ export function createTuiApp(options: CreateTuiAppOptions): TuiApp {
       started = true;
       terminalNotifications.setActive(true);
       terminalTitle.setActive(true);
+      terminalProgramStatus.setActive(true);
       updateChrome(controller.snapshot());
       surfaceHost.setChatFocus(editor);
       runtimeEventFlow.start();

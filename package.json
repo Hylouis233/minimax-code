@@ -1,6 +1,6 @@
 {
   "name": "minimax-code",
-  "version": "0.6.3",
+  "version": "0.6.5",
   "private": true,
   "type": "module",
   "description": "Standalone MiniMax Code TUI with managed accounts, BYOK models, cloud tools, plugins and ACP.",
@@ -33,6 +33,7 @@
     "test:webui-browser": "playwright install chromium && playwright test packages/webui/test/browser",
     "typecheck:webui": "pnpm --filter @mavis/webui typecheck:server && pnpm --filter @mavis/webui typecheck:client && pnpm --filter @mavis/webui typecheck:test",
     "check:source": "node scripts/source-inventory.mjs",
+    "check:plugin": "node tools/plugins/validate-plugin.mjs",
     "test:capabilities": "node scripts/run-vitest-suite.mjs capability",
     "test:windows": "node scripts/run-vitest-suite.mjs windows",
     "test:artifact": "node --test test/public-artifact.test.mjs",
