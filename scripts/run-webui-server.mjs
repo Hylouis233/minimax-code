@@ -83,7 +83,7 @@ if (!process.env.WEBUI_SERVER_TSX) {
   await browser.initialize();
   const service = new WebuiService({
     port,
-    operations: createOperationRegistry(port, terminal, browser.port),
+    operations: createOperationRegistry(port, terminal, browser.port, browserBridge),
     terminal,
     tcpPort,
     dev: true,
