@@ -379,17 +379,48 @@ surfaces, and the extension's `chrome.debugger` subset was not dispatched
 against a live tab. Ticket #193 stays open for that reason and for the store
 builds, not because Edge is unavailable.
 
+## Round 5
+
+> Verdict: the plan is not closable. The real-browser test does launch both
+> Chrome and Edge, but its bridge server enables the **Chrome** surface in both
+> cases, so it does not establish independent Edge-surface acceptance. The
+> published documents also still describe the bridge as unwired.
+
+| # | Severity | Finding | Status |
+| --- | --- | --- | --- |
+| N1 | MAJOR | The published documents contradict the current tree, and the review record contradicted itself about which browsers had been exercised. | `fixed` |
+| N2 | MAJOR | The Edge browser test authenticated the **Chrome** surface, so the Edge switch, the Edge pairing credential and the Edge routing were never exercised. | `fixed` |
+
+### What was done
+
+- **N1** — The capability matrix, the bridge protocol and the extension
+  admission document were reconciled against the tree: the bridge is wired, the
+  Agent's tool adapter exists, and the measurement column says what was
+  measured on which surface. The review record's own contradictory sentences
+  about which browsers had been exercised were removed.
+- **N2** — The acceptance is now parameterised by **surface**, not only by
+  browser. The Chrome run is admitted on the `chrome` surface with the Chrome
+  allowlist, and the Edge run on the `edge` surface with the Edge allowlist,
+  and each asserts the matching surface's state. A single bug — reading the
+  installation key from the wrong surface — was what the parameterisation
+  exposed, and it is fixed.
+
 ## What this document does not establish
 
-- That the external path works end to end against a real Edge or Chrome. Neither
-  browser was installed on the machine that produced this change, and no
-  extension was loaded into a real browser.
+- That the external path works end to end against a real Edge or Chrome for
+  **every** behaviour. The handshake and the refusal are established, each on
+  its own surface — the `chrome` surface in Chrome and the `edge` surface in
+  Edge. The input, image and target paths are exercised against a synthetic
+  peer, and the extension's `chrome.debugger` subset was not dispatched
+  against a live tab in a real browser.
 - That the macOS, Windows or Linux credential-store forms behave as intended.
   The Linux form was probed on one host and was **unavailable** there; the
   macOS and Windows forms are asserted through an injected command runner, not
   executed.
-- That the Agent's browser tools address the same session as the panel. The
-  tool adapter exists and forwards to the same service, but which *surface* a
-  tool call acts on is resolved from the run's own selection rather than from
-  a default, so a run that has selected nothing is refused rather than being
-  sent somewhere the person is not looking.
+- That the Agent's browser tools address the same session as the panel **in a
+  real browser**. The tool adapter exists and forwards to the same service, and
+  which *surface* a tool call acts on is resolved from the run's own selection
+  rather than from a default, so a run that has selected nothing is refused
+  rather than being sent somewhere the person is not looking. What is not
+  established is the whole path exercised end to end against a real browser in
+  one run.

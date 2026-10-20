@@ -171,6 +171,7 @@ async function provision(
 /** Starts the bridge behind an HTTP server the spec owns. */
 async function startBridge(
   extensionId: string,
+  surface: "edge" | "chrome",
 ): Promise<{
   bridge: BrowserBridgeServer;
   origin: string;
@@ -180,10 +181,16 @@ async function startBridge(
     host: "127.0.0.1",
     dev: true,
     credentialStore: createInMemorySecureCredentialStore(),
-    env: { MAVIS_BROWSER_CHROME_EXTENSION_IDS: extensionId },
+    // The allowlist is per surface, and so is the pairing. A browser running
+    // the extension has to be admitted on **its own** surface, or the Edge
+    // run would prove nothing about the Edge switch.
+    env:
+      surface === "edge"
+        ? { MAVIS_BROWSER_EDGE_EXTENSION_IDS: extensionId }
+        : { MAVIS_BROWSER_CHROME_EXTENSION_IDS: extensionId },
   });
   await bridge.start();
-  await bridge.enableSurface("chrome");
+  await bridge.enableSurface(surface);
 
   const http = createServer((_request, response) => {
     response.writeHead(426).end();
@@ -209,17 +216,18 @@ async function startBridge(
 
 async function waitForConnected(
   bridge: BrowserBridgeServer,
+  surface: "edge" | "chrome",
   connected: boolean,
   worker?: Worker,
 ): Promise<void> {
   const deadline = Date.now() + CONNECT_TIMEOUT_MS;
   while (Date.now() < deadline) {
-    if (bridge.snapshot().surfaces.chrome.connected === connected) return;
+    if (bridge.snapshot().surfaces[surface].connected === connected) return;
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   // Both sides record what they thought happened; without them a failure here
   // says only "not connected", which is not a diagnosis.
-  const snapshot = bridge.snapshot().surfaces.chrome;
+  const snapshot = bridge.snapshot().surfaces[surface];
   const lastError = await worker
     ?.evaluate(() => chrome.storage.session.get("webui.browserBridge.lastError"))
     .catch(() => undefined);
@@ -234,29 +242,36 @@ async function waitForConnected(
  * Edge and Chrome are both installed on this machine, and the extension is one
  * package for both, so the acceptance runs against each.
  */
-const BROWSERS = ["chromium", "msedge"] as const;
+const BROWSERS = [
+  { channel: "chromium", surface: "chrome" },
+  { channel: "msedge", surface: "edge" },
+] as const;
 
 test.describe("the browser bridge, against a real browser", () => {
   test.beforeAll(async () => {
     await buildExtension();
   });
 
-  for (const browser of BROWSERS) {
-    test(`the extension completes the handshake in ${browser} once it can prove the installation key`, async () => {
+  for (const { channel, surface } of BROWSERS) {
+    test(`the extension completes the handshake on the ${surface} surface in ${channel} once it can prove the installation key`, async () => {
       test.setTimeout(180_000);
-      const { context, worker, extensionId, profileDir } = await launchWithExtension(browser);
-      const started = await startBridge(extensionId);
+      const { context, worker, extensionId, profileDir } = await launchWithExtension(channel);
+      const started = await startBridge(extensionId, surface);
       try {
-        const view = await started.bridge.readInstallationKey("chrome");
+        // The key belongs to the surface the browser is being admitted on.
+        const view = await started.bridge.readInstallationKey(surface);
         expect(view).toBeDefined();
 
         await provision(worker, context, extensionId, started.origin, view!.key);
-        await waitForConnected(started.bridge, true, worker);
+        await waitForConnected(started.bridge, surface, true, worker);
 
         // The host is the authority: it is the host that decides a surface is
         // connected, not the extension's own belief that it connected.
-        expect(started.bridge.snapshot().surfaces.chrome.connected).toBe(true);
-        expect(started.bridge.snapshot().surfaces.chrome.enabled).toBe(true);
+        // The **matching** surface: an Edge-hosted extension has to be
+        // admitted on the Edge surface, which is a separate switch, a
+        // separate credential and a separate allowlist.
+        expect(started.bridge.snapshot().surfaces[surface].connected).toBe(true);
+        expect(started.bridge.snapshot().surfaces[surface].enabled).toBe(true);
       } finally {
         await started.close();
         await context.close();
@@ -264,18 +279,18 @@ test.describe("the browser bridge, against a real browser", () => {
       }
     });
 
-    test(`an extension that cannot prove the installation key is refused in ${browser}`, async () => {
+    test(`an extension that cannot prove the installation key is refused on the ${surface} surface in ${channel}`, async () => {
       test.setTimeout(180_000);
-      const { context, worker, extensionId, profileDir } = await launchWithExtension(browser);
-      const started = await startBridge(extensionId);
+      const { context, worker, extensionId, profileDir } = await launchWithExtension(channel);
+      const started = await startBridge(extensionId, surface);
       try {
         // The same extension, connected to the same host, but with no key.
         await provision(worker, context, extensionId, started.origin, undefined);
-        await waitForConnected(started.bridge, false, worker);
+        await waitForConnected(started.bridge, surface, false, worker);
 
         // It must not have been admitted, and the host must not have handed it a
         // credential.
-        expect(started.bridge.snapshot().surfaces.chrome.connected).toBe(false);
+        expect(started.bridge.snapshot().surfaces[surface].connected).toBe(false);
       } finally {
         await started.close();
         await context.close();

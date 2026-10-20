@@ -8,11 +8,11 @@
 | `required` | A rule the contracts pin with no enforcing code at that point. | `packages/webui/src/shared/contracts/browser-bridge.ts` |
 | `not yet measured` | An open question. Not a denial and not a promise. | Nothing |
 
-**The admission function exists. Nothing calls it.** `admitBrowserBridgeUpgrade` is implemented in
-`packages/webui/src/server/browser-bridge/admission.ts:81` and is referenced only from its own module,
-from the package's `index.ts`, and from tests. The server's upgrade dispatcher
-(`packages/webui/src/server/websocket-server.ts:63`) sends every upgrade to the generic
-`admitWebSocketUpgrade`, so no extension can reach the bridge today. Finding F3 in
+**The admission function is wired and exercised.** `admitBrowserBridgeUpgrade` is implemented in
+`packages/webui/src/server/browser-bridge/admission.ts` and the server's upgrade dispatcher
+(`packages/webui/src/server/websocket-server.ts`) branches on `/browser-bridge` **before** the generic
+`admitWebSocketUpgrade`, so a bridge request never reaches the generic path and the generic path is
+unchanged. A real Chrome and a real Edge have connected and been refused through it — see
 [`07-review-findings.md`](07-review-findings.md).
 
 ## Why a dedicated path

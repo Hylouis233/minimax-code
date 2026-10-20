@@ -31,10 +31,10 @@ declaration rather than a probe result. This document is the measurement half.
 
 | | Isolated Chromium | Edge | Chrome |
 | --- | --- | --- | --- |
-| How it is reached | `implemented` — this process launches it and speaks CDP over a loopback WebSocket. Probe measured the CDP surface end to end. | `not yet reached`. The bridge modules exist under `packages/webui/src/server/browser-bridge/`, but **no production code wires them into the server's WebSocket upgrade path**, so an extension cannot connect yet. Not measured either. | same as Edge |
+| How it is reached | `implemented` — this process launches it and speaks CDP over a loopback WebSocket. Probe measured the CDP surface end to end. | `implemented` — the extension bridge, reached over the dedicated `/browser-bridge` path. The handshake and the refusal are **measured** in real Edge. | `implemented` — the same bridge, on the `chrome` surface. The handshake and the refusal are **measured** in real Chrome. |
 | Authorization switch | `isolatedChromium` | `edge` | `chrome` |
-| Live image stream | **measured** — `Page.captureScreenshot` and `Page.startScreencast` both succeeded against a real page | not measured | not measured |
-| Pointer / keyboard / text input | **measured** — mouse press + release, `Input.insertText`, and `Input.dispatchKeyEvent` all succeeded against a real page | not measured | not measured |
+| Live image stream | **measured** — `Page.captureScreenshot` and `Page.startScreencast` both succeeded against a real page | implemented; the frame path is exercised against a synthetic peer | implemented; the frame path is exercised against a synthetic peer |
+| Pointer / keyboard / text input | **measured** — mouse press + release, `Input.insertText`, and `Input.dispatchKeyEvent` all succeeded against a real page | implemented; the input path is exercised against a synthetic peer | implemented; the input path is exercised against a synthetic peer |
 | Agent browser tools | **not implemented.** The restricted action vocabulary exists in `packages/agent-tools`, and the WebUI now has a browser service with an isolated-Chromium provider, but no Agent browser-tool adapter calls it — so the Agent cannot reach the WebUI browser service from this client. | not implemented, same reason | not implemented, same reason |
 | Full CDP widening | `implemented` — gated in `WebuiBrowserService.sendCommand` | `implemented`, same gate | `implemented`, same gate |
 | Restricted command set | `implemented` — `WEBUI_BROWSER_RESTRICTED_COMMANDS`, 28 names, `packages/webui/src/shared/contracts/browser.ts:285` | same vocabulary over the bridge | same vocabulary over the bridge |

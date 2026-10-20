@@ -8,11 +8,15 @@
 | `required` | A rule the contracts pin with no enforcing code at that point. | The contracts |
 | `not yet measured` | An open question. Not a denial and not a promise. | Nothing |
 
-**The protocol is implemented on both sides and unwired end to end.** Both the host contract and the
-extension carry the frames, the credential transfer, the challenge/proof and the reconnect ladder. No
-extension has connected: `admitBrowserBridgeUpgrade` has no production caller (finding F3) and bridge
-commands are routed to the most recently admitted session rather than to the session owning the target
-(finding F4). See [`07-review-findings.md`](07-review-findings.md).
+**The protocol is implemented on both sides and wired end to end.** Both the host contract and the
+extension carry the frames, the credential transfer, the challenge/proof and the reconnect ladder. The
+server's upgrade dispatcher branches on `/browser-bridge` before the generic admission, and a bridge
+command is routed to the session that **owns** the target rather than to the most recently admitted one.
+
+**It has been exercised in real browsers.** The handshake completes and an unprovisioned peer is
+refused, each on its own surface: the `chrome` surface in Chrome and the `edge` surface in Edge. See
+[`07-review-findings.md`](07-review-findings.md) and
+`packages/webui/test/browser/browser-bridge-real-browser.spec.ts`.
 
 The bridge is the only way this process reaches the person's own browser. It is a WebSocket on
 loopback, but it is **not** the WebUI's own WebSocket: it has its own path, its own admission and its
