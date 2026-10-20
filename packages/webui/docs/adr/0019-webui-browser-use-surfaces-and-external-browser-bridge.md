@@ -261,7 +261,35 @@ rather than a spoofable `Origin` header.
 This is recorded here as an open product decision rather than left implicit,
 because the gap is a security boundary and not a detail of the implementation.
 
-### A2 — What "the enabled state survives a restart" means for the credential
+### A2 — The peer is authenticated by an installation key, not by its `Origin`
+
+**Supersedes the limitation A1 recorded.** Admission still selects the
+allowlisted extension id from the `Origin` header, but that is now a
+**pre-filter**, not the authentication decision. A peer must prove possession of
+the surface's **installation key** — a long-lived secret held in the OS secure
+store on the host and in `chrome.storage.local` in one browser — before the
+host will release a pairing credential.
+
+- The host mints a 32-byte installation key per surface, stores it in the OS
+  secure store, and shows it in the WebUI Settings surface. The person pastes
+  it into the extension's options page once; the extension stores it and
+  thereafter shows only a fingerprint.
+- The handshake is **proof-first**: `hello` → `challenge` → `proof` → and only
+  then, for a peer that proved the installation key, the sealed pairing
+  credential. A peer that proves only a pairing credential the host already
+  issued is admitted without a further credential. A peer that proves neither
+  is refused and **receives no credential at all**.
+- The installation key is **not** destroyed when a surface is switched off: it
+  is bound to the browser, not to the switch, so the person does not have to
+  provision again after a toggle.
+
+Provisioning is explicit, and that is the deliberate cost. An unprovable peer
+identity cannot be automated away: the automatic pairing this record describes
+is automatic with respect to **tabs**, not with respect to **peer identity**. The
+alternative — native messaging — has the same property and is the other
+candidate; it is recorded in the research findings below.
+
+### A3 — What "the enabled state survives a restart" means for the credential
 
 The decision above says each browser's enabled state and authorization survive
 WebUI and browser restarts. The first implementation read that as "the switch
@@ -278,7 +306,7 @@ The answer is that the two paths are different on purpose:
   mints a fresh one. This is the "turning it on later establishes a fresh
   pairing" behaviour the decision above asks for.
 
-### A3 — The target selection is scoped to the Agent run
+### A4 — The target selection is scoped to the Agent run
 
 The decision above says the Agent run owns the target selection and the panel
 follows the active run's target. The first implementation held one selection

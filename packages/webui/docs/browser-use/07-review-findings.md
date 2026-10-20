@@ -255,7 +255,7 @@ protocol that has never been exercised against a browser.
 | N3 | MAJOR | The Agent tool path silently used the isolated Chromium even when the panel was showing Edge or Chrome. | `fixed` |
 | N4 | MAJOR | The published documents still said the tool adapter did not exist and that the host and the extension minted independent credentials. | `fixed` |
 
-### N1 — the bridge is not authenticated against a local process
+### N1 — the bridge is now authenticated by an installation key
 
 This is the one finding that is a **design** gap rather than a defect, and the
 ADR's amendment A1 already names the shape of the answer: the extension needs
