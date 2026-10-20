@@ -30,6 +30,28 @@ import { BrowserBridgeServer } from "../../src/server/browser-bridge/server.js";
 import { createInMemorySecureCredentialStore } from "../../src/server/browser-bridge/credential-store.js";
 
 const run = promisify(execFile);
+
+/**
+ * The slice of the extension API this spec uses.
+ *
+ * The callbacks below are serialized and run inside the extension's service
+ * worker, where `chrome` exists; the WebUI's test tsconfig does not carry the
+ * extension's ambient types, so the slice it uses is declared here rather than
+ * pulling a whole API surface into a test that touches four members of it.
+ */
+declare const chrome: {
+  storage: {
+    local: {
+      get(key: string): Promise<Record<string, unknown>>;
+      set(items: Record<string, unknown>): Promise<void>;
+      remove(key: string): Promise<void>;
+    };
+    session: {
+      get(key: string): Promise<Record<string, unknown>>;
+    };
+  };
+  runtime: { reload(): Promise<void> };
+};
 // The spec lives at packages/webui/test/browser/, so the repository root is
 // four levels up from the file's directory.
 const repoRoot = resolve(new URL("../../../..", import.meta.url).pathname);
@@ -200,7 +222,7 @@ async function waitForConnected(
 test.describe("the browser bridge, against a real Chrome", () => {
   test.beforeAll(async () => {
     await buildExtension();
-  }, { timeout: 180_000 });
+  });
 
   // The happy path does not complete in this harness yet, and the reason is
   // not established: the extension never opens a connection to the bridge, and
@@ -211,9 +233,20 @@ test.describe("the browser bridge, against a real Chrome", () => {
   //
   // It is marked `fixme` rather than deleted so the gap stays visible and the
   // test runs as soon as it can.
-  test.fixme(
-    "the extension completes the handshake once it can prove the installation key",
-    async () => {
+  test("the extension completes the handshake once it can prove the installation key", async () => {
+    // The happy path does not complete in this harness yet, and the reason is
+    // not established: the extension never opens a connection to the bridge, and
+    // it records no failure of its own, so the new service worker is either not
+    // starting or is starting without the origin it was given. The refusal test
+    // below passes, so the host's refusal is proven against a real browser; what
+    // is missing is the other half.
+    //
+    // It is marked fixme rather than deleted so the gap stays visible and the
+    // test runs as soon as it can.
+    test.fixme(
+      true,
+      "the extension does not yet open a connection in this harness, and the reason is not established",
+    );
     test.setTimeout(180_000);
     const { context, worker: launched, extensionId, profileDir } = await launchWithExtension();
     let worker = launched;
@@ -240,7 +273,7 @@ test.describe("the browser bridge, against a real Chrome", () => {
       await context.close();
       await rm(profileDir, { recursive: true, force: true });
     }
-  }, 120_000);
+  });
 
   test("an extension that cannot prove the installation key is refused", async () => {
     test.setTimeout(180_000);
@@ -260,5 +293,5 @@ test.describe("the browser bridge, against a real Chrome", () => {
       await context.close();
       await rm(profileDir, { recursive: true, force: true });
     }
-  }, 120_000);
+  });
 });
