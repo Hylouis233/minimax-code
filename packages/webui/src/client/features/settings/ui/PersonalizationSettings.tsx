@@ -1,6 +1,7 @@
 import { useMemo, type ReactElement } from "react";
 import type { WebuiAgentMemoryView, WebuiGlobalInstructionsView, WebuiMemorySettingsView, WebuiUserProfileFields, WebuiUserProfileView } from "../../../../shared/contracts/personalization.js";
 import { useWebuiSettingsWorkflows, useWebuiSettingsWorkflowsState } from "../../../bindings/use-query-state.js";
+import { SettingsPage } from "../../../ui/settings-layout.js";
 import type { WebuiResourceLoadOutcome } from "../../../conversation/request-freshness.js";
 import type { MemoryHandoff } from "../contracts/memory-handoff.js";
 import { GlobalInstructionsSection } from "./GlobalInstructionsSection.js";
@@ -132,7 +133,7 @@ export function PersonalizationSettings({ onCreateInSession }: PersonalizationSe
   }, [settings]);
 
   return (
-    <div data-testid="content-body" className="webui-personalization-page">
+    <SettingsPage testId="content-body">
       <GlobalInstructionsSection
         getGlobalInstructions={sections.getGlobalInstructions}
         setGlobalInstructions={sections.setGlobalInstructions}
@@ -148,6 +149,6 @@ export function PersonalizationSettings({ onCreateInSession }: PersonalizationSe
         setMemorySettings={sections.setMemorySettings}
         {...(onCreateInSession ? { onCreateInSession } : {})}
       />
-    </div>
+    </SettingsPage>
   );
 }

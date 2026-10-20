@@ -276,7 +276,10 @@ describe("WebUI compiled stylesheet", () => {
       /\.webui-textarea\s*\{/u,
       /\.webui-nav-item\s*\{/u,
       /\.webui-nav-item\[data-webui-nav-active="true"\]\s*\{/u,
-      /\.webui-empty-state\s*\{/u,
+      // The rail's empty state, renamed from `.webui-empty-state` when the
+      // rail became project-first: the box it draws now carries the folder
+      // glyph, and the old class went with it.
+      /\.webui-project-empty\s*\{/u,
       /\.webui-transcript-empty-state\s*\{/u,
       /\.webui-input:focus-visible/u,
       /\.webui-textarea:focus-visible/u,

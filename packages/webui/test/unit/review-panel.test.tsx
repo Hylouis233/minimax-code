@@ -261,7 +261,7 @@ describe("choosing a workspace to review", () => {
    * satisfied by the attribute even when the displayed text is the basename
    * alone. */
   it("shows the full path, not just the folder name", () => {
-    const shown = [...picker({ workspaces }).matchAll(/<p class="webui-worktree-path"[^>]*>([^<]*)<\/p>/gu)].map((match) => match[1] ?? "");
+    const shown = [...picker({ workspaces }).matchAll(/<p class="webui-review-workspace-path"[^>]*>([^<]*)<\/p>/gu)].map((match) => match[1] ?? "");
     expect(shown.join("|")).toContain("C:\\repo\\alpha");
     expect(shown.join("|")).toContain("C:\\repo\\alpha-wt");
   });

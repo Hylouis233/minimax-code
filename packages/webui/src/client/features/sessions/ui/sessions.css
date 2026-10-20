@@ -28,8 +28,11 @@
     flex-shrink: 0;
     align-items: center;
     gap: var(--spacing_4);
-    font-size: 11px;
-    line-height: 1;
+    /* The type scale, not a size of its own: 11px was off the scale, and a
+     * rail whose meta text is set apart from the scale drifts from the rest
+     * of the shell the first time the scale moves. */
+    font-size: var(--size_12);
+    line-height: var(--line_height_16);
     color: var(--text_default_tertiary);
   }
   .webui-rail-spinner {

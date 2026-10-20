@@ -325,6 +325,7 @@
       "packages/webui/test/unit/session-transfer-download.test.ts",
       "packages/webui/test/unit/session-transfer-route.test.ts",
       "packages/webui/test/unit/session-transfer.test.ts",
+      "packages/webui/test/unit/settings-layout.test.tsx",
       "packages/webui/test/unit/settings-modal.test.tsx",
       "packages/webui/test/unit/settings-workflows.test.ts",
       "packages/webui/test/unit/shell-surface.test.ts",

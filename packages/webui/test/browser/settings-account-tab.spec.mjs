@@ -93,7 +93,7 @@ async function openSettings(page) {
 }
 
 function accountPanel(page) {
-  return page.locator(".webui-settings-panels .webui-settings-panel");
+  return page.locator(".webui-settings-page .webui-settings-section");
 }
 
 test("the account tab is enabled where the unfinished tabs are still disabled", async ({ page }) => {

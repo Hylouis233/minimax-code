@@ -1417,6 +1417,15 @@
       "home": "target"
     },
     {
+      "path": "client/features/sessions/application/session-activity-controller.ts",
+      "layers": [
+        "application"
+      ],
+      "role": "feature-application",
+      "business": "sessions",
+      "home": "target"
+    },
+    {
       "path": "client/features/sessions/application/session-catalog.public.ts",
       "layers": [
         "application"
@@ -3110,6 +3119,15 @@
     },
     {
       "path": "client/ui/settings-glyphs.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "ui",
+      "business": null,
+      "home": "target"
+    },
+    {
+      "path": "client/ui/settings-layout.tsx",
       "layers": [
         "bindings"
       ],

@@ -89,6 +89,10 @@ styled with the same names the token file declares.
   card, small badges.
 - Density is low: menu rows sit around 13–14px with 12–14px gaps, and the composer is surrounded by
   empty space.
+- The settings pages share one skeleton: `client/ui/settings-layout.tsx` renders the page column
+  (704px, centred), the section title, the grouped-surface card and the row, and every settings
+  page — including the code-review page the settings panel shows — renders that frame instead of
+  a copy of it. A settings page brings its own content, never its own frame.
 
 ## Styling rules
 

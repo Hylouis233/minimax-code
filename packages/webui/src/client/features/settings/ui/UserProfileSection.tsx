@@ -13,7 +13,8 @@ import type {
   WebuiUserProfileFields,
   WebuiUserProfileView,
 } from "../../../../shared/contracts/personalization.js";
-import { PERSONALIZATION_SECTION_HINTS, SectionHeader } from "./settings-atoms.js";
+import { SettingsSection } from "../../../ui/settings-layout.js";
+import { PERSONALIZATION_SECTION_HINTS } from "./settings-atoms.js";
 
 const PROFILE_PLACEHOLDER = "告诉 Agent 你的背景和长期偏好……";
 
@@ -26,10 +27,15 @@ const PROFILE_PLACEHOLDER = "告诉 Agent 你的背景和长期偏好……";
  * the three.
  */
 function pickProfileFields(view: WebuiUserProfileView): WebuiUserProfileFields {
+  // The two short fields only exist in the *file* layer, so a runtime that
+  // answers without them leaves the view short two fields. The draft is
+  // narrowed to strings here rather than trusted to carry them: a missing
+  // field is a blank field, and reading `.length` off it used to take the
+  // whole section down with it.
   return {
-    nickname: view.nickname,
-    occupation: view.occupation,
-    moreAbout: view.moreAbout,
+    nickname: view.nickname ?? "",
+    occupation: view.occupation ?? "",
+    moreAbout: view.moreAbout ?? "",
   };
 }
 
@@ -187,12 +193,12 @@ export function UserProfileSection({
   const disabled = malformed || draft === undefined;
 
   return (
-    <section data-testid="user-profile-section" className="webui-generic-section">
-      <SectionHeader
-        title="关于你"
-        hint={PERSONALIZATION_SECTION_HINTS.userProfile}
-        hintTestId="user-profile-hint"
-      >
+    <SettingsSection
+      title="关于你"
+      testId="user-profile-section"
+      hint={PERSONALIZATION_SECTION_HINTS.userProfile}
+      hintTestId="user-profile-hint"
+      actions={
         <button
           type="button"
           data-testid="user-profile-save"
@@ -202,63 +208,62 @@ export function UserProfileSection({
         >
           保存
         </button>
-      </SectionHeader>
-      <div className="webui-generic-card">
-        <div className="webui-user-profile-fields">
-          {/* One control, not three. The section
-             renders a single TextArea bound to `moreAbout` — the `nickname` and
-             `occupation` keys exist only in the *file* layer, where the reader
-             and the writer still parse and re-emit their `Nickname: ` /
-             `Occupation: ` lines so an existing profile is not truncated on the
-             next save. Rendering inputs for them produced two permanently empty
-             boxes above the real field, which is what they showed: the user's
-             own `user.md` has both labels with nothing after the colon. */}
-          <textarea
-            aria-label="更多关于你"
-            data-testid="user-profile-more-about"
-            className="webui-personalization-textarea"
-            value={draft?.moreAbout ?? ""}
-            spellCheck={false}
-            placeholder={PROFILE_PLACEHOLDER}
-            disabled={disabled}
-            onChange={(event) => update("moreAbout", event.target.value)}
-          />
-        </div>
-        <div className="webui-personalization-meta">
-          <span data-testid="user-profile-path">{filePath}</span>
-          <span
-            data-testid="user-profile-size"
-            className={overLimit ? "is-over-limit" : undefined}
-          >
-            {length} / {maxChars} 字符
-          </span>
-        </div>
-        {overLimit ? (
-          <p role="alert" data-testid="user-profile-over-limit" className="webui-settings-error">
-            超过 {maxChars} 字符后，超出部分不会注入提示，请精简后再保存。
-          </p>
-        ) : null}
-        {malformed ? (
-          <p role="alert" data-testid="user-profile-malformed" className="webui-settings-error">
-            user.md 的标记不完整，为避免覆盖记忆中已收集的内容，这里不做写入。
-          </p>
-        ) : null}
-        {error ? (
-          <p role="alert" data-testid="user-profile-error" className="webui-settings-error">
-            {error}
-          </p>
-        ) : null}
-        {saved && !saving ? (
-          <p data-testid="user-profile-saved" className="webui-personalization-saved">
-            已保存
-          </p>
-        ) : null}
-        {!getUserProfile || !setUserProfile ? (
-          <p data-testid="user-profile-unavailable" className="webui-settings-error">
-            当前运行时不支持「关于你」读写。
-          </p>
-        ) : null}
+      }
+    >
+      <div className="webui-user-profile-fields">
+        {/* One control, not three. The section
+           renders a single TextArea bound to `moreAbout` — the `nickname` and
+           `occupation` keys exist only in the *file* layer, where the reader
+           and the writer still parse and re-emit their `Nickname: ` /
+           `Occupation: ` lines so an existing profile is not truncated on the
+           next save. Rendering inputs for them produced two permanently empty
+           boxes above the real field, which is what they showed: the user's
+           own `user.md` has both labels with nothing after the colon. */}
+        <textarea
+          aria-label="更多关于你"
+          data-testid="user-profile-more-about"
+          className="webui-personalization-textarea"
+          value={draft?.moreAbout ?? ""}
+          spellCheck={false}
+          placeholder={PROFILE_PLACEHOLDER}
+          disabled={disabled}
+          onChange={(event) => update("moreAbout", event.target.value)}
+        />
       </div>
-    </section>
+      <div className="webui-personalization-meta">
+        <span data-testid="user-profile-path">{filePath}</span>
+        <span
+          data-testid="user-profile-size"
+          className={overLimit ? "is-over-limit" : undefined}
+        >
+          {length} / {maxChars} 字符
+        </span>
+      </div>
+      {overLimit ? (
+        <p role="alert" data-testid="user-profile-over-limit" className="webui-settings-error">
+          超过 {maxChars} 字符后，超出部分不会注入提示，请精简后再保存。
+        </p>
+      ) : null}
+      {malformed ? (
+        <p role="alert" data-testid="user-profile-malformed" className="webui-settings-error">
+          user.md 的标记不完整，为避免覆盖记忆中已收集的内容，这里不做写入。
+        </p>
+      ) : null}
+      {error ? (
+        <p role="alert" data-testid="user-profile-error" className="webui-settings-error">
+          {error}
+        </p>
+      ) : null}
+      {saved && !saving ? (
+        <p data-testid="user-profile-saved" className="webui-personalization-saved">
+          已保存
+        </p>
+      ) : null}
+      {!getUserProfile || !setUserProfile ? (
+        <p data-testid="user-profile-unavailable" className="webui-settings-error">
+          当前运行时不支持「关于你」读写。
+        </p>
+      ) : null}
+    </SettingsSection>
   );
 }

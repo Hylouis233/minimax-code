@@ -3,14 +3,15 @@
 // pre-migration browser draft when there is no file to conflict with, and saves through
 // `setGlobalInstructions`.
 //
-// Its section header comes from `settings-atoms.tsx`, not from the parent — the parent composes this
-// module, so a child importing back from it would be a cycle.
+// Its section frame comes from the shared settings skeleton in `client/ui/settings-layout.tsx`, not from the
+// parent — the parent composes this module, so a child importing back from it would be a cycle.
 
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from "react";
 
 import type { WebuiGlobalInstructionsView } from "../../../../shared/contracts/personalization.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
-import { PERSONALIZATION_SECTION_HINTS, SectionHeader } from "./settings-atoms.js";
+import { SettingsSection } from "../../../ui/settings-layout.js";
+import { PERSONALIZATION_SECTION_HINTS } from "./settings-atoms.js";
 
 const INSTRUCTIONS_PLACEHOLDER = [
   "# Agents 全局设定",
@@ -137,15 +138,12 @@ export function GlobalInstructionsSection({
   }, [draft, overLimit, saving, setGlobalInstructions, storage]);
 
   return (
-    <section
-      data-testid="global-instructions-section"
-      className="webui-generic-section"
-    >
-      <SectionHeader
-        title="自定义指令"
-        hint={PERSONALIZATION_SECTION_HINTS.globalInstructions}
-        hintTestId="global-instructions-hint"
-      >
+    <SettingsSection
+      title="自定义指令"
+      testId="global-instructions-section"
+      hint={PERSONALIZATION_SECTION_HINTS.globalInstructions}
+      hintTestId="global-instructions-hint"
+      actions={
         <button
           type="button"
           data-testid="global-instructions-save"
@@ -155,49 +153,48 @@ export function GlobalInstructionsSection({
         >
           保存
         </button>
-      </SectionHeader>
-      <div className="webui-generic-card">
-        <textarea
-          data-testid="global-instructions-textarea"
-          className="webui-personalization-textarea"
-          value={draft}
-          spellCheck={false}
-          placeholder={INSTRUCTIONS_PLACEHOLDER}
-          onChange={(event) => {
-            setDraft(event.target.value);
-            setSaved(false);
-          }}
-        />
-        <div className="webui-personalization-meta">
-          <span data-testid="global-instructions-path">{filePath}</span>
-          <span
-            data-testid="global-instructions-size"
-            className={overLimit ? "is-over-limit" : undefined}
-          >
-            {byteLength} / {maxBytes} 字节
-          </span>
-        </div>
-        {overLimit ? (
-          <p role="alert" data-testid="global-instructions-over-limit" className="webui-settings-error">
-            内容超出 {maxBytes} 字节上限，请精简后再保存。
-          </p>
-        ) : null}
-        {error ? (
-          <p role="alert" data-testid="global-instructions-error" className="webui-settings-error">
-            {error}
-          </p>
-        ) : null}
-        {saved && !dirty ? (
-          <p data-testid="global-instructions-saved" className="webui-personalization-saved">
-            已保存
-          </p>
-        ) : null}
-        {!setGlobalInstructions ? (
-          <p data-testid="global-instructions-unavailable" className="webui-settings-error">
-            当前运行时不支持自定义指令读写。
-          </p>
-        ) : null}
+      }
+    >
+      <textarea
+        data-testid="global-instructions-textarea"
+        className="webui-personalization-textarea"
+        value={draft}
+        spellCheck={false}
+        placeholder={INSTRUCTIONS_PLACEHOLDER}
+        onChange={(event) => {
+          setDraft(event.target.value);
+          setSaved(false);
+        }}
+      />
+      <div className="webui-personalization-meta">
+        <span data-testid="global-instructions-path">{filePath}</span>
+        <span
+          data-testid="global-instructions-size"
+          className={overLimit ? "is-over-limit" : undefined}
+        >
+          {byteLength} / {maxBytes} 字节
+        </span>
       </div>
-    </section>
+      {overLimit ? (
+        <p role="alert" data-testid="global-instructions-over-limit" className="webui-settings-error">
+          内容超出 {maxBytes} 字节上限，请精简后再保存。
+        </p>
+      ) : null}
+      {error ? (
+        <p role="alert" data-testid="global-instructions-error" className="webui-settings-error">
+          {error}
+        </p>
+      ) : null}
+      {saved && !dirty ? (
+        <p data-testid="global-instructions-saved" className="webui-personalization-saved">
+          已保存
+        </p>
+      ) : null}
+      {!setGlobalInstructions ? (
+        <p data-testid="global-instructions-unavailable" className="webui-settings-error">
+          当前运行时不支持自定义指令读写。
+        </p>
+      ) : null}
+    </SettingsSection>
   );
 }

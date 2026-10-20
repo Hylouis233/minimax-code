@@ -996,15 +996,26 @@ describe("WebUI shell — desktop anatomy", () => {
     const html = renderShell();
 
     expect(html).toMatch(/text-text_default_primary/u);
-    expect(html).toMatch(/text-text_default_secondary/u);
     expect(html).toMatch(/text-text_default_tertiary/u);
     expect(html).toMatch(/text-icon_default_tertiary/u);
     expect(html).toMatch(/border-border_default/u);
-    expect(html).toMatch(/text-size_12/u);
-    expect(html).toMatch(/leading-line_height_16/u);
+
+    // The rail's own small text and its secondary surfaces are classes now
+    // rather than pairs of utilities -- the meta row carries its own layout,
+    // and the rail moved out of the shell into the sessions business -- so
+    // the scale and the secondary colour are checked on the stylesheet that
+    // carries them. What the assertion is about is unchanged: the shell takes
+    // its colours and its small type from the token ramp rather than from
+    // literals, and a rule that hardcodes either is the failure it guards.
+    const styles = readFileSync(
+      new URL("../../src/client/styles/shell.css", import.meta.url),
+      "utf8",
+    );
+    expect(styles).toMatch(/color:\s*var\(--text_default_secondary\)/u);
+    expect(styles).toMatch(/font-size:\s*var\(--size_12\)/u);
+    expect(styles).toMatch(/line-height:\s*var\(--line_height_16\)/u);
 
     expect(html).toMatch(/webui-nav-item/u);
-    expect(html).toMatch(/webui-empty-state/u);
     expect(html).toMatch(/webui-textarea/u);
     // The workspace trigger moved off the generic `webui-pill` onto the
     // purpose-built bar class, because it now sits inside the grey band that
@@ -1066,8 +1077,11 @@ describe("WebUI shell — desktop anatomy", () => {
     // from 6 to 7. The rail import row joined them when session import
     // shipped: it opens a file picker that posts to /session-import, so it is
     // bound rather than a placeholder, and the count moved from 7 to 8. The
-    // the retired rail view tabs and session-favourites control are absent;
-    // the remaining controls are backed by their current actions.
+    // two rail section headers joined them when the rail became project-first:
+    // the 置顶 and 项目 headers each toggle their own section, so they are
+    // bound rather than labels dressed as buttons, and the count moved from 8
+    // to 10. The retired rail view tabs and session-favourites control are
+    // absent; the remaining controls are backed by their current actions.
     const html = renderShell();
     const controlTags: string[] = [];
     const re = /<(button|div|a|input|textarea|select)\b[^>]*>/gu;
@@ -1082,7 +1096,7 @@ describe("WebUI shell — desktop anatomy", () => {
         !/(?:^|\s)disabled(?:=|\s|>)/u.test(tag) &&
         !/aria-disabled="true"/u.test(tag),
     );
-    expect(operable).toHaveLength(8);
+    expect(operable).toHaveLength(10);
     expect(html).toMatch(/data-testid="composer-add-menu"/u);
     expect(html).toMatch(/data-webui-sidebar-toggle="true"/u);
     expect(html).toMatch(/data-webui-nav-item="新建任务"/u);
@@ -1096,6 +1110,10 @@ describe("WebUI shell — desktop anatomy", () => {
     expect(html).toMatch(/data-webui-session-import-input="true"/u);
     expect(html).not.toMatch(/data-webui-nav-item="导入会话"[^>]*\sdisabled/u);
     expect(html).not.toMatch(/data-webui-rail-view(?:-active)?=/u);
+    // The two section headers are controls, not labels: each one reports the
+    // state it toggles, so a header that lost its action could not hide.
+    expect(html).toMatch(/data-webui-rail-section-id="pinned"/u);
+    expect(html).toMatch(/data-webui-rail-section-id="projects"/u);
   });
 
   it("lets the composer take a draft before a session exists", () => {

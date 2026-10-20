@@ -15,6 +15,7 @@ import {
   type WebuiWorktreeWorkspace,
 } from "../../../features/sessions/projection/worktree-state.public.js";
 import { FolderIcon } from "../../../ui/settings-glyphs.js";
+import { SettingsPage, SettingsRow, SettingsSection } from "../../../ui/settings-layout.js";
 
 export { SETTINGS_GROUPS } from "../projection/settings-view.js";
 
@@ -35,30 +36,35 @@ export function WebuiWorktreePanel({ workspaces, worktrees, primary, error }: {
 }): ReactElement {
   const branches = worktrees ?? selectWebuiWorktreeWorkspaces(workspaces);
   const main = primary ?? selectWebuiPrimaryWorkspace(workspaces);
-  return <div className="webui-review-page" data-testid="settings-worktree-page" data-webui-worktree-state={error ? "error" : branches.length ? "ready" : "empty"}>
+  // The page renders the shared settings skeleton: the same frame, the same
+  // section title and the same card of rows every other settings page uses.
+  // What a row carries inside it — the session list — is this page's own
+  // content and keeps its own rules.
+  return <SettingsPage testId="settings-worktree-page" dataAttributes={{ "data-webui-worktree-state": error ? "error" : branches.length ? "ready" : "empty" }}>
     {error ? <p className="webui-review-error" role="alert" data-testid="worktree-error">{error}</p> : null}
-    {main ? <section className="webui-worktree-group" data-testid="worktree-primary" data-webui-worktree-primary="true">
-      <header className="webui-worktree-heading">
-        <span className="webui-worktree-name"><FolderIcon />{main.name}</span>
+    {main ? <SettingsSection title="工作区" testId="worktree-primary-section">
+      <SettingsRow
+        title={<><FolderIcon />{main.name}</>}
+        description={main.workspaceDir}
+        testId="worktree-primary"
+        dataAttributes={{ "data-webui-worktree-primary": "true" }}
+        body={<ul className="webui-worktree-sessions">
+          {main.sessions.map((entry) => <li className="webui-worktree-session" key={entry.sessionId} data-testid="worktree-session">
+            <span className="webui-worktree-session-title" title={entry.title}>{entry.title}</span>
+          </li>)}
+        </ul>}
+      >
         <span className="webui-worktree-kind">主检出</span>
-      </header>
-      <p className="webui-worktree-path" title={main.workspaceDir}>{main.workspaceDir}</p>
-      <ul className="webui-worktree-sessions">
-        {main.sessions.map((entry) => <li className="webui-worktree-session" key={entry.sessionId} data-testid="worktree-session">
-          <span className="webui-worktree-session-title" title={entry.title}>{entry.title}</span>
-        </li>)}
-      </ul>
-    </section> : null}
-    <h3 className="webui-worktree-section-title">并行实验分支</h3>
-    {branches.length === 0 ? <p className="webui-review-empty" data-testid="worktree-empty">还没有工作树。在会话的右键菜单里选「复制到新工作树」即可开一个。</p> : null}
-    <ul className="webui-worktree-branches">
-      {branches.map((branch) => <li className="webui-worktree-group" key={branch.workspaceDir} data-testid="worktree-branch" data-webui-worktree-dir={branch.workspaceDir}>
-        <header className="webui-worktree-heading">
-          <span className="webui-worktree-name"><FolderIcon />{branch.name}</span>
-          <span className="webui-worktree-kind">{branch.sessions.length} 个会话</span>
-        </header>
-        <p className="webui-worktree-path" title={branch.workspaceDir}>{branch.workspaceDir}</p>
-        <ul className="webui-worktree-sessions">
+      </SettingsRow>
+    </SettingsSection> : null}
+    <SettingsSection title="并行实验分支" testId="worktree-branches-section">
+      {branches.length === 0 ? <p className="webui-review-empty" data-testid="worktree-empty">还没有工作树。在会话的右键菜单里选「复制到新工作树」即可开一个。</p> : branches.map((branch) => <SettingsRow
+        key={branch.workspaceDir}
+        title={<><FolderIcon />{branch.name}</>}
+        description={branch.workspaceDir}
+        testId="worktree-branch"
+        dataAttributes={{ "data-webui-worktree-dir": branch.workspaceDir }}
+        body={<ul className="webui-worktree-sessions">
           {branch.sessions.map((entry) => <li className="webui-worktree-session" key={entry.sessionId} data-testid="worktree-session" data-webui-worktree-session={entry.sessionId}>
             {/* Session navigation in this shell is the `#session=<id>` hash,
                 which is what the rail's own links use. Reusing it keeps one
@@ -66,8 +72,10 @@ export function WebuiWorktreePanel({ workspaces, worktrees, primary, error }: {
             <a className="webui-worktree-session-link" href={`#session=${entry.sessionId}`} title={entry.title}>{entry.title}</a>
             {entry.parentSessionId ? <span className="webui-worktree-forked" title={`派生自 ${entry.parentSessionId}`}>派生</span> : null}
           </li>)}
-        </ul>
-      </li>)}
-    </ul>
-  </div>;
+        </ul>}
+      >
+        <span className="webui-worktree-kind">{branch.sessions.length} 个会话</span>
+      </SettingsRow>)}
+    </SettingsSection>
+  </SettingsPage>;
 }

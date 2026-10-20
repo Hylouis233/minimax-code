@@ -469,6 +469,85 @@
     font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
   }
 
+  /* The settings page skeleton: the one frame every settings page renders in.
+   *
+   * This block is shared rather than business-owned because the settings panel
+   * shows pages from more than one business — the settings pages and the code
+   * review page — and the point of the skeleton is that they cannot drift
+   * apart again. The general page's look is the reference: a centred 704px
+   * column, a 14px medium section title, and a grouped-surface card with a
+   * 16px radius.
+   *
+   * The content inside a card is the page's own business. What lives here is
+   * only the frame: the column, the title row, the card, the row and the
+   * hairline between two rows. */
+  .webui-settings-page { display: flex; width: 100%; min-height: 0; max-width: 704px; flex: 1; margin: 0 auto; flex-direction: column; gap: var(--spacing_16); padding: 0 0 var(--spacing_32); }
+  .webui-settings-section { display: flex; width: 100%; flex-direction: column; gap: var(--spacing_12); }
+  .webui-settings-section-header { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: var(--spacing_12); padding: 0 var(--spacing_16); }
+  .webui-settings-section-title { display: flex; min-width: 0; align-items: center; gap: var(--spacing_4); }
+  .webui-settings-section-title h3 { display: flex; min-width: 0; align-items: center; gap: var(--spacing_4); margin: 0; color: var(--text_default_primary); font-size: var(--size_14); font-weight: var(--weight_medium); line-height: var(--line_height_20); }
+  .webui-settings-section-actions { display: flex; flex: none; align-items: center; gap: var(--spacing_8); }
+  /* The card is the grouped surface the rows sit on. A section whose content
+   * brings its own surface — a row of mode cards, a form — opts out of it
+   * with `is-bare` rather than nesting a second surface inside a third. */
+  .webui-settings-card { display: flex; width: 100%; flex-direction: column; border-radius: var(--radius_16); background: var(--bg_grouped_tertiary); padding: var(--spacing_4); }
+  .webui-settings-card.is-bare { background: transparent; padding: 0; }
+  .webui-settings-row { display: flex; width: 100%; min-height: 56px; flex-direction: column; align-items: stretch; justify-content: center; gap: var(--spacing_4); overflow: hidden; border-radius: var(--radius_12); padding: var(--spacing_8) var(--spacing_8) var(--spacing_8) var(--spacing_12); }
+  .webui-settings-row-main { display: flex; width: 100%; min-width: 0; align-items: center; justify-content: space-between; gap: var(--spacing_24); }
+  .webui-settings-row.is-disabled { opacity: 0.5; }
+  .webui-settings-row-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: var(--spacing_4); }
+  .webui-settings-row-copy strong { display: flex; min-width: 0; align-items: center; gap: var(--spacing_4); overflow: hidden; color: var(--text_default_primary); font-size: var(--size_14); font-weight: var(--weight_regular); line-height: var(--line_height_20); text-overflow: ellipsis; white-space: nowrap; }
+  .webui-settings-row-copy span { color: var(--text_default_secondary); font-size: var(--size_12); font-weight: var(--weight_regular); line-height: var(--line_height_16); }
+  .webui-settings-row-body { display: flex; width: 100%; min-width: 0; flex-direction: column; }
+  .webui-settings-row-control { display: flex; flex: none; align-items: center; }
+  .webui-settings-divider { display: flex; width: 100%; align-items: center; justify-content: center; padding: 6px var(--spacing_12); }
+  .webui-settings-divider span { display: block; width: 100%; height: 1px; background: var(--border_light); }
+  /* The section title's help affordance. A real bubble rather than a native
+   * `title`: `title` cannot match the dark bubble with an arrow this hangs
+   * above the glyph — the browser draws its own surface, delays it about a
+   * second, and paints no arrow. The shape itself is not new —
+   * `.webui-signin-credits-tooltip` and `.webui-context-usage-label` already
+   * carry it, and this is another call site against the same object rather
+   * than another design. */
+  .webui-settings-info-hint-anchor { position: relative; display: inline-flex; flex: none; }
+  /* Reset as a button: a native one brings a border, a background and its own
+   * font, and this control is a 14px circle drawn over the section title. */
+  .webui-settings-info-hint { display: inline-flex; width: 14px; height: 14px; flex: none; align-items: center; justify-content: center; border: 1px solid var(--border_light); border-radius: 50%; background: transparent; padding: 0; color: var(--text_default_tertiary); font-size: 9px; font-style: normal; font-weight: var(--weight_medium); line-height: 1; cursor: help; }
+  .webui-settings-info-hint:hover { border-color: var(--border_accent); color: var(--text_default_secondary); }
+  .webui-settings-info-hint:focus-visible { outline: 2px solid var(--border_accent); outline-offset: 1px; }
+  /* The dark bubble with an arrow is the shell's existing tooltip shape (see
+   * `.webui-signin-credits-tooltip`); its 6px
+   * radius, 8/12 padding and 18px line height are the same three numbers, so
+   * this is a third call site on one shape rather than a third shape.
+   *
+   * The hardcoded `rgb(0 0 0 / 85%)` / `#fff` is DELIBERATE and must not be
+   * rebound to a token. These values are antd's `Tooltip` colours, sourced
+   * from the `colorBgSpotlight` and `colorTextLightSolid`
+   * global tokens — documented defaults `rgba(0,0,0,0.85)` and `#fff` — and
+   * they are theme-independent: the bubble is black under BOTH
+   * `.light` and `.dark`. The same source
+   * explains the 6px radius and the 250px max width, which are antd's
+   * `borderRadius` and Tooltip `maxWidth` defaults rather than measurements.
+   * Everything else on this surface is token-driven because it *should* follow
+   * the theme; this bubble should not, so a token binding here would be a
+   * fidelity regression dressed up as a fix.
+   *
+   * The 250 is antd's `Tooltip` `maxWidth` default, which is not
+   * overridden — so all three of these bubbles now share one width, and the 340
+   * that used to sit on `.webui-signin-credits-tooltip` is gone. Two more
+   * labels still read 220, but both are under `white-space: nowrap` where the
+   * ceiling cannot shape anything; see the note on `.webui-context-usage-label`.
+   *
+   * `position: absolute` against the anchor, NOT `fixed`: absolute travels
+   * with the section when the panel scrolls, which is what a tooltip attached
+   * to a heading has to do. `pointer-events: none` for the same reason the
+   * context-usage label is — otherwise the pointer leaving the glyph toward
+   * the bubble drops the hover that is showing it. */
+  .webui-settings-info-hint-bubble { position: absolute; bottom: calc(100% + var(--spacing_8)); left: 50%; z-index: 60; width: max-content; max-width: 250px; padding: var(--spacing_8) var(--spacing_12); border-radius: 6px; transform: translateX(-50%) translateY(3px); transform-origin: bottom center; background: rgb(0 0 0 / 85%); box-shadow: 0 6px 16px rgb(0 0 0 / 18%); color: #fff; font-size: var(--size_12); line-height: var(--line_height_18); white-space: normal; text-align: left; opacity: 0; pointer-events: none; visibility: hidden; transition: opacity 120ms ease, transform 120ms ease, visibility 120ms step-end; }
+  .webui-settings-info-hint-bubble::after { position: absolute; top: 100%; left: 50%; border: 5px solid transparent; border-top-color: rgb(0 0 0 / 85%); content: ""; transform: translateX(-50%); }
+  .webui-settings-info-hint-anchor:hover .webui-settings-info-hint-bubble,
+  .webui-settings-info-hint:focus-visible ~ .webui-settings-info-hint-bubble { opacity: 1; transform: translateX(-50%) translateY(0); visibility: visible; transition: opacity 120ms ease, transform 120ms ease, visibility 0s; }
+
   @keyframes webui-overlay-enter { from { opacity: 0; } to { opacity: 1; } }
   @keyframes webui-modal-enter { from { opacity: 0; transform: translateY(8px) scale(.995); } to { opacity: 1; transform: translateY(0) scale(1); } }
   @keyframes webui-panel-enter-right { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: translateX(0); } }

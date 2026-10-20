@@ -5,35 +5,13 @@
 // imports that dialog's shared pieces rather than the other way round: the section renders the dialog,
 // so the dialog must not import the section.
 
-import { useCallback, useEffect, useState, type ReactElement, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactElement } from "react";
 import type { WebuiAgentMemoryView, WebuiMemorySettingsView } from "../../../../shared/contracts/personalization.js";
 import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
-import { PERSONALIZATION_SECTION_HINTS, SectionHeader } from "./settings-atoms.js";
+import { SettingsRow, SettingsSection } from "../../../ui/settings-layout.js";
+import { PERSONALIZATION_SECTION_HINTS } from "./settings-atoms.js";
 import { MemoryManagerDialog } from "./MemoryManagerDialog.js";
 import { formatMemoryTimestamp, isMemorySaveable, type MemoryHandoff } from "../contracts/memory-handoff.js";
-
-/** One switch row inside the 记忆 card. */
-function MemoryRow({
-  title,
-  description,
-  testId,
-  children,
-}: {
-  readonly title: string;
-  readonly description: string;
-  readonly testId: string;
-  readonly children: ReactNode;
-}): ReactElement {
-  return (
-    <div data-testid={testId} className="webui-generic-row">
-      <div className="webui-generic-row-copy">
-        <strong>{title}</strong>
-        <span>{description}</span>
-      </div>
-      <div className="webui-generic-row-control">{children}</div>
-    </div>
-  );
-}
 
 interface MemorySectionProps {
   readonly getAgentMemory?: (request?: {
@@ -134,78 +112,76 @@ export function MemorySection({
   const closeManager = useCallback(() => setManaging(false), []);
 
   return (
-    <section data-testid="memory-section" className="webui-generic-section">
-      <SectionHeader
+    <SettingsSection
+      title="记忆"
+      testId="memory-section"
+      hint={PERSONALIZATION_SECTION_HINTS.memory}
+      hintTestId="memory-hint"
+    >
+      <SettingsRow
         title="记忆"
-        hint={PERSONALIZATION_SECTION_HINTS.memory}
-        hintTestId="memory-hint"
-      />
-      <div className="webui-generic-card">
-        <MemoryRow
-          title="记忆"
-          description="在提示、提醒和自动维护中使用已保存的记忆"
-          testId="memory-enabled-row"
+        description="在提示、提醒和自动维护中使用已保存的记忆"
+        testId="memory-enabled-row"
+      >
+        <ToggleSwitch
+          checked={settings?.enabled ?? false}
+          label="记忆"
+          testId="memory-enabled-switch"
+          disabled={toggling || !settings || !setMemorySettings}
+          onChange={(checked) => void toggle({ enabled: checked })}
+        />
+      </SettingsRow>
+      <SettingsRow
+        title="主动记忆"
+        description="主动识别并通过 Memory 保存值得长期保留的偏好和可复用经验"
+        testId="memory-proactive-row"
+      >
+        <ToggleSwitch
+          checked={settings?.proactive ?? false}
+          label="主动记忆"
+          testId="memory-proactive-switch"
+          disabled={toggling || !settings || !setMemorySettings}
+          onChange={(checked) => void toggle({ proactive: checked })}
+        />
+      </SettingsRow>
+      <SettingsRow
+        title="记忆摘要"
+        description="查看、编辑或删除 MiniMax 已整理的长期记忆。"
+        testId="memory-summary-row"
+      >
+        <button
+          type="button"
+          data-testid="agent-memory-load"
+          className="webui-mavis-button webui-mavis-button-gray"
+          disabled={!getAgentMemory || !setAgentMemory}
+          onClick={() => setManaging((open) => !open)}
         >
-          <ToggleSwitch
-            checked={settings?.enabled ?? false}
-            label="记忆"
-            testId="memory-enabled-switch"
-            disabled={toggling || !settings || !setMemorySettings}
-            onChange={(checked) => void toggle({ enabled: checked })}
-          />
-        </MemoryRow>
-        <MemoryRow
-          title="主动记忆"
-          description="主动识别并通过 Memory 保存值得长期保留的偏好和可复用经验"
-          testId="memory-proactive-row"
-        >
-          <ToggleSwitch
-            checked={settings?.proactive ?? false}
-            label="主动记忆"
-            testId="memory-proactive-switch"
-            disabled={toggling || !settings || !setMemorySettings}
-            onChange={(checked) => void toggle({ proactive: checked })}
-          />
-        </MemoryRow>
-        <MemoryRow
-          title="记忆摘要"
-          description="查看、编辑或删除 MiniMax 已整理的长期记忆。"
-          testId="memory-summary-row"
-        >
-          <button
-            type="button"
-            data-testid="agent-memory-load"
-            className="webui-mavis-button webui-mavis-button-gray"
-            disabled={!getAgentMemory || !setAgentMemory}
-            onClick={() => setManaging((open) => !open)}
-          >
-            管理
-          </button>
-        </MemoryRow>
-        {!getMemorySettings || !setMemorySettings ? (
-          <p data-testid="memory-settings-unavailable" className="webui-settings-error">
-            当前运行时不支持记忆开关。
-          </p>
-        ) : null}
-        {!getAgentMemory || !setAgentMemory ? (
-          <p data-testid="agent-memory-unavailable" className="webui-settings-error">
-            当前运行时不支持长期记忆读写。
-          </p>
-        ) : null}
-        {error ? (
-          <p role="alert" data-testid="memory-error" className="webui-settings-error">
-            {error}
-          </p>
-        ) : null}
-        {managing ? (
-          <MemoryManagerDialog
-            getAgentMemory={getAgentMemory}
-            setAgentMemory={setAgentMemory}
-            onClose={closeManager}
-            {...(onCreateInSession ? { onCreateInSession } : {})}
-          />
-        ) : null}
-      </div>
-    </section>
+          管理
+        </button>
+      </SettingsRow>
+      {!getMemorySettings || !setMemorySettings ? (
+        <p data-testid="memory-settings-unavailable" className="webui-settings-error">
+          当前运行时不支持记忆开关。
+        </p>
+      ) : null}
+      {!getAgentMemory || !setAgentMemory ? (
+        <p data-testid="agent-memory-unavailable" className="webui-settings-error">
+          当前运行时不支持长期记忆读写。
+        </p>
+      ) : null}
+      {error ? (
+        <p role="alert" data-testid="memory-error" className="webui-settings-error">
+          {error}
+        </p>
+      ) : null}
+      {managing ? (
+        <MemoryManagerDialog
+          getAgentMemory={getAgentMemory}
+          setAgentMemory={setAgentMemory}
+          onClose={closeManager}
+          {...(onCreateInSession ? { onCreateInSession } : {})}
+        />
+      ) : null}
+    </SettingsSection>
   );
 }

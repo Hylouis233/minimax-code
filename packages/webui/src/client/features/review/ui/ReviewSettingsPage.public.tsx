@@ -36,6 +36,7 @@ import {
   useWebuiWorkspaceReview,
 } from "../../../bindings/use-query-state.js";
 import { FolderIcon, SearchIcon } from "../../../ui/settings-glyphs.js";
+import { SettingsCard, SettingsPage } from "../../../ui/settings-layout.js";
 
 type WebuiReviewStateAction = Parameters<typeof reduceWebuiReviewState>[1];
 
@@ -206,7 +207,7 @@ export function WebuiReviewWorkspacePicker({ workspaces, selected, loading, erro
   readonly onSelect?: (workspaceDir: string) => void;
 }): ReactElement {
   const state = error ? "error" : loading ? "loading" : workspaces.length ? "ready" : "empty";
-  return <div className="webui-review-page" data-testid="review-workspace-picker" data-webui-workspace-state={state}>
+  return <SettingsPage testId="review-workspace-picker" dataAttributes={{ "data-webui-workspace-state": state }}>
     <p className="webui-review-empty">选一个工作区来审查它的变更。</p>
     {error ? <p className="webui-review-error" role="alert" data-testid="review-workspace-error">{error}</p> : null}
     {loading ? <p className="webui-review-loading" role="status">正在读取可审查的工作区…</p> : null}
@@ -215,23 +216,25 @@ export function WebuiReviewWorkspacePicker({ workspaces, selected, loading, erro
        * heading reads as the bug this page is fixing. */
       <p className="webui-review-empty" data-testid="review-workspace-empty">现在没有绑定项目目录的会话，所以没有可审查的工作区。在左栏给一个会话选好项目目录，再回到这里。</p>
     ) : null}
-    <ul className="webui-worktree-branches">
-      {workspaces.map((workspace) => <li className="webui-worktree-group" key={workspace.workspaceDir}>
-        <button
-          type="button"
-          className="webui-worktree-heading"
-          data-testid="review-workspace-option"
-          data-webui-workspace-dir={workspace.workspaceDir}
-          data-webui-workspace-current={workspace.workspaceDir === selected ? "true" : undefined}
-          onClick={() => onSelect?.(workspace.workspaceDir)}
-        >
-          <span className="webui-worktree-name"><FolderIcon />{workspace.name}</span>
-          <span className="webui-worktree-kind">{workspace.sessions.length} 个会话</span>
-        </button>
-        <p className="webui-worktree-path" title={workspace.workspaceDir}>{workspace.workspaceDir}</p>
-      </li>)}
-    </ul>
-  </div>;
+    <SettingsCard>
+      <ul className="webui-review-workspace-list">
+        {workspaces.map((workspace) => <li className="webui-review-workspace" key={workspace.workspaceDir}>
+          <button
+            type="button"
+            className="webui-review-workspace-heading"
+            data-testid="review-workspace-option"
+            data-webui-workspace-dir={workspace.workspaceDir}
+            data-webui-workspace-current={workspace.workspaceDir === selected ? "true" : undefined}
+            onClick={() => onSelect?.(workspace.workspaceDir)}
+          >
+            <span className="webui-review-workspace-name"><FolderIcon />{workspace.name}</span>
+            <span className="webui-review-workspace-kind">{workspace.sessions.length} 个会话</span>
+          </button>
+          <p className="webui-review-workspace-path" title={workspace.workspaceDir}>{workspace.workspaceDir}</p>
+        </li>)}
+      </ul>
+    </SettingsCard>
+  </SettingsPage>;
 }
 
 export function WebuiReviewPanel({ state, visible, filtering, loading, note, empty, workspaceDir, onQueryChange, onClearFilters, onToggleFile, onOpenFileLine }: {
@@ -249,7 +252,7 @@ export function WebuiReviewPanel({ state, visible, filtering, loading, note, emp
 }): ReactElement {
   const rows = visible ?? state.files;
   const filterActive = filtering ?? isWebuiReviewFiltering(state);
-  return <div className="webui-review-page" data-testid="settings-review-page" data-webui-review-state={state.status} data-webui-review-snapshot={state.reviewSnapshotId}>
+  return <SettingsPage testId="settings-review-page" dataAttributes={{ "data-webui-review-state": state.status, ...(state.reviewSnapshotId ? { "data-webui-review-snapshot": state.reviewSnapshotId } : {}) }}>
     {state.status === "ready" ? <div className="webui-review-totals" data-testid="review-totals">
       <span>{state.totals.files} 个文件</span>
       <span className="webui-diff-add">{`+${state.totals.additions}`}</span>
@@ -271,49 +274,51 @@ export function WebuiReviewPanel({ state, visible, filtering, loading, note, emp
     {workspaceDir ? <p className="webui-review-empty" data-testid="review-workspace">{workspaceDir}</p> : null}
     {empty && !note ? <p className="webui-review-empty" data-testid="review-empty">{empty}</p> : null}
     {state.status === "ready" && rows.length === 0 ? <p className="webui-review-empty" data-testid="review-empty">{filterActive ? "没有匹配的文件" : "没有可显示的文件"}</p> : null}
-    <ul className="webui-review-files">
-      {rows.map((file) => {
-        const expanded = state.expandedFileIds.includes(file.fileId);
-        const diff = state.diffs[file.fileId];
-        const diffError = state.diffErrors[file.fileId];
-        const pending = state.loadingFileIds.includes(file.fileId);
-        return <li className="webui-review-file" key={file.fileId} data-testid="review-file" data-file-id={file.fileId} data-webui-review-file-status={file.status}>
-          <button
-            type="button"
-            className="webui-review-file-heading"
-            data-testid="review-file-toggle"
-            aria-expanded={expanded}
-            onClick={() => onToggleFile?.(file.fileId, !expanded, file)}
-          >
-            <span className="webui-review-file-path" title={file.path}>{file.path}</span>
-            <span className="webui-review-file-status">{file.status}</span>
-            <span className="webui-review-file-stats">
-              <span className="webui-diff-add">{`+${file.additions}`}</span>
-              {file.deletions > 0 ? <span className="webui-diff-del">{`-${file.deletions}`}</span> : null}
-            </span>
-          </button>
-          {expanded ? <div className="webui-review-file-body" data-testid="review-file-body">
-            {pending ? <p className="webui-review-loading" role="status">正在读取这个文件的补丁…</p> : null}
-            {diffError ? <p className="webui-review-file-error" role="status" data-testid="review-file-error">{diffError}</p> : null}
-            {diff ? <ol className="webui-review-lines" data-testid="review-lines">
-              {projectWebuiReviewLines(diff).map((line, index) => {
-                const target = webuiReviewLineTarget(line);
-                const text = (
-                  <>
-                    <span className="webui-review-line-number">{line.newLine ?? ""}</span>
-                    <span className="webui-review-line-text">{line.text}</span>
-                  </>
-                );
-                return <li className={`webui-review-line webui-review-line--${line.kind}`} key={index} data-webui-review-line-kind={line.kind} data-webui-review-line={line.newLine ?? ""}>
-                  {target === undefined || !onOpenFileLine
-                    ? <span className="webui-review-line-static">{text}</span>
-                    : <button type="button" className="webui-review-line-jump" data-testid="review-line-jump" data-webui-review-jump-line={target} onClick={() => onOpenFileLine(file.path, target)}>{text}</button>}
-                </li>;
-              })}
-            </ol> : null}
-          </div> : null}
-        </li>;
-      })}
-    </ul>
-  </div>;
+    <SettingsCard>
+      <ul className="webui-review-files">
+        {rows.map((file) => {
+          const expanded = state.expandedFileIds.includes(file.fileId);
+          const diff = state.diffs[file.fileId];
+          const diffError = state.diffErrors[file.fileId];
+          const pending = state.loadingFileIds.includes(file.fileId);
+          return <li className="webui-review-file" key={file.fileId} data-testid="review-file" data-file-id={file.fileId} data-webui-review-file-status={file.status}>
+            <button
+              type="button"
+              className="webui-review-file-heading"
+              data-testid="review-file-toggle"
+              aria-expanded={expanded}
+              onClick={() => onToggleFile?.(file.fileId, !expanded, file)}
+            >
+              <span className="webui-review-file-path" title={file.path}>{file.path}</span>
+              <span className="webui-review-file-status">{file.status}</span>
+              <span className="webui-review-file-stats">
+                <span className="webui-diff-add">{`+${file.additions}`}</span>
+                {file.deletions > 0 ? <span className="webui-diff-del">{`-${file.deletions}`}</span> : null}
+              </span>
+            </button>
+            {expanded ? <div className="webui-review-file-body" data-testid="review-file-body">
+              {pending ? <p className="webui-review-loading" role="status">正在读取这个文件的补丁…</p> : null}
+              {diffError ? <p className="webui-review-file-error" role="status" data-testid="review-file-error">{diffError}</p> : null}
+              {diff ? <ol className="webui-review-lines" data-testid="review-lines">
+                {projectWebuiReviewLines(diff).map((line, index) => {
+                  const target = webuiReviewLineTarget(line);
+                  const text = (
+                    <>
+                      <span className="webui-review-line-number">{line.newLine ?? ""}</span>
+                      <span className="webui-review-line-text">{line.text}</span>
+                    </>
+                  );
+                  return <li className={`webui-review-line webui-review-line--${line.kind}`} key={index} data-webui-review-line-kind={line.kind} data-webui-review-line={line.newLine ?? ""}>
+                    {target === undefined || !onOpenFileLine
+                      ? <span className="webui-review-line-static">{text}</span>
+                      : <button type="button" className="webui-review-line-jump" data-testid="review-line-jump" data-webui-review-jump-line={target} onClick={() => onOpenFileLine(file.path, target)}>{text}</button>}
+                  </li>;
+                })}
+              </ol> : null}
+            </div> : null}
+          </li>;
+        })}
+      </ul>
+    </SettingsCard>
+  </SettingsPage>;
 }
