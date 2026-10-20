@@ -291,14 +291,19 @@ external surfaces are **not** safe against an attacker who can reach loopback,
 and the switch that enables them should be understood as enabling them for
 **the person's browser**, not as a boundary against a local process.
 
-### A residual gap the N2 fix left behind
+### A residual gap the N2 fix left behind — now closed
 
-The panel opens its image stream once per `(surface, runId)`. If it opens the
-stream **before** the run has selected anything, the service refuses it —
-which is the required behaviour — and the panel then shows no live frames
-until the surface or the run changes. The client would need to re-subscribe
-after the first successful selection. This is recorded here rather than left
-for someone to discover.
+The panel used to open its image stream once per `(surface, runId)`. Opened
+**before** the run had selected anything, the service refused it — which is
+the required behaviour — and the panel then showed no live frames until the
+surface or the run changed.
+
+The subscription is now tied to the run's **selected target**: when the person
+picks a target the stream opens, and when the run's target moves the previous
+subscription is closed and a new one opened for the new target. The decision
+is a pure function in the projection
+(`selectWebuiBrowserStreamTarget` / `webuiBrowserStreamTargetKey`), so it is
+tested without a DOM renderer — the client test environment has none.
 
 ### N2, N3, N4
 

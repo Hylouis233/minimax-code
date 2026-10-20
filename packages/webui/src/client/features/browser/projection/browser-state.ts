@@ -265,6 +265,38 @@ export function selectWebuiBrowserFrame(
   return frameHeld(state, key) ? state.frames[key] : undefined;
 }
 
+/**
+ * The target the live image stream should be open for.
+ *
+ * It is the run's selected target, and nothing else. A run that has selected
+ * nothing has no page to stream, so the answer is `undefined` and the panel
+ * opens no subscription — the server would refuse one anyway, and a
+ * subscription that can never deliver a frame is a subscription that leaves
+ * the panel blank.
+ *
+ * The decision is a pure function so it can be tested without a DOM renderer;
+ * the client test environment has none.
+ */
+export function selectWebuiBrowserStreamTarget(
+  state: WebuiBrowserPanelState,
+): WebuiBrowserTargetId | undefined {
+  return state.selectedTarget;
+}
+
+/**
+ * A stable key for the stream's target.
+ *
+ * The subscription is re-opened when this changes, so it has to name the
+ * browser, the tab and the generation — a tab that was replaced is a
+ * different page even though it is the same tab.
+ */
+export function webuiBrowserStreamTargetKey(
+  target: WebuiBrowserTargetId | undefined,
+): string | undefined {
+  if (!target) return undefined;
+  return `${target.browserId}:${target.targetId}:${target.generation}`;
+}
+
 export function selectWebuiBrowserSelectedTarget(
   state: WebuiBrowserPanelState,
 ): WebuiBrowserTargetState | undefined {

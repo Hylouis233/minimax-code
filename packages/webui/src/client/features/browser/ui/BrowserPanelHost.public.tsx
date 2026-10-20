@@ -39,7 +39,9 @@ import type { WebuiBrowserInputIntent } from "../contracts/browser-panel.js";
 import {
   initialWebuiBrowserPanelState,
   reduceWebuiBrowserPanelState,
+  selectWebuiBrowserStreamTarget,
   selectedWebuiBrowserRunTarget,
+  webuiBrowserStreamTargetKey,
 } from "../projection/browser-state.js";
 import { BrowserAuthorizationSwitches } from "./BrowserAuthorizationSwitches.public.js";
 import { BrowserPanel } from "./BrowserPanel.public.js";
@@ -97,6 +99,8 @@ export function BrowserPanelHost({
   // the active run changing means the old one has to be closed and the new one's
   // opened — otherwise the panel would keep showing the previous run's page.
   const subscribedRunId = useRef<string | undefined>(undefined);
+  /** The target the open subscription is attached to. */
+  const subscribedTarget = useRef<string | undefined>(undefined);
 
   // The run the panel is on, kept where a read that is still in flight can see
   // it. The effect below is what moves it, so it is current before any read for
@@ -166,11 +170,35 @@ export function BrowserPanelHost({
     void refreshTargets(surface);
   }, [port, refreshTargets, surface]);
 
+  // The live image stream is opened for the run's **selected** target.
+  //
+  // The server refuses a stream for a run that has selected nothing, so the
+  // subscription is tied to the selection rather than to the panel's lifetime:
+  // when the person picks a target the stream opens, and when the run's target
+  // moves the previous subscription is closed and a new one opened for the new
+  // target. A subscription opened before there was anything to show would never
+  // deliver a frame, and the panel would stay blank until something else
+  // changed.
+  const selectedTargetKey = webuiBrowserStreamTargetKey(
+    selectWebuiBrowserStreamTarget(state),
+  );
+
   useEffect(() => {
     if (!port?.watchBrowserFrames) return;
-    if (subscribedSurface.current === surface && subscribedRunId.current === runId) return;
+    if (!selectedTargetKey) {
+      // Nothing is selected, so there is no page to stream.
+      return;
+    }
+    if (
+      subscribedSurface.current === surface &&
+      subscribedRunId.current === runId &&
+      subscribedTarget.current === selectedTargetKey
+    ) {
+      return;
+    }
     subscribedSurface.current = surface;
     subscribedRunId.current = runId;
+    subscribedTarget.current = selectedTargetKey;
     const stop = port.watchBrowserFrames({ surface, ...runScope }, (frame) => {
       dispatch({ type: "frame", frame });
     });
@@ -178,8 +206,9 @@ export function BrowserPanelHost({
       stop();
       subscribedSurface.current = undefined;
       subscribedRunId.current = undefined;
+      subscribedTarget.current = undefined;
     };
-  }, [port, runScope, surface, runId]);
+  }, [port, runScope, selectedTargetKey, surface, runId]);
 
   const onSelectTarget = useCallback(
     (target: WebuiBrowserTargetId) => {

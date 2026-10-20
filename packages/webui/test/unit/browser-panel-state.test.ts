@@ -16,6 +16,8 @@ import {
   initialWebuiBrowserPanelState,
   reduceWebuiBrowserPanelState,
   selectWebuiBrowserFrame,
+  selectWebuiBrowserStreamTarget,
+  webuiBrowserStreamTargetKey,
   selectedWebuiBrowserRunTarget,
   webuiBrowserFrameDataUrl,
 } from "../../src/client/features/browser/projection/browser-state.js";
@@ -334,5 +336,65 @@ describe("webuiBrowserFrameDataUrl", () => {
   it("refuses a format outside the two the contract allows", () => {
     const forged = { ...frame(), format: "svg+xml" } as unknown as WebuiBrowserImageFrame;
     expect(webuiBrowserFrameDataUrl(forged)).toBeUndefined();
+  });
+});
+
+describe("the target the live image stream is open for", () => {
+  it("is the run's selected target", () => {
+    const state = reduceWebuiBrowserPanelState(
+      initialWebuiBrowserPanelState,
+      {
+        type: "targets-loaded",
+        list: {
+          surface: "isolated-chromium",
+          targets: [
+            {
+              id: {
+                surface: "isolated-chromium",
+                browserId: "browser-1",
+                targetId: "tab-1",
+                generation: 1,
+              },
+              title: "Example",
+              url: "https://example.test",
+              status: "open",
+              selected: false,
+            },
+          ],
+        },
+      },
+    );
+    const selected = {
+      surface: "isolated-chromium" as const,
+      browserId: "browser-1",
+      targetId: "tab-1",
+      generation: 1,
+    };
+    const afterSelection = reduceWebuiBrowserPanelState(state, {
+      type: "target-selected",
+      target: selected,
+    });
+    expect(selectWebuiBrowserStreamTarget(afterSelection)).toEqual(selected);
+  });
+
+  it("is nothing when the run has selected nothing", () => {
+    // The server refuses a stream for a run that has selected nothing, so the
+    // panel opens no subscription: a subscription that can never deliver a
+    // frame is a subscription that leaves the panel blank.
+    expect(selectWebuiBrowserStreamTarget(initialWebuiBrowserPanelState)).toBeUndefined();
+  });
+
+  it("names the browser, the tab and the generation, so a replaced page re-opens the stream", () => {
+    const target = {
+      surface: "isolated-chromium" as const,
+      browserId: "browser-1",
+      targetId: "tab-1",
+      generation: 1,
+    };
+    expect(webuiBrowserStreamTargetKey(target)).toBe("browser-1:tab-1:1");
+    // A tab that was replaced is a different page even though it is the same
+    // tab, so the key has to change with the generation.
+    expect(webuiBrowserStreamTargetKey({ ...target, generation: 2 })).toBe("browser-1:tab-1:2");
+    expect(webuiBrowserStreamTargetKey(undefined)).toBeUndefined();
   });
 });
