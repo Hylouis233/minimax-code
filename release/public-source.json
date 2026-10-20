@@ -4111,6 +4111,7 @@
     "packages/webui/test/browser/README.md",
     "packages/webui/test/browser/account-login.spec.mjs",
     "packages/webui/test/browser/architecture-acceptance.spec.mjs",
+    "packages/webui/test/browser/browser-bridge-real-browser.spec.ts",
     "packages/webui/test/browser/composer.spec.mjs",
     "packages/webui/test/browser/connection-status.spec.mjs",
     "packages/webui/test/browser/context-usage-ring.spec.mjs",

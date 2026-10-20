@@ -341,6 +341,30 @@ This is the kind of gap that only a real browser finds, and it is the reason
 the programme's evidence says "not yet measured" for the external surfaces
 rather than claiming they work.
 
+## Round 6 — the external path, against a real browser
+
+A Playwright spec now drives a **real Chrome with the built extension loaded**
+against a **real bridge server**: `packages/webui/test/browser/browser-bridge-real-browser.spec.ts`.
+
+**What it proves.** An extension that cannot prove the installation key is
+**refused**: the host reports the surface as configured and enabled but not
+connected, and no credential crosses to the peer. That is the security property
+that matters, and it is now established against a real browser rather than a
+synthetic peer.
+
+**What it does not yet prove.** The happy path — the same extension, with the
+installation key provisioned, completing the handshake — does **not** complete
+in the harness, and the reason is not established. The extension never opens a
+connection, and it records no failure of its own, so the service worker that
+should answer the challenge is either not starting after the reload or is
+starting without the origin it was given. The test is marked `fixme` rather
+than deleted, so the gap stays visible and the test runs as soon as it can.
+
+**What this means for the claims.** The external path is **not** yet
+demonstrated working in a real browser. Ticket #193 stays open, and the
+capability matrix records the external surfaces as *not measured* rather than
+*working*.
+
 ## What this document does not establish
 
 - That the external path works end to end against a real Edge or Chrome. Neither
