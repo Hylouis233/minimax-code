@@ -41,6 +41,11 @@ export {
   cancelAccountLoginOperation,
   getUsageQuotaOperation,
   getAccountStatusOperation,
+  getCreditFallbackOperation,
+  setCreditFallbackOperation,
+  listResetCardsOperation,
+  useResetCardOperation,
+  queryResetCardFlowsOperation,
 } from "./account.js";
 export type {
   WebuiOperation,
@@ -157,6 +162,11 @@ export function createOperationRegistry(
   registerOperation(registry, entry("setMemorySettings"));
   registerOperation(registry, entry("getSessionUsage"));
   registerOperation(registry, entry("getUsageQuota"));
+  registerOperation(registry, entry("getCreditFallback"));
+  registerOperation(registry, entry("setCreditFallback"));
+  registerOperation(registry, entry("listResetCards"));
+  registerOperation(registry, entry("useResetCard"));
+  registerOperation(registry, entry("queryResetCardFlows"));
   registerOperation(registry, entry("getSigninPanel"));
   registerOperation(registry, entry("claimSignin"));
   registerOperation(registry, entry("beginAccountLogin"));

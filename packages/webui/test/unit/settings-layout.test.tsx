@@ -12,6 +12,8 @@ import {
 } from "../../src/client/ui/settings-layout.js";
 import { WebuiWorktreePanel } from "../../src/client/features/settings/ui/SettingsModal.js";
 import { UsageModelSettings } from "../../src/client/features/settings/ui/UsageModelSettings.js";
+import { UsageResetCards } from "../../src/client/features/settings/ui/UsageResetCards.js";
+import type { WebuiAccountWorkflowsConsumer } from "../../src/client/features/account/bindings/use-account-workflows.public.js";
 
 /* The settings pages used to carry a frame each — a page column, a section
  * title, a card — and the copies drifted: the worktree page drew a bordered
@@ -31,6 +33,7 @@ const PAGE_SOURCES = [
   "../../src/client/features/settings/ui/UserProfileSection.tsx",
   "../../src/client/features/settings/ui/MemorySection.tsx",
   "../../src/client/features/settings/ui/UsageModelSettings.tsx",
+  "../../src/client/features/settings/ui/UsageResetCards.tsx",
   "../../src/client/features/review/ui/ReviewSettingsPage.public.tsx",
 ];
 
@@ -133,5 +136,67 @@ describe("the shared settings skeleton", () => {
       </SettingsCard>,
     );
     expect(markup).toContain('class="webui-settings-card"');
+  });
+});
+
+describe("the 限额重置 section renders the shared frame", () => {
+  /** A subscribed account: the reset cards are a plan feature. */
+  const subscribedAccount = {
+    canUseResetCards: true,
+    loadResetCards: () => Promise.resolve(true),
+    loadMoreResetCards: () => Promise.resolve(true),
+    openResetCardHistory: () => Promise.resolve(true),
+    loadMoreResetCardHistory: () => Promise.resolve(true),
+    closeResetCardHistory: () => undefined,
+    selectResetCard: () => undefined,
+    clearResetCardSelection: () => undefined,
+    redeemResetCard: () => Promise.resolve(),
+  } as unknown as WebuiAccountWorkflowsConsumer;
+
+  const state = {
+    cards: {
+      items: [
+        { cardId: "card-1", name: "完全重置", expireTimeMs: Date.UTC(2026, 9, 31) },
+      ],
+      page: 1,
+      loading: false,
+      hasMore: false,
+      retryMore: false,
+    },
+    total: 1,
+    history: { items: [], page: 0, loading: false, hasMore: true, retryMore: false },
+    phase: "idle" as const,
+    dialogOpen: false,
+    historyOpen: false,
+  };
+
+  it("renders the section title, the card and the rows the page renders", () => {
+    const markup = renderToStaticMarkup(
+      <UsageResetCards account={subscribedAccount} state={state} />,
+    );
+    expect(markup).toContain('class="webui-settings-section"');
+    expect(markup).toContain('class="webui-settings-card"');
+    expect(markup).toContain('class="webui-settings-row"');
+    expect(markup).toContain("<h3>限额重置</h3>");
+    // The history is the section's action, not a stray link under the list.
+    expect(markup).toContain('class="webui-settings-section-actions"');
+  });
+
+  it("uses the page's own button, not a border of its own", () => {
+    const markup = renderToStaticMarkup(
+      <UsageResetCards account={subscribedAccount} state={state} />,
+    );
+    expect(markup).toContain("webui-mavis-button");
+    expect(markup).not.toContain("border-border_default");
+  });
+
+  it("shows no section at all for an account without a plan", () => {
+    const markup = renderToStaticMarkup(
+      <UsageResetCards
+        account={{ ...subscribedAccount, canUseResetCards: false } as unknown as WebuiAccountWorkflowsConsumer}
+        state={state}
+      />,
+    );
+    expect(markup).toBe("");
   });
 });

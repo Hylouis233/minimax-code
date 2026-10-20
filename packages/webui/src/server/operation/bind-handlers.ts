@@ -106,6 +106,11 @@ import {
   cancelAccountLoginOperation,
   getUsageQuotaOperation,
   getAccountStatusOperation,
+  getCreditFallbackOperation,
+  setCreditFallbackOperation,
+  listResetCardsOperation,
+  useResetCardOperation,
+  queryResetCardFlowsOperation,
 } from "./account.js";
 
 import {
@@ -541,6 +546,31 @@ export const WEBUI_OPERATION_BINDINGS = {
   }),
   getUsageQuota: bind("account")("getUsageQuota")("getUsageQuota")({
     operation: getUsageQuotaOperation,
+    args: (body) => [body],
+    result: identity,
+  }),
+  getCreditFallback: bind("account")("getCreditFallback")("getCreditFallback")({
+    operation: getCreditFallbackOperation,
+    args: () => [],
+    result: identity,
+  }),
+  setCreditFallback: bind("account")("setCreditFallback")("setCreditFallback")({
+    operation: setCreditFallbackOperation,
+    args: (body) => [body],
+    result: identity,
+  }),
+  listResetCards: bind("account")("listResetCards")("listResetCards")({
+    operation: listResetCardsOperation,
+    args: (body) => [body],
+    result: identity,
+  }),
+  useResetCard: bind("account")("useResetCard")("useResetCard")({
+    operation: useResetCardOperation,
+    args: (body) => [body],
+    result: identity,
+  }),
+  queryResetCardFlows: bind("account")("queryResetCardFlows")("queryResetCardFlows")({
+    operation: queryResetCardFlowsOperation,
     args: (body) => [body],
     result: identity,
   }),

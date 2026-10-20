@@ -11,7 +11,23 @@ import { toWebuiRecord } from "./result-conversion.js";
 
 export function createAccountAdapter(
   host: WebuiRuntimeHostHandle,
-): Pick<WebuiHarnessPort, "getUsageQuota" | "getSigninPanel" | "claimSignin" | "beginAccountLogin" | "getAccountLoginStatus" | "cancelAccountLogin" | "signOutAccount" | "getAccountStatus" | "getSessionUsage"> {
+): Pick<
+  WebuiHarnessPort,
+  | "getUsageQuota"
+  | "getCreditFallback"
+  | "setCreditFallback"
+  | "listResetCards"
+  | "useResetCard"
+  | "queryResetCardFlows"
+  | "getSigninPanel"
+  | "claimSignin"
+  | "beginAccountLogin"
+  | "getAccountLoginStatus"
+  | "cancelAccountLogin"
+  | "signOutAccount"
+  | "getAccountStatus"
+  | "getSessionUsage"
+> {
   return {
     async getUsageQuota(request) {
       const getUsageQuota = requireHostSlot(
@@ -19,6 +35,46 @@ export function createAccountAdapter(
         "the usage quota client",
       );
       return getUsageQuota.call(host, request ?? {});
+    },
+
+    async getCreditFallback() {
+      const getCreditFallback = requireHostSlot(
+        host.getCreditFallback,
+        "the account billing client",
+      );
+      return getCreditFallback.call(host);
+    },
+
+    async setCreditFallback(request) {
+      const setCreditFallback = requireHostSlot(
+        host.setCreditFallback,
+        "the account billing client",
+      );
+      return setCreditFallback.call(host, request);
+    },
+
+    async listResetCards(request) {
+      const listResetCards = requireHostSlot(
+        host.listResetCards,
+        "the account billing client",
+      );
+      return listResetCards.call(host, request);
+    },
+
+    async useResetCard(request) {
+      const useResetCard = requireHostSlot(
+        host.useResetCard,
+        "the account billing client",
+      );
+      return useResetCard.call(host, request);
+    },
+
+    async queryResetCardFlows(request) {
+      const queryResetCardFlows = requireHostSlot(
+        host.queryResetCardFlows,
+        "the account billing client",
+      );
+      return queryResetCardFlows.call(host, request);
     },
 
     async getSigninPanel() {

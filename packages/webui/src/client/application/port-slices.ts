@@ -199,6 +199,11 @@ const SETTINGS_KEYS = [
 
 const ACCOUNT_KEYS = [
   "getUsageQuota",
+  "getCreditFallback",
+  "setCreditFallback",
+  "listResetCards",
+  "useResetCard",
+  "queryResetCardFlows",
   "getSigninPanel",
   "claimSignin",
   "beginAccountLogin",

@@ -10,12 +10,40 @@ import type {
   WebuiClaimSigninView,
   WebuiSigninPanelView,
 } from "../../../../shared/contracts/account.js";
+import type {
+  WebuiCreditFallbackView,
+  WebuiResetCardFlowsResult,
+  WebuiResetCardListResult,
+  WebuiResetCardUseResult,
+} from "../../../../shared/contracts/account-billing.js";
 import type { WebuiUsageQuotaResult } from "../../../../shared/contracts/usage-quota.js";
 
 export interface AccountPort {
   readonly getUsageQuota?: (request?: {
     readonly forceRefresh?: boolean;
   }) => Promise<WebuiUsageQuotaResult>;
+  /** Whether chat usage may fall back to credits once the plan quota is spent. */
+  readonly getCreditFallback?: () => Promise<WebuiCreditFallbackView>;
+  /** Turns the credit fallback on or off; the answer is the account's verdict. */
+  readonly setCreditFallback?: (request: {
+    readonly enabled: boolean;
+  }) => Promise<WebuiCreditFallbackView>;
+  /** One page of the account's redeemable reset cards. */
+  readonly listResetCards?: (request?: {
+    readonly page?: number;
+    readonly size?: number;
+  }) => Promise<WebuiResetCardListResult>;
+  /** Redeems one reset card. */
+  readonly useResetCard?: (request: {
+    readonly sourceType?: string;
+    readonly outBizNo?: string;
+  }) => Promise<WebuiResetCardUseResult>;
+  /** One page of the reset-card history. */
+  readonly queryResetCardFlows?: (request?: {
+    readonly page?: number;
+    readonly size?: number;
+    readonly createTimeMs?: number;
+  }) => Promise<WebuiResetCardFlowsResult>;
   readonly getSigninPanel?: () => Promise<WebuiSigninPanelView>;
   readonly claimSignin?: () => Promise<WebuiClaimSigninView>;
   /** Account login (device authorization) and its polling/cancel pair.

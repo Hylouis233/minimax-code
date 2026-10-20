@@ -320,6 +320,21 @@ class FullPort implements WebuiHarnessPort {
   async getUsageQuota() {
     return { signedIn: false as const };
   }
+  async getCreditFallback() {
+    return { resolved: false as const };
+  }
+  async setCreditFallback() {
+    return { resolved: false as const };
+  }
+  async listResetCards() {
+    return { cards: [], total: 0 };
+  }
+  async useResetCard() {
+    return { outcome: "UNKNOWN" as const };
+  }
+  async queryResetCardFlows() {
+    return { flows: [] };
+  }
   async getSigninPanel() {
     return { scene: 0, days: [] };
   }
@@ -604,7 +619,7 @@ describe("WebUI host-shape invariant (batch C seam)", () => {
     // The bindings materialise from the operation descriptors; we only need
     // to verify the port is accepted and every binding is registered.
     const entries = createBindingEntries(port);
-    expect(entries.size).toBe(86);
+    expect(entries.size).toBe(91);
   });
 
   // --------------------------------------------------------------------

@@ -96,6 +96,12 @@ import type { WebuiHostPrerequisiteFacts } from "../shared/capability-manifest.j
 import type { WebuiVersionInfo } from "../shared/contracts/version.js";
 import type { WebuiUsageQuotaResult } from "../shared/contracts/usage-quota.js";
 import type {
+  WebuiCreditFallbackView,
+  WebuiResetCardFlowsResult,
+  WebuiResetCardListResult,
+  WebuiResetCardUseResult,
+} from "../shared/contracts/account-billing.js";
+import type {
   WebuiAccountLoginView,
   WebuiClaimSigninView,
   WebuiSigninPanelView,
@@ -423,6 +429,30 @@ export interface WebuiHarnessPort {
   getUsageQuota(request?: {
     readonly forceRefresh?: boolean;
   }): Promise<WebuiUsageQuotaResult>;
+  /**
+   * The account-billing surface of the usage-and-model page: whether chat
+   * usage may fall back to credits, and the reset cards the account can
+   * redeem. Not a harness capability — see `usage-quota.ts`; the assembly
+   * supplies the client (so the method is unconditionally present on the port
+   * the service binds to, even though the live `CliService` does not own it).
+   */
+  getCreditFallback(): Promise<WebuiCreditFallbackView>;
+  setCreditFallback(request: {
+    readonly enabled: boolean;
+  }): Promise<WebuiCreditFallbackView>;
+  listResetCards(request?: {
+    readonly page?: number;
+    readonly size?: number;
+  }): Promise<WebuiResetCardListResult>;
+  useResetCard(request: {
+    readonly sourceType?: string;
+    readonly outBizNo?: string;
+  }): Promise<WebuiResetCardUseResult>;
+  queryResetCardFlows(request?: {
+    readonly page?: number;
+    readonly size?: number;
+    readonly createTimeMs?: number;
+  }): Promise<WebuiResetCardFlowsResult>;
   /**
    * Auth invalidation is owned by the auth context reader, not the
    * harness. The assembly supplies the invalidator alongside the host,

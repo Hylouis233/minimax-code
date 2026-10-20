@@ -5,6 +5,8 @@ import { useWebuiAccountWorkflows, useWebuiAccountWorkflowsState } from "../../.
 import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
 import { SettingsPage, SettingsSection } from "../../../ui/settings-layout.js";
 import { formatResetLabel, getActiveSourceBadge, type ProviderHeaderDraft } from "../../../features/models/projection/usage-settings.public.js";
+import { formatPlanName, formatPlanSourceLabel, hasWebuiPlan } from "../projection/usage-plan.js";
+import { UsageResetCards } from "./UsageResetCards.js";
 import { IconButton, RefreshIcon } from "../../../ui/form-atoms.js";
 import { ProviderFormPanel, type WebuiProviderFormCommands } from "../../../features/models/ui/ProviderFormPanel.public.js";
 import { useWebuiProviderEditor } from "../../../features/models/bindings/use-provider-editor.public.js";
@@ -109,6 +111,7 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
   useEffect(() => {
     void account?.loadUsage(); void account?.loadApiKeyStatus(); void models?.loadProviders();
     void settings?.loadModelSource(); void account?.loadCodexOAuthStatus();
+    void account?.loadCreditFallback();
   // Owner objects are stable; the initial loads are keyed on the session as before.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
@@ -181,8 +184,27 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
   // two names and the badge are different lengths, and a width that follows
   // the text would move the 自定义模型 button on every switch.
   const source = activeSource ?? (sourceTab === "minimax-api" ? "minimax_api_key" : "token_plan");
-  const sourceLabel = source === "minimax_api_key" ? "MiniMax API" : "Token Plan";
+  // The plan label is the account's, not a constant: the membership answer
+  // says which subscription kind the account has and which tier it is on, and
+  // the legacy "Token Plan" name only belongs to the legacy subscription kind.
+  // Hard-coding it made an M Plan account read as a Token Plan account.
+  const planFacts = quotaView
+    ? {
+        hasTokenPlan: quotaView.hasTokenPlan,
+        tokenPlanTier: quotaView.tokenPlanTier,
+        planName: quotaView.planName,
+        subscriptionType: quotaView.subscriptionType,
+      }
+    : undefined;
+  const planSourceLabel = formatPlanSourceLabel(planFacts?.subscriptionType);
+  const sourceLabel = source === "minimax_api_key" ? "MiniMax API" : planSourceLabel;
   const sourceBadge = getActiveSourceBadge(sourceLoaded, activeSource, quotaView?.hasTokenPlan === true);
+  // The credit fallback is the account's own flag. The Desktop shows the row
+  // only once the account has produced a verdict, and a signed-out or
+  // unanswered account gets no row rather than a switch that says "off".
+  const creditFallback = accountState.creditFallback;
+  const creditResolved = creditFallback.enabled !== undefined;
+  const creditLoading = creditFallback.status === "loading" && !creditResolved;
 
 
   return <SettingsPage testId="settings-usage-model">
@@ -192,7 +214,7 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
         <button type="button" data-testid="settings-usage-source-tab" className="flex h-full min-w-[140px] pl-3 pr-1 items-center" onClick={() => setSourceMenuOpen((open) => !open)}>{sourceLabel}{sourceBadge ? <span className={`rounded-[6px] px-1 py-0.5 text-[12px] leading-4 ${sourceBadge === "使用中" ? "bg-bg_status_positive text-icon_status_success" : "bg-[rgba(10,10,10,0.04)] text-[#666]"}`}>{sourceBadge}</span> : null}</button>
         <button type="button" aria-label="选择模型来源" className="flex h-full w-7 items-center justify-center hover:bg-bg_interaction_tertiary_hover" onClick={() => setSourceMenuOpen((open) => !open)}><ChevronDownIcon /></button>
       </div>
-      {sourceMenuOpen ? <div className="absolute left-0 top-full z-10 mt-1 flex min-w-[180px] flex-col rounded-[12px] bg-bg_default_primary p-1.5 shadow-lg"><button type="button" className="flex h-[30px] items-center rounded-[8px] px-3 text-left text-sm hover:bg-bg_interaction_tertiary_hover" onClick={() => { setSourceMenuOpen(false); void chooseSource("token_plan"); }}>Token Plan</button><button type="button" className="flex h-[30px] items-center rounded-[8px] px-3 text-left text-sm hover:bg-bg_interaction_tertiary_hover" onClick={() => { setSourceMenuOpen(false); void chooseSource("minimax_api_key"); }}>MiniMax API</button></div> : null}
+      {sourceMenuOpen ? <div className="absolute left-0 top-full z-10 mt-1 flex min-w-[180px] flex-col rounded-[12px] bg-bg_default_primary p-1.5 shadow-lg"><button type="button" className="flex h-[30px] items-center rounded-[8px] px-3 text-left text-sm hover:bg-bg_interaction_tertiary_hover" onClick={() => { setSourceMenuOpen(false); void chooseSource("token_plan"); }}>{planSourceLabel}</button><button type="button" className="flex h-[30px] items-center rounded-[8px] px-3 text-left text-sm hover:bg-bg_interaction_tertiary_hover" onClick={() => { setSourceMenuOpen(false); void chooseSource("minimax_api_key"); }}>MiniMax API</button></div> : null}
       </div>
       <div className="h-3 w-[0.5px] bg-border_default" />
       <button type="button" className={`h-8 rounded-[8px] px-3 text-[14px] font-medium leading-5 transition-colors ${sourceTab === "custom" ? "bg-bg_interaction_tertiary_hover text-text_default_primary" : "text-text_default_secondary hover:bg-bg_interaction_tertiary_hover"}`} onClick={() => setSourceTab("custom")}>自定义模型</button>
@@ -201,12 +223,13 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
     {sourceTab === "token-plan" ? <section className="flex w-full flex-col gap-4" data-testid="settings-usage-token-plan">
       {quotaLoading ? <p>加载中…</p> : quotaError ? <div role="alert" className="flex items-center gap-3"><span>加载失败</span><button type="button" onClick={() => void loadQuota()}>重试</button></div> : !quotaView ? <p>登录后查看用量</p> : <>
         <SettingsSection title="当前套餐" testId="settings-usage-plan">
-            <div className="flex min-h-[64px] w-full items-center gap-6 overflow-hidden rounded-[12px] py-2 pl-3 pr-2"><div className="min-w-0"><span className="block text-[14px] leading-5">{quotaView.tokenPlanTier || (quotaView.hasTokenPlan ? "Token Plan" : "未订阅 Token Plan")}</span>{quotaView.tokenPlanExpiresAt ? <span className="mt-1 block text-[12px] leading-4 text-text_default_secondary">{new Date(quotaView.tokenPlanExpiresAt < 1e12 ? quotaView.tokenPlanExpiresAt * 1000 : quotaView.tokenPlanExpiresAt).toLocaleDateString("sv-SE").replaceAll("-", ".")}{quotaView.willRenewal ? " 自动续费" : ""}</span> : null}</div></div>
+            <div className="flex min-h-[64px] w-full items-center gap-6 overflow-hidden rounded-[12px] py-2 pl-3 pr-2"><div className="min-w-0"><span className="block text-[14px] leading-5" data-testid="settings-usage-plan-name">{planFacts ? formatPlanName(planFacts) : ""}</span>{quotaView.tokenPlanExpiresAt ? <span className="mt-1 block text-[12px] leading-4 text-text_default_secondary">{new Date(quotaView.tokenPlanExpiresAt < 1e12 ? quotaView.tokenPlanExpiresAt * 1000 : quotaView.tokenPlanExpiresAt).toLocaleDateString("sv-SE").replaceAll("-", ".")}{quotaView.willRenewal ? " 自动续费" : " 到期"}</span> : planFacts && !hasWebuiPlan(planFacts) ? <span className="mt-1 block text-[12px] leading-4 text-text_default_secondary" data-testid="settings-usage-plan-state">未订阅 M Plan</span> : null}</div></div>
             <div className="h-[0.5px] bg-border_default" />
             <div className="flex min-h-[64px] w-full items-center gap-6 overflow-hidden rounded-[12px] py-2 pl-3 pr-2"><div><span className="block text-[14px] leading-5">积分</span><span className="mt-1 block text-[12px] leading-4 text-text_default_secondary">剩余 {quotaView.purchasedCredits !== undefined && quotaView.freeCredits !== undefined ? `${formatWebuiCredits(quotaView.purchasedCredits)} + ${formatWebuiCredits(quotaView.freeCredits)}` : formatWebuiCredits(quotaView.creditBalance)}</span></div></div>
         </SettingsSection>
         {quotaData ? <SettingsSection title="用量" testId="settings-usage-limits">{([["5 小时限额", quotaData.fiveHour], ["周限额", quotaData.weekly], ...(quotaData.video ? [["视频限额", quotaData.video] as const] : [])] as const).map(([label, window]) => { const value = recordOf(window); const usedPercent = typeof value.usedPercent === "number" ? value.usedPercent : undefined; const usedCount = typeof value.usedCount === "number" ? value.usedCount : undefined; const totalCount = typeof value.totalCount === "number" ? value.totalCount : undefined; const percent = Math.round(usedPercent ?? (totalCount ? (usedCount ?? 0) / totalCount * 100 : 0)); const resetAtMs = typeof value.resetAtMs === "number" ? value.resetAtMs : undefined; const reset = resetLabel(resetAtMs); return <div key={label} className="flex min-h-[72px] flex-col justify-center gap-2 overflow-hidden rounded-[12px] py-2 pl-3 pr-2"><div className="flex items-center justify-between gap-3"><span className="text-[14px] font-normal leading-5 text-text_default_primary">{label}</span><span className="shrink-0 text-[13px] leading-5 text-text_default_secondary">{window.unlimited ? "无限制" : usedCount !== undefined ? `${usedCount}/${totalCount ?? 0}` : `${usedPercent ?? 0}% / 100%`}</span></div><div className="h-1 w-full overflow-hidden rounded-full bg-bg_interaction_tertiary_press"><div className="h-full rounded-full bg-text_default_primary" style={{ width: `${Math.max(0, Math.min(100, percent))}%` }} /></div>{reset ? <span className="text-[12px] font-normal leading-4 text-text_default_secondary">{reset}</span> : null}</div>; })}</SettingsSection> : null}
-        <SettingsSection title={<>积分 <InfoIcon /></>} testId="settings-usage-points"><div className="flex min-h-[48px] w-full items-center justify-between gap-4 px-3 py-1"><span>开启后，可以在对话中消耗你的积分（含赠予积分）。</span><ToggleSwitch checked={false} label="消耗积分" disabled title="Disabled (not yet wired)" className="shrink-0 disabled:opacity-60" /></div></SettingsSection>
+        <SettingsSection title={<>积分 <InfoIcon /></>} testId="settings-usage-points">{creditLoading ? <div data-testid="settings-usage-credit-fallback-loading" className="mx-3 h-[36px] w-full animate-pulse rounded-[12px] bg-bg_interaction_tertiary_press" /> : creditResolved ? <div data-testid="settings-usage-credit-fallback" className="flex min-h-[48px] w-full items-center justify-between gap-4 px-3 py-1"><span>开启后，可以在对话中消耗你的积分（含赠予积分）。</span><ToggleSwitch checked={creditFallback.enabled === true} label="M Plan 达限后使用积分" disabled={creditFallback.saving} onChange={(next) => { void account?.setCreditFallback(next); }} testId="settings-usage-credit-fallback-toggle" className="shrink-0 disabled:opacity-60" /></div> : null}</SettingsSection>
+        <UsageResetCards account={account} state={accountState.resetCards} />
       </>}
     </section> : null}
 

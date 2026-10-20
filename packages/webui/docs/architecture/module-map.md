@@ -42,7 +42,7 @@ business is — and what it is not — is in `../client/ownership.md`.
 | `runtime/port.ts` | `WebuiHarnessPort` — the boundary to the harness: the callable, `AsyncIterable` and cancellation types plus one method per operation. It declares no wire DTO; those live in `shared/contracts/<domain>.ts`. |
 | `runtime/harness/` | The per-domain adapters that implement the port by delegating to the host handle: `host-contract.ts` (`WebuiRuntimeHostHandle`, `WebuiRuntimeCliService`), `adapter.ts` (`createHarnessPortFromHost`), plus `account`, `execution`, `interactions`, `models-plugins`, `requirements`, `sessions`, `settings`, `workspace`. |
 | `runtime/auth-session.ts`, `runtime/auth-context.ts` | The one OAuth core with its lease and refresh timer, and the per-request auth context. |
-| `runtime/account-login.ts`, `runtime/check-in.ts`, `runtime/usage-quota.ts`, `runtime/usage-quota-projection.ts`, `runtime/signing.ts` | Account login, daily check-in, the quota client and its pure projection, request signing. |
+| `runtime/account-login.ts`, `runtime/check-in.ts`, `runtime/usage-quota.ts`, `runtime/usage-quota-projection.ts`, `runtime/reset-card-projection.ts`, `runtime/signing.ts` | Account login, daily check-in, the account-billing client (the quota, the credit fallback and the reset cards) and its two pure projections, request signing. |
 | `runtime/terminal.ts` | The terminal process manager. One per WebUI service, not a host-wide singleton. |
 | `runtime/mcode-tools.ts`, `runtime/mcode-tools-environment.ts`, `runtime/mcode-tools-entry.ts` | The mcode-tools broker, the child-process environment projection and the embedded entry loader. |
 | `runtime/workspace-archive.ts` + `runtime/workspace-archive/` | Archive listing and extraction: `zip-adapter.ts` and `tar-adapter.ts` over `archive-policy.ts`, `archive-listing.ts`, `archive-filesystem.ts`, `archive-types.ts`. |
@@ -81,7 +81,7 @@ The binding roster and the compiler enforcement that keeps it in step with the p
 
 | Module | Role |
 | --- | --- |
-| `shared/contracts/<domain>.ts` | The request/result DTOs both sides of the boundary share — account, canvas, commands, goal, interactions, messages, models, personalization, queue, review, session, stream, terminal, usage-quota, version, workspace. |
+| `shared/contracts/<domain>.ts` | The request/result DTOs both sides of the boundary share — account, account-billing (the credit fallback and the reset cards), canvas, commands, goal, interactions, messages, models, personalization, queue, review, session, stream, terminal, usage-quota, version, workspace. |
 | `shared/envelope.ts` | Frame shape, protocol version, error codes. |
 | `shared/operation-names.ts` | Every `*_OPERATION_NAME` constant and the `OperationSpec` map that unary request types are derived from. |
 | `shared/plugin-management.ts` | `WebuiPluginManagementAction` and the plugin wire shapes. |

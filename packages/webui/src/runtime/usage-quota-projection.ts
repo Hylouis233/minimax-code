@@ -23,6 +23,8 @@ export interface ProjectedMembership {
   readonly opGroupId?: string;
   readonly creditBalance?: string;
   readonly tokenPlanTier?: string;
+  readonly subscriptionType?: string;
+  readonly planName?: string;
   readonly tokenPlanExpiresAt?: number;
   readonly upgradeAction?: string;
   readonly willRenewal?: boolean;
@@ -40,6 +42,12 @@ export function projectMembership(body: Record<string, unknown>): ProjectedMembe
     readString(creditSummary, undefined, "total_remaining_amount") ??
     readNumberishString(body, data, "opcredit_balance");
   const tokenPlanTier = readString(body, data, "token_plan_tier");
+  // The Desktop reads the plan name from two places: `token_plan_tier` when the
+  // account is subscribed and `plan_name` when it is not. `subscription_type`
+  // tells the two subscription kinds apart — the legacy `token_plan` one still
+  // reads "Token Plan", every other kind reads "M Plan".
+  const subscriptionType = readString(body, data, "subscription_type");
+  const planName = readString(body, data, "plan_name");
   const tokenPlanExpiresAt = finiteNumber(body.token_plan_expires_at ?? data?.token_plan_expires_at);
   const upgradeAction = readString(body, data, "upgrade_action");
   const willRenewalValue = body.will_renewal ?? data?.will_renewal;
@@ -51,6 +59,8 @@ export function projectMembership(body: Record<string, unknown>): ProjectedMembe
     ...(opGroupId ? { opGroupId } : {}),
     ...(creditBalance !== undefined ? { creditBalance } : {}),
     ...(tokenPlanTier ? { tokenPlanTier } : {}),
+    ...(subscriptionType ? { subscriptionType } : {}),
+    ...(planName ? { planName } : {}),
     ...(tokenPlanExpiresAt !== undefined ? { tokenPlanExpiresAt } : {}),
     ...(upgradeAction ? { upgradeAction } : {}),
     ...(willRenewal !== undefined ? { willRenewal } : {}),
@@ -68,6 +78,8 @@ export function projectPersonalWorkspace(
       hasTokenPlan?: boolean;
       creditBalance?: string;
       tokenPlanTier?: string;
+      subscriptionType?: string;
+      planName?: string;
       tokenPlanExpiresAt?: number;
       upgradeAction?: string;
       willRenewal?: boolean;
@@ -97,6 +109,8 @@ export function projectPersonalWorkspace(
         ? { creditBalance: membership.creditBalance }
         : {}),
       ...(membership.tokenPlanTier ? { tokenPlanTier: membership.tokenPlanTier } : {}),
+      ...(membership.subscriptionType ? { subscriptionType: membership.subscriptionType } : {}),
+      ...(membership.planName ? { planName: membership.planName } : {}),
       ...(membership.tokenPlanExpiresAt !== undefined ? { tokenPlanExpiresAt: membership.tokenPlanExpiresAt } : {}),
       ...(membership.upgradeAction ? { upgradeAction: membership.upgradeAction } : {}),
       ...(membership.willRenewal !== undefined ? { willRenewal: membership.willRenewal } : {}),
@@ -120,6 +134,8 @@ export function mergeMembership(
   const creditBalance = scoped.creditBalance ?? personal.creditBalance;
   const opGroupId = personal.opGroupId ?? scoped.opGroupId;
   const tokenPlanTier = scoped.tokenPlanTier ?? personal.tokenPlanTier;
+  const subscriptionType = scoped.subscriptionType ?? personal.subscriptionType;
+  const planName = scoped.planName ?? personal.planName;
   const tokenPlanExpiresAt = scoped.tokenPlanExpiresAt ?? personal.tokenPlanExpiresAt;
   const upgradeAction = scoped.upgradeAction ?? personal.upgradeAction;
   const willRenewal = scoped.willRenewal ?? personal.willRenewal;
@@ -130,6 +146,8 @@ export function mergeMembership(
     ...(opGroupId ? { opGroupId } : {}),
     ...(creditBalance !== undefined ? { creditBalance } : {}),
     ...(tokenPlanTier ? { tokenPlanTier } : {}),
+    ...(subscriptionType ? { subscriptionType } : {}),
+    ...(planName ? { planName } : {}),
     ...(tokenPlanExpiresAt !== undefined ? { tokenPlanExpiresAt } : {}),
     ...(upgradeAction ? { upgradeAction } : {}),
     ...(willRenewal !== undefined ? { willRenewal } : {}),

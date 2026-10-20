@@ -28,6 +28,11 @@ import type {
   WebuiClaimSigninView,
   WebuiSigninPanelView,
 } from "../../../../shared/contracts/account.js";
+import type {
+  WebuiResetCardFlowView,
+  WebuiResetCardOutcome,
+  WebuiResetCardView,
+} from "../../../../shared/contracts/account-billing.js";
 import type { WebuiUsageQuotaResult } from "../../../../shared/contracts/usage-quota.js";
 
 /** The transport methods this owner drives. Absent means "not wired". */
@@ -35,6 +40,11 @@ export type WebuiAccountPortSlice = Pick<
   AccountPort,
   | "getAccountStatus"
   | "getUsageQuota"
+  | "getCreditFallback"
+  | "setCreditFallback"
+  | "listResetCards"
+  | "useResetCard"
+  | "queryResetCardFlows"
   | "getSigninPanel"
   | "claimSignin"
   | "beginAccountLogin"
@@ -88,6 +98,24 @@ export interface WebuiAccountSignOutState {
 }
 
 /**
+ * The credit-fallback switch of the usage-and-model page: whether chat usage
+ * may spend credits once the plan quota is exhausted.
+ *
+ * `enabled` is absent until the account API has produced a verdict, and
+ * `resolved` says whether it did. A signed-out account leaves it unresolved
+ * rather than reporting "off": the row hides itself in that case, and a switch
+ * that says "off" would claim a setting the account does not have.
+ */
+export interface WebuiCreditFallbackState {
+  readonly status: "idle" | "loading" | "ready" | "error";
+  readonly enabled?: boolean;
+  readonly resolved: boolean;
+  /** True while a write is in flight; the switch is disabled meanwhile. */
+  readonly saving: boolean;
+  readonly error?: string;
+}
+
+/**
  * One credential-status read. `error` carries the unavailable message too: an
  * un-wired capability and a failed read are both "no answer", and the surface
  * that renders them already distinguishes the two by their text.
@@ -103,6 +131,8 @@ export interface WebuiAccountWorkflowsState {
   readonly apiKeyStatus: WebuiAccountCredentialStatusState;
   readonly codexOAuth: WebuiAccountCredentialStatusState;
   readonly usage: WebuiUsageQuotaState;
+  readonly creditFallback: WebuiCreditFallbackState;
+  readonly resetCards: WebuiResetCardState;
   readonly signin: WebuiSigninState;
   readonly login: WebuiAccountLoginState;
   readonly signOut: WebuiAccountSignOutState;
@@ -132,11 +162,94 @@ export const initialWebuiAccountSignOutState: WebuiAccountSignOutState = {
 export const initialWebuiAccountCredentialStatusState: WebuiAccountCredentialStatusState =
   { status: "idle" };
 
+export const initialWebuiCreditFallbackState: WebuiCreditFallbackState = {
+  status: "idle",
+  resolved: false,
+  saving: false,
+};
+
+/**
+ * The redemption phase. The names and the order are the Desktop's: the phase
+ * decides which status line the card panel shows and which actions it offers,
+ * so a phase that is not listed here has no meaning to copy.
+ */
+export type WebuiResetCardPhase =
+  | "idle"
+  | "using"
+  | "refreshing"
+  | "success"
+  | "replayed"
+  | "unavailable"
+  | "offline"
+  | "retryable"
+  | "busy"
+  | "unknown"
+  | "refresh_failed";
+
+/** One paged list — the cards or the history. */
+export interface WebuiResetCardPageState<T = WebuiResetCardView> {
+  readonly items: readonly T[];
+  readonly page: number;
+  readonly loading: boolean;
+  readonly error?: string;
+  readonly hasMore: boolean;
+  /** True when a "load more" failed, so the retry belongs to that button. */
+  readonly retryMore: boolean;
+}
+
+/**
+ * The reset-card state: the card list, the history and the phase of the last
+ * redemption.
+ *
+ * The redemption answer is not a boolean. The account API distinguishes "the
+ * quota was reset" from "this card was already used", "this card expired" and
+ * "the request may or may not have gone through", and the last one must not be
+ * reported as a failure — the card may well have been spent.
+ */
+export interface WebuiResetCardState {
+  readonly cards: WebuiResetCardPageState;
+  readonly total: number;
+  readonly history: WebuiResetCardPageState<WebuiResetCardFlowView>;
+  readonly phase: WebuiResetCardPhase;
+  readonly error?: string;
+  readonly selected?: WebuiResetCardView;
+  readonly dialogOpen: boolean;
+  readonly historyOpen: boolean;
+}
+
+export const initialWebuiResetCardPageState: WebuiResetCardPageState = {
+  items: [],
+  page: 0,
+  loading: false,
+  hasMore: true,
+  retryMore: false,
+};
+
+export const initialWebuiResetCardState: WebuiResetCardState = {
+  cards: initialWebuiResetCardPageState,
+  total: 0,
+  history: { ...initialWebuiResetCardPageState, items: [] as readonly WebuiResetCardFlowView[] },
+  phase: "idle",
+  dialogOpen: false,
+  historyOpen: false,
+};
+
+/**
+ * The history window the Desktop asks for: the last 30 days. The account API
+ * takes the lower bound as a timestamp, so the window is computed per read.
+ */
+export const WEBUI_RESET_CARD_HISTORY_WINDOW_MS = 30 * 24 * 60 * 60 * 1_000;
+
+/** The page size the Desktop uses for both the card list and the history. */
+const RESET_CARD_PAGE_SIZE = 20;
+
 export const initialWebuiAccountWorkflowsState: WebuiAccountWorkflowsState = {
   account: initialWebuiAccountRecordState,
   apiKeyStatus: initialWebuiAccountCredentialStatusState,
   codexOAuth: initialWebuiAccountCredentialStatusState,
   usage: initialWebuiUsageQuotaState,
+  creditFallback: initialWebuiCreditFallbackState,
+  resetCards: initialWebuiResetCardState,
   signin: initialWebuiSigninState,
   login: initialWebuiAccountLoginState,
   signOut: initialWebuiAccountSignOutState,
@@ -160,7 +273,44 @@ export interface WebuiAccountWorkflows {
   /** Read the account record. A superseded answer is dropped. */
   readonly loadAccount: (sessionId?: string) => Promise<void>;
   /** Read the usage quota. `forceRefresh` asks the runtime to bypass its cache. */
-  readonly loadUsage: (forceRefresh?: boolean) => Promise<void>;
+  readonly loadUsage: (forceRefresh?: boolean) => Promise<boolean>;
+  /**
+   * Read the credit-fallback switch. A superseded answer is dropped, like
+   * every other read this owner drives.
+   */
+  readonly loadCreditFallback: () => Promise<void>;
+  /**
+   * Turn the credit fallback on or off. The state the switch ends up in is
+   * the account API's own verdict, not the requested value — the Desktop
+   * re-reads the flag from the response for the same reason.
+   */
+  readonly setCreditFallback: (enabled: boolean) => Promise<void>;
+
+  /**
+   * The reset cards are a plan feature: the Desktop only offers them to a
+   * subscribed account, and so does this owner.
+   */
+  readonly canUseResetCards: boolean;
+  /** Read the first page of the account's redeemable reset cards. */
+  readonly loadResetCards: () => Promise<boolean>;
+  /** Read the next page of the card list. */
+  readonly loadMoreResetCards: () => Promise<boolean>;
+  /** Open the history panel and read its first page. */
+  readonly openResetCardHistory: () => Promise<boolean>;
+  /** Read the next page of the history. */
+  readonly loadMoreResetCardHistory: () => Promise<boolean>;
+  /** Close the history panel. */
+  readonly closeResetCardHistory: () => void;
+  /** Choose the card the confirmation panel is about. */
+  readonly selectResetCard: (card: WebuiResetCardView) => void;
+  /** Drop the chosen card without redeeming it. */
+  readonly clearResetCardSelection: () => void;
+  /**
+   * Redeem the chosen card. The phase it ends in is the account API's verdict,
+   * not a success flag: an answer that cannot be trusted becomes `unknown`, and
+   * the card stays selected so the user can retry the same card.
+   */
+  readonly redeemResetCard: () => Promise<void>;
 
   /** Read the daily check-in panel. */
   readonly loadSigninPanel: () => Promise<void>;
@@ -473,22 +623,358 @@ export function createWebuiAccountWorkflows(deps: {
     }
   };
 
-  const loadUsage = async (forceRefresh = false): Promise<void> => {
+  const loadCreditFallback = async (): Promise<void> => {
+    const read = port.getCreditFallback;
+    const key = "creditFallback";
+    const version = bump(key);
+    if (!read) {
+      set((current) => ({
+        ...current,
+        creditFallback: { status: "idle", resolved: false, saving: false },
+      }));
+      return;
+    }
+    set((current) => ({
+      ...current,
+      creditFallback: { ...current.creditFallback, status: "loading" },
+    }));
+    try {
+      const view = await read();
+      if (disposed || !isCurrent(key, version)) return;
+      set((current) => ({
+        ...current,
+        creditFallback: {
+          status: "ready",
+          resolved: view.resolved,
+          ...(view.enabled !== undefined ? { enabled: view.enabled } : {}),
+          saving: false,
+        },
+      }));
+    } catch (reason) {
+      if (disposed || !isCurrent(key, version)) return;
+      set((current) => ({
+        ...current,
+        creditFallback: {
+          status: "error",
+          resolved: false,
+          saving: false,
+          error: message(reason),
+        },
+      }));
+    }
+  };
+
+  const setCreditFallback = async (enabled: boolean): Promise<void> => {
+    const write = port.setCreditFallback;
+    if (!write) return;
+    const key = "creditFallback";
+    const version = bump(key);
+    set((current) => ({
+      ...current,
+      creditFallback: { ...current.creditFallback, saving: true, error: undefined },
+    }));
+    try {
+      const view = await write({ enabled });
+      if (disposed || !isCurrent(key, version)) return;
+      set((current) => ({
+        ...current,
+        creditFallback: {
+          status: "ready",
+          resolved: view.resolved,
+          ...(view.enabled !== undefined ? { enabled: view.enabled } : {}),
+          saving: false,
+        },
+      }));
+    } catch (reason) {
+      if (disposed || !isCurrent(key, version)) return;
+      set((current) => ({
+        ...current,
+        creditFallback: {
+          ...current.creditFallback,
+          saving: false,
+          error: message(reason),
+        },
+      }));
+    }
+  };
+
+  const loadResetCards = async (): Promise<boolean> => loadResetCardPage("cards", 1);
+
+  const loadMoreResetCards = async (): Promise<boolean> => {
+    const page = state.resetCards.cards;
+    if (!page.hasMore || page.loading) return false;
+    return loadResetCardPage("cards", page.page + 1, true);
+  };
+
+  const openResetCardHistory = async (): Promise<boolean> => {
+    set((current) => ({
+      ...current,
+      resetCards: { ...current.resetCards, historyOpen: true },
+    }));
+    return loadResetCardPage("history", 1);
+  };
+
+  const loadMoreResetCardHistory = async (): Promise<boolean> => {
+    const page = state.resetCards.history;
+    if (!page.hasMore || page.loading) return false;
+    return loadResetCardPage("history", page.page + 1, true);
+  };
+
+  const closeResetCardHistory = (): void => {
+    set((current) => ({
+      ...current,
+      resetCards: { ...current.resetCards, historyOpen: false },
+    }));
+  };
+
+  const selectResetCard = (card: WebuiResetCardView): void => {
+    set((current) => ({
+      ...current,
+      resetCards: {
+        ...current.resetCards,
+        selected: card,
+        phase: "idle",
+        error: undefined,
+      },
+    }));
+  };
+
+  const clearResetCardSelection = (): void => {
+    set((current) => ({
+      ...current,
+      resetCards: { ...current.resetCards, selected: undefined },
+    }));
+  };
+
+  /**
+   * Redeems the chosen card.
+   *
+   * The order of the checks is the Desktop's: the card has to still be on the
+   * list and unexpired, the account has to be online, and only then is the
+   * request sent. The answer is mapped to a phase rather than to a boolean, so
+   * "could not tell" stays a phase the user can retry from instead of becoming
+   * a failure that pretends the card is untouched.
+   */
+  const redeemResetCard = async (): Promise<void> => {
+    const read = port.useResetCard;
+    const selected = state.resetCards.selected;
+    if (!read || !selected) return;
+    if (!isOnline()) {
+      set((current) => ({
+        ...current,
+        resetCards: { ...current.resetCards, phase: "offline", error: undefined },
+      }));
+      return;
+    }
+    set((current) => ({
+      ...current,
+      resetCards: { ...current.resetCards, phase: "using", error: undefined },
+    }));
+    let outcome: WebuiResetCardOutcome;
+    try {
+      const result = await read({
+        ...(selected.sourceType !== undefined ? { sourceType: selected.sourceType } : {}),
+        ...(selected.outBizNo !== undefined ? { outBizNo: selected.outBizNo } : {}),
+      });
+      outcome = result.outcome;
+    } catch (reason) {
+      set((current) => ({
+        ...current,
+        resetCards: { ...current.resetCards, phase: "unknown", error: message(reason) },
+      }));
+      return;
+    }
+    if (outcome === "SUCCESS" || outcome === "REPLAYED") {
+      const redeemedPhase: WebuiResetCardPhase =
+        outcome === "SUCCESS" ? "success" : "replayed";
+      set((current) => ({
+        ...current,
+        resetCards: {
+          ...current.resetCards,
+          phase: redeemedPhase,
+          selected: undefined,
+        },
+      }));
+      await refreshAfterRedemption(redeemedPhase);
+      return;
+    }
+    if (outcome === "EXPIRED" || outcome === "NOT_FOUND") {
+      set((current) => ({
+        ...current,
+        resetCards: { ...current.resetCards, phase: "unavailable", selected: undefined },
+      }));
+      await loadResetCards();
+      return;
+    }
+    const phase: WebuiResetCardPhase =
+      outcome === "RETRYABLE_FAIL" ? "retryable" : outcome === "LOCK_BUSY" ? "busy" : "unknown";
+    set((current) => ({
+      ...current,
+      resetCards: { ...current.resetCards, phase },
+    }));
+  };
+
+  /**
+   * After a redemption the account's quota, its cards and its history have all
+   * moved. The Desktop reads all three again and restores the redemption's own
+   * phase when the refresh succeeded, so a successful reset does not leave the
+   * panel saying "refreshing" forever.
+   */
+  const refreshAfterRedemption = async (
+    redeemedPhase: WebuiResetCardPhase,
+  ): Promise<void> => {
+    set((current) => ({
+      ...current,
+      resetCards: { ...current.resetCards, phase: "refreshing" },
+    }));
+    const results = await Promise.all([
+      loadUsage(true),
+      loadResetCards(),
+      // The Desktop re-reads the history only when the history panel is open;
+      // a closed panel has nothing to show and no reason to ask.
+      state.resetCards.historyOpen ? loadResetCardPage("history", 1) : Promise.resolve(true),
+    ]);
+    const refreshed = results.every(Boolean);
+    set((current) => ({
+      ...current,
+      resetCards: {
+        ...current.resetCards,
+        phase: refreshed ? redeemedPhase : "refresh_failed",
+      },
+    }));
+  };
+
+  /**
+   * Reads one page of the card list or of the history. A failed "load more"
+   * keeps the rows it already has and marks the retry on that button, so a
+   * failed page does not wipe the list the user is reading.
+   */
+  const loadResetCardPage = async (
+    kind: "cards" | "history",
+    page: number,
+    isMore = false,
+  ): Promise<boolean> => {
+    const key = `resetCards.${kind}`;
+    const version = bump(key);
+    set((current) => ({
+      ...current,
+      resetCards: {
+        ...current.resetCards,
+        [kind]: {
+          ...current.resetCards[kind],
+          loading: true,
+          error: undefined,
+          retryMore: isMore,
+        },
+      },
+    }));
+    try {
+      if (kind === "cards") {
+        const read = port.listResetCards;
+        if (!read) {
+          set((current) => ({
+            ...current,
+            resetCards: {
+              ...current.resetCards,
+              cards: { ...current.resetCards.cards, loading: false, hasMore: false },
+            },
+          }));
+          return false;
+        }
+        const result = await read({ page, size: RESET_CARD_PAGE_SIZE });
+        if (disposed || !isCurrent(key, version)) return false;
+        set((current) => ({
+          ...current,
+          resetCards: {
+            ...current.resetCards,
+            total: result.total,
+            cards: {
+              items: isMore
+                ? mergeResetCards(current.resetCards.cards.items, result.cards)
+                : result.cards,
+              page,
+              loading: false,
+              hasMore: result.cards.length > 0 && RESET_CARD_PAGE_SIZE * page < result.total,
+              retryMore: false,
+            },
+          },
+        }));
+        return true;
+      }
+      const read = port.queryResetCardFlows;
+      if (!read) {
+        set((current) => ({
+          ...current,
+          resetCards: {
+            ...current.resetCards,
+            history: { ...current.resetCards.history, loading: false, hasMore: false },
+          },
+        }));
+        return false;
+      }
+      const result = await read({
+        page,
+        size: RESET_CARD_PAGE_SIZE,
+        createTimeMs: Date.now() - WEBUI_RESET_CARD_HISTORY_WINDOW_MS,
+      });
+      if (disposed || !isCurrent(key, version)) return false;
+      set((current) => ({
+        ...current,
+        resetCards: {
+          ...current.resetCards,
+          history: {
+            items: isMore
+              ? mergeResetCardFlows(current.resetCards.history.items, result.flows)
+              : result.flows,
+            page,
+            loading: false,
+            hasMore: result.flows.length > 0,
+            retryMore: false,
+          },
+        },
+      }));
+      return true;
+    } catch (reason) {
+      if (disposed || !isCurrent(key, version)) return false;
+      set((current) => ({
+        ...current,
+        resetCards: {
+          ...current.resetCards,
+          [kind]: {
+            ...current.resetCards[kind],
+            loading: false,
+            error: message(reason),
+            retryMore: isMore,
+          },
+        },
+      }));
+      return false;
+    }
+  };
+
+  /**
+   * Reads the usage quota. The answer is `true` when the read produced a
+   * result: the reset-card refresh needs to know whether the quota actually
+   * moved, not merely whether the call returned.
+   */
+  const loadUsage = async (forceRefresh = false): Promise<boolean> => {
     const read = port.getUsageQuota;
     const key = "usage";
     const version = bump(key);
     if (!read) {
       set((current) => ({ ...current, usage: { status: "idle" } }));
-      return;
+      return false;
     }
     set((current) => ({ ...current, usage: { ...current.usage, status: "loading" } }));
     try {
       const result = await read(forceRefresh ? { forceRefresh: true } : undefined);
-      if (disposed || !isCurrent(key, version)) return;
+      if (disposed || !isCurrent(key, version)) return false;
       set((current) => ({ ...current, usage: { status: "ready", result } }));
+      return true;
     } catch (reason) {
-      if (disposed || !isCurrent(key, version)) return;
+      if (disposed || !isCurrent(key, version)) return false;
       set((current) => ({ ...current, usage: { status: "error", error: message(reason) } }));
+      return false;
     }
   };
 
@@ -590,6 +1076,18 @@ export function createWebuiAccountWorkflows(deps: {
     canSignOut: port.signOut !== undefined,
     canReadApiKeyStatus: port.getMiniMaxApiKeyStatus !== undefined,
     canReadCodexOAuth: port.getCodexOAuthStatus !== undefined,
+    // The reset cards are a plan feature: the Desktop only offers them to a
+    // subscribed account. The answer follows the usage read, so it is a getter
+    // rather than a value captured when the owner was built.
+    get canUseResetCards(): boolean {
+      const result = state.usage.result;
+      return (
+        port.listResetCards !== undefined &&
+        result !== undefined &&
+        result.signedIn === true &&
+        result.hasTokenPlan === true
+      );
+    },
     loadApiKeyStatus: () =>
       loadCredentialStatus(
         "apiKeyStatus",
@@ -606,6 +1104,16 @@ export function createWebuiAccountWorkflows(deps: {
     dispose,
     loadAccount,
     loadUsage,
+    loadCreditFallback,
+    setCreditFallback,
+    loadResetCards,
+    loadMoreResetCards,
+    openResetCardHistory,
+    loadMoreResetCardHistory,
+    closeResetCardHistory,
+    selectResetCard,
+    clearResetCardSelection,
+    redeemResetCard,
     loadSigninPanel,
     claimSignin,
     beginLogin,
@@ -615,4 +1123,45 @@ export function createWebuiAccountWorkflows(deps: {
     signOutAccount,
     clearSignOutError,
   };
+}
+
+/**
+ * Whether the browser believes it is online. The Desktop reads the same
+ * `navigator.onLine` flag and refuses to redeem a card while it is false, so
+ * the failure is reported as "offline" rather than as a request error. A host
+ * without a `navigator` (a server render, a unit test) is treated as online:
+ * the request itself is the real check.
+ */
+function isOnline(): boolean {
+  if (typeof navigator === "undefined") return true;
+  return navigator.onLine !== false;
+}
+
+/**
+ * Merges a page into the list it extends. A card that is already on the list
+ * is replaced by the newer copy, so a card the account re-issued does not
+ * appear twice.
+ */
+function mergeResetCards(
+  existing: readonly WebuiResetCardView[],
+  incoming: readonly WebuiResetCardView[],
+): readonly WebuiResetCardView[] {
+  return [
+    ...new Map([...existing, ...incoming].map((card) => [card.cardId, card])).values(),
+  ];
+}
+
+/** Merges a history page into the list it extends, the same way. */
+function mergeResetCardFlows(
+  existing: readonly WebuiResetCardFlowView[],
+  incoming: readonly WebuiResetCardFlowView[],
+): readonly WebuiResetCardFlowView[] {
+  return [
+    ...new Map(
+      [...existing, ...incoming].map((flow) => [
+        `${flow.cardId}\u0000${flow.eventType}\u0000${flow.createTimeMs ?? ""}\u0000${flow.sourceType ?? ""}`,
+        flow,
+      ]),
+    ).values(),
+  ];
 }

@@ -1741,6 +1741,15 @@
       "home": "target"
     },
     {
+      "path": "client/features/settings/projection/usage-plan.ts",
+      "layers": [
+        "view"
+      ],
+      "role": "feature-projection",
+      "business": "settings",
+      "home": "target"
+    },
+    {
       "path": "client/features/settings/ui/GlobalInstructionsSection.tsx",
       "layers": [
         "bindings"
@@ -1796,6 +1805,15 @@
     },
     {
       "path": "client/features/settings/ui/UsageModelSettings.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "settings",
+      "home": "target"
+    },
+    {
+      "path": "client/features/settings/ui/UsageResetCards.tsx",
       "layers": [
         "bindings"
       ],
@@ -3397,6 +3415,15 @@
       "home": "outside"
     },
     {
+      "path": "runtime/reset-card-projection.ts",
+      "layers": [
+        "runtime"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
       "path": "runtime/runtime-environment.ts",
       "layers": [
         "runtime"
@@ -3920,6 +3947,15 @@
     },
     {
       "path": "shared/capability-manifest.ts",
+      "layers": [
+        "shared"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
+      "path": "shared/contracts/account-billing.ts",
       "layers": [
         "shared"
       ],

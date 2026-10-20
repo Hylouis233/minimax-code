@@ -300,6 +300,35 @@
   .mavis-settings-theme-preview img { border-radius: var(--radius_8); object-fit: cover; }
 
   .webui-settings-no-results { padding: var(--spacing_16); color: var(--text_default_secondary); font-size: var(--size_12); }
+  /* The settings pages' dialog: a scrim, a surface, a header and a body.
+   *
+   * The scrim is what makes a dialog a dialog — the memory manager's
+   * treatment, under a name that says what it is rather than which feature
+   * happens to use it. The surface is the grouped secondary surface with the
+   * 16px radius the settings card uses, so a dialog and the card it opened
+   * from are the same surface. The z-index sits above the settings shell's
+   * own 100, because a dialog inside the settings modal must float above the
+   * modal, not inside it. */
+  .webui-settings-dialog-mask { position: fixed; inset: 0; z-index: 120; display: flex; align-items: center; justify-content: center; background: var(--utility_scrim); animation: webui-overlay-enter 160ms ease-out both; }
+  .webui-settings-dialog-surface { display: flex; width: min(420px, calc(100vw - 32px)); max-height: calc(100vh - 64px); overflow: hidden; flex-direction: column; gap: var(--spacing_12); border: 1px solid var(--border_default); border-radius: var(--radius_16); background: var(--bg_grouped_secondary); padding: var(--spacing_16); color: var(--text_default_primary); outline: none; }
+  .webui-settings-dialog-surface.is-wide { width: min(560px, calc(100vw - 32px)); }
+  .webui-settings-dialog-header { display: flex; width: 100%; flex: none; align-items: center; justify-content: space-between; gap: var(--spacing_12); }
+  .webui-settings-dialog-header h3 { display: flex; min-width: 0; align-items: center; gap: var(--spacing_4); margin: 0; color: var(--text_default_primary); font-size: var(--size_14); font-weight: var(--weight_medium); line-height: var(--line_height_20); }
+  .webui-settings-dialog-header button { display: flex; width: 26px; height: 26px; flex: none; align-items: center; justify-content: center; border: 0; border-radius: var(--radius_8); background: var(--bg_interaction_tertiary_default); color: var(--text_default_tertiary); cursor: pointer; transition: background-color 120ms ease, color 120ms ease; }
+  .webui-settings-dialog-header button:hover { background: var(--bg_interaction_tertiary_hover); color: var(--text_default_secondary); }
+  .webui-settings-dialog-header button:focus-visible { outline: 2px solid var(--border_accent); outline-offset: 1px; }
+  /* The body scrolls, not the surface. A surface that scrolls carries its own
+   * header and footer away with it, and a list that overflows its body paints
+   * over the footer instead of scrolling inside it. */
+  .webui-settings-dialog-body { display: flex; width: 100%; min-height: 0; flex: 1; flex-direction: column; gap: var(--spacing_8); overflow-y: auto; }
+  .webui-settings-dialog-footer { display: flex; width: 100%; flex: none; align-items: center; justify-content: flex-end; gap: var(--spacing_8); }
+  /* A dialog's own list: the same row shape the settings card uses, minus the
+   * card around it, so the rows in a dialog and the rows in a section read as
+   * the same object. */
+  .webui-settings-dialog-list { display: flex; width: 100%; flex-direction: column; }
+  .webui-settings-dialog-list-row { display: flex; width: 100%; min-height: 44px; align-items: center; justify-content: space-between; gap: var(--spacing_12); color: var(--text_default_primary); font-size: var(--size_14); line-height: var(--line_height_20); }
+  .webui-settings-dialog-list-row span { color: var(--text_default_secondary); font-size: var(--size_12); }
+  .webui-settings-dialog-empty { padding: var(--spacing_16) 0; color: var(--text_default_secondary); font-size: var(--size_12); text-align: center; }
   /* The memory manager is a dialog, not a settings section, so it keeps a
      header of its own: a title on the left, a close button on the right. The
      settings pages themselves render the shared section header instead. */
@@ -537,6 +566,13 @@
   .webui-mavis-button-black { background: var(--bg_interaction_primary_default); color: var(--text_label_primary_default); }
   .webui-mavis-button-danger { background: var(--bg_interaction_danger_primary_default); color: var(--text_label_danger_primary_default); }
   .webui-mavis-button-danger:hover:not(:disabled) { background: var(--bg_interaction_danger_primary_hover); }
+  /* The row-action size. A settings row is 56px tall and its control sits on
+   * the right; the regular button's 80px minimum width makes a two-character
+   * action read as the row's headline. This drops the minimum, shortens the
+   * button and steps the type down one notch, so the action reads as an
+   * action. */
+  .webui-mavis-button-compact { min-width: 0; height: 30px; padding: 0 var(--spacing_8); font-size: var(--size_12); }
+  .webui-mavis-button:disabled { opacity: .45; cursor: default; }
   /* The section save button, declared from the token layer rather than measured
    * off a capture.
    *

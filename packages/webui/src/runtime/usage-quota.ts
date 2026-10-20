@@ -27,11 +27,23 @@
 import { webuiFirstPartySignatureHeaders } from "./signing.js";
 
 import type {
+  WebuiCreditFallbackView,
+  WebuiResetCardFlowsResult,
+  WebuiResetCardListResult,
+  WebuiResetCardUseResult,
+} from "../shared/contracts/account-billing.js";
+import type {
   WebuiUsageQuotaResult,
   WebuiUsageQuotaVideoView,
   WebuiUsageQuotaView,
   WebuiUsageQuotaWindowView,
 } from "../shared/contracts/usage-quota.js";
+import {
+  projectCreditFallback,
+  projectResetCardFlows,
+  projectResetCardList,
+  projectResetCardUse,
+} from "./reset-card-projection.js";
 import {
   asRecord,
   finiteNumber,
@@ -83,6 +95,17 @@ const USER_INFO_PATH = "/v1/api/user/info";
 // `/v1/api/openplatform/coding_plan/remains` reports *remaining* percent and
 // feeds the terminal client's "% left" display — not this panel's copy.
 const TOKEN_PLAN_REMAINS_PATH = "/backend/account/token_plan/remains_percent";
+// The credit pool and the reset cards live on the same open-platform origin as
+// the quota endpoint above; the paths and the request/response shapes were read
+// out of the Desktop renderer bundle, which is the behavioural authority for
+// this surface.
+const TOKEN_PLAN_CREDIT_PATH = "/backend/account/token_plan_credit";
+const TOKEN_PLAN_CREDIT_FALLBACK_PATH = "/backend/account/token_plan_credit/fallback";
+const RESET_CARD_LIST_PATH = "/backend/account/reset_card/list";
+const RESET_CARD_USE_PATH = "/backend/account/reset_card/use";
+const RESET_CARD_FLOWS_PATH = "/backend/account/reset_card/flows";
+/** The Desktop pages the reset-card list and the history 20 rows at a time. */
+const RESET_CARD_PAGE_SIZE = 20;
 const DEFAULT_TIMEOUT_MS = 3_000;
 const DEFAULT_MEMBERSHIP_CACHE_TTL_MS = 30_000;
 const DEFAULT_QUOTA_CACHE_TTL_MS = 5_000;
@@ -122,6 +145,8 @@ interface BillingContext {
   readonly opGroupId?: string;
   readonly creditBalance?: string;
   readonly tokenPlanTier?: string;
+  readonly subscriptionType?: string;
+  readonly planName?: string;
   readonly tokenPlanExpiresAt?: number;
   readonly upgradeAction?: string;
   readonly willRenewal?: boolean;
@@ -136,7 +161,7 @@ interface CacheEntry<V> {
 }
 
 /**
- * The one owner of the quota request and its cache.
+ * The one owner of the account-billing requests and their cache.
  *
  * The absence of a split is as much a decision as a split is, so it is recorded
  * here: this class stays in one piece. The identity keys, the two TTLs, the
@@ -145,7 +170,13 @@ interface CacheEntry<V> {
  * cache — a reader that spread them over per-endpoint modules would have to hand
  * the cache and the clock between them, which is exactly the complexity the
  * split would have been meant to remove. What left is the pure projection in
- * `usage-quota-projection.ts`.
+ * `usage-quota-projection.ts` and `reset-card-projection.ts`.
+ *
+ * The surface it owns is the account-billing one the Desktop settings page
+ * shows: the plan quota (`token_plan/remains_percent`), the credit fallback
+ * switch (`token_plan_credit`) and the reset cards (`reset_card/*`). The
+ * Desktop renderer calls the same endpoints from the same origin, so this is
+ * the same seam rather than a new one.
  */
 export class UsageQuotaClient {
   private readonly fetchImpl: typeof fetch;
@@ -200,6 +231,8 @@ export class UsageQuotaClient {
           ? { creditBalance: billing.creditBalance }
           : {}),
         ...(billing.tokenPlanTier ? { tokenPlanTier: billing.tokenPlanTier } : {}),
+        ...(billing.subscriptionType ? { subscriptionType: billing.subscriptionType } : {}),
+        ...(billing.planName ? { planName: billing.planName } : {}),
         ...(billing.tokenPlanExpiresAt !== undefined ? { tokenPlanExpiresAt: billing.tokenPlanExpiresAt } : {}),
         ...(billing.upgradeAction ? { upgradeAction: billing.upgradeAction } : {}),
         ...(billing.willRenewal !== undefined ? { willRenewal: billing.willRenewal } : {}),
@@ -217,6 +250,8 @@ export class UsageQuotaClient {
         ? { creditBalance: billing.creditBalance }
         : {}),
       ...(billing.tokenPlanTier ? { tokenPlanTier: billing.tokenPlanTier } : {}),
+      ...(billing.subscriptionType ? { subscriptionType: billing.subscriptionType } : {}),
+      ...(billing.planName ? { planName: billing.planName } : {}),
       ...(billing.tokenPlanExpiresAt !== undefined ? { tokenPlanExpiresAt: billing.tokenPlanExpiresAt } : {}),
       ...(billing.upgradeAction ? { upgradeAction: billing.upgradeAction } : {}),
       ...(billing.willRenewal !== undefined ? { willRenewal: billing.willRenewal } : {}),
@@ -224,6 +259,108 @@ export class UsageQuotaClient {
       ...(billing.freeCredits !== undefined ? { freeCredits: billing.freeCredits } : {}),
       ...(quota ? { quota } : {}),
     };
+  }
+
+  /**
+   * Whether chat usage may fall back to credits once the plan quota is
+   * exhausted. A signed-out account reads as "not resolved" rather than as
+   * "off": the settings row hides itself in that case instead of showing a
+   * switch that cannot be written.
+   */
+  async getCreditFallback(): Promise<WebuiCreditFallbackView> {
+    const token = await this.options.tokenProvider().catch(() => undefined);
+    if (!token) return { resolved: false };
+    const billing = await this.resolveBillingContext(token, false);
+    const body = await this.openPlatformRequest(TOKEN_PLAN_CREDIT_PATH, {
+      method: "GET",
+      token,
+      opGroupId: billing.opGroupId,
+    });
+    return projectCreditFallback(body);
+  }
+
+  /**
+   * Turns the credit fallback on or off. The answer is the account API's own
+   * verdict, not the requested value: the Desktop re-reads the flag from the
+   * response so the switch cannot drift from the server.
+   */
+  async setCreditFallback(request: {
+    readonly enabled: boolean;
+  }): Promise<WebuiCreditFallbackView> {
+    const token = await this.requireBillingToken();
+    const billing = await this.resolveBillingContext(token, false);
+    const body = await this.openPlatformRequest(TOKEN_PLAN_CREDIT_FALLBACK_PATH, {
+      method: "PUT",
+      token,
+      opGroupId: billing.opGroupId,
+      body: { enabled: request.enabled },
+    });
+    return projectCreditFallback(body);
+  }
+
+  /** One page of the account's redeemable reset cards. */
+  async listResetCards(request?: {
+    readonly page?: number;
+    readonly size?: number;
+  }): Promise<WebuiResetCardListResult> {
+    const token = await this.requireBillingToken();
+    const billing = await this.resolveBillingContext(token, false);
+    const body = await this.openPlatformRequest(RESET_CARD_LIST_PATH, {
+      method: "GET",
+      token,
+      opGroupId: billing.opGroupId,
+      query: {
+        page: request?.page ?? 1,
+        size: request?.size ?? RESET_CARD_PAGE_SIZE,
+      },
+    });
+    return projectResetCardList(body);
+  }
+
+  /**
+   * Redeems one reset card. The card identity the account API expects is the
+   * `(source_type, out_biz_no)` pair the card was issued with, not its id.
+   */
+  async useResetCard(request: {
+    readonly sourceType?: string;
+    readonly outBizNo?: string;
+  }): Promise<WebuiResetCardUseResult> {
+    const token = await this.requireBillingToken();
+    const billing = await this.resolveBillingContext(token, false);
+    const body = await this.openPlatformRequest(RESET_CARD_USE_PATH, {
+      method: "POST",
+      token,
+      opGroupId: billing.opGroupId,
+      body: {
+        source_type: request.sourceType ?? "",
+        out_biz_no: request.outBizNo ?? "",
+      },
+    });
+    return projectResetCardUse(body);
+  }
+
+  /**
+   * One page of the reset-card history. `createTimeMs` is the lower bound the
+   * Desktop asks for: the history window is the last 30 days.
+   */
+  async queryResetCardFlows(request?: {
+    readonly page?: number;
+    readonly size?: number;
+    readonly createTimeMs?: number;
+  }): Promise<WebuiResetCardFlowsResult> {
+    const token = await this.requireBillingToken();
+    const billing = await this.resolveBillingContext(token, false);
+    const body = await this.openPlatformRequest(RESET_CARD_FLOWS_PATH, {
+      method: "GET",
+      token,
+      opGroupId: billing.opGroupId,
+      query: {
+        page: request?.page ?? 1,
+        size: request?.size ?? RESET_CARD_PAGE_SIZE,
+        create_time: request?.createTimeMs,
+      },
+    });
+    return { flows: projectResetCardFlows(body) };
   }
 
   /** Resolves the account identity required by the identity and check-in UI. */
@@ -304,6 +441,8 @@ export class UsageQuotaClient {
         hasTokenPlan?: boolean;
         creditBalance?: string;
         tokenPlanTier?: string;
+        subscriptionType?: string;
+        planName?: string;
         tokenPlanExpiresAt?: number;
         upgradeAction?: string;
         willRenewal?: boolean;
@@ -338,6 +477,8 @@ export class UsageQuotaClient {
         : {}),
       ...(personalWorkspace.opGroupId ? { opGroupId: personalWorkspace.opGroupId } : {}),
       ...(personalWorkspace.tokenPlanTier ? { tokenPlanTier: personalWorkspace.tokenPlanTier } : {}),
+      ...(personalWorkspace.subscriptionType ? { subscriptionType: personalWorkspace.subscriptionType } : {}),
+      ...(personalWorkspace.planName ? { planName: personalWorkspace.planName } : {}),
       ...(personalWorkspace.tokenPlanExpiresAt !== undefined ? { tokenPlanExpiresAt: personalWorkspace.tokenPlanExpiresAt } : {}),
       ...(personalWorkspace.upgradeAction ? { upgradeAction: personalWorkspace.upgradeAction } : {}),
       ...(personalWorkspace.willRenewal !== undefined ? { willRenewal: personalWorkspace.willRenewal } : {}),
@@ -403,26 +544,14 @@ export class UsageQuotaClient {
     token: UsageQuotaTokenContext,
     opGroupId: string | undefined,
   ): Promise<WebuiUsageQuotaView | undefined> {
-    const origin = OPEN_PLATFORM_ORIGINS[this.options.region]?.[this.options.buildEnv];
-    if (!origin) return undefined;
-    const signal = AbortSignal.timeout(this.timeoutMs);
-    const response = await this.fetchImpl(`${origin}${TOKEN_PLAN_REMAINS_PATH}`, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${token.accessToken}`,
-        ...(opGroupId ? { "X-Group-Id": opGroupId } : {}),
-      },
-      signal,
-    });
-    if (!response.ok) return undefined;
-    const body = asRecord(await response.json());
-    if (!body) return undefined;
-    const baseResponse = asRecord(body.base_resp);
-    if (
-      typeof baseResponse?.status_code === "number" &&
-      baseResponse.status_code !== 0
-    ) {
+    let body: Record<string, unknown>;
+    try {
+      body = await this.openPlatformRequest(TOKEN_PLAN_REMAINS_PATH, {
+        method: "GET",
+        token,
+        opGroupId,
+      });
+    } catch {
       return undefined;
     }
     const modelRemains = Array.isArray(body.model_remains) ? body.model_remains : [];
@@ -444,6 +573,74 @@ export class UsageQuotaClient {
       weekly: readQuotaWindow(primary, "weekly"),
       ...(video ? { video: readVideoQuota(video) } : {}),
     };
+  }
+
+  /**
+   * The one request shape the open-platform account endpoints share: a bearer
+   * lease, the group header when the account has a group, and the same
+   * `base_resp` / `statusInfo` verdict the Desktop's interceptor applies.
+   */
+  private async openPlatformRequest(
+    pathname: string,
+    options: {
+      readonly method: "GET" | "POST" | "PUT";
+      readonly token: UsageQuotaTokenContext;
+      readonly opGroupId?: string;
+      readonly query?: Readonly<Record<string, string | number | undefined>>;
+      readonly body?: Record<string, unknown>;
+    },
+  ): Promise<Record<string, unknown>> {
+    const origin = OPEN_PLATFORM_ORIGINS[this.options.region]?.[this.options.buildEnv];
+    if (!origin) {
+      throw new Error(`Usage quota ${pathname} unavailable outside prod origins`);
+    }
+    const url = new URL(pathname, origin);
+    for (const [key, value] of Object.entries(options.query ?? {})) {
+      if (value !== undefined) url.searchParams.set(key, String(value));
+    }
+    const payload = options.body ? JSON.stringify(options.body) : undefined;
+    const signal = AbortSignal.timeout(this.timeoutMs);
+    const response = await this.fetchImpl(url, {
+      method: options.method,
+      headers: {
+        Accept: "application/json",
+        ...(payload ? { "Content-Type": "application/json" } : {}),
+        Authorization: `Bearer ${options.token.accessToken}`,
+        ...(options.opGroupId ? { "X-Group-Id": options.opGroupId } : {}),
+      },
+      ...(payload ? { body: payload } : {}),
+      signal,
+    });
+    if (response.status === 401 || response.status === 403) {
+      throw new UsageQuotaAuthError(response.status);
+    }
+    if (!response.ok) {
+      throw new Error(`Usage quota ${pathname} failed with HTTP ${response.status}`);
+    }
+    const responseBody = asRecord(await response.json());
+    if (!responseBody) {
+      throw new Error(`Usage quota ${pathname} returned an invalid response`);
+    }
+    // The open-platform account endpoints carry their verdict in
+    // `base_resp.status_code` — the same field the Desktop's client reads. The
+    // matrix convention (`statusInfo.code`) belongs to the matrix endpoints and
+    // is not consulted here, so the quota endpoint keeps the behaviour it had
+    // before this request shape was shared.
+    const baseResponse = asRecord(responseBody.base_resp);
+    if (
+      typeof baseResponse?.status_code === "number" &&
+      baseResponse.status_code !== 0
+    ) {
+      throw new Error(`Usage quota ${pathname} failed with status ${baseResponse.status_code}`);
+    }
+    return responseBody;
+  }
+
+  /** A billing call needs a signed-in account; the panel hides the row instead. */
+  private async requireBillingToken(): Promise<UsageQuotaTokenContext> {
+    const token = await this.options.tokenProvider().catch(() => undefined);
+    if (!token) throw new Error("Account billing is unavailable while signed out");
+    return token;
   }
 
   private async postMatrixJson(

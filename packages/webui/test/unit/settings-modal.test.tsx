@@ -51,7 +51,10 @@ describe("desktop settings registry", () => {
 
   it("renders the usage source shell and its loading branch without a DOM runtime", () => {
     const markup = renderToStaticMarkup(<UsageModelSettings />);
-    expect(markup).toContain("Token Plan");
+    // The source label follows the account's subscription kind, and the
+    // default kind reads "M Plan" — the legacy "Token Plan" name belongs to
+    // the legacy `token_plan` subscription only.
+    expect(markup).toContain("M Plan");
     expect(markup).toContain("加载中…");
   });
 

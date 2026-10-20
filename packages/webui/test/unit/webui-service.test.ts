@@ -450,6 +450,26 @@ class ScriptedHarnessPort implements WebuiHarnessPort {
     return { signedIn: false as const };
   }
 
+  async getCreditFallback() {
+    return { resolved: false as const };
+  }
+
+  async setCreditFallback() {
+    return { resolved: false as const };
+  }
+
+  async listResetCards() {
+    return { cards: [], total: 0 };
+  }
+
+  async useResetCard() {
+    return { outcome: "UNKNOWN" as const };
+  }
+
+  async queryResetCardFlows() {
+    return { flows: [] };
+  }
+
   async getSigninPanel() {
     return { scene: 0, days: [] };
   }
@@ -3882,6 +3902,21 @@ describe("WebUI shutdown order (criterion 7)", () => {
       async getUsageQuota() {
         return { signedIn: false as const };
       },
+      async getCreditFallback() {
+        return { resolved: false as const };
+      },
+      async setCreditFallback() {
+        return { resolved: false as const };
+      },
+      async listResetCards() {
+        return { cards: [], total: 0 };
+      },
+      async useResetCard() {
+        return { outcome: "UNKNOWN" as const };
+      },
+      async queryResetCardFlows() {
+        return { flows: [] };
+      },
       async getSigninPanel() {
         return { scene: 0, days: [] };
       },
@@ -4274,6 +4309,21 @@ describe("WebUI shutdown order (criterion 7)", () => {
       async invalidateAuth() {},
       async getUsageQuota() {
         return { signedIn: false as const };
+      },
+      async getCreditFallback() {
+        return { resolved: false as const };
+      },
+      async setCreditFallback() {
+        return { resolved: false as const };
+      },
+      async listResetCards() {
+        return { cards: [], total: 0 };
+      },
+      async useResetCard() {
+        return { outcome: "UNKNOWN" as const };
+      },
+      async queryResetCardFlows() {
+        return { flows: [] };
       },
       async getSigninPanel() {
         return { scene: 0, days: [] };

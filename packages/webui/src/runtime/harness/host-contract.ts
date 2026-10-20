@@ -564,6 +564,36 @@ export interface WebuiRuntimeHostHandle {
     readonly forceRefresh?: boolean;
   }) => Promise<import("../../shared/contracts/usage-quota.js").WebuiUsageQuotaResult>;
   /**
+   * The account-billing surface of the usage-and-model page: the credit
+   * fallback switch and the reset cards. Backed by `usage-quota.ts`, not the
+   * harness — the assembly supplies the client alongside the host.
+   */
+  readonly getCreditFallback?: () => Promise<
+    import("../../shared/contracts/account-billing.js").WebuiCreditFallbackView
+  >;
+  readonly setCreditFallback?: (request: {
+    readonly enabled: boolean;
+  }) => Promise<import("../../shared/contracts/account-billing.js").WebuiCreditFallbackView>;
+  readonly listResetCards?: (request?: {
+    readonly page?: number;
+    readonly size?: number;
+  }) => Promise<
+    import("../../shared/contracts/account-billing.js").WebuiResetCardListResult
+  >;
+  readonly useResetCard?: (request: {
+    readonly sourceType?: string;
+    readonly outBizNo?: string;
+  }) => Promise<
+    import("../../shared/contracts/account-billing.js").WebuiResetCardUseResult
+  >;
+  readonly queryResetCardFlows?: (request?: {
+    readonly page?: number;
+    readonly size?: number;
+    readonly createTimeMs?: number;
+  }) => Promise<
+    import("../../shared/contracts/account-billing.js").WebuiResetCardFlowsResult
+  >;
+  /**
    * Daily check-in status/claim. Backed by `check-in.ts` (cloud), supplied
    * by the assembly alongside the host.
    */

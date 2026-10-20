@@ -79,6 +79,17 @@ export interface WebuiAssembledHost extends WebuiRuntimeHostHandle {
   readonly dataDir: NonNullable<WebuiRuntimeHostHandle["dataDir"]>;
   readonly invalidateAuth: NonNullable<WebuiRuntimeHostHandle["invalidateAuth"]>;
   readonly getUsageQuota: NonNullable<WebuiRuntimeHostHandle["getUsageQuota"]>;
+  readonly getCreditFallback: NonNullable<
+    WebuiRuntimeHostHandle["getCreditFallback"]
+  >;
+  readonly setCreditFallback: NonNullable<
+    WebuiRuntimeHostHandle["setCreditFallback"]
+  >;
+  readonly listResetCards: NonNullable<WebuiRuntimeHostHandle["listResetCards"]>;
+  readonly useResetCard: NonNullable<WebuiRuntimeHostHandle["useResetCard"]>;
+  readonly queryResetCardFlows: NonNullable<
+    WebuiRuntimeHostHandle["queryResetCardFlows"]
+  >;
   readonly getSigninPanel: NonNullable<WebuiRuntimeHostHandle["getSigninPanel"]>;
   readonly claimSignin: NonNullable<WebuiRuntimeHostHandle["claimSignin"]>;
   readonly beginAccountLogin: NonNullable<
@@ -150,6 +161,11 @@ export type WebuiRuntimeHostFactory = (
     WebuiAssembledHost,
     | "invalidateAuth"
     | "getUsageQuota"
+    | "getCreditFallback"
+    | "setCreditFallback"
+    | "listResetCards"
+    | "useResetCard"
+    | "queryResetCardFlows"
     | "getSigninPanel"
     | "claimSignin"
     | "beginAccountLogin"
@@ -318,6 +334,11 @@ export async function createWebuiRuntimeHost(
     WebuiAssembledHost,
     | "invalidateAuth"
     | "getUsageQuota"
+    | "getCreditFallback"
+    | "setCreditFallback"
+    | "listResetCards"
+    | "useResetCard"
+    | "queryResetCardFlows"
     | "getSigninPanel"
     | "claimSignin"
     | "beginAccountLogin"
@@ -400,6 +421,24 @@ export async function createWebuiRuntimeHost(
     invalidateAuth: authSession.invalidateAuth,
     getUsageQuota: (request?: { readonly forceRefresh?: boolean }) =>
       authSession.usageQuota.getUsageQuota(request),
+    // The account-billing surface of the usage-and-model page rides the same
+    // client and therefore the same credential lease as the quota read.
+    getCreditFallback: () => authSession.usageQuota.getCreditFallback(),
+    setCreditFallback: (request: { readonly enabled: boolean }) =>
+      authSession.usageQuota.setCreditFallback(request),
+    listResetCards: (request?: {
+      readonly page?: number;
+      readonly size?: number;
+    }) => authSession.usageQuota.listResetCards(request),
+    useResetCard: (request: {
+      readonly sourceType?: string;
+      readonly outBizNo?: string;
+    }) => authSession.usageQuota.useResetCard(request),
+    queryResetCardFlows: (request?: {
+      readonly page?: number;
+      readonly size?: number;
+      readonly createTimeMs?: number;
+    }) => authSession.usageQuota.queryResetCardFlows(request),
     getSigninPanel: () => dailyCheckin.getSigninPanel(),
     claimSignin: () => dailyCheckin.claimSignin(),
     beginAccountLogin: () => accountLogin.begin(),

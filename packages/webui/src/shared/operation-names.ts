@@ -70,6 +70,13 @@ export const GET_PERMISSION_MODE_OPERATION_NAME = "getPermissionMode" as const;
 export const SET_PERMISSION_MODE_OPERATION_NAME = "setPermissionMode" as const;
 export const GET_SESSION_USAGE_OPERATION_NAME = "getSessionUsage" as const;
 export const GET_USAGE_QUOTA_OPERATION_NAME = "getUsageQuota" as const;
+// The account-billing surface the Desktop usage-and-model page shows: the
+// credit fallback switch and the reset cards (list, redeem, history).
+export const GET_CREDIT_FALLBACK_OPERATION_NAME = "getCreditFallback" as const;
+export const SET_CREDIT_FALLBACK_OPERATION_NAME = "setCreditFallback" as const;
+export const LIST_RESET_CARDS_OPERATION_NAME = "listResetCards" as const;
+export const USE_RESET_CARD_OPERATION_NAME = "useResetCard" as const;
+export const QUERY_RESET_CARD_FLOWS_OPERATION_NAME = "queryResetCardFlows" as const;
 export const GET_SIGNIN_PANEL_OPERATION_NAME = "getSigninPanel" as const;
 export const CLAIM_SIGNIN_OPERATION_NAME = "claimSignin" as const;
 export const GET_ACCOUNT_STATUS_OPERATION_NAME = "getAccountStatus" as const;
@@ -200,6 +207,12 @@ import type {
 } from "./contracts/models.js";
 import type { WebuiVersionInfo } from "./contracts/version.js";
 import type { WebuiUsageQuotaResult } from "./contracts/usage-quota.js";
+import type {
+  WebuiCreditFallbackView,
+  WebuiResetCardFlowsResult,
+  WebuiResetCardListResult,
+  WebuiResetCardUseResult,
+} from "./contracts/account-billing.js";
 import type {
   WebuiAccountLoginView,
   WebuiClaimSigninView,
@@ -470,6 +483,30 @@ export interface OperationSpec {
   getUsageQuota: {
     request: { readonly forceRefresh?: boolean };
     response: WebuiUsageQuotaResult;
+  };
+  getCreditFallback: {
+    request: Record<string, never>;
+    response: WebuiCreditFallbackView;
+  };
+  setCreditFallback: {
+    request: { readonly enabled: boolean };
+    response: WebuiCreditFallbackView;
+  };
+  listResetCards: {
+    request: { readonly page?: number; readonly size?: number };
+    response: WebuiResetCardListResult;
+  };
+  useResetCard: {
+    request: { readonly sourceType?: string; readonly outBizNo?: string };
+    response: WebuiResetCardUseResult;
+  };
+  queryResetCardFlows: {
+    request: {
+      readonly page?: number;
+      readonly size?: number;
+      readonly createTimeMs?: number;
+    };
+    response: WebuiResetCardFlowsResult;
   };
   getSigninPanel: { request: Record<string, never>; response: WebuiSigninPanelView };
   claimSignin: { request: Record<string, never>; response: WebuiClaimSigninView };

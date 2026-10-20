@@ -29,6 +29,7 @@ import {
 import { ToggleSwitch as Switch } from "../../../ui/ToggleSwitch.js";
 import { FolderIcon, SearchIcon } from "../../../ui/settings-glyphs.js";
 import { SettingsDivider, SettingsPage, SettingsRow, SettingsSection } from "../../../ui/settings-layout.js";
+import { SettingsButton as Button } from "./settings-atoms.js";
 import { ReviewSettingsPage } from "../../../features/review/ui/ReviewSettingsPage.public.js";
 import { UsageModelSettings } from "./UsageModelSettings.js";
 import { PersonalizationSettings } from "./PersonalizationSettings.js";
@@ -69,7 +70,6 @@ function Icon({ name, size = 18 }: { readonly name: string; readonly size?: numb
 }
 function stored(key: string, fallback: string, storage: ReturnType<typeof useWebuiBrowserCapabilities>["storage"]): string { return storage.getItem(key) ?? fallback; }
 function Select({ value, onChange, disabled = false, wide = false, testId }: { readonly value: string; readonly onChange?: (value: string) => void; readonly disabled?: boolean; readonly wide?: boolean; readonly testId?: string }): ReactElement { return <label className={`webui-ant-select${wide ? " is-wide" : ""}`} data-testid={testId}><select value={value} disabled={disabled} onChange={(event) => onChange?.(event.target.value)}><option>{value}</option></select><svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 6L8 10L4 6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" /></svg></label>; }
-function Button({ children, variant = "gray", disabled = false, onClick }: { readonly children: ReactNode; readonly variant?: "gray" | "black"; readonly disabled?: boolean; readonly onClick?: () => void }): ReactElement { return <button type="button" disabled={disabled} onClick={onClick} className={`webui-mavis-button webui-mavis-button-${variant}`}>{children}</button>; }
 
 /** Compatibility alias for the settings modal's capability surface.
  *

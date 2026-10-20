@@ -73,8 +73,10 @@ const EXPECTED: Record<
     "setMiniMaxModelSource", "startCodexOAuthLogin", "cancelCodexOAuthLogin",
   ],
   account: [
-    "getUsageQuota", "getSigninPanel", "claimSignin", "beginAccountLogin",
-    "getAccountLoginStatus", "cancelAccountLogin", "getAccountStatus", "signOut",
+    "getUsageQuota", "getCreditFallback", "setCreditFallback", "listResetCards",
+    "useResetCard", "queryResetCardFlows", "getSigninPanel", "claimSignin",
+    "beginAccountLogin", "getAccountLoginStatus", "cancelAccountLogin",
+    "getAccountStatus", "signOut",
   ],
   shell: ["watchEvents"],
 };
