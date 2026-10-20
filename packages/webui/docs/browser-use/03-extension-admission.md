@@ -169,10 +169,12 @@ path.
 | Pairing-proof admission | `implemented` — `verifyWebuiBrowserBridgeProof`, `contracts/browser-bridge.ts:218` |
 | Browser-switch authorization at admission | `implemented` — `pairing.ts:152` refuses when the switch is off |
 | `dev` does not bypass the bridge | `implemented` — `admission.ts:135` carries an explicit no-op `if (context.dev)` branch documenting the bypass as absent |
-| **The bridge reaching the upgrade path** | **not implemented** — `websocket-server.ts:63` routes every upgrade to the generic `admitWebSocketUpgrade`; nothing calls `admitBrowserBridgeUpgrade` (F3) |
-| **A listener owning a bridge session** | `implemented` in `server/browser-bridge/session.ts`, but unreachable for the reason above |
+| **The bridge reaching the upgrade path** | `implemented` — `websocket-server.ts` branches on `/browser-bridge` **before** the generic `admitWebSocketUpgrade` and returns; the generic path is unchanged |
+| **A listener owning a bridge session** | `implemented` — `server/browser-bridge/server.ts` owns the bridge's own WebSocket server and registers a session on `ready`, not on socket open |
+| **The switch driving the pairing** | `implemented` — the bridge does not switch a surface on by itself; the browser service reads the persisted authorization and calls `enableSurface` / `disableSurface` / `restoreSurface` |
+| **A credential that survives a host restart** | `implemented` — `BrowserBridgePairing.restore` re-adopts the stored credential at startup instead of rotating it, so the extension's copy still matches |
 | **An extension-identity refusal with a stable wire code** | **open decision** — see the wire-level codes note above |
-| The extension connecting end to end | **not implemented, and `not yet measured`** |
+| The extension connecting end to end | **not implemented, and `not yet measured`** — the host and the extension still mint independent credentials, so the handshake cannot complete. See `07-review-findings.md` |
 
 ## Related
 

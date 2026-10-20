@@ -219,6 +219,73 @@ describe("BrowserBridgePairing — credential lifecycle", () => {
   });
 });
 
+describe("BrowserBridgePairing — surviving a restart", () => {
+  it("keeps the credential the extension still holds when the host restarts", async () => {
+    // One store, two host processes: the second is the first one restarted.
+    const store = createInMemorySecureCredentialStore();
+    const first = new BrowserBridgePairing({
+      surface: "edge",
+      credentialStore: store,
+      allowedExtensionIds: KNOWN_EXTENSION_IDS,
+    });
+    await first.enable();
+    const keyIdBefore = first.keyId!;
+
+    // The host restarts. It must NOT mint a fresh credential: the extension
+    // still holds the old one, and a fresh secret on this side would leave the
+    // two unable to prove possession of the same thing.
+    const restarted = new BrowserBridgePairing({
+      surface: "edge",
+      credentialStore: store,
+      allowedExtensionIds: KNOWN_EXTENSION_IDS,
+    });
+    await restarted.restore();
+    expect(restarted.keyId).toBe(keyIdBefore);
+
+    // The extension's proof, made with the secret it kept, is accepted.
+    const secret = await store.load(keyIdBefore);
+    expect(secret).toBeDefined();
+    const challenge = await restarted.issueChallenge();
+    const proof = await signWebuiBrowserBridgeProof(
+      secret!,
+      challenge.nonce,
+      challenge.keyId,
+    );
+    const valid = await restarted.verifyProof({
+      kind: "proof",
+      keyId: challenge.keyId,
+      nonce: challenge.nonce,
+      signature: proof,
+    });
+    expect(valid).toBe(true);
+  });
+
+  it("mints a fresh credential when the surface was switched off in between", async () => {
+    const store = createInMemorySecureCredentialStore();
+    const first = new BrowserBridgePairing({
+      surface: "edge",
+      credentialStore: store,
+      allowedExtensionIds: KNOWN_EXTENSION_IDS,
+    });
+    await first.enable();
+    const keyIdBefore = first.keyId!;
+
+    // The person switched the browser off, then the host restarted. The
+    // credential was revoked, so there is nothing to restore and a fresh one
+    // is minted.
+    await first.disable();
+
+    const restarted = new BrowserBridgePairing({
+      surface: "edge",
+      credentialStore: store,
+      allowedExtensionIds: KNOWN_EXTENSION_IDS,
+    });
+    await restarted.restore();
+    expect(restarted.keyId).toBeDefined();
+    expect(restarted.keyId).not.toBe(keyIdBefore);
+  });
+});
+
 describe("BrowserBridgePairing — browser isolation", () => {
   it("the two bridges never share a credential", async () => {
     const edge = makePairing("edge");

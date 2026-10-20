@@ -45,6 +45,14 @@ import {
   type WebuiBrowserSurfaceProvider,
 } from "./isolated-chromium/provider.js";
 
+/**
+ * How many frames the stream may hold while the consumer is behind.
+ *
+ * The queue keeps the newest frame per target, so the limit is a bound on how
+ * many *targets* a stream may carry, not on how much image data it may hold.
+ */
+const WEBUI_BROWSER_FRAME_QUEUE_LIMIT = 32;
+
 /** How the service reads and writes the authorization. */
 export interface WebuiBrowserAuthorizationStore {
   read(): Promise<WebuiBrowserAuthorization>;
@@ -92,6 +100,13 @@ export interface WebuiBrowserServiceOptions {
   readonly bridge?: {
     enableSurface?(surface: "edge" | "chrome"): Promise<void>;
     disableSurface?(surface: "edge" | "chrome"): Promise<void>;
+    /**
+     * Re-adopts the credential the surface already had.
+     *
+     * The startup path. A host that restarts must keep the credential the
+     * extension still holds, so the startup path restores rather than rotates.
+     */
+    restoreSurface?(surface: "edge" | "chrome"): Promise<void>;
   };
   /** The Chrome executable the isolated browser should use. */
   readonly chromePath?: string;
@@ -151,7 +166,9 @@ export class WebuiBrowserService {
    * extension the person never authorized.
    */
   async initialize(): Promise<void> {
-    await this.#applyAuthorization(await this.readAuthorization());
+    const authorization = await this.readAuthorization();
+    await this.#applyBridgeAuthorization(authorization, { restore: true });
+    await this.#applyIsolatedAuthorization(authorization);
   }
 
   /**
@@ -162,16 +179,27 @@ export class WebuiBrowserService {
    */
   async #applyBridgeAuthorization(
     authorization: WebuiBrowserAuthorization,
+    options: { readonly restore?: boolean } = {},
   ): Promise<void> {
     const bridge = this.#options.bridge;
     if (!bridge) return;
     for (const surface of ["edge", "chrome"] as const) {
       const wanted = authorization[surface];
       const current = this.#bridgeSurfaces.get(surface) ?? false;
-      if (wanted === current) continue;
+      if (wanted === current && !options.restore) continue;
       try {
-        if (wanted) await bridge.enableSurface?.(surface);
-        else await bridge.disableSurface?.(surface);
+        if (wanted) {
+          // At startup the credential is restored, not rotated: the extension
+          // still holds the one that was saved, and a fresh secret would leave
+          // the two unable to prove possession of the same thing.
+          if (options.restore && bridge.restoreSurface) {
+            await bridge.restoreSurface(surface);
+          } else {
+            await bridge.enableSurface?.(surface);
+          }
+        } else {
+          await bridge.disableSurface?.(surface);
+        }
         this.#bridgeSurfaces.set(surface, wanted);
       } catch {
         // A surface whose credential store cannot be reached stays off, and the
@@ -184,6 +212,13 @@ export class WebuiBrowserService {
 
   async #applyAuthorization(authorization: WebuiBrowserAuthorization): Promise<void> {
     await this.#applyBridgeAuthorization(authorization);
+    await this.#applyIsolatedAuthorization(authorization);
+  }
+
+  /** Applies the authorization to the isolated Chromium. */
+  async #applyIsolatedAuthorization(
+    authorization: WebuiBrowserAuthorization,
+  ): Promise<void> {
     for (const surface of ["isolated-chromium", "edge", "chrome"] as const) {
       const usable = isBrowserSurfaceUsable(authorization, surface);
       const provider = this.#providers.get(surface);
@@ -433,10 +468,24 @@ export class WebuiBrowserService {
         "No browser target is selected for this surface.",
       );
     }
+    // The queue keeps the newest frame per target and nothing else.
+    //
+    // A live stream pushes a frame per visual change, and a client that is
+    // slow to read would otherwise accumulate every one of them: a browser
+    // window being resized is enough to fill a megabyte of base64 in a
+    // second. A frame that is already superseded when it is read is not worth
+    // delivering, so the queue holds the latest and drops the rest.
     const queue: WebuiBrowserImageFrame[] = [];
     let notify: (() => void) | undefined;
     const deliver = (frame: WebuiBrowserImageFrame) => {
-      queue.push(frame);
+      const index = queue.findIndex(
+        (queued) =>
+          queued.target.targetId === frame.target.targetId &&
+          queued.target.browserId === frame.target.browserId,
+      );
+      if (index >= 0) queue[index] = frame;
+      else if (queue.length < WEBUI_BROWSER_FRAME_QUEUE_LIMIT) queue.push(frame);
+      else queue[queue.length - 1] = frame;
       notify?.();
     };
     const subscribers = this.#frameSubscribers.get(surface) ?? new Set();

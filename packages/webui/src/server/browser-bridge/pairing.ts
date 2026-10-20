@@ -243,6 +243,41 @@ export class BrowserBridgePairing {
   }
 
   /**
+   * Adopt the credential the store already holds, or mint one if there is none.
+   *
+   * This is the **startup** path, and it is different from `enable()` on
+   * purpose. A host that restarts must keep the credential the extension still
+   * holds: minting a fresh one would leave the two holding different secrets,
+   * and the extension could never answer a challenge the host issued. The
+   * extension stores its credential in `chrome.storage.local` and keeps it
+   * across restarts, so the host has to keep its side too.
+   *
+   * `enable()` remains the **toggle** path: turning a switch off revokes the
+   * credential and removes it from the store, so the next `enable()` finds
+   * nothing to restore and mints a fresh credential, which is what the ADR
+   * asks for.
+   */
+  async restore(): Promise<BrowserBridgePairingMetadata> {
+    const references = await this.credentialStore.list();
+    // The newest reference wins: the store keeps one entry per credential and
+    // a rotation leaves the old one behind only if the delete failed.
+    const newest = [...references].sort((left, right) => right.savedAt - left.savedAt)[0];
+    if (newest) {
+      const secret = await this.credentialStore.load(newest.keyId);
+      if (secret) {
+        this.current = { keyId: newest.keyId, secret };
+        this.savedAt.set(newest.keyId, newest.savedAt);
+        return {
+          keyId: newest.keyId,
+          fingerprint: newest.fingerprint,
+          savedAt: newest.savedAt,
+        };
+      }
+    }
+    return await this.enable();
+  }
+
+  /**
    * Turn the switch on (or replace an existing credential). Throws if the
    * credential store is unavailable: the ADR forbids falling back to a
    * plaintext write. The new credential is fresh: a different key id and a

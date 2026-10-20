@@ -152,6 +152,73 @@ it needs the same wire change as F1's exchange, and doing both at once without
 a real Edge or Chrome to test against would produce a protocol that has never
 spoken to a browser.
 
+## Round 3
+
+> Verdict: the plan cannot be closed. A host restart rotates the host's
+> pairing credential away from the one the extension still holds; the Agent's
+> browser tools never reach the browser service; the target selection is
+> per-surface rather than per Agent run; Full CDP is denied on the external
+> surfaces; the frame queue is unbounded; and this document was stale.
+
+| # | Severity | Finding | Status |
+| --- | --- | --- | --- |
+| N1 | BLOCKER | Startup minted a **new** host credential instead of loading the persisted one, so a restarted host and the extension held different secrets. | `fixed` |
+| N2 | BLOCKER | The Agent's browser tools never reach the browser service. | `open` |
+| N3 | MAJOR | The target selection is per surface, not per Agent run. | `open` |
+| N4 | MAJOR | Full CDP is denied on the external surfaces. | `open` |
+| N5 | MAJOR | The frame queue was unbounded. | `fixed` |
+| N6 | MAJOR | This document set still said the bridge was not wired. | `fixed` |
+
+### What was done
+
+- **N1** — `BrowserBridgePairing.restore()` re-adopts the credential the store
+  already holds, and `BrowserBridgeRegistry.restoreSurface` and
+  `BrowserBridgeServer.restoreSurface` expose it. The browser service calls
+  **restore** at startup and **enable** on a user toggle, and the two are
+  different on purpose: a restart must not rotate the credential away from the
+  one the extension still holds, while turning a switch off and on again must
+  mint a fresh one. The switch-off path removes the credential from the store,
+  so the next enable finds nothing to restore.
+  `packages/webui/test/unit/browser-bridge-pairing.test.ts` — "keeps the
+  credential the extension still holds when the host restarts" and "mints a
+  fresh credential when the surface was switched off in between".
+- **N5** — The stream keeps the **newest frame per target** and nothing else. A
+  live stream pushes a frame per visual change, and a client that reads
+  slowly would otherwise accumulate every one of them; a frame that is already
+  superseded when it is read is not worth delivering.
+- **N6** — `03-extension-admission.md`'s status table now states what the tree
+  does: the bridge reaches the upgrade path, a session is registered on `ready`
+  rather than on socket open, the switch drives the pairing, and a credential
+  survives a host restart.
+
+### What is still open, and why
+
+**N2 — the Agent's browser tools do not reach the service.** The shared
+session, the restricted command set and the `sendBrowserCommand` operation
+exist and the panel uses them, but the tool-side adapter — the thing that
+turns a browser tool call into a restricted command against that same service
+— does not. Until it does, the tools and the panel are two callers of one
+service but only the panel is wired. This is a new adapter rather than a
+correction, and the isolated browser's own tool surface is the natural place
+to put it.
+
+**N3 — the selection is per surface, not per Agent run.** ADR 0019 scopes the
+target selection to the Agent run: the panel follows the active run's target,
+so a run that selects a tab changes what the panel shows. The selection is
+currently held per surface by the browser service. Making it run-scoped means
+carrying the run identity into the service and into the selection, and
+deciding what the panel shows when no run is active. It is a design change
+rather than a bug, and it is recorded here rather than half-built.
+
+**N4 — Full CDP on the external surfaces.** The runtime gate is in place and
+the isolated Chromium forwards a raw DevTools method, but the bridge provider
+refuses every raw command, because `chrome.debugger` exposes only a subset of
+the DevTools domains. The fix is a bounded bridge command frame and an
+extension-side dispatch restricted to that subset, with an unsupported method
+refused explicitly. It needs the same wire change as the pairing exchange, and
+without a real Edge or Chrome to speak to, doing both at once would produce a
+protocol that has never been exercised against a browser.
+
 ## What this document does not establish
 
 - That the external path works end to end against a real Edge or Chrome. Neither

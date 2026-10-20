@@ -272,6 +272,22 @@ export class BrowserBridgeServer {
     this.#credentialFailures.delete(surface);
   }
 
+  /**
+   * Re-adopt the credential this surface already had, at startup.
+   *
+   * A host that restarts must keep the credential the extension still holds,
+   * so the startup path restores rather than rotating.
+   */
+  async restoreSurface(surface: WebuiBridgeBrowserSurface): Promise<void> {
+    try {
+      await this.registry.restoreSurface(surface);
+      this.#credentialFailures.delete(surface);
+    } catch (error) {
+      this.#credentialFailures.set(surface, describe(error));
+      throw error;
+    }
+  }
+
   /** Per-surface state for diagnostics. Carries no credential material. */
   snapshot(): {
     readonly surfaces: Readonly<

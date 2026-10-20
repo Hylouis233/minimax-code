@@ -405,6 +405,20 @@ export class BrowserBridgeRegistry extends EventEmitter {
   }
 
   /**
+   * Re-adopt the credential this surface already had, at startup.
+   *
+   * The difference from `enableSurface` is the whole point: a restart must not
+   * rotate the credential away from the one the extension still holds.
+   */
+  async restoreSurface(surface: WebuiBridgeBrowserSurface): Promise<void> {
+    const pairing = this.pairings.get(surface);
+    if (!pairing) throw new Error(`no pairing registered for surface "${surface}"`);
+    this.closeAllForSurface(surface);
+    await pairing.restore();
+    this.emit("surfaceEnabled", { surface });
+  }
+
+  /**
    * Turn a surface's switch off. Revokes the credential, closes every live
    * session, and forgets pending operations.
    */

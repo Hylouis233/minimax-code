@@ -60,6 +60,13 @@ export interface WebuiBrowserBridge {
   /** Turns a surface's pairing on and mints its credential. */
   enableSurface?(surface: "edge" | "chrome"): Promise<void>;
   /**
+   * Re-adopts the credential the surface already had, at startup.
+   *
+   * A host that restarts must keep the credential the extension still holds,
+   * so the startup path restores rather than rotating.
+   */
+  restoreSurface?(surface: "edge" | "chrome"): Promise<void>;
+  /**
    * Turns a surface's pairing off: the credential is revoked, the sessions are
    * closed and the old credential is refused from then on.
    */
@@ -133,6 +140,7 @@ export function createBrowserAdapter(
           bridge: {
             enableSurface: bridge.enableSurface?.bind(bridge),
             disableSurface: bridge.disableSurface?.bind(bridge),
+            restoreSurface: bridge.restoreSurface?.bind(bridge),
           },
         }
       : {}),
