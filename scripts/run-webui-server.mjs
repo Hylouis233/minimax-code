@@ -27,11 +27,12 @@ if (!process.env.WEBUI_SERVER_TSX) {
 } else {
   const os = await import("node:os");
   const path = await import("node:path");
-  const { createWebuiRuntimeHost, createHarnessPortFromHost, WebuiTerminalManager } = await import(
-    "../packages/webui/src/runtime/index.ts"
-  );
+  const { createWebuiRuntimeHost, createHarnessPortFromHost, createBrowserAdapter, WebuiTerminalManager } =
+    await import("../packages/webui/src/runtime/index.ts");
   const { WebuiService, createOperationRegistry } =
     await import("../packages/webui/src/server/index.ts");
+  const { BrowserBridgeServer } =
+    await import("../packages/webui/src/server/browser-bridge/index.ts");
   const dataDir =
     process.env.MINIMAX_DATA_DIR?.trim() || path.join(os.homedir(), ".minimax");
   const tcpPort = Number(process.env.WEBUI_SERVER_PORT ?? 8787);
@@ -49,18 +50,35 @@ if (!process.env.WEBUI_SERVER_TSX) {
   // this service's resource scope — one per service, not a host-wide singleton
   // (T15) — and the service ends every PTY it owns in `close()`.
   const terminal = new WebuiTerminalManager();
+  // The browser adapter is wired the same way the terminal port is: the host
+  // assembles it, the registry binds the browser operations to it, and the
+  // service owns its lifecycle. The adapter is absent when the host cannot
+  // answer the browser authorization at all, and the browser operations then
+  // stay unregistered.
+  //
+  // The extension bridge is assembled here rather than inside the adapter: the
+  // layer matrix forbids `src/runtime/**` from importing `src/server/**`, so
+  // this file — outside the layer system — is the one place that can hold the
+  // bridge, hand its provider factory to the adapter and give the same instance
+  // to the service's `/browser-bridge` upgrade branch. `dev: true` is passed
+  // through unchanged; the bridge's admission ignores it by design.
+  const browserBridge = new BrowserBridgeServer({ host: "127.0.0.1", dev: true });
+  await browserBridge.start();
+  const browser = createBrowserAdapter(assembled.host, {}, browserBridge);
   const service = new WebuiService({
     port,
-    operations: createOperationRegistry(port, terminal),
+    operations: createOperationRegistry(port, terminal, browser?.port),
     terminal,
     tcpPort,
     dev: true,
     clientDir,
+    browserBridge,
   });
   const info = await service.start();
   console.log(`[webui] server listening at ${info.boundUrl}`);
   const close = async () => {
     await service.close();
+    await browser?.close();
   };
   process.once("SIGINT", () => void close());
   process.once("SIGTERM", () => void close());

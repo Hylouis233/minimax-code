@@ -17,6 +17,10 @@ import type { WebuiDeliveryHandle } from "../features/turn/contracts/execution-p
 import type { WebuiStreamFrame } from "../../shared/contracts/stream.js";
 import type { WebuiTerminalFrame } from "../../shared/contracts/terminal.js";
 import type {
+  WebuiBrowserImageFrame,
+  WebuiBrowserSurface,
+} from "../../shared/contracts/browser.js";
+import type {
   OperationSpec,
   WebuiUnaryOperationName,
 } from "../../shared/operation-names.js";
@@ -128,6 +132,19 @@ export interface WebuiWire {
     operation: string,
     requestBody: { readonly terminalId: string },
     onFrame: (frame: WebuiTerminalFrame) => void,
+  ): () => void;
+  /**
+   * The browser image stream.
+   *
+   * A watch rather than a stream: the panel keeps the images flowing for as
+   * long as it is showing the browser, and detaching has to release the
+   * provider-side resources the stream held rather than merely stop reading
+   * them.
+   */
+  watchBrowserFrames(
+    operation: string,
+    requestBody: { readonly surface: WebuiBrowserSurface },
+    onFrame: (frame: WebuiBrowserImageFrame) => void,
   ): () => void;
   /** The one HTTP route, built from the same base and token as the socket. */
   workspaceFileUrl(input: { readonly workspaceDir: string; readonly path: string }): string;
@@ -353,6 +370,27 @@ export function createWebuiWire({
     };
   }
 
+  function watchBrowserFrames(
+    operation: string,
+    requestBody: { readonly surface: WebuiBrowserSurface },
+    onFrame: (frame: WebuiBrowserImageFrame) => void,
+  ): () => void {
+    let stopped = false;
+    const session = openWireSession(operation, requestBody, {
+      frame: (_session, frame) => {
+        // A stopped watch must not deliver, and `close()` is not a promise that
+        // the socket stops emitting: the caller's flag is what guarantees it.
+        if (stopped) return;
+        if (frame.kind !== "event" || !frame.body || typeof frame.body !== "object") return;
+        onFrame(frame.body as WebuiBrowserImageFrame);
+      },
+    });
+    return () => {
+      stopped = true;
+      session.close();
+    };
+  }
+
   function workspaceFileUrl({
     workspaceDir,
     path: filePath,
@@ -372,6 +410,7 @@ export function createWebuiWire({
     request,
     stream,
     watchTerminal,
+    watchBrowserFrames,
     workspaceFileUrl,
     watchEvents: createWebuiEventChannel({ websocketUrl, webSocket }),
   };

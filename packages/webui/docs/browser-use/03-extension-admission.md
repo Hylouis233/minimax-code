@@ -1,0 +1,183 @@
+# The dedicated extension admission path
+
+**Status:** This document mixes three kinds of statement, labelled inline:
+
+| Label | Means | Backed by |
+| --- | --- | --- |
+| `implemented` | The source enforces this today; the row names the file and line. | The cited file in this repository |
+| `required` | A rule the contracts pin with no enforcing code at that point. | `packages/webui/src/shared/contracts/browser-bridge.ts` |
+| `not yet measured` | An open question. Not a denial and not a promise. | Nothing |
+
+**The admission function exists. Nothing calls it.** `admitBrowserBridgeUpgrade` is implemented in
+`packages/webui/src/server/browser-bridge/admission.ts:81` and is referenced only from its own module,
+from the package's `index.ts`, and from tests. The server's upgrade dispatcher
+(`packages/webui/src/server/websocket-server.ts:63`) sends every upgrade to the generic
+`admitWebSocketUpgrade`, so no extension can reach the bridge today. Finding F3 in
+[`07-review-findings.md`](07-review-findings.md).
+
+## Why a dedicated path
+
+The WebUI already admits WebSocket upgrades, in `admitWebSocketUpgrade`
+(`packages/webui/src/server/access-policy.ts:51`). That function cannot admit an extension:
+
+- **The origin check rejects it.** `isAllowedOrigin` (`access-policy.ts:119`) parses the origin and
+  returns `false` unless the protocol is `http:` or `https:` and the hostname is `127.0.0.1` or
+  `localhost`. A `chrome-extension://` origin fails the protocol test at `access-policy.ts:127`.
+- **The credential it expects is the wrong one.** `admitWebSocketUpgrade` reads a `token` query
+  parameter and checks it against the per-start WebUI credential. That credential is a fresh
+  `randomUUID()` for every service start (`createWebuiCredential`,
+  `packages/webui/src/server/credentials.ts:19`). An extension installed once cannot learn a value
+  that changes on every restart, and ADR 0019 forbids replacing the pairing credential with it.
+
+So the extension cannot be admitted by the existing path, and the existing path must not be widened to
+admit it. The bridge gets its own admission.
+
+## The generic path, quoted exactly
+
+For reference, this is the rule the dedicated path must not inherit. From `admitWebSocketUpgrade`
+(`packages/webui/src/server/access-policy.ts:51`):
+
+| Step | Check | Refusal |
+| --- | --- | --- |
+| 1 | `Host` header is present and its host part is loopback (`127.0.0.1`, `localhost`, `::1`, `[::1]`) | `403 Forbidden Host` |
+| 2 | The URL hostname is `127.0.0.1` or `localhost` | `403 Forbidden Host` |
+| 3 | If an `Origin` is present, it is a loopback HTTP(S) origin | `403 Forbidden Origin` |
+| 4 | The `token` query parameter matches the per-start credential — **unless `dev` is true** | `401 Unauthorized` |
+
+Refusals are written by `rejectUpgrade` (`access-policy.ts:83`) as a bare HTTP status line followed by
+`Connection: close`.
+
+## The `dev: true` bypass, and why it must not apply here
+
+Step 4 is skipped entirely when `context.dev` is true. The condition at
+`packages/webui/src/server/access-policy.ts:76` reads:
+
+```ts
+const presented = url.searchParams.get("token");
+if (!context.dev && !credentialMatches(context.credential, presented)) {
+  rejectUpgrade(socket, 401, "Unauthorized");
+  return false;
+}
+```
+
+**`dev: true` disables the credential check, not just the token requirement.** That is a real bypass,
+and it is the current state of both composition roots:
+
+| Entry point | Line | `dev` |
+| --- | --- | --- |
+| `scripts/run-webui-server.mjs` | 57 | `dev: true` |
+| `release/webui-npm/bin/mcode-webui.mjs` | 37 | `dev: true` |
+
+So on a packaged WebUI today, the generic path already accepts any upgrade that passes the loopback
+Host, URL-host and origin checks **without presenting the token at all**. ADR 0019 already records that
+both entries run with `dev: true`.
+
+**`implemented`: the bridge admission path never reads `dev`.** The pairing proof is verified
+unconditionally, and the browser switch is checked unconditionally. `admission.ts:135` holds an
+explicit no-op `if (context.dev)` branch whose only purpose is to make the absence of a bypass
+reviewable: adding `return undefined` inside it would short-circuit every check below it, and the
+branch's comment says so. That is a contract marker, not an enforcement mechanism — the enforcement is
+that no such early return exists.
+
+The three requirements stand as written:
+
+- Extension admission does not consume `context.dev` as authority to skip a check. There is no `dev`
+  parameter on it and no branch inside it that grants anything.
+- Pairing proof is verified unconditionally. There is no mode in which the bridge accepts a socket
+  without a valid proof.
+- Browser authorization is checked unconditionally. A `dev: true` WebUI does not admit an extension
+  for a browser whose switch is off.
+
+Turning a development bypass into a way to control somebody's logged-in browser would defeat the
+purpose of the whole pairing design. The exemption is scoped to the generic WebUI path and stays there.
+
+## Admission checks and refusal statuses — what the function does
+
+The order matters: cheap structural checks first, then identity, then the credential, then
+authorization. This table is `implemented` and transcribed from `admission.ts:81` and `pairing.ts`:
+
+| # | Check | Source | Refusal returned |
+| --- | --- | --- | --- |
+| 0 | The upgrade URL parses | `admission.ts:89` | `400 Bad Request` |
+| 1 | Request path is exactly `/browser-bridge` (`WEBUI_BROWSER_BRIDGE_PATH`) | `admission.ts:95` | `400 Bad Request` |
+| 2 | `Host` header host part is loopback (`isLoopbackHost`) | `admission.ts:102` | `403 Forbidden Host` |
+| 3 | URL hostname is `127.0.0.1` or `localhost` | `admission.ts:107` | `403 Forbidden Host` |
+| 4 | `Origin` is a `chrome-extension://<id>/` URL **and** some pairing's allowlist admits that id | `admission.ts:114`, `admission.ts:122` | `403 Forbidden Origin` |
+| 5 | A challenge has been issued and the presented `proof` verifies: `keyId` matches, `nonce` matches, the algorithm is the issued one, and the signature compares equal | `pairing.ts`, via `verifyWebuiBrowserBridgeProof` (`contracts/browser-bridge.ts:218`) | closed with `reason` |
+| 6 | The switch for the browser named in `hello` is on, and a current credential exists for it | `pairing.ts:152` | closed with `reason` |
+
+Two corrections to the shape this document originally specified, both now taken from the source:
+
+- A **path** mismatch is refused with `400`, not `404`. `admission.ts:92` comments that a wrong path is
+  a misroute from the generic upgrade dispatcher rather than a missing resource.
+- The extension-identity check and the origin check are **one** check with one refusal.
+  `admission.ts:118` returns `403 Forbidden Origin` both when the origin is not a `chrome-extension://`
+  URL and when no pairing's allowlist admits that id. The implementation merges them deliberately.
+
+Checks 5 and 6 are independent of 1–4, and of each other: a correctly signed proof from a browser
+whose switch is off is still refused, and a revoked credential fails even from an allowlisted
+extension.
+
+**Wire-level codes.** The HTTP statuses above are on the upgrade. The post-upgrade refusals reported to
+the client are the stable error codes in `packages/webui/src/shared/contracts/browser.ts` —
+`browser_pairing_rejected` and `browser_surface_not_authorized` are both in that set, along with
+`browser_credential_store_unavailable`. The extension-identity refusal has **no** stable code: an
+extension refused for its identity is given `403 Forbidden Origin`, which is indistinguishable from a
+malformed origin by design. This remains an open decision — either it reuses
+`browser_pairing_rejected`, which is defensible since an unallowlisted extension must not learn that it
+is unallowlisted rather than unpaired, or a code is added to the pinned list. This document does not
+decide it; it records that the decision is outstanding.
+
+## The extension-identity allowlist
+
+Each store build's **exact** extension identity is validated at the bridge. The allowlist is by
+identity, not by shape:
+
+| Rule | Detail |
+| --- | --- |
+| Packaged builds accept only their own store identities | A Chrome Web Store build and an Edge Add-ons build are distinct identities and neither is accepted for the other. |
+| Development identities are explicit development configuration | An unpacked extension's identity is accepted only when the host is configured to accept it. |
+| **A packaged build never accepts a development identity** | Development identities are not accepted by packaged builds. This is the rule that keeps an unpacked, locally-loaded build from being a way into a released client. |
+| An identity outside the list is refused | It is not merely deprioritized or asked to confirm. |
+
+The allowlist is configuration, not code-level inference: the host must be told which identities it
+accepts. Because the two stores are separate submissions generated from one source package, the two
+identities differ and both must be registered.
+
+## The origin check is not broadened
+
+**Required, and stated separately because it is the tempting shortcut.** `isAllowedOrigin`
+(`access-policy.ts:119`) is not modified. The rule that only loopback HTTP(S) origins are admitted
+stays exactly as it is. `chrome-extension://` is not added to it. A `chrome-extension://` origin
+continues to be rejected by the generic path, and that rejection is what forces the dedicated path to
+exist rather than being an inconvenience to work around.
+
+Broadening the generic check would admit *every* extension origin against *every* WebSocket endpoint on
+the loopback interface, which is a much larger grant than admitting one known extension to one known
+path.
+
+## Summary of what is required versus what exists
+
+| Element | State |
+| --- | --- |
+| Loopback Host, URL-host and origin checks | `implemented` — `admitWebSocketUpgrade`, `access-policy.ts:51` |
+| Per-start token check with a `dev: true` bypass | `implemented` — `access-policy.ts:76` |
+| Rejection of `chrome-extension://` by the generic origin check | `implemented` — `access-policy.ts:127` |
+| Per-start credential that changes on every start | `implemented` — `createWebuiCredential`, `credentials.ts:19` |
+| Dedicated `/browser-bridge` path check | `implemented` — `admission.ts:95` |
+| Extension-identity allowlist | `implemented` — `BrowserBridgePairing.admitsExtensionId`, `pairing.ts:142`; configured per pairing |
+| Pairing-proof admission | `implemented` — `verifyWebuiBrowserBridgeProof`, `contracts/browser-bridge.ts:218` |
+| Browser-switch authorization at admission | `implemented` — `pairing.ts:152` refuses when the switch is off |
+| `dev` does not bypass the bridge | `implemented` — `admission.ts:135` carries an explicit no-op `if (context.dev)` branch documenting the bypass as absent |
+| **The bridge reaching the upgrade path** | **not implemented** — `websocket-server.ts:63` routes every upgrade to the generic `admitWebSocketUpgrade`; nothing calls `admitBrowserBridgeUpgrade` (F3) |
+| **A listener owning a bridge session** | `implemented` in `server/browser-bridge/session.ts`, but unreachable for the reason above |
+| **An extension-identity refusal with a stable wire code** | **open decision** — see the wire-level codes note above |
+| The extension connecting end to end | **not implemented, and `not yet measured`** |
+
+## Related
+
+| Concern | Document |
+| --- | --- |
+| The wire shape admitted here | [`02-bridge-protocol.md`](02-bridge-protocol.md) |
+| The credential presented at check 4 | [`04-pairing-credentials.md`](04-pairing-credentials.md) |
+| Where each switch is enforced | [`06-runtime-authorization-trace.md`](06-runtime-authorization-trace.md) |

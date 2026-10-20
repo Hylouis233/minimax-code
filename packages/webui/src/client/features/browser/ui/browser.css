@@ -1,0 +1,205 @@
+/* browser — the Browser panel: target list, live frame, input surface.
+ *
+ * The stage is a positioned box because the input surface is absolutely
+ * positioned over the frame rather than beside it: the coordinates the panel
+ * forwards are measured against that element, so anything drawn next to the
+ * picture would aim the pointer at the wrong place.
+ *
+ * The frame scales with `object-fit: contain` and is never given a width or
+ * height in the markup, so a frame of any aspect ratio keeps its own geometry
+ * instead of being stretched to the panel's. */
+
+@layer components {
+
+  .webui-browser-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    padding: 12px;
+    background: var(--bg_grouped_secondary);
+  }
+
+  .webui-browser-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .webui-browser-panel-title {
+    margin: 0;
+    font-size: var(--font-size_14, 14px);
+    font-weight: 600;
+    color: var(--text_default_primary);
+  }
+
+  .webui-browser-surfaces {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  .webui-browser-surface {
+    padding: 4px 10px;
+    border: 1px solid var(--border_light);
+    border-radius: var(--border-radius_8, 8px);
+    background: var(--bg_grouped_secondary);
+    color: var(--text_default_secondary);
+    font-size: var(--font-size_12, 12px);
+    cursor: pointer;
+  }
+
+  .webui-browser-surface.is-active {
+    border-color: var(--icon_default_accent);
+    color: var(--text_default_primary);
+  }
+
+  /* An unauthorized surface stays legible rather than looking broken: the panel
+   * still shows which browsers exist, and the notice above says why they cannot
+   * be used. */
+  .webui-browser-surface[data-authorized="false"] {
+    opacity: 0.55;
+  }
+
+  .webui-browser-notice {
+    margin: 0;
+    padding: 6px 10px;
+    border-radius: var(--border-radius_8, 8px);
+    background: var(--bg_interaction_secondary_default);
+    color: var(--text_default_secondary);
+    font-size: var(--font-size_12, 12px);
+  }
+
+  .webui-browser-notice.is-error {
+    color: var(--text_default_primary);
+    border: 1px solid var(--border_light);
+  }
+
+  .webui-browser-body {
+    display: flex;
+    gap: 12px;
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+  }
+
+  .webui-browser-targets {
+    flex: 0 0 220px;
+    min-width: 0;
+    overflow-y: auto;
+  }
+
+  .webui-browser-target-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .webui-browser-target {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid transparent;
+    border-radius: var(--border-radius_8, 8px);
+    background: transparent;
+    color: var(--text_default_primary);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .webui-browser-target.is-active {
+    border-color: var(--icon_default_accent);
+    background: var(--bg_interaction_secondary_default);
+  }
+
+  .webui-browser-target strong,
+  .webui-browser-target-url,
+  .webui-browser-target-meta {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .webui-browser-target strong {
+    font-size: var(--font-size_12, 12px);
+    font-weight: 600;
+  }
+
+  .webui-browser-target-url,
+  .webui-browser-target-meta {
+    color: var(--text_default_secondary);
+    font-size: var(--font-size_11, 11px);
+  }
+
+  .webui-browser-stage {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 240px;
+    overflow: hidden;
+    border: 1px solid var(--border_light);
+    border-radius: var(--border-radius_8, 8px);
+    background: var(--bg_grouped_tertiary);
+  }
+
+  .webui-browser-frame {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    user-select: none;
+  }
+
+  /* Transparent and stretched over the stage: the pointer lands here so the
+   * measured coordinate is the point on the picture the person chose. */
+  .webui-browser-input {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .webui-browser-input:focus-visible {
+    outline: 2px solid var(--icon_default_accent);
+    outline-offset: -2px;
+  }
+
+  .webui-browser-input-hint {
+    margin: 0 auto 0 0;
+    color: var(--text_default_secondary);
+    font-size: var(--font-size_11, 11px);
+    pointer-events: none;
+  }
+
+  .webui-browser-text {
+    max-width: 60%;
+    padding: 4px 8px;
+    border: 1px solid var(--border_light);
+    border-radius: var(--border-radius_8, 8px);
+    background: var(--bg_grouped_secondary);
+    color: var(--text_default_primary);
+    font-size: var(--font-size_12, 12px);
+  }
+
+  .webui-browser-empty {
+    margin: 0;
+    padding: 12px;
+    color: var(--text_default_secondary);
+    font-size: var(--font-size_12, 12px);
+    text-align: center;
+  }
+}

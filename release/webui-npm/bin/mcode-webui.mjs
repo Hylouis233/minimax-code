@@ -7,9 +7,11 @@ import { fileURLToPath } from "node:url";
 import {
   WebuiService,
   createOperationRegistry,
+  BrowserBridgeServer,
 } from "../server/server.js";
 import {
   WebuiTerminalManager,
+  createBrowserAdapter,
   createHarnessPortFromHost,
   createWebuiRuntimeHost,
 } from "../server/runtime.js";
@@ -28,20 +30,36 @@ process.env.MAVIS_BUILTIN_AGENTS_DIR ??= path.join(packageRoot, "assets/agents")
 const assembled = await createWebuiRuntimeHost({ dataDir, appVersion: version });
 const port = createHarnessPortFromHost(assembled.host);
 const terminal = new WebuiTerminalManager();
+// The browser adapter is assembled by the host, exactly like the terminal
+// port: the registry binds the browser operations to it, and the shutdown
+// path releases it so no browser process outlives the service.
+//
+// The extension bridge is assembled here, beside it, because the layer matrix
+// forbids `src/runtime/**` from importing `src/server/**`. This file is the
+// composition root: it is the one place that can hand the bridge's provider
+// factory to the adapter AND the same instance to the service's
+// `/browser-bridge` upgrade branch, so the extension and the browser service
+// address one session rather than two. `dev: true` is passed through
+// unchanged; the bridge's admission ignores it by design.
+const browserBridge = new BrowserBridgeServer({ host: "127.0.0.1", dev: true });
+await browserBridge.start();
+const browser = createBrowserAdapter(assembled.host, {}, browserBridge);
 const service = new WebuiService({
   port,
-  operations: createOperationRegistry(port, terminal),
+  operations: createOperationRegistry(port, terminal, browser?.port),
   terminal,
   host: "127.0.0.1",
   tcpPort,
   dev: true,
   clientDir: path.join(packageRoot, "client"),
+  browserBridge,
 });
 
 let closing;
 const close = () => {
   closing ??= (async () => {
     await service.close();
+    await browser?.close();
     await assembled.host.apiHost.close();
   })();
   return closing;

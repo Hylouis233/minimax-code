@@ -22,6 +22,7 @@ import {
 } from "./bind-handlers.js";
 import { createWorkspaceHandlerEntries } from "./handlers/workspace.js";
 import { createTerminalHandlerEntries } from "./handlers/terminal.js";
+import { createBrowserHandlerEntries } from "./handlers/browser.js";
 import { createCommandHandlerEntries } from "./handlers/commands.js";
 import { createAccountHandlerEntries } from "./handlers/account.js";
 import { createStreamHandlerEntries } from "./handlers/stream.js";
@@ -32,6 +33,7 @@ import type {
   WebuiOperationRegistration,
 } from "./operation-contract.js";
 import type { WebuiTerminalProcessPort } from "../../runtime/port.js";
+import type { WebuiBrowserPort } from "../../runtime/port.js";
 export {
   getSigninPanelOperation,
   claimSigninOperation,
@@ -69,6 +71,7 @@ export type {
 export function createOperationRegistry(
   port: WebuiOperationPort,
   terminal?: WebuiTerminalProcessPort,
+  browser?: WebuiBrowserPort,
 ): ReadonlyMap<string, WebuiOperationRegistryEntry> {
   const registry = new Map<string, WebuiOperationRegistryEntry>();
   const entries = new Map<string, WebuiOperationRegistryEntry>([
@@ -79,6 +82,7 @@ export function createOperationRegistry(
     ...createStreamHandlerEntries(port),
     ...createMessageHandlerEntries(port),
     ...(terminal ? createTerminalHandlerEntries(terminal) : []),
+    ...(browser ? createBrowserHandlerEntries(browser) : []),
   ]);
   const entry = (name: string): WebuiOperationRegistryEntry => {
     const found = entries.get(name);
@@ -139,6 +143,21 @@ export function createOperationRegistry(
     registerOperation(registry, entry("resizeTerminal"));
     registerOperation(registry, entry("disposeTerminal"));
     registerOperation(registry, entry("watchTerminal"));
+  }
+  // The browser adapter is a real second surface (a browser, not a harness port
+  // method). When none is supplied the seven browser operations stay
+  // unregistered, so an inbound frame becomes an `unknown_operation` error
+  // rather than a "method is not a function" runtime explosion — the same wire
+  // contract a host without a browser has always emitted.
+  if (browser) {
+    registerOperation(registry, entry("getBrowserAuthorization"));
+    registerOperation(registry, entry("setBrowserAuthorization"));
+    registerOperation(registry, entry("listBrowserTargets"));
+    registerOperation(registry, entry("selectBrowserTarget"));
+    registerOperation(registry, entry("sendBrowserInput"));
+    registerOperation(registry, entry("sendBrowserCommand"));
+    registerOperation(registry, entry("watchBrowserFrames"));
+    registerOperation(registry, entry("listBrowserCapabilities"));
   }
   registerOperation(registry, entry("archiveSession"));
   registerOperation(registry, entry("deleteSession"));

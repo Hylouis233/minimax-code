@@ -4,6 +4,16 @@ import type {
   WebuiRunCommandResult,
 } from "../shared/contracts/terminal.js";
 import type {
+  WebuiBrowserAuthorization,
+  WebuiBrowserCapabilityEntry,
+  WebuiBrowserImageFrame,
+  WebuiBrowserInputCommand,
+  WebuiBrowserSurface,
+  WebuiBrowserTargetId,
+  WebuiBrowserTargetList,
+  WebuiBrowserTargetState,
+} from "../shared/contracts/browser.js";
+import type {
   WebuiActiveTurnResult,
   WebuiCreateSessionRequest,
   WebuiCreateSessionResult,
@@ -603,4 +613,63 @@ export interface WebuiTerminalProcessPort {
   }>;
   /** Ends every terminal this port owns. The service calls it on shutdown. */
   disposeBySession(): void;
+}
+
+/**
+ * The narrow browser port.
+ *
+ * The browser operations consume this port rather than the browser service
+ * itself, so the registry that serves them does not depend on the class that
+ * happens to implement it. It lives in this module — the runtime's port
+ * surface — because the layer matrix lets `server` reach `runtime-port` and
+ * nothing else under `runtime/`.
+ *
+ * `watchFrames` is the delivery stream: the operation handler drives it and
+ * the WebSocket server frames what it yields, the same way the terminal's
+ * output is framed.
+ */
+export interface WebuiBrowserPort {
+  /** The four authorization switches, as they stand. */
+  getAuthorization(): Promise<WebuiBrowserAuthorization>;
+  /**
+   * Writes one switch and applies its consequence: a surface that was turned
+   * off stops, a surface that was turned on starts.
+   */
+  setAuthorization(
+    input: Partial<WebuiBrowserAuthorization>,
+  ): Promise<WebuiBrowserAuthorization>;
+  /** Every target of one surface. */
+  listTargets(surface: WebuiBrowserSurface): Promise<WebuiBrowserTargetList>;
+  /** Selects the target the panel shows for a surface. */
+  selectTarget(target: WebuiBrowserTargetId): Promise<WebuiBrowserTargetState>;
+  /**
+   * Forwards one input command.
+   *
+   * The command is validated before it is forwarded, and it is bound to the
+   * target it was aimed at: an input aimed at a target that has since been
+   * replaced is refused rather than delivered to the new page.
+   */
+  sendInput(command: WebuiBrowserInputCommand): Promise<{ readonly accepted: true }>;
+  /**
+   * Runs one browser command.
+   *
+   * The runtime decides whether the command is allowed: a restricted
+   * browser-tool action, or a raw DevTools command under the Full CDP switch.
+   * A command that is neither is refused, never forwarded on the chance that
+   * the provider would accept it.
+   */
+  sendCommand(
+    surface: WebuiBrowserSurface,
+    command: string,
+    params?: Record<string, unknown>,
+  ): Promise<{ readonly accepted: true; readonly result?: unknown }>;
+  /** The live image stream of one surface. */
+  watchFrames(
+    surface: WebuiBrowserSurface,
+    signal?: AbortSignal,
+  ): AsyncIterable<WebuiBrowserImageFrame>;
+  /** What each surface can offer right now. */
+  listCapabilities(): Promise<{
+    readonly entries: readonly WebuiBrowserCapabilityEntry[];
+  }>;
 }

@@ -41,6 +41,7 @@ import {
   closeHttpListener,
 } from "./http-server.js";
 import { WebuiWebSocketServer } from "./websocket-server.js";
+import type { BrowserBridgeServer } from "./browser-bridge/server.js";
 import { serveHttpRequest, type WebuiHttpRouterContext } from "./http/router.js";
 
 export const WEBUI_MAX_MESSAGE_BYTES = 256 * 1024;
@@ -157,6 +158,16 @@ export interface WebuiServiceOptions {
    */
   readonly dev?: boolean;
   /**
+   * The extension bridge the composition root assembled.
+   *
+   * The bridge is a WebSocket server of its own and is handed to this service
+   * rather than built here so the composition root can share one instance with
+   * the browser adapter, which borrows its providers. Optional: a host with no
+   * bridge still serves the page, and a `/browser-bridge` upgrade is refused
+   * rather than falling through to the page admission.
+   */
+  readonly browserBridge?: BrowserBridgeServer;
+  /**
    * Override the directory the service reads `index.html`, `client.js`
    * and `styles.css` from. Tests inject the built-artifact path
    * (`dist-webui/client`) so they can assert the assets the served page
@@ -188,6 +199,7 @@ export class WebuiService {
   private readonly httpServer: Server;
   private readonly wsServer: WebuiWebSocketServer;
   private readonly terminal: WebuiTerminalProcessPort | undefined;
+  private readonly browserBridge: BrowserBridgeServer | undefined;
   private readonly httpContext: WebuiHttpRouterContext;
   private accepting = true;
   private startedPromise: Promise<WebuiServiceInfo> | undefined;
@@ -213,6 +225,7 @@ export class WebuiService {
     this.clientDirOverride = options.clientDir;
     this.operations = withRegistryDerivedAvailability(options.operations, options.port);
     this.terminal = options.terminal;
+    this.browserBridge = options.browserBridge;
     this.httpServer = createHttpListener(options.httpServerFactory);
     this.wsServer = new WebuiWebSocketServer({
       maxMessageBytes: this.maxMessageBytes,
@@ -223,6 +236,7 @@ export class WebuiService {
       dev: this.dev,
       operations: this.operations,
       isAccepting: () => this.accepting,
+      ...(this.browserBridge ? { browserBridge: this.browserBridge } : {}),
     });
     this.httpContext = {
       host: this.host,
@@ -288,6 +302,10 @@ export class WebuiService {
     // and can hang for the duration of the platform TCP timeout.
     this.wsServer.closeConnections();
     await this.wsServer.close();
+    // The bridge closes after the WebSocket connections: its own server is a
+    // second listener on the same process, and an extension still mid-handshake
+    // would otherwise be terminated by the HTTP listener going away first.
+    await this.browserBridge?.close();
     await closeHttpListener(this.httpServer);
     await this.port.close();
   }

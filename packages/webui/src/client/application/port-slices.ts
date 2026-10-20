@@ -51,6 +51,7 @@ import type { ShellEventPort } from "../features/shell/contracts/watch-port.js";
 import type { TranscriptPort } from "../features/transcript/contracts/session-read-port.js";
 import type { TurnExecutionPort } from "../features/turn/contracts/execution-port.js";
 import type { TerminalPort } from "../features/terminal/contracts/terminal-port.js";
+import type { BrowserPort } from "../features/browser/contracts/browser-port.js";
 import type { WorkspacePort } from "../features/workspace/contracts/workspace-port.js";
 import {
   createWebuiTurnCapabilitySlice,
@@ -75,7 +76,8 @@ export interface WebuiPortSliceSource
     SettingsPort,
     ModelsPort,
     AccountPort,
-    PluginPort {}
+    PluginPort,
+    BrowserPort {}
 
 // The key lists below are the old-to-new mapping as data. Each is checked
 // against its port by `satisfies`, so a renamed or removed member stops the
@@ -130,6 +132,17 @@ const TERMINAL_KEYS = [
   "disposeTerminal",
   "watchTerminal",
 ] as const satisfies readonly (keyof TerminalPort)[];
+
+const BROWSER_KEYS = [
+  "getBrowserAuthorization",
+  "setBrowserAuthorization",
+  "listBrowserTargets",
+  "selectBrowserTarget",
+  "sendBrowserInput",
+  "sendBrowserCommand",
+  "watchBrowserFrames",
+  "listBrowserCapabilities",
+] as const satisfies readonly (keyof BrowserPort)[];
 
 const COMPOSER_KEYS = [
   "runCommand",
@@ -232,6 +245,7 @@ export type WebuiPluginsSlice = Pick<PluginPort, (typeof PLUGINS_KEYS)[number]>;
 export type WebuiSettingsSlice = Pick<SettingsPort, (typeof SETTINGS_KEYS)[number]>;
 export type WebuiAccountSlice = Pick<AccountPort, (typeof ACCOUNT_KEYS)[number]>;
 export type WebuiShellSlice = Pick<ShellEventPort, (typeof SHELL_KEYS)[number]>;
+export type WebuiBrowserSlice = Pick<BrowserPort, (typeof BROWSER_KEYS)[number]>;
 export type WebuiTurnSlice = WebuiTurnCapabilitySlice;
 
 /** One slice per business. */
@@ -247,6 +261,7 @@ export interface WebuiPortSlices {
   readonly settings: WebuiSettingsSlice;
   readonly account: WebuiAccountSlice;
   readonly shell: WebuiShellSlice;
+  readonly browser: WebuiBrowserSlice;
   readonly turn: WebuiTurnSlice;
 }
 
@@ -285,6 +300,7 @@ export function createWebuiPortSlices(
     settings: cut(source, SETTINGS_KEYS),
     account: cut(source, ACCOUNT_KEYS),
     shell: cut(source, SHELL_KEYS),
+    browser: cut(source, BROWSER_KEYS),
     // `turn`'s published slice, built by its own factory so there is exactly one
     // construction site for it. That factory drops an absent member
     // instead of storing `undefined` under it, so `turn` is the one slice whose

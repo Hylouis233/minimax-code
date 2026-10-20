@@ -1,0 +1,228 @@
+# The extension bridge protocol
+
+**Status:** This document mixes three kinds of statement, labelled inline:
+
+| Label | Means | Backed by |
+| --- | --- | --- |
+| `implemented` | The source does this today; the row names the file and line. | `packages/webui/src/shared/contracts/browser-bridge.ts`, `packages/webui/src/server/browser-bridge/`, `packages/browser-extension/src/` |
+| `required` | A rule the contracts pin with no enforcing code at that point. | The contracts |
+| `not yet measured` | An open question. Not a denial and not a promise. | Nothing |
+
+**The protocol is implemented on both sides and unwired end to end.** Both the host contract and the
+extension carry the frames, the challenge/proof and the reconnect ladder. No extension has connected:
+`admitBrowserBridgeUpgrade` has no production caller (finding F3) and bridge commands are routed to the
+most recently admitted session rather than to the session owning the target (finding F4). See
+[`07-review-findings.md`](07-review-findings.md).
+
+The bridge is the only way this process reaches the person's own browser. It is a WebSocket on
+loopback, but it is **not** the WebUI's own WebSocket: it has its own path, its own admission and its
+own credential, because what connects to it is a browser extension rather than the WebUI page.
+
+## Path
+
+`WEBUI_BROWSER_BRIDGE_PATH` is `/browser-bridge` — a dedicated path, not an addition to the WebUI's
+own path. Admission on this path is described in
+[`03-extension-admission.md`](03-extension-admission.md).
+
+## Frames
+
+The two directions are separate types. The host is the only side that issues a challenge; the
+extension is the only side that answers one.
+
+### Client → host (`WebuiBrowserBridgeClientFrame`)
+
+| `kind` | Carries |
+| --- | --- |
+| `hello` | `browser` (`edge` or `chrome`), `browserId`, `extensionVersion` |
+| `proof` | `keyId`, echoed `nonce`, base64 `signature` — the answer to the outstanding challenge |
+| `targets` | The targets the extension can reach, each with `browserId`, `targetId`, `title`, `url`, `generation` |
+| `frame` | One `WebuiBrowserBridgeImageFrame`: `browserId`, `targetId`, `generation`, base64 `data`, `format`, `sequence` |
+| `input-result` | `commandId`, `accepted`, optional `error` |
+| `pong` | The `nonce` answering a `ping` |
+
+### Host → client (`WebuiBrowserBridgeHostFrame`)
+
+| `kind` | Carries |
+| --- | --- |
+| `challenge` | `nonce`, `algorithm`, `keyId` |
+| `ready` | `sessionId` — the bridge session is admitted |
+| `input` | `commandId` and a `WebuiBrowserBridgeInputCommand` |
+| `ping` | `nonce` |
+| `closed` | `reason` |
+
+Every target-bearing message on the bridge carries a `generation`
+(`WebuiBrowserBridgeTarget`, `WebuiBrowserBridgeImageFrame`, and each `WebuiBrowserBridgeInputCommand`
+variant). The bridge is the edge where the `WebuiBrowserTargetId` contract
+(`packages/webui/src/shared/contracts/browser.ts`) is projected down to the three fields the extension
+can actually resolve; see [`05-target-identity.md`](05-target-identity.md).
+
+### How a command is routed — `implemented`
+
+`BrowserBridgeRegistry.dispatch` (`packages/webui/src/server/browser-bridge/registry.ts`) is the
+host's outbound command path. It serializes per target: commands for the same target queue behind each
+other, and different targets proceed in parallel.
+
+It routes through a **target-ownership table** rather than guessing. Each session's `targets` frame
+records which session owns which `browserId`/`targetId`, and at which generation
+(`targetOwners`, `registry.ts:166` and `registry.ts:243`). A command is then resolved against that
+table and refused — never guessed — in three distinct ways:
+
+| Condition | Refusal |
+| --- | --- |
+| No session announced that target | `no bridge session announced target "…"` |
+| The announced generation is behind the command's | `target "…" moved on: command generation N, announced generation M` |
+| The owning session has gone | refused rather than delivered to a stale socket |
+
+Ownership is dropped when a session ends (`registry.ts:256`). Finding F4 in
+[`07-review-findings.md`](07-review-findings.md) records what this replaced: routing to the most
+recently admitted session, which could deliver a command to the wrong browser.
+
+### The extension's image path is not CDP
+
+A bridge `frame` is not a screencast. `packages/browser-extension/src/images.ts` documents that
+`chrome.debugger` exposes a restricted CDP subset that **excludes** `Page.captureScreenshot`, so an
+attached debugger cannot produce an image frame at all; the extension captures through
+`chrome.tabs.captureVisibleTab` instead. Two consequences follow, and neither is measured here:
+
+- Only the tab the person is currently looking at, in a window that is in front, can be captured. A
+  background tab yields no frame, and the extension reports that rather than substituting another tab.
+- The renderer-attachment retry described in
+  [`01-capability-matrix.md`](01-capability-matrix.md) applies to the isolated provider only. It has no
+  analogue on this path.
+
+## Pairing: challenge and proof
+
+Pairing is challenge-response rather than a shared bearer token, so the secret never crosses the wire
+in a form that could be replayed from a packet capture, and a captured proof is useless because it is
+bound to a fresh nonce. The one time the secret crosses the wire is the *initial* pairing, once, over
+loopback, to establish a credential that then lives in the OS secure store — see
+[`04-pairing-credentials.md`](04-pairing-credentials.md).
+
+```mermaid
+sequenceDiagram
+    participant H as Host bridge
+    participant E as Extension
+    H->>E: challenge { nonce, algorithm, keyId }
+    E->>E: compute HMAC-SHA256 over nonce + " " + keyId
+    E->>H: proof { keyId, nonce, signature }
+    H->>H: constant-time compare, nonce and keyId must match
+    H->>E: ready { sessionId }
+    Note over H,E: hello carries browser, browserId, extensionVersion
+```
+
+The algorithm is pinned as `WEBUI_BROWSER_BRIDGE_SIGNATURE_ALGORITHM` = `"HMAC-SHA256"`.
+
+`verifyWebuiBrowserBridgeProof` refuses in three ways before it compares: a `keyId` that is not the
+expected one, a `nonce` that is not the outstanding one, and a signature whose length differs from the
+expected signature. A proof that does not even have the right shape is a wrong proof, not an
+exception. The comparison itself is constant-time.
+
+## HMAC material
+
+The signed material is produced by one shared function, `webuiBrowserBridgeProofMaterial`:
+
+```text
+material = nonce + " " + keyId
+signature = base64(HMAC-SHA256(secret, utf8(material)))
+```
+
+The key id is inside the signed material so a proof captured for one credential cannot be presented
+against another.
+
+### Pinned cross-implementation test vector
+
+Both sides must compute the same signature. This vector is the check; if either implementation drifts,
+it fails here.
+
+| Input | Value |
+| --- | --- |
+| Secret, UTF-8 | `webui-browser-bridge-test-secret` |
+| Nonce | `nonce-abc` |
+| Key id | `key-1` |
+| Signed material | `nonce-abc key-1` |
+| Expected signature, base64 | `xb7/GT5s+ScVsaiLkh+eRRndKi5oPQwqQMqU3aX8Znc=` |
+
+This is a published test constant, not a credential. It was recomputed independently during this
+validation from the secret bytes and the material above, and matches the expected signature.
+
+### The portability caveat is resolved — this note is historical
+
+This document originally carried a caveat: `signWebuiBrowserBridgeProof` encoded with
+`Buffer.from(signature).toString("base64")` and `verifyWebuiBrowserBridgeProof` compared through a
+dynamic `import("node:crypto")`, both of which are Node-only, while the extension runs in a browser.
+**That is no longer the case.** The current implementation is browser-safe on both sides:
+
+| Concern | Host contract | Extension |
+| --- | --- | --- |
+| HMAC | `crypto.subtle.importKey` + `crypto.subtle.sign` (`contracts/browser-bridge.ts:182`, `:189`) | `crypto.subtle` too (`packages/browser-extension/src/protocol.ts:165`) |
+| Base64 | `encodeBase64` via `btoa` (`contracts/browser-bridge.ts:247`) | `encodeWebuiBrowserBridgeBase64` (`packages/browser-extension/src/protocol.ts:209`) |
+| Constant-time compare | `constantTimeEqual`, a hand-rolled XOR-accumulate loop (`contracts/browser-bridge.ts:263`) | the same shape (`protocol.ts:205`) |
+| `Buffer` / `node:crypto` | not used | not used |
+
+Neither module references `Buffer` or `node:crypto` for signing. The byte-for-byte parity requirement
+still stands, and the test vector above — not the encoding call — is what pins the two together.
+
+`verifyWebuiBrowserBridgeProof` (`contracts/browser-bridge.ts:218`) refuses in three ways before it
+compares: a `keyId` that is not the expected one, a `nonce` that is not the outstanding one, and an
+`algorithm` that is present and is not the one the host issued. An **absent** `algorithm` is treated as
+the older extension and accepted; a *different* one is refused. The length comparison then happens
+inside `constantTimeEqual`, which returns false on a length mismatch rather than throwing.
+
+## Reconnect policy — `implemented`, unwired
+
+A reconnect must never change what the user selected. The schedule is implemented in
+`packages/webui/src/server/browser-bridge/reconnect.ts` and every value below is transcribed from the
+constants there:
+
+| Rule | Value | Source |
+| --- | --- | --- |
+| Operation deadline during a disconnect | 15 s | `WEBUI_BRIDGE_OPERATION_RECONNECT_TOTAL_MS`, `reconnect.ts:24` |
+| Retry delays | 250 ms, 500 ms, 1 s, 2 s, 4 s | `WEBUI_BRIDGE_OPERATION_RECONNECT_STEPS_MS`, `reconnect.ts:18` |
+| Delay cap | 5 s | `WEBUI_BRIDGE_OPERATION_RECONNECT_CAP_MS`, `reconnect.ts:21` |
+| Jitter | applied to each retry delay | `applyJitter` |
+| Background reconnect backoff cap | 30 s | `WEBUI_BRIDGE_BACKGROUND_RECONNECT_CAP_MS`, `reconnect.ts:27` |
+| Background reconnect continues while | the corresponding browser switch is on | by design; **not yet wired** |
+| On deadline expiry | an explicit error; **no replay** of an operation whose execution is uncertain | by design |
+| Selected target | kept | by design |
+| Fallback | never silently switch tab, browser or isolated surface | by design |
+
+The first attempt costs nothing: `reconnect.ts:110` deliberately does not delay a fresh connection, so a
+first try pays no 250 ms tax.
+
+The distinction between the two backoffs is deliberate. The 250 ms → 4 s ladder is an *in-flight
+operation* trying to finish inside its own 15-second deadline. The 30 s cap is a *background* reconnect
+that keeps trying for as long as the switch is on. An operation that times out fails; the connection
+keeps trying. No replay is attempted because the operation's execution is uncertain — a click that was
+dispatched before the disconnect may or may not have taken effect, and re-issuing it could duplicate an
+effect the user already sees.
+
+On deadline expiry the operation reports `browser_operation_timeout` from the pinned error-code set
+(`packages/webui/src/shared/contracts/browser.ts`).
+
+`not yet measured` — nothing exercised this ladder. The bridge is unwired (finding F3), and no probe
+induced a disconnect.
+
+## MV3 service-worker restart
+
+**`required`, and not verified.** A Manifest V3 extension service worker can terminate and restart at
+the browser's discretion. Chrome documents that an active WebSocket connection extends the worker's
+lifetime from Chrome 116 onward — and the extension's `manifest.json` sets
+`"minimum_chrome_version": "116"` for exactly that reason — which reduces how often this happens. It
+does not make it impossible.
+
+The consequence for this protocol: the connection lifecycle must tolerate a worker restart, and a
+restart is not distinguishable on the wire from any other disconnect. It is therefore handled by the
+same path as any other disconnect: the reconnect ladder for an in-flight operation, the 30 s
+background ladder otherwise, and never a target switch. A restarted worker re-sends `hello` and
+answers a fresh challenge; the credential it answers with is the one in extension local storage, which
+survives the worker.
+
+No probe observed a worker restart. This row states a requirement, not a measurement.
+
+## Related
+
+| Concern | Document |
+| --- | --- |
+| Who may connect, and what is refused | [`03-extension-admission.md`](03-extension-admission.md) |
+| Where the credential that answers the challenge lives | [`04-pairing-credentials.md`](04-pairing-credentials.md) |
+| Target identity and generation over the bridge | [`05-target-identity.md`](05-target-identity.md) |

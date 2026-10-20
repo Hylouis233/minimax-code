@@ -9,6 +9,7 @@ packages:
   - "packages/agent-tools"
   - "packages/agent-modules/background-task"
   - "packages/browser-core"
+  - "packages/browser-extension"
   - "packages/config"
   - "packages/agent-modules/context-manager"
   - "packages/agent-modules/conversation-contract"

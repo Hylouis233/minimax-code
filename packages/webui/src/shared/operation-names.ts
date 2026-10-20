@@ -48,6 +48,14 @@ export const WRITE_TERMINAL_OPERATION_NAME = "writeTerminal" as const;
 export const RESIZE_TERMINAL_OPERATION_NAME = "resizeTerminal" as const;
 export const DISPOSE_TERMINAL_OPERATION_NAME = "disposeTerminal" as const;
 export const WATCH_TERMINAL_OPERATION_NAME = "watchTerminal" as const;
+export const GET_BROWSER_AUTHORIZATION_OPERATION_NAME = "getBrowserAuthorization" as const;
+export const SET_BROWSER_AUTHORIZATION_OPERATION_NAME = "setBrowserAuthorization" as const;
+export const LIST_BROWSER_TARGETS_OPERATION_NAME = "listBrowserTargets" as const;
+export const SELECT_BROWSER_TARGET_OPERATION_NAME = "selectBrowserTarget" as const;
+export const SEND_BROWSER_INPUT_OPERATION_NAME = "sendBrowserInput" as const;
+export const SEND_BROWSER_COMMAND_OPERATION_NAME = "sendBrowserCommand" as const;
+export const WATCH_BROWSER_FRAMES_OPERATION_NAME = "watchBrowserFrames" as const;
+export const LIST_BROWSER_CAPABILITIES_OPERATION_NAME = "listBrowserCapabilities" as const;
 export const SEND_MESSAGE_OPERATION_NAME = "sendMessage" as const;
 export const ENQUEUE_MESSAGE_OPERATION_NAME = "enqueueMessage" as const;
 export const RESUME_SESSION_OPERATION_NAME = "resumeSession" as const;
@@ -210,6 +218,18 @@ import type {
   WebuiUpdateUserModelProviderRequest,
 } from "./contracts/models.js";
 import type { WebuiVersionInfo } from "./contracts/version.js";
+import type {
+  WebuiBrowserAuthorization,
+  WebuiBrowserAuthorizationChange,
+  WebuiBrowserCommandRequest,
+  WebuiBrowserCapabilityEntry,
+  WebuiBrowserImageFrame,
+  WebuiBrowserInputCommand,
+  WebuiBrowserSurface,
+  WebuiBrowserTargetId,
+  WebuiBrowserTargetList,
+  WebuiBrowserTargetState,
+} from "./contracts/browser.js";
 import type { WebuiUsageQuotaResult } from "./contracts/usage-quota.js";
 import type {
   WebuiCreditFallbackView,
@@ -401,6 +421,38 @@ export interface OperationSpec {
   resizeTerminal: { request: Record<string, unknown>; response: { readonly success: true } };
   disposeTerminal: { request: Record<string, unknown>; response: { readonly success: true } };
   watchTerminal: { request: Record<string, unknown>; response: WebuiTerminalStreamEnvelope };
+  getBrowserAuthorization: {
+    request: Record<string, never>;
+    response: WebuiBrowserAuthorization;
+  };
+  setBrowserAuthorization: {
+    request: WebuiBrowserAuthorizationChange;
+    response: WebuiBrowserAuthorization;
+  };
+  listBrowserTargets: {
+    request: { readonly surface: WebuiBrowserSurface };
+    response: WebuiBrowserTargetList;
+  };
+  selectBrowserTarget: {
+    request: { readonly target: WebuiBrowserTargetId };
+    response: WebuiBrowserTargetState;
+  };
+  sendBrowserInput: {
+    request: WebuiBrowserInputCommand;
+    response: { readonly accepted: true };
+  };
+  sendBrowserCommand: {
+    request: WebuiBrowserCommandRequest;
+    response: { readonly accepted: true; readonly result?: unknown };
+  };
+  watchBrowserFrames: {
+    request: { readonly surface: WebuiBrowserSurface };
+    response: WebuiBrowserFrameStreamEnvelope;
+  };
+  listBrowserCapabilities: {
+    request: Record<string, never>;
+    response: { readonly entries: readonly WebuiBrowserCapabilityEntry[] };
+  };
   sendMessage: {
     request: WebuiSendMessageRequest;
     response: WebuiSendMessageStreamEnvelope;
@@ -640,6 +692,7 @@ export const WEBUI_STREAM_OPERATION_NAMES = [
   RESUME_SESSION_OPERATION_NAME,
   WATCH_EVENTS_OPERATION_NAME,
   WATCH_TERMINAL_OPERATION_NAME,
+  WATCH_BROWSER_FRAMES_OPERATION_NAME,
 ] as const;
 
 export type WebuiStreamOperationName = (typeof WEBUI_STREAM_OPERATION_NAMES)[number];
@@ -663,6 +716,14 @@ export interface WebuiTerminalStreamEnvelope {
   readonly stream: {
     readonly ok: true;
     readonly source: AsyncIterable<Record<string, unknown>>;
+  };
+}
+
+/** The `{ stream }` envelope for the browser image stream. */
+export interface WebuiBrowserFrameStreamEnvelope {
+  readonly stream: {
+    readonly ok: true;
+    readonly source: AsyncIterable<WebuiBrowserImageFrame>;
   };
 }
 

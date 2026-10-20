@@ -1,0 +1,172 @@
+# Runtime authorization trace
+
+**Status:** This document mixes three kinds of statement, labelled inline:
+
+| Label | Means | Backed by |
+| --- | --- | --- |
+| `implemented` | The source enforces this today; the row names the file and line. | The cited file in this repository |
+| `required` | A rule the contracts pin with **no** enforcing code at that point. | `packages/webui/src/shared/contracts/browser.ts` |
+| `not yet measured` | An open question. Not a denial and not a promise. | Nothing |
+
+This document traces each of the four authorization switches to the places it has to be enforced, and
+records what is standing at each of those places in the tree as of this writing. The five enforcement
+points are recorded per-row rather than in a footnote — a reader deciding whether a capability is gated
+must not have to infer it from the absence of a section.
+
+**Read the rows, not this document's history.** Several points below were traced against an earlier tree
+that had no browser runtime at all, and those rows have since been corrected against the source. What
+changed, and what is still open, is recorded in
+[`07-review-findings.md`](07-review-findings.md).
+
+## The four switches
+
+`WebuiBrowserAuthorization`, `packages/webui/src/shared/contracts/browser.ts:60`. All four default to
+off — `WEBUI_BROWSER_AUTHORIZATION_DEFAULT` at line 72 is a frozen object with `isolatedChromium`,
+`edge`, `chrome` and `fullCdp` all `false`.
+
+| Switch | Authorizes | Never authorizes |
+| --- | --- | --- |
+| `isolatedChromium` | launching and using the isolated browser this process owns | anything about Edge or Chrome |
+| `edge` | the Edge bridged surface | anything about Chrome, or a browser permission the user has not granted |
+| `chrome` | the Chrome bridged surface | anything about Edge, or a browser permission the user has not granted |
+| `fullCdp` | arbitrary DevTools commands on an **already-authorized** surface | a surface. It widens; it never opens |
+
+`isWebuiBrowserSurfaceAuthorized` (`browser.ts:100`) is the surface check: it maps a surface to its switch
+and is exhaustive over the three surfaces.
+
+**`implemented` — the gate exists.** `packages/webui/src/runtime/browser/authorization.ts` centralizes
+the decision:
+
+| Element | Source | Behaviour |
+| --- | --- | --- |
+| `isBrowserSurfaceUsable(authorization, surface)` | `authorization.ts:110` | Whether the surface may be used at all. Deliberately does not consider Full CDP. |
+| `isBrowserCommandAllowed(authorization, command, restrictedCommands)` | `authorization.ts:127` | Whether a command is in the restricted set, or the Full CDP switch is on. |
+| `normalizeBrowserAuthorization(raw)` | `authorization.ts:71` | Normalises anything missing to **off**, so a partial host answer is never a grant. |
+| `browserSwitchForSurface(surface)` | `authorization.ts:40` | Maps a surface to its switch; `full-cdp` maps to the global switch. |
+
+`isBrowserSurfaceUsable` **is** called, by the browser service, and is the enforcement point for the
+panel paths. `isBrowserCommandAllowed` currently has **no caller** — see enforcement point 5.
+
+## Two provider paths exist
+
+There are two, and they are not the same thing. Confusing them is how the original trace concluded that
+no provider existed at all.
+
+**The host-supplied seam** — a provider object passed in by the composition root:
+
+| Element | Location | What it does |
+| --- | --- | --- |
+| `WebuiBrowserProvider` | `packages/webui/src/runtime/browser-provider.ts:29` | A supplied `adapter`, an optional tool exposure, and `close()` |
+| `adoptWebuiBrowserProvider` | `packages/webui/src/runtime/browser-provider.ts:49` | Binds a host-supplied provider in; sets `browserUseTooling: provider !== undefined` |
+| Adoption in the assembly | `packages/webui/src/runtime/assembly.ts:260` | Calls `adoptWebuiBrowserProvider(options.browserProvider, options.browserToolExposure)` |
+| Release | `packages/webui/src/runtime/lifecycle.ts:22` | `closeBrowserProvider` releases it in the close order |
+
+`browserUseTooling` is a **readiness statement**, not an authorization decision. It is true exactly
+when a provider object exists, and says nothing about which switch is on. The composition roots still
+call `createWebuiRuntimeHost({ dataDir, appVersion })` with no `browserProvider`, so this seam receives
+`undefined` and its browser fields stay absent.
+
+**The owned browser service** — the one this trace is about. `createBrowserAdapter`
+(`packages/webui/src/runtime/harness/browser.ts:54`) builds a `WebuiBrowserService` from the host's
+configuration capability and hands its `WebuiBrowserPort` to the operation registry. The service
+constructs its own `WebuiIsolatedChromiumProvider` lazily, and only when the `isolatedChromium` switch
+is on. Unlike the seam above, this one **does** read a switch before it acts — which is why points 1
+and 2 below are partly implemented.
+
+## Trace: switch → enforcing place
+
+Five enforcement points. "Required check" is the rule; "Code today" is what exists at that place.
+
+### 1. The panel's live image stream
+
+| | |
+| --- | --- |
+| Required check | The surface switch is on, and the target identity — including generation — matches what the panel is showing |
+| Refusal | `browser_surface_not_authorized`, `browser_target_stale` |
+| Code today | **`implemented`.** `WebuiBrowserService.watchFrames` refuses with `browser_surface_not_authorized` before doing anything, and the stream is registered as the `watchBrowserFrames` operation (`shared/operation-names.ts`, `server/operation/browser.ts`). Frames are fenced: `#frameMatchesSelection` (`browser-service.ts:396`) compares surface, browserId, targetId **and generation**, and the stream loop drops anything that does not match (`browser-service.ts:370`) |
+| Not measured | No probe or integration run observed a frame being dropped for a superseded generation — verified by reading the source |
+| What does exist | `WebuiBrowserImageFrame` and the bridge's `WebuiBrowserBridgeImageFrame`, which carry the target identity including generation so a client *can* drop a frame for a page it is no longer showing ([`05-target-identity.md`](05-target-identity.md)) |
+| Provider-side prerequisite | `implemented` — `#withAttachmentRetry` (`provider.ts:588`) re-issues an attachment failure for up to 3 s across eleven sends. The failure itself is `measured`, see [`01-capability-matrix.md`](01-capability-matrix.md) |
+
+### 2. The panel's input forwarding
+
+| | |
+| --- | --- |
+| Required check | The surface switch is on; the command satisfies `WebuiBrowserInputCommand`; the named target matches the registry including generation |
+| Refusal | `browser_surface_not_authorized`, `browser_command_invalid`, `browser_target_stale` |
+| Code today | **`implemented`.** `WebuiBrowserService.sendInput` (`browser-service.ts:289`) calls `validateBrowserInputCommand` first (`input.ts`), then refuses with `browser_surface_not_authorized`, then calls `this.#registry.isCurrent(validated.target)` and refuses with `browser_target_stale`. It is registered as the `sendBrowserInput` operation |
+| What made the generation check effective | The registry's counter is fed: `#ensureProvider` subscribes to `provider.onTargetChanged` and calls `registry.raiseGeneration` (`browser-service.ts:176`), so the registry's generation advances when the provider reports a page replacement. Finding F2 in [`07-review-findings.md`](07-review-findings.md) |
+| Not measured | No run drove a navigation and observed a refused input — verified by reading the source |
+| What does exist | `WebuiBrowserInputCommand` (pointer / key / text), `WebuiBrowserBridgeInputCommand`, and `browser_command_invalid` in the pinned error codes |
+| Why validation is a gate and not hygiene | A panel showing a stale page must not deliver input to whatever replaced it. The generation in the command is what makes that refusal possible |
+
+### 3. The Agent's browser tools
+
+| | |
+| --- | --- |
+| Required check | The surface switch for the selected surface is on, and the requested action is in the restricted command set (or the Full CDP gate is on, for anything outside it) |
+| Refusal | `browser_surface_not_authorized`, `browser_capability_denied` |
+| Code today | **The restricted vocabulary exists; the authorization does not.** The action names and their input contracts are declared in `packages/agent-tools/src/desktop/builtin-browser-defs.ts` — `LOCAL_BROWSER_ACTION_NAMES` at line 744 (24 names) and `LOCAL_BROWSER_ACTION_INPUT_CONTRACTS` at line 714. The actions are implemented over a CDP send in `packages/browser-core/src/browser-actions.ts`. **No switch is read anywhere on that path.** |
+| Reachability from this client | **None — and this is the part that is easy to get wrong.** The WebUI *does* now have a browser port (`WebuiBrowserPort`, `runtime/port.ts:632`), a browser adapter (`runtime/harness/browser.ts:54`) and seven registered browser operations (`shared/operation-names.ts:51`–`57`). But every consumer of those operations is inside `packages/webui` — the client transport and the operation registry. A repository-wide search for `sendBrowserInput`, `listBrowserTargets` and `createBrowserAdapter` returns no hit under `packages/agent-tools/` or `packages/agent-modules/`. **No Agent browser-tool adapter reaches the WebUI browser service**, so nothing on the Agent side reads the switches |
+| Isolated-surface provider | `packages/tui/src/runtime/browser/headless-chrome-provider.ts` with `headless-chrome-transport.ts` and `headless-cdp-connection.ts`. This is the working isolated-Chromium surface that exists in this repository; it is not adopted by WebUI |
+
+### 4. Bridge admission
+
+| | |
+| --- | --- |
+| Required check | Loopback Host; the path is `/browser-bridge`; the extension identity is allowlisted; the pairing proof verifies; the switch for the claimed browser is on |
+| Refusal | `browser_pairing_rejected`, `browser_surface_not_authorized` |
+| Code today | **`implemented` in isolation, and unwired.** `admitBrowserBridgeUpgrade` (`server/browser-bridge/admission.ts:81`) implements every required check below, and `BrowserBridgePairing` (`server/browser-bridge/pairing.ts:76`) implements the allowlist, the challenge and the proof verification. **But nothing calls them.** `admitBrowserBridgeUpgrade` is referenced only from its own module and from `server/browser-bridge/index.ts`; `packages/webui/src/server/websocket-server.ts:63` routes every upgrade to the generic `admitWebSocketUpgrade`. Correspondingly `WebuiBrowserService.#ensureProvider` returns `undefined` for `edge` and `chrome` (`browser-service.ts:176`). Finding F3 in [`07-review-findings.md`](07-review-findings.md) |
+| What does exist today | The generic admission it must not inherit: `admitWebSocketUpgrade`, `packages/webui/src/server/access-policy.ts:51`, and the credential check it skips when `dev` is true at `access-policy.ts:76` |
+| Both entries run `dev: true` | `scripts/run-webui-server.mjs:57` and `release/webui-npm/bin/mcode-webui.mjs:37` |
+| Requirement | The `dev` flag is not an input to this path. `admission.ts:135` carries an explicit no-op `if (context.dev)` branch that documents the bypass as absent, so a future edit that adds `return undefined` there is caught. Proof and authorization are verified unconditionally — see [`03-extension-admission.md`](03-extension-admission.md) |
+| Also required | A missing `keyId`→credential mapping must fail with `browser_credential_store_unavailable` rather than admitting unpaired or falling back. `BrowserBridgePairing.issueChallenge` calls `credentialStore.isAvailable()` first (`pairing.ts:159`) and throws `BrowserCredentialStoreUnavailableError` — [`04-pairing-credentials.md`](04-pairing-credentials.md) |
+
+### 5. The Full CDP gate
+
+| | |
+| --- | --- |
+| Required check | `fullCdp` is on **and** the surface switch is on. Both, in that order: the switch decides whether the surface exists, the Full CDP gate decides how wide it is |
+| Refusal | `browser_surface_not_authorized` when the surface is off; `browser_capability_denied` when a full-CDP-only call is attempted with `fullCdp` off |
+| Code today | **`implemented`.** `isBrowserCommandAllowed` (`authorization.ts:127`) has a caller: `WebuiBrowserService.sendCommand` (`browser-service.ts:419`) checks the surface switch **first** (`browser-service.ts:425`) and then `isBrowserCommandAllowed(authorization, command, WEBUI_BROWSER_RESTRICTED_COMMANDS)` (`browser-service.ts:431`), refusing an out-of-set command with `browser_capability_denied` rather than forwarding it. The restricted vocabulary is pinned as `WEBUI_BROWSER_RESTRICTED_COMMANDS` (`contracts/browser.ts:285`, 28 names), and the path is exposed as the `sendBrowserCommand` operation. Finding F5 in [`07-review-findings.md`](07-review-findings.md) |
+| What does exist | `fullCdpApplies` on `WebuiBrowserCapabilityEntry`, a declaration that the switch widens a surface; and `browser_capability_denied` in the pinned error codes |
+| Not measured | No run sent a real DevTools command through the gate with the switch off — verified by reading the source |
+| Constraint on the widening | The command set is whatever the active provider actually supports. It does not enable a surface that is disabled or unavailable, and it does not promise that Edge, Chrome and isolated Chromium expose identical domains |
+
+## The composable rule
+
+Each enforcement point is one of two kinds, and the distinction decides where a check belongs:
+
+| Kind | Decides | Reads | Applies at |
+| --- | --- | --- | --- |
+| **Surface authorization** | whether this browser may be used at all | one surface switch | every path, before anything else |
+| **Full CDP widening** | how wide an already-authorized surface may be driven | `fullCdp`, on top of the surface switch | only where a command outside the restricted set is requested |
+
+The ordering is the whole point: a call is refused for `browser_surface_not_authorized` if the surface
+is off, regardless of `fullCdp`. Full CDP never authorizes a surface on its own. Turning `fullCdp` off
+blocks further full-CDP calls and ends full-CDP-only streams; it does not disable ordinary Browser Use
+on a surface that is still enabled.
+
+The four switches are separate on purpose, and the separation is only meaningful if each is checked at
+each of the five points above. A combined check — one switch consulted in one place — would make it
+impossible to allow one surface without allowing the rest.
+
+## Summary
+
+| Enforcement point | Surface switch checked | Full CDP checked | Code today |
+| --- | --- | --- | --- |
+| Panel image stream | required | not applicable | **implemented** — surface check enforced, frames fenced to the selected generation (F6) |
+| Panel input forwarding | required | not applicable | **implemented** — validation, surface check and `isCurrent`; the registry's generation is fed from `onTargetChanged` (F2) |
+| Agent browser tools | required | required, for non-restricted commands | **not implemented** — vocabulary exists, no Agent adapter reaches the WebUI service |
+| Bridge admission | required | not applicable | **implemented but unwired** — no caller in the upgrade path (F3). Command routing is fixed (F4) |
+| Full CDP gate | required first | required | **implemented** — `sendCommand` checks the surface first, then the switch (F5) |
+
+## Related
+
+| Concern | Document |
+| --- | --- |
+| The switches and their defaults | `packages/webui/src/shared/contracts/browser.ts` |
+| What each surface is allowed to offer | [`01-capability-matrix.md`](01-capability-matrix.md) |
+| The admission path and the `dev: true` bypass | [`03-extension-admission.md`](03-extension-admission.md) |
+| The credential admission requires | [`04-pairing-credentials.md`](04-pairing-credentials.md) |
+| The target identity each check compares | [`05-target-identity.md`](05-target-identity.md) |
