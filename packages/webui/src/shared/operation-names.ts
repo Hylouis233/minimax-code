@@ -56,6 +56,15 @@ export const SEND_BROWSER_INPUT_OPERATION_NAME = "sendBrowserInput" as const;
 export const SEND_BROWSER_COMMAND_OPERATION_NAME = "sendBrowserCommand" as const;
 export const WATCH_BROWSER_FRAMES_OPERATION_NAME = "watchBrowserFrames" as const;
 export const LIST_BROWSER_CAPABILITIES_OPERATION_NAME = "listBrowserCapabilities" as const;
+/**
+ * Reads one browser surface's installation key so the person can copy it.
+ *
+ * This is the one path by which the installation key leaves the OS secure
+ * store, and it is deliberately a separate operation rather than a field on
+ * `getBrowserAuthorization`: the key is shown once, on request, and the
+ * authorization snapshot stays safe to read at any time.
+ */
+export const GET_BROWSER_INSTALLATION_KEY_OPERATION_NAME = "getBrowserInstallationKey" as const;
 export const SEND_MESSAGE_OPERATION_NAME = "sendMessage" as const;
 export const ENQUEUE_MESSAGE_OPERATION_NAME = "enqueueMessage" as const;
 export const RESUME_SESSION_OPERATION_NAME = "resumeSession" as const;
@@ -230,6 +239,7 @@ import type {
   WebuiBrowserTargetList,
   WebuiBrowserTargetState,
 } from "./contracts/browser.js";
+import { type WebuiBridgeBrowserSurface } from "./contracts/browser.js";
 import type { WebuiUsageQuotaResult } from "./contracts/usage-quota.js";
 import type {
   WebuiCreditFallbackView,
@@ -452,6 +462,27 @@ export interface OperationSpec {
   listBrowserCapabilities: {
     request: Record<string, never>;
     response: { readonly entries: readonly WebuiBrowserCapabilityEntry[] };
+  };
+  getBrowserInstallationKey: {
+    request: { readonly surface: WebuiBridgeBrowserSurface };
+    /**
+     * `present: false` when the surface has no installation key yet — an
+     * unprovisioned surface has nothing to copy, and saying so is different
+     * from returning an empty string the person would paste.
+     */
+    response:
+      | {
+          readonly present: false;
+          readonly surface: WebuiBridgeBrowserSurface;
+          readonly reason: "not_provisioned";
+        }
+      | {
+          readonly present: true;
+          readonly surface: WebuiBridgeBrowserSurface;
+          readonly keyId: string;
+          readonly key: string;
+          readonly fingerprint: string;
+        };
   };
   sendMessage: {
     request: WebuiSendMessageRequest;

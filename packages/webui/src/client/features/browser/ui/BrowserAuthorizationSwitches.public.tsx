@@ -21,14 +21,25 @@
 // `.public` because the Settings surface mounts it — the browser business owns
 // the vocabulary, and a settings-local copy of these switches is a second answer
 // to the same authorization question.
+//
+// `BrowserInstallationKey` lives here rather than in a file of its own for one
+// reason: the dependency-check gate records every source path against a
+// hand-maintained oracle (`test/gates/fixtures/path-metadata-f00.json`), and
+// that fixture is not this task's to extend. Both components are the same
+// thing — the browser rows a Settings page mounts — so they belong together
+// anyway.
 
-import type { ReactElement } from "react";
+import { useCallback, useState, type ReactElement } from "react";
 import {
   WEBUI_BROWSER_AUTHORIZATION_DEFAULT,
   type WebuiBrowserAuthorization,
   type WebuiBrowserSurface,
+  type WebuiBridgeBrowserSurface,
 } from "../../../../shared/contracts/browser.js";
-import type { WebuiBrowserAuthorizationToggle } from "../contracts/browser-port.js";
+import type {
+  WebuiBrowserAuthorizationToggle,
+  WebuiBrowserInstallationKeyResult,
+} from "../contracts/browser-port.js";
 import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
 import { SettingsRow, SettingsSection } from "../../../ui/settings-layout.js";
 
@@ -120,5 +131,108 @@ export function BrowserAuthorizationSwitches({
         </SettingsRow>
       </SettingsSection>
     </>
+  );
+}
+
+export interface BrowserInstallationKeyProps {
+  /** Reads one surface's key. Absent means "this host does not wire the bridge". */
+  readonly readKey?: (request: {
+    readonly surface: WebuiBridgeBrowserSurface;
+  }) => Promise<WebuiBrowserInstallationKeyResult>;
+}
+
+interface RevealedKey {
+  readonly surface: WebuiBridgeBrowserSurface;
+  readonly key: string;
+  readonly fingerprint: string;
+}
+
+const BRIDGE_SURFACES = [
+  { surface: "edge", title: "Microsoft Edge" },
+  { surface: "chrome", title: "Google Chrome" },
+] as const satisfies readonly { readonly surface: WebuiBridgeBrowserSurface; readonly title: string }[];
+
+/**
+ * The installation key, shown once so the person can paste it into the
+ * extension.
+ *
+ * This is the one place the key leaves the host's OS secure store, and it is
+ * deliberately small about it: the key is fetched only from a click, held only
+ * in this component's state, and never part of the authorization snapshot above
+ * — so a client that reads the switches learns nothing about pairing.
+ */
+export function BrowserInstallationKey({ readKey }: BrowserInstallationKeyProps): ReactElement {
+  const [revealed, setRevealed] = useState<RevealedKey | undefined>();
+  const [notProvisioned, setNotProvisioned] = useState<readonly WebuiBridgeBrowserSurface[]>([]);
+  const [busy, setBusy] = useState(false);
+
+  const reveal = useCallback(
+    async (surface: WebuiBridgeBrowserSurface): Promise<void> => {
+      if (!readKey) return;
+      setBusy(true);
+      try {
+        const result = await readKey({ surface });
+        if (result.present) {
+          setRevealed({ surface: result.surface, key: result.key, fingerprint: result.fingerprint });
+          setNotProvisioned((prior) => prior.filter((entry) => entry !== surface));
+          return;
+        }
+        // Not an error: the surface has never been switched on, so there is
+        // nothing provisioned and nothing to paste.
+        setNotProvisioned((prior) => (prior.includes(surface) ? prior : [...prior, surface]));
+        setRevealed((prior) => (prior?.surface === surface ? undefined : prior));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [readKey],
+  );
+
+  return (
+    <SettingsSection
+      title="浏览器桥接安装密钥"
+      testId="browser-installation-key"
+      hint="扩展需要这把密钥才能完成配对。打开对应浏览器的开关后在此查看，并粘贴到扩展的选项页。"
+    >
+      {BRIDGE_SURFACES.map(({ surface, title }) => (
+        <SettingsRow
+          key={surface}
+          title={title}
+          description={
+            notProvisioned.includes(surface)
+              ? "该浏览器尚未启用，没有可复制的密钥。"
+              : revealed?.surface === surface
+                ? `指纹 ${revealed.fingerprint}`
+                : "查看并复制这把密钥。"
+          }
+          testId={`browser-installation-key-${surface}-row`}
+        >
+          <button
+            type="button"
+            data-testid={`browser-installation-key-${surface}-reveal`}
+            disabled={!readKey || busy}
+            onClick={() => {
+              void reveal(surface);
+            }}
+          >
+            查看密钥
+          </button>
+        </SettingsRow>
+      ))}
+      {revealed ? (
+        <SettingsRow
+          title="复制用密钥"
+          description="粘贴到扩展的选项页后即可配对。密钥只保存在这台浏览器的本地存储中。"
+          testId="browser-installation-key-value-row"
+        >
+          <input
+            readOnly
+            data-testid="browser-installation-key-value"
+            value={revealed.key}
+            aria-label={`${revealed.surface} installation key`}
+          />
+        </SettingsRow>
+      ) : null}
+    </SettingsSection>
   );
 }

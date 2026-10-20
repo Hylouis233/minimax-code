@@ -21,6 +21,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   BrowserBridgePairing,
+  BrowserCredentialStoreUnavailableError,
   createInMemorySecureCredentialStore,
   exportWebuiBrowserBridgeEcdhPublicKey,
   generateBridgeCredential,
@@ -93,7 +94,7 @@ describe("BrowserBridgePairing — challenge and proof", () => {
       nonce: challenge.nonce,
       signature: signed,
     });
-    expect(valid).toBe(true);
+    expect(valid.kind).toBe("pairing_credential");
   });
 
   it("refuses a wrong nonce", async () => {
@@ -107,7 +108,7 @@ describe("BrowserBridgePairing — challenge and proof", () => {
       nonce: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
       signature: signed,
     });
-    expect(valid).toBe(false);
+    expect(valid).toEqual({ kind: "refused", reason: expect.any(String) });
   });
 
   it("refuses a wrong key id", async () => {
@@ -121,7 +122,7 @@ describe("BrowserBridgePairing — challenge and proof", () => {
       nonce: challenge.nonce,
       signature: signed,
     });
-    expect(valid).toBe(false);
+    expect(valid).toEqual({ kind: "refused", reason: expect.any(String) });
   });
 
   it("refuses a tampered signature", async () => {
@@ -138,7 +139,7 @@ describe("BrowserBridgePairing — challenge and proof", () => {
       nonce: challenge.nonce,
       signature: tampered,
     });
-    expect(valid).toBe(false);
+    expect(valid).toEqual({ kind: "refused", reason: expect.any(String) });
   });
 
   it("refuses a proof when the switch is off", async () => {
@@ -157,7 +158,7 @@ describe("BrowserBridgePairing — challenge and proof", () => {
       nonce: challenge.nonce,
       signature: signed,
     });
-    expect(first).toBe(true);
+    expect(first.kind).toBe("pairing_credential");
     expect(pairing.outstandingNonceCount()).toBe(0);
     const second = await pairing.verifyProof({
       kind: "proof",
@@ -165,7 +166,7 @@ describe("BrowserBridgePairing — challenge and proof", () => {
       nonce: challenge.nonce,
       signature: signed,
     });
-    expect(second).toBe(false);
+    expect(second).toEqual({ kind: "refused", reason: expect.any(String) });
   });
 
   it("emits a different nonce per call", async () => {
@@ -209,7 +210,7 @@ describe("BrowserBridgePairing — credential lifecycle", () => {
       nonce: oldChallenge.nonce,
       signature: oldSigned,
     });
-    expect(valid).toBe(false);
+    expect(valid).toEqual({ kind: "refused", reason: expect.any(String) });
   });
 
   it("refuses ALL operations after disable", async () => {
@@ -274,7 +275,7 @@ describe("BrowserBridgePairing — surviving a restart", () => {
       nonce: challenge.nonce,
       signature: proof,
     });
-    expect(valid).toBe(true);
+    expect(valid.kind).toBe("pairing_credential");
   });
 
   it("mints a fresh credential when the surface was switched off in between", async () => {
@@ -349,7 +350,7 @@ describe("BrowserBridgePairing — proof construction pinning", () => {
       nonce: challenge.nonce,
       signature: signed,
     });
-    expect(valid).toBe(true);
+    expect(valid.kind).toBe("pairing_credential");
   });
 });
 
@@ -443,7 +444,7 @@ describe("the pairing exchange — host and extension both real", () => {
         nonce: challenge.nonce,
         signature: proof,
       }),
-    ).toBe(true);
+    ).toEqual({ kind: "pairing_credential" });
   });
 
   it("delivers the credential again on a second connection, replacing the stored one", async () => {
@@ -484,7 +485,7 @@ describe("the pairing exchange — host and extension both real", () => {
           secondStored.keyId,
         ),
       }),
-    ).toBe(true);
+    ).toEqual({ kind: "pairing_credential" });
   });
 
   it("sends no credential at all when the surface's switch is off", async () => {
@@ -540,7 +541,7 @@ describe("the pairing exchange — host and extension both real", () => {
           chromeCredential.keyId,
         ),
       }),
-    ).toBe(false);
+    ).toEqual({ kind: "refused", reason: "unknown_key_id" });
   });
 
   it("cannot be opened by a key that is not the one offered in hello", async () => {
@@ -555,6 +556,215 @@ describe("the pairing exchange — host and extension both real", () => {
     await expect(
       extensionAppliesPair(toPairFrame(sealed), someoneElse.privateKey),
     ).rejects.toBeDefined();
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* The installation key                                                        */
+/* -------------------------------------------------------------------------- */
+
+describe("BrowserBridgePairing — the installation key", () => {
+  it("provisions one when the surface is switched on and none is stored", async () => {
+    const pairing = makePairing("edge");
+    expect(await pairing.installationKeyForDisplay()).toBeUndefined();
+
+    await pairing.enable();
+
+    const view = await pairing.installationKeyForDisplay();
+    expect(view).toBeDefined();
+    expect(view!.surface).toBe("edge");
+    expect(view!.keyId).toBe(pairing.installationKeyId);
+    // 32 bytes, base64 — the same width as the pairing credential.
+    expect(Buffer.from(view!.key, "base64")).toHaveLength(32);
+  });
+
+  it("stores it in the OS secure store, and only there", async () => {
+    const store = createInMemorySecureCredentialStore();
+    const pairing = new BrowserBridgePairing({
+      surface: "edge",
+      credentialStore: store,
+      allowedExtensionIds: KNOWN_EXTENSION_IDS,
+    });
+    await pairing.enable();
+
+    // In the store, under its own key id, alongside but apart from the
+    // pairing credential.
+    const stored = await store.load(pairing.installationKeyId);
+    expect(stored).toHaveLength(32);
+    const references = (await store.list()).map((reference) => reference.keyId);
+    expect(references).toContain(pairing.installationKeyId);
+    expect(references).toContain(pairing.keyId!);
+
+    // And nowhere in any rendered form of the pairing's own reporting: the
+    // status snapshot the UI reads carries no key material of either kind.
+    const serialised = JSON.stringify(pairing.status());
+    expect(serialised).not.toContain(Buffer.from(stored!).toString("base64"));
+    expect(serialised).not.toContain(hexOf(stored!));
+  });
+
+  it("never puts the key in an error message", async () => {
+    const store = createInMemorySecureCredentialStore();
+    const pairing = new BrowserBridgePairing({
+      surface: "edge",
+      credentialStore: store,
+      allowedExtensionIds: KNOWN_EXTENSION_IDS,
+    });
+    await pairing.enable();
+    const view = await pairing.installationKeyForDisplay();
+
+    const messages: string[] = [];
+    // Signing without a key, and reading from a store that throws, are the two
+    // error paths that could plausibly interpolate the secret.
+    const hostile: BrowserBridgePairing = new BrowserBridgePairing({
+      surface: "edge",
+      credentialStore: {
+        isAvailable: async () => false,
+        save: async () => {
+          throw new BrowserCredentialStoreUnavailableError("no store", "cause");
+        },
+        load: async () => undefined,
+        delete: async () => undefined,
+        list: async () => [],
+      },
+      allowedExtensionIds: KNOWN_EXTENSION_IDS,
+    });
+    for (const attempt of [
+      () => hostile.enable(),
+      () => hostile.signInstallationKeyProof("nonce"),
+    ]) {
+      await attempt().catch((error: unknown) => {
+        messages.push(error instanceof Error ? `${error.message}\u0000${error.stack ?? ""}` : String(error));
+      });
+    }
+    expect(messages).not.toEqual([]);
+    for (const message of messages) {
+      expect(message).not.toContain(view!.key);
+      expect(message).not.toContain(Buffer.from(view!.key, "base64").toString("hex"));
+    }
+  });
+
+  it("keeps the key when the surface is switched off, and reuses it on the way back", async () => {
+    const store = createInMemorySecureCredentialStore();
+    const pairing = new BrowserBridgePairing({
+      surface: "edge",
+      credentialStore: store,
+      allowedExtensionIds: KNOWN_EXTENSION_IDS,
+    });
+    await pairing.enable();
+    const before = (await pairing.installationKeyForDisplay())!.key;
+    const credentialBefore = pairing.keyId;
+
+    await pairing.disable();
+
+    // The credential is gone; the installation key is not. Destroying it would
+    // send the person back to the extension's options page on every toggle,
+    // with no security gain — the credential it authorises was just revoked.
+    expect(pairing.keyId).toBeUndefined();
+    expect(await store.load(credentialBefore!)).toBeUndefined();
+    const after = await pairing.installationKeyForDisplay();
+    expect(after?.key).toBe(before);
+
+    // And switching back on mints a NEW credential against the SAME key.
+    await pairing.enable();
+    expect(pairing.keyId).not.toBe(credentialBefore);
+    expect((await pairing.installationKeyForDisplay())!.key).toBe(before);
+  });
+
+  it("survives a restart, and is never adopted as the pairing credential", async () => {
+    const store = createInMemorySecureCredentialStore();
+    const first = new BrowserBridgePairing({
+      surface: "edge",
+      credentialStore: store,
+      allowedExtensionIds: KNOWN_EXTENSION_IDS,
+    });
+    await first.enable();
+    const credentialKeyId = first.keyId!;
+    const installationKey = (await first.installationKeyForDisplay())!.key;
+
+    const restarted = new BrowserBridgePairing({
+      surface: "edge",
+      credentialStore: store,
+      allowedExtensionIds: KNOWN_EXTENSION_IDS,
+    });
+    await restarted.restore();
+
+    // The install key alone must never win the "newest reference" race that
+    // restores the pairing credential, or every extension would be verifying
+    // against the wrong secret.
+    expect(restarted.keyId).toBe(credentialKeyId);
+    expect((await restarted.installationKeyForDisplay())!.key).toBe(installationKey);
+  });
+
+  it("admits a proof made with the installation key", async () => {
+    const pairing = makePairing("edge");
+    await pairing.enable();
+    const challenge = await pairing.issueChallenge();
+    expect(challenge.installationKeyId).toBe(pairing.installationKeyId);
+
+    const outcome = await pairing.verifyProof({
+      kind: "proof",
+      keyId: challenge.installationKeyId,
+      nonce: challenge.nonce,
+      signature: await pairing.signInstallationKeyProof(challenge.nonce),
+    });
+    // This is the outcome that authorises sending the credential, so it is
+    // distinct from "already paired" rather than a boolean.
+    expect(outcome).toEqual({ kind: "installation_key" });
+  });
+
+  it("refuses an installation key from a different host", async () => {
+    const pairing = makePairing("edge");
+    await pairing.enable();
+    const other = makePairing("edge");
+    await other.enable();
+
+    const challenge = await pairing.issueChallenge();
+    expect(
+      await pairing.verifyProof({
+        kind: "proof",
+        keyId: challenge.installationKeyId,
+        nonce: challenge.nonce,
+        signature: await other.signInstallationKeyProof(challenge.nonce),
+      }),
+    ).toEqual({ kind: "refused", reason: "installation_key_mismatch" });
+  });
+
+  it("refuses a proof for a nonce it never issued", async () => {
+    const pairing = makePairing("edge");
+    await pairing.enable();
+    expect(
+      await pairing.verifyProof({
+        kind: "proof",
+        keyId: pairing.installationKeyId,
+        nonce: "a-nonce-this-host-never-issued",
+        signature: await pairing.signInstallationKeyProof("a-nonce-this-host-never-issued"),
+      }),
+    ).toEqual({ kind: "refused", reason: "unknown_nonce" });
+  });
+
+  it("answers a challenge with the installation key before the pairing credential", async () => {
+    const pairing = makePairing("edge");
+    await pairing.enable();
+    const challenge = await pairing.issueChallenge();
+    const signature = await pairing.signInstallationKeyProof(challenge.nonce);
+
+    // Proved with the installation key first, because the pairing credential
+    // the host currently holds may be newer than the one this browser was
+    // given — only the installation key survives a rotation.
+    expect(await pairing.verifyProof({
+      kind: "proof",
+      keyId: pairing.installationKeyId,
+      nonce: challenge.nonce,
+      signature,
+    })).toEqual({ kind: "installation_key" });
+
+    // The same nonce cannot be reused to buy a second credential.
+    expect(await pairing.verifyProof({
+      kind: "proof",
+      keyId: pairing.installationKeyId,
+      nonce: challenge.nonce,
+      signature,
+    })).toEqual({ kind: "refused", reason: "unknown_nonce" });
   });
 });
 

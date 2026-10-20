@@ -20,7 +20,10 @@ import {
 import type { BrowserPort } from "../../src/client/features/browser/contracts/browser-port.js";
 import { initialWebuiBrowserPanelState, reduceWebuiBrowserPanelState } from "../../src/client/features/browser/projection/browser-state.js";
 import { BrowserPanel } from "../../src/client/features/browser/ui/BrowserPanel.public.js";
-import { BrowserAuthorizationSwitches } from "../../src/client/features/browser/ui/BrowserAuthorizationSwitches.public.js";
+import {
+  BrowserAuthorizationSwitches,
+  BrowserInstallationKey,
+} from "../../src/client/features/browser/ui/BrowserAuthorizationSwitches.public.js";
 
 function targetState(overrides: Partial<WebuiBrowserTargetState> = {}): WebuiBrowserTargetState {
   return {
@@ -285,5 +288,52 @@ describe("the authorization switches a Settings page mounts", () => {
     expect(fullCdpSection).toContain("DevTools 命令");
     expect(fullCdpSection).toContain("不会启用任何浏览器");
     expect(fullCdpSection).toContain('data-testid="browser-authorization-full-cdp-row"');
+  });
+});
+
+describe("the installation key a Settings page mounts", () => {
+  it("renders no key before one is asked for", () => {
+    // A static render runs no effects, and the key is fetched on a click, so
+    // there is nothing to leak into a first paint: the row exists, the value
+    // does not.
+    const markup = renderToStaticMarkup(<BrowserInstallationKey />);
+
+    expect(markup).toContain('data-testid="browser-installation-key"');
+    expect(markup).toContain('data-testid="browser-installation-key-edge-reveal"');
+    expect(markup).toContain('data-testid="browser-installation-key-chrome-reveal"');
+    expect(markup).not.toContain('data-testid="browser-installation-key-value"');
+  });
+
+  it("keeps the reveal buttons out of reach when the host wires no bridge", () => {
+    const markup = renderToStaticMarkup(<BrowserInstallationKey />);
+
+    for (const id of [
+      "browser-installation-key-edge-reveal",
+      "browser-installation-key-chrome-reveal",
+    ]) {
+      expect(markup).toMatch(new RegExp(`<button[^>]*data-testid="${id}"[^>]*disabled=""`, "u"));
+    }
+  });
+
+  it("offers the reveal when the host does wire the bridge", () => {
+    const markup = renderToStaticMarkup(
+      <BrowserInstallationKey
+        readKey={async () => ({
+          present: false,
+          surface: "edge",
+          reason: "not_provisioned",
+        })}
+      />,
+    );
+
+    for (const id of [
+      "browser-installation-key-edge-reveal",
+      "browser-installation-key-chrome-reveal",
+    ]) {
+      expect(markup).not.toMatch(new RegExp(`<button[^>]*data-testid="${id}"[^>]*disabled=""`, "u"));
+    }
+    // Still no key on the first paint: the reader is only ever called from the
+    // click handler, and nothing else can render one.
+    expect(markup).not.toContain('data-testid="browser-installation-key-value"');
   });
 });

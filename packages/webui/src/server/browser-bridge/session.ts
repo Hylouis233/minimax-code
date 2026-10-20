@@ -33,7 +33,11 @@ import {
   type WebuiBrowserBridgeTarget,
 } from "../../shared/contracts/browser-bridge.js";
 
-import { PairingSwitchedOffError, BrowserBridgePairing } from "./pairing.js";
+import {
+  PairingSwitchedOffError,
+  BrowserBridgePairing,
+  type BrowserBridgeProofRefusal,
+} from "./pairing.js";
 import {
   bridgeOperationReconnectDelayMs,
   withBridgeOperationRetry,
@@ -85,6 +89,14 @@ export interface BrowserBridgeBridgeImageFrameExport {
 export type BrowserBridgeSessionCloseReason =
   | { readonly kind: "remote" }
   | { readonly kind: "proof_failed" }
+  /**
+   * The peer presented an allowlisted origin but could not prove either
+   * anchor. `reason` names which one was missing or wrong — a generic
+   * "pairing failed" would leave the person unable to tell "paste your
+   * installation key" from "your host rotated and you already hold the old
+   * one".
+   */
+  | { readonly kind: "pairing_refused"; readonly reason: BrowserBridgeProofRefusal }
   | { readonly kind: "switched_off" }
   | { readonly kind: "store_unavailable" }
   | { readonly kind: "host_revoked" }
@@ -181,44 +193,30 @@ export class BrowserBridgeSession extends EventEmitter {
   /**
    * Boots the post-hello handshake.
    *
-   * The session is constructed on the upgrade, but `pair` and `challenge`
-   * wait until the extension's `hello` arrives so the host can build an ECDH
-   * cipher the extension can actually open.
+   * The session is constructed on the upgrade, but the handshake waits until
+   * the extension's `hello` arrives so the host can see the peer's ephemeral
+   * public key before it seals anything.
    */
   beginHelloGatedHandshake(): void {
-    void this.sendPairAndChallenge();
+    void this.sendChallenge();
   }
 
   /**
-   * Sends the pairing transfer (if any) and then the challenge.
+   * Issues the challenge. Deliberately sends **no** `pair` frame.
    *
-   * Order matters: a `pair` frame carries the host's credential, which is
-   * what the extension answers the challenge against. Reversing the order
-   * would leave the extension signing with a credential it does not yet
-   * have.
+   * The order here is the security property: proof first, credential second.
+   * The host used to seal its credential to whatever key the `hello` frame
+   * carried and send it immediately, which handed that credential to any local
+   * process able to spoof the allowlisted `Origin` header — the origin proves
+   * nothing about the peer behind it. Nothing is handed over now until the
+   * peer has proved possession of the installation key or of a credential this
+   * host already issued; `handleProof` sends the `pair` frame, and only then.
    */
-  private async sendPairAndChallenge(): Promise<void> {
+  private async sendChallenge(): Promise<void> {
     const hello = this.helloFrame;
     if (!hello) return;
     if (this.closeReason) return;
     try {
-      if (hello.publicKey) {
-        const sealed = await this.pairing.sealCredentialForExtension(hello.publicKey);
-        if (sealed.kind === "sealed") {
-          this.sendFrameOrClose({
-            kind: "pair",
-            keyId: sealed.keyId,
-            publicKey: sealed.publicKey,
-            salt: sealed.salt,
-            payload: sealed.payload,
-          });
-          if (this.closeReason) return;
-        }
-        // `off`: the surface's pairing has no credential. The host sends no
-        // `pair` frame, so the extension cannot complete the handshake —
-        // admission already refused the connection, and the session will
-        // close once `issueChallenge` is asked.
-      }
       const challenge = await this.pairing.issueChallenge();
       this.activeChallenge = challenge;
       this.sendFrameOrClose(challenge);
@@ -364,16 +362,31 @@ export class BrowserBridgeSession extends EventEmitter {
     // might pin the algorithm again here; the contract does not require it
     // today and we follow the wire.
     const challengeNonce = this.activeChallenge.nonce;
-    const valid = await this.pairing.verifyProof(proof);
-    if (!valid) {
+    const outcome = await this.pairing.verifyProof(proof);
+    if (outcome.kind === "refused") {
       // Forget the nonce so it cannot be replayed later; the extension gets
       // one shot per challenge and the host does not chase further.
       this.pairing.forgetChallenge(challengeNonce);
       this.activeChallenge = undefined;
-      this.close({ kind: "proof_failed" });
+      // The reason is specific on purpose: "pairing proof failed" does not
+      // tell the person whether to paste an installation key, re-paste one,
+      // or fix a host that no longer holds their credential.
+      this.close({ kind: "pairing_refused", reason: outcome.reason });
       return;
     }
     this.activeChallenge = undefined;
+    if (outcome.kind === "installation_key") {
+      // The peer proved possession of the installation key — the only thing a
+      // local process cannot hold — so it is now entitled to the credential.
+      // It is sent here, after the proof, and nowhere earlier in the flow.
+      const handedOver = await this.deliverPairingCredential();
+      if (!handedOver) return;
+    }
+    // `pairing_credential`: the peer proved a credential this host issued and
+    // the peer already holds, so no `pair` frame is sent. Re-sealing it would
+    // put the credential on the wire again for no gain, and would blur the one
+    // property that matters here: a `pair` frame is sent only to a peer that
+    // has proved the installation key.
     this.admitted = true;
     const ready: WebuiBrowserBridgeHostFrame = { kind: "ready", sessionId: this.sessionId };
     try {
@@ -382,6 +395,35 @@ export class BrowserBridgeSession extends EventEmitter {
     } catch (error) {
       this.close({ kind: "host_error", error: errorMessage(error) });
     }
+  }
+
+  /**
+   * Seals the pairing credential to this peer's ephemeral public key and sends
+   * it. Returns `false` when the session has already been closed, so the
+   * caller stops rather than sending `ready` on a dead socket.
+   */
+  private async deliverPairingCredential(): Promise<boolean> {
+    const hello = this.helloFrame;
+    if (!hello?.publicKey) {
+      // The peer proved the installation key but sent no key to seal to, so
+      // it cannot be given the credential. Refused rather than admitted: the
+      // handshake is incomplete, and "admitted" would be a lie.
+      this.close({ kind: "pairing_refused", reason: "no_peer_public_key" });
+      return false;
+    }
+    const sealed = await this.pairing.sealCredentialForExtension(hello.publicKey);
+    if (sealed.kind !== "sealed") {
+      this.close({ kind: "switched_off" });
+      return false;
+    }
+    this.sendFrameOrClose({
+      kind: "pair",
+      keyId: sealed.keyId,
+      publicKey: sealed.publicKey,
+      salt: sealed.salt,
+      payload: sealed.payload,
+    });
+    return !this.closeReason;
   }
 
   private async handleInputResult(
@@ -567,6 +609,8 @@ function describeClose(reason: BrowserBridgeSessionCloseReason): string {
       return "remote closed";
     case "proof_failed":
       return "pairing proof failed";
+    case "pairing_refused":
+      return describeRefusal(reason.reason);
     case "switched_off":
       return "browser switch turned off";
     case "store_unavailable":
@@ -575,6 +619,31 @@ function describeClose(reason: BrowserBridgeSessionCloseReason): string {
       return "host revoked the session";
     case "host_error":
       return `host error: ${reason.error}`;
+  }
+}
+
+/**
+ * The refusal text the extension shows and logs.
+ *
+ * Each line names the missing thing rather than reporting a generic failure,
+ * because each has a different fix. These strings are part of the wire
+ * contract the extension reads, so they are written out in full rather than
+ * composed from a code.
+ */
+function describeRefusal(reason: BrowserBridgeProofRefusal): string {
+  switch (reason) {
+    case "switched_off":
+      return "pairing refused: the browser switch for this surface is turned off";
+    case "unknown_nonce":
+      return "pairing refused: the proof answers a challenge this host did not issue, or one already answered";
+    case "unknown_key_id":
+      return "pairing refused: the proof names a key this host does not hold for this surface";
+    case "installation_key_mismatch":
+      return "pairing refused: this browser's installation key does not match this host — paste the key from the WebUI Settings into the extension options page again";
+    case "pairing_credential_mismatch":
+      return "pairing refused: this browser holds a pairing credential this host no longer accepts — the host has been re-provisioned, so paste the installation key again";
+    case "no_peer_public_key":
+      return "pairing refused: this browser proved the installation key but sent no public key, so the credential cannot be sealed to it";
   }
 }
 

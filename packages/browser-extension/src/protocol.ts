@@ -42,6 +42,15 @@ export interface WebuiBrowserBridgeChallenge {
   readonly algorithm: typeof WEBUI_BROWSER_BRIDGE_SIGNATURE_ALGORITHM;
   /** Which stored credential the host expects the answer to use. */
   readonly keyId: string;
+  /**
+   * Which installation key the host will accept a proof with.
+   *
+   * The installation key is what a browser proves *before* it is handed a
+   * pairing credential, so it — not `keyId` — is what the extension signs
+   * with on a first connection. The id is public: the host names it here on
+   * every challenge.
+   */
+  readonly installationKeyId: string;
 }
 
 export interface WebuiBrowserBridgeProof {
@@ -463,6 +472,16 @@ export function parseWebuiBrowserBridgeHostFrame(raw: string): WebuiBrowserBridg
       }
       if (typeof candidate.keyId !== "string" || candidate.keyId.length === 0) {
         return { ok: false, reason: "challenge has no key id" };
+      }
+      // Required, not optional: without it the extension cannot tell which
+      // key the host will accept a proof with, and answering with the pairing
+      // credential on a first connection would fail against a host that has
+      // none. A host that omits it is refused rather than guessed at.
+      if (
+        typeof candidate.installationKeyId !== "string" ||
+        candidate.installationKeyId.length === 0
+      ) {
+        return { ok: false, reason: "challenge has no installation key id" };
       }
       if (candidate.algorithm !== WEBUI_BROWSER_BRIDGE_SIGNATURE_ALGORITHM) {
         return { ok: false, reason: `challenge algorithm ${String(candidate.algorithm)} is not supported` };

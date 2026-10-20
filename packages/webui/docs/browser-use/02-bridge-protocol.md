@@ -44,8 +44,8 @@ extension is the only side that answers one.
 
 | `kind` | Carries |
 | --- | --- |
-| `pair` | `keyId`, `publicKey`, base64 `salt`, base64 `payload` — the host's credential, encrypted |
-| `challenge` | `nonce`, `algorithm`, `keyId` |
+| `pair` | `keyId`, `publicKey`, base64 `salt`, base64 `payload` — the host's credential, encrypted. Sent **only** after an installation-key proof. |
+| `challenge` | `nonce`, `algorithm`, `keyId` (the pairing credential), `installationKeyId` (the anchor a first pairing proves) |
 | `ready` | `sessionId` — the bridge session is admitted |
 | `input` | `commandId` and a `WebuiBrowserBridgeInputCommand` |
 | `ping` | `nonce` |
@@ -112,16 +112,24 @@ attached debugger cannot produce an image frame at all; the extension captures t
   [`01-capability-matrix.md`](01-capability-matrix.md) applies to the isolated provider only. It has no
   analogue on this path.
 
-## Pairing: the credential transfer, then challenge and proof
+## Pairing: proof first, credential second
 
 The credential is **host-authored**. The extension does not mint one: two
 independently minted credentials never match, and the host would reject a proof
 made with the wrong one. Instead the host delivers its credential, encrypted to
-a key the extension mints for that one connection.
+a key the extension mints for that one connection — but only once the peer has
+proved it is a real extension.
 
-Pairing after that is challenge-response rather than a shared bearer token, so a
-proof lifted off the loopback socket is useless against the next connection, and
-a captured proof is useless because it is bound to a fresh nonce.
+Pairing is challenge-response rather than a shared bearer token, so a proof
+lifted off the loopback socket is useless against the next connection, and a
+captured proof is useless because it is bound to a fresh nonce.
+
+**Proof first, credential second.** A peer that has proved possession of the
+**installation key** — the long-lived secret the person pasted into the
+extension's options page, and the one secret a local process cannot reach — is
+entitled to the pairing credential. A peer that proves only a pairing credential
+this host already issued is already paired and receives nothing further. A peer
+that proves neither is refused and **no `pair` frame is sent at all**.
 
 ```mermaid
 sequenceDiagram
@@ -129,21 +137,33 @@ sequenceDiagram
     participant E as Extension
     E->>E: generate ephemeral ECDH P-256 key pair
     E->>H: hello { browser, browserId, extensionVersion, publicKey }
+    H->>E: challenge { nonce, algorithm, keyId, installationKeyId }
+    E->>E: HMAC-SHA256 over nonce + " " + installationKeyId
+    E->>H: proof { keyId: installationKeyId, nonce, signature }
+    H->>H: verify against the installation key
     H->>H: seal the credential to publicKey (HKDF-SHA256 + AES-256-GCM)
     H->>E: pair { keyId, publicKey, salt, payload }
     E->>E: open the payload, store { keyId, secret }
-    H->>E: challenge { nonce, algorithm, keyId }
-    E->>E: HMAC-SHA256 over nonce + " " + keyId
-    E->>H: proof { keyId, nonce, signature }
-    H->>H: constant-time compare, nonce and keyId must match
     H->>E: ready { sessionId }
 ```
 
-`pair` is sent **before** `challenge`, because the extension needs the credential
-to answer the challenge: the host's is the only one it will accept a proof
-against. The host sends `pair` on **every** `hello`, so a credential that was
-rotated — the surface's switch going off and on again — reaches the extension
-with nobody doing anything.
+The challenge names **two** key ids: `installationKeyId`, which a peer proves to
+be entitled to a credential, and `keyId`, the current pairing credential an
+already-paired peer answers with. The key id in the proof selects which branch
+the host takes, so a proof made for one anchor cannot be replayed as the other —
+the key id is inside the signed material.
+
+A peer that already holds the pairing credential answers with `keyId` and is
+admitted with **no `pair` frame**. Re-sealing a credential it already holds
+would put the credential on the wire again for no gain, and would blur the one
+property worth being able to check by reading one line: a `pair` frame is sent
+only after an installation-key proof.
+
+The person has to paste the installation key once per browser — see
+[`04-pairing-credentials.md`](04-pairing-credentials.md). Provisioning is explicit
+because an unprovable peer identity cannot be automated away: the ADR's
+"automatic pairing" is about not asking about **tabs**, and it does not survive a
+peer that cannot be told apart from a local process.
 
 ### The cipher — `implemented`
 
@@ -188,10 +208,11 @@ These are published test constants, not credentials.
 
 | Case | Behaviour |
 | --- | --- |
-| `hello` with no `publicKey` (an older extension) | The host does not pair and sends no `pair` frame. It still sends `challenge`, so the extension's proof is simply wrong and the session closes — a reported failure, not a silent hang. |
-| A `publicKey` that is not a P-256 JWK | Same: refused by a structural check, no `pair`. |
-| The host sends no `pair` (its surface is off) | The extension has no credential to sign with and reports that the handshake cannot complete. |
-| The surface's switch is off | The host holds no credential and sends no `pair`; the existing admission already refuses the connection. |
+| A `challenge` with no `installationKeyId` | The extension refuses the frame and closes the socket. Without it the extension cannot tell which key the host will accept a proof with, and answering with the pairing credential on a first connection would fail against a host that has none. |
+| `hello` with no `publicKey`, but a valid installation-key proof | Refused with `no_peer_public_key`. There is nothing to seal the credential to, and admitting an incomplete handshake would be a lie. |
+| A `publicKey` that is not a P-256 JWK | Refused by a structural check before any sealing, so no `pair`. |
+| The surface's switch is off | The host holds no credential and issues no challenge; the existing admission already refuses the connection. |
+| The host sends no `pair` (the peer proved only a pairing credential) | Nothing to do — the peer already holds that credential. |
 
 ## Challenge and proof
 

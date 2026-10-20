@@ -39,6 +39,7 @@ import {
 } from "../../shared/contracts/browser.js";
 import type {
   WebuiBrowserBridgeImageFrame,
+  WebuiBrowserBridgeInstallationKeyView,
   WebuiBrowserBridgeTarget,
 } from "../../shared/contracts/browser-bridge.js";
 import {
@@ -288,7 +289,25 @@ export class BrowserBridgeServer {
     }
   }
 
-  /** Per-surface state for diagnostics. Carries no credential material. */
+  /**
+   * One surface's installation key, for the Settings surface to display.
+   *
+   * This is the bridge's implementation of the narrow source the installation
+   * key operation reads. It answers `undefined` for a surface that has never
+   * been switched on — there is no key to copy, and the person is told that
+   * rather than handed an empty paste.
+   */
+async readInstallationKey(
+    surface: WebuiBridgeBrowserSurface,
+  ): Promise<WebuiBrowserBridgeInstallationKeyView | undefined> {
+    const pairing = this.pairings.get(surface);
+    if (!pairing) return undefined;
+    return pairing.installationKeyForDisplay();
+  }
+
+  /**
+   * Per-surface state for diagnostics. Carries no credential material.
+   */
   snapshot(): {
     readonly surfaces: Readonly<
     Record<WebuiBridgeBrowserSurface, BrowserBridgeServerSurfaceStatus>

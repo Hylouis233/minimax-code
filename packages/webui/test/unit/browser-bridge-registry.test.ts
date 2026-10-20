@@ -144,7 +144,7 @@ describe("BrowserBridgeRegistry — switch lifecycle", () => {
       nonce: oldChallenge.nonce,
       signature: oldSigned,
     });
-    expect(valid).toBe(false);
+    expect(valid).toEqual({ kind: "refused", reason: "switched_off" });
   });
 
   it("does not affect the other surface", async () => {

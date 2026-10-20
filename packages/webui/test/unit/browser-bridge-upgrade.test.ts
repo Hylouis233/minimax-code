@@ -357,3 +357,152 @@ describe("WebUI browser bridge — the dedicated upgrade branch", () => {
     client.socket.terminate();
   });
 });
+
+/**
+ * The installation-key exchange, over a real socket.
+ *
+ * Finding N1: admission trusted the `Origin` header to pick an allowlisted
+ * extension id, and the host then sealed its credential to whatever key the
+ * peer's `hello` carried. Any local process could spoof that origin, mint its
+ * own ECDH key, decrypt the credential and answer the challenge — so "the
+ * origin is allowlisted" was doing no work.
+ *
+ * These tests are the wire-level counterpart. They open an actual `ws` socket
+ * with the allowlisted origin, so what is asserted is what a real attacker
+ * would observe: the frames that arrive, and the ones that never do.
+ */
+describe("WebUI browser bridge — the installation key gates the credential", () => {
+  /** Hello with the allowlisted origin and a key the host will seal to. */
+  async function sayHello(
+    harness: Harness & { readonly bridge: BrowserBridgeServer },
+    client: ReturnType<typeof connectClient>,
+    browserId: string,
+  ): Promise<void> {
+    client.socket.send(
+      JSON.stringify({
+        kind: "hello",
+        browser: "edge",
+        browserId,
+        extensionVersion: "1.0.0",
+        publicKey: await bogusClientPublicKey(),
+      }),
+    );
+  }
+
+  it("sends no pair frame at all to a peer that cannot prove the installation key", async () => {
+    const harness = await startHarness({ dev: true });
+    const pairing = harness.bridge.pairings.get("edge")!;
+
+    // The attacker: a local process that knows the allowlisted extension id,
+    // spoofs the origin, and holds a secret of its own choosing.
+    const client = connectClient(harness.port, {
+      origin: `chrome-extension://${KNOWN_EDGE_ID}/`,
+    });
+    await client.opened;
+    await sayHello(harness, client, "edge-attacker");
+
+    const challenge = await client.waitFor<{ nonce: string; keyId: string; installationKeyId: string }>(
+      "challenge",
+    );
+
+    // It answers with its own key and its own signature. Both halves are
+    // wrong: the key id is not one this host issued for that purpose, and the
+    // HMAC is not over this host's secret.
+    client.socket.send(
+      JSON.stringify({
+        kind: "proof",
+        keyId: challenge.installationKeyId,
+        nonce: challenge.nonce,
+        signature: "AAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      }),
+    );
+    await settle();
+
+    // The headline assertion, on the wire: no `pair` frame was ever sent, so
+    // there was no sealed credential to decrypt and nothing to replay.
+    expect(client.frames.map((frame) => frame.kind)).not.toContain("pair");
+    expect(client.frames.map((frame) => frame.kind)).not.toContain("ready");
+    // And the refusal names what was missing rather than failing generically.
+    const closed = client.frames.find((frame) => frame.kind === "closed") as
+      | { readonly reason: string }
+      | undefined;
+    expect(closed?.reason).toContain("installation key does not match");
+    expect(harness.bridge.createProvider("edge")).toBeUndefined();
+    // The host still holds its own credential; nothing was leaked or revoked.
+    expect(pairing.keyId).toBeTruthy();
+    client.socket.terminate();
+  });
+
+  it("sends the sealed credential to a peer that proves the installation key", async () => {
+    const harness = await startHarness({ dev: true });
+    const pairing = harness.bridge.pairings.get("edge")!;
+
+    const client = connectClient(harness.port, {
+      origin: `chrome-extension://${KNOWN_EDGE_ID}/`,
+    });
+    await client.opened;
+    await sayHello(harness, client, "edge-real");
+
+    const challenge = await client.waitFor<{ nonce: string; keyId: string; installationKeyId: string }>(
+      "challenge",
+    );
+    expect(challenge.installationKeyId).toBe(pairing.installationKeyId);
+
+    client.socket.send(
+      JSON.stringify({
+        kind: "proof",
+        keyId: challenge.installationKeyId,
+        nonce: challenge.nonce,
+        signature: await pairing.signInstallationKeyProof(challenge.nonce),
+      }),
+    );
+
+    // The credential arrives only now, after the proof.
+    const pair = await client.waitFor<{ keyId: string; payload: string }>("pair");
+    expect(pair.keyId).toBe(pairing.keyId);
+    await client.waitFor("ready");
+    await settle();
+    expect(harness.bridge.createProvider("edge")).toBeDefined();
+    client.socket.terminate();
+  });
+
+  it("admits a peer that holds the pairing credential without the installation key", async () => {
+    const harness = await startHarness({ dev: true });
+    const client = await pairExtension(harness, "edge", "edge-already-paired");
+    await client.waitFor("ready");
+    await settle();
+    // Already paired means already holding the credential, so no `pair` frame
+    // is re-sent: re-sealing it would put the credential on the wire again for
+    // no gain, and would blur the property that `pair` follows the installation
+    // key proof.
+    expect(client.frames.map((frame) => frame.kind)).not.toContain("pair");
+    expect(harness.bridge.createProvider("edge")).toBeDefined();
+    client.socket.terminate();
+  });
+
+  it("refuses an unknown key id with a reason that names it", async () => {
+    const harness = await startHarness({ dev: true });
+    const client = connectClient(harness.port, {
+      origin: `chrome-extension://${KNOWN_EDGE_ID}/`,
+    });
+    await client.opened;
+    await sayHello(harness, client, "edge-unknown-key");
+
+    const challenge = await client.waitFor<{ nonce: string }>("challenge");
+    client.socket.send(
+      JSON.stringify({
+        kind: "proof",
+        keyId: "some-key-this-host-never-issued",
+        nonce: challenge.nonce,
+        signature: "AAAA",
+      }),
+    );
+    await settle();
+    const closed = client.frames.find((frame) => frame.kind === "closed") as
+      | { readonly reason: string }
+      | undefined;
+    expect(closed?.reason).toContain("names a key this host does not hold");
+    expect(client.frames.map((frame) => frame.kind)).not.toContain("pair");
+    client.socket.terminate();
+  });
+});

@@ -59,6 +59,8 @@ export {
   type BrowserBridgePairingMetadata,
   type BrowserBridgePairingOptions,
   type BrowserBridgePairingStatus,
+  type BrowserBridgeProofOutcome,
+  type BrowserBridgeProofRefusal,
 } from "./pairing.js";
 
 export {
@@ -69,7 +71,9 @@ export {
   openWebuiBrowserBridgePairingCredential,
   signWebuiBrowserBridgeProof,
   verifyWebuiBrowserBridgeProof,
+  webuiBrowserBridgeInstallationKeyId,
   webuiBrowserBridgeProofMaterial,
+  WEBUI_BROWSER_BRIDGE_INSTALLATION_KEY_BYTES,
   WEBUI_BROWSER_BRIDGE_PATH,
   WEBUI_BROWSER_BRIDGE_PAIR_HKDF_INFO,
   WEBUI_BROWSER_BRIDGE_PAIR_HKDF_SALT_BYTES,
@@ -81,6 +85,7 @@ export {
   type WebuiBrowserBridgeHostFrame,
   type WebuiBrowserBridgeImageFrame,
   type WebuiBrowserBridgeInputCommand,
+  type WebuiBrowserBridgeInstallationKeyView,
   type WebuiBrowserBridgePair,
   type WebuiBrowserBridgePairCipher,
   type WebuiBrowserBridgeProof,

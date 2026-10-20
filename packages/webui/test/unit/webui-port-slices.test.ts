@@ -56,6 +56,7 @@ const EXPECTED: Record<
     "selectBrowserTarget", "sendBrowserInput", "sendBrowserCommand",
     "watchBrowserFrames",
     "listBrowserCapabilities",
+    "getBrowserInstallationKey",
   ],
   composer: ["runCommand", "enqueueMessage", "listQueueMessages", "deleteQueueItem"],
   interactions: [

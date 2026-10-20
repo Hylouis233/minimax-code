@@ -15,11 +15,14 @@ import {
 import { createWebuiBrowserBridgeImageStream } from "../images.js";
 import { createWebuiBrowserBridgeInputDispatcher } from "../input.js";
 import {
-  answerWebuiBrowserBridgeChallenge,
+  answerWebuiBrowserBridgeChallengeWithStoredSecrets,
   applyWebuiBrowserBridgePairingCredential,
+  loadWebuiBrowserBridgeInstallationKey,
   loadWebuiBrowserBridgePairingCredential,
+  webuiBrowserBridgeInstallationKeyStore,
   webuiBrowserBridgePairingStore,
   type WebuiBrowserBridgeBrowserName,
+  type WebuiBrowserBridgeInstallationKey,
   type WebuiBrowserBridgePairingCredential,
 } from "../pairing.js";
 import type {
@@ -51,6 +54,7 @@ const LAST_ERROR_STORAGE_KEY = "webui.browserBridge.lastError";
 const IMAGE_FRAME_INTERVAL_MS = 500;
 
 const pairingStore = webuiBrowserBridgePairingStore(chrome.storage.local);
+const installationKeyStore = webuiBrowserBridgeInstallationKeyStore(chrome.storage.local);
 const generations = webuiBrowserBridgeTargetGenerationStore(chrome.storage.session);
 
 let starting: Promise<void> | undefined;
@@ -82,6 +86,11 @@ async function startBridge(): Promise<void> {
   // `applyPairCredential` below.
   let credential: WebuiBrowserBridgePairingCredential | undefined =
     await loadWebuiBrowserBridgePairingCredential(pairingStore);
+  // The installation key the person pasted into the options page. Absent on a
+  // browser that has never been provisioned, which is a state the handshake
+  // reports rather than works around.
+  let installationKeyForAnswer: WebuiBrowserBridgeInstallationKey | undefined =
+    await loadWebuiBrowserBridgeInstallationKey(installationKeyStore);
   const targets = createWebuiBrowserBridgeTargetRegistry({
     browserId,
     tabs: chrome.tabs,
@@ -187,12 +196,17 @@ async function startBridge(): Promise<void> {
       // is only a fast path: a worker restart reloads from storage and a
       // `pair` overwrites both.
       const current = credential ?? (await loadWebuiBrowserBridgePairingCredential(pairingStore));
-      if (!current) {
-        throw new Error(
-          "browser bridge: host issued a challenge before delivering a pairing credential",
-        );
-      }
-      return answerWebuiBrowserBridgeChallenge(challenge, current);
+      const installationKey =
+        installationKeyForAnswer ?? (await loadWebuiBrowserBridgeInstallationKey(installationKeyStore));
+      // The installation key is preferred: it is the anchor the host recognises
+      // on every connection and the one that survives a credential rotation, so
+      // preferring it is what lets a host that re-provisioned re-pair this
+      // browser without the person touching anything.
+      return answerWebuiBrowserBridgeChallengeWithStoredSecrets(
+        challenge,
+        installationKey,
+        current,
+      );
     },
     onStatus: (status) => {
       if (status !== "connected") return;

@@ -132,6 +132,7 @@ import {
   SEND_BROWSER_COMMAND_OPERATION_NAME,
   WATCH_BROWSER_FRAMES_OPERATION_NAME,
   LIST_BROWSER_CAPABILITIES_OPERATION_NAME,
+  GET_BROWSER_INSTALLATION_KEY_OPERATION_NAME,
 } from "../../shared/operation-names.js";
 import { createWebuiWire, type WebuiWireOptions } from "./wire.js";
 
@@ -245,6 +246,8 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
     watchBrowserFrames: (body, onFrame) =>
       watchBrowserFrames(WATCH_BROWSER_FRAMES_OPERATION_NAME, body, onFrame),
     listBrowserCapabilities: () => request(LIST_BROWSER_CAPABILITIES_OPERATION_NAME, {}),
+    getBrowserInstallationKey: (body) =>
+      request(GET_BROWSER_INSTALLATION_KEY_OPERATION_NAME, body),
     createSession: (body) => request(CREATE_SESSION_OPERATION_NAME, body),
     sendMessage: (body, onFrame, onDelivery) =>
       stream(SEND_MESSAGE_OPERATION_NAME, body, onFrame, onDelivery),

@@ -209,6 +209,7 @@ describe("host frame parsing", () => {
           nonce: "n-1",
           algorithm: "HMAC-SHA256",
           keyId: "key-1",
+          installationKeyId: "webui-browser-bridge-installation-edge-v1",
         }),
       ),
     ).toMatchObject({ ok: true });

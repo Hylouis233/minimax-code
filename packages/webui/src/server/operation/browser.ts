@@ -15,6 +15,7 @@
 import { WebuiErrorCode } from "../../shared/envelope.js";
 import {
   GET_BROWSER_AUTHORIZATION_OPERATION_NAME,
+  GET_BROWSER_INSTALLATION_KEY_OPERATION_NAME,
   LIST_BROWSER_CAPABILITIES_OPERATION_NAME,
   LIST_BROWSER_TARGETS_OPERATION_NAME,
   SELECT_BROWSER_TARGET_OPERATION_NAME,
@@ -25,9 +26,11 @@ import {
 } from "../../shared/operation-names.js";
 import {
   WEBUI_BROWSER_SURFACES,
+  WEBUI_BRIDGE_BROWSER_SURFACES,
   type WebuiBrowserInputCommand,
   type WebuiBrowserSurface,
   type WebuiBrowserTargetId,
+  type WebuiBridgeBrowserSurface,
 } from "../../shared/contracts/browser.js";
 import type { WebuiOperation, WebuiOperationValidation } from "./operation-contract.js";
 import { invalidBody, requireRecord } from "./operation-contract.js";
@@ -40,6 +43,23 @@ export const getBrowserAuthorizationOperation: WebuiOperation<Record<string, nev
 export const listBrowserCapabilitiesOperation: WebuiOperation<Record<string, never>> = {
   name: LIST_BROWSER_CAPABILITIES_OPERATION_NAME,
   validate: (body) => validateEmptyBody(LIST_BROWSER_CAPABILITIES_OPERATION_NAME, body),
+};
+
+/**
+ * The installation-key read.
+ *
+ * Validated to name exactly one of the two extension-reachable surfaces. A
+ * request for `isolatedChromium` is refused rather than answered with "no key":
+ * there is no extension on that surface, so there is nothing to paste, and
+ * returning a shape the caller would misread as "not provisioned yet" would
+ * send the person to a page that does not exist.
+ */
+export const getBrowserInstallationKeyOperation: WebuiOperation<Record<string, unknown>> = {
+  name: GET_BROWSER_INSTALLATION_KEY_OPERATION_NAME,
+  validate: (body) => validateInstallationKeySurface(
+    GET_BROWSER_INSTALLATION_KEY_OPERATION_NAME,
+    body,
+  ),
 };
 
 export const setBrowserAuthorizationOperation: WebuiOperation<Record<string, unknown>> = {
@@ -140,6 +160,30 @@ function validateSurface(
     return invalidBody(`${operation} body requires a known browser surface`);
   }
   return validateRunId(operation, result.body);
+}
+
+/**
+ * Validates an installation-key read.
+ *
+ * Only the two extension-reachable surfaces are accepted. `isolatedChromium`
+ * is refused rather than answered with "not provisioned": there is no
+ * extension on that surface, so there is nothing to paste, and a "no key yet"
+ * answer would send the person to an options page that can never pair.
+ */
+function validateInstallationKeySurface(
+  operation: string,
+  body: unknown,
+): WebuiOperationValidation<Record<string, unknown>> {
+  const result = requireRecord(operation, body);
+  if (!result.ok) return result;
+  const surface = result.body.surface;
+  if (
+    typeof surface !== "string" ||
+    !WEBUI_BRIDGE_BROWSER_SURFACES.includes(surface as WebuiBridgeBrowserSurface)
+  ) {
+    return invalidBody(`${operation} body requires a surface reached through the extension bridge`);
+  }
+  return { ok: true, body: result.body };
 }
 
 /**

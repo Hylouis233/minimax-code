@@ -142,6 +142,7 @@ const BROWSER_KEYS = [
   "sendBrowserCommand",
   "watchBrowserFrames",
   "listBrowserCapabilities",
+  "getBrowserInstallationKey",
 ] as const satisfies readonly (keyof BrowserPort)[];
 
 const COMPOSER_KEYS = [

@@ -86,6 +86,16 @@ export interface WebuiBrowserBridgeChallenge {
   readonly algorithm: typeof WEBUI_BROWSER_BRIDGE_SIGNATURE_ALGORITHM;
   /** Which stored credential the host expects the answer to use. */
   readonly keyId: string;
+  /**
+   * Which installation key the host will accept a proof with.
+   *
+   * The installation key is the anchor a peer proves *before* it is handed a
+   * pairing credential. Naming it on the challenge tells the extension which
+   * key id to sign with when it has that key, and tells a peer that has only
+   * the pairing credential which key id that was. It is a public label — the
+   * id goes on the wire — exactly like `keyId`.
+   */
+  readonly installationKeyId: string;
 }
 
 /** The client's answer to a challenge. */
@@ -328,6 +338,41 @@ function decodeBase64(value: string): Uint8Array {
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
   return bytes;
+}
+
+/**
+ * The installation key's size, in bytes.
+ *
+ * 32 bytes matches the pairing credential's own secret, so the two secrets a
+ * browser holds are the same strength and neither is the weak link.
+ */
+export const WEBUI_BROWSER_BRIDGE_INSTALLATION_KEY_BYTES = 32;
+
+/**
+ * The key id of a surface's installation key.
+ *
+ * The id is public — it is named on the challenge, so the extension knows what
+ * to sign with — and it is *derived from the surface* rather than random: the
+ * host has to find this exact entry again on the next start, and a stable id is
+ * what makes that a load rather than a search.
+ */
+export function webuiBrowserBridgeInstallationKeyId(surface: string): string {
+  return `webui-browser-bridge-installation-${surface}-v1`;
+}
+
+/** The one installation key for a surface, as the Settings surface receives it. */
+export interface WebuiBrowserBridgeInstallationKeyView {
+  /** The surface the key belongs to. */
+  readonly surface: string;
+  /** The public key id; the secret bytes are under `key`. */
+  readonly keyId: string;
+  /** Base64 of the 32 raw bytes. Shown once, to be pasted into the extension. */
+  readonly key: string;
+  /**
+   * A short non-secret fingerprint, so the extension's options page can say
+   * "a key is stored" without ever displaying it again.
+   */
+  readonly fingerprint: string;
 }
 
 /**

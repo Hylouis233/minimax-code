@@ -30,6 +30,7 @@ import type {
   WebuiBrowserTargetId,
   WebuiBrowserTargetList,
   WebuiBrowserTargetState,
+  WebuiBridgeBrowserSurface,
 } from "../../../../shared/contracts/browser.js";
 
 // The operation names come from the shared table rather than being declared
@@ -46,6 +47,7 @@ import {
   SEND_BROWSER_COMMAND_OPERATION_NAME,
   WATCH_BROWSER_FRAMES_OPERATION_NAME,
   LIST_BROWSER_CAPABILITIES_OPERATION_NAME,
+  GET_BROWSER_INSTALLATION_KEY_OPERATION_NAME,
 } from "../../../../shared/operation-names.js";
 
 export {
@@ -57,6 +59,7 @@ export {
   SEND_BROWSER_COMMAND_OPERATION_NAME,
   WATCH_BROWSER_FRAMES_OPERATION_NAME,
   LIST_BROWSER_CAPABILITIES_OPERATION_NAME,
+  GET_BROWSER_INSTALLATION_KEY_OPERATION_NAME,
 };
 
 /** Every browser operation name, as one closed set. */
@@ -69,6 +72,7 @@ export const WEBUI_BROWSER_OPERATION_NAMES = Object.freeze([
   SEND_BROWSER_COMMAND_OPERATION_NAME,
   WATCH_BROWSER_FRAMES_OPERATION_NAME,
   LIST_BROWSER_CAPABILITIES_OPERATION_NAME,
+  GET_BROWSER_INSTALLATION_KEY_OPERATION_NAME,
 ] as const);
 
 /**
@@ -104,6 +108,27 @@ export interface WebuiBrowserAuthorizationToggle {
 export interface WebuiBrowserCapabilityList {
   readonly entries: readonly WebuiBrowserCapabilityEntry[];
 }
+
+/**
+ * What the installation-key read returns.
+ *
+ * `present: false` is its own case rather than an empty `key`, because the
+ * two mean different things to the person: one is "switch this surface on and
+ * come back", the other would be a value to paste that could never work.
+ */
+export type WebuiBrowserInstallationKeyResult =
+  | {
+      readonly present: false;
+      readonly surface: WebuiBridgeBrowserSurface;
+      readonly reason: "not_provisioned";
+    }
+  | {
+      readonly present: true;
+      readonly surface: WebuiBridgeBrowserSurface;
+      readonly keyId: string;
+      readonly key: string;
+      readonly fingerprint: string;
+    };
 
 /** What `sendBrowserInput` answers. */
 export interface WebuiBrowserInputReceipt {
@@ -187,4 +212,15 @@ export interface BrowserPort {
     onFrame: (frame: WebuiBrowserImageFrame) => void,
   ) => () => void;
   readonly listBrowserCapabilities?: () => Promise<WebuiBrowserCapabilityList>;
+  /**
+   * Reads one extension-reached surface's installation key so the person can
+   * paste it into the extension's options page.
+   *
+   * Optional because the bridge is optional: a host without one leaves this
+   * undefined, and the surface shows the key panel as unavailable rather than
+   * inventing a key.
+   */
+  readonly getBrowserInstallationKey?: (request: {
+    readonly surface: WebuiBridgeBrowserSurface;
+  }) => Promise<WebuiBrowserInstallationKeyResult>;
 }

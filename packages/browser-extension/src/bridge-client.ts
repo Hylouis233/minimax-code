@@ -458,11 +458,12 @@ export class WebuiBrowserBridgeClient {
   /**
    * Decrypts and stores the host's `pair` frame.
    *
-   * Order in the wire protocol is `pair` then `challenge`: this method runs
-   * before the challenge reaches the answerer. If the decryption fails — a
-   * tampered payload, a cipher that came from a different key — we report it
-   * and close the socket rather than carry on against a credential we cannot
-   * verify.
+   * Order on the wire is `challenge`, then `proof`, then `pair` — and the
+   * `pair` is sent only to a peer that proved the installation key. This
+   * method therefore runs *after* the challenge has been answered, not before
+   * it. If the decryption fails — a tampered payload, a cipher that came from a
+   * different key — we report it and close the socket rather than carry on
+   * against a credential we cannot verify.
    */
   private async applyPair(
     frame: WebuiBrowserBridgePair,

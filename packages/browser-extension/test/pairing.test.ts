@@ -12,10 +12,19 @@ import { describe, expect, it } from "vitest";
 
 import {
   answerWebuiBrowserBridgeChallenge,
+  answerWebuiBrowserBridgeChallengeWithStoredSecrets,
+  answerWebuiBrowserBridgeInstallationChallenge,
   applyWebuiBrowserBridgePairingCredential,
+  clearWebuiBrowserBridgeInstallationKey,
   clearWebuiBrowserBridgePairingCredential,
+  loadWebuiBrowserBridgeInstallationKey,
   loadWebuiBrowserBridgePairingCredential,
+  saveWebuiBrowserBridgeInstallationKey,
+  webuiBrowserBridgeInstallationKeyStore,
   webuiBrowserBridgePairingStore,
+  webuiBrowserBridgeInstallationKeyStatus,
+  WEBUI_BROWSER_BRIDGE_INSTALLATION_KEY_BYTES,
+  WEBUI_BROWSER_BRIDGE_INSTALLATION_KEY_STORAGE_KEY,
   WEBUI_BROWSER_BRIDGE_PAIRING_STORAGE_KEY,
   WEBUI_BROWSER_BRIDGE_SECRET_BYTES,
   type WebuiBrowserBridgeStorageArea,
@@ -29,6 +38,7 @@ import {
   verifyWebuiBrowserBridgeProof,
   WEBUI_BROWSER_BRIDGE_PAIR_AES_IV_BYTES,
   WEBUI_BROWSER_BRIDGE_PAIR_HKDF_INFO,
+  type WebuiBrowserBridgeChallenge,
   type WebuiBrowserBridgeEcdhPublicKey,
   type WebuiBrowserBridgePair,
 } from "../src/protocol.js";
@@ -244,7 +254,7 @@ describe("pairing credential — host-authored", () => {
     // service worker that was terminated between connections.
     const afterRestart = await loadWebuiBrowserBridgePairingCredential(store);
     const proof = await answerWebuiBrowserBridgeChallenge(
-      { kind: "challenge", nonce: "nonce-abc", algorithm: "HMAC-SHA256", keyId: credential.keyId },
+      challengeFor("nonce-abc", credential.keyId),
       afterRestart!,
     );
 
@@ -308,13 +318,13 @@ describe("challenge answering", () => {
 
     await expect(
       answerWebuiBrowserBridgeChallenge(
-        { kind: "challenge", nonce: "n", algorithm: "HMAC-SHA256", keyId: "edge-someone-else" },
+        challengeFor("n", "edge-someone-else"),
         credential,
       ),
     ).rejects.toThrow(/does not hold/);
     await expect(
       answerWebuiBrowserBridgeChallenge(
-        { kind: "challenge", nonce: "n", algorithm: "HMAC-SHA1" as "HMAC-SHA256", keyId: credential.keyId },
+        { ...challengeFor("n", credential.keyId), algorithm: "HMAC-SHA1" as "HMAC-SHA256" },
         credential,
       ),
     ).rejects.toThrow(/algorithm/);
@@ -323,13 +333,128 @@ describe("challenge answering", () => {
   it("binds the proof to the nonce so an earlier one cannot stand in", async () => {
     const credential = { keyId: "edge-key", secret: makeHostSecret(13) };
     const proof = await answerWebuiBrowserBridgeChallenge(
-      { kind: "challenge", nonce: "nonce-now", algorithm: "HMAC-SHA256", keyId: "edge-key" },
+      challengeFor("nonce-now", "edge-key"),
       credential,
     );
 
     await expect(
       verifyWebuiBrowserBridgeProof(credential.secret, proof, "nonce-later", "edge-key"),
     ).resolves.toBe(false);
+  });
+});
+
+describe("the installation key — what the options page stores", () => {
+  it("stores the pasted key in chrome.storage.local, under its own key", async () => {
+    const area = fakeArea();
+    const store = webuiBrowserBridgeInstallationKeyStore(area);
+    const pasted = encodeWebuiBrowserBridgeBase64(makeHostSecret(7));
+
+    await saveWebuiBrowserBridgeInstallationKey(store, pasted);
+
+    // Its own entry, not the pairing credential's: the two have different
+    // lifetimes, so one can never be cleared by clearing the other.
+    expect(area.values[WEBUI_BROWSER_BRIDGE_INSTALLATION_KEY_STORAGE_KEY]).toBeDefined();
+    expect(area.values[WEBUI_BROWSER_BRIDGE_PAIRING_STORAGE_KEY]).toBeUndefined();
+
+    const loaded = await loadWebuiBrowserBridgeInstallationKey(store);
+    expect(loaded).toBeDefined();
+    expect(loaded!.secret).toHaveLength(WEBUI_BROWSER_BRIDGE_INSTALLATION_KEY_BYTES);
+  });
+
+  it("refuses a paste that is not exactly 32 bytes", async () => {
+    const store = webuiBrowserBridgeInstallationKeyStore(fakeArea());
+    const tooShort = encodeWebuiBrowserBridgeBase64(new Uint8Array(16));
+    await expect(saveWebuiBrowserBridgeInstallationKey(store, tooShort)).rejects.toThrow(/32 bytes/);
+    expect(
+      await loadWebuiBrowserBridgeInstallationKey(store),
+    ).toBeUndefined();
+  });
+
+  it("never returns the key after it is stored, only a fingerprint", async () => {
+    const store = webuiBrowserBridgeInstallationKeyStore(fakeArea());
+    const pasted = encodeWebuiBrowserBridgeBase64(makeHostSecret(11));
+    await saveWebuiBrowserBridgeInstallationKey(store, pasted);
+
+    // This is the only reader the options page uses. Its return type carries
+    // no key field at all, so "the key is never displayed again" is a
+    // property of the type rather than of the markup.
+    const state = await webuiBrowserBridgeInstallationKeyStatus(store);
+    expect(state).toEqual({ stored: true, fingerprint: expect.stringMatching(/^[0-9a-f]{16}$/u) });
+    expect(JSON.stringify(state)).not.toContain(pasted);
+    expect("key" in state).toBe(false);
+  });
+
+  it("reports an empty browser as having nothing stored", async () => {
+    expect(await webuiBrowserBridgeInstallationKeyStatus(webuiBrowserBridgeInstallationKeyStore(fakeArea()))).toEqual({
+      stored: false,
+    });
+  });
+
+  it("clears only the installation key", async () => {
+    const area = fakeArea();
+    const pairing = webuiBrowserBridgePairingStore(area);
+    const installation = webuiBrowserBridgeInstallationKeyStore(area);
+    await saveWebuiBrowserBridgeInstallationKey(installation, encodeWebuiBrowserBridgeBase64(makeHostSecret(3)));
+    await pairing.write({ keyId: "edge", secret: encodeWebuiBrowserBridgeBase64(makeHostSecret(5)) });
+
+    await clearWebuiBrowserBridgeInstallationKey(installation);
+
+    expect(await loadWebuiBrowserBridgeInstallationKey(installation)).toBeUndefined();
+    expect(await loadWebuiBrowserBridgePairingCredential(pairing)).toBeDefined();
+  });
+});
+
+describe("answering with the installation key", () => {
+  it("signs with the installation key the host named on the challenge", async () => {
+    const challenge = challengeFor("nonce-first", "edge-credential-key");
+    const installationKey = { secret: makeHostSecret(31) };
+
+    const proof = await answerWebuiBrowserBridgeInstallationChallenge(challenge, installationKey);
+
+    // The key id is the one the host named, so the proof is bound to this
+    // host's key and cannot be replayed against another.
+    expect(proof.keyId).toBe(challenge.installationKeyId);
+    await expect(
+      verifyWebuiBrowserBridgeProof(installationKey.secret, proof, challenge.nonce, proof.keyId),
+    ).resolves.toBe(true);
+  });
+
+  it("prefers the installation key over a held pairing credential", async () => {
+    const challenge = challengeFor("nonce-both", "edge-credential-key");
+    const installationKey = { secret: makeHostSecret(41) };
+    const credential = { keyId: "edge-credential-key", secret: makeHostSecret(43) };
+
+    const proof = await answerWebuiBrowserBridgeChallengeWithStoredSecrets(
+      challenge,
+      installationKey,
+      credential,
+    );
+    // The installation key survives a host-side credential rotation; a stale
+    // pairing credential does not. Preferring it is what lets a re-provisioned
+    // host re-pair without the person touching anything.
+    expect(proof.keyId).toBe(challenge.installationKeyId);
+  });
+
+  it("falls back to the pairing credential when no installation key is held", async () => {
+    const challenge = challengeFor("nonce-fallback", "edge-credential-key");
+    const credential = { keyId: "edge-credential-key", secret: makeHostSecret(47) };
+
+    const proof = await answerWebuiBrowserBridgeChallengeWithStoredSecrets(
+      challenge,
+      undefined,
+      credential,
+    );
+    expect(proof.keyId).toBe(credential.keyId);
+  });
+
+  it("refuses, with a message that says what to do, when it holds neither", async () => {
+    await expect(
+      answerWebuiBrowserBridgeChallengeWithStoredSecrets(
+        challengeFor("nonce-neither", "edge-credential-key"),
+        undefined,
+        undefined,
+      ),
+    ).rejects.toThrow(/paste the installation key/);
   });
 });
 
@@ -346,7 +471,7 @@ describe("secret handling", () => {
       const cipher = await hostPairFrame(publicJwk, hostSecret, "edge-quiet");
       await openWebuiBrowserBridgePairingCredential(cipher, privateKey);
       await answerWebuiBrowserBridgeChallenge(
-        { kind: "challenge", nonce: "nonce-abc", algorithm: "HMAC-SHA256", keyId: "edge-quiet" },
+        challengeFor("nonce-abc", "edge-quiet"),
         { keyId: "edge-quiet", secret: hostSecret },
       );
     } finally {
@@ -361,6 +486,23 @@ describe("secret handling", () => {
 });
 
 /* -------------------------------------------------------------------------- */
+
+/**
+ * A host challenge, naming both key ids.
+ *
+ * A challenge without an `installationKeyId` is not one this extension will
+ * accept — see `parseWebuiBrowserBridgeHostFrame` — so every fixture here
+ * names it rather than omitting it.
+ */
+function challengeFor(nonce: string, keyId: string): WebuiBrowserBridgeChallenge {
+  return {
+    kind: "challenge",
+    nonce,
+    algorithm: "HMAC-SHA256",
+    keyId,
+    installationKeyId: "webui-browser-bridge-installation-edge-v1",
+  };
+}
 
 /** Base64 decode without `Buffer`: this package is type-checked against a browser. */
 function decodeBase64ForTest(value: string): Uint8Array {

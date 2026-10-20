@@ -27,6 +27,7 @@ import {
 
 const SECRET = new TextEncoder().encode("webui-browser-bridge-test-secret");
 const KEY_ID = "key-1";
+const INSTALLATION_KEY_ID = "webui-browser-bridge-installation-edge-v1";
 const ORIGIN = "http://127.0.0.1:7777";
 
 /** A virtual clock: nothing waits in real time, so the schedule is assertable. */
@@ -187,7 +188,13 @@ function createHarness(options: { respondWith?: boolean; respondEverySocket?: bo
 }
 
 function challenge(nonce: string): WebuiBrowserBridgeHostFrame {
-  return { kind: "challenge", nonce, algorithm: WEBUI_BROWSER_BRIDGE_SIGNATURE_ALGORITHM, keyId: KEY_ID };
+  return {
+    kind: "challenge",
+    nonce,
+    algorithm: WEBUI_BROWSER_BRIDGE_SIGNATURE_ALGORITHM,
+    keyId: KEY_ID,
+    installationKeyId: INSTALLATION_KEY_ID,
+  };
 }
 
 async function connect(harness: Harness, nonce = "nonce-1"): Promise<FakeSocket> {

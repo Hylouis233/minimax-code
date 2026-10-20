@@ -13,8 +13,11 @@
 // person using the panel.
 
 import type { WebuiBrowserPort } from "../../../runtime/port.js";
+import type { WebuiBridgeBrowserSurface } from "../../../shared/contracts/browser.js";
+import type { WebuiBrowserBridgeInstallationKeyView } from "../../../shared/contracts/browser-bridge.js";
 import {
   getBrowserAuthorizationOperation,
+  getBrowserInstallationKeyOperation,
   listBrowserCapabilitiesOperation,
   listBrowserTargetsOperation,
   readBrowserCommand,
@@ -35,8 +38,24 @@ import type {
 
 type DedicatedHandler<Descriptor> = WebuiOperationHandler<unknown>;
 
+/**
+ * Reads one surface's installation key out of the bridge.
+ *
+ * A narrow structural interface rather than a `BrowserBridgeServer` type, for
+ * two reasons: the handler layer must not depend on the bridge's WebSocket
+ * server to answer a question about a stored secret, and a structural seam
+ * keeps the composition root free to pass whatever object actually owns the
+ * pairing.
+ */
+export interface WebuiBrowserBridgeInstallationKeySource {
+  readInstallationKey(
+    surface: WebuiBridgeBrowserSurface,
+  ): Promise<WebuiBrowserBridgeInstallationKeyView | undefined>;
+}
+
 export function createBrowserHandlerEntries(
   browser: WebuiBrowserPort,
+  installationKeys?: WebuiBrowserBridgeInstallationKeySource,
 ): ReadonlyMap<string, WebuiOperationRegistryEntry> {
   const getBrowserAuthorization: DedicatedHandler<typeof getBrowserAuthorizationOperation> =
     async () => ({
@@ -117,6 +136,37 @@ export function createBrowserHandlerEntries(
       body: await browser.listCapabilities(),
     });
 
+  /**
+   * Hands the person their surface's installation key so they can paste it
+   * into the extension.
+   *
+   * The one place the key leaves the OS secure store, so it answers only for a
+   * surface that was actually provisioned and says `not_provisioned` otherwise —
+   * an empty string here would be something the person could paste and be
+   * refused for. When no bridge is wired at all the operation refuses rather
+   * than reporting a key nobody can use.
+   */
+  const getBrowserInstallationKey: DedicatedHandler<typeof getBrowserInstallationKeyOperation> =
+    async (_context, body) => {
+      const surface = readBrowserSurface(body as Record<string, unknown>) as WebuiBridgeBrowserSurface;
+      const view = await installationKeys?.readInstallationKey(surface);
+      return {
+        body: view
+          ? {
+              present: true as const,
+              surface: view.surface,
+              keyId: view.keyId,
+              key: view.key,
+              fingerprint: view.fingerprint,
+            }
+          : {
+              present: false as const,
+              surface,
+              reason: "not_provisioned" as const,
+            },
+      };
+    };
+
   return new Map([
     [
       getBrowserAuthorizationOperation.name,
@@ -172,6 +222,13 @@ export function createBrowserHandlerEntries(
       {
         operation: listBrowserCapabilitiesOperation,
         handle: listBrowserCapabilities as WebuiOperationHandler<unknown>,
+      },
+    ],
+    [
+      getBrowserInstallationKeyOperation.name,
+      {
+        operation: getBrowserInstallationKeyOperation,
+        handle: getBrowserInstallationKey as WebuiOperationHandler<unknown>,
       },
     ],
   ]);

@@ -38,6 +38,17 @@ import {
 export const WEBUI_BROWSER_BRIDGE_PAIRING_STORAGE_KEY = "webui.browserBridge.pairing.v1";
 
 /**
+ * The `chrome.storage.local` key the installation key is stored under.
+ *
+ * Deliberately a different entry from the pairing credential: the two have
+ * different lifetimes. The installation key outlives a revoked credential (the
+ * person must not have to re-paste it after toggling the switch), so the two
+ * can never be cleared together by accident.
+ */
+export const WEBUI_BROWSER_BRIDGE_INSTALLATION_KEY_STORAGE_KEY =
+  "webui.browserBridge.installationKey.v1";
+
+/**
  * 32 bytes of entropy for the HMAC key.
  *
  * 256 bits is the hash width, so the key is not the weak link; below that it
@@ -166,6 +177,202 @@ export async function answerWebuiBrowserBridgeChallenge(
     algorithm: challenge.algorithm,
     signature: await signWebuiBrowserBridgeProof(credential.secret, challenge.nonce, credential.keyId),
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/* The installation key                                                        */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * 32 bytes of entropy for the installation key. Matches the pairing
+ * credential's own width, so neither secret is the weak link.
+ */
+export const WEBUI_BROWSER_BRIDGE_INSTALLATION_KEY_BYTES = 32;
+
+/**
+ * An installation key this browser holds, **as stored**.
+ *
+ * The `keyId` is not stored: the host names it on every challenge, so the
+ * extension stores only the secret and takes the id from the challenge. That
+ * way a host that re-provisions the id cannot leave a stale id behind here.
+ */
+export interface WebuiBrowserBridgeInstallationKey {
+  readonly secret: Uint8Array;
+}
+
+/** The store the options page writes the pasted key through. */
+export function webuiBrowserBridgeInstallationKeyStore(
+  area: WebuiBrowserBridgeStorageArea,
+  key: string = WEBUI_BROWSER_BRIDGE_INSTALLATION_KEY_STORAGE_KEY,
+): WebuiBrowserBridgePairingStore {
+  return {
+    async read() {
+      return (await area.get(key))[key];
+    },
+    async write(value) {
+      await area.set({ [key]: value });
+    },
+    async clear() {
+      await area.remove(key);
+    },
+  };
+}
+
+/**
+ * Stores the key the person pasted from the WebUI Settings surface.
+ *
+ * This is the only writer. The extension cannot mint an installation key,
+ * because the host would then verify against a different secret than the one
+ * the person pasted — the same rule that makes the pairing credential
+ * host-authored.
+ *
+ * The value is validated to exactly 32 bytes before it is stored: a truncated
+ * or padded paste would otherwise be accepted and then fail as an opaque
+ * "installation key does not match" at handshake time.
+ */
+export async function saveWebuiBrowserBridgeInstallationKey(
+  store: WebuiBrowserBridgePairingStore,
+  key: string,
+): Promise<WebuiBrowserBridgeInstallationKey> {
+  const secret = decodeWebuiBrowserBridgeBase64(key.trim());
+  if (secret.length !== WEBUI_BROWSER_BRIDGE_INSTALLATION_KEY_BYTES) {
+    throw new Error(
+      `browser bridge: an installation key is ${WEBUI_BROWSER_BRIDGE_INSTALLATION_KEY_BYTES} bytes; got ${secret.length}`,
+    );
+  }
+  await store.write({ secret: encodeWebuiBrowserBridgeBase64(secret) });
+  return { secret };
+}
+
+/**
+ * The installation key this browser holds, or `undefined` if none was pasted.
+ *
+ * Read from storage on every connection rather than cached in a module
+ * variable: an MV3 service worker is terminated at will and must still be able
+ * to answer a challenge after it restarts.
+ */
+export async function loadWebuiBrowserBridgeInstallationKey(
+  store: WebuiBrowserBridgePairingStore,
+): Promise<WebuiBrowserBridgeInstallationKey | undefined> {
+  const stored = await store.read();
+  if (typeof stored !== "object" || stored === null) return undefined;
+  const record = stored as Record<string, unknown>;
+  if (typeof record.secret !== "string" || record.secret.length === 0) return undefined;
+  let secret: Uint8Array;
+  try {
+    secret = decodeWebuiBrowserBridgeBase64(record.secret);
+  } catch {
+    return undefined;
+  }
+  if (secret.length !== WEBUI_BROWSER_BRIDGE_INSTALLATION_KEY_BYTES) return undefined;
+  return { secret };
+}
+
+/** Forgets the installation key. Only the options page's "clear" does this. */
+export async function clearWebuiBrowserBridgeInstallationKey(
+  store: WebuiBrowserBridgePairingStore,
+): Promise<void> {
+  await store.clear();
+}
+
+/**
+ * What the options page is allowed to show about the stored key.
+ *
+ * A fingerprint and nothing else. The type carries no `key` field on purpose:
+ * the page has no way to display the key even if a future change wanted to,
+ * so "the key is never rendered again" is a property of this type rather than
+ * of the markup.
+ */
+export type WebuiBrowserBridgeInstallationKeyStatus =
+  | { readonly stored: false }
+  | { readonly stored: true; readonly fingerprint: string };
+
+/**
+ * The stored key, reduced to what the options page may display.
+ *
+ * This is the only reader the options page uses, so the page never receives
+ * the key's bytes — not on first load, not after a save, and not after a
+ * service-worker restart.
+ */
+export async function webuiBrowserBridgeInstallationKeyStatus(
+  store: WebuiBrowserBridgePairingStore,
+): Promise<WebuiBrowserBridgeInstallationKeyStatus> {
+  const key = await loadWebuiBrowserBridgeInstallationKey(store);
+  if (!key) return { stored: false };
+  return { stored: true, fingerprint: await installationKeyFingerprint(key.secret) };
+}
+
+/**
+ * A short, non-secret handle for a stored installation key.
+ *
+ * Computed with `crypto.subtle` rather than `node:crypto` because this runs in
+ * an extension page. It reveals nothing about the key: it is a digest, not a
+ * reversible encoding.
+ */
+export async function installationKeyFingerprint(secret: Uint8Array): Promise<string> {
+  const digest = new Uint8Array(
+    await crypto.subtle.digest("SHA-256", new Uint8Array(secret)),
+  );
+  let hex = "";
+  for (const byte of digest.subarray(0, 8)) hex += byte.toString(16).padStart(2, "0");
+  return hex;
+}
+
+/**
+ * Answers a challenge with the installation key.
+ *
+ * This is the answer a browser gives on a *first* connection, where it has no
+ * pairing credential yet. The key id is the one the host named on the
+ * challenge, which is what binds the proof to this host's key and stops a
+ * proof made for one host from being replayed against another.
+ */
+export async function answerWebuiBrowserBridgeInstallationChallenge(
+  challenge: WebuiBrowserBridgeChallenge,
+  installationKey: WebuiBrowserBridgeInstallationKey,
+): Promise<WebuiBrowserBridgeProof> {
+  if (challenge.algorithm !== WEBUI_BROWSER_BRIDGE_SIGNATURE_ALGORITHM) {
+    throw new Error(`browser bridge: unsupported challenge algorithm ${challenge.algorithm}`);
+  }
+  return {
+    kind: "proof",
+    keyId: challenge.installationKeyId,
+    nonce: challenge.nonce,
+    algorithm: challenge.algorithm,
+    signature: await signWebuiBrowserBridgeProof(
+      installationKey.secret,
+      challenge.nonce,
+      challenge.installationKeyId,
+    ),
+  };
+}
+
+/**
+ * Answers whichever challenge this browser can actually answer.
+ *
+ * The installation key wins when this browser holds one, because it is the
+ * anchor the host recognises on every connection and the one that survives a
+ * credential rotation. The pairing credential is the fallback for a browser
+ * that was paired before the installation key existed, or whose options page
+ * was cleared after the credential was already issued.
+ *
+ * When neither is held the answer is a refusal, not a guess: signing with a
+ * key the host does not expect would produce a proof that fails anyway, and
+ * the person needs a message that says what to paste.
+ */
+export async function answerWebuiBrowserBridgeChallengeWithStoredSecrets(
+  challenge: WebuiBrowserBridgeChallenge,
+  installationKey: WebuiBrowserBridgeInstallationKey | undefined,
+  credential: WebuiBrowserBridgePairingCredential | undefined,
+): Promise<WebuiBrowserBridgeProof> {
+  if (installationKey) {
+    return answerWebuiBrowserBridgeInstallationChallenge(challenge, installationKey);
+  }
+  if (credential) {
+    return answerWebuiBrowserBridgeChallenge(challenge, credential);
+  }
+  throw new Error(
+    "browser bridge: this browser holds no installation key and no pairing credential — open the extension's options page and paste the installation key from the WebUI Settings",
+  );
 }
 
 /**

@@ -142,18 +142,16 @@ describe("WebUI bridge session (wire-level)", () => {
     if (!harness.closed) await harness.close();
   });
 
-  it("sends pair before challenge, so the credential is there when the challenge arrives", async () => {
+  it("sends no pair before the proof: a peer that cannot prove gets no credential", async () => {
     const publicKey = await makeClientPublicKey();
     const { client, frames } = await connectClient(harness, KNOWN_EDGE_ID, { publicKey });
 
-    // Order is the whole point: `pair` carries the credential the extension
-    // answers the challenge against, so it has to leave first.
+    // The order is the security property: `challenge` leaves first and
+    // nothing else does. A `pair` frame here would hand this host's
+    // credential to anything that could open a socket, which is exactly the
+    // defect the installation key exists to close.
     await waitForKind(frames, "challenge");
-    const pairIndex = frames.findIndex((frame) => frame.kind === "pair");
-    const challengeIndex = frames.findIndex((frame) => frame.kind === "challenge");
-    expect(pairIndex).toBeGreaterThanOrEqual(0);
-    expect(challengeIndex).toBeGreaterThanOrEqual(0);
-    expect(pairIndex).toBeLessThan(challengeIndex);
+    expect(frames.some((frame) => frame.kind === "pair")).toBe(false);
     client.close();
   });
 
@@ -161,22 +159,16 @@ describe("WebUI bridge session (wire-level)", () => {
     const publicKey = await makeClientPublicKey();
     const { client, frames } = await connectClient(harness, KNOWN_EDGE_ID, { publicKey });
 
-    // The host sends `pair` first so the extension has the credential by the
-    // time `challenge` arrives. The pair's `keyId` is the host's chosen id
-    // and the challenge's `keyId` echoes it, so they have to match — which
-    // the headline test asserts explicitly.
-    const pairFrame = await waitForKind(frames, "pair");
-    expect(pairFrame.kind).toBe("pair");
-    expect(pairFrame.keyId).toMatch(/^[!-~]+$/u);
-
     const challengeFrame = await waitForKind(frames, "challenge");
     expect(challengeFrame.kind).toBe("challenge");
     expect(challengeFrame.algorithm).toBe("HMAC-SHA256");
-    expect(challengeFrame.keyId).toBe(pairFrame.keyId);
+    expect(challengeFrame.installationKeyId).toMatch(/^[!-~]+$/u);
     expect(harness.sessions).toHaveLength(1);
     expect(harness.sessions[0]!.isAdmitted).toBe(false);
 
-    // Sign a valid proof with the pairing and send it.
+    // Answer with the pairing credential this host already issued. That is
+    // the "already paired" branch: admitted, and no `pair` frame, because the
+    // peer already holds that exact credential.
     const proof = await harness.pairing.signProof(challengeFrame.nonce);
     client.send(
       JSON.stringify({
@@ -189,7 +181,31 @@ describe("WebUI bridge session (wire-level)", () => {
 
     const readyFrame = await waitForKind(frames, "ready");
     expect(readyFrame.kind).toBe("ready");
+    expect(frames.some((frame) => frame.kind === "pair")).toBe(false);
     expect(harness.sessions[0]!.isAdmitted).toBe(true);
+    client.close();
+  });
+
+  it("delivers the sealed credential to a peer that proves the installation key", async () => {
+    const publicKey = await makeClientPublicKey();
+    const { client, frames } = await connectClient(harness, KNOWN_EDGE_ID, { publicKey });
+
+    const challengeFrame = await waitForKind(frames, "challenge");
+    client.send(
+      JSON.stringify({
+        kind: "proof",
+        keyId: challengeFrame.installationKeyId,
+        nonce: challengeFrame.nonce,
+        signature: await harness.pairing.signInstallationKeyProof(challengeFrame.nonce),
+      }),
+    );
+
+    // Only now does a credential leave the host.
+    const pairFrame = await waitForKind(frames, "pair");
+    expect(pairFrame.kind).toBe("pair");
+    expect(pairFrame.keyId).toBe(harness.pairing.keyId);
+    expect(pairFrame.keyId).toBe(challengeFrame.keyId);
+    await waitForKind(frames, "ready");
     client.close();
   });
 

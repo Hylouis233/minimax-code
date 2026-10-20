@@ -43,7 +43,10 @@ import {
   selectedWebuiBrowserRunTarget,
   webuiBrowserStreamTargetKey,
 } from "../projection/browser-state.js";
-import { BrowserAuthorizationSwitches } from "./BrowserAuthorizationSwitches.public.js";
+import {
+  BrowserAuthorizationSwitches,
+  BrowserInstallationKey,
+} from "./BrowserAuthorizationSwitches.public.js";
 import { BrowserPanel } from "./BrowserPanel.public.js";
 
 export interface BrowserPanelHostProps {
@@ -281,6 +284,9 @@ export function BrowserPanelHost({
         onChange={onToggle}
         disabled={!port?.setBrowserAuthorization}
       />
+      {/* The key is shown only on request, and only for the surface the person
+          asks about — it is never part of the authorization snapshot above. */}
+      <BrowserInstallationKey readKey={port?.getBrowserInstallationKey} />
     </div>
   );
 }

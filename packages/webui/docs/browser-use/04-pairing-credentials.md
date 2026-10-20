@@ -242,6 +242,62 @@ credential is persisted in the OS store at all — but only there.
 `packages/webui/src/server/browser-bridge/reconnect.ts`) but **unwired**, and no probe observed a
 disconnect or a service-worker restart. See [`02-bridge-protocol.md`](02-bridge-protocol.md).
 
+## The installation key — the anchor the credential is gated on
+
+`implemented`. A pairing credential alone cannot decide whether a peer is a real
+extension. Admission reads the `Origin` header to pick an allowlisted extension
+id, and any local process can write that header; the host then sealed its
+credential to whatever key the peer's `hello` carried, so a local process could
+spoof the origin, mint its own ECDH key, decrypt the credential and answer the
+challenge. Being on the allowlist proved nothing about the peer behind it.
+
+The **installation key** is what closes that. It is a long-lived 32-byte secret,
+one per surface, that exists in exactly two places: the OS secure store on the
+host, and `chrome.storage.local` in that one browser.
+
+| Property | Value |
+| --- | --- |
+| Size | 32 bytes (`WEBUI_BROWSER_BRIDGE_INSTALLATION_KEY_BYTES`) |
+| Key id | Derived from the surface, not random — `webui-browser-bridge-installation-<surface>-v1`, so the host finds the same entry again on a restart |
+| Host storage | The same `SecureCredentialStore` the pairing credential uses, under its own key id so the two are never confused |
+| Extension storage | `chrome.storage.local`, under `webui.browserBridge.installationKey.v1` — a different entry from the pairing credential's, because the two have different lifetimes |
+| Minted by | The host only, when a surface is switched on and no key is stored. The extension cannot mint one; two independently minted keys never match. |
+
+### What the person does, once per browser
+
+1. Switch the surface on in WebUI Settings. That provisions the installation key
+   and mints a fresh pairing credential.
+2. Open the key in Settings (**查看密钥** for Edge or Chrome). This is the one
+   place the key leaves the OS secure store, and it is the person's own tab; the
+   key's purpose is to defeat a local *process*, not the person.
+3. Open the extension's options page (`options.html`, wired as `options_ui` in
+   the manifest) and paste it.
+4. The extension stores it and never displays it again in full — the options page
+   reads it back through a status type that carries a fingerprint and no key
+   field at all.
+
+### What the exchange does with it
+
+See [`02-bridge-protocol.md`](02-bridge-protocol.md) for the frame order. In
+short: proof first, credential second. A peer that proved the installation key
+receives the sealed pairing credential; a peer that proved only a pairing
+credential this host already issued is admitted with no `pair` frame; a peer that
+proved neither is refused and receives no credential at all.
+
+### The lifecycle rules
+
+| Event | Installation key | Pairing credential |
+| --- | --- | --- |
+| Surface switched **on** | Kept if present; minted if absent | Freshly minted |
+| Surface switched **off** | **Kept.** The key is bound to the browser, not to the switch, and destroying it would send the person back to the options page on every toggle with no security gain — the credential it authorises has just been revoked | Revoked and deleted; every live session for that surface is closed |
+| Host **restart** | Restored from the store | Restored, not rotated: the extension still holds it |
+| Surface switched on again after off | The **same** key, so the extension re-pairs with no action | A **new** credential, delivered on the next exchange the key authorises |
+
+The restart path filters the installation key out of the "newest reference wins"
+search that restores the pairing credential. Without that filter a host that
+provisioned the key most recently would adopt it as its pairing credential, and
+every extension would then be verifying against the wrong secret.
+
 ## Two independent gates
 
 The extension's browser permission and the WebUI browser switch are **independent**. Neither implies the
@@ -259,7 +315,7 @@ either — see [`06-runtime-authorization-trace.md`](06-runtime-authorization-tr
 | Rule | Detail |
 | --- | --- |
 | Never logged | A credential, a secret, a salt, a payload, a nonce or a signature is not written to a log, an error message, a crash report or a diagnostic dump |
-| Written to exactly one place | The OS secure credential store on the host, `chrome.storage.local` on the extension. Nowhere else, ever. |
+| Written to exactly one place | The OS secure credential store on the host, `chrome.storage.local` on the extension. Nowhere else, ever. The installation key follows the same rule: the only place it is ever rendered is the Settings surface that exists to copy it. |
 | Never replaced by the per-start token | The per-start WebUI connection token is not a pairing credential and must not be reused as one |
 | Never echoed in a refusal | An admission failure reports *which* check failed, never the value presented |
 | Proofs are not secrets | A proof is bound to a single-use nonce and is useless once that nonce is spent; it is still treated as sensitive material in transit and is not persisted |
