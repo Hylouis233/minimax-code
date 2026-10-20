@@ -22,6 +22,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { WebuiIsolatedChromiumProvider } from "../../src/runtime/browser/isolated-chromium/provider.js";
+import type { WebuiBrowserTargetId } from "../../src/shared/contracts/browser.js";
 
 /**
  * A page that records what it received.
@@ -92,12 +93,7 @@ describe.skipIf(!available)("the browser input path, against a real page", () =>
    * It is the provider's own selected target, read back from the provider, so
    * the command is aimed at the page the test is actually looking at.
    */
-  async function pageTarget(): Promise<{
-    surface: "isolated-chromium";
-    browserId: string;
-    targetId: string;
-    generation: number;
-  }> {
+  async function pageTarget(): Promise<WebuiBrowserTargetId> {
     const selected = (await provider.listTargets()).find((entry) => entry.selected);
     if (!selected) throw new Error("the provider reported no selected target");
     return selected.id;
