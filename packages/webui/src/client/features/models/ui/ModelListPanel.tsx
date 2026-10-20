@@ -1,12 +1,14 @@
 // The panel's SECOND state: the catalogue, grouped by provider.
 //
 //   ┌───────────────────────────────┐
-//   │ 选择模型                       │
-//   │ ── OpenAI ──                   │
+//   │ 选择模型                    ‹  │
+//   │ OpenAI                        │
+//   │ openai                        │
 //   │   GPT-6.1 Sol                  │
 //   │   GPT-6 Astra                  │
 //   │   GPT-6 Luna              ✓    │
-//   │ ── Anthropic ──                │
+//   │ Anthropic                     │
+//   │ anthropic                     │
 //   │   Claude …                     │
 //   └───────────────────────────────┘
 //
@@ -49,6 +51,11 @@ export function WebuiModelListPanel({
   return (
     <div className="webui-model-list" data-webui-model-list="true">
       <div className="webui-model-list-head">
+        <span className="webui-model-list-title">选择模型</span>
+        {/*
+          The way back. It sits opposite the title rather than beside it, so
+          the title keeps the place the title has in every list in this client.
+        */}
         <button
           type="button"
           className="webui-model-list-back"
@@ -59,7 +66,6 @@ export function WebuiModelListPanel({
         >
           <WebuiIconChevronLeft className="webui-model-list-back-icon" />
         </button>
-        <span className="webui-model-list-title">选择模型</span>
       </div>
       <div className="webui-model-list-groups">
         {groups.length === 0 ? (
@@ -71,7 +77,19 @@ export function WebuiModelListPanel({
             className="webui-model-list-group"
             data-webui-model-list-group={group.id}
           >
-            <div className="webui-model-list-group-header">{group.label}</div>
+            <div className="webui-model-list-group-header">
+              <span className="webui-model-list-group-name">{group.label}</span>
+              {/*
+                The provider's own identifier, under its name. Two providers may
+                share a display name, and the id is the thing that tells them
+                apart — and it is the id the settings page asks for.
+              */}
+              {group.id !== group.label ? (
+                <span className="webui-model-list-group-subtitle">
+                  {group.id}
+                </span>
+              ) : null}
+            </div>
             {group.models.map((model) => {
               const active = modelKey(model) === selectedKey;
               return (

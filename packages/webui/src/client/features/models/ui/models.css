@@ -120,13 +120,19 @@
    * popup with its content swapped, so the two share one width, one radius and
    * one dismissal — a picker that opened a second popup beside the first is a
    * picker whose two dismissal listeners race for the same pointerdown.
+   *
+   * The panel is a card: one accent word, one model name, one rail. The level
+   * is the answer the panel gives, so it is the one thing in the accent blue,
+   * and it is centred because it is the answer and not a label for something
+   * beside it.
    */
   .webui-model-menu {
     display: flex;
-    width: min(320px, calc(100vw - 32px));
-    max-height: min(460px, calc(100dvh - 112px));
+    width: min(400px, calc(100vw - 32px));
+    max-height: min(520px, calc(100dvh - 112px));
     flex-direction: column;
-    padding: var(--spacing_12);
+    padding: var(--spacing_16);
+    border-radius: var(--radius_16);
     overflow: hidden;
   }
   .webui-model-popup {
@@ -140,9 +146,6 @@
     flex-direction: column;
     gap: var(--spacing_12);
   }
-  /* The level word names the position the thumb is on, and the reset puts it
-   * back where the engine decides it. The word is centred because it is the
-   * panel's answer, not a label for something beside it. */
   .webui-model-panel-head {
     position: relative;
     display: flex;
@@ -152,8 +155,8 @@
   }
   .webui-model-panel-level {
     color: var(--text_default_accent);
-    font-size: var(--size_14);
-    line-height: var(--line_height_20);
+    font-size: var(--size_16);
+    line-height: var(--line_height_22);
     font-weight: 500;
   }
   .webui-model-panel-reset {
@@ -204,6 +207,8 @@
     white-space: nowrap;
   }
   .webui-model-panel-model-chevron {
+    width: var(--spacing_16);
+    height: var(--spacing_16);
     flex: 0 0 auto;
     color: var(--icon_default_tertiary);
   }
@@ -214,7 +219,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--spacing_4);
+    gap: var(--spacing_8);
     border-top: 1px solid var(--border_default);
     padding-top: var(--spacing_8);
   }
@@ -245,18 +250,19 @@
   }
   /* ---- the thinking scale ----
    *
-   * A blue rail up to the thumb, a white thumb on it, and the stops as dots.
-   * The fill is the part of the scale that is behind the user, so it is the
-   * only coloured thing on the rail: the dots mark the stops and stay quiet
-   * until the fill reaches them.
+   * A blue rail up to the thumb, a white thumb ON it, and the stops as small
+   * dots. The fill is the part of the scale that is behind the user, so it is
+   * the only coloured thing on the rail; a dot on the fill is a MARK on the
+   * blue, and a dot off it is a mark on the grey.
+   *
+   * The thumb is a circle ON a bar, so it is taller than the bar and casts a
+   * shadow: it is the thing the pointer holds, and it has to look like it.
+   * The stops sit inside the track by the thumb's radius, because a circle at
+   * the end of a bar hangs off it.
    */
-  .webui-model-effort-slider {
-    padding: 0 var(--spacing_12);
-  }
   .webui-model-effort-rail {
     position: relative;
-    height: var(--spacing_24);
-    margin: 0 var(--spacing_12);
+    height: var(--spacing_40);
     cursor: pointer;
     touch-action: none;
   }
@@ -265,7 +271,7 @@
     top: 50%;
     right: 0;
     left: 0;
-    height: var(--spacing_8);
+    height: var(--spacing_20);
     transform: translateY(-50%);
     border-radius: 999px;
     background: var(--bg_grouped_tertiary);
@@ -274,7 +280,7 @@
     position: absolute;
     top: 50%;
     left: 0;
-    height: var(--spacing_8);
+    height: var(--spacing_20);
     transform: translateY(-50%);
     border-radius: 999px;
     background: var(--bg_interaction_accent_focus_blue);
@@ -282,26 +288,26 @@
   .webui-model-effort-dot {
     position: absolute;
     top: 50%;
-    width: var(--spacing_6);
-    height: var(--spacing_6);
+    width: var(--spacing_8);
+    height: var(--spacing_8);
     transform: translate(-50%, -50%);
     border-radius: 999px;
     background: var(--text_default_tertiary);
   }
-  /* A dot on the filled part of the rail is a MARK on the blue, not a second
-     blue: it has to read against the fill it sits on. */
   .webui-model-effort-dot[data-passed="true"] {
     background: var(--opacity_white_0_50);
   }
   .webui-model-effort-thumb {
     position: absolute;
     top: 50%;
-    width: var(--spacing_24);
-    height: var(--spacing_24);
+    width: var(--spacing_40);
+    height: var(--spacing_40);
     transform: translate(-50%, -50%);
     border-radius: 999px;
     background: var(--bg_default_primary);
-    box-shadow: 0 0 0 2px var(--bg_interaction_accent_focus_blue);
+    box-shadow:
+      0 2px 10px rgb(0 0 0 / 18%),
+      0 0 0 1px rgb(0 0 0 / 5%);
   }
   /* A model with no thinking at all still shows the control, so the panel's
    * layout does not change shape from one model to the next — it just does
@@ -316,13 +322,13 @@
     min-height: 0;
     flex: 1 1 auto;
     flex-direction: column;
-    gap: var(--spacing_4);
+    gap: var(--spacing_16);
   }
   .webui-model-list-head {
     display: flex;
     flex: 0 0 auto;
     align-items: center;
-    gap: var(--spacing_4);
+    justify-content: space-between;
   }
   .webui-model-list-back {
     display: flex;
@@ -340,17 +346,20 @@
     background: var(--bg_interaction_tertiary_hover);
     color: var(--icon_default_secondary);
   }
+  .webui-model-list-back-icon {
+    width: var(--spacing_16);
+    height: var(--spacing_16);
+  }
   .webui-model-list-title {
-    color: var(--text_default_primary);
-    font-size: var(--size_14);
-    line-height: var(--line_height_20);
-    font-weight: 500;
+    color: var(--text_default_tertiary);
+    font-size: var(--size_12);
+    line-height: var(--line_height_16);
   }
   .webui-model-list-groups {
     display: flex;
     min-height: 0;
     flex-direction: column;
-    gap: var(--spacing_8);
+    gap: var(--spacing_16);
     overflow-y: auto;
     scrollbar-width: none;
     -ms-overflow-style: none;
@@ -363,16 +372,22 @@
     flex-direction: column;
     gap: var(--spacing_2);
   }
-  .webui-model-list-empty {
-    margin: 0;
-    padding: var(--spacing_16) var(--spacing_12);
-    color: var(--text_default_tertiary);
+  /* The group's name and, under it, the identifier it answers to. A group
+   * header is two lines because the second line is the part that tells two
+   * same-named groups apart. */
+  .webui-model-list-group-header {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0 var(--spacing_8) var(--spacing_4);
+  }
+  .webui-model-list-group-name {
+    color: var(--text_default_primary);
     font-size: var(--size_14);
     line-height: var(--line_height_20);
-    text-align: center;
+    font-weight: 600;
   }
-  .webui-model-list-group-header {
-    padding: 0 var(--spacing_8);
+  .webui-model-list-group-subtitle {
     color: var(--text_default_tertiary);
     font-size: var(--size_12);
     line-height: var(--line_height_16);
@@ -411,5 +426,13 @@
     align-items: center;
     justify-content: center;
     color: var(--icon_default_primary);
+  }
+  .webui-model-list-empty {
+    margin: 0;
+    padding: var(--spacing_16) var(--spacing_8);
+    color: var(--text_default_tertiary);
+    font-size: var(--size_14);
+    line-height: var(--line_height_20);
+    text-align: center;
   }
 }

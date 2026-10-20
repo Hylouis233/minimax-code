@@ -112,12 +112,19 @@ describe("model picker — provider grouping", () => {
       }),
     );
 
-    // One header per provider, carrying the provider name as text…
+    // One header per provider, carrying the provider name and, under it, the
+    // provider id it answers to…
     expect(html).toContain(
-      '<div class="webui-model-list-group-header">MiniMax</div>',
+      '<span class="webui-model-list-group-name">MiniMax</span>',
     );
     expect(html).toContain(
-      '<div class="webui-model-list-group-header">DeepSeek</div>',
+      '<span class="webui-model-list-group-subtitle">minimax</span>',
+    );
+    expect(html).toContain(
+      '<span class="webui-model-list-group-name">DeepSeek</span>',
+    );
+    expect(html).toContain(
+      '<span class="webui-model-list-group-subtitle">deepseek</span>',
     );
     // …and the rows stay in catalog order, under their own provider.
     expect(html.match(/webui-model-list-row-name/gu)).toHaveLength(3);

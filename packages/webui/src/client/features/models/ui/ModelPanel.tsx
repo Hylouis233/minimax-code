@@ -18,7 +18,7 @@
 
 import type { ReactElement } from "react";
 
-import { WebuiIconChevronDown } from "../../../shell/icons.js";
+import { WebuiIconChevronRight } from "../../../shell/icons.js";
 import type {
   WebuiModelPickerDraft,
   WebuiModelPickerEntry,
@@ -123,7 +123,7 @@ export function WebuiModelPanel({
         onClick={onOpenList}
       >
         <span className="webui-model-panel-model-name">{modelName}</span>
-        <WebuiIconChevronDown className="webui-model-panel-model-chevron" />
+        <WebuiIconChevronRight className="webui-model-panel-model-chevron" />
       </button>
 
       {contextOptions.length > 0 ? (

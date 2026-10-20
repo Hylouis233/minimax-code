@@ -19,7 +19,7 @@ import {
 
 import {
   effortStopIndex,
-  effortStopPercent,
+  effortStopRatio,
   type WebuiEffortScale,
 } from "../projection/effort-scale.js";
 
@@ -30,6 +30,16 @@ export interface WebuiModelEffortSliderProps {
   /** Called once, when the drag ends on a level. */
   readonly onCommit: (value: string) => void;
 }
+
+/**
+ * The travel of the thumb, as a CSS length expression.
+ *
+ * The stops sit inside the track by the thumb's radius on each side, so the
+ * thumb is always whole on the track — a circle at the very end of a bar
+ * hangs off it, and a scale whose end stop is half off the rail reads as a
+ * control that was cut short.
+ */
+const TRAVEL = "calc(var(--spacing_20) + (100% - var(--spacing_40)) *";
 
 export function WebuiModelEffortSlider({
   scale,
@@ -42,7 +52,8 @@ export function WebuiModelEffortSlider({
 
   const total = scale.stops.length;
   const index = effortStopIndex(scale, preview ?? value);
-  const percent = total > 0 ? effortStopPercent(Math.max(index, 0), total) : 0;
+  const ratio = effortStopRatio(Math.max(index, 0), total);
+  const position = `${TRAVEL} ${ratio})`;
 
   /** The stop under a pointer, as the nearest one. */
   const stopAt = useCallback(
@@ -51,7 +62,12 @@ export function WebuiModelEffortSlider({
       if (!rail || total === 0) return undefined;
       const rect = rail.getBoundingClientRect();
       if (rect.width <= 0) return undefined;
-      const ratio = (clientX - rect.left) / rect.width;
+      // The travel is inset, so the pointer is measured against the inset
+      // range rather than against the whole rail.
+      const inset = 20;
+      const travel = rect.width - inset * 2;
+      if (travel <= 0) return undefined;
+      const ratio = (clientX - rect.left - inset) / travel;
       const last = total - 1;
       const at = Math.min(last, Math.max(0, Math.round(ratio * last)));
       return scale.stops[at]?.value;
@@ -112,21 +128,18 @@ export function WebuiModelEffortSlider({
         onPointerCancel={handlePointerCancel}
       >
         <div className="webui-model-effort-track" />
-        <div
-          className="webui-model-effort-fill"
-          style={{ width: `${percent}%` }}
-        />
+        <div className="webui-model-effort-fill" style={{ width: position }} />
         {scale.stops.map((stop, at) => (
           <span
             key={stop.value}
             className="webui-model-effort-dot"
             data-passed={at <= index ? "true" : "false"}
-            style={{ left: `${effortStopPercent(at, total)}%` }}
+            style={{ left: `${TRAVEL} ${effortStopRatio(at, total)})` }}
           />
         ))}
         <span
           className="webui-model-effort-thumb"
-          style={{ left: `${percent}%` }}
+          style={{ left: position }}
         />
       </div>
     </div>

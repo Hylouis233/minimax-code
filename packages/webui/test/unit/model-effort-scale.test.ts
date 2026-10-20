@@ -10,7 +10,7 @@ import {
   effortResetOption,
   effortScaleFor,
   effortStopIndex,
-  effortStopPercent,
+  effortStopRatio,
   isBinaryEffort,
 } from "../../src/client/features/models/projection/effort-scale.js";
 import type { WebuiModelPickerEntry } from "../../src/client/features/models/contracts/model-view.js";
@@ -189,14 +189,16 @@ describe("effort scale — the position on the rail", () => {
   });
 
   it("spreads the stops evenly along the rail", () => {
-    expect(effortStopPercent(0, 4)).toBe(0);
-    expect(effortStopPercent(1, 4)).toBeCloseTo(33.33, 1);
-    expect(effortStopPercent(2, 4)).toBeCloseTo(66.67, 1);
-    expect(effortStopPercent(3, 4)).toBe(100);
+    // A fraction of the travel, not a percentage: the stops sit inside the
+    // track by the thumb's radius, so the rail's ends are not the stops.
+    expect(effortStopRatio(0, 4)).toBe(0);
+    expect(effortStopRatio(1, 4)).toBeCloseTo(0.3333, 3);
+    expect(effortStopRatio(2, 4)).toBeCloseTo(0.6667, 3);
+    expect(effortStopRatio(3, 4)).toBe(1);
   });
 
   it("rests a single stop in the middle", () => {
     // A rail with one position is a position, not a range.
-    expect(effortStopPercent(0, 1)).toBe(50);
+    expect(effortStopRatio(0, 1)).toBe(0.5);
   });
 });

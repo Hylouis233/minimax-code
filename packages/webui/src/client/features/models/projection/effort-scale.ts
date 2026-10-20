@@ -139,12 +139,17 @@ export function effortResetOption(
 }
 
 /**
- * Where a stop sits along the rail, as a percentage.
+ * Where a stop sits along the rail, as a fraction of the travel.
+ *
+ * A fraction, not a percentage: the rail's travel is inset by the thumb's
+ * radius, so the stops do not reach the ends of the track — the thumb is a
+ * circle, and a circle at the end of a track hangs off it. The caller places
+ * the stop inside that inset.
  *
  * One stop has no span to sit in, so it rests in the middle: a rail with a
  * single position is a position, not a range.
  */
-export function effortStopPercent(index: number, total: number): number {
-  if (total <= 1) return 50;
-  return (index / (total - 1)) * 100;
+export function effortStopRatio(index: number, total: number): number {
+  if (total <= 1) return 0.5;
+  return index / (total - 1);
 }
