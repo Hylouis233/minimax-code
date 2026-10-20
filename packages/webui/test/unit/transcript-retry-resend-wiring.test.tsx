@@ -167,7 +167,6 @@ function renderComposer(props: {
         draft: props.draft ?? "",
         onDraftChange: () => undefined,
         teamModeOff: false,
-        favoritesStorage: { read: () => [], write: () => undefined },
         sendMessage: props.sendMessage ?? (async () => undefined),
         loadMessages: props.loadMessages,
       } as React.ComponentProps<typeof WebuiComposer>)}

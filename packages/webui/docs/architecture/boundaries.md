@@ -45,7 +45,7 @@ not by reading it:
 `projection/` is the one directory where the *layer* depends on the module rather than on where it
 sits, and the rule is deliberately explicit rather than inferred from the file's imports: a
 `domain` derivation carries a business rule (a normalisation, a classification, a decision about
-what counts as active), while a `view` derivation only reads and shapes (`model-picker-search`,
+what counts as active), while a `view` derivation only reads and shapes (`model-picker-rows`,
 `session-lookups`). Adding a projection means adding its basename to `PROJECTION_DOMAIN` in
 `scripts/lib/webui-dependency-rules.mjs` if it carries a rule — that list is the whole decision, and
 `classifyLayers` consults it for both the `features/*/projection/` and `client/projection/` spellings

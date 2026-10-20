@@ -44,38 +44,16 @@ export interface ModelDraftResolution {
  *
  * A thinking option RESETS to the model's configured default, flips the wire
  * VARIANT, or records a depth level depending on its shape — that mapping is
- * `thinkingDraftPatch`'s, and the option is reported verbatim by the fly-out
+ * `thinkingDraftPatch`'s, and the option is reported verbatim by the control
  * rather than pre-mapped there.
  *
- * Both editing paths SELECT the model. The fly-out belongs to a row, so choosing
- * an option inside it is a statement about that row: a user who picks "1M" next
- * to M3 has chosen M3, and leaving the row unselected while closing the menu made
- * the action read as "changed a setting" and left the tick out of step. The row
- * click is the same two calls in a different order, so both routes to a finished
- * selection look alike.
+ * The picker performs the resolution itself: it has ONE write to make, and
+ * making it twice — once as a settings change and once as a selection — put two
+ * answers to one press on the wire, in the order the runtime felt like
+ * answering them. The panel that owns the control is the only surface that
+ * decides what a change DOES, so the decision is here and the calls are
+ * there.
  */
-/**
- * Performs a resolution. The decision above is shared; this is what each surface
- * has to do with it, so the fly-out and the row click cannot perform it
- * differently.
- */
-export function applyModelDraftResolution(
-  resolution: ModelDraftResolution,
-  actions: {
-    readonly commitDraft: (draft: WebuiModelPickerDraft) => void;
-    readonly commitSettings: (draft: WebuiModelPickerDraft) => void;
-    readonly select: (draft: WebuiModelPickerDraft) => void;
-    readonly close: () => void;
-  },
-): void {
-  if (resolution.commitsSettings) {
-    actions.commitDraft(resolution.draft);
-    actions.commitSettings(resolution.draft);
-  }
-  actions.select(resolution.draft);
-  if (resolution.closes) actions.close();
-}
-
 export function resolveModelDraftSelection(params: {
   readonly model: WebuiModelPickerEntry;
   readonly draft: WebuiModelPickerDraft;

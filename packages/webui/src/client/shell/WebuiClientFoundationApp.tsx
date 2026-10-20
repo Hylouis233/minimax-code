@@ -93,7 +93,6 @@ import {
 import type { WebuiWorkspaceGitChangedSignal } from "../features/workspace/projection/workspace-panel-state.js";
 import { ConnectionStatus } from "./ConnectionStatus.js";
 import { deriveConversationUsageNotice } from "../features/transcript/projection/message-projection.js";
-import { normalizeFavoriteModelIds } from "../features/models/projection/model-favorites.js";
 
 // The hash plumbing moved to `client/bindings/navigation.ts`. Both
 // symbols stay re-exported here: `main.tsx` re-exports `subscribeToSessionHash`
@@ -309,15 +308,26 @@ export function WebuiClientFoundationApp(
   const dispatchShellSurface = useCallback((command: WebuiShellSurfaceCommand) => {
     setShellSurface((current) => reduceWebuiShellSurface(current, command));
   }, []);
-  const favoriteStorage = useMemo(
-    () => ({
-      read: () => browserStorage.readFavoriteModels(normalizeFavoriteModelIds),
-      write: (ids: readonly string[]) => browserStorage.writeFavoriteModels(ids, normalizeFavoriteModelIds),
-    }),
-    [browserStorage],
-  );
   const [selectedSessionId, setSelectedSessionId] =
     useSelectedSessionId(locationHash);
+  /**
+   * Selecting a session is ONE action.
+   *
+   * The page's route and the application's selection are two records of the
+   * same fact, and the second one used to be written by a module that had
+   * nothing to do with selection — the activity wiring, which owned the rail's
+   * row animations. The model catalogue follows "the session the application has
+   * selected", so a selection that did not reach the application left the
+   * composer reading a catalogue for a session that was not the one on screen,
+   * and the picker came up empty. The route decides here, and the application
+   * is told; every path that changes the route passes through here.
+   */
+  const selectSession = useCallback((sessionId: string | undefined) => {
+    setSelectedSessionId(sessionId);
+  }, []);
+  useEffect(() => {
+    application.select(selectedSessionId);
+  }, [application, selectedSessionId]);
   // The plan-review reply workflow lives with the assembly: it reads the
   // selection and the session's agent name when the reply is submitted, so a card
   // left open across a selection change replies to the session it belongs to
@@ -507,7 +517,7 @@ export function WebuiClientFoundationApp(
     flatSessionsWithChildren,
     setDraft,
     dispatchShellSurface,
-    setSelectedSessionId,
+    selectSession,
     recordSessionTeamMode,
   });
   // The navigation claim the creation use case measures its completions against:
@@ -543,7 +553,7 @@ export function WebuiClientFoundationApp(
 
   const handleWorkspaceSubagentClick = useCallback(
     (subagent: WebuiWorkspaceSubagent) => {
-      setSelectedSessionId(subagent.sessionId);
+      selectSession(subagent.sessionId);
       if (typeof window !== "undefined")
         window.history.replaceState(
           null,
@@ -551,17 +561,17 @@ export function WebuiClientFoundationApp(
           `${window.location.pathname}${window.location.search}${sessionHash(subagent.sessionId)}`,
         );
     },
-    [],
+    [selectSession],
   );
   const handleSelectComposerSession = useCallback((sessionId: string) => {
-    setSelectedSessionId(sessionId);
+    selectSession(sessionId);
     if (typeof window !== "undefined")
       window.history.replaceState(
         null,
         "",
         `${window.location.pathname}${window.location.search}${sessionHash(sessionId)}`,
       );
-  }, []);
+  }, [selectSession]);
   const childSessions = selectedSessionId
     ? page.sessions.filter(
         (session) => session.parentSessionId === selectedSessionId,
@@ -603,7 +613,7 @@ export function WebuiClientFoundationApp(
     workflows: sessionWorkflows,
     selectedSessionId,
     selectedSession,
-    setSelectedSessionId,
+    selectSession,
     setPageError,
   });
   const pluginManagementArea = webuiPluginManagementArea(shellSurface);
@@ -641,7 +651,6 @@ export function WebuiClientFoundationApp(
     () => ({
       onChannelReady: (listener: () => void) =>
         applicationRef.current.onChannelReady(listener),
-      select: (id: string | undefined) => applicationRef.current.select(id),
       seed: (sessions: Parameters<typeof application.sessionActivity.seed>[0]) =>
         applicationRef.current.sessionActivity.seed(sessions),
       // Interest, and the probe per identity the scheduler issues from it. The
@@ -935,7 +944,6 @@ export function WebuiClientFoundationApp(
                   inputHistory={composerState.history[composerKey] ?? []}
                   onInputSubmitted={recordComposerInput}
                   teamModeOff={composerTeamModeOff}
-                  favoritesStorage={favoriteStorage}
                   workspaceDir={selectedSession?.workspaceDir ?? newTaskWorkspaceDir}
                   onSelectSession={handleSelectComposerSession}
                   onOpenPluginManagement={openPluginManagement}

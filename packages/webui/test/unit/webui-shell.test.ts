@@ -1080,8 +1080,9 @@ describe("WebUI shell — desktop anatomy", () => {
     // two rail section headers joined them when the rail became project-first:
     // the 置顶 and 项目 headers each toggle their own section, so they are
     // bound rather than labels dressed as buttons, and the count moved from 8
-    // to 10. The retired rail view tabs and session-favourites control are
-    // absent; the remaining controls are backed by their current actions.
+    // to 10, and the model chip to 11 when the picker became one panel. The
+    // retired rail view tabs and session-favourites control are absent; the
+    // remaining controls are backed by their current actions.
     const html = renderShell();
     const controlTags: string[] = [];
     const re = /<(button|div|a|input|textarea|select)\b[^>]*>/gu;
@@ -1096,7 +1097,14 @@ describe("WebUI shell — desktop anatomy", () => {
         !/(?:^|\s)disabled(?:=|\s|>)/u.test(tag) &&
         !/aria-disabled="true"/u.test(tag),
     );
-    expect(operable).toHaveLength(10);
+    // The model chip joined them when the picker became one panel: it opens
+    // the panel that names the model in use and sets its thinking level. It
+    // used to go INERT whenever the catalogue was momentarily empty, which is
+    // what left a user staring at a chip that would not open -- and a reload
+    // was the only thing that brought it back.
+    expect(operable).toHaveLength(11);
+    expect(html).toMatch(/data-webui-model-selector="true"/u);
+    expect(html).not.toMatch(/data-webui-model-selector="true"[^>]*\sdisabled/u);
     expect(html).toMatch(/data-testid="composer-add-menu"/u);
     expect(html).toMatch(/data-webui-sidebar-toggle="true"/u);
     expect(html).toMatch(/data-webui-nav-item="新建任务"/u);

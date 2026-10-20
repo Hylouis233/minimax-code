@@ -115,11 +115,9 @@ import {
   WebuiModelPicker,
   type WebuiModelPickerDraft,
 } from "../../../features/models/ui/ModelPicker.public.js";
-import { ThinkingTrigger } from "./ThinkingTrigger.js";
 import {
   chipLevelLabel,
   resolveEffortOptions,
-  thinkingDraftPatch,
 } from "../../../features/models/projection/thinking-control.public.js";
 import {
   WebuiIconAttach,
@@ -216,7 +214,6 @@ export function WebuiComposer({
   onSelectSession,
   onOpenPluginManagement,
   seedAttachment,
-  favoritesStorage,
 }: {
   readonly sessionId?: string;
   readonly sessionLayout?: boolean;
@@ -266,10 +263,6 @@ export function WebuiComposer({
    */
   readonly onSessionCreated?: (sessionId: string, selected: boolean, teamModeOff: boolean) => void;
   readonly teamModeOff: boolean;
-  readonly favoritesStorage: {
-    readonly read: () => string[];
-    readonly write: (ids: readonly string[]) => void;
-  };
   /**
    * What is installed, and what the agent can run, answered by the plugins
    * business. The composer used to hold `pluginManagement` and `listSkills`
@@ -383,18 +376,24 @@ export function WebuiComposer({
   // the composer used to hold a second copy fed by its own 2s poll of the raw
   // `listModels` port method.
   const modelsWorkflows = useWebuiModelsWorkflows();
-  const modelsSnapshot = useWebuiModelsWorkflowsState();
+  // The subscription, not the value: the models owner publishes on every
+  // catalogue commit, and this component reads its own session's entry below.
+  // The subscription is what makes that read current.
+  useWebuiModelsWorkflowsState();
   /**
-   * Which session the visible catalogue was read for.
+   * The catalogue of the session on screen.
    *
-   * The surface used to clear its own copy on home so one session's models could
-   * not bleed into the next. It no longer holds a copy, so it gates instead:
-   * the owner's cached read is rendered only while it answers for the session
-   * on screen.
+   * It used to be the owner's SELECTED catalogue, gated on a scope the composer
+   * kept of its own — two facts that had to agree, and when they did not, the
+   * list came out empty: the chip fell back to the literal "Model" and the
+   * trigger went inert until a reload. Asking the owner for THIS session's
+   * entry removes the agreement: the entry is keyed by the session, so one
+   * session's models can never be rendered as another's, and the last good
+   * answer stands in while the next read is in flight.
    */
-  const modelsScope = controllerSnapshot.inspectionSessionId;
   const models: readonly WebuiModelEntry[] =
-    modelsScope === sessionId ? (modelsSnapshot.models.value ?? []) : [];
+    modelsWorkflows?.readModelsFor(sessionId).value ?? [];
+  const modelsScope = controllerSnapshot.inspectionSessionId;
   // The account status is the account owner's answer, not this component's copy
   // of an RPC result. The owner drops a superseded read.
   const accountSnapshot = useWebuiAccountWorkflowsState();
@@ -1327,11 +1326,10 @@ export function WebuiComposer({
                   <WebuiModelPicker
                     models={enabledModels}
                     selected={selectedModel}
-                    favorites={favoritesStorage}
                     // The level rides the model name. It is resolved from the
-                    // SAME option list the brain trigger below reads, so the two
+                    // SAME option list the panel's slider reads, so the two
                     // cannot disagree about whether this model has a depth
-                    // scale — a chip claiming "max" beside a brain that says
+                    // scale — a chip claiming "max" beside a panel that says
                     // nothing about a level is the contradiction this avoids.
                     triggerLevel={
                       selectedModel ? chipLevelLabel(thinkingOptions, selectedModel.thinking?.effort) : ""
@@ -1342,20 +1340,6 @@ export function WebuiComposer({
                     onSettingChange={(model, draft) =>
                       void handleSelectModel(model, draft)
                     }
-                  />
-                  <ThinkingTrigger
-                    options={thinkingOptions}
-                    recorded={selectedModel?.thinking?.effort}
-                    variant={selectedModel?.variant}
-                    preview={false}
-                    onChange={(option) => {
-                      const model = selectedModel;
-                      if (!model) return;
-                      // Same three shapes of commit the cascade's fly-out
-                      // reports, and for the same reason: which shape applies is
-                      // a fact about the model contract, not the control.
-                      void handleSelectModel(model, thinkingDraftPatch(model, option));
-                    }}
                   />
                   <WebuiComposerSubmitButton
                     sending={sending}

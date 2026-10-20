@@ -17,8 +17,10 @@ needs its own behavioural evidence — browser or assembled-application, per
 ## Where the pieces live
 
 - The surface is `client/features/composer/ui/WebuiComposer.tsx`, with the editor staging, menus,
-  submission controls, permission control, project row, queue panel and thinking trigger beside it in
-  the same `ui/` directory.
+  submission controls, permission control, project row and queue panel beside it in the same `ui/`
+  directory. The model picker it renders lives in the models business
+  (`client/features/models/ui/ModelPicker.public.tsx`), and it owns the thinking level: there is no
+  thinking control in the composer's own toolbar to disagree with it.
 - The owner, the controller, the queue and the persisted store are in
   `client/features/composer/application/` (`composer-controller.ts`, `composer-queue.ts`,
   `composer-store.ts`, `composer-history.ts`, `command-workflows.ts`, `turn-retry.ts`).

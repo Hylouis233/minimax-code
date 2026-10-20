@@ -1,31 +1,28 @@
 /**
- * Composer-side model picker, a two-column popover:
+ * Composer-side model picker: ONE popup with TWO states.
  *
- *   ┌─ models ──────────┬─ detail ──────────────────┐
- *   │ ● MiniMax-M3       │ 上下文窗口                 │
- *   │   MiniMax-M2.7-…   │ 512K                      │
- *   │   MiniMax-M2.7     │ 1M                    ✓   │
- *   │   OpenCode Go      ├─ 推理等级                 │
- *   │                    │ default                   │
- *   └────────────────────┴───────────────────────────┘
+ *   ┌─ panel ──────────────┐      ┌─ list ─────────────────┐
+ *   │            高    ↺    │      │ 选择模型                │
+ *   │      GPT-6 Luna  ›    │  →   │ ── OpenAI ──            │
+ *   │  ●━━━●━━━◉━━━○━━━○     │  ←   │   GPT-6.1 Sol            │
+ *   └───────────────────────┘      │   GPT-6 Luna        ✓    │
+ *                                  └─────────────────────────┘
  *
- * Model choices and their settings share a compact vertical menu. Selecting a
- * model closes the menu; changing thinking or context immediately commits the
- * focused model's draft through the same `selectModel` operation.
+ * The two states are the same popup with its content swapped, not a popup
+ * beside a popup. That is the fix for the picker feeling broken: the cascade
+ * had two popups, each with the shared skeleton's own dismissal listener, so a
+ * pointerdown on a model row was claimed by the fly-out first — it retracted a
+ * layer, the DOM was rebuilt, and the click landed on whatever had taken the
+ * row's place. The user saw a control that did nothing, and the only thing
+ * that brought it back was a reload.
  *
- * The model column is grouped by provider: each group renders a plain provider
- * name above its rows — no nested menu, no second level. Grouping follows the
- * catalog's own order, so the first provider listed stays on top.
+ * One popup means one dismissal, one Escape ladder and one place the list can
+ * be: the state that swaps content cannot be reordered under the pointer,
+ * because the content is a snapshot taken when the popup opened.
  *
- * Drafts live in a `useState` map keyed by `providerId/modelId/variant` so a
- * setting remains responsive while the runtime refreshes its model catalog.
- * The runtime projection is the source of truth after the menu is reopened.
- *
- * The menu itself is a `WebuiDropdown`: the shared skeleton owns its surface,
- * its motion, its placement above the trigger and its dismissal, so the panel
- * and every other popup in the client answer a press outside and an Escape the
- * same way. What stays here is the picker's own ladder — which of the two
- * Escape answers applies — and the trigger that opens it.
+ * The chip names the model and its level. The panel owns the level: it is the
+ * one place a thinking level is set, and it is set by a slider whose stops are
+ * the model's own.
  */
 import {
   useCallback,
@@ -34,10 +31,10 @@ import {
   useMemo,
   useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactElement,
 } from "react";
 
-import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { WebuiIconChevronDown } from "../../../shell/icons.js";
 import { WebuiDropdown } from "../../../ui/Dropdown.js";
 import type {
@@ -45,24 +42,11 @@ import type {
   WebuiModelPickerEntry,
   WebuiModelProviderGroup,
 } from "../contracts/model-view.js";
-import {
-  applyModelDraftResolution,
-  resolveModelDraftSelection,
-} from "../projection/model-draft.js";
-import {
-  modelKey,
-  projectModelPickerSections,
-} from "../projection/model-picker-rows.js";
-import { useModelPickerInteraction } from "../bindings/use-model-picker-interaction.js";
-import { isSearchEmpty } from "../projection/model-picker-search.js";
-import { toggleFavoriteId } from "../projection/model-favorites.js";
-import { WebuiModelMenuCluster } from "./ModelMenu.js";
-import { WebuiModelDraftEditor } from "./ModelDraftEditor.js";
-// `WebuiModelMenuList` is NOT republished here. It lives in `ModelMenu.tsx` and
-// only the models business's own tests import it; forwarding it from a published
-// surface would make this module the publisher of a symbol nothing outside the
-// business needs, and a forwarding export is the escape the publication gate
-// exists to close.
+import { resolveModelDraftSelection } from "../projection/model-draft.js";
+import { effortResetOption } from "../projection/effort-scale.js";
+import { groupModelsByProvider } from "../projection/model-picker-rows.js";
+import { WebuiModelListPanel } from "./ModelListPanel.js";
+import { WebuiModelPanel } from "./ModelPanel.js";
 
 // Re-export so existing importers keep their import path stable.
 export type {
@@ -88,17 +72,16 @@ export interface ModelPickerProps {
    *
    * Passed in rather than derived here because "which shape is this model's
    * thinking" is a fact about the model CONTRACT, and it is already resolved
-   * once for the composer's brain trigger — deriving it a second time here
-   * would give two places to disagree about whether this model has a depth
-   * scale, and the disagreement would show as a chip claiming a level the
-   * brain beside it says nothing about.
+   * once for the composer's chip — deriving it a second time here would give
+   * two places to disagree about whether this model has a depth scale, and the
+   * disagreement would show as a chip claiming a level the panel says nothing
+   * about.
    */
   readonly triggerLevel?: string;
-  readonly favorites: {
-    readonly read: () => string[];
-    readonly write: (ids: readonly string[]) => void;
-  };
 }
+
+/** Which of the popup's two states is on screen. */
+type PickerView = "panel" | "list";
 
 export function WebuiModelPicker({
   models,
@@ -107,147 +90,147 @@ export function WebuiModelPicker({
   onSettingChange,
   triggerLabel,
   triggerLevel,
-  favorites,
 }: ModelPickerProps): ReactElement {
-  const [query, setQuery] = useState("");
-  const [favoriteIds, setFavoriteIds] = useState<readonly string[]>([]);
-  const [drafts, setDrafts] = useState<
-    Readonly<Record<string, WebuiModelPickerDraft>>
-  >({});
-
-  const groupedModels = useMemo(
-    () =>
-      projectModelPickerSections({
-        models,
-        query,
-        favoriteIds,
-        favoritesLabel: "收藏",
-      }),
-    [models, query, favoriteIds],
-  );
-  const interaction = useModelPickerInteraction({
-    models,
-    groups: groupedModels,
-    selected,
-  });
-  const { focusedModel, focusedKey } = interaction;
-  const focusedDraft = focusedModel ? (drafts[focusedKey] ?? {}) : {};
-  const { open, tier } = interaction;
+  const [open, setOpen] = useState(false);
+  const [view, setView] = useState<PickerView>("panel");
+  /**
+   * The catalogue as it was when the popup opened.
+   *
+   * A snapshot, not a live projection: the catalogue is re-read in the
+   * background, and a list that re-orders while it is open moves the row a
+   * pointer was on. The snapshot is taken when the popup opens and released
+   * when it closes.
+   */
+  const [groups, setGroups] = useState<readonly WebuiModelProviderGroup[]>([]);
+  /** The settings being edited, when they differ from the model's own. */
+  const [draft, setDraft] = useState<WebuiModelPickerDraft>({});
   const triggerId = useId();
-  const searchId = useId();
+  const escapeRef = useRef(false);
 
-  const { dom } = useWebuiBrowserCapabilities();
-
-  /**
-   * What this dismissal IS, and whether that Escape has already been answered.
-   *
-   * One Escape may walk back ONE tier. The menu and the fly-out are two
-   * dropdowns, each with the shared skeleton's document listener, so the same
-   * keydown reaches both of them and answering it twice would throw away the
-   * list position the user built up — which is the part that took effort. So
-   * the first dismissal claims the press and the second finds it claimed.
-   *
-   * The recorder below is what says a press is an Escape at all. It is not the
-   * only path: React stops the event at the app root before it reaches the
-   * document when the focus is on the trigger, so the trigger's own handler
-   * below records the press by hand.
-   */
-  const escapeClaimedRef = useRef(false);
-  const escapeSpentRef = useRef(false);
-
-  const noteEscape = useCallback(() => {
-    escapeClaimedRef.current = true;
-    escapeSpentRef.current = false;
+  const close = useCallback(() => {
+    setOpen(false);
+    setView("panel");
+    setDraft({});
   }, []);
 
-  useEffect(
-    () =>
-      dom.listenForKeyDown((event) => {
-        if (event.key === "Escape") noteEscape();
-      }),
-    [dom, noteEscape],
+  const handleOpen = useCallback(() => {
+    setGroups(groupModelsByProvider(models));
+    setView("panel");
+    setOpen(true);
+  }, [models]);
+
+  /**
+   * One dismissal, two answers.
+   *
+   * A press outside ends the visit; an Escape walks back one step, from the
+   * list to the panel and from the panel to nothing. The ladder is inside ONE
+   * popup, so there is no second listener that could answer the same key
+   * first.
+   */
+  const handleDismiss = useCallback(() => {
+    // The Escape is consumed here, whatever this dismissal answers: a mark
+    // left behind would make the NEXT press outside look like an Escape, and
+    // the list would step back to the panel instead of closing.
+    const wasEscape = escapeRef.current;
+    escapeRef.current = false;
+    if (wasEscape && view === "list") {
+      setView("panel");
+      return;
+    }
+    close();
+  }, [close, view]);
+
+  const handlePopupKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLDivElement>) => {
+      if (event.key !== "Escape") return;
+      // The popup answers its own Escape, so the skeleton's document listener
+      // never sees this press: one press, one answer.
+      event.stopPropagation();
+      event.preventDefault();
+      escapeRef.current = true;
+      handleDismiss();
+    },
+    [handleDismiss],
   );
 
   /**
-   * Claim the Escape this dismissal is answering, if it is one.
+   * Commit a level.
    *
-   * `"press"` is a dismissal that is not the Escape — a pointer press outside,
-   * which has its own answer per surface. `"spent"` is the same Escape seen by
-   * the second popup, which has already been answered and must stay quiet.
+   * ONE write: the model in use is re-selected with the new level, which is
+   * the same `selectModel` the model list uses. The old cascade fired that
+   * write twice — once as a settings change and once as a selection — and two
+   * answers to one press is how a panel ends up showing a level nobody chose.
    */
-  const claimEscape = useCallback((): "press" | "escape" | "spent" => {
-    if (!escapeClaimedRef.current) return "press";
-    if (escapeSpentRef.current) return "spent";
-    escapeSpentRef.current = true;
-    return "escape";
-  }, []);
+  const handleEffortChange = useCallback(
+    (option: string) => {
+      if (!selected) return;
+      const resolution = resolveModelDraftSelection({
+        model: selected,
+        draft,
+        change: { kind: "thinking", option },
+      });
+      setDraft(resolution.draft);
+      onSettingChange(selected, resolution.draft);
+    },
+    [draft, onSettingChange, selected],
+  );
 
   /**
-   * The menu's dismissal: a press outside is the end of it, an Escape is one
-   * step back up the ladder.
+   * Put the level back where it rests by default.
    *
-   * Not memoised — the skeleton reads `onClose` through a ref, so a fresh
-   * closure per render costs it nothing.
+   * The default is a position, not the absence of one: a depth scale returns
+   * to "the engine decides", and a switch returns to the position the runtime
+   * itself declares. Committing "default" to a switch would move nothing —
+   * the switch's state is the variant, and the default stop is not one of its
+   * two.
    */
-  const handleMenuDismiss = () => {
-    const answer = claimEscape();
-    if (answer === "escape") interaction.onEscape();
-    else if (answer === "press") interaction.close();
-  };
-
-  /**
-   * The fly-out's dismissal, in either form, and both forms mean the same thing:
-   * back to the list.
-   *
-   * An Escape here is already spent in almost every case — the menu's skeleton
-   * listens to the same keydown and is registered first, so it walks the ladder
-   * and this finds the press claimed. A press outside the fly-out but inside the
-   * model list lands on the list's own answer, which is this one.
-   */
-  const handleFlyoutDismiss = () => {
-    if (claimEscape() === "press") interaction.onEscape();
-  };
-
-  useEffect(() => {
-    if (open) return;
-    setDrafts({});
-  }, [open]);
-  useEffect(() => {
-    if (open) return;
-    setQuery("");
-  }, [open]);
-  useEffect(() => {
-    if (!open) return;
-    setFavoriteIds(favorites.read());
-  }, [favorites, open]);
-
-  const handleToggleFavorite = (key: string) => {
-    setFavoriteIds((current) => {
-      const next = toggleFavoriteId(current, key);
-      favorites.write(next);
-      return next;
+  const handleResetEffort = useCallback(() => {
+    if (!selected) return;
+    const resolution = resolveModelDraftSelection({
+      model: selected,
+      draft,
+      change: { kind: "thinking", option: effortResetOption(selected) },
     });
-  };
-  const handleCommitDraft = (draft: WebuiModelPickerDraft) => {
-    setDrafts((current) => ({ ...current, [focusedKey]: draft }));
-  };
-  const handleSelectModel = (model: WebuiModelPickerEntry) => {
-    applyModelDraftResolution(
-      resolveModelDraftSelection({
+    setDraft(resolution.draft);
+    onSettingChange(selected, resolution.draft);
+  }, [draft, onSettingChange, selected]);
+
+  /**
+   * Commit a context window.
+   *
+   * A window is a commitment rather than a level: it ends the visit, the same
+   * way it did in the fly-out, so a user who picks a window is not left
+   * wondering whether it took.
+   */
+  const handleContextLimitChange = useCallback(
+    (contextLimit: number) => {
+      if (!selected) return;
+      const resolution = resolveModelDraftSelection({
+        model: selected,
+        draft,
+        change: { kind: "context", value: contextLimit },
+      });
+      setDraft(resolution.draft);
+      onSettingChange(selected, resolution.draft);
+      close();
+    },
+    [close, draft, onSettingChange, selected],
+  );
+
+  /** Choose a model from the list. */
+  const handleSelectModel = useCallback(
+    (model: WebuiModelPickerEntry) => {
+      const resolution = resolveModelDraftSelection({
         model,
-        draft: drafts[modelKey(model)] ?? {},
+        draft: {},
         change: { kind: "select" },
-      }),
-      {
-        commitDraft: handleCommitDraft,
-        commitSettings: (next) => onSettingChange(model, next),
-        select: (next) => onSelect(model, next),
-        close: interaction.close,
-      },
-    );
-  };
-  const favoriteKeys = useMemo(() => new Set(favoriteIds), [favoriteIds]);
-  const searchIsEmpty = isSearchEmpty(groupedModels, query, models.length);
+      });
+      setDraft(resolution.draft);
+      onSelect(model, resolution.draft);
+      close();
+    },
+    [close, onSelect],
+  );
 
   const triggerText =
     selected?.displayName ??
@@ -255,12 +238,44 @@ export function WebuiModelPicker({
     triggerLabel ??
     "Model";
 
+  const popup = useMemo(() => {
+    if (view === "list") {
+      return (
+        <WebuiModelListPanel
+          groups={groups}
+          selected={selected}
+          onSelect={handleSelectModel}
+          onBack={() => setView("panel")}
+        />
+      );
+    }
+    return (
+      <WebuiModelPanel
+        model={selected}
+        draft={draft}
+        onOpenList={() => setView("list")}
+        onEffortChange={handleEffortChange}
+        onResetEffort={handleResetEffort}
+        onContextLimitChange={handleContextLimitChange}
+      />
+    );
+  }, [
+    draft,
+    groups,
+    handleContextLimitChange,
+    handleEffortChange,
+    handleResetEffort,
+    handleSelectModel,
+    selected,
+    view,
+  ]);
+
   return (
     <div className="webui-model-selector" data-webui-model-selector="true">
       <WebuiDropdown
         open={open}
-        onOpen={interaction.toggle}
-        onClose={handleMenuDismiss}
+        onOpen={handleOpen}
+        onClose={handleDismiss}
         role="dialog"
         // The panel is named by the control that opens it, which is the same
         // one the skeleton's trigger props name — `id` below is this id, so
@@ -274,10 +289,10 @@ export function WebuiModelPicker({
         align="end"
         offset={8}
         collision="flip"
-        className="webui-model-menu webui-model-menu--cascade"
+        className="webui-model-menu"
         popupDataAttributes={{
           "data-webui-model-menu": "true",
-          "data-webui-model-tier": tier,
+          "data-webui-model-view": view,
         }}
         trigger={(triggerProps) => {
           // The popup is measured against this button by default, and every
@@ -288,23 +303,9 @@ export function WebuiModelPicker({
             <button
               type="button"
               {...buttonProps}
-              // The skeleton's trigger handler closes the popup on Escape and
-              // stops the event on its way out. Here that would answer one press
-              // with the whole menu, so the trigger answers it with the ladder
-              // instead — the same answer the key gives inside the list — and
-              // keeps the event to itself so the two document listeners do not
-              // answer it a second time. The focus is already here, which is all
-              // the skeleton's handler would have restored.
-              onKeyDown={(event) => {
-                if (event.key !== "Escape") return;
-                event.stopPropagation();
-                noteEscape();
-                handleMenuDismiss();
-              }}
               id={triggerId}
               className="webui-model-selector-trigger"
               aria-label="Model"
-              disabled={models.length === 0}
             >
               <span className="flex min-w-0 items-baseline gap-[6px]">
                 <span className="min-w-0 truncate whitespace-nowrap">
@@ -312,9 +313,9 @@ export function WebuiModelPicker({
                 </span>
                 {/*
                   The level, named where the model is named. A depth scale has a
-                  POSITION to state and the brain's on/off colour cannot state one, so
-                  the word rides the model name in the muted colour instead of a
-                  second copy of it sitting two controls away. The name truncates and
+                  POSITION to state and a colour cannot state one, so the word
+                  rides the model name in the muted colour instead of a second
+                  copy of it sitting two controls away. The name truncates and
                   this does not: a long provider-prefixed name losing its tail is
                   fine, a level word half-clipped is not.
                 */}
@@ -332,41 +333,14 @@ export function WebuiModelPicker({
           );
         }}
       >
-        <WebuiModelMenuCluster
-          query={query}
-          searchId={searchId}
-          searchIsEmpty={searchIsEmpty}
-          onQueryChange={(value) => {
-            interaction.retract();
-            setQuery(value);
-          }}
-          onSearchFocus={interaction.retract}
-          onMoveRow={interaction.onMoveRow}
-          groups={groupedModels}
-          selected={selected}
-          focusedRowId={interaction.focused?.rowId}
-          favoriteKeys={favoriteKeys}
-          onFocus={interaction.onRowFocus}
-          onHoverIntent={interaction.onHoverIntent}
-          onHoverLeave={interaction.onHoverLeave}
-          onSelect={handleSelectModel}
-          onToggleFavorite={handleToggleFavorite}
-          onRowMount={interaction.onRowMount}
-        />
+        <div
+          className="webui-model-popup"
+          data-webui-model-popup="true"
+          onKeyDown={handlePopupKeyDown}
+        >
+          {popup}
+        </div>
       </WebuiDropdown>
-      <WebuiModelDraftEditor
-        open={open}
-        tier={tier}
-        model={focusedModel}
-        draft={focusedDraft}
-        anchor={interaction.flyoutAnchor}
-        preview={interaction.isPreviewing}
-        onCommitDraft={handleCommitDraft}
-        onSettingChange={onSettingChange}
-        onSelect={onSelect}
-        onCloseMenu={interaction.close}
-        onRetract={handleFlyoutDismiss}
-      />
     </div>
   );
 }

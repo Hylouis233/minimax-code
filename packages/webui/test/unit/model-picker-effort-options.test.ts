@@ -74,52 +74,39 @@ describe("effort options — the binary case", () => {
   });
 });
 
-const FLYOUT_SOURCE = readFileSync(
+const PANEL_SOURCE = readFileSync(
   path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
-    "../../src/client/features/models/ui/ModelSettingsFlyout.tsx",
+    "../../src/client/features/models/ui/ModelPanel.tsx",
   ),
   "utf8",
 );
 
 describe("who answers 'is thinking on'", () => {
-  const flyoutSource = FLYOUT_SOURCE;
-
-  it("routes the fly-out toggle through the shared resolver", () => {
-    // The fly-out had its own local copy of the question, answered from the
-    // recorded effort alone — a field a two-state model never writes. So the
-    // toolbar brain and the fly-out switch disagreed about the same model, and
-    // both were wrong. One resolver, so a third control cannot re-derive it.
-    const code = flyoutSource
+  it("routes the panel's control through the shared scale", () => {
+    // The panel reads the level through the scale module, which is the one
+    // place that knows a switch's state lives in the VARIANT. A local copy of
+    // the question — answered from the recorded effort alone, a field a
+    // two-state model never writes — is how the toolbar brain and the fly-out
+    // switch came to disagree about the same model, and both were wrong.
+    const code = PANEL_SOURCE
       .split("\n")
       .filter((line) => !line.trimStart().startsWith("//"))
       .join("\n");
-    expect(code).toContain("resolveThinkingVerdict(");
+    expect(code).toContain("currentEffortValue(");
+    expect(code).toContain("effortScaleFor(");
     // The old re-derivation, in the shape it had: an effort-only answer.
     expect(code).not.toContain('model.thinking?.effort === "on"');
   });
 });
 
-describe("what the fly-out calls the thinking control", () => {
-  it("branches the label on the control's shape, not on the row", () => {
-    // A switch has no level to sit at, so calling it 「推理等级」 promised a
-    // scale the control cannot express — and contradicted the toolbar brain
-    // beside the send button, which was already calling the same thing 思考.
-    expect(FLYOUT_SOURCE).toContain('const effortLabel = isBinary ? "思考" : "推理等级";');
-  });
-
-  it("uses that one label for the visible text and both accessible names", () => {
-    // Three strings for one control is three places to drift. The ToggleSwitch
-    // prop reaches aria-label, so leaving it hardcoded would have left the
-    // switch announcing 「推理等级」 while the row beside it read 思考.
-    expect(FLYOUT_SOURCE).toContain(
-      '<span className="webui-model-detail-label">{effortLabel}</span>',
-    );
-    expect(FLYOUT_SOURCE).toContain("label={effortLabel}");
-    expect(FLYOUT_SOURCE).toContain("aria-label={effortLabel}");
-    // And no literal survives anywhere the control renders it.
-    expect(FLYOUT_SOURCE).not.toContain('label="推理等级"');
-    expect(FLYOUT_SOURCE).not.toContain('aria-label="推理等级"');
+describe("what the panel calls the thinking control", () => {
+  it("names the level with the shared label, in the interface's language", () => {
+    // One label, from the one table that knows it: a level word the interface
+    // cannot translate is shown as it arrived, but a level word translated
+    // twice is two translations to disagree.
+    expect(PANEL_SOURCE).toContain("effortLabel(");
+    expect(PANEL_SOURCE).not.toContain("推理等级");
   });
 });
 

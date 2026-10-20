@@ -54,7 +54,7 @@ export interface UseNewTaskWorkspaceOptions {
   readonly flatSessionsWithChildren: readonly WebuiClientSession[];
   readonly setDraft: (draft: string) => void;
   readonly dispatchShellSurface: (command: WebuiShellSurfaceCommand) => void;
-  readonly setSelectedSessionId: (id: string | undefined) => void;
+  readonly selectSession: (id: string | undefined) => void;
   /**
    * Records the Agent Team choice the created session was started with. Sessions
    * owns that choice, so this hook asks for the record rather than reaching the
@@ -84,7 +84,7 @@ export function useNewTaskWorkspace(options: UseNewTaskWorkspaceOptions): NewTas
     flatSessionsWithChildren,
     setDraft,
     dispatchShellSurface,
-    setSelectedSessionId,
+    selectSession,
     recordSessionTeamMode,
   } = options;
 
@@ -143,7 +143,7 @@ export function useNewTaskWorkspace(options: UseNewTaskWorkspaceOptions): NewTas
     // no URL. The catalogue reads are not repeated here: creation completion
     // refreshes them in the use case, which is the one owner of that rule.
     if (!selected) return;
-    setSelectedSessionId(id);
+    selectSession(id);
     if (typeof window !== "undefined")
       window.history.replaceState(
         null,
@@ -169,7 +169,7 @@ export function useNewTaskWorkspace(options: UseNewTaskWorkspaceOptions): NewTas
     // watches the session id cannot see it. Close the marketplace here too, or
     // the row looks dead exactly as it did before.
     dispatchShellSurface({ type: "show-conversation" });
-    setSelectedSessionId(undefined);
+    selectSession(undefined);
     if (typeof window !== "undefined") {
       window.history.replaceState(
         null,

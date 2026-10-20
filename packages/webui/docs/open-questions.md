@@ -7,10 +7,12 @@ would be picking for them. Nothing here is a bug report.
 ## 1. Does the model chip's depth level take a separator before it?
 
 **Status:** open, shipped as 6px of space, deliberately reversible.
-`client/features/models/ui/ModelPicker.tsx` renders `<span className="flex min-w-0 items-baseline
+`client/features/models/ui/ModelPicker.public.tsx` renders `<span className="flex min-w-0 items-baseline
 gap-[6px]">` and the level span beside it, with no separator token anywhere in `features/models/`.
 
-- **Today:** `M3.1-Flash-Preview  max` — the 6px gap reads as one label at 12px tertiary weight.
+- **Today:** `M3.1-Flash-Preview  高` — the 6px gap reads as one label at 12px tertiary weight. The
+  level is shown in the interface's language, not the wire's, since the wire speaks `high` and the
+  interface speaks Chinese.
 - **Alternative:** a middle dot (`·`) draws an explicit line between a model and a setting.
 - **How to decide:** render the longest catalogue name at both settings and compare; the gap choice
   was made reversible precisely so this is a one-line change.

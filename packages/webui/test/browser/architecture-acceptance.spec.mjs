@@ -105,7 +105,10 @@ test("V31/V34 inspection and authorization progress through a saturated activity
   await expect.poll(() => requestCount(page, "getAccountStatus")).toBe(initialAccount + 1);
   const picker = page.locator("[data-webui-model-selector]");
   await picker.getByRole("button").first().click();
-  await expect(page.getByRole("option", { name: /External after/ })).toBeVisible();
+  // The panel opens on the model in use; the catalogue is one click further,
+  // behind the model name.
+  await page.locator('[data-webui-model-panel-model="true"]').click();
+  await expect(page.locator("[data-webui-model-list-row]")).toContainText("External after");
   await page.mouse.click(8, 8);
   await page.locator('[data-testid="sidebar-user-menu-trigger"]').click();
   await page.getByTestId("user-menu-account-login").click();
