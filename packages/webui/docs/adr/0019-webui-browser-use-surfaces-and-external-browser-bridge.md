@@ -237,14 +237,29 @@ code the person copied from the host into the extension — was considered and
 rejected, because it puts the credential in the clear on the wire and adds a
 surface the person has to use correctly.
 
-**What this does not establish.** The extension's identity is established by
-its origin being on the allowlist, and a local process can put any `Origin`
-header it likes on a loopback socket. The exchange protects the credential
-*in transit*; it does not turn the allowlist into a cryptographic identity. A
-host that must defend against a local attacker needs a stronger anchor than an
-origin allowlist — a per-installation pre-shared key, or the native-messaging
-route this record already lists in its research findings. That is a product
-decision, and it is recorded here rather than left implicit.
+**What this does not establish — and it is not a small gap.** The extension's
+identity is established by its origin being on the allowlist, and a local
+process can put any `Origin` header it likes on a loopback socket. The host
+then seals the credential to the public key *that peer supplied*. A local
+process can therefore be admitted as the allowlisted extension, supply its own
+ephemeral key, decrypt the credential and answer the challenge.
+
+The exchange protects the credential **in transit** and nothing more. It is
+**not** an authentication of the peer, and the bridge must be treated as
+**unauthenticated against anything that can reach loopback** until a stronger
+anchor exists. The switch that enables an external surface enables it for
+**the person's browser**; it is not a boundary against a local process.
+
+The stronger anchor is an **installation key** the extension holds and a local
+process does not: provisioned when the extension is installed and configured,
+proved during the exchange, and bound to the key the credential is sealed to so
+that only a peer that has already proved possession of it can receive one. The
+native-messaging route this record's research findings already list is the
+other candidate, and it has the same property — a registered host process,
+rather than a spoofable `Origin` header.
+
+This is recorded here as an open product decision rather than left implicit,
+because the gap is a security boundary and not a detail of the implementation.
 
 ### A2 — What "the enabled state survives a restart" means for the credential
 

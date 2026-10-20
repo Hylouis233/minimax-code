@@ -240,6 +240,71 @@ refused explicitly. It needs the same wire change as the pairing exchange, and
 without a real Edge or Chrome to speak to, doing both at once would produce a
 protocol that has never been exercised against a browser.
 
+## Round 4
+
+> Verdict: the plan cannot be closed. The credential exchange and the run-scoped
+> selection exist, but the panel's image stream stays attached to the target that
+> was selected when the stream started, the Agent tool path has no connection to
+> the surface the panel is showing, and the extension's allowlisted `Origin` does
+> not authenticate an extension.
+
+| # | Severity | Finding | Status |
+| --- | --- | --- | --- |
+| N1 | BLOCKER | Admission trusts the `Origin` header to select an allowlisted extension id, and the host then encrypts its credential to the public key that peer supplies. A local process can spoof the allowlisted origin, supply its own key, decrypt the credential and answer the challenge. | `open` |
+| N2 | MAJOR | Changing the selected target did not retarget the active image stream. | `fixed` |
+| N3 | MAJOR | The Agent tool path silently used the isolated Chromium even when the panel was showing Edge or Chrome. | `fixed` |
+| N4 | MAJOR | The published documents still said the tool adapter did not exist and that the host and the extension minted independent credentials. | `fixed` |
+
+### N1 — the bridge is not authenticated against a local process
+
+This is the one finding that is a **design** gap rather than a defect, and the
+ADR's amendment A1 already names the shape of the answer: the extension needs
+an **installation key** that a local process does not have, and the exchange
+must be bound to it.
+
+What the tree does today, stated plainly so nobody has to infer it:
+
+- The host selects the allowlisted extension id from the `Origin` header.
+- The host then seals its pairing credential to the **public key that peer
+  supplied**, and sends it.
+- A local process can put any `Origin` on a loopback socket, so it can be
+  admitted as the allowlisted extension, supply its own ephemeral key, decrypt
+  the credential and answer the challenge.
+
+The exchange therefore protects the credential **in transit** and nothing more.
+It is not an authentication of the peer. The bridge must be treated as
+**unauthenticated against a local process** until the installation key lands,
+and the credential must not be regarded as secret from anything that can
+reach loopback.
+
+**What is needed.** A per-installation key that the extension holds and a
+local process does not, provisioned when the extension is installed and
+configured, and bound into the exchange so that only the holder of that key
+can complete it. The credential would then only ever be sealed to a key the
+host has already seen prove possession of the installation key. The native
+messaging route the ADR's research findings already list is the other
+candidate, and it has the same property: a registered host process, not a
+spoofable `Origin` header.
+
+Until that exists, the honest position is the one this document takes: the
+external surfaces are **not** safe against an attacker who can reach loopback,
+and the switch that enables them should be understood as enabling them for
+**the person's browser**, not as a boundary against a local process.
+
+### N2, N3, N4
+
+- **N2** — The stream now follows the run's current selection: a selection
+  change restarts the provider stream for the new target and stops the
+  previous target's stream, so a screencast is not left running for a tab the
+  person moved away from. The existing identity and generation fences still
+  drop a frame that belongs to a superseded target.
+- **N3** — The tool path no longer defaults to the isolated Chromium. It acts
+  on the surface the **run** selected, and a run that has selected nothing is
+  **refused** with a stable browser error code rather than being sent to a
+  browser the person is not looking at.
+- **N4** — The stale claims in this document and in
+  `03-extension-admission.md` are corrected.
+
 ## What this document does not establish
 
 - That the external path works end to end against a real Edge or Chrome. Neither
@@ -250,5 +315,7 @@ protocol that has never been exercised against a browser.
   macOS and Windows forms are asserted through an injected command runner, not
   executed.
 - That the Agent's browser tools address the same session as the panel. The
-  shared session and the command path exist, but the tool-side adapter does
-  not; see the ticket table in the specification issue.
+  tool adapter exists and forwards to the same service, but which *surface* a
+  tool call acts on is resolved from the run's own selection rather than from
+  a default, so a run that has selected nothing is refused rather than being
+  sent somewhere the person is not looking.

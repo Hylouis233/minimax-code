@@ -174,7 +174,8 @@ path.
 | **The switch driving the pairing** | `implemented` — the bridge does not switch a surface on by itself; the browser service reads the persisted authorization and calls `enableSurface` / `disableSurface` / `restoreSurface` |
 | **A credential that survives a host restart** | `implemented` — `BrowserBridgePairing.restore` re-adopts the stored credential at startup instead of rotating it, so the extension's copy still matches |
 | **An extension-identity refusal with a stable wire code** | **open decision** — see the wire-level codes note above |
-| The extension connecting end to end | **not implemented, and `not yet measured`** — the host and the extension still mint independent credentials, so the handshake cannot complete. See `07-review-findings.md` |
+| The extension connecting end to end | **implemented, and `not yet measured`** — the host and the extension share a credential through the encrypted exchange; it has not been performed against a real Edge or Chrome. See `07-review-findings.md` |
+| **The peer is authenticated** | **not implemented** — admission selects the allowlisted extension id from the `Origin` header, which a local process can spoof, and the host then seals its credential to the public key that peer supplied. The bridge is therefore **not authenticated against a local process**. See `07-review-findings.md` |
 
 ## Related
 
