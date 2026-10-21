@@ -81,8 +81,8 @@ belongs to a specific ticket. The research notes #197 and #198 carry the full in
    string). `event.params.sessionId` is the numeric screencast acknowledgement id, and routing by it
    looks right and silently finds no page. Affects #200, #201, #204.
 3. **A stable tab id breaks the caches that are keyed by it.**
-   The file results are cached by tab id (`WorkspacePanels.tsx:449`, `:485`) and the review summary
-   is matched by tab id (`:497`), while the effects that read them depend on `[activeTab?.id]`. With
+   The file results are cached by tab id (`WorkspacePanels.tsx:291`, `:485`) and the review summary
+   is matched by tab id (`:339`), while the effects that read them depend on `[activeTab?.id]`. With
    a stable id and a mutable content the effect does **not** re-run and the component reads the
    previous content's entry. Affects #207, #208.
 4. **`deleteSession` is not a hook.** It is a binding with no browser-service edge

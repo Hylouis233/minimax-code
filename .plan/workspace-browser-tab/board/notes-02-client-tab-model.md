@@ -26,14 +26,14 @@ Decision authority: ADR 0022
 ## 2. The strip narrows on the kind in 28 places
 
 `packages/webui/src/client/features/workspace/ui/WorkspacePanels.tsx` — the strip's rendering
-narrows on `activeTab?.kind` in 28 places (`const tab = activeTab?.kind ?? "files"` at `:364` is
+narrows on `activeTab?.kind` in 28 places (`const tab = activeTab?.kind ?? "files"` at `:206` is
 the first). With a mutable content, every one of those guards is a place where the content has to
 be read instead.
 
 ## 3. The stale-read hazard: a stable id with a changing content
 
-The file results are cached **by tab id** — `fileResults.get(activeTab.id)` at `:449` and `:485` —
-and the review summary is matched by tab id — `reviewSummary.tabId === activeTab?.id` at `:497` —
+The file results are cached **by tab id** — `fileResults.get(activeTab.id)` at `:291` and `:327` —
+and the review summary is matched by tab id — `reviewSummary.tabId === activeTab?.id` at `:339` —
 while the effects that read them depend on `[activeTab?.id]`. Today the id changes when the
 content does, so the effect re-runs.
 

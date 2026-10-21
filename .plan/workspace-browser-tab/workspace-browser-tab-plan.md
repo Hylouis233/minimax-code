@@ -97,7 +97,7 @@ These are source observations, not claims about what the product does.
 | The panel's input is bound to the panel's own selected target | `client/features/browser/application/browser-commands.ts:282-290` |
 | A workspace tab's id is derived from its kind, so the browser kind is one tab per session and directory | `client/features/workspace/projection/workspace-panel-state.ts:251` |
 | The tab kinds are a fixed enumeration, and the add menu is a separate ordered list | `client/features/workspace/projection/workspace-panel-state.ts:102-133` |
-| The browser panel is mounted by the workspace business as one tab's content, and its kind is the `browser` entry of that enumeration | `client/features/workspace/ui/WorkspacePanels.tsx:25`, `:753` |
+| The browser panel is mounted by the workspace business as one tab's content, and its kind is the `browser` entry of that enumeration | `client/features/workspace/ui/WorkspacePanels.tsx:25`, `:593` |
 | The browser panel is the only place a surface is chosen: it carries the chips that pick between the isolated Chromium and the external browsers, and the target list of the external ones | `client/features/browser/ui/BrowserPanel.public.tsx:207` |
 | `sendBrowserCommand` is wired end to end and has no client caller; the provider implements `navigate`, `reload`, `back`, `forward` and `open_tab` | `client/platform/transport.ts:245`, `isolated-chromium/provider.ts:429-476` |
 | The client has no browser chrome: no address bar, no back/forward, no reload | searched `packages/webui/src/client` for `address`, `omnibox`, `back`, `forward`, `reload` in UI components |
@@ -233,7 +233,7 @@ These are source observations, not claims about what the product does.
   review and the turn review the **same** id, so one overwrites the other and the two can no longer
   share a slot; `:155-157` derives the label from the kind and the review source; and `:299-303`
   narrows the tab shape on `kind === "review"`. In `WorkspacePanels.tsx` the strip's rendering
-  narrows on `activeTab?.kind` in roughly two dozen places, and the file results and the review
+  narrows on `activeTab?.kind` in 28 places, and the file results and the review
   summary are cached **by tab id** while their effects depend on `[activeTab?.id]` — with a stable
   id and a changing content, those effects do not re-run and read a stale entry. Every one of those
   sites has to be re-thought against a mutable content, not swept through a rename.
