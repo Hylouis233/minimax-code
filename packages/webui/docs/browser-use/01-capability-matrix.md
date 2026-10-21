@@ -5,7 +5,7 @@ is:
 
 | Label | Means | Backed by |
 | --- | --- | --- |
-| `measured` | A probe observed this on the machine named in the section heading. | `.plan/browser-use/complete/cdp-evidence.json` or `.plan/browser-use/complete/credential-store-evidence.json` |
+| `measured` | A probe observed this on the machine named in the section heading. | `.plan/browser-use/complete/cdp-evidence.json`, `.plan/browser-use/complete/credential-store-evidence.json` or `.plan/workspace-browser-tab/complete/two-page-spike.json` |
 | `implemented` | The source does this today. The row names the file. | The cited file in this repository |
 | `not yet measured` | An open question. Not a denial and not a promise. | Nothing — see the section that collects them |
 
@@ -265,11 +265,11 @@ a pairing credential. See [`04-pairing-credentials.md`](04-pairing-credentials.m
 Read this section before citing the matrix. Each line is a gap in the evidence, not a known limitation
 of the product.
 
-- **The isolated surface drives exactly one page, and no probe exercised two.** The provider refuses
-  every target that is not the page it launched, so `open_tab` creates a page that nothing can address.
-  Nothing here measures a second page on one surface, and the tab model that needs one
-  ([ADR 0022](../adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md)) is `required`, not
-  `implemented`.
+- **The isolated surface drives exactly one page.** The provider refuses every target that is not the
+  page it launched, so `open_tab` creates a page that nothing can address. **What the browser itself can
+  do with two pages is now `measured`** — see [the workspace browser tab model](#the-workspace-browser-tab-model)
+  and `.plan/workspace-browser-tab/complete/two-page-spike.json`. The gap that remains is the
+  *repository's* provider, not the browser's capability.
 - **The isolated surface's CDP matrix was measured on Chromium only.** The probe ran against the
   bundled Chromium, not against Edge, so the isolated surface's cells describe that browser. Edge
   *was* exercised for the **extension** path — see the real-browser acceptance below — but the
@@ -324,3 +324,150 @@ an unearned capability.
 
 `liveImages` and `input` are `true` for the two bridged surfaces as declarations only. The image stream
 and input paths for those surfaces run over the bridge, and nothing measured here confirms either.
+
+## The workspace browser tab model
+
+[ADR 0022](../adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md) turns the workspace panel into a
+browser tab strip: a tab is a **web tab**, and the panel shows a picture of a live page. That gives the
+tab model its own matrix. It is measured against the **isolated Chromium** — the surface the
+programme's first slice uses — because that is the surface the repository drives itself.
+
+**Measured on the validation host.** `/usr/bin/google-chrome`, `Chrome/152.0.7977.82`, revision
+`@d04cdb24d67b081f6cf80200cfc5233f44b61109` (`two-page-spike.json` → `host.chrome`). The record is
+`.plan/workspace-browser-tab/complete/two-page-spike.json`.
+
+**Probe method.** The spike launches a real Chrome in the provider's own launch shape and speaks CDP
+through the repository's own `WebuiBrowserCdpConnection`
+(`packages/webui/src/runtime/browser/isolated-chromium/cdp-connection.ts`). It attaches to **two**
+pages and exercises them at the same time. It also launches the repository's own
+`WebuiIsolatedChromiumProvider` to record what the provider does today. The two pages are real
+documents served from `127.0.0.1`; no network and no real user content were involved. The spike
+asserts nothing — the record is the evidence.
+
+### What a web tab can do — measured
+
+Every cell in this table is `measured`, and the evidence field is named.
+
+| Capability | Mark | Evidence |
+| --- | --- | --- |
+| Two pages of one isolated Chromium, live at the same time | **measured** | `substrate.pages` — two pages, two distinct target ids and two distinct target sessions |
+| Each page is driven independently | **measured** | `substrate.afterNavigation` — page A answers `Page A`, page B answers `Page B2` |
+| Each page is streamed independently | **measured** | `substrate.framesAtTheEnd.byEnvelopeSession` — A: 1 frame, B: 3 frames, from two different target sessions; `substrate.frameIdentityIsSufficient.bothPagesStreamedAtTheSameTime` is `true` |
+| Each page is input into independently | **measured** | `substrate.input` — page A's field reads `alpha`, page B's reads `bravo`; `independent` is `true` |
+| A navigation on the second page advances **that** page's generation and leaves the first alone | **measured** | `substrate.generation` — A stays `1`, B goes `1` → `2` |
+| A reference recorded against a page's previous generation is refused | **measured** | `substrate.fence.staleReferenceOnNavigatedPage` — refused with `browser_target_stale` |
+| A reference against the untouched page's current generation is still accepted | **measured** | `substrate.fence.currentReferenceOnUntouchedPage` — `accepted: true` |
+| The frame's page is resolved from the **envelope's** session id | **measured** | `substrate.frameRouting` — the envelope's `event.sessionId` resolves to a page for every frame; `event.params.sessionId` resolves to none |
+
+**The frame's identity, in one line.** The envelope's `event.sessionId` is the target session — a
+string, put on the event by the CDP connection (`cdp-connection.ts:234`, `:237`) — and it identifies the
+page. `event.params.sessionId` is the **number** `1` for frames from *both* pages
+(`substrate.frameRouting.paramsSessionIdValues`), and identifies nothing. A screencast frame is
+routed by the envelope.
+
+### What this repository does today
+
+`not yet measured` in this table means the source does not do this yet, and the row names the ticket
+that closes it. It is a gap, not a denial.
+
+| Capability | Mark | Where it stands |
+| --- | --- | --- |
+| The provider drives one page per web tab | **not yet measured** | `provider.ts:405`, `:266` and `:317` refuse every target that is not the launch page. #201 |
+| The generation advances per page | **not yet measured** | `provider.ts:251` reports a constant `1` for every other page; `provider.ts:229` sends `Page.enable` to one session only; `provider.ts:532` raises one page's generation. #201 |
+| A frame is routed to the page that asked for it | **not yet measured** | `provider.ts:543` stamps **every** screencast frame with the provider's own target id. #201 |
+| The image stream is keyed by target | **not yet measured** | `browser-service.ts:180` keys the frame subscribers by surface and then by **run**. #204 |
+| The runtime publishes the session's web tabs as a snapshot | **not yet measured** | no such operation exists. #203 |
+| The Agent opens tabs and gives a run its first selection | **not yet measured** | `tool-adapter.ts:163` refuses a run that has selected nothing, so the Agent cannot acquire a selection of its own and `open_tab` is refused with it. #206 |
+| The client's tab is a stable id with a mutable content | **not yet measured** | `workspace-panel-state.ts:251` derives the id from the kind and its parts, so there is no stable id for a web tab whose page changes under it. #207 |
+| The frame operation's request names a target | **not yet measured** | `operation-names.ts:458` takes `{ surface, runId? }`. #204 |
+| The provider's attachment retry | **implemented** | `provider.ts:588` — the mechanism is cited in full above |
+| The files tab is a singleton | **implemented** | `workspace-panel-state.ts:289` drops every `files` tab before adding one |
+| The two review tabs share one id | **implemented** | `workspace-panel-state.ts:279` and `:283` derive the same `tabId("review", sessionId, workspaceDir)` |
+| A tab's label is derived from its kind | **implemented** | `workspace-panel-state.ts:154` |
+| The provider refuses a second page rather than sending a command to the wrong one | **implemented** | `provider.ts:410` — the comment says why, and the refusal is measured today: `phases.provider.driveNewPageNavigate`, `.driveNewPageInput` and `.streamNewPage` are all `browser_target_unknown` |
+
+**One number worth stating plainly.** The provider's `open_tab` **does** create a page: the page count
+goes from 2 to 3 (`phases.provider.pageCount`) and the new page is listed by `listTargets` with its own
+target id (`phases.provider.newPageIdentity`). What does not exist is any way to *address* it. That is
+the whole gap the programme closes, and it is a gap in this repository, not in the browser.
+
+### The fence, on every page
+
+The fence is what makes a reference to a page that has been replaced detectable. The spike shows it
+working on a page that is **not** the one the browser was launched with:
+
+| Page | What happened | Result |
+| --- | --- | --- |
+| B (navigated) | its generation advanced `1` → `2`; a reference recorded against generation `1` was offered | refused with `browser_target_stale` |
+| A (untouched) | its generation stayed `1`; a reference recorded against generation `1` was offered | accepted |
+
+A fence that only works on the launch page is a fence that does not work. The repository's fence today
+is the launch page's fence only: `provider.ts:328` compares the command's generation against the one
+generation the provider holds, and there is one of them.
+
+### The registration cost of the new operation
+
+The programme adds one operation that publishes the session's web tabs. Registering it costs the
+**eight** sites below, and every one of them is a place where a change that is forgotten shows up as a
+missing capability rather than as an error.
+
+| Site | Where | What the new operation needs |
+| --- | --- | --- |
+| The capability manifest's `browser.ready` list | `packages/webui/src/shared/capability-manifest.ts:143` | the operation's name joins the list. A `ready` member that is not wired makes the whole browser family **not-ready** (`capability-manifest.ts:202`), not absent — a quiet degradation |
+| The operation-name constants | `packages/webui/src/shared/operation-names.ts:51` | one new `as const` constant beside the eight browser names |
+| The operation spec | `packages/webui/src/shared/operation-names.ts:458` | one row naming the request and the response type, beside `watchBrowserFrames` |
+| The contract type | `packages/webui/src/shared/contracts/browser.ts` | the request and response types live here; `watchBrowserFrames` has none of its own, so the new operation introduces one |
+| The operation registry | `packages/webui/src/server/operation/operations.ts:162` | one `registerOperation(registry, entry("<name>"))` line inside the `if (browser)` block. **The order is a wire contract** (`operations.ts:69`) |
+| The server handler | `packages/webui/src/server/operation/handlers/browser.ts:127` | a dedicated handler. A stream handler returns `{ stream: { ok: true, source } }` and lets the service's generator raise the errors — the handler does not catch them |
+| The port member and its implementation | `packages/webui/src/runtime/port.ts:637` and `packages/webui/src/runtime/harness/browser.ts:206` | the member on `WebuiBrowserPort` and its body in `createBrowserPort` |
+| The transport's request table | `packages/webui/src/client/platform/transport.ts:232` | the client's request builder; a stream also needs the wire session in `packages/webui/src/client/platform/wire.ts:144` and `:373` |
+
+**There is no `bind()` row to add.** The browser operations are dedicated handlers, not bindings: the
+`WEBUI_OPERATION_BINDINGS` table (`packages/webui/src/server/operation/bind-handlers.ts:149`) has no
+browser entry, and there is no `RuntimeGroups.browser` group to extend.
+
+### The plumbing cost of a new source file and a new test file
+
+| What | Where | What it costs |
+| --- | --- | --- |
+| The frozen path metadata fixture | `packages/webui/test/gates/fixtures/path-metadata-f00.json` | a new source path needs an entry, classified by the **frozen** baseline classifier. The fixture's own README says not to regenerate expectations from the current classifier: strip only `.public` before the TypeScript suffix, then run the frozen classifier against the path and review any mismatch separately |
+| The declared Vitest suite groups | `packages/webui/test/vitest-suites.json` | a new Vitest file is appended to `suites.webui`. This JSON is the single source — no `package.json` script and no Vitest config change |
+| The source inventory | `release/public-source.json` | regenerate with `node scripts/source-inventory.mjs --write`; `pnpm check:source` reads it. The inventory scans the working tree, including untracked files, so a scratch file left in the repository becomes a publication problem |
+| The Playwright spec directory | `packages/webui/test/browser/` | a real-browser spec lands here. A test that drives the **isolated Chromium runtime** is not a Playwright spec: it belongs in `packages/webui/test/integration/`, beside `browser-use-real-input.test.ts`, and is a Vitest suite |
+
+### The tab-model inventory, checked against the tree
+
+The inventory the research notes name, checked against the code as it stands. Every row is real.
+
+| Site | Where | What it is |
+| --- | --- | --- |
+| The files-tab singleton | `workspace-panel-state.ts:289` | `open-primary-view` drops **every** `files` tab before adding one — the singleton is enforced by deletion, not by a lookup |
+| The two review tabs that share one id | `workspace-panel-state.ts:279` and `:283` | the workspace's change set and a turn's review derive the **same** id, `tabId("review", sessionId, workspaceDir)`. One of them replaces the other |
+| The label derived from the kind | `workspace-panel-state.ts:154` | `webuiWorkspaceTabLabel` switches on `tab.kind` |
+| The `kind === "review"` narrowing | `workspace-panel-state.ts:156`, `:299`, `:302`, `:303`; `WorkspacePanels.tsx:332`, `:337`, `:338`, `:340`, `:341` | the two review sources are told apart by narrowing on the kind and then on the source |
+| The `activeTab?.kind` guards | `WorkspacePanels.tsx` | **28** of them |
+| The caches keyed by a tab id whose effects depend on `[activeTab?.id]` | `WorkspacePanels.tsx:291`, `:306`, `:309`, `:325`, `:327`, `:330`, `:337`, `:347`, `:353`, `:417` | the file-results cache, the review summary, the review search and the review diffs are all keyed by the tab id, and their effects re-run when that id changes |
+
+**Why that breaks under a mutable content.** A tab's id is derived from its kind and its parts
+(`workspace-panel-state.ts:251`), and a web tab's page changes without the kind changing. The
+caches above are keyed by the id and their effects are keyed by the id, so a content that changes
+under a stable id leaves a stale picture on screen: the cache says the tab is showing generation 1
+while the page behind it is generation 2. The id has to become stable and the content has to become
+the thing that changes — which is what #207 does.
+
+### Not yet measured — the tab model's open questions
+
+- **The two-page case was measured on the substrate, not through the provider.** The provider cannot
+  hold two pages today, so the spike drove the CDP connection directly to find out what the browser
+  can do. The provider's own per-target map is #201, and the same spike re-run against it is what
+  closes this question.
+- **The frame mis-stamping count is a modelled consequence, not a provider observation.**
+  `substrate.currentProviderFrameRule` applies the provider's current rule to the frames the spike
+  observed, because the provider cannot stream a second page at all. It is arithmetic over a
+  measurement, and it is labelled as such in the record.
+- **Nothing end-to-end has been measured.** The client's tab model, the strip, the new tab page, the
+  toolbar and the two selections are not exercised by any suite yet. #208, #209, #210, #211 and #212
+  are where that happens.
+- **The bridged surfaces have no tab model at all.** Everything measured here is the isolated
+  Chromium. The extension bridge exposes one visible tab per browser, so a tab strip over it is a
+  different question and was not asked.
