@@ -12,6 +12,12 @@
 // rules are right: a foreign business must not be able to construct another
 // business's state. It may only ask the owner to.
 //
+// The host is now keyed by **a target**, not by a switchable surface. Edge and
+// Chrome are reached in the person's own windows, and the only surface the
+// host is ever pointed at is the isolated Chromium: a web tab is the
+// isolated Chromium's page, and the tab decides which target the host is on.
+// The surface-switcher that used to sit at the top of `BrowserPanel` is gone.
+//
 // The authorization switches are not here any more: they are settings, and they
 // live in the Settings page now. What is left in the panel is the answer —
 // whether the surface on screen is authorized — and it comes from the browser
@@ -52,13 +58,15 @@ import { BrowserPanel } from "./BrowserPanel.public.js";
 
 export interface BrowserPanelHostProps {
   /**
-   * The surface the panel is showing.
+   * The target the panel is showing.
    *
-   * The isolated Chromium by default; the person's own Edge or Chrome once the
-   * panel is pointed at them. Changing it re-reads the targets and re-opens the
-   * live image stream for the new surface.
+   * The strip passes the web tab's target here, and the host reads the
+   * surface off the target. Edge and Chrome are no longer reachable from the
+   * panel — they are driven in the person's own windows — so a target that
+   * names another surface is left to show the unauthorized notice rather
+   * than being hidden by a switcher.
    */
-  readonly surface?: WebuiBrowserSurface;
+  readonly target?: WebuiBrowserTargetId;
   /**
    * The port.
    *
@@ -82,7 +90,7 @@ export interface BrowserPanelHostProps {
 }
 
 export function BrowserPanelHost({
-  surface: surfaceProp,
+  target: targetProp,
   port: portProp,
   runId: runIdProp,
 }: BrowserPanelHostProps): ReactElement {
@@ -92,7 +100,11 @@ export function BrowserPanelHost({
     reduceWebuiBrowserPanelState,
     initialWebuiBrowserPanelState,
   );
-  const surface = surfaceProp ?? state.surface;
+  // The target the strip or the run handed us is the surface-bearing one; the
+  // state still carries a `surface` because the reducer and the stream key
+  // both want it, but the only writes it gets now are derived from the
+  // target's surface, never from a switcher click.
+  const surface = targetProp?.surface ?? state.surface;
   const activeRunId = useWebuiBrowserRunId();
   const runId = runIdProp ?? activeRunId;
   const runScope = useMemo(() => (runId ? { runId } : {}), [runId]);
@@ -173,6 +185,8 @@ export function BrowserPanelHost({
     };
   }, [port]);
 
+  // A target's surface moves the panel to that surface — the same effect the
+  // old switcher used to drive, only the input is a target rather than a click.
   useEffect(() => {
     if (surface !== state.surface) {
       dispatch({ type: "surface-changed", surface });
@@ -266,7 +280,6 @@ export function BrowserPanelHost({
         port={port}
         state={state}
         onSelectTarget={onSelectTarget}
-        onSurfaceChange={(next) => dispatch({ type: "surface-changed", surface: next })}
         onSendInput={onSendInput}
         onRejected={onRejected}
       />

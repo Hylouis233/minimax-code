@@ -22,6 +22,13 @@ import { WebuiMarkdown } from "../../transcript/ui/markdown.public.js";
 // The browser panel is another business's published surface. The workspace
 // may mount it and hand it a surface; it may not construct the browser
 // state itself, which is why the host component exists.
+//
+// The strip itself lives in `WebuiWorkspaceTabStrip.public.tsx` — this file
+// is over the size that "everything about the panel" fits in, and the strip
+// is the part that crosses into the browser business through its published
+// port. The strip subscribes to `watchBrowserWebTabs` and, for the active
+// web tab, this file mounts `BrowserPanelHost` with the tab's target.
+import { BrowserPanelHost } from "../../browser/ui/BrowserPanelHost.public.js";
 import type { WebuiFileDiffInfoView } from "../../../../shared/contracts/session.js";
 import type {
   WebuiWorkspaceFile,
@@ -42,7 +49,6 @@ import {
   webuiWorkspaceAddMenu,
   webuiWorkspaceReviewContent,
   webuiWorkspaceTabContentKey,
-  webuiWorkspaceTabLabel,
 } from "../projection/workspace-panel-state.js";
 import { focusWebuiFileLine, webuiFileLineTargetId } from "../../../bindings/browser-effects.js";
 import {
@@ -69,6 +75,7 @@ import {
 } from "../../../bindings/use-query-state.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { WebuiDropdown } from "../../../ui/Dropdown.js";
+import { WebuiWorkspaceTabStrip } from "./WebuiWorkspaceTabStrip.public.js";
 import { webuiFileLanguage, projectWebuiUnifiedDiffLines, isWorkspaceArchivePath, isWorkspaceHtmlPath } from "../projection/panel-projection.js";
 // `mergeWorkspaceFileChildren`, `chunkWebuiWorkspaceReviewFileIds` and
 // `WEBUI_WORKSPACE_REVIEW_DIFF_BATCH_SIZE` are re-exported below: the panel
@@ -207,7 +214,6 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   const reviewSearch = queryState.reviewSearch;
   const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId);
   const tab = activeTab?.content.kind ?? "files";
-  const tabListRef = useRef<HTMLDivElement>(null);
   const fileTreeScrollRef = useRef<HTMLDivElement>(null);
   const autoNavigationRequests = useRef(new Set<string>());
   const [fileSearch, setFileSearch] = useState("");
@@ -311,9 +317,6 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   }, [activeWorkspace, queries]);
   useEffect(() => {
     setFileCodeMode(activeTab?.content.kind === "file-preview" && activeTab.content.lineStart !== undefined);
-  }, [activeTab?.id]);
-  useEffect(() => {
-    tabListRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [activeTab?.id]);
   useEffect(() => {
     if (!activeWorkspace) return;
@@ -501,11 +504,8 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     // its commands are stable, so a panel drag cannot re-run this effect and
     // rebuild a shell that is running.
   }, [terminalTargetId, terminalOwner, tab]);
-  // The label rule lives in the registry; the icon below is the host render
-  // branch the registry is allowed to have.
-  const tabLabel = (item: WorkspacePanelTab): string => webuiWorkspaceTabLabel(item);
   // The registry carries the kinds, their words and how each opens; the glyphs are
-  // this file's.
+  // this file's. The tab glyphs the strip needs live in the strip itself.
   const addMenuGlyph = (kind: WebuiWorkspaceTabKind) => {
     switch (kind) {
       case "review":
@@ -520,25 +520,10 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
         return null;
     }
   };
-  const fileTabGlyph = (item: WorkspacePanelTab) => {
-    if (item.content.kind === "files") return <WebuiIconFile className="webui-workspace-tab-file-icon" />;
-    if (item.content.kind !== "file-preview") return null;
-    const extension = item.content.path.split(/[./\\]/u).at(-1)?.toLowerCase();
-    if (extension === "md" || extension === "mdx") return <span className="webui-workspace-filetype-badge is-markdown" aria-hidden="true">M↓</span>;
-    if (["js", "jsx", "mjs", "cjs"].includes(extension ?? "")) return <span className="webui-workspace-filetype-badge is-javascript" aria-hidden="true">JS</span>;
-    if (["ts", "tsx", "mts", "cts"].includes(extension ?? "")) return <span className="webui-workspace-filetype-badge is-typescript" aria-hidden="true">TS</span>;
-    if (extension === "json") return <span className="webui-workspace-filetype-badge is-json" aria-hidden="true">{ }</span>;
-    return <WebuiIconDiffFile fileName={item.content.path} className="webui-workspace-tab-file-icon" />;
-  };
   return <aside className={`webui-workspace-panel ${state.expanded ? "is-expanded" : ""}`} data-testid="workspace-panel" data-active-tab={tab}>
     <div className="webui-workspace-panel-header">
       <div className="webui-workspace-tabs" role="tablist" aria-label="工作区面板标签">
-        <div className="webui-workspace-tab-list" ref={tabListRef}>
-          {state.tabs.map((item) => <div key={item.id} className={`webui-workspace-tab ${state.activeTabId === item.id ? "is-active" : ""}`} role="presentation">
-            <button type="button" role="tab" aria-selected={state.activeTabId === item.id} onClick={() => dispatch({ type: "select-tab", tabId: item.id })}>{fileTabGlyph(item)}<span className="webui-workspace-tab-label">{tabLabel(item)}</span></button>
-            <button type="button" aria-label={`${tabLabel(item)} ${DESKTOP_COPY.fileClose}`} onClick={() => dispatch({ type: "close-tab", tabId: item.id })}><WebuiIconClose className="size-3" /></button>
-          </div>)}
-        </div>
+        <WebuiWorkspaceTabStrip state={state} dispatch={dispatch} />
         <WebuiDropdown
           open={state.addMenuOpen}
           // The reducer only knows how to toggle, so closing is the toggle it
@@ -550,7 +535,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
           ariaLabel="添加工作区标签"
           wrapperClassName="webui-workspace-add-anchor"
           className="webui-workspace-add-menu"
-          trigger={(triggerProps) => { const { ref, ...rest } = triggerProps; return <button type="button" {...rest} ref={ref} className="webui-workspace-add-trigger" aria-label="添加标签">+</button>; }}
+          trigger={(triggerProps) => { const { ref, ...rest } = triggerProps; return <button type="button" {...rest} ref={ref} className="webui-workspace-add-trigger" aria-label="添加工具标签">+</button>; }}
         >
           {webuiWorkspaceAddMenu().map((entry) => {
             // Bound to a const so the discriminated union narrows in the branch below.
@@ -604,6 +589,12 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
       {turnReviewFiles.length ? <div className="webui-turn-review-files">{turnReviewFiles.map((file) => <WebuiDiffFileSection key={file.file} file={file} selected={selectedReviewPath === file.file} />)}</div> : <p className="webui-turn-review-empty">本轮没有可审查的文件差异。</p>}
     </div> : null}
     {tab === "canvas" ? <WorkspaceCanvas sessionId={activeSessionId} /> : null}
+    {tab === "web" && activeTab?.content.kind === "web" ? <div className="webui-workspace-web-tab" data-testid="workspace-web-tab" data-tab-id={activeTab.id}>
+      <BrowserPanelHost target={activeTab.content.target} />
+    </div> : null}
+    {tab === "launcher" && activeTab?.content.kind === "launcher" ? <div className="webui-workspace-launcher" data-testid="workspace-launcher">
+      <p className="webui-workspace-launcher-placeholder">新建标签页</p>
+    </div> : null}
     {tab === "terminal" && terminalAvailability ? <p role="status" data-webui-terminal-availability={terminalSupport}>{terminalAvailability}</p> : null}
     {tab === "terminal" && terminalError && terminals.length === 0 ? <p role="alert">{terminalError}</p> : null}
     {tab === "terminal" ? <div className="webui-terminal-empty">{!terminalsReady ? <><p>{DESKTOP_COPY.terminalLoading}</p></> : terminals.length === 0 ? <><strong>{DESKTOP_COPY.terminalEmptyTitle}</strong><p>{DESKTOP_COPY.terminalEmptyDescription}</p></> : <><div className="webui-terminal-tabs">{terminals.map((terminal, index) => <button type="button" key={String(terminal.terminalId)} className={`file-tab group/tab-close h-8 w-40 min-w-20 ${String(terminal.terminalId) === (activeTerminalId ?? String(terminals[0]?.terminalId)) ? "bg-bg_interaction_tertiary_selected" : ""}`} onClick={() => setActiveTerminalId(String(terminal.terminalId))}><span>#{index + 1}</span>{terminal.status === "exited" ? DESKTOP_COPY.terminalExited : DESKTOP_COPY.terminalLabel}<span className="file-tab-close opacity-0 group-hover/tab-close:opacity-100"><WebuiIconClose className="size-[14px]" /></span></button>)}</div><div ref={terminalHost} className="webui-xterm-host" />{terminalError ? <p role="alert">{terminalError}</p> : null}<div className="webui-terminal-actions"><button type="button" disabled={terminalCreateDisabled} title={terminalCreateReason} onClick={createTerminal}>{DESKTOP_COPY.newTerminal}</button><button type="button" onClick={() => { const active = terminals.find((candidate) => String(candidate.terminalId) === (activeTerminalId ?? String(terminals[0]?.terminalId))); if (active && terminalOwner?.canDispose) void terminalOwner.disposeProcess(String(active.terminalId)).then(() => syncTerminalsFromOwner(terminalOwner)); }}>{DESKTOP_COPY.fileClose}</button></div></> }{terminalsReady && terminals.length === 0 ? <button type="button" disabled={terminalCreateDisabled} title={terminalCreateReason} onClick={createTerminal}>{DESKTOP_COPY.newTerminal}</button> : null}</div> : null}

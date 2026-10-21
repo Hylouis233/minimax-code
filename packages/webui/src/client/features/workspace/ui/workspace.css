@@ -195,6 +195,14 @@
   .webui-workspace-tab button:first-child { width: 100%; min-width: 0; height: 100%; justify-content: flex-start; gap: var(--spacing_8); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .webui-workspace-tab-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .webui-workspace-tab-file-icon { width: 16px; height: 16px; flex: 0 0 16px; }
+  /* The strip owns the per-tab glyphs for the new kinds. The default glyphs
+   * used here are placeholders — a dot for a web tab and a "+" for the
+   * launcher — until the icons the design settles on are available. The
+   * icons themselves are added by the next programme step, and the strip
+   * does not fetch a favicon. */
+  .webui-workspace-tab-glyph { width: 16px; height: 16px; flex: 0 0 16px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; line-height: 1; }
+  .webui-workspace-web-glyph { color: var(--icon_default_secondary, #5b6473); }
+  .webui-workspace-launcher-glyph { color: var(--icon_default_secondary, #5b6473); font-weight: 600; }
   .webui-workspace-filetype-badge { display: inline-flex; width: 16px; height: 16px; flex: 0 0 16px; align-items: center; justify-content: center; font-family: ui-monospace, monospace; font-size: 9px; font-weight: 600; line-height: 1; }
   .webui-workspace-filetype-badge.is-markdown { color: var(--text_default_accent); }
   .webui-workspace-filetype-badge.is-javascript { border-radius: 2px; background: #f4d54e; color: #403600; }
@@ -218,6 +226,13 @@
   .webui-workspace-add-anchor { position: relative; z-index: 4; flex: 0 0 auto; }
   .webui-workspace-add-trigger { width: 32px; height: 32px; border-radius: 8px; background: var(--bg_default_secondary); color: var(--text_default_primary); font-size: 18px; line-height: 1; }
   .webui-workspace-add-trigger:hover, .webui-workspace-panel-actions button:hover { background: var(--bg_interaction_tertiary_hover); }
+  /* The strip's "+" opens the new tab page (the launcher tab). It is a
+   * separate trigger from the add-menu's "+", which opens a tool tab — a
+   * separate kind of open — and they sit next to each other in the panel
+   * header. The strip's trigger lives inside the row of tabs, the add
+   * menu's trigger sits outside it. */
+  .webui-workspace-new-tab-trigger { width: 28px; height: 28px; flex: 0 0 28px; border-radius: 6px; background: transparent; color: var(--icon_default_secondary, #5b6473); font-size: 16px; line-height: 1; }
+  .webui-workspace-new-tab-trigger:hover { background: var(--bg_interaction_tertiary_hover); color: var(--text_default_primary); }
   .webui-workspace-panel-actions { flex: 0 0 auto; gap: var(--spacing_8); padding-left: var(--spacing_4); }
   .webui-workspace-panel-actions button { width: 32px; height: 32px; flex: 0 0 32px; border-radius: 8px; color: var(--icon_default_secondary); }
   .webui-workspace-panel-close { color: var(--icon_default_secondary); }

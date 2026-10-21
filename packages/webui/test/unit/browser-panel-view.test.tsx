@@ -7,6 +7,11 @@
 // uniquely good at proving: that the picture is an `<img>` over a `data:` URL and
 // not an embedded document, and that the switch row a Settings page mounts is
 // four independent switches with Full CDP apart from the other three.
+//
+// The surface switcher that used to sit at the top of the panel is gone now:
+// Edge and Chrome are reached in the person's own windows, and the only surface
+// the panel is ever pointed at is the isolated Chromium. The test no longer
+// asserts the three-button row.
 
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
@@ -175,14 +180,16 @@ describe("the Browser panel", () => {
     expect(markup).toContain("浏览器提供方不可用。");
   });
 
-  it("names each of the three browser surfaces and whether it is authorized", () => {
+  it("does not carry a surface switcher any more", () => {
+    // The surface switcher used to show three radio buttons — one per surface
+    // the service knows about. That row is gone now: Edge and Chrome are
+    // reached in the person's own windows, and the only surface the panel sees
+    // is the isolated Chromium.
     const markup = renderToStaticMarkup(<BrowserPanel port={wiredPort} state={loadedState()} />);
 
-    expect(markup).toContain('data-testid="browser-surface-isolated-chromium"');
-    expect(markup).toContain('data-testid="browser-surface-edge"');
-    expect(markup).toContain('data-testid="browser-surface-chrome"');
-    expect(markup).toContain('data-authorized="true"');
-    expect(markup).toContain('data-authorized="false"');
+    expect(markup).not.toContain('data-testid="browser-surface-isolated-chromium"');
+    expect(markup).not.toContain('data-testid="browser-surface-edge"');
+    expect(markup).not.toContain('data-testid="browser-surface-chrome"');
   });
 
   describe("capability states", () => {

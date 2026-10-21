@@ -52,7 +52,7 @@ still says something is not implemented, that is because it is not — the per-r
 | `packages/webui/src/server/browser-bridge/admission.ts`, `pairing.ts`, `session.ts`, `registry.ts`, `reconnect.ts` | `implemented` and **wired** into the server's upgrade path and the browser service; target-ownership routing fixed (F4) | `02`, `03` |
 | `packages/webui/src/shared/operation-names.ts` | `implemented` — eight browser operations registered, including `sendBrowserCommand` (F5) | `06` |
 | `packages/browser-extension/` | `implemented` — MV3 service worker, `chrome.storage.local` credential, Web Crypto signing | `02`, `04` |
-| The tab model of ADR 0022 | `required` — decided, not in the tree: the Agent cannot acquire a selection, the provider drives one page, and the frame stream is per run | `05`, `07` |
+| The tab model of ADR 0022 | `implemented` for the strip, the surface-switcher deletion and the launcher content kind — the workspace's reducer carries a `launcher` content, the strip renders tool tabs and web tabs in one row, and `BrowserPanelHost` is keyed by a target rather than a switchable surface; the rest of the model (the toolbar, the tile launcher, the run-vs-tab split, the acceptance record) is `required` and lives in later issues | `01`, `05`, `07` |
 
 The *measurements* in these documents were never affected by the tree moving. They come from the probe
 artifacts, not from the source. What moved was the implementation status, and that is what this pass

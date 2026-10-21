@@ -75,6 +75,17 @@ export type WebuiWorkspaceTabContent =
       readonly title: string;
       /** The page's url, as the runtime publishes it. */
       readonly url: string;
+    }
+  | {
+      /**
+       * The new tab page.
+       *
+       * Opened by the strip's "new tab" affordance. The launcher UI itself —
+       * tiles and URL box — is the next programme step and is added by the
+       * following issue; this kind exists now so the strip can open a tab as
+       * the new tab page rather than as a placeholder for an empty tab list.
+       */
+      readonly kind: "launcher";
     };
 
 /** The content's kinds — the closed set, derived from the content itself. */
@@ -124,6 +135,8 @@ export function webuiWorkspaceTabContentKey(content: WebuiWorkspaceTabContent): 
       }`;
     case "web":
       return `web:${content.target.browserId}:${content.target.targetId}`;
+    case "launcher":
+      return "launcher";
     default:
       return `${content.kind}:${content.sessionId ?? ""}:${content.workspaceDir ?? ""}`;
   }
@@ -161,6 +174,14 @@ export const WEBUI_WORKSPACE_TAB_KINDS: Readonly<
    * stand for is gone.
    */
   web: { label: "网页", addMenu: null },
+  /**
+   * The new tab page.
+   *
+   * It has no add-menu entry of its own: the strip opens the launcher tab as
+   * the trailing tab whenever the person asks for a new one, and the launcher
+   * itself is the next programme step.
+   */
+  launcher: { label: "新建标签页", addMenu: null },
 };
 
 /**
@@ -471,7 +492,27 @@ export function reduceWorkspacePanelState(state: WorkspacePanelState, command: W
           candidate.target.browserId === command.target.browserId &&
           candidate.target.targetId === command.target.targetId,
       );
-      if (existing) return activate(state, { ...existing, content });
+      if (existing) {
+        // The page behind the tab moved: the content updates under a tab that
+        // is already open, and the person keeps looking at whatever they were
+        // looking at. A snapshot that changes nothing changes nothing here
+        // either, so the panel is not re-rendered for no reason.
+        const current = existing.content;
+        if (
+          current.kind === "web" &&
+          current.title === content.title &&
+          current.url === content.url &&
+          current.target.generation === content.target.generation
+        ) {
+          return state;
+        }
+        return {
+          ...state,
+          tabs: state.tabs.map((tab) =>
+            tab.id === existing.id ? { ...existing, content } : tab,
+          ),
+        };
+      }
       return openNewTab(state, content);
     }
     case "open-primary-view": {
@@ -495,6 +536,16 @@ export function reduceWorkspacePanelState(state: WorkspacePanelState, command: W
       };
       const existing = tabShowing(state, (candidate) => isSameInstance(candidate, command.kind, command.sessionId, command.workspaceDir));
       if (existing) return activate(state, { ...existing, content });
+      return openNewTab(state, content);
+    }
+    case "open-new-tab": {
+      const content: WebuiWorkspaceTabContent = { kind: "launcher" };
+      // The new tab page is a singleton: only one of them shows, no matter how
+      // many times the strip's "+" was pressed. Re-opening the launcher
+      // activates what is already there, and a strip that hid it (last tab
+      // closed) restores it.
+      const existing = tabShowing(state, (candidate) => candidate.kind === "launcher");
+      if (existing) return activate(state, existing);
       return openNewTab(state, content);
     }
     case "select-tab":

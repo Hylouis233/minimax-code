@@ -186,6 +186,66 @@ describe("right workspace panel navigation", () => {
     expect(state.activeTabId).toBe(firstId);
   });
 
+  it("opens one launcher tab when the strip asks for one", () => {
+    let state = initialWorkspacePanelState;
+    state = reduceWorkspacePanelState(state, { type: "open-new-tab" });
+    expect(state.open).toBe(true);
+    expect(state.tabs).toHaveLength(1);
+    expect(state.tabs[0]?.content.kind).toBe("launcher");
+    // The launcher carries no payload of its own: the strip is its opening, and
+    // the launcher UI itself is the next programme step.
+    expect(state.tabs[0]?.content).toEqual({ kind: "launcher" });
+    expect(state.activeTabId).toBe(state.tabs[0]?.id);
+  });
+
+  it("keeps one launcher tab per session no matter how many times the strip asks", () => {
+    let state = initialWorkspacePanelState;
+    state = reduceWorkspacePanelState(state, { type: "open-new-tab" });
+    state = reduceWorkspacePanelState(state, { type: "open-new-tab" });
+    state = reduceWorkspacePanelState(state, { type: "open-new-tab" });
+    const launchers = state.tabs.filter((tab) => tab.content.kind === "launcher");
+    expect(launchers).toHaveLength(1);
+  });
+
+  it("activates the launcher that is already there when the strip asks again", () => {
+    let state = initialWorkspacePanelState;
+    state = reduceWorkspacePanelState(state, { type: "open-new-tab" });
+    const launcherId = state.activeTabId;
+    // A second tab of another kind takes the active slot; the strip's "+"
+    // arrives again, and what it means is "back to the new tab page", not
+    // "open another launcher".
+    state = reduceWorkspacePanelState(state, { type: "open-tab", kind: "files", sessionId: "s", workspaceDir: "/w" });
+    expect(state.activeTabId).not.toBe(launcherId);
+    state = reduceWorkspacePanelState(state, { type: "open-new-tab" });
+    expect(state.activeTabId).toBe(launcherId);
+    expect(state.tabs.filter((tab) => tab.content.kind === "launcher")).toHaveLength(1);
+  });
+
+  it("updates a web tab's content without moving the person off the tab they are on", () => {
+    let state = initialWorkspacePanelState;
+    const target = { surface: "isolated-chromium", browserId: "b", targetId: "t1", generation: 1 } as const;
+    state = reduceWorkspacePanelState(state, { type: "open-web-tab", target, title: "First", url: "https://example.test/one" });
+    const webTabId = state.activeTabId;
+    // A tool tab the person is looking at.
+    state = reduceWorkspacePanelState(state, { type: "open-tab", kind: "files", sessionId: "s1", workspaceDir: "/repo" });
+    const filesTabId = state.activeTabId;
+
+    // The page behind the web tab navigated: the title moved and the page got
+    // a new generation. The web tab's content updates — and the person keeps
+    // looking at the tab they were looking at.
+    state = reduceWorkspacePanelState(state, {
+      type: "open-web-tab",
+      target: { ...target, generation: 2 },
+      title: "Second",
+      url: "https://example.test/two",
+    });
+
+    expect(state.activeTabId).toBe(filesTabId);
+    const web = state.tabs.find((tab) => tab.id === webTabId);
+    expect(web?.content).toMatchObject({ kind: "web", title: "Second", url: "https://example.test/two" });
+    expect(web?.content.kind === "web" && web.content.target.generation).toBe(2);
+  });
+
   it("labels a tab by its content, and a changed content changes the label", () => {
     let state = initialWorkspacePanelState;
     state = reduceWorkspacePanelState(state, { type: "open-file", sessionId: "s1", workspaceDir: "/repo", path: "src/index.ts" });

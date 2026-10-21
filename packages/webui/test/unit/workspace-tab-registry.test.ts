@@ -54,14 +54,18 @@ describe("the kinds are declared once", () => {
   });
 
   it("carries every kind the host can open, and no label of its own", () => {
-    const component = flat(read("features/workspace/ui/WorkspacePanels.tsx"));
+    const workspaceUi = flat(read("features/workspace/ui/WorkspacePanels.tsx"))
+      + flat(read("features/workspace/ui/WebuiWorkspaceTabStrip.public.tsx"));
     // The label map is gone; the words come from the registry.
-    expect(component).not.toContain('{ files: "查看文件"');
-    expect(component).toContain("webuiWorkspaceTabLabel(item)");
+    expect(workspaceUi).not.toContain('{ files: "查看文件"');
+    // The strip is what carries the tab labels and the registry's render now:
+    // the `webuiWorkspaceTabLabel(...)` reading lives in the strip's own file,
+    // the only place the row's label is computed.
+    expect(workspaceUi).toContain("webuiWorkspaceTabLabel(item)");
     // The menu is built from the registry, never re-listed...
-    expect(component).toContain("webuiWorkspaceAddMenu().map(");
+    expect(flat(read("features/workspace/ui/WorkspacePanels.tsx"))).toContain("webuiWorkspaceAddMenu().map(");
     for (const entry of webuiWorkspaceAddMenu()) {
-      expect(component).not.toContain(`<span>${entry.label}</span>`);
+      expect(workspaceUi).not.toContain(`<span>${entry.label}</span>`);
     }
   });
 });

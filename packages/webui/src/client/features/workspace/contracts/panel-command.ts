@@ -28,6 +28,14 @@ export type WorkspacePanelCommand =
    */
   | { readonly type: "open-web-tab"; readonly target: WebuiBrowserTargetId; readonly title: string; readonly url: string }
   | { readonly type: "open-tab"; readonly kind: WebuiWorkspaceMenuTabKind; readonly sessionId?: string; readonly workspaceDir?: string }
+  /**
+   * Open the new tab page.
+   *
+   * Dispatched by the strip's "+" affordance. There is only one launcher tab
+   * per session, so dispatching it again activates the existing one rather
+   * than opening a duplicate.
+   */
+  | { readonly type: "open-new-tab" }
   | { readonly type: "select-tab"; readonly tabId: string }
   | { readonly type: "select-review-file"; readonly tabId: string; readonly path: string }
   | { readonly type: "set-review-snapshot"; readonly tabId: string; readonly reviewSnapshotId: string }

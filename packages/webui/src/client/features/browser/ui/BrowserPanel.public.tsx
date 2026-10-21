@@ -23,6 +23,12 @@
 // on screen and the page the Agent drives are the same page — in the state,
 // where it can be asserted without a browser.
 //
+// The panel used to carry a surface switcher at the top of the body: three
+// radios, one for each of the surfaces the service knows about. That switcher
+// is gone now — Edge and Chrome are reached in the person's own windows, and
+// the only surface the panel sees is the isolated Chromium. The tab strip
+// decides what target is on screen, and this panel is that target's picture.
+//
 // `.public` because the workspace panel mounts it: the Browser business publishes
 // the panel and the workspace business renders it. Nothing else in this directory
 // is mounted from outside.
@@ -35,7 +41,6 @@ import {
   type ReactElement,
 } from "react";
 import {
-  WEBUI_BROWSER_SURFACES,
   isWebuiBrowserSurfaceAuthorized,
   type WebuiBrowserError,
   type WebuiBrowserInputCommand,
@@ -77,7 +82,7 @@ const PANEL_COPY = {
   inputHint: "点击画面后可在此输入文字。",
   textInputLabel: "发送到浏览器的文字",
   noTargets: "当前浏览器没有可显示的标签页。",
-  unauthorized: "该浏览器未授权。请在设置的「浏览器」页中打开对应的浏览器开关。",
+  unauthorized: "隔离浏览器未授权。请在设置的「浏览器」页中打开对应的浏览器开关。",
   absent: "当前运行时没有浏览器能力，浏览器面板不可用。",
   notReady: "浏览器能力尚未就绪（例如扩展未连接），面板暂时无法显示页面。",
   unknown: "当前运行时没有报告浏览器能力，面板按未授权处理。",
@@ -98,7 +103,6 @@ export interface BrowserPanelProps {
   /** The handshake manifest, so the panel can say *why* a family is unusable. */
   readonly capabilities?: WebuiCapabilityView;
   readonly onSelectTarget?: (target: WebuiBrowserTargetId) => void;
-  readonly onSurfaceChange?: (surface: WebuiBrowserSurface) => void;
   /** Receives only commands that passed validation and the generation binding. */
   readonly onSendInput?: (command: WebuiBrowserInputCommand) => void;
   /** Receives every refusal, so a gesture that went nowhere is visible. */
@@ -110,7 +114,6 @@ export function BrowserPanel({
   state,
   capabilities,
   onSelectTarget,
-  onSurfaceChange,
   onSendInput,
   onRejected,
 }: BrowserPanelProps): ReactElement {
@@ -194,26 +197,6 @@ export function BrowserPanel({
     <section className="webui-browser-panel" data-testid="browser-panel" role="region" aria-label={PANEL_COPY.title}>
       <header className="webui-browser-panel-header">
         <h3 className="webui-browser-panel-title">{PANEL_COPY.title}</h3>
-        <div className="webui-browser-surfaces" role="group" aria-label={PANEL_COPY.title}>
-          {WEBUI_BROWSER_SURFACES.map((candidate) => {
-            const allowed = state ? isWebuiBrowserSurfaceAuthorized(state.authorization, candidate) : false;
-            return (
-              <button
-                key={candidate}
-                type="button"
-                role="radio"
-                aria-checked={candidate === surface}
-                aria-label={SURFACE_LABELS[candidate]}
-                data-testid={`browser-surface-${candidate}`}
-                data-authorized={allowed ? "true" : "false"}
-                className={candidate === surface ? "webui-browser-surface is-active" : "webui-browser-surface"}
-                onClick={() => onSurfaceChange?.(candidate)}
-              >
-                {SURFACE_LABELS[candidate]}
-              </button>
-            );
-          })}
-        </div>
       </header>
 
       {capability === "absent" ? (

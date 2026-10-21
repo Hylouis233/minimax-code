@@ -13,6 +13,11 @@
 // its `.public` components, and nothing else. The browser state machine lives
 // in that business's private projection, so the panel cannot drive it from
 // here — the owner has to be published by the business that owns it.
+//
+// The third group is the new equilibrium: the panel mounts the published host
+// for an active web tab, using the browser business's `BrowserPanelHost` to
+// show that tab's page, and the host is what keys the image stream on the
+// tab's target. The panel itself never reaches into the host's reducer.
 
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
@@ -85,10 +90,14 @@ describe("the workspace panel reaches the browser business only through its publ
     expect(source).not.toContain("application/port-slices");
   });
 
-  it("mounts no browser tool tab", () => {
-    // The browser tool tab is gone with the browser kind: the panel's tabs are
-    // web tabs now, and the strip renders them from the runtime's snapshot.
+  it("mounts the published host, never a private component, for an active web tab", () => {
+    // The browser tool tab is gone, but a web tab is still rendered by the
+    // browser business — it just goes through the published host now. The host
+    // owns its own state; the panel only knows the target.
     const source = readFileSync(PANEL_SOURCE, "utf8");
-    expect(source).not.toContain("BrowserPanelHost");
+    expect(source).toContain("BrowserPanelHost");
+    // The panel never reaches for one of the business's private `.tsx` files.
+    expect(source).not.toContain("browser/projection/browser-state");
+    expect(source).not.toContain("browser/application/browser-commands");
   });
 });

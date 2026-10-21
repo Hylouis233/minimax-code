@@ -2857,6 +2857,15 @@
       "home": "target"
     },
     {
+      "path": "client/features/workspace/ui/WebuiWorkspaceTabStrip.public.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "workspace",
+      "home": "target"
+    },
+    {
       "path": "client/features/workspace/ui/WorkspaceArchiveView.tsx",
       "layers": [
         "bindings"
