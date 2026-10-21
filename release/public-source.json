@@ -502,7 +502,6 @@
     "packages/browser-core/src/operation-timeout.ts",
     "packages/browser-extension/README.md",
     "packages/browser-extension/STORE-DISCLOSURES.md",
-    "packages/browser-extension/dist-chrome.zip",
     "packages/browser-extension/manifest.json",
     "packages/browser-extension/options.html",
     "packages/browser-extension/package.json",

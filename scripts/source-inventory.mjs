@@ -28,9 +28,27 @@ const skipped = new Set([
   // the tool installed fails `check:source` over a file they never wrote.
   ".codegraph",
 ]);
+/**
+ * Whether a name is a build output rather than source.
+ *
+ * The packaged store archives are named after the directory they are built
+ * into (`dist-chrome.zip`, `dist-edge.zip`). They are build outputs, not
+ * source, and they are machine-local: the archive the store takes is
+ * produced by the build, not committed. Leaving them in would make the
+ * inventory record a file the export does not carry, and the export gate
+ * would fail with a difference that no one can act on.
+ */
+function isBuildOutput(name) {
+  return name.startsWith("dist-") && name.endsWith(".zip");
+}
+
 function filesIn(directory, prefix = "") {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    if (skipped.has(entry.name) || entry.name.endsWith(".tsbuildinfo"))
+    if (
+      skipped.has(entry.name) ||
+      entry.name.endsWith(".tsbuildinfo") ||
+      isBuildOutput(entry.name)
+    )
       return [];
     const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
     if (entry.isSymbolicLink())
