@@ -1,18 +1,21 @@
 # WebUI Workspace Browser Tab Model — Development Plan
 
-**Status:** Product decisions are recorded in ADR 0022 and in amendment A8 of ADR 0019; this plan
-turns them into an ordered implementation programme. No implementation has started.
+**Status:** **Delivered.** All thirteen issues of the board are implemented on
+`feat/workspace-browser-tab`, one commit each, and the WebUI gates in §7 pass. The product
+decisions are recorded in ADR 0022 and in amendment A8 of ADR 0019, and ADR 0022 now says it is
+implemented.
 **Date:** 2026-10-21
+**Delivered:** 2026-10-22
 **Decision authority:** [ADR 0022](../../packages/webui/docs/adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md)
 and [ADR 0019 A8](../../packages/webui/docs/adr/0019-webui-browser-use-surfaces-and-external-browser-bridge.md)
 **Reference material:** [`packages/webui/docs/browser-use/`](../../packages/webui/docs/browser-use/) —
 `05-target-identity.md` carries the rules as `required`, `07-review-findings.md` carries round 11,
 which is what this plan closes.
 
-This plan is workspace material: `.plan` is listed in the repository `.gitignore` and is not part of
-the published source projection. **An implementer working in a git worktree cannot see it.** What
-they can see is ADR 0022, which carries the decision; anything an implementer needs beyond it has
-to go into the ticket body and into the ADR, the way the previous programme did it.
+This plan is workspace material, and it **is** tracked: the previous programme's plan was left out
+of the repository, and an implementer working in a git worktree could not see it. This one is
+tracked, so the ticket bodies and ADR 0022 are the decision and this is the programme's record of
+it.
 
 ## 1. Outcome
 
@@ -352,15 +355,16 @@ The slice is done when:
 
 ## 10. Execution board and handoff
 
-**No board has been created for this programme.** The previous programme's board is
-[`.plan/browser-use/board/`](../browser-use/board/) and belongs to the extension and bridge work; this slice is a different
-body of work with a different boundary. Creating GitHub issues is an external action and needs its
-own authorization.
+**The board exists.** It is [`.plan/workspace-browser-tab/board/`](board/) — the specification, one
+ticket per issue, and the handoff — and the same work is tracked as GitHub issues #199 (the
+specification) and #200 to #212 (one per issue) on `mcode-webui/minimax-code`. The previous
+programme's board is [`.plan/browser-use/board/`](../browser-use/board/) and belongs to the
+extension and bridge work; this slice is a different body of work with a different boundary.
 
-When a board is created, the same rules as the previous one apply:
+The rules the previous programme's board followed apply here:
 
-- The plan is **not** in git, so a ticket may not depend on it. Everything an implementer needs goes
-  into the ticket body and into ADR 0022.
+- A ticket may not depend on this plan alone: everything an implementer needs goes into the ticket
+  body and into ADR 0022. The plan is tracked now, but the decision is still ADR 0022's.
 - If implementation evidence contradicts ADR 0022, amend the ADR first, then re-scope the ticket.
 - The first ticket is the technical validation one: the provider's per-target behaviour and the
   service's snapshot are what every later ticket is written against.
