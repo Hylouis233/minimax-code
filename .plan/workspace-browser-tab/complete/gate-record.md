@@ -6,7 +6,9 @@ checked without running it again.
 
 **The run.** Every gate below was run on the tree that carries this record, in one sequence, in this
 order. The only files that changed after the run are this record and the inventory line it adds; no
-source file, no test and no document changed after it.
+source file, no test and no document changed after it. The run was made at `4e7efd43`; the only
+commits since are this record and the inventory line it adds, so the code the gates ran against is
+the code this tip carries. The gate was first run on that code at `4d247f43`.
 
 **The unit suite ran four more times** after the last of the fixes below, on the same tree: 208 files
 and 3230 tests, every time, with no unhandled errors. The gate had been red twice before that — once
