@@ -118,8 +118,19 @@ function targetKey(input: {
  * one — a command is checked against the generation the owner holds now, not
  * against a separate row per page instance.
  */
-function ownershipKey(browserId: string, targetId: string): string {
-  return `${browserId}\u0000${targetId}`;
+/**
+ * The key one target is owned under.
+ *
+ * The surface is part of the key because the instance identity alone is not
+ * unique across surfaces: the same extension running in Edge and in Chrome is
+ * two browsers, and one of them must not take the other's tab.
+ */
+function ownershipKey(
+  surface: WebuiBridgeBrowserSurface,
+  browserId: string,
+  targetId: string,
+): string {
+  return `${surface}\u0000${browserId}\u0000${targetId}`;
 }
 
 /**
@@ -180,6 +191,14 @@ function toBridgeWireCommand(input: WebuiBrowserInputCommand): WebuiBrowserBridg
 export class BrowserBridgeRegistry extends EventEmitter {
   readonly pairings: ReadonlyMap<WebuiBridgeBrowserSurface, BrowserBridgePairing>;
   private readonly sessions = new Map<string, BrowserBridgeSession>();
+  /**
+   * The live session per browser instance, keyed by surface and instance.
+   *
+   * The surface is part of the key because the instance identity alone is not
+   * unique across surfaces: the same extension running in Edge and in Chrome
+   * is two browsers, and one of them must not close the other because they
+   * happened to report the same instance id.
+   */
   private readonly sessionByBrowser = new Map<string, BrowserBridgeSession>();
   /** Per-target queue: the next dispatch waits for the previous to settle. */
   private readonly queues = new Map<string, Promise<unknown>>();
@@ -219,14 +238,15 @@ export class BrowserBridgeRegistry extends EventEmitter {
       session.close({ kind: "host_revoked" });
       throw new Error(`surface "${surface}" already has ${MAX_SESSIONS_PER_SURFACE} sessions`);
     }
-    if (this.sessionByBrowser.has(browserId)) {
+    const browserKey = `${surface}\u0000${browserId}`;
+    if (this.sessionByBrowser.has(browserKey)) {
       // Replacing a previous session for the same browser. The old session
       // is closed and the new one takes its slot.
-      const prior = this.sessionByBrowser.get(browserId);
+      const prior = this.sessionByBrowser.get(browserKey);
       prior?.close({ kind: "host_revoked" });
     }
     this.sessions.set(session.sessionId, session);
-    this.sessionByBrowser.set(browserId, session);
+    this.sessionByBrowser.set(browserKey, session);
     // The session re-emits its own `targets` frames, so the registry learns
     // ownership without the wiring code having to relay them. Announcements
     // are also accepted through `announceTargets` for a caller that already
@@ -236,7 +256,7 @@ export class BrowserBridgeRegistry extends EventEmitter {
     });
     session.once("closed", () => {
       if (this.sessions.get(session.sessionId) === session) this.sessions.delete(session.sessionId);
-      if (this.sessionByBrowser.get(browserId) === session) this.sessionByBrowser.delete(browserId);
+      if (this.sessionByBrowser.get(browserKey) === session) this.sessionByBrowser.delete(browserKey);
       this.releaseSessionTargets(session);
       this.emit("sessionClosed", { surface, browserId, sessionId: session.sessionId });
     });
@@ -259,7 +279,12 @@ export class BrowserBridgeRegistry extends EventEmitter {
       // recording it would only add a row nothing can ever match.
       if (target.browserId.length === 0 || target.targetId.length === 0) continue;
       if (!Number.isFinite(target.generation)) continue;
-      const key = ownershipKey(target.browserId, target.targetId);
+      // The surface comes from the session that announced the target: that is
+      // the browser it belongs to. The instance identity alone is not unique
+      // across surfaces, and one browser must not take another's tab.
+      const owner = session.pairing?.surface;
+      if (!owner) continue;
+      const key = ownershipKey(owner, target.browserId, target.targetId);
       const current = this.targetOwners.get(key);
       // A higher generation is a different page behind the same tab id and
       // supersedes the earlier claim. A lower one is a late duplicate of an
@@ -287,7 +312,7 @@ export class BrowserBridgeRegistry extends EventEmitter {
   /** Close every live session for a surface — used when its switch goes off. */
   closeAllForSurface(surface: WebuiBridgeBrowserSurface): void {
     for (const session of this.sessions.values()) {
-      if (session.pairing.surface === surface) {
+      if (session.pairing?.surface === surface) {
         session.close({ kind: "host_revoked" });
       }
     }
@@ -298,8 +323,12 @@ export class BrowserBridgeRegistry extends EventEmitter {
     const surfaces = {} as Record<WebuiBridgeBrowserSurface, BrowserBridgeSurfaceStatus>;
     const counts = new Map<WebuiBridgeBrowserSurface, number>();
     for (const session of this.sessions.values()) {
-      const current = counts.get(session.pairing.surface) ?? 0;
-      counts.set(session.pairing.surface, current + 1);
+      // A registered session has named its browser, so it has a surface. One
+      // that has not is not counted rather than counted under a wrong one.
+      const surface = session.pairing?.surface;
+      if (!surface) continue;
+      const current = counts.get(surface) ?? 0;
+      counts.set(surface, current + 1);
     }
     for (const [surface, pairing] of this.pairings.entries()) {
       const status = pairing.status();
@@ -435,8 +464,21 @@ export class BrowserBridgeRegistry extends EventEmitter {
         reason: `the command named the unsupported surface "${input.target.surface}"`,
       };
     }
-    const ownership = this.targetOwners.get(ownershipKey(browserId, targetId));
+    const ownership = this.targetOwners.get(ownershipKey(surface, browserId, targetId));
     if (!ownership) {
+      // The target may be owned on the **other** surface. Saying so is more
+      // useful than "no session announced it": the caller named a real tab
+      // and pointed it at the wrong browser.
+      const other = surface === "edge" ? "chrome" : "edge";
+      const elsewhere = this.targetOwners.get(ownershipKey(other, browserId, targetId));
+      if (elsewhere) {
+        return {
+          ok: false,
+          reason:
+            `target "${browserId}/${targetId}" is owned by a "${other}" ` +
+            `session but the command named surface "${surface}"`,
+        };
+      }
       return {
         ok: false,
         reason: `no bridge session announced target "${browserId}/${targetId}"`,
@@ -460,11 +502,11 @@ export class BrowserBridgeRegistry extends EventEmitter {
         reason: `the session that announced target "${browserId}/${targetId}" is no longer connected`,
       };
     }
-    if (session.pairing.surface !== surface) {
+    if (session.pairing?.surface !== surface) {
       return {
         ok: false,
         reason:
-          `target "${browserId}/${targetId}" is owned by a "${session.pairing.surface}" ` +
+          `target "${browserId}/${targetId}" is owned by a "${session.pairing?.surface ?? "unknown"}" ` +
           `session but the command named surface "${surface}"`,
       };
     }

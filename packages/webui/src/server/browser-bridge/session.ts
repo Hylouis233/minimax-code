@@ -32,6 +32,7 @@ import {
   type WebuiBrowserBridgeProof,
   type WebuiBrowserBridgeTarget,
 } from "../../shared/contracts/browser-bridge.js";
+import type { WebuiBridgeBrowserSurface } from "../../shared/contracts/browser.js";
 
 import {
   PairingSwitchedOffError,
@@ -45,6 +46,14 @@ import {
 } from "./reconnect.js";
 
 const DEFAULT_OPERATION_DEADLINE_MS = 15_000;
+
+/**
+ * How long a peer has to open with a `hello`.
+ *
+ * The same fifteen seconds the operation deadline gives: a peer that cannot
+ * open a conversation in that time is not going to.
+ */
+const DEFAULT_HELLO_DEADLINE_MS = 15_000;
 const DEFAULT_PING_INTERVAL_MS = 10_000;
 const MAX_INFLIGHT_COMMANDS = 32;
 
@@ -117,12 +126,30 @@ export type BrowserBridgeSessionCloseReason =
   | { readonly kind: "switched_off" }
   | { readonly kind: "store_unavailable" }
   | { readonly kind: "host_revoked" }
+  /**
+   * The surface is already served by another browser.
+   *
+   * A surface is one browser. A second live session on the same surface would
+   * be a browser the host cannot address — the panel and the tools have one
+   * provider per surface — so the second connection is refused rather than
+   * allowed to take the surface away from the first.
+   */
+  | { readonly kind: "surface_busy" }
   | { readonly kind: "host_error"; readonly error: string };
 
 /** The session's dependencies. */
 export interface BrowserBridgeSessionOptions {
-  /** The pairing this session authenticates against. */
-  readonly pairing: BrowserBridgePairing;
+  /**
+   * The pairings this peer's identity is admitted on.
+   *
+   * Usually one. More than one is possible, and is not a mistake: an unpacked
+   * build has a single identity, and a person who loads it in both Edge and
+   * Chrome lists that identity on both surfaces. The identity therefore
+   * cannot say which surface the peer is on — the peer's own `hello` names
+   * the browser it runs in, and the pairing for that browser is the one that
+   * authenticates it.
+   */
+  readonly pairings: readonly BrowserBridgePairing[];
   /** The underlying WebSocket the admission path handed us. */
   readonly socket: WebSocket;
   /**
@@ -136,6 +163,13 @@ export interface BrowserBridgeSessionOptions {
    * fatal close.
    */
   readonly pingIntervalMs?: number;
+  /**
+   * How long the peer has to open with a `hello`.
+   *
+   * A peer that never says anything holds an upgraded socket and the host's
+   * attention for as long as it likes. The deadline bounds that.
+   */
+  readonly helloDeadlineMs?: number;
   /**
    * Wall-clock source; tests inject a deterministic clock.
    */
@@ -157,7 +191,6 @@ export interface BrowserBridgeSessionOptions {
  * each new piece of behaviour.
  */
 export class BrowserBridgeSession extends EventEmitter {
-  readonly pairing: BrowserBridgePairing;
   readonly sessionId: string;
 
   private readonly socket: WebSocket;
@@ -165,13 +198,26 @@ export class BrowserBridgeSession extends EventEmitter {
   private readonly pingIntervalMs: number;
   private readonly now: () => number;
   private readonly sleep: (ms: number) => Promise<void>;
+  private readonly helloDeadlineMs: number;
+  /** The timer that closes a session whose peer never says hello. */
+  private helloTimer: ReturnType<typeof setTimeout> | undefined;
+  /** The pairings this peer's identity is admitted on. */
+  private readonly candidatePairings: readonly BrowserBridgePairing[];
+  /** The pairing this session authenticates against, once the peer named its browser. */
+  private resolvedPairing: BrowserBridgePairing | undefined;
 
   /** The current challenge nonce, or `undefined` while the session is open. */
   private activeChallenge: WebuiBrowserBridgeChallenge | undefined;
   /** Whether the session has been fully admitted. */
   private admitted = false;
   /** The hello frame the extension opens with, cached so the pairing can run. */
-  private helloFrame: { readonly publicKey?: WebuiBrowserBridgeEcdhPublicKey } | undefined;
+  private helloFrame:
+    | {
+        readonly publicKey?: WebuiBrowserBridgeEcdhPublicKey;
+        /** The browser the peer says it runs in. */
+        readonly browser: string;
+      }
+    | undefined;
   /** Why the session closed, captured for `closed` emission. */
   private closeReason: BrowserBridgeSessionCloseReason | undefined;
   /** The set of command ids awaiting an `input-result` reply. */
@@ -186,7 +232,7 @@ export class BrowserBridgeSession extends EventEmitter {
 
   constructor(options: BrowserBridgeSessionOptions) {
     super();
-    this.pairing = options.pairing;
+    this.candidatePairings = options.pairings;
     this.socket = options.socket;
     this.sessionId = options.sessionId;
     this.operationDeadlineMs =
@@ -194,9 +240,16 @@ export class BrowserBridgeSession extends EventEmitter {
     this.pingIntervalMs = options.pingIntervalMs ?? DEFAULT_PING_INTERVAL_MS;
     this.now = options.now ?? Date.now;
     this.sleep = options.sleep ?? defaultSleep;
+    this.helloDeadlineMs = options.helloDeadlineMs ?? DEFAULT_HELLO_DEADLINE_MS;
     this.socket.on("message", (data, isBinary) => {
       void this.handleMessage(data, isBinary);
     });
+    // The peer has to open with a `hello`. A socket that never does is closed
+    // rather than left holding the connection.
+    this.helloTimer = setTimeout(() => {
+      this.close({ kind: "host_error", error: "the peer did not open with a hello frame" });
+    }, this.helloDeadlineMs);
+    this.helloTimer.unref?.();
     this.socket.on("close", () => {
       if (!this.closeReason) this.closeReason = { kind: "remote" };
       this.teardown();
@@ -214,9 +267,14 @@ export class BrowserBridgeSession extends EventEmitter {
    *
    * The session is constructed on the upgrade, but the handshake waits until
    * the extension's `hello` arrives so the host can see the peer's ephemeral
-   * public key before it seals anything.
+   * public key before it seals anything — and so the host can settle which
+   * surface the peer is on.
    */
   beginHelloGatedHandshake(): void {
+    // The pairing is resolved from the peer's `hello`, so a handshake cannot
+    // start before it. A caller that got here another way has nothing to
+    // challenge against.
+    if (!this.resolvedPairing) return;
     void this.sendChallenge();
   }
 
@@ -236,7 +294,7 @@ export class BrowserBridgeSession extends EventEmitter {
     if (!hello) return;
     if (this.closeReason) return;
     try {
-      const challenge = await this.pairing.issueChallenge();
+      const challenge = await this.activePairing.issueChallenge();
       this.activeChallenge = challenge;
       this.sendFrameOrClose(challenge);
     } catch (error) {
@@ -253,6 +311,72 @@ export class BrowserBridgeSession extends EventEmitter {
    */
   get isAdmitted(): boolean {
     return this.admitted;
+  }
+
+  /**
+   * The pairing this session authenticates against.
+   *
+   * `undefined` until the peer has named the browser it runs in: a peer that
+   * has not said which browser it is has not said which pairing it is. The
+   * pairing is resolved once and never changes — a session cannot migrate
+   * from one surface to another.
+   */
+  get pairing(): BrowserBridgePairing | undefined {
+    return this.resolvedPairing;
+  }
+
+  /**
+   * The surface this session belongs to, once the peer has named its browser.
+   */
+  get surface(): WebuiBridgeBrowserSurface | undefined {
+    return this.resolvedPairing?.surface;
+  }
+
+  /**
+   * The resolved pairing, for the paths that run only after the resolution.
+   *
+   * Every use of it is downstream of the `hello` that resolved it: the
+   * challenge, the proof and the sealing all happen after that, and the
+   * teardown only forgets a challenge that was issued. A throw here would
+   * therefore mean a path that runs before the resolution, which is a bug
+   * rather than a state the wire can produce.
+   */
+  private get activePairing(): BrowserBridgePairing {
+    if (!this.resolvedPairing) {
+      throw new Error("browser bridge: the pairing was used before it was resolved");
+    }
+    return this.resolvedPairing;
+  }
+
+  /**
+   * Picks the pairing this peer authenticates against.
+   *
+   * The peer's identity can be admitted on more than one surface, so the
+   * identity alone is not enough to say which one it is: the peer names the
+   * browser it runs in, and the host answers with the pairing for that
+   * browser. A peer that names a browser this host does not know is refused,
+   * rather than attached to whichever pairing happened to come first in the
+   * list — which would put a Chrome browser on the Edge pairing, and report
+   * the Edge surface as connected while the person is looking at Chrome.
+   *
+   * **The name selects the secret; it does not substitute for it.** Each
+   * surface has its own installation key and its own credential, and the
+   * challenge this pairing issues is verified against that surface's own
+   * secret. A peer that claims to be Edge and answers with the Chrome
+   * surface's installation key is refused with `installation_key_mismatch`,
+   * whatever it called itself. The name only says *which* secret the peer has
+   * to prove; it cannot produce one.
+   */
+  #resolvePairing(claimedBrowser: string | undefined): boolean {
+    const match = claimedBrowser
+      ? this.candidatePairings.find((pairing) => pairing.surface === claimedBrowser)
+      : undefined;
+    if (!match) {
+      this.close({ kind: "pairing_refused", reason: "unknown_browser" });
+      return false;
+    }
+    this.resolvedPairing = match;
+    return true;
   }
 
   /** Why the session closed, if it has. */
@@ -447,13 +571,22 @@ export class BrowserBridgeSession extends EventEmitter {
         await this.handleProof(frame);
         break;
       case "hello":
-        // Capture the public key once. A second `hello` is ignored: the
-        // session's identity is the first one, and any later frame would
-        // either say the same thing or be a downgrade.
+        // Capture the public key and the browser once. A second `hello` is
+        // ignored: the session's identity is the first one, and any later
+        // frame would either say the same thing or be a downgrade.
         if (!this.helloFrame) {
+          if (this.helloTimer) {
+            clearTimeout(this.helloTimer);
+            this.helloTimer = undefined;
+          }
           this.helloFrame = {
             publicKey: isEcdhPublicKey(frame.publicKey) ? frame.publicKey : undefined,
+            browser: frame.browser,
           };
+          // The pairing is settled here, before the challenge goes out: the
+          // challenge is signed by the pairing, so the host has to know which
+          // pairing this peer is before it asks the peer to prove anything.
+          if (!this.#resolvePairing(frame.browser)) break;
           this.beginHelloGatedHandshake();
         }
         break;
@@ -494,11 +627,11 @@ export class BrowserBridgeSession extends EventEmitter {
     // might pin the algorithm again here; the contract does not require it
     // today and we follow the wire.
     const challengeNonce = this.activeChallenge.nonce;
-    const outcome = await this.pairing.verifyProof(proof);
+    const outcome = await this.activePairing.verifyProof(proof);
     if (outcome.kind === "refused") {
       // Forget the nonce so it cannot be replayed later; the extension gets
       // one shot per challenge and the host does not chase further.
-      this.pairing.forgetChallenge(challengeNonce);
+      this.activePairing.forgetChallenge(challengeNonce);
       this.activeChallenge = undefined;
       // The reason is specific on purpose: "pairing proof failed" does not
       // tell the person whether to paste an installation key, re-paste one,
@@ -543,7 +676,7 @@ export class BrowserBridgeSession extends EventEmitter {
       this.close({ kind: "pairing_refused", reason: "no_peer_public_key" });
       return false;
     }
-    const sealed = await this.pairing.sealCredentialForExtension(hello.publicKey);
+    const sealed = await this.activePairing.sealCredentialForExtension(hello.publicKey);
     if (sealed.kind !== "sealed") {
       this.close({ kind: "switched_off" });
       return false;
@@ -646,11 +779,18 @@ export class BrowserBridgeSession extends EventEmitter {
   }
 
   private teardown(): void {
+    if (this.helloTimer) {
+      clearTimeout(this.helloTimer);
+      this.helloTimer = undefined;
+    }
     if (!this.admitted && !this.closeReason) {
       this.closeReason = { kind: "remote" };
     }
     if (this.activeChallenge) {
-      this.pairing.forgetChallenge(this.activeChallenge.nonce);
+      // The optional call: a challenge is only ever issued after the pairing
+      // was resolved, so the pairing is there — but a teardown must never be
+      // the thing that throws.
+      this.resolvedPairing?.forgetChallenge(this.activeChallenge.nonce);
       this.activeChallenge = undefined;
     }
     for (const [commandId, pending] of this.inflight.entries()) {
@@ -745,6 +885,8 @@ function describeClose(reason: BrowserBridgeSessionCloseReason): string {
       return "credential store unavailable";
     case "host_revoked":
       return "host revoked the session";
+    case "surface_busy":
+      return "this browser surface is already served by another browser";
     case "host_error":
       return `host error: ${reason.error}`;
   }
@@ -772,6 +914,8 @@ function describeRefusal(reason: BrowserBridgeProofRefusal): string {
       return "pairing refused: this browser holds a pairing credential this host no longer accepts — the host has been re-provisioned, so paste the installation key again";
     case "no_peer_public_key":
       return "pairing refused: this browser proved the installation key but sent no public key, so the credential cannot be sealed to it";
+    case "unknown_browser":
+      return "pairing refused: this browser is not registered on this host — the host does not accept this extension for the browser it is running in";
   }
 }
 

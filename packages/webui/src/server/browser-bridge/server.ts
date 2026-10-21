@@ -167,7 +167,15 @@ export class WebuiBridgeOperationError extends Error {
 
 /** What one surface's live session currently looks like. */
 interface BridgeSurfaceState {
-  readonly surface: WebuiBridgeBrowserSurface;
+  /**
+   * The surface this session belongs to.
+   *
+   * `undefined` until the peer has named the browser it runs in: the peer's
+   * identity can be admitted on more than one surface, so the surface is
+   * settled by the peer's own `hello` and not by the order the pairings
+   * happen to be in.
+   */
+  surface: WebuiBridgeBrowserSurface | undefined;
   readonly session: BrowserBridgeSession;
   /** The instance identity, from the extension's `hello` frame. */
   browserId: string;
@@ -403,7 +411,7 @@ async readInstallationKey(
   createProvider(surface: WebuiBridgeBrowserSurface): WebuiBridgeSurfaceProvider | undefined {
     const state = this.#surfaces.get(surface);
     if (!state || !state.live) return undefined;
-    return new BridgeProvider(state, this.registry);
+    return new BridgeProvider(surface, state, this.registry);
   }
 
   /** Release the sessions and shut the bridge's WebSocket server down. */
@@ -422,20 +430,20 @@ async readInstallationKey(
   /* ---------------------------------------------------------------------- */
 
   #onConnection(ws: WebSocket, request: IncomingMessage): void {
-    const pairing = this.#pairingFor(request);
-    if (!pairing) {
+    const candidates = this.#pairingsFor(request);
+    if (candidates.length === 0) {
       // Unreachable while admission and this lookup agree; refusing beats
       // constructing a session with no pairing to authenticate against.
       ws.close(1008, "Forbidden");
       return;
     }
     const session = new BrowserBridgeSession({
-      pairing,
+      pairings: candidates,
       socket: ws,
       sessionId: `bridge-${randomUUID()}`,
     });
     const state: BridgeSurfaceState = {
-      surface: pairing.surface,
+      surface: undefined,
       session,
       browserId: "",
       live: false,
@@ -443,7 +451,6 @@ async readInstallationKey(
       frameListeners: new Map(),
       targetChangeListeners: new Set(),
     };
-    this.#surfaces.set(pairing.surface, state);
     this.#observeHello(ws, state);
     session.on("targets", (announcedBrowserId: string, targets) => {
       this.#onTargets(state, announcedBrowserId, targets);
@@ -456,30 +463,65 @@ async readInstallationKey(
     // socket that never proves possession never becomes a live session and is
     // never reachable through `createProvider`.
     session.once("ready", () => {
+      // The surface is settled here: the peer's `hello` named the browser it
+      // runs in, and the session resolved the pairing from that. A session
+      // that reached `ready` always has one — the session refuses the
+      // handshake otherwise.
+      const surface = session.pairing?.surface;
+      if (!surface) {
+        state.live = false;
+        return;
+      }
+      // A surface is one browser. The panel and the Agent's tools have one
+      // provider per surface, and a second live session would be a browser the
+      // host could not address.
+      //
+      // The **same** browser is not a second browser: a Manifest V3 worker that
+      // restarts reconnects, and the new connection has to be able to take
+      // over from the old one before the old socket's close has been noticed.
+      // A *different* browser instance is refused, rather than being allowed
+      // to take the surface away from the one that holds it.
+      const existing = this.#surfaces.get(surface);
+      if (existing && existing !== state && existing.live && existing.browserId !== state.browserId) {
+        session.close({ kind: "surface_busy" });
+        state.live = false;
+        return;
+      }
+      state.surface = surface;
+      this.#surfaces.set(surface, state);
       state.live = true;
-      void this.registry.registerSession(pairing.surface, state.browserId, session).catch(() => {
+      void this.registry.registerSession(surface, state.browserId, session).catch(() => {
         state.live = false;
       });
     });
     session.once("closed", () => {
-      if (this.#surfaces.get(pairing.surface) === state) this.#surfaces.delete(pairing.surface);
+      const surface = state.surface;
+      if (surface && this.#surfaces.get(surface) === state) this.#surfaces.delete(surface);
     });
   }
 
   /**
-   * The pairing an upgrade claimed.
+   * The pairings an upgrade's identity is admitted on.
    *
    * Mirrors the loop in `admitBrowserBridgeUpgrade`, which has already run by
-   * the time this is called and does not report which pairing matched. The walk
-   * is deterministic over the same allowlists, so the two agree.
+   * the time this is called and does not report which pairings matched. The
+   * walk is over the same allowlists, so the two agree.
+   *
+   * More than one can match, and that is not an error: an unpacked build has
+   * one identity, and a person who loads it in both Edge and Chrome lists
+   * that identity on both surfaces. Which surface the peer is on is settled
+   * by the browser the peer names in its `hello`, not by the order the
+   * pairings happen to be in — the first match here would put a Chrome
+   * browser on the Edge pairing.
    */
-  #pairingFor(request: IncomingMessage): BrowserBridgePairing | undefined {
+  #pairingsFor(request: IncomingMessage): readonly BrowserBridgePairing[] {
     const extensionId = parseExtensionOrigin((request.headers.origin ?? "").toLowerCase());
-    if (!extensionId) return undefined;
+    if (!extensionId) return [];
+    const matches: BrowserBridgePairing[] = [];
     for (const pairing of this.pairings.values()) {
-      if (pairing.admitsExtensionId(extensionId)) return pairing;
+      if (pairing.admitsExtensionId(extensionId)) matches.push(pairing);
     }
-    return undefined;
+    return matches;
   }
 
   /**
@@ -543,9 +585,14 @@ async readInstallationKey(
     // dropped instead.
     const announced = state.targets.get(image.targetId);
     if (announced && announced.generation !== image.generation) return;
+    // A frame can only arrive after the handshake, and the handshake is what
+    // settles the surface. A frame without one is dropped rather than
+    // presented under an identity nobody can check.
+    const surface = state.surface;
+    if (!surface) return;
     const frame: WebuiBrowserImageFrame = {
       target: {
-        surface: state.surface,
+        surface,
         browserId: state.browserId || image.browserId,
         targetId: image.targetId,
         generation: image.generation,
@@ -575,10 +622,14 @@ class BridgeProvider implements WebuiBridgeSurfaceProvider {
   /** The callback this provider installed per streamed target. */
   readonly #streamed = new Map<string, (frame: WebuiBrowserImageFrame) => void>();
 
-  constructor(state: BridgeSurfaceState, registry: BrowserBridgeRegistry) {
+  constructor(
+    surface: WebuiBridgeBrowserSurface,
+    state: BridgeSurfaceState,
+    registry: BrowserBridgeRegistry,
+  ) {
     this.#state = state;
     this.#registry = registry;
-    this.surface = state.surface;
+    this.surface = surface;
   }
 
   /**

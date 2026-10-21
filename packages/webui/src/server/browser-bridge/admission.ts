@@ -118,14 +118,16 @@ export function admitBrowserBridgeUpgrade(
   if (!extensionId) {
     return reject(socket, 403, "Forbidden Origin");
   }
-  let matchingPairing: BrowserBridgePairing | undefined;
-  for (const pairing of context.pairings.values()) {
-    if (pairing.admitsExtensionId(extensionId)) {
-      matchingPairing = pairing;
-      break;
-    }
-  }
-  if (!matchingPairing) {
+  // The origin's identity has to be one this host admits, on **some** surface.
+  // Which surface it is does not have to be decided here: an unpacked build
+  // has one identity and a person who loads it in both Edge and Chrome lists
+  // that identity on both surfaces, so the surface is settled by the browser
+  // the peer names in its `hello`. Deciding it here by taking the first
+  // match would put a Chrome browser on the Edge pairing.
+  const admitted = [...context.pairings.values()].some((pairing) =>
+    pairing.admitsExtensionId(extensionId),
+  );
+  if (!admitted) {
     return reject(socket, 403, "Forbidden Origin");
   }
   // Dev does NOT bypass. The header is on the upgrade so a future wiring
@@ -136,7 +138,7 @@ export function admitBrowserBridgeUpgrade(
     // No-op check. If we ever add a `if (context.dev) return undefined;`
     // here, the headline test will fail. The presence of this branch is
     // intentional: it documents the contract.
-    void matchingPairing;
+    void extensionId;
   }
   return undefined;
 }

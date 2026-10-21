@@ -98,7 +98,18 @@ export type BrowserBridgeProofRefusal =
    * the host has nothing to seal the credential to. Raised by the session,
    * which owns the peer's `hello` frame.
    */
-  | "no_peer_public_key";
+  | "no_peer_public_key"
+  /**
+   * The peer named a browser this host does not admit its identity on.
+   *
+   * An unpacked build has one identity, and a person who loads it in both
+   * Edge and Chrome lists that identity on both surfaces. The identity
+   * therefore cannot say which surface the peer is on, so the peer names the
+   * browser it runs in and the host answers with the pairing for that
+   * browser. A peer naming a browser the host does not know is refused
+   * rather than attached to whichever pairing happened to be first.
+   */
+  | "unknown_browser";
 
 /** What a verified proof proved. Decides whether a `pair` frame follows. */
 export type BrowserBridgeProofOutcome =
