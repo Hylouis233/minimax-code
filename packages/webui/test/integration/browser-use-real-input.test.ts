@@ -23,6 +23,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { WebuiIsolatedChromiumProvider } from "../../src/runtime/browser/isolated-chromium/provider.js";
 import type { WebuiBrowserTargetId } from "../../src/shared/contracts/browser.js";
+import { observeAcceptance } from "../browser/acceptance-record.js";
+
+/** The record file this suite writes. */
+const SUITE = "isolated-chromium";
 
 /**
  * A page that records what it received.
@@ -43,6 +47,11 @@ const PAGE_HTML = [
 ].join("\n");
 
 async function chromeIsAvailable(): Promise<boolean> {
+  return (await resolveChromePath()) !== undefined;
+}
+
+/** The Chrome the isolated provider drives, and its own version. */
+async function resolveChromePath(): Promise<string | undefined> {
   const { access } = await import("node:fs/promises");
   for (const candidate of [
     "/usr/bin/google-chrome",
@@ -52,12 +61,30 @@ async function chromeIsAvailable(): Promise<boolean> {
   ]) {
     try {
       await access(candidate);
-      return true;
+      return candidate;
     } catch {
       // Keep looking.
     }
   }
-  return false;
+  return undefined;
+}
+
+/**
+ * The browser's own version.
+ *
+ * Read from the binary rather than assumed: an acceptance record that says
+ * "Chrome" without saying which Chrome is not a record.
+ */
+async function chromeVersion(path: string): Promise<string> {
+  const { execFile } = await import("node:child_process");
+  const { promisify } = await import("node:util");
+  const run = promisify(execFile);
+  try {
+    const { stdout } = await run(path, ["--version"], { timeout: 20_000 });
+    return stdout.trim();
+  } catch {
+    return "unknown";
+  }
 }
 
 const available = await chromeIsAvailable();
@@ -65,10 +92,13 @@ const available = await chromeIsAvailable();
 describe.skipIf(!available)("the browser input path, against a real page", () => {
   let dataDir: string;
   let provider: WebuiIsolatedChromiumProvider;
+  let browserVersion = "unknown";
 
   beforeAll(async () => {
     dataDir = await mkdtemp(join(tmpdir(), "webui-browser-use-e2e-"));
     provider = await WebuiIsolatedChromiumProvider.launch({ dataDir });
+    const path = await resolveChromePath();
+    if (path) browserVersion = await chromeVersion(path);
   }, 60_000);
 
   afterAll(async () => {
@@ -116,64 +146,107 @@ describe.skipIf(!available)("the browser input path, against a real page", () =>
   }
 
   it("delivers text input to the page the provider is showing", async () => {
-    await navigate(`data:text/html,${encodeURIComponent(PAGE_HTML)}`);
-    // The provider marks the page it drives as the selected one. Picking
-    // "the first page" would pick a different tab when the browser has more
-    // than one, and the input would then be addressed to a page the provider
-    // is not driving.
-    const targets = await provider.listTargets();
-    const target = targets.find((entry) => entry.selected);
-    expect(target).toBeDefined();
-    expect(await readFieldValue()).toBe("");
+    await observeAcceptance(
+      SUITE,
+      {
+        surface: "isolated-chromium",
+        browser: "chrome",
+        browserVersion,
+        entry: "development",
+        case: "the isolated Chromium delivers text input to the page it is showing",
+        settings: {
+          isolatedChromium: true,
+          edge: false,
+          chrome: false,
+          fullCdp: false,
+          allowlist: "not applicable",
+          build: "not applicable",
+        },
+        observed: "a pointer click and a text input both arrived in the page the provider was driving",
+      },
+      async () => {
+        await navigate(`data:text/html,${encodeURIComponent(PAGE_HTML)}`);
+        // The provider marks the page it drives as the selected one. Picking
+        // "the first page" would pick a different tab when the browser has more
+        // than one, and the input would then be addressed to a page the provider
+        // is not driving.
+        const targets = await provider.listTargets();
+        const target = targets.find((entry) => entry.selected);
+        expect(target).toBeDefined();
+        expect(await readFieldValue()).toBe("");
 
-    const identity = {
-      surface: "isolated-chromium" as const,
-      browserId: provider.browserId,
-      targetId: target!.id.targetId,
-      generation: target!.id.generation,
-    };
+        const identity = {
+          surface: "isolated-chromium" as const,
+          browserId: provider.browserId,
+          targetId: target!.id.targetId,
+          generation: target!.id.generation,
+        };
 
-    // A real pointer click first: text input goes to whatever holds the
-    // focus, so the panel's user has to be able to aim at the field before
-    // typing into it. This is the same path the panel uses.
-    const centre = await fieldCentre();
-    await provider.sendInput({
-      kind: "pointer",
-      target: identity,
-      x: centre.x,
-      y: centre.y,
-      button: "left",
-      clickCount: 1,
-    });
+        // A real pointer click first: text input goes to whatever holds the
+        // focus, so the panel's user has to be able to aim at the field before
+        // typing into it. This is the same path the panel uses.
+        const centre = await fieldCentre();
+        await provider.sendInput({
+          kind: "pointer",
+          target: identity,
+          x: centre.x,
+          y: centre.y,
+          button: "left",
+          clickCount: 1,
+        });
 
-    await provider.sendInput({ kind: "text", target: identity, text: "hello" });
+        await provider.sendInput({ kind: "text", target: identity, text: "hello" });
 
-    expect(await readFieldValue()).toBe("hello");
+        expect(await readFieldValue()).toBe("hello");
+      },
+    );
   });
 
   it("refuses an input recorded against the page a navigation replaced", async () => {
-    await navigate(`data:text/html,${encodeURIComponent(PAGE_HTML)}`);
-    const before = (await provider.listTargets()).find((entry) => entry.selected);
-    expect(before).toBeDefined();
+    await observeAcceptance(
+      SUITE,
+      {
+        surface: "isolated-chromium",
+        browser: "chrome",
+        browserVersion,
+        entry: "development",
+        case: "the isolated Chromium refuses an input recorded against the page a navigation replaced",
+        settings: {
+          isolatedChromium: true,
+          edge: false,
+          chrome: false,
+          fullCdp: false,
+          allowlist: "not applicable",
+          build: "not applicable",
+        },
+        observed:
+          "the stale identity was refused with browser_target_stale and the page that replaced it received nothing",
+      },
+      async () => {
+        await navigate(`data:text/html,${encodeURIComponent(PAGE_HTML)}`);
+        const before = (await provider.listTargets()).find((entry) => entry.selected);
+        expect(before).toBeDefined();
 
-    // The navigation replaces the page behind the tab.
-    await navigate(`data:text/html,${encodeURIComponent(PAGE_HTML)}`);
-    const after = (await provider.listTargets()).find((entry) => entry.selected);
-    expect(after).toBeDefined();
+        // The navigation replaces the page behind the tab.
+        await navigate(`data:text/html,${encodeURIComponent(PAGE_HTML)}`);
+        const after = (await provider.listTargets()).find((entry) => entry.selected);
+        expect(after).toBeDefined();
 
-    // The provider raised its generation, so the identity recorded before the
-    // navigation is stale.
-    const stale = {
-      surface: "isolated-chromium" as const,
-      browserId: provider.browserId,
-      targetId: before!.id.targetId,
-      generation: before!.id.generation,
-    };
-    await expect(
-      provider.sendInput({ kind: "text", target: stale, text: "must not arrive" }),
-    ).rejects.toMatchObject({ code: "browser_target_stale" });
+        // The provider raised its generation, so the identity recorded before the
+        // navigation is stale.
+        const stale = {
+          surface: "isolated-chromium" as const,
+          browserId: provider.browserId,
+          targetId: before!.id.targetId,
+          generation: before!.id.generation,
+        };
+        await expect(
+          provider.sendInput({ kind: "text", target: stale, text: "must not arrive" }),
+        ).rejects.toMatchObject({ code: "browser_target_stale" });
 
-    // The page that replaced it received nothing.
-    expect(await readFieldValue()).toBe("");
+        // The page that replaced it received nothing.
+        expect(await readFieldValue()).toBe("");
+      },
+    );
   });
 });

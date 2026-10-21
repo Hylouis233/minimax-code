@@ -62,11 +62,33 @@ declare const chrome: {
  * The source directory is not loadable: a browser extension runtime executes
  * JavaScript only, and the source manifest points the service worker at a
  * `.ts` file. The build is what a browser can actually run.
+ *
+ * A store build is a different artefact, not a different flag on the same one:
+ * it embeds the store's public key, so its identity is fixed by that key
+ * rather than by the path it is loaded from. It is built into its own
+ * directory so the two builds cannot overwrite one another.
  */
-export async function buildExtension(): Promise<void> {
-  await run("pnpm", ["--filter", "@mavis/browser-extension", "build"], {
+export async function buildExtension(
+  options: {
+    readonly store?: "chrome" | "edge";
+    /** The directory to build into, relative to the extension package. */
+    readonly out?: string;
+    /** The store's public key, for a store build. */
+    readonly publicKey?: string;
+  } = {},
+): Promise<void> {
+  const args = ["--filter", "@mavis/browser-extension", "build"];
+  if (options.store) args.push("--store", options.store);
+  if (options.out) args.push("--out", options.out);
+  await run("pnpm", args, {
     cwd: repoRoot,
     timeout: 120_000,
+    env: options.store && options.publicKey
+      ? {
+          ...process.env,
+          [`MAVIS_BROWSER_STORE_${options.store.toUpperCase()}_PUBLIC_KEY`]: options.publicKey,
+        }
+      : process.env,
   });
 }
 
@@ -84,14 +106,21 @@ function extensionIdOf(worker: Worker): string {
  * stable for this directory — but it is read at runtime rather than
  * hard-coded, because a different path means a different id and a hard-coded
  * one would silently stop matching the allowlist.
+ *
+ * A store build is loaded from its own directory, and its id is the one the
+ * store's public key determines rather than the one the path determines.
  */
-export async function launchWithExtension(channel: "msedge" | "chromium"): Promise<{
+export async function launchWithExtension(
+  channel: "msedge" | "chromium",
+  options: { readonly dist?: string } = {},
+): Promise<{
   context: BrowserContext;
   worker: Worker;
   extensionId: string;
   profileDir: string;
 }> {
   const profileDir = await mkdtemp(join(tmpdir(), "webui-bridge-real-"));
+  const dist = options.dist ?? extensionDist;
   const context = await chromium.launchPersistentContext(profileDir, {
     headless: true,
     // "chromium" is the bundled browser and "msedge" is the installed Edge.
@@ -99,8 +128,8 @@ export async function launchWithExtension(channel: "msedge" | "chromium"): Promi
     // is the browser it runs in.
     channel,
     args: [
-      `--disable-extensions-except=${extensionDist}`,
-      `--load-extension=${extensionDist}`,
+      `--disable-extensions-except=${dist}`,
+      `--load-extension=${dist}`,
       "--no-first-run",
       "--no-default-browser-check",
     ],
@@ -108,6 +137,16 @@ export async function launchWithExtension(channel: "msedge" | "chromium"): Promi
   let worker = context.serviceWorkers()[0];
   if (!worker) worker = await context.waitForEvent("serviceworker", { timeout: 30_000 });
   return { context, worker, extensionId: extensionIdOf(worker), profileDir };
+}
+
+/**
+ * The browser's own version.
+ *
+ * Read from the browser rather than assumed: an acceptance record that says
+ * "Chrome" without saying which Chrome is not a record.
+ */
+export function browserVersionOf(context: BrowserContext): string {
+  return context.browser()?.version() ?? "unknown";
 }
 
 /**
@@ -177,27 +216,46 @@ export const BRIDGE_TEST_PAGE_HTML = [
   "</script>",
 ].join("\n");
 
-/** Starts the bridge behind an HTTP server the harness owns. */
+/**
+ * Starts the bridge behind an HTTP server the harness owns.
+ *
+ * `packaged: true` makes the host read the **store** allowlist instead of the
+ * development one, which is what a packaged production entry does. The two
+ * are different configurations, and the difference is the point: a packaged
+ * host must not accept a development identity.
+ *
+ * `allowlist` says which variable the id is written into. It is separate from
+ * `packaged` on purpose: the interesting case is a packaged host whose
+ * development allowlist names the extension — that is the configuration a
+ * packaged build has to refuse.
+ */
 export async function startBridge(
   extensionId: string,
   surface: "edge" | "chrome",
+  options: {
+    readonly packaged?: boolean;
+    readonly allowlist?: "store" | "development";
+  } = {},
 ): Promise<{
   bridge: BrowserBridgeServer;
   origin: string;
   pageUrl: string;
   close: () => Promise<void>;
 }> {
+  const allowlist = options.allowlist ?? (options.packaged ? "store" : "development");
+  const variable =
+    allowlist === "store"
+      ? `MAVIS_BROWSER_STORE_${surface.toUpperCase()}_EXTENSION_IDS`
+      : `MAVIS_BROWSER_${surface.toUpperCase()}_EXTENSION_IDS`;
   const bridge = new BrowserBridgeServer({
     host: "127.0.0.1",
     dev: true,
+    ...(options.packaged ? { packaged: true } : {}),
     credentialStore: createInMemorySecureCredentialStore(),
     // The allowlist is per surface, and so is the pairing. A browser running
     // the extension has to be admitted on **its own** surface, or the Edge
     // run would prove nothing about the Edge switch.
-    env:
-      surface === "edge"
-        ? { MAVIS_BROWSER_EDGE_EXTENSION_IDS: extensionId }
-        : { MAVIS_BROWSER_CHROME_EXTENSION_IDS: extensionId },
+    env: { [variable]: extensionId },
   });
   await bridge.start();
   await bridge.enableSurface(surface);
