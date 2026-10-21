@@ -444,6 +444,32 @@ export interface WebuiRuntimeCliService {
     readonly proactive?: boolean;
   }): Promise<WebuiMemorySettingsView>;
   /**
+   * The four browser authorization switches.
+   *
+   * Optional on the same terms as the memory pair: a host that predates the
+   * browser surface has to fail closed with one clear message rather than
+   * crash on an absent method, and the browser adapter returns nothing at all
+   * when these are missing — which leaves the browser operations unregistered
+   * and the capability manifest reporting the family as absent.
+   */
+  getBrowserAuthorization?(): Promise<{
+    isolatedChromium: boolean;
+    edge: boolean;
+    chrome: boolean;
+    fullCdp: boolean;
+  }>;
+  setBrowserAuthorization?(request: {
+    isolatedChromium?: boolean;
+    edge?: boolean;
+    chrome?: boolean;
+    fullCdp?: boolean;
+  }): Promise<{
+    isolatedChromium: boolean;
+    edge: boolean;
+    chrome: boolean;
+    fullCdp: boolean;
+  }>;
+  /**
    * The model selection the runtime answers with a verdict, not an object.
    *
    * Declared here rather than as `CliService["selectModel"]`: this file is the

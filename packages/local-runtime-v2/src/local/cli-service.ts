@@ -854,6 +854,41 @@ export class CliService {
     return configuration.setMemorySettings(input);
   }
 
+  /**
+   * The browser authorization switches, optional on the capability for the same
+   * reason the memory pair is: a host that predates the surface has to fail
+   * closed with one clear message rather than crash on an absent method.
+   */
+  getBrowserAuthorization(): Promise<{
+    isolatedChromium: boolean;
+    edge: boolean;
+    chrome: boolean;
+    fullCdp: boolean;
+  }> {
+    const configuration = this.requireCapability("configuration", "Configuration");
+    if (!configuration.getBrowserAuthorization)
+      throw new Error("Runtime host does not expose browser authorization");
+    return configuration.getBrowserAuthorization();
+  }
+
+  setBrowserAuthorization(
+    input: Parameters<
+      NonNullable<
+        NonNullable<LocalRuntimeApplication["configuration"]>["setBrowserAuthorization"]
+      >
+    >[0],
+  ): Promise<{
+    isolatedChromium: boolean;
+    edge: boolean;
+    chrome: boolean;
+    fullCdp: boolean;
+  }> {
+    const configuration = this.requireCapability("configuration", "Configuration");
+    if (!configuration.setBrowserAuthorization)
+      throw new Error("Runtime host does not expose browser authorization");
+    return configuration.setBrowserAuthorization(input);
+  }
+
   listModels(
     input?: Parameters<
       NonNullable<LocalRuntimeApplication["models"]>["list"]

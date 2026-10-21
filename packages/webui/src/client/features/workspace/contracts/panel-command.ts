@@ -40,4 +40,4 @@ export type WebuiWorkspaceMenuTabKind = Extract<
 /** How an add-menu entry opens its tab. Data, so the component only dispatches it. */
 export type WebuiWorkspaceAddMenuOpen =
   | { readonly type: "open-workspace-review" }
-  | { readonly type: "open-tab"; readonly kind: "files" | "canvas" | "terminal" };
+  | { readonly type: "open-tab"; readonly kind: "files" | "canvas" | "terminal" | "browser" };

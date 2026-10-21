@@ -59,6 +59,20 @@ export interface WebuiWorkspaceTabShapes {
   readonly terminal: {
     readonly workspaceDir?: string;
   };
+  /**
+   * The browser panel's tab.
+   *
+   * It carries the optional instance fields every menu-opened tab carries and no
+   * file path: a browser tab opens a browser's page, not a document in the
+   * workspace. The instance fields are declared rather than refused because the
+   * add menu sends them with every `open-tab` and the tab is built as one object
+   * literal — a shape that would not accept them fails to compile the moment the
+   * command names this kind, instead of carrying two words no view reads.
+   */
+  readonly browser: {
+    readonly sessionId?: string;
+    readonly workspaceDir?: string;
+  };
 }
 
 export type WebuiWorkspaceTabKind = keyof WebuiWorkspaceTabShapes;
@@ -93,16 +107,28 @@ export const WEBUI_WORKSPACE_TAB_KINDS: Readonly<
   review: { label: "变更", addMenu: { type: "open-workspace-review" } },
   canvas: { label: "画布", addMenu: { type: "open-tab", kind: "canvas" } },
   terminal: { label: "终端", addMenu: { type: "open-tab", kind: "terminal" } },
+  /**
+   * The browser panel.
+   *
+   * The command's `open-tab` names `browser` alongside the other kinds, so this
+   * row has a menu entry of its own. The panel is mounted by the browser
+   * business's published host, which owns the browser state — a workspace
+   * component may not construct another business's state.
+   */
+  browser: { label: "浏览器", addMenu: { type: "open-tab", kind: "browser" } },
 };
 
 /**
  * The add menu's order. It is not the table's: 审查 leads and 查看文件 trails the
- * kinds that open a process.
+ * kinds that open a process. The browser panel leads the file views — it is
+ * another thing to watch while the work runs — and contributes no entry while its
+ * row above is `null`.
  */
 export const WEBUI_WORKSPACE_ADD_MENU_ORDER: readonly WebuiWorkspaceTabKind[] = [
   "review",
   "terminal",
   "canvas",
+  "browser",
   "files",
 ];
 

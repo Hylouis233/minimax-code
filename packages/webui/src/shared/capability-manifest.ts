@@ -29,6 +29,7 @@ export const WEBUI_CAPABILITY_NAMES = [
   "interactions",
   "workspace",
   "terminal",
+  "browser",
   "models",
   "plugins",
   "settings",
@@ -125,6 +126,26 @@ export const WEBUI_CAPABILITY_REGISTRY_PROOFS: Readonly<
   terminal: {
     operations: ["listTerminals", "createTerminal", "disposeTerminal"],
     ready: ["watchTerminal", "writeTerminal", "resizeTerminal"],
+  },
+  /**
+   * The browser family exists when the host wired the browser adapter, and
+   * not when it did not — the seven browser operations are dedicated handlers
+   * that are only registered when the adapter is supplied, so an unregistered
+   * family is the honest "this host has no browser" answer.
+   *
+   * The family being present says nothing about whether any browser is
+   * authorized: that is the four switches' answer, read at call time. A host
+   * with the browser family but no browser switched on still answers every
+   * browser call with a refusal that says which switch is off.
+   */
+  browser: {
+    operations: ["getBrowserAuthorization", "listBrowserCapabilities"],
+    ready: [
+      "listBrowserTargets",
+      "selectBrowserTarget",
+      "sendBrowserInput",
+      "watchBrowserFrames",
+    ],
   },
   models: { operations: ["listModels", "selectModel"] },
   plugins: { operations: ["pluginManagement"] },

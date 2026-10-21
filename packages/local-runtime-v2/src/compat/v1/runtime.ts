@@ -774,6 +774,41 @@ function createPeripheralApplication(
           proactive: memory?.proactive === true,
         };
       },
+      /**
+       * The four browser authorization switches.
+       *
+       * Read as "on only when the configuration says `true`", so a missing
+       * `browser` tree is the documented default — nothing is authorized — rather
+       * than an error. Writing goes through `put` on the `browser` root for the
+       * same reason the memory pair does: the shallow-assign path would drop the
+       * sibling keys.
+       */
+      getBrowserAuthorization: async () => {
+        const browser = host.apiHost.configGetter().browser;
+        return {
+          isolatedChromium: browser?.isolatedChromium === true,
+          edge: browser?.edge === true,
+          chrome: browser?.chrome === true,
+          fullCdp: browser?.fullCdp === true,
+        };
+      },
+      setBrowserAuthorization: async (input) => {
+        const put: Record<string, boolean> = {};
+        if (input.isolatedChromium !== undefined) put.isolatedChromium = input.isolatedChromium;
+        if (input.edge !== undefined) put.edge = input.edge;
+        if (input.chrome !== undefined) put.chrome = input.chrome;
+        if (input.fullCdp !== undefined) put.fullCdp = input.fullCdp;
+        if (Object.keys(put).length > 0) {
+          await updateLocalConfigFile({ field: "browser", put });
+        }
+        const browser = host.apiHost.configGetter().browser;
+        return {
+          isolatedChromium: browser?.isolatedChromium === true,
+          edge: browser?.edge === true,
+          chrome: browser?.chrome === true,
+          fullCdp: browser?.fullCdp === true,
+        };
+      },
     },
     backgroundTasks: {
       list: async ({

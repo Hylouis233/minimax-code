@@ -391,6 +391,87 @@
       "home": "target"
     },
     {
+      "path": "client/features/browser/application/browser-commands.ts",
+      "layers": [
+        "application"
+      ],
+      "role": "feature-application",
+      "business": "browser",
+      "home": "target"
+    },
+    {
+      "path": "client/features/browser/bindings/use-browser-run.public.ts",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-bindings",
+      "business": "browser",
+      "home": "target"
+    },
+    {
+      "path": "client/features/browser/contracts/browser-panel.ts",
+      "layers": [
+        "contracts"
+      ],
+      "role": "feature-contracts",
+      "business": "browser",
+      "home": "target"
+    },
+    {
+      "path": "client/features/browser/contracts/browser-port.ts",
+      "layers": [
+        "contracts"
+      ],
+      "role": "feature-contracts",
+      "business": "browser",
+      "home": "target"
+    },
+    {
+      "path": "client/features/browser/projection/browser-state.ts",
+      "layers": [
+        "view"
+      ],
+      "role": "feature-projection",
+      "business": "browser",
+      "home": "target"
+    },
+    {
+      "path": "client/features/browser/ui/BrowserAuthorizationSwitches.public.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "browser",
+      "home": "target"
+    },
+    {
+      "path": "client/features/browser/ui/BrowserPanel.public.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "browser",
+      "home": "target"
+    },
+    {
+      "path": "client/features/browser/ui/BrowserPanelHost.public.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "browser",
+      "home": "target"
+    },
+    {
+      "path": "client/features/browser/ui/browser.css",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "browser",
+      "home": "target"
+    },
+    {
       "path": "client/features/composer/application/command-workflows.ts",
       "layers": [
         "application"
@@ -3316,6 +3397,78 @@
       "home": "outside"
     },
     {
+      "path": "runtime/browser/authorization.ts",
+      "layers": [
+        "runtime"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
+      "path": "runtime/browser/browser-service.ts",
+      "layers": [
+        "runtime"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
+      "path": "runtime/browser/errors.ts",
+      "layers": [
+        "runtime"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
+      "path": "runtime/browser/input.ts",
+      "layers": [
+        "runtime"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
+      "path": "runtime/browser/isolated-chromium/cdp-connection.ts",
+      "layers": [
+        "runtime"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
+      "path": "runtime/browser/isolated-chromium/provider.ts",
+      "layers": [
+        "runtime"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
+      "path": "runtime/browser/target-registry.ts",
+      "layers": [
+        "runtime"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
+      "path": "runtime/browser/tool-adapter.ts",
+      "layers": [
+        "runtime"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
       "path": "runtime/check-in.ts",
       "layers": [
         "runtime"
@@ -3353,6 +3506,15 @@
     },
     {
       "path": "runtime/harness/adapter.ts",
+      "layers": [
+        "runtime"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
+      "path": "runtime/harness/browser.ts",
       "layers": [
         "runtime"
       ],
@@ -3676,6 +3838,78 @@
       "home": "outside"
     },
     {
+      "path": "server/browser-bridge/admission.ts",
+      "layers": [
+        "server"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
+      "path": "server/browser-bridge/credential-store.ts",
+      "layers": [
+        "server"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
+      "path": "server/browser-bridge/index.ts",
+      "layers": [
+        "server"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
+      "path": "server/browser-bridge/pairing.ts",
+      "layers": [
+        "server"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
+      "path": "server/browser-bridge/reconnect.ts",
+      "layers": [
+        "server"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
+      "path": "server/browser-bridge/registry.ts",
+      "layers": [
+        "server"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
+      "path": "server/browser-bridge/server.ts",
+      "layers": [
+        "server"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
+      "path": "server/browser-bridge/session.ts",
+      "layers": [
+        "server"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
       "path": "server/credentials.ts",
       "layers": [
         "server"
@@ -3802,6 +4036,15 @@
       "home": "outside"
     },
     {
+      "path": "server/operation/browser.ts",
+      "layers": [
+        "server"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
       "path": "server/operation/common.ts",
       "layers": [
         "server"
@@ -3830,6 +4073,15 @@
     },
     {
       "path": "server/operation/handlers/account.ts",
+      "layers": [
+        "server"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
+      "path": "server/operation/handlers/browser.ts",
       "layers": [
         "server"
       ],
@@ -4100,6 +4352,24 @@
     },
     {
       "path": "shared/contracts/account.ts",
+      "layers": [
+        "shared"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
+      "path": "shared/contracts/browser-bridge.ts",
+      "layers": [
+        "shared"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
+      "path": "shared/contracts/browser.ts",
       "layers": [
         "shared"
       ],

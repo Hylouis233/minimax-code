@@ -9,6 +9,8 @@ import type { Duplex } from "node:stream";
 import { WebSocketServer, type WebSocket } from "ws";
 
 import { admitWebSocketUpgrade, parseWebSocketUrl, rejectUpgrade } from "./access-policy.js";
+import type { BrowserBridgeServer } from "./browser-bridge/server.js";
+import { WEBUI_BROWSER_BRIDGE_PATH } from "../shared/contracts/browser-bridge.js";
 import { handleInboundFrame } from "./frame-handler.js";
 import type { WebuiOperationRegistryEntry } from "./operation/operations.js";
 import type { WebuiCredential } from "./credentials.js";
@@ -23,6 +25,14 @@ export interface WebuiWebSocketServerContext {
   readonly dev: boolean;
   readonly operations: ReadonlyMap<string, WebuiOperationRegistryEntry>;
   readonly isAccepting: () => boolean;
+  /**
+   * The extension bridge, when one is wired.
+   *
+   * Optional because a host that has no bridge still serves the page: the
+   * upgrade branch below refuses a bridge request outright rather than letting
+   * it fall through to an admission that would refuse it for the wrong reason.
+   */
+  readonly browserBridge?: BrowserBridgeServer;
 }
 
 export class WebuiWebSocketServer {
@@ -57,6 +67,20 @@ export class WebuiWebSocketServer {
     const url = parseWebSocketUrl(request.url);
     if (!url) {
       rejectUpgrade(socket, 400, "Bad Request");
+      return;
+    }
+    // The bridge is a different socket with a different credential and a
+    // different origin rule, so it is routed BEFORE the generic admission and
+    // the generic path never sees it. The order matters in both directions: a
+    // bridge request must not be judged by the bearer-token rule, and the page
+    // path must not be widened to admit `chrome-extension://` origins in order
+    // to make the bridge work (ADR 0019).
+    if (url.pathname === WEBUI_BROWSER_BRIDGE_PATH) {
+      if (!this.context.browserBridge) {
+        rejectUpgrade(socket, 404, "Not Found");
+        return;
+      }
+      this.context.browserBridge.handleUpgrade(request, socket, head);
       return;
     }
     if (

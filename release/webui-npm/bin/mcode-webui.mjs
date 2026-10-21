@@ -7,9 +7,11 @@ import { fileURLToPath } from "node:url";
 import {
   WebuiService,
   createOperationRegistry,
+  BrowserBridgeServer,
 } from "../server/server.js";
 import {
   WebuiTerminalManager,
+  createBrowserAdapter,
   createHarnessPortFromHost,
   createWebuiRuntimeHost,
 } from "../server/runtime.js";
@@ -25,23 +27,75 @@ if (!Number.isInteger(tcpPort) || tcpPort < 1 || tcpPort > 65535) {
 const dataDir = process.env.MINIMAX_DATA_DIR?.trim() || path.join(os.homedir(), ".minimax");
 process.env.MAVIS_BUILTIN_AGENTS_V2_DIR ??= path.join(packageRoot, "assets/agents");
 process.env.MAVIS_BUILTIN_AGENTS_DIR ??= path.join(packageRoot, "assets/agents");
-const assembled = await createWebuiRuntimeHost({ dataDir, appVersion: version });
+// The extension bridge is assembled here, beside the browser adapter, because
+// the layer matrix forbids `src/runtime/**` from importing `src/server/**`. This
+// file is the composition root: it is the one place that can hand the bridge's
+// provider factory to the adapter AND the same instance to the service's
+// `/browser-bridge` upgrade branch, so the extension and the browser service
+// address one session rather than two. `dev: true` is passed through
+// unchanged; the bridge's admission ignores it by design.
+//
+// `packaged: true` is what makes this the **packaged** entry. A packaged host
+// reads the store allowlist (`MAVIS_BROWSER_STORE_EDGE_EXTENSION_IDS`,
+// `MAVIS_BROWSER_STORE_CHROME_EXTENSION_IDS`) and never the development one
+// (`MAVIS_BROWSER_EDGE_EXTENSION_IDS`, `MAVIS_BROWSER_CHROME_EXTENSION_IDS`).
+// The difference matters: an unpacked build's id is derived from the directory
+// it was loaded from, so it is not an identity anyone can rely on, and a
+// packaged host that accepted those ids would admit whatever unpacked
+// extension happened to be present. The development entry
+// (`scripts/run-webui-server.mjs`) is the one that reads the development
+// allowlist.
+const browserBridge = new BrowserBridgeServer({
+  host: "127.0.0.1",
+  dev: true,
+  packaged: true,
+});
+await browserBridge.start();
+// The browser adapter is built before the runtime host, because the host is
+// what takes the browser provider: the adapter reads its authorization
+// switches through the host, so the host is attached to it immediately after.
+//
+// The same binding carries both faces of the one browser session — the port the
+// browser operations bind to, and the Agent's browser tools. Building the tool
+// adapter anywhere else would put the Agent on a second browser, and the panel
+// would show the first.
+const browser = createBrowserAdapter({ dataDir, bridge: browserBridge });
+const assembled = await createWebuiRuntimeHost({
+  dataDir,
+  appVersion: version,
+  browserProvider: {
+    adapter: browser.toolAdapter,
+    close: () => browser.close(),
+  },
+  // One compact Browser tool over the restricted command set. The detailed
+  // per-action tools would re-offer the same actions under their own names.
+  browserToolExposure: "compact",
+});
+browser.attachHost(assembled.host);
 const port = createHarnessPortFromHost(assembled.host);
 const terminal = new WebuiTerminalManager();
+// The browser port is absent when the host cannot answer the browser
+// authorization at all, and the browser operations then stay unregistered.
+//
+// The bridge's pairings follow the switches, so the persisted authorization has
+// to reach them before the service starts serving.
+await browser.initialize();
 const service = new WebuiService({
   port,
-  operations: createOperationRegistry(port, terminal),
+  operations: createOperationRegistry(port, terminal, browser.port, browserBridge),
   terminal,
   host: "127.0.0.1",
   tcpPort,
   dev: true,
   clientDir: path.join(packageRoot, "client"),
+  browserBridge,
 });
 
 let closing;
 const close = () => {
   closing ??= (async () => {
     await service.close();
+    await browser.close();
     await assembled.host.apiHost.close();
   })();
   return closing;

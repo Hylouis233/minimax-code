@@ -51,6 +51,13 @@ const EXPECTED: Record<
     "createTerminal", "listTerminals", "writeTerminal", "resizeTerminal",
     "disposeTerminal", "watchTerminal",
   ],
+  browser: [
+    "getBrowserAuthorization", "setBrowserAuthorization", "listBrowserTargets",
+    "selectBrowserTarget", "sendBrowserInput", "sendBrowserCommand",
+    "watchBrowserFrames",
+    "listBrowserCapabilities",
+    "getBrowserInstallationKey",
+  ],
   composer: ["runCommand", "enqueueMessage", "listQueueMessages", "deleteQueueItem"],
   interactions: [
     "listPendingPermissions", "getPendingQuestionnaire", "replyPermission",

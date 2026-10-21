@@ -279,6 +279,36 @@ export interface LocalRuntimeApplication {
       enabled?: boolean;
       proactive?: boolean;
     }): Promise<{ enabled: boolean; proactive: boolean }>;
+    /**
+     * The four browser authorization switches, read and written as their own
+     * narrow surface.
+     *
+     * They are four booleans rather than one because they are four different
+     * grants: launching an isolated browser, reaching the person's Edge,
+     * reaching the person's Chrome, and letting a caller send every DevTools
+     * command instead of the restricted set. A single switch would make it
+     * impossible to allow one without allowing the rest.
+     *
+     * Optional on the same terms as the memory pair, and read with the same
+     * rule: an absent method means "this host cannot answer", never "off".
+     */
+    getBrowserAuthorization?(): Promise<{
+      isolatedChromium: boolean;
+      edge: boolean;
+      chrome: boolean;
+      fullCdp: boolean;
+    }>;
+    setBrowserAuthorization?(input: {
+      isolatedChromium?: boolean;
+      edge?: boolean;
+      chrome?: boolean;
+      fullCdp?: boolean;
+    }): Promise<{
+      isolatedChromium: boolean;
+      edge: boolean;
+      chrome: boolean;
+      fullCdp: boolean;
+    }>;
   };
   readonly models?: {
     list(input?: { sessionId?: string }): Promise<readonly unknown[]>;

@@ -124,6 +124,15 @@ import {
   VERSION_OPERATION_NAME,
   WATCH_TERMINAL_OPERATION_NAME,
   WRITE_TERMINAL_OPERATION_NAME,
+  GET_BROWSER_AUTHORIZATION_OPERATION_NAME,
+  SET_BROWSER_AUTHORIZATION_OPERATION_NAME,
+  LIST_BROWSER_TARGETS_OPERATION_NAME,
+  SELECT_BROWSER_TARGET_OPERATION_NAME,
+  SEND_BROWSER_INPUT_OPERATION_NAME,
+  SEND_BROWSER_COMMAND_OPERATION_NAME,
+  WATCH_BROWSER_FRAMES_OPERATION_NAME,
+  LIST_BROWSER_CAPABILITIES_OPERATION_NAME,
+  GET_BROWSER_INSTALLATION_KEY_OPERATION_NAME,
 } from "../../shared/operation-names.js";
 import { createWebuiWire, type WebuiWireOptions } from "./wire.js";
 
@@ -140,7 +149,8 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
    * breaks the build. The `Required` qualifier is scoped to this
    * implementation boundary; the `WebuiTransport` capability contract
    * consumed by components keeps its optional semantics. */
-  const { request, stream, watchTerminal, workspaceFileUrl, watchEvents } = createWebuiWire(options);
+  const { request, stream, watchTerminal, watchBrowserFrames, workspaceFileUrl, watchEvents } =
+    createWebuiWire(options);
 
   return {
     version: () => request(VERSION_OPERATION_NAME, undefined),
@@ -219,6 +229,25 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
     resizeTerminal: (body) => request(RESIZE_TERMINAL_OPERATION_NAME, {...body}),
     disposeTerminal: (body) => request(DISPOSE_TERMINAL_OPERATION_NAME, body),
     watchTerminal: (body, onFrame) => watchTerminal(WATCH_TERMINAL_OPERATION_NAME, body, onFrame),
+    getBrowserAuthorization: () => request(GET_BROWSER_AUTHORIZATION_OPERATION_NAME, {}),
+    setBrowserAuthorization: (body) => request(SET_BROWSER_AUTHORIZATION_OPERATION_NAME, body),
+    listBrowserTargets: (body) => request(LIST_BROWSER_TARGETS_OPERATION_NAME, body),
+    selectBrowserTarget: (body) => request(SELECT_BROWSER_TARGET_OPERATION_NAME, body),
+    // The run is an envelope field on the wire, not part of the command: the
+    // runtime validates the command shape and knows nothing about which run sent
+    // it. The panel's `runId` is therefore folded in here, where the boundary
+    // between the port's request and the operation's body already lives.
+    sendBrowserInput: (body) =>
+      request(SEND_BROWSER_INPUT_OPERATION_NAME, {
+        ...body.command,
+        ...(body.runId ? { runId: body.runId } : {}),
+      }),
+    sendBrowserCommand: (body) => request(SEND_BROWSER_COMMAND_OPERATION_NAME, body),
+    watchBrowserFrames: (body, onFrame) =>
+      watchBrowserFrames(WATCH_BROWSER_FRAMES_OPERATION_NAME, body, onFrame),
+    listBrowserCapabilities: () => request(LIST_BROWSER_CAPABILITIES_OPERATION_NAME, {}),
+    getBrowserInstallationKey: (body) =>
+      request(GET_BROWSER_INSTALLATION_KEY_OPERATION_NAME, body),
     createSession: (body) => request(CREATE_SESSION_OPERATION_NAME, body),
     sendMessage: (body, onFrame, onDelivery) =>
       stream(SEND_MESSAGE_OPERATION_NAME, body, onFrame, onDelivery),

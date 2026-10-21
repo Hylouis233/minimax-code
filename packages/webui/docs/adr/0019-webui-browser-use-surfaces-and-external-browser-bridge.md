@@ -202,3 +202,169 @@ supporting these decisions are kept here with the decision record.
 The two handoff documents supplied during this decision review record the MVP behavior and earlier
 WebUI research. They are research records, not implementation evidence. Current implementation
 claims must be checked against the source.
+
+## Amendments
+
+Implementation and the review rounds recorded in
+[`../browser-use/07-review-findings.md`](../browser-use/07-review-findings.md)
+raised questions the original text did not settle. These are the answers,
+recorded here because they change how the bridge is built rather than only how
+it is documented.
+
+### A1 — How the extension obtains the host's pairing credential
+
+The decision above says pairing is automatic: enabling a browser's switch pairs
+the browser's installed extension without per-tab confirmation. It does not say
+how the two sides come to hold the same secret, and the first implementation
+left that open — the host minted a credential and the extension minted a
+different one, so the handshake could never complete.
+
+The answer is a **credential exchange over the existing socket**, with the
+credential encrypted to a key the extension generates for that connection:
+
+- The extension generates an **ephemeral** ECDH P-256 key pair when it
+  connects and sends the public key in its `hello` frame. Nothing about the
+  key is stored, so there is no long-term key to manage, rotate or leak.
+- The host, when the surface's pairing is enabled and the extension's id is on
+  the surface's allowlist, encrypts the credential to that public key and
+  sends it in a `pair` frame: ECDH P-256, then HKDF-SHA256, then AES-256-GCM.
+  The secret never crosses the wire in the clear.
+- The extension decrypts it, stores it in `chrome.storage.local`, and answers
+  the challenge with it.
+
+This keeps the "automatic" property: there is no code for the person to
+carry and no options page to configure. The alternative — a one-time pairing
+code the person copied from the host into the extension — was considered and
+rejected, because it puts the credential in the clear on the wire and adds a
+surface the person has to use correctly.
+
+**What this does not establish — and it is not a small gap.** The extension's
+identity is established by its origin being on the allowlist, and a local
+process can put any `Origin` header it likes on a loopback socket. The host
+then seals the credential to the public key *that peer supplied*. A local
+process can therefore be admitted as the allowlisted extension, supply its own
+ephemeral key, decrypt the credential and answer the challenge.
+
+The exchange protects the credential **in transit** and nothing more. It is
+**not** an authentication of the peer, and the bridge must be treated as
+**unauthenticated against anything that can reach loopback** until a stronger
+anchor exists. The switch that enables an external surface enables it for
+**the person's browser**; it is not a boundary against a local process.
+
+The stronger anchor is an **installation key** the extension holds and a local
+process does not: provisioned when the extension is installed and configured,
+proved during the exchange, and bound to the key the credential is sealed to so
+that only a peer that has already proved possession of it can receive one. The
+native-messaging route this record's research findings already list is the
+other candidate, and it has the same property — a registered host process,
+rather than a spoofable `Origin` header.
+
+This is recorded here as an open product decision rather than left implicit,
+because the gap is a security boundary and not a detail of the implementation.
+
+### A2 — The peer is authenticated by an installation key, not by its `Origin`
+
+**Supersedes the limitation A1 recorded.** Admission still selects the
+allowlisted extension id from the `Origin` header, but that is now a
+**pre-filter**, not the authentication decision. A peer must prove possession of
+the surface's **installation key** — a long-lived secret held in the OS secure
+store on the host and in `chrome.storage.local` in one browser — before the
+host will release a pairing credential.
+
+- The host mints a 32-byte installation key per surface, stores it in the OS
+  secure store, and shows it in the WebUI Settings surface. The person pastes
+  it into the extension's options page once; the extension stores it and
+  thereafter shows only a fingerprint.
+- The handshake is **proof-first**: `hello` → `challenge` → `proof` → and only
+  then, for a peer that proved the installation key, the sealed pairing
+  credential. A peer that proves only a pairing credential the host already
+  issued is admitted without a further credential. A peer that proves neither
+  is refused and **receives no credential at all**.
+- The installation key is **not** destroyed when a surface is switched off: it
+  is bound to the browser, not to the switch, so the person does not have to
+  provision again after a toggle.
+
+Provisioning is explicit, and that is the deliberate cost. An unprovable peer
+identity cannot be automated away: the automatic pairing this record describes
+is automatic with respect to **tabs**, not with respect to **peer identity**. The
+alternative — native messaging — has the same property and is the other
+candidate; it is recorded in the research findings below.
+
+### A3 — What "the enabled state survives a restart" means for the credential
+
+The decision above says each browser's enabled state and authorization survive
+WebUI and browser restarts. The first implementation read that as "the switch
+is still on" and minted a **fresh** credential on every start, which quietly
+contradicted the first half of the sentence: the extension still held the old
+secret, so the two could not talk.
+
+The answer is that the two paths are different on purpose:
+
+- **Startup restores.** The host re-adopts the credential the OS secure store
+  already holds, because the extension kept its copy across the restart.
+- **A user toggle rotates.** Turning a switch off revokes the credential and
+  removes it from the store, so the next enable finds nothing to restore and
+  mints a fresh one. This is the "turning it on later establishes a fresh
+  pairing" behaviour the decision above asks for.
+
+### A4 — The target selection is scoped to the Agent run
+
+The decision above says the Agent run owns the target selection and the panel
+follows the active run's target. The first implementation held one selection
+per surface, which is a host-wide selection: two runs looking at different
+tabs of the same browser would fight over it, and the panel would show
+whichever selection was written last.
+
+The selection is therefore carried by the run that made it. What the panel
+shows when no run is active — the last selection the run made, or nothing — is
+a product decision that the implementation records rather than guessing.
+
+### A5 — The surface is settled by the browser, and bound to that surface's own secret
+
+The decision above treats a surface as a browser. The first implementation
+mapped a peer's **extension identity** to a surface, taking the first pairing
+whose allowlist admitted it. That is wrong for the development configuration
+the decision asks for: an unpacked build has one identity, and a person who
+loads it in both Edge and Chrome lists that identity on both surfaces. The
+first match won, so a Chrome browser landed on the Edge pairing — the Edge
+surface reported connected while the person was looking at Chrome, and the
+Chrome surface never came up at all.
+
+The peer therefore names the browser it runs in, and the host answers with the
+pairing for that browser. The name is not the authority: each surface has its
+own installation key and its own credential, the challenge is issued by that
+surface's pairing, and the proof is verified against that pairing's own
+secret. A peer that calls itself Edge and answers with the Chrome surface's
+installation key is refused. The name only selects *which* secret has to be
+proved; it cannot produce one.
+
+### A6 — A packaged host accepts store identities and never development ones
+
+The decision above says the extension comes from a store, so the identity is
+the one the store issues. The first implementation had a packaged host and a
+development host in the source and no rule connecting them: both composition
+roots built the bridge the same way, so a released WebUI accepted whatever
+unpacked extension happened to be present. An unpacked build's identity is
+derived from the directory it was loaded from, so it is not an identity anyone
+can rely on.
+
+A packaged host now reads the store allowlist and never the development one.
+The development entry reads the development allowlist, because that is where
+the identities of unpacked builds belong. A store identity is still an
+ordinary configuration value: an operator who runs the packaged entry against
+a locally built extension names that extension's identity explicitly, in the
+store variable.
+
+### A7 — A surface is one browser
+
+The decision above has one panel per surface, and the Agent's tools act on the
+surface the run selected. The bridge exposed one provider per surface, so a
+second live session on that surface would be a browser the host could not
+address: its tabs were announced into a table the provider did not read.
+
+A surface therefore serves one browser. A *different* browser instance
+connecting to a surface that is already served is refused with a reason,
+rather than being allowed to take the surface away from the one that holds
+it. The **same** browser reconnecting is not a second browser: a Manifest V3
+worker that restarts reconnects, and the new connection has to be able to
+take over before the old socket's close has been noticed.

@@ -19,6 +19,7 @@
     "packages/agent-runtime",
     "packages/agent-tools",
     "packages/browser-core",
+    "packages/browser-extension",
     "packages/config",
     "packages/local-runtime",
     "packages/local-runtime-v2",

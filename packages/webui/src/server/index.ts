@@ -35,6 +35,15 @@ export {
   type WebuiCredential,
 } from "./credentials.js";
 export { isWebuiFrame } from "./envelope.js";
+// The browser bridge server: the dedicated path that reaches the person's
+// own Edge or Chrome. It is exported here so the npm composition root can
+// build the one instance that both the WebSocket server and the runtime
+// adapter share.
+export {
+  BrowserBridgeServer,
+  readAllowedExtensionIds,
+  type BrowserBridgeServerOptions,
+} from "./browser-bridge/server.js";
 export {
   WEBUI_PROTOCOL_VERSION,
   WebuiErrorCode,
