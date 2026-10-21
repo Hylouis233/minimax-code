@@ -8,6 +8,10 @@ checked without running it again.
 order. The only files that changed after the run are this record and the inventory line it adds; no
 source file, no test and no document changed after it.
 
+**The unit suite ran four more times** after the last of the fixes below, on the same tree: 208 files
+and 3230 tests, every time, with no unhandled errors. The gate had been red twice before that — once
+for a reason that is now understood, and once for a reason that was a defect in the service.
+
 **The environment.** Linux 7.0.0-38-generic, Node v26.8.1, Google Chrome 152.0.7977.82
 (`/usr/bin/google-chrome`), in the branch's own worktree.
 
@@ -16,7 +20,7 @@ source file, no test and no document changed after it.
 | Gate | Command | Result |
 | --- | --- | --- |
 | Types | `pnpm typecheck:webui` | **pass** — the server, the client and the test projects all type-check |
-| Unit and gate tests | `pnpm test:webui` | **pass** — 208 files, 3229 tests, 38.8s |
+| Unit and gate tests | `pnpm test:webui` | **pass** — 208 files, 3230 tests |
 | Dependency direction | `pnpm check:webui-dependency` | **pass** — 476 source files, 1734 in-package references, 0 violations, 0 cycles, 0 role violations, 0 publication violations |
 | Build | `pnpm build:webui` | **pass** — 130 server inputs, 345 client inputs, 467 total |
 | Build boundary | `pnpm check:webui-boundary` | **pass** — 467 inputs; source/output integrity, required entries and public workspace imports verified |
@@ -40,19 +44,27 @@ would spend the time on gates that cannot pass until the slice is finished. That
 for the *focused* work: each issue ran the suites that issue touched, and the full gate was not run
 per issue.
 
-The full gate itself ran three times, each after a whole block of changes:
+The full gate itself ran five times, each after a whole block of changes:
 
 1. **At the end of the plan.** It found two real defects: the stylesheet referenced two variables
    that do not exist, and the file results were read by the tab id while the read was filed by the
    content key. Both were fixed.
 2. **After the external review's fixes.** It found the port-slices test naming the browser slice's
    members, which the new close operation had joined.
-3. **On the tree that carries this record.** Everything green, as the table above says.
+3. **On the tree that carries this record, the first time.** It found an acceptance case failing
+   intermittently — a run with no selection that opened a web tab was not given the page, because the
+   service compared a selection it had read *before* the listing against a generation that had moved
+   while the listing was in flight. The service now reads the selection per target, and the registry
+   adopts a provider-reported generation that is ahead, because a page that is still loading is
+   observed as a replaced page while it is being attached to.
+4. **On the same tree.** It found the suite's file failing with every test in it passing: the
+   provider removed its profile directory right after killing the browser, and the browser was still
+   writing it. The removal is now retried.
+5. **On the tree that carries this record.** Everything green, as the table above says.
 
-The unit suite was then run four further times while an intermittent file-level failure was chased
-(the file's own tests all passed while the file was reported failed). It did not reproduce: 208 files
-and 3229 tests, every time. That one failure was never captured, so it is not claimed to be
-understood — only that it did not recur.
+The two intermittent failures were the *same* two defects, seen from different angles: the first was
+a test failing, the second was a file failing with nothing failing in it. Both are fixed, and the
+unit suite was run four times afterwards without either recurring.
 
 ## What the real-browser acceptance rests on
 
