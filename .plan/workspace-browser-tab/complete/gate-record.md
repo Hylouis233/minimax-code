@@ -79,6 +79,7 @@ branch and on the base branch:
 | `acbf1b40` | `verify (ubuntu-latest)` — the six external-bridge cases described below |
 | `01cf5785` | the same six, and `verify (macos-latest)` was **cancelled** with the matrix |
 | `9d945e54` | the same six — now with a named cause — and `verify (macos-latest)` **passed** (14m51s) |
+| `54db73a3` | the ubuntu and windows jobs **pass** — the ubuntu job is green for the first time since the browser-use programme landed; the macOS job was cancelled while it was still queued, so it carries no verdict |
 | `a63a6c99` — the base branch's own CI run, before this programme | `verify (macos-latest)` and `verify (ubuntu-latest)` |
 
 So the `test:capabilities` failure is **pre-existing on the base branch**, in a package this slice
@@ -162,8 +163,15 @@ Two changes, both test-side, neither of them an assertion:
 | `9d945e54` | every wait in the harness that can outlive its case is bounded, and names its step |
 | `a4f8f7c6` | the browser stops before the server, and the harness cuts the connections it still holds instead of waiting for them |
 
-The local browser suite is green with both (146 cases, 2.1m). What the next CI run says about the
-six is recorded below.
+The local browser suite is green with both (146 cases, 2.1m).
+
+**And the CI run at `54db73a3` is green**: `verify (ubuntu-latest)` **passed** — `test:webui` 208
+files, `test:webui-browser` **146 passed in 2.8m**, the source projection 5407 files, the dependency
+and build-boundary checks, the installed package and the capability suite — and
+`verify (windows-latest)` passed with it. The six cases that had been red on every CI run since
+the browser-use programme introduced them now pass on the runner that has been failing them. The
+macOS job of that run was cancelled while it was still queued, so it carries no verdict; the run
+at `9d945e54` passed macOS in 14m51s.
 
 **This corrects what an earlier version of this record said.** It said the runner "cannot drive a
 real browser with the extension", and that the spec's "is the browser installed" guard was the
@@ -217,9 +225,10 @@ Neither the extension nor the bridge server changed at all.
 write names the browsers they ran in — Chromium 153.0.8010.12 and Edge 155.0.4283.62, six cases,
 all `pass` (`.plan/browser-use/complete/real-external.acceptance.json`).
 
-**What is left, exactly:** the CI's ubuntu job is red on six external-bridge cases that were
-already red on the base branch's own head. Everything this slice is responsible for is green in CI
-(`test:webui`, `test:webui-package`) and green locally (the browser suite, 146 cases).
+**What is left, exactly:** nothing in CI. The ubuntu job — the one that had been red on the six
+external-bridge cases since the browser-use programme landed them — passes at `54db73a3`, and so
+does the windows job. The six cases were inherited from the base branch, and the fix that turned
+them green is in this branch.
 
 ## What the real-browser acceptance rests on
 
@@ -231,8 +240,9 @@ programme's own evidence, and it is the file the published acceptance record is 
 ## What was not observed
 
 - The macOS `verify` job at the tip: it was **cancelled** with the matrix when the ubuntu job
-  failed, so it had no verdict. It has one now — the run at `9d945e54` passed it (14m51s) — and the
-  run after that passes it too.
+  failed, so it had no verdict. It has one now — the run at `9d945e54` passed it (14m51s). At
+  `54db73a3` the macOS job was cancelled again, but **while it was still queued**: it never started,
+  so that is the runner queue, not a verdict.
 - The cross-surface bootstrap — a person opening a web tab while the run is selected on Edge — is
   implemented run-wide, but it has no dedicated test. The two same-surface cases are covered by the
   acceptance suite. The plan's own acceptance matrix (§6) is entirely on the `isolated` surface, so
