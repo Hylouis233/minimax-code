@@ -86,7 +86,7 @@ async function startHarness(extensionId: string, dev: boolean): Promise<Harness>
     if (rejection) return;
     wss.handleUpgrade(request, socket, head, (ws) => {
       const session = new BrowserBridgeSession({
-        pairing,
+        pairings: [pairing],
         socket: ws as unknown as never,
         sessionId: `s-${sessions.length}`,
       });

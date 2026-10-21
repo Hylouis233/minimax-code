@@ -23,7 +23,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { WebuiIsolatedChromiumProvider } from "../../src/runtime/browser/isolated-chromium/provider.js";
 import type { WebuiBrowserTargetId } from "../../src/shared/contracts/browser.js";
-import { observeAcceptance } from "../browser/acceptance-record.js";
+import { beginAcceptanceSuite, observeAcceptance } from "../browser/acceptance-record.js";
 
 /** The record file this suite writes. */
 const SUITE = "isolated-chromium";
@@ -95,6 +95,9 @@ describe.skipIf(!available)("the browser input path, against a real page", () =>
   let browserVersion = "unknown";
 
   beforeAll(async () => {
+    // The record is emptied here, at the start of the run: a run that failed
+    // during setup would otherwise leave the previous run's cases in place.
+    beginAcceptanceSuite(SUITE);
     dataDir = await mkdtemp(join(tmpdir(), "webui-browser-use-e2e-"));
     provider = await WebuiIsolatedChromiumProvider.launch({ dataDir });
     const path = await resolveChromePath();
@@ -155,10 +158,14 @@ describe.skipIf(!available)("the browser input path, against a real page", () =>
         entry: "development",
         case: "the isolated Chromium delivers text input to the page it is showing",
         settings: {
+          // The isolated surface is driven directly by the provider, so there
+          // is no allowlist and no extension: the runtime's own switch is the
+          // only authorization, and it is on for this case.
+          surface: "isolated-chromium",
           isolatedChromium: true,
-          edge: false,
-          chrome: false,
-          fullCdp: false,
+          edge: "not carried by the isolated surface",
+          chrome: "not carried by the isolated surface",
+          fullCdp: "not exercised by this case",
           allowlist: "not applicable",
           build: "not applicable",
         },
@@ -212,10 +219,14 @@ describe.skipIf(!available)("the browser input path, against a real page", () =>
         entry: "development",
         case: "the isolated Chromium refuses an input recorded against the page a navigation replaced",
         settings: {
+          // The isolated surface is driven directly by the provider, so there
+          // is no allowlist and no extension: the runtime's own switch is the
+          // only authorization, and it is on for this case.
+          surface: "isolated-chromium",
           isolatedChromium: true,
-          edge: false,
-          chrome: false,
-          fullCdp: false,
+          edge: "not carried by the isolated surface",
+          chrome: "not carried by the isolated surface",
+          fullCdp: "not exercised by this case",
           allowlist: "not applicable",
           build: "not applicable",
         },

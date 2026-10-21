@@ -75,16 +75,36 @@ function createSpyStore(): { readonly store: SecureCredentialStore; readonly sec
  *
  * The console methods and both process streams are the places a diagnostic
  * ends up. A credential in any of them has been disclosed.
+ *
+ * The console arguments are captured in every form they could carry the
+ * secret: a string is itself, a byte array is captured as base64, as hex and
+ * as the decimal list `String()` would produce, and an object is captured as
+ * JSON with byte arrays expanded. `String(arg)` alone would turn an object
+ * into `[object Object]` and a byte array into a comma-separated decimal
+ * list, and the test would then not notice a leak in either.
  */
 async function captureOutput<T>(body: () => Promise<T>): Promise<{ readonly value: T; readonly output: string }> {
   const chunks: string[] = [];
-  const consoleMethods = ["log", "info", "warn", "error", "debug"] as const;
-  const originals = new Map<string, (...args: unknown[]) => void>();
+  // Every console method that writes. `dir` and `table` are not exotic: a
+  // diagnostic that dumps an object uses them, and a capture that replaced
+  // only the five common ones would miss exactly that.
+  const consoleMethods = [
+    "log",
+    "info",
+    "warn",
+    "error",
+    "debug",
+    "dir",
+    "table",
+    "trace",
+  ] as const;
+  const originals = new Map<string, (...args: never[]) => void>();
   for (const method of consoleMethods) {
-    originals.set(method, console[method].bind(console));
-    console[method] = (...args: unknown[]) => {
-      chunks.push(args.map((arg) => String(arg)).join(" "));
-    };
+    const original = console[method].bind(console) as (...args: never[]) => void;
+    originals.set(method, original);
+    console[method] = ((...args: never[]) => {
+      chunks.push(args.map(describeArgument).join(" "));
+    }) as typeof console.log;
   }
   const stdout = process.stdout.write.bind(process.stdout);
   const stderr = process.stderr.write.bind(process.stderr);
@@ -101,10 +121,32 @@ async function captureOutput<T>(body: () => Promise<T>): Promise<{ readonly valu
     return { value, output: chunks.join("\n") };
   } finally {
     for (const method of consoleMethods) {
-      console[method] = originals.get(method)! as typeof console.log;
+      console[method] = originals.get(method)! as unknown as typeof console.log;
     }
     process.stdout.write = stdout;
     process.stderr.write = stderr;
+  }
+}
+
+/**
+ * Renders one logged argument in every form it could carry a secret.
+ */
+function describeArgument(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value instanceof Uint8Array) {
+    return [
+      Buffer.from(value).toString("base64"),
+      Buffer.from(value).toString("hex"),
+      Array.from(value).join(","),
+    ].join(" ");
+  }
+  try {
+    const json = JSON.stringify(value, (_key, item: unknown) =>
+      item instanceof Uint8Array ? Array.from(item) : item,
+    );
+    return json ?? String(value);
+  } catch {
+    return String(value);
   }
 }
 
@@ -202,21 +244,38 @@ describe("WebUI bridge credential secrecy", () => {
     // Every form a secret could take in a log.
     const forms = spy.secrets.flatMap((secret) => [
       Buffer.from(secret).toString("base64"),
+      Buffer.from(secret).toString("base64url"),
       Buffer.from(secret).toString("hex"),
       Buffer.from(secret).toString("utf8"),
+      // The comma-separated decimal list `String(bytes)` produces.
+      Array.from(secret).join(","),
     ]);
     for (const form of forms) {
       expect(captured.output).not.toContain(form);
     }
 
-    // And the frames the host sent must not carry them either: the credential
-    // travels sealed, not in the clear.
+    // And the capture has teeth: a secret written to the console this way is
+    // found. Without this, a capture that silently captured nothing would
+    // pass the assertions above for the wrong reason.
+    const selfCheck = await captureOutput(async () => {
+      console.log("self-check", spy.secrets[0]);
+    });
+    expect(selfCheck.output).toContain(Buffer.from(spy.secrets[0]!).toString("base64"));
+
+    // And **every** frame the host sent must not carry them either: the
+    // credential travels sealed, not in the clear. Checking only the `pair`
+    // frame would miss a credential that leaked in another one.
+    expect(frames.length).toBeGreaterThan(0);
+    const framesText = JSON.stringify(frames);
+    for (const form of forms) {
+      expect(framesText).not.toContain(form);
+    }
+    // The sealed credential is there, in the frame that carries it, so the
+    // assertion above is about the sealing and not about a frame that never
+    // arrived.
     const pairFrame = frames.find((frame) => frame.kind === "pair");
     expect(pairFrame).toBeDefined();
-    const pairText = JSON.stringify(pairFrame);
-    for (const form of forms) {
-      expect(pairText).not.toContain(form);
-    }
+    expect(typeof pairFrame?.payload).toBe("string");
   });
 });
 

@@ -50,9 +50,10 @@ async function extensionLastError(
 }
 
 import type { WebuiBrowserTargetState } from "../../src/shared/contracts/browser.js";
-import { observeAcceptance } from "./acceptance-record.js";
+import { beginAcceptanceSuite, observeAcceptance } from "./acceptance-record.js";
 import {
   browserVersionOf,
+  bridgeSettings,
   buildExtension,
   launchWithExtension,
   provision,
@@ -70,6 +71,9 @@ const SUITE = "real-external";
 
 test.describe("the external bridge, against a real browser and a real page", () => {
   test.beforeAll(async () => {
+    // The record is emptied here, at the start of the run: a run that failed
+    // during setup would otherwise leave the previous run's cases in place.
+    beginAcceptanceSuite(SUITE);
     await buildExtension();
   });
 
@@ -93,16 +97,12 @@ test.describe("the external bridge, against a real browser and a real page", () 
             browserVersion,
             entry: "development",
             case: "the bridge survives the worker being terminated during an active stream",
-            settings: {
-              isolatedChromium: false,
-              edge: surface === "edge",
-              chrome: surface === "chrome",
-              fullCdp: false,
-              allowlist: "development",
+            settings: () => ({
+              ...bridgeSettings(started.bridge, surface, "development"),
               build: "development",
               extensionId,
               installationKeyProved: true,
-            },
+            }),
             observed:
               "the host noticed the terminated worker, the surface went down and came back, and a command against the live tab answered again",
           },
@@ -172,16 +172,12 @@ test.describe("the external bridge, against a real browser and a real page", () 
             browserVersion,
             entry: "development",
             case: "text input reaches the page and the page's image reaches the host",
-            settings: {
-              isolatedChromium: false,
-              edge: surface === "edge",
-              chrome: surface === "chrome",
-              fullCdp: false,
-              allowlist: "development",
+            settings: () => ({
+              ...bridgeSettings(started.bridge, surface, "development"),
               build: "development",
               extensionId,
               installationKeyProved: true,
-            },
+            }),
             observed:
               "the text the host sent appeared in the page's field, and a non-empty image frame for that page arrived at the host",
           },
@@ -266,16 +262,12 @@ test.describe("the external bridge, against a real browser and a real page", () 
             browserVersion,
             entry: "development",
             case: "a DevTools command runs against the live tab, and one outside the allowed set is refused as unsupported",
-            settings: {
-              isolatedChromium: false,
-              edge: surface === "edge",
-              chrome: surface === "chrome",
-              fullCdp: true,
-              allowlist: "development",
+            settings: () => ({
+              ...bridgeSettings(started.bridge, surface, "development"),
               build: "development",
               extensionId,
               installationKeyProved: true,
-            },
+            }),
             observed:
               "the command in the allowed subset answered with the page's title, and a command outside it was refused as unsupported",
           },

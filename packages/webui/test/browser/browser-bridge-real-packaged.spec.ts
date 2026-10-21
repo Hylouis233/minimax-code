@@ -31,9 +31,10 @@ import { resolve } from "node:path";
 
 import { expect, test } from "@playwright/test";
 
-import { observeAcceptance } from "./acceptance-record.js";
+import { beginAcceptanceSuite, observeAcceptance } from "./acceptance-record.js";
 import {
   browserVersionOf,
+  bridgeSettings,
   buildExtension,
   launchWithExtension,
   provision,
@@ -90,6 +91,12 @@ function extensionIdOfPublicKey(publicKeyDer: Buffer): string {
 test.describe("the packaged production entry, against a real browser", () => {
   test.setTimeout(240_000);
 
+  test.beforeAll(() => {
+    // The record is emptied here, at the start of the run: a run that failed
+    // during setup would otherwise leave the previous run's cases in place.
+    beginAcceptanceSuite(SUITE);
+  });
+
   for (const { store, channel, surface } of STORES) {
     test(`the ${store} store build's identity is the one its public key determines, and only a packaged host admits it`, async () => {
       const { publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
@@ -119,16 +126,15 @@ test.describe("the packaged production entry, against a real browser", () => {
             browserVersion,
             entry: "packaged",
             case: `the ${store} store build's identity is the one its public key determines`,
-            settings: {
-              isolatedChromium: false,
-              edge: surface === "edge",
-              chrome: surface === "chrome",
-              fullCdp: false,
-              allowlist: "store",
+            settings: () => ({
+              // These two cases are about the **build**, and there is no host
+              // yet: the switch states come from the host once it exists.
+              surface,
               build: "store",
+              allowlist: "store",
               extensionId,
               installationKeyProved: true,
-            },
+            }),
             observed: `the browser assigned the extension the id the public key determines (${expectedId})`,
           },
           async () => {
@@ -149,16 +155,15 @@ test.describe("the packaged production entry, against a real browser", () => {
             browserVersion,
             entry: "packaged",
             case: `the ${store} store build differs from the development build in exactly the manifest key`,
-            settings: {
-              isolatedChromium: false,
-              edge: surface === "edge",
-              chrome: surface === "chrome",
-              fullCdp: false,
-              allowlist: "store",
+            settings: () => ({
+              // These two cases are about the **build**, and there is no host
+              // yet: the switch states come from the host once it exists.
+              surface,
               build: "store",
+              allowlist: "store",
               extensionId,
               installationKeyProved: true,
-            },
+            }),
             observed: "the packaged manifest carries the store's public key and differs from the development manifest in nothing else",
           },
           async () => {
@@ -191,16 +196,12 @@ test.describe("the packaged production entry, against a real browser", () => {
               browserVersion,
               entry: "packaged",
               case: `a packaged host admits the ${store} store build through the store allowlist`,
-              settings: {
-                isolatedChromium: false,
-                edge: surface === "edge",
-                chrome: surface === "chrome",
-                fullCdp: false,
-                allowlist: "store",
+              settings: () => ({
+                ...bridgeSettings(packaged.bridge, surface, "store"),
                 build: "store",
                 extensionId,
                 installationKeyProved: true,
-              },
+              }),
               observed: "the packaged host completed the handshake and reported the surface connected",
             },
             async () => {
@@ -230,16 +231,12 @@ test.describe("the packaged production entry, against a real browser", () => {
               browserVersion,
               entry: "packaged",
               case: `a packaged host refuses the ${store} extension named only in the development allowlist`,
-              settings: {
-                isolatedChromium: false,
-                edge: surface === "edge",
-                chrome: surface === "chrome",
-                fullCdp: false,
-                allowlist: "development",
+              settings: () => ({
+                ...bridgeSettings(refusing.bridge, surface, "development"),
                 build: "store",
                 extensionId,
                 installationKeyProved: true,
-              },
+              }),
               observed: "the packaged host refused the extension and reported no connected surface",
             },
             async () => {

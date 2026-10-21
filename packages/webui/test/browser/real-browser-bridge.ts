@@ -150,6 +150,32 @@ export function browserVersionOf(context: BrowserContext): string {
 }
 
 /**
+ * The configuration a bridge case ran under, read from the bridge.
+ *
+ * The switch states come from the bridge's own snapshot, so the record says
+ * what was in force rather than what the test intended. The two switches the
+ * bridge does not carry are named as such rather than guessed at: the
+ * isolated-Chromium switch belongs to the runtime, and the Full CDP switch is
+ * enforced in the runtime service, not in the bridge.
+ */
+export function bridgeSettings(
+  bridge: BrowserBridgeServer,
+  surface: "edge" | "chrome",
+  allowlist: string,
+): Readonly<Record<string, unknown>> {
+  const surfaces = bridge.snapshot().surfaces;
+  const other = surface === "edge" ? "chrome" : "edge";
+  return {
+    surface,
+    surfaceSwitch: surfaces[surface].enabled,
+    otherSurfaceSwitch: surfaces[other].enabled,
+    isolatedChromium: "not carried by the bridge",
+    fullCdp: "enforced in the runtime service, not in the bridge",
+    allowlist,
+  };
+}
+
+/**
  * Provisions the extension and wakes its service worker.
  *
  * The worker reads the host's address when it starts and exits if there is
@@ -234,7 +260,7 @@ export async function startBridge(
   surface: "edge" | "chrome",
   options: {
     readonly packaged?: boolean;
-    readonly allowlist?: "store" | "development";
+    readonly allowlist?: "store" | "development" | "both";
   } = {},
 ): Promise<{
   bridge: BrowserBridgeServer;
@@ -243,10 +269,17 @@ export async function startBridge(
   close: () => Promise<void>;
 }> {
   const allowlist = options.allowlist ?? (options.packaged ? "store" : "development");
-  const variable =
-    allowlist === "store"
-      ? `MAVIS_BROWSER_STORE_${surface.toUpperCase()}_EXTENSION_IDS`
-      : `MAVIS_BROWSER_${surface.toUpperCase()}_EXTENSION_IDS`;
+  const variable = (kind: "store" | "development", browser: "edge" | "chrome"): string =>
+    kind === "store"
+      ? `MAVIS_BROWSER_STORE_${browser.toUpperCase()}_EXTENSION_IDS`
+      : `MAVIS_BROWSER_${browser.toUpperCase()}_EXTENSION_IDS`;
+  const env: Record<string, string> =
+    allowlist === "both"
+      ? {
+          [variable("development", "edge")]: extensionId,
+          [variable("development", "chrome")]: extensionId,
+        }
+      : { [variable(allowlist, surface)]: extensionId };
   const bridge = new BrowserBridgeServer({
     host: "127.0.0.1",
     dev: true,
@@ -255,10 +288,13 @@ export async function startBridge(
     // The allowlist is per surface, and so is the pairing. A browser running
     // the extension has to be admitted on **its own** surface, or the Edge
     // run would prove nothing about the Edge switch.
-    env: { [variable]: extensionId },
+    env,
   });
   await bridge.start();
   await bridge.enableSurface(surface);
+  // With one identity on both surfaces, both surfaces are switched on: that is
+  // the configuration the collision case is about.
+  if (allowlist === "both" && surface !== "chrome") await bridge.enableSurface("chrome");
 
   const http = createServer((request, response) => {
     // The query string is ignored: the harness serves the same page whatever

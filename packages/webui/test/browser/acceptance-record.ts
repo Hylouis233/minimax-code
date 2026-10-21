@@ -30,8 +30,21 @@ export interface AcceptanceObservation {
   readonly entry: "development" | "packaged";
   /** The case's name. */
   readonly case: string;
-  /** The settings that were in force while the case ran. */
-  readonly settings: Readonly<Record<string, unknown>>;
+  /**
+   * The configuration the case ran under.
+   *
+   * Read from the host where the host knows it: the switch states come from
+   * the bridge's own snapshot, so the record says what was in force rather
+   * than what the test intended. The switches the bridge does not carry are
+   * named as such.
+   *
+   * A function is read **after** the case body has run, so the record
+   * describes the state the observation was made in rather than the state the
+   * case started in.
+   */
+  readonly settings:
+    | Readonly<Record<string, unknown>>
+    | (() => Readonly<Record<string, unknown>>);
   /** What was observed. */
   readonly observed: string;
   /** Whether the case held. */
@@ -56,11 +69,26 @@ const recordDir = resolve(
 const started = new Set<string>();
 
 /**
+ * Start a suite's record.
+ *
+ * The suite's file is emptied here, at the start of the run, rather than on
+ * its first record: a run that fails during setup — the extension does not
+ * build, the browser does not start — would otherwise leave the **previous**
+ * run's cases in place, and the file would then read as a pass for cases
+ * that never ran.
+ */
+export function beginAcceptanceSuite(suite: string): void {
+  mkdirSync(recordDir, { recursive: true });
+  writeFileSync(resolve(recordDir, `${suite}.acceptance.json`), "[]\n", "utf8");
+  started.add(suite);
+}
+
+/**
  * Write one record for a suite.
  *
- * The suite's file is replaced on its first record of the process, so a second
- * run of the same suite starts from an empty file rather than appending to the
- * previous run's cases.
+ * The suite's file is replaced on its first record of the process, so a
+ * second run of the same suite starts from an empty file rather than
+ * appending to the previous run's cases.
  */
 export function recordAcceptance(
   suite: string,
@@ -95,12 +123,15 @@ export async function observeAcceptance(
   observation: Omit<AcceptanceObservation, "result">,
   body: () => Promise<void>,
 ): Promise<void> {
+  const settings = (): Readonly<Record<string, unknown>> =>
+    typeof observation.settings === "function" ? observation.settings() : observation.settings;
   try {
     await body();
-    recordAcceptance(suite, { ...observation, result: "pass" });
+    recordAcceptance(suite, { ...observation, settings: settings(), result: "pass" });
   } catch (error) {
     recordAcceptance(suite, {
       ...observation,
+      settings: settings(),
       result: "fail",
       observed: `${observation.observed} — failed: ${
         error instanceof Error ? error.message : String(error)

@@ -24,9 +24,10 @@ import { rm } from "node:fs/promises";
 
 import { expect, test } from "@playwright/test";
 
-import { observeAcceptance } from "./acceptance-record.js";
+import { beginAcceptanceSuite, observeAcceptance } from "./acceptance-record.js";
 import {
   browserVersionOf,
+  bridgeSettings,
   buildExtension,
   launchWithExtension,
   provision,
@@ -53,6 +54,9 @@ const SUITE = "real-browser";
 
 test.describe("the browser bridge, against a real browser", () => {
   test.beforeAll(async () => {
+    // The record is emptied here, at the start of the run: a run that failed
+    // during setup would otherwise leave the previous run's cases in place.
+    beginAcceptanceSuite(SUITE);
     await buildExtension();
   });
 
@@ -75,16 +79,12 @@ test.describe("the browser bridge, against a real browser", () => {
             browserVersion,
             entry: "development",
             case: "the extension completes the handshake once it can prove the installation key",
-            settings: {
-              isolatedChromium: false,
-              edge: surface === "edge",
-              chrome: surface === "chrome",
-              fullCdp: false,
-              allowlist: "development",
+            settings: () => ({
+              ...bridgeSettings(started.bridge, surface, "development"),
               build: "development",
               extensionId,
               installationKeyProved: true,
-            },
+            }),
             observed: "the handshake completed and the host reported the surface connected",
           },
           async () => {
@@ -121,16 +121,12 @@ test.describe("the browser bridge, against a real browser", () => {
             browserVersion,
             entry: "development",
             case: "an extension that cannot prove the installation key is refused",
-            settings: {
-              isolatedChromium: false,
-              edge: surface === "edge",
-              chrome: surface === "chrome",
-              fullCdp: false,
-              allowlist: "development",
+            settings: () => ({
+              ...bridgeSettings(started.bridge, surface, "development"),
               build: "development",
               extensionId,
               installationKeyProved: false,
-            },
+            }),
             observed: "the host refused the extension and reported no connected surface",
           },
           async () => {
@@ -150,4 +146,107 @@ test.describe("the browser bridge, against a real browser", () => {
       }
     });
   }
+
+  test("each browser lands on its own surface when one identity is listed on both", async () => {
+    // The configuration a person ends up in for real: an unpacked build has
+    // one identity, and loading it in Edge and Chrome lists that identity on
+    // both surfaces. The identity alone cannot say which browser is
+    // connecting, so the peer names the browser it runs in and the host
+    // answers with that surface's pairing.
+    //
+    // Taking the first match instead would put the Chrome browser on the Edge
+    // pairing: the Edge surface would report connected while the person is
+    // looking at Chrome, and the Chrome surface would never come up at all.
+    test.setTimeout(240_000);
+    const browsers: {
+      channel: "chromium" | "msedge";
+      surface: "edge" | "chrome";
+      context: Awaited<ReturnType<typeof launchWithExtension>>["context"];
+      worker: Awaited<ReturnType<typeof launchWithExtension>>["worker"];
+      extensionId: string;
+      profileDir: string;
+      browserVersion: string;
+    }[] = [];
+    // The first browser tells the host which identity to admit on both
+    // surfaces; the second one has to arrive with the same identity, because
+    // both load the one unpacked build.
+    const first = await launchWithExtension(BROWSERS[0].channel);
+    browsers.push({
+      channel: BROWSERS[0].channel,
+      surface: BROWSERS[0].surface,
+      ...first,
+      browserVersion: browserVersionOf(first.context),
+    });
+    const started = await startBridge(first.extensionId, "edge", { allowlist: "both" });
+    try {
+      for (const { channel, surface } of BROWSERS.slice(1)) {
+        const launched = await launchWithExtension(channel);
+        browsers.push({
+          channel,
+          surface,
+          ...launched,
+          browserVersion: browserVersionOf(launched.context),
+        });
+        const view = await started.bridge.readInstallationKey(surface);
+        await provision(
+          launched.worker,
+          launched.context,
+          launched.extensionId,
+          started.origin,
+          view!.key,
+        );
+        await waitForConnected(started.bridge, surface, true, launched.worker);
+      }
+      // The first browser has to be provisioned too.
+      {
+        const [launched] = browsers;
+        const view = await started.bridge.readInstallationKey(launched!.surface);
+        await provision(
+          launched!.worker,
+          launched!.context,
+          launched!.extensionId,
+          started.origin,
+          view!.key,
+        );
+        await waitForConnected(started.bridge, launched!.surface, true, launched!.worker);
+      }
+
+      // The two unpacked builds have one identity between them, and the two
+      // browsers have one host between them.
+      expect(browsers[0]!.extensionId).toBe(browsers[1]!.extensionId);
+
+      await observeAcceptance(
+        SUITE,
+        {
+          surface: "edge and chrome",
+          browser: `${browsers[0]!.channel} and ${browsers[1]!.channel}`,
+          browserVersion: `${browsers[0]!.browserVersion} and ${browsers[1]!.browserVersion}`,
+          entry: "development",
+          case: "each browser lands on its own surface when one identity is listed on both",
+          settings: () => ({
+            ...bridgeSettings(started.bridge, "edge", "development, on both surfaces"),
+            build: "development",
+            extensionId: browsers[0]!.extensionId,
+            installationKeyProved: true,
+          }),
+          observed:
+            "both browsers were connected, each on its own surface, and each surface's provider belonged to that surface",
+        },
+        async () => {
+          // Both surfaces are connected, each by its own browser.
+          expect(started.bridge.snapshot().surfaces.edge.connected).toBe(true);
+          expect(started.bridge.snapshot().surfaces.chrome.connected).toBe(true);
+          // And neither browser was put on the other's surface.
+          expect(started.bridge.createProvider("edge")?.surface).toBe("edge");
+          expect(started.bridge.createProvider("chrome")?.surface).toBe("chrome");
+        },
+      );
+    } finally {
+      await started.close();
+      for (const browser of browsers) {
+        await browser.context.close();
+        await rm(browser.profileDir, { recursive: true, force: true });
+      }
+    }
+  });
 });
