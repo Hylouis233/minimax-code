@@ -7,15 +7,15 @@
 // **The open/closed flags and the mutual exclusion stay here**: `loadUsage` opens
 // usage and closes check-in (and `loadSignin` the reverse), every close — the outside pointer,
 // Escape, or the trigger — takes both panels down together,
-// and neither panel can be dismissed from inside itself. The panels load on hover, focus or
-// click — never on mount — and this file keeps those handlers. Each panel owns only its own
+// and each fly-out closes after its complete hover region is left. The panels load on hover,
+// focus or click — never on mount — and this file keeps those handlers. Each panel owns only its own
 // presentation.
 //
 // The menu's own surface is the shared dropdown skeleton: it owns the popup's placement, its
 // motion and its dismissal, so the outside-pointer and Escape listeners this file used to carry
 // are gone. What is left here is the open state and the two panels.
 
-import { useCallback, useEffect, useState, type ReactElement } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
 import { WebuiIconBell, WebuiIconBrand, WebuiIconCommandUsage } from "../../../shell/icons.js";
 import { SigninClaimResult } from "@mavis/shared/daily-signin";
@@ -71,6 +71,17 @@ function UsageGlyph({ kind }: { readonly kind: "settings" | "signin" }): ReactEl
   return <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d={path} fill="currentColor" fillRule="evenodd" clipRule="evenodd" /></svg>;
 }
 
+function SigninGlyph(): ReactElement {
+  return <UsageGlyph kind="signin" />;
+}
+
+function AccountGlyph(): ReactElement {
+  return <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+    <circle cx="10" cy="6.5" r="2.75" stroke="currentColor" strokeWidth="1.5" />
+    <path d="M4.5 16.5c.55-2.55 2.55-4 5.5-4s4.95 1.45 5.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+  </svg>;
+}
+
 function Chevron(): ReactElement {
   return <svg className="webui-user-menu-chevron" width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m7.5 4.75 5.25 5.25-5.25 5.25" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }
@@ -114,6 +125,7 @@ export function UserMenu({
   const [loginOpen, setLoginOpen] = useState(false);
   const [usageOpen, setUsageOpen] = useState(false);
   const [signinOpen, setSigninOpen] = useState(false);
+  const panelCloseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [animatedDay, setAnimatedDay] = useState<number | null>(null);
   // Derived from the one owner's snapshot rather than held locally: the menu
   // and the login dialog read the same answer, and neither writes it.
@@ -146,9 +158,32 @@ export function UserMenu({
   }, [claimedDay]);
 
   const closePanels = () => {
+    if (panelCloseTimer.current !== undefined) {
+      clearTimeout(panelCloseTimer.current);
+      panelCloseTimer.current = undefined;
+    }
     setUsageOpen(false);
     setSigninOpen(false);
   };
+
+  const cancelPanelClose = () => {
+    if (panelCloseTimer.current === undefined) return;
+    clearTimeout(panelCloseTimer.current);
+    panelCloseTimer.current = undefined;
+  };
+
+  const schedulePanelClose = () => {
+    cancelPanelClose();
+    // The fly-outs have a deliberate visual gap. Keep the panel alive while
+    // the pointer crosses it, then close after the whole hover region is left.
+    panelCloseTimer.current = setTimeout(() => {
+      panelCloseTimer.current = undefined;
+      setUsageOpen(false);
+      setSigninOpen(false);
+    }, 180);
+  };
+
+  useEffect(() => () => cancelPanelClose(), []);
 
   useEffect(() => {
     if (!open) return;
@@ -211,10 +246,10 @@ export function UserMenu({
         <div className="webui-user-menu-uid" aria-label="用户 ID">UID : {uid ?? "—"}</div>
         <div className="webui-user-menu-list">
           <button type="button" className="webui-user-menu-item" role="menuitem" data-testid="user-menu-settings" onClick={() => { setOpen(false); setSettingsOpen(true); }}><UsageGlyph kind="settings" /><span>设置</span><span className="webui-user-menu-shortcut">Ctrl+,</span></button>
-          <button type="button" className="webui-user-menu-item" role="menuitem" data-testid="user-menu-account-login" onClick={() => { setOpen(false); setLoginOpen(true); }}><UsageGlyph kind="signin" /><span>账号与登录</span></button>
+          <button type="button" className="webui-user-menu-item" role="menuitem" data-testid="user-menu-account-login" onClick={() => { setOpen(false); setLoginOpen(true); }}><AccountGlyph /><span>账号与登录</span></button>
           <MenuDivider />
-          <div className="webui-user-menu-signin-anchor" onMouseEnter={() => loadSignin()} onFocus={() => loadSignin()} onClick={(event) => { event.stopPropagation(); if (!signinOpen) loadSignin(); }}>
-            <button type="button" className="webui-user-menu-item" role="menuitem" aria-haspopup="dialog" aria-expanded={signinOpen} data-testid="user-menu-signin"><UsageGlyph kind="signin" /><span>每日签到</span><Chevron /></button>
+          <div className="webui-user-menu-signin-anchor" onMouseEnter={() => { cancelPanelClose(); loadSignin(); }} onMouseLeave={schedulePanelClose} onFocus={() => { cancelPanelClose(); loadSignin(); }} onClick={(event) => { event.stopPropagation(); if (!signinOpen) loadSignin(); }}>
+            <button type="button" className="webui-user-menu-item" role="menuitem" aria-haspopup="dialog" aria-expanded={signinOpen} data-testid="user-menu-signin"><SigninGlyph /><span>每日签到</span><Chevron /></button>
             {signinOpen ? (
               <div className="webui-user-menu-signin-panel" role="dialog" aria-label={SIGNIN.title}>
                 <SigninCard
@@ -233,7 +268,7 @@ export function UserMenu({
               </div>
             ) : null}
           </div>
-          <div className="webui-user-menu-usage-anchor" onMouseEnter={() => loadUsage()} onFocus={() => loadUsage()}>
+          <div className="webui-user-menu-usage-anchor" onMouseEnter={() => { cancelPanelClose(); loadUsage(); }} onMouseLeave={schedulePanelClose} onFocus={() => { cancelPanelClose(); loadUsage(); }}>
             <button type="button" className="webui-user-menu-item" role="menuitem" aria-haspopup="dialog" aria-expanded={usageOpen} data-testid="user-menu-usage" onClick={() => loadUsage()}><WebuiIconCommandUsage /><span>用量</span><Chevron /></button>
             {usageOpen ? <UsagePanel state={usage} onRetry={() => loadUsage(true)} onLogin={() => { setOpen(false); setLoginOpen(true); }} /> : null}
           </div>

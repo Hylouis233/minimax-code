@@ -235,3 +235,154 @@ test("a todo update inside a stream message reaches the progress panel live", as
   });
   await expect.poll(() => panelText(page)).toContain("第二步：收尾");
 });
+
+test("collapsing Todo releases the overview space and moves Subagents upward", async ({ page }) => {
+  await openApp(page);
+  await attachLiveTurn(page);
+  await emitAgentMessage(page, "A", {
+    msg_id: "collapse-layout-todo",
+    msg_content: JSON.stringify({
+      eventType: "todo_updated",
+      todos: [{ content: "可折叠步骤", status: "in_progress" }],
+    }),
+  });
+  await emitAgentMessage(page, "A", {
+    msg_id: "collapse-layout-subagent",
+    msg_content: JSON.stringify({
+      eventType: "session.spawned",
+      sessionId: "collapse-layout-child",
+      agentName: "layout-worker",
+      parentSessionId: "A",
+      status: "running",
+      createdAt: 1_700_000_100_000,
+    }),
+  });
+
+  const todoHeading = page.getByRole("button", { name: "进度", exact: true });
+  await expect(todoHeading).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("button", { name: "layout-worker running" })).toBeVisible();
+  const expanded = await page.evaluate(() => {
+    const main = document.querySelector(".webui-progress-overview-main");
+    const subagents = document.querySelector(".webui-subagents-panel");
+    const card = document.querySelector(".webui-progress-overview-card");
+    return {
+      mainHeight: main.getBoundingClientRect().height,
+      subagentsTop: subagents.getBoundingClientRect().top,
+      cardHeight: card.getBoundingClientRect().height,
+    };
+  });
+
+  await todoHeading.click();
+  await expect(todoHeading).toHaveAttribute("aria-expanded", "false");
+  await expect.poll(() => page.locator(".webui-progress-overview-card").evaluate((element) => element.getBoundingClientRect().height))
+    .toBeLessThan(expanded.cardHeight - 20);
+  await expect.poll(() => page.locator(".webui-progress-overview-main").evaluate((element) => element.getBoundingClientRect().height))
+    .toBeLessThan(expanded.mainHeight - 20);
+  await expect.poll(() => page.locator(".webui-subagents-panel").evaluate((element) => element.getBoundingClientRect().top))
+    .toBeLessThan(expanded.subagentsTop - 20);
+  const collapsed = await page.evaluate(() => {
+    const main = document.querySelector(".webui-progress-overview-main");
+    const subagents = document.querySelector(".webui-subagents-panel");
+    const card = document.querySelector(".webui-progress-overview-card");
+    return {
+      mainHeight: main.getBoundingClientRect().height,
+      subagentsTop: subagents.getBoundingClientRect().top,
+      cardHeight: card.getBoundingClientRect().height,
+    };
+  });
+  expect(collapsed.mainHeight).toBeLessThan(expanded.mainHeight - 20);
+  expect(collapsed.subagentsTop).toBeLessThan(expanded.subagentsTop - 20);
+  expect(collapsed.cardHeight).toBeLessThan(expanded.cardHeight - 20);
+});
+
+test("extends a content-heavy progress panel within the viewport and keeps each section visible", async ({ page }) => {
+  await configureFixture(page, () => window.__fixture.setResponse("getWorkspaceEnvironment", {
+    isGitRepo: true,
+    branch: "synthetic-progress-layout",
+    changedFiles: 0,
+    insertions: 0,
+    deletions: 0,
+    lineStatsStatus: "skipped",
+  }));
+  await openApp(page);
+  await attachLiveTurn(page);
+  await emitAgentMessage(page, "A", {
+    msg_id: "extended-layout-todos",
+    msg_content: JSON.stringify({
+      eventType: "todo_updated",
+      todos: Array.from({ length: 9 }, (_, index) => ({ content: `长任务步骤 ${index + 1}`, status: "pending" })),
+    }),
+  });
+  for (let index = 0; index < 8; index += 1) {
+    await emitAgentMessage(page, "A", {
+      msg_id: `extended-layout-subagent-${index}`,
+      msg_content: JSON.stringify({
+        eventType: "session.spawned",
+        sessionId: `extended-layout-child-${index}`,
+        agentName: `worker-${index}`,
+        parentSessionId: "A",
+        status: "running",
+        createdAt: 1_700_000_100_000 + index,
+      }),
+    });
+  }
+  await expect.poll(() => page.locator(".webui-progress-scroll").textContent()).toContain("长任务步骤 9");
+  await expect.poll(() => page.locator(".webui-subagent-row").count()).toBeGreaterThanOrEqual(8);
+
+  const metrics = await page.evaluate(() => {
+    const card = document.querySelector(".webui-progress-overview-card");
+    const environment = document.querySelector(".webui-environment-panel");
+    const progress = document.querySelector(".webui-progress-panel");
+    const subagents = document.querySelector(".webui-subagents-panel");
+    const progressScroll = document.querySelector(".webui-progress-scroll");
+    const subagentsScroll = document.querySelector(".webui-subagents-scroll");
+    const bounds = (element) => {
+      const rect = element.getBoundingClientRect();
+      return { top: rect.top, bottom: rect.bottom, height: rect.height };
+    };
+    return {
+      card: bounds(card),
+      environment: bounds(environment),
+      progress: bounds(progress),
+      subagents: bounds(subagents),
+      progressScrollHeight: progressScroll.scrollHeight,
+      progressClientHeight: progressScroll.clientHeight,
+      subagentsScrollHeight: subagentsScroll.scrollHeight,
+      subagentsClientHeight: subagentsScroll.clientHeight,
+      viewportHeight: window.innerHeight,
+    };
+  });
+
+  expect(metrics.card.height).toBeGreaterThan(400);
+  expect(metrics.card.bottom).toBeLessThanOrEqual(metrics.viewportHeight - 12);
+  expect(metrics.environment.height).toBeGreaterThan(0);
+  expect(metrics.progress.height).toBeGreaterThanOrEqual(58);
+  expect(metrics.subagents.height).toBeGreaterThan(28);
+  expect(metrics.environment.top).toBeLessThan(metrics.progress.top);
+  expect(metrics.progress.top).toBeLessThan(metrics.subagents.top);
+  expect(metrics.progressScrollHeight).toBeGreaterThan(metrics.progressClientHeight);
+  expect(metrics.subagentsScrollHeight).toBeGreaterThan(metrics.subagentsClientHeight);
+
+  const titleGeometry = await page.locator(".webui-workspace-section-title").evaluateAll((buttons) =>
+    buttons.map((button) => {
+      const rect = button.getBoundingClientRect();
+      const icon = button.querySelector("svg").getBoundingClientRect();
+      return { title: button.textContent.trim(), iconRight: icon.right };
+    }),
+  );
+  const titleIconRightEdges = titleGeometry.map(({ iconRight }) => iconRight);
+  expect(Math.max(...titleIconRightEdges) - Math.min(...titleIconRightEdges), JSON.stringify(titleGeometry)).toBeLessThanOrEqual(1);
+
+  const cardHeightBeforeCollapse = metrics.card.height;
+  await page.getByRole("button", { name: "Subagents", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Subagents", exact: true })).toHaveAttribute("aria-expanded", "false");
+  await expect.poll(() => page.locator(".webui-progress-overview-card").evaluate((element) => element.getBoundingClientRect().height))
+    .toBeLessThan(cardHeightBeforeCollapse - 20);
+  const collapsedSubagentsGap = await page.evaluate(() => {
+    const lastTodo = document.querySelector(".webui-progress-row:last-child");
+    const subagentsTitle = [...document.querySelectorAll(".webui-workspace-section-title")]
+      .find((button) => button.textContent.trim() === "Subagents");
+    return subagentsTitle.getBoundingClientRect().top - lastTodo.getBoundingClientRect().bottom;
+  });
+  expect(collapsedSubagentsGap).toBeLessThanOrEqual(12);
+});

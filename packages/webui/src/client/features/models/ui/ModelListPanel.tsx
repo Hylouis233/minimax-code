@@ -64,6 +64,7 @@ export function WebuiModelListPanel({
           >
             <div className="webui-model-list-group-header">
               <span className="webui-model-list-group-name">{group.label}</span>
+              <span className="webui-model-list-group-subtitle">{group.id}</span>
             </div>
             {group.models.map((model) => {
               const active = modelKey(model) === selectedKey;

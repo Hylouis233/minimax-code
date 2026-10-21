@@ -21,6 +21,7 @@ import { describe, it, expect, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
+import { WebuiWorkspaceQueriesProvider } from "../../src/client/bindings/use-query-state.js";
 import {
   WebuiContextMenu,
 } from "../../src/client/ui/ContextMenu.js";
@@ -175,7 +176,9 @@ import {
   settleAbortedStream,
   type WebuiStreamState,
 } from "../../src/client/features/turn/projection/stream-state.js";
-import { WebuiProgressOverviewPanel, WebuiProgressPanel, WebuiSubagentsPanel, WebuiWorkspacePanel, WebuiWorkspacePanelControls } from "../../src/client/features/workspace/ui/WorkspacePanels.js";
+import { WebuiWorkspacePanel } from "../../src/client/features/workspace/ui/WorkspacePanels.js";
+import { WebuiWorkspacePanelControls } from "../../src/client/features/workspace/ui/WorkspacePanelControls.js";
+import { WebuiProgressOverviewPanel, WebuiProgressPanel, WebuiSubagentsPanel } from "../../src/client/features/workspace/ui/WorkspaceProgressPanel.js";
 import { projectWebuiTodos } from "../../src/client/features/workspace/projection/panel-projection.js";
 import { initialWorkspacePanelState, reduceWorkspacePanelState } from "../../src/client/features/workspace/projection/workspace-panel-state.js";
 import type { WebuiStreamFrame } from "../../src/shared/contracts/stream.js";
@@ -246,10 +249,59 @@ describe("WebUI shell", () => {
     expect(markup).toContain('data-webui-subagents-panel="true"');
   });
 
+  it("does not render the Subagents section until child sessions arrive", () => {
+    expect(WebuiSubagentsPanel({ subagents: [] })).toBeNull();
+  });
+
+  it("keeps the overview layout content-driven for expanded and collapsed Todo sections", () => {
+    const todos = [{ content: "有数据的进度", status: "in_progress" as const }];
+    const expanded = renderToStaticMarkup(createElement(WebuiProgressOverviewPanel, { todos, open: true }));
+    const collapsed = renderToStaticMarkup(createElement(WebuiProgressOverviewPanel, { todos, open: true, progressCollapsed: true }));
+    const empty = renderToStaticMarkup(createElement(WebuiProgressOverviewPanel, { todos: [], open: true }));
+
+    expect(expanded).toContain('class="webui-progress-overview-main"');
+    expect(expanded).not.toContain("has-extended-content");
+    expect(collapsed).toContain("webui-progress-overview-main");
+    expect(collapsed).not.toContain("has-expanded-progress");
+    expect(collapsed).toContain('class="webui-progress-overview-card"');
+    expect(empty).toContain('class="webui-progress-overview-main"');
+
+    const contentHeavy = renderToStaticMarkup(createElement(WebuiProgressOverviewPanel, {
+      todos: Array.from({ length: 7 }, (_, index) => ({ content: `步骤 ${index + 1}`, status: "pending" as const })),
+      subagents: Array.from({ length: 5 }, (_, index) => ({ sessionId: `child-${index}`, agentName: `worker-${index}`, status: "running" as const })),
+      open: true,
+    }));
+    expect(contentHeavy).not.toContain("has-extended-content");
+  });
+
+  it("shows the default progress card only when environment, todos, and subagents are absent", () => {
+    const noWorkspace = renderToStaticMarkup(createElement(WebuiProgressOverviewPanel, { todos: [], open: true }));
+    const environmentOnly = renderToStaticMarkup(createElement(WebuiProgressOverviewPanel, {
+      workspaceDir: "/tmp/project",
+      workspaceEnvironment: { isGitRepo: true, branch: "main", changedFiles: 0, insertions: 0, deletions: 0, lineStatsStatus: "skipped" },
+      todos: [],
+      open: true,
+    }));
+    const subagentsOnly = renderToStaticMarkup(createElement(WebuiProgressOverviewPanel, {
+      todos: [],
+      subagents: [{ sessionId: "child-1", agentName: "worker", status: "running" }],
+      open: true,
+    }));
+
+    expect(noWorkspace).toContain("跟踪较长任务的进度");
+    expect(noWorkspace).toContain('data-webui-progress-panel="true"');
+    expect(environmentOnly).not.toContain("跟踪较长任务的进度");
+    expect(environmentOnly).not.toContain('data-webui-progress-panel="true"');
+    expect(subagentsOnly).not.toContain("跟踪较长任务的进度");
+    expect(subagentsOnly).toContain("worker");
+  });
+
   it("renders the environment/progress content inside the single right panel structure", () => {
     const environment: WebuiWorkspaceEnvironment = { isGitRepo: true, branch: "webui", changedFiles: 2, insertions: 4, deletions: 1, lineStatsStatus: "ready", canPush: true };
-    const overview = renderToStaticMarkup(createElement(WebuiProgressOverviewPanel, { workspaceDir: "/tmp/project", workspaceEnvironment: environment, todos: [] }));
+    const overview = renderToStaticMarkup(createElement(WebuiProgressOverviewPanel, { open: true, workspaceDir: "/tmp/project", workspaceEnvironment: environment, todos: [] }));
+    expect(overview).toContain('data-testid="progress-overview-panel"');
     expect(overview).toContain('data-testid="progress-overview-card"');
+    expect(overview).toContain('aria-hidden="false"');
     expect(overview).toContain("环境信息");
     expect(overview).toContain(">webui<");
     // 158a301 起行数拆成两个着色 span，"+4 -1" 不再是连续文本。
@@ -259,8 +311,7 @@ describe("WebUI shell", () => {
     expect(changesText).toContain(`+${environment.insertions}`);
     expect(changesText).toContain(`-${environment.deletions}`);
     expect(changesBadge).toContain(`aria-label="新增 ${environment.insertions} 行，删除 ${environment.deletions} 行"`);
-    expect(overview).toContain("进度");
-    expect(overview).toContain("跟踪较长任务的进度");
+    expect(overview).not.toContain('data-webui-progress-panel="true"');
     expect(overview).not.toContain('data-webui-placeholder-chrome="environment-变更"');
 
     const controls = renderToStaticMarkup(createElement(WebuiWorkspacePanelControls, { filePanelOpen: false, progressPanelOpen: true, onOpenFiles: () => undefined, onToggleProgressPanel: () => undefined }));
@@ -269,14 +320,46 @@ describe("WebUI shell", () => {
     expect(controls).not.toContain('aria-label="浏览器"');
   });
 
+  it("renders progress and subagents beside a reserved environment loading slot", () => {
+    const initialQueries = {
+      getSnapshot: () => ({
+        environment: {
+          workspaceDir: "/tmp/previous-project",
+          environment: { isGitRepo: true, branch: "old", changedFiles: 0, insertions: 0, deletions: 0, lineStatsStatus: "skipped" },
+          loading: false,
+        },
+        environmentRevision: 0,
+      }),
+      subscribe: () => () => undefined,
+      environment: { canReadEnvironment: true },
+    } as never;
+    const markup = renderToStaticMarkup(createElement(WebuiWorkspaceQueriesProvider, {
+      queries: initialQueries,
+      children: createElement(WebuiProgressOverviewPanel, {
+        open: true,
+        workspaceDir: "/tmp/project",
+        todos: [{ content: "Existing progress", status: "completed" }],
+        subagents: [{ sessionId: "child-1", agentName: "worker", status: "running" }],
+      }),
+    }));
+    expect(markup).toContain('data-testid="progress-overview-panel"');
+    expect(markup).toContain('data-webui-environment-panel="true"');
+    expect(markup).toContain('aria-busy="true"');
+    expect(markup).toContain('aria-label="正在加载环境信息"');
+    expect(markup).toContain("webui-environment-skeleton--action");
+    expect(markup).toContain("Existing progress");
+    expect(markup).toContain("worker");
+  });
+
   it("does not render Desktop's environment section for a non-git session", () => {
     const overview = renderToStaticMarkup(createElement(WebuiProgressOverviewPanel, {
       workspaceDir: "/tmp/non-git-workspace",
       workspaceEnvironment: { isGitRepo: false, changedFiles: 0, insertions: 0, deletions: 0, lineStatsStatus: "skipped" },
       todos: [],
     }));
-    expect(overview).not.toContain("环境信息");
-    expect(overview).toContain("进度");
+    expect(overview).not.toContain('data-webui-environment-panel="true"');
+    expect(overview).toContain('data-webui-progress-panel="true"');
+    expect(overview).toContain("跟踪较长任务的进度");
   });
 
   it("renders completed, in-progress, and pending progress rows in SSR", () => {
@@ -296,6 +379,15 @@ describe("WebUI shell", () => {
     expect(markup).toContain("webui-progress-row--pending");
     expect(markup).toContain("line-through");
     expect(markup).toContain('class="webui-progress-marker"><svg');
+
+    const collapsed = renderToStaticMarkup(createElement(WebuiProgressPanel, {
+      todos: [{ content: "收起后的步骤", status: "completed" }],
+      collapsed: true,
+    }));
+    expect(collapsed).toContain("webui-progress-panel flex flex-col is-collapsed");
+    expect(collapsed).toMatch(/class="webui-progress-panel-content flex min-h-0\s+flex-col overflow-hidden"/u);
+    expect(collapsed).toContain('aria-expanded="false"');
+    expect(collapsed).toContain('aria-hidden="true"');
   });
   it("preserves an explicit empty thinking variant in model selection requests", () => {
     expect(

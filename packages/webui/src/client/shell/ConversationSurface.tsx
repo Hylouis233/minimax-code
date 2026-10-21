@@ -1,7 +1,7 @@
 import type { ReactElement, ReactNode } from "react";
 import { WebuiIconBrand } from "./icons.js";
 import { GreetingSkeleton } from "../features/transcript/ui/TranscriptSkeletons.js";
-import { WebuiWorkspacePanelControls } from "../features/workspace/ui/WorkspacePanels.js";
+import { WebuiWorkspacePanelControls } from "../features/workspace/ui/WorkspacePanelControls.js";
 
 /** Conversation column layout; Shell supplies already-owned feature surfaces and named navigation actions. */
 export function ConversationSurface(props: {
@@ -52,9 +52,7 @@ export function ConversationSurface(props: {
         </div>
       </div>
     </div>
-    {!props.home ? <div className={`webui-progress-panel-motion${props.progressOpen ? " is-open" : ""}`} aria-hidden={!props.progressOpen} ref={(element) => element?.toggleAttribute("inert", !props.progressOpen)}>
-      <aside className="webui-progress-overview-panel" data-testid="progress-overview-panel" aria-label="环境信息与进度">{props.progressPanel}</aside>
-    </div> : null}
+    {!props.home ? props.progressPanel : null}
     {!props.home ? props.workspacePanel : null}
   </>;
 }
