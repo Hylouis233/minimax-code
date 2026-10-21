@@ -85,6 +85,38 @@ ground this change does not move, and that is exactly what the history shows. Th
 ones §7 names and §9 requires — are green at the tip that carries this record, and the run at
 `83d8052a` that the CI caught was the cleanup race, which is fixed.
 
+### The CI's ubuntu job, at the tip
+
+The CI's `Source verification` run at the tip that carries this record: `changes` pass,
+`verify (windows-latest)` **pass**, `verify (macos-latest)` **pass**, `verify (ubuntu-latest)` **failure**,
+and the run stopped at `test:webui-browser`. Inside it:
+
+| Step | Result |
+| --- | --- |
+| `test:webui` | **pass** (107.5s) — the webui unit suite is green in CI |
+| `test:webui-package` | **pass** (23.1s) |
+| `test:webui-browser` | **FAIL** (929.0s) — 140 passed, **6 failed** |
+
+The six failures are all in
+`packages/webui/test/browser/browser-bridge-real-external.spec.ts` — the **previous** programme's
+external-bridge cases, which launch a real Edge or Chrome with the extension installed. They fail as
+timeouts, because the runner has a Chrome binary (so the spec's "is the browser installed" guard does
+not fire) but cannot drive it with the extension.
+
+**They pass here**: the same six cases, on the same tree, in 5 seconds. The extension build, the bridge
+worker's lifecycle and the extension's pairing are not touched by this slice — the bridge provider only
+gained an *optional* `openTab` member, which the extension bridge does not implement and which the
+service refuses with `browser_capability_denied`.
+
+The base branch's own CI is not green either: its `Source verification` run failed
+`verify (macos-latest)` and `verify (ubuntu-latest)` before this programme started. The macOS job
+passes here, and the ubuntu job fails at the external-bridge cases, which are the previous
+programme's.
+
+**What is left, exactly:** the CI's ubuntu job is red on six external-bridge cases that need a real
+external browser with the extension. Everything this slice is responsible for is green in CI
+(`test:webui`, `test:webui-package`) and green locally (the browser suite, 146 cases).
+
 ## What the real-browser acceptance rests on
 
 The fourteen acceptance cases in
