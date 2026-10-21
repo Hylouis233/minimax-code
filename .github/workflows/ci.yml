@@ -51,7 +51,11 @@ jobs:
     needs: changes
     if: needs.changes.outputs.docs_only == 'false'
     name: verify (${{ matrix.os }}, ${{ matrix.node }})
-    timeout-minutes: 15
+    # A ceiling, not a cost: a job that finishes in eleven minutes still takes
+    # eleven minutes. The Linux profile drives the real-browser suite, which
+    # launches a browser per case because each case needs a clean extension
+    # state, and that suite does not fit in fifteen minutes any more.
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
