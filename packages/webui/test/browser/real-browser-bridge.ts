@@ -419,6 +419,12 @@ export async function startBridge(
     pageUrl: `http://127.0.0.1:${port}/test-page`,
     close: async () => {
       await bounded("the bridge did not close", 30_000, bridge.close());
+      // The browser is still running while the harness closes its server, so
+      // the browser may still be holding a connection: the extension's socket,
+      // or the keep-alive connection the test page was fetched over. A server
+      // that waits for a client to go away first cannot close while that
+      // client is still running — so the connections are cut here instead.
+      http.closeAllConnections();
       await bounded(
         "the bridge's http server did not close",
         30_000,

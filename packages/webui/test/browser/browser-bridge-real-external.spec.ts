@@ -154,8 +154,11 @@ test.describe("the external bridge, against a real browser and a real page", () 
           },
         );
       } finally {
-        await started.close();
+        // The browser stops first. The extension reconnects to a host that is
+        // going away, and a server that waits for a client to go away first
+        // cannot close while that client is still running.
         await closeBrowser(context);
+        await started.close();
         await rm(profileDir, { recursive: true, force: true });
       }
     });
@@ -253,8 +256,11 @@ test.describe("the external bridge, against a real browser and a real page", () 
           },
         );
       } finally {
-        await started.close();
+        // The browser stops first. The extension reconnects to a host that is
+        // going away, and a server that waits for a client to go away first
+        // cannot close while that client is still running.
         await closeBrowser(context);
+        await started.close();
         await page.close().catch(() => undefined);
         await rm(profileDir, { recursive: true, force: true });
       }
@@ -311,8 +317,11 @@ test.describe("the external bridge, against a real browser and a real page", () 
           },
         );
       } finally {
-        await started.close();
+        // The browser stops first. The extension reconnects to a host that is
+        // going away, and a server that waits for a client to go away first
+        // cannot close while that client is still running.
         await closeBrowser(context);
+        await started.close();
         await page.close().catch(() => undefined);
         await rm(profileDir, { recursive: true, force: true });
       }
