@@ -692,8 +692,14 @@ the file and the line that carries it, and the behaviour is measured in a real C
   real browser**. The tool adapter exists and forwards to the same service, and
   which *surface* a tool call acts on is resolved from the run's own selection
   rather than from a default, so a run that has selected nothing is refused
-  rather than being sent somewhere the person is not looking. What is not
-  established is the whole path exercised end to end against a real browser in
-  one run — and since round 11 it is not even reachable: the Agent cannot
-  acquire a selection, the isolated provider drives one page, and the image
-  stream is per run rather than per target.
+  rather than being sent somewhere the person is not looking. That path is
+  reachable now — round 11's T1, T2 and T3 closed the three things that made it
+  unreachable — and the tab model's own run exercises it end to end against a
+  real Chrome: the Agent's `open_tab` opens a page, the run's selection points
+  at it, the strip gains it, and the Agent's next action lands on the page it
+  opened
+  ([`09-acceptance-record.md`](09-acceptance-record.md#the-workspace-browser-tab-models-acceptance)).
+  What that run does **not** establish is the same path on the **external**
+  bridge's surfaces: the rounds above drove the chrome and edge surfaces
+  through the bridge, and the tab model's run drove the isolated surface
+  through the runtime.
