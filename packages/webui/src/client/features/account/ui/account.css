@@ -179,6 +179,7 @@
   }
   .webui-user-menu-usage-anchor {
     position: relative;
+    --webui-user-menu-flyout-gap: 11px;
   }
   /* A hover fly-out, so it is not a dropdown — but it is the same surface:
    * the background, border, radius, shadow and motion come from
@@ -187,7 +188,7 @@
   .webui-user-menu-usage-panel {
     position: absolute;
     top: -176px;
-    left: calc(100% + 4px);
+    left: calc(100% + var(--webui-user-menu-flyout-gap));
     z-index: 111;
     width: 222px;
     min-height: 154px;
@@ -349,6 +350,7 @@
    */
   .webui-user-menu-signin-anchor {
     position: relative;
+    --webui-user-menu-flyout-gap: 11px;
   }
   /* A positioning shell only: the check-in card inside carries its own
    * artwork, corner clip and shadow, so it deliberately does not take the
@@ -363,7 +365,7 @@
   .webui-user-menu-signin-panel {
     position: absolute;
     top: -84px;
-    left: calc(100% + 11px);
+    left: calc(100% + var(--webui-user-menu-flyout-gap));
     z-index: 111;
     animation: webui-dropdown-in 140ms cubic-bezier(0.16, 1, 0.3, 1);
   }

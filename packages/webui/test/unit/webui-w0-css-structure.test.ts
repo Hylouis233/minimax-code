@@ -477,6 +477,7 @@ describe("W0 · stylesheet composition", () => {
       "../features/transcript/ui/transcript.css",
       "../features/sessions/ui/sessions.css",
       "../features/workspace/ui/workspace.css",
+      "../features/workspace/ui/workspace-progress.css",
       "../features/browser/ui/browser.css",
       "../features/goal/ui/goal.css",
       "../features/account/ui/account.css",
@@ -533,6 +534,54 @@ describe("W0 · structural declarations W5 must preserve", () => {
     );
     expect(declaration(sessionViewport.body, "min-width")).toBe("0");
     expect(declaration(sessionViewport.body, "align-items")).toBe("stretch");
+
+    const progressMotion = winning(".webui-progress-panel-motion");
+    expect(declaration(progressMotion.body, "position")).toBe("fixed");
+    expect(declaration(progressMotion.body, "overflow")).toBe("hidden");
+    const progressPanel = winning(".webui-progress-overview-panel");
+    expect(declaration(progressPanel.body, "min-height")).toBe("0");
+    const workspaceSectionTitle = winning(".webui-workspace-section-title");
+    expect(declaration(workspaceSectionTitle.body, "padding")).toBe("0 var(--spacing_6)");
+    expect(declaration(workspaceSectionTitle.body, "font-size")).toBe("var(--size_14)");
+    expect(declaration(workspaceSectionTitle.body, "line-height")).toBe("20px");
+    expect(declaration(winning(".webui-progress-overview-main").body, "flex")).toBe("0 1 auto");
+    const progressCard = winning(".webui-progress-overview-card");
+    expect(declaration(progressCard.body, "height")).toBe("auto");
+    expect(declaration(progressCard.body, "box-shadow")).toBe("none");
+    expect(progressCard.body).toContain(
+      "max-height: max(0px, min(560px, calc(100vh - 88px)))",
+    );
+    expect(progressCard.body).toContain(
+      "max-height: max(0px, min(560px, calc(100dvh - 88px)))",
+    );
+    expect(declarationsFor(".webui-progress-overview-card.has-extended-content")).toHaveLength(0);
+    const sectionTitleText = winning(".webui-workspace-section-title > [data-workspace-section-title]");
+    expect(declaration(sectionTitleText.body, "flex")).toBe("1 1 auto");
+    expect(declaration(sectionTitleText.body, "min-width")).toBe("0");
+    expect(declaration(winning(".webui-progress-panel").body, "min-height")).toBe("58px");
+    const environmentLoading = winning(".webui-environment-loading");
+    expect(declaration(environmentLoading.body, "min-height")).toBe("132px");
+    expect(declaration(environmentLoading.body, "box-sizing")).toBe("border-box");
+    const progressScroll = winning(
+      ".webui-expandable-motion > .webui-progress-scroll",
+    );
+    expect(declaration(progressScroll.body, "overflow-y")).toBe("auto");
+    expect(declaration(progressScroll.body, "overflow-x")).toBe("hidden");
+    expect(declaration(winning(".webui-progress-scroll").body, "scrollbar-width")).toBe("none");
+    expect(declaration(winning(".webui-subagents-scroll").body, "scrollbar-width")).toBe("none");
+    expect(declaration(winning(".webui-progress-scroll").body, "scrollbar-gutter")).toBe("auto");
+    expect(declaration(winning(".webui-subagents-scroll").body, "scrollbar-gutter")).toBe("auto");
+    expect(declarationsFor(".webui-progress-scroll::-webkit-scrollbar")).toContain("display: none");
+    expect(declarationsFor(".webui-subagents-scroll::-webkit-scrollbar")).toContain("display: none");
+    expect(
+      declaration(winning(".webui-progress-panel.is-collapsed").body, "flex"),
+    ).toBe("0 0 auto");
+    expect(
+      declaration(
+        winning(".webui-progress-panel.is-collapsed > .webui-progress-panel-content").body,
+        "flex",
+      ),
+    ).toBe("0 0 auto");
 
     const scroll = declarationsFor(
       ".webui-session-layout .webui-session-transcript-scroll",
@@ -737,7 +786,7 @@ describe("W0 · at-rules and animations W5/W6 must not remove", () => {
     // asked for reduced motion. The exact list is the point -- adding an
     // animated rule without registering its override here is the same defect,
     // in the other direction.
-    expect(reducedMotion).toHaveLength(12);
+    expect(reducedMotion).toHaveLength(15);
     for (const rule of reducedMotion)
       expect(rule.body).toMatch(/(?:animation|transition):\s*none/u);
 
@@ -755,13 +804,18 @@ describe("W0 · at-rules and animations W5/W6 must not remove", () => {
       // popup in the client slide. The fly-out surface is the same sheet: it
       // carries the same motion, so it carries the same override.
       ".webui-dropdown-popup, .webui-dropdown-popup.is-leaving, .webui-dropdown-surface",
+      ".webui-environment-skeleton::after",
       ".webui-message-actions",
+      // The thinking slider animates its fill, stops and thumb while the user
+      // drags it; reduced motion must disable those transitions as a group.
+      ".webui-model-effort-fill, .webui-model-effort-dot, .webui-model-effort-thumb",
       // The model menu's list and panel slide in during the transition, so a
       // reader who asked for reduced motion would otherwise watch both move.
       ".webui-model-menu[data-webui-model-transitioning=\"true\"] .webui-model-list, .webui-model-menu[data-webui-model-transitioning=\"true\"] .webui-model-panel",
       // Added with the project-first rail: the section that holds a project's
       // sessions opens and closes by transitioning its height, so a reader who
       // asked for reduced motion would otherwise watch the section slide.
+      ".webui-progress-content-enter",
       ".webui-project-section-content",
       // Added with the rail activity spinner. It spins forever by design, so a
       // reader who asked for reduced motion would otherwise get an animation
@@ -858,6 +912,8 @@ describe("W0 · at-rules and animations W5/W6 must not remove", () => {
       "webui-overlay-enter",
       "webui-panel-enter-right",
       "webui-popover-enter",
+      "webui-progress-content-enter",
+      "webui-progress-skeleton",
       "webui-settings-content-in",
       "webui-signin-claim-spin",
       "webui-user-menu-usage-pulse",

@@ -1,202 +1,6 @@
-/* settings — moved out of styles/shell.css; rules kept in their original relative order. */
+/* settings — settings pages, dialogs and account surfaces. */
 @layer components {
 
-  .webui-workspace-panel { position: relative; display: flex; width: 50%; min-width: 0; min-height: 0; flex: 0 1 50%; flex-direction: column; overflow: hidden; border-left: 1px solid var(--border_default); background: var(--bg_default_primary); color: var(--text_default_primary); animation: webui-panel-enter-right 180ms cubic-bezier(.2, .7, .2, 1) both; }
-  .webui-workspace-panel.is-expanded { position: fixed; inset: 0; }
-  .webui-workspace-panel.is-expanded .webui-workspace-file-tree-panel { width: min(360px, 34vw); flex-basis: min(360px, 34vw); }
-  .webui-progress-panel-motion { position: absolute; top: 56px; right: 12px; z-index: 45; display: block; width: min(288px, calc(100% - 24px)); max-height: calc(100% - 68px); overflow-x: hidden; overflow-y: auto; clip-path: inset(0 0 100% 0 round 16px); opacity: 0; pointer-events: none; transition: clip-path 180ms cubic-bezier(.2, .7, .2, 1), opacity 140ms ease-out; }
-  .webui-progress-panel-motion.is-open { clip-path: inset(0 0 0 0 round 16px); opacity: 1; pointer-events: auto; }
-  .webui-progress-overview-panel { position: static; display: flex; width: 100%; flex-direction: column; overflow: visible; border: 0; background: transparent; padding: 0; }
-  .webui-session-has-progress-panel { box-sizing: border-box; padding-right: 312px; }
-  .webui-workspace-panel-header, .webui-workspace-panel-actions, .webui-workspace-tabs, .webui-workspace-tab { display: flex; align-items: center; }
-  .webui-workspace-panel-header { position: relative; z-index: 2; min-height: 56px; flex: 0 0 56px; justify-content: space-between; gap: var(--spacing_8); border-bottom: 1px solid var(--border_default); padding: 0 var(--spacing_8); }
-  .webui-workspace-tabs { min-width: 0; flex: 1 1 auto; gap: var(--spacing_8); overflow: visible; }
-  .webui-workspace-tab-list { display: flex; min-width: 0; flex: 1 1 0; align-items: center; gap: var(--spacing_4); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
-  .webui-workspace-tab-list::-webkit-scrollbar { display: none; }
-  .webui-workspace-tab { max-width: 180px; min-width: 104px; height: 40px; flex: 0 0 auto; gap: var(--spacing_4); border-radius: 10px; background: transparent; color: var(--text_default_secondary); }
-  .webui-workspace-tab.is-active { background: var(--bg_interaction_tertiary_selected); color: var(--text_default_primary); }
-  .webui-workspace-tab button, .webui-workspace-add-trigger, .webui-workspace-panel-actions button, .webui-workspace-add-menu button { display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; padding: var(--spacing_8); color: inherit; }
-  .webui-workspace-tab button:first-child { width: 100%; min-width: 0; height: 100%; justify-content: flex-start; gap: var(--spacing_8); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .webui-workspace-tab-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .webui-workspace-tab-file-icon { width: 16px; height: 16px; flex: 0 0 16px; }
-  .webui-workspace-filetype-badge { display: inline-flex; width: 16px; height: 16px; flex: 0 0 16px; align-items: center; justify-content: center; font-family: ui-monospace, monospace; font-size: 9px; font-weight: 600; line-height: 1; }
-  .webui-workspace-filetype-badge.is-markdown { color: var(--text_default_accent); }
-  .webui-workspace-filetype-badge.is-javascript { border-radius: 2px; background: #f4d54e; color: #403600; }
-  .webui-workspace-filetype-badge.is-typescript { border-radius: 2px; background: #3178c6; color: #fff; }
-  .webui-workspace-filetype-badge.is-json { color: #b88900; font-size: 11px; }
-  .webui-workspace-filetype-badge.is-css { color: #7e57c2; font-size: 7px; }
-  .webui-workspace-filetype-badge.is-html { color: #e44d26; font-size: 11px; font-weight: 700; }
-  .webui-workspace-filetype-badge.is-java { color: #e76f00; font-weight: 700; }
-  .webui-workspace-filetype-badge.is-python { color: #3472a5; font-weight: 700; }
-  .webui-workspace-filetype-badge.is-rust { color: #b7410e; font-weight: 700; }
-  .webui-workspace-filetype-badge.is-shell { color: #555; font-weight: 700; }
-  .webui-workspace-filetype-badge.is-sql { color: #d97706; font-size: 8px; font-weight: 700; }
-  .webui-workspace-filetype-badge.is-go { color: #00add8; font-weight: 700; }
-  .webui-workspace-filetype-badge.is-xml { color: #e37933; font-weight: 700; }
-  .webui-workspace-filetype-badge.is-yaml { color: #cb171e; font-weight: 700; }
-  .webui-workspace-filetype-badge.is-code { color: #3178c6; font-weight: 700; }
-  .webui-workspace-tab button:last-child { position: absolute; top: 50%; right: 4px; width: 22px; height: 22px; transform: translateY(-50%); border-radius: 5px; padding: 0; color: var(--icon_default_tertiary); opacity: 0; }
-  .webui-workspace-tab { position: relative; }
-  .webui-workspace-tab:hover button:last-child, .webui-workspace-tab.is-active button:last-child { opacity: 1; }
-  .webui-workspace-tab:hover button:first-child, .webui-workspace-tab.is-active button:first-child { padding-right: 24px; }
-  .webui-workspace-add-anchor { position: relative; z-index: 4; flex: 0 0 auto; }
-  .webui-workspace-add-trigger { width: 32px; height: 32px; border-radius: 8px; background: var(--bg_default_secondary); color: var(--text_default_primary); font-size: 18px; line-height: 1; }
-  .webui-workspace-add-trigger:hover, .webui-workspace-panel-actions button:hover { background: var(--bg_interaction_tertiary_hover); }
-  .webui-workspace-panel-actions { flex: 0 0 auto; gap: var(--spacing_8); padding-left: var(--spacing_4); }
-  .webui-workspace-panel-actions button { width: 32px; height: 32px; flex: 0 0 32px; border-radius: 8px; color: var(--icon_default_secondary); }
-  .webui-workspace-panel-close { color: var(--icon_default_secondary); }
-  .webui-workspace-panel-body { display: flex; min-width: 0; min-height: 0; flex: 1 1 auto; overflow: hidden; }
-  .webui-workspace-view { display: flex; min-width: 0; min-height: 0; flex: 1 1 auto; flex-direction: column; overflow: auto; }
-  .webui-workspace-file-toolbar { display: flex; min-height: 48px; flex: 0 0 48px; align-items: center; gap: var(--spacing_8); border-bottom: 1px solid var(--border_default); padding: 0 var(--spacing_16); }
-  .webui-workspace-file-breadcrumb { display: flex; min-width: 0; flex: 1 1 auto; align-items: center; gap: var(--spacing_8); overflow: hidden; color: var(--text_default_tertiary); font-size: var(--size_14); white-space: nowrap; }
-  .webui-workspace-file-breadcrumb > span { display: inline-flex; min-width: 0; align-items: center; gap: var(--spacing_8); overflow: hidden; text-overflow: ellipsis; }
-  .webui-workspace-file-breadcrumb .is-current { color: var(--text_default_primary); }
-  .webui-workspace-file-mode { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 2px; border-radius: 8px; background: var(--bg_default_secondary); padding: 2px; }
-  .webui-workspace-file-mode button { min-height: 28px; border: 0; border-radius: 6px; background: transparent; padding: 0 10px; color: var(--text_default_secondary); font-size: var(--size_12); }
-  .webui-workspace-file-mode button[aria-pressed="true"] { background: var(--bg_default_primary); color: var(--text_default_primary); box-shadow: 0 1px 3px rgb(0 0 0 / 12%); }
-  .webui-workspace-edit-action { display: inline-flex; width: 34px; height: 34px; flex: 0 0 34px; align-items: center; justify-content: center; border: 0; border-radius: 8px; background: transparent; color: var(--icon_default_secondary); }
-  .webui-workspace-edit-action:disabled { cursor: default; color: var(--icon_default_tertiary); opacity: .72; }
-  .webui-workspace-edit-action:not(:disabled):hover { background: var(--bg_interaction_tertiary_hover); }
-  .webui-workspace-tree-toggle { display: inline-flex; width: 34px; height: 34px; flex: 0 0 34px; align-items: center; justify-content: center; border: 0; border-radius: 8px; background: transparent; color: var(--icon_default_secondary); }
-  .webui-workspace-tree-toggle:hover, .webui-workspace-tree-toggle[aria-pressed="true"] { background: var(--bg_interaction_tertiary_selected); color: var(--icon_default_primary); }
-  .webui-workspace-file-tree-panel { display: flex; width: clamp(232px, 24vw, 288px); flex: 0 0 clamp(232px, 24vw, 288px); min-height: 0; flex-direction: column; border-left: 1px solid var(--border_default); background: var(--bg_default_primary); animation: webui-panel-enter-right 180ms cubic-bezier(.2, .7, .2, 1) both; }
-  .webui-workspace-file-search { display: flex; height: 40px; flex: 0 0 40px; align-items: center; gap: var(--spacing_8); margin: var(--spacing_8) var(--spacing_12); border: 1px solid var(--border_default); border-radius: 10px; padding: 0 var(--spacing_8); color: var(--icon_default_tertiary); }
-  .webui-workspace-file-search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text_default_primary); font-size: var(--size_14); }
-  .webui-workspace-file-search input::placeholder { color: var(--text_default_tertiary); }
-  .webui-workspace-file-tree-scroll { min-height: 0; flex: 1 1 auto; overflow: auto; padding: 0 var(--spacing_12) var(--spacing_12); }
-  .webui-workspace-file-tree-scroll > [role="status"], .webui-workspace-file-tree-scroll > [role="alert"], .webui-workspace-tree-empty { padding: var(--spacing_8); color: var(--text_default_tertiary); font-size: var(--size_12); }
-  .webui-file-tree-children { padding-left: var(--spacing_12); }
-  .webui-file-tree-children > [role="status"], .webui-file-tree-children > [role="alert"], .webui-file-tree-children > p { margin: 0; padding: 2px var(--spacing_12) 6px; color: var(--text_default_tertiary); font-size: var(--size_12); }
-  .webui-workspace-files-empty { display: flex; min-height: 0; flex: 1 1 auto; flex-direction: column; align-items: center; justify-content: center; gap: var(--spacing_8); color: var(--text_default_tertiary); }
-  .webui-workspace-files-empty strong { color: var(--text_default_secondary); font-size: var(--size_16); font-weight: var(--weight_medium); }
-  .webui-workspace-files-empty p { margin: 0; font-size: var(--size_14); }
-  .webui-workspace-file-document { min-width: 0; min-height: 0; flex: 1 1 auto; overflow: auto; }
-  .webui-workspace-file-document > p { margin: var(--spacing_16); color: var(--text_default_tertiary); }
-  .webui-workspace-file-document > .webui-markdown { max-width: 960px; margin: 0 auto; padding: 32px clamp(24px, 7vw, 64px); }
-  .webui-workspace-image-preview { display: block; max-width: 100%; max-height: calc(100vh - 180px); margin: 24px auto; object-fit: contain; }
-  .webui-file-code { min-width: max-content; min-height: 100%; margin: 0; overflow: auto; background: var(--bg_default_primary); padding: 20px 0; color: var(--text_default_primary); font-family: Hack, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; line-height: 1.65; tab-size: 2; white-space: pre; }
-  .webui-file-code code { display: block; min-width: 100%; }
-  .webui-file-code-line { position: relative; display: block; min-height: 1.65em; padding: 0 24px 0 68px; }
-  .webui-file-code-line::before { position: absolute; left: 0; width: 48px; padding-right: 12px; color: var(--text_default_tertiary); content: attr(data-line-number); text-align: right; user-select: none; }
-  .webui-file-code-line.webui-file-preview-line-active { background: var(--bg_interaction_tertiary_selected); }
-  .webui-file-code .hljs-comment, .webui-file-code .hljs-quote { color: var(--text_default_tertiary); font-style: italic; }
-  .webui-file-code .hljs-keyword, .webui-file-code .hljs-meta .hljs-keyword { color: var(--text_label_accent_default); }
-  .webui-file-code .hljs-string, .webui-file-code .hljs-doctag { color: var(--text_label_positive_secondary_default); }
-  .webui-file-code .hljs-number, .webui-file-code .hljs-literal { color: var(--text_label_warning_secondary_default); }
-  .webui-file-code .hljs-title, .webui-file-code .hljs-title.function_, .webui-file-code .hljs-function, .webui-file-code .hljs-section { color: var(--text_label_accent_default); }
-  .webui-file-code .hljs-type, .webui-file-code .hljs-built_in, .webui-file-code .hljs-title.class_ { color: var(--text_label_danger_secondary_default); }
-  .webui-file-code .hljs-attr, .webui-file-code .hljs-variable, .webui-file-code .hljs-property { color: var(--text_default_secondary); }
-  /* The add menu's surface and its placement come from the shared dropdown
-   * layer (`.webui-dropdown-popup`); this rule only says what the menu holds. */
-  .webui-workspace-add-menu { display: flex; min-width: 198px; flex-direction: column; gap: 2px; padding: 4px; color: var(--text_default_primary); }
-  .webui-workspace-add-menu button { width: 100%; min-height: 34px; justify-content: flex-start; gap: var(--spacing_8); border-radius: 8px; padding: 0 10px; color: inherit; font-size: var(--size_14); text-align: left; white-space: nowrap; }
-  .webui-workspace-add-menu button:hover { background: var(--bg_interaction_tertiary_hover); }
-  .webui-workspace-add-menu button svg { color: var(--icon_default_secondary); }
-
-  .webui-turn-review { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; overflow: auto; }
-  .webui-turn-review-summary { display: flex; min-height: 48px; flex: 0 0 48px; align-items: center; justify-content: space-between; gap: var(--spacing_12); border-bottom: 1px solid var(--border_default); padding: 0 var(--spacing_16); color: var(--text_default_primary); font-size: var(--size_14); }
-  .webui-turn-review-files { min-width: 0; flex: 1 1 auto; overflow: auto; }
-  .webui-turn-review-file { min-width: 0; border-bottom: 1px solid var(--border_default); }
-  .webui-turn-review-file-heading { position: sticky; top: 0; display: flex; min-width: 0; min-height: 40px; align-items: center; gap: var(--spacing_8); border: 0; background: var(--bg_default_primary); padding: 0 var(--spacing_12); color: var(--text_default_primary); cursor: pointer; list-style: none; }
-  .webui-turn-review-file-heading::-webkit-details-marker { display: none; }
-  .webui-turn-review-file-heading::before { width: 12px; flex: 0 0 12px; color: var(--icon_default_tertiary); content: "›"; font-size: 18px; text-align: center; }
-  .webui-turn-review-file[open] > .webui-turn-review-file-heading::before { content: "⌄"; }
-  .webui-turn-review-file-heading:hover { background: var(--bg_interaction_secondary_default); }
-  .webui-turn-review-file-heading .webui-diff-file-icon { width: 18px; height: 18px; }
-  .webui-turn-review-file-heading .webui-diff-file-icon .webui-workspace-filetype-badge { width: 18px; height: 18px; }
-  .webui-turn-review-file-path { min-width: 0; flex: 1; overflow: hidden; font-size: var(--size_14); text-overflow: ellipsis; white-space: nowrap; }
-  .webui-turn-review-code { width: max-content; min-width: 100%; margin: 0; padding: 0; overflow: auto; background: var(--bg_default_primary); font-size: var(--size_12); line-height: 1.65; white-space: pre; overflow-wrap: normal; }
-  .webui-turn-review-code code { display: block; min-width: max-content; }
-  .webui-turn-review-line { display: grid; min-width: max-content; grid-template-columns: 48px 48px 20px minmax(0, 1fr); }
-  .webui-turn-review-line--addition { background: var(--bg_status_positive); color: #17251d; }
-  .webui-turn-review-line--deletion { background: var(--bg_status_error); color: #302022; }
-  .webui-turn-review-line--hunk { background: var(--bg_grouped_secondary); color: var(--text_default_tertiary); }
-  /* The no-newline marker: it renders as its own row with no gutter
-     numbers and neutral text, because it records a fact about the line above
-     rather than being a line of the file. */
-  .webui-turn-review-line--noNewline { grid-column: 1 / -1; padding: 1px var(--spacing_12); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--text_default_tertiary); }
-  .webui-turn-review-line-number { border-right: 1px solid var(--border_light); padding: 0 8px 0 4px; color: var(--text_default_tertiary); text-align: right; user-select: none; }
-  .webui-turn-review-line--addition .webui-turn-review-line-number { color: var(--text_status_success); }
-  .webui-turn-review-line--deletion .webui-turn-review-line-number { color: var(--text_status_error); }
-  .webui-turn-review-marker { color: var(--text_default_tertiary); text-align: center; user-select: none; }
-  .webui-turn-review-line--addition .webui-turn-review-marker { color: var(--text_status_success); }
-  .webui-turn-review-line--deletion .webui-turn-review-marker { color: var(--text_status_error); }
-  .webui-turn-review-source { min-width: max-content; padding-right: var(--spacing_16); }
-  .webui-turn-review-hunk { grid-column: 1 / -1; padding: 1px var(--spacing_12); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-  .webui-turn-review-unavailable, .webui-turn-review-empty { padding: var(--spacing_16); color: var(--text_default_tertiary); font-size: var(--size_14); }
-  .webui-workspace-review-status { flex: 0 0 auto; margin: 0; border-bottom: 1px solid var(--border_light); padding: var(--spacing_8) var(--spacing_12); color: var(--text_default_tertiary); font-size: var(--size_12); }
-  .webui-workspace-review-search { display: flex; flex: 0 0 auto; gap: var(--spacing_8); border-bottom: 1px solid var(--border_light); padding: var(--spacing_8) var(--spacing_12); }
-  .webui-workspace-review-search input { min-width: 0; flex: 1; border: 1px solid var(--border_default); border-radius: var(--radius_8); background: var(--bg_default_primary); padding: 0 var(--spacing_8); color: var(--text_default_primary); font-size: var(--size_14); }
-  .webui-workspace-review-search button { flex: 0 0 auto; border: 1px solid var(--border_default); border-radius: var(--radius_8); background: var(--bg_default_primary); padding: 0 var(--spacing_12); color: var(--text_default_primary); font-size: var(--size_14); }
-  .webui-turn-review .webui-workspace-review-search-results { flex: 0 0 auto; overflow: auto; border-bottom: 1px solid var(--border_light); padding: var(--spacing_8) var(--spacing_12); }
-  .webui-workspace-review-search-results button { max-width: 100%; overflow: hidden; color: var(--text_default_secondary); text-overflow: ellipsis; white-space: nowrap; }
-  .webui-file-preview-line-active { display: inline-block; width: 100%; background: var(--bg_interaction_tertiary_selected); }
-
-  .webui-progress-overview-card { position: relative; display: flex; width: 100%; flex-direction: column; border: .5px solid var(--border_default); border-radius: 16px; background: var(--bg_grouped_secondary_elevated); padding: 6px; box-shadow: 0 6px 24px rgb(0 0 0 / 8%); color: var(--text_default_primary); }
-  .webui-environment-panel, .webui-progress-panel, .webui-subagents-panel { display: flex; flex-shrink: 0; flex-direction: column; overflow: hidden; }
-  .webui-environment-panel + .webui-progress-panel { border-top: 1px solid var(--border_light); }
-  .webui-progress-panel + .webui-subagents-panel { border-top: 1px solid var(--border_light); }
-  .webui-environment-body { padding: 0 6px 6px; }
-  .webui-environment-workspace { overflow: hidden; padding: 0 0 4px; color: var(--text_default_tertiary); font-size: var(--size_12); line-height: 18px; text-overflow: ellipsis; white-space: nowrap; }
-  .webui-environment-actions { display: flex; flex-direction: column; gap: 1px; }
-  .webui-environment-action { display: flex; min-height: 34px; width: 100%; align-items: center; gap: var(--spacing_8); border: 0; border-radius: var(--radius_8); background: transparent; padding: 0 2px; color: var(--text_default_primary); font-size: var(--size_14); text-align: left; }
-  .webui-environment-action small { display: inline-flex; flex-shrink: 0; gap: var(--spacing_8); margin-left: auto; font-size: var(--size_12); }
-  .webui-environment-action small .webui-diff-additions { color: var(--text_label_positive_secondary_default); }
-  .webui-environment-action small .webui-diff-deletions { color: var(--text_label_danger_secondary_default); }
-  .webui-environment-action:not(:disabled):hover { background: var(--bg_interaction_tertiary_hover); }
-  .webui-environment-action:disabled { cursor: default; color: var(--text_default_tertiary); opacity: .72; }
-  .webui-commit-dialog { position: fixed; top: 50%; left: 50%; z-index: 100; display: flex; width: min(420px, calc(100vw - 32px)); transform: translate(-50%, -50%); flex-direction: column; gap: var(--spacing_12); border: 1px solid var(--border_default); border-radius: var(--radius_12); background: var(--bg_grouped_secondary_elevated); padding: var(--spacing_16); box-shadow: 0 12px 40px rgb(0 0 0 / 18%); color: var(--text_default_primary); }
-  .webui-commit-dialog-header, .webui-commit-dialog-actions { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing_8); }
-  .webui-commit-dialog-header button { border: 0; background: transparent; color: var(--icon_default_tertiary); }
-  .webui-commit-dialog-label { display: flex; flex-direction: column; gap: var(--spacing_4); color: var(--text_default_secondary); font-size: var(--size_12); }
-  .webui-commit-dialog-label textarea { min-height: 88px; resize: vertical; border: 1px solid var(--border_default); border-radius: var(--radius_8); background: var(--bg_default_primary); padding: var(--spacing_8); color: var(--text_default_primary); font: inherit; outline: 0; }
-  .webui-commit-dialog-hint, .webui-commit-dialog-error { margin: 0; color: var(--text_default_tertiary); font-size: var(--size_12); }
-  .webui-commit-dialog-error { color: var(--text_label_danger_secondary_default); }
-  .webui-commit-dialog-actions { justify-content: flex-end; }
-  .webui-commit-dialog-actions button { border: 1px solid var(--border_default); border-radius: var(--radius_8); background: transparent; padding: var(--spacing_8) var(--spacing_12); color: var(--text_default_primary); }
-  .webui-commit-dialog-actions button:last-child { border-color: var(--border_accent); background: var(--bg_interaction_primary_default); color: var(--text_default_inverted); }
-  .webui-workspace-panel-controls { position: absolute; top: 16px; right: 12px; z-index: 50; display: flex; align-items: center; gap: 8px; }
-  .webui-workspace-icon-button { display: flex; width: 36px; height: 36px; align-items: center; justify-content: center; border: 0; border-radius: 10px; background: transparent; color: var(--icon_default_secondary); }
-  .webui-workspace-icon-button:not(:disabled):hover, .webui-workspace-icon-button.is-active { background: var(--bg_interaction_tertiary_selected); color: var(--icon_default_primary); }
-  .webui-workspace-icon-button:disabled { cursor: default; opacity: .72; }
-  .webui-workspace-section-title { display: flex; height: 28px; width: 100%; align-items: center; justify-content: space-between; border: 0; background: transparent; padding: 0 var(--spacing_12); color: var(--text_default_secondary); font-size: var(--size_12); text-align: left; }
-  .webui-progress-panel { padding: 0 0 2px; }
-  .webui-progress-row { display: flex; min-height: 30px; align-items: center; gap: var(--spacing_8); border-radius: 10px; padding: 0 var(--spacing_4); font-size: var(--size_12); }
-  .webui-progress-marker { display: inline-flex; width: 18px; height: 18px; flex: 0 0 18px; align-items: center; justify-content: center; border-radius: 50%; font-size: 11px; }
-  .webui-progress-row--completed .webui-progress-marker { background: var(--icon_default_secondary); color: var(--text_default_inverted); }
-  .webui-progress-row--in_progress .webui-progress-marker { background: var(--bg_grouped_tertiary); color: var(--text_default_primary); }
-  .webui-progress-row--pending .webui-progress-marker { background: var(--bg_default_secondary); color: var(--text_default_tertiary); }
-  .webui-progress-row--cancelled .webui-progress-marker { background: var(--bg_default_secondary); color: var(--text_default_tertiary); }
-  .webui-progress-empty { margin: 0; padding: var(--spacing_8) var(--spacing_4); color: var(--text_default_tertiary); font-size: var(--size_12); }
-  .webui-subagent-row { display: flex; min-height: 32px; width: 100%; align-items: center; gap: var(--spacing_8); border: 0; border-radius: var(--radius_8); background: transparent; padding: 0 var(--spacing_4); color: var(--text_default_primary); font-size: var(--size_14); }
-  .webui-subagent-row:hover { background: var(--bg_interaction_tertiary_hover); }
-  .webui-subagent-avatar { display: inline-flex; width: 20px; height: 20px; flex: 0 0 20px; object-fit: contain; }
-  .webui-subagent-status { display: inline-flex; width: 18px; height: 18px; flex: 0 0 18px; align-items: center; justify-content: center; border-radius: 50%; color: var(--text_default_tertiary); font-size: 14px; font-weight: var(--weight_medium); }
-  .webui-subagent-status--completed { background: var(--icon_default_secondary); color: var(--text_default_inverted); }
-  .webui-subagent-status--error { color: var(--text_label_danger_secondary_default); }
-  .webui-workspace-panel-close { display: flex; width: 32px; height: 32px; flex: 0 0 32px; align-items: center; justify-content: center; border: 0; border-radius: var(--radius_8); background: transparent; color: var(--icon_default_tertiary); }
-  .webui-workspace-panel-close:hover { background: var(--bg_interaction_tertiary_hover); color: var(--icon_default_primary); }
-
-  .webui-file-tree-row { display: flex; width: 100%; min-height: 32px; align-items: center; gap: var(--spacing_8); overflow: hidden; border: 0; border-radius: 6px; background: transparent; padding: 0 var(--spacing_4); color: var(--text_default_secondary); text-align: left; text-overflow: ellipsis; white-space: nowrap; font-size: var(--size_14); transition: background-color 120ms ease-out, color 120ms ease-out; }
-  .webui-expandable-motion { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 180ms cubic-bezier(.2, .7, .2, 1), opacity 140ms ease-out; }
-  .webui-expandable-motion > * { min-height: 0; overflow: hidden; }
-  .webui-expandable-motion.is-open { grid-template-rows: 1fr; opacity: 1; }
-  .webui-file-tree-row:hover { background: var(--bg_interaction_tertiary_hover); color: var(--text_default_primary); }
-  .webui-file-tree-row.is-selected { background: var(--bg_interaction_tertiary_selected); color: var(--text_default_primary); }
-
-  .file-tab { display: flex; align-items: center; gap: var(--spacing_4); overflow: hidden; padding: 0 var(--spacing_8); font-size: var(--size_12); white-space: nowrap; }
-  .file-tab button { margin-left: auto; border: 0; background: transparent; color: inherit; }
-
-  .webui-canvas-content, .webui-terminal-empty { position: relative; display: flex; min-height: 300px; height: calc(100% - 180px); flex-direction: column; align-items: center; justify-content: center; gap: var(--spacing_8); padding: var(--spacing_16); color: var(--text_default_secondary); text-align: center; }
-  .webui-canvas-content p, .webui-terminal-empty p { margin: 0; color: var(--text_default_tertiary); font-size: var(--size_12); }
-  .webui-canvas-stage { display: flex; min-width: 160px; min-height: 100px; align-items: center; justify-content: center; gap: var(--spacing_8); transform-origin: center; }
-  .webui-canvas-node { border: 1px solid var(--border_default); border-radius: var(--radius_8); background: var(--bg_grouped_secondary); padding: var(--spacing_8); font-size: var(--size_12); }
-  .webui-canvas-zoom { position: absolute; right: var(--spacing_8); bottom: var(--spacing_8); font-size: var(--size_12); }
-  .webui-terminal-empty button { border: 1px solid var(--border_default); border-radius: var(--radius_8); background: transparent; padding: var(--spacing_8) var(--spacing_12); color: var(--text_default_primary); }
-  .webui-xterm-host { width: 100%; min-height: 260px; overflow: hidden; background: var(--bg_default_secondary); padding: var(--spacing_8); text-align: left; }
-  .webui-xterm-host .xterm { height: 100%; }
-  .webui-xterm-host .xterm-viewport { background: var(--bg_default_secondary) !important; }
-  .webui-terminal-actions { display: flex; gap: var(--spacing_8); }
   .webui-settings-mask { position: fixed; inset: 0; z-index: 100; display: flex; background: var(--utility_scrim); animation: webui-overlay-enter 160ms ease-out both; }
   /* The account login dialog: the settings mask's overlay treatment around a
    * small centered card — a dialog, not a full page, because the entry points
@@ -292,6 +96,13 @@
   .webui-archived-unarchive { height: 36px; flex: 0 0 auto; border: 0; border-radius: 12px; padding: 0 12px; background: var(--bg_grouped_tertiary); color: var(--text_default_primary); font: inherit; font-size: var(--size_14); cursor: pointer; }
   .webui-archived-unarchive:hover { background: var(--bg_interaction_tertiary_press); }
   .webui-archived-empty { display: grid; min-height: 180px; place-items: center; color: var(--text_default_tertiary); font-size: var(--size_14); }
+  @media (max-width: 1080px) {
+    .webui-settings-sidebar {
+      width: clamp(196px, 24vw, 260px);
+      flex-basis: clamp(196px, 24vw, 260px);
+    }
+  }
+
   @media (max-width: 760px) { .webui-archived-unarchive { padding: 0 9px; } }
 
   .webui-settings-error { margin: 0 var(--spacing_20) var(--spacing_16); color: var(--text_label_danger_secondary_default); font-size: var(--size_12); }
@@ -708,12 +519,6 @@
     .webui-settings-sidebar {
       width: clamp(168px, 28vw, 210px);
       flex-basis: clamp(168px, 28vw, 210px);
-    }
-
-    .webui-model-menu--two-column {
-      width: min(560px, calc(100vw - 32px));
-      grid-template-columns: minmax(0, 1fr);
-      grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
     }
   }
 

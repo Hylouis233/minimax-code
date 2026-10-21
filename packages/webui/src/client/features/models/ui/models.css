@@ -448,6 +448,11 @@
     line-height: var(--line_height_20);
     font-weight: 600;
   }
+  .webui-model-list-group-subtitle {
+    color: var(--text_default_tertiary);
+    font-size: var(--size_12);
+    line-height: var(--line_height_16);
+  }
   .webui-model-list-row {
     display: flex;
     width: 100%;
@@ -490,5 +495,21 @@
     font-size: var(--size_14);
     line-height: var(--line_height_20);
     text-align: center;
+  }
+
+
+  @media (max-width: 1080px) {
+    .webui-model-menu--two-column {
+      min-width: 0;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+    }
+  }
+
+  @media (max-width: 760px) {
+    .webui-model-menu--two-column {
+      width: min(560px, calc(100vw - 32px));
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    }
   }
 }

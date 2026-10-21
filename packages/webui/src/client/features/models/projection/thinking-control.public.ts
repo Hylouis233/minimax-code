@@ -64,7 +64,7 @@ const EFFORT_LABELS: Readonly<Record<string, string>> = {
   low: "低",
   medium: "中",
   high: "高",
-  max: "Ultra",
+  max: "最高",
 };
 
 /** The label one level is shown with. */

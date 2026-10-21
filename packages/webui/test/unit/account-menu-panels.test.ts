@@ -39,7 +39,8 @@ describe("the menu keeps the two open flags and the mutual exclusion (LC-7)", ()
 
 describe("dismissal stays with the menu (LC-8)", () => {
   it("closes both panels from the one dismissal helper", () => {
-    expect(shell).toContain("const closePanels = () => {\n    setUsageOpen(false);\n    setSigninOpen(false);\n  };");
+    expect(shell).toContain("const closePanels = () => {\n    if (panelCloseTimer.current !== undefined) {\n      clearTimeout(panelCloseTimer.current);");
+    expect(shell).toContain("    setUsageOpen(false);\n    setSigninOpen(false);\n  };");
     // The rail's own trigger closes them too, and the two cross-panel jumps do: check-in -> usage is
     // the one that used to be easy to lose, since it starts inside the panel that is going away.
     expect(shell).toContain("setSigninOpen(false);\n                    loadUsage();");
@@ -59,8 +60,8 @@ describe("dismissal stays with the menu (LC-8)", () => {
 
 describe("the panels load on demand, never on mount (LC-9)", () => {
   it("opens each panel from a hover, focus or click on the menu", () => {
-    expect(shell).toContain("onMouseEnter={() => loadSignin()} onFocus={() => loadSignin()}");
-    expect(shell).toContain("onMouseEnter={() => loadUsage()} onFocus={() => loadUsage()}");
+    expect(shell).toContain("onMouseEnter={() => { cancelPanelClose(); loadSignin(); }} onMouseLeave={schedulePanelClose} onFocus={() => { cancelPanelClose(); loadSignin(); }}");
+    expect(shell).toContain("onMouseEnter={() => { cancelPanelClose(); loadUsage(); }} onMouseLeave={schedulePanelClose} onFocus={() => { cancelPanelClose(); loadUsage(); }}");
   });
 
   it("gives neither panel a mount-time load", () => {

@@ -134,6 +134,7 @@
     min-height: 0;
     min-width: 0;
     width: 100%;
+    transition: padding-right 180ms cubic-bezier(.2, .7, .2, 1);
   }
   .webui-session-layout .webui-session-scroll-viewport {
     min-width: 0;
