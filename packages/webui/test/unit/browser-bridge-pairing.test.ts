@@ -892,7 +892,14 @@ describe("the pairing exchange — the cross-implementation vector", () => {
   const SALT = "AAECAwQFBgcICQoLDA0ODw==";
   const PLAINTEXT = "ABEiM0RVZneImaq7zN3u/w==";
   const PAYLOAD = "EBESExQVFhcYGRobrpzg8LW2dZC7oVrnYW8vU8zfjg8p/FNAc/YdMgkvUx7+O5ceWIULAw==";
-  const SECRET_HEX = "00112233445566778899aabbccddeeff";
+  /**
+   * The plaintext the payload carries, in hex.
+   *
+   * A published transfer vector, not a credential: the bytes are
+   * 0x00, 0x11, 0x22, … so that they are obviously synthetic. The ciphertext
+   * is pinned to them, so the value cannot be changed — only the name.
+   */
+  const PLAINTEXT_HEX = "00112233445566778899aabbccddeeff";
 
   /**
    * One continuous 0x00, 0x01, 0x02, … stream, so the first 16 bytes are the
@@ -937,7 +944,7 @@ describe("the pairing exchange — the cross-implementation vector", () => {
     );
 
     const cipher = await sealWebuiBrowserBridgePairingCredential(
-      Buffer.from(SECRET_HEX, "hex"),
+      Buffer.from(PLAINTEXT_HEX, "hex"),
       EXTENSION_PUBLIC,
       { randomBytes: countingRandom(), hostKeyPair: { privateKey, publicKey } },
     );
@@ -951,7 +958,7 @@ describe("the pairing exchange — the cross-implementation vector", () => {
       y: HOST_PRIVATE_JWK.y,
     });
     // The plaintext the two suites agree on is `base64(secret)`.
-    expect(Buffer.from(SECRET_HEX, "hex").toString("base64")).toBe(PLAINTEXT);
+    expect(Buffer.from(PLAINTEXT_HEX, "hex").toString("base64")).toBe(PLAINTEXT);
   });
 
   it("opens the same vector from the extension's fixed private key", async () => {
@@ -984,7 +991,7 @@ describe("the pairing exchange — the cross-implementation vector", () => {
       extensionPrivate,
     );
 
-    expect(hexOf(secret)).toBe(SECRET_HEX);
+    expect(hexOf(secret)).toBe(PLAINTEXT_HEX);
     expect(Buffer.from(secret).toString("base64")).toBe(PLAINTEXT);
   });
 

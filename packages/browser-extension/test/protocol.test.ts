@@ -61,8 +61,14 @@ const VECTOR_SALT = "AAECAwQFBgcICQoLDA0ODw==";
 const VECTOR_PLAINTEXT = "ABEiM0RVZneImaq7zN3u/w==";
 const VECTOR_PAYLOAD =
   "EBESExQVFhcYGRobrpzg8LW2dZC7oVrnYW8vU8zfjg8p/FNAc/YdMgkvUx7+O5ceWIULAw==";
-/** The secret the plaintext above encodes. */
-const VECTOR_SECRET_HEX = "00112233445566778899aabbccddeeff";
+/**
+ * The plaintext the payload above carries, in hex.
+ *
+ * A published transfer vector, not a credential: the bytes are
+ * 0x00, 0x11, 0x22, … so that they are obviously synthetic. The ciphertext
+ * above is pinned to them, so the value cannot be changed — only the name.
+ */
+const VECTOR_PLAINTEXT_HEX = "00112233445566778899aabbccddeeff";
 
 describe("browser bridge pairing transfer vector", () => {
   it("pins the agreed HKDF info and the byte layout", () => {
@@ -83,7 +89,7 @@ describe("browser bridge pairing transfer vector", () => {
       privateKey,
     );
 
-    expect(hexOf(secret)).toBe(VECTOR_SECRET_HEX);
+    expect(hexOf(secret)).toBe(VECTOR_PLAINTEXT_HEX);
     // The plaintext on the wire is `base64(secret)`, not the raw bytes.
     expect(encodeBase64(secret)).toBe(VECTOR_PLAINTEXT);
   });
