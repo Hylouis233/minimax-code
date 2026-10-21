@@ -81,6 +81,7 @@ branch and on the base branch:
 | `9d945e54` | the same six — now with a named cause — and `verify (macos-latest)` **passed** (14m51s) |
 | `54db73a3` | the ubuntu and windows jobs **pass** — the ubuntu job is green for the first time since the browser-use programme landed; the macOS job was cancelled while it was still queued, so it carries no verdict |
 | `3d3b7846` | **nothing** — all three platforms pass, and the workflow's own "Require every planned check" gate passes with them |
+| `4a0a5d90` | `test:webui` on ubuntu — a suite file failing with every test in it passing: the `ENOTEMPTY` removal race, this time in a test's own teardown. And `test:windows` on windows, where the runner's PowerShell timed out while it checked the checkout volume |
 | `a63a6c99` — the base branch's own CI run, before this programme | `verify (macos-latest)` and `verify (ubuntu-latest)` |
 
 So the `test:capabilities` failure is **pre-existing on the base branch**, in a package this slice
@@ -173,8 +174,30 @@ and build-boundary checks, the installed package and the capability suite — an
 the browser-use programme introduced them now pass on the runner that has been failing them. The
 macOS job of that run was cancelled while it was still queued, so it carried no verdict; the next
 run, at `3d3b7846`, has **all three platforms passing** and the workflow's own "Require every
-planned check" gate passing with them. The fork's CI has been red on this line since the
-browser-use programme landed; it is green now, and it is green on the tree this record carries.
+planned check" gate passing with them — and so does the run at `9ac67622`, after the second
+`ENOTEMPTY` fix below. The fork's CI has been red on this line since the browser-use programme
+landed; it is green now, and it is green on the tree this record carries.
+
+### The second `ENOTEMPTY`, and a runner flake
+
+The run at `4a0a5d90` failed the ubuntu job on a suite file whose every test passed:
+
+```
+FAIL packages/webui/test/integration/browser-use-real-input.test.ts
+Error: ENOTEMPTY: directory not empty, rmdir '/tmp/webui-browser-use-e2e-*/browser'
+```
+
+That is the same race as the one this record already carries, in a different place: the browser is
+killed and its profile directory is removed straight away, and the browser may still be writing its
+last files. The provider's own removal has retried for that reason since `782c137b`; the tests that
+remove a browser's profile did not, so the race surfaced there instead. Every such removal retries
+now (`9ac67622`) — a profile is a directory the browser owned, and the browser is gone, so a removal
+that races with its last writes is retried rather than reported as a failure.
+
+The same run failed the **windows** job on `test/windows-contract.test.mjs` — "Windows could not
+verify the checkout volume (spawnSync powershell.exe ETIMEDOUT)". That is the runner's PowerShell
+timing out while it checked the volume, in a repository-level gate this slice does not touch; the
+run before it passed the same test on the same code, and the run after it did too.
 
 **This corrects what an earlier version of this record said.** It said the runner "cannot drive a
 real browser with the extension", and that the spec's "is the browser installed" guard was the
