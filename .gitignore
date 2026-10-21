@@ -11,6 +11,5 @@ dist-webui/
 .DS_Store
 .idea/
 .codegraph/
-.plan
 dist-*.zip
 dist-store-*/

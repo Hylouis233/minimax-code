@@ -15,8 +15,10 @@ const skipped = new Set([
   "dist",
   WEBUI_DIST_DIRECTORY,
   ".cache",
-  // Local development plans are workspace material, not part of the published source projection.
-  ".plan",
+  // The development plans are tracked: a ticket has to be readable from a
+  // worktree, and a worktree only carries tracked files. Their content is
+  // scanned like any other file, so a plan cannot carry a credential or an
+  // internal host into the published projection.
   ".pnpm-store",
   ".turbo",
   ".idea",

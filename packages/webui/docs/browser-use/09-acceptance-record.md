@@ -14,8 +14,9 @@ Two tickets ask for a recorded result rather than a claim: the browser version, 
 the settings that were enabled, and what was observed. A matrix written by hand drifts from what the
 suites did, so **the suites write the record as they run** and this document is written from it.
 
-The record is written to `.plan/browser-use/complete/<suite>.acceptance.json` — workspace material, not a
-published document. The four suites that produce it are:
+The record is written to `.plan/browser-use/complete/<suite>.acceptance.json`, which is tracked in
+the repository and part of the published source projection, so the raw record travels with this
+document. The four suites that produce it are:
 
 | Suite | What it drives |
 | --- | --- |
@@ -191,8 +192,8 @@ pnpm test:webui          # the isolated-Chromium cases (Vitest)
 pnpm test:webui-browser  # the real-browser, real-external and real-packaged cases (Playwright)
 ```
 
-Both write their records to `.plan/browser-use/complete/`. The records are workspace material, so they
-are not part of the published source projection; the rows above are the published copy of them.
+Both write their records to `.plan/browser-use/complete/`. The records are tracked and published
+alongside this document; the rows above are the published copy of them.
 
 A machine without the **installed** Edge cannot run the Edge cases: they are skipped with the
 reason, not failed on a browser that was never there. The bundled Chromium is installed by the

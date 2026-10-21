@@ -116,10 +116,11 @@ validation host, and from the acceptance suites that write a record as they run:
 | `.plan/browser-use/complete/probe-credential-store.mjs` | `.plan/browser-use/complete/credential-store-evidence.json` | Which OS secure credential store **the one Linux host it ran on** actually offers. Nothing about any other platform |
 | `packages/webui/test/browser/*` (Playwright) and `packages/webui/test/integration/browser-use-real-input.test.ts` (Vitest) | `.plan/browser-use/complete/*.acceptance.json` | The acceptance matrix: the browser version, the operating system, the settings and the observed result, for every surface. See [`09-acceptance-record.md`](09-acceptance-record.md) |
 
-`.plan/` is workspace material: it is listed in the repository `.gitignore` and is not part of the
-public-source projection, so these documents are not accompanied by the raw probe records in a
-published checkout. Each measurement is therefore quoted inline with the JSON field it came from, so
-the derived value can be checked against the probe output whenever the workspace material is present.
+`.plan/` holds the development plans, the boards and the raw probe records. It is **tracked in the
+repository**, so a ticket and the plan behind it are both readable from a worktree, and it is
+part of the public-source projection like any other tracked file. The raw probe records therefore
+travel with the published checkout; each measurement is still quoted inline below, so the derived
+value can be checked against the probe output without leaving the document.
 The probe scripts are reproducible: re-running them regenerates the evidence for the host they run on,
 and **produces a different artifact on a different host**.
 
