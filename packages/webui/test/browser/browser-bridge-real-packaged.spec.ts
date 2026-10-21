@@ -6,7 +6,7 @@
 // store's public key, and its id is the one that key determines. That is the
 // id a store issues, and the id the bridge has to validate.
 //
-// So this suite proves three things, in order:
+// So this suite proves, for **each** store and in **that store's browser**:
 //
 //   1. the id the browser assigns to the store build is exactly the id the
 //      public key determines — the identity the bridge validates is the
@@ -25,6 +25,7 @@
 // test cannot pass against a hard-coded id.
 
 import { createHash, generateKeyPairSync } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { rm } from "node:fs/promises";
 import { resolve } from "node:path";
 
@@ -43,10 +44,29 @@ import {
 /** The record file this suite writes. */
 const SUITE = "real-packaged";
 
-/** Where the store build is built. It is not `dist/`: the two cannot share. */
-const storeDist = resolve(
-  new URL("../../../browser-extension/dist-store-chrome", import.meta.url).pathname,
+/** The development build's manifest, for the build comparison. */
+const developmentDist = resolve(
+  new URL("../../../browser-extension/dist/manifest.json", import.meta.url).pathname,
 );
+
+/**
+ * The two stores.
+ *
+ * One extension source, two artifacts, and each artifact is checked in the
+ * browser its store serves: the Chrome Web Store build in Chrome, the Edge
+ * Add-ons build in Edge.
+ */
+const STORES = [
+  { store: "chrome", channel: "chromium", surface: "chrome" },
+  { store: "edge", channel: "msedge", surface: "edge" },
+] as const;
+
+/** Where a store build is built. It is not `dist/`: the two cannot share. */
+function storeDistOf(store: "chrome" | "edge"): string {
+  return resolve(
+    new URL(`../../../browser-extension/dist-store-${store}`, import.meta.url).pathname,
+  );
+}
 
 /**
  * The extension id the public key determines.
@@ -70,126 +90,172 @@ function extensionIdOfPublicKey(publicKeyDer: Buffer): string {
 test.describe("the packaged production entry, against a real browser", () => {
   test.setTimeout(240_000);
 
-  test("the store build's identity is the one its public key determines, and only a packaged host admits it", async () => {
-    const { publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
-    const publicKeyDer = publicKey.export({ type: "spki", format: "der" });
-    const publicKeyBase64 = publicKeyDer.toString("base64");
-    const expectedId = extensionIdOfPublicKey(publicKeyDer);
+  for (const { store, channel, surface } of STORES) {
+    test(`the ${store} store build's identity is the one its public key determines, and only a packaged host admits it`, async () => {
+      const { publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+      const publicKeyDer = publicKey.export({ type: "spki", format: "der" });
+      const publicKeyBase64 = publicKeyDer.toString("base64");
+      const expectedId = extensionIdOfPublicKey(publicKeyDer);
 
-    await buildExtension({
-      store: "chrome",
-      out: "dist-store-chrome",
-      publicKey: publicKeyBase64,
-    });
+      // The development build first: it is the other half of the comparison
+      // below, and it is what a developer loads.
+      await buildExtension();
+      await buildExtension({
+        store,
+        out: `dist-store-${store}`,
+        publicKey: publicKeyBase64,
+      });
 
-    const { context, worker, extensionId, profileDir } = await launchWithExtension("chromium", {
-      dist: storeDist,
-    });
-    const browserVersion = browserVersionOf(context);
-    try {
-      await observeAcceptance(
-        SUITE,
-        {
-          surface: "chrome",
-          browser: "chromium",
-          browserVersion,
-          entry: "packaged",
-          case: "the store build's identity is the one its public key determines",
-          settings: {
-            isolatedChromium: false,
-            edge: false,
-            chrome: true,
-            fullCdp: false,
-            allowlist: "store",
-            build: "store",
-            extensionId,
-            installationKeyProved: true,
-          },
-          observed: `the browser assigned the extension the id the public key determines (${expectedId})`,
-        },
-        async () => {
-          // The identity the browser assigned and the identity the key
-          // determines are the same string.
-          expect(extensionId).toBe(expectedId);
-        },
-      );
-
-      // A packaged host, with the store allowlist: the build is admitted and
-      // the handshake completes.
-      const packaged = await startBridge(extensionId, "chrome", { packaged: true });
+      const { context, worker, extensionId, profileDir } = await launchWithExtension(channel, {
+        dist: storeDistOf(store),
+      });
+      const browserVersion = browserVersionOf(context);
       try {
         await observeAcceptance(
           SUITE,
           {
-            surface: "chrome",
-            browser: "chromium",
+            surface,
+            browser: channel,
             browserVersion,
             entry: "packaged",
-            case: "a packaged host admits the store build through the store allowlist",
+            case: `the ${store} store build's identity is the one its public key determines`,
             settings: {
               isolatedChromium: false,
-              edge: false,
-              chrome: true,
+              edge: surface === "edge",
+              chrome: surface === "chrome",
               fullCdp: false,
               allowlist: "store",
               build: "store",
               extensionId,
               installationKeyProved: true,
             },
-            observed: "the packaged host completed the handshake and reported the surface connected",
+            observed: `the browser assigned the extension the id the public key determines (${expectedId})`,
           },
           async () => {
-            const view = await packaged.bridge.readInstallationKey("chrome");
-            expect(view).toBeDefined();
-            await provision(worker, context, extensionId, packaged.origin, view!.key);
-            await waitForConnected(packaged.bridge, "chrome", true, worker);
-            expect(packaged.bridge.snapshot().surfaces.chrome.connected).toBe(true);
+            // The identity the browser assigned and the identity the key
+            // determines are the same string.
+            expect(extensionId).toBe(expectedId);
           },
         );
-      } finally {
-        await packaged.close();
-      }
 
-      // The same packaged host, with the id named only in the *development*
-      // allowlist: the extension is refused, and no credential is handed out.
-      const refusing = await startBridge(extensionId, "chrome", {
-        packaged: true,
-        allowlist: "development",
-      });
-      try {
+        // The packaged build differs from the development build in exactly one
+        // way: the manifest carries the store's public key, and the id follows
+        // from it. Nothing else about the extension is different.
         await observeAcceptance(
           SUITE,
           {
-            surface: "chrome",
-            browser: "chromium",
+            surface,
+            browser: channel,
             browserVersion,
             entry: "packaged",
-            case: "a packaged host refuses an extension named only in the development allowlist",
+            case: `the ${store} store build differs from the development build in exactly the manifest key`,
             settings: {
               isolatedChromium: false,
-              edge: false,
-              chrome: true,
+              edge: surface === "edge",
+              chrome: surface === "chrome",
               fullCdp: false,
-              allowlist: "development",
+              allowlist: "store",
               build: "store",
               extensionId,
               installationKeyProved: true,
             },
-            observed: "the packaged host refused the extension and reported no connected surface",
+            observed: "the packaged manifest carries the store's public key and differs from the development manifest in nothing else",
           },
           async () => {
-            const view = await refusing.bridge.readInstallationKey("chrome");
-            await provision(worker, context, extensionId, refusing.origin, view!.key);
-            await waitForConnected(refusing.bridge, "chrome", false, worker);
-            expect(refusing.bridge.snapshot().surfaces.chrome.connected).toBe(false);
+            const packaged = JSON.parse(
+              await readFile(resolve(storeDistOf(store), "manifest.json"), "utf8"),
+            ) as Record<string, unknown>;
+            // The comparison is against the **development build**, not the
+            // source manifest: the build rewrites the two source paths, and
+            // that rewrite is not a difference between the two builds.
+            const development = JSON.parse(
+              await readFile(resolve(developmentDist), "utf8"),
+            ) as Record<string, unknown>;
+            expect(packaged.key).toBe(publicKeyBase64);
+            expect(development.key).toBeUndefined();
+            const { key: _packagedKey, ...packagedRest } = packaged;
+            const { key: _developmentKey, ...developmentRest } = development;
+            expect(packagedRest).toEqual(developmentRest);
           },
         );
+
+        // A packaged host, with the store allowlist: the build is admitted and
+        // the handshake completes.
+        const packaged = await startBridge(extensionId, surface, { packaged: true });
+        try {
+          await observeAcceptance(
+            SUITE,
+            {
+              surface,
+              browser: channel,
+              browserVersion,
+              entry: "packaged",
+              case: `a packaged host admits the ${store} store build through the store allowlist`,
+              settings: {
+                isolatedChromium: false,
+                edge: surface === "edge",
+                chrome: surface === "chrome",
+                fullCdp: false,
+                allowlist: "store",
+                build: "store",
+                extensionId,
+                installationKeyProved: true,
+              },
+              observed: "the packaged host completed the handshake and reported the surface connected",
+            },
+            async () => {
+              const view = await packaged.bridge.readInstallationKey(surface);
+              expect(view).toBeDefined();
+              await provision(worker, context, extensionId, packaged.origin, view!.key);
+              await waitForConnected(packaged.bridge, surface, true, worker);
+              expect(packaged.bridge.snapshot().surfaces[surface].connected).toBe(true);
+            },
+          );
+        } finally {
+          await packaged.close();
+        }
+
+        // The same packaged host, with the id named only in the *development*
+        // allowlist: the extension is refused, and no credential is handed out.
+        const refusing = await startBridge(extensionId, surface, {
+          packaged: true,
+          allowlist: "development",
+        });
+        try {
+          await observeAcceptance(
+            SUITE,
+            {
+              surface,
+              browser: channel,
+              browserVersion,
+              entry: "packaged",
+              case: `a packaged host refuses the ${store} extension named only in the development allowlist`,
+              settings: {
+                isolatedChromium: false,
+                edge: surface === "edge",
+                chrome: surface === "chrome",
+                fullCdp: false,
+                allowlist: "development",
+                build: "store",
+                extensionId,
+                installationKeyProved: true,
+              },
+              observed: "the packaged host refused the extension and reported no connected surface",
+            },
+            async () => {
+              const view = await refusing.bridge.readInstallationKey(surface);
+              await provision(worker, context, extensionId, refusing.origin, view!.key);
+              await waitForConnected(refusing.bridge, surface, false, worker);
+              expect(refusing.bridge.snapshot().surfaces[surface].connected).toBe(false);
+            },
+          );
+        } finally {
+          await refusing.close();
+        }
       } finally {
-        await refusing.close();
+        await context.close();
+        await rm(profileDir, { recursive: true, force: true });
       }
-    } finally {
-      await context.close();
-      await rm(profileDir, { recursive: true, force: true });
-    }
-  });
+    });
+  }
 });

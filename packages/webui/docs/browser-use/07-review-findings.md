@@ -466,11 +466,14 @@ diff. It found five things; all five are closed.
   `MAVIS_BROWSER_STORE_EDGE_EXTENSION_IDS` / `MAVIS_BROWSER_STORE_CHROME_EXTENSION_IDS`
   and never the development variables. The development entry
   (`scripts/run-webui-server.mjs`) is the one that reads the development
-  allowlist. The difference is now **measured**, not asserted: the new
-  `real-packaged` suite builds a store build with a public key, loads it in a
-  real Chrome, and shows that the id the browser assigns is the id the key
-  determines, that a packaged host admits it, and that the same packaged host
-  refuses it when the id is named only in the development allowlist.
+  allowlist. The difference is now **measured**, not asserted, and for **each**
+  store: the new `real-packaged` suite builds the Chrome Web Store artifact
+  and the Edge Add-ons artifact from the one shared source, loads each in its
+  own browser, and shows that the id the browser assigns is the id the key
+  determines, that the two builds differ in the manifest's `key` and nothing
+  else, that a packaged host admits them through the store allowlist, and that
+  the same packaged host refuses them when the id is named only in the
+  development allowlist.
 - **P2** — `packages/webui/test/unit/browser-bridge-adversarial.test.ts` drives
   all four cases against a real `ws` server and a real client. The host
   survives the first two, the earlier session is replaced rather than left

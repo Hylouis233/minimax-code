@@ -95,7 +95,9 @@ telemetry of any kind.
 | | Development build | Packaged build |
 | --- | --- | --- |
 | Extension identity | The id Chrome derives from the unpacked directory — different for every path, and therefore **not** a stable identity | The id the store issues, fixed and recorded |
+| How the identity is fixed | Nothing in the build pins it | The manifest's `key` field carries the store's public key, and the id follows from it: the first sixteen bytes of its SHA-256, each nibble mapped to a letter from `a` |
 | Where the identity is recorded | Nowhere; it is derived from the path | In the build manifest, and the host validates against it |
+| Everything else | Identical | Identical — the packaged manifest differs from the development manifest in the `key` field and in nothing else |
 | Accepted by a packaged host | **No.** A packaged host ignores the development allowlist | Only the recorded store identity |
 | Accepted by a development host | Only the ids in the development allowlist | The store identity, when it is listed |
 

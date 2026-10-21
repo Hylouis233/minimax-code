@@ -63,11 +63,16 @@ ones each case actually had.
 | `edge` | development | Edge 151.0.4129.107 | The bridge survives the worker being terminated during an active stream | `edge` on; the host notices the terminated worker, the surface goes down and comes back, and a command against the live tab answers again | `measured` — pass |
 | `edge` | development | Edge 151.0.4129.107 | Text input reaches the page and the page's image reaches the host | `edge` on; the text the host sent appeared in the page's field, and a non-empty image frame for that page arrived at the host | `measured` — pass |
 | `edge` | development | Edge 151.0.4129.107 | A DevTools command runs against the live tab, and one outside the allowed set is refused as unsupported | `edge` on, Full CDP exercised; the command in the allowed subset answered with the page's title, and a command outside it was refused as unsupported | `measured` — pass |
-| `chrome` | **packaged** | Chromium 153.0.8010.12 (bundled) | The store build's identity is the one its public key determines | store allowlist; the browser assigned the extension the id the public key determines | `measured` — pass |
-| `chrome` | **packaged** | Chromium 153.0.8010.12 (bundled) | A packaged host admits the store build through the store allowlist | store allowlist; the packaged host completed the handshake and reported the surface connected | `measured` — pass |
-| `chrome` | **packaged** | Chromium 153.0.8010.12 (bundled) | A packaged host refuses an extension named only in the development allowlist | development allowlist on a packaged host; the packaged host refused the extension and reported no connected surface | `measured` — pass |
+| `chrome` | **packaged** | Chromium 153.0.8010.12 (bundled) | The chrome store build's identity is the one its public key determines | store allowlist; the browser assigned the extension the id the public key determines | `measured` — pass |
+| `chrome` | **packaged** | Chromium 153.0.8010.12 (bundled) | The chrome store build differs from the development build in exactly the manifest key | store allowlist; the packaged manifest carries the store's public key and differs from the development manifest in nothing else | `measured` — pass |
+| `chrome` | **packaged** | Chromium 153.0.8010.12 (bundled) | A packaged host admits the chrome store build through the store allowlist | store allowlist; the packaged host completed the handshake and reported the surface connected | `measured` — pass |
+| `chrome` | **packaged** | Chromium 153.0.8010.12 (bundled) | A packaged host refuses the chrome extension named only in the development allowlist | development allowlist on a packaged host; the packaged host refused the extension and reported no connected surface | `measured` — pass |
+| `edge` | **packaged** | Edge 151.0.4129.107 | The edge store build's identity is the one its public key determines | store allowlist; the browser assigned the extension the id the public key determines | `measured` — pass |
+| `edge` | **packaged** | Edge 151.0.4129.107 | The edge store build differs from the development build in exactly the manifest key | store allowlist; the packaged manifest carries the store's public key and differs from the development manifest in nothing else | `measured` — pass |
+| `edge` | **packaged** | Edge 151.0.4129.107 | A packaged host admits the edge store build through the store allowlist | store allowlist; the packaged host completed the handshake and reported the surface connected | `measured` — pass |
+| `edge` | **packaged** | Edge 151.0.4129.107 | A packaged host refuses the edge extension named only in the development allowlist | development allowlist on a packaged host; the packaged host refused the extension and reported no connected surface | `measured` — pass |
 
-**Fifteen cases, fifteen passes.** The three surfaces the specification names — the isolated
+**Twenty cases, twenty passes.** The three surfaces the specification names — the isolated
 Chromium, Edge and Chrome — are all in the matrix, and every row names the surface it ran on.
 
 ## The packaged entry, in detail
@@ -77,15 +82,21 @@ from, so the id is a property of the machine rather than of the extension. A pac
 different — it carries the store's public key, and its id is the one that key determines. That is the
 id a store issues, and the id the bridge has to validate.
 
-The `real-packaged` suite therefore proves three things in order:
+The `real-packaged` suite therefore proves four things in order, **for each store and in that
+store's browser** — the Chrome Web Store build in Chrome, the Edge Add-ons build in Edge:
 
 1. **The identity is the key's.** The suite generates an RSA key pair, embeds the public key in the
    build, computes the id the browser's own rule produces, and asserts that the id the browser
    assigned to the loaded extension is the same string. The rule is therefore *checked against the
    browser*, not assumed.
-2. **A packaged host admits it.** The packaged host reads the store allowlist
-   (`MAVIS_BROWSER_STORE_CHROME_EXTENSION_IDS`) and the handshake completes.
-3. **A packaged host refuses the development identity.** The same host, with the same extension, with
+2. **The two builds differ in exactly one thing.** The packaged manifest and the development
+   manifest are identical apart from the `key` field — the store's public key. The difference is the
+   whole of what the store requires, and it is recorded in
+   `packages/browser-extension/STORE-DISCLOSURES.md`.
+3. **A packaged host admits it.** The packaged host reads the store allowlist
+   (`MAVIS_BROWSER_STORE_CHROME_EXTENSION_IDS`, `MAVIS_BROWSER_STORE_EDGE_EXTENSION_IDS`) and the
+   handshake completes.
+4. **A packaged host refuses the development identity.** The same host, with the same extension, with
    the id named only in `MAVIS_BROWSER_CHROME_EXTENSION_IDS`, refuses it. A packaged host that fell
    back to the development allowlist would admit whatever unpacked extension happened to be present,
    which is the identity nobody can rely on.
