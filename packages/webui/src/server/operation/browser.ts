@@ -87,10 +87,10 @@ export const sendBrowserInputOperation: WebuiOperation<Record<string, unknown>> 
 /**
  * The browser command operation.
  *
- * The validator checks only that the request *names* a surface and a command.
- * Whether the command is allowed — a restricted action, or a raw DevTools
- * method under the Full CDP switch — is the runtime's decision, because only
- * the runtime knows the live authorization.
+ * The validator checks only that the request *names* a surface, a command, and
+ * — when it names one — the page it acts on. Whether the command is allowed — a
+ * restricted action, or a raw DevTools method under the Full CDP switch — is the
+ * runtime's decision, because only the runtime knows the live authorization.
  */
 export const sendBrowserCommandOperation: WebuiOperation<Record<string, unknown>> = {
   name: SEND_BROWSER_COMMAND_OPERATION_NAME,
@@ -333,6 +333,12 @@ function validateInputCommand(
  *
  * A command with an empty name is malformed and is refused here rather than
  * being forwarded for the runtime to reject.
+ *
+ * A command may also name the **target** it acts on. That is what a web tab's
+ * toolbar sends: the tab holds exactly one page, and the person pressing back
+ * means the page they are looking at, not whichever page the surface currently
+ * has selected. An absent target is still the selection, so every existing
+ * caller keeps its meaning.
  */
 function validateCommand(
   operation: string,
@@ -354,6 +360,10 @@ function validateCommand(
   const params = result.body.params;
   if (params !== undefined && !isRecord(params)) {
     return invalidBody(`${operation} body requires params to be an object`);
+  }
+  const target = result.body.target;
+  if (target !== undefined && (!isRecord(target) || !isCompleteTargetIdentity(target))) {
+    return invalidBody(`${operation} body requires a complete target identity`);
   }
   const runId = result.body.runId;
   if (runId !== undefined && (typeof runId !== "string" || runId.length === 0)) {
@@ -419,18 +429,29 @@ export function readBrowserWebTabUrl(body: Record<string, unknown>): string {
   return String(body.url);
 }
 
-/** The command a validated body carries, as the runtime expects it. */
+/**
+ * The command a validated body carries, as the runtime expects it.
+ *
+ * A `target` is read as part of the command rather than left on the body, the
+ * same way `readBrowserInputCommand` folds its target into the command: the
+ * runtime's command contract says which page it acts on, and leaving a wire
+ * field loose on the object would let a caller believe it acted on one page
+ * while the service drove another.
+ */
 export function readBrowserCommand(body: Record<string, unknown>): {
   readonly surface: WebuiBrowserSurface;
   readonly command: string;
   readonly params: Record<string, unknown>;
+  readonly target?: WebuiBrowserTargetId;
   readonly runId?: string;
 } {
   const params = body.params;
+  const target = body.target;
   return {
     surface: body.surface as WebuiBrowserSurface,
     command: String(body.command),
     params: isRecord(params) ? params : {},
+    ...(isRecord(target) ? { target: target as unknown as WebuiBrowserTargetId } : {}),
     ...(typeof body.runId === "string" && body.runId.length > 0
       ? { runId: body.runId }
       : {}),

@@ -22,6 +22,14 @@
 // live in the Settings page now. What is left in the panel is the answer —
 // whether the surface on screen is authorized — and it comes from the browser
 // family's owner, which the Settings page writes to.
+//
+// The **toolbar** is here too, above the panel. It is chrome for one page, and
+// the page is this business's: the strip owns the row of tabs and nothing
+// between them, and a workspace component that drew the chrome of a foreign
+// business's page would be the dependency rule inverted. So the toolbar is a
+// view over what the tab holds — its target and the url the runtime published
+// with it — and both are values, not authority: the host drives the port and
+// the strip never does.
 
 import {
   useCallback,
@@ -33,6 +41,7 @@ import {
 } from "react";
 
 import type {
+  WebuiBrowserCommandRequest,
   WebuiBrowserError,
   WebuiBrowserInputCommand,
   WebuiBrowserSurface,
@@ -56,6 +65,28 @@ import {
 } from "../projection/browser-state.js";
 import { BrowserPanel } from "./BrowserPanel.public.js";
 
+/**
+ * The commands a web tab's toolbar can send.
+ *
+ * Three, and no more. They are the page's own history and its own re-read —
+ * what a tab does to the page it holds. Opening a url is not one of them: the
+ * address box exists in the new tab page, which is the only place a person
+ * types a url.
+ */
+export const WEBUI_BROWSER_TOOLBAR_COMMANDS = ["back", "forward", "reload"] as const;
+
+export type WebuiBrowserToolbarCommand = (typeof WEBUI_BROWSER_TOOLBAR_COMMANDS)[number];
+
+const TOOLBAR_COPY = {
+  label: "网页工具栏",
+  urlLabel: "当前网址",
+  commands: {
+    back: "后退",
+    forward: "前进",
+    reload: "刷新",
+  },
+} as const;
+
 export interface BrowserPanelHostProps {
   /**
    * The target the panel is showing.
@@ -67,6 +98,16 @@ export interface BrowserPanelHostProps {
    * than being hidden by a switcher.
    */
   readonly target?: WebuiBrowserTargetId;
+  /**
+   * The url of the page the target is on, as the runtime last reported it.
+   *
+   * The toolbar shows this as text and never as a field: the only address box
+   * in the workspace is the new tab page's. It arrives as a prop for the same
+   * reason the target does — the runtime publishes the url with the target, and
+   * the host reads both together so the toolbar and the frame describe the same
+   * navigation rather than a pair that has drifted.
+   */
+  readonly url?: string;
   /**
    * The port.
    *
@@ -91,6 +132,7 @@ export interface BrowserPanelHostProps {
 
 export function BrowserPanelHost({
   target: targetProp,
+  url: urlProp,
   port: portProp,
   runId: runIdProp,
 }: BrowserPanelHostProps): ReactElement {
@@ -268,6 +310,23 @@ export function BrowserPanelHost({
     dispatch({ type: "failed", error });
   }, []);
 
+  // The toolbar's three commands go through the browser family's own command
+  // operation — the same one a run's tools use, with the page named so that the
+  // runtime acts on the tab rather than on whichever page a selection points at.
+  const onToolbarCommand = useCallback(
+    (command: WebuiBrowserToolbarCommand) => {
+      if (!targetProp) return;
+      void webuiBrowserToolbarRun({
+        send: port?.sendBrowserCommand,
+        target: targetProp,
+        command,
+      }).catch((error: unknown) => {
+        dispatch({ type: "failed", error: toBrowserError(error) });
+      });
+    },
+    [port, targetProp],
+  );
+
   const buildInput = useMemo(
     () =>
       (intent: WebuiBrowserInputIntent) => prepareWebuiBrowserInputCommand(state, intent),
@@ -276,6 +335,9 @@ export function BrowserPanelHost({
 
   return (
     <div className="webui-browser-host" data-testid="browser-panel-host">
+      {targetProp ? (
+        <WebuiBrowserToolbar url={urlProp} onCommand={onToolbarCommand} />
+      ) : null}
       <BrowserPanel
         port={port}
         state={state}
@@ -283,6 +345,89 @@ export function BrowserPanelHost({
         onSendInput={onSendInput}
         onRejected={onRejected}
       />
+    </div>
+  );
+}
+
+/**
+ * The request one toolbar press sends.
+ *
+ * The target rides along with the command rather than being resolved on the
+ * other end. A web tab holds exactly one page, so the person pressing back means
+ * the page in front of them; a request that left the target off would act on the
+ * surface's selection — a run's page, or the panel's own cell — which is a page
+ * the tab may not even be showing.
+ */
+export function webuiBrowserToolbarRequest(
+  target: WebuiBrowserTargetId,
+  command: WebuiBrowserToolbarCommand,
+): WebuiBrowserCommandRequest {
+  return { surface: target.surface, command, target };
+}
+
+/**
+ * Runs one toolbar press through the browser family's command path.
+ *
+ * The send function is injected so the transition is testable on its own, and a
+ * refusal travels out unchanged: the runtime's own code and message are what the
+ * person needs — a bridge that is switched off says `browser_capability_denied`,
+ * and a page that moved says `browser_target_stale`. Neither is papered over here.
+ */
+export async function webuiBrowserToolbarRun(input: {
+  readonly send: ((request: WebuiBrowserCommandRequest) => Promise<unknown>) | undefined;
+  readonly target: WebuiBrowserTargetId;
+  readonly command: WebuiBrowserToolbarCommand;
+}): Promise<void> {
+  if (!input.send) {
+    throw {
+      code: "browser_provider_unavailable",
+      message: "当前运行时没有浏览器命令能力，工具栏不可用。",
+      retryable: false,
+    } satisfies WebuiBrowserError;
+  }
+  await input.send(webuiBrowserToolbarRequest(input.target, input.command));
+}
+
+/**
+ * The chrome above one page.
+ *
+ * The url is a `<span>`, not an `<input>`. A web tab is not somewhere a person
+ * types a url: the address box is the new tab page's, and a field here would be
+ * a second one that could disagree with it.
+ */
+function WebuiBrowserToolbar({
+  url,
+  onCommand,
+}: {
+  readonly url?: string;
+  readonly onCommand: (command: WebuiBrowserToolbarCommand) => void;
+}): ReactElement {
+  return (
+    <div
+      className="webui-browser-toolbar"
+      role="toolbar"
+      aria-label={TOOLBAR_COPY.label}
+      data-testid="browser-toolbar"
+    >
+      {WEBUI_BROWSER_TOOLBAR_COMMANDS.map((command) => (
+        <button
+          key={command}
+          type="button"
+          className="webui-browser-toolbar-command"
+          aria-label={TOOLBAR_COPY.commands[command]}
+          data-testid={`browser-toolbar-${command}`}
+          onClick={() => onCommand(command)}
+        >
+          {TOOLBAR_COPY.commands[command]}
+        </button>
+      ))}
+      <span
+        className="webui-browser-toolbar-url"
+        aria-label={TOOLBAR_COPY.urlLabel}
+        data-testid="browser-toolbar-url"
+      >
+        {url ?? ""}
+      </span>
     </div>
   );
 }

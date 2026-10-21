@@ -694,6 +694,22 @@ export interface WebuiBrowserPort {
     params?: Record<string, unknown>,
   ): Promise<{ readonly accepted: true; readonly result?: unknown }>;
   /**
+   * Runs one browser command against a **named page**.
+   *
+   * This is what a web tab's toolbar sends. A web tab holds exactly one page,
+   * so the tab is addressable and the person pressing back means the page they
+   * are looking at — not a run's selection, and not the panel's own cell. The
+   * target carries a generation, so a reference recorded before a navigation is
+   * refused rather than answered against the page that moved.
+   */
+  sendCommandToTarget(
+    surface: WebuiBrowserSurface,
+    target: WebuiBrowserTargetId,
+    command: string,
+    params?: Record<string, unknown>,
+    signal?: AbortSignal,
+  ): Promise<{ readonly accepted: true; readonly result?: unknown }>;
+  /**
    * Opens a page and answers with its identity.
    *
    * This is `open_tab` — the same call, the same switch and the same refusal

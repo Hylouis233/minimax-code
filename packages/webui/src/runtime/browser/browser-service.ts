@@ -1152,6 +1152,55 @@ export class WebuiBrowserService {
   }
 
   /**
+   * Runs one browser command against the page the caller names.
+   *
+   * This is the path a web tab's toolbar takes. The tab holds exactly one page,
+   * so the person pressing back means the page in front of them: resolving a
+   * selection instead would answer with whichever page the run or the panel
+   * happened to have selected, and a toolbar that reloads a page nobody is
+   * looking at is worse than no toolbar.
+   *
+   * The fences are the ones every command path makes, in the same order: the
+   * surface's switch and the command gate first, so a refusal names the switch
+   * rather than the page; then the generation, so a reference recorded before a
+   * navigation is refused instead of being applied to the page that moved.
+   *
+   * What it deliberately does **not** do is move a selection. A command that
+   * names a page acts on that page and answers; which cell the answer belongs to
+   * is the opener's answer to give, and the toolbar's three commands open
+   * nothing.
+   */
+  async sendCommandToTarget(
+    surface: WebuiBrowserSurface,
+    target: WebuiBrowserTargetId,
+    command: string,
+    params: Record<string, unknown> = {},
+    signal?: AbortSignal,
+  ): Promise<{
+    readonly accepted: true;
+    readonly target: WebuiBrowserTargetId;
+    readonly result?: unknown;
+  }> {
+    await this.#authorizeCommand(surface, command);
+    if (!this.#registry.isCurrent(target)) {
+      throw browserOperationError(
+        "browser_target_stale",
+        "The browser page has been replaced; open the tab again.",
+      );
+    }
+    const provider = await this.#commandProvider(surface);
+    const result = await awaitAbortableCommand(
+      provider.sendCommand(target, command, params),
+      signal,
+    );
+    return {
+      accepted: true,
+      target,
+      result,
+    };
+  }
+
+  /**
    * Observes a page that a command opened.
    *
    * A command that opened a page answers with that page's identity, and the

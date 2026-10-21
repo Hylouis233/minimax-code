@@ -11,6 +11,61 @@
 
 @layer components {
 
+  /* The host stacks the toolbar over the stage, so the stage is the child that
+   * gives up height rather than the toolbar: a chrome row that grows would push
+   * the picture — the thing the person is looking at — off the panel. */
+  .webui-browser-host {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+  }
+
+  .webui-browser-host > .webui-browser-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  /* The toolbar sits above the stage rather than inside it: the stage is
+   * measured to aim the pointer, and anything drawn beside the picture would
+   * move the coordinates the input surface computes. The url takes the free
+   * width and clips itself, because a long url is not a reason to push the
+   * commands off the row. */
+  .webui-browser-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    padding: 6px 12px;
+    background: var(--bg_grouped_secondary);
+    border-bottom: 1px solid var(--border_default);
+  }
+
+  .webui-browser-toolbar-command {
+    flex: 0 0 auto;
+    padding: 2px 10px;
+    font-size: var(--font-size_13, 13px);
+    color: var(--text_default_primary);
+    background: var(--bg_interaction_tertiary_hover, transparent);
+    border: 1px solid var(--border_default);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  .webui-browser-toolbar-command:hover {
+    background: var(--bg_interaction_tertiary_hover);
+  }
+
+  .webui-browser-toolbar-url {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--font-size_13, 13px);
+    color: var(--text_default_secondary);
+  }
+
   .webui-browser-panel {
     display: flex;
     flex-direction: column;

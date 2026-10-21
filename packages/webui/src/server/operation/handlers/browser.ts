@@ -112,6 +112,19 @@ export function createBrowserHandlerEntries(
     body,
   ) => {
     const command = readBrowserCommand(body as Record<string, unknown>);
+    // A command that names a target acts on that page — this is what a web
+    // tab's toolbar sends, because the tab holds exactly one page and the
+    // person pressing back means the page they are looking at.
+    if (command.target) {
+      return {
+        body: await browser.sendCommandToTarget(
+          command.surface,
+          command.target,
+          command.command,
+          command.params,
+        ),
+      };
+    }
     // A command that names a run acts on that run's page. One that does not
     // acts on the no-run selection — the one the panel makes when no Agent run
     // is active.

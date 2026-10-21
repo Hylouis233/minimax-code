@@ -552,7 +552,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     </div> : null}
     {tab === "canvas" ? <WorkspaceCanvas sessionId={activeSessionId} /> : null}
     {tab === "web" && activeTab?.content.kind === "web" ? <div className="webui-workspace-web-tab" data-testid="workspace-web-tab" data-tab-id={activeTab.id}>
-      <BrowserPanelHost target={activeTab.content.target} />
+      <BrowserPanelHost target={activeTab.content.target} url={activeTab.content.url} />
     </div> : null}
     {tab === "launcher" && activeTab?.content.kind === "launcher" ? <WebuiWorkspaceLauncher tab={activeTab} dispatch={dispatch} sessionId={sessionId} workspaceDir={workspaceDir} /> : null}
     {tab === "terminal" && terminalAvailability ? <p role="status" data-webui-terminal-availability={terminalSupport}>{terminalAvailability}</p> : null}

@@ -417,6 +417,17 @@ export interface WebuiBrowserCommandRequest {
   readonly surface: WebuiBrowserSurface;
   readonly command: string;
   readonly params?: Readonly<Record<string, unknown>>;
+  /**
+   * The page the command acts on.
+   *
+   * A web tab's toolbar names the page its tab holds, because a tab is what the
+   * person is looking at: it is neither a run's selection nor the panel's own
+   * cell, so a command that resolved either would drive a page nobody is
+   * watching. A request that names no target keeps the old answer — a run's
+   * selection when it names a run, the panel's own cell otherwise — so the
+   * Agent's tools are unaffected.
+   */
+  readonly target?: WebuiBrowserTargetId;
 }
 
 /**

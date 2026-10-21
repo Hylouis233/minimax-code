@@ -238,6 +238,13 @@ function createBrowserPort(service: WebuiBrowserService): WebuiBrowserPort {
       command: string,
       params?: Record<string, unknown>,
     ) => service.sendCommandToSelection(surface, runId, command, params ?? {}),
+    sendCommandToTarget: (
+      surface: WebuiBrowserSurface,
+      target: WebuiBrowserTargetId,
+      command: string,
+      params?: Record<string, unknown>,
+      signal?: AbortSignal,
+    ) => service.sendCommandToTarget(surface, target, command, params ?? {}, signal),
     watchFrames: (surface: WebuiBrowserSurface, target: WebuiBrowserTargetId, signal?: AbortSignal) =>
       service.watchFrames(surface, target, signal),
     // `runId` is optional on the port because the person is not a run: the

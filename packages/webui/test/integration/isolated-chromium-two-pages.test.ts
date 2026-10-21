@@ -10,6 +10,10 @@
 //     every page, not only on the one the browser was launched with;
 //   * a frame is delivered to the page that asked for it and to no other.
 //
+// The last suite is the toolbar the web tab carries: back, forward, reload and
+// a read-only url, pressed against a real page through the same operation the
+// client sends through.
+//
 // The frames are the sharpest of the four. A provider that stamped every
 // screencast frame with its own target would still deliver *a* picture to
 // every subscriber — the wrong one. Only the envelope's session id says which
@@ -29,8 +33,16 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { WebuiIsolatedChromiumProvider } from "../../src/runtime/browser/isolated-chromium/provider.js";
 import { WebuiBrowserService } from "../../src/runtime/browser/browser-service.js";
 import { createWebuiBrowserToolAdapter } from "../../src/runtime/browser/tool-adapter.js";
+import type { WebuiBrowserPort } from "../../src/runtime/port.js";
+import {
+  webuiBrowserToolbarRun,
+  type WebuiBrowserToolbarCommand,
+} from "../../src/client/features/browser/ui/BrowserPanelHost.public.js";
+import { SEND_BROWSER_COMMAND_OPERATION_NAME } from "../../src/shared/operation-names.js";
+import { createBrowserHandlerEntries } from "../../src/server/operation/handlers/browser.js";
 import type {
   WebuiBrowserAuthorization,
+  WebuiBrowserCommandRequest,
   WebuiBrowserImageFrame,
   WebuiBrowserTargetId,
 } from "../../src/shared/contracts/browser.js";
@@ -492,5 +504,188 @@ describe.skipIf(!available)("the Agent opening a tab of a real isolated Chromium
       { expression: "document.title", returnByValue: true },
     )) as { result?: { result?: { value?: string } } };
     expect(read.result?.result?.value).toBe("driven by the agent");
+  });
+});
+
+/**
+ * The web tab's toolbar, against a real page.
+ *
+ * The toolbar is three presses and a line of text, and neither half is worth
+ * believing until it has moved a real page. This drives it the way the person
+ * does — the client's own helper builds the request, the operation's own
+ * validator and handler carry it, the service fences it and the isolated
+ * Chromium executes it — so what is proved is the whole path rather than a
+ * component in isolation:
+ *
+ *   * `navigate` gives the page a history, then `back` and `forward` walk it
+ *     and land on the pages they name;
+ *   * `reload` re-reads the page it is on;
+ *   * the generation follows each move, so the reference recorded before one is
+ *     refused with `browser_target_stale` — and the tab's current reference is
+ *     accepted, so the fence refuses the stale one and not the toolbar;
+ *   * a move the page's history cannot make is refused with the provider's own
+ *     `browser_capability_denied`, and the page is untouched.
+ *
+ * The client helper is imported from the browser business on purpose: the path
+ * under test is the one the shipped toolbar takes, not a re-statement of it.
+ */
+describe.skipIf(!available)("the web tab's toolbar, on a real page", () => {
+  let dataDir: string;
+  let service: WebuiBrowserService;
+
+  const authorization: WebuiBrowserAuthorization = {
+    isolatedChromium: true,
+    edge: false,
+    chrome: false,
+    // Reading the title back is a raw DevTools method, and the Full CDP switch
+    // is what allows it through.
+    fullCdp: true,
+  };
+
+  beforeAll(async () => {
+    dataDir = await mkdtemp(join(tmpdir(), "webui-web-tab-toolbar-"));
+    service = new WebuiBrowserService({
+      authorization: {
+        read: async () => authorization,
+        write: async () => authorization,
+      },
+      dataDir,
+    });
+  }, 60_000);
+
+  afterAll(async () => {
+    await service?.close();
+    if (dataDir) await rm(dataDir, { recursive: true, force: true });
+  });
+
+  /**
+   * The operation the toolbar sends through, as the wire sees it.
+   *
+   * The handler is the server's own: validation and routing included, so the
+   * test fails if the target ever stops being routed to the page it names.
+   */
+  async function sendCommand(request: WebuiBrowserCommandRequest): Promise<unknown> {
+    const entry = createBrowserHandlerEntries(service as unknown as WebuiBrowserPort).get(
+      SEND_BROWSER_COMMAND_OPERATION_NAME,
+    );
+    if (!entry) throw new Error("sendBrowserCommand has no handler");
+    const validated = entry.operation.validate(request);
+    if (!validated.ok) throw new Error(validated.message);
+    const result = await entry.handle({ requestId: "toolbar" }, validated.body);
+    return (result as { readonly body: { readonly result?: unknown } }).body.result;
+  }
+
+  /** One toolbar press, through the client helper and the wire. */
+  async function pressToolbar(
+    target: WebuiBrowserTargetId,
+    command: WebuiBrowserToolbarCommand,
+  ): Promise<void> {
+    await webuiBrowserToolbarRun({ send: sendCommand, target, command });
+  }
+
+  /** How long a page is given to settle after a move. */
+  async function settle(): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+  }
+
+  /** The tab's current identity, as the runtime's web-tab snapshot publishes it. */
+  async function currentTab(target: WebuiBrowserTargetId): Promise<WebuiBrowserTargetId> {
+    const list = await service.listTargets("isolated-chromium");
+    const found = list.targets.find((entry) => entry.id.targetId === target.targetId);
+    if (!found) throw new Error("the web tab is not in the target list");
+    return found.id;
+  }
+
+  /** The title the page behind the tab is showing. */
+  async function readTitle(target: WebuiBrowserTargetId): Promise<string> {
+    const read = (await sendCommand({
+      surface: target.surface,
+      command: "Runtime.evaluate",
+      params: { expression: "document.title", returnByValue: true },
+      target: await currentTab(target),
+    })) as { result?: { value?: unknown } } | undefined;
+    return typeof read?.result?.value === "string" ? read.result.value : "";
+  }
+
+  it("walks a real page's history and re-reads it", async () => {
+    // The person's launcher opens the page, which gives the tab something to
+    // show and something to go back to.
+    const opened = await service.openWebTab(undefined, { url: pageUrl("toolbar one") });
+    await settle();
+    let tab = await currentTab(opened.target);
+
+    // The page moves: the Agent's `navigate`, sent through the same operation
+    // the toolbar sends through, naming the page it acts on.
+    await sendCommand({
+      surface: tab.surface,
+      command: "navigate",
+      params: { url: pageUrl("toolbar two") },
+      target: tab,
+    });
+    await settle();
+    tab = await currentTab(tab);
+    expect(await readTitle(tab)).toBe("toolbar two");
+
+    // Back lands on the page it came from.
+    await pressToolbar(tab, "back");
+    await settle();
+    const afterBack = await currentTab(tab);
+    expect(await readTitle(afterBack)).toBe("toolbar one");
+
+    // Forward lands on the one it left.
+    await pressToolbar(afterBack, "forward");
+    await settle();
+    const afterForward = await currentTab(afterBack);
+    expect(await readTitle(afterForward)).toBe("toolbar two");
+
+    // Reload re-reads the page it is on, and the title follows the page rather
+    // than the press: it is still the page the tab holds.
+    await pressToolbar(afterForward, "reload");
+    await settle();
+    const afterReload = await currentTab(afterForward);
+    expect(afterReload.targetId).toBe(afterForward.targetId);
+    expect(await readTitle(afterReload)).toBe("toolbar two");
+  });
+
+  it("follows the page's generation, so a reference recorded before a move is refused", async () => {
+    const opened = await service.openWebTab(undefined, { url: pageUrl("generation one") });
+    await settle();
+    const recorded = await currentTab(opened.target);
+
+    await sendCommand({
+      surface: recorded.surface,
+      command: "navigate",
+      params: { url: pageUrl("generation two") },
+      target: recorded,
+    });
+    await settle();
+
+    // The move advanced the page, so the reference the toolbar was holding is
+    // stale and is refused rather than answered against the page that moved.
+    await expect(pressToolbar(recorded, "reload")).rejects.toMatchObject({
+      code: "browser_target_stale",
+    });
+
+    // The tab's current reference — the one the runtime's snapshot publishes —
+    // still works, so the fence refuses the stale one and not the toolbar.
+    const current = await currentTab(recorded);
+    expect(current.generation).toBeGreaterThan(recorded.generation);
+    await pressToolbar(current, "reload");
+    await settle();
+    expect(await readTitle(current)).toBe("generation two");
+  });
+
+  it("refuses a move the page's history cannot make, with the provider's own code", async () => {
+    const opened = await service.openWebTab(undefined, { url: pageUrl("nowhere to go") });
+    await settle();
+    const tab = await currentTab(opened.target);
+    const before = await readTitle(tab);
+
+    // A freshly opened page has nothing in front of it. `back` says so with the
+    // refusal it already has rather than pretending, and the page is untouched.
+    await expect(pressToolbar(tab, "back")).rejects.toMatchObject({
+      code: "browser_capability_denied",
+    });
+    expect(await readTitle(await currentTab(tab))).toBe(before);
   });
 });

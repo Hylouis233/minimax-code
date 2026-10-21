@@ -450,6 +450,7 @@
       "packages/webui/test/unit/browser-workspace-panel.test.tsx",
       "packages/webui/test/unit/browser-tool-adapter.test.ts",
       "packages/webui/test/unit/browser-web-tabs-operation.test.ts",
+      "packages/webui/test/unit/browser-web-tab-toolbar.test.tsx",
       "packages/webui/test/unit/browser-frame-stream.test.ts",
       "packages/webui/test/unit/browser-session-release.test.ts",
       "packages/webui/test/unit/browser-bridge-cdp.test.ts",
