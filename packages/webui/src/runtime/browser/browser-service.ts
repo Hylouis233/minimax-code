@@ -41,6 +41,7 @@ import {
   type WebuiBrowserImageFrame,
   type WebuiBrowserInputCommand,
   type WebuiBrowserSurface,
+  type WebuiBrowserTabOpener,
   type WebuiBrowserTargetId,
   type WebuiBrowserTargetList,
   type WebuiBrowserTargetState,
@@ -1043,30 +1044,41 @@ export class WebuiBrowserService {
    * second identity the service keeps.
    */
   /**
-   * Opens a page for a run and makes it the run's selection.
+   * Opens a page, and says what the new page does to the run's selection.
    *
-   * This is the bootstrap. `open_tab` is the one action a run with no
-   * selection may perform, because it is the action that would create the
-   * selection the gate wants. Every other action of a run with no selection is
-   * still refused with `browser_target_unknown`: a run that has selected
-   * nothing is refused rather than handed a page nobody chose, and only the
-   * action that creates a selection is allowed to create one.
+   * The page is opened the same way whoever opened it: one `open_tab`, one surface
+   * switch, one provider. What differs is which cell the new page joins, because
+   * the run's selection and the tab the person is looking at are two cells with one
+   * writer each (ADR 0022):
    *
-   * The surface is a fact rather than a choice the run made. A run with a
-   * selection keeps the surface it selected on; a run without one opens a
-   * page in the isolated Chromium, because the embedded panel is the isolated
-   * browser's view and the external browsers are driven in the person's own
-   * windows.
+   * - `agent` — the page becomes the run's selection. The run asked for it, and a
+   *   second `open_tab` moves it to the second page without losing the first. It is
+   *   also the bootstrap the tool gate allows: `open_tab` is the one action a run
+   *   with no selection may perform, because it is the action that would create the
+   *   selection the gate wants. Every other action of a run with no selection is
+   *   still refused with `browser_target_unknown`: a run that has selected nothing
+   *   is refused rather than handed a page nobody chose.
+   * - `person` — the page is recorded as the session's web tab, and joins the run's
+   *   selection **only if the run had none at this moment**. That is the one
+   *   bootstrap, and it is decided here rather than by the caller: the runtime owns
+   *   the selection, so the runtime is the only place that can read it at the moment
+   *   the page appears. A run that already has a page keeps it — the person opened a
+   *   tab, not the Agent's page.
    *
-   * The run is optional because the person's launcher is not a run: an absent
-   * run is the panel's own cell, which records the page and selects it there.
-   * No run's selection moves, so opening a page by hand does not move the
-   * Agent off the page it is working on.
+   * The surface is a fact rather than a choice either party made. A run with a
+   * selection keeps the surface it selected on; a run without one opens a page in
+   * the isolated Chromium, because the panel is the isolated browser's view and the
+   * external browsers are driven in the person's own windows.
+   *
+   * The run is optional because the person may have no run in view: an absent run
+   * is the panel's own cell, and the bootstrap applies to it exactly as it applies
+   * to a run.
    */
   async openWebTab(
     runId: string = WEBUI_BROWSER_NO_RUN_ID,
     params: Record<string, unknown> = {},
     signal?: AbortSignal,
+    opener: WebuiBrowserTabOpener = "agent",
   ): Promise<{
     readonly accepted: true;
     readonly target: WebuiBrowserTargetId;
@@ -1099,13 +1111,18 @@ export class WebuiBrowserService {
       generation: identity.generation,
     });
     this.#recordWebTab(surface, runId, identity);
-    // The Agent's tab is the run's selection: the run acts on the page it
-    // opened, and a second `open_tab` moves it to the second page without
-    // losing the first.
-    this.#runSelections(surface).set(runId, {
-      target: identity,
-      order: (this.#selectionOrder += 1),
-    });
+    // The one bootstrap. A run that opened the page writes its own cell. A
+    // person does not: their page joins the run's selection only while the run
+    // has none, so a person who opens a tab in a running session never moves the
+    // Agent off the page it is working on, and a run with nothing to act on is
+    // not a dead end.
+    const runHadNoSelection = this.#selectionOf(surface, runId) === undefined;
+    if (opener === "agent" || runHadNoSelection) {
+      this.#runSelections(surface).set(runId, {
+        target: identity,
+        order: (this.#selectionOrder += 1),
+      });
+    }
     this.#publishWebTabs(surface, runId);
     return { accepted: true, target: identity, result: identity };
   }

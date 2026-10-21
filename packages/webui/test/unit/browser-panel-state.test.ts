@@ -46,13 +46,18 @@ function frame(overrides: Partial<WebuiBrowserImageFrame> = {}): WebuiBrowserIma
   };
 }
 
-/** A panel showing `selected`, with one frame already delivered for it. */
-function showingSelectedTarget(selected: WebuiBrowserTargetId = target()): WebuiBrowserPanelState {
-  const withSelection = reduceWebuiBrowserPanelState(initialWebuiBrowserPanelState, {
-    type: "target-selected",
-    target: selected,
+/**
+ * A panel showing `page`, with one frame already delivered for it.
+ *
+ * `page` is the client's cell: the tab the person is looking at, which is what the
+ * panel shows and what a gesture is bound to.
+ */
+function showingPage(page: WebuiBrowserTargetId = target()): WebuiBrowserPanelState {
+  const viewing = reduceWebuiBrowserPanelState(initialWebuiBrowserPanelState, {
+    type: "page-viewed",
+    target: page,
   });
-  return reduceWebuiBrowserPanelState(withSelection, { type: "frame", frame: frame({ target: selected }) });
+  return reduceWebuiBrowserPanelState(viewing, { type: "frame", frame: frame({ target: page }) });
 }
 
 describe("the frame buffer", () => {
@@ -60,7 +65,7 @@ describe("the frame buffer", () => {
     // A live stream pushes a frame per visual change, so an append-only buffer
     // would grow for as long as the panel is open. The bound is structural here:
     // one entry per target key, whatever arrives afterwards.
-    let state = showingSelectedTarget();
+    let state = showingPage();
     for (let sequence = 2; sequence <= 40; sequence += 1) {
       state = reduceWebuiBrowserPanelState(state, {
         type: "frame",
@@ -82,7 +87,7 @@ describe("the frame buffer", () => {
     // replaces its entry instead of adding a second one.
     const before = target({ generation: 3 });
     const after = target({ generation: 4 });
-    let state = reduceWebuiBrowserPanelState(showingSelectedTarget(before), {
+    let state = reduceWebuiBrowserPanelState(showingPage(before), {
       type: "frame",
       frame: frame({ target: before, sequence: 5 }),
     });
@@ -104,7 +109,7 @@ describe("generation awareness", () => {
     // failure ADR 0019 names: the panel shows one page while the Agent drives
     // another.
     const shown = target({ generation: 4 });
-    const state = reduceWebuiBrowserPanelState(showingSelectedTarget(shown), {
+    const state = reduceWebuiBrowserPanelState(showingPage(shown), {
       type: "frame",
       frame: frame({ target: target({ generation: 3 }), sequence: 9 }),
     });
@@ -114,7 +119,7 @@ describe("generation awareness", () => {
   });
 
   it("drops a reordered frame rather than going backwards in the stream", () => {
-    const held = reduceWebuiBrowserPanelState(showingSelectedTarget(), {
+    const held = reduceWebuiBrowserPanelState(showingPage(), {
       type: "frame",
       frame: frame({ sequence: 12 }),
     });
@@ -138,22 +143,22 @@ describe("generation awareness", () => {
       targets: [{ id: after, title: "Example", url: "https://example.test/", status: "open", selected: false }],
     };
 
-    const state = reduceWebuiBrowserPanelState(showingSelectedTarget(before), {
+    const state = reduceWebuiBrowserPanelState(showingPage(before), {
       type: "targets-loaded",
       list,
     });
 
     expect(state.targetChange).toEqual({ target: after, previousGeneration: 3 });
-    expect(state.selectedTarget).toEqual(after);
+    expect(state.viewedPage).toEqual(after);
     // The buffered frame belonged to generation 3.
     expect(selectWebuiBrowserFrame(state)).toBeUndefined();
   });
 
-  it("clears the selection rather than promoting another tab when the chosen one is gone", () => {
-    // ADR 0019: never silently switch to another tab. An empty panel says what
-    // happened; a different page would not.
+  it("clears the page in front rather than promoting another tab when its page is gone", () => {
+    // Never silently switch to another tab. An empty panel says what happened; a
+    // different page would not, and it would be a page nobody chose.
     const other = target({ targetId: "tab-2" });
-    const state = reduceWebuiBrowserPanelState(showingSelectedTarget(), {
+    const state = reduceWebuiBrowserPanelState(showingPage(), {
       type: "targets-loaded",
       list: {
         surface: "isolated-chromium",
@@ -161,36 +166,45 @@ describe("generation awareness", () => {
       },
     });
 
-    expect(state.selectedTarget).toBeUndefined();
+    expect(state.viewedPage).toBeUndefined();
     expect(selectWebuiBrowserFrame(state)).toBeUndefined();
     expect(state.targets[0]?.selected).toBe(false);
     expect(state.status).toBe("empty");
   });
 
-  it("follows the active run's target and drops the frame it was showing", () => {
-    const previous = target();
-    const next = target({ targetId: "tab-2" });
-    const state = reduceWebuiBrowserPanelState(showingSelectedTarget(previous), {
-      type: "target-changed",
-      target: next,
+  it("records the run's own page moving on without touching the page in front", () => {
+    // The runtime's cell moves; the client's cell does not. The Agent navigating
+    // its own tab must not change which tab the person is looking at, and must
+    // not drop the picture they are looking at either.
+    const person = target({ targetId: "tab-person" });
+    const runPage = target({ targetId: "tab-agent" });
+    const loaded = reduceWebuiBrowserPanelState(showingPage(person), {
+      type: "targets-loaded",
+      list: listOf([person, runPage], runPage),
+      selected: runPage,
     });
 
-    expect(state.selectedTarget).toEqual(next);
-    expect(state.targetChange).toEqual({ target: next, previousGeneration: 3 });
-    expect(selectWebuiBrowserFrame(state)).toBeUndefined();
+    const moved = reduceWebuiBrowserPanelState(loaded, {
+      type: "target-changed",
+      target: target({ targetId: "tab-agent", generation: 4 }),
+    });
+
+    expect(moved.runSelection).toEqual(target({ targetId: "tab-agent", generation: 4 }));
+    expect(moved.viewedPage).toEqual(person);
+    expect(selectWebuiBrowserFrame(moved)?.target).toEqual(person);
   });
 });
 
 describe("the panel's status", () => {
-  it("is ready only while the selected target holds a frame of that generation", () => {
-    const selected = target({ generation: 2 });
+  it("is ready only while the page in front holds a frame of that generation", () => {
+    const viewed = target({ generation: 2 });
     const empty = reduceWebuiBrowserPanelState(initialWebuiBrowserPanelState, {
-      type: "target-selected",
-      target: selected,
+      type: "page-viewed",
+      target: viewed,
     });
     expect(empty.status).toBe("loading");
 
-    const ready = showingSelectedTarget(selected);
+    const ready = showingPage(viewed);
     expect(ready.status).toBe("ready");
   });
 
@@ -267,7 +281,7 @@ describe("following the active run", () => {
       list: listOf([first, second], second),
       selected: second,
     });
-    expect(following.selectedTarget).toEqual(second);
+    expect(following.runSelection).toEqual(second);
     expect(following.targets.map((entry) => entry.selected)).toEqual([false, true]);
   });
 
@@ -278,23 +292,29 @@ describe("following the active run", () => {
         list: listOf([first, second], first),
         selected: first,
       }),
-      { type: "frame", frame: frame({ target: first }) },
+      { type: "page-viewed", target: first },
     );
-
-    // Between the two runs' answers the panel claims no target: showing the
+    // Between the two runs' answers the panel claims no run target: showing the
     // previous run's page as if it were the new run's is the disagreement the
-    // ADR names. The buffered frames stay — they are per tab, not per run.
-    const between = reduceWebuiBrowserPanelState(showingFirst, { type: "run-changed" });
-    expect(between.selectedTarget).toBeUndefined();
+    // ADR names. The buffered frames stay — they are per tab, not per run — and
+    // so does the page the person is looking at, which is not the run's.
+    const withFrame = reduceWebuiBrowserPanelState(showingFirst, {
+      type: "frame",
+      frame: frame({ target: first }),
+    });
+    const between = reduceWebuiBrowserPanelState(withFrame, { type: "run-changed" });
+    expect(between.runSelection).toBeUndefined();
+    expect(between.viewedPage).toEqual(first);
     expect(between.targets.every((entry) => !entry.selected)).toBe(true);
     expect(Object.keys(between.frames)).toHaveLength(1);
 
-    // A new run that picks the same tab shows it at once, without a new frame.
+    // A new run that picks the same tab is marked at once, without a new frame.
     const resumed = reduceWebuiBrowserPanelState(between, {
       type: "targets-loaded",
       list: listOf([first, second], first),
       selected: first,
     });
+    expect(resumed.runSelection).toEqual(first);
     expect(selectWebuiBrowserFrame(resumed)?.target).toEqual(first);
   });
 
@@ -314,8 +334,94 @@ describe("following the active run", () => {
       list: listOf([first, second]),
     });
 
-    expect(idle.selectedTarget).toBeUndefined();
+    expect(idle.runSelection).toBeUndefined();
     expect(idle.targets.every((entry) => !entry.selected)).toBe(true);
+  });
+});
+
+/**
+ * Two cells, one writer each (ADR 0022).
+ *
+ * The run's selection is the runtime's and the page in front is the client's. What
+ * is asserted here is not that both are present — it is that neither write reaches
+ * across, because the whole shape of the failure the ADR exists to prevent is a
+ * client's write landing in the runtime's cell or the other way round.
+ */
+describe("the two cells", () => {
+  const person = target({ targetId: "tab-person", generation: 1 });
+  const agent = target({ targetId: "tab-agent", generation: 1 });
+
+  it("holds both at once, each written by its own side", () => {
+    // The run's answer arrives from the runtime's list; the person's arrives from
+    // the strip. Neither one implies the other.
+    const afterRun = reduceWebuiBrowserPanelState(initialWebuiBrowserPanelState, {
+      type: "targets-loaded",
+      list: listOf([person, agent], agent),
+      selected: agent,
+    });
+    expect(afterRun.runSelection).toEqual(agent);
+    expect(afterRun.viewedPage).toBeUndefined();
+
+    const afterPerson = reduceWebuiBrowserPanelState(afterRun, {
+      type: "page-viewed",
+      target: person,
+    });
+    expect(afterPerson.viewedPage).toEqual(person);
+    expect(afterPerson.runSelection).toEqual(agent);
+  });
+
+  it("does not move the run's selection when the person changes tab", () => {
+    const state = reduceWebuiBrowserPanelState(
+      reduceWebuiBrowserPanelState(initialWebuiBrowserPanelState, {
+        type: "targets-loaded",
+        list: listOf([person, agent], agent),
+        selected: agent,
+      }),
+      { type: "page-viewed", target: person },
+    );
+    const switched = reduceWebuiBrowserPanelState(state, {
+      type: "page-viewed",
+      target: agent,
+    });
+
+    expect(switched.viewedPage).toEqual(agent);
+    // The run's selection was already `agent` and is still `agent`: the person
+    // looked at the Agent's page, which is a coincidence, not a write.
+    expect(switched.runSelection).toEqual(agent);
+  });
+
+  it("keeps the page in front when the run's selection moves somewhere else", () => {
+    const state = reduceWebuiBrowserPanelState(
+      reduceWebuiBrowserPanelState(initialWebuiBrowserPanelState, {
+        type: "page-viewed",
+        target: person,
+      }),
+      { type: "frame", frame: frame({ target: person }) },
+    );
+    const moved = reduceWebuiBrowserPanelState(state, {
+      type: "targets-loaded",
+      list: listOf([person, agent], agent),
+      selected: agent,
+    });
+
+    expect(moved.runSelection).toEqual(agent);
+    expect(moved.viewedPage).toEqual(person);
+    expect(selectWebuiBrowserFrame(moved)?.target).toEqual(person);
+  });
+
+  it("keeps the page in front when the active run changes", () => {
+    const state = reduceWebuiBrowserPanelState(
+      reduceWebuiBrowserPanelState(initialWebuiBrowserPanelState, {
+        type: "page-viewed",
+        target: person,
+      }),
+      { type: "frame", frame: frame({ target: person }) },
+    );
+    const nextRun = reduceWebuiBrowserPanelState(state, { type: "run-changed" });
+
+    expect(nextRun.runSelection).toBeUndefined();
+    expect(nextRun.viewedPage).toEqual(person);
+    expect(selectWebuiBrowserFrame(nextRun)?.target).toEqual(person);
   });
 });
 
@@ -340,7 +446,7 @@ describe("webuiBrowserFrameDataUrl", () => {
 });
 
 describe("the target the live image stream is open for", () => {
-  it("is the run's selected target", () => {
+  it("is the page the person is looking at, not the run's selection", () => {
     const state = reduceWebuiBrowserPanelState(
       initialWebuiBrowserPanelState,
       {
@@ -370,17 +476,47 @@ describe("the target the live image stream is open for", () => {
       targetId: "tab-1",
       generation: 1,
     };
-    const afterSelection = reduceWebuiBrowserPanelState(state, {
-      type: "target-selected",
+    const afterRunLoaded = reduceWebuiBrowserPanelState(state, {
+      type: "targets-loaded",
+      list: {
+        surface: "isolated-chromium",
+        targets: [
+          {
+            id: selected,
+            title: "Example",
+            url: "https://example.test",
+            status: "open",
+            selected: true,
+          },
+        ],
+      },
+      selected,
+    });
+    // The run has a selection and the person is looking at the same page: the
+    // stream is opened for the page, and the two cells happen to agree.
+    const viewing = reduceWebuiBrowserPanelState(afterRunLoaded, {
+      type: "page-viewed",
       target: selected,
     });
-    expect(selectWebuiBrowserStreamTarget(afterSelection)).toEqual(selected);
+    expect(selectWebuiBrowserStreamTarget(viewing)).toEqual(selected);
+
+    // The Agent moves to another tab. The stream stays on the page in front —
+    // that is what the person is watching, and the picture of the Agent's page
+    // is not what this tab shows.
+    const agentElsewhere = target({ targetId: "tab-2" });
+    const followed = reduceWebuiBrowserPanelState(viewing, {
+      type: "targets-loaded",
+      list: listOf([selected, agentElsewhere], agentElsewhere),
+      selected: agentElsewhere,
+    });
+    expect(followed.runSelection).toEqual(agentElsewhere);
+    expect(selectWebuiBrowserStreamTarget(followed)).toEqual(selected);
   });
 
-  it("is nothing when the run has selected nothing", () => {
-    // The server refuses a stream for a run that has selected nothing, so the
-    // panel opens no subscription: a subscription that can never deliver a
-    // frame is a subscription that leaves the panel blank.
+  it("is nothing when no tab is in front", () => {
+    // Nothing is being looked at, so there is no page to stream. The panel opens
+    // no subscription: one that can never deliver a frame leaves the panel blank,
+    // and one for somebody else's page shows the Agent's work under this tab.
     expect(selectWebuiBrowserStreamTarget(initialWebuiBrowserPanelState)).toBeUndefined();
   });
 

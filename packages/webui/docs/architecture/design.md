@@ -50,16 +50,17 @@ nothing from `packages/tui` (ADR 0003) and does not drive the CLI binary (ADR 00
 | --- | --- | --- |
 | `src/client/` | Browser orchestration, business state, presentation, browser IO | Speaks to the harness, holds a Node resource |
 | `src/server/` | Network ingress: admission, envelope validation, dispatch, wire projection, socket lifecycle, static assets | Holds browser state, imports a runtime implementation |
-| `src/runtime/` | Harness capability adaptation, and every Node-side process resource | Knows which tab a person is looking at, or which target a run has selected (`required` — see below) |
+| `src/runtime/` | Harness capability adaptation, and every Node-side process resource | Decides which target a run has selected (`see below` — the runtime owns that cell, and the person cannot write it) |
 | `src/shared/` | Cross-process wire contracts and shared constants | Imports either execution side |
 
 That last cell names two things, and under
 [ADR 0022](../adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md) they are two cells with one
 writer each: the person writes the tab they are looking at through the strip, and the Agent writes
-the target its run has selected. The runtime holds both cells and writes neither: the person and the
-Agent are the writers, and the runtime is the place the cells live. That split is `required` — the tree
-keeps the run's selection in `runtime/browser/browser-service.ts`, where the panel is its only
-writer.
+the target its run has selected. The run's selection is the runtime's cell and the Agent writes it
+through the runtime; the tab in front is the client's and the person writes it. The runtime holds the
+selection — `runtime/browser/browser-service.ts` — and the client only reads it, out of the mark it
+publishes on the target list. The one write that crosses is the bootstrap, and it is the runtime's to
+make: `openWebTab` is told who opened the page and applies it only when the run has no selection.
 
 `src/client/` compiles under `tsconfig.client.json`; `src/server/`, `src/runtime/` and `src/shared/`
 under `tsconfig.server.json`. `scripts/build-webui.mjs` builds separate client and server outputs,
@@ -242,9 +243,9 @@ are the list. Owning a screen is not part of the definition: `terminal` owns the
 this client knows about, the commands that create, write to, resize and dispose one, and the watch
 registry, while the workspace surface renders them; `review` owns the turn-changeset and
 working-tree-snapshot families, which the transcript, workspace and settings surfaces read; `browser`
-owns the per-target browser state — a page, its title and URL, and the run's selection — while
-`workspace` owns the session's tab strip that renders it (`required`: both businesses exist, but the
-selection is the runtime's, not the browser business's); and `turn` has no `ui/` at all, yet is a
+owns the per-target browser state — a page, its title and URL, and the page the person is looking at —
+while `workspace` owns the session's tab strip that renders it. The run's selection is the runtime's,
+and the browser business reads it rather than owning it; and `turn` has no `ui/` at all, yet is a
 business, because its attach-to-settle lifecycle and generation-fenced identity outlive any
 surface. The process behind a terminal is the service's, not the business's
 (§11). Each business directory holds up to five roles (`contracts/`, `application/`, `projection/`,
@@ -335,8 +336,9 @@ A change that breaks one of these is a design change, not a refactor:
     has one owner.
 11. **One writer per browser cell, and the two cells are separate.** The run's selection is written by
     the Agent through the runtime; the tab the person is looking at is written by the person through
-    the strip; neither party writes the other's cell. There is one bootstrap: a person who opens a web
-    tab while the run has no selection gives the run that page, because a run with no selection cannot
-    act at all. `required` — the tree has one selection map, the panel writes it (`selectBrowserTarget`),
-    and the Agent cannot write it at all: its tools refuse a run that has selected nothing
-    (`runtime/browser/tool-adapter.ts`). See §8 for the businesses that own each side.
+    the strip; neither party writes the other's cell. The panel shows, streams and binds input to the
+    viewed page, and its target list reports the runtime's mark without offering to change it. There is
+    one bootstrap: a person who opens a web tab while the run has no selection gives the run that page,
+    because a run with no selection cannot act at all — and the runtime decides it, from the selection
+    it owns at the moment the page appears (`runtime/browser/browser-service.ts` — `openWebTab`).
+    See §8 for the businesses that own each side.

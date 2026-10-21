@@ -257,6 +257,24 @@ export interface WebuiBrowserWebTabOpen {
 }
 
 /**
+ * Who opened a web tab, and therefore what the new page does to the run's selection.
+ *
+ * The two cells are separate (ADR 0022): the run's selection is the runtime's and
+ * the Agent writes it, the tab the person is looking at is the client's and the
+ * person writes it. Opening a page is the one request that can reach across, so it
+ * says which side asked:
+ *
+ * - `agent` — the run's own `open_tab`. The page becomes the run's selection, and a
+ *   second `open_tab` moves it to the second page. The run is writing its own cell.
+ * - `person` — the new tab page's url box. The page is recorded as the session's web
+ *   tab either way, and becomes the run's selection **only when the run has none at
+ *   that moment**. That is the bootstrap, and it is a bootstrap rather than a
+ *   co-write: it is decided from the run's selection at the moment the page is
+ *   opened, and after it the two cells are independent again.
+ */
+export type WebuiBrowserTabOpener = "agent" | "person";
+
+/**
  * The key a client reconciles a web tab by.
  *
  * The runtime's id is the target's id, and a target id names a page in one

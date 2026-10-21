@@ -41,18 +41,25 @@ function targetState(overrides: Partial<WebuiBrowserTargetState> = {}): WebuiBro
   };
 }
 
-/** A panel state with one authorized surface, one selected tab and one frame. */
+/**
+ * A panel state with one authorized surface, one tab in front and one frame.
+ *
+ * The two cells are both present here, as they are in a running session: the
+ * runtime's list marks `tab-1` as the run's selection, and the strip says the same
+ * tab is the page in front. The view follows the second one.
+ */
 function loadedState() {
-  const selected = targetState().id;
+  const viewed = targetState().id;
   const authorized: WebuiBrowserAuthorization = { ...WEBUI_BROWSER_AUTHORIZATION_DEFAULT, isolatedChromium: true };
   let state = reduceWebuiBrowserPanelState({ ...initialWebuiBrowserPanelState, authorization: authorized }, {
     type: "targets-loaded",
     list: { surface: "isolated-chromium", targets: [targetState()] },
-    selected,
+    selected: viewed,
   });
+  state = reduceWebuiBrowserPanelState(state, { type: "page-viewed", target: viewed });
   state = reduceWebuiBrowserPanelState(state, {
     type: "frame",
-    frame: { target: selected, data: "QUJD", format: "png", sequence: 7 },
+    frame: { target: viewed, data: "QUJD", format: "png", sequence: 7 },
   });
   return state;
 }
@@ -121,6 +128,52 @@ describe("the Browser panel", () => {
     expect(markup).toContain("https://example.test/");
     expect(markup).toContain("第 4 代");
     expect(markup).toContain('aria-current="true"');
+  });
+
+  it("reports the run's selection without offering to change it", () => {
+    // The list is what tells the person which page the Agent is working on. It is
+    // a report and not a control: the run's selection is the runtime's cell, and
+    // the strip — not this list — is what chooses the tab in front.
+    const markup = renderToStaticMarkup(
+      <BrowserPanel port={wiredPort} state={loadedState()} capabilities={{ browser: "supported" }} />,
+    );
+
+    expect(markup).not.toContain("<button");
+    expect(markup).toContain('aria-current="true"');
+  });
+
+  it("shows and binds input to the tab in front, not to the run's selection", () => {
+    // Two tabs, one per cell: the runtime marks tab-2 as the run's selection while
+    // the person is looking at tab-1. The picture, the alt text and the input
+    // surface must all be tab-1's — a panel that showed or aimed at tab-2 would
+    // put the Agent's work under the person's cursor.
+    const person = { surface: "isolated-chromium" as const, browserId: "chromium-1", targetId: "tab-1", generation: 4 };
+    const agent = { surface: "isolated-chromium" as const, browserId: "chromium-1", targetId: "tab-2", generation: 4 };
+    const authorized: WebuiBrowserAuthorization = { ...WEBUI_BROWSER_AUTHORIZATION_DEFAULT, isolatedChromium: true };
+    let state = reduceWebuiBrowserPanelState({ ...initialWebuiBrowserPanelState, authorization: authorized }, {
+      type: "targets-loaded",
+      list: {
+        surface: "isolated-chromium",
+        targets: [targetState(), targetState({ id: agent, title: "Agent page", url: "https://agent.test/", selected: true })],
+      },
+      selected: agent,
+    });
+    state = reduceWebuiBrowserPanelState(state, { type: "page-viewed", target: person });
+    state = reduceWebuiBrowserPanelState(state, {
+      type: "frame",
+      frame: { target: person, data: "QUJD", format: "png", sequence: 3 },
+    });
+
+    const markup = renderToStaticMarkup(
+      <BrowserPanel port={wiredPort} state={state} capabilities={{ browser: "supported" }} />,
+    );
+
+    expect(markup).toContain('alt="Example Domain 的浏览器画面"');
+    expect(markup).not.toContain("Agent page 的浏览器画面");
+    // The input surface is only reachable when there is a page in front.
+    expect(markup).toContain('tabindex="0"');
+    expect(markup).toContain('data-testid="browser-panel-text-input"');
+    expect(markup).not.toContain("disabled");
   });
 
   it("renders a closed target rather than hiding it", () => {

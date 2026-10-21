@@ -25,6 +25,7 @@ import type {
   WebuiBrowserImageFrame,
   WebuiBrowserInputCommand,
   WebuiBrowserSurface,
+  WebuiBrowserTabOpener,
   WebuiBrowserTargetId,
   WebuiBrowserTargetList,
   WebuiBrowserTargetState,
@@ -249,8 +250,12 @@ function createBrowserPort(service: WebuiBrowserService): WebuiBrowserPort {
       service.watchFrames(surface, target, signal),
     // `runId` is optional on the port because the person is not a run: the
     // service reads an absent run as the panel's own cell.
-    openWebTab: (runId?: string, params?: Record<string, unknown>, signal?: AbortSignal) =>
-      service.openWebTab(runId, params ?? {}, signal),
+    openWebTab: (
+      runId?: string,
+      params?: Record<string, unknown>,
+      signal?: AbortSignal,
+      opener?: WebuiBrowserTabOpener,
+    ) => service.openWebTab(runId, params ?? {}, signal, opener),
     watchWebTabs: (surface: WebuiBrowserSurface, runId?: string, signal?: AbortSignal) =>
       service.watchWebTabs(surface, runId, signal),
     listCapabilities: () => service.listCapabilities(),

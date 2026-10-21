@@ -154,15 +154,16 @@ The rules that decision pins are in [The tab model](#the-tab-model-adr-0022).
 
 | Rule | Reason | State |
 | --- | --- | --- |
-| The panel projects the active run's selection | The user is watching the run they are looking at, not a different run's tab | `implemented` — the panel reads the run's selection from the target list (`BrowserPanelHost` → `listBrowserTargets`) |
-| Changing runs updates the panel | The panel re-reads the newly active run's selection | `implemented` — the panel re-reads the list when the run changes |
+| The panel reports the active run's selection | The person can see which page the Agent is working on, and it is a different page from the one in front | `implemented` — the panel reads the run's selection from the target list (`BrowserPanelHost` → `listBrowserTargets`) and mirrors it into `WebuiBrowserPanelState.runSelection`. It **reports** rather than projects: the panel shows the page in front (below) |
+| Changing runs updates what the panel reports | The panel re-reads the newly active run's selection, and the page in front does not move with it | `implemented` — the panel re-reads the list when the run changes; `run-changed` clears `runSelection` and leaves `viewedPage` alone |
 | A frame for a target the panel is not showing is dropped | The frame carries its identity, so a stale or out-of-band frame is detectable and is not displayed as if it were the chosen page. | `implemented` — `WebuiBrowserService.#frameMatchesSelection` (`browser-service.ts:733`) compares all four identity fields and the stream drops non-matching frames (`browser-service.ts:664`); see finding F6 |
-| The panel never switches the target itself | Selection belongs to the run; the panel reflects it | `implemented` — the panel writes a selection only when the person clicks a target, and it never moves one on its own |
+| The panel never writes the run's selection | Selection belongs to the Agent; the panel reflects it | `implemented` — the panel's target list is a report of the runtime's mark, with no write behind it: `BrowserPanelProps` has no `onSelectTarget` and nothing in the panel calls `selectBrowserTarget`. The person writes the cell they own — the tab in front — by choosing a tab in the strip |
 
-That last row is the distinction that keeps the panel honest. The panel reflects the run's selection,
-and it writes that selection only when the person asks it to. If the panel could move a selection on
-its own, it would be a second writer on the same per-run selection, and the run's choice would stop
-being authoritative.
+That last row is the distinction that keeps the panel honest. The run's selection is the Agent's cell,
+and a person cannot move it from the panel at all: a click that used to hand the Agent a page is gone,
+because the strip — which the ADR 0022 gives the row of tabs — is what the person writes now. If the
+panel could move a selection on its own, it would be a second writer on the same per-run selection, and
+the run's choice would stop being authoritative.
 
 The frame's `sequence` is a monotonic per-stream counter, so a client can also detect a dropped frame —
 a liveness signal that is independent of whether the frame was the right one.
@@ -181,15 +182,21 @@ is `required` — the contracts pin it and the source does not enforce it yet.
 | A web tab holds exactly one browser page | The isolated Chromium holds one page per web tab, so a page is addressable by the tab that shows it | `required` |
 | A web tab is titled by the page and glyphed by default | The title is the one the provider already reports; the icon is a default glyph, and fetching a site's icon is not part of this | `required` |
 | The Agent opens web tabs | `open_tab` creates a page, makes it the run's selection and tells the client, so a tab appears in the strip and becomes the active one | `required` — the tree refuses every action of a run with no selection, including `open_tab` |
-| The run's selection and the person's active tab are separate cells | A person opening their own tab does not move the Agent off its page, and the Agent opening a tab does not yank the person away from theirs. The person's input follows their tab; the Agent's actions follow the run's selection | `required` |
-| One bootstrap: a person opening a web tab gives the run that page **only when the run has no selection** | A run with no selection cannot act at all, so the person's page becomes the run's selection; after that the two cells are independent | `required` |
+| The run's selection and the person's active tab are separate cells | A person opening their own tab does not move the Agent off its page, and the Agent opening a tab does not yank the person away from theirs. The person's input follows their tab; the Agent's actions follow the run's selection | `implemented` — `WebuiBrowserPanelState.viewedPage` (the client's cell, written by `page-viewed`) and `runSelection` (the runtime's cell, written by `targets-loaded`). The picture, the alt text, the frame stream and the input binding all read `viewedPage`; `prepareWebuiBrowserInputCommand` takes it as its own argument, so no gesture can be aimed at the run's page |
+| One bootstrap: a person opening a web tab gives the run that page **only when the run has no selection** | A run with no selection cannot act at all, so the person's page becomes the run's selection; after that the two cells are independent | `implemented` — `openWebTab` takes a `WebuiBrowserTabOpener` (`"agent"` or `"person"`), and a person-opened page joins the run's selection only when `#selectionOf(surface, runId)` was undefined at the moment the page appeared. The runtime decides it, because the runtime is the only place that can read that selection; the workspace names its session and applies nothing itself |
 | Closing a web tab closes its page | The runtime's page set follows the strip, so a closed tab leaves no page behind in the Chromium | `required` |
 | The browser tool tab is deleted | The strip's kinds lose `browser` and with it the surface switcher: the panel is the isolated browser's view, and the external browsers are driven in the user's own windows | `required` |
 | Frames are per target | Each tab's picture is its own; a frame reaches only the tab that asked for it | `required` — the stream is per run today |
 
 The last two rows are the ones that change the previous section. The panel is no longer a projection
 of the run's selection: it shows the tab the person is looking at, and the run's selection is a
-separate cell with a separate writer.
+separate cell with a separate writer. Both are named in the code as they are named here —
+`WebuiBrowserRunSelectionTarget` and `WebuiBrowserViewedPage` in
+`client/features/browser/contracts/browser-panel.ts` — and both were observed on a real isolated
+Chromium in `packages/webui/test/integration/isolated-chromium-two-pages.test.ts`, "the run's selection
+and the tab in front, on a real browser": the Agent drove one page while the person typed in another,
+each page ended up holding only its own input, and an input recorded before a page moved was refused
+with `browser_target_stale` rather than dropped.
 
 ## Related
 

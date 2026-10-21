@@ -24,20 +24,28 @@ import {
   webuiBrowserPointerButton,
 } from "../../src/client/features/browser/application/browser-commands.js";
 import type { WebuiBrowserPanelState } from "../../src/client/features/browser/contracts/browser-panel.js";
+import { selectWebuiBrowserViewedTarget } from "../../src/client/features/browser/projection/browser-state.js";
 
 function target(overrides: Partial<WebuiBrowserTargetId> = {}): WebuiBrowserTargetId {
   return { surface: "isolated-chromium", browserId: "chromium-1", targetId: "tab-1", generation: 7, ...overrides };
 }
 
-function panelState(selected?: WebuiBrowserTargetId): WebuiBrowserPanelState {
+/**
+ * The two cells, as the panel holds them: the run's selection is the runtime's,
+ * the viewed page is the client's. Most cases here only need one of them.
+ */
+function panelState(cells: {
+  readonly viewedPage?: WebuiBrowserTargetId;
+  readonly runSelection?: WebuiBrowserTargetId;
+}): WebuiBrowserPanelState {
   return {
     authorization: WEBUI_BROWSER_AUTHORIZATION_DEFAULT,
     surface: "isolated-chromium",
     targets: [],
     frames: {},
-    status: selected ? "loading" : "idle",
+    status: cells.viewedPage ? "loading" : "idle",
     droppedFrameCount: 0,
-    selectedTarget: selected,
+    ...cells,
   };
 }
 
@@ -173,10 +181,10 @@ describe("a command carries the generation it was aimed at", () => {
   });
 });
 
-describe("a command is refused unless it names the page being shown", () => {
-  it("accepts a command aimed at the shown target and generation", () => {
-    const shown = target();
-    const result = prepareWebuiBrowserInputCommand(panelState(shown), {
+describe("a command is refused unless it names the page the person is looking at", () => {
+  it("accepts a command aimed at the page in front and its generation", () => {
+    const viewed = target();
+    const result = prepareWebuiBrowserInputCommand(viewed, {
       kind: "pointer",
       x: 10,
       y: 20,
@@ -185,6 +193,26 @@ describe("a command is refused unless it names the page being shown", () => {
     });
 
     expect(result.ok).toBe(true);
+  });
+
+  it("binds to the tab the person is looking at while the run's selection is elsewhere", () => {
+    // The two cells are one apart in this state on purpose: the Agent is working
+    // in `tab-agent`, the person is looking at `tab-person`. The text the person
+    // typed must be bound to the page in front, and the run's selection must not
+    // be reachable from this path at all.
+    const state = panelState({
+      viewedPage: target({ targetId: "tab-person" }),
+      runSelection: target({ targetId: "tab-agent" }),
+    });
+    const result = prepareWebuiBrowserInputCommand(selectWebuiBrowserViewedTarget(state)?.id ?? state.viewedPage, {
+      kind: "text",
+      text: "hi",
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      command: { target: { targetId: "tab-person" } },
+    });
   });
 
   it("refuses a command bound to a generation the page has moved past", () => {
@@ -213,8 +241,8 @@ describe("a command is refused unless it names the page being shown", () => {
     });
   });
 
-  it("refuses every command while no target is selected", () => {
-    const result = prepareWebuiBrowserInputCommand(panelState(undefined), { kind: "text", text: "hi" });
+  it("refuses every command while no page is in front", () => {
+    const result = prepareWebuiBrowserInputCommand(undefined, { kind: "text", text: "hi" });
 
     expect(result).toMatchObject({
       ok: false,
@@ -228,7 +256,7 @@ describe("a command is refused unless it names the page being shown", () => {
     // facts and the caller is told which one failed.
     const shown = target();
     expect(
-      prepareWebuiBrowserInputCommand(panelState(shown), {
+      prepareWebuiBrowserInputCommand(shown, {
         kind: "pointer",
         x: Number.NaN,
         y: 0,

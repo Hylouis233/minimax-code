@@ -38,7 +38,11 @@ import {
   webuiBrowserToolbarRun,
   type WebuiBrowserToolbarCommand,
 } from "../../src/client/features/browser/ui/BrowserPanelHost.public.js";
-import { SEND_BROWSER_COMMAND_OPERATION_NAME } from "../../src/shared/operation-names.js";
+import {
+  SEND_BROWSER_COMMAND_OPERATION_NAME,
+  SEND_BROWSER_INPUT_OPERATION_NAME,
+} from "../../src/shared/operation-names.js";
+import { prepareWebuiBrowserInputCommand } from "../../src/client/features/browser/application/browser-commands.js";
 import { createBrowserHandlerEntries } from "../../src/server/operation/handlers/browser.js";
 import type {
   WebuiBrowserAuthorization,
@@ -609,8 +613,14 @@ describe.skipIf(!available)("the web tab's toolbar, on a real page", () => {
 
   it("walks a real page's history and re-reads it", async () => {
     // The person's launcher opens the page, which gives the tab something to
-    // show and something to go back to.
-    const opened = await service.openWebTab(undefined, { url: pageUrl("toolbar one") });
+    // show and something to go back to. No run is in view here, so the page is
+    // recorded in the panel's own cell.
+    const opened = await service.openWebTab(
+      undefined,
+      { url: pageUrl("toolbar one") },
+      undefined,
+      "person",
+    );
     await settle();
     let tab = await currentTab(opened.target);
 
@@ -648,7 +658,12 @@ describe.skipIf(!available)("the web tab's toolbar, on a real page", () => {
   });
 
   it("follows the page's generation, so a reference recorded before a move is refused", async () => {
-    const opened = await service.openWebTab(undefined, { url: pageUrl("generation one") });
+    const opened = await service.openWebTab(
+      undefined,
+      { url: pageUrl("generation one") },
+      undefined,
+      "person",
+    );
     await settle();
     const recorded = await currentTab(opened.target);
 
@@ -676,7 +691,12 @@ describe.skipIf(!available)("the web tab's toolbar, on a real page", () => {
   });
 
   it("refuses a move the page's history cannot make, with the provider's own code", async () => {
-    const opened = await service.openWebTab(undefined, { url: pageUrl("nowhere to go") });
+    const opened = await service.openWebTab(
+      undefined,
+      { url: pageUrl("nowhere to go") },
+      undefined,
+      "person",
+    );
     await settle();
     const tab = await currentTab(opened.target);
     const before = await readTitle(tab);
@@ -687,5 +707,240 @@ describe.skipIf(!available)("the web tab's toolbar, on a real page", () => {
       code: "browser_capability_denied",
     });
     expect(await readTitle(await currentTab(tab))).toBe(before);
+  });
+});
+
+/**
+ * The two cells, against a real isolated Chromium.
+ *
+ * The run's selection is the runtime's and the page in front is the client's, one
+ * writer each (ADR 0022). Everything below runs the shipped paths rather than the
+ * service's own API: the Agent acts through `sendCommandToSelection` and its
+ * adapter, the person's gesture is built by the client's own binding function and
+ * carried by the `sendBrowserInput` handler, and both are read back out of the
+ * pages themselves. A fake would be free to agree with whatever the reducer says;
+ * a browser is not.
+ *
+ * Two facts are worth a real browser each:
+ *
+ *   * the Agent works in one tab while the person types in another, and each page
+ *     ends up holding exactly its own input — neither cell reaches the other's page;
+ *   * on one page, both are delivered, and an input recorded before the Agent's
+ *     navigation is *refused* with the runtime's code rather than dropped in
+ *     silence, which is the difference between a fence and a lost keystroke.
+ */
+describe.skipIf(!available)("the run's selection and the tab in front, on a real browser", () => {
+  let dataDir: string;
+  let service: WebuiBrowserService;
+  let entries: ReturnType<typeof createBrowserHandlerEntries>;
+
+  const authorization: WebuiBrowserAuthorization = {
+    isolatedChromium: true,
+    edge: false,
+    chrome: false,
+    // The raw DevTools methods below focus the field and read the pages back,
+    // and the Full CDP switch is what allows them through.
+    fullCdp: true,
+  };
+
+  beforeAll(async () => {
+    dataDir = await mkdtemp(join(tmpdir(), "webui-two-cells-"));
+    service = new WebuiBrowserService({
+      authorization: {
+        read: async () => authorization,
+        write: async () => authorization,
+      },
+      dataDir,
+    });
+    // Built here rather than in the describe body: the service is created by the
+    // hook, and the handlers are handed the object they will call.
+    entries = createBrowserHandlerEntries(service as unknown as WebuiBrowserPort);
+  }, 60_000);
+
+  afterAll(async () => {
+    await service?.close();
+    if (dataDir) await rm(dataDir, { recursive: true, force: true });
+  });
+
+  async function settle(): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+  }
+
+  /** The tab's current identity, as the runtime's target list publishes it. */
+  async function currentTab(target: WebuiBrowserTargetId): Promise<WebuiBrowserTargetId> {
+    const list = await service.listTargets("isolated-chromium");
+    const found = list.targets.find((entry) => entry.id.targetId === target.targetId);
+    if (!found) throw new Error("the web tab is not in the target list");
+    return found.id;
+  }
+
+  /** The target the run has selected, or `undefined` when it has selected nothing. */
+  async function runSelection(runId = "run-1"): Promise<string | undefined> {
+    const list = await service.listTargets("isolated-chromium", runId);
+    return list.targets.find((entry) => entry.selected)?.id.targetId;
+  }
+
+  /** Runs a raw DevTools method against one named page and reads the answer back. */
+  async function evaluate(
+    target: WebuiBrowserTargetId,
+    expression: string,
+  ): Promise<unknown> {
+    const entry = entries.get(SEND_BROWSER_COMMAND_OPERATION_NAME);
+    if (!entry) throw new Error("sendBrowserCommand has no handler");
+    const request: WebuiBrowserCommandRequest = {
+      surface: target.surface,
+      command: "Runtime.evaluate",
+      params: { expression, returnByValue: true },
+      target: await currentTab(target),
+    };
+    const validated = entry.operation.validate(request);
+    if (!validated.ok) throw new Error(validated.message);
+    const answered = await entry.handle({ requestId: "two-cells" }, validated.body);
+    const result = (answered as { readonly body: { readonly result?: { result?: { value?: unknown } } } }).body
+      .result;
+    return result?.result?.value;
+  }
+
+  /** The value of the page's field. */
+  async function readField(target: WebuiBrowserTargetId): Promise<string> {
+    const value = await evaluate(target, "document.getElementById('field').value");
+    return typeof value === "string" ? value : "";
+  }
+
+  /** The field's centre, in page coordinates. */
+  async function fieldCentre(target: WebuiBrowserTargetId): Promise<{ x: number; y: number }> {
+    const value = (await evaluate(
+      target,
+      "(() => { const r = document.getElementById('field').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()",
+    )) as { x?: number; y?: number } | undefined;
+    return { x: value?.x ?? 0, y: value?.y ?? 0 };
+  }
+
+  /**
+   * The person's gesture, built the way the panel builds it.
+   *
+   * `prepareWebuiBrowserInputCommand` is the client's binding function and it is
+   * given the tab the person is looking at — nothing else — so the command can
+   * only ever name that page. The send is the `sendBrowserInput` operation, the
+   * one the client reaches through the port.
+   */
+  async function personTypes(
+    page: WebuiBrowserTargetId,
+    text: string,
+    runId = "run-1",
+  ): Promise<void> {
+    const entry = entries.get(SEND_BROWSER_INPUT_OPERATION_NAME);
+    if (!entry) throw new Error("sendBrowserInput has no handler");
+    const tab = await currentTab(page);
+    const centre = await fieldCentre(tab);
+    await evaluate(tab, "document.getElementById('field').value = ''");
+    const tap = prepareWebuiBrowserInputCommand(tab, {
+      kind: "pointer",
+      x: centre.x,
+      y: centre.y,
+      button: "left",
+      clickCount: 1,
+    });
+    const typed = prepareWebuiBrowserInputCommand(tab, { kind: "text", text });
+    if (!tap.ok) throw new Error(`the tap was refused: ${tap.error.message}`);
+    if (!typed.ok) throw new Error(`the text was refused: ${typed.error.message}`);
+    // The wire envelope is the command itself with the run's id beside it — the
+    // client's port call spreads the same fields into the message.
+    for (const command of [tap.command, typed.command]) {
+      const validated = entry.operation.validate({ ...command, runId });
+      if (!validated.ok) throw new Error(validated.message);
+      await entry.handle({ requestId: "person" }, validated.body);
+    }
+  }
+
+  /** The Agent's own action on whatever page its run has selected. */
+  async function agentRuns(expression: string, runId = "run-1"): Promise<unknown> {
+    const answered = await service.sendCommandToSelection(
+      "isolated-chromium",
+      runId,
+      "Runtime.evaluate",
+      { expression, returnByValue: true },
+    );
+    return (answered as { result?: { result?: { value?: unknown } } }).result?.result?.value;
+  }
+
+  it("keeps the Agent's page and the person's page apart while both are in use", async () => {
+    // The Agent opens its page: its run's selection is the page it opened.
+    const opened = await service.openWebTab("run-1", { url: pageUrl("agent page") });
+    await settle();
+    const agentPage = await currentTab(opened.target);
+    expect(await runSelection()).toBe(agentPage.targetId);
+
+    // The person opens their own page in the same session. The run already has a
+    // page, so the bootstrap does not apply and the Agent stays where it was.
+    const personOpened = await service.openWebTab(
+      "run-1",
+      { url: pageUrl("person page") },
+      undefined,
+      "person",
+    );
+    await settle();
+    const personPage = await currentTab(personOpened.target);
+    expect(personPage.targetId).not.toBe(agentPage.targetId);
+    expect(await runSelection()).toBe(agentPage.targetId);
+
+    // The Agent acts on its own page, and the person types on theirs. Neither
+    // gesture is aimed at the other's page, and each page ends up with its own.
+    await agentRuns("document.title = 'agent acted'");
+    await personTypes(personPage, "person typed");
+    await settle();
+
+    expect(await evaluate(agentPage, "document.title")).toBe("agent acted");
+    expect(await readField(agentPage)).toBe("");
+    // The page's own script rewrites its title from the text it received, so
+    // this title is the browser saying the input event reached *this* page.
+    expect(await evaluate(personPage, "document.title")).toBe("text:person typed");
+    expect(await readField(personPage)).toBe("person typed");
+    // The Agent's next action still lands on the Agent's page, and nothing the
+    // person did moved it.
+    expect(await runSelection()).toBe(agentPage.targetId);
+  });
+
+  it("delivers both on one page, and refuses a stale input rather than dropping it", async () => {
+    // A second run, which has selected nothing. The page the person opens is
+    // therefore bootstrapped into its selection — the one write that crosses from
+    // the client's cell to the runtime's, and it is decided here by the runtime.
+    const opened = await service.openWebTab(
+      "run-2",
+      { url: pageUrl("shared page") },
+      undefined,
+      "person",
+    );
+    await settle();
+    const shared = await currentTab(opened.target);
+    expect(await runSelection("run-2")).toBe(shared.targetId);
+
+    // The person types on that page and the Agent acts on the same page. Neither
+    // is a cancel of the other: both land, and both are visible in the page.
+    await personTypes(shared, "both delivered", "run-2");
+    await agentRuns("document.title = 'agent acted'", "run-2");
+    await settle();
+    expect(await readField(shared)).toBe("both delivered");
+    expect(await evaluate(shared, "document.title")).toBe("agent acted");
+
+    // The person moves their own page with the tab's toolbar. An input recorded
+    // before that move is now stale — and the runtime refuses it with its own
+    // code rather than swallowing the keystroke, which is the difference between a
+    // fence and a lost character.
+    const recorded = await currentTab(shared);
+    await evaluate(recorded, "location.href = 'about:blank'");
+    await settle();
+    const late = prepareWebuiBrowserInputCommand(recorded, { kind: "text", text: "too late" });
+    expect(late).toMatchObject({ ok: true });
+    if (!late.ok) return;
+    const entry = entries.get(SEND_BROWSER_INPUT_OPERATION_NAME);
+    const validated = entry?.operation.validate({ ...late.command, runId: "run-2" });
+    expect(validated?.ok).toBe(true);
+    await expect(
+      entry?.handle({ requestId: "stale" }, validated?.ok ? validated.body : {}),
+    ).rejects.toMatchObject({ code: "browser_target_stale" });
+
+    // The page in front is still the tab's own page, and the run still has it.
+    expect(await runSelection("run-2")).toBe(shared.targetId);
   });
 });

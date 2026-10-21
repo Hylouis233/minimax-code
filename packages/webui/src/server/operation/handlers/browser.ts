@@ -185,6 +185,11 @@ export function createBrowserHandlerEntries(
    * share the surface's switch, the provider's own refusal codes and the
    * session's web-tab record. A body that names no run is the panel's own cell
    * rather than a run's, exactly as every other browser operation reads it.
+   *
+   * `opener` is what separates the two cells here, and this operation is the
+   * person's side of it: the page joins the run's selection only when the run has
+   * none at this moment, which is the one bootstrap. A body naming a run that is
+   * already working on a page leaves that run's selection alone.
    */
   const openBrowserWebTab: DedicatedHandler<typeof openBrowserWebTabOperation> = async (
     _context,
@@ -193,6 +198,8 @@ export function createBrowserHandlerEntries(
     body: await browser.openWebTab(
       readBrowserRunId(body as Record<string, unknown>),
       { url: readBrowserWebTabUrl(body as Record<string, unknown>) },
+      undefined,
+      "person",
     ),
   });
 

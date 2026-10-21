@@ -151,14 +151,20 @@ describe("the operation that opens a page for the person", () => {
     expect(openBrowserWebTabOperation.validate({ url: "https://example.test" }).ok).toBe(true);
   });
 
-  it("asks the port for the page the person typed, with no run of its own", async () => {
-    // The port member is the one the Agent's `open_tab` reaches, and the
-    // request carries no run: the panel is not a run, so the page is recorded in
-    // the panel's own cell rather than a run's selection.
-    const asked: { runId?: string; params?: Record<string, unknown> }[] = [];
+  it("asks the port for the page the person typed, declaring the person's side of it", async () => {
+    // The port member is the one the Agent's `open_tab` reaches. What differs is
+    // the last argument: this operation is the person's side, so the page joins
+    // the run's selection only through the runtime's one bootstrap rather than
+    // replacing whatever the run was working on.
+    const asked: { runId?: string; params?: Record<string, unknown>; opener?: string }[] = [];
     const port = {
-      openWebTab: async (runId?: string, params?: Record<string, unknown>) => {
-        asked.push({ runId, params });
+      openWebTab: async (
+        runId?: string,
+        params?: Record<string, unknown>,
+        _signal?: AbortSignal,
+        opener?: string,
+      ) => {
+        asked.push({ runId, params, opener });
         return {
           accepted: true,
           target: {
@@ -177,8 +183,44 @@ describe("the operation that opens a page for the person", () => {
       { url: "https://example.test" },
     );
 
-    expect(asked).toEqual([{ runId: undefined, params: { url: "https://example.test" } }]);
+    expect(asked).toEqual([
+      { runId: undefined, params: { url: "https://example.test" }, opener: "person" },
+    ]);
     expect(result).toMatchObject({ body: { accepted: true } });
+  });
+
+  it("passes the run the workspace named, so the runtime can apply the bootstrap", async () => {
+    // The workspace knows its session, and the session id is the run id the rest
+    // of the browser port already uses. Naming it is what lets the runtime decide
+    // the bootstrap; the client never decides it.
+    const asked: { runId?: string; opener?: string }[] = [];
+    const port = {
+      openWebTab: async (
+        runId?: string,
+        _params?: Record<string, unknown>,
+        _signal?: AbortSignal,
+        opener?: string,
+      ) => {
+        asked.push({ runId, opener });
+        return {
+          accepted: true,
+          target: {
+            surface: "isolated-chromium",
+            browserId: "browser-1",
+            targetId: "tab-1",
+            generation: 1,
+          },
+        };
+      },
+    } as unknown as WebuiBrowserPort;
+
+    const handler = createBrowserHandlerEntries(port).get(openBrowserWebTabOperation.name);
+    await handler?.handle(
+      { requestId: "request-2" } as never,
+      { runId: "session-1", url: "https://example.test" },
+    );
+
+    expect(asked).toEqual([{ runId: "session-1", opener: "person" }]);
   });
 
   it("gets the same refusal as the Agent when the surface's switch is off", async () => {

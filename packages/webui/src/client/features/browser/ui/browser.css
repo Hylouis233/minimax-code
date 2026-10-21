@@ -168,7 +168,6 @@
     background: transparent;
     color: var(--text_default_primary);
     text-align: left;
-    cursor: pointer;
   }
 
   .webui-browser-target.is-active {

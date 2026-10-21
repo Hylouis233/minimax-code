@@ -30,6 +30,14 @@
 // view over what the tab holds — its target and the url the runtime published
 // with it — and both are values, not authority: the host drives the port and
 // the strip never does.
+//
+// **Two cells meet here.** The `target` prop is the client's: the tab the person
+// is looking at, which the strip chooses and this host binds every display and
+// every gesture to. The run's selection is the runtime's, and the host only
+// reads it — out of the target list the runtime publishes — so that the panel
+// can say which page the Agent is on. Nothing a person does in this component
+// writes it, and the one write that crosses cells is the runtime's bootstrap
+// (ADR 0022).
 
 import {
   useCallback,
@@ -55,7 +63,10 @@ import {
 } from "../bindings/use-browser-authorization.public.js";
 import { prepareWebuiBrowserInputCommand } from "../application/browser-commands.js";
 import type { BrowserPort } from "../contracts/browser-port.js";
-import type { WebuiBrowserInputIntent } from "../contracts/browser-panel.js";
+import {
+  isUsableWebuiBrowserTargetId,
+  type WebuiBrowserInputIntent,
+} from "../contracts/browser-panel.js";
 import {
   initialWebuiBrowserPanelState,
   reduceWebuiBrowserPanelState,
@@ -89,10 +100,13 @@ const TOOLBAR_COPY = {
 
 export interface BrowserPanelHostProps {
   /**
-   * The target the panel is showing.
+   * The target the panel is showing — the tab the person is looking at.
    *
    * The strip passes the web tab's target here, and the host reads the
-   * surface off the target. Edge and Chrome are no longer reachable from the
+   * surface off the target. This is the client's cell: the picture, the toolbar
+   * and every pointer, key and text gesture are bound to this page and to no
+   * other, so a person working in one tab never types into the Agent's page
+   * (ADR 0022). Edge and Chrome are no longer reachable from the
    * panel — they are driven in the person's own windows — so a target that
    * names another surface is left to show the unauthorized notice rather
    * than being hidden by a switcher.
@@ -121,11 +135,13 @@ export interface BrowserPanelHostProps {
    */
   readonly port?: BrowserPort;
   /**
-   * The run whose selection the panel is showing, when the host knows it.
+   * The run whose selection the panel is reporting, when the host knows it.
    *
    * Normally left out: the panel reads the active run itself (ADR 0019 — the
-   * panel follows the active run's target), so a caller that happens to know it
-   * does not have to keep saying so.
+   * panel follows the active run), so a caller that happens to know it does not
+   * have to keep saying so. It scopes the *runtime's* cell and the fences that
+   * are scoped with it; it is not what the panel shows, which is the tab's own
+   * target.
    */
   readonly runId?: string;
 }
@@ -235,6 +251,16 @@ export function BrowserPanelHost({
     }
   }, [surface, state.surface]);
 
+  // The client's cell, written here and only here. The strip hands the host the
+  // tab that is in front, and this is what tells the panel which page that is — so
+  // the picture, the alt text and the input binding all follow the tab the person
+  // chose. The run's selection is a different cell (ADR 0022) and this effect does
+  // not touch it: a person switching tabs never moves the Agent off its page.
+  useEffect(() => {
+    if (!isUsableWebuiBrowserTargetId(targetProp)) return;
+    dispatch({ type: "page-viewed", target: targetProp });
+  }, [targetProp]);
+
   // The panel follows the active run. A run's selection belongs to that run, so
   // when the active run changes the previous one is forgotten rather than shown
   // as if it were still the run's target — and this runs before the read below,
@@ -259,22 +285,22 @@ export function BrowserPanelHost({
   // something else changed. A page that navigates gets a new generation, and
   // the subscription follows it.
   const streamTarget = selectWebuiBrowserStreamTarget(state);
-  const selectedTargetKey = webuiBrowserStreamTargetKey(streamTarget);
+  const streamTargetKey = webuiBrowserStreamTargetKey(streamTarget);
 
   useEffect(() => {
     if (!port?.watchBrowserFrames) return;
-    if (!streamTarget || !selectedTargetKey) {
+    if (!streamTarget || !streamTargetKey) {
       // Nothing is shown, so there is no page to stream.
       return;
     }
     if (
       subscribedSurface.current === surface &&
-      subscribedTarget.current === selectedTargetKey
+      subscribedTarget.current === streamTargetKey
     ) {
       return;
     }
     subscribedSurface.current = surface;
-    subscribedTarget.current = selectedTargetKey;
+    subscribedTarget.current = streamTargetKey;
     const stop = port.watchBrowserFrames({ surface, target: streamTarget }, (frame) => {
       dispatch({ type: "frame", frame });
     });
@@ -283,20 +309,14 @@ export function BrowserPanelHost({
       subscribedSurface.current = undefined;
       subscribedTarget.current = undefined;
     };
-  }, [port, selectedTargetKey, streamTarget, surface]);
-
-  const onSelectTarget = useCallback(
-    (target: WebuiBrowserTargetId) => {
-      dispatch({ type: "target-selected", target });
-      void port?.selectBrowserTarget?.({ target, ...runScope }).catch((error: unknown) => {
-        dispatch({ type: "failed", error: toBrowserError(error) });
-      });
-    },
-    [port, runScope],
-  );
+  }, [port, streamTargetKey, streamTarget, surface]);
 
   const onSendInput = useCallback(
     (command: WebuiBrowserInputCommand) => {
+      // The command already names the page in front — the target was bound to it
+      // when the gesture was built — so this is a send, not a selection. The run
+      // scope rides along only because the runtime's own fence is scoped; nothing
+      // here reads or moves the run's selection.
       void port
         ?.sendBrowserInput?.({ command, ...runScope })
         .catch((error: unknown) => {
@@ -329,7 +349,10 @@ export function BrowserPanelHost({
 
   const buildInput = useMemo(
     () =>
-      (intent: WebuiBrowserInputIntent) => prepareWebuiBrowserInputCommand(state, intent),
+      // Bound to the page the person is looking at, and read at send time from
+      // that cell alone: a gesture can never be re-aimed at the Agent's page.
+      (intent: WebuiBrowserInputIntent) =>
+        prepareWebuiBrowserInputCommand(state.viewedPage, intent),
     [state],
   );
 
@@ -338,13 +361,7 @@ export function BrowserPanelHost({
       {targetProp ? (
         <WebuiBrowserToolbar url={urlProp} onCommand={onToolbarCommand} />
       ) : null}
-      <BrowserPanel
-        port={port}
-        state={state}
-        onSelectTarget={onSelectTarget}
-        onSendInput={onSendInput}
-        onRejected={onRejected}
-      />
+      <BrowserPanel port={port} state={state} onSendInput={onSendInput} onRejected={onRejected} />
     </div>
   );
 }

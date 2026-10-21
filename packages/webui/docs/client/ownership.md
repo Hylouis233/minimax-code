@@ -17,9 +17,9 @@ owns the per-target browser state — a page, its title and URL, and the run's s
 `workspace` owns the session's tab strip that renders it. The process behind a terminal belongs to
 the service, not to the business — see *Surface facts worth knowing* below. `turn` is a business even
 without a screen, because its attach-to-settle lifecycle and generation-fenced identity outlive any
-surface. The browser clause is `required` in one part: both businesses and the strip exist, but the
-run's selection is the runtime's (`runtime/browser/browser-service.ts`), and the panel's target list
-is its only writer.
+surface. Both cells exist: the run's selection is the runtime's
+(`runtime/browser/browser-service.ts`), and the client reads it rather than writing it — the panel's
+target list reports the runtime's mark and offers no way to change it.
 
 Each business directory holds up to five roles, and the role decides what the file may do — not the
 directory it happens to sit in:
@@ -70,10 +70,11 @@ Four rules, each with a mechanism in `client/conversation/`:
   fields cannot overwrite each other. A selected destination is a separate cell with its own
   identity and generation, so a slow answer for an earlier selection is refused at the new one.
   A web tab's page is the browser's instance of that split: the page's title, URL and generation
-  are answers keyed by the target, while the tab the person is looking at is the selected cell, so
-  two tabs cannot overwrite each other's page state and a frame for a tab the strip has left is
-  refused rather than drawn as the tab on screen (`required` — the frame stream is keyed by run
-  today: `runtime/browser/browser-service.ts` follows one run's selection, not a target's).
+  are answers keyed by the target, while the tab the person is looking at is the viewed cell
+  (`WebuiBrowserPanelState.viewedPage`), so two tabs cannot overwrite each other's page state and a
+  frame for a tab the strip has left is refused rather than drawn as the tab on screen. The frame
+  stream is keyed by the target (`runtime/browser/browser-service.ts` — `watchFrames`), and the panel
+  opens it for the viewed page.
 
 Resource release retires cached detail, revisions, in-flight records and epoch subscriptions.
 A monotonic revision floor prevents a released and recreated key from accepting old tokens.
@@ -134,9 +135,10 @@ proposing to move this state to the server.
   the URL box exists only inside the new tab page — a web tab carries a toolbar (back, forward,
   reload, the URL read-only) instead. The run's selection and the tab the person is looking at are two
   cells with one writer each, with one bootstrap: a person who opens a web tab while the run has no
-  selection gives the run that page. The slot, the launcher and the two cells are `required`: the
-  tree's tabs are keyed by kind and opened from the new tab page's tiles
-  (`client/features/workspace/projection/workspace-panel-state.ts`), so one browser tab sits among
-  six rather than a strip of tabs the Agent can open. The browser tab is the isolated browser's
-  view and the surface switcher it carries goes with it — the external browsers are driven in the
-  user's own windows, so the panel is not where a surface is chosen.
+  selection gives the run that page, decided by the runtime at the moment the page appears
+  (`WebuiBrowserTabOpener` — `runtime/browser/browser-service.ts` — `openWebTab`). A tab is a stable
+  id and its content is what changes
+  (`client/features/workspace/projection/workspace-panel-state.ts`), and the strip holds tool tabs and
+  web tabs in one row. The browser tab is the isolated browser's view and the surface switcher it
+  carries goes with it — the external browsers are driven in the user's own windows, so the panel is
+  not where a surface is chosen.

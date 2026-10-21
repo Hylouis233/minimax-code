@@ -9,6 +9,7 @@ import type {
   WebuiBrowserImageFrame,
   WebuiBrowserInputCommand,
   WebuiBrowserSurface,
+  WebuiBrowserTabOpener,
   WebuiBrowserTargetId,
   WebuiBrowserTargetList,
   WebuiBrowserTargetState,
@@ -715,14 +716,19 @@ export interface WebuiBrowserPort {
    * This is `open_tab` — the same call, the same switch and the same refusal
    * codes as the one a run's browser tools make, which is the whole point:
    * every web tab, the person's and the Agent's alike, is opened through one
-   * gate. The run is optional because the person is not a run; absent means the
-   * panel's own cell, and it records the page there rather than moving any run
-   * off its own page.
+   * gate.
+   *
+   * `opener` says which side asked, because the two sides have different cells:
+   * an `agent` opener makes the page the run's selection, and a `person` opener
+   * makes it the run's selection only when the run had none — the one bootstrap.
+   * The run is optional because the person may have no run in view; absent means
+   * the panel's own cell, and the bootstrap applies to it as it does to a run.
    */
   openWebTab(
     runId?: string,
     params?: Record<string, unknown>,
     signal?: AbortSignal,
+    opener?: WebuiBrowserTabOpener,
   ): Promise<WebuiBrowserWebTabOpen>;
   /**
    * The live image stream of one **target**.

@@ -386,7 +386,7 @@ that closes it. It is a gap, not a denial.
 | The image stream is keyed by target | **implemented** | the client asks for the target it is showing; the service's frame subscribers are keyed by target, one screencast per page, and a frame that names another page is dropped and counted. `packages/webui/src/runtime/browser/browser-service.ts` — `watchFrames` |
 | A session's pages are released when the session ends | **implemented** | the release is keyed on the **session**, not on one operation. The three ways a session goes away — deletion, archiving, and a transfer away — all reach it: the first two through the harness port's own `deleteSession` and `archiveSession`, the third through the transfer's rollback, which calls the same `deleteSession`. `packages/webui/src/runtime/harness/sessions.ts` — `releaseSessionIfItEnded`; `packages/webui/src/runtime/browser/browser-service.ts` — `releaseSession` |
 | The runtime publishes the session's web tabs as a snapshot | **implemented** | the service keeps the session's web tabs beside the run's selection and publishes them on the `watchBrowserWebTabs` stream — each tab's id, its target identity, its title, its URL, and whether it is the run's selection. `packages/webui/src/runtime/browser/browser-service.ts` — `watchWebTabs` |
-| The client subscribes to the published snapshot | **implemented** | the browser port carries `watchBrowserWebTabs`, the transport's request table has it, and the wire opens the stream. The strip renders from it in #208. `packages/webui/src/client/features/browser/contracts/browser-port.ts` |
+| The client subscribes to the published snapshot | **implemented** | the browser port carries `watchBrowserWebTabs`, the transport's request table has it, and the wire opens the stream, and the strip subscribes **under the session's run id**: the pages of a session are recorded in that cell whether the Agent opened them or the person did, so one subscription carries both. `packages/webui/src/client/features/browser/contracts/browser-port.ts`; `packages/webui/src/client/features/workspace/ui/WebuiWorkspaceTabStrip.public.tsx` |
 | The Agent opens tabs and gives a run its first selection | **implemented** | `open_tab` is the one action a run with no selection may perform, because it is the action that would create the selection the gate wants. Every other action of a cold run is still refused with `browser_target_unknown`. `packages/webui/src/runtime/browser/tool-adapter.ts` — the `open_tab` branch; `packages/webui/src/runtime/browser/browser-service.ts` — `openWebTab` | `tool-adapter.ts:163` refuses a run that has selected nothing, so the Agent cannot acquire a selection of its own and `open_tab` is refused with it. The provider's side is done; the tool's side is not. #206 |
 | The client's tab is a stable id with a mutable content | **implemented** | the id is assigned by the client when the tab is opened and does not change when the content does, so two web tabs in one session are two tabs. The rules that used to fall out of the id — the same file opens one tab, the workspace review and the turn review are two tabs — are content checks now. `packages/webui/src/client/features/workspace/projection/workspace-panel-state.ts` |
 | The frame operation's request names a target | **implemented** | `watchBrowserFrames` takes `{ surface, target }`. A request that still carries a run id is refused with an explicit error rather than answered with the run's selection. `packages/webui/src/server/operation/browser.ts` — `validateFrameStream` |
@@ -407,6 +407,32 @@ that closes it. It is a gap, not a denial.
 | The toolbar's three presses go through the existing command path, and name the page | **implemented** | one request per press on the browser family's own `sendBrowserCommand` operation — no second operation, no second route. `WebuiBrowserCommandRequest` gained an optional `target`, and the handler routes a named target to `WebuiBrowserPort.sendCommandToTarget`. The target is what makes the press mean the page in front of the person: an absent target still resolves the surface's selection (a run's, or the panel's own cell), which is a page the tab may not be showing. `packages/webui/src/server/operation/browser.ts`, `packages/webui/src/server/operation/handlers/browser.ts`, `packages/webui/src/runtime/browser/browser-service.ts` |
 | A toolbar press that cannot be honoured says so, and leaves the page alone | **implemented** | the refusal travels out with the runtime's own code and message: `browser_target_stale` for a reference recorded before a move, `browser_capability_denied` when the page's history has nothing to go to. The service checks the surface switch and the command gate first, so a refusal names the switch rather than the page. The client helper does not catch: `browser-web-tab-toolbar.test.tsx` |
 | Back, forward and reload move a real page | **implemented** | `packages/webui/test/integration/isolated-chromium-two-pages.test.ts`, "the web tab's toolbar, on a real page": three presses through the client's own helper, the operation's validator and handler, the service and a real isolated Chromium. Observed: `back` lands on the page it came from, `forward` on the one it left, `reload` re-reads the page it is on, the generation advances with each move so the pre-move reference is refused with `browser_target_stale` while the tab's current reference still works, and a `back` with nothing behind it is refused with `browser_capability_denied` with the page untouched |
+
+### The two cells, one writer each
+
+The tab model has **two** answers to "which page?", and they are not the same answer. ADR 0022 names
+them, the code names them, and keeping them apart is what the input path exists for.
+
+| Cell | Whose | Written by | Read by | Code |
+| --- | --- | --- | --- | --- |
+| The **run's selection** | the runtime's | the Agent, through its own `open_tab` and its own selection operation | the client, read-only, out of the mark the runtime puts on the target list | `WebuiBrowserRunSelectionTarget` — `WebuiBrowserPanelState.runSelection`, `packages/webui/src/runtime/browser/browser-service.ts` `#runSelections` |
+| The **tab the person is looking at** | the client's | the person, by choosing a tab | the client, for the picture, the alt text, the input binding and the frame stream | `WebuiBrowserViewedPage` — `WebuiBrowserPanelState.viewedPage`, `packages/webui/src/client/features/browser/contracts/browser-panel.ts` |
+
+| Capability | Mark | Where it stands |
+| --- | --- | --- |
+| The panel's input is bound to the page the person is looking at, never to the run's selection | **implemented** | `prepareWebuiBrowserInputCommand` takes the viewed page as its own argument — there is no field of the run's selection left in its signature for a gesture to be aimed at — and `checkWebuiBrowserInputTarget` fences it against that page's generation. `packages/webui/src/client/features/browser/application/browser-commands.ts`; `packages/webui/test/unit/browser-input-command.test.ts`, "binds to the tab the person is looking at while the run's selection is elsewhere" |
+| The panel shows and streams the page in front, not the Agent's page | **implemented** | `selectWebuiBrowserStreamTarget` and `selectWebuiBrowserFrame` read `viewedPage`; the host dispatches `page-viewed` when the tab it was handed changes. `packages/webui/src/client/features/browser/projection/browser-state.ts`; `packages/webui/src/client/features/browser/ui/BrowserPanelHost.public.tsx` |
+| The person cannot write the run's selection from the panel | **implemented** | the panel's target list is a report of the runtime's mark, not a control: the rows are spans, `BrowserPanelProps` has no `onSelectTarget`, and the client port member `selectBrowserTarget` is no longer called from the panel. The `selectBrowserTarget` operation and port member still exist — the runtime still owns that write — the panel simply is not one of its callers |
+| Neither cell writes the other when either one moves | **implemented** | `page-viewed` moves `viewedPage` alone; `targets-loaded` and `target-changed` move `runSelection` alone; `run-changed` clears `runSelection` and leaves `viewedPage`. `packages/webui/test/unit/browser-panel-state.test.ts`, "the two cells" |
+| The bootstrap: a page a person opened while the run has no selection becomes the run's selection | **implemented** | the request says who opened it — `WebuiBrowserTabOpener` is `"agent"` or `"person"` — and the **runtime** decides: a person-opened page joins the run's selection only when `#selectionOf(surface, runId)` was undefined at the moment the page appeared. `packages/webui/src/runtime/browser/browser-service.ts` — `openWebTab`; `packages/webui/test/unit/browser-service.test.ts`, "run-scoped selection" |
+| The bootstrap is not a standing co-write rule | **implemented** | an `agent` opener always sets the selection — a second `open_tab` moves the run and loses nothing — while a `person` opener with a run that already has a page records the web tab and leaves the selection where the Agent put it. Both are asserted in `browser-service.test.ts` and both were observed against a real browser |
+| The two cells are separated on a real browser, with both in use | **implemented** | `packages/webui/test/integration/isolated-chromium-two-pages.test.ts`, "the run's selection and the tab in front, on a real browser". Observed: the Agent opened a page and drove it while the person opened a second page and typed into it through the client's binding function and the `sendBrowserInput` handler; the Agent's page read `agent acted` with an empty field, the person's page read `text:person typed` in its field, and the run's selection was still the Agent's page at the end. On one page — the one the bootstrap gave the cold run — the person's text and the Agent's action were both delivered, and an input recorded before that page moved was refused with `browser_target_stale` rather than dropped |
+
+**What the bootstrap is not.** It is not a rule that says "the person's page is the run's page", and it
+is not decided by the client. The workspace names its session in the request and the runtime compares it
+against the selection it owns at that moment; the client cannot see a run's selection at all. That is why
+the launcher passes the run id straight through (`webuiWorkspaceLauncherOpenPage`) and applies nothing
+itself.
 
 **What the provider does today, measured again.** The provider's `open_tab` creates a page, attaches
 to it and registers it, and the page is listed with its own identity
@@ -461,9 +487,13 @@ mechanics:
 
 - **Its request carries a URL and a run, not a surface.** The surface is read off the run, the same way
   the Agent's path reads it, so the two cannot disagree about where a page is opened. A request with no
-  run is the panel's own cell — the panel is not a run — which means opening a page by hand records it
-  without moving any run's selection. The bootstrap that gives a cold run the page a person opened is
-  #211 and is not in this shape.
+  run is the panel's own cell — the panel is not a run — and the bootstrap applies to it as it applies to
+  a run. The workspace names its session, which is the same run id the rest of the browser port already
+  uses; **what the request does not carry is the answer.** The bootstrap is decided by the runtime, which
+  is the only place that can read the run's selection at the moment the page appears, so the launcher
+  passes the run through and applies nothing itself. The handler is what declares the request the
+  person's: it passes `WebuiBrowserTabOpener`'s `"person"`, and `WebuiBrowserPort.openWebTab` carries it
+  to the service. **Done in #211.**
 - **Its validator refuses an empty URL** with `invalid_body` rather than defaulting it. A blank page
   opened by a request that claimed to be honoured is worse than a request that was refused.
 
@@ -512,12 +542,16 @@ the thing that changes — which is what #207 does.
   `substrate.currentProviderFrameRule` applies the provider's current rule to the frames the spike
   observed, because the provider cannot stream a second page at all. It is arithmetic over a
   measurement, and it is labelled as such in the record.
-- **The toolbar is now measured against a real browser; the rest of the tab model is not.** The three
-  commands a web tab carries — back, forward, reload — are pressed against a real isolated Chromium in
-  `packages/webui/test/integration/isolated-chromium-two-pages.test.ts`, through the client's own helper,
-  the operation's validator and handler, and the service. The tab model, the strip, the new tab page and
-  the two selections are still exercised only by unit coverage: #208 and #209 covered the tab model, the
-  strip and the new tab page, #210 covered the toolbar, and #211 and #212 are where the rest happens.
+- **The toolbar and the two cells are measured against a real browser; the rest of the tab model is
+  not.** The three commands a web tab carries — back, forward, reload — are pressed against a real
+  isolated Chromium in `packages/webui/test/integration/isolated-chromium-two-pages.test.ts`, through
+  the client's own helper, the operation's validator and handler, and the service. So is the separation
+  of the two cells: the Agent working in one page while the person types in another, both delivered on
+  the one page the bootstrap gave a cold run, and a stale input refused rather than dropped — in
+  "the run's selection and the tab in front, on a real browser", in the same file. The tab model, the
+  strip and the new tab page are still exercised only by unit coverage: #208 and #209 covered the tab
+  model, the strip and the new tab page, #210 the toolbar, #211 the two cells, and #212 is where the
+  acceptance record and the documentation sweep happen.
 - **Only the foregrounded page renders.** Chrome throttles the pages it is not showing, so a tab in
   the background produces no new frames. A strip shows one tab at a time, so the page in front is the
   one that produces the picture — but whether a background tab should show a *still* picture, and

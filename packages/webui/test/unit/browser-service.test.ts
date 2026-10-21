@@ -79,10 +79,20 @@ class RecordingProvider implements WebuiBrowserSurfaceProvider {
     params: Record<string, unknown>,
   ): Promise<unknown> {
     this.commands.push({ command, params });
-    if (command !== "open_tab") return undefined;
-    // A command that opened a page answers with that page's identity, the way
-    // the isolated provider answers: the surface, the browser, the target and
-    // the generation the provider's own accounting gives it.
+    // The restricted command set reaches `open_tab` as a command; the dedicated
+    // `openWebTab` path reaches it as `openTab`. Both are the same page-opening,
+    // so both go through the one place that accounts for it.
+    if (command === "open_tab") return this.openTab(params);
+    return undefined;
+  }
+
+  /**
+   * Opens a page and answers with its identity.
+   *
+   * The same answer the isolated provider gives: the surface, the browser, the
+   * target and the generation the provider's own accounting has for it.
+   */
+  async openTab(_params: Record<string, unknown> = {}): Promise<WebuiBrowserTargetId> {
     const targetId = `tab-${this.tabIds.length + this.openedTabs.length + 1}`;
     this.openedTabs.push(targetId);
     return {
@@ -818,6 +828,60 @@ describe("run-scoped selection", () => {
       service.sendCommandToSelection("isolated-chromium", "run-a", "reload"),
     ).rejects.toMatchObject({ code: "browser_target_unknown" });
     expect(provider.commands).toHaveLength(0);
+    await service.close();
+  });
+
+  it("gives a run the page a person opened while it had no selection", async () => {
+    // The bootstrap, and only that. A run with nothing selected cannot act at
+    // all, so the page the person opened becomes its selection — and the run can
+    // act on it immediately, which is what the bootstrap is for.
+    const { service } = createService(TWO_TABS, ["tab-1", "tab-2"]);
+    await service.listTargets("isolated-chromium", "run-a");
+
+    const { target } = await service.openWebTab(
+      "run-a",
+      { url: "https://example.test" },
+      undefined,
+      "person",
+    );
+
+    expect(await selectedTargetOf(service, "run-a")).toBe(target.targetId);
+    await service.close();
+  });
+
+  it("leaves a run's selection alone when a person opens a tab and it has one", async () => {
+    // The other half of the bootstrap: a person opening a tab is not a way to
+    // move the Agent. The page is still the session's web tab and appears in the
+    // snapshot — only the selection is left where the run put it.
+    const { service } = createService(TWO_TABS, ["tab-1", "tab-2"]);
+    await service.listTargets("isolated-chromium", "run-a");
+    await service.selectTarget(tab("tab-1"), "run-a");
+
+    const { target } = await service.openWebTab(
+      "run-a",
+      { url: "https://example.test" },
+      undefined,
+      "person",
+    );
+
+    expect(await selectedTargetOf(service, "run-a")).toBe("tab-1");
+    expect((await firstSnapshot(service, "run-a")).tabs.map((entry) => entry.id)).toContain(
+      target.targetId,
+    );
+    await service.close();
+  });
+
+  it("moves a run's selection when the Agent itself opens the second page", async () => {
+    // The Agent writing its own cell is not the bootstrap and is not conditional:
+    // a second `open_tab` has to move the run to the second page or the run
+    // could never move on.
+    const { service } = createService(TWO_TABS, ["tab-1", "tab-2"]);
+    await service.listTargets("isolated-chromium", "run-a");
+    await service.openWebTab("run-a", { url: "https://first.test/" });
+
+    const { target } = await service.openWebTab("run-a", { url: "https://second.test/" });
+
+    expect(await selectedTargetOf(service, "run-a")).toBe(target.targetId);
     await service.close();
   });
 

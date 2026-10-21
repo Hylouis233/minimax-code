@@ -239,8 +239,13 @@ export interface BrowserPort {
    * Agent go through the same surface switch and the same refusals — the panel
    * does not get a browser of its own by typing into its own launcher.
    *
-   * No `runId`: the panel is not a run. The service records the page in the
-   * panel's own cell, so opening one does not move the Agent off its page.
+   * `runId` is sent when the workspace knows its session, and that is what lets the
+   * runtime apply the one bootstrap: the page joins the run's selection when the run
+   * has none at that moment, and a run already working on a page keeps it. The
+   * launcher does not decide that — it cannot see the run's selection, and deciding
+   * it on the client would make the person a standing writer of the Agent's cell.
+   * Without a `runId` the page is recorded in the panel's own cell, which is the
+   * whole answer when there is no run behind the workspace at all.
    */
   readonly openBrowserWebTab?: (
     request: WebuiBrowserRunScope & { readonly url: string },

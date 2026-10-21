@@ -15,6 +15,13 @@
 // A generation that moves forward therefore replaces the entry under the same key
 // rather than adding a second one, which is what keeps the frame buffer bounded
 // to one frame per tab however long a session runs.
+//
+// Two cells live here, one writer each (ADR 0022): `runSelection` is the runtime's
+// and the Agent writes it, `viewedPage` is the client's and the person writes it.
+// Anything in this module that answers "what is the panel showing" or "what does a
+// gesture land on" reads `viewedPage`, and anything that answers "what is the Agent
+// working on" reads `runSelection`. The bootstrap is the one write that crosses, and
+// it is the runtime's to make.
 
 import type {
   WebuiBrowserAuthorization,
@@ -63,13 +70,39 @@ export interface WebuiBrowserTargetChange {
   readonly previousGeneration: WebuiBrowserTargetGeneration;
 }
 
+/**
+ * The run's selection — the runtime's cell.
+ *
+ * The page one run acts on, and the runtime owns it: the Agent writes it through
+ * its own `open_tab` and its own selection operation, and the client only ever
+ * *reads* it, out of the target list the runtime publishes, to be able to say which
+ * page the Agent is working on. Nothing a person does writes this cell — not a
+ * click, not a tab, not a gesture. The one exception is the bootstrap, and it is
+ * decided by the runtime at the moment a person opens a web tab (ADR 0022).
+ */
+export type WebuiBrowserRunSelectionTarget = WebuiBrowserTargetId;
+
+/**
+ * The tab the person is looking at — the client's cell.
+ *
+ * This is the page a web tab holds, and the person writes it by choosing a tab; the
+ * Agent never writes it. It is what the panel shows and what a pointer, key or text
+ * gesture is bound to, which is the whole reason it is not the run's selection: an
+ * input aimed at the page in front must never be delivered to the page the Agent is
+ * working on.
+ */
+export type WebuiBrowserViewedPage = WebuiBrowserTargetId;
+
 export interface WebuiBrowserPanelState {
   /** The four switches. Off until a read says otherwise. */
   readonly authorization: WebuiBrowserAuthorization;
   /** The surface whose targets are listed. */
   readonly surface: WebuiBrowserSurface;
   readonly targets: readonly WebuiBrowserTargetState[];
-  readonly selectedTarget?: WebuiBrowserTargetId;
+  /** The runtime's cell: which page this run acts on. Read-only for the client. */
+  readonly runSelection?: WebuiBrowserRunSelectionTarget;
+  /** The client's cell: which page the person is looking at, and what is shown. */
+  readonly viewedPage?: WebuiBrowserViewedPage;
   /**
    * The newest frame per target, keyed by `webuiBrowserFrameKey`.
    *
@@ -81,7 +114,7 @@ export interface WebuiBrowserPanelState {
   readonly status: WebuiBrowserPanelStatus;
   readonly error?: WebuiBrowserError;
   readonly capabilities?: readonly WebuiBrowserCapabilityEntry[];
-  /** Set while the selected target's generation has moved past what was shown. */
+  /** Set while the viewed page's generation has moved past what was shown. */
   readonly targetChange?: WebuiBrowserTargetChange;
   /** How many frames were dropped as stale, so the panel can say so. */
   readonly droppedFrameCount: number;
@@ -169,9 +202,23 @@ export type WebuiBrowserPanelEvent =
   | {
       readonly type: "targets-loaded";
       readonly list: WebuiBrowserTargetList;
-      readonly selected?: WebuiBrowserTargetId;
+      /** The runtime's answer for this run's cell. Never written by the person. */
+      readonly selected?: WebuiBrowserRunSelectionTarget;
     }
-  | { readonly type: "target-selected"; readonly target: WebuiBrowserTargetId }
+  /**
+   * The page the person is looking at changed.
+   *
+   * This is the client's cell and the person's write: the strip holds the tabs and
+   * hands the host the tab in front, so the host reports which page that is. It
+   * moves the run's selection by nothing — the two cells are separate (ADR 0022).
+   */
+  | { readonly type: "page-viewed"; readonly target: WebuiBrowserViewedPage }
+  /**
+   * The run's page moved on.
+   *
+   * The runtime's cell only. It never moves the page in front: the Agent working
+   * on its own tab is not a reason to change which tab the person is looking at.
+   */
   | { readonly type: "target-changed"; readonly target: WebuiBrowserTargetId }
   | { readonly type: "frame"; readonly frame: WebuiBrowserImageFrame }
   | { readonly type: "failed"; readonly error: WebuiBrowserError }

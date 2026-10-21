@@ -508,7 +508,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   return <aside className={`webui-workspace-panel ${state.expanded ? "is-expanded" : ""}`} data-testid="workspace-panel" data-active-tab={tab}>
     <div className="webui-workspace-panel-header">
       <div className="webui-workspace-tabs" role="tablist" aria-label="工作区面板标签">
-        <WebuiWorkspaceTabStrip state={state} dispatch={dispatch} />
+        <WebuiWorkspaceTabStrip state={state} dispatch={dispatch} sessionId={sessionId} />
       </div>
       <div className="webui-workspace-panel-actions">
         <button type="button" aria-label={state.expanded ? "收起面板" : "展开面板"} aria-pressed={state.expanded} onClick={() => dispatch({ type: "toggle-expanded" })}><WebuiIconWorkspaceExpand className="size-[18px]" /></button>

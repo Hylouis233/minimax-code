@@ -13,10 +13,10 @@
 //
 // The web tabs it shows come from the runtime's `watchBrowserWebTabs`
 // snapshot, never a parallel copy the client keeps. The strip subscribes
-// once and turns each published web tab into an `open-web-tab` panel
-// command, so the workspace's own reducer is what holds the list — the
-// reconciliation lives there, and a snapshot that lands twice changes
-// nothing.
+// once, under the session's run id, and turns each published web tab into an
+// `open-web-tab` panel command, so the workspace's own reducer is what holds
+// the list — the reconciliation lives there, and a snapshot that lands
+// twice changes nothing.
 //
 // `.public` because the Browser business's host renders the strip's
 // active web tab: a foreign business's component renders the workspace's
@@ -26,6 +26,7 @@
 import {
   useState,
   useEffect,
+  useMemo,
   useRef,
   type FormEvent,
   type ReactElement,
@@ -84,6 +85,15 @@ export interface WebuiWorkspaceTabStripProps {
   readonly state: WorkspacePanelState;
   /** The dispatch the strip fires commands at. */
   readonly dispatch: (command: WorkspacePanelCommand) => void;
+  /**
+   * The session the strip belongs to, when there is one.
+   *
+   * It names the run whose web tabs the strip subscribes to. The pages of a
+   * session are recorded under that run — whether the Agent opened them or the
+   * person did — so one subscription shows both, and neither needs a second copy
+   * of "what is open".
+   */
+  readonly sessionId?: string;
 }
 
 /**
@@ -173,6 +183,7 @@ function fileTabGlyph(item: WorkspacePanelTab): ReactElement | null {
 export function WebuiWorkspaceTabStrip({
   state,
   dispatch,
+  sessionId,
 }: WebuiWorkspaceTabStripProps): ReactElement {
   // The strip does not touch its own state. What it does is reconcile the
   // snapshot against the workspace's tabs: for each published web tab, dispatch
@@ -202,10 +213,16 @@ export function WebuiWorkspaceTabStrip({
   // identity we close the previous subscription and open a new one for the
   // slice the strip is now wired to.
   const watchKey = watchBrowserWebTabs ?? null;
+  const runScope = useMemo(() => (sessionId ? { runId: sessionId } : {}), [sessionId]);
   useEffect(() => {
     if (!watchBrowserWebTabs) return;
     const stop = watchBrowserWebTabs(
-      { surface: "isolated-chromium" },
+      // The session's web tabs, under the session's run id: the run's selection
+      // and the session's pages are recorded in the same cell, so a page opened
+      // by the Agent and a page opened by the person arrive on one subscription.
+      // With no session in view it is the panel's own cell, which is what the
+      // person has when there is no run behind the workspace.
+      { surface: "isolated-chromium", ...runScope },
       (snapshot: WebuiBrowserWebTabSnapshot) => {
         // The strip owns the closing gesture only; the reducer owns the
         // canonical list. Each published web tab that has no panel tab is
@@ -221,7 +238,7 @@ export function WebuiWorkspaceTabStrip({
     return () => {
       stop();
     };
-  }, [watchKey, dispatch]);
+  }, [watchKey, dispatch, runScope]);
 
   return (
     <div className="webui-workspace-tab-list" data-testid="workspace-tab-strip" ref={tabListRef}>
@@ -317,6 +334,12 @@ export function WebuiWorkspaceLauncher({
       url,
       dispatch,
       open: openBrowserWebTab,
+      // The run is named so the runtime can decide the bootstrap: the page joins
+      // the run's selection only when the run has none at that moment. The
+      // launcher does not decide it — it cannot see the run's selection, and
+      // deciding it here would make the person a standing writer of the Agent's
+      // cell.
+      ...(sessionId ? { runId: sessionId } : {}),
     });
   };
 
@@ -390,6 +413,11 @@ export function WebuiWorkspaceLauncher({
  * refusal is the runtime's own message, kept rather than replaced: a person who
  * typed a url into a browser that is switched off is told the switch is off.
  *
+ * `runId` is passed through rather than acted on. Naming the run is what lets the
+ * runtime apply the one bootstrap — the page joins the run's selection when the
+ * run has none — while a run that is already working on a page keeps it. What the
+ * person typed is a tab, and the tab is the client's cell either way.
+ *
  * Exported for the test that drives the transition without a DOM — the
  * component's only job here is the form around it.
  */
@@ -399,12 +427,14 @@ export async function webuiWorkspaceLauncherOpenPage(input: {
   readonly dispatch: (command: WorkspacePanelCommand) => void;
   readonly open: (request: {
     readonly url: string;
+    readonly runId?: string;
   }) => Promise<{ readonly target: WebuiBrowserTargetId }>;
+  readonly runId?: string;
 }): Promise<void> {
-  const { tabId, url, dispatch, open } = input;
+  const { tabId, url, dispatch, open, runId } = input;
   dispatch({ type: "request-web-page", tabId, url });
   try {
-    const { target } = await open({ url });
+    const { target } = await open({ url, ...(runId ? { runId } : {}) });
     // The title and the URL are the runtime's to report, and they arrive on the
     // snapshot; what the answer carries is the identity this tab is bound to.
     dispatch({ type: "open-web-tab", target, title: "", url, tabId });
