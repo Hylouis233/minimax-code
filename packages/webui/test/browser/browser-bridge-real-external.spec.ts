@@ -55,6 +55,7 @@ import {
   browserVersionOf,
   bridgeSettings,
   buildExtension,
+  closeBrowser,
   isBrowserInstalled,
   launchWithExtension,
   provision,
@@ -154,7 +155,7 @@ test.describe("the external bridge, against a real browser and a real page", () 
         );
       } finally {
         await started.close();
-        await context.close();
+        await closeBrowser(context);
         await rm(profileDir, { recursive: true, force: true });
       }
     });
@@ -253,7 +254,7 @@ test.describe("the external bridge, against a real browser and a real page", () 
         );
       } finally {
         await started.close();
-        await context.close();
+        await closeBrowser(context);
         await page.close().catch(() => undefined);
         await rm(profileDir, { recursive: true, force: true });
       }
@@ -311,7 +312,7 @@ test.describe("the external bridge, against a real browser and a real page", () 
         );
       } finally {
         await started.close();
-        await context.close();
+        await closeBrowser(context);
         await page.close().catch(() => undefined);
         await rm(profileDir, { recursive: true, force: true });
       }
