@@ -310,6 +310,21 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
     return this.#pagesBySession.get(sessionId);
   }
 
+  /**
+   * Forgets a page the browser has destroyed.
+   *
+   * A closed tab does not leave a page behind in the provider's map: the page
+   * is gone, and a target that still resolved would let a command be aimed at
+   * a page that no longer exists.
+   */
+  #forgetPage(targetId: string): void {
+    const page = this.#pages.get(targetId);
+    if (!page) return;
+    this.#pages.delete(targetId);
+    this.#pagesBySession.delete(page.sessionId);
+    if (this.#launchTargetId === targetId) this.#launchTargetId = undefined;
+  }
+
   async listTargets(): Promise<readonly WebuiBrowserTargetState[]> {
     const connection = this.#connection;
     if (!connection) return [];
@@ -655,6 +670,17 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
    * one.
    */
   #onEvent(event: WebuiBrowserCdpEvent): void {
+    // A page that is gone is not a page the provider drives any more. The
+    // event carries the target's id rather than a session — it is a
+    // browser-level event — so the page is found by its id.
+    if (
+      event.method === "Target.detachedFromTarget" ||
+      event.method === "Target.targetDestroyed"
+    ) {
+      const destroyed = event.params.targetId;
+      if (typeof destroyed === "string") this.#forgetPage(destroyed);
+      return;
+    }
     const page = this.#pageBySession(event.sessionId);
     if (!page) return;
     if (event.method === "Page.frameNavigated") {

@@ -55,6 +55,14 @@ export const SELECT_BROWSER_TARGET_OPERATION_NAME = "selectBrowserTarget" as con
 export const SEND_BROWSER_INPUT_OPERATION_NAME = "sendBrowserInput" as const;
 export const SEND_BROWSER_COMMAND_OPERATION_NAME = "sendBrowserCommand" as const;
 export const WATCH_BROWSER_FRAMES_OPERATION_NAME = "watchBrowserFrames" as const;
+/**
+ * The stream that publishes the session's web tabs.
+ *
+ * A snapshot rather than a delta, on a stream of its own: the strip renders
+ * what the runtime publishes, and the runtime's record of what is open is the
+ * authority — a client that kept its own copy would be a second authority.
+ */
+export const WATCH_BROWSER_WEB_TABS_OPERATION_NAME = "watchBrowserWebTabs" as const;
 export const LIST_BROWSER_CAPABILITIES_OPERATION_NAME = "listBrowserCapabilities" as const;
 /**
  * Reads one browser surface's installation key so the person can copy it.
@@ -238,6 +246,7 @@ import type {
   WebuiBrowserTargetId,
   WebuiBrowserTargetList,
   WebuiBrowserTargetState,
+  WebuiBrowserWebTabSnapshot,
 } from "./contracts/browser.js";
 import { type WebuiBridgeBrowserSurface } from "./contracts/browser.js";
 import type { WebuiUsageQuotaResult } from "./contracts/usage-quota.js";
@@ -458,6 +467,10 @@ export interface OperationSpec {
   watchBrowserFrames: {
     request: { readonly surface: WebuiBrowserSurface; readonly runId?: string };
     response: WebuiBrowserFrameStreamEnvelope;
+  };
+  watchBrowserWebTabs: {
+    request: { readonly surface: WebuiBrowserSurface; readonly runId?: string };
+    response: WebuiBrowserWebTabStreamEnvelope;
   };
   listBrowserCapabilities: {
     request: Record<string, never>;
@@ -724,6 +737,7 @@ export const WEBUI_STREAM_OPERATION_NAMES = [
   WATCH_EVENTS_OPERATION_NAME,
   WATCH_TERMINAL_OPERATION_NAME,
   WATCH_BROWSER_FRAMES_OPERATION_NAME,
+  WATCH_BROWSER_WEB_TABS_OPERATION_NAME,
 ] as const;
 
 export type WebuiStreamOperationName = (typeof WEBUI_STREAM_OPERATION_NAMES)[number];
@@ -755,6 +769,14 @@ export interface WebuiBrowserFrameStreamEnvelope {
   readonly stream: {
     readonly ok: true;
     readonly source: AsyncIterable<WebuiBrowserImageFrame>;
+  };
+}
+
+/** The `{ stream }` envelope for the browser web-tab snapshot stream. */
+export interface WebuiBrowserWebTabStreamEnvelope {
+  readonly stream: {
+    readonly ok: true;
+    readonly source: AsyncIterable<WebuiBrowserWebTabSnapshot>;
   };
 }
 

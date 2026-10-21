@@ -141,6 +141,7 @@ const BROWSER_KEYS = [
   "sendBrowserInput",
   "sendBrowserCommand",
   "watchBrowserFrames",
+  "watchBrowserWebTabs",
   "listBrowserCapabilities",
   "getBrowserInstallationKey",
 ] as const satisfies readonly (keyof BrowserPort)[];

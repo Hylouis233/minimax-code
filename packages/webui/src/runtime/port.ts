@@ -12,6 +12,7 @@ import type {
   WebuiBrowserTargetId,
   WebuiBrowserTargetList,
   WebuiBrowserTargetState,
+  WebuiBrowserWebTabSnapshot,
 } from "../shared/contracts/browser.js";
 import type {
   WebuiActiveTurnResult,
@@ -697,6 +698,19 @@ export interface WebuiBrowserPort {
     runId?: string,
     signal?: AbortSignal,
   ): AsyncIterable<WebuiBrowserImageFrame>;
+  /**
+   * The session's web tabs, as a snapshot, on a stream.
+   *
+   * The runtime owns the record of what the session has open: the strip
+   * renders what this publishes rather than keeping a copy of its own, and a
+   * snapshot is idempotent, so a client that reconnects reconciles against
+   * it instead of drifting.
+   */
+  watchWebTabs(
+    surface: WebuiBrowserSurface,
+    runId?: string,
+    signal?: AbortSignal,
+  ): AsyncIterable<WebuiBrowserWebTabSnapshot>;
   /** What each surface can offer right now. */
   listCapabilities(): Promise<{
     readonly entries: readonly WebuiBrowserCapabilityEntry[];

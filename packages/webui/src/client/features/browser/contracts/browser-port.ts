@@ -30,6 +30,7 @@ import type {
   WebuiBrowserTargetId,
   WebuiBrowserTargetList,
   WebuiBrowserTargetState,
+  WebuiBrowserWebTabSnapshot,
   WebuiBridgeBrowserSurface,
 } from "../../../../shared/contracts/browser.js";
 
@@ -210,6 +211,21 @@ export interface BrowserPort {
   readonly watchBrowserFrames?: (
     request: WebuiBrowserRunScope & { readonly surface: WebuiBrowserSurface },
     onFrame: (frame: WebuiBrowserImageFrame) => void,
+  ) => () => void;
+  /**
+   * The session's web tabs, as a snapshot, on a stream.
+   *
+   * The runtime owns the record of what the session has open, and this is how
+   * the client learns it: the strip renders what arrives here rather than
+   * keeping a copy of its own, because two copies of "what is open" disagree
+   * exactly when a tab is closed.
+   *
+   * Returns the disposer, like `watchBrowserFrames`: the subscription outlives
+   * the render that opened it.
+   */
+  readonly watchBrowserWebTabs?: (
+    request: WebuiBrowserRunScope & { readonly surface: WebuiBrowserSurface },
+    onSnapshot: (snapshot: WebuiBrowserWebTabSnapshot) => void,
   ) => () => void;
   readonly listBrowserCapabilities?: () => Promise<WebuiBrowserCapabilityList>;
   /**

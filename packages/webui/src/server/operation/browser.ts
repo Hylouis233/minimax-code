@@ -1,8 +1,8 @@
 // The browser operations.
 //
-// Seven operations: four that answer a question, one that changes the
-// authorization, one that forwards an input, and one that streams the live
-// images.
+// Ten operations: the ones that answer a question, the one that changes the
+// authorization, the ones that forward an input and a command, and the two
+// that stream — the live images, and the web tabs the session has open.
 //
 // The validators here are deliberately thin. The *shape* of a request is the
 // wire's business and belongs in this layer; whether an input command is
@@ -23,6 +23,7 @@ import {
   SEND_BROWSER_COMMAND_OPERATION_NAME,
   SET_BROWSER_AUTHORIZATION_OPERATION_NAME,
   WATCH_BROWSER_FRAMES_OPERATION_NAME,
+  WATCH_BROWSER_WEB_TABS_OPERATION_NAME,
 } from "../../shared/operation-names.js";
 import {
   WEBUI_BROWSER_SURFACES,
@@ -98,6 +99,19 @@ export const sendBrowserCommandOperation: WebuiOperation<Record<string, unknown>
 export const watchBrowserFramesOperation: WebuiOperation<Record<string, unknown>> = {
   name: WATCH_BROWSER_FRAMES_OPERATION_NAME,
   validate: (body) => validateSurface(WATCH_BROWSER_FRAMES_OPERATION_NAME, body),
+};
+
+/**
+ * The web-tab snapshot stream.
+ *
+ * The request names a surface and, optionally, the run whose tabs it wants.
+ * The snapshot itself is the runtime's record of the session's web tabs, so
+ * there is nothing for the client to ask for beyond which session it is
+ * asking about.
+ */
+export const watchBrowserWebTabsOperation: WebuiOperation<Record<string, unknown>> = {
+  name: WATCH_BROWSER_WEB_TABS_OPERATION_NAME,
+  validate: (body) => validateSurface(WATCH_BROWSER_WEB_TABS_OPERATION_NAME, body),
 };
 
 const AUTHORIZATION_SWITCHES = [

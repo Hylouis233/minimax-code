@@ -131,6 +131,7 @@ import {
   SEND_BROWSER_INPUT_OPERATION_NAME,
   SEND_BROWSER_COMMAND_OPERATION_NAME,
   WATCH_BROWSER_FRAMES_OPERATION_NAME,
+  WATCH_BROWSER_WEB_TABS_OPERATION_NAME,
   LIST_BROWSER_CAPABILITIES_OPERATION_NAME,
   GET_BROWSER_INSTALLATION_KEY_OPERATION_NAME,
 } from "../../shared/operation-names.js";
@@ -149,8 +150,15 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
    * breaks the build. The `Required` qualifier is scoped to this
    * implementation boundary; the `WebuiTransport` capability contract
    * consumed by components keeps its optional semantics. */
-  const { request, stream, watchTerminal, watchBrowserFrames, workspaceFileUrl, watchEvents } =
-    createWebuiWire(options);
+  const {
+    request,
+    stream,
+    watchTerminal,
+    watchBrowserFrames,
+    watchBrowserWebTabs,
+    workspaceFileUrl,
+    watchEvents,
+  } = createWebuiWire(options);
 
   return {
     version: () => request(VERSION_OPERATION_NAME, undefined),
@@ -245,6 +253,8 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
     sendBrowserCommand: (body) => request(SEND_BROWSER_COMMAND_OPERATION_NAME, body),
     watchBrowserFrames: (body, onFrame) =>
       watchBrowserFrames(WATCH_BROWSER_FRAMES_OPERATION_NAME, body, onFrame),
+    watchBrowserWebTabs: (body, onSnapshot) =>
+      watchBrowserWebTabs(WATCH_BROWSER_WEB_TABS_OPERATION_NAME, body, onSnapshot),
     listBrowserCapabilities: () => request(LIST_BROWSER_CAPABILITIES_OPERATION_NAME, {}),
     getBrowserInstallationKey: (body) =>
       request(GET_BROWSER_INSTALLATION_KEY_OPERATION_NAME, body),

@@ -155,10 +155,10 @@ export function createOperationRegistry(
     registerOperation(registry, entry("watchTerminal"));
   }
   // The browser adapter is a real second surface (a browser, not a harness port
-  // method). When none is supplied the seven browser operations stay
-  // unregistered, so an inbound frame becomes an `unknown_operation` error
-  // rather than a "method is not a function" runtime explosion — the same wire
-  // contract a host without a browser has always emitted.
+  // method). When none is supplied the browser operations stay unregistered, so
+  // an inbound frame becomes an `unknown_operation` error rather than a
+  // "method is not a function" runtime explosion — the same wire contract a
+  // host without a browser has always emitted.
   if (browser) {
     registerOperation(registry, entry("getBrowserAuthorization"));
     registerOperation(registry, entry("setBrowserAuthorization"));
@@ -167,6 +167,7 @@ export function createOperationRegistry(
     registerOperation(registry, entry("sendBrowserInput"));
     registerOperation(registry, entry("sendBrowserCommand"));
     registerOperation(registry, entry("watchBrowserFrames"));
+    registerOperation(registry, entry("watchBrowserWebTabs"));
     registerOperation(registry, entry("listBrowserCapabilities"));
     // Registered with the rest of the browser operations, and answering
     // `not_provisioned` when the composition root wired no bridge — the same

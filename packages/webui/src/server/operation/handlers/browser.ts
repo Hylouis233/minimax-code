@@ -30,6 +30,7 @@ import {
   sendBrowserInputOperation,
   setBrowserAuthorizationOperation,
   watchBrowserFramesOperation,
+  watchBrowserWebTabsOperation,
 } from "../browser.js";
 import type {
   WebuiOperationHandler,
@@ -141,6 +142,22 @@ export function createBrowserHandlerEntries(
     },
   });
 
+  const watchBrowserWebTabs: DedicatedHandler<typeof watchBrowserWebTabsOperation> = (
+    context,
+    body,
+  ) => ({
+    stream: {
+      ok: true,
+      // The same envelope as the frame stream: a snapshot is a third kind of
+      // payload with the same shape.
+      source: browser.watchWebTabs(
+        readBrowserSurface(body as Record<string, unknown>),
+        readBrowserRunId(body as Record<string, unknown>),
+        context.signal,
+      ) as unknown as AsyncIterable<Record<string, unknown>>,
+    },
+  });
+
   const listBrowserCapabilities: DedicatedHandler<typeof listBrowserCapabilitiesOperation> =
     async () => ({
       body: await browser.listCapabilities(),
@@ -225,6 +242,13 @@ export function createBrowserHandlerEntries(
       {
         operation: watchBrowserFramesOperation,
         handle: watchBrowserFrames as WebuiOperationHandler<unknown>,
+      },
+    ],
+    [
+      watchBrowserWebTabsOperation.name,
+      {
+        operation: watchBrowserWebTabsOperation,
+        handle: watchBrowserWebTabs as WebuiOperationHandler<unknown>,
       },
     ],
     [

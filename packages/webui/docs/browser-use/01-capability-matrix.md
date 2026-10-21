@@ -381,7 +381,8 @@ that closes it. It is a gap, not a denial.
 | The identity `open_tab` returns names the page it created | **implemented** | the answer carries the surface, the browser id, the target id and the generation the provider's own accounting gives the page. `packages/webui/src/runtime/browser/isolated-chromium/provider.ts` — the `open_tab` case of `sendCommand` |
 | The service observes a new page from the identity `open_tab` returns | **implemented** | the service reads the answer and observes that target in the registry, so the identity is usable at once — it does not have to wait for the provider to be asked for its list again. `packages/webui/src/runtime/browser/browser-service.ts` — `#observeOpenedTarget` |
 | The image stream is keyed by target | **not yet measured** | `browser-service.ts:180` keys the frame subscribers by surface and then by **run**. #204 |
-| The runtime publishes the session's web tabs as a snapshot | **not yet measured** | no such operation exists. #203 |
+| The runtime publishes the session's web tabs as a snapshot | **implemented** | the service keeps the session's web tabs beside the run's selection and publishes them on the `watchBrowserWebTabs` stream — each tab's id, its target identity, its title, its URL, and whether it is the run's selection. `packages/webui/src/runtime/browser/browser-service.ts` — `watchWebTabs` |
+| The client subscribes to the published snapshot | **implemented** | the browser port carries `watchBrowserWebTabs`, the transport's request table has it, and the wire opens the stream. The strip renders from it in #208. `packages/webui/src/client/features/browser/contracts/browser-port.ts` |
 | The Agent opens tabs and gives a run its first selection | **not yet measured** | `tool-adapter.ts:163` refuses a run that has selected nothing, so the Agent cannot acquire a selection of its own and `open_tab` is refused with it. The provider's side is done; the tool's side is not. #206 |
 | The client's tab is a stable id with a mutable content | **not yet measured** | `workspace-panel-state.ts:251` derives the id from the kind and its parts, so there is no stable id for a web tab whose page changes under it. #207 |
 | The frame operation's request names a target | **not yet measured** | `operation-names.ts:458` takes `{ surface, runId? }`. #204 |
@@ -416,18 +417,20 @@ did **not** navigate is still accepted.
 
 The programme adds one operation that publishes the session's web tabs. Registering it costs the
 **eight** sites below, and every one of them is a place where a change that is forgotten shows up as a
-missing capability rather than as an error.
+missing capability rather than as an error. **The `watchBrowserWebTabs` operation is registered at
+every one of them**; `packages/webui/test/unit/browser-web-tabs-operation.test.ts` is the executable
+form of this list, and a site that loses the operation fails there.
 
 | Site | Where | What the new operation needs |
 | --- | --- | --- |
-| The capability manifest's `browser.ready` list | `packages/webui/src/shared/capability-manifest.ts:143` | the operation's name joins the list. A `ready` member that is not wired makes the whole browser family **not-ready** (`capability-manifest.ts:202`), not absent — a quiet degradation |
-| The operation-name constants | `packages/webui/src/shared/operation-names.ts:51` | one new `as const` constant beside the eight browser names |
-| The operation spec | `packages/webui/src/shared/operation-names.ts:458` | one row naming the request and the response type, beside `watchBrowserFrames` |
-| The contract type | `packages/webui/src/shared/contracts/browser.ts` | the request and response types live here; `watchBrowserFrames` has none of its own, so the new operation introduces one |
-| The operation registry | `packages/webui/src/server/operation/operations.ts:162` | one `registerOperation(registry, entry("<name>"))` line inside the `if (browser)` block. **The order is a wire contract** (`operations.ts:69`) |
-| The server handler | `packages/webui/src/server/operation/handlers/browser.ts:127` | a dedicated handler. A stream handler returns `{ stream: { ok: true, source } }` and lets the service's generator raise the errors — the handler does not catch them |
-| The port member and its implementation | `packages/webui/src/runtime/port.ts:637` and `packages/webui/src/runtime/harness/browser.ts:206` | the member on `WebuiBrowserPort` and its body in `createBrowserPort` |
-| The transport's request table | `packages/webui/src/client/platform/transport.ts:232` | the client's request builder; a stream also needs the wire session in `packages/webui/src/client/platform/wire.ts:144` and `:373` |
+| The capability manifest's `browser.ready` list | `packages/webui/src/shared/capability-manifest.ts:143` | the operation's name joins the list. A `ready` member that is not wired makes the whole browser family **not-ready** (`capability-manifest.ts:202`), not absent — a quiet degradation. **Done.** |
+| The operation-name constants | `packages/webui/src/shared/operation-names.ts:51` | one new `as const` constant beside the eight browser names. **Done.** |
+| The operation spec | `packages/webui/src/shared/operation-names.ts:458` | one row naming the request and the response type, beside `watchBrowserFrames`. **Done.** |
+| The contract type | `packages/webui/src/shared/contracts/browser.ts` | the request and response types live here; `watchBrowserFrames` has none of its own, so the new operation introduces one. **Done.** |
+| The operation registry | `packages/webui/src/server/operation/operations.ts:162` | one `registerOperation(registry, entry("<name>"))` line inside the `if (browser)` block. **The order is a wire contract** (`operations.ts:69`). **Done.** |
+| The server handler | `packages/webui/src/server/operation/handlers/browser.ts:127` | a dedicated handler. A stream handler returns `{ stream: { ok: true, source } }` and lets the service's generator raise the errors — the handler does not catch them. **Done.** |
+| The port member and its implementation | `packages/webui/src/runtime/port.ts:637` and `packages/webui/src/runtime/harness/browser.ts:206` | the member on `WebuiBrowserPort` and its body in `createBrowserPort`. **Done.** |
+| The transport's request table | `packages/webui/src/client/platform/transport.ts:232` | the client's request builder; a stream also needs the wire session in `packages/webui/src/client/platform/wire.ts:144` and `:373`. **Done.** |
 
 **There is no `bind()` row to add.** The browser operations are dedicated handlers, not bindings: the
 `WEBUI_OPERATION_BINDINGS` table (`packages/webui/src/server/operation/bind-handlers.ts:149`) has no

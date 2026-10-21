@@ -54,7 +54,7 @@ const EXPECTED: Record<
   browser: [
     "getBrowserAuthorization", "setBrowserAuthorization", "listBrowserTargets",
     "selectBrowserTarget", "sendBrowserInput", "sendBrowserCommand",
-    "watchBrowserFrames",
+    "watchBrowserFrames", "watchBrowserWebTabs",
     "listBrowserCapabilities",
     "getBrowserInstallationKey",
   ],

@@ -28,6 +28,7 @@ import type {
   WebuiBrowserTargetId,
   WebuiBrowserTargetList,
   WebuiBrowserTargetState,
+  WebuiBrowserWebTabSnapshot,
 } from "../../shared/contracts/browser.js";
 import {
   WebuiBrowserService,
@@ -227,6 +228,8 @@ function createBrowserPort(service: WebuiBrowserService): WebuiBrowserPort {
     ) => service.sendCommandToSelection(surface, runId, command, params ?? {}),
     watchFrames: (surface: WebuiBrowserSurface, runId?: string, signal?: AbortSignal) =>
       service.watchFrames(surface, runId, signal),
+    watchWebTabs: (surface: WebuiBrowserSurface, runId?: string, signal?: AbortSignal) =>
+      service.watchWebTabs(surface, runId, signal),
     listCapabilities: () => service.listCapabilities(),
   };
 }

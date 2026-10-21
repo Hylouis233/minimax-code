@@ -203,6 +203,55 @@ export interface WebuiBrowserTargetList {
 }
 
 /**
+ * One web tab the runtime publishes.
+ *
+ * A web tab is a page of the isolated Chromium. The `id` is the runtime's
+ * handle for it, and it is the target's id: a page that navigates keeps its
+ * target id and gains a generation, so the web tab is still the same web tab.
+ *
+ * The `target` is the **binding** the client holds. The tab's own id belongs
+ * to the client and is assigned when the tab is opened; the runtime's target
+ * identity is what the client binds the tab to, and it is the thing that
+ * identifies the page uniquely — a target id alone names a page in one
+ * browser only.
+ */
+export interface WebuiBrowserWebTab {
+  /** The runtime's id for the web tab. It is the target's id. */
+  readonly id: string;
+  /** The target the web tab is bound to. The generation moves with the page. */
+  readonly target: WebuiBrowserTargetId;
+  /** The page's title, as the provider reports it. */
+  readonly title: string;
+  /** The page's url, as the provider reports it. */
+  readonly url: string;
+  /** Whether this web tab is the run's selection. */
+  readonly selected: boolean;
+}
+
+/**
+ * The session's web tabs, as a snapshot.
+ *
+ * A snapshot rather than a delta: the list is small, and a snapshot is
+ * idempotent, so a client that reconnects reconciles against it instead of
+ * drifting away from the runtime's record of what is open.
+ */
+export interface WebuiBrowserWebTabSnapshot {
+  readonly surface: WebuiBrowserSurface;
+  readonly tabs: readonly WebuiBrowserWebTab[];
+}
+
+/**
+ * The key a client reconciles a web tab by.
+ *
+ * The runtime's id is the target's id, and a target id names a page in one
+ * browser only — two surfaces can hold the same one. The binding is the whole
+ * identity, so the binding is the key.
+ */
+export function webuiBrowserWebTabKey(target: WebuiBrowserTargetId): string {
+  return `${target.surface}:${target.browserId}:${target.targetId}`;
+}
+
+/**
  * A validated input command aimed at one target.
  *
  * The panel does not forward raw DOM events. It converts them into this

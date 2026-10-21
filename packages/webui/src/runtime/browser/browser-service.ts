@@ -44,6 +44,8 @@ import {
   type WebuiBrowserTargetId,
   type WebuiBrowserTargetList,
   type WebuiBrowserTargetState,
+  type WebuiBrowserWebTab,
+  type WebuiBrowserWebTabSnapshot,
 } from "../../shared/contracts/browser.js";
 import {
   browserOperationError,
@@ -181,6 +183,23 @@ export class WebuiBrowserService {
     WebuiBrowserSurface,
     Map<string, Set<(frame: WebuiBrowserImageFrame) => void>>
   >();
+  /**
+   * The web tabs each session has open, per surface and then per run.
+   *
+   * The runtime owns this record. The strip renders what the runtime
+   * publishes, so a client that kept its own copy of the open tabs would be a
+   * second authority about what is open — and two authorities disagree at
+   * exactly the moment a tab is closed.
+   */
+  readonly #webTabs = new Map<
+    WebuiBrowserSurface,
+    Map<string, Map<string, WebuiBrowserTargetId>>
+  >();
+  /** The web-tab snapshot subscribers, per surface and then per run. */
+  readonly #webTabSubscribers = new Map<
+    WebuiBrowserSurface,
+    Map<string, Set<() => void>>
+  >();
 
   constructor(options: WebuiBrowserServiceOptions) {
     this.#options = options;
@@ -203,6 +222,161 @@ export class WebuiBrowserService {
     runId: string,
   ): WebuiBrowserTargetId | undefined {
     return this.#selected.get(surface)?.get(runId)?.target;
+  }
+
+  /** The web tabs one session has open on one surface. */
+  #webTabsOf(
+    surface: WebuiBrowserSurface,
+    runId: string,
+  ): Map<string, WebuiBrowserTargetId> | undefined {
+    return this.#webTabs.get(surface)?.get(runId);
+  }
+
+  /**
+   * Records a page a session opened as one of its web tabs.
+   *
+   * The identity is the one the provider answered `open_tab` with, so the
+   * runtime's record names the page that was actually created rather than one
+   * it inferred afterwards.
+   */
+  #recordWebTab(
+    surface: WebuiBrowserSurface,
+    runId: string,
+    target: WebuiBrowserTargetId,
+  ): void {
+    const runs = this.#webTabs.get(surface) ?? new Map<string, Map<string, WebuiBrowserTargetId>>();
+    const tabs = runs.get(runId) ?? new Map<string, WebuiBrowserTargetId>();
+    tabs.set(target.targetId, target);
+    runs.set(runId, tabs);
+    this.#webTabs.set(surface, runs);
+    this.#publishWebTabs(surface, runId);
+  }
+
+  /** Wakes the snapshot subscribers of one session. */
+  #publishWebTabs(surface: WebuiBrowserSurface, runId: string): void {
+    const subscribers = this.#webTabSubscribers.get(surface)?.get(runId);
+    if (!subscribers) return;
+    for (const wake of [...subscribers]) wake();
+  }
+
+  /**
+   * The session's web tabs, as a snapshot.
+   *
+   * The target identities come from the runtime's own record; the titles and
+   * urls come from the provider, which is the only party that knows what a
+   * page is showing. A tab the provider no longer lists is still published,
+   * with the title and url it last had — the runtime's record of what is open
+   * is not the provider's to decide.
+   */
+  async #webTabSnapshot(
+    surface: WebuiBrowserSurface,
+    runId: string,
+  ): Promise<WebuiBrowserWebTabSnapshot> {
+    const tabs = this.#webTabsOf(surface, runId);
+    const selected = this.#selectionOf(surface, runId);
+    const provider = this.#providers.get(surface);
+    const listed = provider ? await provider.listTargets() : [];
+    const byTargetId = new Map(listed.map((entry) => [entry.id.targetId, entry]));
+    const published = [...(tabs?.values() ?? [])].map((target) => {
+      const state = byTargetId.get(target.targetId);
+      return {
+        id: target.targetId,
+        // The generation is the page's own, so a page that navigated is
+        // published with its new generation while the web tab stays the same
+        // web tab.
+        target: { ...target, generation: state?.id.generation ?? target.generation },
+        title: state?.title ?? "",
+        url: state?.url ?? "",
+        selected: selected
+          ? selected.surface === target.surface &&
+            selected.browserId === target.browserId &&
+            selected.targetId === target.targetId
+          : false,
+      } satisfies WebuiBrowserWebTab;
+    });
+    return { surface, tabs: published };
+  }
+
+  /**
+   * The session's web tabs, on a stream.
+   *
+   * A snapshot rather than a delta: the list is small, and a snapshot is
+   * idempotent, so a client that reconnects receives the same snapshot and
+   * applying it twice changes nothing. The stream publishes only when the
+   * snapshot actually differs, so a client is not woken for a change that did
+   * not happen.
+   */
+  async *watchWebTabs(
+    surface: WebuiBrowserSurface,
+    runId: string = WEBUI_BROWSER_NO_RUN_ID,
+    signal?: AbortSignal,
+  ): AsyncIterable<WebuiBrowserWebTabSnapshot> {
+    const authorization = await this.readAuthorization();
+    if (!isBrowserSurfaceUsable(authorization, surface)) {
+      throw browserOperationError(
+        "browser_surface_not_authorized",
+        `Browser surface "${surface}" is not authorized.`,
+      );
+    }
+    await this.#ensureProvider(surface);
+
+    let notify: (() => void) | undefined;
+    const wake = (): void => notify?.();
+    const runs = this.#webTabSubscribers.get(surface) ?? new Map<string, Set<() => void>>();
+    const subscribers = runs.get(runId) ?? new Set<() => void>();
+    subscribers.add(wake);
+    runs.set(runId, subscribers);
+    this.#webTabSubscribers.set(surface, runs);
+
+    try {
+      let published: string | undefined;
+      while (!signal?.aborted) {
+        const snapshot = await this.#webTabSnapshot(surface, runId);
+        const encoded = JSON.stringify(snapshot);
+        if (encoded !== published) {
+          published = encoded;
+          yield snapshot;
+        }
+        await Promise.race([
+          new Promise<void>((resolve) => {
+            notify = resolve;
+          }),
+          new Promise<void>((resolve) => setTimeout(resolve, 250)),
+        ]);
+        notify = undefined;
+      }
+    } finally {
+      subscribers.delete(wake);
+      if (subscribers.size === 0) runs.delete(runId);
+    }
+  }
+
+  /**
+   * Closes a web tab's page and forgets the tab.
+   *
+   * Closing a web tab closes its page: a tab the person closes does not leave
+   * a page behind in the Chromium, and the runtime's page set follows the
+   * strip. The tab leaves the next snapshot either way — a tab that is still
+   * published after it was closed would be a tab the strip cannot get rid of.
+   */
+  async closeWebTab(
+    surface: WebuiBrowserSurface,
+    runId: string,
+    targetId: string,
+  ): Promise<void> {
+    const tabs = this.#webTabsOf(surface, runId);
+    const target = tabs?.get(targetId);
+    if (!target) return;
+    tabs?.delete(targetId);
+    this.#publishWebTabs(surface, runId);
+    const provider = this.#providers.get(surface);
+    if (!provider) return;
+    try {
+      await provider.sendCommand(target, "Target.closeTarget", { targetId });
+    } catch {
+      // A page that is already gone needs no closing, and a provider that
+      // refuses the command has already done what was asked.
+    }
   }
 
   /**
@@ -408,6 +582,15 @@ export class WebuiBrowserService {
           }
         }
       }
+      // The page behind a web tab was replaced, so the tab's generation moved
+      // and the snapshot that publishes it is no longer the one the client
+      // holds. Every session that has the tab open has to hear about it.
+      for (const [runId, tabs] of [...(this.#webTabs.get(surface) ?? new Map())]) {
+        if (!tabs.has(change.targetId)) continue;
+        const tab = tabs.get(change.targetId);
+        if (tab && raised) tabs.set(change.targetId, raised.id);
+        this.#publishWebTabs(surface, runId);
+      }
     });
     return provider;
   }
@@ -419,6 +602,8 @@ export class WebuiBrowserService {
     this.#providers.delete(surface);
     this.#selected.delete(surface);
     this.#frameSubscribers.delete(surface);
+    this.#webTabs.delete(surface);
+    this.#webTabSubscribers.delete(surface);
     for (const target of this.#registry.list(surface)) {
       this.#registry.close({
         surface,
@@ -518,6 +703,9 @@ export class WebuiBrowserService {
       target,
       order: (this.#selectionOrder += 1),
     });
+    // The snapshot says which web tab is the run's selection, so a selection
+    // that moved is a change the subscribers have to hear about.
+    this.#publishWebTabs(target.surface, runId);
     return { ...known, selected: true };
   }
 
@@ -771,7 +959,7 @@ export class WebuiBrowserService {
       );
     }
     const result = await provider.sendCommand(target, command, params);
-    this.#observeOpenedTarget(command, result);
+    this.#observeOpenedTarget(command, result, surface, WEBUI_BROWSER_NO_RUN_ID);
     return { accepted: true, result };
   }
 
@@ -825,7 +1013,7 @@ export class WebuiBrowserService {
       provider.sendCommand(selected, command, params),
       signal,
     );
-    this.#observeOpenedTarget(command, result);
+    this.#observeOpenedTarget(command, result, surface, runId);
     return {
       accepted: true,
       target: selected,
@@ -841,11 +1029,20 @@ export class WebuiBrowserService {
    * therefore known before anything asks the provider for its list again, and
    * with the generation the provider gave it rather than a guess.
    *
+   * The page also joins the session's web tabs: the runtime owns the record of
+   * what the session has open, and the strip renders what the runtime
+   * publishes.
+   *
    * A command that did not open a page — or a provider whose answer is not an
    * identity — is left alone. The registry is the service's record of what the
    * browser has, and a command that opened nothing has nothing to add to it.
    */
-  #observeOpenedTarget(command: string, result: unknown): void {
+  #observeOpenedTarget(
+    command: string,
+    result: unknown,
+    surface: WebuiBrowserSurface,
+    runId: string,
+  ): void {
     if (command !== "open_tab") return;
     const identity = readOpenedTargetIdentity(result);
     if (!identity) return;
@@ -861,6 +1058,7 @@ export class WebuiBrowserService {
       status: "open",
       generation: identity.generation,
     });
+    this.#recordWebTab(surface, runId, identity);
   }
 
   /**
