@@ -108,10 +108,13 @@ worker's lifecycle and the extension's pairing are not touched by this slice —
 gained an *optional* `openTab` member, which the extension bridge does not implement and which the
 service refuses with `browser_capability_denied`.
 
-The base branch's own CI is not green either: its `Source verification` run failed
-`verify (macos-latest)` and `verify (ubuntu-latest)` before this programme started. The macOS job
-passes here, and the ubuntu job fails at the external-bridge cases, which are the previous
-programme's.
+**The base branch is not green either, and was not before this programme.** The `verify` matrix runs
+on pull requests, so the fork's `webui` branch has one `Source verification` run in its history — at
+`a63a6c99`, from PR #168 — and it failed `verify (macos-latest)` and `verify (ubuntu-latest)`. The
+fork's `webui` branch also carries a second workflow, `WebUI npm preview`, which has failed on every
+one of its recent commits (`11be3112`, `1a1a9757`, `23474c74`, `a2749939`, …). None of that is this
+slice's: the macOS job passes here, and the ubuntu job fails on the external-bridge cases, which are
+the previous programme's.
 
 **What is left, exactly:** the CI's ubuntu job is red on six external-bridge cases that need a real
 external browser with the extension. Everything this slice is responsible for is green in CI
