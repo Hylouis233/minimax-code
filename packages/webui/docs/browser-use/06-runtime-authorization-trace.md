@@ -77,18 +77,19 @@ and 2 below are partly implemented.
 
 Five enforcement points. "Required check" is the rule; "Code today" is what exists at that place.
 
-### 1. The panel's live image stream
+### 1. A tab's live image stream
 
 | | |
 | --- | --- |
-| Required check | The surface switch is on, and the target identity — including generation — matches what the panel is showing |
+| Required check | The surface switch is on, and the target identity — including generation — matches what the tab is showing |
 | Refusal | `browser_surface_not_authorized`, `browser_target_stale` |
-| Code today | **`implemented`.** `WebuiBrowserService.watchFrames` refuses with `browser_surface_not_authorized` before doing anything, and the stream is registered as the `watchBrowserFrames` operation (`shared/operation-names.ts`, `server/operation/browser.ts`). Frames are fenced: `#frameMatchesSelection` (`browser-service.ts:396`) compares surface, browserId, targetId **and generation**, and the stream loop drops anything that does not match (`browser-service.ts:370`) |
+| Code today | **`implemented`.** `WebuiBrowserService.watchFrames` refuses with `browser_surface_not_authorized` before doing anything, and the stream is registered as the `watchBrowserFrames` operation (`shared/operation-names.ts`, `server/operation/browser.ts`). Frames are fenced: `#frameMatchesSelection` (`browser-service.ts:733`) compares surface, browserId, targetId **and generation**, and the stream loop drops anything that does not match (`browser-service.ts:664`) |
 | Not measured | No probe or integration run observed a frame being dropped for a superseded generation — verified by reading the source |
 | What does exist | `WebuiBrowserImageFrame` and the bridge's `WebuiBrowserBridgeImageFrame`, which carry the target identity including generation so a client *can* drop a frame for a page it is no longer showing ([`05-target-identity.md`](05-target-identity.md)) |
 | Provider-side prerequisite | `implemented` — `#withAttachmentRetry` (`provider.ts:588`) re-issues an attachment failure for up to 3 s across eleven sends. The failure itself is `measured`, see [`01-capability-matrix.md`](01-capability-matrix.md) |
+| What ADR 0022 changes | The stream is keyed by the run, so it carries the run's selection. [ADR 0022](../adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md) makes it per target, so a person looking at one tab does not receive another tab's frames. `required` — not in the tree yet |
 
-### 2. The panel's input forwarding
+### 2. A tab's input forwarding
 
 | | |
 | --- | --- |
@@ -98,16 +99,16 @@ Five enforcement points. "Required check" is the rule; "Code today" is what exis
 | What made the generation check effective | The registry's counter is fed: `#ensureProvider` subscribes to `provider.onTargetChanged` and calls `registry.raiseGeneration` (`browser-service.ts:176`), so the registry's generation advances when the provider reports a page replacement. Finding F2 in [`07-review-findings.md`](07-review-findings.md) |
 | Not measured | No run drove a navigation and observed a refused input — verified by reading the source |
 | What does exist | `WebuiBrowserInputCommand` (pointer / key / text), `WebuiBrowserBridgeInputCommand`, and `browser_command_invalid` in the pinned error codes |
-| Why validation is a gate and not hygiene | A panel showing a stale page must not deliver input to whatever replaced it. The generation in the command is what makes that refusal possible |
+| Why validation is a gate and not hygiene | A tab showing a stale page must not deliver input to whatever replaced it. The generation in the command is what makes that refusal possible |
 
 ### 3. The Agent's browser tools
 
 | | |
 | --- | --- |
-| Required check | The surface switch for the selected surface is on, and the requested action is in the restricted command set (or the Full CDP gate is on, for anything outside it) |
+| Required check | The surface switch for the selected surface is on, and the requested action is in the restricted command set (or the Full CDP gate is on, for anything outside it). `open_tab` is the exception the tab model introduces: it reads the surface switch and creates the page itself, so it needs no prior selection |
 | Refusal | `browser_surface_not_authorized`, `browser_capability_denied` |
 | Code today | **Implemented.** The restricted vocabulary is declared in `packages/agent-tools/src/desktop/builtin-browser-defs.ts` — `LOCAL_BROWSER_ACTION_NAMES` at line 744 (24 names) and `LOCAL_BROWSER_ACTION_INPUT_CONTRACTS` at line 714. The WebUI's tool adapter (`packages/webui/src/runtime/browser/tool-adapter.ts`) implements `LocalBrowserAdapter` over the browser service: `getCapabilities()` declares exactly the restricted set, and `execute` forwards the action to the service, which reads the surface switch and the Full CDP gate. An action outside the restricted set is refused with `browser_capability_denied` even when Full CDP is on, because the tool path is the restricted path. |
-| Reachability from this client | **Reachable.** The WebUI has a browser port (`WebuiBrowserPort`, `runtime/port.ts`), a browser adapter (`runtime/harness/browser.ts`) and the registered browser operations. The adapter is handed to the runtime host as the `browserProvider` by both composition roots, and the service is the one place the switch is read — so the Agent's tools and the panel address the same session by construction rather than by convention. The service's `sendCommandToSelection` runs the action against the **selected** target of the surface, and refuses when there is no selection rather than defaulting to one |
+| Reachability from this client | **Reachable.** The WebUI has a browser port (`WebuiBrowserPort`, `runtime/port.ts`), a browser adapter (`runtime/harness/browser.ts`) and the registered browser operations. The adapter is handed to the runtime host as the `browserProvider` by both composition roots, and the service is the one place the switch is read — so the Agent's tools and the panel address the same session by construction rather than by convention. The service's `sendCommandToSelection` runs the action against the **selected** target of the surface, and refuses when there is no selection rather than defaulting to one. A run that has never selected anything therefore cannot act at all, `open_tab` included: the tree has no path by which the Agent creates the selection it needs. [ADR 0022](../adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md) decides that `open_tab` is that path; `required`, not in the tree yet |
 | Isolated-surface provider | The WebUI's own: `packages/webui/src/runtime/browser/isolated-chromium/provider.ts` with `cdp-connection.ts`. The repository also has a TUI-side provider (`packages/tui/src/runtime/browser/headless-chrome-provider.ts`); the WebUI does not adopt it, because the WebUI's provider is the one the panel's live image stream and the tool adapter share |
 
 ### 4. Bridge admission
@@ -128,7 +129,7 @@ Five enforcement points. "Required check" is the rule; "Code today" is what exis
 | --- | --- |
 | Required check | `fullCdp` is on **and** the surface switch is on. Both, in that order: the switch decides whether the surface exists, the Full CDP gate decides how wide it is |
 | Refusal | `browser_surface_not_authorized` when the surface is off; `browser_capability_denied` when a full-CDP-only call is attempted with `fullCdp` off |
-| Code today | **`implemented`.** `isBrowserCommandAllowed` (`authorization.ts:127`) has a caller: `WebuiBrowserService.sendCommand` (`browser-service.ts:419`) checks the surface switch **first** (`browser-service.ts:425`) and then `isBrowserCommandAllowed(authorization, command, WEBUI_BROWSER_RESTRICTED_COMMANDS)` (`browser-service.ts:431`), refusing an out-of-set command with `browser_capability_denied` rather than forwarding it. The restricted vocabulary is pinned as `WEBUI_BROWSER_RESTRICTED_COMMANDS` (`contracts/browser.ts:285`, 28 names), and the path is exposed as the `sendBrowserCommand` operation. Finding F5 in [`07-review-findings.md`](07-review-findings.md) |
+| Code today | **`implemented`.** `isBrowserCommandAllowed` (`authorization.ts:127`) has a caller: `WebuiBrowserService.sendCommand` (`browser-service.ts:419`) checks the surface switch **first** (`browser-service.ts:425`) and then `isBrowserCommandAllowed(authorization, command, WEBUI_BROWSER_RESTRICTED_COMMANDS)` (`browser-service.ts:431`), refusing an out-of-set command with `browser_capability_denied` rather than forwarding it. The restricted vocabulary is pinned as `WEBUI_BROWSER_RESTRICTED_COMMANDS` (`contracts/browser.ts:310`, 28 names), and the path is exposed as the `sendBrowserCommand` operation. Finding F5 in [`07-review-findings.md`](07-review-findings.md) |
 | What does exist | `fullCdpApplies` on `WebuiBrowserCapabilityEntry`, a declaration that the switch widens a surface; and `browser_capability_denied` in the pinned error codes |
 | Not measured | No run sent a real DevTools command through the gate with the switch off — verified by reading the source |
 | Constraint on the widening | The command set is whatever the active provider actually supports. It does not enable a surface that is disabled or unavailable, and it does not promise that Edge, Chrome and isolated Chromium expose identical domains |
@@ -155,9 +156,9 @@ impossible to allow one surface without allowing the rest.
 
 | Enforcement point | Surface switch checked | Full CDP checked | Code today |
 | --- | --- | --- | --- |
-| Panel image stream | required | not applicable | **implemented** — surface check enforced, frames fenced to the selected generation (F6) |
-| Panel input forwarding | required | not applicable | **implemented** — validation, surface check and `isCurrent`; the registry's generation is fed from `onTargetChanged` (F2) |
-| Agent browser tools | required | required, for non-restricted commands | **implemented** — the tool adapter (`packages/webui/src/runtime/browser/tool-adapter.ts`) forwards to the same browser service the panel uses, and the composition root hands it to the runtime host |
+| A tab's image stream | required | not applicable | **implemented** — surface check enforced, frames fenced to the selected generation (F6). The stream is keyed by the run; [ADR 0022](../adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md) makes it per target (`required`) |
+| A tab's input forwarding | required | not applicable | **implemented** — validation, surface check and `isCurrent`; the registry's generation is fed from `onTargetChanged` (F2) |
+| Agent browser tools | required | required, for non-restricted commands | **implemented** — the tool adapter (`packages/webui/src/runtime/browser/tool-adapter.ts`) forwards to the same browser service the panel uses, and the composition root hands it to the runtime host. A run with no selection is refused every action, `open_tab` included; ADR 0022 gives `open_tab` the bootstrap path (`required`) |
 | Bridge admission | required | not applicable | **implemented** — the bridge has its own upgrade path, branched on before the generic one (F3), and the command routing is fixed (F4) |
 | Full CDP gate | required first | required | **implemented** — `sendCommand` checks the surface first, then the switch (F5) |
 

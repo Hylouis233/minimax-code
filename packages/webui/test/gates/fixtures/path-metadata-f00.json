@@ -2902,7 +2902,34 @@
       "home": "target"
     },
     {
+      "path": "client/features/workspace/ui/WorkspacePanelControls.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "workspace",
+      "home": "target"
+    },
+    {
+      "path": "client/features/workspace/ui/WorkspaceProgressPanel.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "workspace",
+      "home": "target"
+    },
+    {
       "path": "client/features/workspace/ui/WorkspacePanels.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "workspace",
+      "home": "target"
+    },
+    {
+      "path": "client/features/workspace/ui/workspace-progress.css",
       "layers": [
         "bindings"
       ],

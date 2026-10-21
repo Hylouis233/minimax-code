@@ -3500,6 +3500,7 @@
     "packages/webui/docs/adr/0019-webui-browser-use-surfaces-and-external-browser-bridge.md",
     "packages/webui/docs/adr/0020-webui-miniapp-view-and-runtime-seams.md",
     "packages/webui/docs/adr/0021-webui-model-picker-is-one-popup-with-two-states.md",
+    "packages/webui/docs/adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md",
     "packages/webui/docs/adr/observation-architecture.md",
     "packages/webui/docs/agents/domain.md",
     "packages/webui/docs/agents/issue-tracker.md",

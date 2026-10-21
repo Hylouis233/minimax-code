@@ -14,7 +14,7 @@ Two tickets ask for a recorded result rather than a claim: the browser version, 
 the settings that were enabled, and what was observed. A matrix written by hand drifts from what the
 suites did, so **the suites write the record as they run** and this document is written from it.
 
-The record is written to `.plan/board/validation/<suite>.acceptance.json` — workspace material, not a
+The record is written to `.plan/browser-use/complete/<suite>.acceptance.json` — workspace material, not a
 published document. The four suites that produce it are:
 
 | Suite | What it drives |
@@ -178,7 +178,11 @@ reason.
   browser service and is covered by the unit suite.
 - **The Agent's browser tools were not driven against a real browser in this pass.** The tool adapter
   forwards to the same browser service as the panel, and a run that has selected nothing is refused
-  rather than being sent somewhere the person is not looking.
+  rather than being sent somewhere the person is not looking. Since round 11 of the review findings
+  that refusal reaches `open_tab` as well, so the Agent could not drive a browser at all: it could not
+  acquire a selection, the isolated provider drove one page, and the image stream was per run. The tab
+  model that fixes all three is decided ([ADR 0022](../adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md))
+  and is not in this tree, so nothing in this record speaks for it.
 
 ## Reproducing this
 
@@ -187,7 +191,7 @@ pnpm test:webui          # the isolated-Chromium cases (Vitest)
 pnpm test:webui-browser  # the real-browser, real-external and real-packaged cases (Playwright)
 ```
 
-Both write their records to `.plan/board/validation/`. The records are workspace material, so they
+Both write their records to `.plan/browser-use/complete/`. The records are workspace material, so they
 are not part of the published source projection; the rows above are the published copy of them.
 
 A machine without the **installed** Edge cannot run the Edge cases: they are skipped with the

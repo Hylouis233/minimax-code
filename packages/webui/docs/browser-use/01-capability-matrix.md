@@ -5,7 +5,7 @@ is:
 
 | Label | Means | Backed by |
 | --- | --- | --- |
-| `measured` | A probe observed this on the machine named in the section heading. | `.plan/board/validation/cdp-evidence.json` or `.plan/board/validation/credential-store-evidence.json` |
+| `measured` | A probe observed this on the machine named in the section heading. | `.plan/browser-use/complete/cdp-evidence.json` or `.plan/browser-use/complete/credential-store-evidence.json` |
 | `implemented` | The source does this today. The row names the file. | The cited file in this repository |
 | `not yet measured` | An open question. Not a denial and not a promise. | Nothing — see the section that collects them |
 
@@ -35,12 +35,12 @@ declaration rather than a probe result. This document is the measurement half.
 | Authorization switch | `isolatedChromium` | `edge` | `chrome` |
 | Live image stream | **measured** — `Page.captureScreenshot` and `Page.startScreencast` both succeeded against a real page | **measured** — the extension captured the visible tab and a non-empty image frame reached the host, in a real Edge | **measured** — the same, in a real Chrome |
 | Pointer / keyboard / text input | **measured** — mouse press + release, `Input.insertText`, and `Input.dispatchKeyEvent` all succeeded against a real page | **measured** — the text the host sent appeared in the page's field, read back through the browser's own automation, in a real Edge | **measured** — the same, in a real Chrome |
-| Agent browser tools | **implemented** — the tool adapter forwards to the same browser service the panel uses, and the composition root hands it to the runtime host. Which *surface* a call acts on is resolved from the run's own selection, so a run that has selected nothing is refused rather than being sent somewhere the person is not looking | **implemented**, same adapter | **implemented**, same adapter |
+| Agent browser tools | **implemented** — the tool adapter forwards to the same browser service the panel uses, and the composition root hands it to the runtime host. Which *surface* a call acts on is resolved from the run's own selection, so a run that has selected nothing is refused rather than being sent somewhere the person is not looking — and the refusal reaches `open_tab` too, so the Agent cannot acquire a selection of its own. [ADR 0022](../adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md) gives `open_tab` that path (`required`) | **implemented**, same adapter | **implemented**, same adapter |
 | Full CDP widening | `implemented` — gated in `WebuiBrowserService.sendCommand` | `implemented`, same gate | `implemented`, same gate |
-| Restricted command set | `implemented` — `WEBUI_BROWSER_RESTRICTED_COMMANDS`, 28 names, `packages/webui/src/shared/contracts/browser.ts:285` | same vocabulary over the bridge | same vocabulary over the bridge |
+| Restricted command set | `implemented` — `WEBUI_BROWSER_RESTRICTED_COMMANDS`, 28 names, `packages/webui/src/shared/contracts/browser.ts:310` | same vocabulary over the bridge | same vocabulary over the bridge |
 | Extension permission gate | not applicable — no extension is involved | The extension's own browser permission, independent of the WebUI switch | The extension's own browser permission, independent of the WebUI switch |
 
-## Measured on the validation machine — `.plan/board/validation/cdp-evidence.json`
+## Measured on the validation machine — `.plan/browser-use/complete/cdp-evidence.json`
 
 Everything in this section is `measured`, and every value is quoted with the JSON field it came from.
 
@@ -193,7 +193,7 @@ lists in the tree and they are **not** the same, which is worth stating before e
 
 | List | Where | Count | Whose it is |
 | --- | --- | --- | --- |
-| `WEBUI_BROWSER_RESTRICTED_COMMANDS` | `packages/webui/src/shared/contracts/browser.ts:285` | **28** | the WebUI's own gate, read by `isBrowserCommandAllowed` and enforced in `WebuiBrowserService.sendCommand` |
+| `WEBUI_BROWSER_RESTRICTED_COMMANDS` | `packages/webui/src/shared/contracts/browser.ts:310` | **28** | the WebUI's own gate, read by `isBrowserCommandAllowed` and enforced in `WebuiBrowserService.sendCommand` |
 | `LOCAL_BROWSER_ACTION_NAMES` | `packages/agent-tools/src/desktop/builtin-browser-defs.ts:744` | **24** | the Agent tools' browser-action vocabulary |
 
 The 28-name WebUI list adds `wait_for`, `get_dom`, `verify_text` and `inspect_editable_targets` to the
@@ -225,7 +225,7 @@ reading the source.
 ### OS secure credential store
 
 **`measured` — on the validation host, and on that host only.**
-`.plan/board/validation/credential-store-evidence.json`, `platform: "linux"`:
+`.plan/browser-use/complete/credential-store-evidence.json`, `platform: "linux"`:
 
 | Provider | Field | Value |
 | --- | --- | --- |
@@ -265,6 +265,11 @@ a pairing credential. See [`04-pairing-credentials.md`](04-pairing-credentials.m
 Read this section before citing the matrix. Each line is a gap in the evidence, not a known limitation
 of the product.
 
+- **The isolated surface drives exactly one page, and no probe exercised two.** The provider refuses
+  every target that is not the page it launched, so `open_tab` creates a page that nothing can address.
+  Nothing here measures a second page on one surface, and the tab model that needs one
+  ([ADR 0022](../adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md)) is `required`, not
+  `implemented`.
 - **The isolated surface's CDP matrix was measured on Chromium only.** The probe ran against the
   bundled Chromium, not against Edge, so the isolated surface's cells describe that browser. Edge
   *was* exercised for the **extension** path — see the real-browser acceptance below — but the

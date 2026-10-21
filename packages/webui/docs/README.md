@@ -82,8 +82,9 @@ stands; ADR 0018 records the last ownership programme and the observation decisi
 [`adr/observation-architecture.md`](adr/observation-architecture.md)). ADR 0010 sets the build
 (esbuild artifact, Vite as dev server only); ADR 0011 lets the WebUI re-implement TUI projection
 logic against a shared harness-event corpus. ADR 0019 records the accepted Browser Use surfaces and
-the decisions and remaining design questions for Browser Use. ADR 0019 is the sole decision record
-for that feature. ADR 0020 records the accepted Mini App view, the runtime seams it needs, the
+the decisions and remaining design questions for Browser Use. ADR 0022 records the workspace panel as
+a browser tab strip and the two selections it separates, and amends ADR 0019 with **A8**; between
+them they are the decision record for that feature. ADR 0020 records the accepted Mini App view, the runtime seams it needs, the
 desktop capabilities it deliberately drops, and the contract-baseline question it leaves open; it
 is the sole decision record for Mini App hosting. ADR 0021 records the model picker as one popup
 with two states, and the cascade it replaces. A new decision takes the next free number.

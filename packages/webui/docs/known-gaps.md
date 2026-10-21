@@ -4,7 +4,7 @@ Capabilities the WebUI does not have, verified against the tree. Each entry says
 how, and what remains unverified. "Not implemented" and "not decided" are different states and are
 kept apart here; the undecided ones are also in `open-questions.md`.
 
-Last verified: 2026-10-19, against `webui` at `33016455`. This list covers capabilities; open
+Last verified: 2026-10-21, against `webui` at `ccc51961`. This list covers capabilities; open
 decisions are in [`open-questions.md`](open-questions.md).
 
 ## 1. Connector and App tools depend on a beta feature, and on the model finding them
@@ -89,15 +89,33 @@ in-process tick loop and its `<dataDir>/webui/scheduled-tasks.sqlite` store are 
 `cronService` for this client, but nothing in the browser surfaces them, and no plan exists to
 restore the removed surface (the retirement decision is in the branch history).
 
-## 8. Browser Use has an adoption seam but no WebUI provider or panel
+## 8. Browser Use reaches one page, and the Agent cannot open it
 
-The runtime can adopt a host-supplied provider (`src/runtime/browser-provider.ts`), and the runtime
-assembly accepts that provider. Both the development WebUI entry point
-(`scripts/run-webui-server.mjs`) and the packaged production entry point
-(`release/webui-npm/bin/mcode-webui.mjs`) currently create the runtime without one. The client has no
-browser panel, and Settings has no Browser Use authorization controls. Therefore the accepted
-direction in [ADR 0019](adr/0019-webui-browser-use-surfaces-and-external-browser-bridge.md) is not
-implemented. ADR 0019 is the sole record of its decisions and remaining design questions.
+More of Browser Use exists than this entry used to claim. The client has a browser business
+(`client/features/browser/`), mounted as the workspace's browser tab
+(`client/features/workspace/ui/WorkspacePanels.tsx` mounts `BrowserPanelHost`), and Settings carries
+an enabled `browser` page with the authorization switches (`BrowserSettingsPage.public.tsx`). The
+runtime has the isolated Chromium provider
+(`src/runtime/browser/isolated-chromium/provider.ts`), the target registry and its generation, and a
+browser service composed in `runtime/harness/browser.ts` that launches that provider itself. What is
+missing is what
+[ADR 0022](adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md) decides on top of them:
+
+- **The Agent cannot acquire a selection.** `runtime/browser/tool-adapter.ts` refuses every action of
+  a run whose `selectionSurfaceOf(runId)` is empty, with `browser_target_unknown` — including
+  `open_tab`, the action that would have given it one. The panel's target list is the only writer
+  (`BrowserPanelHost.public.tsx` calls `selectBrowserTarget`).
+- **The isolated provider drives one page.** `#pageTargetId` names a single target and every command
+  refuses another; the provider's `open_tab` calls `Target.createTarget`, so it creates a page
+  nothing can then drive.
+- **The frame stream is per run.** Subscribers are keyed by `runId` and `#frameMatchesSelection`
+  drops every frame that is not that run's target, so two tabs cannot each have their own picture.
+- **The tab model is decided and not built.** A tab is still keyed by kind and opened from the add
+  menu (`workspace-panel-state.ts`), so there is no new tab page, no URL box, no in-place content
+  change and no per-target stream.
+
+A web tab can name only the isolated Chromium: the extension bridge implements no `open_tab`, so Edge
+and Chrome keep the panel's target list as their entry point.
 
 ## 9. The Mini App capability is not reachable from this client
 

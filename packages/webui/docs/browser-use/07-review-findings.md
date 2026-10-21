@@ -1,6 +1,7 @@
 # Review findings — WebUI Browser Use
 
-**Ten review rounds** have been run against this change. Nine of them were run
+**Ten review rounds** have been run against this change, and a eleventh has been raised by the
+tab-model review. Nine of them were run
 by a `codex` `gpt-6-luna` reviewer reading the source rather than the
 description; the seventh was the final acceptance pass, run against the
 finished tree and against the acceptance criteria the tickets state. This
@@ -338,8 +339,8 @@ extension id is `ijoijfjbpmfdebiopnbodncfgdjmgjce` — but the manifest points
 **A browser extension runtime executes JavaScript only.** The worker therefore
 registers and then cannot run, and the extension as packaged cannot drive a
 browser at all. The evidence is in
-`.plan/board/validation/extension-load-evidence.json`; the probe is
-`.plan/board/validation/probe-extension-load.mjs`.
+`.plan/browser-use/complete/extension-load-evidence.json`; the probe is
+`.plan/browser-use/complete/probe-extension-load.mjs`.
 
 The fix is a build step: bundle the extension's TypeScript to JavaScript and
 point the manifest at the built output. Until that lands, every claim about
@@ -646,6 +647,27 @@ are closed.
   names the browser each case ran in, and the published matrix names the host,
   so a skipped case is visible rather than silent.
 
+## Round 11 — the tab model's review, of the tree the ten rounds left behind
+
+This round was not run by an external reviewer. It was raised by a person asking the Agent to open a
+browser and visit a page, and reading the refusal it produced. Four findings came out of that, and
+none of them is closed.
+
+| # | Severity | Finding | Status |
+| --- | --- | --- | --- |
+| T1 | BLOCKER | **The Agent cannot create a selection, so it cannot act at all.** The tool adapter resolves the surface from the run's own selection and refuses with `browser_target_unknown` when the run has none, and the only writer of a selection is the panel. A person asking for a browser therefore got the same refusal for every action — `inspect`, `navigate` and `open_tab` alike — and `open_tab` was the one action that should have produced a selection. ADR 0019 required that both the user and the Agent can select a target; the tree carried half of it. | `open` — [ADR 0022](../adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md) decides that `open_tab` creates the page and the selection. Not in the tree. |
+| T2 | MAJOR | **`open_tab` created a page that nothing could address.** The isolated provider drives exactly one page and refuses every other target, so `Target.createTarget` produced a second page that the provider would not drive, would not stream, and would not accept input for. It appeared in the target list as a tab that did nothing when chosen. | `open` — ADR 0022 makes the provider hold one page per web tab. Not in the tree. |
+| T3 | MAJOR | **The image stream was per run, so the person and the Agent could not be on different pages.** `watchFrames` resolved the run's selection and streamed that target, and the client dropped any frame that did not match it. A person opening another tab had no way to see it without moving the run's selection, which would have moved the Agent's work with it. | `open` — ADR 0022 makes the stream per target, and separates the run's selection from the tab the person is looking at. Not in the tree. |
+| T4 | MINOR | **A page had no identity in the interface.** The panel was a view of a run's selected target, and that selection was invisible: a person moved it by clicking a chip inside the browser panel, and the Agent could not move it at all. | `open` — ADR 0022 gives a page a name, a tab strip and an opener on both sides. Not in the tree. |
+
+### What was done
+
+Nothing is fixed yet; this round is the reason [ADR 0022](../adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md)
+was written, and [ADR 0019 amendment A8](../adr/0019-webui-browser-use-surfaces-and-external-browser-bridge.md)
+records the change to the panel's role. The decisions are settled and the tree is not; the rules they
+pin are listed as `required` in [`05-target-identity.md`](05-target-identity.md), and the work is
+carried by the plan rather than by this document.
+
 ## What this document does not establish
 
 - That the external path works end to end against a real Edge or Chrome for
@@ -668,4 +690,6 @@ are closed.
   rather than from a default, so a run that has selected nothing is refused
   rather than being sent somewhere the person is not looking. What is not
   established is the whole path exercised end to end against a real browser in
-  one run.
+  one run — and since round 11 it is not even reachable: the Agent cannot
+  acquire a selection, the isolated provider drives one page, and the image
+  stream is per run rather than per target.

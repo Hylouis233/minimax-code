@@ -57,3 +57,21 @@ not silently change title generation (`packages/local-runtime/src/runtime/runtim
   client gets, or fall back to the policy's default. A change here moves user-visible session titles.
 - **How to decide:** needs a title-generation comparison across both settings on real sessions; no
   such run is recorded.
+
+## 5. What does a tab show when the page behind it is closed?
+
+**Status:** open, listed as unsettled by
+[ADR 0022](adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md) and decided nowhere.
+
+- **Today:** a closed target is kept rather than dropped, so it stays in the panel's list labelled
+  closed and stays selectable (`WebuiBrowserTargetStatus` is `"open" | "closed"`, and `isCurrent`
+  refuses it as stale); the stage behind it falls back to its empty-picture notice, because a closed
+  page pushes no frames. There is no tab to lose either way: the browser tab is the panel's own
+  `browser` kind, not a slot holding a page.
+- **Alternative:** the tab falls back to the new tab page, so the slot stays usable and the URL box
+  comes back with it; or the tab closes with its page, so a tab always names a live page.
+- **What a decision would change:** whether the strip may hold a tab whose content is absent, and
+  whether closing the last page closes the tab — which decides whether closing a page and closing a
+  tab are one command or two.
+- **How to decide:** one pass against a real isolated Chromium — close the page behind a tab and
+  observe what the strip should keep — and record the observation here.

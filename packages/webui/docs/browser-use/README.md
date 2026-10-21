@@ -13,21 +13,26 @@ Where a document mixes the three, they are separated inline rather than merged i
 
 **Read [`07-review-findings.md`](07-review-findings.md) before anything else.** **Ten review rounds**
 have run against this change — nine by a `codex` `gpt-6-luna` reviewer reading the source rather
-than the description, and a final acceptance pass against the finished tree. That document records
-every finding and states, for each, whether it is closed or still open. **Every finding is closed**;
-the ones that changed a decision are recorded in the decision record's amendments, and the ones that
-could not be closed on this machine are marked `fixed, platform unverified` rather than rounded up.
+than the description, and a final acceptance pass against the finished tree — and an eleventh was
+raised by the tab-model review. That document records every finding and states, for each, whether it
+is closed or still open. **The first ten rounds are closed**; the ones that changed a decision are
+recorded in the decision record's amendments, and the ones that could not be closed on this machine
+are marked `fixed, platform unverified` rather than rounded up. **The eleventh round's four findings
+are open**: they are what the tab model was written to close.
 
 The decision record for this programme is
-[`../adr/0019-webui-browser-use-surfaces-and-external-browser-bridge.md`](../adr/0019-webui-browser-use-surfaces-and-external-browser-bridge.md).
+[`../adr/0019-webui-browser-use-surfaces-and-external-browser-bridge.md`](../adr/0019-webui-browser-use-surfaces-and-external-browser-bridge.md),
+amended by **A8** for the tab model, whose own decision record is
+[`../adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md`](../adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md).
 This directory holds the evidence and the pinned contracts that ADR 0019 left as validation work:
-what was actually measured, what was deliberately not measured, and the exact wire shapes the panel,
-the Agent's browser tools and the extension must agree on.
+what was actually measured, what was deliberately not measured, and the exact wire shapes the tab
+strip, the Agent's browser tools and the extension must agree on.
 
 Nothing here describes shipped, released behavior. The isolated-Chromium surface has a provider, a
 service and a panel path in this branch, and the extension bridge is wired into the server's upgrade
 path; the external handshake completes against a real Chrome and a real Edge, and the acceptance
-matrix records what each run observed. Where a document states a rule that has no implementing code,
+matrix records what each run observed. The tab model that ADR 0022 decides is **not in this tree**:
+its rules appear below as `required`. Where a document states a rule that has no implementing code,
 it says so in place rather than in a footnote.
 
 ## Implementation status was re-checked against the tree
@@ -41,12 +46,13 @@ still says something is not implemented, that is because it is not — the per-r
 | --- | --- | --- |
 | `packages/webui/src/runtime/browser/authorization.ts` | `implemented` — the surface gate is enforced by the browser service | `06` |
 | `packages/webui/src/runtime/browser/target-registry.ts` | `implemented`, and fed from `provider.onTargetChanged` (F2) | `05` |
-| `packages/webui/src/runtime/browser/browser-service.ts` | `implemented` — owns authorization, providers and the registry | `06` |
-| `packages/webui/src/runtime/browser/isolated-chromium/provider.ts` | `implemented` — including the attachment retry | `01` |
+| `packages/webui/src/runtime/browser/browser-service.ts` | `implemented` — owns authorization, providers, the registry and the per-run frame streams | `06` |
+| `packages/webui/src/runtime/browser/isolated-chromium/provider.ts` | `implemented` — including the attachment retry; it drives exactly one page, and a second page cannot be addressed | `01` |
 | `packages/webui/src/server/browser-bridge/credential-store.ts` | `implemented`, rewritten mid-review; the three per-OS forms are in place, and the macOS and Windows forms are asserted through an injected runner rather than executed | `04` |
 | `packages/webui/src/server/browser-bridge/admission.ts`, `pairing.ts`, `session.ts`, `registry.ts`, `reconnect.ts` | `implemented` and **wired** into the server's upgrade path and the browser service; target-ownership routing fixed (F4) | `02`, `03` |
 | `packages/webui/src/shared/operation-names.ts` | `implemented` — eight browser operations registered, including `sendBrowserCommand` (F5) | `06` |
 | `packages/browser-extension/` | `implemented` — MV3 service worker, `chrome.storage.local` credential, Web Crypto signing | `02`, `04` |
+| The tab model of ADR 0022 | `required` — decided, not in the tree: the Agent cannot acquire a selection, the provider drives one page, and the frame stream is per run | `05`, `07` |
 
 The *measurements* in these documents were never affected by the tree moving. They come from the probe
 artifacts, not from the source. What moved was the implementation status, and that is what this pass
@@ -74,7 +80,7 @@ open are listed in [`07-review-findings.md`](07-review-findings.md).
 | [`04-pairing-credentials.md`](04-pairing-credentials.md) | Credential lifecycle, the per-OS secure store on each platform, and the explicit-failure rule when no store exists | You implement pairing, credential storage, revocation or re-enable |
 | [`05-target-identity.md`](05-target-identity.md) | The three-part target identity and its generation, what invalidates a generation, and how a stale reference is rejected | You work with targets, input forwarding, tab selection or run scoping |
 | [`06-runtime-authorization-trace.md`](06-runtime-authorization-trace.md) | Each of the four authorization switches traced to the place it must be enforced, with the current implementation status of each check | You implement an authorization check, or you are auditing whether one exists |
-| [`07-review-findings.md`](07-review-findings.md) | All the findings from the ten review rounds, what was done about each, and what is still open | You want to know what is known to be broken, or what has been corrected |
+| [`07-review-findings.md`](07-review-findings.md) | All the findings from the eleven review rounds, what was done about each, and what is still open | You want to know what is known to be broken, or what has been corrected |
 | [`packages/browser-extension/STORE-DISCLOSURES.md`](../../../browser-extension/STORE-DISCLOSURES.md) | The store disclosures for the Chrome Web Store and the Edge Add-ons, and the differences between a packaged build and a development build | You are preparing a store submission, or you need to know what a packaged build is |
 | [`09-acceptance-record.md`](09-acceptance-record.md) | The acceptance matrix: every surface, every case, the browser version, the operating system, the settings and the observed result — written from the records the suites produce | You want to know what was actually run, and where the evidence is thin |
 
@@ -106,9 +112,9 @@ validation host, and from the acceptance suites that write a record as they run:
 
 | Probe | Result | What it establishes |
 | --- | --- | --- |
-| `.plan/board/validation/probe-cdp.mjs` | `.plan/board/validation/cdp-evidence.json` | Which CDP commands a real Chrome accepted, whether real input and image capture work, and whether a renderer-attachment race exists |
-| `.plan/board/validation/probe-credential-store.mjs` | `.plan/board/validation/credential-store-evidence.json` | Which OS secure credential store **the one Linux host it ran on** actually offers. Nothing about any other platform |
-| `packages/webui/test/browser/*` (Playwright) and `packages/webui/test/integration/browser-use-real-input.test.ts` (Vitest) | `.plan/board/validation/*.acceptance.json` | The acceptance matrix: the browser version, the operating system, the settings and the observed result, for every surface. See [`09-acceptance-record.md`](09-acceptance-record.md) |
+| `.plan/browser-use/complete/probe-cdp.mjs` | `.plan/browser-use/complete/cdp-evidence.json` | Which CDP commands a real Chrome accepted, whether real input and image capture work, and whether a renderer-attachment race exists |
+| `.plan/browser-use/complete/probe-credential-store.mjs` | `.plan/browser-use/complete/credential-store-evidence.json` | Which OS secure credential store **the one Linux host it ran on** actually offers. Nothing about any other platform |
+| `packages/webui/test/browser/*` (Playwright) and `packages/webui/test/integration/browser-use-real-input.test.ts` (Vitest) | `.plan/browser-use/complete/*.acceptance.json` | The acceptance matrix: the browser version, the operating system, the settings and the observed result, for every surface. See [`09-acceptance-record.md`](09-acceptance-record.md) |
 
 `.plan/` is workspace material: it is listed in the repository `.gitignore` and is not part of the
 public-source projection, so these documents are not accompanied by the raw probe records in a
@@ -141,6 +147,10 @@ directory:
 | **Restricted command set** | The fixed browser action vocabulary the Agent's tools may use while Full CDP access is off. |
 | **Full CDP** | The separate authorization to send arbitrary DevTools commands to an already-authorized surface. It never authorizes a surface on its own. |
 | **Generation** | The monotonic counter that makes a recorded page reference detectably stale rather than silently mis-aimed. See [`05-target-identity.md`](05-target-identity.md). |
+| **Run** | The Agent's browser working context, keyed by the WebUI Agent session. One session drives one browser selection. |
+| **Run selection** | The page the Agent acts on. The tree has no path by which the Agent creates one, which is what the eleventh review round found and what ADR 0022 decides. |
+| **Tab** | A slot in the workspace panel's strip. It holds one piece of content at a time, and its content can be replaced without the tab being closed. |
+| **New tab page** | The launcher a newly opened tab shows: the tool views and a URL box. Choosing either replaces that tab's content. The URL box exists nowhere else. |
 
 ## Publication note
 
