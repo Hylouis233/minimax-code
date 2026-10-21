@@ -26,6 +26,7 @@ import {
 import {
   openBrowserWebTabOperation,
   watchBrowserWebTabsOperation,
+  closeBrowserWebTabOperation,
 } from "../../src/server/operation/browser.js";
 import { createBrowserHandlerEntries } from "../../src/server/operation/handlers/browser.js";
 import { createOperationRegistry } from "../../src/server/operation/operations.js";
@@ -68,6 +69,18 @@ describe("the web-tab snapshot operation", () => {
       inertBrowserPort,
     );
     expect(registry.has(WATCH_BROWSER_WEB_TABS_OPERATION_NAME)).toBe(true);
+  });
+
+  it("is registered for the close of a web tab", () => {
+    // The close is the other half of the open: a tab the person closes must
+    // not leave a page running in the browser, and the only way to reach the
+    // runtime's close is an operation.
+    expect(closeBrowserWebTabOperation.name).toBe("closeBrowserWebTab");
+    const registry = createOperationRegistry({} as never, undefined, inertBrowserPort);
+    expect(registry.has(closeBrowserWebTabOperation.name)).toBe(true);
+    expect(
+      createBrowserHandlerEntries(inertBrowserPort).has(closeBrowserWebTabOperation.name),
+    ).toBe(true);
   });
 
   it("is in the server's handler table", () => {

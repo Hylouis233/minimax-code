@@ -143,6 +143,7 @@ const BROWSER_KEYS = [
   "watchBrowserFrames",
   "watchBrowserWebTabs",
   "openBrowserWebTab",
+  "closeBrowserWebTab",
   "listBrowserCapabilities",
   "getBrowserInstallationKey",
 ] as const satisfies readonly (keyof BrowserPort)[];

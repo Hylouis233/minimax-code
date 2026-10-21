@@ -147,6 +147,7 @@ export const WEBUI_CAPABILITY_REGISTRY_PROOFS: Readonly<
       "watchBrowserFrames",
       "watchBrowserWebTabs",
       "openBrowserWebTab",
+      "closeBrowserWebTab",
     ],
   },
   models: { operations: ["listModels", "selectModel"] },

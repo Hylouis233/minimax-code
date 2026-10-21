@@ -14,6 +14,7 @@ import type {
   WebuiBrowserTargetList,
   WebuiBrowserTargetState,
   WebuiBrowserWebTabOpen,
+  WebuiBrowserWebTabClose,
   WebuiBrowserWebTabSnapshot,
 } from "../shared/contracts/browser.js";
 import type {
@@ -743,6 +744,13 @@ export interface WebuiBrowserPort {
     target: WebuiBrowserTargetId,
     signal?: AbortSignal,
   ): AsyncIterable<WebuiBrowserImageFrame>;
+  /**
+   * Closes the page a web tab is bound to.
+   *
+   * A tab the person closes does not leave a page behind in the browser, and
+   * the runtime's page set follows the strip.
+   */
+  closeWebTab(target: WebuiBrowserTargetId): Promise<WebuiBrowserWebTabClose>;
   /**
    * The session's web tabs, as a snapshot, on a stream.
    *

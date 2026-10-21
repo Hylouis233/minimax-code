@@ -281,6 +281,17 @@ export type WebuiBrowserTabOpener = "agent" | "person";
  * browser only — two surfaces can hold the same one. The binding is the whole
  * identity, so the binding is the key.
  */
+/**
+ * The answer to a request that closes a web tab.
+ *
+ * The page is gone, so there is nothing to name: the answer says which page was
+ * closed and that the close was accepted.
+ */
+export interface WebuiBrowserWebTabClose {
+  readonly accepted: true;
+  readonly targetId: string;
+}
+
 export function webuiBrowserWebTabKey(target: WebuiBrowserTargetId): string {
   return `${target.surface}:${target.browserId}:${target.targetId}`;
 }

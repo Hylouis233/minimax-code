@@ -191,6 +191,23 @@ export function WebuiWorkspaceTabStrip({
   // existing-tab rule (issue #206) keeps duplicates out.
   const slice = useWebuiPortSlice("browser");
   const watchBrowserWebTabs = slice?.watchBrowserWebTabs;
+  const closeBrowserWebTab = slice?.closeBrowserWebTab;
+
+  /**
+   * Closes a tab.
+   *
+   * A web tab's page is closed in the browser **first**, and the tab leaves
+   * the strip after: the runtime stops publishing the tab when its page is
+   * closed, and a tab that left the strip while the runtime still published
+   * it would be re-added by the next snapshot. A tool tab holds no page, so
+   * closing it is the client's business alone.
+   */
+  const closeTab = async (item: WorkspacePanelTab): Promise<void> => {
+    if (item.content.kind === "web") {
+      await closeBrowserWebTab?.({ target: item.content.target });
+    }
+    dispatch({ type: "close-tab", tabId: item.id });
+  };
 
   // A ref-stable handle on the latest published web tabs. The effect that
   // subscribes to `watchBrowserWebTabs` is recreated only when the slice's
@@ -272,7 +289,7 @@ export function WebuiWorkspaceTabStrip({
             type="button"
             aria-label={`${webuiWorkspaceTabLabel(item)} ${STRIP_COPY.fileClose}`}
             data-testid={`workspace-tab-${item.id}-close`}
-            onClick={() => dispatch({ type: "close-tab", tabId: item.id })}
+            onClick={() => void closeTab(item)}
           >
             <WebuiIconClose className="size-3" />
           </button>

@@ -30,6 +30,7 @@ import type {
   WebuiBrowserTargetId,
   WebuiBrowserTargetList,
   WebuiBrowserTargetState,
+  WebuiBrowserWebTabClose,
   WebuiBrowserWebTabOpen,
   WebuiBrowserWebTabSnapshot,
   WebuiBridgeBrowserSurface,
@@ -250,6 +251,16 @@ export interface BrowserPort {
   readonly openBrowserWebTab?: (
     request: WebuiBrowserRunScope & { readonly url: string },
   ) => Promise<WebuiBrowserWebTabOpen>;
+  /**
+   * Closes the page a web tab is bound to.
+   *
+   * The tab names the target it holds, so the runtime closes the page that
+   * tab holds. The tab leaves the strip either way — a tab that is still
+   * published after it was closed would be a tab the strip cannot get rid of.
+   */
+  readonly closeBrowserWebTab?: (
+    request: { readonly target: WebuiBrowserTargetId },
+  ) => Promise<WebuiBrowserWebTabClose>;
   readonly listBrowserCapabilities?: () => Promise<WebuiBrowserCapabilityList>;
   /**
    * Reads one extension-reached surface's installation key so the person can

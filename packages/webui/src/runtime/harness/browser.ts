@@ -29,6 +29,7 @@ import type {
   WebuiBrowserTargetId,
   WebuiBrowserTargetList,
   WebuiBrowserTargetState,
+  WebuiBrowserWebTabClose,
   WebuiBrowserWebTabSnapshot,
 } from "../../shared/contracts/browser.js";
 import {
@@ -248,6 +249,7 @@ function createBrowserPort(service: WebuiBrowserService): WebuiBrowserPort {
     ) => service.sendCommandToTarget(surface, target, command, params ?? {}, signal),
     watchFrames: (surface: WebuiBrowserSurface, target: WebuiBrowserTargetId, signal?: AbortSignal) =>
       service.watchFrames(surface, target, signal),
+    closeWebTab: (target: WebuiBrowserTargetId) => service.closeWebTab(target),
     // `runId` is optional on the port because the person is not a run: the
     // service reads an absent run as the panel's own cell.
     openWebTab: (

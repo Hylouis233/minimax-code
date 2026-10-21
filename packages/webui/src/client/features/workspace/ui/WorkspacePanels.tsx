@@ -330,10 +330,12 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     }
     queries.readFile(activeFileKey!, activeTab.content.workspaceDir, activeTab.content.path);
     return undefined;
-    // The content is a dependency, not just the id: the id is stable and the
+    // The cache key is the dependency, not the id: the id is stable and the
     // content is not, so a tab that changed from one file to another has to
-    // read the new one.
-  }, [activeTab?.id, activeFileKey, activeTab?.content, queries]);
+    // read the new one. The content *object* is not a dependency — a content
+    // that is replaced by an equal one is the same file, and re-reading it
+    // would supersede the read that is already in flight.
+  }, [activeTab?.id, activeFileKey, queries]);
   useEffect(() => {
     if (activeTab?.content.kind !== "file-preview" || activeTab.content.lineStart === undefined || fileResults.get(activeFileKey!)?.loading || !fileResults.get(activeFileKey!)?.content || fileResults.get(activeFileKey!)?.error) return;
     const target = dom.getElementById(webuiFileLineTargetId(activeTab.id, activeTab.content.lineStart));
@@ -529,7 +531,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     <div className="webui-workspace-panel-body">
       <div className="webui-workspace-view">
     {tab === "files" ? <div className="webui-workspace-files-empty" data-testid="workspace-files-empty"><WebuiIconFolder className="size-8" /><strong>查看文件</strong><p>从工作区目录树中选择文件</p></div> : null}
-    {tab === "file-preview" && activeTab?.content.kind === "file-preview" ? <WebuiFilePreview tabId={activeTab.id} content={activeTab.content} result={fileResults.get(activeTab.id)} codeMode={fileCodeMode} workspaceFileUrl={workspaceFileUrl} /> : null}
+    {tab === "file-preview" && activeTab?.content.kind === "file-preview" ? <WebuiFilePreview tabId={activeTab.id} content={activeTab.content} result={fileResults.get(activeFileKey!)} codeMode={fileCodeMode} workspaceFileUrl={workspaceFileUrl} /> : null}
     {tab === "review" && activeTab?.content.kind === "review" && activeTab.content.source === "workspace" ? <div className="webui-turn-review" data-testid="workspace-review">
       {reviewSummary?.tabId !== activeTab.id || reviewSummary.loading && !reviewSummary.summary ? <p className="webui-turn-review-empty" role="status">正在收集变更…</p> : reviewSummary.error && !reviewSummary.summary ? <p className="webui-turn-review-empty" role="alert">{reviewSummary.error}</p> : reviewSummary.summary ? <>
         <div className="webui-turn-review-summary"><span>{reviewSummary.summary.totals.files} 个文件</span><span className="webui-diff-header-stats"><span className="webui-diff-add">+{reviewSummary.summary.totals.additions}</span>{reviewSummary.summary.totals.deletions ? <span className="webui-diff-del">-{reviewSummary.summary.totals.deletions}</span> : null}</span></div>

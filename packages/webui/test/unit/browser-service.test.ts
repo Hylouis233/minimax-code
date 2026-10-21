@@ -166,6 +166,7 @@ class RecordingProvider implements WebuiBrowserSurfaceProvider {
 function createService(
   initial: WebuiBrowserAuthorization,
   tabIds: readonly string[] = ["tab-1"],
+  edgeProvider?: WebuiBrowserSurfaceProvider,
 ): {
   service: WebuiBrowserService;
   provider: RecordingProvider;
@@ -183,6 +184,9 @@ function createService(
     },
     dataDir: "/tmp/webui-browser-use-test",
     createIsolatedProvider: async () => provider,
+    ...(edgeProvider
+      ? { createBridgeProvider: async (surface: string) => (surface === "edge" ? edgeProvider : undefined) }
+      : {}),
   };
   return { service: new WebuiBrowserService(options), provider, state };
 }
@@ -658,7 +662,7 @@ describe("browser service", () => {
     });
     expect((await firstSnapshot(service, "run-1")).tabs).toHaveLength(1);
 
-    await service.closeWebTab("isolated-chromium", "run-1", "tab-2");
+    await service.closeWebTabInSession("isolated-chromium", "run-1", "tab-2");
     expect((await firstSnapshot(service, "run-1")).tabs).toHaveLength(0);
     await service.close();
   });
@@ -798,6 +802,39 @@ describe("run-scoped selection", () => {
     // run's selection and not the other run's.
     expect(await selectedTargetOf(service, "run-a")).toBe("tab-2");
     expect(await selectedTargetOf(service, "run-b")).toBeUndefined();
+    await service.close();
+  });
+
+  it("opens a person's page in the isolated Chromium, whatever the Agent is working on", async () => {
+    // The extension bridge drives the person's own browser through
+    // `chrome.debugger` and cannot open a page in it. The panel is the
+    // isolated browser's view, so the person typing a url must not be refused
+    // because the Agent happens to be working in Edge.
+    const edge = new RecordingProvider(["edge-tab"]);
+    const { service, provider } = createService(
+      { ...ALL_OFF, isolatedChromium: true, edge: true },
+      ["tab-1"],
+      edge,
+    );
+    // The Agent is working on Edge.
+    const edgeList = await service.listTargets("edge", "run-1");
+    const edgeTarget = edgeList.targets.find((entry) => entry.id.targetId === "edge-tab")?.id;
+    expect(edgeTarget).toBeDefined();
+    await service.selectTarget(edgeTarget!, "run-1");
+
+    const opened = await service.openWebTab(
+      "run-1",
+      { url: "https://example.test/" },
+      undefined,
+      "person",
+    );
+
+    // The page was opened in the isolated Chromium, not in the browser the
+    // Agent is working in.
+    expect(opened.target.surface).toBe("isolated-chromium");
+    expect(opened.target.browserId).toBe("browser-1");
+    // And the run keeps the page it was working on: a person who opens a tab
+    // while the run has a selection does not move it.
     await service.close();
   });
 

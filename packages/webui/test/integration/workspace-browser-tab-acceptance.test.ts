@@ -260,7 +260,7 @@ describe.skipIf(!available)("the acceptance of the workspace browser tab model",
   it("the Agent opens a tab, and the strip gains it as the active tab", async () => {
     await record(
       "the Agent opens a tab",
-      "the run's selection points at the page the Agent opened, and the client's strip shows it and makes it the active tab",
+      "the run's selection points at the page the Agent opened, the runtime publishes it, and the strip's reconciliation makes it the active panel tab",
       async () => {
         const opened = (await agent.execute(
           { sessionId: "run-1" } as never,
@@ -273,20 +273,26 @@ describe.skipIf(!available)("the acceptance of the workspace browser tab model",
         const selection = await runSelection("run-1");
         expect(selection?.targetId).toBe(opened.targetId);
 
-        // The client's cell: the strip's reconciliation turns the published
-        // tab into a panel tab, and the reducer makes it the active one.
-        const published = {
-          surface: "isolated-chromium" as const,
-          tabs: [
-            {
-              id: opened.targetId,
-              target: opened,
-              title: "agent page",
-              url: "about:blank",
-              selected: true,
-            },
-          ],
-        };
+        // The client's cell: the **runtime's own published stream** is read,
+        // the strip's reconciliation turns what it published into a panel
+        // command, and the reducer makes the tab the active one. The mounted
+        // strip is covered by the unit suites; what this case proves is that
+        // the runtime publishes the Agent's tab, and that the strip's own
+        // reconciliation and the reducer agree on it.
+        const controller = new AbortController();
+        const published = await (async () => {
+          for await (const snapshot of service.watchWebTabs(
+            "isolated-chromium",
+            "run-1",
+            controller.signal,
+          )) {
+            return snapshot;
+          }
+          throw new Error("the snapshot stream ended without publishing anything");
+        })();
+        controller.abort();
+
+        expect(published.tabs.map((tab) => tab.target.targetId)).toContain(opened.targetId);
         const commands = webuiWorkspaceTabStripReconcile(panel().tabs, published);
         expect(commands).toHaveLength(1);
         let state = reduceWorkspacePanelState(panel(), commands[0]!.command);
@@ -539,14 +545,26 @@ describe.skipIf(!available)("the acceptance of the workspace browser tab model",
           ),
         ).toBe(true);
 
-        await service.closeWebTab("isolated-chromium", "run-6", opened.targetId);
+        // The close goes through the **shipped path** — the server's own
+        // handler, the way the strip's close button reaches it — and not
+        // through the service's method. Calling the service directly would
+        // prove the service and say nothing about whether a person closing a
+        // tab closes the page.
+        const close = handler("closeBrowserWebTab");
+        const validated = close.validate({ target: opened });
+        expect(validated.ok).toBe(true);
+        if (!validated.ok) throw new Error(validated.message);
+        await close.handle({ requestId: "acceptance" }, validated.body!);
         await delay(SETTLE_MS);
 
+        // The page is gone from the browser, not only from the panel's list.
         expect(
           (await service.listTargets("isolated-chromium", "run-6")).targets.some(
             (entry) => entry.id.targetId === opened.targetId,
           ),
         ).toBe(false);
+        // And the tab is no longer the run's selection.
+        expect(await runSelection("run-6")).toBeUndefined();
       },
     );
   });

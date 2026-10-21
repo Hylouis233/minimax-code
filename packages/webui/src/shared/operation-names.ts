@@ -73,6 +73,15 @@ export const WATCH_BROWSER_WEB_TABS_OPERATION_NAME = "watchBrowserWebTabs" as co
  * the panel is not acting for a run: absent means the panel's own cell.
  */
 export const OPEN_BROWSER_WEB_TAB_OPERATION_NAME = "openBrowserWebTab" as const;
+/**
+ * The operation that closes a web tab.
+ *
+ * A tab the person closes does not leave a page behind in the browser, and the
+ * runtime's page set follows the strip. The request names the **target** the
+ * tab is bound to, so the runtime closes the page that tab holds — the client
+ * does not have to know which session opened it.
+ */
+export const CLOSE_BROWSER_WEB_TAB_OPERATION_NAME = "closeBrowserWebTab" as const;
 export const LIST_BROWSER_CAPABILITIES_OPERATION_NAME = "listBrowserCapabilities" as const;
 /**
  * Reads one browser surface's installation key so the person can copy it.
@@ -257,6 +266,7 @@ import type {
   WebuiBrowserTargetList,
   WebuiBrowserTargetState,
   WebuiBrowserWebTabOpen,
+  WebuiBrowserWebTabClose,
   WebuiBrowserWebTabSnapshot,
 } from "./contracts/browser.js";
 import { type WebuiBridgeBrowserSurface } from "./contracts/browser.js";
@@ -494,6 +504,10 @@ export interface OperationSpec {
   openBrowserWebTab: {
     request: { readonly url: string; readonly runId?: string };
     response: WebuiBrowserWebTabOpen;
+  };
+  closeBrowserWebTab: {
+    request: { readonly target: WebuiBrowserTargetId };
+    response: WebuiBrowserWebTabClose;
   };
   listBrowserCapabilities: {
     request: Record<string, never>;

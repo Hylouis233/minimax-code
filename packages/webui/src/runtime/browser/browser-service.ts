@@ -46,6 +46,7 @@ import {
   type WebuiBrowserTargetList,
   type WebuiBrowserTargetState,
   type WebuiBrowserWebTab,
+  type WebuiBrowserWebTabClose,
   type WebuiBrowserWebTabSnapshot,
 } from "../../shared/contracts/browser.js";
 import {
@@ -373,7 +374,7 @@ export class WebuiBrowserService {
    * strip. The tab leaves the next snapshot either way — a tab that is still
    * published after it was closed would be a tab the strip cannot get rid of.
    */
-  async closeWebTab(
+  async closeWebTabInSession(
     surface: WebuiBrowserSurface,
     runId: string,
     targetId: string,
@@ -383,10 +384,50 @@ export class WebuiBrowserService {
     if (!target) return;
     tabs?.delete(targetId);
     this.#publishWebTabs(surface, runId);
+    await this.#closeTarget(surface, target);
+  }
+
+  /**
+   * Closes the page a web tab is bound to.
+   *
+   * The tab names the target it holds, and the target names the page: a tab
+   * does not have to know which session opened the page it shows, and the
+   * page is closed wherever it is. The page leaves every session's tabs and
+   * every session's selection, because a page that is gone cannot be the page
+   * anybody is looking at or acting on.
+   */
+  async closeWebTab(target: WebuiBrowserTargetId): Promise<WebuiBrowserWebTabClose> {
+    const surface = target.surface;
+    for (const [runId, tabs] of [...this.#webTabs.get(surface) ?? new Map()]) {
+      if (!tabs.has(target.targetId)) continue;
+      tabs.delete(target.targetId);
+      this.#publishWebTabs(surface, runId);
+    }
+    for (const selections of this.#selected.values()) {
+      for (const [runId, selection] of [...selections]) {
+        if (selection.target.targetId !== target.targetId) continue;
+        selections.delete(runId);
+        this.#publishWebTabs(surface, runId);
+      }
+    }
+    await this.#closeTarget(surface, target);
+    return { accepted: true, targetId: target.targetId };
+  }
+
+  /** Closes one page and forgets the target behind it. */
+  async #closeTarget(
+    surface: WebuiBrowserSurface,
+    target: WebuiBrowserTargetId,
+  ): Promise<void> {
     const provider = this.#providers.get(surface);
     if (!provider) return;
+    // The stream stops first: a screencast left running for a page that is
+    // gone is a resource the browser holds for nobody.
+    await provider.stopImageStream(target.targetId).catch(() => undefined);
     try {
-      await provider.sendCommand(target, "Target.closeTarget", { targetId });
+      await provider.sendCommand(target, "Target.closeTarget", {
+        targetId: target.targetId,
+      });
     } catch {
       // A page that is already gone needs no closing, and a provider that
       // refuses the command has already done what was asked.
@@ -1070,10 +1111,12 @@ export class WebuiBrowserService {
    *   the page appears. A run that already has a page keeps it — the person opened a
    *   tab, not the Agent's page.
    *
-   * The surface is a fact rather than a choice either party made. A run with a
-   * selection keeps the surface it selected on; a run without one opens a page in
-   * the isolated Chromium, because the panel is the isolated browser's view and the
-   * external browsers are driven in the person's own windows.
+   * The surface is a fact rather than a choice either party made. The **Agent's**
+   * page follows the surface its run selected on, and a run without a selection
+   * opens a page in the isolated Chromium. The **person's** page is always in the
+   * isolated Chromium: the panel is the isolated browser's view, and the external
+   * browsers are driven in the person's own windows — so a person typing a url
+   * must not be refused because the Agent happens to be working in Edge.
    *
    * The run is optional because the person may have no run in view: an absent run
    * is the panel's own cell, and the bootstrap applies to it exactly as it applies
@@ -1089,7 +1132,10 @@ export class WebuiBrowserService {
     readonly target: WebuiBrowserTargetId;
     readonly result?: unknown;
   }> {
-    const surface = this.selectionSurfaceOf(runId) ?? "isolated-chromium";
+    const surface =
+      opener === "person"
+        ? "isolated-chromium"
+        : (this.selectionSurfaceOf(runId) ?? "isolated-chromium");
     // The switch comes first: a surface that is switched off is refused
     // before anything is attempted, so the refusal names the switch rather
     // than the selection.
@@ -1101,6 +1147,16 @@ export class WebuiBrowserService {
         `Browser surface "${surface}" cannot open a tab.`,
       );
     }
+    // Whether the run has a selection is read **before** the page is created,
+    // and it is read across every surface: the Agent acts on one page, so the
+    // bootstrap is about the run and not about a surface. A run working in
+    // Edge still has a selection, and a person opening a tab must not take it.
+    //
+    // The bootstrap is decided at the moment the page is opened, and the page
+    // takes a moment to open: a run that selected a page while the person's
+    // page was opening must not have its selection taken away by the
+    // bootstrap afterwards.
+    const runHadNoSelection = this.selectionSurfaceOf(runId) === undefined;
     const identity = (await awaitAbortableCommand(
       provider.openTab(params),
       signal,
@@ -1121,7 +1177,6 @@ export class WebuiBrowserService {
     // has none, so a person who opens a tab in a running session never moves the
     // Agent off the page it is working on, and a run with nothing to act on is
     // not a dead end.
-    const runHadNoSelection = this.#selectionOf(surface, runId) === undefined;
     if (opener === "agent" || runHadNoSelection) {
       // The registry's generation is the current one. A page that is still
       // loading is observed as a replaced page when its first load lands, and

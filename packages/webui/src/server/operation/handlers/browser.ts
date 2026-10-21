@@ -16,6 +16,7 @@ import type { WebuiBrowserPort } from "../../../runtime/port.js";
 import type { WebuiBridgeBrowserSurface } from "../../../shared/contracts/browser.js";
 import type { WebuiBrowserBridgeInstallationKeyView } from "../../../shared/contracts/browser-bridge.js";
 import {
+  closeBrowserWebTabOperation,
   getBrowserAuthorizationOperation,
   getBrowserInstallationKeyOperation,
   listBrowserCapabilitiesOperation,
@@ -204,6 +205,23 @@ export function createBrowserHandlerEntries(
   });
 
   /**
+   * Closes a web tab's page.
+   *
+   * The tab names the target it is bound to, so the runtime closes the page
+   * that tab holds and drops it from the session's tabs. The tab leaves the
+   * next snapshot either way: a tab that is still published after it was
+   * closed would be a tab the strip cannot get rid of.
+   */
+  const closeBrowserWebTab: DedicatedHandler<typeof closeBrowserWebTabOperation> = async (
+    _context,
+    body,
+  ) => ({
+    body: await browser.closeWebTab(
+      readBrowserTarget(body as Record<string, unknown>),
+    ),
+  });
+
+  /**
    * Hands the person their surface's installation key so they can paste it
    * into the extension.
    *
@@ -296,6 +314,13 @@ export function createBrowserHandlerEntries(
       {
         operation: openBrowserWebTabOperation,
         handle: openBrowserWebTab as WebuiOperationHandler<unknown>,
+      },
+    ],
+    [
+      closeBrowserWebTabOperation.name,
+      {
+        operation: closeBrowserWebTabOperation,
+        handle: closeBrowserWebTab as WebuiOperationHandler<unknown>,
       },
     ],
     [

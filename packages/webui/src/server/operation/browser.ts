@@ -18,6 +18,7 @@ import {
   GET_BROWSER_INSTALLATION_KEY_OPERATION_NAME,
   LIST_BROWSER_CAPABILITIES_OPERATION_NAME,
   LIST_BROWSER_TARGETS_OPERATION_NAME,
+  CLOSE_BROWSER_WEB_TAB_OPERATION_NAME,
   OPEN_BROWSER_WEB_TAB_OPERATION_NAME,
   SELECT_BROWSER_TARGET_OPERATION_NAME,
   SEND_BROWSER_INPUT_OPERATION_NAME,
@@ -128,6 +129,17 @@ export const watchBrowserWebTabsOperation: WebuiOperation<Record<string, unknown
 export const openBrowserWebTabOperation: WebuiOperation<Record<string, unknown>> = {
   name: OPEN_BROWSER_WEB_TAB_OPERATION_NAME,
   validate: (body) => validateWebTabUrl(OPEN_BROWSER_WEB_TAB_OPERATION_NAME, body),
+};
+
+/**
+ * The request that closes a web tab.
+ *
+ * The request names the target the tab is bound to, not a session: the tab
+ * knows the page it holds, and the runtime closes the page that tab holds.
+ */
+export const closeBrowserWebTabOperation: WebuiOperation<Record<string, unknown>> = {
+  name: CLOSE_BROWSER_WEB_TAB_OPERATION_NAME,
+  validate: (body) => validateWebTabTarget(CLOSE_BROWSER_WEB_TAB_OPERATION_NAME, body),
 };
 
 const AUTHORIZATION_SWITCHES = [
@@ -390,6 +402,38 @@ function validateWebTabUrl(
     return invalidBody(`${operation} body requires a url`);
   }
   return validateRunId(operation, result.body);
+}
+
+/**
+ * The request that closes a web tab.
+ *
+ * The request names the target the tab is bound to. The generation is not
+ * required to be current: a tab whose page was replaced is still a tab the
+ * person can close, and the page it holds is the one the close reaches.
+ */
+function validateWebTabTarget(
+  operation: string,
+  body: unknown,
+): WebuiOperationValidation<Record<string, unknown>> {
+  const result = requireRecord(operation, body);
+  if (!result.ok) return result;
+  const target = result.body.target;
+  if (!isRecord(target)) {
+    return invalidBody(`${operation} body requires a target`);
+  }
+  if (
+    typeof target.surface !== "string" ||
+    !WEBUI_BROWSER_SURFACES.includes(target.surface as WebuiBrowserSurface) ||
+    typeof target.browserId !== "string" ||
+    target.browserId.length === 0 ||
+    typeof target.targetId !== "string" ||
+    target.targetId.length === 0 ||
+    typeof target.generation !== "number" ||
+    !Number.isInteger(target.generation)
+  ) {
+    return invalidBody(`${operation} body requires a complete target identity`);
+  }
+  return { ok: true, body: result.body };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

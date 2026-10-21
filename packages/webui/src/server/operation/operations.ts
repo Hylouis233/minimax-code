@@ -172,6 +172,7 @@ export function createOperationRegistry(
     // operation name, one port member, and one place the surface's switch is
     // read.
     registerOperation(registry, entry("openBrowserWebTab"));
+    registerOperation(registry, entry("closeBrowserWebTab"));
     registerOperation(registry, entry("listBrowserCapabilities"));
     // Registered with the rest of the browser operations, and answering
     // `not_provisioned` when the composition root wired no bridge — the same

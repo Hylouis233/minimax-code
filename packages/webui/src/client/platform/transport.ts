@@ -132,6 +132,7 @@ import {
   SEND_BROWSER_COMMAND_OPERATION_NAME,
   WATCH_BROWSER_FRAMES_OPERATION_NAME,
   WATCH_BROWSER_WEB_TABS_OPERATION_NAME,
+  CLOSE_BROWSER_WEB_TAB_OPERATION_NAME,
   OPEN_BROWSER_WEB_TAB_OPERATION_NAME,
   LIST_BROWSER_CAPABILITIES_OPERATION_NAME,
   GET_BROWSER_INSTALLATION_KEY_OPERATION_NAME,
@@ -257,6 +258,7 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
     watchBrowserWebTabs: (body, onSnapshot) =>
       watchBrowserWebTabs(WATCH_BROWSER_WEB_TABS_OPERATION_NAME, body, onSnapshot),
     openBrowserWebTab: (body) => request(OPEN_BROWSER_WEB_TAB_OPERATION_NAME, body),
+    closeBrowserWebTab: (body) => request(CLOSE_BROWSER_WEB_TAB_OPERATION_NAME, body),
     listBrowserCapabilities: () => request(LIST_BROWSER_CAPABILITIES_OPERATION_NAME, {}),
     getBrowserInstallationKey: (body) =>
       request(GET_BROWSER_INSTALLATION_KEY_OPERATION_NAME, body),
