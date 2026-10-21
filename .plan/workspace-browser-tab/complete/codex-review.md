@@ -9,6 +9,77 @@ five, and the WebUI gate found a sixth. All six are fixed; the commit that
 fixes them is `456f814c`, and the acceptance record and the capability matrix
 were corrected with them.
 
+## The invocation
+
+The review is not only attested by the commit that fixed its findings. It was run like this:
+
+| | |
+| --- | --- |
+| Started through | **paseo** (`mcp__paseo__create_agent`) |
+| Agent | `40b1e2eb-b15d-4eb9-9bde-9f3137523157` |
+| Workspace | `wks_ed83bdde5de1ebe1` |
+| Provider and model | `codex` / `gpt-6-luna` |
+| Thinking option | `high` |
+| Mode | `auto` — Codex's default permissions |
+| Codex session | `01a15f26-28d2-7271-9feb-20a0c79a0746` |
+| Codex CLI | 0.162.0 |
+| Directory | the branch's own worktree, `/home/fectivnfy/my_data/project/my_project/minimax-code-workspace-browser-tab` |
+| Started / finished | 2026-10-21T15:48:18Z / 2026-10-21T15:57:47Z |
+| Tokens | 176654 in (171904 cached), 3847 out |
+
+The session's own transcript is on this machine at
+`~/.codex/sessions/2026/10/21/rollout-2026-10-21T23-48-18-01a15f26-28d2-7271-9feb-20a0c79a0746.jsonl`.
+It is not part of the published source — it is a session log — but it is the
+record of what was asked and what came back. The prompt was this, verbatim:
+
+```text
+You are reviewing a completed feature programme in the MiniMax Code monorepo. **This is a read-only review: report findings, do not edit any file, do not commit anything, do not run the full test gate.** Read the code and reason about it; running a single focused test file is fine if it helps you confirm a finding.
+
+## What to review
+
+The branch `feat/workspace-browser-tab` in this repository, against its base `origin/webui`. Get the diff with:
+
+    git log --oneline origin/webui..feat/workspace-browser-tab
+    git diff origin/webui...feat/workspace-browser-tab
+
+The programme is "the workspace panel is a browser tab strip" (ADR 0022). It turns the WebUI's right-hand workspace panel into a browser: a strip of tabs, where a tab is a stable slot whose content can be replaced in place, and a web tab holds a page of the isolated Chromium.
+
+The plan and the issue board are in the repository and are the contract:
+
+- `.plan/workspace-browser-tab/workspace-browser-tab-plan.md` — the plan
+- `.plan/workspace-browser-tab/board/spec.md` — the specification
+- `.plan/workspace-browser-tab/board/t01.md` … `t13.md` — one ticket per issue, each with its acceptance criteria
+- `.plan/workspace-browser-tab/board/HANDOFF.md` — the state of the work
+- `packages/webui/docs/adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md` — the decision record
+- `packages/webui/docs/browser-use/01-capability-matrix.md` — the capability matrix, written from measurements
+
+Thirteen issues were implemented, one commit each, in the order the board's dependency graph allows. Read the diff and judge the **result**, not the process.
+
+## What I want you to look for
+
+1. **Correctness bugs.** Especially: the generation fence (a page's generation advances when the page behind it is replaced — a reference recorded before that must be refused, on *every* page); the routing of a screencast frame to the page it belongs to (by the envelope's `event.sessionId`, never by `event.params.sessionId`); races between a page's first load and the answer that opened it; anything that can leave a page, a target or a selection behind.
+2. **The two cells.** The **run's selection** (the runtime's cell — the page the Agent acts on) and **the tab the person is looking at** (the client's cell) must stay separate, with one writer each, and exactly one documented bootstrap (a person who opens a web tab while the run has *no* selection gives the run that page; a person who opens one while the run *has* a selection must not move it). Look for any path where one cell writes the other.
+3. **Layering and ownership.** The workspace business and the browser business must not reach into each other's private modules; the runtime owns the run's selection and the client owns the person's tab. `node scripts/check-webui-dependency.mjs` passes, but a rule the gate cannot see is still a rule.
+4. **Tests that do not prove what they claim.** A test that would pass with the behaviour broken, a mock where a real browser is required, an assertion that is weaker than the acceptance criterion it stands for.
+5. **The documentation's honesty.** A rule described as `implemented` without the code behind it; a claim of a measurement the record does not support; a stale statement left behind by the change.
+6. **Anything the change broke that the programme did not notice** — a capability removed by accident, an error code that changed meaning, a wire shape that other callers still use.
+
+## What I want back
+
+A findings report, in this shape:
+
+- **Findings** — each with a severity (BLOCKER / MAJOR / MINOR), the `file:line`, what is wrong, and **what the consequence is** (a wrong picture on screen, an action aimed at the wrong page, a page left running, a claim that is not true). A finding with no consequence is a preference, not a finding — put it under "Observations" instead.
+- **Observations** — things worth knowing that are not defects.
+- **What is sound** — the parts you checked and believe are right, and why. I need to know what you actually verified, not what you skimmed.
+
+Rank the findings by severity and be specific. If you find nothing in a category, say so explicitly rather than inventing something. If you are not sure whether something is a defect, say what would settle it.
+
+Do not edit files. Report only.
+```
+
+The reviewer answered with five findings, in the shape the prompt asked for, and its report is quoted
+in the findings table below.
+
 ## What the reviewer was asked for
 
 1. **Correctness bugs** — the generation fence on every page; the routing of a
