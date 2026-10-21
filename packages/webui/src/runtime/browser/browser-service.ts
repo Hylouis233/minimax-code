@@ -1042,6 +1042,69 @@ export class WebuiBrowserService {
    * page it acted on; it is the registry's current view of that target, not a
    * second identity the service keeps.
    */
+  /**
+   * Opens a page for a run and makes it the run's selection.
+   *
+   * This is the bootstrap. `open_tab` is the one action a run with no
+   * selection may perform, because it is the action that would create the
+   * selection the gate wants. Every other action of a run with no selection is
+   * still refused with `browser_target_unknown`: a run that has selected
+   * nothing is refused rather than handed a page nobody chose, and only the
+   * action that creates a selection is allowed to create one.
+   *
+   * The surface is a fact rather than a choice the run made. A run with a
+   * selection keeps the surface it selected on; a run without one opens a
+   * page in the isolated Chromium, because the embedded panel is the isolated
+   * browser's view and the external browsers are driven in the person's own
+   * windows.
+   */
+  async openWebTab(
+    runId: string,
+    params: Record<string, unknown> = {},
+    signal?: AbortSignal,
+  ): Promise<{
+    readonly accepted: true;
+    readonly target: WebuiBrowserTargetId;
+    readonly result?: unknown;
+  }> {
+    const surface = this.selectionSurfaceOf(runId) ?? "isolated-chromium";
+    // The switch comes first: a surface that is switched off is refused
+    // before anything is attempted, so the refusal names the switch rather
+    // than the selection.
+    await this.#authorizeCommand(surface, "open_tab");
+    const provider = await this.#commandProvider(surface);
+    if (!provider.openTab) {
+      throw browserOperationError(
+        "browser_capability_denied",
+        `Browser surface "${surface}" cannot open a tab.`,
+      );
+    }
+    const identity = (await awaitAbortableCommand(
+      provider.openTab(params),
+      signal,
+    )) as WebuiBrowserTargetId;
+    // The new page is known to the registry, and it is the session's web tab.
+    this.#registry.observe({
+      surface: identity.surface,
+      browserId: identity.browserId,
+      targetId: identity.targetId,
+      title: "",
+      url: "",
+      status: "open",
+      generation: identity.generation,
+    });
+    this.#recordWebTab(surface, runId, identity);
+    // The Agent's tab is the run's selection: the run acts on the page it
+    // opened, and a second `open_tab` moves it to the second page without
+    // losing the first.
+    this.#runSelections(surface).set(runId, {
+      target: identity,
+      order: (this.#selectionOrder += 1),
+    });
+    this.#publishWebTabs(surface, runId);
+    return { accepted: true, target: identity, result: identity };
+  }
+
   async sendCommandToSelection(
     surface: WebuiBrowserSurface,
     runId: string,

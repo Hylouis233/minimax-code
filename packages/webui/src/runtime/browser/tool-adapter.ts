@@ -64,6 +64,22 @@ export interface WebuiBrowserToolCommandSurface {
    * adapter's cue to refuse rather than to choose a browser.
    */
   selectionSurfaceOf(runId: string): WebuiBrowserSurface | undefined;
+  /**
+   * Opens a page for a run and makes it the run's selection.
+   *
+   * The bootstrap: `open_tab` is the one action a run with no selection may
+   * perform, because it is the action that would create the selection the
+   * gate wants.
+   */
+  openWebTab(
+    runId: string,
+    params?: Record<string, unknown>,
+    signal?: AbortSignal,
+  ): Promise<{
+    readonly accepted: true;
+    readonly target: WebuiBrowserTargetId;
+    readonly result?: unknown;
+  }>;
   sendCommandToSelection(
     surface: WebuiBrowserSurface,
     runId: string,
@@ -159,6 +175,15 @@ export function createWebuiBrowserToolAdapter(
       // selection: two runs driving one surface act on the target each of them
       // selected, never on each other's.
       const runId = ctx.sessionId;
+      if (action === "open_tab") {
+        // `open_tab` is the bootstrap, and it is the only exception to the
+        // gate below. It is the action that would create the selection the
+        // gate wants, so it is the one action a run with no selection may
+        // perform — and it moves the run's selection to the page it opened.
+        // Every other action of a run with no selection is still refused.
+        const { result } = await options.browser.openWebTab(runId, input, signal);
+        return result;
+      }
       const surface = options.browser.selectionSurfaceOf(runId);
       if (!surface) {
         // There is no surface to act on that the run chose, and no honest

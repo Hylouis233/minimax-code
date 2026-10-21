@@ -37,15 +37,11 @@ class RecordingProvider implements WebuiBrowserSurfaceProvider {
   readonly commands: { command: string; params: Record<string, unknown> }[] = [];
   /** The tabs this browser has, so two runs can hold different selections. */
   readonly tabIds: readonly string[];
+  /** The pages a command opened, in the order they were opened. */
+  readonly openedTabs: string[] = [];
   /** When set, a command is recorded but never answers. */
   neverSettle = false;
   closed = false;
-
-  constructor(surface: WebuiBrowserSurface, tabIds: readonly string[] = ["tab-1"]) {
-    this.surface = surface;
-    this.browserId = surface === "isolated-chromium" ? "browser-1" : `${surface}-browser`;
-    this.tabIds = tabIds;
-  }
 
   async sendCommand(
     _target: unknown,
@@ -57,8 +53,43 @@ class RecordingProvider implements WebuiBrowserSurfaceProvider {
     return { command, params };
   }
 
+  /**
+   * Opens a page and answers with its identity.
+   *
+   * The shape the isolated provider answers with: the surface, the browser,
+   * the target and the generation the provider's own accounting gives it.
+   *
+   * The member is **absent** on a surface that cannot open a page at all, the
+   * way the extension bridge's provider has no such member — the service
+   * refuses with `browser_capability_denied` when it is missing.
+   */
+  openTab?: (params?: Record<string, unknown>) => Promise<WebuiBrowserTargetId>;
+
+  constructor(
+    surface: WebuiBrowserSurface,
+    tabIds: readonly string[] = ["tab-1"],
+    canOpenTab = true,
+  ) {
+    this.surface = surface;
+    this.browserId = surface === "isolated-chromium" ? "browser-1" : `${surface}-browser`;
+    this.tabIds = tabIds;
+    if (canOpenTab) {
+      this.openTab = async (params: Record<string, unknown> = {}) => {
+        this.commands.push({ command: "open_tab", params });
+        const targetId = `tab-${this.tabIds.length + this.openedTabs.length + 1}`;
+        this.openedTabs.push(targetId);
+        return {
+          surface: this.surface,
+          browserId: this.browserId,
+          targetId,
+          generation: 1,
+        };
+      };
+    }
+  }
+
   async listTargets(): Promise<readonly WebuiBrowserTargetState[]> {
-    return this.tabIds.map((targetId) => ({
+    return [...this.tabIds, ...this.openedTabs].map((targetId) => ({
       id: {
         surface: this.surface,
         browserId: this.browserId,
@@ -145,8 +176,10 @@ function createService(
     "isolated-chromium",
     options.isolatedTabs ?? ["tab-1"],
   );
+  // The edge provider never has an `openTab`: the extension drives the
+  // person's own browser through its debugger and cannot open a page in it.
   const edge = options.edgeTabs
-    ? new RecordingProvider("edge", options.edgeTabs)
+    ? new RecordingProvider("edge", options.edgeTabs, false)
     : undefined;
   const state = { authorization };
   const serviceOptions: WebuiBrowserServiceOptions = {
@@ -175,6 +208,15 @@ function createService(
  * testing the refusal path. The surface follows the target, so a run that
  * selected in Edge is set up in Edge.
  */
+/** The target the named run currently has selected, as the list reports it. */
+async function selectedTargetOf(
+  service: WebuiBrowserService,
+  runId?: string,
+): Promise<string | undefined> {
+  const list = await service.listTargets("isolated-chromium", runId);
+  return list.targets.find((target) => target.selected)?.id.targetId;
+}
+
 async function selectRunTarget(
   service: WebuiBrowserService,
   runId: string,
@@ -237,6 +279,10 @@ function recordingCommandSurface(surfaceOf: (runId: string) => WebuiBrowserSurfa
         asked.push(runId);
         return surfaceOf(runId);
       },
+      openWebTab: async (runId, params, signal) => {
+        calls.push({ surface: "isolated-chromium", runId, command: "open_tab", params, signal });
+        return { accepted: true as const, target: SELECTED_TARGET, result: "opened" };
+      },
       sendCommandToSelection: async (surface, runId, command, params, signal) => {
         calls.push({ surface, runId, command, params, signal });
         return { accepted: true as const, target: SELECTED_TARGET, result: "done" };
@@ -246,6 +292,80 @@ function recordingCommandSurface(surfaceOf: (runId: string) => WebuiBrowserSurfa
 }
 
 describe("Agent browser-tool adapter", () => {
+  it("lets a cold run open a tab, and gives the run that page", async () => {
+    const { service, provider } = createService(SURFACE_AUTHORIZED);
+    const adapter = createWebuiBrowserToolAdapter({ browser: service });
+
+    // The run has selected nothing, and `open_tab` is the one action it may
+    // perform: it is the action that would create the selection the gate wants.
+    const result = await adapter.execute(TOOL_CONTEXT, "open_tab", {
+      url: "https://example.test/",
+    });
+
+    expect(provider.commands.map((entry) => entry.command)).toContain("open_tab");
+    // The run's selection is the page it opened, so the run can act on it.
+    expect(await selectedTargetOf(service, "run-a")).toBe("tab-2");
+    expect(result).toMatchObject({ targetId: "tab-2" });
+  });
+
+  it("refuses every other action of a cold run", async () => {
+    const { service, provider } = createService(SURFACE_AUTHORIZED);
+    const adapter = createWebuiBrowserToolAdapter({ browser: service });
+
+    // The refusal reaches no further than it did: the run has selected
+    // nothing, so it is refused rather than handed a page nobody chose.
+    await expect(
+      adapter.execute(TOOL_CONTEXT, "navigate", { url: "https://example.test/" }),
+    ).rejects.toMatchObject({ code: "browser_target_unknown" });
+    expect(provider.commands).toHaveLength(0);
+  });
+
+  it("refuses open_tab on a surface whose switch is off, and opens no page", async () => {
+    const { service, provider } = createService(ALL_OFF);
+    const adapter = createWebuiBrowserToolAdapter({ browser: service });
+
+    await expect(
+      adapter.execute(TOOL_CONTEXT, "open_tab", { url: "https://example.test/" }),
+    ).rejects.toMatchObject({ code: "browser_surface_not_authorized" });
+    expect(provider.commands).toHaveLength(0);
+  });
+
+  it("refuses open_tab on a surface that cannot open a tab", async () => {
+    const { service } = createService(
+      { ...ALL_OFF, edge: true },
+      { edgeTabs: ["tab-edge"] },
+    );
+    const adapter = createWebuiBrowserToolAdapter({ browser: service });
+    // The run works on Edge, and the extension drives that browser through
+    // its debugger — it cannot open a page in it.
+    await service.listTargets("edge", "run-a");
+    await service.selectTarget(EDGE_TARGET, "run-a");
+
+    await expect(
+      adapter.execute(TOOL_CONTEXT, "open_tab", { url: "https://example.test/" }),
+    ).rejects.toMatchObject({ code: "browser_capability_denied" });
+  });
+
+  it("moves the run's selection to a second tab without losing the first", async () => {
+    const { service, provider } = createService(SURFACE_AUTHORIZED);
+    const adapter = createWebuiBrowserToolAdapter({ browser: service });
+
+    await adapter.execute(TOOL_CONTEXT, "open_tab", { url: "https://example.test/one" });
+    expect(await selectedTargetOf(service, "run-a")).toBe("tab-2");
+
+    await adapter.execute(TOOL_CONTEXT, "open_tab", { url: "https://example.test/two" });
+    // The run's selection moved to the second page, and the first page is
+    // still the session's.
+    expect(await selectedTargetOf(service, "run-a")).toBe("tab-3");
+    const list = await service.listTargets("isolated-chromium", "run-a");
+    expect(list.targets.map((entry) => entry.id.targetId)).toEqual([
+      "tab-1",
+      "tab-2",
+      "tab-3",
+    ]);
+    expect(provider.openedTabs).toEqual(["tab-2", "tab-3"]);
+  });
+
   it("declares the restricted command set as its whole capability", () => {
     const { service } = createService(SURFACE_AUTHORIZED);
     const adapter = createWebuiBrowserToolAdapter({ browser: service });

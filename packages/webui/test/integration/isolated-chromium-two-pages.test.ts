@@ -28,6 +28,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { WebuiIsolatedChromiumProvider } from "../../src/runtime/browser/isolated-chromium/provider.js";
 import { WebuiBrowserService } from "../../src/runtime/browser/browser-service.js";
+import { createWebuiBrowserToolAdapter } from "../../src/runtime/browser/tool-adapter.js";
 import type {
   WebuiBrowserAuthorization,
   WebuiBrowserImageFrame,
@@ -420,5 +421,76 @@ describe.skipIf(!available)("the browser service, streaming two pages of one Chr
     // Neither stream received the other page's picture.
     expect(firstFrames.every((frame) => frame.target.targetId === first!.targetId)).toBe(true);
     expect(secondFrames.every((frame) => frame.target.targetId === second.targetId)).toBe(true);
+  });
+});
+
+/**
+ * The Agent's own path, against a real isolated Chromium.
+ *
+ * A cold run has selected nothing, and `open_tab` is the one action it may
+ * perform: it is the action that would create the selection the gate wants.
+ * The page it opens is then the run's page, and the run can drive it.
+ */
+describe.skipIf(!available)("the Agent opening a tab of a real isolated Chromium", () => {
+  let dataDir: string;
+  let service: WebuiBrowserService;
+
+  const authorization: WebuiBrowserAuthorization = {
+    isolatedChromium: true,
+    edge: false,
+    chrome: false,
+    // The raw DevTools method below reads the page back, and the Full CDP
+    // switch is what allows a raw method through.
+    fullCdp: true,
+  };
+
+  beforeAll(async () => {
+    dataDir = await mkdtemp(join(tmpdir(), "webui-agent-opens-tab-"));
+    service = new WebuiBrowserService({
+      authorization: {
+        read: async () => authorization,
+        write: async () => authorization,
+      },
+      dataDir,
+    });
+  }, 60_000);
+
+  afterAll(async () => {
+    await service?.close();
+    if (dataDir) await rm(dataDir, { recursive: true, force: true });
+  });
+
+  it("opens a page the same run can then navigate", async () => {
+    const adapter = createWebuiBrowserToolAdapter({ browser: service });
+    const context = { sessionId: "run-1" } as never;
+
+    // The run has selected nothing, and it is refused everything — except the
+    // action that creates a selection.
+    await expect(
+      adapter.execute(context, "navigate", { url: pageUrl("refused") }),
+    ).rejects.toMatchObject({ code: "browser_target_unknown" });
+
+    const opened = (await adapter.execute(context, "open_tab", {
+      url: pageUrl("agent page"),
+    })) as WebuiBrowserTargetId;
+    expect(opened.targetId).toEqual(expect.any(String));
+
+    // The run's selection is the page it opened, and the run can drive it.
+    const list = await service.listTargets("isolated-chromium", "run-1");
+    expect(list.targets.find((entry) => entry.selected)?.id.targetId).toBe(
+      opened.targetId,
+    );
+
+    await adapter.execute(context, "navigate", { url: pageUrl("driven by the agent") });
+    await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+
+    // The page behind the tab is the one the run navigated.
+    const read = (await service.sendCommandToSelection(
+      "isolated-chromium",
+      "run-1",
+      "Runtime.evaluate",
+      { expression: "document.title", returnByValue: true },
+    )) as { result?: { result?: { value?: string } } };
+    expect(read.result?.result?.value).toBe("driven by the agent");
   });
 });

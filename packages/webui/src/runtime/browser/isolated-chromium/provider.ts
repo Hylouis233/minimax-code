@@ -137,6 +137,18 @@ export interface WebuiBrowserSurfaceProvider {
     command: string,
     params: Record<string, unknown>,
   ): Promise<unknown>;
+  /**
+   * Opens a page and returns its identity.
+   *
+   * `open_tab` is not aimed at a page — it creates one — so it needs no target
+   * to be sent to. That is what makes it the bootstrap: a run with no
+   * selection has no page to aim at, and the page it is about to open does not
+   * exist yet.
+   *
+   * A surface that cannot open a page has no such method, and the service
+   * refuses with `browser_capability_denied`.
+   */
+  openTab?(params: Record<string, unknown>): Promise<WebuiBrowserTargetId>;
   /** Releases everything the provider holds. */
   close(): Promise<void>;
 }
@@ -323,6 +335,35 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
     this.#pages.delete(targetId);
     this.#pagesBySession.delete(page.sessionId);
     if (this.#launchTargetId === targetId) this.#launchTargetId = undefined;
+  }
+
+  /**
+   * Opens a page, attaches to it and registers it.
+   *
+   * The new page is a web tab this provider drives: it is commanded, streamed
+   * and input into like any other page, and it carries its own generation.
+   * The answer names the page that was created — the surface, the browser, the
+   * target and the generation the provider's own accounting gives it — so a
+   * caller can address the page from it alone.
+   */
+  async openTab(params: Record<string, unknown> = {}): Promise<WebuiBrowserTargetId> {
+    const connection = this.#connection;
+    if (!connection) {
+      throw browserOperationError(
+        "browser_provider_unavailable",
+        "The isolated Chromium is not running.",
+        true,
+      );
+    }
+    const url = typeof params.url === "string" ? params.url : "about:blank";
+    const created = await connection.send<{ targetId: string }>("Target.createTarget", { url });
+    const page = await this.#attachPage(created.targetId);
+    return {
+      surface: this.surface,
+      browserId: this.browserId,
+      targetId: page.targetId,
+      generation: page.generation,
+    };
   }
 
   async listTargets(): Promise<readonly WebuiBrowserTargetState[]> {
@@ -591,23 +632,10 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
         return await connection.send("DOM.getDocument", { depth: -1 }, sessionId);
       }
       case "open_tab": {
-        const url = typeof params.url === "string" ? params.url : "about:blank";
-        const created = await connection.send<{ targetId: string }>("Target.createTarget", {
-          url,
-        });
-        // The new page is attached to and registered, so it is a web tab this
-        // provider drives: it is commanded, streamed and input into like any
-        // other page, and it carries its own generation.
-        const page = await this.#attachPage(created.targetId);
         // The answer names the page that was created: the surface, the
         // browser, the target and the generation the provider's own accounting
         // gives it. A caller can address the page from this answer alone.
-        return {
-          surface: this.surface,
-          browserId: this.browserId,
-          targetId: page.targetId,
-          generation: page.generation,
-        } satisfies WebuiBrowserTargetId;
+        return await this.openTab(params);
       }
       default:
         break;
