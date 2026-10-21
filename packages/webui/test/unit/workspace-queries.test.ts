@@ -49,6 +49,30 @@ const summary = (snapshotId: string): WebuiWorkspaceReviewSummary => ({
   totals: { files: 0, additions: 0, deletions: 0 },
 });
 
+describe("the workspace query owner files a read under the key it was given", () => {
+  it("reads again when the content changed, because the key changed with it", async () => {
+    const reads: string[] = [];
+    const queries = webuiWorkspaceQueries({
+      port: {
+        readWorkspaceFile: ({ path }) => {
+          reads.push(path);
+          return Promise.resolve({ type: "text", content: path } as WebuiWorkspaceFileContent);
+        },
+      },
+    });
+
+    // The cache is keyed by what the tab is showing. A tab that changed from
+    // one file to another has a different key, so the new file is read rather
+    // than the old one's result being handed back.
+    queries.files.readFile("file:s1:/w:src/index.ts", "/w", "src/index.ts");
+    await flush();
+    queries.files.readFile("file:s1:/w:README.md", "/w", "README.md");
+    await flush();
+
+    expect(reads).toEqual(["src/index.ts", "README.md"]);
+  });
+});
+
 describe("the workspace query owner discards a superseded response", () => {
   it("keeps the newest file read when an older one answers later", async () => {
     const first = deferred<WebuiWorkspaceFileContent>();

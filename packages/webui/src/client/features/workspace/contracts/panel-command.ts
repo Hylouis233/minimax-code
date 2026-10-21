@@ -5,6 +5,7 @@
 // from the projection that happens to reduce it.
 
 import type { WebuiTurnDiffView } from "../../../../shared/contracts/session.js";
+import type { WebuiBrowserTargetId } from "../../../../shared/contracts/browser.js";
 
 export type WorkspacePanelCommand =
   | { readonly type: "open-file"; readonly sessionId: string; readonly workspaceDir: string; readonly path: string; readonly lineStart?: number; readonly lineEnd?: number }
@@ -18,6 +19,14 @@ export type WorkspacePanelCommand =
   | { readonly type: "open-workspace-review"; readonly sessionId: string; readonly workspaceDir: string; readonly selectedPath?: string }
   | { readonly type: "open-turn-review"; readonly sessionId: string; readonly workspaceDir: string; readonly messageId: string; readonly assistantMessageId?: string; readonly turnId?: string; readonly changeSetId?: string; readonly files: WebuiTurnDiffView["fileChanges"]; readonly selectedPath?: string }
   | { readonly type: "open-primary-view"; readonly kind: "files"; readonly sessionId?: string; readonly workspaceDir?: string }
+  /**
+   * Opens a web tab, or updates the one already bound to that target.
+   *
+   * The command carries the target the tab is bound to. The tab's own id is
+   * the client's and is assigned when the tab is opened, so the same target
+   * always finds the same tab.
+   */
+  | { readonly type: "open-web-tab"; readonly target: WebuiBrowserTargetId; readonly title: string; readonly url: string }
   | { readonly type: "open-tab"; readonly kind: WebuiWorkspaceMenuTabKind; readonly sessionId?: string; readonly workspaceDir?: string }
   | { readonly type: "select-tab"; readonly tabId: string }
   | { readonly type: "select-review-file"; readonly tabId: string; readonly path: string }
@@ -40,4 +49,4 @@ export type WebuiWorkspaceMenuTabKind = Extract<
 /** How an add-menu entry opens its tab. Data, so the component only dispatches it. */
 export type WebuiWorkspaceAddMenuOpen =
   | { readonly type: "open-workspace-review" }
-  | { readonly type: "open-tab"; readonly kind: "files" | "canvas" | "terminal" | "browser" };
+  | { readonly type: "open-tab"; readonly kind: "files" | "canvas" | "terminal" };

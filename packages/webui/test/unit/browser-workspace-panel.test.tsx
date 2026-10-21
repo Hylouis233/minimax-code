@@ -1,20 +1,18 @@
-// The browser tab in the workspace panel's registry.
+// The web tab kind in the workspace panel's registry.
 //
-// The Browser panel is implemented and gated, and the panel that should mount it
-// (`features/workspace/ui/WorkspacePanels.tsx`) cannot: a browser tab's `addMenu`
-// entry carries a `WorkspacePanelCommand`, and the published command's `open-tab`
-// names only `files | canvas | terminal`
-// (`features/workspace/contracts/panel-command.ts:43`). Nothing can open the tab
-// until that union names `browser`, so what is pinned here is the half of the work
-// that is real — the kind is declared, labelled and placed in the menu order — plus
-// the two properties that must survive that change rather than be rewritten by it.
+// The browser tool tab is gone: the panel's tabs are web tabs, and a web tab
+// is opened by typing a URL in the new tab page or by the Agent — not by an
+// entry in the add menu. What is pinned here is the kind, its label, the fact
+// that it has no menu entry of its own, and the property that must survive
+// that change rather than be rewritten by it: the menu is the registry's rows
+// that have an entry, so the menu never becomes a second list.
 //
-// The second group is the reason the panel is not mounted yet, stated as a test
-// because it is the rule that would otherwise be rediscovered by running the
-// dependency gate: the workspace panel is presentation, so it may read the browser
-// business's contracts and its `.public` components, and nothing else. The browser
-// state machine lives in that business's private projection, so the panel cannot
-// drive it from here — the owner has to be published by the business that owns it.
+// The second group is stated as a test because it is the rule that would
+// otherwise be rediscovered by running the dependency gate: the workspace
+// panel is presentation, so it may read the browser business's contracts and
+// its `.public` components, and nothing else. The browser state machine lives
+// in that business's private projection, so the panel cannot drive it from
+// here — the owner has to be published by the business that owns it.
 
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
@@ -32,22 +30,33 @@ const PANEL_SOURCE = new URL(
   import.meta.url,
 );
 
-describe("the browser tab kind", () => {
-  it("is a declared kind with its own word", () => {
-    expect(WEBUI_WORKSPACE_TAB_KINDS.browser.label).toBe("浏览器");
-    // Built the way `open-tab` builds one: no path, no workspace directory, and
-    // the optional instance fields the add menu sends with every such command.
-    const tab: WorkspacePanelTab = { id: "browser:::", kind: "browser" };
-    expect(webuiWorkspaceTabLabel(tab)).toBe("浏览器");
+describe("the web tab kind", () => {
+  it("is a declared kind, and a web tab is titled by its page", () => {
+    expect(WEBUI_WORKSPACE_TAB_KINDS.web).toBeDefined();
+    const tab: WorkspacePanelTab = {
+      id: "tab-1",
+      content: {
+        kind: "web",
+        target: {
+          surface: "isolated-chromium",
+          browserId: "browser-1",
+          targetId: "tab-9",
+          generation: 1,
+        },
+        title: "Example",
+        url: "https://example.test/",
+      },
+    };
+    expect(webuiWorkspaceTabLabel(tab)).toBe("Example");
   });
 
-  it("leads the file views in the add-menu order", () => {
-    const order = WEBUI_WORKSPACE_ADD_MENU_ORDER;
-    expect(order.indexOf("browser")).toBeGreaterThan(order.indexOf("terminal"));
-    expect(order.indexOf("browser")).toBeLessThan(order.indexOf("files"));
-    // Every kind is named once, and every name is a declared kind.
-    expect(new Set(order).size).toBe(order.length);
-    for (const kind of order) expect(WEBUI_WORKSPACE_TAB_KINDS[kind]).toBeDefined();
+  it("has no add-menu entry of its own", () => {
+    // A web tab is opened by typing a URL or by the Agent, so the add menu
+    // does not offer it — and the browser tool tab it replaced is gone.
+    expect(WEBUI_WORKSPACE_TAB_KINDS.web.addMenu).toBeNull();
+    expect(WEBUI_WORKSPACE_ADD_MENU_ORDER).not.toContain("web");
+    expect(WEBUI_WORKSPACE_TAB_KINDS).not.toHaveProperty("browser");
+    expect(webuiWorkspaceAddMenu().some((entry) => entry.kind === "web")).toBe(false);
   });
 
   it("reaches the menu through the registry rather than a second list", () => {
@@ -74,5 +83,12 @@ describe("the workspace panel reaches the browser business only through its publ
     expect(source).not.toContain("browser/projection/");
     expect(source).not.toContain("browser/application/");
     expect(source).not.toContain("application/port-slices");
+  });
+
+  it("mounts no browser tool tab", () => {
+    // The browser tool tab is gone with the browser kind: the panel's tabs are
+    // web tabs now, and the strip renders them from the runtime's snapshot.
+    const source = readFileSync(PANEL_SOURCE, "utf8");
+    expect(source).not.toContain("BrowserPanelHost");
   });
 });
