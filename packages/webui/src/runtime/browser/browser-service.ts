@@ -909,6 +909,60 @@ export class WebuiBrowserService {
   }
 
   /**
+   * Releases a session's pages.
+   *
+   * A session's pages are released when the session ends — deleted, archived,
+   * or transferred away. The release closes the page, drops the target from
+   * the registry, and takes the run's selection with it: a page in the
+   * isolated Chromium is a live process with a live target, and a target the
+   * registry still offers is a target a command could still be aimed at.
+   *
+   * The release is keyed on the **session**, not on the operation that ended
+   * it, so a session that goes away in any of the three ways leaves the same
+   * nothing behind.
+   */
+  async releaseSession(sessionId: string): Promise<void> {
+    for (const [surface, runs] of [...this.#webTabs]) {
+      const tabs = runs.get(sessionId);
+      if (!tabs) continue;
+      for (const target of [...tabs.values()]) {
+        await this.#releaseTarget(surface, target);
+      }
+      runs.delete(sessionId);
+    }
+    // The run's selection goes with the session: a selection that names a page
+    // of a session that no longer exists is a selection nothing can act on.
+    for (const selections of this.#selected.values()) {
+      selections.delete(sessionId);
+    }
+  }
+
+  /** Closes one page and forgets its target. */
+  async #releaseTarget(
+    surface: WebuiBrowserSurface,
+    target: WebuiBrowserTargetId,
+  ): Promise<void> {
+    const provider = this.#providers.get(surface);
+    // The stream stops first: a screencast left running for a page that is
+    // gone is a resource the browser holds for nobody.
+    await provider?.stopImageStream(target.targetId).catch(() => undefined);
+    if (provider) {
+      try {
+        await provider.sendCommand(target, "Target.closeTarget", {
+          targetId: target.targetId,
+        });
+      } catch {
+        // A page that is already gone needs no closing.
+      }
+    }
+    this.#registry.forget({
+      surface: target.surface,
+      browserId: target.browserId,
+      targetId: target.targetId,
+    });
+  }
+
+  /**
    * How many frames this service has dropped on a surface.
    *
    * A frame that names another page is dropped rather than put on screen, and

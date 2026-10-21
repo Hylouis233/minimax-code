@@ -25,8 +25,27 @@ import { createAccountAdapter } from "./account.js";
 import { runWebuiCommand } from "../commands/runner.js";
 import { importWebuiSessionTransfer } from "../session-transfer.js";
 
+/**
+ * What the harness port needs beyond the host.
+ *
+ * The session-ended hook is the edge a session's end needs: the runtime has
+ * no per-session lifecycle signal, and the composition root is the only place
+ * that holds both the harness port and the browser service, so it is the
+ * place that can wire the two together.
+ */
+export interface CreateHarnessPortOptions {
+  /**
+   * Called when a session has ended — deleted, archived, or transferred away.
+   *
+   * The composition root hands this to the browser service, so a session that
+   * ends leaves no page behind in the isolated Chromium.
+   */
+  readonly onSessionEnded?: (sessionId: string) => void | Promise<void>;
+}
+
 export function createHarnessPortFromHost(
   handle: WebuiRuntimeHostHandle,
+  options: CreateHarnessPortOptions = {},
 ): WebuiHarnessPort {
   const host = handle;
   // Filled in below, once the port exists: the manifest is a fact about what was
@@ -45,7 +64,7 @@ export function createHarnessPortFromHost(
     async invalidateAuth() {
       host.invalidateAuth?.();
     },
-    ...createSessionsAdapter(host),
+    ...createSessionsAdapter(host, options),
     ...createExecutionAdapter(host),
     ...createInteractionsAdapter(host),
     ...createWorkspaceAdapter(host),

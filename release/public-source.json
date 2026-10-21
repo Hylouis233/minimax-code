@@ -4248,6 +4248,7 @@
     "packages/webui/test/unit/browser-panel-state.test.ts",
     "packages/webui/test/unit/browser-panel-view.test.tsx",
     "packages/webui/test/unit/browser-service.test.ts",
+    "packages/webui/test/unit/browser-session-release.test.ts",
     "packages/webui/test/unit/browser-settings-page.test.tsx",
     "packages/webui/test/unit/browser-target-registry.test.ts",
     "packages/webui/test/unit/browser-tool-adapter.test.ts",

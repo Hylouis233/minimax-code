@@ -76,7 +76,13 @@ if (!process.env.WEBUI_SERVER_TSX) {
     browserToolExposure: "compact",
   });
   browser.attachHost(assembled.host);
-  const port = createHarnessPortFromHost(assembled.host);
+  // A session's pages are released when the session ends -- deleted, archived
+// or transferred away. The runtime has no per-session lifecycle signal, and
+// this is the only place that holds both the harness port and the browser
+// service, so the release is wired here rather than on one operation.
+const port = createHarnessPortFromHost(assembled.host, {
+  onSessionEnded: (sessionId) => browser.releaseSession(sessionId),
+});
   // The registry and the terminal port are assembled here, by the host, and the
   // network service binds what it was handed (T14). The manager itself belongs to
   // this service's resource scope — one per service, not a host-wide singleton

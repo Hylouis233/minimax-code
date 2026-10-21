@@ -72,7 +72,13 @@ const assembled = await createWebuiRuntimeHost({
   browserToolExposure: "compact",
 });
 browser.attachHost(assembled.host);
-const port = createHarnessPortFromHost(assembled.host);
+// A session's pages are released when the session ends -- deleted, archived
+// or transferred away. The runtime has no per-session lifecycle signal, and
+// this is the only place that holds both the harness port and the browser
+// service, so the release is wired here rather than on one operation.
+const port = createHarnessPortFromHost(assembled.host, {
+  onSessionEnded: (sessionId) => browser.releaseSession(sessionId),
+});
 const terminal = new WebuiTerminalManager();
 // The browser port is absent when the host cannot answer the browser
 // authorization at all, and the browser operations then stay unregistered.

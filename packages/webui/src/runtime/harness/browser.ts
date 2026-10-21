@@ -134,8 +134,19 @@ export interface WebuiBrowserAdapterBinding {
    * not know which switches are on.
    */
   initialize(): Promise<void>;
-  /** Releases every provider the browser service started. */
+  /**
+   * Releases every provider the browser service started.
+   */
   close(): Promise<void>;
+  /**
+   * Releases one session's pages.
+   *
+   * A session's pages are released when the session ends — deleted, archived
+   * or transferred away. The composition root wires this to the port's
+   * session-ending operations, so the release is keyed on the session rather
+   * than on whichever operation happened to end it.
+   */
+  releaseSession(sessionId: string): Promise<void>;
 }
 
 /** What the adapter needs before it has a host. */
@@ -201,6 +212,7 @@ export function createBrowserAdapter(
     },
     initialize: () => service.initialize(),
     close: () => service.close(),
+    releaseSession: (sessionId: string) => service.releaseSession(sessionId),
   };
 }
 
