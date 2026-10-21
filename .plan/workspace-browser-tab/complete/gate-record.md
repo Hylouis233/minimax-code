@@ -66,6 +66,23 @@ The two intermittent failures were the *same* two defects, seen from different a
 a test failing, the second was a file failing with nothing failing in it. Both are fixed, and the
 unit suite was run four times afterwards without either recurring.
 
+## What the repository's CI says, and what it does not
+
+The fork's CI runs the repository's whole `verify` profile, which is wider than §7. Its history on this
+branch and on the base branch:
+
+| Tip | What failed |
+| --- | --- |
+| `83d8052a` (the first push) | `test:webui` on ubuntu — the suite's file failing with every test in it passing: the `ENOTEMPTY` cleanup race, fixed in `782c137b` |
+| `5d154673` | `test:capabilities` on macos-latest, in `packages/local-runtime-v2/test/unit/agent/storage/agent.repository.test.ts` |
+| `a63a6c99` — **the base branch's own tip**, before this programme | the same two jobs, `verify (macos-latest)` and `verify (ubuntu-latest)` |
+
+So the `test:capabilities` failure is **pre-existing on the base branch**, in a package this slice
+does not touch: `packages/local-runtime-v2`. The plan's §7 says the repository-level gates cover
+ground this change does not move, and that is exactly what the history shows. The webui gates — the
+ones §7 names and §9 requires — are green at the tip that carries this record, and the run at
+`83d8052a` that the CI caught was the cleanup race, which is fixed.
+
 ## What the real-browser acceptance rests on
 
 The fourteen acceptance cases in
