@@ -39,6 +39,8 @@ class RecordingProvider implements WebuiBrowserSurfaceProvider {
   >();
   /** The tabs this browser has, in listing order. */
   readonly tabIds: readonly string[];
+  /** The tabs a command opened, in the order they were opened. */
+  readonly openedTabs: string[] = [];
   /** One frame handler per open stream, keyed by the tab it watches. */
   readonly frameHandlers = new Map<string, (frame: WebuiBrowserImageFrame) => void>();
   /** The most recently opened stream's handler. */
@@ -69,12 +71,24 @@ class RecordingProvider implements WebuiBrowserSurfaceProvider {
     _target: unknown,
     command: string,
     params: Record<string, unknown>,
-  ): Promise<void> {
+  ): Promise<unknown> {
     this.commands.push({ command, params });
+    if (command !== "open_tab") return undefined;
+    // A command that opened a page answers with that page's identity, the way
+    // the isolated provider answers: the surface, the browser, the target and
+    // the generation the provider's own accounting gives it.
+    const targetId = `tab-${this.tabIds.length + this.openedTabs.length + 1}`;
+    this.openedTabs.push(targetId);
+    return {
+      surface: this.surface,
+      browserId: this.browserId,
+      targetId,
+      generation: 1,
+    } satisfies WebuiBrowserTargetId;
   }
 
   async listTargets(): Promise<readonly WebuiBrowserTargetState[]> {
-    return this.tabIds.map((targetId) => ({
+    return [...this.tabIds, ...this.openedTabs].map((targetId) => ({
       id: {
         surface: this.surface,
         browserId: this.browserId,
@@ -470,6 +484,71 @@ describe("browser service", () => {
       service.sendCommand("isolated-chromium", "reload"),
     ).rejects.toMatchObject({ code: "browser_surface_not_authorized" });
     expect(provider.commands).toHaveLength(0);
+    await service.close();
+  });
+
+  it("answers a command that opened a page with that page's identity", async () => {
+    const { service, provider } = createService({
+      ...ALL_OFF,
+      isolatedChromium: true,
+    });
+    await service.listTargets("isolated-chromium");
+    await service.selectTarget(tab("tab-1"));
+
+    const opened = await service.sendCommand("isolated-chromium", "open_tab", {
+      url: "https://example.test/",
+    });
+
+    // The answer names the page that was created: the surface, the browser,
+    // the target and the generation.
+    expect(opened.result).toEqual({
+      surface: "isolated-chromium",
+      browserId: "browser-1",
+      targetId: "tab-2",
+      generation: 1,
+    });
+    await service.close();
+  });
+
+  it("knows a page that open_tab opened from the identity alone", async () => {
+    const { service, provider } = createService({
+      ...ALL_OFF,
+      isolatedChromium: true,
+    });
+    await service.listTargets("isolated-chromium");
+    await service.selectTarget(tab("tab-1"));
+
+    const opened = await service.sendCommand("isolated-chromium", "open_tab", {
+      url: "https://example.test/",
+    });
+    const identity = opened.result as WebuiBrowserTargetId;
+
+    // The service learned about the page from the answer, so the identity is
+    // usable at once — it does not have to wait for the provider to be asked
+    // for its list again.
+    await service.selectTarget(identity);
+    expect(await selectedTargetOf(service)).toBe("tab-2");
+
+    await service.sendInput({ kind: "text", target: identity, text: "hello" });
+    expect(provider.inputs).toHaveLength(1);
+    expect(provider.inputs[0]?.target.targetId).toBe("tab-2");
+    await service.close();
+  });
+
+  it("leaves the registry alone for a command that opened no page", async () => {
+    const { service, provider } = createService({
+      ...ALL_OFF,
+      isolatedChromium: true,
+    });
+    await service.listTargets("isolated-chromium");
+    await service.selectTarget(tab("tab-1"));
+
+    // A command whose answer is not an identity must not be turned into one.
+    await service.sendCommand("isolated-chromium", "reload");
+    await expect(service.selectTarget(tab("tab-9"))).rejects.toMatchObject({
+      code: "browser_target_unknown",
+    });
+    expect(provider.openedTabs).toHaveLength(0);
     await service.close();
   });
 

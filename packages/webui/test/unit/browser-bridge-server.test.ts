@@ -262,6 +262,38 @@ describe("WebUI browser bridge — the providers it lends to the browser service
     client.socket.terminate();
   });
 
+  it("refuses to open a tab, because the extension drives the browser through its debugger", async () => {
+    const harness = await startHarness();
+    const client = await pairEdge(harness);
+    const provider = harness.bridge.createProvider("edge");
+    expect(provider).toBeDefined();
+    announceTarget(client, 4);
+    await settle();
+
+    // The extension drives the person's own browser through `chrome.debugger`,
+    // which cannot open a page in it. The extension refuses the method
+    // because it is outside its supported subset, and the refusal reaches the
+    // caller as `browser_capability_denied`.
+    const pending = provider!.sendCommand(
+      { targetId: TARGET_ID, generation: 4 },
+      "open_tab",
+      { url: "https://example.com/" },
+    );
+    const request = await client.waitFor<{ commandId: string }>("cdp");
+    client.socket.send(
+      JSON.stringify({
+        kind: "cdp-result",
+        commandId: request.commandId,
+        accepted: false,
+        error: 'the extension does not support the DevTools command "open_tab"',
+        unsupported: true,
+      }),
+    );
+    const outcome = await pending.catch((error: unknown) => error);
+    expect(outcome).toMatchObject({ code: "browser_capability_denied" });
+    client.socket.terminate();
+  });
+
   it("drops an extension frame whose generation the announcement moved past", async () => {
     const harness = await startHarness();
     const client = await pairEdge(harness);

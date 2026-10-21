@@ -231,6 +231,39 @@ describe.skipIf(!available)("the isolated Chromium, one page per web tab", () =>
     expect(await readField(first)).toBe("still works");
   });
 
+  it("answers open_tab with the identity of the page it created", async () => {
+    const launch = await launchTarget();
+
+    const opened = (await provider.sendCommand(launch, "open_tab", {
+      url: pageUrl("opened page"),
+    })) as WebuiBrowserTargetId;
+
+    // The answer names the page that was created: the surface, the browser,
+    // the target and the generation.
+    expect(opened.surface).toBe("isolated-chromium");
+    expect(opened.browserId).toBe(provider.browserId);
+    expect(typeof opened.targetId).toBe("string");
+    expect(typeof opened.generation).toBe("number");
+
+    // The page appears in the provider's target list under that identity.
+    await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+    const listed = (await provider.listTargets()).find(
+      (entry) => entry.id.targetId === opened.targetId,
+    );
+    expect(listed?.id.surface).toBe(opened.surface);
+    expect(listed?.id.browserId).toBe(opened.browserId);
+    expect(listed?.id.targetId).toBe(opened.targetId);
+
+    // The page the answer names is a page that can be driven. The generation
+    // is read from the list rather than from the answer: a page that is still
+    // loading is observed as a replaced page once its first load lands, and
+    // that is the generation the provider holds afterwards.
+    const current = listed!.id;
+    await provider.sendCommand(current, "Page.navigate", { url: pageUrl("driven page") });
+    await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+    expect(await readTitle(current)).toBe("driven page");
+  });
+
   it("delivers a frame to the page that asked for it and to no other", async () => {
     const first = await launchTarget();
     const second = await openPage("streamed page");

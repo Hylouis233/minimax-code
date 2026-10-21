@@ -770,7 +770,9 @@ export class WebuiBrowserService {
         `No browser target is selected for the "${surface}" surface.`,
       );
     }
-    return { accepted: true, result: await provider.sendCommand(target, command, params) };
+    const result = await provider.sendCommand(target, command, params);
+    this.#observeOpenedTarget(command, result);
+    return { accepted: true, result };
   }
 
   /**
@@ -819,14 +821,46 @@ export class WebuiBrowserService {
       );
     }
     const provider = await this.#commandProvider(surface);
+    const result = await awaitAbortableCommand(
+      provider.sendCommand(selected, command, params),
+      signal,
+    );
+    this.#observeOpenedTarget(command, result);
     return {
       accepted: true,
       target: selected,
-      result: await awaitAbortableCommand(
-        provider.sendCommand(selected, command, params),
-        signal,
-      ),
+      result,
     };
+  }
+
+  /**
+   * Observes a page that a command opened.
+   *
+   * A command that opened a page answers with that page's identity, and the
+   * registry learns about the page from the answer alone. The new target is
+   * therefore known before anything asks the provider for its list again, and
+   * with the generation the provider gave it rather than a guess.
+   *
+   * A command that did not open a page — or a provider whose answer is not an
+   * identity — is left alone. The registry is the service's record of what the
+   * browser has, and a command that opened nothing has nothing to add to it.
+   */
+  #observeOpenedTarget(command: string, result: unknown): void {
+    if (command !== "open_tab") return;
+    const identity = readOpenedTargetIdentity(result);
+    if (!identity) return;
+    this.#registry.observe({
+      surface: identity.surface,
+      browserId: identity.browserId,
+      targetId: identity.targetId,
+      // The title and the url are the provider's to report, and it reports
+      // them the next time it is asked. What the answer carries is the
+      // identity, and that is what the registry needs to know a page exists.
+      title: "",
+      url: "",
+      status: "open",
+      generation: identity.generation,
+    });
   }
 
   /**
@@ -961,4 +995,27 @@ async function awaitAbortableCommand(
  */
 export function browserErrorCode(error: unknown): string | undefined {
   return error instanceof WebuiBrowserOperationError ? error.code : undefined;
+}
+
+/**
+ * The identity a command that opened a page answered with.
+ *
+ * The answer is read rather than assumed. A provider that did not open a page
+ * — or a surface that cannot open one at all — answers with something else,
+ * and the service must not invent a target out of it.
+ */
+function readOpenedTargetIdentity(result: unknown): WebuiBrowserTargetId | undefined {
+  if (typeof result !== "object" || result === null) return undefined;
+  const candidate = result as Record<string, unknown>;
+  const { surface, browserId, targetId, generation } = candidate;
+  if (
+    typeof surface !== "string" ||
+    typeof browserId !== "string" ||
+    typeof targetId !== "string" ||
+    typeof generation !== "number" ||
+    !Number.isInteger(generation)
+  ) {
+    return undefined;
+  }
+  return { surface: surface as WebuiBrowserSurface, browserId, targetId, generation };
 }

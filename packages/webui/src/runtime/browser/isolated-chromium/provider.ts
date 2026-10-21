@@ -583,8 +583,16 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
         // The new page is attached to and registered, so it is a web tab this
         // provider drives: it is commanded, streamed and input into like any
         // other page, and it carries its own generation.
-        await this.#attachPage(created.targetId);
-        return created;
+        const page = await this.#attachPage(created.targetId);
+        // The answer names the page that was created: the surface, the
+        // browser, the target and the generation the provider's own accounting
+        // gives it. A caller can address the page from this answer alone.
+        return {
+          surface: this.surface,
+          browserId: this.browserId,
+          targetId: page.targetId,
+          generation: page.generation,
+        } satisfies WebuiBrowserTargetId;
       }
       default:
         break;
