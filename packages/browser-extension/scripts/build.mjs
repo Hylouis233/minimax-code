@@ -21,9 +21,25 @@ import { build } from "esbuild";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
+const run = promisify(execFile);
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const outDir = join(packageRoot, "dist");
+
+/**
+ * The store this build is for, when it is a packaged build.
+ *
+ * `--store chrome` or `--store edge`. A packaged build embeds the store's
+ * public key, which fixes the extension's identity: an unpacked build derives
+ * its id from the directory it is loaded from, and that id is different for
+ * every path and therefore not an identity anyone can rely on.
+ */
+const store = process.argv.includes("--store")
+  ? process.argv[process.argv.indexOf("--store") + 1]
+  : undefined;
 
 /** The browser this targets. The manifest's `minimum_chrome_version` says the same. */
 const BROWSER_TARGET = ["chrome116", "edge116"];
@@ -73,6 +89,19 @@ if (manifest.background?.service_worker) {
 if (manifest.options_ui?.page) {
   manifest.options_ui.page = "options.html";
 }
+if (store) {
+  // The store's public key fixes the identity. It is the same key the store
+  // holds, so the id the extension gets is the id the store issued.
+  const keyEnv = `MAVIS_BROWSER_STORE_${store.toUpperCase()}_PUBLIC_KEY`;
+  const publicKey = process.env[keyEnv];
+  if (!publicKey) {
+    throw new Error(
+      `a packaged build needs the store's public key in ${keyEnv}; ` +
+        "a packaged build without a fixed identity is not a packaged build.",
+    );
+  }
+  manifest.key = publicKey;
+}
 await writeFile(join(outDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 
 // The manifest's icon, if the extension ever has one, is copied verbatim.
@@ -83,3 +112,12 @@ if (manifest.icons) {
 }
 
 process.stdout.write(`Built the extension into ${outDir}\n`);
+
+if (store) {
+  // The store takes a zip of the unpacked directory. The name carries the
+  // store, so the two artifacts cannot be confused for one another.
+  const archive = join(packageRoot, `dist-${store}.zip`);
+  await rm(archive, { force: true });
+  await run("zip", ["-r", "-q", archive, "."], { cwd: outDir });
+  process.stdout.write(`Packaged the ${store} build as ${archive}\n`);
+}

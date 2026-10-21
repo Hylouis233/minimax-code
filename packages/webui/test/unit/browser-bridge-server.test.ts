@@ -462,3 +462,43 @@ describe("WebUI browser bridge — the providers it lends to the browser service
     client.socket.terminate();
   });
 });
+
+describe("the bridge's extension identity", () => {
+  it("a packaged host accepts the store identity and refuses the development one", async () => {
+    // The development allowlist names the ids of unpacked builds. A packaged
+    // host must not accept them: an unpacked build's id is derived from the
+    // directory it was loaded from, so it is not an identity anyone can rely
+    // on.
+    const developmentId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab";
+    const storeId = "cccccccccccccccccccccccccccccccd";
+
+    const packaged = new BrowserBridgeServer({
+      host: "127.0.0.1",
+      dev: true,
+      packaged: true,
+      credentialStore: createInMemorySecureCredentialStore(),
+      env: {
+        MAVIS_BROWSER_CHROME_EXTENSION_IDS: developmentId,
+        MAVIS_BROWSER_STORE_CHROME_EXTENSION_IDS: storeId,
+      },
+    });
+    expect(
+      packaged.pairings.get("chrome")!.admitsExtensionId(developmentId),
+      "a packaged host must not admit a development identity",
+    ).toBe(false);
+    expect(packaged.pairings.get("chrome")!.admitsExtensionId(storeId)).toBe(true);
+    await packaged.close();
+  });
+
+  it("a development host accepts the development identity", async () => {
+    const developmentId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab";
+    const development = new BrowserBridgeServer({
+      host: "127.0.0.1",
+      dev: true,
+      credentialStore: createInMemorySecureCredentialStore(),
+      env: { MAVIS_BROWSER_CHROME_EXTENSION_IDS: developmentId },
+    });
+    expect(development.pairings.get("chrome")!.admitsExtensionId(developmentId)).toBe(true);
+    await development.close();
+  });
+});

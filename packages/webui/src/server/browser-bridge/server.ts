@@ -73,6 +73,20 @@ const EXTENSION_ID_ENV_BY_SURFACE = {
   chrome: "MAVIS_BROWSER_CHROME_EXTENSION_IDS",
 } as const;
 
+/**
+ * The environment variable that lists the **store** extension ids.
+ *
+ * A packaged host reads these and *not* the development ones: a store build
+ * has an identity the store issued, and a development build's id is derived
+ * from the directory it was loaded from. Accepting a development id in a
+ * packaged host would mean accepting whatever happens to be unpacked on the
+ * machine.
+ */
+const STORE_EXTENSION_ID_ENV_BY_SURFACE = {
+  edge: "MAVIS_BROWSER_STORE_EDGE_EXTENSION_IDS",
+  chrome: "MAVIS_BROWSER_STORE_CHROME_EXTENSION_IDS",
+} as const;
+
 /** The provider shape the runtime's browser service consumes. */
 export interface WebuiBridgeSurfaceProvider {
   readonly surface: WebuiBridgeBrowserSurface;
@@ -120,6 +134,14 @@ export interface BrowserBridgeServerOptions {
   readonly maxMessageBytes?: number;
   /** The environment the extension allowlists are read from. */
   readonly env?: Readonly<Record<string, string | undefined>>;
+  /**
+   * Whether this is a packaged host.
+   *
+   * A packaged host accepts only the extension identities the **store**
+   * issued, and never the development ones. The two are different identities:
+   * an unpacked build's id is derived from the directory it was loaded from.
+   */
+  readonly packaged?: boolean;
 }
 
 /**
@@ -187,8 +209,12 @@ export interface BrowserBridgeServerSurfaceStatus {
 export function readAllowedExtensionIds(
   surface: WebuiBridgeBrowserSurface,
   env: Readonly<Record<string, string | undefined>>,
+  options: { readonly packaged?: boolean } = {},
 ): ReadonlySet<string> {
-  const raw = env[EXTENSION_ID_ENV_BY_SURFACE[surface]];
+  const variable = options.packaged
+    ? STORE_EXTENSION_ID_ENV_BY_SURFACE[surface]
+    : EXTENSION_ID_ENV_BY_SURFACE[surface];
+  const raw = env[variable];
   if (!raw) return new Set<string>();
   const ids = raw
     .split(",")
@@ -202,6 +228,8 @@ export class BrowserBridgeServer {
   readonly server: WebSocketServer;
   readonly pairings: ReadonlyMap<WebuiBridgeBrowserSurface, BrowserBridgePairing>;
   readonly registry: BrowserBridgeRegistry;
+  /** Whether this host is a packaged build. See the options. */
+  readonly packaged: boolean;
 
   readonly #host: string;
   readonly #dev: boolean;
@@ -214,6 +242,7 @@ export class BrowserBridgeServer {
 
   constructor(options: BrowserBridgeServerOptions) {
     this.#host = options.host;
+    this.packaged = options.packaged === true;
     this.#dev = options.dev;
     const credentialStore =
       options.credentialStore ??
@@ -221,7 +250,9 @@ export class BrowserBridgeServer {
     const env = options.env ?? process.env;
     const pairings = new Map<WebuiBridgeBrowserSurface, BrowserBridgePairing>();
     for (const surface of WEBUI_BRIDGE_BROWSER_SURFACES) {
-      const allowedExtensionIds = readAllowedExtensionIds(surface, env);
+      const allowedExtensionIds = readAllowedExtensionIds(surface, env, {
+        packaged: this.packaged,
+      });
       this.#allowedIds.set(surface, allowedExtensionIds);
       pairings.set(
         surface,
