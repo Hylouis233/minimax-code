@@ -21,7 +21,7 @@
     "whatItIsNot": "This is not a test. It asserts nothing; it records what it observed. The record is the evidence.",
     "reproduce": "Run the spike from the repository's webui package with tsx, against /usr/bin/google-chrome. The spike script itself is work material and lives outside the published source; the record it writes is committed here."
   },
-  "startedAt": "2026-10-21T12:19:14.662Z",
+  "startedAt": "2026-10-21T12:30:01.796Z",
   "phases": {
     "provider": {
       "description": "The real WebuiIsolatedChromiumProvider class, today.",
@@ -29,8 +29,8 @@
         {
           "id": {
             "surface": "isolated-chromium",
-            "browserId": "isolated-chromium-fc772637",
-            "targetId": "65B598C6A854F92A41E6D84989840EBE",
+            "browserId": "isolated-chromium-wadkjvl8",
+            "targetId": "14E37D8770E0DB344CB98AAD88A06C4C",
             "generation": 1
           },
           "title": "about:blank",
@@ -41,8 +41,8 @@
         {
           "id": {
             "surface": "isolated-chromium",
-            "browserId": "isolated-chromium-fc772637",
-            "targetId": "DC6CA1E893EE5DBDAFFA13B8E2A48388",
+            "browserId": "isolated-chromium-wadkjvl8",
+            "targetId": "AFB89EBB03E3F0272D7C87098E21FC86",
             "generation": 1
           },
           "title": "about:blank",
@@ -52,14 +52,14 @@
         }
       ],
       "openTabResult": {
-        "targetId": "8A66389216F0D4C93DF1100708BFA0B6"
+        "targetId": "AFEDCFF719D084495C93E65A16E9B932"
       },
       "targetsAfterOpenTab": [
         {
           "id": {
             "surface": "isolated-chromium",
-            "browserId": "isolated-chromium-fc772637",
-            "targetId": "65B598C6A854F92A41E6D84989840EBE",
+            "browserId": "isolated-chromium-wadkjvl8",
+            "targetId": "14E37D8770E0DB344CB98AAD88A06C4C",
             "generation": 1
           },
           "title": "about:blank",
@@ -70,8 +70,8 @@
         {
           "id": {
             "surface": "isolated-chromium",
-            "browserId": "isolated-chromium-fc772637",
-            "targetId": "DC6CA1E893EE5DBDAFFA13B8E2A48388",
+            "browserId": "isolated-chromium-wadkjvl8",
+            "targetId": "AFB89EBB03E3F0272D7C87098E21FC86",
             "generation": 1
           },
           "title": "about:blank",
@@ -82,8 +82,8 @@
         {
           "id": {
             "surface": "isolated-chromium",
-            "browserId": "isolated-chromium-fc772637",
-            "targetId": "8A66389216F0D4C93DF1100708BFA0B6",
+            "browserId": "isolated-chromium-wadkjvl8",
+            "targetId": "AFEDCFF719D084495C93E65A16E9B932",
             "generation": 1
           },
           "title": "about:blank",
@@ -98,42 +98,34 @@
       },
       "newPageIdentity": {
         "surface": "isolated-chromium",
-        "browserId": "isolated-chromium-fc772637",
-        "targetId": "8A66389216F0D4C93DF1100708BFA0B6",
+        "browserId": "isolated-chromium-wadkjvl8",
+        "targetId": "AFEDCFF719D084495C93E65A16E9B932",
         "generation": 1
       },
       "newPageIsListedByTheProvider": true,
       "driveNewPageNavigate": {
         "attempted": true,
         "outcome": {
-          "ok": false,
-          "error": {
-            "name": "WebuiBrowserOperationError",
-            "code": "browser_target_unknown",
-            "message": "The isolated Chromium has no such target."
+          "ok": true,
+          "value": {
+            "frameId": "AFEDCFF719D084495C93E65A16E9B932",
+            "loaderId": "197A18319FAFF4ABD19D84BC8F4C3974",
+            "isDownload": false
           }
         }
       },
       "driveNewPageInput": {
         "attempted": true,
         "outcome": {
-          "ok": false,
-          "error": {
-            "name": "WebuiBrowserOperationError",
-            "code": "browser_target_unknown",
-            "message": "The isolated Chromium has no such target."
-          }
+          "ok": true,
+          "value": null
         }
       },
       "streamNewPage": {
         "attempted": true,
         "outcome": {
-          "ok": false,
-          "error": {
-            "name": "WebuiBrowserOperationError",
-            "code": "browser_target_unknown",
-            "message": "The isolated Chromium has no such target."
-          }
+          "ok": true,
+          "value": null
         }
       },
       "generationOfNewPage": 1,
@@ -152,24 +144,24 @@
       "pages": [
         {
           "label": "A",
-          "targetId": "74D93BB4C685C5B31C4DB4A57D464C6D",
-          "sessionId": "A620B87DAD5FB03858BF93CA90AD295D"
+          "targetId": "523F643B0CC0383A2686FE4D40E887D2",
+          "sessionId": "6E4260243A3E33B0B99DE1AB8BA18A2E"
         },
         {
           "label": "B",
-          "targetId": "9F0A5C87C3F8BF6EB8971A9BF5CC28DB",
-          "sessionId": "89944F28584C4F0ED9E21F4FC15893B1"
+          "targetId": "1E783F3D1623A1BFAA511D24FAAEED2D",
+          "sessionId": "60354765619FF6A7B540EC966A496330"
         }
       ],
       "sessionsAreDistinct": true,
       "targetIdsAreDistinct": true,
       "pageEnableSentTo": [
-        "A620B87DAD5FB03858BF93CA90AD295D",
-        "89944F28584C4F0ED9E21F4FC15893B1"
+        "6E4260243A3E33B0B99DE1AB8BA18A2E",
+        "60354765619FF6A7B540EC966A496330"
       ],
       "screencastStartedFor": [
-        "A620B87DAD5FB03858BF93CA90AD295D",
-        "89944F28584C4F0ED9E21F4FC15893B1"
+        "6E4260243A3E33B0B99DE1AB8BA18A2E",
+        "60354765619FF6A7B540EC966A496330"
       ],
       "input": {
         "pageAValue": "alpha",
@@ -180,14 +172,14 @@
         "count": 3,
         "byEnvelopeSession": [
           {
-            "sessionId": "89944F28584C4F0ED9E21F4FC15893B1",
+            "sessionId": "60354765619FF6A7B540EC966A496330",
             "page": "B",
             "count": 3
           }
         ],
         "sample": [
           {
-            "envelopeSessionId": "89944F28584C4F0ED9E21F4FC15893B1",
+            "envelopeSessionId": "60354765619FF6A7B540EC966A496330",
             "envelopeSessionIdType": "string",
             "paramsSessionId": 1,
             "paramsSessionIdType": "number",
@@ -195,7 +187,7 @@
             "dataPrefix": "/9j/4AAQSkZJRgABAQAAAQAB"
           },
           {
-            "envelopeSessionId": "89944F28584C4F0ED9E21F4FC15893B1",
+            "envelopeSessionId": "60354765619FF6A7B540EC966A496330",
             "envelopeSessionIdType": "string",
             "paramsSessionId": 1,
             "paramsSessionIdType": "number",
@@ -203,7 +195,7 @@
             "dataPrefix": "/9j/4AAQSkZJRgABAQAAAQAB"
           },
           {
-            "envelopeSessionId": "89944F28584C4F0ED9E21F4FC15893B1",
+            "envelopeSessionId": "60354765619FF6A7B540EC966A496330",
             "envelopeSessionIdType": "string",
             "paramsSessionId": 1,
             "paramsSessionIdType": "number",
@@ -223,9 +215,9 @@
         },
         "navigationsObserved": [
           {
-            "envelopeSessionId": "89944F28584C4F0ED9E21F4FC15893B1",
+            "envelopeSessionId": "60354765619FF6A7B540EC966A496330",
             "mainFrame": true,
-            "url": "http://127.0.0.1:42671/b2"
+            "url": "http://127.0.0.1:44699/b2"
           }
         ]
       },
@@ -271,19 +263,19 @@
         "count": 4,
         "byEnvelopeSession": [
           {
-            "sessionId": "89944F28584C4F0ED9E21F4FC15893B1",
+            "sessionId": "60354765619FF6A7B540EC966A496330",
             "page": "B",
             "count": 3
           },
           {
-            "sessionId": "A620B87DAD5FB03858BF93CA90AD295D",
+            "sessionId": "6E4260243A3E33B0B99DE1AB8BA18A2E",
             "page": "A",
             "count": 1
           }
         ],
         "sample": [
           {
-            "envelopeSessionId": "89944F28584C4F0ED9E21F4FC15893B1",
+            "envelopeSessionId": "60354765619FF6A7B540EC966A496330",
             "envelopeSessionIdType": "string",
             "paramsSessionId": 1,
             "paramsSessionIdType": "number",
@@ -291,7 +283,7 @@
             "dataPrefix": "/9j/4AAQSkZJRgABAQAAAQAB"
           },
           {
-            "envelopeSessionId": "89944F28584C4F0ED9E21F4FC15893B1",
+            "envelopeSessionId": "60354765619FF6A7B540EC966A496330",
             "envelopeSessionIdType": "string",
             "paramsSessionId": 1,
             "paramsSessionIdType": "number",
@@ -299,7 +291,7 @@
             "dataPrefix": "/9j/4AAQSkZJRgABAQAAAQAB"
           },
           {
-            "envelopeSessionId": "89944F28584C4F0ED9E21F4FC15893B1",
+            "envelopeSessionId": "60354765619FF6A7B540EC966A496330",
             "envelopeSessionIdType": "string",
             "paramsSessionId": 1,
             "paramsSessionIdType": "number",
@@ -307,7 +299,7 @@
             "dataPrefix": "/9j/4AAQSkZJRgABAQAAAQAB"
           },
           {
-            "envelopeSessionId": "A620B87DAD5FB03858BF93CA90AD295D",
+            "envelopeSessionId": "6E4260243A3E33B0B99DE1AB8BA18A2E",
             "envelopeSessionIdType": "string",
             "paramsSessionId": 1,
             "paramsSessionIdType": "number",
@@ -323,8 +315,8 @@
           "1"
         ],
         "envelopeSessionIdValues": [
-          "89944F28584C4F0ED9E21F4FC15893B1",
-          "A620B87DAD5FB03858BF93CA90AD295D"
+          "60354765619FF6A7B540EC966A496330",
+          "6E4260243A3E33B0B99DE1AB8BA18A2E"
         ],
         "conclusion": "the envelope's event.sessionId is the target session and identifies the page; event.params.sessionId is a number that is not the target session and identifies nothing"
       },
@@ -348,5 +340,5 @@
       }
     }
   },
-  "finishedAt": "2026-10-21T12:19:17.348Z"
+  "finishedAt": "2026-10-21T12:30:04.453Z"
 }

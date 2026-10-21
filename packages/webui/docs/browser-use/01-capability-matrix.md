@@ -265,11 +265,11 @@ a pairing credential. See [`04-pairing-credentials.md`](04-pairing-credentials.m
 Read this section before citing the matrix. Each line is a gap in the evidence, not a known limitation
 of the product.
 
-- **The isolated surface drives exactly one page.** The provider refuses every target that is not the
-  page it launched, so `open_tab` creates a page that nothing can address. **What the browser itself can
-  do with two pages is now `measured`** — see [the workspace browser tab model](#the-workspace-browser-tab-model)
-  and `.plan/workspace-browser-tab/complete/two-page-spike.json`. The gap that remains is the
-  *repository's* provider, not the browser's capability.
+- **The isolated surface drives one page per web tab now.** The provider resolves a target to the
+  page that carries it, raises the generation per page, and routes a screencast frame by the
+  envelope's session id. **What the browser itself does with two pages was measured** — see
+  [the workspace browser tab model](#the-workspace-browser-tab-model) and
+  `.plan/workspace-browser-tab/complete/two-page-spike.json`.
 - **The isolated surface's CDP matrix was measured on Chromium only.** The probe ran against the
   bundled Chromium, not against Edge, so the isolated surface's cells describe that browser. Edge
   *was* exercised for the **extension** path — see the real-browser acceptance below — but the
@@ -353,6 +353,7 @@ Every cell in this table is `measured`, and the evidence field is named.
 | Two pages of one isolated Chromium, live at the same time | **measured** | `substrate.pages` — two pages, two distinct target ids and two distinct target sessions |
 | Each page is driven independently | **measured** | `substrate.afterNavigation` — page A answers `Page A`, page B answers `Page B2` |
 | Each page is streamed independently | **measured** | `substrate.framesAtTheEnd.byEnvelopeSession` — A: 1 frame, B: 3 frames, from two different target sessions; `substrate.frameIdentityIsSufficient.bothPagesStreamedAtTheSameTime` is `true` |
+| A page that is **not** in front produces no new frames | **measured** | typing into the background page added no frame to its stream; `Page.bringToFront` on that page made it produce one. Chrome renders the foregrounded tab and throttles the others |
 | Each page is input into independently | **measured** | `substrate.input` — page A's field reads `alpha`, page B's reads `bravo`; `independent` is `true` |
 | A navigation on the second page advances **that** page's generation and leaves the first alone | **measured** | `substrate.generation` — A stays `1`, B goes `1` → `2` |
 | A reference recorded against a page's previous generation is refused | **measured** | `substrate.fence.staleReferenceOnNavigatedPage` — refused with `browser_target_stale` |
@@ -372,24 +373,28 @@ that closes it. It is a gap, not a denial.
 
 | Capability | Mark | Where it stands |
 | --- | --- | --- |
-| The provider drives one page per web tab | **not yet measured** | `provider.ts:405`, `:266` and `:317` refuse every target that is not the launch page. #201 |
-| The generation advances per page | **not yet measured** | `provider.ts:251` reports a constant `1` for every other page; `provider.ts:229` sends `Page.enable` to one session only; `provider.ts:532` raises one page's generation. #201 |
-| A frame is routed to the page that asked for it | **not yet measured** | `provider.ts:543` stamps **every** screencast frame with the provider's own target id. #201 |
+| The provider drives one page per web tab | **implemented** | the provider holds a map of target id → session and generation, and resolves the session by target in `sendCommand`, `sendInput`, `startImageStream` and `stopImageStream`. `packages/webui/src/runtime/browser/isolated-chromium/provider.ts` |
+| The generation advances per page | **implemented** | the generation lives on the page, not on the browser. `Page.enable` goes to every page, and the raise is keyed by the event's own session. `provider.ts` — `#attachPage` and `#onEvent` |
+| A frame is routed to the page that asked for it | **implemented** | a screencast frame is matched to its page by the **envelope's** session id, and the subscriber that receives it is that page's own. `provider.ts` — `#onEvent` |
+| A page the provider never attached to is still refused | **implemented** | only the pages the provider attached to are in the map, and a target that is not in the map is refused with `browser_target_unknown` rather than being sent to the wrong page. `provider.ts` — `sendCommand` |
+| The identity `open_tab` returns names the page it created | **not yet measured** | `open_tab` creates the page, attaches to it and registers it, but still returns the browser's own answer rather than the target's identity. #202 |
+| The service observes a new page from the identity `open_tab` returns | **not yet measured** | the service learns about the new page from the provider's target listing, not from the action's answer. #202 |
 | The image stream is keyed by target | **not yet measured** | `browser-service.ts:180` keys the frame subscribers by surface and then by **run**. #204 |
 | The runtime publishes the session's web tabs as a snapshot | **not yet measured** | no such operation exists. #203 |
-| The Agent opens tabs and gives a run its first selection | **not yet measured** | `tool-adapter.ts:163` refuses a run that has selected nothing, so the Agent cannot acquire a selection of its own and `open_tab` is refused with it. #206 |
+| The Agent opens tabs and gives a run its first selection | **not yet measured** | `tool-adapter.ts:163` refuses a run that has selected nothing, so the Agent cannot acquire a selection of its own and `open_tab` is refused with it. The provider's side is done; the tool's side is not. #206 |
 | The client's tab is a stable id with a mutable content | **not yet measured** | `workspace-panel-state.ts:251` derives the id from the kind and its parts, so there is no stable id for a web tab whose page changes under it. #207 |
 | The frame operation's request names a target | **not yet measured** | `operation-names.ts:458` takes `{ surface, runId? }`. #204 |
-| The provider's attachment retry | **implemented** | `provider.ts:588` — the mechanism is cited in full above |
+| The provider's attachment retry | **implemented** | `provider.ts` — the mechanism is cited in full above |
 | The files tab is a singleton | **implemented** | `workspace-panel-state.ts:289` drops every `files` tab before adding one |
 | The two review tabs share one id | **implemented** | `workspace-panel-state.ts:279` and `:283` derive the same `tabId("review", sessionId, workspaceDir)` |
 | A tab's label is derived from its kind | **implemented** | `workspace-panel-state.ts:154` |
-| The provider refuses a second page rather than sending a command to the wrong one | **implemented** | `provider.ts:410` — the comment says why, and the refusal is measured today: `phases.provider.driveNewPageNavigate`, `.driveNewPageInput` and `.streamNewPage` are all `browser_target_unknown` |
 
-**One number worth stating plainly.** The provider's `open_tab` **does** create a page: the page count
-goes from 2 to 3 (`phases.provider.pageCount`) and the new page is listed by `listTargets` with its own
-target id (`phases.provider.newPageIdentity`). What does not exist is any way to *address* it. That is
-the whole gap the programme closes, and it is a gap in this repository, not in the browser.
+**What the provider does today, measured again.** The provider's `open_tab` creates a page, attaches
+to it and registers it, and the page is listed with its own identity
+(`phases.provider.newPageIsListedByTheProvider`). Driving it, inputing into it and streaming it all
+succeed (`phases.provider.driveNewPageNavigate`, `.driveNewPageInput` and `.streamNewPage` are all
+`ok`). The page count still goes from 2 to 3 (`phases.provider.pageCount`) — the third page is the
+one Chrome opened for itself, which the provider has never attached to and therefore still refuses.
 
 ### The fence, on every page
 
@@ -401,9 +406,10 @@ working on a page that is **not** the one the browser was launched with:
 | B (navigated) | its generation advanced `1` → `2`; a reference recorded against generation `1` was offered | refused with `browser_target_stale` |
 | A (untouched) | its generation stayed `1`; a reference recorded against generation `1` was offered | accepted |
 
-A fence that only works on the launch page is a fence that does not work. The repository's fence today
-is the launch page's fence only: `provider.ts:328` compares the command's generation against the one
-generation the provider holds, and there is one of them.
+A fence that only works on the launch page is a fence that does not work. The provider's fence now
+covers every page: the generation it compares against is the page's own, so a reference recorded
+against a page that navigated is refused on that page, and the same reference against a page that
+did **not** navigate is still accepted.
 
 ### The registration cost of the new operation
 
@@ -457,10 +463,10 @@ the thing that changes — which is what #207 does.
 
 ### Not yet measured — the tab model's open questions
 
-- **The two-page case was measured on the substrate, not through the provider.** The provider cannot
-  hold two pages today, so the spike drove the CDP connection directly to find out what the browser
-  can do. The provider's own per-target map is #201, and the same spike re-run against it is what
-  closes this question.
+- **The two-page case was first measured on the substrate and then through the provider.** The
+  provider could not hold two pages when the spike first ran, so the spike drove the CDP connection
+  directly to find out what the browser can do. The provider's per-target map is now implemented and
+  the same spike observes it driving, inputing into and streaming the second page.
 - **The frame mis-stamping count is a modelled consequence, not a provider observation.**
   `substrate.currentProviderFrameRule` applies the provider's current rule to the frames the spike
   observed, because the provider cannot stream a second page at all. It is arithmetic over a
@@ -468,6 +474,10 @@ the thing that changes — which is what #207 does.
 - **Nothing end-to-end has been measured.** The client's tab model, the strip, the new tab page, the
   toolbar and the two selections are not exercised by any suite yet. #208, #209, #210, #211 and #212
   are where that happens.
+- **Only the foregrounded page renders.** Chrome throttles the pages it is not showing, so a tab in
+  the background produces no new frames. A strip shows one tab at a time, so the page in front is the
+  one that produces the picture — but whether a background tab should show a *still* picture, and
+  when it is refreshed, is not decided.
 - **The bridged surfaces have no tab model at all.** Everything measured here is the isolated
   Chromium. The extension bridge exposes one visible tab per browser, so a tab strip over it is a
   different question and was not asked.
