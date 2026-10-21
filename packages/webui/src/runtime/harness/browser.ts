@@ -226,8 +226,8 @@ function createBrowserPort(service: WebuiBrowserService): WebuiBrowserPort {
       command: string,
       params?: Record<string, unknown>,
     ) => service.sendCommandToSelection(surface, runId, command, params ?? {}),
-    watchFrames: (surface: WebuiBrowserSurface, runId?: string, signal?: AbortSignal) =>
-      service.watchFrames(surface, runId, signal),
+    watchFrames: (surface: WebuiBrowserSurface, target: WebuiBrowserTargetId, signal?: AbortSignal) =>
+      service.watchFrames(surface, target, signal),
     watchWebTabs: (surface: WebuiBrowserSurface, runId?: string, signal?: AbortSignal) =>
       service.watchWebTabs(surface, runId, signal),
     listCapabilities: () => service.listCapabilities(),

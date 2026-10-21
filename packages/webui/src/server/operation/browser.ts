@@ -98,7 +98,7 @@ export const sendBrowserCommandOperation: WebuiOperation<Record<string, unknown>
 
 export const watchBrowserFramesOperation: WebuiOperation<Record<string, unknown>> = {
   name: WATCH_BROWSER_FRAMES_OPERATION_NAME,
-  validate: (body) => validateSurface(WATCH_BROWSER_FRAMES_OPERATION_NAME, body),
+  validate: (body) => validateFrameStream(WATCH_BROWSER_FRAMES_OPERATION_NAME, body),
 };
 
 /**
@@ -230,21 +230,66 @@ function validateTarget(
   if (!isRecord(target)) {
     return invalidBody(`${operation} body requires a target`);
   }
-  if (
-    typeof target.surface !== "string" ||
-    !WEBUI_BROWSER_SURFACES.includes(target.surface as WebuiBrowserSurface) ||
-    typeof target.browserId !== "string" ||
-    target.browserId.length === 0 ||
-    typeof target.targetId !== "string" ||
-    target.targetId.length === 0 ||
-    typeof target.generation !== "number" ||
-    !Number.isInteger(target.generation)
-  ) {
+  if (!isCompleteTargetIdentity(target)) {
     return invalidBody(`${operation} body requires a complete target identity`);
   }
   return validateRunId(operation, result.body);
 }
 
+/**
+ * Validates a frame-stream request.
+ *
+ * The request names the **target** the client is showing, not a run: the
+ * stream is per target, so two tabs get their own pictures and the person and
+ * the Agent can work on different pages at the same time.
+ *
+ * A request that still carries a run id is refused with an explicit error
+ * rather than being answered with the run's selection. A client asking for
+ * the old shape would otherwise be shown a page it did not ask for, and a
+ * stream that silently answers with the wrong page is worse than one that
+ * says the request is out of date.
+ */
+function validateFrameStream(
+  operation: string,
+  body: unknown,
+): WebuiOperationValidation<Record<string, unknown>> {
+  const result = requireRecord(operation, body);
+  if (!result.ok) return result;
+  if (result.body.runId !== undefined) {
+    return invalidBody(
+      `${operation} is keyed by a target, not by a run; send the target the client is showing`,
+    );
+  }
+  const surface = result.body.surface;
+  if (
+    typeof surface !== "string" ||
+    !WEBUI_BROWSER_SURFACES.includes(surface as WebuiBrowserSurface)
+  ) {
+    return invalidBody(`${operation} body requires a known browser surface`);
+  }
+  const target = result.body.target;
+  if (!isRecord(target)) {
+    return invalidBody(`${operation} body requires a target`);
+  }
+  if (!isCompleteTargetIdentity(target)) {
+    return invalidBody(`${operation} body requires a complete target identity`);
+  }
+  return { ok: true, body: result.body };
+}
+
+/** Whether a body carries a target identity with all four of its fields. */
+function isCompleteTargetIdentity(target: Record<string, unknown>): boolean {
+  return (
+    typeof target.surface === "string" &&
+    WEBUI_BROWSER_SURFACES.includes(target.surface as WebuiBrowserSurface) &&
+    typeof target.browserId === "string" &&
+    target.browserId.length > 0 &&
+    typeof target.targetId === "string" &&
+    target.targetId.length > 0 &&
+    typeof target.generation === "number" &&
+    Number.isInteger(target.generation)
+  );
+}
 /**
  * Validates the *envelope* of an input command.
  *

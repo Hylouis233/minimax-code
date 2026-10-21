@@ -4243,6 +4243,7 @@
     "packages/webui/test/unit/browser-bridge-server.test.ts",
     "packages/webui/test/unit/browser-bridge-session.test.ts",
     "packages/webui/test/unit/browser-bridge-upgrade.test.ts",
+    "packages/webui/test/unit/browser-frame-stream.test.ts",
     "packages/webui/test/unit/browser-input-command.test.ts",
     "packages/webui/test/unit/browser-panel-state.test.ts",
     "packages/webui/test/unit/browser-panel-view.test.tsx",

@@ -136,7 +136,7 @@ export function createBrowserHandlerEntries(
       // cast is the same one the terminal watcher makes.
       source: browser.watchFrames(
         readBrowserSurface(body as Record<string, unknown>),
-        readBrowserRunId(body as Record<string, unknown>),
+        readBrowserTarget(body as Record<string, unknown>),
         context.signal,
       ) as unknown as AsyncIterable<Record<string, unknown>>,
     },

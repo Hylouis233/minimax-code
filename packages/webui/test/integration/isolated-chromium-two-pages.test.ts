@@ -27,7 +27,9 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { WebuiIsolatedChromiumProvider } from "../../src/runtime/browser/isolated-chromium/provider.js";
+import { WebuiBrowserService } from "../../src/runtime/browser/browser-service.js";
 import type {
+  WebuiBrowserAuthorization,
   WebuiBrowserImageFrame,
   WebuiBrowserTargetId,
 } from "../../src/shared/contracts/browser.js";
@@ -303,5 +305,120 @@ describe.skipIf(!available)("the isolated Chromium, one page per web tab", () =>
 
     await provider.stopImageStream(first.targetId);
     await provider.stopImageStream(second.targetId);
+  });
+});
+
+/**
+ * The service, streaming two pages of one real Chromium.
+ *
+ * The provider-level suite above proves the pages are independent. This one
+ * proves the *streams* are: the client asks for the page it is showing, and
+ * two streams open at once must not cross.
+ */
+describe.skipIf(!available)("the browser service, streaming two pages of one Chromium", () => {
+  let dataDir: string;
+  let service: WebuiBrowserService;
+
+  const authorization: WebuiBrowserAuthorization = {
+    isolatedChromium: true,
+    edge: false,
+    chrome: false,
+    // The raw DevTools method below is how the test repaints a page, and the
+    // Full CDP switch is what allows a raw method through.
+    fullCdp: true,
+  };
+
+  beforeAll(async () => {
+    dataDir = await mkdtemp(join(tmpdir(), "webui-two-page-streams-"));
+    service = new WebuiBrowserService({
+      authorization: {
+        read: async () => authorization,
+        write: async () => authorization,
+      },
+      dataDir,
+    });
+  }, 60_000);
+
+  afterAll(async () => {
+    await service?.close();
+    if (dataDir) await rm(dataDir, { recursive: true, force: true });
+  });
+
+  /** Repaints the page the run is on, which is what makes the screencast push. */
+  async function repaint(): Promise<void> {
+    await service.sendCommandToSelection("isolated-chromium", "run-1", "Runtime.evaluate", {
+      expression: "document.body.style.background = 'rgb(12, 34, 56)'",
+    });
+    await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+  }
+
+  it("gives two tabs their own pictures, and neither receives the other's frames", async () => {
+    const list = await service.listTargets("isolated-chromium", "run-1");
+    // The service marks the *run's* selection, and the run has not selected
+    // anything yet, so the page to start from is found by asking the provider
+    // which of the listed pages it can actually drive: the browser opens a
+    // page of its own that the provider never attached to.
+    let first: WebuiBrowserTargetId | undefined;
+    for (const candidate of list.targets) {
+      await service.selectTarget(candidate.id, "run-1");
+      try {
+        await service.sendCommandToSelection("isolated-chromium", "run-1", "Runtime.evaluate", {
+          expression: "1",
+        });
+        first = candidate.id;
+        break;
+      } catch {
+        // This page is not one the provider drives; try the next.
+      }
+    }
+    expect(first).toBeDefined();
+
+    // The run opens a second tab, so the session owns two pages.
+    const opened = await service.sendCommandToSelection(
+      "isolated-chromium",
+      "run-1",
+      "open_tab",
+      { url: pageUrl("second page") },
+    );
+    const second = opened.result as WebuiBrowserTargetId;
+    expect(second.targetId).not.toBe(first!.targetId);
+
+    const firstFrames: WebuiBrowserImageFrame[] = [];
+    const secondFrames: WebuiBrowserImageFrame[] = [];
+    const controller = new AbortController();
+    const firstStream = (async () => {
+      for await (const frame of service.watchFrames(
+        "isolated-chromium",
+        first!,
+        controller.signal,
+      )) {
+        firstFrames.push(frame);
+      }
+    })();
+    const secondStream = (async () => {
+      for await (const frame of service.watchFrames(
+        "isolated-chromium",
+        second,
+        controller.signal,
+      )) {
+        secondFrames.push(frame);
+      }
+    })();
+
+    // Chrome renders the page in front, so each page is repainted while its
+    // own stream is the one watching.
+    await repaint();
+    await service.selectTarget(second, "run-1");
+    await repaint();
+
+    await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+    controller.abort();
+    await Promise.allSettled([firstStream, secondStream]);
+
+    expect(firstFrames.length).toBeGreaterThan(0);
+    expect(secondFrames.length).toBeGreaterThan(0);
+    // Neither stream received the other page's picture.
+    expect(firstFrames.every((frame) => frame.target.targetId === first!.targetId)).toBe(true);
+    expect(secondFrames.every((frame) => frame.target.targetId === second.targetId)).toBe(true);
   });
 });

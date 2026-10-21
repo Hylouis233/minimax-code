@@ -695,7 +695,7 @@ describe("browser service", () => {
 
     const controller = new AbortController();
     const received: WebuiBrowserImageFrame[] = [];
-    const stream = service.watchFrames("isolated-chromium", "run-panel", controller.signal);
+    const stream = service.watchFrames("isolated-chromium", tab("tab-1"), controller.signal);
     const consumer = (async () => {
       for await (const frame of stream) {
         received.push(frame);
@@ -723,7 +723,7 @@ describe("browser service", () => {
 
     const controller = new AbortController();
     const received: WebuiBrowserImageFrame[] = [];
-    const stream = service.watchFrames("isolated-chromium", "run-panel", controller.signal);
+    const stream = service.watchFrames("isolated-chromium", tab("tab-1"), controller.signal);
     const consumer = (async () => {
       for await (const frame of stream) {
         received.push(frame);
@@ -731,16 +731,23 @@ describe("browser service", () => {
       }
     })();
 
+    // The stream is established before the page is replaced: a stream opened
+    // for a page that has already been replaced is refused outright, because
+    // the picture it would carry is of a page that is gone.
+    await waitForStreams(provider, 1);
+
     // The provider announces that the page behind the tab was replaced. A frame
     // that arrives afterwards still names the previous page, and the panel has
     // already moved past it, so it must not reach the screen.
     provider.announceTargetChange(2);
-    await pushWhenSubscribed(provider, 1);
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    provider.pushFrame(1, "tab-1");
+    await settleFrames();
+
     controller.abort();
     await consumer.catch(() => undefined);
 
     expect(received).toHaveLength(0);
+    expect(service.droppedFrameCount("isolated-chromium")).toBe(1);
     await service.close();
   });
 });
@@ -814,15 +821,15 @@ describe("run-scoped selection", () => {
     await service.close();
   });
 
-  it("gives each run's stream only that run's target's frames", async () => {
+  it("gives each target's stream only that target's frames", async () => {
     const { service, provider } = createService(TWO_TABS, ["tab-1", "tab-2"]);
     await service.listTargets("isolated-chromium", "run-a");
     await service.listTargets("isolated-chromium", "run-b");
     await service.selectTarget(tab("tab-1"), "run-a");
     await service.selectTarget(tab("tab-2"), "run-b");
 
-    const first = collectFrames(service, "run-a");
-    const second = collectFrames(service, "run-b");
+    const first = collectFrames(service, tab("tab-1"));
+    const second = collectFrames(service, tab("tab-2"));
     await waitForStreams(provider, 2);
 
     provider.pushFrame(1, "tab-1");
@@ -834,20 +841,21 @@ describe("run-scoped selection", () => {
     await stop(service, [first, second]);
   });
 
-  it("drops a frame that belongs to another run's target", async () => {
+  it("drops a frame that belongs to another target", async () => {
     const { service, provider } = createService(TWO_TABS, ["tab-1", "tab-2"]);
     await service.listTargets("isolated-chromium", "run-a");
     await service.listTargets("isolated-chromium", "run-b");
     await service.selectTarget(tab("tab-1"), "run-a");
     await service.selectTarget(tab("tab-2"), "run-b");
 
-    const first = collectFrames(service, "run-a");
-    const second = collectFrames(service, "run-b");
+    const first = collectFrames(service, tab("tab-1"));
+    const second = collectFrames(service, tab("tab-2"));
     await waitForStreams(provider, 2);
 
-    // The provider hands run A's stream a frame of run B's tab. Keeping the
-    // streams apart is the service's job, not the provider's, so the fence is
-    // against this run's own selection and the foreign frame is dropped.
+    // The provider hands the first tab's stream a frame of the second tab.
+    // Keeping the streams apart is the service's job as well as the
+    // provider's, so the fence is against the target the subscriber asked for
+    // and the foreign frame is dropped.
     provider.frameHandlers.get("tab-1")?.({
       target: {
         surface: "isolated-chromium",
@@ -897,20 +905,19 @@ describe("run-scoped selection", () => {
  * the person left is a panel that never shows the tab they moved to), and one
  * run's retarget is one run's business.
  */
-describe("stream retargeting", () => {
+describe("the stream of one target", () => {
   const TWO_TABS: WebuiBrowserAuthorization = {
     ...ALL_OFF,
     isolatedChromium: true,
   };
 
-  it("refuses a stream for a run that has selected nothing", async () => {
+  it("refuses a stream for a target that does not exist", async () => {
     const { service, provider } = createService(TWO_TABS, ["tab-1", "tab-2"]);
     await service.listTargets("isolated-chromium", "run-a");
-    // Another run's selection is not this one's to stream, and streaming
-    // nothing would leave the panel watching a page it cannot see.
-    await service.selectTarget(tab("tab-1"), "run-b");
 
-    await expect(drainStream(service, "run-a")).rejects.toMatchObject({
+    // A stream for a target nobody has is a stream that can never deliver a
+    // frame, and a panel waiting for one looks like a panel that is broken.
+    await expect(drainStream(service, tab("tab-9"))).rejects.toMatchObject({
       code: "browser_target_unknown",
     });
     // The refusal is the whole outcome: nothing was started on the provider.
@@ -918,105 +925,107 @@ describe("stream retargeting", () => {
     await service.close();
   });
 
-  it("starts the stream for the target the run selected at the time", async () => {
+  it("refuses a stream for a target whose page was replaced", async () => {
     const { service, provider } = createService(TWO_TABS, ["tab-1", "tab-2"]);
     await service.listTargets("isolated-chromium", "run-a");
-    await service.selectTarget(tab("tab-2"), "run-a");
+    provider.announceTargetChange(2, "tab-1");
 
-    const stream = collectFrames(service, "run-a");
+    await expect(drainStream(service, tab("tab-1"))).rejects.toMatchObject({
+      code: "browser_target_stale",
+    });
+    expect(provider.startedStreams).toHaveLength(0);
+    await service.close();
+  });
+
+  it("starts the stream for the target the request names", async () => {
+    const { service, provider } = createService(TWO_TABS, ["tab-1", "tab-2"]);
+    await service.listTargets("isolated-chromium", "run-a");
+
+    const stream = collectFrames(service, tab("tab-2"));
     await waitUntil(() => provider.startedStreams.includes("tab-2"));
     await stop(service, [stream]);
 
     expect(provider.startedStreams).toEqual(["tab-2"]);
   });
 
-  it("moves the stream onto the target the run selected next and stops the old one", async () => {
+  it("gives two tabs their own pictures, and neither receives the other's frames", async () => {
     const { service, provider } = createService(TWO_TABS, ["tab-1", "tab-2"]);
     await service.listTargets("isolated-chromium", "run-a");
-    await service.selectTarget(tab("tab-1"), "run-a");
 
-    const stream = collectFrames(service, "run-a");
-    await waitUntil(() => provider.startedStreams.includes("tab-1"));
-    const oldHandler = provider.frameHandlers.get("tab-1");
-
-    // The person points at another tab while the panel is watching this one.
-    await service.selectTarget(tab("tab-2"), "run-a");
-    await waitUntil(() => provider.startedStreams.includes("tab-2"));
-
-    // The screencast for the tab they moved away from is released rather than
-    // left running: a stream left attached to it would hold the browser's
-    // resources for a page nobody is looking at.
-    expect(provider.stoppedStreams).toEqual(["tab-1"]);
-
-    // A frame of the tab the run is on now arrives on the same stream.
-    provider.pushFrame(1, "tab-2");
-    // A frame that arrives from the old tab afterwards is dropped by the fence:
-    // it names a page this run is no longer showing. The handler is the one
-    // captured before the retarget, so the drop is the fence's doing and not
-    // the provider's.
-    oldHandler?.({
-      target: tab("tab-1"),
-      data: "QlRSQVk=",
-      format: "jpeg",
-      sequence: 2,
-    });
-    await settleFrames();
-
-    expect(stream.frames.map((frame) => frame.target.targetId)).toEqual(["tab-2"]);
-    await stop(service, [stream]);
-  });
-
-  it("keeps another run's stream when one run retargets", async () => {
-    const { service, provider } = createService(TWO_TABS, ["tab-1", "tab-2", "tab-3"]);
-    await service.listTargets("isolated-chromium", "run-a");
-    await service.listTargets("isolated-chromium", "run-b");
-    await service.selectTarget(tab("tab-1"), "run-a");
-    await service.selectTarget(tab("tab-2"), "run-b");
-
-    const first = collectFrames(service, "run-a");
-    const second = collectFrames(service, "run-b");
+    const first = collectFrames(service, tab("tab-1"));
+    const second = collectFrames(service, tab("tab-2"));
     await waitUntil(() => provider.startedStreams.length >= 2);
     expect(new Set(provider.startedStreams)).toEqual(new Set(["tab-1", "tab-2"]));
 
-    await service.selectTarget(tab("tab-3"), "run-a");
-    await waitUntil(() => provider.startedStreams.includes("tab-3"));
-
-    // Run B's screencast belongs to run B. Stopping it because run A moved
-    // would leave another run's panel without a stream at all.
-    expect(provider.stoppedStreams).toEqual(["tab-1"]);
-
-    provider.pushFrame(1, "tab-3");
+    provider.pushFrame(1, "tab-1");
     provider.pushFrame(1, "tab-2");
     await settleFrames();
 
-    expect(first.frames.map((frame) => frame.target.targetId)).toEqual(["tab-3"]);
+    expect(first.frames.map((frame) => frame.target.targetId)).toEqual(["tab-1"]);
     expect(second.frames.map((frame) => frame.target.targetId)).toEqual(["tab-2"]);
     await stop(service, [first, second]);
   });
 
-  it("keeps the stream on the tab whose page navigated", async () => {
+  it("drops a frame that names a target the subscriber did not ask for, and counts the drop", async () => {
     const { service, provider } = createService(TWO_TABS, ["tab-1", "tab-2"]);
     await service.listTargets("isolated-chromium", "run-a");
-    await service.selectTarget(tab("tab-1"), "run-a");
 
-    const stream = collectFrames(service, "run-a");
+    const stream = collectFrames(service, tab("tab-1"));
     await waitUntil(() => provider.startedStreams.includes("tab-1"));
 
-    // The tab is still the one the run selected; only the page behind it was
-    // replaced. The screencast follows the tab on its own, so nothing is
-    // restarted — and the new page's frame is what the panel then shows.
-    provider.announceTargetChange(2);
-    // The stream loop re-reads the selection once per pass, so this covers a
-    // whole pass before the restart counters are read.
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(provider.startedStreams).toEqual(["tab-1"]);
-    expect(provider.stoppedStreams).toEqual([]);
+    // The provider hands a frame to the page that asked for it, so the frame
+    // is delivered to this subscriber's own handler directly: the fence is
+    // what decides, and it has to be shown deciding on a frame that names
+    // another page. The drop is counted, because a stream that quietly stops
+    // updating and one that is dropping frames look the same from outside.
+    const handler = provider.frameHandlers.get("tab-1");
+    handler?.({
+      target: tab("tab-2"),
+      data: "QlRSQVk=",
+      format: "jpeg",
+      sequence: 1,
+    });
+    await settleFrames();
 
+    expect(stream.frames).toHaveLength(0);
+    expect(service.droppedFrameCount("isolated-chromium")).toBe(1);
+    await stop(service, [stream]);
+  });
+
+  it("refuses a frame from a superseded generation", async () => {
+    const { service, provider } = createService(TWO_TABS, ["tab-1", "tab-2"]);
+    await service.listTargets("isolated-chromium", "run-a");
+
+    const stream = collectFrames(service, tab("tab-1"));
+    await waitUntil(() => provider.startedStreams.includes("tab-1"));
+
+    // The page behind the tab was replaced, so the generation moved. The
+    // frame that arrives now carries the new generation, and the subscriber
+    // asked for the old one: a picture of a page that is gone.
+    provider.announceTargetChange(2, "tab-1");
     provider.pushFrame(2, "tab-1");
     await settleFrames();
 
-    expect(stream.frames.map((frame) => frame.target.generation)).toEqual([2]);
+    expect(stream.frames).toHaveLength(0);
+    expect(service.droppedFrameCount("isolated-chromium")).toBe(1);
     await stop(service, [stream]);
+  });
+
+  it("leaves the run's selection deciding what the Agent's commands act on", async () => {
+    const { service, provider } = createService(TWO_TABS, ["tab-1", "tab-2"]);
+    await service.listTargets("isolated-chromium", "run-a");
+    await service.selectTarget(tab("tab-2"), "run-a");
+
+    // The stream is keyed by the target the client asked for, and the command
+    // path is keyed by the run. They are different cells: the panel shows
+    // tab-1, and the Agent still acts on tab-2.
+    const stream = collectFrames(service, tab("tab-1"));
+    await waitUntil(() => provider.startedStreams.includes("tab-1"));
+
+    await service.sendCommandToSelection("isolated-chromium", "run-a", "reload", {});
+    expect(provider.commands.map((entry) => entry.command)).toEqual(["reload"]);
+    await stop(service, [stream]);
+    await service.close();
   });
 });
 
@@ -1067,14 +1076,17 @@ interface OpenStream {
   readonly frames: WebuiBrowserImageFrame[];
 }
 
-/** Starts one run's stream and drains it in the background. */
-function collectFrames(service: WebuiBrowserService, runId: string): OpenStream {
+/** Starts one target's stream and drains it in the background. */
+function collectFrames(
+  service: WebuiBrowserService,
+  target: WebuiBrowserTargetId = tab("tab-1"),
+): OpenStream {
   const controller = new AbortController();
   const stream: OpenStream = { controller, frames: [] };
   void (async () => {
     for await (const frame of service.watchFrames(
       "isolated-chromium",
-      runId,
+      target,
       controller.signal,
     )) {
       stream.frames.push(frame);
@@ -1113,13 +1125,16 @@ async function waitUntil(condition: () => boolean): Promise<void> {
  * Reads one run's stream, so a refusal on the way in is a rejection the caller
  * can read: an async generator that is never iterated never runs at all.
  */
-function drainStream(service: WebuiBrowserService, runId: string): Promise<void> {
+function drainStream(
+  service: WebuiBrowserService,
+  target: WebuiBrowserTargetId = tab("tab-1"),
+): Promise<void> {
   const controller = new AbortController();
   return (async () => {
     try {
       for await (const _frame of service.watchFrames(
         "isolated-chromium",
-        runId,
+        target,
         controller.signal,
       )) {
         return;

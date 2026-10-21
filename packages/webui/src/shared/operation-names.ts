@@ -465,7 +465,10 @@ export interface OperationSpec {
     response: { readonly accepted: true; readonly result?: unknown };
   };
   watchBrowserFrames: {
-    request: { readonly surface: WebuiBrowserSurface; readonly runId?: string };
+    request: {
+      readonly surface: WebuiBrowserSurface;
+      readonly target: WebuiBrowserTargetId;
+    };
     response: WebuiBrowserFrameStreamEnvelope;
   };
   watchBrowserWebTabs: {

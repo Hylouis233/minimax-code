@@ -19,6 +19,7 @@ import type { WebuiTerminalFrame } from "../../shared/contracts/terminal.js";
 import type {
   WebuiBrowserImageFrame,
   WebuiBrowserSurface,
+  WebuiBrowserTargetId,
   WebuiBrowserWebTabSnapshot,
 } from "../../shared/contracts/browser.js";
 import type {
@@ -144,7 +145,7 @@ export interface WebuiWire {
    */
   watchBrowserFrames(
     operation: string,
-    requestBody: { readonly surface: WebuiBrowserSurface },
+    requestBody: { readonly surface: WebuiBrowserSurface; readonly target: WebuiBrowserTargetId },
     onFrame: (frame: WebuiBrowserImageFrame) => void,
   ): () => void;
   /**
@@ -385,7 +386,7 @@ export function createWebuiWire({
 
   function watchBrowserFrames(
     operation: string,
-    requestBody: { readonly surface: WebuiBrowserSurface },
+    requestBody: { readonly surface: WebuiBrowserSurface; readonly target: WebuiBrowserTargetId },
     onFrame: (frame: WebuiBrowserImageFrame) => void,
   ): () => void {
     let stopped = false;

@@ -692,10 +692,17 @@ export interface WebuiBrowserPort {
     command: string,
     params?: Record<string, unknown>,
   ): Promise<{ readonly accepted: true; readonly result?: unknown }>;
-  /** The live image stream of one surface, fenced to one run's selection. */
+  /**
+   * The live image stream of one **target**.
+   *
+   * The stream is keyed by the target rather than by the run: the client asks
+   * for the page it is showing, so two tabs get their own pictures. The run's
+   * selection still decides what the **Agent's** commands act on — the two are
+   * different cells and this one does not move the other.
+   */
   watchFrames(
     surface: WebuiBrowserSurface,
-    runId?: string,
+    target: WebuiBrowserTargetId,
     signal?: AbortSignal,
   ): AsyncIterable<WebuiBrowserImageFrame>;
   /**

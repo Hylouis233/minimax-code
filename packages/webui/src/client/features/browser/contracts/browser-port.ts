@@ -200,16 +200,18 @@ export interface BrowserPort {
   ) => Promise<{ readonly accepted: true; readonly result?: unknown }>;
 
   /**
-   * The live image stream for one surface, carrying the named run's own target.
+   * The live image stream for one **target**.
+   *
+   * The stream is keyed by the target rather than by the run: the client asks
+   * for the page it is showing, so two tabs get their own pictures and the
+   * person and the Agent can work on different pages at the same time.
    *
    * Returns the disposer, matching `TerminalPort.watchTerminal`, because the
    * subscription outlives the render that opened it and something has to close
-   * it when the panel goes away. Switching runs closes this one and opens the
-   * active run's: a frame belonging to another run's target is not this
-   * stream's to show.
+   * it when the panel goes away.
    */
   readonly watchBrowserFrames?: (
-    request: WebuiBrowserRunScope & { readonly surface: WebuiBrowserSurface },
+    request: { readonly surface: WebuiBrowserSurface; readonly target: WebuiBrowserTargetId },
     onFrame: (frame: WebuiBrowserImageFrame) => void,
   ) => () => void;
   /**

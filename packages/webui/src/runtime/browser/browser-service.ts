@@ -178,11 +178,24 @@ export class WebuiBrowserService {
   #selectionOrder = 0;
   /** Which external surfaces the service has turned on, per surface. */
   readonly #bridgeSurfaces = new Map<"edge" | "chrome", boolean>();
-  /** The frame subscribers, per surface and then per run. */
+  /** The frame subscribers, per surface and then per target. */
   readonly #frameSubscribers = new Map<
     WebuiBrowserSurface,
     Map<string, Set<(frame: WebuiBrowserImageFrame) => void>>
   >();
+  /**
+   * The provider-side frame handler, per surface and then per target.
+   *
+   * One screencast per page, shared by that page's subscribers: the provider
+   * holds one frame handler per page, so two subscriptions for the same page
+   * would otherwise take each other's frames away.
+   */
+  readonly #frameHandlers = new Map<
+    WebuiBrowserSurface,
+    Map<string, (frame: WebuiBrowserImageFrame) => void>
+  >();
+  /** How many frames each surface dropped, per surface. */
+  readonly #droppedFrames = new Map<WebuiBrowserSurface, number>();
   /**
    * The web tabs each session has open, per surface and then per run.
    *
@@ -775,7 +788,7 @@ export class WebuiBrowserService {
    */
   async *watchFrames(
     surface: WebuiBrowserSurface,
-    runId: string = WEBUI_BROWSER_NO_RUN_ID,
+    target: WebuiBrowserTargetId,
     signal?: AbortSignal,
   ): AsyncIterable<WebuiBrowserImageFrame> {
     const authorization = await this.readAuthorization();
@@ -793,15 +806,19 @@ export class WebuiBrowserService {
         true,
       );
     }
-    const selected = this.#selectionOf(surface, runId);
-    if (!selected) {
-      // Streaming nothing would leave the panel showing a browser it cannot
-      // watch, so a run that has not selected anything is refused here and the
-      // caller is told to select first. The stream below follows the selection
-      // once it exists; this is only about the starting point.
+    // The target has to be a page this service knows. A stream for a target
+    // that does not exist would deliver nothing at all, and a panel waiting
+    // for a picture that cannot arrive looks like a panel that is broken.
+    if (!this.#registry.resolve(target)) {
       throw browserOperationError(
         "browser_target_unknown",
-        "No browser target is selected for this surface.",
+        "The browser target does not exist.",
+      );
+    }
+    if (!this.#registry.isCurrent(target)) {
+      throw browserOperationError(
+        "browser_target_stale",
+        "The browser target has been replaced; select it again.",
       );
     }
     // The queue keeps the newest frame per target and nothing else.
@@ -814,6 +831,15 @@ export class WebuiBrowserService {
     const queue: WebuiBrowserImageFrame[] = [];
     let notify: (() => void) | undefined;
     const deliver = (frame: WebuiBrowserImageFrame) => {
+      // The fence. A frame belongs to the page behind the target the
+      // subscriber asked for, and all four identity fields decide it. A frame
+      // that names another page — another tab's, or a previous generation of
+      // this one — is dropped here rather than queued, so a subscriber never
+      // sees a picture of a page it did not ask for, not even briefly.
+      if (!this.#frameMatchesTarget(target, frame)) {
+        this.#droppedFrames.set(surface, (this.#droppedFrames.get(surface) ?? 0) + 1);
+        return;
+      }
       const index = queue.findIndex(
         (queued) =>
           queued.target.targetId === frame.target.targetId &&
@@ -824,32 +850,42 @@ export class WebuiBrowserService {
       else queue[queue.length - 1] = frame;
       notify?.();
     };
-    const runs = this.#frameSubscribers.get(surface) ?? new Map<
-      string,
-      Set<(frame: WebuiBrowserImageFrame) => void>
-    >();
-    const subscribers = runs.get(runId) ?? new Set<(frame: WebuiBrowserImageFrame) => void>();
-    subscribers.add(deliver);
-    runs.set(runId, subscribers);
-    this.#frameSubscribers.set(surface, runs);
 
-    // The target the provider-side stream is attached to right now. It moves
-    // with the run's selection, so `finally` releases whichever target the
-    // stream ended up on rather than the one it opened with.
-    let streaming: string | undefined = selected.targetId;
-    await provider.startImageStream(streaming, deliver);
+    // One provider-side screencast per page, shared by that page's
+    // subscribers: the provider holds one frame handler per page, so two
+    // subscriptions for the same page would otherwise take each other's
+    // frames away.
+    const targetKey = target.targetId;
+    const surfaceSubscribers =
+      this.#frameSubscribers.get(surface) ??
+      new Map<string, Set<(frame: WebuiBrowserImageFrame) => void>>();
+    const subscribers =
+      surfaceSubscribers.get(targetKey) ??
+      new Set<(frame: WebuiBrowserImageFrame) => void>();
+    const first = subscribers.size === 0;
+    subscribers.add(deliver);
+    surfaceSubscribers.set(targetKey, subscribers);
+    this.#frameSubscribers.set(surface, surfaceSubscribers);
+
+    const surfaceHandlers =
+      this.#frameHandlers.get(surface) ??
+      new Map<string, (frame: WebuiBrowserImageFrame) => void>();
+    const handler =
+      surfaceHandlers.get(targetKey) ??
+      ((frame: WebuiBrowserImageFrame) => {
+        const current = this.#frameSubscribers.get(surface)?.get(targetKey);
+        if (!current) return;
+        for (const subscriber of [...current]) subscriber(frame);
+      });
+    surfaceHandlers.set(targetKey, handler);
+    this.#frameHandlers.set(surface, surfaceHandlers);
+
+    if (first) await provider.startImageStream(targetKey, handler);
     try {
       while (!signal?.aborted) {
-        streaming = await this.#followSelection(surface, runId, provider, deliver, streaming);
         while (queue.length > 0) {
           const frame = queue.shift();
           if (!frame) continue;
-          // A frame belongs to the panel only while it names the page this
-          // run's panel is showing. A frame that arrives after that selection
-          // moved, after the page behind the target was replaced, or that
-          // belongs to another run's target would put a different page on
-          // screen than the one the person chose.
-          if (!this.#frameMatchesSelection(surface, runId, frame)) continue;
           yield frame;
         }
         await Promise.race([
@@ -862,76 +898,48 @@ export class WebuiBrowserService {
       }
     } finally {
       subscribers.delete(deliver);
-      if (subscribers.size === 0) runs.delete(runId);
-      // Cancelling the stream releases the provider-side resources it held:
-      // the screencast is stopped, not merely ignored.
-      if (streaming) await provider.stopImageStream(streaming).catch(() => undefined);
+      if (subscribers.size === 0) {
+        // Cancelling the stream releases the provider-side resources it held:
+        // the screencast is stopped, not merely ignored.
+        await provider.stopImageStream(targetKey).catch(() => undefined);
+        surfaceSubscribers.delete(targetKey);
+        surfaceHandlers.delete(targetKey);
+      }
     }
   }
 
   /**
-   * Moves one stream onto the target its run has selected now, and reports the
-   * target it is attached to afterwards.
+   * How many frames this service has dropped on a surface.
    *
-   * A run selects a target again and again while a stream runs, and the stream
-   * has to follow: the person pointed at another tab, so the panel has to show
-   * that tab. Re-reading the selection on every pass is what makes the stream
-   * follow it, and the provider-side stream is restarted rather than reused —
-   * the screencast is per target, so a stream left attached to the old one
-   * would show a page nobody is looking at and never show the new one.
-   *
-   * The old target's resources are released by stopping its stream before the
-   * new one starts: a screencast left running for a tab the person moved away
-   * from is a leak, and the provider holds it until it is told to let go.
-   *
-   * A new *generation* of the same target is not a retarget. The page behind the
-   * tab was replaced while the tab stayed the one the run selected, so the
-   * screencast follows it on its own and only the fence below has anything to
-   * say about it.
-   *
-   * A selection that disappeared while the stream ran — the surface's provider
-   * was stopped, which forgets the surface's selections — stops the stream and
-   * starts nothing. There is no longer a target this stream may carry.
+   * A frame that names another page is dropped rather than put on screen, and
+   * the drop is counted rather than silent: a stream that quietly stops
+   * updating and a stream that is dropping frames look identical from the
+   * outside.
    */
-  async #followSelection(
-    surface: WebuiBrowserSurface,
-    runId: string,
-    provider: WebuiBrowserSurfaceProvider,
-    deliver: (frame: WebuiBrowserImageFrame) => void,
-    streaming: string | undefined,
-  ): Promise<string | undefined> {
-    const wanted = this.#selectionOf(surface, runId)?.targetId;
-    if (wanted === streaming) return streaming;
-    if (streaming !== undefined) {
-      await provider.stopImageStream(streaming).catch(() => undefined);
-    }
-    if (wanted === undefined) return undefined;
-    await provider.startImageStream(wanted, deliver);
-    return wanted;
+  droppedFrameCount(surface: WebuiBrowserSurface): number {
+    return this.#droppedFrames.get(surface) ?? 0;
   }
 
   /**
-   * Whether a frame still describes the page one run is showing.
+   * Whether a frame still describes the page behind the target.
    *
-   * The comparison is against *that run's* current selection, not the one the
-   * stream started with and not another run's: a run can select another tab
-   * while the stream is running, another run can select a different tab on the
-   * same surface, and a frame from either must not appear.
+   * Two things have to hold. The frame has to name the very target the
+   * subscriber asked for — all four identity fields, so another tab's frame
+   * and a previous generation of this one are both refused. And the page
+   * behind that target has to still be the one the frame is a picture of: the
+   * registry knows the current generation, and a frame of a page that has
+   * been replaced is a picture of something the person has already moved away
+   * from.
    */
-  #frameMatchesSelection(
-    surface: WebuiBrowserSurface,
-    runId: string,
+  #frameMatchesTarget(
+    target: WebuiBrowserTargetId,
     frame: WebuiBrowserImageFrame,
   ): boolean {
-    const selected = this.#selectionOf(surface, runId);
-    if (!selected) return false;
-    return (
-      selected.surface === frame.target.surface &&
-      selected.browserId === frame.target.browserId &&
-      selected.targetId === frame.target.targetId &&
-      selected.generation === frame.target.generation
-    );
+    if (!isSameWebuiBrowserTarget(target, frame.target)) return false;
+    const current = this.#registry.resolve(target);
+    return current !== undefined && current.id.generation === frame.target.generation;
   }
+
 
   /**
    * Runs one browser command.

@@ -112,13 +112,11 @@ export function BrowserPanelHost({
   // a screencast running for a surface nobody is looking at.
   const subscribedSurface = useRef<WebuiBrowserSurface | undefined>(undefined);
 
-  // The run the stream was opened for. The stream carries one run's target, so
-  // the active run changing means the old one has to be closed and the new one's
-  // opened — otherwise the panel would keep showing the previous run's page.
-  const subscribedRunId = useRef<string | undefined>(undefined);
-  /** The target the open subscription is attached to. */
+  // The target the open subscription is attached to. The stream is keyed by
+  // the target rather than by the run, so a run change does not reopen it —
+  // the run decides what the Agent's commands act on, and the panel decides
+  // what it shows.
   const subscribedTarget = useRef<string | undefined>(undefined);
-
   // The run the panel is on, kept where a read that is still in flight can see
   // it. The effect below is what moves it, so it is current before any read for
   // the new run starts.
@@ -195,45 +193,41 @@ export function BrowserPanelHost({
     void refreshTargets(surface);
   }, [port, refreshTargets, surface]);
 
-  // The live image stream is opened for the run's **selected** target.
+  // The live image stream is opened for the **target** the panel is showing.
   //
-  // The server refuses a stream for a run that has selected nothing, so the
-  // subscription is tied to the selection rather than to the panel's lifetime:
-  // when the person picks a target the stream opens, and when the run's target
-  // moves the previous subscription is closed and a new one opened for the new
-  // target. A subscription opened before there was anything to show would never
-  // deliver a frame, and the panel would stay blank until something else
-  // changed.
-  const selectedTargetKey = webuiBrowserStreamTargetKey(
-    selectWebuiBrowserStreamTarget(state),
-  );
+  // The stream is keyed by the target rather than by the run, so two tabs get
+  // their own pictures and the person and the Agent can work on different
+  // pages at the same time. The subscription is tied to the target rather than
+  // to the panel's lifetime: a subscription opened before there was anything
+  // to show would never deliver a frame, and the panel would stay blank until
+  // something else changed. A page that navigates gets a new generation, and
+  // the subscription follows it.
+  const streamTarget = selectWebuiBrowserStreamTarget(state);
+  const selectedTargetKey = webuiBrowserStreamTargetKey(streamTarget);
 
   useEffect(() => {
     if (!port?.watchBrowserFrames) return;
-    if (!selectedTargetKey) {
-      // Nothing is selected, so there is no page to stream.
+    if (!streamTarget || !selectedTargetKey) {
+      // Nothing is shown, so there is no page to stream.
       return;
     }
     if (
       subscribedSurface.current === surface &&
-      subscribedRunId.current === runId &&
       subscribedTarget.current === selectedTargetKey
     ) {
       return;
     }
     subscribedSurface.current = surface;
-    subscribedRunId.current = runId;
     subscribedTarget.current = selectedTargetKey;
-    const stop = port.watchBrowserFrames({ surface, ...runScope }, (frame) => {
+    const stop = port.watchBrowserFrames({ surface, target: streamTarget }, (frame) => {
       dispatch({ type: "frame", frame });
     });
     return () => {
       stop();
       subscribedSurface.current = undefined;
-      subscribedRunId.current = undefined;
       subscribedTarget.current = undefined;
     };
-  }, [port, runScope, selectedTargetKey, surface, runId]);
+  }, [port, selectedTargetKey, streamTarget, surface]);
 
   const onSelectTarget = useCallback(
     (target: WebuiBrowserTargetId) => {
