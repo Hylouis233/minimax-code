@@ -9,12 +9,12 @@
       "surface": "chrome",
       "build": "store",
       "allowlist": "store",
-      "extensionId": "ejnneljbcbiapcamdfmgfkaappehipac",
+      "extensionId": "klfboeijbpnckbjcbjanlheebbhgmpbl",
       "installationKeyProved": true
     },
-    "observed": "the browser assigned the extension the id the public key determines (ejnneljbcbiapcamdfmgfkaappehipac)",
+    "observed": "the browser assigned the extension the id the public key determines (klfboeijbpnckbjcbjanlheebbhgmpbl)",
     "result": "pass",
-    "at": "2026-10-21T11:45:57.026Z",
+    "at": "2026-10-21T19:27:19.196Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-packaged"
   },
@@ -28,12 +28,12 @@
       "surface": "chrome",
       "build": "store",
       "allowlist": "store",
-      "extensionId": "ejnneljbcbiapcamdfmgfkaappehipac",
+      "extensionId": "klfboeijbpnckbjcbjanlheebbhgmpbl",
       "installationKeyProved": true
     },
     "observed": "the packaged manifest carries the store's public key and differs from the development manifest in nothing else",
     "result": "pass",
-    "at": "2026-10-21T11:45:57.028Z",
+    "at": "2026-10-21T19:27:19.197Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-packaged"
   },
@@ -51,12 +51,12 @@
       "fullCdp": "enforced in the runtime service, not in the bridge",
       "allowlist": "store",
       "build": "store",
-      "extensionId": "ejnneljbcbiapcamdfmgfkaappehipac",
+      "extensionId": "klfboeijbpnckbjcbjanlheebbhgmpbl",
       "installationKeyProved": true
     },
     "observed": "the packaged host completed the handshake and reported the surface connected",
     "result": "pass",
-    "at": "2026-10-21T11:45:57.107Z",
+    "at": "2026-10-21T19:27:19.283Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-packaged"
   },
@@ -74,12 +74,12 @@
       "fullCdp": "enforced in the runtime service, not in the bridge",
       "allowlist": "development",
       "build": "store",
-      "extensionId": "ejnneljbcbiapcamdfmgfkaappehipac",
+      "extensionId": "klfboeijbpnckbjcbjanlheebbhgmpbl",
       "installationKeyProved": true
     },
     "observed": "the packaged host refused the extension and reported no connected surface",
     "result": "pass",
-    "at": "2026-10-21T11:45:57.153Z",
+    "at": "2026-10-21T19:27:19.330Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-packaged"
   },
@@ -93,12 +93,12 @@
       "surface": "edge",
       "build": "store",
       "allowlist": "store",
-      "extensionId": "gaflfamaoomjenkedomchkimnkabfkmo",
+      "extensionId": "edppplbagledhnfaipdcjbfefdbaoddg",
       "installationKeyProved": true
     },
-    "observed": "the browser assigned the extension the id the public key determines (gaflfamaoomjenkedomchkimnkabfkmo)",
+    "observed": "the browser assigned the extension the id the public key determines (edppplbagledhnfaipdcjbfefdbaoddg)",
     "result": "pass",
-    "at": "2026-10-21T11:45:57.930Z",
+    "at": "2026-10-21T19:27:20.035Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-packaged"
   },
@@ -112,12 +112,12 @@
       "surface": "edge",
       "build": "store",
       "allowlist": "store",
-      "extensionId": "gaflfamaoomjenkedomchkimnkabfkmo",
+      "extensionId": "edppplbagledhnfaipdcjbfefdbaoddg",
       "installationKeyProved": true
     },
     "observed": "the packaged manifest carries the store's public key and differs from the development manifest in nothing else",
     "result": "pass",
-    "at": "2026-10-21T11:45:57.931Z",
+    "at": "2026-10-21T19:27:20.036Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-packaged"
   },
@@ -135,12 +135,12 @@
       "fullCdp": "enforced in the runtime service, not in the bridge",
       "allowlist": "store",
       "build": "store",
-      "extensionId": "gaflfamaoomjenkedomchkimnkabfkmo",
+      "extensionId": "edppplbagledhnfaipdcjbfefdbaoddg",
       "installationKeyProved": true
     },
     "observed": "the packaged host completed the handshake and reported the surface connected",
     "result": "pass",
-    "at": "2026-10-21T11:45:58.024Z",
+    "at": "2026-10-21T19:27:20.106Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-packaged"
   },
@@ -158,12 +158,12 @@
       "fullCdp": "enforced in the runtime service, not in the bridge",
       "allowlist": "development",
       "build": "store",
-      "extensionId": "gaflfamaoomjenkedomchkimnkabfkmo",
+      "extensionId": "edppplbagledhnfaipdcjbfefdbaoddg",
       "installationKeyProved": true
     },
     "observed": "the packaged host refused the extension and reported no connected surface",
     "result": "pass",
-    "at": "2026-10-21T11:45:58.097Z",
+    "at": "2026-10-21T19:27:20.158Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-packaged"
   }

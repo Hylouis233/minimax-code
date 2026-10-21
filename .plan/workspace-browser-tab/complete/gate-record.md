@@ -5,10 +5,12 @@ pass". This file is that record — what was run, on what, and what it said — 
 checked without running it again.
 
 **The run.** Every gate below was run on the tree that carries this record, in one sequence, in this
-order. The only files that changed after the run are this record and the inventory line it adds; no
-source file, no test and no document changed after it. The run was made at `4e7efd43`; the only
-commits since are this record and the inventory line it adds, so the code the gates ran against is
-the code this tip carries. The gate was first run on that code at `4d247f43`.
+order. The run was made at `4e7efd43`, the commit that carries the plan's implementation; the gate
+was first run on that code at `4d247f43`. Two test-side commits came after it — `9d945e54` and
+`a4f8f7c6`, which bound the external-bridge harness's waits and fix its cleanup — and **the whole
+of §7 was run again at the tip that carries this record**, after them: types, 208 files and 3230
+unit tests, dependency direction, build, build boundary, the source projection (5407 paths), and
+146 browser cases in 2.0m. No source file of the programme changed after `4e7efd43`.
 
 **The unit suite ran four more times** after the last of the fixes below, on the same tree: 208 files
 and 3230 tests, every time, with no unhandled errors. The gate had been red twice before that — once
@@ -26,7 +28,7 @@ for a reason that is now understood, and once for a reason that was a defect in 
 | Dependency direction | `pnpm check:webui-dependency` | **pass** — 476 source files, 1734 in-package references, 0 violations, 0 cycles, 0 role violations, 0 publication violations |
 | Build | `pnpm build:webui` | **pass** — 130 server inputs, 345 client inputs, 467 total |
 | Build boundary | `pnpm check:webui-boundary` | **pass** — 467 inputs; source/output integrity, required entries and public workspace imports verified |
-| Source projection | `node scripts/source-inventory.mjs --write` then `pnpm check:source` | **pass** — 5406 published paths |
+| Source projection | `node scripts/source-inventory.mjs --write` then `pnpm check:source` | **pass** — 5407 published paths |
 | Real browser | `pnpm test:webui-browser` | **pass** — 146 Playwright tests, 2.1m, against real Chrome 152 |
 
 One gate beyond §7 was run as well, because it is the closest thing the repository has to
@@ -75,7 +77,8 @@ branch and on the base branch:
 | `83d8052a` (the first push) | `test:webui` on ubuntu — the suite's file failing with every test in it passing: the `ENOTEMPTY` cleanup race, fixed in `782c137b` |
 | `5d154673` | `test:capabilities` on macos-latest, in `packages/local-runtime-v2/test/unit/agent/storage/agent.repository.test.ts` |
 | `acbf1b40` | `verify (ubuntu-latest)` — the six external-bridge cases described below |
-| `01cf5785` (the tip) | the same six, and `verify (macos-latest)` was **cancelled** with the matrix |
+| `01cf5785` | the same six, and `verify (macos-latest)` was **cancelled** with the matrix |
+| `9d945e54` | the same six — now with a named cause — and `verify (macos-latest)` **passed** (14m51s) |
 | `a63a6c99` — the base branch's own CI run, before this programme | `verify (macos-latest)` and `verify (ubuntu-latest)` |
 
 So the `test:capabilities` failure is **pre-existing on the base branch**, in a package this slice
@@ -109,12 +112,17 @@ Inside the ubuntu job:
 | `test:webui-package` | **pass** (23.1s) |
 | `test:webui-browser` | **FAIL** (890.4s) — 140 passed, **6 failed** |
 
+The next run of the branch — `39656341109`, head `9d945e54` — repeated the ubuntu failure and settled
+the macOS question: `changes` **pass**, `verify (windows-latest)` **pass** (2m59s),
+`verify (macos-latest)` **pass** (14m51s), `verify (ubuntu-latest)` **failure** (16m59s). The macOS job
+had no verdict at `01cf5785` because the matrix cancelled it; it has one now.
+
 ### The six failures, and what they are not
 
 The six are all in `packages/webui/test/browser/browser-bridge-real-external.spec.ts` — the
 **previous** programme's external-bridge cases, which drive a real browser with the built extension
-and then act on the **live tab**. Each one ran to the test's own 120-second timeout with no other
-error:
+and then act on the **live tab**. At `01cf5785` each one ran to the test's own 120-second timeout
+with no other error:
 
 | Case | Result |
 | --- | --- |
@@ -124,6 +132,38 @@ error:
 | `browser-bridge-real-external.spec.ts:82:5` — the bridge survives the worker being terminated in `msedge` | timeout (2.0m) |
 | `browser-bridge-real-external.spec.ts:162:5` — text input reaches the page through the edge bridge in `msedge` | timeout (2.0m) |
 | `browser-bridge-real-external.spec.ts:262:5` — a DevTools command runs against the live tab through the edge bridge in `msedge` | timeout (2.0m) |
+
+### Where they stop, and what was done about it
+
+A timeout with no other information says nothing about *where* the case stopped, because the
+harness's waits on the extension have no deadline of their own: a service worker Chrome has
+reclaimed does not answer, and a message nobody replies to does not settle. Every such wait is now
+bounded, and each bound names the step it was waiting for (`9d945e54`) — a bound that expires
+fails the case with a diagnosis, and it neither makes a failing case pass nor skips one.
+
+With the bounds in place, the next CI run named the step:
+
+```
+Error: the bridge's http server did not close did not finish within 30000ms
+    at real-browser-bridge.ts:127
+```
+
+So the cases' **work is finished** — the browser starts, the extension pairs, the handshake
+completes, the DevTools command runs against the live tab — and what hangs is the **cleanup**. The
+browser is still running while the harness closes its server, so the browser may still be holding a
+connection: the extension's socket, or the keep-alive connection the test page was fetched over.
+A server that waits for a client to go away first cannot close while that client is still running,
+and the extension makes it worse by reconnecting to a host that is going away.
+
+Two changes, both test-side, neither of them an assertion:
+
+| Commit | Change |
+| --- | --- |
+| `9d945e54` | every wait in the harness that can outlive its case is bounded, and names its step |
+| `a4f8f7c6` | the browser stops before the server, and the harness cuts the connections it still holds instead of waiting for them |
+
+The local browser suite is green with both (146 cases, 2.1m). What the next CI run says about the
+six is recorded below.
 
 **This corrects what an earlier version of this record said.** It said the runner "cannot drive a
 real browser with the extension", and that the spec's "is the browser installed" guard was the
@@ -161,14 +201,17 @@ $ git diff --name-only webui..HEAD -- packages/browser-extension packages/webui/
 $ git diff --name-only webui..HEAD -- packages/webui/test/browser
 packages/webui/test/browser/acceptance-record.ts
 packages/webui/test/browser/architecture-acceptance.spec.mjs
+packages/webui/test/browser/browser-bridge-real-external.spec.ts
 packages/webui/test/browser/native-runtime.spec.mjs
+packages/webui/test/browser/real-browser-bridge.ts
 packages/webui/test/browser/review-consumers.spec.mjs
 packages/webui/test/browser/terminal-cross-page.spec.mjs
 ```
 
-The five files under `packages/webui/test/browser/` are the acceptance-record writer — which the
-sibling spec shares, and which the sibling spec passing in CI demonstrates to be sound — and four
-specs that never mention the bridge or the extension.
+Of the seven files under `packages/webui/test/browser/`, five are the acceptance-record writer and
+four specs that never mention the bridge or the extension, and the other two are the external-bridge
+case and the harness it shares with the sibling spec — the two files the cleanup fix above touches.
+Neither the extension nor the bridge server changed at all.
 
 **They pass here**: the same six cases, on the same tree, in about five seconds, and the record they
 write names the browsers they ran in — Chromium 153.0.8010.12 and Edge 155.0.4283.62, six cases,
@@ -188,17 +231,15 @@ programme's own evidence, and it is the file the published acceptance record is 
 ## What was not observed
 
 - The macOS `verify` job at the tip: it was **cancelled** with the matrix when the ubuntu job
-  failed, so it has no verdict. At `acbf1b40` the same job passed (14m47s), on the same code — the
-  five commits between them are documentation only.
-- Why the six external-bridge cases hang on that runner. They hang without an error, the run names
-  no step, and Playwright's trace for them is written to the runner's temporary directory and is
-  not uploaded with the verification summary. The local runs pass, the runner's sibling spec
-  passes, and the same six failed on the base branch's own head; what is still unknown is the
-  step inside the case where they stop. Nothing in this slice narrows that further, and this
-  record says so rather than naming a cause it has not seen.
+  failed, so it had no verdict. It has one now — the run at `9d945e54` passed it (14m51s) — and the
+  run after that passes it too.
 - The cross-surface bootstrap — a person opening a web tab while the run is selected on Edge — is
   implemented run-wide, but it has no dedicated test. The two same-surface cases are covered by the
-  acceptance suite.
+  acceptance suite. The plan's own acceptance matrix (§6) is entirely on the `isolated` surface, so
+  this is a gap in the evidence rather than in the plan's requirements.
+- Playwright's trace for the six external-bridge cases is written to the runner's temporary
+  directory and is not uploaded with the verification summary, so the trace itself has not been
+  read. The bounded waits name the step without it.
 
 ## A commit whose subject names only part of it
 
