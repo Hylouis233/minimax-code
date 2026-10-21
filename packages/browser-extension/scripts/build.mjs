@@ -27,7 +27,19 @@ import { promisify } from "node:util";
 const run = promisify(execFile);
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-const outDir = join(packageRoot, "dist");
+
+/**
+ * Where this build goes.
+ *
+ * `--out <dir>`, relative to the package root. The default is `dist`. A store
+ * build wants its own directory: a packaged build and a development build
+ * cannot share one directory, because the packaged build's manifest carries the
+ * store's public key and the development build's does not, and a build that
+ * overwrote the other would make the identity of the loaded extension depend
+ * on which suite ran last.
+ */
+const outIndex = process.argv.indexOf("--out");
+const outDir = outIndex >= 0 ? join(packageRoot, process.argv[outIndex + 1]) : join(packageRoot, "dist");
 
 /**
  * The store this build is for, when it is a packaged build.

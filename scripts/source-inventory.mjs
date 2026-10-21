@@ -29,6 +29,16 @@ const skipped = new Set([
   ".codegraph",
 ]);
 /**
+ * The unpacked store builds, by name.
+ *
+ * A store build is built into its own directory beside `dist/`, because the
+ * packaged build's manifest carries the store's public key and the development
+ * build's does not. They are build outputs and they are machine-local, in the
+ * same way the archives beside them are.
+ */
+const STORE_BUILD_DIRECTORIES = new Set(["dist-store-chrome", "dist-store-edge"]);
+
+/**
  * Whether a name is a build output rather than source.
  *
  * The packaged store archives are named after the directory they are built
@@ -39,6 +49,7 @@ const skipped = new Set([
  * would fail with a difference that no one can act on.
  */
 function isBuildOutput(name) {
+  if (STORE_BUILD_DIRECTORIES.has(name)) return true;
   return name.startsWith("dist-") && name.endsWith(".zip");
 }
 

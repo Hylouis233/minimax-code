@@ -13,3 +13,4 @@ dist-webui/
 .codegraph/
 .plan
 dist-*.zip
+dist-store-*/
