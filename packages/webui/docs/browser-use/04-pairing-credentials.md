@@ -5,7 +5,7 @@
 | Label | Means | Backed by |
 | --- | --- | --- |
 | `implemented` | The source does this today; the row names the file. | `packages/webui/src/server/browser-bridge/credential-store.ts` and the extension's `src/pairing.ts` |
-| `measured` | A probe observed this on the machine named in that section. | `.plan/board/validation/credential-store-evidence.json` |
+| `measured` | A probe observed this on the machine named in that section. | `.plan/browser-use/complete/credential-store-evidence.json` |
 | `not yet measured` | An open question. Not a denial and not a promise. | Nothing |
 
 The per-OS mechanisms below are `implemented`. Credential-store **availability** is `measured` on one
@@ -78,7 +78,7 @@ still asserted through an injected runner rather than executed.
 
 ## Measured: unavailable on the one host the probe ran on
 
-`.plan/board/validation/credential-store-evidence.json`, `platform: "linux"`:
+`.plan/browser-use/complete/credential-store-evidence.json`, `platform: "linux"`:
 
 | Provider | Field | Value |
 | --- | --- | --- |

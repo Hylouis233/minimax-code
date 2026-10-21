@@ -368,3 +368,38 @@ rather than being allowed to take the surface away from the one that holds
 it. The **same** browser reconnecting is not a second browser: a Manifest V3
 worker that restarts reconnects, and the new connection has to be able to
 take over before the old socket's close has been noticed.
+
+### A8 — The panel shows the person's tab; the run's selection is a separate cell
+
+The decisions above say that the panel follows the target of the active
+Agent run, and that both the user and the Agent can select a target. The
+implementation carried the first and refused the second: the panel was a
+view of a run's selected target, and the only writer of that selection was
+the panel's own target list. A run that had never selected anything could
+not act at all — not even `open_tab`, which is the action that would have
+given it a selection. A person asking the Agent to open a browser got
+`browser_target_unknown` for every action.
+
+[ADR 0022](./0022-webui-workspace-panel-is-a-browser-tab-strip.md) replaces
+the single Browser panel with a per-session browser tab strip, and it
+separates the two things the earlier text had merged:
+
+- The **run's selection** is the page the Agent acts on. The Agent creates it
+  with `open_tab`, which opens a page, makes it the run's selection, and
+  tells the client so the tab appears in the strip. The panel does not write
+  this cell, and the rule that a run with no selection is refused rather than
+  given a page nobody chose still stands for every other action.
+- The **tab the person is looking at** is the page the person sees and types
+  into. Activating a tab and choosing a launcher tile are panel actions.
+
+The two may name different pages at the same time, and the frame stream
+becomes per target so that each tab's picture is its own. A person browsing
+their own tab therefore does not move the Agent off its page, and the Agent
+opening a tab does not yank the person away from theirs.
+
+The external browsers are not changed by this amendment: the extension bridge, the pairing and
+the credential store are untouched, and a switched-on surface still authorizes the Agent's commands.
+What is removed is the browser tool tab, with the panel it belonged to, and with it the surface
+switcher. That switcher was the panel's way of reaching Edge and Chrome, and the panel was never
+where those browsers are driven: they are driven in the user's own windows, where the person sees
+them. The panel is the isolated browser's view, and it stays that.

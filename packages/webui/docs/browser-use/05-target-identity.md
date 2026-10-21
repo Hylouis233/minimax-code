@@ -131,14 +131,14 @@ identity the message arrives on. See [`02-bridge-protocol.md`](02-bridge-protoco
 
 ## Selection is scoped to the Agent run / TUN
 
-| Rule | Consequence |
-| --- | --- |
-| Each Agent run / TUN owns its own target selection | Two concurrent runs select independently |
-| One run's selection must not overwrite another's | Selecting a tab in run A does not move run B's target |
-| The Agent may choose a different authorized tab each turn | Selection is not pinned for the life of a run |
-| **After switching tabs, the Agent must reacquire page elements** | References from the previous tab are dead. This is a caller obligation, enforced by the generation counter making it visible |
-| Operations against the same tab are serialized | One writer per tab |
-| Operations against different tabs may proceed independently | Concurrency is per tab, not global |
+| Rule | Consequence | State |
+| --- | --- | --- |
+| Each Agent run / TUN owns its own target selection | Two concurrent runs select independently | `implemented` — the service keys its selections by surface and then by run (`WebuiBrowserService.#selected`) |
+| One run's selection must not overwrite another's | Selecting a tab in run A does not move run B's target | `implemented` — the selection map is per run |
+| The Agent may choose a different authorized tab each turn | Selection is not pinned for the life of a run | `required` — the contracts pin it and the tree has no path: the Agent's tools can only act on a selection, and nothing the Agent does creates one. [ADR 0022](../adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md) decides how that path is built |
+| **After switching tabs, the Agent must reacquire page elements** | References from the previous tab are dead. This is a caller obligation, enforced by the generation counter making it visible | `required` — a rule on the caller; the generation counter can only report the mismatch |
+| Operations against the same tab are serialized | One writer per tab | `required` — the service and the CDP connection both answer commands without serializing them per target |
+| Operations against different tabs may proceed independently | Concurrency is per tab, not global | `required` — the tree has one provider per surface, so a second tab has no session to address |
 
 The reacquire rule is stated as a requirement on the caller rather than as a mechanism, because the
 generation counter can only report the mismatch — it cannot re-resolve an element reference. A reference
@@ -147,21 +147,49 @@ recorded against generation *N* has no meaning at *N+1*, and nothing on the host
 ## The panel follows the active run
 
 There is one browser panel. It shows the target of the **active or focused** Agent run, and it shows
-that run's target rather than any other run's.
+that run's target rather than any other run's. This section describes the tree as it stands;
+[ADR 0022](../adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md) replaces the single panel
+with a per-session tab strip and separates the run's selection from the tab a person is looking at.
+The rules that decision pins are in [The tab model](#the-tab-model-adr-0022).
 
-| Rule | Reason |
-| --- | --- |
-| The panel projects the active run's selection | The user is watching the run they are looking at, not a different run's tab |
-| Changing runs updates the panel | The panel re-reads the newly active run's selection |
-| A frame for a target the panel is not showing is dropped | The frame carries its identity, so a stale or out-of-band frame is detectable and is not displayed as if it were the chosen page. **`implemented`** — `WebuiBrowserService.#frameMatchesSelection` (`browser-service.ts:396`) compares all four identity fields and the stream drops non-matching frames (`browser-service.ts:370`); see finding F6 |
-| The panel never switches the target itself | Selection belongs to the run; the panel reflects it |
+| Rule | Reason | State |
+| --- | --- | --- |
+| The panel projects the active run's selection | The user is watching the run they are looking at, not a different run's tab | `implemented` — the panel reads the run's selection from the target list (`BrowserPanelHost` → `listBrowserTargets`) |
+| Changing runs updates the panel | The panel re-reads the newly active run's selection | `implemented` — the panel re-reads the list when the run changes |
+| A frame for a target the panel is not showing is dropped | The frame carries its identity, so a stale or out-of-band frame is detectable and is not displayed as if it were the chosen page. | `implemented` — `WebuiBrowserService.#frameMatchesSelection` (`browser-service.ts:733`) compares all four identity fields and the stream drops non-matching frames (`browser-service.ts:664`); see finding F6 |
+| The panel never switches the target itself | Selection belongs to the run; the panel reflects it | `implemented` — the panel writes a selection only when the person clicks a target, and it never moves one on its own |
 
-That last row is the distinction that keeps the panel honest. The panel is a projection of another
-owner's state. If the panel could select, it would be a second writer on the same per-run selection, and
-the run's choice would stop being authoritative.
+That last row is the distinction that keeps the panel honest. The panel reflects the run's selection,
+and it writes that selection only when the person asks it to. If the panel could move a selection on
+its own, it would be a second writer on the same per-run selection, and the run's choice would stop
+being authoritative.
 
 The frame's `sequence` is a monotonic per-stream counter, so a client can also detect a dropped frame —
 a liveness signal that is independent of whether the frame was the right one.
+
+## The tab model (ADR 0022)
+
+[ADR 0022](../adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md) replaces the single browser
+panel with a per-session browser tab strip. It is accepted and not yet in the tree, so every rule below
+is `required` — the contracts pin it and the source does not enforce it yet.
+
+| Rule | Consequence | State |
+| --- | --- | --- |
+| A tab is a slot whose content can be replaced in place | Choosing a launcher tile or typing a URL changes what the tab shows; the tab is not closed and the strip does not flicker | `required` |
+| The tab's id belongs to the client | Two web tabs in one session are two tabs, and the id does not change when the content does; the target identity is a binding the tab holds | `required` |
+| The URL box belongs to the new tab page | There is no persistent address bar; a web tab carries a toolbar (back, forward, reload, read-only URL) instead | `required` |
+| A web tab holds exactly one browser page | The isolated Chromium holds one page per web tab, so a page is addressable by the tab that shows it | `required` |
+| A web tab is titled by the page and glyphed by default | The title is the one the provider already reports; the icon is a default glyph, and fetching a site's icon is not part of this | `required` |
+| The Agent opens web tabs | `open_tab` creates a page, makes it the run's selection and tells the client, so a tab appears in the strip and becomes the active one | `required` — the tree refuses every action of a run with no selection, including `open_tab` |
+| The run's selection and the person's active tab are separate cells | A person opening their own tab does not move the Agent off its page, and the Agent opening a tab does not yank the person away from theirs. The person's input follows their tab; the Agent's actions follow the run's selection | `required` |
+| One bootstrap: a person opening a web tab gives the run that page **only when the run has no selection** | A run with no selection cannot act at all, so the person's page becomes the run's selection; after that the two cells are independent | `required` |
+| Closing a web tab closes its page | The runtime's page set follows the strip, so a closed tab leaves no page behind in the Chromium | `required` |
+| The browser tool tab is deleted | The strip's kinds lose `browser` and with it the surface switcher: the panel is the isolated browser's view, and the external browsers are driven in the user's own windows | `required` |
+| Frames are per target | Each tab's picture is its own; a frame reaches only the tab that asked for it | `required` — the stream is per run today |
+
+The last two rows are the ones that change the previous section. The panel is no longer a projection
+of the run's selection: it shows the tab the person is looking at, and the run's selection is a
+separate cell with a separate writer.
 
 ## Related
 

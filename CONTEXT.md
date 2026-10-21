@@ -126,6 +126,11 @@ One submitted request inside a session, from submission to completion, including
 tool execution and interactions it requires.
 _Avoid_: request, run, task
 
+**Run**:
+The Agent's browser working context. A run is keyed by the WebUI Agent session, so one
+session drives one browser selection, and the run's selection is the page the Agent acts on.
+_Avoid_: turn (a turn is one submitted request inside a session)
+
 **Working directory**:
 The directory a session is bound to. It is the execution boundary for file and Git
 tools, is chosen explicitly when the session is created, and cannot be changed
@@ -199,14 +204,15 @@ client may also operate that same target.
 _Avoid_: browser automation (too broad; may mean unrelated test automation)
 
 **Browser target**:
-The browser page or session selected for Browser Use. Its origin may be an isolated browser or a
-user's existing browser; its identity is distinct from the WebUI Agent session.
-_Avoid_: tab (a target may outlive or span a tab)
+The browser page selected for Browser Use, named by its browser, its tab and the generation of
+the page behind it. Its origin may be an isolated browser or a user's existing browser; its
+identity is distinct from the WebUI Agent session.
+_Avoid_: tab (a tab is the slot that holds a target; the target is the page inside it)
 
 **Browser surface**:
-A client-facing way to view or select a Browser Use target, such as the isolated-browser panel or an
-external-browser connection.
-_Avoid_: browser target (the surface is how the target is reached, not the target itself)
+Which browser a Browser Use target belongs to: the host's own isolated browser, or the user's
+own Edge or Chrome. A surface is how a target is reached, not the target itself.
+_Avoid_: browser target (the surface is which browser, the target is which page)
 
 **Capability slice**:
 The subset of capability methods supplied to a business owner. Presentation
@@ -418,9 +424,35 @@ The message input, its menus and its toolbar.
 A session's message log.
 
 **Workspace panel**:
-The right column and the tabs it shows. A tab is a kind, not a component, and the
-set of kinds is enumerated in exactly one place.
+The right column and the tabs it shows. A tab is a slot whose content can be replaced in
+place, and the set of content kinds is enumerated in exactly one place. Its strip holds tool
+tabs and web tabs.
 _Avoid_: side panel, right bar, inspector
+
+**Tab**:
+A slot in the workspace panel's strip. It holds one piece of content at a time, and its
+content can be replaced without the tab being closed.
+_Avoid_: page (a page is what a web tab holds), kind
+
+**Tab strip**:
+The row of tabs in the workspace panel. It follows a browser's rules: a new tab opens with the
+new tab page, a tab can be closed, and one tab is active at a time.
+_Avoid_: browser (the driven browser is a surface, not this), toolbar, menu bar
+
+**Tool tab**:
+A tab whose content is a workspace tool view — files, terminal, canvas or changes. It holds no
+browser page.
+_Avoid_: plugin tab, panel, view tab
+
+**Web tab**:
+A tab whose content is a browser page. It is the unit a person browses in and the unit the
+Agent opens.
+_Avoid_: target (a tab holds one), page
+
+**New tab page**:
+The launcher a newly opened tab shows. It offers the tool views and a URL box; choosing
+either replaces that tab's content.
+_Avoid_: home page, start page, add menu
 
 **Progress**:
 What a turn has done so far, expressed as todos and subagents.

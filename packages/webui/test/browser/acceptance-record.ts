@@ -10,6 +10,10 @@
 // matrix is `packages/webui/docs/browser-use/09-acceptance-record.md`, and it
 // says which run it was written from.
 //
+// The records live under the plan that asked for them, in that plan's
+// `complete/` directory, so a second plan's records cannot land on top of this
+// one's.
+//
 // One file per suite. A suite replaces its own file on the first record of a
 // run, so a re-run cannot leave a case behind from the previous one, and the
 // suites cannot overwrite each other's records.
@@ -62,7 +66,7 @@ export interface AcceptanceRecord extends AcceptanceObservation {
 }
 
 const recordDir = resolve(
-  new URL("../../../../.plan/board/validation", import.meta.url).pathname,
+  new URL("../../../../.plan/browser-use/complete", import.meta.url).pathname,
 );
 
 /** The suites that have written a record in this process. */

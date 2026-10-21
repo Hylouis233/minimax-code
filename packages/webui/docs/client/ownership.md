@@ -12,10 +12,14 @@ published commands or read models. It may serve several presentation surfaces wi
 any one of them, and owning a surface is not part of the definition: `terminal` owns the catalogue of
 terminals this client knows about, the commands that create, write to, resize and dispose one, and the
 watch registry that the workspace surface renders; `review` owns the turn-changeset and
-working-tree-snapshot families that the transcript, workspace and settings surfaces read. The process
-behind a terminal belongs to the service, not to the business — see *Surface facts worth knowing*
-below. `turn` is a business even without a screen, because its attach-to-settle lifecycle and
-generation-fenced identity outlive any surface.
+working-tree-snapshot families that the transcript, workspace and settings surfaces read; `browser`
+owns the per-target browser state — a page, its title and URL, and the run's selection — while
+`workspace` owns the session's tab strip that renders it. The process behind a terminal belongs to
+the service, not to the business — see *Surface facts worth knowing* below. `turn` is a business even
+without a screen, because its attach-to-settle lifecycle and generation-fenced identity outlive any
+surface. The browser clause is `required` in one part: both businesses and the strip exist, but the
+run's selection is the runtime's (`runtime/browser/browser-service.ts`), and the panel's target list
+is its only writer.
 
 Each business directory holds up to five roles, and the role decides what the file may do — not the
 directory it happens to sit in:
@@ -65,6 +69,11 @@ Four rules, each with a mechanism in `client/conversation/`:
   response-affecting input (including opaque credential/configuration generations), so two answer
   fields cannot overwrite each other. A selected destination is a separate cell with its own
   identity and generation, so a slow answer for an earlier selection is refused at the new one.
+  A web tab's page is the browser's instance of that split: the page's title, URL and generation
+  are answers keyed by the target, while the tab the person is looking at is the selected cell, so
+  two tabs cannot overwrite each other's page state and a frame for a tab the strip has left is
+  refused rather than drawn as the tab on screen (`required` — the frame stream is keyed by run
+  today: `runtime/browser/browser-service.ts` follows one run's selection, not a target's).
 
 Resource release retires cached detail, revisions, in-flight records and epoch subscriptions.
 A monotonic revision floor prevents a released and recreated key from accepting old tokens.
@@ -119,3 +128,15 @@ proposing to move this state to the server.
 - **Review.** Turn changesets and working-tree snapshots are two distinct resource families with
   separate owners (`client/features/review/application/turn-review-owner.ts`,
   `workspace-review-owner.ts`); a revert or reapply invalidates the family it touched.
+- **Browser.** The strip is per session: `client/shell/use-workspace-panel-session.ts` reads and
+  writes panel state through `stateFor(sessionId)` and `dispatch(sessionId, …)`, so a tab opened in
+  one session is not in another's. A tab is a stable slot whose content can be replaced in place, and
+  the URL box exists only inside the new tab page — a web tab carries a toolbar (back, forward,
+  reload, the URL read-only) instead. The run's selection and the tab the person is looking at are two
+  cells with one writer each, with one bootstrap: a person who opens a web tab while the run has no
+  selection gives the run that page. The slot, the launcher and the two cells are `required`: the
+  tree's tabs are keyed by kind and opened from the add menu
+  (`client/features/workspace/projection/workspace-panel-state.ts`), so one browser tab sits among
+  six rather than a strip of tabs the Agent can open. The browser tab is the isolated browser's
+  view and the surface switcher it carries goes with it — the external browsers are driven in the
+  user's own windows, so the panel is not where a surface is chosen.

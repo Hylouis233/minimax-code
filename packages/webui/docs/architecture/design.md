@@ -50,8 +50,16 @@ nothing from `packages/tui` (ADR 0003) and does not drive the CLI binary (ADR 00
 | --- | --- | --- |
 | `src/client/` | Browser orchestration, business state, presentation, browser IO | Speaks to the harness, holds a Node resource |
 | `src/server/` | Network ingress: admission, envelope validation, dispatch, wire projection, socket lifecycle, static assets | Holds browser state, imports a runtime implementation |
-| `src/runtime/` | Harness capability adaptation, and every Node-side process resource | Knows which session a browser has selected |
+| `src/runtime/` | Harness capability adaptation, and every Node-side process resource | Knows which tab a person is looking at, or which target a run has selected (`required` — see below) |
 | `src/shared/` | Cross-process wire contracts and shared constants | Imports either execution side |
+
+That last cell names two things, and under
+[ADR 0022](../adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md) they are two cells with one
+writer each: the person writes the tab they are looking at through the strip, and the Agent writes
+the target its run has selected. The runtime holds both cells and writes neither: the person and the
+Agent are the writers, and the runtime is the place the cells live. That split is `required` — the tree
+keeps the run's selection in `runtime/browser/browser-service.ts`, where the panel is its only
+writer.
 
 `src/client/` compiles under `tsconfig.client.json`; `src/server/`, `src/runtime/` and `src/shared/`
 under `tsconfig.server.json`. `scripts/build-webui.mjs` builds separate client and server outputs,
@@ -233,9 +241,12 @@ its own resource identity, policies and published commands — the directories u
 are the list. Owning a screen is not part of the definition: `terminal` owns the catalogue of terminals
 this client knows about, the commands that create, write to, resize and dispose one, and the watch
 registry, while the workspace surface renders them; `review` owns the turn-changeset and
-working-tree-snapshot families, which the transcript, workspace and settings surfaces read; and `turn`
-has no `ui/` at all, yet is a business, because its attach-to-settle lifecycle and generation-fenced
-identity outlive any surface. The process behind a terminal is the service's, not the business's
+working-tree-snapshot families, which the transcript, workspace and settings surfaces read; `browser`
+owns the per-target browser state — a page, its title and URL, and the run's selection — while
+`workspace` owns the session's tab strip that renders it (`required`: both businesses exist, but the
+selection is the runtime's, not the browser business's); and `turn` has no `ui/` at all, yet is a
+business, because its attach-to-settle lifecycle and generation-fenced identity outlive any
+surface. The process behind a terminal is the service's, not the business's
 (§11). Each business directory holds up to five roles (`contracts/`, `application/`, `projection/`,
 `bindings/`, `ui/`); the role decides what a file may do, and the dependency check enforces the layer a
 role belongs to. Details: [`../client/ownership.md`](../client/ownership.md).
@@ -322,3 +333,10 @@ A change that breaks one of these is a design change, not a refactor:
 9. **`shared/` reaches neither execution side**, and `packages/tui` is never imported.
 10. **One writer per piece of state.** No two modules own the same map, and the writable session record
     has one owner.
+11. **One writer per browser cell, and the two cells are separate.** The run's selection is written by
+    the Agent through the runtime; the tab the person is looking at is written by the person through
+    the strip; neither party writes the other's cell. There is one bootstrap: a person who opens a web
+    tab while the run has no selection gives the run that page, because a run with no selection cannot
+    act at all. `required` — the tree has one selection map, the panel writes it (`selectBrowserTarget`),
+    and the Agent cannot write it at all: its tools refuse a run that has selected nothing
+    (`runtime/browser/tool-adapter.ts`). See §8 for the businesses that own each side.
