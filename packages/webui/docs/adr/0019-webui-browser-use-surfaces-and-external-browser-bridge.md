@@ -205,10 +205,11 @@ claims must be checked against the source.
 
 ## Amendments
 
-Implementation and three independent reviews of this decision record raised
-questions the original text did not settle. These are the answers, recorded
-here because they change how the bridge is built rather than only how it is
-documented.
+Implementation and the review rounds recorded in
+[`../browser-use/07-review-findings.md`](../browser-use/07-review-findings.md)
+raised questions the original text did not settle. These are the answers,
+recorded here because they change how the bridge is built rather than only how
+it is documented.
 
 ### A1 — How the extension obtains the host's pairing credential
 
@@ -317,3 +318,53 @@ whichever selection was written last.
 The selection is therefore carried by the run that made it. What the panel
 shows when no run is active — the last selection the run made, or nothing — is
 a product decision that the implementation records rather than guessing.
+
+### A5 — The surface is settled by the browser, and bound to that surface's own secret
+
+The decision above treats a surface as a browser. The first implementation
+mapped a peer's **extension identity** to a surface, taking the first pairing
+whose allowlist admitted it. That is wrong for the development configuration
+the decision asks for: an unpacked build has one identity, and a person who
+loads it in both Edge and Chrome lists that identity on both surfaces. The
+first match won, so a Chrome browser landed on the Edge pairing — the Edge
+surface reported connected while the person was looking at Chrome, and the
+Chrome surface never came up at all.
+
+The peer therefore names the browser it runs in, and the host answers with the
+pairing for that browser. The name is not the authority: each surface has its
+own installation key and its own credential, the challenge is issued by that
+surface's pairing, and the proof is verified against that pairing's own
+secret. A peer that calls itself Edge and answers with the Chrome surface's
+installation key is refused. The name only selects *which* secret has to be
+proved; it cannot produce one.
+
+### A6 — A packaged host accepts store identities and never development ones
+
+The decision above says the extension comes from a store, so the identity is
+the one the store issues. The first implementation had a packaged host and a
+development host in the source and no rule connecting them: both composition
+roots built the bridge the same way, so a released WebUI accepted whatever
+unpacked extension happened to be present. An unpacked build's identity is
+derived from the directory it was loaded from, so it is not an identity anyone
+can rely on.
+
+A packaged host now reads the store allowlist and never the development one.
+The development entry reads the development allowlist, because that is where
+the identities of unpacked builds belong. A store identity is still an
+ordinary configuration value: an operator who runs the packaged entry against
+a locally built extension names that extension's identity explicitly, in the
+store variable.
+
+### A7 — A surface is one browser
+
+The decision above has one panel per surface, and the Agent's tools act on the
+surface the run selected. The bridge exposed one provider per surface, so a
+second live session on that surface would be a browser the host could not
+address: its tabs were announced into a table the provider did not read.
+
+A surface therefore serves one browser. A *different* browser instance
+connecting to a surface that is already served is refused with a reason,
+rather than being allowed to take the surface away from the one that holds
+it. The **same** browser reconnecting is not a second browser: a Manifest V3
+worker that restarts reconnects, and the new connection has to be able to
+take over before the old socket's close has been noticed.
