@@ -281,7 +281,7 @@ compares: a `keyId` that is not the expected one, a `nonce` that is not the outs
 the older extension and accepted; a *different* one is refused. The length comparison then happens
 inside `constantTimeEqual`, which returns false on a length mismatch rather than throwing.
 
-## Reconnect policy — `implemented`, unwired
+## Reconnect policy — `implemented` and wired
 
 A reconnect must never change what the user selected. The schedule is implemented in
 `packages/webui/src/server/browser-bridge/reconnect.ts` and every value below is transcribed from the
@@ -312,12 +312,15 @@ effect the user already sees.
 On deadline expiry the operation reports `browser_operation_timeout` from the pinned error-code set
 (`packages/webui/src/shared/contracts/browser.ts`).
 
-`not yet measured` — nothing exercised this ladder. The bridge is unwired (finding F3), and no probe
-induced a disconnect.
+**`measured`, in part.** A real Chrome and a real Edge had the extension's service worker
+terminated while an image stream was running: the host saw the session drop, the surface went
+down, and the bridge was usable again as soon as the worker woke. The 250 ms → 4 s ladder and the
+15-second operation deadline are exercised by the unit suite; no operation was left to time out
+against a real browser, so the timeout branch is still a unit-suite result.
 
 ## MV3 service-worker restart
 
-**`required`, and not verified.** A Manifest V3 extension service worker can terminate and restart at
+**`implemented`, and `measured` in a real browser.** A Manifest V3 extension service worker can terminate and restart at
 the browser's discretion. Chrome documents that an active WebSocket connection extends the worker's
 lifetime from Chrome 116 onward — and the extension's `manifest.json` sets
 `"minimum_chrome_version": "116"` for exactly that reason — which reduces how often this happens. It
@@ -330,7 +333,11 @@ background ladder otherwise, and never a target switch. A restarted worker mints
 ECDH key, re-sends `hello`, receives a fresh `pair`, stores the credential it recovered in extension
 local storage — which survives the worker — and answers the fresh challenge.
 
-No probe observed a worker restart. This row states a requirement, not a measurement.
+**`measured` in a real Chrome and a real Edge.** The acceptance terminates the extension's service worker
+while an image stream is running, by closing its target — which is what the browser does when it
+reclaims an idle worker. The host sees the session drop, the surface goes down, the worker is
+woken by the next event, and a DevTools command against the live tab answers again afterwards.
+See [`09-acceptance-record.md`](09-acceptance-record.md).
 
 ## Related
 

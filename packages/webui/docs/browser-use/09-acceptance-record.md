@@ -24,10 +24,16 @@ published document. The four suites that produce it are:
 | `real-external` | The bridge itself — input, image, DevTools, worker termination — in the same two browsers. Playwright. |
 | `real-packaged` | The **packaged** entry: a store build's identity, and what a packaged host does with it. Playwright. |
 
-A suite replaces its own file on the first record of a run, so a re-run cannot leave a case behind
-from the previous one, and the suites cannot overwrite each other's records. A **failing** case is
-recorded as a failure before the error is re-thrown: a record that holds only the passing cases is a
-record of what was supposed to happen.
+A suite **empties** its own file at the start of a run, so a re-run cannot leave a case behind from
+the previous one, a run that fails during setup leaves an empty file rather than the previous run's
+passes, and the suites cannot overwrite each other's records. A **failing** case is recorded as a
+failure before the error is re-thrown: a record that holds only the passing cases is a record of
+what was supposed to happen.
+
+The settings in a record are **read from the host** — the switch states come from the bridge's own
+snapshot — and they are read **after** the case body has run, so the record describes the state the
+observation was made in rather than the state the case started in. The two switches the bridge does
+not carry are named as such rather than guessed at.
 
 ## The run this document was written from
 
@@ -57,6 +63,7 @@ ones each case actually had.
 | `chrome` | development | Chromium 153.0.8010.12 (bundled) | An extension that cannot prove the installation key is refused | `chrome` on, `edge` off; the host refuses the extension and reports no connected surface | `measured` — pass |
 | `edge` | development | Edge 151.0.4129.107 | The extension completes the handshake once it can prove the installation key | `edge` on, `chrome` off; the host reports the surface connected | `measured` — pass |
 | `edge` | development | Edge 151.0.4129.107 | An extension that cannot prove the installation key is refused | `edge` on, `chrome` off; the host refuses the extension and reports no connected surface | `measured` — pass |
+| `edge` and `chrome` | development | Chromium 153.0.8010.12 (bundled) and Edge 151.0.4129.107 | Each browser lands on its own surface when one identity is listed on both | both surfaces on, one identity on both allowlists; both browsers were connected, each on its own surface, and each surface's provider belonged to that surface | `measured` — pass |
 | `chrome` | development | Chromium 153.0.8010.12 (bundled) | The bridge survives the worker being terminated during an active stream | `chrome` on; the host notices the terminated worker, the surface goes down and comes back, and a command against the live tab answers again | `measured` — pass |
 | `chrome` | development | Chromium 153.0.8010.12 (bundled) | Text input reaches the page and the page's image reaches the host | `chrome` on; the text the host sent appeared in the page's field, and a non-empty image frame for that page arrived at the host | `measured` — pass |
 | `chrome` | development | Chromium 153.0.8010.12 (bundled) | A DevTools command runs against the live tab, and one outside the allowed set is refused as unsupported | `chrome` on, Full CDP exercised; the command in the allowed subset answered with the page's title, and a command outside it was refused as unsupported | `measured` — pass |
@@ -72,7 +79,7 @@ ones each case actually had.
 | `edge` | **packaged** | Edge 151.0.4129.107 | A packaged host admits the edge store build through the store allowlist | store allowlist; the packaged host completed the handshake and reported the surface connected | `measured` — pass |
 | `edge` | **packaged** | Edge 151.0.4129.107 | A packaged host refuses the edge extension named only in the development allowlist | development allowlist on a packaged host; the packaged host refused the extension and reported no connected surface | `measured` — pass |
 
-**Twenty cases, twenty passes.** The three surfaces the specification names — the isolated
+**Twenty-one cases, twenty-one passes.** The three surfaces the specification names — the isolated
 Chromium, Edge and Chrome — are all in the matrix, and every row names the surface it ran on.
 
 ## The packaged entry, in detail
@@ -101,6 +108,11 @@ store's browser** — the Chrome Web Store build in Chrome, the Edge Add-ons bui
    back to the development allowlist would admit whatever unpacked extension happened to be present,
    which is the identity nobody can rely on.
 
+The **installed package** is checked too, and not by a bridge the test built. The package
+verification starts the real `mcode-webui` from the installed archive, configures it with **both**
+allowlists, and shows that the store identity is admitted on its `/browser-bridge` path while the
+development identity is refused. That is the shipped process, running the shipped configuration.
+
 The two entries are configured apart, in the source:
 
 | Entry | File | Allowlist it reads |
@@ -123,6 +135,10 @@ client:
 | A malformed frame | The socket is closed and the host survives it | `measured` — pass |
 | A duplicate connection from the same extension | The earlier session is **replaced**, not left alive beside the newer one | `measured` — pass |
 | A revocation while an action is in flight | The action **fails** rather than hanging or completing | `measured` — pass |
+| One identity on both allowlists | Each browser lands on **its own** surface, and the earlier session is not closed because the other reported the same instance id | `measured` — pass |
+| A peer that names a browser the host does not know | The peer is **refused**, rather than attached to a pairing it does not belong to | `measured` — pass |
+| A peer that names a browser it cannot prove | The name selects *which* secret has to be proved, and the proof is checked against **that surface's own** installation key — so a peer that calls itself Edge and answers with the Chrome key is refused | `measured` — pass |
+| A second browser on a surface that is already served | A surface is one browser: the newcomer is refused, and the browser that holds the surface keeps it | `measured` — pass |
 
 ## The credential never reaches a log
 
@@ -130,8 +146,13 @@ The credential lifecycle ticket asks for "a test that observes a credential neve
 captured log output". That test is
 `packages/webui/test/unit/browser-bridge-credential-secrecy.test.ts`: the whole pairing runs with the
 console and both process streams captured, and the host's own stored secrets are watched in every
-form they could take — raw bytes, base64, hex. None of them appears in the captured output, and none
-appears in the frames the host sent: the credential travels **sealed**, not in the clear.
+form they could take — raw bytes, base64, base64url, hex, the decimal list a byte array prints as,
+and an object that carries one. None of them appears in the captured output, and none appears in the
+frames the host sent: the credential travels **sealed**, not in the clear.
+
+The capture is checked against itself as well: the test writes a secret to the console and asserts
+that the capture finds it, so a capture that silently captured nothing cannot pass for the right
+reason.
 
 ## What this document does not establish
 
@@ -147,6 +168,10 @@ appears in the frames the host sent: the credential travels **sealed**, not in t
 - **The store submission was not performed.** The packaged build exists; the store identity does not
   exist yet, because a store assigns it when the extension is first published. The acceptance uses a
   key generated at run time for exactly that reason.
+- **The packaged entry was exercised at its admission, not through a full pairing.** The installed
+  package is started and its bridge is asked to admit an identity — that is the part the packaged
+  configuration decides. The full pairing, with a real extension and a real browser, is exercised
+  against a packaged *host* in the matrix above, not against the installed process.
 - **The Full CDP switch was not exercised through the runtime gate in a real browser.** The bridge
   carries the DevTools command and the extension's allowlist refuses what is not in it — that is
   what the `real-external` rows measured. The switch that gates it is enforced in the runtime

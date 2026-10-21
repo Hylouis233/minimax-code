@@ -36,10 +36,25 @@ analytics, no telemetry and no remote code.
 | The result of a DevTools command | The loopback WebUI host | So the host can read the page the Agent asked about. |
 | A pairing credential, encrypted | The loopback WebUI host | So the host can prove the peer is this extension and not something else. |
 
-The extension never sends a page's *contents* — it never reads the DOM, the
-cookies or the storage of a page. It forwards what the browser's own DevTools
-protocol exposes, and only the commands listed in
-`packages/browser-extension/src/cdp.ts`.
+**The extension can read the contents of a page.** It attaches the browser's own
+DevTools debugger to the tab the person has paired, and the allowed commands
+include reading the page: `DOM.getDocument`, `DOM.querySelector`,
+`DOM.getOuterHTML`, `DOM.describeNode`, `Runtime.evaluate`,
+`Runtime.callFunctionOn`, `Runtime.getProperties` and
+`Accessibility.getFullAXTree` read the page's DOM, the values of its
+JavaScript objects and its accessibility tree, and `Network.getCookies` and
+`Network.getResponseBody` read the page's cookies and the bodies of the
+responses it received.
+
+Whatever such a command returns is sent back to the loopback WebUI host,
+because that is how the Agent learns what the page says. **The host is the
+only destination**, and the person is the one who paired the tab, but the
+extension is not limited to the page's title and its picture.
+
+The full list of allowed commands is
+`packages/browser-extension/src/cdp.ts`; a command outside it is refused
+rather than attempted, and the refusal is reported to the host as
+`unsupported`.
 
 ## What the extension stores, and where
 
@@ -69,23 +84,28 @@ material and page content into whatever collects extension logs.
 | `scripting` | Injecting the small amount of scripting the input path needs. |
 | `storage` | Holding the host address, the installation key and the pairing credential, as described above. |
 | `webNavigation` | Knowing when a tab navigated, so the host can tell a page that was replaced from the page it replaced. |
-| `<all_urls>` (host permission) | `chrome.tabs.captureVisibleTab` — the only way to deliver the picture of the visible tab — requires either this permission or an `activeTab` permission granted by a user gesture on that page. There is no gesture here: the **host** is asking for the picture, not the person clicking the extension's icon. Without it the browser refuses the capture with *"Either the '<all_urls>' or 'activeTab' permission is required."* The extension captures the visible tab and does nothing else with it: it does not read the page's contents and it does not inject anything. |
+| `<all_urls>` (host permission) | `chrome.tabs.captureVisibleTab` — the only way to deliver the picture of the visible tab — requires either this permission or an `activeTab` permission granted by a user gesture on that page. There is no gesture here: the **host** is asking for the picture, not the person clicking the extension's icon. Without it the browser refuses the capture with *"Either the '<all_urls>' or 'activeTab' permission is required."* The extension captures the visible tab and does nothing else with the permission itself: it injects nothing into the page, and the picture is the only thing the permission is used for. The permission is what lets the extension attach the debugger to a tab, and the DevTools subset it may run there — which can read the page, as described above — is what that attachment allows. |
 
 The host permissions also include `http://127.0.0.1/*` and
 `http://localhost/*`, which is where the WebUI host is reached.
 
 ## Privacy policy
 
-The extension collects **no personal data** and transmits **no personal data**
-to any party other than the WebUI host running on the same machine, which the
-person has installed and started themselves.
+The extension collects **no personal data** of its own and transmits
+**no personal data** to any party other than the WebUI host running on the
+same machine, which the person has installed and started themselves.
 
 The data that passes between the extension and that host — tab titles, tab
-URLs, the picture of the visible tab, and the person's input — is the data of
+URLs, the picture of the visible tab, the person's input, and the result of a
+DevTools command, which **can** be the content of the page — is the data of
 the pages the person is already looking at. It moves only between two programs
 on the same machine, over the loopback interface, and only while the person has
 the browser's Browser Use switch on. It is not stored by the extension beyond
 the credentials described above, and it is not sent anywhere else.
+
+The host stores what it is given in its own data directory, and the Agent may
+act on it. That is the point of the feature, and it is why the switch is off
+until the person turns it on.
 
 No data is sold, shared, or used for advertising, and there is no analytics or
 telemetry of any kind.

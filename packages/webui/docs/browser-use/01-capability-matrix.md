@@ -9,8 +9,8 @@ is:
 | `implemented` | The source does this today. The row names the file. | The cited file in this repository |
 | `not yet measured` | An open question. Not a denial and not a promise. | Nothing — see the section that collects them |
 
-One surface was measured, on one Linux host. Everything else is declared or implemented, and is
-labelled as such.
+The surfaces were measured on one Linux host: the isolated Chromium directly, and Edge and Chrome
+through the extension bridge. Everything else is declared or implemented, and is labelled as such.
 
 This is the matrix ADR 0019 decision 6 requires: what each browser surface offers, which commands were
 actually observed to work, and where the evidence runs out. The authoritative list of what the host
@@ -33,9 +33,9 @@ declaration rather than a probe result. This document is the measurement half.
 | --- | --- | --- | --- |
 | How it is reached | `implemented` — this process launches it and speaks CDP over a loopback WebSocket. Probe measured the CDP surface end to end. | `implemented` — the extension bridge, reached over the dedicated `/browser-bridge` path. The handshake and the refusal are **measured** in real Edge. | `implemented` — the same bridge, on the `chrome` surface. The handshake and the refusal are **measured** in real Chrome. |
 | Authorization switch | `isolatedChromium` | `edge` | `chrome` |
-| Live image stream | **measured** — `Page.captureScreenshot` and `Page.startScreencast` both succeeded against a real page | implemented; the frame path is exercised against a synthetic peer | implemented; the frame path is exercised against a synthetic peer |
-| Pointer / keyboard / text input | **measured** — mouse press + release, `Input.insertText`, and `Input.dispatchKeyEvent` all succeeded against a real page | implemented; the input path is exercised against a synthetic peer | implemented; the input path is exercised against a synthetic peer |
-| Agent browser tools | **not implemented.** The restricted action vocabulary exists in `packages/agent-tools`, and the WebUI now has a browser service with an isolated-Chromium provider, but no Agent browser-tool adapter calls it — so the Agent cannot reach the WebUI browser service from this client. | not implemented, same reason | not implemented, same reason |
+| Live image stream | **measured** — `Page.captureScreenshot` and `Page.startScreencast` both succeeded against a real page | **measured** — the extension captured the visible tab and a non-empty image frame reached the host, in a real Edge | **measured** — the same, in a real Chrome |
+| Pointer / keyboard / text input | **measured** — mouse press + release, `Input.insertText`, and `Input.dispatchKeyEvent` all succeeded against a real page | **measured** — the text the host sent appeared in the page's field, read back through the browser's own automation, in a real Edge | **measured** — the same, in a real Chrome |
+| Agent browser tools | **implemented** — the tool adapter forwards to the same browser service the panel uses, and the composition root hands it to the runtime host. Which *surface* a call acts on is resolved from the run's own selection, so a run that has selected nothing is refused rather than being sent somewhere the person is not looking | **implemented**, same adapter | **implemented**, same adapter |
 | Full CDP widening | `implemented` — gated in `WebuiBrowserService.sendCommand` | `implemented`, same gate | `implemented`, same gate |
 | Restricted command set | `implemented` — `WEBUI_BROWSER_RESTRICTED_COMMANDS`, 28 names, `packages/webui/src/shared/contracts/browser.ts:285` | same vocabulary over the bridge | same vocabulary over the bridge |
 | Extension permission gate | not applicable — no extension is involved | The extension's own browser permission, independent of the WebUI switch | The extension's own browser permission, independent of the WebUI switch |
@@ -287,14 +287,15 @@ of the product.
 - **The provider's attachment retry was not exercised by the probe.** The probe measured that the
   failure is real and that a 750 ms settle clears it. It did not drive `WebuiBrowserIsolatedChromiumProvider`
   itself through the race, so the retry in `provider.ts` is `implemented` only.
-- **The bridge was not exercised, and cannot yet be.** No extension connected to `/browser-bridge`.
-  Beyond the absence of a probe, the bridge modules have no production caller: `admitBrowserBridgeUpgrade`
-  is referenced only from its own module and from tests, and `WebuiBrowserService.#ensureProvider`
-  returns `undefined` for `edge` and `chrome`. The protocol in
-  [`02-bridge-protocol.md`](02-bridge-protocol.md) and the admission path in
-  [`03-extension-admission.md`](03-extension-admission.md) are `implemented` in isolation and unwired.
-- **MV3 service-worker restart was not observed.** No worker was stopped and restarted under load.
-  Reconnection support is a requirement derived from the vendor lifecycle documentation.
+- **The bridge was exercised only as far as the matrix above says.** The acceptance connects a real
+  Chrome and a real Edge to `/browser-bridge`, completes the handshake, drives the input, the image
+  and a DevTools command, and refuses a peer that cannot prove its installation key. What was **not**
+  exercised is a real browser against a **production** host: the bridge the acceptance drives is
+  constructed by the test, and the packaged production entry is checked at its admission, by the
+  package verification, rather than through a full pairing.
+- **The commands outside the extension's allowed subset were not exercised against a real browser.**
+  The subset is refused as `unsupported`, which the acceptance observes; the commands *inside* it
+  were not each run against a live page.
 - **Commands outside the 44 probed were not measured.** Chrome implements far more CDP commands than
   were sent. `Schema.getDomains` being unavailable is precisely why no catalogue was available.
 - **`Target.disposeBrowserContext` was called but not recorded.** The probe disposes of the context it

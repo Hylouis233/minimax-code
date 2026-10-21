@@ -11,8 +11,8 @@ status line of its own:
 
 Where a document mixes the three, they are separated inline rather than merged into one sentence.
 
-**Read [`07-review-findings.md`](07-review-findings.md) before anything else.** **Seven review rounds**
-have run against this change — six by a `codex` `gpt-6-luna` reviewer reading the source rather
+**Read [`07-review-findings.md`](07-review-findings.md) before anything else.** **Nine review rounds**
+have run against this change — eight by a `codex` `gpt-6-luna` reviewer reading the source rather
 than the description, and a final acceptance pass against the finished tree. That document records
 every finding and states, for each, whether it is closed or still open. **Every finding is closed**;
 the ones that changed a decision are recorded in the decision record's amendments, and the ones that

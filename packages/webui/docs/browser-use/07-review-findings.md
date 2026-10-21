@@ -1,6 +1,6 @@
 # Review findings — WebUI Browser Use
 
-**Seven review rounds** have been run against this change. Six of them were run
+**Nine review rounds** have been run against this change. Eight of them were run
 by a `codex` `gpt-6-luna` reviewer reading the source rather than the
 description; the seventh was the final acceptance pass, run against the
 finished tree and against the acceptance criteria the tickets state. This
@@ -489,6 +489,125 @@ diff. It found five things; all five are closed.
 - **P5** — the suites now write an acceptance record as they run, and the
   published matrix is written from it. See
   [`09-acceptance-record.md`](09-acceptance-record.md).
+
+## Round 8 — the seventh `codex` review, of the finished tree
+
+The seventh `codex` review was run against the tree round 7 left behind, with
+the instruction to attack the newest material hardest: the packaged host
+wiring, the acceptance record, the acceptance matrix, the adversarial suite,
+the credential-secrecy suite, the store builds and the published documents.
+It raised six findings; all six are closed.
+
+| # | Severity | Finding | Status |
+| --- | --- | --- | --- |
+| Q1 | MAJOR | **A development extension identity could bind to the wrong browser surface.** The admission accepted an origin if *any* pairing admitted it and stopped at the first match, and the server repeated that first match. An unpacked build has one identity, and a person who loads it in Edge and Chrome lists that identity on both surfaces — so a Chrome browser landed on the Edge pairing, and the Edge surface reported connected while the person was looking at Chrome. | `fixed` |
+| Q2 | MAJOR | **The packaged acceptance did not exercise the packaged entry.** It built a bridge with `packaged: true` in the test, which proves the option's behaviour but not that the shipped entry passes it. | `fixed` |
+| Q3 | MAJOR | **The store disclosure understated the extension's access.** It said the extension "never reads the DOM, the cookies or the storage of a page", while the allowed DevTools set includes `DOM.getDocument`, `DOM.getOuterHTML`, `Runtime.evaluate`, `Accessibility.getFullAXTree`, `Network.getCookies` and `Network.getResponseBody`. | `fixed` |
+| Q4 | MAJOR | **Four published status claims were stale** — the Agent's browser tools "not implemented", the bridge admission "unwired", the external image and input paths "exercised against a synthetic peer", and the MV3 worker restart "not verified". | `fixed` |
+| Q5 | MINOR | **The acceptance records overstated the settings and could preserve a stale pass.** The switch states were written by the caller rather than read from the host, and the record file was emptied on the first *record*, so a run that failed during setup left the previous run's cases in place. | `fixed` |
+| Q6 | MINOR | **The secrecy test missed some logged representations.** Console arguments were captured with `String(arg)`, which turns an object into `[object Object]` and a byte array into a comma-separated decimal list. | `fixed` |
+
+### What was done
+
+- **Q1** — the surface is now settled by the peer, not by the order the
+  pairings happen to be in. The session holds the **candidate** pairings — the
+  ones whose allowlist admits the peer's identity — and the peer's own `hello`
+  names the browser it runs in; the pairing for that browser is the one that
+  authenticates it, and the challenge is issued by that pairing
+  (`session.ts`). A peer that names a browser the host does not know is
+  refused with `unknown_browser` rather than attached to a pairing it does
+  not belong to. The registry keys its live sessions by **surface and
+  instance** rather than by instance alone, so one browser can no longer close
+  another because they reported the same instance id. The acceptance now
+  exercises the configuration the fix is about: one unpacked build, one
+  identity, both allowlists, a real Chrome and a real Edge — each lands on
+  its own surface (`browser-bridge-real-browser.spec.ts`), and the
+  adversarial suite covers the unit-level case and the refusal
+  (`browser-bridge-adversarial.test.ts`).
+- **Q2** — the package verification now checks the **installed** package's
+  bridge, not a bridge the test built. It starts the real `mcode-webui` from
+  the installed archive, configures it with both allowlists, and shows that
+  the store identity is admitted on its `/browser-bridge` path while the
+  development identity is refused (`scripts/verify-webui-package.mjs`).
+  The real-browser acceptance still drives a packaged host against a real
+  browser, for the store identity and the handshake.
+- **Q3** — `STORE-DISCLOSURES.md` now says what the extension can read: the
+  DOM, the values of the page's JavaScript objects, its accessibility tree,
+  its cookies and the bodies of its responses, and that whatever such a
+  command returns goes to the loopback host. The claim that was wrong is
+  gone; the claim that is true is stated.
+- **Q4** — the four documents are corrected against the tree, and each row
+  now says what the suite that measured it actually measured.
+- **Q5** — the record's switch states are read from the bridge's own
+  snapshot, and the two switches the bridge does not carry are named as such
+  rather than guessed at. The record file is emptied at the **start** of a
+  run, so a run that fails during setup leaves an empty file rather than the
+  previous run's passes.
+- **Q6** — the console capture renders each argument in every form it could
+  carry the secret: a string as itself, a byte array as base64, base64url,
+  hex and the decimal list, and an object as JSON with byte arrays expanded.
+  The test also captures a secret it writes itself and asserts the capture
+  finds it, so a capture that silently captured nothing cannot pass for the
+  right reason.
+
+## Round 9 — the eighth `codex` review, of round 8's fixes
+
+The eighth `codex` review was run against the tree round 8 left behind, with
+the instruction to attack the fixes themselves. It raised eight findings; all
+eight are closed.
+
+| # | Severity | Finding | Status |
+| --- | --- | --- | --- |
+| R1 | MAJOR | **`hello.browser` is an unverified claim.** The review read the surface selection as trusting the peer's own name, and asked for the surface to be bound to a secret the peer cannot obtain through the other surface. | `fixed` — the binding already existed and is now stated and proved |
+| R2 | MINOR | **A peer that never opens with a `hello` holds the socket indefinitely.** There was no deadline on the greeting. | `fixed` |
+| R3 | MAJOR | **The server exposes one provider per surface while the registry allows several sessions on one surface.** With two browser instances on a surface, the provider described whichever connected last. | `fixed` |
+| R4 | MINOR | **Target ownership omitted the surface from its key.** | `fixed` |
+| R5 | MAJOR | **The store disclosure contradicted itself.** The new text said the extension can read the page, while the `<all_urls>` permission row and the privacy policy still said it does not and that it collects no personal data. | `fixed` |
+| R6 | MAJOR | **Four more published status claims were stale** — the bridge admission "unwired" in two documents, the capability matrix's "one surface was measured", and the reconnect policy "unwired". | `fixed` |
+| R7 | MINOR | **The acceptance record read the switch states before the case body ran**, so a change during the case would leave the record describing the state the case started in. | `fixed` |
+| R8 | MAJOR | **The secrecy test checked only the `pair` frame, and replaced only five console methods.** A secret that leaked in another frame, or through `console.table`, would have passed. | `fixed` |
+
+### What was done
+
+- **R1** — the review was right that the **name** does not bind the surface,
+  and wrong that nothing does. Each surface has its own **installation key**
+  and its own **credential**, the challenge is issued by the pairing of the
+  claimed surface, and the proof is verified against **that pairing's own
+  secret**. A peer that calls itself Edge and answers the Edge challenge with
+  the Chrome surface's installation key is refused, because the Edge pairing
+  does not hold that key. The name selects *which* secret has to be proved; it
+  cannot produce one. That is now stated in the code
+  (`session.ts`, `#resolvePairing`) and **proved by a test**
+  (`browser-bridge-adversarial.test.ts`, "refuses a peer that names a browser
+  it cannot prove"), which answers the Edge challenge with the Chrome
+  installation key and expects the refusal.
+- **R2** — a session whose peer never opens is closed after fifteen seconds,
+  the same window the operation deadline gives. The timer is cleared when the
+  `hello` arrives and on teardown.
+- **R3** — **a surface is one browser.** The host has one provider per
+  surface, so a second live session would be a browser the host could not
+  address. A *different* browser instance is now refused with
+  "this browser surface is already served by another browser" rather than
+  being allowed to take the surface away from the one that holds it. The
+  **same** browser reconnecting is not a second browser — a Manifest V3
+  worker that restarts reconnects, and the new connection has to be able to
+  take over before the old socket's close has been noticed — so it still
+  replaces its predecessor.
+- **R4** — the ownership key carries the surface, and a command that names a
+  target owned by the *other* surface is refused with the mismatch named,
+  rather than as an unknown target.
+- **R5** — the `<all_urls>` permission row and the privacy policy now say
+  what the DevTools subset can read and that the host stores what it is
+  given. The disclosure is for a store reviewer: a claim that understates the
+  extension is worse than one that does not.
+- **R6** — the four documents are corrected, and each row now says what
+  measured it.
+- **R7** — the record reads the switch states **after** the case body has
+  run, so the record describes the state the observation was made in.
+- **R8** — the secrecy test now checks **every** frame the host sent, and
+  replaces eight console methods rather than five. It also asserts that the
+  sealed credential is in the frame that carries it, so the check is about the
+  sealing and not about a frame that never arrived.
 
 ## What this document does not establish
 

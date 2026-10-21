@@ -116,9 +116,9 @@ Five enforcement points. "Required check" is the rule; "Code today" is what exis
 | --- | --- |
 | Required check | Loopback Host; the path is `/browser-bridge`; the extension identity is allowlisted; the pairing proof verifies; the switch for the claimed browser is on |
 | Refusal | `browser_pairing_rejected`, `browser_surface_not_authorized` |
-| Code today | **`implemented` in isolation, and unwired.** `admitBrowserBridgeUpgrade` (`server/browser-bridge/admission.ts:81`) implements every required check below, and `BrowserBridgePairing` (`server/browser-bridge/pairing.ts:76`) implements the allowlist, the challenge and the proof verification. **But nothing calls them.** `admitBrowserBridgeUpgrade` is referenced only from its own module and from `server/browser-bridge/index.ts`; `packages/webui/src/server/websocket-server.ts:63` routes every upgrade to the generic `admitWebSocketUpgrade`. Correspondingly `WebuiBrowserService.#ensureProvider` returns `undefined` for `edge` and `chrome` (`browser-service.ts:176`). Finding F3 in [`07-review-findings.md`](07-review-findings.md) |
+| Code today | **`implemented` and wired.** `admitBrowserBridgeUpgrade` (`server/browser-bridge/admission.ts:81`) implements every required check below, and `BrowserBridgePairing` (`server/browser-bridge/pairing.ts:76`) implements the allowlist, the challenge and the proof verification. `packages/webui/src/server/websocket-server.ts` routes a `/browser-bridge` upgrade to the bridge's **own** admission, before the generic `admitWebSocketUpgrade`, and the generic path is unchanged. The bridge is constructed by both composition roots and handed to the service, so `WebuiBrowserService` gets a provider for `edge` and `chrome` whenever their switches are on. Finding F3 in [`07-review-findings.md`](07-review-findings.md) |
 | What does exist today | The generic admission it must not inherit: `admitWebSocketUpgrade`, `packages/webui/src/server/access-policy.ts:51`, and the credential check it skips when `dev` is true at `access-policy.ts:76` |
-| Both entries run `dev: true` | `scripts/run-webui-server.mjs:57` and `release/webui-npm/bin/mcode-webui.mjs:37` |
+| Both entries run `dev: true` | `scripts/run-webui-server.mjs` and `release/webui-npm/bin/mcode-webui.mjs`. The bridge's admission does not read it: `admission.ts` carries an explicit no-op `if (context.dev)` branch |
 | Requirement | The `dev` flag is not an input to this path. `admission.ts:135` carries an explicit no-op `if (context.dev)` branch that documents the bypass as absent, so a future edit that adds `return undefined` there is caught. Proof and authorization are verified unconditionally — see [`03-extension-admission.md`](03-extension-admission.md) |
 | Also required | A missing `keyId`→credential mapping must fail with `browser_credential_store_unavailable` rather than admitting unpaired or falling back. `BrowserBridgePairing.issueChallenge` calls `credentialStore.isAvailable()` first (`pairing.ts:159`) and throws `BrowserCredentialStoreUnavailableError` — [`04-pairing-credentials.md`](04-pairing-credentials.md) |
 
@@ -157,8 +157,8 @@ impossible to allow one surface without allowing the rest.
 | --- | --- | --- | --- |
 | Panel image stream | required | not applicable | **implemented** — surface check enforced, frames fenced to the selected generation (F6) |
 | Panel input forwarding | required | not applicable | **implemented** — validation, surface check and `isCurrent`; the registry's generation is fed from `onTargetChanged` (F2) |
-| Agent browser tools | required | required, for non-restricted commands | **not implemented** — vocabulary exists, no Agent adapter reaches the WebUI service |
-| Bridge admission | required | not applicable | **implemented but unwired** — no caller in the upgrade path (F3). Command routing is fixed (F4) |
+| Agent browser tools | required | required, for non-restricted commands | **implemented** — the tool adapter (`packages/webui/src/runtime/browser/tool-adapter.ts`) forwards to the same browser service the panel uses, and the composition root hands it to the runtime host |
+| Bridge admission | required | not applicable | **implemented** — the bridge has its own upgrade path, branched on before the generic one (F3), and the command routing is fixed (F4) |
 | Full CDP gate | required first | required | **implemented** — `sendCommand` checks the surface first, then the switch (F5) |
 
 ## Related
