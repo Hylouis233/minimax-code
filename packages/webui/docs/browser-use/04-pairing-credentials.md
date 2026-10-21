@@ -62,6 +62,20 @@ The Linux row's presence on PATH is not sufficient evidence that a store exists.
 `gnome-keyring-daemon` and a D-Bus session bus and still have no Secret Service client, because nothing
 installed can speak the protocol. A daemon that cannot be talked to is not a store.
 
+## The credential never reaches a log
+
+The credential lifecycle ticket asks for "a test that observes a credential never appearing in captured
+log output". That test exists: `packages/webui/test/unit/browser-bridge-credential-secrecy.test.ts`.
+
+The whole pairing runs with the console and both process streams captured, and the host's own stored
+secrets — the installation key and the pairing credential — are watched in every form they could take:
+raw bytes, base64 and hex. None of them appears in the captured output, and none appears in the frames
+the host sent: the credential travels **sealed** (ECDH → HKDF-SHA256 → AES-256-GCM), not in the clear.
+
+This is a claim about the bridge's **own** output. It says nothing about a third-party logger attached
+to the process, and it does not widen the platform rows above: the macOS and Windows commands are
+still asserted through an injected runner rather than executed.
+
 ## Measured: unavailable on the one host the probe ran on
 
 `.plan/board/validation/credential-store-evidence.json`, `platform: "linux"`:

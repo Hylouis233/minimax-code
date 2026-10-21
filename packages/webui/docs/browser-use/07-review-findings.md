@@ -1,8 +1,10 @@
 # Review findings — WebUI Browser Use
 
-Two independent reviews of this change were run against the tree, both by a
-`codex` `gpt-6-luna` reviewer reading the source rather than the description.
-This document records what each review found and what was done about it.
+**Seven review rounds** have been run against this change. Six of them were run
+by a `codex` `gpt-6-luna` reviewer reading the source rather than the
+description; the seventh was the final acceptance pass, run against the
+finished tree and against the acceptance criteria the tickets state. This
+document records what each round found and what was done about it.
 
 Every status below is a claim about the **tree**, and each one names the file
 that carries it. A finding that is still open is marked open; nothing here is
@@ -443,18 +445,64 @@ That is exercised in both Chrome and Edge, so the bridge's survival across a
 worker restart is no longer an assertion about the code's shape but an
 observation of the behaviour.
 
+## Round 7 — the final acceptance pass
+
+This round was run by the implementer against the finished tree, against the
+acceptance criteria the tickets state, rather than by a reviewer reading the
+diff. It found five things; all five are closed.
+
+| # | Severity | Finding | Status |
+| --- | --- | --- | --- |
+| P1 | MAJOR | The **packaged production entry did not set `packaged: true`**. The bridge read the development allowlist in both composition roots, so a packaged host accepted development identities — the one thing the packaged build is for is refusing. | `fixed` |
+| P2 | MAJOR | Four of the adversarial cases the acceptance names — an oversized frame, a malformed frame, a duplicate extension connection, and a revocation during an in-flight action — had **no test at all**. | `fixed` |
+| P3 | MAJOR | The credential lifecycle ticket asks for "a test that observes a credential never appearing in captured log output". **No such test existed.** | `fixed` |
+| P4 | MAJOR | The published documents still described the input, image and DevTools paths as exercised against a **synthetic peer**. They are exercised against a real browser. | `fixed` |
+| P5 | MINOR | The acceptance was not **recorded**: no run wrote down the browser version, the operating system, the settings and the observed result. | `fixed` |
+
+### What was done
+
+- **P1** — `release/webui-npm/bin/mcode-webui.mjs` now passes `packaged: true`
+  to the bridge, so the packaged entry reads
+  `MAVIS_BROWSER_STORE_EDGE_EXTENSION_IDS` / `MAVIS_BROWSER_STORE_CHROME_EXTENSION_IDS`
+  and never the development variables. The development entry
+  (`scripts/run-webui-server.mjs`) is the one that reads the development
+  allowlist. The difference is now **measured**, not asserted: the new
+  `real-packaged` suite builds a store build with a public key, loads it in a
+  real Chrome, and shows that the id the browser assigns is the id the key
+  determines, that a packaged host admits it, and that the same packaged host
+  refuses it when the id is named only in the development allowlist.
+- **P2** — `packages/webui/test/unit/browser-bridge-adversarial.test.ts` drives
+  all four cases against a real `ws` server and a real client. The host
+  survives the first two, the earlier session is replaced rather than left
+  alive beside the newer one, and the in-flight action fails rather than
+  hanging.
+- **P3** — `packages/webui/test/unit/browser-bridge-credential-secrecy.test.ts`
+  runs the whole pairing with the console and both process streams captured,
+  and watches the host's stored secrets in every form they could take — raw
+  bytes, base64, hex. None of them appears in the output, and none appears in
+  the frames the host sent: the credential travels sealed.
+- **P4** — the paragraph above is the correction: the external path is driven
+  end to end in a real Chrome and a real Edge, each on its own surface.
+- **P5** — the suites now write an acceptance record as they run, and the
+  published matrix is written from it. See
+  [`09-acceptance-record.md`](09-acceptance-record.md).
+
 ## What this document does not establish
 
 - That the external path works end to end against a real Edge or Chrome for
-  **every** behaviour. The handshake and the refusal are established, each on
-  its own surface — the `chrome` surface in Chrome and the `edge` surface in
-  Edge. The input, image and target paths are exercised against a synthetic
-  peer, and the extension's `chrome.debugger` subset was not dispatched
-  against a live tab in a real browser.
+  **every** behaviour. The handshake, the refusal, the input, the image, the
+  DevTools command and the worker's termination are established, each on its
+  own surface — the `chrome` surface in Chrome and the `edge` surface in Edge.
+  What is not established is the **Agent's** path against a real browser, and
+  the Full CDP switch through the runtime gate against a real browser: the
+  bridge carries the command and the extension's allowlist refuses what is not
+  in it, which is a different thing from the runtime switch.
 - That the macOS, Windows or Linux credential-store forms behave as intended.
   The Linux form was probed on one host and was **unavailable** there; the
   macOS and Windows forms are asserted through an injected command runner, not
   executed.
+- That the store identities exist. A store assigns them when the extension is
+  first published, so the packaged acceptance uses a key generated at run time.
 - That the Agent's browser tools address the same session as the panel **in a
   real browser**. The tool adapter exists and forwards to the same service, and
   which *surface* a tool call acts on is resolved from the run's own selection

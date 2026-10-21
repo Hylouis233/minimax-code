@@ -11,12 +11,12 @@ status line of its own:
 
 Where a document mixes the three, they are separated inline rather than merged into one sentence.
 
-**Read [`07-review-findings.md`](07-review-findings.md) before anything else.** Three independent
-reviews of this change have run against the source, and they raised **twenty findings** between them.
-That document records every one and states, for each, whether it is closed or still open. **Seventeen
-are closed in the tree.** The three that remain open are the Agent-tool adapter, the run-scoped target
-selection, and the credential exchange between the host and the extension — each with the reason it is
-open, and each recorded in the decision record's amendments.
+**Read [`07-review-findings.md`](07-review-findings.md) before anything else.** **Seven review rounds**
+have run against this change — six by a `codex` `gpt-6-luna` reviewer reading the source rather
+than the description, and a final acceptance pass against the finished tree. That document records
+every finding and states, for each, whether it is closed or still open. **Every finding is closed**;
+the ones that changed a decision are recorded in the decision record's amendments, and the ones that
+could not be closed on this machine are marked `fixed, platform unverified` rather than rounded up.
 
 The decision record for this programme is
 [`../adr/0019-webui-browser-use-surfaces-and-external-browser-bridge.md`](../adr/0019-webui-browser-use-surfaces-and-external-browser-bridge.md).
@@ -26,8 +26,9 @@ the Agent's browser tools and the extension must agree on.
 
 Nothing here describes shipped, released behavior. The isolated-Chromium surface has a provider, a
 service and a panel path in this branch, and the extension bridge is wired into the server's upgrade
-path, but the external handshake cannot yet complete and three review findings remain open; where a
-document states a rule that has no implementing code, it says so in place rather than in a footnote.
+path; the external handshake completes against a real Chrome and a real Edge, and the acceptance
+matrix records what each run observed. Where a document states a rule that has no implementing code,
+it says so in place rather than in a footnote.
 
 ## Implementation status was re-checked against the tree
 
@@ -73,7 +74,9 @@ open are listed in [`07-review-findings.md`](07-review-findings.md).
 | [`04-pairing-credentials.md`](04-pairing-credentials.md) | Credential lifecycle, the per-OS secure store on each platform, and the explicit-failure rule when no store exists | You implement pairing, credential storage, revocation or re-enable |
 | [`05-target-identity.md`](05-target-identity.md) | The three-part target identity and its generation, what invalidates a generation, and how a stale reference is rejected | You work with targets, input forwarding, tab selection or run scoping |
 | [`06-runtime-authorization-trace.md`](06-runtime-authorization-trace.md) | Each of the four authorization switches traced to the place it must be enforced, with the current implementation status of each check | You implement an authorization check, or you are auditing whether one exists |
-| [`07-review-findings.md`](07-review-findings.md) | All twenty findings from three independent review rounds, what was done about each, and which three are still open | You want to know what is known to be broken, or what has been corrected |
+| [`07-review-findings.md`](07-review-findings.md) | All the findings from the seven review rounds, what was done about each, and what is still open | You want to know what is known to be broken, or what has been corrected |
+| [`packages/browser-extension/STORE-DISCLOSURES.md`](../../../browser-extension/STORE-DISCLOSURES.md) | The store disclosures for the Chrome Web Store and the Edge Add-ons, and the differences between a packaged build and a development build | You are preparing a store submission, or you need to know what a packaged build is |
+| [`09-acceptance-record.md`](09-acceptance-record.md) | The acceptance matrix: every surface, every case, the browser version, the operating system, the settings and the observed result — written from the records the suites produce | You want to know what was actually run, and where the evidence is thin |
 
 ## How to read these documents
 
@@ -99,12 +102,13 @@ Finding F7 was exactly this failure in these documents, and it is recorded in
 ## Evidence provenance
 
 The measurements below come from two probes written for this work and run against the Chrome on the
-validation host:
+validation host, and from the acceptance suites that write a record as they run:
 
 | Probe | Result | What it establishes |
 | --- | --- | --- |
 | `.plan/board/validation/probe-cdp.mjs` | `.plan/board/validation/cdp-evidence.json` | Which CDP commands a real Chrome accepted, whether real input and image capture work, and whether a renderer-attachment race exists |
 | `.plan/board/validation/probe-credential-store.mjs` | `.plan/board/validation/credential-store-evidence.json` | Which OS secure credential store **the one Linux host it ran on** actually offers. Nothing about any other platform |
+| `packages/webui/test/browser/*` (Playwright) and `packages/webui/test/integration/browser-use-real-input.test.ts` (Vitest) | `.plan/board/validation/*.acceptance.json` | The acceptance matrix: the browser version, the operating system, the settings and the observed result, for every surface. See [`09-acceptance-record.md`](09-acceptance-record.md) |
 
 `.plan/` is workspace material: it is listed in the repository `.gitignore` and is not part of the
 public-source projection, so these documents are not accompanied by the raw probe records in a
@@ -140,7 +144,7 @@ directory:
 
 ## Publication note
 
-These eight files are new, and every file in this repository is listed in the generated inventory
+These nine files are new, and every file in this repository is listed in the generated inventory
 `release/public-source.json`. Recording them requires running, in the repository root:
 
 ```sh

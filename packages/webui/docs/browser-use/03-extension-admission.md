@@ -63,14 +63,24 @@ if (!context.dev && !credentialMatches(context.credential, presented)) {
 **`dev: true` disables the credential check, not just the token requirement.** That is a real bypass,
 and it is the current state of both composition roots:
 
-| Entry point | Line | `dev` |
-| --- | --- | --- |
-| `scripts/run-webui-server.mjs` | 57 | `dev: true` |
-| `release/webui-npm/bin/mcode-webui.mjs` | 37 | `dev: true` |
+| Entry point | Line | `dev` | Bridge allowlist |
+| --- | --- | --- | --- |
+| `scripts/run-webui-server.mjs` | 56 | `dev: true` | development — `MAVIS_BROWSER_EDGE_EXTENSION_IDS`, `MAVIS_BROWSER_CHROME_EXTENSION_IDS` |
+| `release/webui-npm/bin/mcode-webui.mjs` | 48 | `dev: true` | **store** — `MAVIS_BROWSER_STORE_EDGE_EXTENSION_IDS`, `MAVIS_BROWSER_STORE_CHROME_EXTENSION_IDS` |
 
 So on a packaged WebUI today, the generic path already accepts any upgrade that passes the loopback
 Host, URL-host and origin checks **without presenting the token at all**. ADR 0019 already records that
 both entries run with `dev: true`.
+
+**The two entries differ in one more way, and it is the one that matters here.** The packaged entry
+passes `packaged: true` to the bridge, so it reads the **store** allowlist and never the development
+one. An unpacked build's id is derived from the directory it was loaded from, so it is not an
+identity anyone can rely on; a packaged host that accepted those ids would admit whatever unpacked
+extension happened to be present. The development entry is the one that reads the development
+allowlist, because that is where the ids of unpacked builds belong. The distinction is measured
+against a real browser in [`09-acceptance-record.md`](09-acceptance-record.md): the id a store build
+gets is the one its public key determines, a packaged host admits that id, and the same packaged host
+refuses it when the id is named only in the development allowlist.
 
 **`implemented`: the bridge admission path never reads `dev`.** The pairing proof is verified
 unconditionally, and the browser switch is checked unconditionally. `admission.ts:135` holds an
