@@ -43,7 +43,7 @@ still says something is not implemented, that is because it is not — the per-r
 | `packages/webui/src/runtime/browser/target-registry.ts` | `implemented`, and fed from `provider.onTargetChanged` (F2) | `05` |
 | `packages/webui/src/runtime/browser/browser-service.ts` | `implemented` — owns authorization, providers and the registry | `06` |
 | `packages/webui/src/runtime/browser/isolated-chromium/provider.ts` | `implemented` — including the attachment retry | `01` |
-| `packages/webui/src/server/browser-bridge/credential-store.ts` | `implemented`, rewritten mid-review; per-OS mechanisms under active revision | `04` |
+| `packages/webui/src/server/browser-bridge/credential-store.ts` | `implemented`, rewritten mid-review; the three per-OS forms are in place, and the macOS and Windows forms are asserted through an injected runner rather than executed | `04` |
 | `packages/webui/src/server/browser-bridge/admission.ts`, `pairing.ts`, `session.ts`, `registry.ts`, `reconnect.ts` | `implemented` and **wired** into the server's upgrade path and the browser service; target-ownership routing fixed (F4) | `02`, `03` |
 | `packages/webui/src/shared/operation-names.ts` | `implemented` — eight browser operations registered, including `sendBrowserCommand` (F5) | `06` |
 | `packages/browser-extension/` | `implemented` — MV3 service worker, `chrome.storage.local` credential, Web Crypto signing | `02`, `04` |
