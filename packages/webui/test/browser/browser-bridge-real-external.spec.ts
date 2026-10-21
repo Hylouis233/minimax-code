@@ -69,6 +69,59 @@ test.describe("the external bridge, against a real browser and a real page", () 
   });
 
   for (const { channel, surface } of BROWSERS) {
+    test(`the bridge survives the worker being terminated in ${channel}`, async () => {
+      test.setTimeout(120_000);
+      const { context, worker, extensionId, profileDir } = await launchWithExtension(channel);
+      const started = await startBridge(extensionId, surface);
+      // The page has to exist before the extension pairs: the extension
+      // announces the tabs it can see, and there is nothing to announce in a
+      // browser with no tabs.
+      const page = await context.newPage();
+      await page.goto(started.pageUrl);
+      try {
+        const view = await started.bridge.readInstallationKey(surface);
+        await provision(worker, context, extensionId, started.origin, view!.key);
+        await waitForConnected(started.bridge, surface, true, worker);
+
+        const provider = started.bridge.createProvider(surface);
+        const target = await waitForTarget(provider!);
+
+        // An **active** image stream, so the worker is doing work when it dies.
+        const frames: unknown[] = [];
+        await provider!.startImageStream(target.id.targetId, (frame) => {
+          frames.push(frame);
+        });
+        await expect
+          .poll(() => frames.length, { timeout: 20_000 })
+          .toBeGreaterThan(0);
+
+        // Terminate the service worker the way the browser does when it
+        // reclaims an idle worker: closing its target ends the worker, and the
+        // socket it held goes with it. The session has to notice.
+        const cdp = await context.browser()!.newBrowserCDPSession();
+        const { targetInfos } = (await cdp.send("Target.getTargets")) as {
+          readonly targetInfos: readonly { readonly targetId: string; readonly type: string }[];
+        };
+        const serviceWorker = targetInfos.find((target) => target.type === "service_worker");
+        expect(serviceWorker, "the extension's service worker target").toBeDefined();
+        await cdp.send("Target.closeTarget", { targetId: serviceWorker!.targetId });
+        await waitForConnected(started.bridge, surface, false);
+
+        // Wake the worker. Chrome starts a terminated Manifest V3 worker on the
+        // next event, and a navigation is one the extension listens for.
+        await page.goto(`${started.pageUrl}?after=termination`);
+        await waitForConnected(started.bridge, surface, true);
+
+        // And the bridge works again: a command against the live tab answers.
+        const title = await evaluate(provider!, target, "document.title");
+        expect(typeof title).toBe("string");
+      } finally {
+        await started.close();
+        await context.close();
+        await rm(profileDir, { recursive: true, force: true });
+      }
+    });
+
     test(`text input reaches the page through the ${surface} bridge in ${channel}`, async () => {
       test.setTimeout(120_000);
       const { context, worker, extensionId, profileDir } = await launchWithExtension(channel);

@@ -431,6 +431,18 @@ It found **four** defects, all of them real:
    host is asking for the picture. The permission is now declared, and the
    reason is recorded in the extension's README rather than left implicit.
 
+### The worker's termination, exercised
+
+The same acceptance now terminates the extension's **service worker** while an
+image stream is running — the browser closes the worker's target, which is what
+the browser does when it reclaims an idle worker. The host sees the session
+drop, the worker is woken by the next event, and the bridge is usable again:
+a DevTools command against the live tab answers afterwards.
+
+That is exercised in both Chrome and Edge, so the bridge's survival across a
+worker restart is no longer an assertion about the code's shape but an
+observation of the behaviour.
+
 ## What this document does not establish
 
 - That the external path works end to end against a real Edge or Chrome for

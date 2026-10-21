@@ -203,7 +203,9 @@ export async function startBridge(
   await bridge.enableSurface(surface);
 
   const http = createServer((request, response) => {
-    if (request.url === "/test-page") {
+    // The query string is ignored: the harness serves the same page whatever
+    // the caller appends.
+    if (request.url?.startsWith("/test-page")) {
       response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
       response.end(BRIDGE_TEST_PAGE_HTML);
       return;
