@@ -258,7 +258,7 @@ test.describe("the packaged production entry, against a real browser", () => {
         }
       } finally {
         await context.close();
-        await rm(profileDir, { recursive: true, force: true });
+        await rm(profileDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
       }
     });
   }

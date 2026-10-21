@@ -159,7 +159,7 @@ test.describe("the external bridge, against a real browser and a real page", () 
         // cannot close while that client is still running.
         await closeBrowser(context);
         await started.close();
-        await rm(profileDir, { recursive: true, force: true });
+        await rm(profileDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
       }
     });
 
@@ -262,7 +262,7 @@ test.describe("the external bridge, against a real browser and a real page", () 
         await closeBrowser(context);
         await started.close();
         await page.close().catch(() => undefined);
-        await rm(profileDir, { recursive: true, force: true });
+        await rm(profileDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
       }
     });
 
@@ -323,7 +323,7 @@ test.describe("the external bridge, against a real browser and a real page", () 
         await closeBrowser(context);
         await started.close();
         await page.close().catch(() => undefined);
-        await rm(profileDir, { recursive: true, force: true });
+        await rm(profileDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
       }
     });
   }

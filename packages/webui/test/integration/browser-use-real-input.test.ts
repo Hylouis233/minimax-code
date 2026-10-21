@@ -106,7 +106,7 @@ describe.skipIf(!available)("the browser input path, against a real page", () =>
 
   afterAll(async () => {
     await provider?.close();
-    if (dataDir) await rm(dataDir, { recursive: true, force: true });
+    if (dataDir) await rm(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
 
   /** The field's centre, in page coordinates. */
