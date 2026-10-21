@@ -34,7 +34,22 @@ process.env.MAVIS_BUILTIN_AGENTS_DIR ??= path.join(packageRoot, "assets/agents")
 // `/browser-bridge` upgrade branch, so the extension and the browser service
 // address one session rather than two. `dev: true` is passed through
 // unchanged; the bridge's admission ignores it by design.
-const browserBridge = new BrowserBridgeServer({ host: "127.0.0.1", dev: true });
+//
+// `packaged: true` is what makes this the **packaged** entry. A packaged host
+// reads the store allowlist (`MAVIS_BROWSER_STORE_EDGE_EXTENSION_IDS`,
+// `MAVIS_BROWSER_STORE_CHROME_EXTENSION_IDS`) and never the development one
+// (`MAVIS_BROWSER_EDGE_EXTENSION_IDS`, `MAVIS_BROWSER_CHROME_EXTENSION_IDS`).
+// The difference matters: an unpacked build's id is derived from the directory
+// it was loaded from, so it is not an identity anyone can rely on, and a
+// packaged host that accepted those ids would admit whatever unpacked
+// extension happened to be present. The development entry
+// (`scripts/run-webui-server.mjs`) is the one that reads the development
+// allowlist.
+const browserBridge = new BrowserBridgeServer({
+  host: "127.0.0.1",
+  dev: true,
+  packaged: true,
+});
 await browserBridge.start();
 // The browser adapter is built before the runtime host, because the host is
 // what takes the browser provider: the adapter reads its authorization

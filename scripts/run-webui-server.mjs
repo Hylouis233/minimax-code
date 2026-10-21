@@ -46,6 +46,13 @@ if (!process.env.WEBUI_SERVER_TSX) {
   // bridge, hand its provider factory to the adapter and give the same instance
   // to the service's `/browser-bridge` upgrade branch. `dev: true` is passed
   // through unchanged; the bridge's admission ignores it by design.
+  //
+  // This is the **development** entry, so the bridge is not `packaged`: it
+  // reads the development allowlist (`MAVIS_BROWSER_EDGE_EXTENSION_IDS`,
+  // `MAVIS_BROWSER_CHROME_EXTENSION_IDS`), which is where the ids of unpacked
+  // builds belong. The packaged entry
+  // (`release/webui-npm/bin/mcode-webui.mjs`) reads the store allowlist and
+  // refuses these.
   const browserBridge = new BrowserBridgeServer({ host: "127.0.0.1", dev: true });
   await browserBridge.start();
   // The browser adapter is built before the runtime host, because the host is
