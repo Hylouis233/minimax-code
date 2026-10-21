@@ -1,10 +1,16 @@
 # Review findings — WebUI Browser Use
 
-**Nine review rounds** have been run against this change. Eight of them were run
+**Ten review rounds** have been run against this change. Nine of them were run
 by a `codex` `gpt-6-luna` reviewer reading the source rather than the
 description; the seventh was the final acceptance pass, run against the
 finished tree and against the acceptance criteria the tickets state. This
 document records what each round found and what was done about it.
+
+Two **probe rounds** — a real browser against the built extension, and the
+external path driven against it — are recorded here as well. They are numbered
+`Probe A` and `Probe B` rather than as rounds, because they were findings of
+the implementation, not of a reviewer, and because the two used to carry the
+same numbers as rounds 5 and 6.
 
 Every status below is a claim about the **tree**, and each one names the file
 that carries it. A finding that is still open is marked open; nothing here is
@@ -321,7 +327,7 @@ tested without a DOM renderer — the client test environment has none.
 - **N4** — The stale claims in this document and in
   `03-extension-admission.md` are corrected.
 
-## Round 5 — found by probing the real browser
+## Probe A — found by probing the real browser
 
 No review round caught this one, because every test of the extension runs
 against its **TypeScript source**. A probe against a real Chrome shows the
@@ -343,7 +349,7 @@ This is the kind of gap that only a real browser finds, and it is the reason
 the programme's evidence says "not yet measured" for the external surfaces
 rather than claiming they work.
 
-## Round 6 — the external path, against a real browser
+## Probe B — the external path, against a real browser
 
 A Playwright spec now drives a **real Chrome with the built extension loaded**
 against a **real bridge server**: `packages/webui/test/browser/browser-bridge-real-browser.spec.ts`.
@@ -608,6 +614,37 @@ eight are closed.
   replaces eight console methods rather than five. It also asserts that the
   sealed credential is in the frame that carries it, so the check is about the
   sealing and not about a frame that never arrived.
+
+## Round 10 — the ninth `codex` review, of round 9's fixes
+
+The ninth `codex` review was run against the tree round 9 left behind, with
+the instruction to attack the fixes themselves. It raised two findings; both
+are closed.
+
+| # | Severity | Finding | Status |
+| --- | --- | --- | --- |
+| S1 | MAJOR | **The session declared a liveness ping and never sent one.** It held the pending-ping table, it answered a `pong`, and its own option comment said the session emits a `ping` — but no ping was ever written to the socket. A browser that was gone behind an open socket was therefore never noticed. | `fixed` |
+| S2 | MAJOR | **The real-browser acceptance failed on a machine without the installed Edge.** The Edge cases drive `/usr/bin/microsoft-edge`, so a CI image or a container that does not ship Edge reported a broken bridge rather than an absent browser. | `fixed` |
+
+### What was done
+
+- **S1** — an admitted session now pings the peer every ten seconds and closes
+  the session when the pong does not come within one interval. A WebSocket can
+  stay open long after the browser behind it is gone: the extension's worker is
+  terminated, the profile is closed, the machine sleeps. The socket's close is
+  then the only signal, and it can take a while to arrive; the unanswered ping
+  is the faster signal, and the extension's reconnect ladder picks the session
+  back up. The close is transient at the system level — the peer's state lives
+  in its own storage, so nothing is lost. The extension already answered a
+  `ping` with a `pong`, so nothing on that side changed. The timer is cleared
+  on teardown and does not hold the process open (`session.ts`,
+  `startLiveness`).
+- **S2** — the Edge cases now **skip with the reason** when the installed Edge
+  is not on the machine, rather than failing on a browser that was never there
+  (`real-browser-bridge.ts`, `isBrowserInstalled`). The bundled Chromium is
+  installed by the gate itself, so the Chromium cases always run. The record
+  names the browser each case ran in, and the published matrix names the host,
+  so a skipped case is visible rather than silent.
 
 ## What this document does not establish
 

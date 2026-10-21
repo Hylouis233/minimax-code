@@ -11,8 +11,8 @@ status line of its own:
 
 Where a document mixes the three, they are separated inline rather than merged into one sentence.
 
-**Read [`07-review-findings.md`](07-review-findings.md) before anything else.** **Nine review rounds**
-have run against this change — eight by a `codex` `gpt-6-luna` reviewer reading the source rather
+**Read [`07-review-findings.md`](07-review-findings.md) before anything else.** **Ten review rounds**
+have run against this change — nine by a `codex` `gpt-6-luna` reviewer reading the source rather
 than the description, and a final acceptance pass against the finished tree. That document records
 every finding and states, for each, whether it is closed or still open. **Every finding is closed**;
 the ones that changed a decision are recorded in the decision record's amendments, and the ones that
@@ -74,7 +74,7 @@ open are listed in [`07-review-findings.md`](07-review-findings.md).
 | [`04-pairing-credentials.md`](04-pairing-credentials.md) | Credential lifecycle, the per-OS secure store on each platform, and the explicit-failure rule when no store exists | You implement pairing, credential storage, revocation or re-enable |
 | [`05-target-identity.md`](05-target-identity.md) | The three-part target identity and its generation, what invalidates a generation, and how a stale reference is rejected | You work with targets, input forwarding, tab selection or run scoping |
 | [`06-runtime-authorization-trace.md`](06-runtime-authorization-trace.md) | Each of the four authorization switches traced to the place it must be enforced, with the current implementation status of each check | You implement an authorization check, or you are auditing whether one exists |
-| [`07-review-findings.md`](07-review-findings.md) | All the findings from the seven review rounds, what was done about each, and what is still open | You want to know what is known to be broken, or what has been corrected |
+| [`07-review-findings.md`](07-review-findings.md) | All the findings from the ten review rounds, what was done about each, and what is still open | You want to know what is known to be broken, or what has been corrected |
 | [`packages/browser-extension/STORE-DISCLOSURES.md`](../../../browser-extension/STORE-DISCLOSURES.md) | The store disclosures for the Chrome Web Store and the Edge Add-ons, and the differences between a packaged build and a development build | You are preparing a store submission, or you need to know what a packaged build is |
 | [`09-acceptance-record.md`](09-acceptance-record.md) | The acceptance matrix: every surface, every case, the browser version, the operating system, the settings and the observed result — written from the records the suites produce | You want to know what was actually run, and where the evidence is thin |
 
