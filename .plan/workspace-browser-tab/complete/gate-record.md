@@ -108,6 +108,18 @@ worker's lifecycle and the extension's pairing are not touched by this slice —
 gained an *optional* `openTab` member, which the extension bridge does not implement and which the
 service refuses with `browser_capability_denied`.
 
+**The mechanism, so this is not a guess.** The spec's guard is
+`test.skip(!(await isBrowserInstalled(channel)), ...)`, and
+`isBrowserInstalled` (`packages/webui/test/browser/real-browser-bridge.ts:154`) returns `true`
+**unconditionally for the `chromium` channel** — it only probes the filesystem for the `msedge`
+channels. So the guard cannot fire for chromium, and the case runs on a runner that cannot drive a
+real browser with the extension, and fails as a timeout. The spec's own comment says the opposite is
+intended: "A case that cannot run says so instead of failing on a browser that was never there."
+
+Whether to tighten that probe is a change to the **previous** programme's spec, in the area this
+slice does not cover, and it is not made here: silently changing another programme's test so that a
+CI job turns green is not a fix, and it is not this programme's decision. It is recorded instead.
+
 **The base branch is not green either, and was not before this programme.** The `verify` matrix runs
 on pull requests, so the fork's `webui` branch has one `Source verification` run in its history — at
 `a63a6c99`, from PR #168 — and it failed `verify (macos-latest)` and `verify (ubuntu-latest)`. The
