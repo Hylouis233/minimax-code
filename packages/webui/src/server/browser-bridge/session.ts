@@ -158,9 +158,13 @@ export interface BrowserBridgeSessionOptions {
    */
   readonly operationDeadlineMs?: number;
   /**
-   * Liveness ping cadence. The session emits `ping` and awaits `pong`
-   * within one interval; a missed pong is a transient retry rather than a
-   * fatal close.
+   * Liveness ping cadence.
+   *
+   * The session emits `ping` and awaits `pong` within one interval. A missed
+   * pong means the socket looks open but the browser behind it is gone, so the
+   * session closes — and the extension's reconnect ladder takes it from there.
+   * The close is a transient retry at the system level, not a fatal error:
+   * nothing is lost, because the peer's state lives in its own storage.
    */
   readonly pingIntervalMs?: number;
   /**
@@ -201,6 +205,8 @@ export class BrowserBridgeSession extends EventEmitter {
   private readonly helloDeadlineMs: number;
   /** The timer that closes a session whose peer never says hello. */
   private helloTimer: ReturnType<typeof setTimeout> | undefined;
+  /** The timer that sends the liveness ping. */
+  private livenessTimer: ReturnType<typeof setTimeout> | undefined;
   /** The pairings this peer's identity is admitted on. */
   private readonly candidatePairings: readonly BrowserBridgePairing[];
   /** The pairing this session authenticates against, once the peer named its browser. */
@@ -229,6 +235,8 @@ export class BrowserBridgeSession extends EventEmitter {
   private readonly pendingPings = new Map<string, () => void>();
   /** The counter behind the DevTools command ids. */
   private cdpCommandCounter = 0;
+  /** The counter behind the liveness pings' nonces. */
+  private pingCounter = 0;
 
   constructor(options: BrowserBridgeSessionOptions) {
     super();
@@ -653,6 +661,7 @@ export class BrowserBridgeSession extends EventEmitter {
     // property that matters here: a `pair` frame is sent only to a peer that
     // has proved the installation key.
     this.admitted = true;
+    this.startLiveness();
     const ready: WebuiBrowserBridgeHostFrame = { kind: "ready", sessionId: this.sessionId };
     try {
       this.sendFrame(ready);
@@ -778,10 +787,66 @@ export class BrowserBridgeSession extends EventEmitter {
     }
   }
 
+  /**
+   * Starts the liveness ping.
+   *
+   * A WebSocket can stay open long after the browser behind it is gone — the
+   * extension's worker is terminated, the profile is closed, the machine
+   * sleeps. The socket's close is then the only signal, and it can take a
+   * while to arrive. A ping the peer does not answer is the faster signal,
+   * and the extension's reconnect ladder is what picks the session back up.
+   */
+  private startLiveness(): void {
+    if (this.livenessTimer || this.closeReason) return;
+    const tick = (): void => {
+      if (this.closeReason) return;
+      void this.sendPing();
+      this.livenessTimer = setTimeout(tick, this.pingIntervalMs);
+      this.livenessTimer.unref?.();
+    };
+    this.livenessTimer = setTimeout(tick, this.pingIntervalMs);
+    this.livenessTimer.unref?.();
+  }
+
+  /**
+   * Sends one ping and waits for its pong.
+   *
+   * A missed pong closes the session. The peer is not told it is wrong: the
+   * socket is the thing that failed, and the extension reconnects on its own.
+   */
+  private async sendPing(): Promise<void> {
+    if (this.closeReason) return;
+    const nonce = `ping-${this.pingCounter++}`;
+    let answered = false;
+    const answeredPromise = new Promise<void>((resolve) => {
+      this.pendingPings.set(nonce, () => {
+        answered = true;
+        resolve();
+      });
+    });
+    try {
+      this.sendFrameOrClose({ kind: "ping", nonce });
+    } catch {
+      return;
+    }
+    await Promise.race([answeredPromise, this.sleep(this.pingIntervalMs)]);
+    this.pendingPings.delete(nonce);
+    if (!answered && !this.closeReason) {
+      this.close({
+        kind: "host_error",
+        error: "the peer did not answer a liveness ping",
+      });
+    }
+  }
+
   private teardown(): void {
     if (this.helloTimer) {
       clearTimeout(this.helloTimer);
       this.helloTimer = undefined;
+    }
+    if (this.livenessTimer) {
+      clearTimeout(this.livenessTimer);
+      this.livenessTimer = undefined;
     }
     if (!this.admitted && !this.closeReason) {
       this.closeReason = { kind: "remote" };

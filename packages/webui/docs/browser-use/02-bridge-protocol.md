@@ -52,7 +52,7 @@ extension is the only side that answers one.
 | `challenge` | `nonce`, `algorithm`, `keyId` (the pairing credential), `installationKeyId` (the anchor a first pairing proves) |
 | `ready` | `sessionId` — the bridge session is admitted |
 | `input` | `commandId` and a `WebuiBrowserBridgeInputCommand` |
-| `ping` | `nonce` |
+| `ping` | `nonce` — the liveness check. The host sends one every ten seconds once the session is admitted, and closes the session when the pong does not come: a socket can look open long after the browser behind it is gone, and the extension's reconnect ladder is what picks the session back up |
 | `closed` | `reason` |
 
 ### The exact wire shapes of the exchange

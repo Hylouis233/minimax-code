@@ -46,7 +46,11 @@ interface Harness {
   readonly receivedClientFrames: WebuiBrowserBridgeClientFrame[];
 }
 
-async function startHarness(extensionId: string, dev: boolean): Promise<Harness> {
+async function startHarness(
+  extensionId: string,
+  dev: boolean,
+  options: { readonly pingIntervalMs?: number } = {},
+): Promise<Harness> {
   const pairing = new BrowserBridgePairing({
     surface: "edge",
     credentialStore: createInMemorySecureCredentialStore(),
@@ -89,6 +93,7 @@ async function startHarness(extensionId: string, dev: boolean): Promise<Harness>
         pairings: [pairing],
         socket: ws as unknown as never,
         sessionId: `s-${sessions.length}`,
+        ...(options.pingIntervalMs ? { pingIntervalMs: options.pingIntervalMs } : {}),
       });
       sessions.push(session);
     });
@@ -286,6 +291,40 @@ describe("WebUI bridge session (wire-level)", () => {
     // (Either the host sent it explicitly, or the socket went away; either
     // path is fine — what we care about is that `ready` did not appear.)
     expect(harness.pairing.enabled).toBe(true);
+  });
+
+  it("emits a liveness ping and closes the session when the pong does not come", async () => {
+    await harness.close();
+    harness = await startHarness(KNOWN_EDGE_ID, true, { pingIntervalMs: 60 });
+
+    const publicKey = await makeClientPublicKey();
+    const { client, frames } = await connectClient(harness, KNOWN_EDGE_ID, { publicKey });
+
+    // Admit the peer first: the liveness ping belongs to an admitted session.
+    const challengeFrame = await waitForKind(frames, "challenge");
+    const proof = await harness.pairing.signProof(challengeFrame.nonce);
+    client.send(
+      JSON.stringify({
+        kind: "proof",
+        keyId: challengeFrame.keyId,
+        nonce: challengeFrame.nonce,
+        signature: proof,
+      }),
+    );
+    await waitForKind(frames, "ready");
+
+    // The host pings once the peer is admitted, and the peer here does not
+    // answer: a socket that looks open but has nobody behind it is closed,
+    // so the extension's reconnect ladder can pick it up.
+    const ping = await waitForKind(frames, "ping");
+    expect(ping.nonce).toMatch(/^ping-/u);
+
+    const closed = await once(client, "close");
+    expect(closed).toBeDefined();
+    const closeFrame = frames.find((frame) => frame.kind === "closed");
+    expect(closeFrame && "reason" in closeFrame ? closeFrame.reason : "").toContain(
+      "liveness ping",
+    );
   });
 });
 
