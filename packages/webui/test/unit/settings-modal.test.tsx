@@ -15,6 +15,7 @@ describe("desktop settings registry", () => {
       ["voice", "preferences", "语音"],
       ["shortcuts", "preferences", "快捷键"],
       ["custom-instructions", "preferences", "个性化"],
+      ["browser", "preferences", "浏览器"],
       ["usage", "management", "用量与模型"],
       ["connection", "management", "连接"],
       ["account", "management", "账户"],

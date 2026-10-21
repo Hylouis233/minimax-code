@@ -418,12 +418,13 @@ export function createWebuiSettingsWorkflows(deps: {
     readonly key: WebuiResourceKey;
     readonly write: () => Promise<T>;
     readonly reconcile: () => Promise<unknown>;
+    readonly advanceConfiguration?: boolean;
   }): Promise<T> =>
     serializeWrite(options.name, async () => {
       options.resource.invalidate(options.key);
       const outcome = await runWebuiMutation(options.write);
       if (outcome.status === "settled") {
-        afterConfigurationWrite();
+        if (options.advanceConfiguration !== false) afterConfigurationWrite();
         options.resource.commit(options.resource.capture(options.key), {
           status: "ready",
           value: outcome.value,
@@ -671,6 +672,7 @@ export function createWebuiSettingsWorkflows(deps: {
         return answer;
       },
       reconcile: () => loadPermissionMode(),
+      advanceConfiguration: false,
       // The permission preference has its own generation semantics: this write
       // does not advance the configuration epoch, so the commit must not be
       // retired by one. `saveWithCommit` advances it after a settled write; for

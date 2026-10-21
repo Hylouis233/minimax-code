@@ -16,7 +16,7 @@
 // back where the engine decides it, and the context window appears only for a
 // model that has windows to choose from.
 
-import type { ReactElement } from "react";
+import { useState, type ReactElement } from "react";
 
 import { WebuiIconChevronRight } from "../../../shell/icons.js";
 import type {
@@ -62,8 +62,10 @@ export function WebuiModelPanel({
   onResetEffort,
   onContextLimitChange,
 }: WebuiModelPanelProps): ReactElement {
+  const [previewLevel, setPreviewLevel] = useState<string | undefined>();
   const scale = effortScaleFor(model);
-  const level = currentEffortValue(model, draft);
+  const currentLevel = currentEffortValue(model, draft);
+  const level = previewLevel ?? currentLevel;
   const levelLabel = scale.disabled ? "" : effortLabel(level);
   const contextOptions = model?.contextWindowOptions ?? [];
   const recordedContext =
@@ -80,6 +82,7 @@ export function WebuiModelPanel({
       <div className="webui-model-panel-head">
         <span
           className="webui-model-panel-level"
+          data-ultra={level === "max" ? "true" : "false"}
           data-webui-model-panel-level="true"
         >
           {levelLabel}
@@ -154,9 +157,10 @@ export function WebuiModelPanel({
 
       <WebuiModelEffortSlider
         scale={scale}
-        value={level}
+        value={currentLevel}
         binary={isBinaryEffort(model)}
         onCommit={onEffortChange}
+        onPreviewChange={setPreviewLevel}
       />
     </div>
   );

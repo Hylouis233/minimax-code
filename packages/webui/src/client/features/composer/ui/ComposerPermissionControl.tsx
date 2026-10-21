@@ -137,8 +137,12 @@ export function WebuiComposerPermissionControl({
               type="button"
               role="menuitemradio"
               aria-checked={active}
+              data-permission-mode={option}
               className="webui-composer-permission-option"
-              disabled={busy}
+              // The dropdown keeps the popup mounted during its exit motion.
+              // Once a choice closes it, do not repaint the leaving copy as
+              // disabled/grey while the runtime write is in flight.
+              disabled={busy && menuOpen}
               onClick={() => onChangeMode(option)}
             >
               <Icon className="webui-composer-permission-icon" />

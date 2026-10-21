@@ -33,9 +33,9 @@
   .webui-provider-format-trigger > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .webui-provider-format-trigger > svg { flex: 0 0 auto; color: var(--icon_default_tertiary); }
   .webui-provider-format-menu { padding: 4px; }
-  .webui-provider-format-option { display: flex; width: 100%; height: 32px; align-items: center; border: 0; border-radius: 8px; background: transparent; padding: 0 12px; color: var(--text_default_primary); font: inherit; font-size: 14px; text-align: left; }
+  .webui-provider-format-option { display: flex; width: 100%; height: 32px; align-items: center; margin-block: 2px; border: 0; border-radius: 8px; background: transparent; padding: 0 12px; color: var(--text_default_primary); font: inherit; font-size: 14px; text-align: left; }
   .webui-provider-format-option:hover, .webui-provider-format-option[aria-selected="true"] { background: var(--bg_interaction_tertiary_hover); }
-  .webui-provider-picker-option { display: flex; width: 100%; height: 36px; align-items: center; gap: 8px; border: 0; border-radius: 8px; background: transparent; padding: 0 12px; color: var(--text_default_primary); font-size: 14px; text-align: left; }
+  .webui-provider-picker-option { display: flex; width: 100%; height: 36px; align-items: center; gap: 8px; margin-block: 2px; border: 0; border-radius: 8px; background: transparent; padding: 0 12px; color: var(--text_default_primary); font-size: 14px; text-align: left; }
   .webui-provider-picker-option:hover, .webui-provider-picker-option[aria-selected="true"] { background: var(--bg_interaction_tertiary_hover); }
   .webui-provider-picker-option-name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* The provider's mark in its own bordered tile, as Desktop draws it. */
@@ -95,7 +95,11 @@
   }
   .webui-model-selector-trigger {
     display: flex;
+    width: fit-content;
     align-items: center;
+    min-width: 0;
+    max-width: 100%;
+    flex: 0 1 auto;
     gap: var(--spacing_4);
     height: 36px;
     max-width: 244px;
@@ -121,6 +125,7 @@
     cursor: default;
     color: var(--text_default_tertiary);
   }
+  .webui-model-selector-trigger [data-ultra="true"] { color: #9b5cff; transition: color 180ms ease; }
   /* ------------------------------------------------------------- the picker
    *
    * ONE popup with two states: the panel (the model in use and its thinking
@@ -190,6 +195,7 @@
     line-height: var(--line_height_22);
     font-weight: 500;
   }
+  .webui-model-panel-level[data-ultra="true"] { color: #9b5cff; transition: color 180ms ease; }
   .webui-model-panel-reset {
     position: absolute;
     right: 0;
@@ -319,6 +325,16 @@
     transform: translateY(-50%);
     border-radius: 999px;
     background: var(--bg_interaction_accent_focus_blue);
+    overflow: hidden;
+    transition: width 110ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .webui-model-effort-fill::after { position: absolute; inset: 0; background: linear-gradient(90deg, #3f6ff4 0%, #7f5cf5 52%, #b36bff 100%); content: ""; opacity: 0; transition: opacity 180ms ease; }
+  .webui-model-effort-fill[data-ultra="true"]::after { opacity: 1; }
+  /* A rounded fill narrower than the track height paints as a flat sliver.
+   * Collapse it immediately at the minimum stop instead of animating through
+   * that rectangular intermediate shape. */
+  .webui-model-effort-fill[data-empty="true"] {
+    transition: none;
   }
   .webui-model-effort-dot {
     position: absolute;
@@ -328,6 +344,7 @@
     transform: translate(-50%, -50%);
     border-radius: 999px;
     background: var(--text_default_tertiary);
+    transition: background-color 110ms ease;
   }
   .webui-model-effort-dot[data-passed="true"] {
     background: var(--opacity_white_0_50);
@@ -343,6 +360,21 @@
     box-shadow:
       0 2px 10px rgb(0 0 0 / 18%),
       0 0 0 1px rgb(0 0 0 / 5%);
+    cursor: grab;
+    transition:
+      left 110ms cubic-bezier(0.2, 0.7, 0.2, 1),
+      transform 140ms cubic-bezier(0.2, 0.7, 0.2, 1),
+      box-shadow 140ms ease;
+  }
+  .webui-model-effort-rail:hover .webui-model-effort-thumb {
+    transform: translate(-50%, -50%) scale(1.08);
+    box-shadow:
+      0 3px 12px rgb(0 0 0 / 20%),
+      0 0 0 1px rgb(0 0 0 / 6%);
+  }
+  .webui-model-effort-rail:active .webui-model-effort-thumb {
+    cursor: grabbing;
+    transform: translate(-50%, -50%) scale(1.1);
   }
   /* A model with no thinking at all still shows the control, so the panel's
    * layout does not change shape from one model to the next — it just does
@@ -350,6 +382,13 @@
   .webui-model-effort-slider[data-disabled="true"] {
     opacity: 0.4;
     pointer-events: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .webui-model-effort-fill,
+    .webui-model-effort-dot,
+    .webui-model-effort-thumb {
+      transition: none;
+    }
   }
   /* ---- the list state ---- */
   .webui-model-list {
@@ -363,28 +402,7 @@
     display: flex;
     flex: 0 0 auto;
     align-items: center;
-    justify-content: space-between;
     padding: 0 var(--spacing_8);
-  }
-  .webui-model-list-back {
-    display: flex;
-    width: var(--spacing_24);
-    height: var(--spacing_24);
-    flex: 0 0 auto;
-    align-items: center;
-    justify-content: center;
-    border: 0;
-    border-radius: var(--radius_8);
-    background: transparent;
-    color: var(--icon_default_tertiary);
-  }
-  .webui-model-list-back:hover {
-    background: var(--bg_interaction_tertiary_hover);
-    color: var(--icon_default_secondary);
-  }
-  .webui-model-list-back-icon {
-    width: var(--spacing_16);
-    height: var(--spacing_16);
   }
   .webui-model-list-title {
     color: var(--text_default_tertiary);
@@ -407,26 +425,28 @@
     display: flex;
     flex-direction: column;
     gap: var(--spacing_4);
+    padding-bottom: var(--spacing_12);
+  }
+  .webui-model-list-group + .webui-model-list-group {
+    border-top: 1px solid var(--border_light);
+    padding-top: var(--spacing_12);
   }
   /* The group's name and, under it, the identifier it answers to. A group
    * header is two lines because the second line is the part that tells two
    * same-named groups apart. */
   .webui-model-list-group-header {
     display: flex;
+    align-items: flex-start;
     flex-direction: column;
     gap: 2px;
-    padding: 0 var(--spacing_8) var(--spacing_4);
+    padding: 0 var(--spacing_12) var(--spacing_4);
+    text-align: left;
   }
   .webui-model-list-group-name {
     color: var(--text_default_primary);
-    font-size: var(--size_16);
-    line-height: var(--line_height_22);
-    font-weight: var(--weight_regular);
-  }
-  .webui-model-list-group-subtitle {
-    color: var(--text_default_tertiary);
     font-size: var(--size_14);
     line-height: var(--line_height_20);
+    font-weight: 600;
   }
   .webui-model-list-row {
     display: flex;
@@ -435,9 +455,9 @@
     align-items: center;
     gap: var(--spacing_8);
     border: 0;
-    border-radius: var(--radius_16);
+    border-radius: 0;
     background: transparent;
-    padding: 0 var(--spacing_8);
+    padding: 0 var(--spacing_12);
     color: var(--text_default_primary);
     font: inherit;
     font-size: var(--size_16);

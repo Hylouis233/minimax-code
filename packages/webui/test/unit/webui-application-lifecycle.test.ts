@@ -85,6 +85,28 @@ it("reads the route's own catalogue at start when the route names a session", as
   application.dispose();
 });
 
+it("reads the home catalogue when returning from a session to a new task", async () => {
+  const listModels = vi.fn(async (request?: { readonly sessionId?: string }) => [
+    { providerId: "fixture", modelId: request?.sessionId ?? "home" },
+  ]);
+  const application = createWebuiApplication({
+    openEventChannel: () => scriptedChannel().channel,
+    slices: createWebuiPortSlices({ listModels } as never),
+    turns: { resumeSession: (async () => {}) as unknown as WebuiClientSessionResumer },
+  });
+
+  application.start({ initialSessionId: SESSION });
+  await Promise.resolve();
+  await Promise.resolve();
+  application.select(undefined);
+  await Promise.resolve();
+  await Promise.resolve();
+
+  expect(listModels).toHaveBeenLastCalledWith(undefined);
+  expect(application.modelsWorkflows.getSnapshot().models.value?.[0]?.modelId).toBe("home");
+  application.dispose();
+});
+
 function scriptedChannel() {
   const listeners = new Set<(event: WebuiRuntimeEvent) => void>();
   const ready = new Set<() => void>();

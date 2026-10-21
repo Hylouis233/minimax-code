@@ -18,6 +18,10 @@ import { MemorySection } from "./MemorySection.js";
  * but the two do not overlap in behaviour. The shell owns the tab list, groups
  * and search filtering; this component owns one tab body and the transport
  * calls behind it.
+ *
+ * Boundary note: the browser switches are not here. They are their own tab —
+ * 浏览器 — because the browser business owns that vocabulary, and a page of
+ * this business's preferences is not where another business's settings live.
  */
 
 /**

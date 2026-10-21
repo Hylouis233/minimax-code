@@ -11,6 +11,11 @@
 // directly — is a private-peer import the dependency rules forbid, and the
 // rules are right: a foreign business must not be able to construct another
 // business's state. It may only ask the owner to.
+//
+// The authorization switches are not here any more: they are settings, and they
+// live in the Settings page now. What is left in the panel is the answer —
+// whether the surface on screen is authorized — and it comes from the browser
+// family's owner, which the Settings page writes to.
 
 import {
   useCallback,
@@ -30,10 +35,10 @@ import type {
 import { useWebuiPortSlice } from "../../../bindings/port-slices-context.js";
 import { useWebuiBrowserRunId } from "../bindings/use-browser-run.public.js";
 import {
-  applyWebuiBrowserAuthorizationChange,
-  prepareWebuiBrowserInputCommand,
-  webuiBrowserAuthorizationChange,
-} from "../application/browser-commands.js";
+  useWebuiBrowserAuthorization,
+  useWebuiBrowserAuthorizationState,
+} from "../bindings/use-browser-authorization.public.js";
+import { prepareWebuiBrowserInputCommand } from "../application/browser-commands.js";
 import type { BrowserPort } from "../contracts/browser-port.js";
 import type { WebuiBrowserInputIntent } from "../contracts/browser-panel.js";
 import {
@@ -43,10 +48,6 @@ import {
   selectedWebuiBrowserRunTarget,
   webuiBrowserStreamTargetKey,
 } from "../projection/browser-state.js";
-import {
-  BrowserAuthorizationSwitches,
-  BrowserInstallationKey,
-} from "./BrowserAuthorizationSwitches.public.js";
 import { BrowserPanel } from "./BrowserPanel.public.js";
 
 export interface BrowserPanelHostProps {
@@ -64,6 +65,10 @@ export interface BrowserPanelHostProps {
    * Optional, like every port member in this package: an absent port means the
    * host does not wire the browser family at all, and the panel says so rather
    * than discovering it by calling.
+   *
+   * The authorization is not read through this port: it belongs to the browser
+   * family's owner, which the Settings page reads too, so that a switch moved
+   * in the settings page reaches this panel.
    */
   readonly port?: BrowserPort;
   /**
@@ -91,6 +96,15 @@ export function BrowserPanelHost({
   const activeRunId = useWebuiBrowserRunId();
   const runId = runIdProp ?? activeRunId;
   const runScope = useMemo(() => (runId ? { runId } : {}), [runId]);
+
+  // The authorization is the browser family's, and it is read from the owner
+  // the Settings page also reads: the switches moved to the settings page, and
+  // a panel that kept a second copy would go on showing the answer it had when
+  // the person moved the switch somewhere else.
+  const authorizationOwner = useWebuiBrowserAuthorization();
+  const authorizationState = useWebuiBrowserAuthorizationState();
+  const authorization =
+    authorizationState?.status === "ready" ? authorizationState.authorization : undefined;
 
   // The surface the effects last ran for. The frame stream is re-opened when
   // the surface changes, and the previous subscription has to be closed first —
@@ -129,15 +143,23 @@ export function BrowserPanelHost({
     [port, runId, runScope],
   );
 
+  // The authorization is read by its owner, once, for every surface that needs
+  // it. The panel asks for it here because the panel is a surface that needs it.
+  useEffect(() => {
+    void authorizationOwner?.load();
+  }, [authorizationOwner]);
+
+  // The panel's own state follows the owner's answer.
+  useEffect(() => {
+    if (!authorization) return;
+    dispatch({ type: "authorization-loaded", authorization });
+  }, [authorization]);
+
   useEffect(() => {
     let cancelled = false;
     if (!port) return () => undefined;
     void (async () => {
       try {
-        if (port.getBrowserAuthorization) {
-          const authorization = await port.getBrowserAuthorization();
-          if (!cancelled) dispatch({ type: "authorization-loaded", authorization });
-        }
         if (port.listBrowserCapabilities) {
           const capabilities = await port.listBrowserCapabilities();
           if (!cancelled) {
@@ -238,31 +260,6 @@ export function BrowserPanelHost({
     dispatch({ type: "failed", error });
   }, []);
 
-  const onToggle = useCallback(
-    (toggle: Parameters<typeof webuiBrowserAuthorizationChange>[0]) => {
-      const change = webuiBrowserAuthorizationChange(toggle);
-      // The optimistic preview is only safe because the change names one
-      // field: the other three switches are carried over untouched.
-      dispatch({
-        type: "authorization-loaded",
-        authorization: applyWebuiBrowserAuthorizationChange(state.authorization, change),
-      });
-      void port
-        ?.setBrowserAuthorization?.(change)
-        ?.then((authorization) => {
-          dispatch({ type: "authorization-loaded", authorization });
-        })
-        .catch((error: unknown) => {
-          dispatch({
-            type: "authorization-loaded",
-            authorization: state.authorization,
-          });
-          dispatch({ type: "failed", error: toBrowserError(error) });
-        });
-    },
-    [port, state.authorization],
-  );
-
   const buildInput = useMemo(
     () =>
       (intent: WebuiBrowserInputIntent) => prepareWebuiBrowserInputCommand(state, intent),
@@ -279,14 +276,6 @@ export function BrowserPanelHost({
         onSendInput={onSendInput}
         onRejected={onRejected}
       />
-      <BrowserAuthorizationSwitches
-        authorization={state.authorization}
-        onChange={onToggle}
-        disabled={!port?.setBrowserAuthorization}
-      />
-      {/* The key is shown only on request, and only for the surface the person
-          asks about — it is never part of the authorization snapshot above. */}
-      <BrowserInstallationKey readKey={port?.getBrowserInstallationKey} />
     </div>
   );
 }

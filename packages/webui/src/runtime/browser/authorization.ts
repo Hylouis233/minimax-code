@@ -18,6 +18,7 @@
 
 import {
   isWebuiBrowserSurfaceAuthorized,
+  normalizeWebuiBrowserAuthorization,
   WEBUI_BROWSER_AUTHORIZATION_DEFAULT,
   WEBUI_BROWSER_RESTRICTED_COMMANDS,
   type WebuiBrowserAuthorization,
@@ -68,16 +69,14 @@ export function defaultBrowserAuthorization(): WebuiBrowserAuthorization {
  * A host that answers with a partial record has not authorized the missing
  * parts. Defaulting a missing key to `true` would turn an incomplete answer
  * into a grant.
+ *
+ * The rule itself is the shared contract's, because the client reads an answer
+ * the same way: one rule, one answer, whichever side is looking.
  */
 export function normalizeBrowserAuthorization(
   raw: Partial<WebuiBrowserAuthorization> | undefined,
 ): WebuiBrowserAuthorization {
-  return {
-    isolatedChromium: raw?.isolatedChromium === true,
-    edge: raw?.edge === true,
-    chrome: raw?.chrome === true,
-    fullCdp: raw?.fullCdp === true,
-  };
+  return normalizeWebuiBrowserAuthorization(raw);
 }
 
 /** The refusal a surface that is not authorized gets. */

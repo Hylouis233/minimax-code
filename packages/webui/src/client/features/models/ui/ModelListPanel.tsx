@@ -24,7 +24,7 @@
 
 import type { ReactElement } from "react";
 
-import { WebuiIconCheck, WebuiIconChevronLeft } from "../../../shell/icons.js";
+import { WebuiIconCheck } from "../../../shell/icons.js";
 import type {
   WebuiModelPickerEntry,
   WebuiModelProviderGroup,
@@ -37,35 +37,20 @@ export interface WebuiModelListPanelProps {
   readonly selected: WebuiModelPickerEntry | undefined;
   /** Choose a model. */
   readonly onSelect: (model: WebuiModelPickerEntry) => void;
-  /** Back to the panel state. */
-  readonly onBack: () => void;
+  /** Retained for callers that provide the legacy secondary-panel action. */
+  readonly onBack?: () => void;
 }
 
 export function WebuiModelListPanel({
   groups,
   selected,
   onSelect,
-  onBack,
 }: WebuiModelListPanelProps): ReactElement {
   const selectedKey = selected ? modelKey(selected) : undefined;
   return (
     <div className="webui-model-list" data-webui-model-list="true">
       <div className="webui-model-list-head">
         <span className="webui-model-list-title">选择模型</span>
-        {/*
-          The way back. It sits opposite the title rather than beside it, so
-          the title keeps the place the title has in every list in this client.
-        */}
-        <button
-          type="button"
-          className="webui-model-list-back"
-          data-webui-model-list-back="true"
-          aria-label="返回"
-          title="返回"
-          onClick={onBack}
-        >
-          <WebuiIconChevronLeft className="webui-model-list-back-icon" />
-        </button>
       </div>
       <div className="webui-model-list-groups">
         {groups.length === 0 ? (
@@ -79,16 +64,6 @@ export function WebuiModelListPanel({
           >
             <div className="webui-model-list-group-header">
               <span className="webui-model-list-group-name">{group.label}</span>
-              {/*
-                The provider's own identifier, under its name. Two providers may
-                share a display name, and the id is the thing that tells them
-                apart — and it is the id the settings page asks for.
-              */}
-              {group.id !== group.label ? (
-                <span className="webui-model-list-group-subtitle">
-                  {group.id}
-                </span>
-              ) : null}
             </div>
             {group.models.map((model) => {
               const active = modelKey(model) === selectedKey;

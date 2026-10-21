@@ -391,11 +391,29 @@
       "home": "target"
     },
     {
+      "path": "client/features/browser/application/browser-authorization.ts",
+      "layers": [
+        "application"
+      ],
+      "role": "feature-application",
+      "business": "browser",
+      "home": "target"
+    },
+    {
       "path": "client/features/browser/application/browser-commands.ts",
       "layers": [
         "application"
       ],
       "role": "feature-application",
+      "business": "browser",
+      "home": "target"
+    },
+    {
+      "path": "client/features/browser/bindings/use-browser-authorization.public.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-bindings",
       "business": "browser",
       "home": "target"
     },
@@ -455,6 +473,15 @@
     },
     {
       "path": "client/features/browser/ui/BrowserPanelHost.public.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "browser",
+      "home": "target"
+    },
+    {
+      "path": "client/features/browser/ui/BrowserSettingsPage.public.tsx",
       "layers": [
         "bindings"
       ],

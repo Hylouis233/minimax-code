@@ -169,6 +169,7 @@
 
   .webui-composer-permission-wrap {
     position: relative;
+    flex: 0 0 auto;
   }
 
   .webui-composer-permission-button:hover:not(:disabled) {
@@ -188,12 +189,12 @@
    * already supplies the transparent rest state and the grouped hover fill. The
    * explicit `:hover` is required, not redundant: the base hover selector
    * outranks a bare modifier class. */
-  .webui-composer-permission-button--warning {
+  .webui-composer-permission-button.webui-composer-permission-button--warning {
     padding-right: var(--spacing_4);
     color: var(--text_status_warning);
   }
 
-  .webui-composer-permission-button--warning:hover:not(:disabled) {
+  .webui-composer-permission-button.webui-composer-permission-button--warning:hover:not(:disabled) {
     color: var(--text_status_warning);
   }
 
@@ -202,12 +203,14 @@
   }
 
   .webui-composer-permission-icon {
+    display: block;
     width: var(--size_16);
     height: var(--size_16);
     flex: 0 0 var(--size_16);
   }
 
   .webui-composer-permission-chevron {
+    display: block;
     width: var(--size_12);
     height: var(--size_12);
     flex: 0 0 var(--size_12);
@@ -220,9 +223,8 @@
    * joining the single-line `.webui-composer-menu button` rule above — that
    * rule's `min-height: 38px` and centred alignment are the wrong shape for a
    * stacked label, and its compound selector would outrank a single class
-   * anyway. The selected row carries no fill: the orange label, description,
-   * glyph, and trailing check are the whole selection signal, so a grey
-   * background would compete with the row hover. */
+   * anyway. Only the selected full-access row uses the warning color; the
+   * other selected modes keep the normal text color. */
   .webui-composer-permission-menu {
     min-width: 320px;
     max-width: min(360px, calc(100vw - 32px));
@@ -309,10 +311,10 @@
     align-self: center;
   }
 
-  .webui-composer-permission-option[aria-checked="true"] .webui-composer-permission-icon,
-  .webui-composer-permission-option[aria-checked="true"] .webui-composer-permission-label,
-  .webui-composer-permission-option[aria-checked="true"] .webui-composer-permission-description,
-  .webui-composer-permission-option[aria-checked="true"] .webui-composer-permission-check {
+  .webui-composer-permission-option[data-permission-mode="bypassPermissions"][aria-checked="true"] .webui-composer-permission-icon,
+  .webui-composer-permission-option[data-permission-mode="bypassPermissions"][aria-checked="true"] .webui-composer-permission-label,
+  .webui-composer-permission-option[data-permission-mode="bypassPermissions"][aria-checked="true"] .webui-composer-permission-description,
+  .webui-composer-permission-option[data-permission-mode="bypassPermissions"][aria-checked="true"] .webui-composer-permission-check {
     color: var(--text_status_warning);
   }
 
@@ -461,6 +463,10 @@
    * the effective result the split was supposed to preserve. */
   .webui-model-selector {
     position: relative;
+    width: fit-content;
+    max-width: min(244px, 36vw);
+    min-width: 0;
+    flex: 0 1 auto;
   }
   /* The thinking trigger. Three tones, and the third is the one that matters:
    * `unstated` is NOT `off`. The wire says an empty effort means "no override,

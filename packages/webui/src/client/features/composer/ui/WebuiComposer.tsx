@@ -852,6 +852,10 @@ export function WebuiComposer({
   };
   const changePermissionMode = async (mode: WebuiPermissionMode) => {
     if (!settingsWorkflows?.canWritePermissionMode) return;
+    // Close the menu at the point of selection. The write may take a moment,
+    // but the selected row should never remain visible in a disabled/greyed
+    // state while the runtime is saving it.
+    setPermissionMenuOpen(false);
     setPermissionBusy(true);
     setInteractionError(undefined);
     try {
@@ -860,7 +864,6 @@ export function WebuiComposer({
       const refreshed = await settingsWorkflows.savePermissionMode(mode);
       if (refreshed !== mode) throw new Error("授权模式未能保存，请重试");
       setPermissionUnavailable(false);
-      setPermissionMenuOpen(false);
     } catch (error) {
       setInteractionError(error instanceof Error ? error.message : String(error));
     } finally {

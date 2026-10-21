@@ -81,6 +81,7 @@ import {
   WebuiWorkspaceQueriesProvider,
 } from "../bindings/use-query-state.js";
 import { WebuiAccountWorkflowsProvider } from "../features/account/bindings/use-account-workflows.js";
+import { WebuiBrowserAuthorizationProvider } from "../features/browser/bindings/use-browser-authorization.public.js";
 import { useSessionTeamMode } from "../features/sessions/bindings/use-session-team-mode.js";
 import {
   projectWebuiWorkspaceHistory,
@@ -772,6 +773,10 @@ export function WebuiClientFoundationApp(
         * business's slice from this context, which is the reason a child
         * component never has to fall back to the transport. */}
       <WebuiPortSlicesProvider slices={portSlices}>
+    {/* The browser family owns its authorization, and the panel in the tool area
+        and the settings page in the modal are different trees: only a provider
+        above both of them gives them one answer. */}
+    <WebuiBrowserAuthorizationProvider>
     <WebuiWorkspaceQueriesProvider queries={workspaceQueries}>
     <WebuiAccountWorkflowsProvider workflows={accountWorkflows}>
     <WebuiModelsWorkflowsProvider workflows={modelsWorkflows}>
@@ -983,6 +988,7 @@ export function WebuiClientFoundationApp(
     </WebuiModelsWorkflowsProvider>
     </WebuiAccountWorkflowsProvider>
     </WebuiWorkspaceQueriesProvider>
+    </WebuiBrowserAuthorizationProvider>
       </WebuiPortSlicesProvider>
     </>
   );

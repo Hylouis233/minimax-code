@@ -456,7 +456,16 @@ export function createWebuiApplication(
   const selectSession = (sessionId: string | undefined): void => {
     sessionScope.select(sessionId);
     store.select(sessionId);
+    // The selected session and the model catalogue it exposes share one
+    // lifecycle. Selecting the home slot from a session must read its catalogue
+    // too; otherwise the new-task composer sees an uninitialised home entry
+    // until the page is reloaded directly into that route. Keep an already
+    // loaded (or currently loading) catalogue and retry only an idle/failed one.
     modelsWorkflows.selectCatalogue(sessionId);
+    const modelCatalogue = modelsWorkflows.readModelsFor(sessionId);
+    if (modelCatalogue.status === "idle" || modelCatalogue.status === "error") {
+      void modelsWorkflows.loadModels(sessionId);
+    }
     composerController?.selectSession(sessionId);
     // Selecting is where a retained dirty marker pays out: the session was
     // marked while nothing needed it, and now something does.
@@ -896,16 +905,11 @@ export function createWebuiApplication(
       if (lifecycle === "disposed") return false;
       if (lifecycle === "started") return true;
       const initialSessionId = options?.initialSessionId;
-      // Order matters: the route the caller booted at is applied first, so the
-      // route the caller booted at is applied before model reads.
+      // The boot route is applied before ingress opens. A home boot already is
+      // the selected state, so read its catalogue directly without running the
+      // user-driven selection effects (which clear the home turn).
       if (initialSessionId !== undefined) selectSession(initialSessionId);
-      // The home slot is a catalogue context like any other, and `select` only
-      // points at its key — nothing read it. `refreshInspection` needs a
-      // sessionId and `loadModels` had only the settings panel as a caller, so a
-      // boot that landed on the new-task screen left the composer's Model picker
-      // holding an empty catalogue and therefore rendering it disabled until the
-      // user opened a conversation. Read whichever context `select` just chose.
-      void modelsWorkflows.loadModels(initialSessionId);
+      else void modelsWorkflows.loadModels(undefined);
       channel = deps.openEventChannel();
       detach = events.attach(channel);
       lifecycle = "started";

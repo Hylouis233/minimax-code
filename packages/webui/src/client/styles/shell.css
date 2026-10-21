@@ -71,6 +71,7 @@
     width: 100%;
     align-items: center;
     gap: var(--spacing_8);
+    margin-block: 2px;
     border: 0;
     border-radius: var(--radius_8);
     background: transparent;
@@ -166,7 +167,10 @@
     text-align: left;
     font-size: var(--size_14);
     line-height: var(--line_height_20);
-    transition: background-color 120ms ease;
+    /* Hover ownership changes on every pointer move. A fade leaves the
+     * previous row painted while the next row is entering, which reads as
+     * two adjacent hover states. */
+    transition: none;
   }
   .webui-model-option:hover,
   .webui-workspace-option:hover,

@@ -113,21 +113,58 @@ test("the slider sets the level, and the chip names it", async ({ page }) => {
   const panel = page.getByRole("dialog");
   const slider = page.locator("[data-webui-model-effort-slider]");
   await expect(slider).toBeVisible();
+  const selectorBox = await chip(page).boundingBox();
+  const sendBox = await page.locator(".webui-send-button").boundingBox();
+  expect(selectorBox).toBeTruthy();
+  expect(sendBox).toBeTruthy();
+  expect(sendBox.x - (selectorBox.x + selectorBox.width)).toBeLessThan(16);
   // Three stops for this model: the levels the runtime lists for it. The
   // control is the model's own scale, not a fixed product scale.
   await expect(slider.locator(".webui-model-effort-dot")).toHaveCount(3);
 
   // Drag the thumb to the leftmost stop and release: one write, at the end of
   // the drag.
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   const rail = slider.locator(".webui-model-effort-rail");
+  const chipBoxBefore = await chip(page).boundingBox();
   const box = await rail.boundingBox();
   expect(box).toBeTruthy();
   await page.mouse.move(box.x + box.width * 0.6, box.y + box.height / 2);
   await page.mouse.down();
+  await page.evaluate(() => {
+    window.__effortFillWidths = [];
+    const fill = document.querySelector(".webui-model-effort-fill");
+    if (!fill) throw new Error("model effort fill is missing");
+    const sample = () => {
+      window.__effortFillWidths.push(fill.getBoundingClientRect().width);
+      if (window.__effortFillWidths.length < 30) requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
   await page.mouse.move(box.x + 2, box.y + box.height / 2, { steps: 8 });
+  await page.waitForTimeout(180);
+  const fillWidths = await page.evaluate(() => window.__effortFillWidths);
+  expect(fillWidths.some((width) => width > 0 && width < 8)).toBe(false);
+  await expect(page.locator('[data-webui-model-panel-level="true"]')).toHaveText(
+    "默认",
+  );
   await page.mouse.up();
 
   await expect(page.locator('[data-webui-model-panel-level="true"]')).toHaveText(
     "默认",
   );
+  const chipBoxAfter = await chip(page).boundingBox();
+  expect(chipBoxAfter?.width).toBe(chipBoxBefore?.width);
+
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  const thumbStyle = await slider.locator(".webui-model-effort-thumb").evaluate((thumb) => {
+    const style = getComputedStyle(thumb);
+    return {
+      scale: new DOMMatrix(style.transform).a,
+      transitionDuration: style.transitionDuration,
+    };
+  });
+  const thumbScale = thumbStyle.scale;
+  expect(thumbScale).toBeGreaterThan(1);
+  expect(thumbStyle.transitionDuration).toContain("0.14s");
 });

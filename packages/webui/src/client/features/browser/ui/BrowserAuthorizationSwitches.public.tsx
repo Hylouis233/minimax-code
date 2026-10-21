@@ -96,7 +96,7 @@ export function BrowserAuthorizationSwitches({
 
   return (
     <>
-      <SettingsSection title="浏览器" testId="browser-authorization-surfaces" hint="每个浏览器单独授权，默认全部关闭。">
+      <SettingsSection title="浏览器设置" testId="browser-authorization-surfaces" hint="每个浏览器单独授权，默认全部关闭。">
         {SURFACE_ROWS.map((row) => (
           <SettingsRow
             key={row.surface}

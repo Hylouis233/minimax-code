@@ -252,10 +252,6 @@ export function WebuiModelPicker({
           groups={groups}
           selected={selected}
           onSelect={handleSelectModel}
-          onBack={() => {
-            setView("panel");
-            setIsViewTransitioning(true);
-          }}
         />
       );
     }
@@ -339,6 +335,7 @@ export function WebuiModelPicker({
                 {triggerLevel ? (
                   <span
                     className="shrink-0 text-icon_default_tertiary"
+                    data-ultra={triggerLevel === "Ultra" ? "true" : "false"}
                     data-webui-model-chip-level="true"
                   >
                     {triggerLevel}

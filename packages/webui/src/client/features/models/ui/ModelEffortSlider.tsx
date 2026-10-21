@@ -11,6 +11,7 @@
 
 import {
   useCallback,
+  useEffect,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -31,6 +32,8 @@ export interface WebuiModelEffortSliderProps {
   readonly binary: boolean;
   /** Called once, when the drag ends on a level. */
   readonly onCommit: (value: string) => void;
+  /** The level under the pointer, for live labels while dragging. */
+  readonly onPreviewChange?: (value: string | undefined) => void;
 }
 
 /**
@@ -48,10 +51,17 @@ export function WebuiModelEffortSlider({
   value,
   binary,
   onCommit,
+  onPreviewChange,
 }: WebuiModelEffortSliderProps): ReactElement {
   const railRef = useRef<HTMLDivElement | null>(null);
   const draggingRef = useRef(false);
   const [preview, setPreview] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (draggingRef.current || preview === undefined || preview !== value) return;
+    setPreview(undefined);
+    onPreviewChange?.(undefined);
+  }, [onPreviewChange, preview, value]);
 
   const total = scale.stops.length;
   const index = effortStopIndex(scale, preview ?? value);
@@ -84,13 +94,19 @@ export function WebuiModelEffortSlider({
     draggingRef.current = true;
     event.currentTarget.setPointerCapture(event.pointerId);
     const stop = stopAt(event.clientX);
-    if (stop !== undefined) setPreview(stop);
+    if (stop !== undefined) {
+      setPreview(stop);
+      onPreviewChange?.(stop);
+    }
   };
 
   const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>): void => {
     if (!draggingRef.current) return;
     const stop = stopAt(event.clientX);
-    if (stop !== undefined) setPreview(stop);
+    if (stop !== undefined) {
+      setPreview(stop);
+      onPreviewChange?.(stop);
+    }
   };
 
   const handlePointerUp = (event: ReactPointerEvent<HTMLDivElement>): void => {
@@ -100,8 +116,16 @@ export function WebuiModelEffortSlider({
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
     const stop = stopAt(event.clientX);
-    setPreview(undefined);
-    if (stop !== undefined && stop !== value) onCommit(stop);
+    if (stop !== undefined && stop !== value) {
+      // Keep the chosen stop visible while the owner commits it. The owner
+      // updates `value` on success; the effect above then releases this preview.
+      setPreview(stop);
+      onPreviewChange?.(stop);
+      onCommit(stop);
+    } else {
+      setPreview(undefined);
+      onPreviewChange?.(undefined);
+    }
   };
 
   /**
@@ -115,12 +139,14 @@ export function WebuiModelEffortSlider({
     if (!draggingRef.current) return;
     draggingRef.current = false;
     setPreview(undefined);
+    onPreviewChange?.(undefined);
   };
 
   return (
     <div
       className="webui-model-effort-slider"
       data-webui-model-effort-slider="true"
+      data-ultra={ratio === 1 ? "true" : "false"}
       data-disabled={scale.disabled ? "true" : "false"}
       data-binary={binary ? "true" : "false"}
     >
@@ -133,7 +159,12 @@ export function WebuiModelEffortSlider({
         onPointerCancel={handlePointerCancel}
       >
         <div className="webui-model-effort-track" />
-        <div className="webui-model-effort-fill" style={{ width: fillWidth }} />
+        <div
+          className="webui-model-effort-fill"
+          data-empty={ratio === 0 ? "true" : "false"}
+          data-ultra={ratio === 1 ? "true" : "false"}
+          style={{ width: fillWidth }}
+        />
         {scale.stops.map((stop, at) => (
           <span
             key={stop.value}

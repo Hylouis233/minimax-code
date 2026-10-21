@@ -77,6 +77,31 @@ export const WEBUI_BROWSER_AUTHORIZATION_DEFAULT: WebuiBrowserAuthorization = Ob
 });
 
 /**
+ * The authorization an answer carries, read as four switches.
+ *
+ * A missing field is off, and only an explicit `true` turns a switch on. That
+ * is the same rule on both sides of the wire — the runtime reads a partial
+ * configuration this way, and the client reads a partial answer this way — so
+ * a host that answers with one switch has authorized that one and nothing
+ * else.
+ *
+ * The rule lives here rather than in either side because a switch that is
+ * `undefined` is not "off": it is a switch whose state nobody knows, and a
+ * control that renders it without an `aria-checked` of its own says nothing
+ * about what it is.
+ */
+export function normalizeWebuiBrowserAuthorization(
+  raw: Partial<WebuiBrowserAuthorization> | undefined,
+): WebuiBrowserAuthorization {
+  return {
+    isolatedChromium: raw?.isolatedChromium === true,
+    edge: raw?.edge === true,
+    chrome: raw?.chrome === true,
+    fullCdp: raw?.fullCdp === true,
+  };
+}
+
+/**
  * One authorization change.
  *
  * The four switches are written one at a time and every field is optional, so
