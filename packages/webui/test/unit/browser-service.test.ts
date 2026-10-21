@@ -73,6 +73,17 @@ class RecordingProvider implements WebuiBrowserSurfaceProvider {
     }
   }
 
+  /**
+   * Reports a generation the provider holds without announcing it.
+   *
+   * The announcement can be lost: a page that is still loading is observed as
+   * a replaced page while it is being attached to, and the announcement
+   * arrives before the service has observed the target at all.
+   */
+  reportGeneration(targetId: string, generation: number): void {
+    this.generations.set(targetId, generation);
+  }
+
   async sendCommand(
     _target: unknown,
     command: string,
@@ -1169,6 +1180,28 @@ describe("the surface a run is working on", () => {
     expect(service.selectionSurfaceOf("run-a")).toBeUndefined();
     await service.close();
   });
+
+  it("moves a selection onto the page the provider now holds", async () => {
+    const { service, provider } = createService({
+      ...ALL_OFF,
+      isolatedChromium: true,
+    });
+    await service.listTargets("isolated-chromium", "run-1");
+    await service.selectTarget(tab("tab-1"), "run-1");
+
+    // The page behind the tab was replaced, and the announcement that says so
+    // was lost — it arrived before the service had observed the target. The
+    // provider's listing is then the only thing that knows, and the selection
+    // has to follow it: a selection left behind would make the Agent's next
+    // action refuse against a page the runtime knows is there.
+    provider.reportGeneration("tab-1", 2);
+    const list = await service.listTargets("isolated-chromium", "run-1");
+    const selected = list.targets.find((entry) => entry.selected);
+    expect(selected?.id.targetId).toBe("tab-1");
+    expect(selected?.id.generation).toBe(2);
+    await service.close();
+  });
+
 });
 
 /** One open stream, plus what it has delivered so far. */

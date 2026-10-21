@@ -107,7 +107,7 @@ describe.skipIf(!available)("the isolated Chromium, one page per web tab", () =>
 
   afterAll(async () => {
     await provider?.close();
-    if (dataDir) await rm(dataDir, { recursive: true, force: true });
+    if (dataDir) await rm(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
 
   /** The identity of the page the browser was launched with. */
@@ -358,7 +358,7 @@ describe.skipIf(!available)("the browser service, streaming two pages of one Chr
 
   afterAll(async () => {
     await service?.close();
-    if (dataDir) await rm(dataDir, { recursive: true, force: true });
+    if (dataDir) await rm(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
 
   /** Repaints the page the run is on, which is what makes the screencast push. */
@@ -473,7 +473,7 @@ describe.skipIf(!available)("the Agent opening a tab of a real isolated Chromium
 
   afterAll(async () => {
     await service?.close();
-    if (dataDir) await rm(dataDir, { recursive: true, force: true });
+    if (dataDir) await rm(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
 
   it("opens a page the same run can then navigate", async () => {
@@ -559,7 +559,7 @@ describe.skipIf(!available)("the web tab's toolbar, on a real page", () => {
 
   afterAll(async () => {
     await service?.close();
-    if (dataDir) await rm(dataDir, { recursive: true, force: true });
+    if (dataDir) await rm(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
 
   /**
@@ -759,7 +759,7 @@ describe.skipIf(!available)("the run's selection and the tab in front, on a real
 
   afterAll(async () => {
     await service?.close();
-    if (dataDir) await rm(dataDir, { recursive: true, force: true });
+    if (dataDir) await rm(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
 
   async function settle(): Promise<void> {

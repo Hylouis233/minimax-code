@@ -231,6 +231,24 @@ export class WebuiBrowserService {
     return created;
   }
 
+  /**
+   * Moves a selection onto the page the runtime currently holds.
+   *
+   * The generation moves when the page behind a target is replaced, and the
+   * selection follows it: the selection names a page, and a page that
+   * navigated is still the same page. A selection left behind would make the
+   * Agent's next action refuse against a page the runtime knows is there.
+   */
+  #followGeneration(identity: WebuiBrowserTargetState): void {
+    for (const selections of this.#selected.values()) {
+      for (const [runId, selection] of [...selections]) {
+        if (selection.target.targetId !== identity.id.targetId) continue;
+        if (selection.target.generation === identity.id.generation) continue;
+        selections.set(runId, { ...selection, target: identity.id });
+      }
+    }
+  }
+
   /** What one run has selected on one surface, if it has selected anything. */
   #selectionOf(
     surface: WebuiBrowserSurface,
@@ -629,14 +647,7 @@ export class WebuiBrowserService {
       // previous page would still look current to that run's stream. The order
       // is carried over because a navigation is not the run choosing a
       // different surface.
-      const selections = this.#selected.get(surface);
-      if (selections && raised) {
-        for (const [runId, selection] of [...selections]) {
-          if (selection.target.targetId === change.targetId) {
-            selections.set(runId, { ...selection, target: raised.id });
-          }
-        }
-      }
+      if (raised) this.#followGeneration(raised);
       // The page behind a web tab was replaced, so the tab's generation moved
       // and the snapshot that publishes it is no longer the one the client
       // holds. Every session that has the tab open has to hear about it.
@@ -709,7 +720,6 @@ export class WebuiBrowserService {
     // This run's own selection, and only that one: marking the flag from a
     // different run's selection is how the panel ends up showing one page while
     // the Agent drives another.
-    const selected = this.#selectionOf(surface, runId);
     const states: WebuiBrowserTargetState[] = [];
     for (const target of await provider.listTargets()) {
       const identity = this.#registry.observe({
@@ -721,6 +731,16 @@ export class WebuiBrowserService {
         status: target.status,
         generation: target.id.generation,
       });
+      // The provider's generation is the authority on which page is there
+      // now, and a selection follows the page it names.
+      this.#followGeneration(identity);
+      // The selection is read here, per target, rather than once before the
+      // listing. The generation can move while the listing is in flight — a
+      // page that is still loading is observed as a replaced page — and a
+      // selection read before the listing would be compared against a
+      // generation that has already moved on, and the tab would be reported
+      // as not selected.
+      const selected = this.#selectionOf(surface, runId);
       states.push({
         ...identity,
         selected: selected ? isSameWebuiBrowserTarget(selected, identity.id) : false,

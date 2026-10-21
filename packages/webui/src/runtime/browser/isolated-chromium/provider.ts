@@ -667,7 +667,16 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
     this.#connection = undefined;
     this.#child?.kill("SIGKILL");
     this.#child = undefined;
-    await rm(this.#userDataDir, { recursive: true, force: true }).catch(() => undefined);
+    // The browser was killed a moment ago, and it may still be writing its
+    // profile. A removal that races with those writes fails with ENOTEMPTY, so
+    // it is retried rather than reported as a failure: the profile is a
+    // directory of files the browser owned, and the browser is gone.
+    await rm(this.#userDataDir, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 100,
+    }).catch(() => undefined);
   }
 
   readonly #targetChangeListeners = new Set<

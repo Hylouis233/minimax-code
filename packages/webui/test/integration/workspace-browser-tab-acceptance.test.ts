@@ -122,7 +122,7 @@ describe.skipIf(!available)("the acceptance of the workspace browser tab model",
 
   afterAll(async () => {
     await service?.close();
-    if (dataDir) await rm(dataDir, { recursive: true, force: true });
+    if (dataDir) await rm(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
 
   // -- the paths the cases drive ------------------------------------------
