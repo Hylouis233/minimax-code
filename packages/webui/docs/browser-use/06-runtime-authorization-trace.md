@@ -156,9 +156,9 @@ impossible to allow one surface without allowing the rest.
 
 | Enforcement point | Surface switch checked | Full CDP checked | Code today |
 | --- | --- | --- | --- |
-| A tab's image stream | required | not applicable | **implemented** — surface check enforced, frames fenced to the selected generation (F6). The stream is keyed by the run; [ADR 0022](../adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md) makes it per target (`required`) |
+| A tab's image stream | required | not applicable | **implemented** — surface check enforced, frames fenced to the selected generation (F6). The stream is keyed by the **target** (`runtime/browser/browser-service.ts:795`), and the provider routes a frame to its page by the envelope's session id |
 | A tab's input forwarding | required | not applicable | **implemented** — validation, surface check and `isCurrent`; the registry's generation is fed from `onTargetChanged` (F2) |
-| Agent browser tools | required | required, for non-restricted commands | **implemented** — the tool adapter (`packages/webui/src/runtime/browser/tool-adapter.ts`) forwards to the same browser service the panel uses, and the composition root hands it to the runtime host. A run with no selection is refused every action, `open_tab` included; ADR 0022 gives `open_tab` the bootstrap path (`required`) |
+| Agent browser tools | required | required, for non-restricted commands | **implemented** — the tool adapter (`packages/webui/src/runtime/browser/tool-adapter.ts`) forwards to the same browser service the panel uses, and the composition root hands it to the runtime host. A run with no selection is refused every action except `open_tab`, which is the action that would create the selection the gate wants (`runtime/browser/tool-adapter.ts:178`) |
 | Bridge admission | required | not applicable | **implemented** — the bridge has its own upgrade path, branched on before the generic one (F3), and the command routing is fixed (F4) |
 | Full CDP gate | required first | required | **implemented** — `sendCommand` checks the surface first, then the switch (F5) |
 

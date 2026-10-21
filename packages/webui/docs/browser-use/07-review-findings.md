@@ -651,22 +651,24 @@ are closed.
 
 This round was not run by an external reviewer. It was raised by a person asking the Agent to open a
 browser and visit a page, and reading the refusal it produced. Four findings came out of that, and
-none of them is closed.
+all four are closed by the tab model ([ADR 0022](../adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md)),
+which is now in the tree.
 
 | # | Severity | Finding | Status |
 | --- | --- | --- | --- |
-| T1 | BLOCKER | **The Agent cannot create a selection, so it cannot act at all.** The tool adapter resolves the surface from the run's own selection and refuses with `browser_target_unknown` when the run has none, and the only writer of a selection is the panel. A person asking for a browser therefore got the same refusal for every action — `inspect`, `navigate` and `open_tab` alike — and `open_tab` was the one action that should have produced a selection. ADR 0019 required that both the user and the Agent can select a target; the tree carried half of it. | `open` — [ADR 0022](../adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md) decides that `open_tab` creates the page and the selection. Not in the tree. |
-| T2 | MAJOR | **`open_tab` created a page that nothing could address.** The isolated provider drives exactly one page and refuses every other target, so `Target.createTarget` produced a second page that the provider would not drive, would not stream, and would not accept input for. It appeared in the target list as a tab that did nothing when chosen. | `open` — ADR 0022 makes the provider hold one page per web tab. Not in the tree. |
-| T3 | MAJOR | **The image stream was per run, so the person and the Agent could not be on different pages.** `watchFrames` resolved the run's selection and streamed that target, and the client dropped any frame that did not match it. A person opening another tab had no way to see it without moving the run's selection, which would have moved the Agent's work with it. | `open` — ADR 0022 makes the stream per target, and separates the run's selection from the tab the person is looking at. Not in the tree. |
-| T4 | MINOR | **A page had no identity in the interface.** The panel was a view of a run's selected target, and that selection was invisible: a person moved it by clicking a chip inside the browser panel, and the Agent could not move it at all. | `open` — ADR 0022 gives a page a name, a tab strip and an opener on both sides. Not in the tree. |
+| T1 | BLOCKER | **The Agent cannot create a selection, so it cannot act at all.** The tool adapter resolves the surface from the run's own selection and refuses with `browser_target_unknown` when the run has none, and the only writer of a selection is the panel. A person asking for a browser therefore got the same refusal for every action — `inspect`, `navigate` and `open_tab` alike — and `open_tab` was the one action that should have produced a selection. ADR 0019 required that both the user and the Agent can select a target; the tree carried half of it. | `closed` — `open_tab` is the one action a run with no selection may perform, because it is the action that would create the selection the gate wants (`packages/webui/src/runtime/browser/tool-adapter.ts:178`). The service opens the page and makes it the run's selection (`packages/webui/src/runtime/browser/browser-service.ts:1082`), and a person who opens a tab while the run has none gives the run that page as a documented bootstrap. Measured in a real Chrome — see [`09-acceptance-record.md`](09-acceptance-record.md), the rows "the Agent opens a tab" and "a person opens a tab while the run has no selection". |
+| T2 | MAJOR | **`open_tab` created a page that nothing could address.** The isolated provider drives exactly one page and refuses every other target, so `Target.createTarget` produced a second page that the provider would not drive, would not stream, and would not accept input for. It appeared in the target list as a tab that did nothing when chosen. | `closed` — the provider holds one page per web tab, each with its own CDP session (`packages/webui/src/runtime/browser/isolated-chromium/provider.ts:199`), and `open_tab` attaches the page it creates and registers it (`packages/webui/src/runtime/browser/isolated-chromium/provider.ts:349`). Measured in a real Chrome — the rows "the Agent opens a tab" and "a second web tab in one session". |
+| T3 | MAJOR | **The image stream was per run, so the person and the Agent could not be on different pages.** `watchFrames` resolved the run's selection and streamed that target, and the client dropped any frame that did not match it. A person opening another tab had no way to see it without moving the run's selection, which would have moved the Agent's work with it. | `closed` — the stream is keyed by the target (`packages/webui/src/runtime/browser/browser-service.ts:795`), and the run's selection and the tab the person is looking at are two cells with one writer each (`packages/webui/src/client/features/browser/contracts/browser-panel.ts`). Measured in a real Chrome — the rows "a person opens a tab while the Agent works" and "a person types into their own tab while the Agent works". |
+| T4 | MINOR | **A page had no identity in the interface.** The panel was a view of a run's selected target, and that selection was invisible: a person moved it by clicking a chip inside the browser panel, and the Agent could not move it at all. | `closed` — a page has a name: the tab strip (`packages/webui/src/client/features/workspace/ui/WebuiWorkspaceTabStrip.public.tsx:183`) shows a row of tabs, and the runtime publishes the session's web tabs as a snapshot (`packages/webui/src/runtime/browser/browser-service.ts`). The strip opens a tab and the Agent opens a tab, each on its own side. Measured in a real Chrome — the row "the Agent opens a tab, and the strip gains it as the active tab". |
 
 ### What was done
 
-Nothing is fixed yet; this round is the reason [ADR 0022](../adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md)
-was written, and [ADR 0019 amendment A8](../adr/0019-webui-browser-use-surfaces-and-external-browser-bridge.md)
-records the change to the panel's role. The decisions are settled and the tree is not; the rules they
-pin are listed as `required` in [`05-target-identity.md`](05-target-identity.md), and the work is
-carried by the plan rather than by this document.
+This round is the reason [ADR 0022](../adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md) was
+written, and [ADR 0019 amendment A8](../adr/0019-webui-browser-use-surfaces-and-external-browser-bridge.md)
+records the change to the panel's role. The decisions are settled **and** the tree carries them now:
+the rules ADR 0022 pins are `implemented` in [`05-target-identity.md`](05-target-identity.md), each with
+the file and the line that carries it, and the behaviour is measured in a real Chrome in
+[`09-acceptance-record.md`](09-acceptance-record.md).
 
 ## What this document does not establish
 
@@ -674,10 +676,12 @@ carried by the plan rather than by this document.
   **every** behaviour. The handshake, the refusal, the input, the image, the
   DevTools command and the worker's termination are established, each on its
   own surface — the `chrome` surface in Chrome and the `edge` surface in Edge.
-  What is not established is the **Agent's** path against a real browser, and
-  the Full CDP switch through the runtime gate against a real browser: the
-  bridge carries the command and the extension's allowlist refuses what is not
-  in it, which is a different thing from the runtime switch.
+  What was not established by **this** document's run is the **Agent's** path
+  against a real browser, and the Full CDP switch through the runtime gate
+  against a real browser: the bridge carries the command and the extension's
+  allowlist refuses what is not in it, which is a different thing from the
+  runtime switch. The Agent's path is established by the tab model's own run —
+  see [the workspace browser tab model's acceptance](09-acceptance-record.md#the-workspace-browser-tab-models-acceptance).
 - That the macOS, Windows or Linux credential-store forms behave as intended.
   The Linux form was probed on one host and was **unavailable** there; the
   macOS and Windows forms are asserted through an injected command runner, not

@@ -713,8 +713,13 @@ export class WebuiBrowserService {
         "The browser target has been replaced; select it again.",
       );
     }
+    // The registry's generation is the current one, and it is the one the
+    // selection is written with. A page that is still loading is observed as
+    // a replaced page when its first load lands, and that observation may have
+    // arrived before this call did — a selection written from the caller's
+    // identity alone would be born stale.
     this.#runSelections(target.surface).set(runId, {
-      target,
+      target: known.id,
       order: (this.#selectionOrder += 1),
     });
     // The snapshot says which web tab is the run's selection, so a selection
@@ -1118,8 +1123,14 @@ export class WebuiBrowserService {
     // not a dead end.
     const runHadNoSelection = this.#selectionOf(surface, runId) === undefined;
     if (opener === "agent" || runHadNoSelection) {
+      // The registry's generation is the current one. A page that is still
+      // loading is observed as a replaced page when its first load lands, and
+      // that observation may have arrived before this answer did — a selection
+      // written from the answer alone would be born stale, and the Agent's
+      // next action would be refused against a page it had just opened.
+      const known = this.#registry.resolve(identity);
       this.#runSelections(surface).set(runId, {
-        target: identity,
+        target: known?.id ?? identity,
         order: (this.#selectionOrder += 1),
       });
     }

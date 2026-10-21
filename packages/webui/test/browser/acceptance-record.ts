@@ -65,85 +65,136 @@ export interface AcceptanceRecord extends AcceptanceObservation {
   readonly suite: string;
 }
 
-const recordDir = resolve(
-  new URL("../../../../.plan/browser-use/complete", import.meta.url).pathname,
-);
-
-/** The suites that have written a record in this process. */
-const started = new Set<string>();
-
 /**
- * Start a suite's record.
+ * The plans that record acceptance results, and the directory each one owns.
  *
- * The suite's file is emptied here, at the start of the run, rather than on
- * its first record: a run that fails during setup — the extension does not
- * build, the browser does not start — would otherwise leave the **previous**
- * run's cases in place, and the file would then read as a pass for cases
- * that never ran.
+ * A record is read as evidence **for the plan that asked for it**, so the
+ * directory is named rather than defaulted: a suite that recorded into a plan
+ * it does not belong to would have its cases published as somebody else's.
+ * Two plans are recording today — the browser-use programme and the
+ * workspace browser tab model that amends it.
  */
-export function beginAcceptanceSuite(suite: string): void {
-  mkdirSync(recordDir, { recursive: true });
-  writeFileSync(resolve(recordDir, `${suite}.acceptance.json`), "[]\n", "utf8");
-  started.add(suite);
+const PLAN_DIRECTORIES = {
+  "browser-use": "../../../../.plan/browser-use/complete",
+  "workspace-browser-tab": "../../../../.plan/workspace-browser-tab/complete",
+} as const;
+
+/** A plan whose acceptance results are recorded. */
+export type WebuiAcceptancePlan = keyof typeof PLAN_DIRECTORIES;
+
+/** The records of one plan: one file per suite, under that plan's `complete/`. */
+export interface AcceptanceRecords {
+  /** Empties one suite's file, at the start of a run. */
+  beginSuite(suite: string): void;
+  /** Writes one record for a suite. */
+  record(suite: string, observation: AcceptanceObservation): void;
+  /** Runs one case and records what it observed. */
+  observe(
+    suite: string,
+    observation: Omit<AcceptanceObservation, "result">,
+    body: () => Promise<void>,
+  ): Promise<void>;
 }
 
 /**
- * Write one record for a suite.
+ * The records of one plan.
  *
- * The suite's file is replaced on its first record of the process, so a
- * second run of the same suite starts from an empty file rather than
- * appending to the previous run's cases.
+ * Each plan gets its own `started` set as well as its own directory: which
+ * suites have written a record is a question about a plan's directory, not
+ * about the process.
  */
-export function recordAcceptance(
-  suite: string,
-  observation: AcceptanceObservation,
-): void {
-  const record: AcceptanceRecord = {
-    ...observation,
-    at: new Date().toISOString(),
-    os: `${process.platform} ${release()}`,
-    suite,
-  };
-  mkdirSync(recordDir, { recursive: true });
-  const path = resolve(recordDir, `${suite}.acceptance.json`);
-  if (!started.has(suite)) {
+export function acceptanceRecordsFor(plan: WebuiAcceptancePlan): AcceptanceRecords {
+  const recordDir = resolve(new URL(PLAN_DIRECTORIES[plan], import.meta.url).pathname);
+  /** The suites of this plan that have written a record in this process. */
+  const started = new Set<string>();
+
+  /**
+   * Start a suite's record.
+   *
+   * The suite's file is emptied here, at the start of the run, rather than on
+   * its first record: a run that fails during setup — the extension does not
+   * build, the browser does not start — would otherwise leave the **previous**
+   * run's cases in place, and the file would then read as a pass for cases
+   * that never ran.
+   */
+  function beginSuite(suite: string): void {
+    mkdirSync(recordDir, { recursive: true });
+    writeFileSync(resolve(recordDir, `${suite}.acceptance.json`), "[]\n", "utf8");
     started.add(suite);
-    writeFileSync(path, "[]\n", "utf8");
   }
-  const existing = readRecords(path);
-  existing.push(record);
-  writeFileSync(path, `${JSON.stringify(existing, null, 2)}\n`, "utf8");
+
+  /**
+   * Write one record for a suite.
+   *
+   * The suite's file is replaced on its first record of the process, so a
+   * second run of the same suite starts from an empty file rather than
+   * appending to the previous run's cases.
+   */
+  function record(suite: string, observation: AcceptanceObservation): void {
+    const written: AcceptanceRecord = {
+      ...observation,
+      at: new Date().toISOString(),
+      os: `${process.platform} ${release()}`,
+      suite,
+    };
+    mkdirSync(recordDir, { recursive: true });
+    const path = resolve(recordDir, `${suite}.acceptance.json`);
+    if (!started.has(suite)) {
+      started.add(suite);
+      writeFileSync(path, "[]\n", "utf8");
+    }
+    const existing = readRecords(path);
+    existing.push(written);
+    writeFileSync(path, `${JSON.stringify(existing, null, 2)}\n`, "utf8");
+  }
+
+  /**
+   * Run one acceptance case and record what it observed.
+   *
+   * A failed case is recorded as a failure before the error is re-thrown: a
+   * record that only holds the passing cases is a record of what was supposed
+   * to happen, which is not what was asked for.
+   */
+  async function observe(
+    suite: string,
+    observation: Omit<AcceptanceObservation, "result">,
+    body: () => Promise<void>,
+  ): Promise<void> {
+    const settings = (): Readonly<Record<string, unknown>> =>
+      typeof observation.settings === "function"
+        ? observation.settings()
+        : observation.settings;
+    try {
+      await body();
+      record(suite, { ...observation, settings: settings(), result: "pass" });
+    } catch (error) {
+      record(suite, {
+        ...observation,
+        settings: settings(),
+        result: "fail",
+        observed: `${observation.observed} — failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      });
+      throw error;
+    }
+  }
+
+  return { beginSuite, record, observe };
 }
 
 /**
- * Run one acceptance case and record what it observed.
+ * The browser-use programme's records.
  *
- * A failed case is recorded as a failure before the error is re-thrown: a
- * record that only holds the passing cases is a record of what was supposed to
- * happen, which is not what was asked for.
+ * Those suites call the module-level names below, which is what keeps them
+ * writing into that plan's own `complete/` unchanged; a suite of a later plan
+ * asks for its own records instead.
  */
-export async function observeAcceptance(
-  suite: string,
-  observation: Omit<AcceptanceObservation, "result">,
-  body: () => Promise<void>,
-): Promise<void> {
-  const settings = (): Readonly<Record<string, unknown>> =>
-    typeof observation.settings === "function" ? observation.settings() : observation.settings;
-  try {
-    await body();
-    recordAcceptance(suite, { ...observation, settings: settings(), result: "pass" });
-  } catch (error) {
-    recordAcceptance(suite, {
-      ...observation,
-      settings: settings(),
-      result: "fail",
-      observed: `${observation.observed} — failed: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    });
-    throw error;
-  }
-}
+const browserUseRecords = acceptanceRecordsFor("browser-use");
+
+export const beginAcceptanceSuite = browserUseRecords.beginSuite;
+export const recordAcceptance = browserUseRecords.record;
+export const observeAcceptance = browserUseRecords.observe;
 
 function readRecords(path: string): AcceptanceRecord[] {
   try {

@@ -445,6 +445,7 @@
       "packages/webui/test/unit/browser-settings-page.test.tsx",
       "packages/webui/test/integration/browser-use-real-input.test.ts",
       "packages/webui/test/integration/isolated-chromium-two-pages.test.ts",
+      "packages/webui/test/integration/workspace-browser-tab-acceptance.test.ts",
       "packages/webui/test/unit/browser-bridge-server.test.ts",
       "packages/webui/test/unit/browser-bridge-upgrade.test.ts",
       "packages/webui/test/unit/browser-workspace-panel.test.tsx",
