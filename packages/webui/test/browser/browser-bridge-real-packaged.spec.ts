@@ -36,6 +36,7 @@ import {
   browserVersionOf,
   bridgeSettings,
   buildExtension,
+  isBrowserInstalled,
   launchWithExtension,
   provision,
   startBridge,
@@ -113,6 +114,12 @@ test.describe("the packaged production entry, against a real browser", () => {
         publicKey: publicKeyBase64,
       });
 
+      // The installed Edge is not on every machine. A case that cannot run
+      // says so instead of failing on a browser that was never there.
+      test.skip(
+        !(await isBrowserInstalled(channel)),
+        `the ${channel} browser is not installed on this machine`,
+      );
       const { context, worker, extensionId, profileDir } = await launchWithExtension(channel, {
         dist: storeDistOf(store),
       });

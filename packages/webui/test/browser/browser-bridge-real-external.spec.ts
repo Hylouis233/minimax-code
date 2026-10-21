@@ -55,6 +55,7 @@ import {
   browserVersionOf,
   bridgeSettings,
   buildExtension,
+  isBrowserInstalled,
   launchWithExtension,
   provision,
   startBridge,
@@ -80,6 +81,12 @@ test.describe("the external bridge, against a real browser and a real page", () 
   for (const { channel, surface } of BROWSERS) {
     test(`the bridge survives the worker being terminated in ${channel}`, async () => {
       test.setTimeout(120_000);
+      // The installed Edge is not on every machine. A case that cannot run
+      // says so instead of failing on a browser that was never there.
+      test.skip(
+        !(await isBrowserInstalled(channel)),
+        `the ${channel} browser is not installed on this machine`,
+      );
       const { context, worker, extensionId, profileDir } = await launchWithExtension(channel);
       const started = await startBridge(extensionId, surface);
       // The page has to exist before the extension pairs: the extension
@@ -154,6 +161,12 @@ test.describe("the external bridge, against a real browser and a real page", () 
 
     test(`text input reaches the page through the ${surface} bridge in ${channel}`, async () => {
       test.setTimeout(120_000);
+      // The installed Edge is not on every machine. A case that cannot run
+      // says so instead of failing on a browser that was never there.
+      test.skip(
+        !(await isBrowserInstalled(channel)),
+        `the ${channel} browser is not installed on this machine`,
+      );
       const { context, worker, extensionId, profileDir } = await launchWithExtension(channel);
       // The page the person is looking at. It is opened *before* the
       // extension pairs, so the extension announces a real tab.
@@ -248,6 +261,12 @@ test.describe("the external bridge, against a real browser and a real page", () 
 
     test(`a DevTools command runs against the live tab through the ${surface} bridge in ${channel}`, async () => {
       test.setTimeout(120_000);
+      // The installed Edge is not on every machine. A case that cannot run
+      // says so instead of failing on a browser that was never there.
+      test.skip(
+        !(await isBrowserInstalled(channel)),
+        `the ${channel} browser is not installed on this machine`,
+      );
       const { context, worker, extensionId, profileDir } = await launchWithExtension(channel);
       const started = await startBridge(extensionId, surface);
       const page = await context.newPage();

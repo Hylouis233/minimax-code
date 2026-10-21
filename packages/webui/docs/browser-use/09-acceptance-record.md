@@ -189,3 +189,8 @@ pnpm test:webui-browser  # the real-browser, real-external and real-packaged cas
 
 Both write their records to `.plan/board/validation/`. The records are workspace material, so they
 are not part of the published source projection; the rows above are the published copy of them.
+
+A machine without the **installed** Edge cannot run the Edge cases: they are skipped with the
+reason, not failed on a browser that was never there. The bundled Chromium is installed by the
+gate itself, so the Chromium cases always run. The record names the browser each case ran in, and
+this document names the host the rows above were measured on.

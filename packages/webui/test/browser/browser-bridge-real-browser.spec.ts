@@ -29,6 +29,7 @@ import {
   browserVersionOf,
   bridgeSettings,
   buildExtension,
+  isBrowserInstalled,
   launchWithExtension,
   provision,
   startBridge,
@@ -63,6 +64,12 @@ test.describe("the browser bridge, against a real browser", () => {
   for (const { channel, surface } of BROWSERS) {
     test(`the extension completes the handshake on the ${surface} surface in ${channel} once it can prove the installation key`, async () => {
       test.setTimeout(180_000);
+      // The installed Edge is not on every machine. A case that cannot run
+      // says so instead of failing on a browser that was never there.
+      test.skip(
+        !(await isBrowserInstalled(channel)),
+        `the ${channel} browser is not installed on this machine`,
+      );
       const { context, worker, extensionId, profileDir } = await launchWithExtension(channel);
       const started = await startBridge(extensionId, surface);
       const browserVersion = browserVersionOf(context);
@@ -109,6 +116,12 @@ test.describe("the browser bridge, against a real browser", () => {
 
     test(`an extension that cannot prove the installation key is refused on the ${surface} surface in ${channel}`, async () => {
       test.setTimeout(180_000);
+      // The installed Edge is not on every machine. A case that cannot run
+      // says so instead of failing on a browser that was never there.
+      test.skip(
+        !(await isBrowserInstalled(channel)),
+        `the ${channel} browser is not installed on this machine`,
+      );
       const { context, worker, extensionId, profileDir } = await launchWithExtension(channel);
       const started = await startBridge(extensionId, surface);
       const browserVersion = browserVersionOf(context);

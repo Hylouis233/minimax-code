@@ -140,6 +140,39 @@ export async function launchWithExtension(
 }
 
 /**
+ * Whether this machine has the browser a case needs.
+ *
+ * The bundled Chromium is installed by the gate itself, so it is always
+ * there. **Edge is not**: the acceptance drives the *installed* Edge, and a
+ * machine without it — a CI image that does not ship it, a developer's
+ * container — cannot run the Edge cases at all. Those cases skip with the
+ * reason, rather than failing on a browser that was never there.
+ *
+ * The acceptance record names the browser each case ran in, and the published
+ * matrix names the host, so a skipped case is visible rather than silent.
+ */
+export async function isBrowserInstalled(channel: "msedge" | "chromium"): Promise<boolean> {
+  if (channel === "chromium") return true;
+  const { access } = await import("node:fs/promises");
+  for (const candidate of [
+    "/usr/bin/microsoft-edge",
+    "/usr/bin/microsoft-edge-stable",
+    "/opt/microsoft/msedge/msedge",
+    "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+    "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+    "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+  ]) {
+    try {
+      await access(candidate);
+      return true;
+    } catch {
+      // Keep looking.
+    }
+  }
+  return false;
+}
+
+/**
  * The browser's own version.
  *
  * Read from the browser rather than assumed: an acceptance record that says
