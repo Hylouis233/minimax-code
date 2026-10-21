@@ -73,8 +73,9 @@ test("a settled revert refreshes the workspace review family", async ({ page }) 
     .getByTestId("workspace-panel-controls")
     .getByRole("button", { name: "工作区文件侧栏" })
     .click();
-  await page.getByRole("button", { name: "添加标签" }).click();
-  await page.getByRole("menuitem", { name: "变更" }).click();
+  await page.getByRole("button", { name: "新建标签页" }).click();
+  await page.getByTestId("workspace-add-tab").click();
+  await page.getByTestId("workspace-launcher-tile-review").click();
   await expect(page.getByTestId("workspace-review")).toBeVisible();
   await expect.poll(() => requests(page, "getWorkspaceReviewSummary")).toBeGreaterThan(0);
   const before = await requests(page, "getWorkspaceReviewSummary");

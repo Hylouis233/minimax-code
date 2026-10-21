@@ -12,6 +12,7 @@ import type {
   WebuiBrowserTargetId,
   WebuiBrowserTargetList,
   WebuiBrowserTargetState,
+  WebuiBrowserWebTabOpen,
   WebuiBrowserWebTabSnapshot,
 } from "../shared/contracts/browser.js";
 import type {
@@ -692,6 +693,21 @@ export interface WebuiBrowserPort {
     command: string,
     params?: Record<string, unknown>,
   ): Promise<{ readonly accepted: true; readonly result?: unknown }>;
+  /**
+   * Opens a page and answers with its identity.
+   *
+   * This is `open_tab` — the same call, the same switch and the same refusal
+   * codes as the one a run's browser tools make, which is the whole point:
+   * every web tab, the person's and the Agent's alike, is opened through one
+   * gate. The run is optional because the person is not a run; absent means the
+   * panel's own cell, and it records the page there rather than moving any run
+   * off its own page.
+   */
+  openWebTab(
+    runId?: string,
+    params?: Record<string, unknown>,
+    signal?: AbortSignal,
+  ): Promise<WebuiBrowserWebTabOpen>;
   /**
    * The live image stream of one **target**.
    *

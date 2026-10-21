@@ -1,4 +1,6 @@
-// The web-tab snapshot operation, and the six places it has to be registered.
+// The web-tab operations: the snapshot the strip reconciles against, and the
+// call that opens a page for the person — plus the places they have to be
+// registered.
 //
 // A new operation is not registered by adding a name. The browser family's
 // readiness is declared in the capability manifest, the name reaches the
@@ -17,10 +19,14 @@ import { createWebuiTransport } from "../../src/client/platform/transport.js";
 import { createWebuiPortSlices } from "../../src/client/application/port-slices.js";
 import { WEBUI_CAPABILITY_REGISTRY_PROOFS } from "../../src/shared/capability-manifest.js";
 import {
+  OPEN_BROWSER_WEB_TAB_OPERATION_NAME,
   WATCH_BROWSER_WEB_TABS_OPERATION_NAME,
   WEBUI_STREAM_OPERATION_NAMES,
 } from "../../src/shared/operation-names.js";
-import { watchBrowserWebTabsOperation } from "../../src/server/operation/browser.js";
+import {
+  openBrowserWebTabOperation,
+  watchBrowserWebTabsOperation,
+} from "../../src/server/operation/browser.js";
 import { createBrowserHandlerEntries } from "../../src/server/operation/handlers/browser.js";
 import { createOperationRegistry } from "../../src/server/operation/operations.js";
 import { WebuiBrowserService } from "../../src/runtime/browser/browser-service.js";
@@ -103,5 +109,98 @@ describe("the web-tab snapshot operation", () => {
       watchBrowserWebTabs: () => () => undefined,
     } as never);
     expect(typeof slices.browser?.watchBrowserWebTabs).toBe("function");
+  });
+});
+
+describe("the operation that opens a page for the person", () => {
+  it("is named in the operation-name constants and promised on the ready list", () => {
+    expect(OPEN_BROWSER_WEB_TAB_OPERATION_NAME).toBe("openBrowserWebTab");
+    expect(WEBUI_CAPABILITY_REGISTRY_PROOFS.browser.ready).toContain(
+      OPEN_BROWSER_WEB_TAB_OPERATION_NAME,
+    );
+  });
+
+  it("is registered in the operation registry and in the server's handler table", () => {
+    const registry = createOperationRegistry({} as never, undefined, inertBrowserPort);
+    expect(registry.has(OPEN_BROWSER_WEB_TAB_OPERATION_NAME)).toBe(true);
+    expect(createBrowserHandlerEntries(inertBrowserPort).has(openBrowserWebTabOperation.name)).toBe(
+      true,
+    );
+  });
+
+  it("is a member of the browser port, and the transport calls it", () => {
+    const portCarriesTheOperation: "openWebTab" extends keyof WebuiBrowserPort ? true : false = true;
+    expect(portCarriesTheOperation).toBe(true);
+
+    const transport = createWebuiTransport({
+      websocketUrl: "ws://127.0.0.1:1",
+      token: "test-token",
+      webSocket: { send: () => undefined, close: () => undefined } as never,
+    });
+    expect(typeof transport.openBrowserWebTab).toBe("function");
+    const slices = createWebuiPortSlices({ openBrowserWebTab: async () => undefined } as never);
+    expect(typeof slices.browser?.openBrowserWebTab).toBe("function");
+  });
+
+  it("refuses a request with no url rather than opening a blank page", () => {
+    expect(openBrowserWebTabOperation.validate({ runId: "run-1" })).toMatchObject({
+      ok: false,
+      code: "invalid_body",
+    });
+    expect(openBrowserWebTabOperation.validate({ url: "   " }).ok).toBe(false);
+    expect(openBrowserWebTabOperation.validate({ url: "https://example.test" }).ok).toBe(true);
+  });
+
+  it("asks the port for the page the person typed, with no run of its own", async () => {
+    // The port member is the one the Agent's `open_tab` reaches, and the
+    // request carries no run: the panel is not a run, so the page is recorded in
+    // the panel's own cell rather than a run's selection.
+    const asked: { runId?: string; params?: Record<string, unknown> }[] = [];
+    const port = {
+      openWebTab: async (runId?: string, params?: Record<string, unknown>) => {
+        asked.push({ runId, params });
+        return {
+          accepted: true,
+          target: {
+            surface: "isolated-chromium",
+            browserId: "browser-1",
+            targetId: "tab-1",
+            generation: 1,
+          },
+        };
+      },
+    } as unknown as WebuiBrowserPort;
+
+    const handler = createBrowserHandlerEntries(port).get(openBrowserWebTabOperation.name);
+    const result = await handler?.handle(
+      { requestId: "request-1" } as never,
+      { url: "https://example.test" },
+    );
+
+    expect(asked).toEqual([{ runId: undefined, params: { url: "https://example.test" } }]);
+    expect(result).toMatchObject({ body: { accepted: true } });
+  });
+
+  it("gets the same refusal as the Agent when the surface's switch is off", async () => {
+    // This is the property the two paths share: both reach `openWebTab`, so a
+    // surface that is switched off refuses both of them the same way — before
+    // any provider is asked for a page.
+    let providerAsked = false;
+    const service = new WebuiBrowserService({
+      authorization: {
+        read: async () => AUTHORIZATION_OFF,
+        write: async () => AUTHORIZATION_OFF,
+      },
+      dataDir: "/tmp/webui-open-web-tab-operation-test",
+      createIsolatedProvider: async () => {
+        providerAsked = true;
+        throw new Error("the browser must not be launched for a refused request");
+      },
+    });
+
+    await expect(
+      service.openWebTab(undefined, { url: "https://example.test" }),
+    ).rejects.toMatchObject({ code: "browser_surface_not_authorized" });
+    expect(providerAsked).toBe(false);
   });
 });

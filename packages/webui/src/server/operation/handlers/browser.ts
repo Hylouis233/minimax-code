@@ -20,11 +20,13 @@ import {
   getBrowserInstallationKeyOperation,
   listBrowserCapabilitiesOperation,
   listBrowserTargetsOperation,
+  openBrowserWebTabOperation,
   readBrowserCommand,
   readBrowserInputCommand,
   readBrowserRunId,
   readBrowserSurface,
   readBrowserTarget,
+  readBrowserWebTabUrl,
   selectBrowserTargetOperation,
   sendBrowserCommandOperation,
   sendBrowserInputOperation,
@@ -164,6 +166,24 @@ export function createBrowserHandlerEntries(
     });
 
   /**
+   * Opens a page for the person, the same call the Agent's `open_tab` makes.
+   *
+   * The port member is the same one the tool adapter reaches, so the two paths
+   * share the surface's switch, the provider's own refusal codes and the
+   * session's web-tab record. A body that names no run is the panel's own cell
+   * rather than a run's, exactly as every other browser operation reads it.
+   */
+  const openBrowserWebTab: DedicatedHandler<typeof openBrowserWebTabOperation> = async (
+    _context,
+    body,
+  ) => ({
+    body: await browser.openWebTab(
+      readBrowserRunId(body as Record<string, unknown>),
+      { url: readBrowserWebTabUrl(body as Record<string, unknown>) },
+    ),
+  });
+
+  /**
    * Hands the person their surface's installation key so they can paste it
    * into the extension.
    *
@@ -249,6 +269,13 @@ export function createBrowserHandlerEntries(
       {
         operation: watchBrowserWebTabsOperation,
         handle: watchBrowserWebTabs as WebuiOperationHandler<unknown>,
+      },
+    ],
+    [
+      openBrowserWebTabOperation.name,
+      {
+        operation: openBrowserWebTabOperation,
+        handle: openBrowserWebTab as WebuiOperationHandler<unknown>,
       },
     ],
     [

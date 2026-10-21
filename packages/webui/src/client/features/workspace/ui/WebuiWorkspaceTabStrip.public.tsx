@@ -1,11 +1,15 @@
-// The workspace panel's tab strip.
+// The workspace panel's tab strip, and the new tab page it opens.
 //
 // The strip is the workspace's one row of tabs: tool tabs (files, review,
 // canvas, terminal) and web tabs interleaved in the order they were opened.
 // It owns three things:
 //   - the per-tab close button,
 //   - the single active tab,
-//   - the "+" affordance that opens the launcher tab.
+//   - the "+" affordance that opens a fresh tab showing the new tab page.
+//
+// The new tab page itself is a launcher — four tiles and a URL box — and it is
+// a tab's content rather than a menu over the strip: choosing a tile or typing
+// a url replaces that tab's content, and the tab keeps its id.
 //
 // The web tabs it shows come from the runtime's `watchBrowserWebTabs`
 // snapshot, never a parallel copy the client keeps. The strip subscribes
@@ -20,18 +24,23 @@
 // dependency rules allow.
 
 import {
+  useState,
   useEffect,
   useRef,
+  type FormEvent,
   type ReactElement,
 } from "react";
 
 import {
+  type WebuiBrowserTargetId,
   type WebuiBrowserWebTab,
   type WebuiBrowserWebTabSnapshot,
 } from "../../../../shared/contracts/browser.js";
 import { useWebuiPortSlice } from "../../../bindings/port-slices-context.js";
 import {
+  webuiWorkspaceLauncherTiles,
   webuiWorkspaceTabLabel,
+  type WebuiWorkspaceLauncherTile,
   type WorkspacePanelCommand,
   type WorkspacePanelState,
   type WorkspacePanelTab,
@@ -40,12 +49,20 @@ import {
   WebuiIconClose,
   WebuiIconDiffFile,
   WebuiIconFile,
+  WebuiIconWorkspaceCanvas,
+  WebuiIconWorkspaceReview,
+  WebuiIconWorkspaceTerminal,
 } from "../../../shell/icons.js";
 
-const DESKTOP_COPY = {
+const STRIP_COPY = {
   addTab: "新建标签页",
   fileClose: "关闭",
   tabsLabel: "工作区面板标签",
+  launcherUrlLabel: "输入网址，打开为网页标签页",
+  launcherUrlPlaceholder: "输入网址",
+  launcherUrlSubmit: "打开网页",
+  launcherPending: "正在打开…",
+  launcherUnavailable: "当前运行时没有浏览器能力，无法打开网页。",
 } as const;
 
 /**
@@ -236,7 +253,7 @@ export function WebuiWorkspaceTabStrip({
           </button>
           <button
             type="button"
-            aria-label={`${webuiWorkspaceTabLabel(item)} ${DESKTOP_COPY.fileClose}`}
+            aria-label={`${webuiWorkspaceTabLabel(item)} ${STRIP_COPY.fileClose}`}
             data-testid={`workspace-tab-${item.id}-close`}
             onClick={() => dispatch({ type: "close-tab", tabId: item.id })}
           >
@@ -247,7 +264,7 @@ export function WebuiWorkspaceTabStrip({
       <button
         type="button"
         className="webui-workspace-new-tab-trigger"
-        aria-label={DESKTOP_COPY.addTab}
+        aria-label={STRIP_COPY.addTab}
         data-testid="workspace-add-tab"
         onClick={() => dispatch({ type: "open-new-tab" })}
       >
@@ -255,4 +272,202 @@ export function WebuiWorkspaceTabStrip({
       </button>
     </div>
   );
+}
+
+export interface WebuiWorkspaceLauncherProps {
+  /** The tab showing the new tab page. Its id survives whatever it opens. */
+  readonly tab: WorkspacePanelTab;
+  readonly dispatch: (command: WorkspacePanelCommand) => void;
+  readonly sessionId?: string;
+  readonly workspaceDir?: string;
+}
+
+/**
+ * The new tab page.
+ *
+ * Four tiles and a URL box, and it is a tab's content rather than a menu over
+ * the strip: choosing a tile opens that view in this tab, and typing a url
+ * makes this tab the web page. The tab is not closed and not replaced, which is
+ * why a tab is an id and a content in the first place.
+ *
+ * The URL box calls the browser business's port. That is the point of it: a
+ * page typed by hand and a page opened by the Agent go through the same
+ * `open_tab`, the same surface switch and the same refusals. The launcher does
+ * not keep a browser of its own.
+ */
+export function WebuiWorkspaceLauncher({
+  tab,
+  dispatch,
+  sessionId,
+  workspaceDir,
+}: WebuiWorkspaceLauncherProps): ReactElement | null {
+  const request = tab.content.kind === "launcher" ? tab.content.request : undefined;
+  const slice = useWebuiPortSlice("browser");
+  const openBrowserWebTab = slice?.openBrowserWebTab;
+  const [typed, setTyped] = useState("");
+  if (tab.content.kind !== "launcher") return null;
+
+  const submit = (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+    const url = webuiWorkspaceLauncherUrl(typed);
+    if (!url || !openBrowserWebTab) return;
+    setTyped("");
+    void webuiWorkspaceLauncherOpenPage({
+      tabId: tab.id,
+      url,
+      dispatch,
+      open: openBrowserWebTab,
+    });
+  };
+
+  const tiles = webuiWorkspaceLauncherTiles()
+    .map((tile) => ({
+      tile,
+      command: webuiWorkspaceLauncherTileCommand(tile, tab.id, { sessionId, workspaceDir }),
+    }))
+    .filter((entry) => entry.command !== undefined);
+
+  return (
+    <div className="webui-workspace-launcher" data-testid="workspace-launcher">
+      <div className="webui-workspace-launcher-tiles">
+        {tiles.map(({ tile, command }) => (
+          <button
+            key={tile.kind}
+            type="button"
+            className="webui-workspace-launcher-tile"
+            data-testid={`workspace-launcher-tile-${tile.kind}`}
+            onClick={() => command && dispatch(command)}
+          >
+            <span className="webui-workspace-launcher-tile-glyph" aria-hidden="true">
+              {launcherTileGlyph(tile.kind)}
+            </span>
+            <span className="webui-workspace-launcher-tile-label">{tile.label}</span>
+          </button>
+        ))}
+      </div>
+      <form className="webui-workspace-launcher-url" onSubmit={submit}>
+        <input
+          className="webui-workspace-launcher-url-input"
+          type="text"
+          value={typed}
+          aria-label={STRIP_COPY.launcherUrlLabel}
+          placeholder={STRIP_COPY.launcherUrlPlaceholder}
+          data-testid="workspace-launcher-url"
+          onChange={(event) => setTyped(event.target.value)}
+        />
+        <button
+          type="submit"
+          className="webui-workspace-launcher-url-submit"
+          data-testid="workspace-launcher-url-submit"
+          disabled={!openBrowserWebTab}
+        >
+          {request && !request.error ? STRIP_COPY.launcherPending : STRIP_COPY.launcherUrlSubmit}
+        </button>
+      </form>
+      {openBrowserWebTab ? null : (
+        <p className="webui-workspace-launcher-unavailable">{STRIP_COPY.launcherUnavailable}</p>
+      )}
+      {request?.error ? (
+        <p className="webui-workspace-launcher-error" data-testid="workspace-launcher-error">
+          {request.error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * The URL box, as one transition: ask the runtime, then bind the page or say
+ * why there is none.
+ *
+ * The request is dispatched before the call rather than after it, because the
+ * runtime publishes the page on its own snapshot as well: the request is what
+ * tells the reducer which tab that page belongs to, and a snapshot that lands
+ * while the call is in flight must not open a second tab beside it.
+ *
+ * `open` is the browser business's port call, so a page typed by hand and a page
+ * opened by the Agent go through the same `open_tab` and the same refusal. The
+ * refusal is the runtime's own message, kept rather than replaced: a person who
+ * typed a url into a browser that is switched off is told the switch is off.
+ *
+ * Exported for the test that drives the transition without a DOM — the
+ * component's only job here is the form around it.
+ */
+export async function webuiWorkspaceLauncherOpenPage(input: {
+  readonly tabId: string;
+  readonly url: string;
+  readonly dispatch: (command: WorkspacePanelCommand) => void;
+  readonly open: (request: {
+    readonly url: string;
+  }) => Promise<{ readonly target: WebuiBrowserTargetId }>;
+}): Promise<void> {
+  const { tabId, url, dispatch, open } = input;
+  dispatch({ type: "request-web-page", tabId, url });
+  try {
+    const { target } = await open({ url });
+    // The title and the URL are the runtime's to report, and they arrive on the
+    // snapshot; what the answer carries is the identity this tab is bound to.
+    dispatch({ type: "open-web-tab", target, title: "", url, tabId });
+  } catch (reason) {
+    dispatch({
+      type: "request-web-page",
+      tabId,
+      url,
+      error: reason instanceof Error ? reason.message : String(reason),
+    });
+  }
+}
+
+/**
+ * The url the browser is told to open.
+ *
+ * A person types a host as often as a scheme, and a bare host is not something
+ * the browser can open — so the scheme is added here rather than answered with
+ * an error page. Anything that already carries one is passed as typed.
+ */
+export function webuiWorkspaceLauncherUrl(input: string): string {
+  const trimmed = input.trim();
+  if (!trimmed) return "";
+  return /^[a-z][a-z0-9+.-]*:(?:\/\/|$)/iu.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
+/**
+ * The command a tile opens, or `undefined` when it cannot open one.
+ *
+ * The registry row says what the tile opens; the tab says where: the launcher
+ * the tile is on. The changes tile keeps the requirements it had as a menu
+ * entry, which are the session and the working directory the change set
+ * belongs to — a tile that cannot open its view is not rendered rather than
+ * rendered dead.
+ */
+export function webuiWorkspaceLauncherTileCommand(
+  tile: WebuiWorkspaceLauncherTile,
+  tabId: string,
+  scope: { readonly sessionId?: string; readonly workspaceDir?: string },
+): WorkspacePanelCommand | undefined {
+  if (tile.opens.type === "open-workspace-review") {
+    const { sessionId: session, workspaceDir: dir } = scope;
+    return session && dir ? { ...tile.opens, sessionId: session, workspaceDir: dir, tabId } : undefined;
+  }
+  const { sessionId: session, workspaceDir: dir } = scope;
+  return {
+    ...tile.opens,
+    ...(session ? { sessionId: session } : {}),
+    ...(dir ? { workspaceDir: dir } : {}),
+    tabId,
+  };
+}
+
+/** The glyph a tile carries. The same icons the strip's own file tabs use. */
+function launcherTileGlyph(kind: WebuiWorkspaceLauncherTile["kind"]): ReactElement {
+  switch (kind) {
+    case "review":
+      return <WebuiIconWorkspaceReview className="size-[18px] shrink-0" />;
+    case "terminal":
+      return <WebuiIconWorkspaceTerminal className="size-[18px] shrink-0" />;
+    case "canvas":
+      return <WebuiIconWorkspaceCanvas className="size-[18px] shrink-0" />;
+    default:
+      return <WebuiIconFile className="size-[18px] shrink-0" />;
+  }
 }

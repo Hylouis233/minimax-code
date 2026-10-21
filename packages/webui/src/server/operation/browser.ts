@@ -18,6 +18,7 @@ import {
   GET_BROWSER_INSTALLATION_KEY_OPERATION_NAME,
   LIST_BROWSER_CAPABILITIES_OPERATION_NAME,
   LIST_BROWSER_TARGETS_OPERATION_NAME,
+  OPEN_BROWSER_WEB_TAB_OPERATION_NAME,
   SELECT_BROWSER_TARGET_OPERATION_NAME,
   SEND_BROWSER_INPUT_OPERATION_NAME,
   SEND_BROWSER_COMMAND_OPERATION_NAME,
@@ -112,6 +113,21 @@ export const watchBrowserFramesOperation: WebuiOperation<Record<string, unknown>
 export const watchBrowserWebTabsOperation: WebuiOperation<Record<string, unknown>> = {
   name: WATCH_BROWSER_WEB_TABS_OPERATION_NAME,
   validate: (body) => validateSurface(WATCH_BROWSER_WEB_TABS_OPERATION_NAME, body),
+};
+
+/**
+ * The person's way of opening a page.
+ *
+ * The request names a url, and a run when there is one. It names no surface:
+ * which surface the page belongs to is the runtime's answer, exactly as it is
+ * for the Agent's `open_tab`, so the two paths cannot disagree about where a
+ * page is opened. Whether the page may be opened at all — the surface's switch,
+ * and the provider behind it — is the runtime's decision and keeps its own
+ * refusal codes.
+ */
+export const openBrowserWebTabOperation: WebuiOperation<Record<string, unknown>> = {
+  name: OPEN_BROWSER_WEB_TAB_OPERATION_NAME,
+  validate: (body) => validateWebTabUrl(OPEN_BROWSER_WEB_TAB_OPERATION_NAME, body),
 };
 
 const AUTHORIZATION_SWITCHES = [
@@ -346,6 +362,26 @@ function validateCommand(
   return { ok: true, body: result.body };
 }
 
+/**
+ * Validates a request to open a page.
+ *
+ * A page needs a url, and an empty one would open a blank page while answering
+ * that the request was honoured — so an empty url is malformed rather than a
+ * default. Whether the url is reachable is not this layer's business.
+ */
+function validateWebTabUrl(
+  operation: string,
+  body: unknown,
+): WebuiOperationValidation<Record<string, unknown>> {
+  const result = requireRecord(operation, body);
+  if (!result.ok) return result;
+  const url = result.body.url;
+  if (typeof url !== "string" || url.trim().length === 0) {
+    return invalidBody(`${operation} body requires a url`);
+  }
+  return validateRunId(operation, result.body);
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -376,6 +412,11 @@ export function readBrowserRunId(body: Record<string, unknown>): string | undefi
 /** The target a validated body carries, as the runtime expects it. */
 export function readBrowserTarget(body: Record<string, unknown>): WebuiBrowserTargetId {
   return body.target as unknown as WebuiBrowserTargetId;
+}
+
+/** The url a validated body carries, as the runtime expects it. */
+export function readBrowserWebTabUrl(body: Record<string, unknown>): string {
+  return String(body.url);
 }
 
 /** The command a validated body carries, as the runtime expects it. */

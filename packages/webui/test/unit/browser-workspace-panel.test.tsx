@@ -1,11 +1,11 @@
 // The web tab kind in the workspace panel's registry.
 //
 // The browser tool tab is gone: the panel's tabs are web tabs, and a web tab
-// is opened by typing a URL in the new tab page or by the Agent — not by an
-// entry in the add menu. What is pinned here is the kind, its label, the fact
-// that it has no menu entry of its own, and the property that must survive
-// that change rather than be rewritten by it: the menu is the registry's rows
-// that have an entry, so the menu never becomes a second list.
+// is opened by typing a URL in the new tab page or by the Agent — not by a tile
+// on it. What is pinned here is the kind, its label, the fact that it has no
+// tile of its own, and the property that must survive that change rather than be
+// rewritten by it: the launcher's tiles are the registry's rows that have one,
+// so the tiles never become a second list.
 //
 // The second group is stated as a test because it is the rule that would
 // otherwise be rediscovered by running the dependency gate: the workspace
@@ -23,9 +23,9 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
 import {
-  WEBUI_WORKSPACE_ADD_MENU_ORDER,
+  WEBUI_WORKSPACE_LAUNCHER_TILE_ORDER,
   WEBUI_WORKSPACE_TAB_KINDS,
-  webuiWorkspaceAddMenu,
+  webuiWorkspaceLauncherTiles,
   webuiWorkspaceTabLabel,
   type WorkspacePanelTab,
 } from "../../src/client/features/workspace/projection/workspace-panel-state.js";
@@ -55,26 +55,37 @@ describe("the web tab kind", () => {
     expect(webuiWorkspaceTabLabel(tab)).toBe("Example");
   });
 
-  it("has no add-menu entry of its own", () => {
-    // A web tab is opened by typing a URL or by the Agent, so the add menu
-    // does not offer it — and the browser tool tab it replaced is gone.
-    expect(WEBUI_WORKSPACE_TAB_KINDS.web.addMenu).toBeNull();
-    expect(WEBUI_WORKSPACE_ADD_MENU_ORDER).not.toContain("web");
+  it("has no tile of its own", () => {
+    // A web tab is opened by typing a URL or by the Agent, so the launcher
+    // offers no tile for it — and the browser tool tab it replaced is gone.
+    expect(WEBUI_WORKSPACE_TAB_KINDS.web.tile).toBeNull();
+    expect(WEBUI_WORKSPACE_LAUNCHER_TILE_ORDER).not.toContain("web");
     expect(WEBUI_WORKSPACE_TAB_KINDS).not.toHaveProperty("browser");
-    expect(webuiWorkspaceAddMenu().some((entry) => entry.kind === "web")).toBe(false);
+    expect(webuiWorkspaceLauncherTiles().some((tile) => tile.kind === "web")).toBe(false);
   });
 
-  it("reaches the menu through the registry rather than a second list", () => {
-    // Whatever a row's `addMenu` says, the menu is the rows that have one, in the
-    // order list — so widening the command's `open-tab` union adds the entry
-    // without this file or the component naming it.
-    const expected = WEBUI_WORKSPACE_ADD_MENU_ORDER.filter(
-      (kind) => WEBUI_WORKSPACE_TAB_KINDS[kind].addMenu !== null,
+  it("reaches the launcher's tiles through the registry rather than a second list", () => {
+    // Whatever a row's `tile` says, the launcher's tiles are the rows that have
+    // one, in the order list — so widening the command's `open-tab` union adds a
+    // tile without this file or the component naming it.
+    const expected = WEBUI_WORKSPACE_LAUNCHER_TILE_ORDER.filter(
+      (kind) => WEBUI_WORKSPACE_TAB_KINDS[kind].tile !== null,
     );
-    expect(webuiWorkspaceAddMenu().map((entry) => entry.kind)).toEqual(expected);
-    for (const entry of webuiWorkspaceAddMenu()) {
-      expect(entry.label).toBe(WEBUI_WORKSPACE_TAB_KINDS[entry.kind].label);
+    expect(webuiWorkspaceLauncherTiles().map((tile) => tile.kind)).toEqual(expected);
+    for (const tile of webuiWorkspaceLauncherTiles()) {
+      expect(tile.label).toBe(WEBUI_WORKSPACE_TAB_KINDS[tile.kind].label);
     }
+  });
+
+  it("is exactly the four tool views, in the ADR's order", () => {
+    // The new tab page is a launcher over the tool views, and the browser tool
+    // view is not one of them: the tiles are 变更, 终端, 画布 and 查看文件.
+    expect(webuiWorkspaceLauncherTiles().map((tile) => tile.kind)).toEqual([
+      "review",
+      "terminal",
+      "canvas",
+      "files",
+    ]);
   });
 });
 

@@ -40,13 +40,11 @@ import type {
 } from "../../../../shared/contracts/review.js";
 import type {
   WebuiWorkspaceTabContent,
-  WebuiWorkspaceTabKind,
   WorkspacePanelCommand,
   WorkspacePanelState,
   WorkspacePanelTab,
 } from "../projection/workspace-panel-state.js";
 import {
-  webuiWorkspaceAddMenu,
   webuiWorkspaceReviewContent,
   webuiWorkspaceTabContentKey,
 } from "../projection/workspace-panel-state.js";
@@ -57,7 +55,7 @@ import {
 } from "../../terminal/projection/terminal-size.public.js";
 import type { WebuiTerminalSize } from "../../terminal/contracts/terminal-port.js";
 import type { WebuiTerminalOwner } from "../../terminal/contracts/terminal-owner.js";
-import { WebuiIconClose, WebuiIconDiffFile, WebuiIconFile, WebuiIconFolder, WebuiIconSearch, WebuiIconSidebarToggle, WebuiIconWorkspaceCanvas, WebuiIconWorkspaceExpand, WebuiIconWorkspaceReview, WebuiIconWorkspaceTerminal } from "../../../shell/icons.js";
+import { WebuiIconClose, WebuiIconDiffFile, WebuiIconFolder, WebuiIconSearch, WebuiIconSidebarToggle, WebuiIconWorkspaceExpand } from "../../../shell/icons.js";
 import { FileTree, filterWorkspaceFiles, findWorkspaceFile, getWorkspaceFileParentPaths, mergeWorkspaceFileChildren } from "./WorkspaceFileTree.js";
 import { WorkspaceMediaPreview } from "./WorkspaceMediaPreview.js";
 import { isMediaContent } from "../projection/media-preview.js";
@@ -74,8 +72,7 @@ import {
   useWebuiWorkspaceQueriesState,
 } from "../../../bindings/use-query-state.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
-import { WebuiDropdown } from "../../../ui/Dropdown.js";
-import { WebuiWorkspaceTabStrip } from "./WebuiWorkspaceTabStrip.public.js";
+import { WebuiWorkspaceLauncher, WebuiWorkspaceTabStrip } from "./WebuiWorkspaceTabStrip.public.js";
 import { webuiFileLanguage, projectWebuiUnifiedDiffLines, isWorkspaceArchivePath, isWorkspaceHtmlPath } from "../projection/panel-projection.js";
 // `mergeWorkspaceFileChildren`, `chunkWebuiWorkspaceReviewFileIds` and
 // `WEBUI_WORKSPACE_REVIEW_DIFF_BATCH_SIZE` are re-exported below: the panel
@@ -504,49 +501,14 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     // its commands are stable, so a panel drag cannot re-run this effect and
     // rebuild a shell that is running.
   }, [terminalTargetId, terminalOwner, tab]);
-  // The registry carries the kinds, their words and how each opens; the glyphs are
-  // this file's. The tab glyphs the strip needs live in the strip itself.
-  const addMenuGlyph = (kind: WebuiWorkspaceTabKind) => {
-    switch (kind) {
-      case "review":
-        return <WebuiIconWorkspaceReview className="size-[18px] shrink-0" />;
-      case "terminal":
-        return <WebuiIconWorkspaceTerminal className="size-[18px] shrink-0" />;
-      case "canvas":
-        return <WebuiIconWorkspaceCanvas className="size-[18px] shrink-0" />;
-      case "files":
-        return <WebuiIconFile className="size-[18px] shrink-0" />;
-      default:
-        return null;
-    }
-  };
+  // The registry carries the kinds, their words and how each opens. Both the tab
+  // glyphs the strip needs and the launcher's tiles live in the strip itself:
+  // the new tab page took the place of this panel's add menu, which was the same
+  // four kinds behind a dropdown.
   return <aside className={`webui-workspace-panel ${state.expanded ? "is-expanded" : ""}`} data-testid="workspace-panel" data-active-tab={tab}>
     <div className="webui-workspace-panel-header">
       <div className="webui-workspace-tabs" role="tablist" aria-label="工作区面板标签">
         <WebuiWorkspaceTabStrip state={state} dispatch={dispatch} />
-        <WebuiDropdown
-          open={state.addMenuOpen}
-          // The reducer only knows how to toggle, so closing is the toggle it
-          // already owns — guarded, because the skeleton calls `onClose` for a
-          // press that landed outside whether or not the menu was up.
-          onOpen={() => dispatch({ type: "toggle-add-menu" })}
-          onClose={() => { if (state.addMenuOpen) dispatch({ type: "toggle-add-menu" }); }}
-          role="menu"
-          ariaLabel="添加工作区标签"
-          wrapperClassName="webui-workspace-add-anchor"
-          className="webui-workspace-add-menu"
-          trigger={(triggerProps) => { const { ref, ...rest } = triggerProps; return <button type="button" {...rest} ref={ref} className="webui-workspace-add-trigger" aria-label="添加工具标签">+</button>; }}
-        >
-          {webuiWorkspaceAddMenu().map((entry) => {
-            // Bound to a const so the discriminated union narrows in the branch below.
-            const opens = entry.opens;
-            return opens.type === "open-workspace-review"
-              ? (sessionId && workspaceDir
-                  ? <button key={entry.kind} type="button" role="menuitem" onClick={() => dispatch({ type: "open-workspace-review", sessionId, workspaceDir })}>{addMenuGlyph(entry.kind)}<span>{entry.label}</span></button>
-                  : null)
-              : <button key={entry.kind} type="button" role="menuitem" onClick={() => dispatch({ type: "open-tab", kind: opens.kind, sessionId, workspaceDir })}>{addMenuGlyph(entry.kind)}<span>{entry.label}</span></button>;
-          })}
-        </WebuiDropdown>
       </div>
       <div className="webui-workspace-panel-actions">
         <button type="button" aria-label={state.expanded ? "收起面板" : "展开面板"} aria-pressed={state.expanded} onClick={() => dispatch({ type: "toggle-expanded" })}><WebuiIconWorkspaceExpand className="size-[18px]" /></button>
@@ -592,9 +554,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     {tab === "web" && activeTab?.content.kind === "web" ? <div className="webui-workspace-web-tab" data-testid="workspace-web-tab" data-tab-id={activeTab.id}>
       <BrowserPanelHost target={activeTab.content.target} />
     </div> : null}
-    {tab === "launcher" && activeTab?.content.kind === "launcher" ? <div className="webui-workspace-launcher" data-testid="workspace-launcher">
-      <p className="webui-workspace-launcher-placeholder">新建标签页</p>
-    </div> : null}
+    {tab === "launcher" && activeTab?.content.kind === "launcher" ? <WebuiWorkspaceLauncher tab={activeTab} dispatch={dispatch} sessionId={sessionId} workspaceDir={workspaceDir} /> : null}
     {tab === "terminal" && terminalAvailability ? <p role="status" data-webui-terminal-availability={terminalSupport}>{terminalAvailability}</p> : null}
     {tab === "terminal" && terminalError && terminals.length === 0 ? <p role="alert">{terminalError}</p> : null}
     {tab === "terminal" ? <div className="webui-terminal-empty">{!terminalsReady ? <><p>{DESKTOP_COPY.terminalLoading}</p></> : terminals.length === 0 ? <><strong>{DESKTOP_COPY.terminalEmptyTitle}</strong><p>{DESKTOP_COPY.terminalEmptyDescription}</p></> : <><div className="webui-terminal-tabs">{terminals.map((terminal, index) => <button type="button" key={String(terminal.terminalId)} className={`file-tab group/tab-close h-8 w-40 min-w-20 ${String(terminal.terminalId) === (activeTerminalId ?? String(terminals[0]?.terminalId)) ? "bg-bg_interaction_tertiary_selected" : ""}`} onClick={() => setActiveTerminalId(String(terminal.terminalId))}><span>#{index + 1}</span>{terminal.status === "exited" ? DESKTOP_COPY.terminalExited : DESKTOP_COPY.terminalLabel}<span className="file-tab-close opacity-0 group-hover/tab-close:opacity-100"><WebuiIconClose className="size-[14px]" /></span></button>)}</div><div ref={terminalHost} className="webui-xterm-host" />{terminalError ? <p role="alert">{terminalError}</p> : null}<div className="webui-terminal-actions"><button type="button" disabled={terminalCreateDisabled} title={terminalCreateReason} onClick={createTerminal}>{DESKTOP_COPY.newTerminal}</button><button type="button" onClick={() => { const active = terminals.find((candidate) => String(candidate.terminalId) === (activeTerminalId ?? String(terminals[0]?.terminalId))); if (active && terminalOwner?.canDispose) void terminalOwner.disposeProcess(String(active.terminalId)).then(() => syncTerminalsFromOwner(terminalOwner)); }}>{DESKTOP_COPY.fileClose}</button></div></> }{terminalsReady && terminals.length === 0 ? <button type="button" disabled={terminalCreateDisabled} title={terminalCreateReason} onClick={createTerminal}>{DESKTOP_COPY.newTerminal}</button> : null}</div> : null}

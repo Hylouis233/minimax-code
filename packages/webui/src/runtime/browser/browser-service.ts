@@ -1057,9 +1057,14 @@ export class WebuiBrowserService {
    * page in the isolated Chromium, because the embedded panel is the isolated
    * browser's view and the external browsers are driven in the person's own
    * windows.
+   *
+   * The run is optional because the person's launcher is not a run: an absent
+   * run is the panel's own cell, which records the page and selects it there.
+   * No run's selection moves, so opening a page by hand does not move the
+   * Agent off the page it is working on.
    */
   async openWebTab(
-    runId: string,
+    runId: string = WEBUI_BROWSER_NO_RUN_ID,
     params: Record<string, unknown> = {},
     signal?: AbortSignal,
   ): Promise<{

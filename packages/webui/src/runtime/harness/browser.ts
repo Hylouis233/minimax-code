@@ -240,6 +240,10 @@ function createBrowserPort(service: WebuiBrowserService): WebuiBrowserPort {
     ) => service.sendCommandToSelection(surface, runId, command, params ?? {}),
     watchFrames: (surface: WebuiBrowserSurface, target: WebuiBrowserTargetId, signal?: AbortSignal) =>
       service.watchFrames(surface, target, signal),
+    // `runId` is optional on the port because the person is not a run: the
+    // service reads an absent run as the panel's own cell.
+    openWebTab: (runId?: string, params?: Record<string, unknown>, signal?: AbortSignal) =>
+      service.openWebTab(runId, params ?? {}, signal),
     watchWebTabs: (surface: WebuiBrowserSurface, runId?: string, signal?: AbortSignal) =>
       service.watchWebTabs(surface, runId, signal),
     listCapabilities: () => service.listCapabilities(),

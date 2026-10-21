@@ -63,6 +63,16 @@ export const WATCH_BROWSER_FRAMES_OPERATION_NAME = "watchBrowserFrames" as const
  * authority — a client that kept its own copy would be a second authority.
  */
 export const WATCH_BROWSER_WEB_TABS_OPERATION_NAME = "watchBrowserWebTabs" as const;
+/**
+ * The unary call that opens a page, the person's way of asking for one.
+ *
+ * The Agent reaches `open_tab` through its browser tools rather than through
+ * this wire, so this operation exists for the new tab page's URL box: a person
+ * who types a url asks the runtime for the page exactly as the Agent does, and
+ * the answer names the page that was created. The `runId` is optional because
+ * the panel is not acting for a run: absent means the panel's own cell.
+ */
+export const OPEN_BROWSER_WEB_TAB_OPERATION_NAME = "openBrowserWebTab" as const;
 export const LIST_BROWSER_CAPABILITIES_OPERATION_NAME = "listBrowserCapabilities" as const;
 /**
  * Reads one browser surface's installation key so the person can copy it.
@@ -246,6 +256,7 @@ import type {
   WebuiBrowserTargetId,
   WebuiBrowserTargetList,
   WebuiBrowserTargetState,
+  WebuiBrowserWebTabOpen,
   WebuiBrowserWebTabSnapshot,
 } from "./contracts/browser.js";
 import { type WebuiBridgeBrowserSurface } from "./contracts/browser.js";
@@ -474,6 +485,15 @@ export interface OperationSpec {
   watchBrowserWebTabs: {
     request: { readonly surface: WebuiBrowserSurface; readonly runId?: string };
     response: WebuiBrowserWebTabStreamEnvelope;
+  };
+  /**
+   * A url, and optionally the run the page is opened for. There is no surface:
+   * the embedded panel is the isolated Chromium's view, and `open_tab` reads
+   * the surface off the run the same way the Agent's path does.
+   */
+  openBrowserWebTab: {
+    request: { readonly url: string; readonly runId?: string };
+    response: WebuiBrowserWebTabOpen;
   };
   listBrowserCapabilities: {
     request: Record<string, never>;

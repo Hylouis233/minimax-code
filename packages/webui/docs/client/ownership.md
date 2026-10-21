@@ -135,7 +135,7 @@ proposing to move this state to the server.
   reload, the URL read-only) instead. The run's selection and the tab the person is looking at are two
   cells with one writer each, with one bootstrap: a person who opens a web tab while the run has no
   selection gives the run that page. The slot, the launcher and the two cells are `required`: the
-  tree's tabs are keyed by kind and opened from the add menu
+  tree's tabs are keyed by kind and opened from the new tab page's tiles
   (`client/features/workspace/projection/workspace-panel-state.ts`), so one browser tab sits among
   six rather than a strip of tabs the Agent can open. The browser tab is the isolated browser's
   view and the surface switcher it carries goes with it — the external browsers are driven in the

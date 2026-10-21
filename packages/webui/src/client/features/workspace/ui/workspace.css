@@ -191,7 +191,7 @@
   .webui-workspace-tab-list::-webkit-scrollbar { display: none; }
   .webui-workspace-tab { max-width: 180px; min-width: 104px; height: 40px; flex: 0 0 auto; gap: var(--spacing_4); border-radius: 10px; background: transparent; color: var(--text_default_secondary); }
   .webui-workspace-tab.is-active { background: var(--bg_interaction_tertiary_selected); color: var(--text_default_primary); }
-  .webui-workspace-tab button, .webui-workspace-add-trigger, .webui-workspace-panel-actions button, .webui-workspace-add-menu button { display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; padding: var(--spacing_8); color: inherit; }
+  .webui-workspace-tab button, .webui-workspace-panel-actions button { display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; padding: var(--spacing_8); color: inherit; }
   .webui-workspace-tab button:first-child { width: 100%; min-width: 0; height: 100%; justify-content: flex-start; gap: var(--spacing_8); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .webui-workspace-tab-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .webui-workspace-tab-file-icon { width: 16px; height: 16px; flex: 0 0 16px; }
@@ -223,14 +223,10 @@
   .webui-workspace-tab { position: relative; }
   .webui-workspace-tab:hover button:last-child, .webui-workspace-tab.is-active button:last-child { opacity: 1; }
   .webui-workspace-tab:hover button:first-child, .webui-workspace-tab.is-active button:first-child { padding-right: 24px; }
-  .webui-workspace-add-anchor { position: relative; z-index: 4; flex: 0 0 auto; }
-  .webui-workspace-add-trigger { width: 32px; height: 32px; border-radius: 8px; background: var(--bg_default_secondary); color: var(--text_default_primary); font-size: 18px; line-height: 1; }
-  .webui-workspace-add-trigger:hover, .webui-workspace-panel-actions button:hover { background: var(--bg_interaction_tertiary_hover); }
-  /* The strip's "+" opens the new tab page (the launcher tab). It is a
-   * separate trigger from the add-menu's "+", which opens a tool tab — a
-   * separate kind of open — and they sit next to each other in the panel
-   * header. The strip's trigger lives inside the row of tabs, the add
-   * menu's trigger sits outside it. */
+  .webui-workspace-panel-actions button:hover { background: var(--bg_interaction_tertiary_hover); }
+  /* The strip's "+" opens a fresh new tab page. It used to sit beside the add
+   * menu's "+", which opened a tool tab behind a dropdown; the menu's four
+   * entries are the launcher's tiles now, and this is the only way in. */
   .webui-workspace-new-tab-trigger { width: 28px; height: 28px; flex: 0 0 28px; border-radius: 6px; background: transparent; color: var(--icon_default_secondary, #5b6473); font-size: 16px; line-height: 1; }
   .webui-workspace-new-tab-trigger:hover { background: var(--bg_interaction_tertiary_hover); color: var(--text_default_primary); }
   .webui-workspace-panel-actions { flex: 0 0 auto; gap: var(--spacing_8); padding-left: var(--spacing_4); }
@@ -277,12 +273,21 @@
   .webui-file-code .hljs-title, .webui-file-code .hljs-title.function_, .webui-file-code .hljs-function, .webui-file-code .hljs-section { color: var(--text_label_accent_default); }
   .webui-file-code .hljs-type, .webui-file-code .hljs-built_in, .webui-file-code .hljs-title.class_ { color: var(--text_label_danger_secondary_default); }
   .webui-file-code .hljs-attr, .webui-file-code .hljs-variable, .webui-file-code .hljs-property { color: var(--text_default_secondary); }
-  /* The add menu's surface and its placement come from the shared dropdown
-   * layer (`.webui-dropdown-popup`); this rule only says what the menu holds. */
-  .webui-workspace-add-menu { display: flex; min-width: 198px; flex-direction: column; gap: 2px; padding: 4px; color: var(--text_default_primary); }
-  .webui-workspace-add-menu button { width: 100%; min-height: 34px; justify-content: flex-start; gap: var(--spacing_8); border-radius: 8px; padding: 0 10px; color: inherit; font-size: var(--size_14); text-align: left; white-space: nowrap; }
-  .webui-workspace-add-menu button:hover { background: var(--bg_interaction_tertiary_hover); }
-  .webui-workspace-add-menu button svg { color: var(--icon_default_secondary); }
+  /* The new tab page: the tiles it opens a view from, and the URL box that
+   * opens a page. It is a tab's content, so it fills the body of the panel
+   * rather than sitting in the strip. */
+  .webui-workspace-launcher { display: flex; min-width: 0; min-height: 0; flex: 1 1 auto; flex-direction: column; align-items: center; justify-content: center; gap: var(--spacing_16); padding: var(--spacing_24); color: var(--text_default_primary); }
+  .webui-workspace-launcher-tiles { display: grid; width: 100%; max-width: 520px; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--spacing_12); }
+  .webui-workspace-launcher-tile { display: flex; min-height: 88px; flex-direction: column; align-items: center; justify-content: center; gap: var(--spacing_8); border: 1px solid var(--border_default); border-radius: 12px; background: var(--bg_default_secondary); padding: var(--spacing_12); color: var(--text_default_secondary); }
+  .webui-workspace-launcher-tile:hover { background: var(--bg_interaction_tertiary_hover); color: var(--text_default_primary); }
+  .webui-workspace-launcher-tile-glyph { font-size: 20px; line-height: 1; }
+  .webui-workspace-launcher-tile-label { font-size: var(--size_14); white-space: nowrap; }
+  .webui-workspace-launcher-url { display: flex; width: 100%; max-width: 520px; gap: var(--spacing_8); }
+  .webui-workspace-launcher-url-input { min-width: 0; flex: 1 1 auto; height: 36px; border: 1px solid var(--border_default); border-radius: 8px; background: var(--bg_default_secondary); padding: 0 var(--spacing_12); color: var(--text_default_primary); font-size: var(--size_14); }
+  .webui-workspace-launcher-url-input:focus { border-color: var(--border_accent); }
+  .webui-workspace-launcher-url-submit { height: 36px; flex: 0 0 auto; border: 0; border-radius: 8px; background: var(--bg_interaction_primary_default); padding: 0 var(--spacing_16); color: var(--text_default_inverted); font-size: var(--size_14); }
+  .webui-workspace-launcher-url-submit:disabled { opacity: 0.5; }
+  .webui-workspace-launcher-unavailable, .webui-workspace-launcher-error { max-width: 520px; color: var(--text_default_secondary); font-size: var(--size_12); text-align: center; }
 
   .webui-turn-review { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; overflow: auto; }
   .webui-turn-review-summary { display: flex; min-height: 48px; flex: 0 0 48px; align-items: center; justify-content: space-between; gap: var(--spacing_12); border-bottom: 1px solid var(--border_default); padding: 0 var(--spacing_16); color: var(--text_default_primary); font-size: var(--size_14); }

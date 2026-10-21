@@ -168,6 +168,10 @@ export function createOperationRegistry(
     registerOperation(registry, entry("sendBrowserCommand"));
     registerOperation(registry, entry("watchBrowserFrames"));
     registerOperation(registry, entry("watchBrowserWebTabs"));
+    // The person's way of opening a page, beside the Agent's `open_tab`: one
+    // operation name, one port member, and one place the surface's switch is
+    // read.
+    registerOperation(registry, entry("openBrowserWebTab"));
     registerOperation(registry, entry("listBrowserCapabilities"));
     // Registered with the rest of the browser operations, and answering
     // `not_provisioned` when the composition root wired no bridge — the same

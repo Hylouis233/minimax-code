@@ -241,6 +241,22 @@ export interface WebuiBrowserWebTabSnapshot {
 }
 
 /**
+ * The page a request to open one produced.
+ *
+ * `open_tab` answers with the identity of the page it created rather than with
+ * the page's picture, and both callers — the Agent's browser tools and the
+ * person's new tab page — get this answer. `accepted` says the request was
+ * allowed to try, and the identity is what the caller binds a tab to: the
+ * title and the URL arrive later, on the runtime's own snapshot.
+ */
+export interface WebuiBrowserWebTabOpen {
+  readonly accepted: true;
+  /** The identity of the page that was created. */
+  readonly target: WebuiBrowserTargetId;
+  readonly result?: unknown;
+}
+
+/**
  * The key a client reconciles a web tab by.
  *
  * The runtime's id is the target's id, and a target id names a page in one

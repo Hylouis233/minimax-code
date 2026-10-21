@@ -2,7 +2,7 @@
 //
 // The right-column tab kinds were enumerated in **three** places — the union in
 // `workspace-panel-state.ts`, the label map in `WorkspacePanels.tsx`, and the
-// add-menu's four buttons — so a new kind meant finding all three, and the type
+// launcher's four tiles — so a new kind meant finding all three, and the type
 // system caught only two of them. The registry has to exist and be the thing the
 // host reads, **and a passing prohibition test does not discharge that**.
 //
@@ -15,9 +15,9 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
 import {
-  WEBUI_WORKSPACE_ADD_MENU_ORDER,
+  WEBUI_WORKSPACE_LAUNCHER_TILE_ORDER,
   WEBUI_WORKSPACE_TAB_KINDS,
-  webuiWorkspaceAddMenu,
+  webuiWorkspaceLauncherTiles,
   webuiWorkspaceTabLabel,
   type WebuiWorkspaceTabContent,
   type WebuiWorkspaceTabKind,
@@ -62,10 +62,12 @@ describe("the kinds are declared once", () => {
     // the `webuiWorkspaceTabLabel(...)` reading lives in the strip's own file,
     // the only place the row's label is computed.
     expect(workspaceUi).toContain("webuiWorkspaceTabLabel(item)");
-    // The menu is built from the registry, never re-listed...
-    expect(flat(read("features/workspace/ui/WorkspacePanels.tsx"))).toContain("webuiWorkspaceAddMenu().map(");
-    for (const entry of webuiWorkspaceAddMenu()) {
-      expect(workspaceUi).not.toContain(`<span>${entry.label}</span>`);
+    // The launcher's tiles are built from the registry, never re-listed...
+    expect(flat(read("features/workspace/ui/WebuiWorkspaceTabStrip.public.tsx"))).toContain(
+      "webuiWorkspaceLauncherTiles()",
+    );
+    for (const tile of webuiWorkspaceLauncherTiles()) {
+      expect(workspaceUi).not.toContain(`<span>${tile.label}</span>`);
     }
   });
 });
@@ -103,36 +105,38 @@ describe("the registry answers for the whole closed set", () => {
     ).toBe("Example");
   });
 
-  it("offers the add menu in one order, and only where a menu entry exists", () => {
-    const menu = webuiWorkspaceAddMenu();
-    expect(menu.map((entry) => entry.kind)).toEqual([
+  it("offers the launcher's tiles in one order, and only where a tile exists", () => {
+    const tiles = webuiWorkspaceLauncherTiles();
+    expect(tiles.map((tile) => tile.kind)).toEqual([
       "review",
       "terminal",
       "canvas",
       "files",
     ]);
-    expect(menu.map((entry) => entry.label)).toEqual([
+    expect(tiles.map((tile) => tile.label)).toEqual([
       "变更",
       "终端",
       "画布",
       "查看文件",
     ]);
-    expect(menu.map((entry) => entry.opens)).toEqual([
+    expect(tiles.map((tile) => tile.opens)).toEqual([
       { type: "open-workspace-review" },
       { type: "open-tab", kind: "terminal" },
       { type: "open-tab", kind: "canvas" },
       { type: "open-tab", kind: "files" },
     ]);
-    // Every menu entry names a declared kind, and the order names each one once.
-    for (const kind of WEBUI_WORKSPACE_ADD_MENU_ORDER) {
+    // Every tile names a declared kind, and the order names each one once.
+    for (const kind of WEBUI_WORKSPACE_LAUNCHER_TILE_ORDER) {
       expect(WEBUI_WORKSPACE_TAB_KINDS[kind]).toBeDefined();
     }
-    expect(new Set(WEBUI_WORKSPACE_ADD_MENU_ORDER).size).toBe(WEBUI_WORKSPACE_ADD_MENU_ORDER.length);
-    // A file preview has no menu entry: it is opened by a path. A web tab has
-    // none either: it is opened by typing a URL, or by the Agent.
-    expect(WEBUI_WORKSPACE_TAB_KINDS["file-preview"].addMenu).toBeNull();
-    expect(WEBUI_WORKSPACE_TAB_KINDS.web.addMenu).toBeNull();
-    expect(menu.some((entry) => entry.kind === "file-preview")).toBe(false);
-    expect(menu.some((entry) => entry.kind === "web")).toBe(false);
+    expect(new Set(WEBUI_WORKSPACE_LAUNCHER_TILE_ORDER).size).toBe(
+      WEBUI_WORKSPACE_LAUNCHER_TILE_ORDER.length,
+    );
+    // A file preview has no tile: it is opened by a path. A web tab has none
+    // either: it is opened by typing a URL, or by the Agent.
+    expect(WEBUI_WORKSPACE_TAB_KINDS["file-preview"].tile).toBeNull();
+    expect(WEBUI_WORKSPACE_TAB_KINDS.web.tile).toBeNull();
+    expect(tiles.some((tile) => tile.kind === "file-preview")).toBe(false);
+    expect(tiles.some((tile) => tile.kind === "web")).toBe(false);
   });
 });

@@ -30,6 +30,7 @@ import type {
   WebuiBrowserTargetId,
   WebuiBrowserTargetList,
   WebuiBrowserTargetState,
+  WebuiBrowserWebTabOpen,
   WebuiBrowserWebTabSnapshot,
   WebuiBridgeBrowserSurface,
 } from "../../../../shared/contracts/browser.js";
@@ -229,6 +230,21 @@ export interface BrowserPort {
     request: WebuiBrowserRunScope & { readonly surface: WebuiBrowserSurface },
     onSnapshot: (snapshot: WebuiBrowserWebTabSnapshot) => void,
   ) => () => void;
+  /**
+   * Opens a page and answers with the page's identity.
+   *
+   * The person's half of the tab model: the new tab page's URL box calls this,
+   * and the answer is what the tab binds to. It is the same `open_tab` the
+   * Agent's tools perform, so a page typed by hand and a page opened by the
+   * Agent go through the same surface switch and the same refusals — the panel
+   * does not get a browser of its own by typing into its own launcher.
+   *
+   * No `runId`: the panel is not a run. The service records the page in the
+   * panel's own cell, so opening one does not move the Agent off its page.
+   */
+  readonly openBrowserWebTab?: (
+    request: WebuiBrowserRunScope & { readonly url: string },
+  ) => Promise<WebuiBrowserWebTabOpen>;
   readonly listBrowserCapabilities?: () => Promise<WebuiBrowserCapabilityList>;
   /**
    * Reads one extension-reached surface's installation key so the person can

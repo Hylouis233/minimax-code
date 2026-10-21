@@ -393,7 +393,13 @@ that closes it. It is a gap, not a denial.
 | A tab's label follows its content | **implemented** | the content carries the kind, and a web tab is titled by the page the runtime publishes |
 | The strip renders tool tabs and web tabs in one row | **implemented** | a published `WebuiWorkspaceTabStrip` renders every tab the workspace's reducer holds — tool tabs (files / review / canvas / terminal) and web tabs side by side — and owns the close button, the active tab and the "+" new-tab affordance. The strip does not keep its own list of web tabs: each `watchBrowserWebTabs` snapshot becomes an `open-web-tab` command, and the reducer's existing-tab rule keeps duplicates out. `packages/webui/src/client/features/workspace/ui/WebuiWorkspaceTabStrip.public.tsx` |
 | The surface switcher is gone | **implemented** | Edge and Chrome are reached in the person's own windows now; the only surface the panel ever shows is the isolated Chromium. `BrowserPanel.public.tsx` no longer renders the three-button radio row, and `BrowserPanelHost.public.tsx`'s `surface` prop becomes a `target` prop, the target the active web tab is bound to. `packages/webui/src/client/features/browser/ui/BrowserPanel.public.tsx`; `packages/webui/src/client/features/browser/ui/BrowserPanelHost.public.tsx` |
-| A newly opened tab opens as the new tab page | **implemented** | the strip's "+" dispatches `open-new-tab`, the workspace's reducer opens a tab with the new `launcher` content kind, and only one launcher tab exists for the session. The launcher's UI itself (tiles and URL box) is the next programme step; this row is the smallest shape that lets the strip open a new tab as the new tab page rather than as an empty placeholder. `packages/webui/src/client/features/workspace/projection/workspace-panel-state.ts`; `packages/webui/src/client/features/workspace/contracts/panel-command.ts` |
+| A newly opened tab opens as the new tab page | **implemented** | the strip's "+" dispatches `open-new-tab`, the workspace's reducer opens a tab with the `launcher` content kind and makes it active. It is a fresh tab every time — the launcher is a tab's content, so a person who typed a URL into one presses "+" again for another. `packages/webui/src/client/features/workspace/projection/workspace-panel-state.ts`; `packages/webui/src/client/features/workspace/contracts/panel-command.ts` |
+| The new tab page is a launcher, not a menu | **implemented** | four tiles — 变更 / 终端 / 画布 / 查看文件 — and a URL box, rendered by `WebuiWorkspaceLauncher` next to the strip that owns the row. The tiles are the registry's rows that carry a tile, in one order list, so the launcher's list is not a second enumeration; the browser tool view is not among them. `packages/webui/src/client/features/workspace/ui/WebuiWorkspaceTabStrip.public.tsx` — `webuiWorkspaceLauncherTiles` |
+| Choosing a tile replaces the tab's content | **implemented** | `open-tab` and `open-workspace-review` carry an optional `tabId`, and with it the reducer replaces that tab's content in place instead of the singleton lookup. The tab keeps its id and is neither closed nor replaced. The singleton rule still holds for every caller that does not name a tab |
+| A URL typed in the launcher opens a page through the same switch | **implemented** | the launcher calls the browser business's port — `openBrowserWebTab`, a new unary operation whose handler calls `WebuiBrowserPort.openWebTab`, the same member the Agent's `open_tab` reaches. The switch, the provider gate and the refusal codes are shared; a surface that is switched off refuses both paths with `browser_surface_not_authorized`, before a provider is asked for a page. `packages/webui/src/server/operation/handlers/browser.ts`; `packages/webui/src/runtime/port.ts` |
+| The page a person opened lands in the tab that asked for it | **implemented** | the launcher dispatches `request-web-page` before the call, so a `watchBrowserWebTabs` snapshot that lands mid-call finds the tab that asked; `open-web-tab` binds the page to the named tab, and to a launcher that is waiting when the command names none. Either order, one page, one tab — and the tab is not activated, so a person who looked elsewhere is not moved. `packages/webui/src/client/features/workspace/projection/workspace-panel-state.ts` |
+| A refusal keeps the launcher, and says why | **implemented** | the runtime's own message is carried on the launcher's `request.error` and rendered under the URL box, so the box stays and the person can type something else. Nothing about the launcher's refusal is worded differently from the Agent's |
+| The URL box exists only on the new tab page | **implemented** | the launcher renders exactly one input, and a web tab renders none: the browser business's panel shows the page's URL as text, not as a field. A read-only URL toolbar for a web tab is #210 |
 
 **What the provider does today, measured again.** The provider's `open_tab` creates a page, attaches
 to it and registers it, and the page is listed with its own identity
@@ -440,6 +446,20 @@ form of this list, and a site that loses the operation fails there.
 `WEBUI_OPERATION_BINDINGS` table (`packages/webui/src/server/operation/bind-handlers.ts:149`) has no
 browser entry, and there is no `RuntimeGroups.browser` group to extend.
 
+**The second operation costs the same eight sites and nothing else.** `openBrowserWebTab` — the call the
+new tab page's URL box makes, so a person and the Agent reach the same `open_tab` — is registered at
+every site above, and `packages/webui/test/unit/browser-web-tabs-operation.test.ts` asserts both
+operations there. Two things about it are worth naming, because both are decisions rather than
+mechanics:
+
+- **Its request carries a URL and a run, not a surface.** The surface is read off the run, the same way
+  the Agent's path reads it, so the two cannot disagree about where a page is opened. A request with no
+  run is the panel's own cell — the panel is not a run — which means opening a page by hand records it
+  without moving any run's selection. The bootstrap that gives a cold run the page a person opened is
+  #211 and is not in this shape.
+- **Its validator refuses an empty URL** with `invalid_body` rather than defaulting it. A blank page
+  opened by a request that claimed to be honoured is worse than a request that was refused.
+
 ### The plumbing cost of a new source file and a new test file
 
 | What | Where | What it costs |
@@ -448,6 +468,12 @@ browser entry, and there is no `RuntimeGroups.browser` group to extend.
 | The declared Vitest suite groups | `packages/webui/test/vitest-suites.json` | a new Vitest file is appended to `suites.webui`. This JSON is the single source — no `package.json` script and no Vitest config change |
 | The source inventory | `release/public-source.json` | regenerate with `node scripts/source-inventory.mjs --write`; `pnpm check:source` reads it. The inventory scans the working tree, including untracked files, so a scratch file left in the repository becomes a publication problem |
 | The Playwright spec directory | `packages/webui/test/browser/` | a real-browser spec lands here. A test that drives the **isolated Chromium runtime** is not a Playwright spec: it belongs in `packages/webui/test/integration/`, beside `browser-use-real-input.test.ts`, and is a Vitest suite |
+
+**The launcher cost none of them.** The new tab page is `WebuiWorkspaceLauncher` inside the strip's own
+published file, and its interaction coverage is inside the strip's existing suite: a launcher that was a
+new component and a new test file would have added a frozen-fixture entry, a suite-group entry and an
+inventory entry for a component the ADR already gives a home. The next programme step should follow the
+same shape — a view that belongs to an existing component belongs in that component's file.
 
 ### The tab-model inventory, checked against the tree
 
@@ -480,8 +506,9 @@ the thing that changes — which is what #207 does.
   observed, because the provider cannot stream a second page at all. It is arithmetic over a
   measurement, and it is labelled as such in the record.
 - **Nothing end-to-end has been measured.** The client's tab model, the strip, the new tab page, the
-  toolbar and the two selections are not exercised by any suite yet. #208, #209, #210, #211 and #212
-  are where that happens.
+  toolbar and the two selections are not exercised by any suite against a real browser. #208 and #209
+  have covered the tab model, the strip and the new tab page with unit coverage; #210, #211 and #212
+  are where the rest happens.
 - **Only the foregrounded page renders.** Chrome throttles the pages it is not showing, so a tab in
   the background produces no new frames. A strip shows one tab at a time, so the page in front is the
   one that produces the picture — but whether a background tab should show a *still* picture, and

@@ -226,7 +226,6 @@ describe("WebUI shell", () => {
     state = reduceWorkspacePanelState(state, { type: "open-tab", kind: "files" });
     state = reduceWorkspacePanelState(state, { type: "open-tab", kind: "canvas" });
     state = reduceWorkspacePanelState(state, { type: "open-tab", kind: "terminal" });
-    state = reduceWorkspacePanelState(state, { type: "toggle-add-menu" });
     const markup = renderToStaticMarkup(createElement(WebuiWorkspacePanel, { state, dispatch: () => undefined, workspaceDir: "/tmp" }));
     expect(markup).toContain('data-testid="workspace-panel"');
     expect(markup).toContain("查看文件");
@@ -234,7 +233,7 @@ describe("WebUI shell", () => {
     expect(markup).toContain("终端");
     expect(markup).not.toContain('data-webui-progress-panel="true"');
     // The browser tool tab is gone: the panel's tabs are web tabs now, and a
-    // web tab is opened by typing a URL rather than from the add menu.
+    // web tab is opened by typing a URL rather than from a launcher tile.
     expect(markup).not.toContain("浏览器");
     expect(markup).not.toContain("Mini App");
   });
