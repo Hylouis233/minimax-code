@@ -550,6 +550,27 @@ export function parseWebuiBrowserBridgeHostFrame(raw: string): WebuiBrowserBridg
       }
       return { ok: true, frame: candidate as unknown as WebuiBrowserBridgeHostFrame };
     }
+    case "cdp": {
+      // A raw DevTools command. The extension decides for itself whether it
+      // will run the method — this parser only establishes that the frame is
+      // well formed, so a malformed one is refused rather than dispatched.
+      if (typeof candidate.commandId !== "string") {
+        return { ok: false, reason: "cdp has no command id" };
+      }
+      if (typeof candidate.targetId !== "string" || candidate.targetId.length === 0) {
+        return { ok: false, reason: "cdp has no target id" };
+      }
+      if (typeof candidate.generation !== "number" || !Number.isInteger(candidate.generation)) {
+        return { ok: false, reason: "cdp has no generation" };
+      }
+      if (typeof candidate.method !== "string" || candidate.method.length === 0) {
+        return { ok: false, reason: "cdp has no method" };
+      }
+      if (!isWebuiBrowserBridgeCdpParams(candidate.params)) {
+        return { ok: false, reason: "cdp carries invalid params" };
+      }
+      return { ok: true, frame: candidate as unknown as WebuiBrowserBridgeHostFrame };
+    }
     case "ping": {
       if (typeof candidate.nonce !== "string") return { ok: false, reason: "ping has no nonce" };
       return { ok: true, frame: candidate as unknown as WebuiBrowserBridgeHostFrame };
@@ -561,6 +582,11 @@ export function parseWebuiBrowserBridgeHostFrame(raw: string): WebuiBrowserBridg
     default:
       return { ok: false, reason: `unknown frame kind ${String(candidate.kind)}` };
   }
+}
+
+/** Whether a value is a plain object of DevTools parameters. */
+function isWebuiBrowserBridgeCdpParams(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /** Whether a value is a structurally valid P-256 ECDH public-key JWK. */

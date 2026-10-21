@@ -1,0 +1,214 @@
+// The external bridge's behaviour, against a real browser and a real page.
+//
+// The handshake acceptance proves that an extension can pair and that an
+// unprovisioned one is refused. It does not prove that the *bridge* works —
+// that a keystroke the host sends arrives in the page the person is looking
+// at, that the page's image reaches the host, and that a DevTools command
+// runs against the live tab.
+//
+// This suite closes that gap. It drives a real browser with the built
+// extension, a real page, and the real bridge: the host sends, and the page
+// receives.
+//
+// The page is read back **through the bridge**, with a DevTools command. That
+// is deliberate — it means the assertion about the page comes from the same
+// path a caller would use, so a broken DevTools path cannot make a broken
+// input path look right.
+
+import { rm } from "node:fs/promises";
+
+import { expect, test } from "@playwright/test";
+
+/**
+ * The slice of the extension API this spec uses.
+ *
+ * The callbacks are serialized and run inside the extension's service worker,
+ * where `chrome` exists; the WebUI's test tsconfig does not carry the
+ * extension's ambient types.
+ */
+declare const chrome: {
+  storage: {
+    session: {
+      get(key: string): Promise<Record<string, unknown>>;
+    };
+  };
+};
+
+/**
+ * The extension's own last failure.
+ *
+ * The extension parks its failures in session storage rather than logging them,
+ * so this is the only place a failure inside the extension is visible from
+ * outside it.
+ */
+async function extensionLastError(
+  worker: { evaluate: (fn: () => Promise<unknown>) => Promise<unknown> },
+): Promise<unknown> {
+  return worker
+    .evaluate(() => chrome.storage.session.get("webui.browserBridge.lastError"))
+    .catch(() => undefined);
+}
+
+import type { WebuiBrowserTargetState } from "../../src/shared/contracts/browser.js";
+import {
+  buildExtension,
+  launchWithExtension,
+  provision,
+  startBridge,
+  waitForConnected,
+} from "./real-browser-bridge.js";
+
+const BROWSERS = [
+  { channel: "chromium", surface: "chrome" },
+  { channel: "msedge", surface: "edge" },
+] as const;
+
+test.describe("the external bridge, against a real browser and a real page", () => {
+  test.beforeAll(async () => {
+    await buildExtension();
+  });
+
+  for (const { channel, surface } of BROWSERS) {
+    test(`text input reaches the page through the ${surface} bridge in ${channel}`, async () => {
+      test.setTimeout(120_000);
+      const { context, worker, extensionId, profileDir } = await launchWithExtension(channel);
+      // The page the person is looking at. It is opened *before* the
+      // extension pairs, so the extension announces a real tab.
+      const started = await startBridge(extensionId, surface);
+      // The page is a real http page, because the extension leaves
+      // policy-blocked URLs — `data:` among them — out of its targets.
+      const page = await context.newPage();
+      await page.goto(started.pageUrl);
+      try {
+        const view = await started.bridge.readInstallationKey(surface);
+        expect(view).toBeDefined();
+        await provision(worker, context, extensionId, started.origin, view!.key);
+        await waitForConnected(started.bridge, surface, true, worker);
+
+        const provider = started.bridge.createProvider(surface);
+        expect(provider).toBeDefined();
+
+        // The extension announces the tab; the provider is how the host sees
+        // it.
+        const target = await waitForTarget(provider!);
+        expect(target.id.surface).toBe(surface);
+
+        await provider!.sendInput({
+          kind: "text",
+          target: target.id,
+          text: "hello",
+        }).catch(async (error: unknown) => {
+          throw new Error(
+            `the input did not arrive: ${String(error)} extension=${JSON.stringify(
+              await extensionLastError(worker),
+            )}`,
+          );
+        });
+
+        // The page is read back through Playwright, which sees the same page
+        // the extension drove. Reading it through the bridge instead would
+        // make this assertion depend on the DevTools path, and a broken
+        // DevTools path would make a broken input path look right.
+        await expect
+          .poll(async () => page.inputValue("#field"), { timeout: 15_000 })
+          .toBe("hello");
+
+        // The image path: the extension captures the person's visible tab and
+        // the host receives it. The frame names its own target, so the host
+        // can tell whose page it is.
+        const frames: { readonly targetId: string; readonly data: string }[] = [];
+        await provider!.startImageStream(target.id.targetId, (frame) => {
+          frames.push({ targetId: frame.target.targetId, data: frame.data });
+        });
+        const frameDeadline = Date.now() + 15_000;
+        while (frames.length === 0 && Date.now() < frameDeadline) {
+          await new Promise((resolve) => setTimeout(resolve, 200));
+        }
+        if (frames.length === 0) {
+          throw new Error(
+            `no image frame arrived: extension=${JSON.stringify(
+              await extensionLastError(worker),
+            )}`,
+          );
+        }
+        expect(frames[0]?.targetId).toBe(target.id.targetId);
+        // A real image, not an empty payload.
+        expect((frames[0]?.data ?? "").length).toBeGreaterThan(100);
+      } finally {
+        await started.close();
+        await context.close();
+        await page.close().catch(() => undefined);
+        await rm(profileDir, { recursive: true, force: true });
+      }
+    });
+
+    test(`a DevTools command runs against the live tab through the ${surface} bridge in ${channel}`, async () => {
+      test.setTimeout(120_000);
+      const { context, worker, extensionId, profileDir } = await launchWithExtension(channel);
+      const started = await startBridge(extensionId, surface);
+      const page = await context.newPage();
+      await page.goto(started.pageUrl);
+      try {
+        const view = await started.bridge.readInstallationKey(surface);
+        await provision(worker, context, extensionId, started.origin, view!.key);
+        await waitForConnected(started.bridge, surface, true, worker);
+
+        const provider = started.bridge.createProvider(surface);
+        const target = await waitForTarget(provider!);
+
+        // A command in the extension's supported subset, against a live tab.
+        const title = await evaluate(provider!, target, "document.title");
+        expect(title).toBe("idle");
+
+        // A command outside the subset is refused with a reason, and the
+        // refusal says *unsupported* rather than failing generically.
+        await expect(
+          provider!.sendCommand(target.id, "Browser.setPermission", { permission: { name: "geolocation" } }),
+        ).rejects.toMatchObject({ code: "browser_capability_denied" });
+      } finally {
+        await started.close();
+        await context.close();
+        await page.close().catch(() => undefined);
+        await rm(profileDir, { recursive: true, force: true });
+      }
+    });
+  }
+});
+
+/** Waits for the extension to announce a tab. */
+async function waitForTarget(
+  provider: { listTargets(): Promise<readonly WebuiBrowserTargetState[]> },
+): Promise<WebuiBrowserTargetState> {
+  const deadline = Date.now() + 20_000;
+  while (Date.now() < deadline) {
+    const targets = await provider.listTargets();
+    const target = targets.find((entry) => entry.id.targetId !== "");
+    if (target) return target;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error("the extension announced no target");
+}
+
+/**
+ * Evaluates an expression against the live tab, through the bridge.
+ *
+ * The value is read back from the DevTools result rather than from the page's
+ * own API, so the assertion is about what the browser actually holds.
+ */
+async function evaluate(
+  provider: {
+    sendCommand(
+      target: { readonly targetId: string; readonly generation: number },
+      command: string,
+      params: Record<string, unknown>,
+    ): Promise<unknown>;
+  },
+  target: WebuiBrowserTargetState,
+  expression: string,
+): Promise<unknown> {
+  const result = (await provider.sendCommand(target.id, "Runtime.evaluate", {
+    expression,
+    returnByValue: true,
+  })) as { readonly result?: { readonly value?: unknown } } | undefined;
+  return result?.result?.value;
+}

@@ -1,0 +1,254 @@
+// The real-browser bridge harness.
+//
+// The acceptance needs a browser with the built extension loaded, a bridge
+// server the extension can reach, and a way to provision the extension the way
+// a person does. Both the handshake acceptance and the external-behaviour
+// acceptance need the same machinery, so it lives here rather than being
+// written twice.
+
+import { execFile } from "node:child_process";
+import { createServer, type IncomingMessage } from "node:http";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { promisify } from "node:util";
+import type { Duplex } from "node:stream";
+
+import { chromium, type BrowserContext, type Worker } from "@playwright/test";
+
+import {
+  BrowserBridgeServer,
+  createInMemorySecureCredentialStore,
+} from "../../src/server/browser-bridge/index.js";
+
+const run = promisify(execFile);
+
+// The spec lives at packages/webui/test/browser/, so the repository root is
+// four levels up from the file's directory.
+const repoRoot = resolve(new URL("../../../..", import.meta.url).pathname);
+const extensionDist = join(repoRoot, "packages/browser-extension/dist");
+
+/** The storage keys the extension keeps its configuration under. */
+export const ORIGIN_STORAGE_KEY = "webui.browserBridge.origin";
+export const INSTALLATION_KEY_STORAGE_KEY = "webui.browserBridge.installationKey.v1";
+
+/** How long to wait for the extension to connect before calling it a failure. */
+export const CONNECT_TIMEOUT_MS = 20_000;
+
+/**
+ * The slice of the extension API the harness uses.
+ *
+ * The callbacks are serialized and run inside the extension's service worker,
+ * where `chrome` exists; the WebUI's test tsconfig does not carry the
+ * extension's ambient types.
+ */
+declare const chrome: {
+  storage: {
+    local: {
+      get(key: string): Promise<Record<string, unknown>>;
+      set(items: Record<string, unknown>): Promise<void>;
+      remove(key: string): Promise<void>;
+    };
+    session: {
+      get(key: string): Promise<Record<string, unknown>>;
+    };
+  };
+  runtime: { reload(): Promise<void>; sendMessage(message: unknown): Promise<unknown> };
+};
+
+/**
+ * Builds the extension.
+ *
+ * The source directory is not loadable: a browser extension runtime executes
+ * JavaScript only, and the source manifest points the service worker at a
+ * `.ts` file. The build is what a browser can actually run.
+ */
+export async function buildExtension(): Promise<void> {
+  await run("pnpm", ["--filter", "@mavis/browser-extension", "build"], {
+    cwd: repoRoot,
+    timeout: 120_000,
+  });
+}
+
+/** The extension's id, read off the service worker's URL. */
+function extensionIdOf(worker: Worker): string {
+  const match = /^chrome-extension:\/\/([a-p]{32})\//u.exec(worker.url());
+  if (!match) throw new Error(`unexpected service worker url: ${worker.url()}`);
+  return match[1]!;
+}
+
+/**
+ * Launches a browser with the built extension loaded.
+ *
+ * The id of an unpacked extension is derived from its load path, so it is
+ * stable for this directory — but it is read at runtime rather than
+ * hard-coded, because a different path means a different id and a hard-coded
+ * one would silently stop matching the allowlist.
+ */
+export async function launchWithExtension(channel: "msedge" | "chromium"): Promise<{
+  context: BrowserContext;
+  worker: Worker;
+  extensionId: string;
+  profileDir: string;
+}> {
+  const profileDir = await mkdtemp(join(tmpdir(), "webui-bridge-real-"));
+  const context = await chromium.launchPersistentContext(profileDir, {
+    headless: true,
+    // "chromium" is the bundled browser and "msedge" is the installed Edge.
+    // The extension is one package for both, and the only thing that differs
+    // is the browser it runs in.
+    channel,
+    args: [
+      `--disable-extensions-except=${extensionDist}`,
+      `--load-extension=${extensionDist}`,
+      "--no-first-run",
+      "--no-default-browser-check",
+    ],
+  });
+  let worker = context.serviceWorkers()[0];
+  if (!worker) worker = await context.waitForEvent("serviceworker", { timeout: 30_000 });
+  return { context, worker, extensionId: extensionIdOf(worker), profileDir };
+}
+
+/**
+ * Provisions the extension and wakes its service worker.
+ *
+ * The worker reads the host's address when it starts and exits if there is
+ * none, so the storage has to be written *before* the worker next runs. The
+ * reconnect message then wakes it, which is what a person pasting into the
+ * options page amounts to.
+ */
+export async function provision(
+  worker: Worker,
+  context: BrowserContext,
+  extensionId: string,
+  origin: string,
+  installationKey: string | undefined,
+): Promise<void> {
+  await worker.evaluate(
+    async ({ originKey, keyKey, secret, host }) => {
+      // The host is passed in by name. A bare `origin` here would resolve to
+      // the *extension's* origin — a service worker has one — and the
+      // extension would then try to connect to itself.
+      await chrome.storage.local.set({ [originKey]: host });
+      if (secret) {
+        await chrome.storage.local.set({ [keyKey]: { secret } });
+      } else {
+        await chrome.storage.local.remove(keyKey);
+      }
+    },
+    {
+      originKey: ORIGIN_STORAGE_KEY,
+      keyKey: INSTALLATION_KEY_STORAGE_KEY,
+      secret: installationKey,
+      host: origin,
+    },
+  );
+  // The message has to come from a *page* — a message sent by the worker is not
+  // delivered to the worker's own listener.
+  const page = await context.newPage();
+  try {
+    await page.goto(`chrome-extension://${extensionId}/options.html`);
+    await page.evaluate(
+      (type) => chrome.runtime.sendMessage({ type }),
+      "webui-bridge-reconnect",
+    );
+  } finally {
+    await page.close();
+  }
+}
+
+/**
+ * The page the external acceptance drives.
+ *
+ * It is served over `http://127.0.0.1` rather than as a `data:` URL, because
+ * the extension's target registry **deliberately** leaves policy-blocked URLs
+ * out — and a `data:` URL is one of them. That is the extension behaving
+ * correctly: a page the browser refuses to expose is not a target.
+ */
+export const BRIDGE_TEST_PAGE_HTML = [
+  "<!doctype html><title>idle</title>",
+  "<input id='field' type='text' autofocus>",
+  "<script>",
+  "const field = document.getElementById('field');",
+  "field.addEventListener('input', (event) => {",
+  "  document.title = 'text:' + event.target.value;",
+  "});",
+  "</script>",
+].join("\n");
+
+/** Starts the bridge behind an HTTP server the harness owns. */
+export async function startBridge(
+  extensionId: string,
+  surface: "edge" | "chrome",
+): Promise<{
+  bridge: BrowserBridgeServer;
+  origin: string;
+  pageUrl: string;
+  close: () => Promise<void>;
+}> {
+  const bridge = new BrowserBridgeServer({
+    host: "127.0.0.1",
+    dev: true,
+    credentialStore: createInMemorySecureCredentialStore(),
+    // The allowlist is per surface, and so is the pairing. A browser running
+    // the extension has to be admitted on **its own** surface, or the Edge
+    // run would prove nothing about the Edge switch.
+    env:
+      surface === "edge"
+        ? { MAVIS_BROWSER_EDGE_EXTENSION_IDS: extensionId }
+        : { MAVIS_BROWSER_CHROME_EXTENSION_IDS: extensionId },
+  });
+  await bridge.start();
+  await bridge.enableSurface(surface);
+
+  const http = createServer((request, response) => {
+    if (request.url === "/test-page") {
+      response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      response.end(BRIDGE_TEST_PAGE_HTML);
+      return;
+    }
+    response.writeHead(426).end();
+  });
+  await new Promise<void>((resolve) => http.listen(0, "127.0.0.1", resolve));
+  const address = http.address();
+  const port = typeof address === "object" && address ? address.port : 0;
+  http.on("upgrade", (request: IncomingMessage, socket: Duplex, head: Buffer) => {
+    bridge.handleUpgrade(request, socket, head);
+  });
+  return {
+    bridge,
+    // The extension takes the loopback origin in its http form and converts
+    // it to ws, the way the WebUI's own workspace-file URL does. It also
+    // appends the bridge path itself, so the origin must not carry one.
+    origin: `http://127.0.0.1:${port}`,
+    // A real http page the extension will report as a target.
+    pageUrl: `http://127.0.0.1:${port}/test-page`,
+    close: async () => {
+      await bridge.close();
+      await new Promise<void>((resolve) => http.close(() => resolve()));
+    },
+  };
+}
+
+export async function waitForConnected(
+  bridge: BrowserBridgeServer,
+  surface: "edge" | "chrome",
+  connected: boolean,
+  worker?: Worker,
+): Promise<void> {
+  const deadline = Date.now() + CONNECT_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    if (bridge.snapshot().surfaces[surface].connected === connected) return;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  // Both sides record what they thought happened; without them a failure here
+  // says only "not connected", which is not a diagnosis.
+  const snapshot = bridge.snapshot().surfaces[surface];
+  const lastError = await worker
+    ?.evaluate(() => chrome.storage.session.get("webui.browserBridge.lastError"))
+    .catch(() => undefined);
+  throw new Error(
+    `the surface did not reach connected=${connected}: host=${JSON.stringify(snapshot)} extension=${JSON.stringify(lastError)}`,
+  );
+}

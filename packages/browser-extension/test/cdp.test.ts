@@ -11,25 +11,28 @@ import { describe, expect, it } from "vitest";
 import {
   WEBUI_BROWSER_BRIDGE_CDP_COMMANDS,
   createWebuiBrowserBridgeCdpDispatcher,
-  type WebuiBrowserBridgeCdpDebuggerApi,
 } from "../src/cdp.js";
+import type { WebuiBrowserBridgeDebuggerApi } from "../src/input.js";
 
 /** A debugger that records what it was asked to do. */
 function recordingDebugger(
   behaviour: (method: string) => "ok" | "refuse" = () => "ok",
-): WebuiBrowserBridgeCdpDebuggerApi & { readonly sent: string[]; readonly attached: number[] } {
+): WebuiBrowserBridgeDebuggerApi & { readonly sent: string[]; readonly attached: number[] } {
   const sent: string[] = [];
   const attached: number[] = [];
   return {
     sent,
     attached,
-    async attach(target) {
+    async attach(target: { readonly tabId?: number }) {
       attached.push(target.tabId ?? -1);
     },
     async detach() {
       // The dispatcher keeps its attachment; detaching is the browser's call.
     },
-    async sendCommand(_target, method) {
+    async sendCommand(
+      _target: { readonly tabId?: number },
+      method: string,
+    ) {
       sent.push(method);
       if (behaviour(method) === "refuse") {
         throw new Error(`the browser does not support ${method}`);
@@ -84,7 +87,7 @@ describe("the bridge's DevTools commands", () => {
   });
 
   it("reports a tab it cannot attach to as a refusal", async () => {
-    const debuggerApi: WebuiBrowserBridgeCdpDebuggerApi = {
+    const debuggerApi: WebuiBrowserBridgeDebuggerApi = {
       async attach() {
         throw new Error("the tab is not debuggable");
       },

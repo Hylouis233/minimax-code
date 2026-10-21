@@ -371,12 +371,12 @@ export class BrowserBridgeSession extends EventEmitter {
     const outcome = await new Promise<BrowserBridgeCommandOutcome>((resolve, reject) => {
       this.inflight.set(commandId, { resolve, reject, deadline: deadlineAt });
     });
-    if (outcome.kind === "rejected") {
-      return { kind: "terminal", reason: "refused", message: outcome.reason };
-    }
-    if (outcome.kind === "timeout") {
-      return { kind: "terminal", reason: "unknown", message: outcome.reason };
-    }
+    // A refusal is an **answer**, not a transport failure. The extension has
+    // spoken, and the caller — the provider — turns that answer into the
+    // stable error code the contract promises. Reporting it as terminal here
+    // throws it past the provider as a generic failure, and the caller loses
+    // the difference between "the peer refused" and "the peer could not be
+    // reached" — which is the difference between a dead end and a retry.
     return { kind: "success", value: outcome };
   }
 
@@ -601,16 +601,12 @@ export class BrowserBridgeSession extends EventEmitter {
         deadline: deadlineAt,
       });
     });
-    if (outcome.kind === "rejected") {
-      return {
-        kind: "terminal",
-        reason: "refused",
-        message: outcome.reason,
-      };
-    }
-    if (outcome.kind === "timeout") {
-      return { kind: "terminal", reason: "unknown", message: outcome.reason };
-    }
+    // A refusal is an **answer**, not a transport failure. The extension has
+    // spoken, and the caller — the provider — turns that answer into the
+    // stable error code the contract promises. Reporting it as terminal here
+    // throws it past the provider as a generic failure, and the caller loses
+    // the difference between "the peer refused" and "the peer could not be
+    // reached" — which is the difference between a dead end and a retry.
     return { kind: "success", value: outcome };
   }
 

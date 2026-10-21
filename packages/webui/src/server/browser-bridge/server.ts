@@ -98,7 +98,7 @@ export interface WebuiBridgeSurfaceProvider {
     target: { readonly targetId: string; readonly generation: number },
     command: string,
     params: Record<string, unknown>,
-  ): Promise<void>;
+  ): Promise<unknown>;
   close(): Promise<void>;
 }
 
@@ -686,7 +686,7 @@ class BridgeProvider implements WebuiBridgeSurfaceProvider {
     target: { readonly targetId: string; readonly generation: number },
     command: string,
     params: Record<string, unknown>,
-  ): Promise<void> {
+  ): Promise<unknown> {
     const wire = this.#wireCommand(target, command, params);
     if (!wire) {
       throw new WebuiBridgeOperationError(
@@ -705,7 +705,7 @@ class BridgeProvider implements WebuiBridgeSurfaceProvider {
       method: wire.method,
       params: wire.params,
     });
-    if (outcome.kind === "accepted") return;
+    if (outcome.kind === "accepted") return outcome.result;
     if (outcome.kind === "timeout") {
       throw new WebuiBridgeOperationError(
         "browser_operation_timeout",

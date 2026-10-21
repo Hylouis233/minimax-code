@@ -405,6 +405,32 @@ builds, not because Edge is unavailable.
   installation key from the wrong surface — was what the parameterisation
   exposed, and it is fixed.
 
+## Round 6 — the external path, driven end to end in a real browser
+
+The handshake acceptance proved that an extension can pair. It did not prove
+that the **bridge** works — that a keystroke the host sends arrives in the page
+the person is looking at, that the page's image reaches the host, or that a
+DevTools command runs against the live tab. A new acceptance drives all three
+through the real bridge, in real Chrome and real Edge, each on its own surface.
+
+It found **four** defects, all of them real:
+
+1. **The extension's frame parser had no `cdp` case.** A DevTools command was
+   therefore rejected as an *unknown frame kind*, and the client closed the
+   socket — which is why the first attempt reported "session closed before
+   reply" rather than a refusal.
+2. **A refusal was converted to a transport failure too early.** The session
+   turned the extension's refusal into a terminal retry outcome, so the
+   provider never saw it and the stable error code the contract promises never
+   applied. A refusal is an **answer**, not a transport failure.
+3. **The provider discarded the command's result**, so a caller had no way to
+   read what the command produced.
+4. **The extension could not capture the page at all.** `chrome.tabs.captureVisibleTab`
+   requires the `<all_urls>` host permission or an `activeTab` permission
+   granted by a user gesture on the page — and there is no gesture here, the
+   host is asking for the picture. The permission is now declared, and the
+   reason is recorded in the extension's README rather than left implicit.
+
 ## What this document does not establish
 
 - That the external path works end to end against a real Edge or Chrome for
