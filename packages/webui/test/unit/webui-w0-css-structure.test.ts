@@ -172,6 +172,52 @@ function declarationsFor(selector: string, rules: CssRule[] = shellRules): strin
     .join("\n");
 }
 
+/** The selectors a rule targets: a rule may group several of them. */
+function targetsOf(rule: CssRule): readonly string[] {
+  return rule.selector.split(",").map((part) => part.trim());
+}
+
+/** Whether a rule targets the selector, naming it alone or in a group. */
+function targets(rule: CssRule, selector: string): boolean {
+  return targetsOf(rule).includes(selector);
+}
+
+/**
+ * The value the cascade gives a property for a selector.
+ *
+ * A rule may group several selectors, and the declaration a reader cares
+ * about may live in the grouped rule rather than in a rule that names the
+ * selector on its own — a stylesheet that collapses three scroll areas into
+ * one rule keeps the behaviour and loses the single-selector lookup. So the
+ * lookup considers every rule that targets the selector, and among those the
+ * last one that actually declares the property.
+ */
+function winningDeclaration(
+  selector: string,
+  property: string,
+  rules: CssRule[] = shellRules,
+): string | undefined {
+  const declaring = rules.filter(
+    (rule) =>
+      targets(rule, selector) &&
+      isCascading(rule) &&
+      declaration(rule.body, property) !== undefined,
+  );
+  if (declaring.length === 0) return undefined;
+  return declaration(declaring[declaring.length - 1]!.body, property);
+}
+
+/** Every declaration that reaches a selector, grouped rules included. */
+function declarationsForTargeting(
+  selector: string,
+  rules: CssRule[] = shellRules,
+): string {
+  return rules
+    .filter((rule) => targets(rule, selector) && isCascading(rule))
+    .map((rule) => rule.body)
+    .join("\n");
+}
+
 beforeAll(() => {
   indexCss = readFileSync(path.join(stylesDir, "index.css"), "utf8");
   // The rules under test are the shell's own population: the feature
@@ -570,12 +616,12 @@ describe("W0 · structural declarations W5 must preserve", () => {
     );
     expect(declaration(progressScroll.body, "overflow-y")).toBe("auto");
     expect(declaration(progressScroll.body, "overflow-x")).toBe("hidden");
-    expect(declaration(winning(".webui-progress-scroll").body, "scrollbar-width")).toBe("none");
-    expect(declaration(winning(".webui-subagents-scroll").body, "scrollbar-width")).toBe("none");
-    expect(declaration(winning(".webui-progress-scroll").body, "scrollbar-gutter")).toBe("auto");
-    expect(declaration(winning(".webui-subagents-scroll").body, "scrollbar-gutter")).toBe("auto");
-    expect(declarationsFor(".webui-progress-scroll::-webkit-scrollbar")).toContain("display: none");
-    expect(declarationsFor(".webui-subagents-scroll::-webkit-scrollbar")).toContain("display: none");
+    expect(winningDeclaration(".webui-progress-scroll", "scrollbar-width")).toBe("none");
+    expect(winningDeclaration(".webui-subagents-scroll", "scrollbar-width")).toBe("none");
+    expect(winningDeclaration(".webui-progress-scroll", "scrollbar-gutter")).toBe("auto");
+    expect(winningDeclaration(".webui-subagents-scroll", "scrollbar-gutter")).toBe("auto");
+    expect(declarationsForTargeting(".webui-progress-scroll::-webkit-scrollbar")).toContain("display: none");
+    expect(declarationsForTargeting(".webui-subagents-scroll::-webkit-scrollbar")).toContain("display: none");
     expect(
       declaration(winning(".webui-progress-section.is-collapsed").body, "flex-basis"),
     ).toBe("28px");
@@ -964,6 +1010,14 @@ describe("W0 · stacking order", () => {
       // pinned headers (1 and 2) because the browser panel is an in-flow
       // region of the shell rather than an overlay: nothing it draws may
       // cover the goal overlay at 20 or the workspace drawer at 40.
+      // 5 is `.webui-workspace-panel-resize-handle`, the eight-pixel strip on
+      // the panel's left edge that drags its width. It is the panel's own
+      // child, so it needs a layer of its own to sit above the panel's
+      // content. It stays in the low band with the pinned headers (1 and 2)
+      // and the browser notice (3): the panel is an in-flow region of the
+      // shell, so nothing it draws may cover the goal overlay at 20 or the
+      // workspace drawer at 40. It is an edge affordance rather than an
+      // overlay — eight pixels wide, transparent, and on the panel's border.
       // 40 is `.webui-workspace-panel` inside `@media (max-width: 1080px)`.
       // Above that breakpoint the panel is an in-flow flex sibling and needs no
       // layer; below it the panel is pulled out of flow into a right-docked
@@ -1007,7 +1061,7 @@ describe("W0 · stacking order", () => {
       // 4 is gone: it was the workspace panel's add-menu anchor, and the add
       // menu became the launcher's tiles. The launcher is a tab's content
       // rather than an overlay, so it needs no layer of its own.
-      1, 2, 3, 20, 40, 45, 50, 60, 70, 100, 110, 111, 120, 121, 130, 140, 1400,
+      1, 2, 3, 5, 20, 40, 45, 50, 60, 70, 100, 110, 111, 120, 121, 130, 140, 1400,
     ]);
   });
 });
