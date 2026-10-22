@@ -1,5 +1,6 @@
 import { marked, type Token } from "marked";
 import katex from "katex";
+import { isWebuiMermaidFence, WebuiMermaid } from "./webui-mermaid.js";
 import hljs from "highlight.js/lib/core";
 import bash from "highlight.js/lib/languages/bash";
 import c from "highlight.js/lib/languages/c";
@@ -266,6 +267,14 @@ function blocks(tokens: readonly Token[] | undefined, onOpenFile?: (reference: N
       } catch {
         return <pre key={key}>{token.text}</pre>;
       }
+    }
+    // Mermaid fences branch off before the generic code path: the diagram
+    // renders to SVG through `WebuiMermaid`, and every failure there lands
+    // back on the plain fence. `codeFenceLanguage` strips the tag's trailing
+    // attributes, so `mermaid title="a.mmd"` is recognised the same as a
+    // bare `mermaid` tag. No other fence is affected by this branch.
+    if (token.type === "code" && isWebuiMermaidFence(codeFenceLanguage(token.lang))) {
+      return <WebuiMermaid key={key} text={token.text} lang={token.lang} />;
     }
     if (token.type === "code") {
       const language = codeFenceLanguage(token.lang);

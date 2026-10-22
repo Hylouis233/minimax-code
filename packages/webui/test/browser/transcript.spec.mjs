@@ -236,3 +236,115 @@ test("a session switch reads the page once per need, not once per reader", async
   await page.waitForTimeout(400);
   expect(await reads()).toBe(1);
 });
+
+/* Mermaid fences in the transcript, against the real library.
+ *
+ * The unit suite mocks `mermaid` (the Node environment has no DOM for it), so
+ * this is where the library actually runs: the diagram renders to SVG, the
+ * chunk loads on demand, and the failure path falls back to the plain fence.
+ * The theme case matters because Mermaid bakes its palette into the SVG — a
+ * diagram drawn with the light palette is a light diagram even on a dark
+ * page, so the renderer has to follow the app's theme. */
+const MERMAID_DIAGRAM = "graph TD;\n  A[开始] --> B[结束];";
+
+async function stageTranscript(page, messages) {
+  // `addInitScript` with an argument, not `configureFixture`: the fixture
+  // setup is serialized with `toString()`, so it cannot close over the
+  // messages.
+  await page.addInitScript((value) => {
+    window.__WEBUI_FIXTURE_SETUP__ ??= [];
+    window.__WEBUI_FIXTURE_SETUP__.push(() => window.__fixture.setPage("A", { messages: value, hasMore: false }));
+  }, messages);
+}
+
+test("a mermaid fence renders as a diagram, not as text", async ({ page }) => {
+  await stageTranscript(page, [
+    { msgId: "m-1", role: "assistant", msgContent: "```mermaid\n" + MERMAID_DIAGRAM + "\n```", timestamp: 1_700_000_000_001 },
+  ]);
+  await openApp(page, "#session=A");
+
+  // The real library, in a real browser: the fence becomes an SVG.
+  const diagram = page.locator(".webui-mermaid svg");
+  await expect(diagram).toBeVisible({ timeout: 20_000 });
+  // …and the diagram is the fence's own content, not the source text.
+  await expect(page.locator(".webui-mermaid pre")).toHaveCount(0);
+  await expect(diagram.locator("text").first()).toContainText("开始");
+});
+
+test("an invalid diagram falls back to the plain fence", async ({ page }) => {
+  await stageTranscript(page, [
+    { msgId: "m-2", role: "assistant", msgContent: "```mermaid\nthis is not a diagram at all {{{\n```", timestamp: 1_700_000_000_001 },
+  ]);
+  await openApp(page, "#session=A");
+
+  // The failure path: no SVG, and the original text back in a plain fence —
+  // the markup the fence had before Mermaid existed.
+  await expect(page.locator(".webui-mermaid svg")).toHaveCount(0);
+  const fallback = page.locator(".webui-code-block code");
+  await expect(fallback).toBeVisible();
+  await expect(fallback).toContainText("this is not a diagram at all");
+});
+
+test("a diagram follows the app's theme", async ({ page }) => {
+  await stageTranscript(page, [
+    { msgId: "m-3", role: "assistant", msgContent: "```mermaid\n" + MERMAID_DIAGRAM + "\n```", timestamp: 1_700_000_000_001 },
+  ]);
+  await openApp(page, "#session=A");
+  await expect(page.locator(".webui-mermaid svg")).toBeVisible({ timeout: 20_000 });
+
+  // Mermaid bakes its palette into the SVG it returns, so a diagram drawn
+  // with the light palette is a light diagram even on a dark page. The
+  // comparison is between two runs rather than against a literal colour, so
+  // it survives a palette change in the library.
+  const readPalette = () =>
+    page.locator(".webui-mermaid svg").evaluate((node) => node.querySelector("style")?.textContent ?? "");
+  const lightPalette = await readPalette();
+
+  // The app's own preference — not a hand-set class: the app applies the
+  // stored theme to `<html>` at boot, and the renderer reads that class when
+  // it draws.
+  await page.addInitScript(() => {
+    window.localStorage.setItem("webui-theme", "dark");
+  });
+  await page.reload();
+  await expect(page.locator(".webui-mermaid svg")).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator("html")).toHaveClass(/dark/);
+
+  expect(await readPalette()).not.toBe(lightPalette);
+});
+
+test("a wide diagram fits its container", async ({ page }) => {
+  // A wide diagram must not push the transcript sideways: the SVG scales with
+  // the container (`max-width: 100%`, `height: auto`).
+  await stageTranscript(page, [
+    {
+      msgId: "m-4",
+      role: "assistant",
+      msgContent: "```mermaid\ngraph LR;\n" + Array.from({ length: 12 }, (_, index) => `  N${index}[节点${index}]`).join("\n") + ";\n```",
+      timestamp: 1_700_000_000_001,
+    },
+  ]);
+  await openApp(page, "#session=A");
+  const diagram = page.locator(".webui-mermaid svg");
+  await expect(diagram).toBeVisible({ timeout: 20_000 });
+  const sizes = await diagram.evaluate((node) => ({
+    svg: node.getBoundingClientRect().width,
+    container: node.parentElement?.getBoundingClientRect().width ?? 0,
+  }));
+  expect(sizes.svg).toBeLessThanOrEqual(sizes.container + 1);
+});
+
+test("a half-streamed fence falls back instead of breaking the transcript", async ({ page }) => {
+  // A fence that has not finished arriving (the model is still streaming) is
+  // an incomplete code block: the diagram cannot render, and the fence must
+  // fall back to the plain source rather than leave the transcript broken.
+  await stageTranscript(page, [
+    { msgId: "m-5", role: "assistant", msgContent: "```mermaid\ngraph TD;\n  A[开始] --> B[结", timestamp: 1_700_000_000_001 },
+  ]);
+  await openApp(page, "#session=A");
+
+  await expect(page.locator(".webui-mermaid svg")).toHaveCount(0);
+  await expect(page.locator(".webui-code-block code")).toBeVisible();
+  // The transcript is still alive: the rest of the message is on screen.
+  await expect(page.getByPlaceholder("输入消息…（输入 / 唤起命令）")).toBeVisible();
+});

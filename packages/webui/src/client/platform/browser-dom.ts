@@ -67,6 +67,16 @@ export interface WebuiBrowserDom {
   readonly getElementById: (id: string) => HTMLElement | null;
   readonly getActiveElement: () => HTMLElement | null;
   readonly updateDocumentAppearance: (theme: "dark" | "light", language: string) => void;
+  /**
+   * The theme the document is currently showing.
+   *
+   * The appearance effect above puts the truth on the document element (the
+   * `dark` class), so a component that has to draw in the app's theme — the
+   * transcript's Mermaid renderer, whose SVG carries its own palette — reads
+   * it from here instead of touching `document`, which the dependency rules
+   * confine to the platform layer.
+   */
+  readonly readDocumentTheme: () => "dark" | "light";
   readonly dispatchContextWindowUsageChange: () => void;
   readonly copyTextFallback: (text: string) => void;
   /**
@@ -164,6 +174,8 @@ export function createWebuiBrowserDom(
       documentObject.documentElement.classList.toggle("light", theme !== "dark");
       documentObject.documentElement.lang = language.startsWith("zh") ? "zh-CN" : "en";
     },
+    readDocumentTheme: () =>
+      documentObject?.documentElement.classList.contains("dark") ? "dark" : "light",
     dispatchContextWindowUsageChange: () => {
       if (windowObject) windowObject.dispatchEvent(new Event("webui-context-window-usage-change"));
     },

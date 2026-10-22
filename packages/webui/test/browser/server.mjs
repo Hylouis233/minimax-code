@@ -14,13 +14,19 @@ const server = createServer(async (request, response) => {
     response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ status: "ok", serverId }));
     return;
   }
+  // Chunks live under `assets/` once the client bundle is split (the
+  // transcript's Mermaid library and the composer's slash palette are both
+  // dynamic imports). The real service already resolves that prefix
+  // (`packages/webui/src/server/http/client-assets.ts`); the test server
+  // has to as well, or every lazily loaded chunk 404s in the browser suite.
+  const isAsset = pathname.startsWith("/assets/");
   const name = pathname === "/" || pathname === "/index.html" ? "index.html" : path.basename(pathname);
-  if (!["index.html", "client.js", "styles.css"].includes(name)) {
+  if (!isAsset && !["index.html", "client.js", "styles.css"].includes(name)) {
     response.writeHead(404).end("not found");
     return;
   }
   try {
-    let body = await readFile(path.join(root, name));
+    let body = await readFile(path.join(root, isAsset ? `.${pathname}` : name));
     if (name === "index.html") {
       const html = body.toString().replace(
         "</head>",
@@ -28,7 +34,7 @@ const server = createServer(async (request, response) => {
       );
       body = Buffer.from(html);
     }
-    const contentType = name.endsWith(".js") ? "text/javascript; charset=utf-8" : name.endsWith(".css") ? "text/css; charset=utf-8" : "text/html; charset=utf-8";
+    const contentType = name.endsWith(".js") ? "text/javascript; charset=utf-8" : name.endsWith(".css") ? "text/css; charset=utf-8" : name.endsWith(".svg") ? "image/svg+xml" : "text/html; charset=utf-8";
     response.writeHead(200, { "content-type": contentType, "cache-control": "no-store" }).end(body);
   } catch {
     response.writeHead(404).end("built WebUI artifact not found; run pnpm build:webui first");

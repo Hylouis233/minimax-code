@@ -1,5 +1,5 @@
 // Browser acceptance host: real assembly, loopback service and native PTYs.
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,6 +26,11 @@ for (const name of ["index.html", "client.js", "styles.css"]) {
     `<script>window.__WEBUI_TEST_SERVER_ID__=${JSON.stringify(process.env.WEBUI_BROWSER_SERVER_ID)};</script></head>`));
   await writeFile(path.join(clientDir, name), body);
 }
+// The split bundle's chunks live under assets/ — the entry imports them, so a
+// copy without the directory cannot boot at all (#webui-root never appears).
+// Copy it wholesale, matching what the loopback resolver serves and the
+// packaged release ships.
+await cp(path.join(root, "dist-webui/client/assets"), path.join(clientDir, "assets"), { recursive: true });
 const assembled = await createWebuiRuntimeHost({
   dataDir: directory, appVersion: "webui-native-acceptance",
   mcodeTools: { prepare: async () => ({ requested: false, ready: false, category: "disabled" as const,

@@ -300,6 +300,7 @@
       "packages/webui/test/unit/markdown-autolink-double-anchor.test.tsx",
       "packages/webui/test/unit/markdown-codeblock-c1-highlight.test.tsx",
       "packages/webui/test/unit/markdown-codeblock-c2-line-numbers.test.tsx",
+      "packages/webui/test/unit/markdown-mermaid.test.tsx",
       "packages/webui/test/unit/message-attachments.test.tsx",
       "packages/webui/test/unit/message-parts.test.ts",
       "packages/webui/test/unit/runtime-warning-rendering.test.tsx",
