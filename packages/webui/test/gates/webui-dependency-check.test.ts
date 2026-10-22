@@ -11,7 +11,7 @@
 // The fixtures live under the OS temp directory, never in the repository, so
 // `scripts/source-inventory.mjs` never sees them.
 
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -50,6 +50,18 @@ const realBaselinePath = path.join(
   repoRoot,
   "scripts/lib/webui-dependency-baseline.json",
 );
+
+/**
+ * The budget every case in this file runs under.
+ *
+ * Each fixture builds a TypeScript program, so what a case costs is the
+ * machine's speed rather than a fact about the rule it checks. Under
+ * vitest's five-second default a loaded machine turns that into a failure
+ * that says nothing about the gate — the same case passes on an idle one,
+ * and a different case fails each time. The budget is written down here so
+ * the gate reports the rule rather than the machine it ran on.
+ */
+vi.setConfig({ testTimeout: 30_000 });
 
 describe("V42 frozen pre-refactor metadata and permissions", () => {
   const oracle = JSON.parse(readFileSync(path.join(here, "./fixtures/path-metadata-f00.json"), "utf8")) as {
