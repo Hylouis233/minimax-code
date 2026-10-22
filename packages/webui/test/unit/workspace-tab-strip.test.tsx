@@ -96,6 +96,19 @@ function renderLauncher(
 }
 
 describe("the workspace panel's tab strip", () => {
+  it("shows the globe glyph on the new tab page tab", () => {
+    const state = stateWithTabs([launcherTab("tab-launcher")], "tab-launcher");
+    const markup = renderToStaticMarkup(
+      <WebuiPortSlicesProvider slices={createWebuiPortSlices({})}>
+        <WebuiWorkspaceTabStrip state={state} dispatch={() => undefined} />
+      </WebuiPortSlicesProvider>,
+    );
+
+    expect(markup).toContain('data-tab-kind="launcher"');
+    expect(markup).toContain("webui-workspace-web-glyph");
+    expect(markup).toContain("<circle");
+  });
+
   it("renders tool tabs and web tabs in one row", () => {
     const state = stateWithTabs([
       { id: "tab-1", content: { kind: "files", sessionId: "session-1", workspaceDir: "/work" } },
@@ -268,6 +281,7 @@ describe("the new tab page", () => {
     for (const kind of ["review", "terminal", "canvas", "files"]) {
       expect(markup).toContain(`data-testid="workspace-launcher-tile-${kind}"`);
     }
+    expect(markup).toContain('data-testid="workspace-launcher-brand"');
     expect(markup).toContain('data-testid="workspace-launcher-url"');
     // Exactly one text input: the URL box. The launcher has no second place to
     // type a url.

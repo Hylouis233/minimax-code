@@ -39,7 +39,6 @@ import {
   useRef,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
-  type WheelEvent as ReactWheelEvent,
   type ReactElement,
 } from "react";
 import {
@@ -228,7 +227,8 @@ export function BrowserPanel({
   const frameRef = hostFrameRef ?? localFrameRef;
   const pressedButtonRef = useRef<"left" | "middle" | "right" | undefined>(undefined);
   const pressedPageRef = useRef(state?.viewedPage);
-  const lastMoveAtRef = useRef(0);
+  const lastMoveAtRef = useRef(-Infinity);
+  const lastWheelAtRef = useRef(-Infinity);
   const moveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const pendingMoveRef = useRef<{ x: number; y: number } | undefined>(undefined);
   const wheelTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -300,34 +300,50 @@ export function BrowserPanel({
     const rect = event.currentTarget.getBoundingClientRect();
     pendingMoveRef.current = webuiBrowserPicturePoint(rect, frameRef.current ?? undefined, event.clientX, event.clientY);
     if (moveTimerRef.current) return;
-    const delay = Math.max(0, 1000 / 30 - (performance.now() - lastMoveAtRef.current));
-    moveTimerRef.current = setTimeout(() => {
+    const delay = Math.max(0, 1000 / 60 - (performance.now() - lastMoveAtRef.current));
+    const flush = () => {
       moveTimerRef.current = undefined;
       const point = pendingMoveRef.current;
       pendingMoveRef.current = undefined;
       if (!point) return;
       lastMoveAtRef.current = performance.now();
       submit({ kind: "pointer", action: "move", ...point });
-    }, delay);
+    };
+    if (delay === 0) flush();
+    else moveTimerRef.current = setTimeout(flush, delay);
   }, [inputEnabled, submit]);
 
-  const onWheel = useCallback((event: ReactWheelEvent<HTMLImageElement>) => {
+  const onWheel = useCallback((event: WheelEvent) => {
     if (!inputEnabled) return;
     event.preventDefault();
-    const rect = event.currentTarget.getBoundingClientRect();
+    const rect = (event.currentTarget as HTMLImageElement).getBoundingClientRect();
     const point = webuiBrowserPicturePoint(rect, frameRef.current ?? undefined, event.clientX, event.clientY);
     const pending = pendingWheelRef.current;
     pendingWheelRef.current = pending
       ? { ...point, deltaX: pending.deltaX + event.deltaX, deltaY: pending.deltaY + event.deltaY }
       : { ...point, deltaX: event.deltaX, deltaY: event.deltaY };
     if (wheelTimerRef.current) return;
-    wheelTimerRef.current = setTimeout(() => {
+    const delay = Math.max(0, 1000 / 60 - (performance.now() - lastWheelAtRef.current));
+    const flush = () => {
       wheelTimerRef.current = undefined;
       const wheel = pendingWheelRef.current;
       pendingWheelRef.current = undefined;
-      if (wheel) submit({ kind: "pointer", action: "scroll", ...wheel });
-    }, 16);
+      if (wheel) {
+        lastWheelAtRef.current = performance.now();
+        submit({ kind: "pointer", action: "scroll", ...wheel });
+      }
+    };
+    if (delay === 0) flush();
+    else wheelTimerRef.current = setTimeout(flush, delay);
   }, [inputEnabled, submit]);
+
+  useEffect(() => {
+    const image = frameRef.current;
+    if (!image) return;
+    // React delegates wheel with a passive listener; cancellation must happen on the image.
+    image.addEventListener("wheel", onWheel, { passive: false });
+    return () => image.removeEventListener("wheel", onWheel);
+  }, [frameRef, frameSrc, onWheel]);
 
   useEffect(() => () => {
     if (moveTimerRef.current) clearTimeout(moveTimerRef.current);
@@ -427,7 +443,6 @@ export function BrowserPanel({
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerUp}
             onPointerMove={onPointerMove}
-            onWheel={onWheel}
             onKeyDown={onKeyDown}
           />
         ) : (

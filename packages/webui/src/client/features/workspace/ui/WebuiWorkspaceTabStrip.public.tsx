@@ -47,6 +47,7 @@ import {
   type WorkspacePanelTab,
 } from "../projection/workspace-panel-state.js";
 import {
+  WebuiIconAgent,
   WebuiIconClose,
   WebuiIconDiffFile,
   WebuiIconFile,
@@ -277,11 +278,10 @@ export function WebuiWorkspaceTabStrip({
             data-testid={`workspace-tab-${item.id}`}
             onClick={() => dispatch({ type: "select-tab", tabId: item.id })}
           >
-            {item.content.kind === "launcher" ? (
-              <span className="webui-workspace-tab-glyph webui-workspace-launcher-glyph" aria-hidden="true">+</span>
-            ) : item.content.kind === "web" ? (
+            {item.content.kind === "launcher" || item.content.kind === "web" ? (
               // A web tab's glyph is the globe every browser puts on a page
-              // that has no icon of its own. Fetching a site's icon is a
+              // that has no icon of its own. The new tab page uses it too:
+              // both tabs lead to web pages. Fetching a site's icon is a
               // separate piece of work and is not part of this.
               <span className="webui-workspace-tab-glyph webui-workspace-web-glyph" aria-hidden="true">
                 <WebuiIconGlobe className="size-3" />
@@ -380,6 +380,9 @@ export function WebuiWorkspaceLauncher({
         a browser's new tab page is built: the one thing a person came here to
         do is the first thing in front of them, and the shortcuts follow it.
       */}
+      <div className="webui-workspace-launcher-brand" data-testid="workspace-launcher-brand" aria-hidden="true">
+        <WebuiIconAgent className="size-20" />
+      </div>
       <form className="webui-workspace-launcher-omnibox" onSubmit={submit}>
         <WebuiIconSearch className="webui-workspace-launcher-omnibox-glyph size-4 shrink-0" />
         <input

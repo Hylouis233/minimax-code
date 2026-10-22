@@ -1,7 +1,7 @@
 // The WebSocket wire mechanics every operation shares.
 //
-// One socket carries one request: this module opens it, writes the same
-// envelope once the socket opens, tells the caller's own answer apart from
+// Requests normally own a socket; frequent unary inputs may share an idle-bounded
+// connection. This module writes the envelope, tells the caller's answer apart from
 // whatever else arrives on that socket, and settles. What a frame *means* is
 // not shared — a unary response resolves, an `event` frame is forwarded until
 // `[DONE]`, a terminal frame is forwarded until the caller stops — so each
@@ -124,6 +124,7 @@ export interface WebuiWire {
   request<K extends WebuiUnaryOperationName>(
     operation: K,
     body: OperationSpec[K]["request"],
+    options?: { readonly reuseConnection?: boolean },
   ): Promise<OperationSpec[K]["response"]>;
   stream(
     operation: string,
@@ -180,6 +181,85 @@ export function createWebuiWire({
 }: WebuiWireOptions): WebuiWire {
   const websocketUrl = () =>
     `${baseWebsocketUrl.replace(/\/$/u, "")}/?token=${encodeURIComponent(token)}`;
+
+  // Frequent inputs share a connection; identity, response and deadline remain per request.
+  let reusable: ReturnType<typeof createReusableConnection> | undefined;
+  function createReusableConnection() {
+    const ws = new webSocket(websocketUrl());
+    const pending = new Map<string, {
+      session: WebuiWireSession;
+      handlers: WebuiWireHandlers;
+      payload: string;
+    }>();
+    let opened = false;
+    let closed = false;
+    let idleTimer: ReturnType<typeof setTimeout> | undefined;
+    const close = () => {
+      if (closed) return;
+      closed = true;
+      if (idleTimer) clearTimeout(idleTimer);
+      if (reusable === connection) reusable = undefined;
+      ws.close();
+    };
+    const failAll = (kind: "closed" | "failed", reason?: WebuiFrameRejectionReason) => {
+      if (closed) return;
+      const entries = [...pending.values()];
+      close();
+      for (const { session, handlers } of entries) {
+        if (reason) handlers.invalidFrame?.(session, reason);
+        else handlers[kind]?.(session);
+      }
+    };
+    const connection = {
+      open(operation: string, body: unknown, handlers: WebuiWireHandlers): WebuiWireSession {
+        if (idleTimer) clearTimeout(idleTimer);
+        const requestId = crypto.randomUUID();
+        const session = {
+          close: () => {
+            pending.delete(requestId);
+            if (!closed && pending.size === 0) idleTimer = setTimeout(close, 1000);
+          },
+        };
+        const payload = JSON.stringify({ protocolVersion: 1, kind: "request", requestId, operation, body });
+        pending.set(requestId, { session, handlers, payload });
+        if (opened) {
+          try {
+            ws.send(payload);
+          } catch {
+            failAll("failed");
+          }
+        }
+        return session;
+      },
+    };
+    ws.addEventListener("open", () => {
+      opened = true;
+      try {
+        for (const { payload } of pending.values()) ws.send(payload);
+      } catch {
+        failAll("failed");
+      }
+    });
+    ws.addEventListener("message", (event) => {
+      if (closed) return;
+      const decoded = decodeWebuiServerFrame(String(event.data));
+      if (!decoded.ok) {
+        failAll("failed", decoded.reason);
+        return;
+      }
+      const frame = decoded.frame;
+      if (frame.kind === "error" && frame.requestId === WEBUI_ANONYMOUS_REQUEST_ID) {
+        for (const { session, handlers } of [...pending.values()]) handlers.frame(session, frame);
+        close();
+        return;
+      }
+      const entry = pending.get(frame.requestId);
+      entry?.handlers.frame(entry.session, frame);
+    });
+    ws.addEventListener("close", () => failAll("closed"));
+    ws.addEventListener("error", () => failAll("failed"));
+    return connection;
+  }
 
   /**
    * One socket, one request frame, one requestId.
@@ -247,6 +327,7 @@ export function createWebuiWire({
   function request<K extends WebuiUnaryOperationName>(
     operation: K,
     body: OperationSpec[K]["request"],
+    options?: { readonly reuseConnection?: boolean },
   ): Promise<OperationSpec[K]["response"]> {
     return new Promise((resolve, reject) => {
       let settled = false;
@@ -258,7 +339,10 @@ export function createWebuiWire({
         session.close();
         reject(error);
       };
-      const session = openWireSession(operation, body, {
+      const open = options?.reuseConnection
+        ? (reusable ??= createReusableConnection()).open
+        : openWireSession;
+      const session = open(operation, body, {
         frame: (session, frame) => {
           if (frame.kind === "error") {
             // The service's own code travels with the refusal. This is what lets a

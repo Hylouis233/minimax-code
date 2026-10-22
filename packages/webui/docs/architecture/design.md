@@ -75,7 +75,7 @@ The request path, end to end:
 React component
   → business application owner            client/features/*/application, client/application
   → WebuiTransport method                 client/platform/transport.ts
-  → one WebSocket per request             client/platform/wire.ts
+  → WebSocket request envelope            client/platform/wire.ts
   ── loopback, admitted ──                server/access-policy.ts, server/websocket-server.ts
   → validate → dispatch                   server/frame-handler.ts, server/operation/operation-dispatch.ts
   → operation entry                       server/operation/operations.ts
@@ -224,8 +224,11 @@ event coordinator is the sole consumer. Stream frames for `sendMessage`/`resumeS
 terminal watch are separate sockets by design: they are per-request, and one of them can be detached
 without touching the ingress.
 
-**Wire mechanics and the domain table are split.** `client/platform/wire.ts` owns one-socket-per-request,
-the unary deadline (30 s), `[DONE]` stream settlement, the terminal watch and the settle-on-detach rule;
+**Wire mechanics and the domain table are split.** `client/platform/wire.ts` owns request sockets,
+the unary deadline (30 s), `[DONE]` stream settlement, the terminal watch and the settle-on-detach rule.
+Browser input opts into a shared unary connection to avoid a WebSocket handshake for every gesture;
+each request retains its own identity, decoder and deadline. The connection closes after one second
+without pending requests, and failed inputs are never replayed. Other operations keep their own sockets;
 `client/platform/transport.ts` is the table mapping a capability method to the operation it travels as,
 naming every operation through the canonical constants rather than string literals. Detaching a delivery
 settles the call instead of failing it, because the host accepted the request long ago and a deliberate

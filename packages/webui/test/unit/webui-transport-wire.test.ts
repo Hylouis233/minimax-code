@@ -7,9 +7,10 @@
 // which nothing pinned before. The three callers' own policies (what settles
 // them, whether a close is an error) stay covered where they already were, in
 // `webui-service.test.ts`.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createWebuiTransport } from "../../src/client/platform/transport.js";
+import { createWebuiWire } from "../../src/client/platform/wire.js";
 import {
   WebuiErrorCode,
   WebuiWireError,
@@ -84,6 +85,102 @@ function transportWith(socket: typeof ControllableSocket) {
     >,
   });
 }
+
+describe("the browser input connection", () => {
+  const input = {
+    command: {
+      kind: "text" as const,
+      target: { surface: "isolated-chromium" as const, browserId: "b", targetId: "t", generation: 1 },
+      text: "a",
+    },
+  };
+
+  it("reuses a connection and correlates overlapping input responses", async () => {
+    vi.useFakeTimers();
+    try {
+      const transport = transportWith(ControllableSocket);
+      const first = transport.sendBrowserInput(input);
+      await tick();
+      const socket = ControllableSocket.latest!;
+      const second = transport.sendBrowserInput({ ...input, runId: "run-2" });
+      await tick();
+      expect(ControllableSocket.latest).toBe(socket);
+      expect(socket.sent).toHaveLength(2);
+      const [a, b] = socket.sent.map((text) => JSON.parse(text));
+      expect(a.requestId).not.toBe(b.requestId);
+      expect(b.body.runId).toBe("run-2");
+      socket.deliver({ kind: "response", requestId: b.requestId, body: { accepted: true } });
+      socket.deliver({ kind: "error", requestId: a.requestId, code: "browser_target_stale", message: "stale" });
+      await expect(first).rejects.toMatchObject({ code: "browser_target_stale" });
+      await expect(second).resolves.toEqual({ accepted: true });
+      const third = transport.sendBrowserInput(input);
+      expect(ControllableSocket.latest).toBe(socket);
+      const c = JSON.parse(socket.sent[2]!);
+      socket.deliver({ kind: "response", requestId: c.requestId, body: { accepted: true } });
+      await third;
+      await vi.advanceTimersByTimeAsync(1000);
+      const fourth = transport.sendBrowserInput(input);
+      await tick();
+      const replacement = ControllableSocket.latest!;
+      expect(replacement).not.toBe(socket);
+      replacement.deliver({ kind: "response", requestId: replacement.request.requestId, body: { accepted: true } });
+      await fourth;
+      await vi.advanceTimersByTimeAsync(1000);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("rejects outstanding inputs on disconnect without replaying them", async () => {
+    const transport = transportWith(ControllableSocket);
+    const first = transport.sendBrowserInput(input);
+    const second = transport.sendBrowserInput(input);
+    const assertions = Promise.all([
+      expect(first).rejects.toThrow("closed before the response"),
+      expect(second).rejects.toThrow("closed before the response"),
+    ]);
+    await tick();
+    const socket = ControllableSocket.latest!;
+    expect(socket.sent).toHaveLength(2);
+    socket.close();
+    await assertions;
+    await tick();
+    expect(ControllableSocket.latest).toBe(socket);
+  });
+
+  it("times out one request without settling or replaying its neighbour", async () => {
+    vi.useFakeTimers();
+    try {
+      const wire = createWebuiWire({ websocketUrl: "ws://127.0.0.1:1", token: "synthetic",
+        webSocket: ControllableSocket, requestTimeoutMs: 100 });
+      const first = wire.request("sendBrowserInput", input.command, { reuseConnection: true });
+      const failed = expect(first).rejects.toThrow("timed out after 100ms");
+      await tick();
+      const socket = ControllableSocket.latest!;
+      await vi.advanceTimersByTimeAsync(50);
+      const second = wire.request("sendBrowserInput", input.command, { reuseConnection: true });
+      await vi.advanceTimersByTimeAsync(50);
+      await failed;
+      const [a, b] = socket.sent.map((text) => JSON.parse(text));
+      socket.deliver({ kind: "response", requestId: a.requestId, body: { accepted: true } });
+      socket.deliver({ kind: "response", requestId: b.requestId, body: { accepted: true } });
+      await expect(second).resolves.toEqual({ accepted: true });
+      expect(socket.sent).toHaveLength(2);
+      await vi.advanceTimersByTimeAsync(1000);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("fails all outstanding requests when their shared envelope is invalid", async () => {
+    const transport = transportWith(ControllableSocket);
+    const first = transport.sendBrowserInput(input);
+    const second = transport.sendBrowserInput(input);
+    const assertions = Promise.all([
+      expect(first).rejects.toMatchObject({ code: WebuiErrorCode.invalidEnvelope }),
+      expect(second).rejects.toMatchObject({ code: WebuiErrorCode.invalidEnvelope }),
+    ]);
+    await tick();
+    ControllableSocket.latest!.deliverRaw("not json");
+    await assertions;
+  });
+});
 
 describe("the shared request envelope", () => {
   it("writes one request frame naming the operation, with a fresh id", async () => {
