@@ -26,7 +26,10 @@ const openPanel = async (page) => {
     .getByRole("button", { name: "浏览器" });
   await browserButton.click();
   await expect(page.getByTestId("workspace-panel")).toBeVisible();
-  await expect(page.getByTestId("workspace-launcher")).toBeVisible();
+  // The panel's browser half shows the pages the runtime published, and the
+  // launcher is the empty case: the control opens a page when the runtime has
+  // published one. So the launcher is not what opening the panel guarantees —
+  // `openLauncher` below is what asks for it.
 };
 
 /** The launcher's address box, opened the way a person opens it. */
@@ -43,13 +46,16 @@ const openPage = async (page, url) => {
   await page.getByTestId("workspace-launcher-url-submit").click();
 };
 
-test("the browser control shows its globe label and opens a new tab page by default", async ({ page }) => {
+test("the browser control shows its browser glyph and opens a new tab page by default", async ({ page }) => {
   await configureFixture(page, () => undefined);
   await openApp(page);
 
   const browserButton = page.getByTestId("workspace-panel-controls").getByRole("button", { name: "浏览器" });
   await expect(browserButton).toHaveAttribute("title", "浏览器");
-  await expect(browserButton.locator("svg circle")).toHaveCount(1);
+  // The control's glyph is the tabler browser icon. It used to be a globe
+  // drawn as an SVG circle, and the library draws this one as paths, so the
+  // assertion names the icon rather than the shape it happens to be made of.
+  await expect(browserButton.locator("svg.tabler-icon-browser")).toHaveCount(1);
   await browserButton.click();
 
   await expect(page.getByTestId("workspace-panel")).toHaveAttribute("data-active-tab", "launcher");
@@ -135,6 +141,9 @@ test("the browser page fills the workspace body and the workspace edge resizes h
   expect(brandBox.height).toBe(80);
   await page.getByTestId("workspace-launcher-url").fill("https://example.test/");
   await page.getByTestId("workspace-launcher-url-submit").click();
+  // The panel swaps the launcher for the page, and the swap re-mounts the
+  // panel: a gesture started before it finished is lost with the old tree.
+  await expect(page.getByTestId("browser-toolbar")).toBeVisible();
 
   const stage = page.locator(".webui-browser-stage");
   const frame = page.getByTestId("browser-panel-frame");
@@ -152,8 +161,13 @@ test("the browser page fills the workspace body and the workspace edge resizes h
   await page.mouse.down();
   await page.mouse.move(before.x - 56, before.y + before.height / 2);
   await page.mouse.up();
+  // The panel's width is a controlled style, so the drag lands in state and
+  // the layout follows when React flushes it — the box is polled rather than
+  // read once, the same way the keyboard nudge below is waited for.
+  await expect
+    .poll(async () => (await panel.boundingBox()).width)
+    .toBeGreaterThan(before.width + 40);
   const after = await panel.boundingBox();
-  expect(after.width).toBeGreaterThan(before.width + 40);
   await expect(handle).toBeVisible();
   await handle.focus();
   await page.keyboard.press("ArrowLeft");

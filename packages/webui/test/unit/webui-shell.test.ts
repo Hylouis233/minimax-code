@@ -316,7 +316,10 @@ describe("WebUI shell", () => {
     const controls = renderToStaticMarkup(createElement(WebuiWorkspacePanelControls, { browserPanelOpen: false, progressPanelOpen: true, onOpenBrowser: () => undefined, onToggleProgressPanel: () => undefined }));
     expect(controls).toContain('aria-label="浏览器"');
     expect(controls).toContain('title="浏览器"');
-    expect(controls).toContain('<circle cx="8" cy="8" r="5.2"');
+    // The control's glyph is the tabler browser icon. It used to be a globe
+    // drawn by hand, so the assertion names the icon rather than the shape it
+    // happens to be made of.
+    expect(controls).toContain("tabler-icon-browser");
     expect(controls).toContain('aria-label="环境信息与进度"');
   });
 

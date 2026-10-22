@@ -106,7 +106,9 @@ describe("the workspace panel's tab strip", () => {
 
     expect(markup).toContain('data-tab-kind="launcher"');
     expect(markup).toContain("webui-workspace-web-glyph");
-    expect(markup).toContain("<circle");
+    // The globe is the tabler world icon now; it used to be drawn by hand, so
+    // the assertion names the icon rather than the shape it is made of.
+    expect(markup).toContain("tabler-icon-world");
   });
 
   it("renders tool tabs and web tabs in one row", () => {
