@@ -40,6 +40,34 @@ const openPage = async (page, url) => {
   await page.getByTestId("workspace-launcher-url-submit").click();
 };
 
+test("pointer and wheel input start immediately and coalesce within a display frame", async ({ page }) => {
+  await configureFixture(page, () => undefined);
+  await openApp(page);
+  await openPanel(page);
+  await openPage(page, "https://example.test/");
+  const frame = page.getByTestId("browser-panel-frame");
+  await expect(frame).toBeVisible();
+  await page.clock.install();
+  await page.clock.pauseAt(new Date());
+  // With timers paused, the first input must reach the wire without a timeout firing.
+  await frame.dispatchEvent("pointermove", { clientX: 100, clientY: 100 });
+  const cancelled = await frame.evaluate((image) => !image.dispatchEvent(new WheelEvent("wheel", {
+    bubbles: true, cancelable: true, clientX: 100, clientY: 100, deltaY: 10, deltaX: 0,
+  })));
+  expect(cancelled).toBe(true);
+  const inputs = () => page.evaluate(() => window.__fixture.requests
+    .filter((request) => request.operation === "sendBrowserInput")
+    .map((request) => request.body));
+  expect((await inputs()).map((body) => body.action)).toEqual(["move", "scroll"]);
+  await frame.dispatchEvent("wheel", { clientX: 100, clientY: 100, deltaY: 20, deltaX: 0 });
+  await frame.dispatchEvent("wheel", { clientX: 100, clientY: 100, deltaY: 30, deltaX: 0 });
+  expect(await inputs()).toHaveLength(2);
+  await page.clock.runFor(17);
+  const delivered = await inputs();
+  expect(delivered).toHaveLength(3);
+  expect(delivered[2]).toMatchObject({ action: "scroll", deltaY: 50 });
+});
+
 test("the launcher's address box opens a page, and the panel is a window around it", async ({ page }) => {
   await configureFixture(page, () => undefined);
   await openApp(page);
@@ -72,7 +100,25 @@ test("the browser page fills the workspace body and the workspace edge resizes h
   await configureFixture(page, () => undefined);
   await openApp(page);
   await openPanel(page);
-  await openPage(page, "https://example.test/");
+  await openLauncher(page);
+
+  const brand = page.getByTestId("workspace-launcher-brand");
+  const omnibox = page.locator(".webui-workspace-launcher-omnibox");
+  const launcher = page.getByTestId("workspace-launcher");
+  const tiles = page.locator(".webui-workspace-launcher-tiles");
+  await expect(brand).toBeVisible();
+  const brandBox = await brand.boundingBox();
+  const omniboxBox = await omnibox.boundingBox();
+  const launcherBox = await launcher.boundingBox();
+  const tilesBox = await tiles.boundingBox();
+  expect(Math.abs(brandBox.x + brandBox.width / 2 - (omniboxBox.x + omniboxBox.width / 2))).toBeLessThanOrEqual(1);
+  expect(brandBox.y + brandBox.height).toBeLessThan(omniboxBox.y);
+  expect((brandBox.y + tilesBox.y + tilesBox.height) / 2).toBeLessThan(launcherBox.y + launcherBox.height / 2);
+  await expect(brand.locator("img")).toHaveAttribute("src", "/assets/img/minimax-code-agent-icon.png");
+  expect(brandBox.width).toBe(80);
+  expect(brandBox.height).toBe(80);
+  await page.getByTestId("workspace-launcher-url").fill("https://example.test/");
+  await page.getByTestId("workspace-launcher-url-submit").click();
 
   const stage = page.locator(".webui-browser-stage");
   const frame = page.getByTestId("browser-panel-frame");

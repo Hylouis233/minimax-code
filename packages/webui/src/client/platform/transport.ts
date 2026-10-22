@@ -251,7 +251,7 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
       request(SEND_BROWSER_INPUT_OPERATION_NAME, {
         ...body.command,
         ...(body.runId ? { runId: body.runId } : {}),
-      }),
+      }, { reuseConnection: true }),
     sendBrowserCommand: (body) => request(SEND_BROWSER_COMMAND_OPERATION_NAME, body),
     watchBrowserFrames: (body, onFrame) =>
       watchBrowserFrames(WATCH_BROWSER_FRAMES_OPERATION_NAME, body, onFrame),

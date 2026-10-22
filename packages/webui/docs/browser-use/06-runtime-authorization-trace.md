@@ -1,5 +1,15 @@
 # Runtime authorization trace
 
+The panel forwards input over a reusable authenticated WebSocket, with a separate request identity
+and deadline for every command. Reusing the connection does not cache authorization: the runtime
+checks the current surface authorization and target generation for each input before delivery.
+The first pointer move or wheel event is forwarded immediately; subsequent events within a 60 Hz
+interval coalesce, retaining the newest position and accumulating scroll deltas. The provider still
+serializes input per target. The panel installs its wheel listener directly on the image with
+`passive: false`, so forwarding a wheel event also prevents scrolling the enclosing WebUI document.
+Capture, image transport and display add latency beyond input submission;
+neither a process-local harness nor a loopback connection guarantees a few milliseconds to visible paint.
+
 **Status:** This document mixes three kinds of statement, labelled inline:
 
 | Label | Means | Backed by |

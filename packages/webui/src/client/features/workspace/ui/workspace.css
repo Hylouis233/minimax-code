@@ -198,14 +198,10 @@
   .webui-workspace-tab button:first-child { width: 100%; min-width: 0; height: 100%; justify-content: flex-start; gap: var(--spacing_8); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .webui-workspace-tab-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .webui-workspace-tab-file-icon { width: 16px; height: 16px; flex: 0 0 16px; }
-  /* The strip owns the per-tab glyphs for the new kinds. The default glyphs
-   * used here are placeholders — a dot for a web tab and a "+" for the
-   * launcher — until the icons the design settles on are available. The
-   * icons themselves are added by the next programme step, and the strip
-   * does not fetch a favicon. */
+  /* The strip owns the per-tab glyphs for the new kinds. Web and launcher
+   * tabs both use the browser's globe; the strip does not fetch favicons. */
   .webui-workspace-tab-glyph { width: 16px; height: 16px; flex: 0 0 16px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; line-height: 1; }
   .webui-workspace-web-glyph { color: var(--icon_default_secondary, #5b6473); }
-  .webui-workspace-launcher-glyph { color: var(--icon_default_secondary, #5b6473); font-weight: 600; }
   .webui-workspace-filetype-badge { display: inline-flex; width: 16px; height: 16px; flex: 0 0 16px; align-items: center; justify-content: center; font-family: ui-monospace, monospace; font-size: 9px; font-weight: 600; line-height: 1; }
   .webui-workspace-filetype-badge.is-markdown { color: var(--text_default_accent); }
   .webui-workspace-filetype-badge.is-javascript { border-radius: 2px; background: #f4d54e; color: #403600; }
@@ -282,7 +278,8 @@
   /* The new tab page: the tiles it opens a view from, and the URL box that
    * opens a page. It is a tab's content, so it fills the body of the panel
    * rather than sitting in the strip. */
-  .webui-workspace-launcher { display: flex; min-width: 0; min-height: 0; flex: 1 1 auto; flex-direction: column; align-items: center; justify-content: center; gap: var(--spacing_32); padding: var(--spacing_24); background: var(--bg_default_primary); color: var(--text_default_primary); }
+  .webui-workspace-launcher { display: flex; min-width: 0; min-height: 0; flex: 1 1 auto; flex-direction: column; align-items: center; justify-content: center; gap: var(--spacing_32); padding: var(--spacing_24) var(--spacing_24) calc(var(--spacing_24) + var(--spacing_48)); background: var(--bg_default_primary); color: var(--text_default_primary); }
+  .webui-workspace-launcher-brand { display: flex; width: 80px; height: 80px; flex: 0 0 80px; align-items: center; justify-content: center; }
   /* The address box, in the middle of the page, the way a browser's new tab
    * page is built: a wide rounded field with the url in it, and the mark that
    * says what the field is for at its left. */
