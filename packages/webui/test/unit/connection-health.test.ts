@@ -21,7 +21,7 @@
 // unregisters in `afterEach` — a leaked once-healthy watcher would degrade
 // every later suite in this worker.
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   isWebuiEventChannelDegraded,
@@ -148,6 +148,86 @@ function accept(socket: FakeSocket): void {
     data: JSON.stringify({ protocolVersion: 1, kind: "response", requestId: request.requestId, body: { ok: true } }),
   });
 }
+
+describe("the startup grace on a never-accepted watcher", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("keeps a booting watcher unknown until the grace runs out, then degrades", () => {
+    // The gap this closes: "unknown" used to last forever, so a host that was
+    // already unreachable when the page loaded read as connected until
+    // something else moved (the stream phase stays idle between turns).
+    register();
+    vi.advanceTimersByTime(29_000);
+    expect(isWebuiEventChannelDegraded()).toBe(false);
+    vi.advanceTimersByTime(1_500);
+    expect(isWebuiEventChannelDegraded()).toBe(true);
+  });
+
+  it("stays unknown for good once the server accepts the watcher", () => {
+    // The ordinary boot: accepted in milliseconds, and the cancelled grace
+    // never fires — a healthy channel must not degrade on a timer later.
+    const token = register();
+    markWebuiEventWatcherHealthy(token);
+    vi.advanceTimersByTime(120_000);
+    expect(isWebuiEventChannelDegraded()).toBe(false);
+  });
+
+  it("an acceptance after the grace still clears the flag", () => {
+    // A slow-but-alive backend: the grace fired while the socket was still
+    // opening, and the acceptance that arrives afterwards must restore the
+    // channel rather than leave it degraded for the page's lifetime.
+    const token = register();
+    vi.advanceTimersByTime(30_000);
+    expect(isWebuiEventChannelDegraded()).toBe(true);
+    markWebuiEventWatcherHealthy(token);
+    expect(isWebuiEventChannelDegraded()).toBe(false);
+  });
+
+  it("expires the grace even when the socket keeps closing and retrying", () => {
+    // The unreachable-host shape end to end: the connect fails, the
+    // transport's close handler marks the watcher down and retries. None of
+    // that is an acceptance, so the grace still runs out — the state that
+    // used to stay silent.
+    const token = register();
+    markWebuiEventWatcherDown(token);
+    vi.advanceTimersByTime(30_000);
+    expect(isWebuiEventChannelDegraded()).toBe(true);
+  });
+
+  it("does not degrade a healthy channel because one watcher is slow", () => {
+    // Several watchers can be mounted (the shell's plus the workspace
+    // panels'). A healthy shell with one slow panel still HAS a live link,
+    // so the channel is not degraded — the deadline only speaks when no
+    // watcher is healthy at all.
+    const shell = register();
+    const panel = register();
+    markWebuiEventWatcherHealthy(shell);
+    vi.advanceTimersByTime(60_000);
+    expect(isWebuiEventChannelDegraded()).toBe(false);
+    // …and once the slow panel is accepted too, still healthy.
+    markWebuiEventWatcherHealthy(panel);
+    expect(isWebuiEventChannelDegraded()).toBe(false);
+  });
+
+  it("a watcher that held a link and lost it still degrades the channel", () => {
+    // The upstream rule, unchanged by this work: a once-healthy watcher going
+    // down degrades the channel even while another watcher is healthy. The
+    // grace is a separate rule (nobody was ever healthy) and does not relax
+    // this one — recorded here so the two are not confused.
+    const shell = register();
+    const panel = register();
+    markWebuiEventWatcherHealthy(shell);
+    markWebuiEventWatcherHealthy(panel);
+    markWebuiEventWatcherDown(panel);
+    expect(isWebuiEventChannelDegraded()).toBe(true);
+  });
+});
 
 describe("the transport's watcher reporting", () => {
   it("marks healthy on the server's acceptance and down on socket close", () => {
