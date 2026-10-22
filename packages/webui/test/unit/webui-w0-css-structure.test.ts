@@ -952,6 +952,15 @@ describe("W0 · stacking order", () => {
 
     expect(unique).toEqual([
       // 1 is used by the project/session row action controls.
+      // 3 is `.webui-browser-notice`, the bubble the browser panel draws over
+      // its own corner — the family is absent, the target changed, the page
+      // dropped frames. It is rendered before the panel's stage, and the stage
+      // and the input surface over it are `position: relative`/`absolute` with
+      // `z-index: auto` and an opaque background, so a value of its own is
+      // what keeps the bubble visible. It stays in the low band with the
+      // pinned headers (1 and 2) because the browser panel is an in-flow
+      // region of the shell rather than an overlay: nothing it draws may
+      // cover the goal overlay at 20 or the workspace drawer at 40.
       // 40 is `.webui-workspace-panel` inside `@media (max-width: 1080px)`.
       // Above that breakpoint the panel is an in-flow flex sibling and needs no
       // layer; below it the panel is pulled out of flow into a right-docked
@@ -995,7 +1004,7 @@ describe("W0 · stacking order", () => {
       // 4 is gone: it was the workspace panel's add-menu anchor, and the add
       // menu became the launcher's tiles. The launcher is a tab's content
       // rather than an overlay, so it needs no layer of its own.
-      1, 2, 20, 40, 45, 50, 60, 70, 100, 110, 111, 120, 121, 130, 140, 1400,
+      1, 2, 3, 20, 40, 45, 50, 60, 70, 100, 110, 111, 120, 121, 130, 140, 1400,
     ]);
   });
 });
