@@ -9,9 +9,7 @@ async function pausedClock(page) {
 const sessionModels = (page) => page.evaluate(() => window.__fixture.requests.filter(r => r.operation === "listModels" && r.body.sessionId === "A").length);
 
 async function openTerminal(page) {
-  await page.getByTestId("workspace-panel-controls").getByRole("button", { name: "工作区文件侧栏" }).click();
-  await page.getByRole("button", { name: "新建标签页" }).click();
-  await page.getByTestId("workspace-add-tab").click();
+  await page.getByTestId("workspace-panel-controls").getByRole("button", { name: "浏览器" }).click();
   await page.getByTestId("workspace-launcher-tile-terminal").click();
 }
 

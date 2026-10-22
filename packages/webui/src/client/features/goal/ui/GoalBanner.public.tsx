@@ -6,6 +6,7 @@
 
 import { useEffect, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
+import { IconPlayerPause, IconPlayerPlay } from "@tabler/icons-react";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import {
   formatWebuiGoalDuration,
@@ -25,11 +26,11 @@ import {
 } from "../../../shell/icons.js";
 
 function GoalPauseIcon(): ReactElement {
-  return <svg viewBox="0 0 20 20" width="18" height="18" fill="none" aria-hidden="true"><path d="M6 4.5v11M14 4.5v11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>;
+  return <IconPlayerPause aria-hidden="true" size={18} stroke={1.5} />;
 }
 
 function GoalResumeIcon(): ReactElement {
-  return <svg viewBox="0 0 20 20" width="18" height="18" fill="none" aria-hidden="true"><path d="m7 4.5 8 5.5-8 5.5v-11Z" fill="currentColor" /></svg>;
+  return <IconPlayerPlay aria-hidden="true" size={18} stroke={1.5} />;
 }
 
 export function WebuiGoalClearDialog({

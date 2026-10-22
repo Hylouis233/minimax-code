@@ -21,16 +21,19 @@ import { expect } from "@playwright/test";
 import { configureFixture, openApp, test } from "./harness.mjs";
 
 const openPanel = async (page) => {
-  await page
+  const browserButton = page
     .getByTestId("workspace-panel-controls")
-    .getByRole("button", { name: "工作区文件侧栏" })
-    .click();
+    .getByRole("button", { name: "浏览器" });
+  await browserButton.click();
   await expect(page.getByTestId("workspace-panel")).toBeVisible();
+  await expect(page.getByTestId("workspace-launcher")).toBeVisible();
 };
 
 /** The launcher's address box, opened the way a person opens it. */
 const openLauncher = async (page) => {
-  await page.getByTestId("workspace-add-tab").click();
+  if (!(await page.getByTestId("workspace-launcher").isVisible().catch(() => false))) {
+    await page.getByTestId("workspace-add-tab").click();
+  }
   await expect(page.getByTestId("workspace-launcher")).toBeVisible();
 };
 
@@ -39,6 +42,19 @@ const openPage = async (page, url) => {
   await page.getByTestId("workspace-launcher-url").fill(url);
   await page.getByTestId("workspace-launcher-url-submit").click();
 };
+
+test("the browser control shows its globe label and opens a new tab page by default", async ({ page }) => {
+  await configureFixture(page, () => undefined);
+  await openApp(page);
+
+  const browserButton = page.getByTestId("workspace-panel-controls").getByRole("button", { name: "浏览器" });
+  await expect(browserButton).toHaveAttribute("title", "浏览器");
+  await expect(browserButton.locator("svg circle")).toHaveCount(1);
+  await browserButton.click();
+
+  await expect(page.getByTestId("workspace-panel")).toHaveAttribute("data-active-tab", "launcher");
+  await expect(page.getByTestId("workspace-launcher")).toBeVisible();
+});
 
 test("pointer and wheel input start immediately and coalesce within a display frame", async ({ page }) => {
   await configureFixture(page, () => undefined);

@@ -21,17 +21,13 @@ import { configureFixture, openApp, test } from "./harness.mjs";
 const openTerminalTab = async (page) => {
   await page
     .getByTestId("workspace-panel-controls")
-    .getByRole("button", { name: "工作区文件侧栏" })
+    .getByRole("button", { name: "浏览器" })
     .click();
-  // A terminal tab is not among the tabs the panel opens with: it comes from the
-  // add menu (`role="menuitem"`), which is the only route to a terminal tab.
   const existing = page.getByTestId("workspace-panel").getByRole("tab", { name: "终端" });
   if (await existing.count()) {
     await existing.click();
     return;
   }
-  await page.getByRole("button", { name: "新建标签页" }).click();
-  await page.getByTestId("workspace-add-tab").click();
   await page.getByTestId("workspace-launcher-tile-terminal").click();
   await expect(page.getByTestId("workspace-panel")).toHaveAttribute("data-active-tab", "terminal");
 };

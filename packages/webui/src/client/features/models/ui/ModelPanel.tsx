@@ -17,6 +17,7 @@
 // model that has windows to choose from.
 
 import { useState, type ReactElement } from "react";
+import { IconRefresh } from "@tabler/icons-react";
 
 import { WebuiIconChevronRight } from "../../../shell/icons.js";
 import type {
@@ -96,27 +97,7 @@ export function WebuiModelPanel({
           disabled={!canReset}
           onClick={onResetEffort}
         >
-          <svg
-            aria-hidden="true"
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="none"
-          >
-            <path
-              d="M2.6 8a5.4 5.4 0 1 0 1.6-3.82"
-              stroke="currentColor"
-              strokeWidth="1.4"
-              strokeLinecap="round"
-            />
-            <path
-              d="M2.3 2.7v2.8h2.8"
-              stroke="currentColor"
-              strokeWidth="1.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <IconRefresh aria-hidden="true" size={16} stroke={1.4} />
         </button>
       </div>
 

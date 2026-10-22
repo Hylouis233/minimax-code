@@ -313,10 +313,11 @@ describe("WebUI shell", () => {
     expect(overview).not.toContain('data-webui-progress-panel="true"');
     expect(overview).not.toContain('data-webui-placeholder-chrome="environment-变更"');
 
-    const controls = renderToStaticMarkup(createElement(WebuiWorkspacePanelControls, { filePanelOpen: false, progressPanelOpen: true, onOpenFiles: () => undefined, onToggleProgressPanel: () => undefined }));
-    expect(controls).toContain('aria-label="工作区文件侧栏"');
+    const controls = renderToStaticMarkup(createElement(WebuiWorkspacePanelControls, { browserPanelOpen: false, progressPanelOpen: true, onOpenBrowser: () => undefined, onToggleProgressPanel: () => undefined }));
+    expect(controls).toContain('aria-label="浏览器"');
+    expect(controls).toContain('title="浏览器"');
+    expect(controls).toContain('<circle cx="8" cy="8" r="5.2"');
     expect(controls).toContain('aria-label="环境信息与进度"');
-    expect(controls).not.toContain('aria-label="浏览器"');
   });
 
   it("renders progress and subagents beside a reserved environment loading slot", () => {

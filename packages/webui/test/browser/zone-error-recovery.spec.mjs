@@ -48,7 +48,7 @@ for (const zone of ["workspace", "settings", "plugins"]) {
     await composer.fill("retained draft across zone failure");
     const watchBefore = await page.evaluate(() => window.__fixture.requests.filter(r => r.operation === "watchEvents").length);
     if (zone === "workspace") {
-      await page.getByTestId("workspace-panel-controls").getByRole("button", { name: "工作区文件侧栏" }).click();
+      await page.getByTestId("workspace-panel-controls").getByRole("button", { name: "浏览器" }).click();
     } else if (zone === "settings") {
       await page.getByTestId("sidebar-user-menu-trigger").click();
       await page.getByTestId("user-menu-settings").click();

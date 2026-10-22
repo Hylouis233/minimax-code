@@ -1,4 +1,5 @@
 import type { ReactElement } from "react";
+import { IconFileCode, IconSearch } from "@tabler/icons-react";
 import type { WebuiPluginIntent } from "../contracts/plugin-actions.js";
 import { readWebuiPluginRow as read } from "../contracts/plugin-rows.js";
 import type { WebuiPluginCatalogueRow } from "../projection/catalogue-view.js";
@@ -59,10 +60,7 @@ export function PluginManagementFilters({
         ))}
       </nav>
       <label className="webui-plugin-market-search">
-        <svg viewBox="0 0 20 20" aria-hidden="true">
-          <circle cx="8.8" cy="8.8" r="5.8" />
-          <path d="m13.2 13.2 4 4" />
-        </svg>
+        <IconSearch aria-hidden="true" size={18} stroke={1.5} />
         <input
           aria-label={`搜索${noun}`}
           placeholder={`搜索${noun}...`}
@@ -115,11 +113,7 @@ export function PluginManagementList({
             >
               {area === "skills" ? (
                 <span className="webui-plugin-skill-icon-tile">
-                  <svg viewBox="0 0 24 24" focusable="false">
-                    <path d="M9 4.25h7.25L19.5 7.5v11.25A1.75 1.75 0 0 1 17.75 20.5H9A2 2 0 0 1 7 18.5v-12.25a2 2 0 0 1 2-2Z" />
-                    <path d="M16 4.5v3.25h3.25M11 11h5.5M11 14h5.5M11 17h3.25" />
-                    <path d="M7 7H5.75A1.75 1.75 0 0 0 4 8.75v9.5A1.75 1.75 0 0 0 5.75 20H9" />
-                  </svg>
+                  <IconFileCode aria-hidden="true" size={22} stroke={1.5} />
                 </span>
               ) : row.iconUrl ? (
                 <>

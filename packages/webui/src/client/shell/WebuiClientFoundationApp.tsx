@@ -898,9 +898,9 @@ export function WebuiClientFoundationApp(
               greetingPending={homeGreetingPending}
               railCollapsed={railCollapsed}
               progressOpen={progressPanelOpen}
-              onOpenFiles={() => {
+              onOpenBrowser={() => {
                 setProgressPanelOpen(false);
-                dispatchWorkspacePanel({ type: "open-primary-view", kind: "files", sessionId: selectedSessionId, workspaceDir: selectedSession?.workspaceDir });
+                dispatchWorkspacePanel({ type: "open-new-tab" });
               }}
               onToggleProgress={() => setProgressPanelOpen((open) => !open)}
               usageBanner={visibleUsageNotice ? <ConversationUsageBanner

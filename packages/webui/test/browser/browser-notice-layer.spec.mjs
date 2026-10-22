@@ -18,10 +18,9 @@ import { configureFixture, openApp, test } from "./harness.mjs";
 const openBrowserPanel = async (page) => {
   await page
     .getByTestId("workspace-panel-controls")
-    .getByRole("button", { name: "工作区文件侧栏" })
+    .getByRole("button", { name: "浏览器" })
     .click();
   await expect(page.getByTestId("workspace-panel")).toBeVisible();
-  await page.getByTestId("workspace-add-tab").click();
   await expect(page.getByTestId("workspace-launcher")).toBeVisible();
   await page.getByTestId("workspace-launcher-url").fill("https://example.test/");
   await page.getByTestId("workspace-launcher-url-submit").click();

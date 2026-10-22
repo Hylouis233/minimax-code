@@ -8,6 +8,7 @@ import { formatResetLabel, getActiveSourceBadge, type ProviderHeaderDraft } from
 import { formatPlanName, formatPlanSourceLabel, hasWebuiPlan } from "../projection/usage-plan.js";
 import { UsageResetCards } from "./UsageResetCards.js";
 import { IconButton, RefreshIcon } from "../../../ui/form-atoms.js";
+import { IconChevronDown, IconExternalLink, IconInfoCircle } from "@tabler/icons-react";
 import { ProviderFormPanel, type WebuiProviderFormCommands } from "../../../features/models/ui/ProviderFormPanel.public.js";
 import { useWebuiProviderEditor } from "../../../features/models/bindings/use-provider-editor.public.js";
 import type { WebuiProviderEditorCommands } from "../../../features/models/contracts/provider-editor.js";
@@ -281,7 +282,7 @@ export function DisabledBillingActions(): ReactElement {
 }
 
 function InfoIcon(): ReactElement {
-  return <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-icon_default_secondary"><circle cx="8" cy="8" r="6.25" stroke="currentColor" strokeWidth="1" /><path d="M8 7.25v3.5M8 5.25h.01" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg>;
+  return <IconInfoCircle aria-hidden="true" size={16} stroke={1.4} className="text-icon_default_secondary" />;
 }
 
 function DesktopGrayAction({ label, dropdown = false, external = false, disabled = true, title, "aria-disabled": ariaDisabled = "true" }: { readonly label: string; readonly dropdown?: boolean; readonly external?: boolean; readonly disabled?: boolean; readonly title?: string; readonly "aria-disabled"?: "true" }): ReactElement {
@@ -289,9 +290,9 @@ function DesktopGrayAction({ label, dropdown = false, external = false, disabled
 }
 
 function ChevronDownIcon({ className = "" }: { readonly className?: string }): ReactElement {
-  return <svg aria-hidden="true" className={className} width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 6L8 10L4 6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+  return <IconChevronDown aria-hidden="true" className={className} size={16} stroke={1.5} />;
 }
 
 function ExternalArrowIcon(): ReactElement {
-  return <svg aria-hidden="true" className="h-4 w-4" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M6.40497 4.24121C6.12883 4.24121 5.90497 4.46507 5.90497 4.74121C5.90497 5.01735 6.12883 5.24121 6.40497 5.24121H10.196L4.64618 10.791C4.45124 10.9862 4.45124 11.3028 4.64618 11.498C4.84144 11.6933 5.15893 11.6933 5.35419 11.498L10.905 5.94629V9.74121C10.905 10.0174 11.1288 10.2412 11.405 10.2412C11.6811 10.2412 11.905 10.0174 11.905 9.74121V4.94141C11.905 4.55481 11.5914 4.24121 11.2048 4.24121H6.40497Z" /></svg>;
+  return <IconExternalLink aria-hidden="true" className="h-4 w-4" size={16} stroke={1.5} />;
 }

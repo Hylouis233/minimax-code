@@ -772,6 +772,22 @@
       "homepage": "https://standardschema.dev"
     },
     {
+      "name": "@tabler/icons",
+      "versions": [
+        "3.49.0"
+      ],
+      "license": "MIT",
+      "homepage": "https://tabler.io/icons"
+    },
+    {
+      "name": "@tabler/icons-react",
+      "versions": [
+        "3.49.0"
+      ],
+      "license": "MIT",
+      "homepage": "https://tabler.io/icons"
+    },
+    {
       "name": "@types/chai",
       "versions": [
         "5.2.3"

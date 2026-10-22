@@ -52,9 +52,7 @@ async function rpc(page, operation, body = operation === "listTerminals" ? {} : 
   }), { operation, body });
 }
 async function openTerminal(page) {
-  await page.getByTestId("workspace-panel-controls").getByRole("button", { name: "工作区文件侧栏" }).click();
-  await page.getByRole("button", { name: "新建标签页" }).click();
-  await page.getByTestId("workspace-add-tab").click();
+  await page.getByTestId("workspace-panel-controls").getByRole("button", { name: "浏览器" }).click();
   await page.getByTestId("workspace-launcher-tile-terminal").click();
 }
 

@@ -1,7 +1,7 @@
 // What the workspace panel does when the runtime answers something it does not
 // understand (T11; the finding T10 handed over).
 //
-// Opening the file side panel crashed the whole UI into its error boundary when
+// Opening the workspace panel crashed the whole UI into its error boundary when
 // the tree or the terminal list came back as something other than what the panel
 // renders: `filterWorkspaceFiles(fileTree.files)` over a non-array, and
 // `terminals.find` over an object. The panel now treats both as "no answer": the
@@ -23,8 +23,9 @@ test("the panel reports an unexpected tree answer instead of crashing", async ({
 
   await page
     .getByTestId("workspace-panel-controls")
-    .getByRole("button", { name: "工作区文件侧栏" })
+    .getByRole("button", { name: "浏览器" })
     .click();
+  await page.getByTestId("workspace-launcher-tile-files").click();
 
   // The panel is there, and the application never fell into its error boundary.
   await expect(page.getByTestId("workspace-panel")).toBeVisible();

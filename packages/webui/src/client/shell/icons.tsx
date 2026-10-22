@@ -10,6 +10,7 @@
 // it takes its size from `className` too.
 
 import { useId, type ReactElement } from "react";
+import { IconWorld } from "@tabler/icons-react";
 
 export interface WebuiIconProps {
   /** Extra classes applied to the root `svg`, e.g. a colour or shrink utility. */
@@ -44,13 +45,7 @@ export function WebuiIconReload({ className }: WebuiIconProps): ReactElement {
 
 /** The address bar's origin mark — the globe every browser puts before a url. */
 export function WebuiIconGlobe({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true" className={className}>
-      <circle cx="8" cy="8" r="5.2" fill="none" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M8 2.8a5.2 5.2 0 0 0 0 10.4 5.2 5.2 0 0 0 0-10.4Z" fill="none" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M2.8 8h10.4" fill="none" stroke="currentColor" strokeWidth="1.5" />
-    </svg>
-  );
+  return <IconWorld aria-hidden="true" className={className} size={16} stroke={1.5} />;
 }
 
 /** The product mark — the hero avatar and identity glyph. */

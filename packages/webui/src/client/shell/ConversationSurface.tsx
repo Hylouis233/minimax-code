@@ -11,7 +11,7 @@ export function ConversationSurface(props: {
   readonly greetingPending: boolean;
   readonly railCollapsed: boolean;
   readonly progressOpen: boolean;
-  readonly onOpenFiles: () => void;
+  readonly onOpenBrowser: () => void;
   readonly onToggleProgress: () => void;
   readonly usageBanner?: ReactNode;
   readonly connectionStatus: ReactNode;
@@ -21,9 +21,9 @@ export function ConversationSurface(props: {
 }): ReactElement {
   return <>
     {!props.home && !props.workspacePanel ? <WebuiWorkspacePanelControls
-      filePanelOpen={false}
+      browserPanelOpen={false}
       progressPanelOpen={props.progressOpen}
-      onOpenFiles={props.onOpenFiles}
+      onOpenBrowser={props.onOpenBrowser}
       onToggleProgressPanel={props.onToggleProgress}
     /> : null}
     <div className="relative flex h-full min-w-0 flex-1 flex-col">

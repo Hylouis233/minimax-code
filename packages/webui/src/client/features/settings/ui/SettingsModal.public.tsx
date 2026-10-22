@@ -12,6 +12,7 @@
 // unchanged, and every other settings surface stays in the private sibling.
 
 import { Fragment, useEffect, useMemo, useState, useSyncExternalStore, type ReactElement, type ReactNode } from "react";
+import { IconArchive, IconArrowLeft, IconBraces, IconBrowser, IconChartBar, IconChevronDown, IconCode, IconGitBranch, IconLayoutDashboard, IconLink, IconMessageCircle, IconMicrophone, IconSearch, IconTrash, IconUserCircle, IconX, IconBook } from "@tabler/icons-react";
 import type { WebuiSessionListItem } from "../../../../shared/contracts/session.js";
 import type { WebuiVersionInfo } from "../../../../shared/contracts/version.js";
 import {
@@ -54,26 +55,33 @@ import { BrowserSettingsPage } from "../../browser/ui/BrowserSettingsPage.public
 import { DESKTOP_SETTINGS_TABS, resolveThemePreference, filterSettingsTabs, SETTINGS_GROUPS } from "../projection/settings-view.js";
 import type { SettingsTabKey } from "../projection/settings-view.js";
 import { WebuiZoneBoundary } from "../../../shell/WebuiZoneBoundary.js";
-import { SETTINGS_ICON_PATHS, WebuiWorktreePanel } from "./SettingsModal.js";
+import { WebuiWorktreePanel } from "./SettingsModal.js";
 
-// The icon paths live in the private sibling, and the dialog reads them from
-// there: a second copy of the glyph set is a second copy to forget a tab in.
-const ICONS: Record<string, string> = SETTINGS_ICON_PATHS;
+const ICONS = {
+  desktop: IconLayoutDashboard,
+  browser: IconBrowser,
+  voice: IconMicrophone,
+  shortcuts: IconBraces,
+  "custom-instructions": IconBook,
+  chart: IconChartBar,
+  link: IconLink,
+  user: IconUserCircle,
+  coding: IconCode,
+  worktree: IconGitBranch,
+  work: IconMessageCircle,
+  archived: IconArchive,
+  search: IconSearch,
+  close: IconX,
+  back: IconArrowLeft,
+} as const;
 
 function Icon({ name, size = 18 }: { readonly name: string; readonly size?: number }): ReactElement {
   const voice = name === "voice";
-  let shape: ReactNode;
-  if (name === "link") {
-    shape = <><circle cx="10" cy="10" r="8" /><path d="M2 10h16M10 2c-2 2.2-3 4.8-3 8s1 5.8 3 8m0-16c2 2.2 3 4.8 3 8s-1 5.8-3 8" /></>;
-  } else if (name === "worktree") {
-    shape = <><circle cx="10" cy="4" r="1.75" /><circle cx="4" cy="15" r="1.75" /><circle cx="10" cy="15" r="1.75" /><circle cx="16" cy="15" r="1.75" /><path d="M10 5.75V9M4 9h12M4 9v4.25M10 9v4.25M16 9v4.25" /></>;
-  } else {
-    shape = <path d={ICONS[name] ?? ICONS.desktop} fill="none" />;
-  }
-  return <svg aria-hidden="true" data-testid={voice ? "asr-mic-icon" : undefined} className="webui-settings-icon" width={size} height={size} viewBox={voice ? "0 0 18 18" : "0 0 20 20"} fill="none" stroke="currentColor" strokeWidth={voice ? "1.08" : "1.2"} strokeLinecap="round" strokeLinejoin="round">{shape}</svg>;
+  const Glyph = ICONS[name as keyof typeof ICONS] ?? IconLayoutDashboard;
+  return <Glyph aria-hidden="true" data-testid={voice ? "asr-mic-icon" : undefined} className="webui-settings-icon" size={size} stroke={1.4} />;
 }
 function stored(key: string, fallback: string, storage: ReturnType<typeof useWebuiBrowserCapabilities>["storage"]): string { return storage.getItem(key) ?? fallback; }
-function Select({ value, onChange, disabled = false, wide = false, testId }: { readonly value: string; readonly onChange?: (value: string) => void; readonly disabled?: boolean; readonly wide?: boolean; readonly testId?: string }): ReactElement { return <label className={`webui-ant-select${wide ? " is-wide" : ""}`} data-testid={testId}><select value={value} disabled={disabled} onChange={(event) => onChange?.(event.target.value)}><option>{value}</option></select><svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 6L8 10L4 6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" /></svg></label>; }
+function Select({ value, onChange, disabled = false, wide = false, testId }: { readonly value: string; readonly onChange?: (value: string) => void; readonly disabled?: boolean; readonly wide?: boolean; readonly testId?: string }): ReactElement { return <label className={`webui-ant-select${wide ? " is-wide" : ""}`} data-testid={testId}><select value={value} disabled={disabled} onChange={(event) => onChange?.(event.target.value)}><option>{value}</option></select><IconChevronDown aria-hidden="true" size={16} stroke={1.5} /></label>; }
 
 /** Compatibility alias for the settings modal's capability surface.
  *
@@ -210,4 +218,4 @@ function formatArchivedDate(timestamp: number): string {
   if (!Number.isFinite(timestamp) || timestamp <= 0) return "";
   return new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(timestamp));
 }
-function TrashIcon(): ReactElement { return <svg aria-hidden="true" width="16" height="16" viewBox="0 0 20 20" fill="none"><path d="M3.5 5.5h13M8 8.5v6m4-6v6M5.5 5.5l.7 11h7.6l.7-11M7.5 5.5V3.7h5v1.8" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" /></svg>; }
+function TrashIcon(): ReactElement { return <IconTrash aria-hidden="true" size={16} stroke={1.4} />; }
