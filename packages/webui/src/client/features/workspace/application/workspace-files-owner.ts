@@ -397,12 +397,10 @@ export function createWebuiWorkspaceFilesOwner(deps: {
     }
     set((current) => ({ ...current, directoryBrowse: { status: "loading" } }));
     void browseDirs(dir ? { dir } : {})
-      .then((listing) => {
+      .then((answer) => {
         if (mine !== browseSeq) return;
-        set((current) => ({
-          ...current,
-          directoryBrowse: { status: "ready", listing: normalizeDirectoryListing(listing) },
-        }));
+        const listing = normalizeDirectoryListing(answer);
+        set((current) => ({ ...current, directoryBrowse: { status: "ready", listing } }));
       })
       .catch((reason: unknown) => {
         if (mine !== browseSeq) return;
