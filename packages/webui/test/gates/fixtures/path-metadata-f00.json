@@ -2398,6 +2398,15 @@
       "home": "target"
     },
     {
+      "path": "client/features/transcript/ui/webui-mermaid.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "transcript",
+      "home": "target"
+    },
+    {
       "path": "client/features/turn/application/composer-submission.ts",
       "layers": [
         "application"
@@ -2920,7 +2929,7 @@
       "home": "target"
     },
     {
-      "path": "client/features/workspace/ui/WorkspaceProgressPanel.tsx",
+      "path": "client/features/workspace/ui/WorkspacePanels.tsx",
       "layers": [
         "bindings"
       ],
@@ -2929,7 +2938,7 @@
       "home": "target"
     },
     {
-      "path": "client/features/workspace/ui/WorkspacePanels.tsx",
+      "path": "client/features/workspace/ui/WorkspaceProgressPanel.tsx",
       "layers": [
         "bindings"
       ],
