@@ -115,6 +115,25 @@ test("the composer's popups are placed by the shared layer, inside the viewport"
   await input.press("Escape");
 });
 
+test("the composer's second-level menu has an opaque shared surface", async ({ page }) => {
+  await openApp(page, "#session=A");
+
+  await page.locator('[data-testid="composer-add-menu"]').click();
+  const root = page.locator(".webui-dropdown-popup.webui-composer-menu-stack");
+  for (const name of ["skills", "plugins"]) {
+    const submenu = page.locator(`[data-webui-composer-submenu="${name}"]`);
+    await page.locator(`[data-webui-composer-submenu-trigger="${name}"]`).hover();
+    await expect(submenu).toBeVisible();
+
+    const [rootBackground, submenuBackground] = await Promise.all([
+      root.evaluate((node) => getComputedStyle(node).backgroundColor),
+      submenu.evaluate((node) => getComputedStyle(node).backgroundColor),
+    ]);
+    expect(submenuBackground, `${name} submenu has an opaque surface`).not.toBe("rgba(0, 0, 0, 0)");
+    expect(submenuBackground, `${name} submenu matches the root menu surface`).toBe(rootBackground);
+  }
+});
+
 test("the workspace picker opens above its row, inside the viewport", async ({ page }) => {
   // The project row lives on the home surface, and its list is the tallest
   // popup in the composer: opened downwards on a short window it ran off the

@@ -20,6 +20,26 @@ const PROGRESS_COPY = {
   close: "关闭",
 } as const;
 
+function WorkspaceProgressSection({ kind, className, title, collapsed, onToggle, children, busy }: {
+  readonly kind: "environment" | "progress" | "subagents";
+  readonly className: string;
+  readonly title: string;
+  readonly collapsed: boolean;
+  readonly onToggle?: () => void;
+  readonly children: ReactElement | null;
+  readonly busy?: boolean;
+}): ReactElement {
+  return <section {...{ [`data-webui-${kind}-panel`]: "true" }} className={`webui-progress-section ${className}${collapsed ? " is-collapsed" : ""}`} data-workspace-section="true" aria-busy={busy || undefined}>
+    <button type="button" className="webui-workspace-section-title" onClick={onToggle} aria-expanded={!collapsed}>
+      <span data-workspace-section-title="true">{title}</span>
+      <WebuiIconChevronDown className={`webui-progress-section-chevron${collapsed ? " is-collapsed" : ""}`} />
+    </button>
+    <div className={`webui-expandable-motion${collapsed ? "" : " is-open"}`} aria-hidden={collapsed} ref={(element) => element?.toggleAttribute("inert", collapsed)}>
+      {children}
+    </div>
+  </section>;
+}
+
 export function WebuiProgressPanel({ todos, showProgress = true, showEmptyState = false, collapsed = false, onToggle }: {
   readonly todos: readonly WebuiTodo[];
   readonly showProgress?: boolean;
@@ -28,21 +48,14 @@ export function WebuiProgressPanel({ todos, showProgress = true, showEmptyState 
   readonly onToggle?: () => void;
 }): ReactElement | null {
   if (!showProgress || (todos.length === 0 && !showEmptyState)) return null;
-  return <div className={`webui-progress-panel flex flex-col${collapsed ? " is-collapsed" : ""}`} data-webui-progress-panel="true" data-workspace-section="true">
-    <button type="button" className="webui-workspace-section-title" onClick={onToggle} aria-expanded={!collapsed}>
-      <span data-workspace-section-title="true">{PROGRESS_COPY.progress}</span><WebuiIconChevronDown className={collapsed ? "size-4 -rotate-90 text-icon_default_tertiary transition-transform duration-[180ms] ease-out" : "size-4 text-icon_default_tertiary transition-transform duration-[180ms] ease-out"} />
-    </button>
-    <div className="webui-progress-panel-content flex min-h-0 flex-col overflow-hidden">
-      <div className={`webui-expandable-motion${collapsed ? "" : " is-open"}`} aria-hidden={collapsed} ref={(element) => element?.toggleAttribute("inert", collapsed)}>
-        {todos.length === 0 ? <p className="webui-progress-empty">{PROGRESS_COPY.progressEmpty}</p> : <div className="webui-progress-scroll">
+  return <WorkspaceProgressSection kind="progress" className="webui-progress-panel" title={PROGRESS_COPY.progress} collapsed={collapsed} onToggle={onToggle}>
+        {todos.length === 0 ? <div className="webui-progress-scroll"><p className="webui-progress-empty">{PROGRESS_COPY.progressEmpty}</p></div> : <div className="webui-progress-scroll">
           {todos.map((todo, index) => <div className={`webui-progress-row webui-progress-row--${todo.status}`} key={`${todo.content}-${index}`}>
             <span className="webui-progress-marker">{todo.status === "completed" ? <WebuiIconCheck className="size-3" /> : index + 1}</span>
             <span className={`min-w-0 flex-1 truncate ${todo.status === "completed" ? "line-through text-text_default_tertiary" : ""}`}>{todo.content}</span>
           </div>)}
         </div>}
-      </div>
-    </div>
-  </div>;
+  </WorkspaceProgressSection>;
 }
 
 export function WebuiSubagentsPanel({ subagents, collapsed = false, onToggle, onMemberClick }: {
@@ -52,16 +65,11 @@ export function WebuiSubagentsPanel({ subagents, collapsed = false, onToggle, on
   readonly onMemberClick?: (subagent: WebuiWorkspaceSubagent) => void;
 }): ReactElement | null {
   if (subagents.length === 0) return null;
-  return <div className="webui-subagents-panel" data-webui-subagents-panel="true" data-workspace-section="true">
-    <button type="button" className="webui-workspace-section-title" onClick={onToggle} aria-expanded={!collapsed}>
-      <span data-workspace-section-title="true">Subagents</span>
-      <WebuiIconChevronDown className={collapsed ? "size-4 -rotate-90 text-icon_default_tertiary transition-transform duration-[180ms] ease-out" : "size-4 text-icon_default_tertiary transition-transform duration-[180ms] ease-out"} />
-    </button>
-    <div className={`webui-expandable-motion${collapsed ? "" : " is-open"}`} aria-hidden={collapsed} ref={(element) => element?.toggleAttribute("inert", collapsed)}>
+  return <WorkspaceProgressSection kind="subagents" className="webui-subagents-panel" title="Subagents" collapsed={collapsed} onToggle={onToggle}>
       <div className="webui-subagents-scroll">
-        {subagents.map((subagent, index) => {
+        {subagents.map((subagent) => {
           const label = subagent.title?.trim() || subagent.agentName;
-          return <button type="button" className="webui-subagent-row webui-progress-content-enter" key={subagent.sessionId} style={{ animationDelay: `${Math.min(index * 35, 210)}ms` }} onClick={() => onMemberClick?.(subagent)}>
+          return <button type="button" className="webui-subagent-row" key={subagent.sessionId} onClick={() => onMemberClick?.(subagent)}>
             <WebuiIconAgent className="webui-subagent-avatar" />
             <span className="min-w-0 flex-1 truncate text-left">{label}</span>
             <span className={`webui-subagent-status webui-subagent-status--${subagent.status}`} aria-label={subagent.status}>
@@ -70,8 +78,7 @@ export function WebuiSubagentsPanel({ subagents, collapsed = false, onToggle, on
           </button>;
         })}
       </div>
-    </div>
-  </div>;
+  </WorkspaceProgressSection>;
 }
 
 function WorkspaceCommitDialog({ environment, workspaceDir, mutateGit, onClose }: {
@@ -146,13 +153,8 @@ export function WebuiEnvironmentPanel({ workspaceDir, isDefaultWorkspace = false
   const canMutate = Boolean(environment && queries?.canMutateGit && !environment.changesError && !environment.metadataError && (hasChanges || environment.canPush));
   const hasLineChanges = Boolean(environment && environment.lineStatsStatus === "ready" && (environment.insertions > 0 || environment.deletions > 0));
   return <>
-    <div className={`webui-environment-panel${pending ? " is-loading" : ""}`} data-webui-environment-panel="true" data-workspace-section="true" aria-busy={pending || undefined}>
-      <button type="button" className="webui-workspace-section-title" onClick={onToggle} aria-expanded={!collapsed}>
-        <span data-workspace-section-title="true">{PROGRESS_COPY.environment}</span>
-        <WebuiIconChevronDown className={collapsed ? "size-4 -rotate-90 text-icon_default_tertiary transition-transform duration-[180ms] ease-out" : "size-4 text-icon_default_tertiary transition-transform duration-[180ms] ease-out"} />
-      </button>
-      <div className={`webui-expandable-motion${collapsed ? "" : " is-open"}`} aria-hidden={collapsed} ref={(element) => element?.toggleAttribute("inert", collapsed)}>
-        {pending ? <div className="webui-environment-loading" role="status" aria-label="正在加载环境信息"><span className="webui-environment-skeleton webui-environment-skeleton--branch" /><span className="webui-environment-skeleton webui-environment-skeleton--action" /><span className="webui-environment-skeleton webui-environment-skeleton--action" /><span className="webui-environment-skeleton webui-environment-skeleton--action" /></div> : environmentError ? <div className="webui-environment-loading" role="alert">环境信息加载失败：{environmentError}</div> : environment ? <div className="webui-environment-body webui-progress-content-enter">
+    <WorkspaceProgressSection kind="environment" className={`webui-environment-panel${pending ? " is-loading" : ""}`} title={PROGRESS_COPY.environment} collapsed={collapsed} onToggle={onToggle} busy={pending}>
+        {pending ? <div className="webui-environment-loading" role="status" aria-label="正在加载环境信息"><span className="webui-environment-skeleton webui-environment-skeleton--branch" /><span className="webui-environment-skeleton webui-environment-skeleton--action" /><span className="webui-environment-skeleton webui-environment-skeleton--action" /><span className="webui-environment-skeleton webui-environment-skeleton--action" /></div> : environmentError ? <div className="webui-environment-loading" role="alert">环境信息加载失败：{environmentError}</div> : environment ? <div className="webui-environment-body">
           <div className="webui-environment-workspace" title={workspaceDir}>{environment.branch || " "}</div>
           <div className="webui-environment-actions">
             <button type="button" className="webui-environment-action" onClick={onOpenChanges} disabled={!onOpenChanges} title={environment.changesError ?? undefined}>
@@ -166,8 +168,7 @@ export function WebuiEnvironmentPanel({ workspaceDir, isDefaultWorkspace = false
             </button>
           </div>
         </div> : null}
-      </div>
-    </div>
+    </WorkspaceProgressSection>
     {commitOpen && environment && workspaceDir && queries?.canMutateGit ? <WorkspaceCommitDialog environment={environment} workspaceDir={workspaceDir} mutateGit={queries.mutateGit} onClose={() => setCommitOpen(false)} /> : null}
   </>;
 }

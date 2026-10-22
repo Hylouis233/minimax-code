@@ -558,7 +558,10 @@ describe("W0 · structural declarations W5 must preserve", () => {
     const sectionTitleText = winning(".webui-workspace-section-title > [data-workspace-section-title]");
     expect(declaration(sectionTitleText.body, "flex")).toBe("1 1 auto");
     expect(declaration(sectionTitleText.body, "min-width")).toBe("0");
-    expect(declaration(winning(".webui-progress-panel").body, "min-height")).toBe("58px");
+    expect(declaration(winning(".webui-progress-section").body, "height")).toBe("200px");
+    expect(declaration(winning(".webui-progress-section.is-collapsed").body, "height")).toBe("28px");
+    expect(declaration(winning(".webui-progress-section.webui-environment-panel").body, "height")).toBe("160px");
+    expect(declaration(winning(".webui-progress-section.webui-environment-panel").body, "flex")).toBe("0 0 160px");
     const environmentLoading = winning(".webui-environment-loading");
     expect(declaration(environmentLoading.body, "min-height")).toBe("132px");
     expect(declaration(environmentLoading.body, "box-sizing")).toBe("border-box");
@@ -574,14 +577,8 @@ describe("W0 · structural declarations W5 must preserve", () => {
     expect(declarationsFor(".webui-progress-scroll::-webkit-scrollbar")).toContain("display: none");
     expect(declarationsFor(".webui-subagents-scroll::-webkit-scrollbar")).toContain("display: none");
     expect(
-      declaration(winning(".webui-progress-panel.is-collapsed").body, "flex"),
-    ).toBe("0 0 auto");
-    expect(
-      declaration(
-        winning(".webui-progress-panel.is-collapsed > .webui-progress-panel-content").body,
-        "flex",
-      ),
-    ).toBe("0 0 auto");
+      declaration(winning(".webui-progress-section.is-collapsed").body, "flex-basis"),
+    ).toBe("28px");
 
     const scroll = declarationsFor(
       ".webui-session-layout .webui-session-transcript-scroll",

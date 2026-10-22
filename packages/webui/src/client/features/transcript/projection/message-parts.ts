@@ -242,26 +242,58 @@ function decodeXmlAttribute(value: string): string {
 function projectDeliveredAssets(content: string, messageId: string): { content: string; parts: WebuiMessagePart[] } {
   const parts: WebuiMessagePart[] = [];
   const containers = /<(deliver-assets|deliver_assets|image-gallery)\b[^>]*>([\s\S]*?)<\/\1\s*>/giu;
+  const containerRanges: Array<{ start: number; end: number }> = [];
   let cleaned = content;
   let match: RegExpExecArray | null;
   while ((match = containers.exec(content)) !== null) {
+    containerRanges.push({ start: match.index, end: match.index + match[0].length });
     const inner = match[2] ?? "";
     const assets: WebuiDeliveredAsset[] = [];
     for (const mediaMatch of inner.matchAll(/<media\b([^>]*?)\/?\s*>/giu)) {
-      const attributes = mediaMatch[1] ?? "";
-      const values: Record<string, string> = {};
-      for (const attribute of attributes.matchAll(/([\w-]+)\s*=\s*(["'])(.*?)\2/gu)) {
-        if (attribute[1] && attribute[3] !== undefined) values[attribute[1].toLowerCase()] = decodeXmlAttribute(attribute[3]);
-      }
-      const src = values.src?.trim();
-      if (!src) continue;
-      const name = values.name?.trim() || values.caption?.trim() || basenamePath(src);
-      assets.push({ src, name, ...(values.type ? { mediaType: values.type } : {}), ...(values.caption ? { caption: values.caption } : {}), ...(values.deleted === "true" ? { deleted: true } : {}) });
+      const asset = parseMediaAsset(mediaMatch[1] ?? "");
+      if (asset) assets.push(asset);
     }
     if (assets.length) parts.push({ id: `delivered-assets-${messageId}-${parts.length}`, type: "asset_list", assets });
     cleaned = cleaned.replace(match[0], "");
   }
+
+  // Desktop's transcript projector also accepts standalone `<media />` tags.
+  // Only lift tags outside a recognized container so nested assets are emitted once.
+  let standaloneIndex = 0;
+  for (const mediaMatch of content.matchAll(/<media\b([^>]*?)\/?\s*>/giu)) {
+    const start = mediaMatch.index ?? 0;
+    if (containerRanges.some((range) => start >= range.start && start < range.end)) continue;
+    const asset = parseMediaAsset(mediaMatch[1] ?? "");
+    if (asset) {
+      parts.push({ id: `delivered-media-${messageId}-${standaloneIndex}`, type: "asset_list", assets: [asset] });
+      standaloneIndex += 1;
+    }
+    cleaned = cleaned.replace(mediaMatch[0], "");
+  }
   return { content: cleaned, parts };
+}
+
+function parseMediaAsset(attributes: string): WebuiDeliveredAsset | undefined {
+  const values: Record<string, string> = {};
+  for (const attribute of attributes.matchAll(/([\w-]+)\s*=\s*(["'])(.*?)\2/gu)) {
+    if (attribute[1] && attribute[3] !== undefined) values[attribute[1].toLowerCase()] = decodeXmlAttribute(attribute[3]);
+  }
+  let src = values.src?.trim();
+  // Desktop unwraps a filepath payload nested in src before projecting it.
+  const filepath = src?.match(/^<filepath\b([^>]*)>([\s\S]*?)<\/filepath>$/iu);
+  if (filepath) {
+    const pathAttribute = filepath[1]?.match(/\b(?:data-path|path)\s*=\s*(["'])(.*?)\1/iu)?.[2];
+    src = decodeXmlAttribute(pathAttribute ?? filepath[2] ?? "").trim();
+  }
+  if (!src) return undefined;
+  const name = values.name?.trim() || values.caption?.trim() || basenamePath(src);
+  return {
+    src,
+    name,
+    ...(values.type ? { mediaType: values.type } : {}),
+    ...(values.caption ? { caption: values.caption } : {}),
+    ...(values.deleted === "true" ? { deleted: true } : {}),
+  };
 }
 
 const DESKTOP_INTERNAL_MESSAGE_BLOCK = /<(agent-message|agent-context|system-reminder|peer-memory-path|engine-message|inbound-context|archon_internal_context|locale-context|runtime-data-context|permission-ask|permission-response|questionnaire-ask|deliver-assets|deliver_assets|image-gallery)\b[^>]*>[\s\S]*?<\/\1\s*>/giu;

@@ -2,23 +2,25 @@
   .webui-progress-panel-motion { position: fixed; top: 72px; right: 12px; z-index: 45; display: block; width: 0; min-width: 0; max-width: min(288px, calc(100vw - 24px)); overflow: hidden; pointer-events: none; transition: width 180ms cubic-bezier(.2, .7, .2, 1); }
   .webui-progress-panel-motion.is-open { width: min(288px, calc(100% - 24px)); pointer-events: auto; }
   .webui-progress-overview-panel { position: static; display: flex; width: min(288px, calc(100vw - 24px)); min-width: min(288px, calc(100vw - 24px)); min-height: 0; flex: 0 0 auto; flex-direction: column; overflow: hidden; border: 0; background: transparent; padding: 0; }
-  .webui-progress-overview-card { position: relative; display: flex; width: 100%; height: auto; max-height: max(0px, min(560px, calc(100vh - 88px))); max-height: max(0px, min(560px, calc(100dvh - 88px))); min-height: 0; box-sizing: border-box; flex-direction: column; overflow: hidden; border: .5px solid var(--border_default); border-radius: 16px; background: var(--bg_grouped_secondary_elevated); padding: 6px; box-shadow: none; color: var(--text_default_primary); }
-  .webui-progress-overview-main { display: flex; width: 100%; min-width: 0; min-height: 0; flex: 0 1 auto; flex-direction: column; overflow: hidden; }
-  .webui-environment-panel, .webui-progress-panel, .webui-subagents-panel { display: flex; width: 100%; min-width: 0; box-sizing: border-box; flex-shrink: 0; flex-direction: column; overflow: hidden; }
-  .webui-progress-panel { min-height: 58px; flex: 0 1 auto; padding: 0 0 2px; }
-  .webui-progress-panel.is-collapsed { min-height: 0; flex: 0 0 auto; }
-  .webui-progress-panel.is-collapsed > .webui-progress-panel-content { flex: 0 0 auto; }
-  .webui-progress-panel-content { width: 100%; min-width: 0; }
-  .webui-progress-scroll { min-height: 0; overflow-y: auto; overflow-x: hidden; }
+  .webui-progress-overview-card { position: relative; display: flex; width: 100%; height: auto; max-height: max(0px, min(560px, calc(100vh - 88px))); max-height: max(0px, min(560px, calc(100dvh - 88px))); min-height: 0; box-sizing: border-box; flex-direction: column; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: var(--border_default) transparent; scrollbar-width: thin; border: .5px solid var(--border_default); border-radius: 16px; background: var(--bg_grouped_secondary_elevated); padding: 6px; box-shadow: none; color: var(--text_default_primary); }
+  .webui-progress-overview-card::-webkit-scrollbar { width: 4px; }
+  .webui-progress-overview-card::-webkit-scrollbar-thumb { border-radius: 4px; background: var(--border_default); }
+  .webui-progress-overview-main { display: flex; width: 100%; min-width: 0; min-height: 0; flex: 0 1 auto; flex-direction: column; overflow: visible; }
+  .webui-progress-section { display: flex; width: 100%; height: 200px; min-width: 0; min-height: 58px; box-sizing: border-box; flex: 0 0 200px; flex-direction: column; overflow: hidden; transition: height 180ms cubic-bezier(.2, .7, .2, 1), flex-basis 180ms cubic-bezier(.2, .7, .2, 1); }
+  .webui-progress-section.webui-environment-panel { height: 160px; min-height: 58px; flex: 0 0 160px; }
+  .webui-progress-section.is-collapsed { height: 28px; min-height: 0; flex-basis: 28px; }
+  .webui-environment-panel, .webui-progress-panel, .webui-subagents-panel { min-width: 0; box-sizing: border-box; }
+  .webui-expandable-motion { width: 100%; min-height: 0; flex: 1 1 auto; }
+  .webui-progress-scroll { height: 100%; min-height: 0; overflow-y: auto; overflow-x: hidden; }
   .webui-progress-scroll { scrollbar-width: none; -ms-overflow-style: none; scrollbar-gutter: auto; }
   .webui-progress-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
   .webui-subagents-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
   .webui-progress-empty { margin: 0; padding: 0 6px 6px; color: var(--text_default_tertiary); font-size: var(--size_14); line-height: 20px; }
-  .webui-subagents-scroll { max-height: 240px; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; -ms-overflow-style: none; scrollbar-gutter: auto; }
+  .webui-subagents-scroll { height: 100%; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; -ms-overflow-style: none; scrollbar-gutter: auto; }
   .webui-environment-panel + .webui-progress-panel { border-top: 1px solid var(--border_light); }
   .webui-progress-panel + .webui-subagents-panel { border-top: 1px solid var(--border_light); }
-  .webui-environment-body { padding: 0 6px 6px; }
-  .webui-environment-loading { display: flex; min-height: 132px; box-sizing: border-box; flex-direction: column; justify-content: center; gap: 8px; padding: 0 6px 6px; color: var(--text_default_tertiary); font-size: var(--size_12); }
+  .webui-environment-body { min-height: 0; padding: 0 6px 6px; }
+  .webui-environment-loading { display: flex; min-height: 132px; box-sizing: border-box; flex-direction: column; justify-content: center; gap: 8px; overflow: hidden; padding: 0 6px 6px; color: var(--text_default_tertiary); font-size: var(--size_12); }
   .webui-environment-skeleton { position: relative; display: block; overflow: hidden; border-radius: 6px; background: var(--bg_grouped_tertiary); }
   .webui-environment-skeleton::after { position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgb(255 255 255 / 36%), transparent); animation: webui-progress-skeleton 1.3s ease-in-out infinite; content: ""; }
   .webui-environment-skeleton--branch { width: 52%; height: 14px; margin: 0 0 2px 4px; }
@@ -46,6 +48,8 @@
   .webui-commit-dialog-actions button { border: 1px solid var(--border_default); border-radius: var(--radius_8); background: transparent; padding: var(--spacing_8) var(--spacing_12); color: var(--text_default_primary); }
   .webui-commit-dialog-actions button:last-child { border-color: var(--border_accent); background: var(--bg_interaction_primary_default); color: var(--text_default_inverted); }
   .webui-workspace-section-title { display: flex; height: 28px; width: 100%; box-sizing: border-box; flex: 0 0 28px; align-self: stretch; align-items: center; justify-content: space-between; border: 0; background: transparent; padding: 0 var(--spacing_6); color: var(--text_default_secondary); font-size: var(--size_14); line-height: 20px; text-align: left; cursor: pointer; }
+  .webui-progress-section-chevron { width: 16px; height: 16px; flex: 0 0 16px; color: var(--icon_default_tertiary); transition: transform 180ms cubic-bezier(.2, .7, .2, 1); }
+  .webui-progress-section-chevron.is-collapsed { transform: rotate(-90deg); }
   .webui-workspace-section-title > [data-workspace-section-title] { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .webui-progress-row { display: flex; min-height: 30px; align-items: center; gap: var(--spacing_8); border-radius: 10px; padding: 0 var(--spacing_4); font-size: var(--size_12); }
   .webui-progress-marker { display: inline-flex; width: 18px; height: 18px; flex: 0 0 18px; align-items: center; justify-content: center; border-radius: 50%; font-size: 11px; }
@@ -61,4 +65,5 @@
   .webui-subagent-status--error { color: var(--text_label_danger_secondary_default); }
   .webui-expandable-motion > .webui-progress-scroll { overflow-y: auto; overflow-x: hidden; }
   .webui-expandable-motion > .webui-subagents-scroll { overflow-y: auto; overflow-x: hidden; }
+  @media (prefers-reduced-motion: reduce) { .webui-progress-section, .webui-progress-section-chevron { transition-duration: 0ms; } }
 }

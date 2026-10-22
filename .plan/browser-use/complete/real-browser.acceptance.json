@@ -13,12 +13,12 @@
       "fullCdp": "enforced in the runtime service, not in the bridge",
       "allowlist": "development",
       "build": "development",
-      "extensionId": "njihcobnpalklclcjdhfnlcdonhhiddm",
+      "extensionId": "dejpmdkbdhkjjhkjkodimegojblnglde",
       "installationKeyProved": true
     },
     "observed": "the handshake completed and the host reported the surface connected",
     "result": "pass",
-    "at": "2026-10-21T19:27:12.077Z",
+    "at": "2026-10-22T02:49:09.524Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-browser"
   },
@@ -36,12 +36,12 @@
       "fullCdp": "enforced in the runtime service, not in the bridge",
       "allowlist": "development",
       "build": "development",
-      "extensionId": "njihcobnpalklclcjdhfnlcdonhhiddm",
+      "extensionId": "dejpmdkbdhkjjhkjkodimegojblnglde",
       "installationKeyProved": false
     },
     "observed": "the host refused the extension and reported no connected surface",
     "result": "pass",
-    "at": "2026-10-21T19:27:12.388Z",
+    "at": "2026-10-22T02:49:09.937Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-browser"
   },
@@ -59,12 +59,12 @@
       "fullCdp": "enforced in the runtime service, not in the bridge",
       "allowlist": "development",
       "build": "development",
-      "extensionId": "njihcobnpalklclcjdhfnlcdonhhiddm",
+      "extensionId": "dejpmdkbdhkjjhkjkodimegojblnglde",
       "installationKeyProved": true
     },
     "observed": "the handshake completed and the host reported the surface connected",
     "result": "pass",
-    "at": "2026-10-21T19:27:12.712Z",
+    "at": "2026-10-22T02:49:10.321Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-browser"
   },
@@ -82,12 +82,12 @@
       "fullCdp": "enforced in the runtime service, not in the bridge",
       "allowlist": "development",
       "build": "development",
-      "extensionId": "njihcobnpalklclcjdhfnlcdonhhiddm",
+      "extensionId": "dejpmdkbdhkjjhkjkodimegojblnglde",
       "installationKeyProved": false
     },
     "observed": "the host refused the extension and reported no connected surface",
     "result": "pass",
-    "at": "2026-10-21T19:27:13.062Z",
+    "at": "2026-10-22T02:49:10.755Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-browser"
   },
@@ -105,12 +105,12 @@
       "fullCdp": "enforced in the runtime service, not in the bridge",
       "allowlist": "development, on both surfaces",
       "build": "development",
-      "extensionId": "njihcobnpalklclcjdhfnlcdonhhiddm",
+      "extensionId": "dejpmdkbdhkjjhkjkodimegojblnglde",
       "installationKeyProved": true
     },
     "observed": "both browsers were connected, each on its own surface, and each surface's provider belonged to that surface",
     "result": "pass",
-    "at": "2026-10-21T19:27:13.921Z",
+    "at": "2026-10-22T02:49:11.710Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-browser"
   }

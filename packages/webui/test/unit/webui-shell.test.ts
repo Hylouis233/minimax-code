@@ -383,8 +383,8 @@ describe("WebUI shell", () => {
       todos: [{ content: "收起后的步骤", status: "completed" }],
       collapsed: true,
     }));
-    expect(collapsed).toContain("webui-progress-panel flex flex-col is-collapsed");
-    expect(collapsed).toMatch(/class="webui-progress-panel-content flex min-h-0\s+flex-col overflow-hidden"/u);
+    expect(collapsed).toContain("webui-progress-section webui-progress-panel is-collapsed");
+    expect(collapsed).toContain('class="webui-expandable-motion" aria-hidden="true"');
     expect(collapsed).toContain('aria-expanded="false"');
     expect(collapsed).toContain('aria-hidden="true"');
   });
@@ -1379,6 +1379,19 @@ describe("WebUI shell — theme switching", () => {
     ).not.toBeNull();
     expect(darkMatch, ".dark must rebind --bg_default_primary").not.toBeNull();
     expect(lightMatch![1].trim()).not.toBe(darkMatch![1].trim());
+  });
+});
+
+describe("WebUI browser tab branding", () => {
+  it("uses the MiniMax Code title and favicon in the HTML wrapper", () => {
+    const html = readFileSync(
+      new URL("../../src/client/index.html", import.meta.url),
+      "utf8",
+    );
+    expect(html).toContain("<title>MiniMax Code</title>");
+    expect(html).toContain(
+      '<link rel="icon" type="image/png" sizes="96x96" href="./assets/img/minimax-code-agent-icon.png" />',
+    );
   });
 });
 

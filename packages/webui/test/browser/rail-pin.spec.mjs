@@ -88,6 +88,66 @@ test("a pinned session row has one pin action and no duplicate pin marker", asyn
   await expect(row.locator('.webui-rail-action[aria-label^="取消置顶"]')).toHaveCount(1);
 });
 
+test("a running session title keeps its space before hover actions", async ({ page }) => {
+  await openApp(page, "#session=A");
+  await expect.poll(() => page.evaluate(() => window.__fixture.requests.some(
+    (request) => request.operation === "watchEvents",
+  ))).toBe(true);
+  await page.evaluate(() => window.__fixture.emitEvent({
+    type: "session.start",
+    payload: { sessionId: "A", turnId: "rail-hover-layout" },
+    timestamp: 1_700_000_000_300,
+    source: "synthetic",
+  }));
+
+  const row = rowOf(page, "A");
+  const metadata = row.locator(".webui-rail-session-meta");
+  const label = row.locator(".webui-project-session-card > span:first-child");
+  const actions = row.locator(".webui-session-row-actions");
+  await expect(metadata.locator(".webui-rail-spinner")).toBeVisible();
+  const before = await metadata.boundingBox();
+  const labelBeforeHover = await label.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const bounds = element.getBoundingClientRect();
+    return {
+      paddingRight: style.paddingRight,
+      contentRight: bounds.right - Number.parseFloat(style.paddingRight),
+    };
+  });
+  const metadataBeforeHover = await metadata.boundingBox();
+  await row.hover();
+  await page.waitForTimeout(150);
+  const after = await metadata.boundingBox();
+  const labelLayout = await label.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const bounds = element.getBoundingClientRect();
+    return {
+      paddingRight: style.paddingRight,
+      transitionProperty: style.transitionProperty,
+      transitionDuration: style.transitionDuration,
+      contentRight: bounds.right - Number.parseFloat(style.paddingRight),
+    };
+  });
+  const actionsBounds = await actions.boundingBox();
+  const metaDisplay = await metadata.evaluate((element) => getComputedStyle(element).display);
+  const actionStyle = await actions.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { opacity: style.opacity, transitionProperty: style.transitionProperty };
+  });
+
+  expect(before).not.toBeNull();
+  expect(after).toBeNull();
+  expect(labelBeforeHover.paddingRight).toBe("0px");
+  expect(labelBeforeHover.contentRight).toBeLessThanOrEqual(metadataBeforeHover.x);
+  expect(labelLayout.paddingRight).toBe("88px");
+  expect(labelLayout.contentRight).toBeLessThanOrEqual(actionsBounds.x);
+  expect(actionsBounds.x - labelLayout.contentRight).toBeLessThanOrEqual(8);
+  expect(labelLayout.transitionProperty).toContain("padding-right");
+  expect(metaDisplay).toBe("none");
+  expect(actionStyle.opacity).toBe("1");
+  expect(actionStyle.transitionProperty).toContain("opacity");
+});
+
 test("the pin button offers the unpin glyph on a pinned row", async ({ page }) => {
   await seedPins(page, { sessions: { A: true } });
   await openApp(page, "#session=A");

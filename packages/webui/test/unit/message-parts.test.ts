@@ -89,6 +89,34 @@ describe("Desktop message parts projection", () => {
     ]);
   });
 
+  it("projects standalone Desktop media tags instead of showing their raw XML", () => {
+    const parts = projectMessageParts({
+      msgId: "standalone-media",
+      msgContent: '生成结果：<media type="png" src="/workspace/chart.png" caption="图表" /> 已完成。',
+    });
+
+    expect(parts.map((part) => part.type)).toEqual(["text", "asset_list"]);
+    const text = parts.find((part) => part.type === "text");
+    expect(text?.type === "text" ? text.content : "").toBe("生成结果： 已完成。");
+    const assets = parts.find((part) => part.type === "asset_list");
+    expect(assets?.type === "asset_list" ? assets.assets : []).toEqual([
+      { src: "/workspace/chart.png", name: "图表", mediaType: "png", caption: "图表" },
+    ]);
+  });
+
+  it("does not project media nested in a delivered-assets container twice", () => {
+    const parts = projectMessageParts({
+      msgId: "nested-media",
+      msgContent: '<deliver-assets><media type="md" src="result.md" /></deliver-assets>',
+    });
+
+    expect(parts).toHaveLength(1);
+    expect(parts[0]).toMatchObject({
+      type: "asset_list",
+      assets: [{ src: "result.md", name: "result.md", mediaType: "md" }],
+    });
+  });
+
   it("preserves the Desktop parts order for thinking, delegation, tools, and final text", () => {
     const parts = projectMessageParts({
       msgId: "ordered",

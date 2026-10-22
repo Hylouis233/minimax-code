@@ -90,15 +90,19 @@
     padding: 0 var(--spacing_8);
     font-size: var(--size_14);
     line-height: var(--line_height_20);
-    transition: color 120ms ease, padding-right 120ms ease;
+    transition: color 120ms ease;
+  }
+  .webui-pinned-session-card > span:first-of-type {
+    clip-path: inset(0 0 0 0);
+    transition: clip-path 160ms cubic-bezier(0.2, 0, 0, 1);
   }
   .webui-pinned-session-card:hover,
   .webui-pinned-session-row:hover .webui-pinned-session-card {
     color: var(--text_default_primary);
   }
-  .webui-pinned-session-row:hover .webui-pinned-session-card,
-  .webui-pinned-session-row:has(:focus-visible) .webui-pinned-session-card {
-    padding-right: 96px;
+  .webui-pinned-session-row:hover .webui-pinned-session-card > span:first-of-type,
+  .webui-pinned-session-row:has(:focus-visible) .webui-pinned-session-card > span:first-of-type {
+    clip-path: inset(0 88px 0 0);
   }
   .webui-project-section-content {
     display: grid;
@@ -315,11 +319,22 @@
     gap: var(--spacing_4);
     border-radius: var(--radius_8);
     padding: 0 var(--spacing_8);
-    transition: padding-right 120ms ease;
   }
-  .webui-project-session-row:hover .webui-project-session-card,
-  .webui-project-session-row:focus-within .webui-project-session-card {
-    padding-right: 100px;
+  .webui-project-session-card > span:first-child {
+    clip-path: inset(0 0 0 0);
+    transition: clip-path 160ms cubic-bezier(0.2, 0, 0, 1);
+  }
+  .webui-project-session-row:hover .webui-project-session-card > span:first-child,
+  .webui-project-session-row:focus-within .webui-project-session-card > span:first-child {
+    clip-path: inset(0 88px 0 0);
+  }
+  .webui-pinned-session-row:hover .webui-rail-session-meta,
+  .webui-pinned-session-row:has(:focus-visible) .webui-rail-session-meta,
+  .webui-project-session-row:hover .webui-rail-session-meta,
+  .webui-project-session-row:focus-within .webui-rail-session-meta,
+  .webui-project-child-session-row:hover .webui-rail-session-meta,
+  .webui-project-child-session-row:focus-within .webui-rail-session-meta {
+    display: none;
   }
 
   /* Subagent rows retain the nested-session geometry: a compact
@@ -342,11 +357,15 @@
     padding-left: 34px;
     padding-right: var(--spacing_8);
     text-align: left;
-    transition: background-color 120ms ease, padding-right 120ms ease;
+    transition: background-color 120ms ease;
   }
-  .webui-project-child-session-row:hover .webui-project-child-session-card,
-  .webui-project-child-session-row:focus-within .webui-project-child-session-card {
-    padding-right: 38px;
+  .webui-project-child-session-card > span:first-of-type {
+    clip-path: inset(0 0 0 0);
+    transition: clip-path 160ms cubic-bezier(0.2, 0, 0, 1);
+  }
+  .webui-project-child-session-row:hover .webui-project-child-session-card > span:first-of-type,
+  .webui-project-child-session-row:focus-within .webui-project-child-session-card > span:first-of-type {
+    clip-path: inset(0 28px 0 0);
   }
   .webui-project-child-session-card:hover,
   .webui-project-child-session-row:hover .webui-project-child-session-card,
