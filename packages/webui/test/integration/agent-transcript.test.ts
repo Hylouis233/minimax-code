@@ -6,7 +6,7 @@ import { createServer } from "node:http";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { chromium, expect as browserExpect } from "@playwright/test";
+import { chromium, expect as browserExpect, type Browser } from "@playwright/test";
 import { expect, it } from "vitest";
 
 const MODEL_ID = "stub-model";
@@ -21,6 +21,25 @@ function frame(delta: Record<string, unknown>, finishReason: string | null = nul
     model: MODEL_ID,
     choices: [{ index: 0, delta, finish_reason: finishReason }],
   })}\n\n`;
+}
+
+/**
+ * The browser this case drives.
+ *
+ * This file belongs to the `test:webui` Vitest gate, which runs before the
+ * `test:webui-browser` gate installs playwright's own chromium — so on CI the
+ * pinned browser is not on disk yet. The runner's own Chrome is, and playwright
+ * drives it through the `chrome` channel. A launch that fails for any other
+ * reason is the failure it looks like, and is not retried.
+ */
+async function launchBrowser(): Promise<Browser> {
+  try {
+    return await chromium.launch({ headless: true });
+  } catch (error) {
+    const missingBrowser = error instanceof Error && error.message.includes("Executable doesn't exist");
+    if (!missingBrowser) throw error;
+    return await chromium.launch({ headless: true, channel: "chrome" });
+  }
 }
 
 it("a real agent turn keeps thinking and order across browser refresh and resume", async () => {
@@ -114,7 +133,7 @@ it("a real agent turn keeps thinking and order across browser refresh and resume
     });
     const info = await service.start();
 
-    browser = await chromium.launch({ headless: true });
+    browser = await launchBrowser();
     const page = await browser.newPage({ locale: "zh-CN", timezoneId: "Asia/Shanghai" });
     const requests: {
       requestId?: string;
