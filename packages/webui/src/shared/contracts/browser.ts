@@ -308,10 +308,14 @@ export type WebuiBrowserInputCommand =
   | {
       readonly kind: "pointer";
       readonly target: WebuiBrowserTargetId;
+      /** Omitted means an atomic click for compatibility with existing callers. */
+      readonly action?: "press" | "release" | "move" | "scroll";
       readonly x: number;
       readonly y: number;
-      readonly button: "left" | "middle" | "right";
-      readonly clickCount: number;
+      readonly button?: "left" | "middle" | "right";
+      readonly clickCount?: number;
+      readonly deltaX?: number;
+      readonly deltaY?: number;
     }
   | {
       readonly kind: "key";

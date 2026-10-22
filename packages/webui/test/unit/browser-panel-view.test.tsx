@@ -198,11 +198,11 @@ describe("the Browser panel", () => {
 
     expect(markup).toContain('alt="Example Domain 的浏览器画面"');
     expect(markup).not.toContain("Agent page 的浏览器画面");
-    // The input surface is only reachable when there is a page in front, and it
-    // is the way in: the picture itself takes the pointer and the keys, and
-    // there is no field of the panel's own.
+    // The image is the input surface; no transparent element sits above it.
     expect(markup).toContain('tabindex="0"');
-    expect(markup).toContain('data-testid="browser-panel-input"');
+    expect(markup).toContain('data-testid="browser-panel-frame"');
+    expect(markup).toContain('aria-label="浏览器输入区"');
+    expect(markup).not.toContain('data-testid="browser-panel-input"');
     expect(markup).not.toContain('data-testid="browser-panel-text-input"');
   });
 
@@ -286,11 +286,11 @@ describe("the Browser panel", () => {
       expect(markup).toContain('data-testid="browser-panel-unknown"');
     });
 
-    it("keeps the input surface out of reach until a target is selected", () => {
+    it("keeps the image input out of reach until a target is selected", () => {
       const markup = renderToStaticMarkup(
         <BrowserPanel port={wiredPort} state={loadedState()} capabilities={{ browser: "supported" }} />,
       );
-      expect(markup).toContain('data-testid="browser-panel-input"');
+      expect(markup).toContain('data-testid="browser-panel-frame"');
       expect(markup).toContain('role="application"');
       expect(markup).not.toContain('data-testid="browser-panel-text-input"');
     });

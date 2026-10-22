@@ -84,6 +84,7 @@ import {
   selectWebuiBrowserStreamTarget,
   selectedWebuiBrowserRunTarget,
   webuiBrowserStreamTargetKey,
+  webuiBrowserFrameDataUrl,
 } from "../projection/browser-state.js";
 import { BrowserPanel } from "./BrowserPanel.public.js";
 
@@ -227,6 +228,8 @@ export function BrowserPanelHost({
   // it. The effect below is what moves it, so it is current before any read for
   // the new run starts.
   const currentRunId = useRef(runId);
+  const frameImageRef = useRef<HTMLImageElement | null>(null);
+  const latestStreamTargetRef = useRef<WebuiBrowserTargetId | undefined>(undefined);
 
   const refreshTargets = useCallback(
     async (next: WebuiBrowserSurface) => {
@@ -309,7 +312,7 @@ export function BrowserPanelHost({
   useEffect(() => {
     if (!port?.listBrowserTargets) return;
     void refreshTargets(surface);
-  }, [port, refreshTargets, surface]);
+  }, [port, refreshTargets, surface, targetProp]);
 
   // The live image stream is opened for the **target** the panel is showing.
   //
@@ -322,6 +325,7 @@ export function BrowserPanelHost({
   // the subscription follows it.
   const streamTarget = selectWebuiBrowserStreamTarget(state);
   const streamTargetKey = webuiBrowserStreamTargetKey(streamTarget);
+  latestStreamTargetRef.current = streamTarget;
 
   useEffect(() => {
     if (!port?.watchBrowserFrames) return;
@@ -337,10 +341,27 @@ export function BrowserPanelHost({
     }
     subscribedSurface.current = surface;
     subscribedTarget.current = streamTargetKey;
+    let firstFrame = true;
+    let lastSequence = -1;
     const stop = port.watchBrowserFrames(
       { surface, target: streamTarget, ...(viewport ? { viewport } : {}) },
       (frame) => {
-        dispatch({ type: "frame", frame });
+        if (
+          !isSameWebuiBrowserTarget(frame.target, streamTarget) ||
+          !latestStreamTargetRef.current ||
+          !isSameWebuiBrowserTarget(frame.target, latestStreamTargetRef.current) ||
+          frame.sequence <= lastSequence
+        ) return;
+        lastSequence = frame.sequence;
+        const source = webuiBrowserFrameDataUrl(frame);
+        if (!source) return;
+        // The image is the rendering surface. Keep frame delivery out of React's
+        // state path so a 30 fps screencast cannot rerender the whole workspace.
+        if (frameImageRef.current) frameImageRef.current.src = source;
+        if (firstFrame) {
+          firstFrame = false;
+          dispatch({ type: "frame", frame });
+        }
       },
     );
     return () => {
@@ -351,16 +372,13 @@ export function BrowserPanelHost({
   }, [port, streamTargetKey, streamTarget, surface, viewport]);
 
   const onSendInput = useCallback(
-    (command: WebuiBrowserInputCommand) => {
+    async (command: WebuiBrowserInputCommand) => {
       // The command already names the page in front — the target was bound to it
       // when the gesture was built — so this is a send, not a selection. The run
       // scope rides along only because the runtime's own fence is scoped; nothing
       // here reads or moves the run's selection.
-      void port
-        ?.sendBrowserInput?.({ command, ...runScope })
-        .catch((error: unknown) => {
-          dispatch({ type: "failed", error: toBrowserError(error) });
-        });
+      if (!port?.sendBrowserInput) throw new Error("Browser input is unavailable.");
+      await port.sendBrowserInput({ command, ...runScope });
     },
     [port, runScope],
   );
@@ -411,6 +429,7 @@ export function BrowserPanelHost({
         state={state}
         capabilities={capabilityManifest}
         onSurfaceSize={setViewport}
+        frameRef={frameImageRef}
         onSendInput={onSendInput}
         onRejected={onRejected}
       />

@@ -39,6 +39,7 @@ import {
   useRef,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
+  type WheelEvent as ReactWheelEvent,
   type ReactElement,
 } from "react";
 import {
@@ -101,8 +102,10 @@ export interface BrowserPanelProps {
    * the browser would follow every one of them.
    */
   readonly onSurfaceSize?: (size: { readonly width: number; readonly height: number }) => void;
+  /** The host streams frames into this image without scheduling a React render per frame. */
+  readonly frameRef?: { current: HTMLImageElement | null };
   /** Receives only commands that passed validation and the generation binding. */
-  readonly onSendInput?: (command: WebuiBrowserInputCommand) => void;
+  readonly onSendInput?: (command: WebuiBrowserInputCommand) => Promise<void>;
   /** Receives every refusal, so a gesture that went nowhere is visible. */
   readonly onRejected?: (error: WebuiBrowserError) => void;
 }
@@ -112,6 +115,7 @@ export function BrowserPanel({
   state,
   capabilities,
   onSurfaceSize,
+  frameRef: hostFrameRef,
   onSendInput,
   onRejected,
 }: BrowserPanelProps): ReactElement {
@@ -128,13 +132,39 @@ export function BrowserPanel({
   const authorized = state ? isWebuiBrowserSurfaceAuthorized(state.authorization, surface) : false;
   const capability = readWebuiCapability(capabilities, WEBUI_BROWSER_CAPABILITY_NAME);
   const inputEnabled = Boolean(viewed) && authorized && Boolean(port?.sendBrowserInput);
+  const inputQueueRef = useRef(new Map<string, WebuiBrowserInputCommand[]>());
+  const inputDrainingRef = useRef(new Set<string>());
+
+  const drainInputQueue = useCallback(async (targetKey: string) => {
+    if (inputDrainingRef.current.has(targetKey)) return;
+    inputDrainingRef.current.add(targetKey);
+    try {
+      const queue = inputQueueRef.current.get(targetKey);
+      while (queue && queue.length > 0) {
+        const command = queue.shift();
+        if (!command) continue;
+        try {
+          await onSendInput?.(command);
+        } catch (error) {
+          onRejected?.({
+            code: "browser_provider_failed",
+            message: error instanceof Error ? error.message : String(error),
+            retryable: false,
+          });
+        }
+      }
+    } finally {
+      inputDrainingRef.current.delete(targetKey);
+      if (inputQueueRef.current.get(targetKey)?.length === 0) inputQueueRef.current.delete(targetKey);
+    }
+  }, [onRejected, onSendInput]);
 
   const submit = useCallback(
-    (intent: WebuiBrowserInputIntent) => {
+    (intent: WebuiBrowserInputIntent, aimedPage = state?.viewedPage) => {
       // Bound to the page in front, at send time: a gesture typed while the strip
       // moved to another tab lands on the tab the person is looking at, or is
       // refused — it is never re-aimed at whatever the Agent is doing.
-      const result = prepareWebuiBrowserInputCommand(state?.viewedPage, intent);
+      const result = prepareWebuiBrowserInputCommand(aimedPage, intent);
       // The refusal path is the one that matters: a gesture that could not be
       // aimed has to be visible, because the alternative is a click that appears
       // to do nothing.
@@ -142,14 +172,67 @@ export function BrowserPanel({
         onRejected?.(result.error);
         return;
       }
-      onSendInput?.(result.command);
+      const command = result.command;
+      const targetKey = [
+        command.target.surface,
+        command.target.browserId,
+        command.target.targetId,
+        command.target.generation,
+      ].join("/");
+      const queue = inputQueueRef.current.get(targetKey) ?? [];
+      inputQueueRef.current.set(targetKey, queue);
+      const previous = queue.at(-1);
+      // Keep only the newest unsent pointer position. Scroll deltas combine so
+      // a busy runtime cannot accumulate a long trail of stale wheel events.
+      if (
+        command.kind === "pointer" &&
+        command.action === "move" &&
+        previous?.kind === "pointer" &&
+        previous.action === "move"
+      ) {
+        queue[queue.length - 1] = command;
+      } else if (
+        command.kind === "pointer" &&
+        command.action === "scroll" &&
+        previous?.kind === "pointer" &&
+        previous.action === "scroll"
+      ) {
+        queue[queue.length - 1] = {
+          ...command,
+          deltaX: (previous.deltaX ?? 0) + (command.deltaX ?? 0),
+          deltaY: (previous.deltaY ?? 0) + (command.deltaY ?? 0),
+        };
+      } else {
+        if (queue.length >= 64) {
+          const staleMove = queue.findIndex((queued) => queued.kind === "pointer" && queued.action === "move");
+          if (staleMove >= 0) queue.splice(staleMove, 1);
+          else {
+            onRejected?.({
+              code: "browser_provider_failed",
+              message: "浏览器输入队列已满，操作未发送。",
+              retryable: false,
+            });
+            return;
+          }
+        }
+        queue.push(command);
+      }
+      void drainInputQueue(targetKey);
     },
-    [onRejected, onSendInput, state],
+    [drainInputQueue, onRejected, state],
   );
 
   // The picture's own size, which is the browser's viewport: a click is mapped
   // into it.
-  const frameRef = useRef<HTMLImageElement | null>(null);
+  const localFrameRef = useRef<HTMLImageElement | null>(null);
+  const frameRef = hostFrameRef ?? localFrameRef;
+  const pressedButtonRef = useRef<"left" | "middle" | "right" | undefined>(undefined);
+  const pressedPageRef = useRef(state?.viewedPage);
+  const lastMoveAtRef = useRef(0);
+  const moveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const pendingMoveRef = useRef<{ x: number; y: number } | undefined>(undefined);
+  const wheelTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const pendingWheelRef = useRef<{ x: number; y: number; deltaX: number; deltaY: number } | undefined>(undefined);
 
   // The size the page is shown at, reported once it has settled.
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -176,29 +259,83 @@ export function BrowserPanel({
   }, [onSurfaceSize]);
 
   const onPointerDown = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
+    (event: ReactPointerEvent<HTMLImageElement>) => {
       if (!inputEnabled) return;
+      event.preventDefault();
+      event.currentTarget.focus();
+      event.currentTarget.setPointerCapture(event.pointerId);
       // Measured against the picture, not against the surface: the picture is
       // the browser's viewport drawn to fit, so a click on the surface is not
       // yet a point in the browser. The point is mapped into the picture's own
       // size, or the click lands somewhere the person never pointed at.
       const rect = event.currentTarget.getBoundingClientRect();
       const point = webuiBrowserPicturePoint(rect, frameRef.current ?? undefined, event.clientX, event.clientY);
+      const button = webuiBrowserPointerButton(event.button);
+      pressedButtonRef.current = button;
+      pressedPageRef.current = state?.viewedPage;
       submit({
         kind: "pointer",
+        action: "press",
         x: point.x,
         y: point.y,
-        button: webuiBrowserPointerButton(event.button),
-        // `detail` is 0 on a press that is not yet a click sequence in some
-        // engines, and the command's contract wants a count of at least one.
-        clickCount: Math.max(1, Math.trunc(event.detail)),
-      });
+        button,
+      }, pressedPageRef.current);
     },
-    [inputEnabled, submit],
+    [inputEnabled, state?.viewedPage, submit],
   );
 
+  const onPointerUp = useCallback((event: ReactPointerEvent<HTMLImageElement>) => {
+    const button = pressedButtonRef.current;
+    if (!inputEnabled || !button) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const point = webuiBrowserPicturePoint(rect, frameRef.current ?? undefined, event.clientX, event.clientY);
+    pressedButtonRef.current = undefined;
+    const aimedPage = pressedPageRef.current;
+    pressedPageRef.current = undefined;
+    submit({ kind: "pointer", action: "release", x: point.x, y: point.y, button }, aimedPage);
+  }, [inputEnabled, submit]);
+
+  const onPointerMove = useCallback((event: ReactPointerEvent<HTMLImageElement>) => {
+    if (!inputEnabled) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    pendingMoveRef.current = webuiBrowserPicturePoint(rect, frameRef.current ?? undefined, event.clientX, event.clientY);
+    if (moveTimerRef.current) return;
+    const delay = Math.max(0, 1000 / 30 - (performance.now() - lastMoveAtRef.current));
+    moveTimerRef.current = setTimeout(() => {
+      moveTimerRef.current = undefined;
+      const point = pendingMoveRef.current;
+      pendingMoveRef.current = undefined;
+      if (!point) return;
+      lastMoveAtRef.current = performance.now();
+      submit({ kind: "pointer", action: "move", ...point });
+    }, delay);
+  }, [inputEnabled, submit]);
+
+  const onWheel = useCallback((event: ReactWheelEvent<HTMLImageElement>) => {
+    if (!inputEnabled) return;
+    event.preventDefault();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const point = webuiBrowserPicturePoint(rect, frameRef.current ?? undefined, event.clientX, event.clientY);
+    const pending = pendingWheelRef.current;
+    pendingWheelRef.current = pending
+      ? { ...point, deltaX: pending.deltaX + event.deltaX, deltaY: pending.deltaY + event.deltaY }
+      : { ...point, deltaX: event.deltaX, deltaY: event.deltaY };
+    if (wheelTimerRef.current) return;
+    wheelTimerRef.current = setTimeout(() => {
+      wheelTimerRef.current = undefined;
+      const wheel = pendingWheelRef.current;
+      pendingWheelRef.current = undefined;
+      if (wheel) submit({ kind: "pointer", action: "scroll", ...wheel });
+    }, 16);
+  }, [inputEnabled, submit]);
+
+  useEffect(() => () => {
+    if (moveTimerRef.current) clearTimeout(moveTimerRef.current);
+    if (wheelTimerRef.current) clearTimeout(wheelTimerRef.current);
+  }, []);
+
   const onKeyDown = useCallback(
-    (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    (event: ReactKeyboardEvent<HTMLImageElement>) => {
       if (!inputEnabled) return;
       event.preventDefault();
       // A composition is not a key. The browser is given the text the input
@@ -273,34 +410,31 @@ export function BrowserPanel({
 
       <div className="webui-browser-stage" ref={stageRef}>
         {frameSrc ? (
-            <img
-              ref={frameRef}
-              className="webui-browser-frame"
-              data-testid="browser-panel-frame"
-              data-format={frame?.format}
-              data-frame-sequence={frame?.sequence}
-              data-target-generation={frame?.target.generation}
-              src={frameSrc}
-              alt={viewed ? `${viewed.title || viewed.url} 的浏览器画面` : PANEL_COPY.frameLabel}
-              draggable={false}
-        />
-      ) : (
+          <img
+            ref={frameRef}
+            className="webui-browser-frame"
+            data-testid="browser-panel-frame"
+            data-format={frame?.format}
+            data-frame-sequence={frame?.sequence}
+            data-target-generation={frame?.target.generation}
+            src={frameSrc}
+            alt={viewed ? `${viewed.title || viewed.url} 的浏览器画面` : PANEL_COPY.frameLabel}
+            draggable={false}
+            role="application"
+            aria-label={PANEL_COPY.inputLabel}
+            tabIndex={inputEnabled ? 0 : -1}
+            onPointerDown={onPointerDown}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+            onPointerMove={onPointerMove}
+            onWheel={onWheel}
+            onKeyDown={onKeyDown}
+          />
+        ) : (
         <p className="webui-browser-empty" role="status" data-testid="browser-panel-frame-empty">
           {frame ? PANEL_COPY.frameUnrenderable : viewed ? PANEL_COPY.frameEmpty : PANEL_COPY.frameNoTarget}
         </p>
-      )}
-      {/* The input surface covers the picture rather than sitting beside it:
-          the coordinates it sends are measured against this element, so a
-          target drawn next to the frame would aim at the wrong place. */}
-      <div
-        className="webui-browser-input"
-        data-testid="browser-panel-input"
-        role="application"
-        aria-label={PANEL_COPY.inputLabel}
-        tabIndex={inputEnabled ? 0 : -1}
-        onPointerDown={onPointerDown}
-        onKeyDown={onKeyDown}
-      />
+        )}
       </div>
     </section>
   );
@@ -314,7 +448,7 @@ export function BrowserPanel({
  * keystroke. The two placeholders an input method reports instead of a word
  * are not text and are left to the key path.
  */
-function webuiBrowserComposedText(event: ReactKeyboardEvent<HTMLDivElement>): string {
+function webuiBrowserComposedText(event: ReactKeyboardEvent<HTMLImageElement>): string {
   const key = event.key;
   if (!key || key === "Process" || key === "Unidentified") return "";
   if (key.length < 2) return "";

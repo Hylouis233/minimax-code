@@ -123,10 +123,13 @@ export type WebuiBrowserBridgeInputCommand =
       readonly kind: "pointer";
       readonly targetId: string;
       readonly generation: number;
+      readonly action?: "press" | "release" | "move" | "scroll";
       readonly x: number;
       readonly y: number;
-      readonly button: "left" | "middle" | "right";
-      readonly clickCount: number;
+      readonly button?: "left" | "middle" | "right";
+      readonly clickCount?: number;
+      readonly deltaX?: number;
+      readonly deltaY?: number;
     }
   | {
       readonly kind: "key";
@@ -614,8 +617,10 @@ export function isWebuiBrowserBridgeInputCommand(value: unknown): value is Webui
       return (
         typeof command.x === "number" &&
         typeof command.y === "number" &&
-        typeof command.button === "string" &&
-        typeof command.clickCount === "number"
+        (command.action === undefined || ["press", "release", "move", "scroll"].includes(String(command.action))) &&
+        (command.action === "move" || command.action === "scroll" || typeof command.button === "string") &&
+        (command.action !== undefined || typeof command.clickCount === "number") &&
+        (command.action !== "scroll" || (typeof command.deltaX === "number" && typeof command.deltaY === "number"))
       );
     case "key":
       return typeof command.key === "string" && Array.isArray(command.modifiers);

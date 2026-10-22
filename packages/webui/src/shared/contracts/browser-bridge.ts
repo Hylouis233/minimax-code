@@ -231,10 +231,13 @@ export type WebuiBrowserBridgeInputCommand =
       readonly kind: "pointer";
       readonly targetId: string;
       readonly generation: number;
+      readonly action?: "press" | "release" | "move" | "scroll";
       readonly x: number;
       readonly y: number;
-      readonly button: "left" | "middle" | "right";
-      readonly clickCount: number;
+      readonly button?: "left" | "middle" | "right";
+      readonly clickCount?: number;
+      readonly deltaX?: number;
+      readonly deltaY?: number;
     }
   | {
       readonly kind: "key";

@@ -157,11 +157,19 @@ describe.skipIf(!available)("the isolated Chromium's screencast", () => {
 
     await provider.sendInput({
       kind: "pointer",
+      action: "press",
       target: id,
       x: onSurface.x,
       y: onSurface.y,
       button: "left",
-      clickCount: 1,
+    });
+    await provider.sendInput({
+      kind: "pointer",
+      action: "release",
+      target: id,
+      x: onSurface.x,
+      y: onSurface.y,
+      button: "left",
     });
     await new Promise((resolve) => setTimeout(resolve, 300));
 

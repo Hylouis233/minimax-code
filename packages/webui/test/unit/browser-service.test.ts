@@ -332,6 +332,70 @@ describe("browser service", () => {
     await service.close();
   });
 
+  it("serializes pointer press and release when authorization reads complete out of order", async () => {
+    const provider = new RecordingProvider();
+    const authorization: WebuiBrowserAuthorization = {
+      ...ALL_OFF,
+      isolatedChromium: true,
+    };
+    let holdFirstInputRead = false;
+    let inputReads = 0;
+    let releaseFirstRead!: () => void;
+    const firstReadGate = new Promise<void>((resolve) => {
+      releaseFirstRead = resolve;
+    });
+    let firstReadStarted!: () => void;
+    const firstReadStartedSignal = new Promise<void>((resolve) => {
+      firstReadStarted = resolve;
+    });
+    const service = new WebuiBrowserService({
+      authorization: {
+        read: async () => {
+          if (holdFirstInputRead && inputReads++ === 0) {
+            firstReadStarted();
+            await firstReadGate;
+          }
+          return authorization;
+        },
+        write: async () => authorization,
+      },
+      dataDir: "/tmp/webui-browser-input-order-test",
+      createIsolatedProvider: async () => provider,
+    });
+    await service.listTargets("isolated-chromium");
+    holdFirstInputRead = true;
+    const target = tab("tab-1");
+    const pressed = service.sendInput({
+      kind: "pointer",
+      action: "press",
+      target,
+      x: 8,
+      y: 9,
+      button: "left",
+    });
+    await firstReadStartedSignal;
+    const released = service.sendInput({
+      kind: "pointer",
+      action: "release",
+      target,
+      x: 8,
+      y: 9,
+      button: "left",
+    });
+    // The second operation must not even read authorization while the first
+    // event is held. Without per-target serialization, this call reads it now,
+    // then reaches the provider before the delayed press.
+    const readsBeforePressCanContinue = inputReads;
+    releaseFirstRead();
+    await Promise.all([pressed, released]);
+    expect(readsBeforePressCanContinue).toBe(1);
+    expect(provider.inputs.map((input) => input.kind === "pointer" ? input.action : input.kind)).toEqual([
+      "press",
+      "release",
+    ]);
+    await service.close();
+  });
+
   it("refuses a malformed input before it reaches the provider", async () => {
     const { service, provider } = createService({
       ...ALL_OFF,

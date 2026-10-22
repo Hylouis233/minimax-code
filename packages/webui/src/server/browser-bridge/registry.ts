@@ -163,10 +163,13 @@ function toBridgeWireCommand(input: WebuiBrowserInputCommand): WebuiBrowserBridg
         kind: "pointer",
         targetId: input.target.targetId,
         generation: input.target.generation,
+        action: input.action,
         x: input.x,
         y: input.y,
         button: input.button,
         clickCount: input.clickCount,
+        deltaX: input.deltaX,
+        deltaY: input.deltaY,
       };
     case "key":
       return {
@@ -580,7 +583,7 @@ function makeLocalId(input: WebuiBrowserInputCommand): string {
   // the same id shape as a real command.
   switch (input.kind) {
     case "pointer":
-      return `ptr:${input.target.targetId}:${input.target.generation}:${input.x},${input.y}:${input.clickCount}`;
+      return `ptr:${input.target.targetId}:${input.target.generation}:${input.action ?? "click"}:${input.x},${input.y}:${input.clickCount ?? ""}:${input.deltaX ?? ""},${input.deltaY ?? ""}`;
     case "key":
       return `key:${input.target.targetId}:${input.target.generation}:${input.key}:${input.modifiers.join("+")}`;
     case "text":

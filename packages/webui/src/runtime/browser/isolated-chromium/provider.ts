@@ -61,6 +61,7 @@ const STARTUP_POLL_INTERVAL_MS = 100;
 const ATTACHMENT_RETRY_WINDOW_MS = 3_000;
 /** The delay between attachment retries. */
 const ATTACHMENT_RETRY_DELAY_MS = 100;
+const CDP_MODIFIER_MASK = { alt: 1, ctrl: 2, meta: 4, shift: 8 } as const;
 
 /** The options the provider is launched with. */
 export interface WebuiIsolatedChromiumProviderOptions {
@@ -83,6 +84,12 @@ export interface WebuiIsolatedChromiumProviderOptions {
 export interface WebuiBrowserTargetChange {
   readonly targetId: string;
   readonly generation: number;
+}
+
+/** A page opened by a page the browser provider already drives. */
+export interface WebuiBrowserTargetCreated {
+  readonly target: WebuiBrowserTargetId;
+  readonly openerTargetId?: string;
 }
 
 /** The surface every browser provider implements. */
@@ -115,6 +122,10 @@ export interface WebuiBrowserSurfaceProvider {
    */
   onTargetChanged?(
     listener: (change: WebuiBrowserTargetChange) => void,
+  ): () => void;
+  /** Subscribes to pages opened from another page, such as `target="_blank"`. */
+  onTargetCreated?(
+    listener: (created: WebuiBrowserTargetCreated) => void,
   ): () => void;
   /** Starts pushing the target's live images to the callback. */
   /** Gives the browser's window the size the panel shows the page at. */
@@ -207,6 +218,14 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
    * session is how an event is matched to the page it is about.
    */
   readonly #pagesBySession = new Map<string, WebuiIsolatedChromiumPage>();
+  /** Attach requests already in flight for targets created by the page. */
+  readonly #pendingAttachments = new Map<string, Promise<WebuiIsolatedChromiumPage>>();
+  /** Attachment failures are returned by listing instead of publishing dead pages. */
+  readonly #attachmentErrors = new Map<string, Error>();
+  /** Targets that have closed while their attach request was still in flight. */
+  readonly #destroyedTargetIds = new Set<string>();
+  /** Targets present before discovery was enabled are not newly opened tabs. */
+  readonly #targetsBeforeDiscovery = new Set<string>();
   /** The page the browser was launched with. */
   #launchTargetId: string | undefined;
   #unsubscribe: (() => void) | undefined;
@@ -276,6 +295,18 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
     });
     this.#launchTargetId = created.targetId;
     await this.#attachPage(created.targetId);
+
+    // The panel must also be told about pages created by links using
+    // `target="_blank"` or `window.open`. Discover only after the launch page
+    // is attached, then ignore the initial inventory Chromium reports as part
+    // of enabling discovery.
+    const initialTargets = await connection.send<{
+      targetInfos?: readonly { targetId: string }[];
+    }>("Target.getTargets");
+    for (const target of initialTargets.targetInfos ?? []) {
+      this.#targetsBeforeDiscovery.add(target.targetId);
+    }
+    await connection.send("Target.setDiscoverTargets", { discover: true });
   }
 
   /**
@@ -287,6 +318,23 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
    * moves is a fence that never fires.
    */
   async #attachPage(targetId: string): Promise<WebuiIsolatedChromiumPage> {
+    const existing = this.#pages.get(targetId);
+    if (existing) return existing;
+    const pending = this.#pendingAttachments.get(targetId);
+    if (pending) return await pending;
+
+    const attaching = this.#attachPageOnce(targetId);
+    this.#pendingAttachments.set(targetId, attaching);
+    try {
+      return await attaching;
+    } finally {
+      if (this.#pendingAttachments.get(targetId) === attaching) {
+        this.#pendingAttachments.delete(targetId);
+      }
+    }
+  }
+
+  async #attachPageOnce(targetId: string): Promise<WebuiIsolatedChromiumPage> {
     const connection = this.#connection;
     if (!connection) {
       throw browserOperationError(
@@ -299,6 +347,13 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
       targetId,
       flatten: true,
     });
+    if (this.#destroyedTargetIds.has(targetId)) {
+      await connection.send("Target.detachFromTarget", { sessionId: attached.sessionId });
+      throw browserOperationError(
+        "browser_target_unknown",
+        "The browser page closed before it could be attached.",
+      );
+    }
     const page: WebuiIsolatedChromiumPage = {
       targetId,
       sessionId: attached.sessionId,
@@ -308,10 +363,24 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
     };
     this.#pages.set(targetId, page);
     this.#pagesBySession.set(page.sessionId, page);
-    await this.#withAttachmentRetry(() =>
-      connection.send("Page.enable", {}, page.sessionId),
-    );
-    return page;
+    try {
+      await this.#withAttachmentRetry(() =>
+        connection.send("Page.enable", {}, page.sessionId),
+      );
+      if (this.#destroyedTargetIds.has(targetId)) {
+        this.#forgetPage(targetId);
+        await connection.send("Target.detachFromTarget", { sessionId: page.sessionId }).catch(() => undefined);
+        throw browserOperationError(
+          "browser_target_unknown",
+          "The browser page closed before it could be attached.",
+        );
+      }
+      return page;
+    } catch (error) {
+      this.#forgetPage(targetId);
+      await connection.send("Target.detachFromTarget", { sessionId: page.sessionId }).catch(() => undefined);
+      throw error;
+    }
   }
 
   /** The page a target names, when this provider drives it. */
@@ -383,6 +452,15 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
     const states: WebuiBrowserTargetState[] = [];
     for (const info of targets.targetInfos ?? []) {
       if (info.type !== "page") continue;
+      // A target created from the page (for example, a clicked external link)
+      // becomes a usable web tab only after it has its own flattened CDP
+      // session and Page domain. Do not publish undiscovered browser pages as
+      // controllable targets.
+      if (!this.#pages.has(info.targetId)) {
+        const attachmentError = this.#attachmentErrors.get(info.targetId);
+        if (attachmentError) throw attachmentError;
+        continue;
+      }
       // The generation is the page's own. A page this provider drives reports
       // the generation it has raised; a page it never attached to has no
       // generation here — and cannot be driven either, so the number is only
@@ -528,52 +606,67 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
     }
     switch (command.kind) {
       case "pointer":
-        await this.#withAttachmentRetry(async () => {
-          await connection.send(
-            "Input.dispatchMouseEvent",
-            {
+        // Input is not retried: after a CDP timeout it is unknown whether the
+        // browser acted, and replaying a click or key sequence can duplicate it.
+        {
+          const base = { x: command.x, y: command.y };
+          if (command.action === "move") {
+            await connection.send(
+              "Input.dispatchMouseEvent",
+              { ...base, type: "mouseMoved", button: "none" },
+              sessionId,
+            );
+          } else if (command.action === "scroll") {
+            await connection.send("Input.dispatchMouseEvent", {
+              ...base,
+              type: "mouseWheel",
+              deltaX: command.deltaX,
+              deltaY: command.deltaY,
+              button: "none",
+            }, sessionId);
+          } else if (command.action === "press" || command.action === "release") {
+            await connection.send("Input.dispatchMouseEvent", {
+              ...base,
+              type: command.action === "press" ? "mousePressed" : "mouseReleased",
+              button: command.button,
+              clickCount: command.clickCount ?? 1,
+            }, sessionId);
+          } else {
+            await connection.send("Input.dispatchMouseEvent", {
+              ...base,
               type: "mousePressed",
-              x: command.x,
-              y: command.y,
               button: command.button,
               clickCount: command.clickCount,
-            },
-            sessionId,
-          );
-          await connection.send(
-            "Input.dispatchMouseEvent",
-            {
+            }, sessionId);
+            await connection.send("Input.dispatchMouseEvent", {
+              ...base,
               type: "mouseReleased",
-              x: command.x,
-              y: command.y,
               button: command.button,
               clickCount: command.clickCount,
-            },
-            sessionId,
-          );
-        });
+            }, sessionId);
+          }
+        }
         return;
       case "key": {
-        const modifiers = command.modifiers.length;
+        const modifiers = command.modifiers.reduce(
+          (mask, modifier) => mask | CDP_MODIFIER_MASK[modifier],
+          0,
+        );
         const base = {
           key: command.key,
           ...(command.code ? { code: command.code } : {}),
           modifiers,
         };
-        await this.#withAttachmentRetry(async () => {
-          await connection.send(
-            "Input.dispatchKeyEvent",
-            { type: command.text ? "keyDown" : "rawKeyDown", text: command.text ?? "", ...base },
-            sessionId,
-          );
-          await connection.send("Input.dispatchKeyEvent", { type: "keyUp", ...base }, sessionId);
-        });
+        await connection.send(
+          "Input.dispatchKeyEvent",
+          { type: command.text ? "keyDown" : "rawKeyDown", text: command.text ?? "", ...base },
+          sessionId,
+        );
+        await connection.send("Input.dispatchKeyEvent", { type: "keyUp", ...base }, sessionId);
         return;
       }
       case "text":
-        await this.#withAttachmentRetry(() =>
-          connection.send("Input.insertText", { text: command.text }, sessionId),
-        );
+        await connection.send("Input.insertText", { text: command.text }, sessionId);
         return;
       default: {
         const exhaustive: never = command;
@@ -717,6 +810,9 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
   readonly #targetChangeListeners = new Set<
     (change: WebuiBrowserTargetChange) => void
   >();
+  readonly #targetCreatedListeners = new Set<
+    (created: WebuiBrowserTargetCreated) => void
+  >();
 
   /** Subscribes to "the page behind this target was replaced". */
   onTargetChanged(
@@ -728,20 +824,54 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
     };
   }
 
+  onTargetCreated(
+    listener: (created: WebuiBrowserTargetCreated) => void,
+  ): () => void {
+    this.#targetCreatedListeners.add(listener);
+    return () => {
+      this.#targetCreatedListeners.delete(listener);
+    };
+  }
+
   /**
    * Handles one CDP event.
    *
-   * Only two matter here: the main frame navigating, which replaces the page
-   * behind the target and raises its generation, and a screencast frame, which
-   * is the panel's live image.
+   * Main-frame navigation replaces the page behind the target, screencast
+   * frames are the panel's live image, and a target-created event means a
+   * page opened another web tab.
    *
-   * Both are matched to their page by the **envelope's** session id — the
-   * flattened target session the connection puts on the event. The
+   * Page events are matched by the **envelope's** session id — the flattened
+   * target session the connection puts on the event. The
    * `event.params.sessionId` a screencast frame carries is the numeric
    * acknowledgement id, and it names no page: two pages' frames carry the same
    * one.
    */
   #onEvent(event: WebuiBrowserCdpEvent): void {
+    if (event.method === "Target.targetCreated") {
+      const info = event.params.targetInfo as
+        | { targetId?: unknown; type?: unknown; openerId?: unknown }
+        | undefined;
+      const targetId = info?.targetId;
+      if (
+        info?.type === "page" &&
+        typeof targetId === "string" &&
+        !this.#targetsBeforeDiscovery.has(targetId)
+      ) {
+        this.#destroyedTargetIds.delete(targetId);
+        this.#attachmentErrors.delete(targetId);
+        const openerTargetId = typeof info.openerId === "string" ? info.openerId : undefined;
+        void this.#attachPage(targetId)
+          .then((page) => this.#announceTargetCreated(page, openerTargetId))
+          .catch((error: unknown) => {
+            if (this.#destroyedTargetIds.has(targetId)) return;
+            this.#attachmentErrors.set(
+              targetId,
+              error instanceof Error ? error : new Error(String(error)),
+            );
+          });
+      }
+      return;
+    }
     // A page that is gone is not a page the provider drives any more. The
     // event carries the target's id rather than a session — it is a
     // browser-level event — so the page is found by its id.
@@ -750,7 +880,11 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
       event.method === "Target.targetDestroyed"
     ) {
       const destroyed = event.params.targetId;
-      if (typeof destroyed === "string") this.#forgetPage(destroyed);
+      if (typeof destroyed === "string") {
+        this.#destroyedTargetIds.add(destroyed);
+        this.#attachmentErrors.delete(destroyed);
+        this.#forgetPage(destroyed);
+      }
       return;
     }
     const page = this.#pageBySession(event.sessionId);
@@ -793,6 +927,28 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
       });
       void metadata;
       return;
+    }
+  }
+
+  #announceTargetCreated(
+    page: WebuiIsolatedChromiumPage,
+    openerTargetId: string | undefined,
+  ): void {
+    const created: WebuiBrowserTargetCreated = {
+      target: {
+        surface: this.surface,
+        browserId: this.browserId,
+        targetId: page.targetId,
+        generation: page.generation,
+      },
+      ...(openerTargetId ? { openerTargetId } : {}),
+    };
+    for (const listener of this.#targetCreatedListeners) {
+      try {
+        listener(created);
+      } catch {
+        // One subscriber cannot prevent another from learning of the new tab.
+      }
     }
   }
 
