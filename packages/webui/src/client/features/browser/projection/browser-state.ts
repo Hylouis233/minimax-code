@@ -37,6 +37,8 @@ import {
   type WebuiBrowserTargetId,
   type WebuiBrowserTargetList,
   type WebuiBrowserTargetState,
+  type WebuiBrowserTargetStatus,
+  type WebuiBrowserWebTabSnapshot,
 } from "../../../../shared/contracts/browser.js";
 import {
   isSameWebuiBrowserTargetSlot,
@@ -369,6 +371,68 @@ export function selectedWebuiBrowserRunTarget(
 /** Whether the surface the panel is showing is authorized to be shown at all. */
 export function selectWebuiBrowserSurfaceAuthorized(state: WebuiBrowserPanelState): boolean {
   return isWebuiBrowserSurfaceAuthorized(state.authorization, state.surface);
+}
+
+/**
+ * One row of the panel's list.
+ *
+ * The list is a report and not a control: the strip chooses the tab in front,
+ * and the run's selection is the runtime's cell (ADR 0022).
+ */
+export interface WebuiBrowserPanelRow {
+  /** The row's identity in the list. */
+  readonly key: string;
+  readonly browserId: string;
+  readonly targetId: string;
+  readonly generation: number;
+  readonly surface: WebuiBrowserSurface;
+  readonly title: string;
+  readonly url: string;
+  /** Whether this row is the page the run is driving. */
+  readonly selected: boolean;
+  readonly status: WebuiBrowserTargetStatus;
+}
+
+/**
+ * The rows the panel's list shows.
+ *
+ * The **session's web tabs**, when the runtime publishes them: the pages that
+ * were opened as tabs, and only those. A browser holds more pages than that —
+ * the page it opens for itself at startup, and the one the provider drives
+ * before anyone asks for a page — and listing those beside the tabs is what
+ * makes a browser with one tab read as a browser with three.
+ *
+ * The runtime's own target list is the fallback, for a runtime that publishes no
+ * web tabs. It is a different thing: it is every page the browser has.
+ */
+export function selectWebuiBrowserPanelRows(
+  state: WebuiBrowserPanelState | undefined,
+  webTabs: WebuiBrowserWebTabSnapshot | undefined,
+): readonly WebuiBrowserPanelRow[] {
+  if (webTabs) {
+    return webTabs.tabs.map((tab) => ({
+      key: tab.id,
+      browserId: tab.target.browserId,
+      targetId: tab.target.targetId,
+      generation: tab.target.generation,
+      surface: tab.target.surface,
+      title: tab.title,
+      url: tab.url,
+      selected: tab.selected,
+      status: "open",
+    }));
+  }
+  return (state?.targets ?? []).map((target) => ({
+    key: `${target.id.browserId}:${target.id.targetId}`,
+    browserId: target.id.browserId,
+    targetId: target.id.targetId,
+    generation: target.id.generation,
+    surface: target.id.surface,
+    title: target.title,
+    url: target.url,
+    selected: target.selected,
+    status: target.status,
+  }));
 }
 
 /** Every surface with its switch, so the view renders the list from one derivation. */

@@ -45,6 +45,7 @@ import {
   useMemo,
   useReducer,
   useRef,
+  useState,
   type ReactElement,
 } from "react";
 
@@ -54,8 +55,10 @@ import type {
   WebuiBrowserInputCommand,
   WebuiBrowserSurface,
   WebuiBrowserTargetId,
+  WebuiBrowserWebTabSnapshot,
 } from "../../../../shared/contracts/browser.js";
 import { useWebuiPortSlice } from "../../../bindings/port-slices-context.js";
+import { useWebuiSettingsWorkflowsState } from "../../../bindings/use-query-state.js";
 import { useWebuiBrowserRunId } from "../bindings/use-browser-run.public.js";
 import {
   useWebuiBrowserAuthorization,
@@ -167,6 +170,20 @@ export function BrowserPanelHost({
   const runId = runIdProp ?? activeRunId;
   const runScope = useMemo(() => (runId ? { runId } : {}), [runId]);
 
+  // The handshake's manifest, so the panel can say *why* a family is unusable.
+  // It arrives with the runtime's version, and the shell reads that; a panel
+  // that asked for nothing was told "unknown" for ever, and said the runtime
+  // had no browser while it was drawing one.
+  const settingsState = useWebuiSettingsWorkflowsState();
+  const capabilityManifest = settingsState.runtimeVersion.value?.capabilities;
+
+  // The session's web tabs, as the runtime published them. The panel's list
+  // shows these: a browser holds pages that are not tabs — the page it opens at
+  // startup, the one the provider drives for itself — and listing those beside
+  // the tabs is what makes a browser with one tab read as three.
+  const [webTabs, setWebTabs] = useState<WebuiBrowserWebTabSnapshot | undefined>(undefined);
+  const watchBrowserWebTabs = port?.watchBrowserWebTabs;
+
   // The authorization is the browser family's, and it is read from the owner
   // the Settings page also reads: the switches moved to the settings page, and
   // a panel that kept a second copy would go on showing the answer it had when
@@ -216,6 +233,21 @@ export function BrowserPanelHost({
   useEffect(() => {
     void authorizationOwner?.load();
   }, [authorizationOwner]);
+
+  // The session's web tabs, subscribed once for the surface the panel is on.
+  // When the slice's `watchBrowserWebTabs` changes identity the previous
+  // subscription is closed and a new one is opened, the same way the strip's
+  // own subscription is managed.
+  const watchTabsKey = watchBrowserWebTabs ?? null;
+  useEffect(() => {
+    if (!watchBrowserWebTabs) return;
+    const stop = watchBrowserWebTabs({ surface, ...runScope }, (snapshot) => {
+      setWebTabs(snapshot);
+    });
+    return () => {
+      stop();
+    };
+  }, [watchTabsKey, surface, runScope]);
 
   // The panel's own state follows the owner's answer.
   useEffect(() => {
@@ -361,7 +393,14 @@ export function BrowserPanelHost({
       {targetProp ? (
         <WebuiBrowserToolbar url={urlProp} onCommand={onToolbarCommand} />
       ) : null}
-      <BrowserPanel port={port} state={state} onSendInput={onSendInput} onRejected={onRejected} />
+      <BrowserPanel
+        port={port}
+        state={state}
+        capabilities={capabilityManifest}
+        webTabs={webTabs}
+        onSendInput={onSendInput}
+        onRejected={onRejected}
+      />
     </div>
   );
 }

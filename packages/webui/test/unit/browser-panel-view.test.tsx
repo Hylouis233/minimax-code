@@ -21,6 +21,7 @@ import {
   WEBUI_BROWSER_AUTHORIZATION_DEFAULT,
   type WebuiBrowserAuthorization,
   type WebuiBrowserTargetState,
+  type WebuiBrowserWebTabSnapshot,
 } from "../../src/shared/contracts/browser.js";
 import type { BrowserPort } from "../../src/client/features/browser/contracts/browser-port.js";
 import { initialWebuiBrowserPanelState, reduceWebuiBrowserPanelState } from "../../src/client/features/browser/projection/browser-state.js";
@@ -128,6 +129,78 @@ describe("the Browser panel", () => {
     expect(markup).toContain("https://example.test/");
     expect(markup).toContain("第 4 代");
     expect(markup).toContain('aria-current="true"');
+  });
+
+  it("lists the session's web tabs and not the browser's other pages", () => {
+    // A browser holds more pages than it has tabs: the page it opens for itself
+    // at startup, and the one the provider drives before anyone asks for a page.
+    // The list is the session's tabs, so a browser with one tab reads as one tab.
+    const state = loadedState();
+    const internal = targetState({
+      id: { surface: "isolated-chromium", browserId: "chromium-1", targetId: "tab-launch", generation: 1 },
+      title: "about:blank",
+      url: "about:blank",
+      selected: false,
+    });
+    const webTabs: WebuiBrowserWebTabSnapshot = {
+      surface: "isolated-chromium",
+      tabs: [
+        {
+          id: "web-tab-1",
+          target: { surface: "isolated-chromium", browserId: "chromium-1", targetId: "tab-1", generation: 2 },
+          title: "Example Domain",
+          url: "https://example.test/",
+          selected: true,
+        },
+      ],
+    };
+
+    const markup = renderToStaticMarkup(
+      <BrowserPanel
+        port={wiredPort}
+        state={{ ...state, targets: [internal, ...state.targets] }}
+        capabilities={{ browser: "supported" }}
+        webTabs={webTabs}
+      />,
+    );
+
+    expect(markup).toContain("Example Domain");
+    expect(markup).toContain("https://example.test/");
+    // The generation comes from the published tab, not from a list read before
+    // the page moved.
+    expect(markup).toContain("第 2 代");
+    // The browser's own pages are not tabs, and the list does not name them.
+    expect(markup).not.toContain("about:blank");
+  });
+
+  it("says the runtime has no browser capability only when the manifest says so", () => {
+    // The panel asks "why is this family unusable", and the answer is the
+    // handshake's manifest. A panel that was never handed one cannot tell
+    // "no browser" from "nobody told me", and says the wrong one.
+    const withoutManifest = renderToStaticMarkup(
+      <BrowserPanel port={wiredPort} state={loadedState()} />,
+    );
+    expect(withoutManifest).toContain("当前运行时没有报告浏览器能力");
+
+    const withManifest = renderToStaticMarkup(
+      <BrowserPanel port={wiredPort} state={loadedState()} capabilities={{ browser: "supported" }} />,
+    );
+    expect(withManifest).not.toContain("当前运行时没有报告浏览器能力");
+  });
+
+  it("is handed the manifest and the session's web tabs by its host", () => {
+    // Two wirings the panel cannot do for itself. The manifest is the
+    // handshake's: without it the panel says the runtime has no browser while
+    // it is drawing one. The web tabs are the session's: without them the list
+    // is the browser's own page list, and a browser with one tab reads as three.
+    const source = readFileSync(
+      new URL("../../src/client/features/browser/ui/BrowserPanelHost.public.tsx", import.meta.url),
+      "utf8",
+    );
+
+    expect(source).toContain("capabilities={capabilityManifest}");
+    expect(source).toContain("webTabs={webTabs}");
+    expect(source).toContain("watchBrowserWebTabs");
   });
 
   it("reports the run's selection without offering to change it", () => {

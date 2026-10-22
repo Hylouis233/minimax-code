@@ -45,6 +45,7 @@ import {
   type WebuiBrowserError,
   type WebuiBrowserInputCommand,
   type WebuiBrowserSurface,
+  type WebuiBrowserWebTabSnapshot,
 } from "../../../../shared/contracts/browser.js";
 import { readWebuiCapability, type WebuiCapabilityView } from "../../../../shared/capability-manifest.js";
 import type { BrowserPort } from "../contracts/browser-port.js";
@@ -60,6 +61,7 @@ import {
 } from "../application/browser-commands.js";
 import {
   selectWebuiBrowserFrame,
+  selectWebuiBrowserPanelRows,
   selectWebuiBrowserViewedTarget,
   webuiBrowserFrameDataUrl,
 } from "../projection/browser-state.js";
@@ -101,6 +103,15 @@ export interface BrowserPanelProps {
   readonly state?: WebuiBrowserPanelState;
   /** The handshake manifest, so the panel can say *why* a family is unusable. */
   readonly capabilities?: WebuiCapabilityView;
+  /**
+   * The session's web tabs, as the runtime published them.
+   *
+   * The list shows these and not the browser's own page list: a browser holds
+   * pages that are not tabs — the page it opens at startup, the one the provider
+   * drives for itself — and a list that names them reads as more tabs than the
+   * person opened.
+   */
+  readonly webTabs?: WebuiBrowserWebTabSnapshot;
   /** Receives only commands that passed validation and the generation binding. */
   readonly onSendInput?: (command: WebuiBrowserInputCommand) => void;
   /** Receives every refusal, so a gesture that went nowhere is visible. */
@@ -111,6 +122,7 @@ export function BrowserPanel({
   port,
   state,
   capabilities,
+  webTabs,
   onSendInput,
   onRejected,
 }: BrowserPanelProps): ReactElement {
@@ -193,7 +205,9 @@ export function BrowserPanel({
     [submit],
   );
 
-  const targets = state?.targets ?? [];
+  // The rows are the session's web tabs when the runtime publishes them, and the
+  // browser's own page list otherwise.
+  const rows = selectWebuiBrowserPanelRows(state, webTabs);
 
   return (
     <section className="webui-browser-panel" data-testid="browser-panel" role="region" aria-label={PANEL_COPY.title}>
@@ -263,25 +277,25 @@ export function BrowserPanel({
           aria-label={PANEL_COPY.targetListLabel}
           data-testid="browser-target-list"
         >
-          {targets.length === 0 ? (
+          {rows.length === 0 ? (
             <p className="webui-browser-empty" role="status" data-testid="browser-panel-no-targets">
               {PANEL_COPY.noTargets}
             </p>
           ) : (
             <ul className="webui-browser-target-list" data-testid="browser-target-items">
-              {targets.map((target) => (
-                <li key={`${target.id.browserId}:${target.id.targetId}:${target.id.generation}`}>
+              {rows.map((row) => (
+                <li key={`${row.key}:${row.generation}`}>
                   <span
-                    aria-current={target.selected ? "true" : undefined}
-                    data-testid={`browser-target-${target.id.browserId}-${target.id.targetId}`}
-                    data-target-generation={target.id.generation}
-                    data-target-status={target.status}
-                    className={target.selected ? "webui-browser-target is-active" : "webui-browser-target"}
+                    aria-current={row.selected ? "true" : undefined}
+                    data-testid={`browser-target-${row.browserId}-${row.targetId}`}
+                    data-target-generation={row.generation}
+                    data-target-status={row.status}
+                    className={row.selected ? "webui-browser-target is-active" : "webui-browser-target"}
                   >
-                    <strong>{target.title || target.url}</strong>
-                    <span className="webui-browser-target-url">{target.url}</span>
+                    <strong>{row.title || row.url}</strong>
+                    <span className="webui-browser-target-url">{row.url}</span>
                     <span className="webui-browser-target-meta">
-                      {`${SURFACE_LABELS[target.id.surface]} · 第 ${target.id.generation} 代 · ${target.status === "open" ? "已打开" : "已关闭"}`}
+                      {`${SURFACE_LABELS[row.surface]} · 第 ${row.generation} 代 · ${row.status === "open" ? "已打开" : "已关闭"}`}
                     </span>
                   </span>
                 </li>
