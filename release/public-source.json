@@ -4473,6 +4473,7 @@
     "scripts/ci-changes.mjs",
     "scripts/export-source-preview.mjs",
     "scripts/gen-tsconfig-paths.mjs",
+    "scripts/lib/acceptance-records.mjs",
     "scripts/lib/builtin-skills.mjs",
     "scripts/lib/cli-release.mjs",
     "scripts/lib/local-runtime-assets.mjs",
