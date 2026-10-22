@@ -184,10 +184,16 @@
    * space away. A bar between the toolbar and the page would cut the window
    * in two, and the page is the thing the person came for. */
   .webui-browser-notice {
-    /* Positioned, so it paints above the stage without a layer of its own:
-     * the shell declares the stacking scale, and a value outside it is a
-     * defect the structure test names. */
+    /* The layer is what keeps the bubble visible, and being positioned is
+     * not enough. The notice is rendered before the stage, and the stage is
+     * `position: relative` with an opaque background while the input surface
+     * over it is `position: absolute` — both `z-index: auto`, so they paint
+     * over the bubble in tree order. 3 sits with the pinned headers (1 and 2)
+     * in the shell's declared scale: the browser panel is an in-flow region
+     * of the shell, not an overlay, so nothing it draws may cover the goal
+     * overlay at 20 or the workspace drawer at 40. */
     position: absolute;
+    z-index: 3;
     top: 8px;
     left: 8px;
     max-width: calc(100% - 16px);

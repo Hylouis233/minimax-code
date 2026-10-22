@@ -16,6 +16,19 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
+/**
+ * Remove a data directory the runtime host has just booted against.
+ *
+ * The host writes its auth store under `auth/prod/cn/`, and it may still be
+ * writing when the test tears the directory down. `rm` then reports
+ * `ENOTEMPTY: directory not empty` — the removal raced the last write, and
+ * the suite file fails with every test in it passing. The provider's own
+ * removal has retried for that reason since 782c137b, and 9ac67622 taught the
+ * browser-profile removals to as well; the teardown here did not.
+ */
+const removeDataDir = (dir: string): Promise<void> =>
+  rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+
 import { resetDefaultLocalRuntimeConfig } from "@mavis/local-runtime-v2";
 
 import { createWebuiRuntimeHost } from "../../src/runtime/index.js";
@@ -131,7 +144,7 @@ describe("WebUI runtime single-owner invariants", () => {
     } finally {
       resetDefaultLocalRuntimeConfig();
       vi.unstubAllEnvs();
-      await rm(dataDir, { recursive: true, force: true });
+      await removeDataDir(dataDir);
     }
   });
 
@@ -171,7 +184,7 @@ describe("WebUI runtime single-owner invariants", () => {
     } finally {
       resetDefaultLocalRuntimeConfig();
       vi.unstubAllEnvs();
-      await rm(dataDir, { recursive: true, force: true });
+      await removeDataDir(dataDir);
     }
   });
 
@@ -205,7 +218,7 @@ describe("WebUI runtime single-owner invariants", () => {
       expect(vi.getTimerCount()).toBe(0);
     } finally {
       vi.useRealTimers();
-      await rm(dataDir, { recursive: true, force: true });
+      await removeDataDir(dataDir);
     }
   });
 });

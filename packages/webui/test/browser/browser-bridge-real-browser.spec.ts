@@ -171,6 +171,19 @@ test.describe("the browser bridge, against a real browser", () => {
     // pairing: the Edge surface would report connected while the person is
     // looking at Chrome, and the Chrome surface would never come up at all.
     test.setTimeout(240_000);
+    // This case needs both browsers, not one: it loads the same unpacked build
+    // in Edge and Chrome and checks that each lands on its own surface. A
+    // machine without Edge cannot run it at all, and the convention the two
+    // single-browser cases above follow — a case that cannot run says so
+    // instead of failing on a browser that was never there — applies to it
+    // as much as to them.
+    const installed = await Promise.all(
+      BROWSERS.map(({ channel }) => isBrowserInstalled(channel)),
+    );
+    test.skip(
+      !installed.every(Boolean),
+      `the ${BROWSERS.map(({ channel }) => channel).join(" and ")} browsers are not all installed on this machine`,
+    );
     const browsers: {
       channel: "chromium" | "msedge";
       surface: "edge" | "chrome";

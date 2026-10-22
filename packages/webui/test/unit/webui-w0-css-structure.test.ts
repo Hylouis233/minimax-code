@@ -777,13 +777,12 @@ describe("W0 · at-rules and animations W5/W6 must not remove", () => {
       rule.context.some((entry) => entry.includes("prefers-reduced-motion")),
     );
 
-    // Eight blocks in shell.css, nine rules inside them (the settings block
-    // disables two selectors). Deleting one of these is the failure mode this
-    // assertion exists for: the base rule would keep animating for a user who
-    // asked for reduced motion. The exact list is the point -- adding an
-    // animated rule without registering its override here is the same defect,
-    // in the other direction.
-    expect(reducedMotion).toHaveLength(15);
+    // Sixteen rules across the stylesheets the shell imports. Deleting one of
+    // these is the failure mode this assertion exists for: the base rule would
+    // keep animating for a user who asked for reduced motion. The exact list
+    // is the point -- adding an animated rule without registering its override
+    // here is the same defect, in the other direction.
+    expect(reducedMotion).toHaveLength(16);
     for (const rule of reducedMotion)
       expect(rule.body).toMatch(/(?:animation|transition):\s*none/u);
 
@@ -813,6 +812,10 @@ describe("W0 · at-rules and animations W5/W6 must not remove", () => {
       // sessions opens and closes by transitioning its height, so a reader who
       // asked for reduced motion would otherwise watch the section slide.
       ".webui-progress-content-enter",
+      // Added with the progress section: it and its chevron transition their
+      // own state, so a reader who asked for reduced motion would otherwise
+      // watch both move.
+      ".webui-progress-section, .webui-progress-section-chevron",
       ".webui-project-section-content",
       // Added with the rail activity spinner. It spins forever by design, so a
       // reader who asked for reduced motion would otherwise get an animation
@@ -952,6 +955,15 @@ describe("W0 · stacking order", () => {
 
     expect(unique).toEqual([
       // 1 is used by the project/session row action controls.
+      // 3 is `.webui-browser-notice`, the bubble the browser panel draws over
+      // its own corner — the family is absent, the target changed, the page
+      // dropped frames. It is rendered before the panel's stage, and the stage
+      // and the input surface over it are `position: relative`/`absolute` with
+      // `z-index: auto` and an opaque background, so a value of its own is
+      // what keeps the bubble visible. It stays in the low band with the
+      // pinned headers (1 and 2) because the browser panel is an in-flow
+      // region of the shell rather than an overlay: nothing it draws may
+      // cover the goal overlay at 20 or the workspace drawer at 40.
       // 40 is `.webui-workspace-panel` inside `@media (max-width: 1080px)`.
       // Above that breakpoint the panel is an in-flow flex sibling and needs no
       // layer; below it the panel is pulled out of flow into a right-docked
@@ -995,7 +1007,7 @@ describe("W0 · stacking order", () => {
       // 4 is gone: it was the workspace panel's add-menu anchor, and the add
       // menu became the launcher's tiles. The launcher is a tab's content
       // rather than an overlay, so it needs no layer of its own.
-      1, 2, 20, 40, 45, 50, 60, 70, 100, 110, 111, 120, 121, 130, 140, 1400,
+      1, 2, 3, 20, 40, 45, 50, 60, 70, 100, 110, 111, 120, 121, 130, 140, 1400,
     ]);
   });
 });
