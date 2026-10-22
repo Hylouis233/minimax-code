@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactElement } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactElement } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { basenamePath } from "../../../projection/common/paths.js";
@@ -198,6 +198,8 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   readonly terminal?: WebuiTerminalOwner;
   readonly onClose?: () => void;
 }): ReactElement {
+  const [panelWidth, setPanelWidth] = useState<number>();
+  const resizeGesture = useRef<{ readonly pointerId: number; readonly startX: number; readonly startWidth: number } | undefined>(undefined);
   const { dom } = useWebuiBrowserCapabilities();
   // Query truth lives in the owner; this component reads its snapshot and
   // submits query commands. Display state — active tab, expansion, search box,
@@ -507,7 +509,38 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   // glyphs the strip needs and the launcher's tiles live in the strip itself:
   // the new tab page took the place of this panel's add menu, which was the same
   // four kinds behind a dropdown.
-  return <aside className={`webui-workspace-panel ${state.expanded ? "is-expanded" : ""}`} data-testid="workspace-panel" data-active-tab={tab}>
+  const startPanelResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (state.expanded || event.button !== 0) return;
+    event.preventDefault();
+    const panel = event.currentTarget.parentElement;
+    if (!panel) return;
+    resizeGesture.current = { pointerId: event.pointerId, startX: event.clientX, startWidth: panel.getBoundingClientRect().width };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const movePanelResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const gesture = resizeGesture.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    const parentWidth = event.currentTarget.parentElement?.parentElement?.getBoundingClientRect().width ?? window.innerWidth;
+    const maxWidth = Math.max(320, parentWidth * 0.95);
+    const minWidth = Math.min(360, maxWidth);
+    const requestedWidth = Math.min(maxWidth, Math.max(minWidth, gesture.startWidth - (event.clientX - gesture.startX)));
+    setPanelWidth(requestedWidth);
+  };
+  const stopPanelResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (resizeGesture.current?.pointerId !== event.pointerId) return;
+    resizeGesture.current = undefined;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+  const nudgePanelResize = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (state.expanded || (event.key !== "ArrowLeft" && event.key !== "ArrowRight")) return;
+    event.preventDefault();
+    const panel = event.currentTarget.parentElement;
+    const parentWidth = panel?.parentElement?.getBoundingClientRect().width ?? window.innerWidth;
+    const currentWidth = panel?.getBoundingClientRect().width ?? parentWidth / 2;
+    setPanelWidth(Math.min(parentWidth * 0.95, Math.max(Math.min(360, parentWidth * 0.95), currentWidth + (event.key === "ArrowLeft" ? 24 : -24))));
+  };
+  return <aside className={`webui-workspace-panel ${state.expanded ? "is-expanded" : ""}`} style={panelWidth !== undefined && !state.expanded ? { width: `${panelWidth}px`, flex: `0 0 ${panelWidth}px` } : undefined} data-testid="workspace-panel" data-active-tab={tab}>
+    <div className="webui-workspace-panel-resize-handle" role="separator" aria-label="调整工作区面板宽度" aria-orientation="vertical" aria-valuenow={Math.round(panelWidth ?? 50)} tabIndex={state.expanded ? -1 : 0} onPointerDown={startPanelResize} onPointerMove={movePanelResize} onPointerUp={stopPanelResize} onPointerCancel={stopPanelResize} onKeyDown={nudgePanelResize} />
     <div className="webui-workspace-panel-header">
       <div className="webui-workspace-tabs" role="tablist" aria-label="工作区面板标签">
         <WebuiWorkspaceTabStrip state={state} dispatch={dispatch} sessionId={sessionId} />

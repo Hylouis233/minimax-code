@@ -137,7 +137,12 @@ describe("input forwarding", () => {
       "Input.dispatchMouseEvent",
       "Input.dispatchMouseEvent",
     ]);
-    expect(browserDebugger.sent[0]?.params).toMatchObject({ type: "mousePressed", x: 10, y: 20, button: "left" });
+    expect(browserDebugger.sent[0]?.params).toMatchObject({
+      type: "mousePressed", x: 10, y: 20, button: "left", clickCount: 1,
+    });
+    expect(browserDebugger.sent[1]?.params).toMatchObject({
+      type: "mouseReleased", x: 10, y: 20, button: "left", clickCount: 1,
+    });
   });
 
   it("delivers text through insertText rather than synthesized key events", async () => {

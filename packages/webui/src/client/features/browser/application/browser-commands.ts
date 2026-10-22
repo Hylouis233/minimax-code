@@ -137,13 +137,32 @@ export function buildWebuiBrowserPointerCommand(
   if (intent.x < 0 || intent.y < 0) {
     return invalid("pointer_coordinate", "指针坐标不能为负数。");
   }
-  if (intent.button !== "left" && intent.button !== "middle" && intent.button !== "right") {
-    return invalid("pointer_button", "指针按钮必须是 left、middle 或 right。");
+  const action = intent.action;
+  if (action !== undefined && !["press", "release", "move", "scroll"].includes(action)) {
+    return invalid("pointer_coordinate", "未知的指针动作。");
   }
-  if (!Number.isInteger(intent.clickCount) || intent.clickCount < 0) {
+  if (action !== "move" && action !== "scroll") {
+    if (intent.button !== "left" && intent.button !== "middle" && intent.button !== "right") {
+      return invalid("pointer_button", "指针按钮必须是 left、middle 或 right。");
+    }
+  }
+  if (action === undefined && (!Number.isInteger(intent.clickCount) || (intent.clickCount ?? -1) < 0)) {
     return invalid("pointer_click_count", "点击次数必须是非负整数。");
   }
-  return { ok: true, command: { kind: "pointer", target, x: intent.x, y: intent.y, button: intent.button, clickCount: intent.clickCount } };
+  if (action === "scroll" && (!finiteCoordinate(intent.deltaX) || !finiteCoordinate(intent.deltaY))) {
+    return invalid("pointer_coordinate", "滚轮偏移必须是有限数值。");
+  }
+  return {
+    ok: true,
+    command: {
+      kind: "pointer", target, x: intent.x, y: intent.y,
+      ...(action ? { action } : {}),
+      ...(intent.button ? { button: intent.button } : {}),
+      ...(intent.clickCount !== undefined ? { clickCount: intent.clickCount } : {}),
+      ...(intent.deltaX !== undefined ? { deltaX: intent.deltaX } : {}),
+      ...(intent.deltaY !== undefined ? { deltaY: intent.deltaY } : {}),
+    },
+  };
 }
 
 /** The keyboard command for one key press, if the press is one the contract allows. */
@@ -219,12 +238,11 @@ export function buildWebuiBrowserTextCommand(
 /**
  * The point the person chose, in the picture's own pixels.
  *
- * The picture is the browser's viewport, drawn to fit the surface it is shown
- * on. A click on the surface is therefore not yet a point in the browser: the
- * picture is scaled down, and the space around it is not part of the page at
- * all. The point is mapped back into the picture's own size -- the same
- * arithmetic the picture is drawn with, in reverse -- so that a click lands
- * where the person saw it.
+ * The picture is the browser's viewport, cropped to cover the surface it is
+ * shown on. A click on the surface is therefore not yet a point in the browser:
+ * the visible image may start partway into the source picture. The point is
+ * mapped back into the picture's own size using that crop, so it lands where
+ * the person saw it.
  *
  * The picture's own size is the browser's viewport, so the point that comes
  * out is a viewport point, which is what the browser's input commands take.
@@ -242,11 +260,13 @@ export function webuiBrowserPicturePoint(
 ): { readonly x: number; readonly y: number } {
   const sourceWidth = picture?.naturalWidth || surface.width;
   const sourceHeight = picture?.naturalHeight || surface.height;
-  const scale = Math.min(surface.width / sourceWidth, surface.height / sourceHeight);
+  const scale = Math.max(surface.width / sourceWidth, surface.height / sourceHeight);
   const drawnWidth = sourceWidth * scale;
   const drawnHeight = sourceHeight * scale;
-  const insetX = (surface.width - drawnWidth) / 2;
-  const insetY = (surface.height - drawnHeight) / 2;
+  // CSS anchors the covered frame at the top left, so overflow is clipped on
+  // the right and bottom rather than shared evenly around the image.
+  const insetX = 0;
+  const insetY = 0;
   const x = (clientX - surface.left - insetX) * (sourceWidth / drawnWidth);
   const y = (clientY - surface.top - insetY) * (sourceHeight / drawnHeight);
   return {

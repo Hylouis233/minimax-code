@@ -68,6 +68,88 @@ test("the launcher's address box opens a page, and the panel is a window around 
   await expect(page.getByTestId("browser-panel")).toHaveAttribute("aria-label", "浏览器");
 });
 
+test("the browser page fills the workspace body and the workspace edge resizes horizontally", async ({ page }) => {
+  await configureFixture(page, () => undefined);
+  await openApp(page);
+  await openPanel(page);
+  await openPage(page, "https://example.test/");
+
+  const stage = page.locator(".webui-browser-stage");
+  const frame = page.getByTestId("browser-panel-frame");
+  const stageBox = await stage.boundingBox();
+  const frameBox = await frame.boundingBox();
+  expect(stageBox).not.toBeNull();
+  expect(frameBox).not.toBeNull();
+  expect(Math.abs(frameBox.width - stageBox.width)).toBeLessThanOrEqual(1);
+  expect(Math.abs(frameBox.height - stageBox.height)).toBeLessThanOrEqual(1);
+
+  const panel = page.getByTestId("workspace-panel");
+  const before = await panel.boundingBox();
+  const handle = page.getByRole("separator", { name: "调整工作区面板宽度" });
+  await page.mouse.move(before.x + 4, before.y + before.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(before.x - 56, before.y + before.height / 2);
+  await page.mouse.up();
+  const after = await panel.boundingBox();
+  expect(after.width).toBeGreaterThan(before.width + 40);
+  await expect(handle).toBeVisible();
+  await handle.focus();
+  await page.keyboard.press("ArrowLeft");
+  await expect.poll(async () => (await panel.boundingBox()).width).toBeGreaterThan(after.width + 10);
+});
+
+test("a narrow workspace crops the page instead of stretching its aspect ratio", async ({ page }) => {
+  await page.setViewportSize({ width: 760, height: 900 });
+  await configureFixture(page, () => undefined);
+  await openApp(page);
+  await openPanel(page);
+  await openPage(page, "https://example.test/");
+
+  const frame = page.getByTestId("browser-panel-frame");
+  await expect(frame).toBeVisible();
+  await expect.poll(() => frame.evaluate((image) => image.naturalWidth)).toBe(640);
+  await expect.poll(() => frame.evaluate((image) => image.naturalHeight)).toBe(400);
+  await expect(frame).toHaveCSS("object-fit", "cover");
+  await expect(frame).toHaveCSS("object-position", "0% 0%");
+});
+
+test("mouse clicks in the cropped part of a narrow browser page map to the visible page coordinates", async ({ page }) => {
+  await page.setViewportSize({ width: 760, height: 900 });
+  await configureFixture(page, () => undefined);
+  await openApp(page);
+  await openPanel(page);
+  await openPage(page, "https://example.test/");
+
+  const frame = page.getByTestId("browser-panel-frame");
+  await expect(frame).toBeVisible();
+  await expect.poll(() => frame.evaluate((image) => image.naturalWidth)).toBe(640);
+
+  const box = await frame.boundingBox();
+  const clickX = box.x + box.width * 0.25;
+  const clickY = box.y + box.height * 0.25;
+  const scale = Math.max(box.width / 640, box.height / 400);
+  const drawnWidth = 640 * scale;
+  const drawnHeight = 400 * scale;
+  const insetX = 0;
+  const insetY = 0;
+  const expectedX = (clickX - box.x - insetX) * 640 / drawnWidth;
+  const expectedY = (clickY - box.y - insetY) * 400 / drawnHeight;
+  await page.mouse.click(clickX, clickY);
+  await expect.poll(() => page.evaluate(() => window.__fixture.requests
+    .filter((request) => request.operation === "sendBrowserInput")
+    .filter((request) => request.body.kind === "pointer" && ["press", "release"].includes(request.body.action))
+    .map((request) => request.body.action))).toEqual(["press", "release"]);
+
+  const points = await page.evaluate(() => window.__fixture.requests
+    .filter((request) => request.operation === "sendBrowserInput")
+    .filter((request) => request.body.kind === "pointer" && request.body.action === "press")
+    .map((request) => request.body));
+  expect(points).toHaveLength(1);
+  expect(points[0].target.targetId).toBe("tab-1");
+  expect(Math.abs(points[0].x - expectedX)).toBeLessThanOrEqual(1);
+  expect(Math.abs(points[0].y - expectedY)).toBeLessThanOrEqual(1);
+});
+
 test("the strip shows the page the runtime published, and the panel follows it", async ({ page }) => {
   await configureFixture(page, () => {
     window.__fixture.setBrowserTabs([
@@ -126,7 +208,7 @@ test("a gesture names the page in front, not the page the Agent is on", async ({
   await page.getByRole("tab", { name: "Person page" }).click();
   await expect(page.getByTestId("browser-toolbar-url")).toHaveText("https://person.test/");
 
-  await page.getByTestId("browser-panel-input").click();
+  await page.getByTestId("browser-panel-frame").click();
 
   await expect
     .poll(() =>
@@ -136,6 +218,17 @@ test("a gesture names the page in front, not the page the Agent is on", async ({
       }),
     )
     .not.toBeNull();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.__fixture.requests
+          .filter((request) => request.operation === "sendBrowserInput")
+          .map((request) => request.body)
+          .filter((body) => body.kind === "pointer" && ["press", "release"].includes(body.action))
+          .map((body) => body.action),
+      ),
+    )
+    .toEqual(["press", "release"]);
   const sent = await page.evaluate(() => {
     const all = window.__fixture.requests.filter((request) => request.operation === "sendBrowserInput");
     return all[all.length - 1].body;

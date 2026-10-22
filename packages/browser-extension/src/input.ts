@@ -140,9 +140,25 @@ async function applyCommand(
 ): Promise<void> {
   switch (command.kind) {
     case "pointer": {
-      const base = { x: command.x, y: command.y, button: command.button, clickCount: command.clickCount };
-      await send(tabId, "Input.dispatchMouseEvent", { ...base, type: "mousePressed" });
-      await send(tabId, "Input.dispatchMouseEvent", { ...base, type: "mouseReleased" });
+      const base = { x: command.x, y: command.y };
+      if (command.action === "move") {
+        await send(tabId, "Input.dispatchMouseEvent", { ...base, type: "mouseMoved", button: "none" });
+      } else if (command.action === "scroll") {
+        await send(tabId, "Input.dispatchMouseEvent", {
+          ...base, type: "mouseWheel", deltaX: command.deltaX, deltaY: command.deltaY, button: "none",
+        });
+      } else if (command.action === "press" || command.action === "release") {
+        await send(tabId, "Input.dispatchMouseEvent", {
+          ...base,
+          type: command.action === "press" ? "mousePressed" : "mouseReleased",
+          button: command.button,
+          clickCount: command.clickCount ?? 1,
+        });
+      } else {
+        const click = { ...base, button: command.button, clickCount: command.clickCount };
+        await send(tabId, "Input.dispatchMouseEvent", { ...click, type: "mousePressed" });
+        await send(tabId, "Input.dispatchMouseEvent", { ...click, type: "mouseReleased" });
+      }
       return;
     }
     case "key": {

@@ -2,21 +2,20 @@
   .webui-progress-panel-motion { position: fixed; top: 72px; right: 12px; z-index: 45; display: block; width: 0; min-width: 0; max-width: min(288px, calc(100vw - 24px)); overflow: hidden; pointer-events: none; transition: width 180ms cubic-bezier(.2, .7, .2, 1); }
   .webui-progress-panel-motion.is-open { width: min(288px, calc(100% - 24px)); pointer-events: auto; }
   .webui-progress-overview-panel { position: static; display: flex; width: min(288px, calc(100vw - 24px)); min-width: min(288px, calc(100vw - 24px)); min-height: 0; flex: 0 0 auto; flex-direction: column; overflow: hidden; border: 0; background: transparent; padding: 0; }
-  .webui-progress-overview-card { position: relative; display: flex; width: 100%; height: auto; max-height: max(0px, min(560px, calc(100vh - 88px))); max-height: max(0px, min(560px, calc(100dvh - 88px))); min-height: 0; box-sizing: border-box; flex-direction: column; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: var(--border_default) transparent; scrollbar-width: thin; border: .5px solid var(--border_default); border-radius: 16px; background: var(--bg_grouped_secondary_elevated); padding: 6px; box-shadow: none; color: var(--text_default_primary); }
-  .webui-progress-overview-card::-webkit-scrollbar { width: 4px; }
-  .webui-progress-overview-card::-webkit-scrollbar-thumb { border-radius: 4px; background: var(--border_default); }
+  .webui-progress-overview-card { position: relative; display: flex; width: 100%; height: auto; max-height: max(0px, min(560px, calc(100vh - 88px))); max-height: max(0px, min(560px, calc(100dvh - 88px))); min-height: 0; box-sizing: border-box; flex-direction: column; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; border: .5px solid var(--border_default); border-radius: 16px; background: var(--bg_grouped_secondary_elevated); padding: 6px; box-shadow: none; color: var(--text_default_primary); }
+  .webui-progress-overview-card, .webui-progress-scroll, .webui-subagents-scroll { scrollbar-width: none; -ms-overflow-style: none; scrollbar-gutter: auto; }
+  .webui-progress-overview-card::-webkit-scrollbar, .webui-progress-scroll::-webkit-scrollbar, .webui-subagents-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
   .webui-progress-overview-main { display: flex; width: 100%; min-width: 0; min-height: 0; flex: 0 1 auto; flex-direction: column; overflow: visible; }
   .webui-progress-section { display: flex; width: 100%; height: 200px; min-width: 0; min-height: 58px; box-sizing: border-box; flex: 0 0 200px; flex-direction: column; overflow: hidden; transition: height 180ms cubic-bezier(.2, .7, .2, 1), flex-basis 180ms cubic-bezier(.2, .7, .2, 1); }
   .webui-progress-section.webui-environment-panel { height: 160px; min-height: 58px; flex: 0 0 160px; }
+  .webui-progress-section.webui-subagents-panel { height: auto; max-height: 200px; flex: 0 0 auto; transition: max-height 180ms cubic-bezier(.2, .7, .2, 1); }
+  .webui-progress-section.webui-subagents-panel.is-collapsed { height: auto; max-height: 28px; min-height: 0; flex-basis: auto; }
   .webui-progress-section.is-collapsed { height: 28px; min-height: 0; flex-basis: 28px; }
   .webui-environment-panel, .webui-progress-panel, .webui-subagents-panel { min-width: 0; box-sizing: border-box; }
   .webui-expandable-motion { width: 100%; min-height: 0; flex: 1 1 auto; }
   .webui-progress-scroll { height: 100%; min-height: 0; overflow-y: auto; overflow-x: hidden; }
-  .webui-progress-scroll { scrollbar-width: none; -ms-overflow-style: none; scrollbar-gutter: auto; }
-  .webui-progress-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
-  .webui-subagents-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
   .webui-progress-empty { margin: 0; padding: 0 6px 6px; color: var(--text_default_tertiary); font-size: var(--size_14); line-height: 20px; }
-  .webui-subagents-scroll { height: 100%; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; -ms-overflow-style: none; scrollbar-gutter: auto; }
+  .webui-subagents-scroll { height: auto; max-height: 171px; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; -ms-overflow-style: none; scrollbar-gutter: auto; }
   .webui-environment-panel + .webui-progress-panel { border-top: 1px solid var(--border_light); }
   .webui-progress-panel + .webui-subagents-panel { border-top: 1px solid var(--border_light); }
   .webui-environment-body { min-height: 0; padding: 0 6px 6px; }

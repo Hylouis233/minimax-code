@@ -904,7 +904,7 @@ function commandIdOf(command: WebuiBrowserBridgeInputCommand): string {
   // readable makes wire captures (during bring-up) obvious in the logs.
   switch (command.kind) {
     case "pointer":
-      return `ptr:${command.targetId}:${command.generation}:${command.x},${command.y}:${command.clickCount}`;
+      return `ptr:${command.targetId}:${command.generation}:${command.action ?? "click"}:${command.x},${command.y}:${command.clickCount ?? ""}:${command.deltaX ?? ""},${command.deltaY ?? ""}`;
     case "key":
       return `key:${command.targetId}:${command.generation}:${command.key}:${command.modifiers.join("+")}`;
     case "text":

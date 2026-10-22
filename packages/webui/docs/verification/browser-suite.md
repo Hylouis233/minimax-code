@@ -45,6 +45,17 @@ runtime's browser behaviour. The isolated Chromium, the extension and the bridge
 runtime's own integration suites and by `browser-bridge-real-*.spec.mjs`, which launch a real
 browser instead of answering from a page.
 
+`test/integration/browser-panel-live-navigation.test.ts` is part of the repository's
+`test:webui` Vitest gate. When system Chrome is available, it runs the real isolated Chromium,
+browser service, CDP pointer and keyboard input, target registry and screencast against two
+temporary HTTP origins. The scenarios cover typing and submit clicks, scrolling, same-origin and
+cross-origin same-tab links, stream resubscription after navigation, back/forward/reload, and a
+cross-origin `target="_blank"` page. The two local origins make navigation repeatable without
+depending on a public site's markup, network availability or anti-bot responses. It skips on
+machines without a system Chrome executable. This runtime integration complements the
+`browser-workspace.spec.mjs` client-panel fixture; neither by itself proves a packaged desktop
+application or a user's logged-in Edge/Chrome session.
+
 ## Determinism
 
 Playwright uses one pinned Linux viewport (1440×900, DPR 1, `zh-CN`, `Asia/Shanghai`, light colour

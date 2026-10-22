@@ -166,6 +166,8 @@ export class WebuiBrowserService {
   readonly #options: WebuiBrowserServiceOptions;
   readonly #registry = new WebuiBrowserTargetRegistry();
   readonly #providers = new Map<WebuiBrowserSurface, WebuiBrowserSurfaceProvider>();
+  /** Input events for one page must reach its provider in the order received. */
+  readonly #inputQueues = new Map<string, Promise<void>>();
   /**
    * The target each run has selected, per surface and then per run.
    *
@@ -659,6 +661,26 @@ export class WebuiBrowserService {
         this.#publishWebTabs(surface, runId);
       }
     });
+    provider.onTargetCreated?.(({ target, openerTargetId }) => {
+      const identity = this.#registry.observe({
+        surface: target.surface,
+        browserId: target.browserId,
+        targetId: target.targetId,
+        title: "",
+        url: "",
+        status: "open",
+        generation: target.generation,
+      });
+      if (!openerTargetId) return;
+
+      // A person can open a new tab by clicking a link. Keep it in the same
+      // session tab strip as the page that opened it, so the UI can select and
+      // subscribe to that page. Do not move the Agent's selection: opening a
+      // person tab must not steal the page the Agent is working on.
+      for (const [runId, tabs] of [...(this.#webTabs.get(surface) ?? new Map())]) {
+        if (tabs.has(openerTargetId)) this.#recordWebTab(surface, runId, identity.id);
+      }
+    });
     return provider;
   }
 
@@ -811,28 +833,41 @@ export class WebuiBrowserService {
     _runId: string = WEBUI_BROWSER_NO_RUN_ID,
   ): Promise<{ readonly accepted: true }> {
     const validated = validateBrowserInputCommand(command);
-    const authorization = await this.readAuthorization();
-    if (!isBrowserSurfaceUsable(authorization, validated.target.surface)) {
-      throw browserOperationError(
-        "browser_surface_not_authorized",
-        `Browser surface "${validated.target.surface}" is not authorized.`,
-      );
-    }
-    if (!this.#registry.isCurrent(validated.target)) {
-      throw browserOperationError(
-        "browser_target_stale",
-        "The browser target has been replaced; the input was not delivered.",
-      );
-    }
-    const provider = await this.#ensureProvider(validated.target.surface);
-    if (!provider) {
-      throw browserOperationError(
-        "browser_provider_unavailable",
-        `Browser surface "${validated.target.surface}" has no connected browser.`,
-        true,
-      );
-    }
-    await provider.sendInput(validated);
+    const { surface, browserId, targetId } = validated.target;
+    const key = `${surface}:${browserId}:${targetId}`;
+    const previous = this.#inputQueues.get(key) ?? Promise.resolve();
+    const delivery = previous.then(async () => {
+      const authorization = await this.readAuthorization();
+      if (!isBrowserSurfaceUsable(authorization, surface)) {
+        throw browserOperationError(
+          "browser_surface_not_authorized",
+          `Browser surface "${surface}" is not authorized.`,
+        );
+      }
+      if (!this.#registry.isCurrent(validated.target)) {
+        throw browserOperationError(
+          "browser_target_stale",
+          "The browser target has been replaced; the input was not delivered.",
+        );
+      }
+      const provider = await this.#ensureProvider(surface);
+      if (!provider) {
+        throw browserOperationError(
+          "browser_provider_unavailable",
+          `Browser surface "${surface}" has no connected browser.`,
+          true,
+        );
+      }
+      await provider.sendInput(validated);
+    });
+    // A failed operation must not poison the queue behind it. Preserve its error
+    // for the caller, while storing a settled continuation for the next event.
+    const settled = delivery.then(() => undefined, () => undefined);
+    this.#inputQueues.set(key, settled);
+    void settled.then(() => {
+      if (this.#inputQueues.get(key) === settled) this.#inputQueues.delete(key);
+    });
+    await delivery;
     return { accepted: true };
   }
 

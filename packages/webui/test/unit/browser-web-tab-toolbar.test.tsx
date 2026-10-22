@@ -51,6 +51,10 @@ const WORKSPACE_PANELS_SOURCE = readFileSync(
   new URL("../../src/client/features/workspace/ui/WorkspacePanels.tsx", import.meta.url),
   "utf8",
 );
+const BROWSER_PANEL_HOST_SOURCE = readFileSync(
+  new URL("../../src/client/features/browser/ui/BrowserPanelHost.public.tsx", import.meta.url),
+  "utf8",
+);
 
 const PAGE: WebuiBrowserTargetId = {
   surface: "isolated-chromium",
@@ -132,6 +136,16 @@ describe("a web tab's toolbar", () => {
     // same page rather than a pair that has drifted.
     expect(WORKSPACE_PANELS_SOURCE).toContain(
       "<BrowserPanelHost target={activeTab.content.target} url={activeTab.content.url} />",
+    );
+  });
+
+  it("reloads the target list when the viewed tab or its page generation changes", () => {
+    // A tab can move to a new page without the host or surface changing. Its
+    // target prop then carries the new generation; the list must be refreshed
+    // too, or the frame can render while input stays disabled because the list
+    // still only knows the previous generation.
+    expect(BROWSER_PANEL_HOST_SOURCE).toContain(
+      "[port, refreshTargets, surface, targetProp]",
     );
   });
 

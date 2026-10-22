@@ -325,31 +325,26 @@ describe("the four authorization switches", () => {
   });
 });
 
-describe("a click is a point in the picture, not in the surface it is shown on", () => {
-  // The picture is the browser's viewport, drawn to fit the surface. A click on
-  // the surface is therefore not yet a point in the browser: the picture is
-  // scaled down, and the space around it is not part of the page at all.
+describe("a click is a point in the top-left anchored picture, not in its surface", () => {
+  // The frame covers the surface without distortion and anchors at top-left;
+  // overflow is clipped on the right or bottom.
   const surface = { left: 0, top: 0, width: 800, height: 600 };
   const picture = { naturalWidth: 1280, naturalHeight: 800 };
 
-  it("maps a click into the picture's own size", () => {
-    // The picture is 1280x800 drawn into 800x600: it is scaled by 0.625, so it
-    // is 800 wide and 500 tall, with 50 pixels of surface above and below it.
+  it("maps a click through the top-left anchored crop", () => {
+    // The picture is scaled by 0.75 to cover 800x600, leaving 160px clipped
+    // from the right edge; the top-left stays at the source origin.
     const centre = webuiBrowserPicturePoint(surface, picture, 400, 300);
-    expect(centre.x).toBeCloseTo(640);
+    expect(centre.x).toBeCloseTo(400 / 0.75);
     expect(centre.y).toBeCloseTo(400);
   });
 
-  it("ignores the space around the picture", () => {
-    // The picture fills the surface's width, so there is no space beside it —
-    // but there is space above it, and a click there is not a point in the
-    // page at all. It is clamped to the page's edge rather than sent as a
-    // point above it.
-    const above = webuiBrowserPicturePoint(surface, picture, 400, 10);
-    expect(above.y).toBe(0);
-    // And a click on the picture's own width is scaled, not passed through.
-    const left = webuiBrowserPicturePoint(surface, picture, 10, 300);
-    expect(left.x).toBeCloseTo(16);
+  it("clips points at the source page's right and bottom edges", () => {
+    const bottomRight = webuiBrowserPicturePoint(surface, picture, 800, 600);
+    expect(bottomRight.x).toBeCloseTo(800 / 0.75);
+    expect(bottomRight.y).toBe(800);
+    const topLeft = webuiBrowserPicturePoint(surface, picture, 0, 0);
+    expect(topLeft).toEqual({ x: 0, y: 0 });
   });
 
   it("falls back to the surface when the picture has no size yet", () => {

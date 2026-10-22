@@ -69,32 +69,33 @@ function validatePointer(command: Record<string, unknown>): WebuiBrowserInputCom
       "Pointer input needs a finite, non-negative y coordinate.",
     );
   }
+  const action = command.action;
+  if (action !== undefined && !["press", "release", "move", "scroll"].includes(String(action))) {
+    throw browserOperationError("browser_command_invalid", "Pointer input has an unknown action.");
+  }
   const button = command.button;
-  if (typeof button !== "string" || !POINTER_BUTTONS.has(button)) {
-    throw browserOperationError(
-      "browser_command_invalid",
-      "Pointer input needs a button of left, middle or right.",
-    );
+  if (action !== "move" && action !== "scroll" && (typeof button !== "string" || !POINTER_BUTTONS.has(button))) {
+    throw browserOperationError("browser_command_invalid", "Pointer input needs a button of left, middle or right.");
   }
   const clickCount = command.clickCount;
-  if (
-    typeof clickCount !== "number" ||
-    !Number.isInteger(clickCount) ||
-    clickCount < 1 ||
-    clickCount > 3
-  ) {
-    throw browserOperationError(
-      "browser_command_invalid",
-      "Pointer input needs a click count between 1 and 3.",
-    );
+  if (action === undefined && (typeof clickCount !== "number" || !Number.isInteger(clickCount) || clickCount < 1 || clickCount > 3)) {
+    throw browserOperationError("browser_command_invalid", "Pointer input needs a click count between 1 and 3.");
+  }
+  const deltaX = command.deltaX;
+  const deltaY = command.deltaY;
+  if (action === "scroll" && (typeof deltaX !== "number" || !Number.isFinite(deltaX) || typeof deltaY !== "number" || !Number.isFinite(deltaY))) {
+    throw browserOperationError("browser_command_invalid", "Scroll input needs finite deltas.");
   }
   return {
     kind: "pointer",
     target: readTarget(command.target),
+    ...(action ? { action: action as "press" | "release" | "move" | "scroll" } : {}),
     x,
     y,
-    button: button as "left" | "middle" | "right",
-    clickCount,
+    ...(typeof button === "string" ? { button: button as "left" | "middle" | "right" } : {}),
+    ...(typeof clickCount === "number" ? { clickCount } : {}),
+    ...(typeof deltaX === "number" ? { deltaX } : {}),
+    ...(typeof deltaY === "number" ? { deltaY } : {}),
   };
 }
 

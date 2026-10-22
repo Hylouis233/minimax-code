@@ -130,10 +130,14 @@ export interface WebuiBrowserPanelState {
  */
 export interface WebuiBrowserPointerIntent {
   readonly kind: "pointer";
+  /** Omitted means an atomic click for existing command callers. */
+  readonly action?: "press" | "release" | "move" | "scroll";
   readonly x: number;
   readonly y: number;
-  readonly button: "left" | "middle" | "right";
-  readonly clickCount: number;
+  readonly button?: "left" | "middle" | "right";
+  readonly clickCount?: number;
+  readonly deltaX?: number;
+  readonly deltaY?: number;
 }
 
 export interface WebuiBrowserKeyIntent {
