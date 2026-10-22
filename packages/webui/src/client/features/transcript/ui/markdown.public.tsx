@@ -46,6 +46,31 @@ const MARKDOWN_CODE_LANGUAGES = {
   xml,
   yaml,
 } as const;
+
+// Match Desktop's inline-code path rule: a path may contain directories, but a
+// bare filename is a file reference only when its extension is recognized.
+const DESKTOP_FILE_EXTENSIONS = new Set([
+  "astro", "bash", "bat", "c", "cc", "cjs", "clj", "cljs", "cljc", "cmd", "cpp", "cs", "css", "cts", "cxx",
+  "dart", "elm", "erl", "ex", "exs", "fish", "fs", "fsi", "fsx", "go", "gradle", "groovy", "h", "handlebars",
+  "hbs", "hcl", "hh", "hpp", "hrl", "htm", "html", "java", "jl", "js", "json", "jsx", "kt", "kts", "less",
+  "lua", "m", "mjs", "mm", "mts", "nim", "php", "pl", "pm", "proto", "ps1", "py", "pyi", "r", "rb", "rs",
+  "sass", "scala", "scss", "sh", "sol", "sql", "svelte", "swift", "tf", "thrift", "toml", "ts", "tsx", "vb",
+  "vbs", "vue", "xml", "yaml", "yml", "zig", "zsh",
+]);
+const DESKTOP_EXTENSIONLESS_FILE_NAMES = new Set([
+  "cmakelists.txt", "dockerfile", "gemfile", "jenkinsfile", "makefile", "rakefile",
+]);
+
+function parseDesktopInlineFileReference(value: string, workspaceDir?: string): ReturnType<typeof parseWebuiMessageFileReference> {
+  const reference = parseWebuiMessageFileReference(value, workspaceDir);
+  if (!reference) return undefined;
+  const name = reference.path.split("/").at(-1)?.toLowerCase() ?? "";
+  const extension = name.split(".").at(-1) ?? "";
+  const hasExtension = /\.[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(name);
+  return (hasExtension && (reference.path.includes("/") || DESKTOP_FILE_EXTENSIONS.has(extension))) || DESKTOP_EXTENSIONLESS_FILE_NAMES.has(name)
+    ? reference
+    : undefined;
+}
 for (const [name, language] of Object.entries(MARKDOWN_CODE_LANGUAGES)) {
   if (!hljs.getLanguage(name)) hljs.registerLanguage(name, language);
 }
@@ -151,7 +176,7 @@ function inline(tokens: readonly Token[] | undefined, onOpenFile?: (reference: N
       return <strong key={key}>{inline(token.tokens, onOpenFile, workspaceDir, lexBareText)}</strong>;
     if (token.type === "em") return <em key={key}>{inline(token.tokens, onOpenFile, workspaceDir, lexBareText)}</em>;
     if (token.type === "codespan") {
-      const reference = onOpenFile ? parseWebuiMessageFileReference(token.text, workspaceDir) : undefined;
+      const reference = onOpenFile ? parseDesktopInlineFileReference(token.text, workspaceDir) : undefined;
       return reference
         ? fileReferenceAnchor(key, token.text, reference, onOpenFile!)
         : <code key={key}>{token.text}</code>;
@@ -205,27 +230,10 @@ function inline(tokens: readonly Token[] | undefined, onOpenFile?: (reference: N
         if (parsedInline.length !== 1 || parsedInline[0]?.type !== "text" || parsedInline[0]?.raw !== (token.raw ?? token.text))
           return <Fragment key={key}>{inline(parsedInline, onOpenFile, workspaceDir, false)}</Fragment>;
       }
-      if (!onOpenFile) return token.text;
-      const parts: ReactNode[] = [];
-      // A path cannot start with a `.`: a match immediately after one is the
-      // tail of a dotted host (`https://example.com/pkg/index.ts`), and the
-      // URL as a whole is not a reference — `parseWebuiMessageFileReference`
-      // returns undefined for it. Excluding `.` keeps the scanner from slicing
-      // the URL before the parser ever sees one.
-      const expression = /(?<![\w/.:])(?:[A-Za-z]:[\\/][\w@.+-]+(?:[\\/][\w@.+-]+)*|\/(?:[\w@.+-]+\/)*[\w@.+-]+|(?:\.\.?\/)?[\w@.+-]+(?:\/[\w@.+-]+)*)\.[A-Za-z0-9_-]+(?::\d+(?:-\d+)?)?/gu;
-      let cursor = 0;
-      for (const match of token.text.matchAll(expression)) {
-        const start = match.index ?? 0;
-        const text = match[0];
-        const reference = parseWebuiMessageFileReference(text, workspaceDir);
-        if (!reference || !(/\//u.test(reference.path) || /\.(?:[cm]?[jt]sx?|html|css|json|md|ya?ml|toml|rs|py|go|java|kt|sh)$/iu.test(reference.path))) continue;
-        if (start > cursor) parts.push(token.text.slice(cursor, start));
-        parts.push(fileReferenceAnchor(`${key}-file-${start}`, text, reference, onOpenFile));
-        cursor = start + text.length;
-      }
-      if (cursor === 0) return token.text;
-      if (cursor < token.text.length) parts.push(token.text.slice(cursor));
-      return <Fragment key={key}>{parts}</Fragment>;
+      // Desktop only promotes explicit Markdown links and recognized inline
+      // code spans to file references. Scanning prose here turns identifiers
+      // such as SQL table names into false file links.
+      return token.text;
     }
     return (
       <Fragment key={key}>

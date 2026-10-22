@@ -77,8 +77,8 @@ function clickFileAnchors(source: string): {
 }
 
 describe("SPEC-C C-5 transcript file/line anchors", () => {
-  it("renders path/to/file.ts:120 as a clickable anchor carrying the line number, not literal text", () => {
-    const html = render("See path/to/file.ts:120 for the failing case.", () => undefined);
+  it("renders a recognized inline-code path with a line number as a clickable file reference", () => {
+    const html = render("See `path/to/file.ts:120` for the failing case.", () => undefined);
 
     // A real anchor, marked as a file reference, with the line number attached.
     expect(html).toContain('class="webui-message-file-link"');
@@ -88,15 +88,12 @@ describe("SPEC-C C-5 transcript file/line anchors", () => {
 
     // The line number is not left in the prose: the anchor labels the basename
     // and the surrounding sentence is untouched.
-    const text = visibleText(html);
-    expect(text).toBe("See 📘file.ts for the failing case.");
-    expect(text).not.toContain("path/to/file.ts");
-    expect(text).not.toContain(":120");
+    expect(visibleText(html)).toBe("See 📘file.ts for the failing case.");
   });
 
-  it("invokes onOpenFile with the parsed reference when the anchor is clicked", () => {
+  it("invokes onOpenFile with the parsed reference for an inline-code path", () => {
     const { references, anchors, defaultPrevented } = clickFileAnchors(
-      "See path/to/file.ts:120 for the failing case.",
+      "See `path/to/file.ts:120` for the failing case.",
     );
 
     expect(anchors).toBe(1);
@@ -105,25 +102,41 @@ describe("SPEC-C C-5 transcript file/line anchors", () => {
     expect(defaultPrevented).toBe(true);
   });
 
-  it("keeps a bare file.ts without a line number a valid reference", () => {
-    // The projection accepts it …
+  it("keeps a recognized bare filename in inline code as a valid reference", () => {
     expect(parseWebuiMessageFileReference("file.ts")).toEqual({ path: "file.ts" });
-    // … and the renderer turns it into an anchor, not a plain string.
-    const html = render("file.ts", () => undefined);
+    const html = render("`file.ts`", () => undefined);
     expect(html).toContain('class="webui-message-file-link"');
     expect(html).toContain('data-webui-file-reference="file.ts"');
     expect(html).toContain('href="file.ts"');
 
-    const { references, anchors } = clickFileAnchors("file.ts");
+    const { references, anchors } = clickFileAnchors("`file.ts`");
     expect(anchors).toBe(1);
     expect(references).toEqual([{ path: "file.ts" }]);
     expect(references[0]).not.toHaveProperty("lineStart");
     expect(references[0]).not.toHaveProperty("lineEnd");
   });
 
+  it("does not promote dotted identifiers or unrecognized bare extensions from inline code", () => {
+    const source = "`zht_user2.sys_user_identity` and `SysUserIdentity.IdentityTypeEnum` and `report.csv`";
+    const html = render(source, () => undefined);
+
+    expect(html).not.toContain("data-webui-file-reference");
+    expect(html).not.toContain("webui-message-file-link");
+    expect(visibleText(html)).toBe("zht_user2.sys_user_identity and SysUserIdentity.IdentityTypeEnum and report.csv");
+    expect(clickFileAnchors(source).references).toEqual([]);
+  });
+
+  it("does not scan ordinary prose for path-looking text", () => {
+    const source = "See path/to/file.ts:120, index.html, and zht_user2.sys_user_identity.";
+    const html = render(source, () => undefined);
+
+    expect(html).not.toContain("data-webui-file-reference");
+    expect(html).not.toContain("webui-message-file-link");
+    expect(visibleText(html)).toBe(source);
+  });
+
   it("leaves a string that merely contains a colon as plain text", () => {
-    // A colon alone is not a reference. Cases deliberately avoid a bare
-    // filename: `config.toml` alone *is* a reference by design (clause 3).
+    // A colon alone is not a reference.
     const prose = [
       "The ratio is 3:1 today.",
       "Meeting at 12:30 — bring notes.",

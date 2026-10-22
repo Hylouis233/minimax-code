@@ -342,7 +342,7 @@ describe("right workspace panel navigation", () => {
   });
 
   it("renders assistant file references as navigable links while preserving ordinary URLs", () => {
-    const markup = renderToStaticMarkup(createElement(WebuiMarkdown, { source: "Open src/index.ts:42 and `index.html`, or visit https://example.com.", onOpenFile: () => undefined }));
+    const markup = renderToStaticMarkup(createElement(WebuiMarkdown, { source: "Open `src/index.ts:42` and `index.html`, or visit https://example.com.", onOpenFile: () => undefined }));
     expect(markup).toContain('data-webui-file-reference="src/index.ts"');
     expect(markup).toContain('data-webui-file-reference="index.html"');
     expect(markup).toContain('href="https://example.com"');
