@@ -15,6 +15,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RawData } from "ws";
 import { WebSocket } from "ws";
 
+/**
+ * Remove a data directory the runtime host has just booted against.
+ *
+ * The host writes its auth store under `auth/prod/cn/`, and it may still be
+ * writing when the test tears the directory down. `rm` then reports
+ * `ENOTEMPTY: directory not empty` — the removal raced the last write, and
+ * the suite file fails with every test in it passing. The provider's own
+ * removal has retried for that reason since 782c137b, and 9ac67622 taught the
+ * browser-profile removals to as well; the teardown in this file did not, so
+ * the race surfaced here instead.
+ */
+const removeDataDir = (dir: string): Promise<void> =>
+  rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+
 import { updateLocalModelSelection } from "@mavis/config";
 import {
   resetDefaultLocalRuntimeConfig,
@@ -3140,7 +3154,7 @@ describe("WebUI runtime host assembly", () => {
       const capabilities = lastOptions?.capabilities as Record<string, unknown>;
       expect(capabilities.cliEmbedded).toBe(true);
     } finally {
-      await rm(dataDir, { recursive: true, force: true });
+      await removeDataDir(dataDir);
     }
   });
 
@@ -3172,7 +3186,7 @@ describe("WebUI runtime host assembly", () => {
       expect(assembled.harnessPort.claimSignin).toBeTypeOf("function");
       await assembled.harnessPort.close();
     } finally {
-      await rm(dataDir, { recursive: true, force: true });
+      await removeDataDir(dataDir);
     }
   });
 
@@ -3224,7 +3238,7 @@ describe("WebUI runtime host assembly", () => {
       expect(getter?.()).toBeUndefined();
       await assembled.harnessPort.close();
     } finally {
-      await rm(dataDir, { recursive: true, force: true });
+      await removeDataDir(dataDir);
     }
   });
 
@@ -3254,7 +3268,7 @@ describe("WebUI runtime host assembly", () => {
       expect(capabilities.elicitation).toBe(true);
       expect(lastOptions?.enableLiveMcp).toBe(true);
     } finally {
-      await rm(dataDir, { recursive: true, force: true });
+      await removeDataDir(dataDir);
     }
   });
 
@@ -3283,7 +3297,7 @@ describe("WebUI runtime host assembly", () => {
       // surface.
       expect("surface" in (lastOptions ?? {})).toBe(false);
     } finally {
-      await rm(dataDir, { recursive: true, force: true });
+      await removeDataDir(dataDir);
     }
   });
 
@@ -3311,7 +3325,7 @@ describe("WebUI runtime host assembly", () => {
       await assembled.harnessPort.close();
       expect(apiHostClosed).toBe(true);
     } finally {
-      await rm(dataDir, { recursive: true, force: true });
+      await removeDataDir(dataDir);
     }
   });
 
@@ -3375,7 +3389,7 @@ describe("WebUI runtime host assembly", () => {
       await assembled.harnessPort.close();
       expect(calls).toEqual(["command-path", "runtime", "broker", "browser"]);
     } finally {
-      await rm(dataDir, { recursive: true, force: true });
+      await removeDataDir(dataDir);
     }
   });
 
@@ -3418,7 +3432,7 @@ describe("WebUI runtime host assembly", () => {
     } finally {
       resetDefaultLocalRuntimeConfig();
       vi.unstubAllEnvs();
-      await rm(dataDir, { recursive: true, force: true });
+      await removeDataDir(dataDir);
     }
   });
 
@@ -3462,7 +3476,7 @@ describe("WebUI runtime host assembly", () => {
       ).rejects.toThrow("host creation failed");
       expect(calls).toEqual(["broker", "browser"]);
     } finally {
-      await rm(dataDir, { recursive: true, force: true });
+      await removeDataDir(dataDir);
     }
   });
 
@@ -3513,7 +3527,7 @@ describe("WebUI runtime host assembly", () => {
       ).rejects.toThrow("command path failed");
       expect(calls).toEqual(["runtime", "broker", "browser"]);
     } finally {
-      await rm(dataDir, { recursive: true, force: true });
+      await removeDataDir(dataDir);
     }
   });
 });
@@ -4502,7 +4516,7 @@ describe("WebUI assembly unconditionally forwards the quarantined startup policy
       await first.harnessPort.close();
       await second.harnessPort.close();
     } finally {
-      await rm(dataDir, { recursive: true, force: true });
+      await removeDataDir(dataDir);
     }
   });
 });
