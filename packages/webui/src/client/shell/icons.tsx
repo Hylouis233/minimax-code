@@ -3,7 +3,7 @@
 import type { ReactElement } from "react";
 import {
   IconArchive, IconArrowBackUp, IconArrowUp, IconBell, IconBug, IconCirclePlus,
-  IconCalendarEvent, IconChartBar, IconCheck, IconChevronDown, IconChevronLeft,
+  IconCalendarEvent, IconCaretRightFilled, IconChartBar, IconCheck, IconChevronDown, IconChevronLeft,
   IconChevronRight, IconClipboard, IconCode, IconCopy, IconDeviceMobile, IconDots,
   IconDownload, IconEdit, IconFile, IconFileCode, IconFolder, IconFolderPlus,
   IconGitBranch, IconGitCompare, IconGitFork, IconHierarchy, IconLayoutDashboard,
@@ -50,7 +50,8 @@ export function WebuiIconBell({ className }: WebuiIconProps): ReactElement { ret
 export function WebuiIconAttach({ className }: WebuiIconProps): ReactElement { return glyph(IconPaperclip, className); }
 export function WebuiIconChevronDown({ className }: WebuiIconProps): ReactElement { return glyph(IconChevronDown, className, 16); }
 export function WebuiIconSessionDisclosure({ className }: WebuiIconProps): ReactElement { return glyph(IconChevronRight, className, 14); }
-export function WebuiIconSessionTreeDisclosure({ className }: WebuiIconProps): ReactElement { return glyph(IconChevronRight, className, 14); }
+/** Filled disclosure arrow retained for expandable parent-session rows. */
+export function WebuiIconSessionTreeDisclosure({ className }: WebuiIconProps): ReactElement { return glyph(IconCaretRightFilled, className, 14); }
 export function WebuiIconPermissionRequest({ className }: WebuiIconProps): ReactElement { return glyph(IconShieldLock, className); }
 export function WebuiIconPermissionAuto({ className }: WebuiIconProps): ReactElement { return glyph(IconShieldCheck, className); }
 export function WebuiIconPermissionFull({ className }: WebuiIconProps): ReactElement { return glyph(IconShieldX, className); }
