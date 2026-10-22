@@ -18,7 +18,7 @@
 // run, so a re-run cannot leave a case behind from the previous one, and the
 // suites cannot overwrite each other's records.
 
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { release } from "node:os";
 import { resolve } from "node:path";
 
@@ -79,6 +79,55 @@ const PLAN_DIRECTORIES = {
   "workspace-browser-tab": "../../../../.plan/workspace-browser-tab/complete",
 } as const;
 
+/**
+ * The record files as the checkout had them.
+ *
+ * A record file is **tracked**: the plan's `complete/` directory is where the
+ * accepted evidence lives, and the file in the checkout is the record of the
+ * run that was accepted. A run rewrites it — every record carries the time
+ * and the machine it ran on — so the working tree is dirty once the suite is
+ * over.
+ *
+ * That dirt is not a source change, and the release packaging refuses to run
+ * with a dirty tree ("Packaging requires a clean committed working tree"), so
+ * on CI the run puts the files back when it is over.
+ *
+ * Locally the records stay: they are what the run just produced, and the
+ * published matrix is written from them. A suite that recorded into a file
+ * the checkout does not have leaves no file behind either.
+ */
+const originals = new Map<string, string | null>();
+
+/** Remembers a record file's content the first time the run writes to it. */
+function rememberOriginal(path: string): void {
+  if (originals.has(path)) return;
+  originals.set(path, existsSync(path) ? readFileSync(path, "utf8") : null);
+}
+
+/**
+ * Puts the record files back the way the checkout had them.
+ *
+ * On CI. A record file is tracked, so a run leaves the working tree dirty —
+ * every record carries the time and the machine it ran on — and the release
+ * packaging refuses to run with a dirty tree ("Packaging requires a clean
+ * committed working tree"). That dirt is the run's own timestamps, not a
+ * source change, so the suite puts the files back when it is done.
+ *
+ * Locally the records stay: they are what the run just produced, and the
+ * published matrix is written from them.
+ */
+export function restoreAcceptanceRecords(): void {
+  if (process.env.CI !== "true") return;
+  for (const [path, content] of originals) {
+    if (content === null) {
+      rmSync(path, { force: true });
+      continue;
+    }
+    writeFileSync(path, content, "utf8");
+  }
+  originals.clear();
+}
+
 /** A plan whose acceptance results are recorded. */
 export type WebuiAcceptancePlan = keyof typeof PLAN_DIRECTORIES;
 
@@ -119,7 +168,9 @@ export function acceptanceRecordsFor(plan: WebuiAcceptancePlan): AcceptanceRecor
    */
   function beginSuite(suite: string): void {
     mkdirSync(recordDir, { recursive: true });
-    writeFileSync(resolve(recordDir, `${suite}.acceptance.json`), "[]\n", "utf8");
+    const path = resolve(recordDir, `${suite}.acceptance.json`);
+    rememberOriginal(path);
+    writeFileSync(path, "[]\n", "utf8");
     started.add(suite);
   }
 
@@ -139,6 +190,7 @@ export function acceptanceRecordsFor(plan: WebuiAcceptancePlan): AcceptanceRecor
     };
     mkdirSync(recordDir, { recursive: true });
     const path = resolve(recordDir, `${suite}.acceptance.json`);
+    rememberOriginal(path);
     if (!started.has(suite)) {
       started.add(suite);
       writeFileSync(path, "[]\n", "utf8");

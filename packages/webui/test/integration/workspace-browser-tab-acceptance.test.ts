@@ -41,7 +41,7 @@ import {
   SEND_BROWSER_COMMAND_OPERATION_NAME,
   SEND_BROWSER_INPUT_OPERATION_NAME,
 } from "../../src/shared/operation-names.js";
-import { acceptanceRecordsFor } from "../browser/acceptance-record.js";
+import { acceptanceRecordsFor, restoreAcceptanceRecords } from "../browser/acceptance-record.js";
 import type {
   WebuiBrowserAuthorization,
   WebuiBrowserTargetId,
@@ -55,7 +55,7 @@ const SUITE = "workspace-browser-tab";
 const SETTLE_MS = 750;
 
 async function chromeIsAvailable(): Promise<boolean> {
-  for (const candidate of ["/usr/bin/google-chrome", "/usr/bin/chromium"]) {
+  for (const candidate of ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/usr/bin/google-chrome", "/usr/bin/chromium"]) {
     try {
       await access(candidate);
       return true;
@@ -123,6 +123,9 @@ describe.skipIf(!available)("the acceptance of the workspace browser tab model",
   afterAll(async () => {
     await service?.close();
     if (dataDir) await rm(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    // On CI the record file is tracked and the run's own timestamps are not a
+    // source change, so the file goes back the way the checkout had it.
+    restoreAcceptanceRecords();
   });
 
   // -- the paths the cases drive ------------------------------------------

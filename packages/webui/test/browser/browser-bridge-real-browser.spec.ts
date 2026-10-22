@@ -24,7 +24,7 @@ import { rm } from "node:fs/promises";
 
 import { expect, test } from "@playwright/test";
 
-import { beginAcceptanceSuite, observeAcceptance } from "./acceptance-record.js";
+import { beginAcceptanceSuite, observeAcceptance, restoreAcceptanceRecords } from "./acceptance-record.js";
 import {
   browserVersionOf,
   bridgeSettings,
@@ -274,5 +274,11 @@ test.describe("the browser bridge, against a real browser", () => {
         await rm(browser.profileDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
       }
     }
+  });
+
+  // On CI the record file is tracked and the run's own timestamps are not a
+  // source change, so the file goes back the way the checkout had it.
+  test.afterAll(() => {
+    restoreAcceptanceRecords();
   });
 });

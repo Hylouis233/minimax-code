@@ -50,7 +50,7 @@ async function extensionLastError(
 }
 
 import type { WebuiBrowserTargetState } from "../../src/shared/contracts/browser.js";
-import { beginAcceptanceSuite, observeAcceptance } from "./acceptance-record.js";
+import { beginAcceptanceSuite, observeAcceptance, restoreAcceptanceRecords } from "./acceptance-record.js";
 import {
   browserVersionOf,
   bridgeSettings,
@@ -327,6 +327,12 @@ test.describe("the external bridge, against a real browser and a real page", () 
       }
     });
   }
+
+  // On CI the record file is tracked and the run's own timestamps are not a
+  // source change, so the file goes back the way the checkout had it.
+  test.afterAll(() => {
+    restoreAcceptanceRecords();
+  });
 });
 
 /** Waits for the extension to announce a tab. */
