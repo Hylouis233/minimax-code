@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { WebuiBrowserService } from "../../src/runtime/browser/browser-service.js";
+import { WebuiBrowserOperationError } from "../../src/runtime/browser/errors.js";
 import type {
   WebuiBrowserAuthorization,
   WebuiBrowserImageFrame,
@@ -58,6 +59,19 @@ async function startPageServer(respond: (path: string) => string): Promise<{
 }
 
 const chromeAvailable = (await resolveChromePath()) !== undefined;
+
+/**
+ * Whether a failure is the page behind a reference moving on.
+ *
+ * A page that is still loading is observed as a replaced page: the runtime
+ * raises the target's generation once the navigation lands, and every
+ * reference taken before that is stale. The page under test did not change —
+ * only the generation that names it did — so this is a state to wait out
+ * rather than a failure.
+ */
+function isStaleTarget(error: unknown): boolean {
+  return error instanceof WebuiBrowserOperationError && error.code === "browser_target_stale";
+}
 
 describe.skipIf(!chromeAvailable)("the browser panel's real Chromium navigation flows", () => {
   let dataDir: string;
@@ -137,25 +151,66 @@ describe.skipIf(!chromeAvailable)("the browser panel's real Chromium navigation 
     return state.id;
   }
 
+  /**
+   * Runs a read against the target the runtime currently holds.
+   *
+   * The reference a caller keeps names a page; its generation moves when the
+   * page behind it is replaced. A read that lands on a stale reference
+   * therefore re-reads the current target instead of failing: the page is the
+   * same one either way.
+   */
+  async function readThrough<T>(
+    target: WebuiBrowserTargetId,
+    read: (current: WebuiBrowserTargetId) => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await read(target);
+    } catch (error) {
+      if (!isStaleTarget(error)) throw error;
+      return await read(await currentTarget(target));
+    }
+  }
+
+  /**
+   * Sends a command to the page the runtime currently holds.
+   *
+   * The same generation rule as the reads: a command that lands on a stale
+   * reference is sent again to the current target, because the page under
+   * test is the same one.
+   */
+  async function sendCommand(
+    target: WebuiBrowserTargetId,
+    command: string,
+    params: Record<string, unknown> = {},
+  ): Promise<void> {
+    await readThrough(target, async (current) => {
+      await service.sendCommandToTarget("isolated-chromium", current, command, params);
+    });
+  }
+
   async function readTitle(target: WebuiBrowserTargetId): Promise<string> {
-    const result = await service.sendCommandToTarget(
-      "isolated-chromium",
-      target,
-      "Runtime.evaluate",
-      { expression: "document.title", returnByValue: true },
-    );
-    const value = (result.result as { result?: { value?: unknown } } | undefined)?.result?.value;
-    return typeof value === "string" ? value : "";
+    return readThrough(target, async (current) => {
+      const result = await service.sendCommandToTarget(
+        "isolated-chromium",
+        current,
+        "Runtime.evaluate",
+        { expression: "document.title", returnByValue: true },
+      );
+      const value = (result.result as { result?: { value?: unknown } } | undefined)?.result?.value;
+      return typeof value === "string" ? value : "";
+    });
   }
 
   async function evaluate(target: WebuiBrowserTargetId, expression: string): Promise<unknown> {
-    const result = await service.sendCommandToTarget(
-      "isolated-chromium",
-      target,
-      "Runtime.evaluate",
-      { expression, returnByValue: true, awaitPromise: true },
-    );
-    return (result.result as { result?: { value?: unknown } } | undefined)?.result?.value;
+    return readThrough(target, async (current) => {
+      const result = await service.sendCommandToTarget(
+        "isolated-chromium",
+        current,
+        "Runtime.evaluate",
+        { expression, returnByValue: true, awaitPromise: true },
+      );
+      return (result.result as { result?: { value?: unknown } } | undefined)?.result?.value;
+    });
   }
 
   async function elementCentre(target: WebuiBrowserTargetId, selector: string): Promise<{ x: number; y: number }> {
@@ -169,14 +224,22 @@ describe.skipIf(!chromeAvailable)("the browser panel's real Chromium navigation 
 
   async function click(target: WebuiBrowserTargetId, selector: string): Promise<void> {
     const point = await elementCentre(target, selector);
-    await service.sendInput({ kind: "pointer", action: "press", target, ...point, button: "left" });
-    await service.sendInput({ kind: "pointer", action: "release", target, ...point, button: "left" });
+    const current = await currentTarget(target);
+    await service.sendInput({ kind: "pointer", action: "press", target: current, ...point, button: "left" });
+    await service.sendInput({ kind: "pointer", action: "release", target: current, ...point, button: "left" });
   }
 
   async function waitFor(condition: () => boolean | Promise<boolean>, description: string): Promise<void> {
     const deadline = Date.now() + TIMEOUT_MS;
     while (Date.now() < deadline) {
-      if (await condition()) return;
+      try {
+        if (await condition()) return;
+      } catch (error) {
+        // A stale reference means the page is still loading and its generation
+        // moved on; the condition gets another turn. Any other failure is the
+        // flow's own and belongs to the caller.
+        if (!isStaleTarget(error)) throw error;
+      }
       await new Promise((resolve) => setTimeout(resolve, POLL_MS));
     }
     throw new Error(`timed out waiting for ${description}`);
@@ -228,24 +291,24 @@ describe.skipIf(!chromeAvailable)("the browser panel's real Chromium navigation 
     await streamTask?.catch(() => undefined);
     const resumedFrames: WebuiBrowserImageFrame[] = [];
     watch(target, resumedFrames);
-    await service.sendCommandToTarget("isolated-chromium", target, "Runtime.evaluate", {
+    await sendCommand(target, "Runtime.evaluate", {
       expression: "document.body.style.background = 'rgb(12, 34, 56)'",
     });
     await waitFor(() => resumedFrames.length > 0, "screencast after navigation and resubscription");
     expect(resumedFrames.at(-1)?.target.generation).toBe(target.generation);
     expect(frames.length).toBeGreaterThanOrEqual(afterNavigation);
 
-    await service.sendCommandToTarget("isolated-chromium", target, "back", {});
+    await sendCommand(target, "back");
     await waitFor(async () => (await readTitle(await currentTarget(target))) === "Same-origin destination", "back navigation");
     target = await currentTarget(target);
-    await service.sendCommandToTarget("isolated-chromium", target, "back", {});
+    await sendCommand(target, "back");
     await waitFor(async () => (await readTitle(await currentTarget(target))) === "Browser panel start", "second back navigation");
     target = await currentTarget(target);
-    await service.sendCommandToTarget("isolated-chromium", target, "forward", {});
+    await sendCommand(target, "forward");
     await waitFor(async () => (await readTitle(await currentTarget(target))) === "Same-origin destination", "forward navigation");
     target = await currentTarget(target);
     const generationBeforeReload = target.generation;
-    await service.sendCommandToTarget("isolated-chromium", target, "reload", {});
+    await sendCommand(target, "reload");
     await waitFor(async () => (await currentTarget(target)).generation > generationBeforeReload, "reload generation");
   }, TIMEOUT_MS);
 
@@ -273,7 +336,7 @@ describe.skipIf(!chromeAvailable)("the browser panel's real Chromium navigation 
       expect(await readTitle(newTarget!)).toBe("New tab destination");
       const frames: WebuiBrowserImageFrame[] = [];
       watch(newTarget!, frames);
-      await service.sendCommandToTarget("isolated-chromium", newTarget!, "Runtime.evaluate", {
+      await sendCommand(newTarget!, "Runtime.evaluate", {
         expression: "document.body.style.background = 'rgb(56, 34, 12)'",
       });
       await waitFor(() => frames.length > 0, "new tab screencast");
