@@ -301,6 +301,7 @@
       "packages/webui/test/unit/markdown-codeblock-c2-line-numbers.test.tsx",
       "packages/webui/test/unit/message-attachments.test.tsx",
       "packages/webui/test/unit/message-parts.test.ts",
+      "packages/webui/test/unit/runtime-warning-rendering.test.tsx",
       "packages/webui/test/unit/model-picker-effort-options.test.ts",
       "packages/webui/test/unit/model-effort-scale.test.ts",
       "packages/webui/test/unit/model-picker-groups.test.tsx",
