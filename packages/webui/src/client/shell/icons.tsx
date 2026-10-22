@@ -3,12 +3,12 @@
 import type { ReactElement } from "react";
 import {
   IconArchive, IconArrowBackUp, IconArrowUp, IconBell, IconBug, IconCirclePlus,
-  IconCalendarEvent, IconChartBar, IconCheck, IconChevronDown, IconChevronLeft,
+  IconCalendarEvent, IconCaretRightFilled, IconChartBar, IconCheck, IconChevronDown, IconChevronLeft,
   IconChevronRight, IconClipboard, IconCode, IconCopy, IconDeviceMobile, IconDots,
   IconDownload, IconEdit, IconFile, IconFileCode, IconFolder, IconFolderPlus,
   IconGitBranch, IconGitCompare, IconGitFork, IconHierarchy, IconLayoutDashboard,
   IconLayoutSidebar, IconMapPin, IconMessage, IconMessageCircle, IconMessageQuestion,
-  IconMinimize, IconPaperclip, IconPin, IconPuzzle, IconRefresh, IconSearch,
+  IconMinimize, IconPaperclip, IconPin, IconPinFilled, IconPuzzle, IconRefresh, IconSearch,
   IconShieldCheck, IconShieldLock, IconShieldX, IconSparkles,
   IconTarget, IconTerminal2, IconThumbDown, IconThumbUp, IconTrash, IconWorld,
   IconX,
@@ -50,7 +50,8 @@ export function WebuiIconBell({ className }: WebuiIconProps): ReactElement { ret
 export function WebuiIconAttach({ className }: WebuiIconProps): ReactElement { return glyph(IconPaperclip, className); }
 export function WebuiIconChevronDown({ className }: WebuiIconProps): ReactElement { return glyph(IconChevronDown, className, 16); }
 export function WebuiIconSessionDisclosure({ className }: WebuiIconProps): ReactElement { return glyph(IconChevronRight, className, 14); }
-export function WebuiIconSessionTreeDisclosure({ className }: WebuiIconProps): ReactElement { return glyph(IconChevronRight, className, 14); }
+/** Filled disclosure arrow retained for expandable parent-session rows. */
+export function WebuiIconSessionTreeDisclosure({ className }: WebuiIconProps): ReactElement { return glyph(IconCaretRightFilled, className, 14); }
 export function WebuiIconPermissionRequest({ className }: WebuiIconProps): ReactElement { return glyph(IconShieldLock, className); }
 export function WebuiIconPermissionAuto({ className }: WebuiIconProps): ReactElement { return glyph(IconShieldCheck, className); }
 export function WebuiIconPermissionFull({ className }: WebuiIconProps): ReactElement { return glyph(IconShieldX, className); }
@@ -64,7 +65,13 @@ export function WebuiIconMore({ className }: WebuiIconProps): ReactElement { ret
 export function WebuiIconProjectAdd({ className }: WebuiIconProps): ReactElement { return glyph(IconFolderPlus, className); }
 export function WebuiIconSessionPinMark({ className }: WebuiIconProps): ReactElement { return glyph(IconPin, className, 14); }
 export function WebuiIconSessionPin({ className }: WebuiIconProps): ReactElement { return glyph(IconPin, className); }
-export function WebuiIconContextPin({ className, pinned = false }: WebuiIconProps & { pinned?: boolean }): ReactElement { return glyph(IconPin, className); }
+export function WebuiIconContextPin({ className, pinned = false }: WebuiIconProps & { pinned?: boolean }): ReactElement {
+  // The pinned state draws the filled pin and the unpinned one the outline, so
+  // a pinned row reads as pinned without the label having to say it. The glyph
+  // used to say it through a hand-drawn slashed variant; the tabler pair says
+  // it the same way.
+  return glyph(pinned ? IconPinFilled : IconPin, className);
+}
 export function WebuiIconContextRename({ className }: WebuiIconProps): ReactElement { return glyph(IconEdit, className); }
 export function WebuiIconContextArchive({ className }: WebuiIconProps): ReactElement { return glyph(IconArchive, className); }
 export function WebuiIconContextFork({ className }: WebuiIconProps): ReactElement { return glyph(IconGitFork, className); }
@@ -73,7 +80,11 @@ export function WebuiIconContextFeedback({ className }: WebuiIconProps): ReactEl
 export function WebuiIconContextExport({ className }: WebuiIconProps): ReactElement { return glyph(IconDownload, className); }
 export function WebuiIconSessionImport({ className }: WebuiIconProps): ReactElement { return glyph(IconArrowBackUp, className); }
 export function WebuiIconContextTrash({ className }: WebuiIconProps): ReactElement { return glyph(IconTrash, className); }
-export function WebuiIconContextChevron({ className }: WebuiIconProps): ReactElement { return glyph(IconChevronRight, className); }
+export function WebuiIconContextChevron({ className }: WebuiIconProps): ReactElement {
+  // The submenu chevron sits in a 16px slot (`.webui-context-menu-chevron`),
+  // so it draws at 16 — the same size the other chevrons draw at.
+  return glyph(IconChevronRight, className, 16);
+}
 export function WebuiIconRunLocation({ className }: WebuiIconProps): ReactElement { return glyph(IconMapPin, className); }
 export function WebuiIconSidebarToggle({ className }: WebuiIconProps): ReactElement { return glyph(IconLayoutSidebar, className); }
 export function WebuiIconSearch({ className }: WebuiIconProps): ReactElement { return glyph(IconSearch, className); }
