@@ -43,6 +43,7 @@ import {
   type WebuiBrowserSurface,
   type WebuiBrowserTabOpener,
   type WebuiBrowserTargetId,
+  type WebuiBrowserViewport,
   type WebuiBrowserTargetList,
   type WebuiBrowserTargetState,
   type WebuiBrowserWebTab,
@@ -857,6 +858,7 @@ export class WebuiBrowserService {
     surface: WebuiBrowserSurface,
     target: WebuiBrowserTargetId,
     signal?: AbortSignal,
+    viewport?: WebuiBrowserViewport,
   ): AsyncIterable<WebuiBrowserImageFrame> {
     const authorization = await this.readAuthorization();
     if (!isBrowserSurfaceUsable(authorization, surface)) {
@@ -947,6 +949,11 @@ export class WebuiBrowserService {
     surfaceHandlers.set(targetKey, handler);
     this.#frameHandlers.set(surface, surfaceHandlers);
 
+    // The window takes the size the panel shows the page at. It is stated on
+    // every subscription rather than only on the first: a panel that is
+    // resized states a new size, and the page behind the target is the same
+    // page whoever looks at it.
+    if (viewport) await provider.setViewport?.(targetKey, viewport);
     if (first) await provider.startImageStream(targetKey, handler);
     try {
       while (!signal?.aborted) {

@@ -216,6 +216,45 @@ export function buildWebuiBrowserTextCommand(
 }
 
 /** Builds whichever command the intent names. */
+/**
+ * The point the person chose, in the picture's own pixels.
+ *
+ * The picture is the browser's viewport, drawn to fit the surface it is shown
+ * on. A click on the surface is therefore not yet a point in the browser: the
+ * picture is scaled down, and the space around it is not part of the page at
+ * all. The point is mapped back into the picture's own size -- the same
+ * arithmetic the picture is drawn with, in reverse -- so that a click lands
+ * where the person saw it.
+ *
+ * The picture's own size is the browser's viewport, so the point that comes
+ * out is a viewport point, which is what the browser's input commands take.
+ */
+export function webuiBrowserPicturePoint(
+  surface: {
+    readonly left: number;
+    readonly top: number;
+    readonly width: number;
+    readonly height: number;
+  },
+  picture: { readonly naturalWidth: number; readonly naturalHeight: number } | undefined,
+  clientX: number,
+  clientY: number,
+): { readonly x: number; readonly y: number } {
+  const sourceWidth = picture?.naturalWidth || surface.width;
+  const sourceHeight = picture?.naturalHeight || surface.height;
+  const scale = Math.min(surface.width / sourceWidth, surface.height / sourceHeight);
+  const drawnWidth = sourceWidth * scale;
+  const drawnHeight = sourceHeight * scale;
+  const insetX = (surface.width - drawnWidth) / 2;
+  const insetY = (surface.height - drawnHeight) / 2;
+  const x = (clientX - surface.left - insetX) * (sourceWidth / drawnWidth);
+  const y = (clientY - surface.top - insetY) * (sourceHeight / drawnHeight);
+  return {
+    x: Math.max(0, Math.min(sourceWidth, x)),
+    y: Math.max(0, Math.min(sourceHeight, y)),
+  };
+}
+
 export function buildWebuiBrowserInputCommand(
   intent: WebuiBrowserInputIntent,
   target: WebuiBrowserInputCommand["target"],

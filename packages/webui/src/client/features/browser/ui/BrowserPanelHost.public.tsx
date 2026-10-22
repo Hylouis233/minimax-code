@@ -45,6 +45,7 @@ import {
   useMemo,
   useReducer,
   useRef,
+  useState,
   type ReactElement,
 } from "react";
 
@@ -54,7 +55,7 @@ import type {
   WebuiBrowserInputCommand,
   WebuiBrowserSurface,
   WebuiBrowserTargetId,
-  WebuiBrowserWebTabSnapshot,
+  WebuiBrowserViewport,
 } from "../../../../shared/contracts/browser.js";
 import { useWebuiPortSlice } from "../../../bindings/port-slices-context.js";
 import { useWebuiSettingsWorkflowsState } from "../../../bindings/use-query-state.js";
@@ -195,6 +196,10 @@ export function BrowserPanelHost({
   // It arrives with the runtime's version, and the shell reads that; a panel
   // that asked for nothing was told "unknown" for ever, and said the runtime
   // had no browser while it was drawing one.
+  // The size the page is shown at. The browser's window takes it, so the page
+  // is drawn at the size the panel shows it rather than scaled down into it.
+  const [viewport, setViewport] = useState<WebuiBrowserViewport | undefined>(undefined);
+
   const settingsState = useWebuiSettingsWorkflowsState();
   const capabilityManifest = settingsState.runtimeVersion.value?.capabilities;
 
@@ -332,15 +337,18 @@ export function BrowserPanelHost({
     }
     subscribedSurface.current = surface;
     subscribedTarget.current = streamTargetKey;
-    const stop = port.watchBrowserFrames({ surface, target: streamTarget }, (frame) => {
-      dispatch({ type: "frame", frame });
-    });
+    const stop = port.watchBrowserFrames(
+      { surface, target: streamTarget, ...(viewport ? { viewport } : {}) },
+      (frame) => {
+        dispatch({ type: "frame", frame });
+      },
+    );
     return () => {
       stop();
       subscribedSurface.current = undefined;
       subscribedTarget.current = undefined;
     };
-  }, [port, streamTargetKey, streamTarget, surface]);
+  }, [port, streamTargetKey, streamTarget, surface, viewport]);
 
   const onSendInput = useCallback(
     (command: WebuiBrowserInputCommand) => {
@@ -402,6 +410,7 @@ export function BrowserPanelHost({
         port={port}
         state={state}
         capabilities={capabilityManifest}
+        onSurfaceSize={setViewport}
         onSendInput={onSendInput}
         onRejected={onRejected}
       />

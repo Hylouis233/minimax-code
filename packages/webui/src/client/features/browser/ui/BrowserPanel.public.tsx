@@ -35,6 +35,8 @@
 
 import {
   useCallback,
+  useEffect,
+  useRef,
   type ChangeEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
@@ -62,6 +64,7 @@ import {
   selectWebuiBrowserViewedTarget,
   webuiBrowserFrameDataUrl,
 } from "../projection/browser-state.js";
+import { webuiBrowserPicturePoint } from "../application/browser-commands.js";
 
 const PANEL_COPY = {
   title: "浏览器",
@@ -92,6 +95,15 @@ export interface BrowserPanelProps {
   readonly state?: WebuiBrowserPanelState;
   /** The handshake manifest, so the panel can say *why* a family is unusable. */
   readonly capabilities?: WebuiCapabilityView;
+  /**
+   * The size the page is shown at.
+   *
+   * The browser's window takes it, so the page is drawn at the size the panel
+   * shows it rather than scaled down into it. It is reported once the size has
+   * settled: a window being dragged reports a size a dozen times a second, and
+   * the browser would follow every one of them.
+   */
+  readonly onSurfaceSize?: (size: { readonly width: number; readonly height: number }) => void;
   /** Receives only commands that passed validation and the generation binding. */
   readonly onSendInput?: (command: WebuiBrowserInputCommand) => void;
   /** Receives every refusal, so a gesture that went nowhere is visible. */
@@ -102,6 +114,7 @@ export function BrowserPanel({
   port,
   state,
   capabilities,
+  onSurfaceSize,
   onSendInput,
   onRejected,
 }: BrowserPanelProps): ReactElement {
@@ -137,16 +150,47 @@ export function BrowserPanel({
     [onRejected, onSendInput, state],
   );
 
+  // The picture's own size, which is the browser's viewport: a click is mapped
+  // into it.
+  const frameRef = useRef<HTMLImageElement | null>(null);
+
+  // The size the page is shown at, reported once it has settled.
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage || !onSurfaceSize) return;
+    if (typeof ResizeObserver === "undefined") return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const report = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        const rect = stage.getBoundingClientRect();
+        if (rect.width < 1 || rect.height < 1) return;
+        onSurfaceSize({ width: rect.width, height: rect.height });
+      }, 250);
+    };
+    report();
+    const observer = new ResizeObserver(report);
+    observer.observe(stage);
+    return () => {
+      if (timer) clearTimeout(timer);
+      observer.disconnect();
+    };
+  }, [onSurfaceSize]);
+
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       if (!inputEnabled) return;
-      // Measured against the input surface rather than the page, so the point the
-      // user chose is the point the command carries.
+      // Measured against the picture, not against the surface: the picture is
+      // the browser's viewport drawn to fit, so a click on the surface is not
+      // yet a point in the browser. The point is mapped into the picture's own
+      // size, or the click lands somewhere the person never pointed at.
       const rect = event.currentTarget.getBoundingClientRect();
+      const point = webuiBrowserPicturePoint(rect, frameRef.current ?? undefined, event.clientX, event.clientY);
       submit({
         kind: "pointer",
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top,
+        x: point.x,
+        y: point.y,
         button: webuiBrowserPointerButton(event.button),
         // `detail` is 0 on a press that is not yet a click sequence in some
         // engines, and the command's contract wants a count of at least one.
@@ -234,9 +278,10 @@ export function BrowserPanel({
         </p>
       ) : null}
 
-      <div className="webui-browser-stage">
+      <div className="webui-browser-stage" ref={stageRef}>
         {frameSrc ? (
             <img
+              ref={frameRef}
               className="webui-browser-frame"
               data-testid="browser-panel-frame"
               data-format={frame?.format}

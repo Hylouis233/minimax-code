@@ -11,6 +11,7 @@ import type {
   WebuiBrowserSurface,
   WebuiBrowserTabOpener,
   WebuiBrowserTargetId,
+  WebuiBrowserViewport,
   WebuiBrowserTargetList,
   WebuiBrowserTargetState,
   WebuiBrowserWebTabOpen,
@@ -743,6 +744,7 @@ export interface WebuiBrowserPort {
     surface: WebuiBrowserSurface,
     target: WebuiBrowserTargetId,
     signal?: AbortSignal,
+    viewport?: WebuiBrowserViewport,
   ): AsyncIterable<WebuiBrowserImageFrame>;
   /**
    * Closes the page a web tab is bound to.

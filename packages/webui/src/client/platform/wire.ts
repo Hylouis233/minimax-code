@@ -20,6 +20,7 @@ import type {
   WebuiBrowserImageFrame,
   WebuiBrowserSurface,
   WebuiBrowserTargetId,
+  WebuiBrowserViewport,
   WebuiBrowserWebTabSnapshot,
 } from "../../shared/contracts/browser.js";
 import type {
@@ -386,7 +387,11 @@ export function createWebuiWire({
 
   function watchBrowserFrames(
     operation: string,
-    requestBody: { readonly surface: WebuiBrowserSurface; readonly target: WebuiBrowserTargetId },
+    requestBody: {
+      readonly surface: WebuiBrowserSurface;
+      readonly target: WebuiBrowserTargetId;
+      readonly viewport?: WebuiBrowserViewport;
+    },
     onFrame: (frame: WebuiBrowserImageFrame) => void,
   ): () => void {
     let stopped = false;

@@ -233,6 +233,9 @@
   .webui-workspace-panel-actions button { width: 32px; height: 32px; flex: 0 0 32px; border-radius: 8px; color: var(--icon_default_secondary); }
   .webui-workspace-panel-close { color: var(--icon_default_secondary); }
   .webui-workspace-panel-body { display: flex; min-width: 0; min-height: 0; flex: 1 1 auto; overflow: hidden; }
+  /* A web tab's content is a window: the browser panel fills the body, or the
+   * page sits at the top of it with the panel's own surface underneath. */
+  .webui-workspace-web-tab { display: flex; min-width: 0; min-height: 0; flex: 1 1 auto; overflow: hidden; }
   .webui-workspace-view { display: flex; min-width: 0; min-height: 0; flex: 1 1 auto; flex-direction: column; overflow: auto; }
   .webui-workspace-file-toolbar { display: flex; min-height: 48px; flex: 0 0 48px; align-items: center; gap: var(--spacing_8); border-bottom: 1px solid var(--border_default); padding: 0 var(--spacing_16); }
   .webui-workspace-file-breadcrumb { display: flex; min-width: 0; flex: 1 1 auto; align-items: center; gap: var(--spacing_8); overflow: hidden; color: var(--text_default_tertiary); font-size: var(--size_14); white-space: nowrap; }

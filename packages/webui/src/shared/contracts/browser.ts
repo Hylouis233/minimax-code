@@ -379,6 +379,22 @@ export interface WebuiBrowserError {
  * client that receives a frame for a target it is no longer showing can drop it
  * rather than display a page that is not the one the user chose.
  */
+/**
+ * The size the browser's window should be.
+ *
+ * The browser is a window, and a window is the size of the place it is shown
+ * in. A page drawn into a surface of another shape is scaled down, and the
+ * person reads it at half the size. The panel therefore states the size it
+ * shows the page at, and the browser takes it.
+ *
+ * It is a request, not a fact: the page behind the target is the same page
+ * whoever looks at it, and the runtime may refuse the size.
+ */
+export interface WebuiBrowserViewport {
+  readonly width: number;
+  readonly height: number;
+}
+
 export interface WebuiBrowserImageFrame {
   readonly target: WebuiBrowserTargetId;
   /** Base64 image bytes, as the transport encodes them. */

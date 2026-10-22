@@ -21,6 +21,7 @@ import {
   prepareWebuiBrowserInputCommand,
   webuiBrowserAuthorizationChange,
   webuiBrowserModifierFlags,
+  webuiBrowserPicturePoint,
   webuiBrowserPointerButton,
 } from "../../src/client/features/browser/application/browser-commands.js";
 import type { WebuiBrowserPanelState } from "../../src/client/features/browser/contracts/browser-panel.js";
@@ -321,5 +322,40 @@ describe("the four authorization switches", () => {
     expect(
       applyWebuiBrowserAuthorizationChange(allOn, webuiBrowserAuthorizationChange({ surface: "edge", enabled: false })),
     ).toEqual({ isolatedChromium: true, edge: false, chrome: true, fullCdp: true });
+  });
+});
+
+describe("a click is a point in the picture, not in the surface it is shown on", () => {
+  // The picture is the browser's viewport, drawn to fit the surface. A click on
+  // the surface is therefore not yet a point in the browser: the picture is
+  // scaled down, and the space around it is not part of the page at all.
+  const surface = { left: 0, top: 0, width: 800, height: 600 };
+  const picture = { naturalWidth: 1280, naturalHeight: 800 };
+
+  it("maps a click into the picture's own size", () => {
+    // The picture is 1280x800 drawn into 800x600: it is scaled by 0.625, so it
+    // is 800 wide and 500 tall, with 50 pixels of surface above and below it.
+    const centre = webuiBrowserPicturePoint(surface, picture, 400, 300);
+    expect(centre.x).toBeCloseTo(640);
+    expect(centre.y).toBeCloseTo(400);
+  });
+
+  it("ignores the space around the picture", () => {
+    // The picture fills the surface's width, so there is no space beside it —
+    // but there is space above it, and a click there is not a point in the
+    // page at all. It is clamped to the page's edge rather than sent as a
+    // point above it.
+    const above = webuiBrowserPicturePoint(surface, picture, 400, 10);
+    expect(above.y).toBe(0);
+    // And a click on the picture's own width is scaled, not passed through.
+    const left = webuiBrowserPicturePoint(surface, picture, 10, 300);
+    expect(left.x).toBeCloseTo(16);
+  });
+
+  it("falls back to the surface when the picture has no size yet", () => {
+    // Before the first frame there is no picture to measure, and the surface
+    // is the only thing that can be measured.
+    const point = webuiBrowserPicturePoint(surface, undefined, 100, 50);
+    expect(point).toEqual({ x: 100, y: 50 });
   });
 });

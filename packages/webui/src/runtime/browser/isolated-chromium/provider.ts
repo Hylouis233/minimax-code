@@ -44,6 +44,7 @@ import type {
   WebuiBrowserSurface,
   WebuiBrowserTargetId,
   WebuiBrowserTargetState,
+  WebuiBrowserViewport,
 } from "../../../shared/contracts/browser.js";
 import { WEBUI_BROWSER_RESTRICTED_COMMANDS } from "../../../shared/contracts/browser.js";
 import { browserOperationError } from "../errors.js";
@@ -116,6 +117,8 @@ export interface WebuiBrowserSurfaceProvider {
     listener: (change: WebuiBrowserTargetChange) => void,
   ): () => void;
   /** Starts pushing the target's live images to the callback. */
+  /** Gives the browser's window the size the panel shows the page at. */
+  setViewport?(targetId: string, viewport: WebuiBrowserViewport): Promise<void>;
   startImageStream(
     targetId: string,
     onFrame: (frame: WebuiBrowserImageFrame) => void,
@@ -399,6 +402,38 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
       });
     }
     return states;
+  }
+
+  /**
+   * Gives the browser's window the size the panel shows the page at.
+   *
+   * The window takes the size of the place it is shown in, so the page is
+   * drawn at its own size rather than scaled down into a surface of another
+   * shape. It is the same device-metrics override the browser's own window
+   * uses, and it does not reload the page.
+   */
+  async setViewport(targetId: string, viewport: WebuiBrowserViewport): Promise<void> {
+    const page = this.#pageOf(targetId);
+    if (!page) {
+      throw browserOperationError(
+        "browser_target_unknown",
+        "The isolated Chromium has no such target.",
+      );
+    }
+    const connection = this.#connection;
+    if (!connection) return;
+    await this.#withAttachmentRetry(() =>
+      connection.send(
+        "Emulation.setDeviceMetricsOverride",
+        {
+          width: Math.max(1, Math.round(viewport.width)),
+          height: Math.max(1, Math.round(viewport.height)),
+          deviceScaleFactor: 1,
+          mobile: false,
+        },
+        page.sessionId,
+      ),
+    );
   }
 
   async startImageStream(
@@ -738,7 +773,12 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
       const metadata = event.params.metadata as { deviceWidth?: number } | undefined;
       if (typeof data !== "string") return;
       const sessionId = event.params.sessionId;
-      void this.#ackScreencastFrame(sessionId);
+      // The ack goes to the **page's** session. A screencast that is never
+      // acknowledged stops after a frame or two: Chromium holds the next frame
+      // until the previous one is confirmed, so an ack that goes to the
+      // browser's connection instead of the page's leaves the page frozen on
+      // whatever it first drew.
+      void this.#ackScreencastFrame(sessionId, page.sessionId);
       page.frameSequence += 1;
       page.frameHandler?.({
         target: {
@@ -775,11 +815,11 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
     }
   }
 
-  async #ackScreencastFrame(sessionId: unknown): Promise<void> {
+  async #ackScreencastFrame(sessionId: unknown, pageSessionId: string): Promise<void> {
     const connection = this.#connection;
     if (!connection || typeof sessionId !== "number") return;
     try {
-      await connection.send("Page.screencastFrameAck", { sessionId });
+      await connection.send("Page.screencastFrameAck", { sessionId }, pageSessionId);
     } catch {
       // An ack that fails means the browser stopped the stream; the stream's
       // own teardown reports it.

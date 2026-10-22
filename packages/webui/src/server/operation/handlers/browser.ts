@@ -27,6 +27,7 @@ import {
   readBrowserRunId,
   readBrowserSurface,
   readBrowserTarget,
+  readBrowserViewport,
   readBrowserWebTabUrl,
   selectBrowserTargetOperation,
   sendBrowserCommandOperation,
@@ -154,6 +155,7 @@ export function createBrowserHandlerEntries(
         readBrowserSurface(body as Record<string, unknown>),
         readBrowserTarget(body as Record<string, unknown>),
         context.signal,
+        readBrowserViewport(body as Record<string, unknown>),
       ) as unknown as AsyncIterable<Record<string, unknown>>,
     },
   });

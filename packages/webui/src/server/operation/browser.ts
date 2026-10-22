@@ -33,6 +33,7 @@ import {
   type WebuiBrowserInputCommand,
   type WebuiBrowserSurface,
   type WebuiBrowserTargetId,
+  type WebuiBrowserViewport,
   type WebuiBridgeBrowserSurface,
 } from "../../shared/contracts/browser.js";
 import type { WebuiOperation, WebuiOperationValidation } from "./operation-contract.js";
@@ -254,6 +255,20 @@ function validateTarget(
 ): WebuiOperationValidation<Record<string, unknown>> {
   const result = requireRecord(operation, body);
   if (!result.ok) return result;
+  const viewport = result.body.viewport;
+  if (viewport !== undefined) {
+    if (
+      !isRecord(viewport) ||
+      typeof viewport.width !== "number" ||
+      typeof viewport.height !== "number" ||
+      !Number.isFinite(viewport.width) ||
+      !Number.isFinite(viewport.height) ||
+      viewport.width <= 0 ||
+      viewport.height <= 0
+    ) {
+      return invalidBody(`${operation} body requires a viewport of a width and a height`);
+    }
+  }
   const target = result.body.target;
   if (!isRecord(target)) {
     return invalidBody(`${operation} body requires a target`);
@@ -294,6 +309,20 @@ function validateFrameStream(
     !WEBUI_BROWSER_SURFACES.includes(surface as WebuiBrowserSurface)
   ) {
     return invalidBody(`${operation} body requires a known browser surface`);
+  }
+  const viewport = result.body.viewport;
+  if (viewport !== undefined) {
+    if (
+      !isRecord(viewport) ||
+      typeof viewport.width !== "number" ||
+      typeof viewport.height !== "number" ||
+      !Number.isFinite(viewport.width) ||
+      !Number.isFinite(viewport.height) ||
+      viewport.width <= 0 ||
+      viewport.height <= 0
+    ) {
+      return invalidBody(`${operation} body requires a viewport of a width and a height`);
+    }
   }
   const target = result.body.target;
   if (!isRecord(target)) {
@@ -417,6 +446,20 @@ function validateWebTabTarget(
 ): WebuiOperationValidation<Record<string, unknown>> {
   const result = requireRecord(operation, body);
   if (!result.ok) return result;
+  const viewport = result.body.viewport;
+  if (viewport !== undefined) {
+    if (
+      !isRecord(viewport) ||
+      typeof viewport.width !== "number" ||
+      typeof viewport.height !== "number" ||
+      !Number.isFinite(viewport.width) ||
+      !Number.isFinite(viewport.height) ||
+      viewport.width <= 0 ||
+      viewport.height <= 0
+    ) {
+      return invalidBody(`${operation} body requires a viewport of a width and a height`);
+    }
+  }
   const target = result.body.target;
   if (!isRecord(target)) {
     return invalidBody(`${operation} body requires a target`);
@@ -466,6 +509,20 @@ export function readBrowserRunId(body: Record<string, unknown>): string | undefi
 /** The target a validated body carries, as the runtime expects it. */
 export function readBrowserTarget(body: Record<string, unknown>): WebuiBrowserTargetId {
   return body.target as unknown as WebuiBrowserTargetId;
+}
+
+/**
+ * The size the panel shows the page at, as the runtime expects it.
+ *
+ * It is optional: a body that states no size leaves the browser's window as
+ * it is, and the page is scaled into whatever surface shows it.
+ */
+export function readBrowserViewport(
+  body: Record<string, unknown>,
+): WebuiBrowserViewport | undefined {
+  const viewport = body.viewport;
+  if (!isRecord(viewport)) return undefined;
+  return { width: Number(viewport.width), height: Number(viewport.height) };
 }
 
 /** The url a validated body carries, as the runtime expects it. */

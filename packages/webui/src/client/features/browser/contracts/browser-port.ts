@@ -28,6 +28,7 @@ import type {
   WebuiBrowserInputCommand,
   WebuiBrowserSurface,
   WebuiBrowserTargetId,
+  WebuiBrowserViewport,
   WebuiBrowserTargetList,
   WebuiBrowserTargetState,
   WebuiBrowserWebTabClose,
@@ -213,7 +214,16 @@ export interface BrowserPort {
    * it when the panel goes away.
    */
   readonly watchBrowserFrames?: (
-    request: { readonly surface: WebuiBrowserSurface; readonly target: WebuiBrowserTargetId },
+    request: {
+      readonly surface: WebuiBrowserSurface;
+      readonly target: WebuiBrowserTargetId;
+      /**
+       * The size the panel shows the page at, so the browser's window can take
+       * it. Without it the page is scaled into the panel, and the person reads
+       * it at half the size.
+       */
+      readonly viewport?: WebuiBrowserViewport;
+    },
     onFrame: (frame: WebuiBrowserImageFrame) => void,
   ) => () => void;
   /**
