@@ -23,7 +23,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { WebuiIsolatedChromiumProvider } from "../../src/runtime/browser/isolated-chromium/provider.js";
 import type { WebuiBrowserTargetId } from "../../src/shared/contracts/browser.js";
-import { beginAcceptanceSuite, observeAcceptance } from "../browser/acceptance-record.js";
+import { beginAcceptanceSuite, observeAcceptance, restoreAcceptanceRecords } from "../browser/acceptance-record.js";
 
 /** The record file this suite writes. */
 const SUITE = "isolated-chromium";
@@ -105,6 +105,9 @@ describe.skipIf(!available)("the browser input path, against a real page", () =>
   }, 60_000);
 
   afterAll(async () => {
+    // This suite rewrites the record file, and the file is tracked, so on CI
+    // the run puts it back the way the checkout had it.
+    restoreAcceptanceRecords();
     await provider?.close();
     if (dataDir) await rm(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });

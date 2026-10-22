@@ -23,6 +23,7 @@ import { copyMcodeToolsArtifact, downloadMcodeToolsArtifact, MCODE_TOOLS_ARTIFAC
 import { checkWindowsSourceLocation, runWindowsSourceLocationCheck } from '../scripts/check-windows-source-location.mjs';
 import { recordBuildIntegrity, verifyBuildIntegrity } from '../scripts/lib/webui-build-integrity.mjs';
 import { validateExceptionLedger, sourceFingerprint } from '../scripts/lib/webui-dependency-rules.mjs';
+import { acceptanceRecordFiles, restoreAcceptanceRecords } from '../scripts/lib/acceptance-records.mjs';
 
 test('permanent loader approval follows tokens rather than line numbers', () => {
   const loader = 'const entry = new URL("./embedded/cli.mjs", import.meta.url); await import(entry.href);';
@@ -657,9 +658,16 @@ function verificationFixture(t) {
   const directory = mkdtempSync(path.join(tmpdir(), 'verify-fixture-'));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   const root = path.join(directory, 'source');
-  mkdirSync(path.join(root, 'scripts'), { recursive: true });
+  mkdirSync(path.join(root, 'scripts/lib'), { recursive: true });
   const verifier = path.join(root, 'scripts/verify.mjs');
   copyFileSync(new URL('../scripts/verify.mjs', import.meta.url), verifier);
+  // The verifier imports the module that puts the acceptance records back, so
+  // the fixture carries it the same way it carries a stub for the export step.
+  // The fixture is not a checkout, so the restore finds nothing to do there.
+  copyFileSync(
+    new URL('../scripts/lib/acceptance-records.mjs', import.meta.url),
+    path.join(root, 'scripts/lib/acceptance-records.mjs'),
+  );
   const manager = path.join(directory, 'manager.cjs');
   writeFileSync(manager, `
     const fs = require('node:fs');
@@ -699,6 +707,55 @@ function verificationFixture(t) {
     report: () => JSON.parse(readFileSync(path.join(reportDir, 'verification.json'), 'utf8')),
   };
 }
+
+test('a verification run puts the browser acceptance records back the way the checkout had them', t => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'acceptance-records-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const git = (...args) => execFileSync('git', ['-C', directory, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  const commit = (...args) => git('-c', 'user.name=fixture', '-c', 'user.email=fixture@local', ...args);
+  git('init');
+  // The repository's own attributes, so the checkout writes the records the
+  // way the repository writes them. Without them a Windows machine would
+  // check the file out with CRLF, and git would keep calling it modified
+  // after it had been restored.
+  copyFileSync(new URL('../.gitattributes', import.meta.url), path.join(directory, '.gitattributes'));
+  commit('add', '--', '.gitattributes');
+  commit('commit', '-m', 'the attributes');
+  commit('commit', '--allow-empty', '-m', 'base');
+  const record = '.plan/browser-use/complete/isolated-chromium.acceptance.json';
+  mkdirSync(path.join(directory, path.dirname(record)), { recursive: true });
+  writeFileSync(path.join(directory, record), '[]\n');
+  commit('add', '--', record);
+  commit('commit', '-m', 'the accepted record');
+  const dirty = () => git('status', '--porcelain', '--untracked-files=no').trim();
+
+  assert.deepEqual(acceptanceRecordFiles(directory), [record]);
+
+  // A run rewrites the record: every record carries the time and the machine
+  // it ran on, so the working tree is dirty once the suite is over.
+  writeFileSync(path.join(directory, record), '[{"at":"2026-01-01T00:00:00.000Z"}]\n');
+  assert.equal(dirty(), `M ${record}`);
+
+  const previous = { ci: process.env.CI, actions: process.env.GITHUB_ACTIONS };
+  delete process.env.CI;
+  delete process.env.GITHUB_ACTIONS;
+  try {
+    // Locally the records stay: they are what the run just produced, and the
+    // published matrix is written from them.
+    assert.deepEqual(restoreAcceptanceRecords(directory), []);
+    assert.equal(dirty(), `M ${record}`);
+
+    // On CI they go back, so the release packaging finds a clean tree.
+    process.env.CI = 'true';
+    assert.deepEqual(restoreAcceptanceRecords(directory), [record]);
+    assert.equal(dirty(), '');
+  } finally {
+    for (const [name, value] of [['CI', previous.ci], ['GITHUB_ACTIONS', previous.actions]]) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+});
 
 test('platform verification omits only the compiler gates and invalid profiles fail closed', t => {
   const f = verificationFixture(t);
@@ -991,6 +1048,12 @@ test('Windows contract profile selects focused gates', () => {
   try {
     const fixture = path.join(root, 'verify.mjs');
     copyFileSync(new URL('../scripts/verify.mjs', import.meta.url), fixture);
+    // The verifier imports the module that puts the acceptance records back.
+    mkdirSync(path.join(root, 'lib'), { recursive: true });
+    copyFileSync(
+      new URL('../scripts/lib/acceptance-records.mjs', import.meta.url),
+      path.join(root, 'lib/acceptance-records.mjs'),
+    );
     const preload = path.join(root, 'platform.cjs');
     writeFileSync(preload, "Object.defineProperty(process, 'platform', { value: 'win32' });\n");
     const result = spawnSync(process.execPath, ['--require', preload, fixture, '--profile', 'windows', '--list'], {

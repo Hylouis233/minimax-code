@@ -12,6 +12,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
+import { restoreAcceptanceRecords } from "./lib/acceptance-records.mjs";
+
 // Single definition of the full verification pipeline. GitHub CI runs `pnpm verify`
 // so a local run executes the same gates in the same order; previously the order
 // only existed inside the workflow file and could not be reproduced locally.
@@ -246,6 +248,22 @@ try {
   }
   report.status = failed ? "FAIL" : "PASS";
 } finally {
+  // The browser acceptance records are tracked files that a test run rewrites,
+  // and the release packaging runs in a separate process after this one and
+  // refuses to run with a dirty tree. Put them back before the run is over, so
+  // a verification run leaves the checkout the way it found it. A failure to
+  // restore is reported rather than thrown: the gate that failed is the
+  // interesting one, and the packaging step says so plainly if the tree is
+  // still dirty.
+  try {
+    const restored = restoreAcceptanceRecords(root);
+    if (restored.length > 0)
+      console.log(`acceptance records restored: ${restored.length} file(s)`);
+  } catch (error) {
+    console.error(
+      `could not restore the acceptance records: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
   rmSync(temporary, { recursive: true, force: true });
   for (const gate of report.gates)
     if (gate.status === "NOT_RUN")
