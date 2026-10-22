@@ -66,13 +66,21 @@ function pinButton(html: string, sessionId: string): string | undefined {
     .match(/<button[^>]*class="webui-rail-action"[^>]*>/u)?.[0];
 }
 
+/**
+ * The pin states a row's glyph draws.
+ *
+ * The glyph's own class says which state it is: the filled pin is the pinned
+ * state and the outline pin is the unpinned one. The hand-drawn glyph used to
+ * say it through the id of a clip path it carried; the tabler glyph says it
+ * through its class.
+ */
 function pinGlyph(html: string, sessionId: string): string[] {
-  const ids = [
+  const classes = [
     ...rowSlice(html, sessionId).matchAll(
-      /<clipPath id="webui-context-pin-(un)?pinned-[^"]*"/gu,
+      /class="[^"]*\btabler-icon-pin(-filled)?\b[^"]*"/gu,
     ),
   ];
-  return ids.map((match) => (match[1] ? "unpinned" : "pinned"));
+  return classes.map((match) => (match[1] ? "pinned" : "unpinned"));
 }
 
 describe("the rail pin action", () => {
@@ -93,11 +101,16 @@ describe("the rail pin action", () => {
 
   it("renders a distinct glyph instance for each session row", () => {
     const html = renderProjectList({ pinnedSessions: { mvs_pinned: true } });
-    const ids = [...html.matchAll(/<clipPath id="(webui-context-pin-[^"]+)"/gu)].map(
-      (match) => match[1],
-    );
-    expect(ids).toHaveLength(2);
-    expect(new Set(ids).size).toBe(2);
+    // Each row draws its own pin element. The hand-drawn glyph carried a clip
+    // path whose id had to be unique per row (a shared id would have made the
+    // second row resolve its clip against the first row's element); the
+    // tabler glyph carries no such id, so the substance of the rule is that
+    // each row has an element of its own.
+    const glyphs = [
+      ...html.matchAll(/<svg[^>]*\btabler-icon-pin\b[^>]*>/gu),
+    ];
+    expect(glyphs).toHaveLength(2);
+    expect(glyphs[0]?.[0]).not.toBe(glyphs[1]?.[0]);
   });
 
   it("does not add a pin glyph before a project name", () => {
@@ -111,6 +124,9 @@ describe("the pin action glyph", () => {
   it("draws different marks for pin and unpin states", () => {
     const pinned = renderToStaticMarkup(createElement(WebuiIconContextPin, { pinned: true }));
     const unpinned = renderToStaticMarkup(createElement(WebuiIconContextPin, { pinned: false }));
+    // The filled pin is the pinned state and the outline the unpinned one.
+    expect(pinned).toContain('class="tabler-icon tabler-icon-pin-filled"');
+    expect(unpinned).toContain('class="tabler-icon tabler-icon-pin"');
     expect(pinned).not.toBe(unpinned);
   });
 });
