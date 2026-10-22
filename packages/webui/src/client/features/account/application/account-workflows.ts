@@ -38,6 +38,7 @@ import type {
   WebuiUsageSummaryView,
 } from "../../../../shared/contracts/account-usage.js";
 import type { WebuiUsageQuotaResult } from "../../../../shared/contracts/usage-quota.js";
+import { SigninPanelScene, type SigninDayItem } from "@mavis/shared/daily-signin";
 
 /** The transport methods this owner drives. Absent means "not wired". */
 export type WebuiAccountPortSlice = Pick<
@@ -296,6 +297,41 @@ export const initialWebuiAccountWorkflowsState: WebuiAccountWorkflowsState = {
 
 function message(reason: unknown): string {
   return reason instanceof Error ? reason.message : String(reason);
+}
+
+/**
+ * Coerce a sign-in panel off the wire before it reaches the state.
+ *
+ * The transport resolves the server body verbatim (`resolve(frame.body as T)`
+ * in `client/platform/transport.ts`), and the sign-in view reads `panel.days`
+ * with no guard — the shared streak helper does `[...days].sort(...)`. A body
+ * that is not a panel — `{}`, a server error envelope, anything without
+ * `days` — therefore threw `days is not iterable` and took the entire app
+ * tree into the error boundary.
+ *
+ * The server does validate (`validateSigninPanel` throws `Invalid sign-in
+ * panel`), so this is defence at the boundary rather than a known live shape.
+ * It is here because the blast radius is the whole UI, not one row: a
+ * malformed panel must degrade to an empty seven-day strip, never to a blank
+ * page.
+ */
+function normalizeSigninPanel(value: unknown): WebuiSigninPanelView {
+  const raw = value as { scene?: unknown; days?: unknown } | null;
+  const days = Array.isArray(raw?.days)
+    ? raw.days.filter(
+        (day): day is SigninDayItem =>
+          Boolean(day) &&
+          typeof day === "object" &&
+          typeof (day as { day_no?: unknown }).day_no === "number",
+      )
+    : [];
+  return {
+    scene:
+      typeof raw?.scene === "number"
+        ? (raw.scene as SigninPanelScene)
+        : SigninPanelScene.Unknown,
+    days,
+  };
 }
 
 export interface WebuiAccountWorkflows {
@@ -1098,7 +1134,7 @@ export function createWebuiAccountWorkflows(deps: {
       if (disposed || !isCurrent(key, version)) return;
       set((current) => ({
         ...current,
-        signin: { ...current.signin, loading: false, panel, error: undefined },
+        signin: { ...current.signin, loading: false, panel: normalizeSigninPanel(panel), error: undefined },
       }));
     } catch (reason) {
       if (disposed || !isCurrent(key, version)) return;
@@ -1123,7 +1159,7 @@ export function createWebuiAccountWorkflows(deps: {
         signin: {
           ...current.signin,
           claiming: false,
-          panel: result.panel,
+          panel: normalizeSigninPanel(result.panel),
           claim: result,
         },
       }));

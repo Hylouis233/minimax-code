@@ -4209,6 +4209,7 @@
     "packages/webui/test/browser/rail-search.spec.mjs",
     "packages/webui/test/browser/rail-transfer.spec.mjs",
     "packages/webui/test/browser/real-browser-bridge.ts",
+    "packages/webui/test/browser/recovered-surfaces.spec.mjs",
     "packages/webui/test/browser/review-consumers.spec.mjs",
     "packages/webui/test/browser/server.mjs",
     "packages/webui/test/browser/settings-account-tab.spec.mjs",

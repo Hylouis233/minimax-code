@@ -105,6 +105,32 @@ function withoutKey(
   return next;
 }
 
+/**
+ * Coerce a directory listing off the wire before it reaches the state.
+ *
+ * The transport resolves the server body verbatim (`resolve(frame.body as T)`
+ * in `client/platform/transport.ts`), so a body that is missing `entries` — or
+ * is not a listing at all — reaches the view, where `listing?.entries.length`
+ * throws `Cannot read properties of undefined (reading 'length')` and the
+ * whole app tree falls into the error boundary. The `?.` stopped one level
+ * too early: it guarded `listing` and left `entries` bare.
+ *
+ * Normalising at the door means the view can read the listing it was given
+ * without re-checking the wire's shape at every use, and a malformed answer
+ * degrades to an empty directory rather than to a blank page.
+ */
+function normalizeDirectoryListing(
+  value: WebuiWorkspaceDirectoryListing,
+): WebuiWorkspaceDirectoryListing {
+  const raw = value as Partial<WebuiWorkspaceDirectoryListing> | null;
+  return {
+    dir: typeof raw?.dir === "string" ? raw.dir : "",
+    parent: typeof raw?.parent === "string" ? raw.parent : undefined,
+    entries: Array.isArray(raw?.entries) ? raw.entries : [],
+    truncated: raw?.truncated === true,
+  };
+}
+
 /** The children a directory load returned, or `undefined` when it was dropped. */
 export type WebuiWorkspaceDirLoad = readonly WebuiWorkspaceFile[] | undefined;
 
@@ -371,8 +397,9 @@ export function createWebuiWorkspaceFilesOwner(deps: {
     }
     set((current) => ({ ...current, directoryBrowse: { status: "loading" } }));
     void browseDirs(dir ? { dir } : {})
-      .then((listing) => {
+      .then((answer) => {
         if (mine !== browseSeq) return;
+        const listing = normalizeDirectoryListing(answer);
         set((current) => ({ ...current, directoryBrowse: { status: "ready", listing } }));
       })
       .catch((reason: unknown) => {
