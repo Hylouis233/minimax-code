@@ -73,20 +73,22 @@ function clipRightInset(clipPath) {
 }
 
 /**
- * The state of the pin glyph in a row's action button, read from the clip path
- * the glyph actually references.
+ * The state of the pin glyph in a row's action button, read from the glyph's
+ * own class.
  *
- * Off the `<g clip-path>` reference rather than off a `clipPath` type selector:
- * the question is whether the slash's clip resolves to *this* row's own path
- * definition, and the reference is what the browser resolves.
+ * The filled pin is the pinned state and the outline the unpinned one, and
+ * the class is what says which: the hand-drawn glyph said it through the id
+ * of the clip path it carried, and the tabler glyph says it through its
+ * class.
  */
 async function pinGlyphState(page, sessionId) {
-  const url = await rowOf(page, sessionId)
-    .locator(".webui-rail-action g[clip-path]")
+  const className = await rowOf(page, sessionId)
+    .locator(".webui-rail-action svg")
     .first()
-    .getAttribute("clip-path");
-  const id = url?.match(/#(.+)\)/u)?.[1] ?? "";
-  return id.includes("unpinned") ? "unpinned" : id.includes("pinned") ? "pinned" : "none";
+    .getAttribute("class");
+  if (!className) return "none";
+  if (className.includes("tabler-icon-pin-filled")) return "pinned";
+  return className.includes("tabler-icon-pin") ? "unpinned" : "none";
 }
 
 async function pinButtonLabel(page, sessionId) {
@@ -186,31 +188,19 @@ test("the pin button offers the pin glyph on a row that is not pinned", async ({
   expect(await pinButtonLabel(page, "B")).toBe("置顶：灵动岛卡住问题");
 });
 
-test("two pinned rows each get their own clip path", async ({ page }) => {
+test("two pinned rows each draw their own pin glyph", async ({ page }) => {
   // A and the child C. A shared clipPath id would make the second row's slash
   // clip against the first row's element -- visually identical here because the
-  // two definitions match, which is exactly why it needs asserting on ids.
+  // two definitions match, which is exactly why it needs asserting on ids. The
+  // tabler glyph carries no such id, so the rule that is left is the one that
+  // still holds: each row has an element of its own.
   await seedPins(page, { sessions: { A: true, B: true } });
   await openApp(page, "#session=A");
 
-  // `url(#...)` reduced to the bare id on both sides: the attribute carries the
-  // function wrapper, the definition does not.
-  const ids = await page
-    .locator(".webui-rail-action g[clip-path]")
-    .evaluateAll((nodes) =>
-      nodes.map((node) => (node.getAttribute("clip-path") ?? "").replace(/^url\(#(.*)\)$/u, "$1")),
-    );
-  expect(ids).toHaveLength(2);
-  expect(new Set(ids).size).toBe(2);
-  // And each reference resolves to a path definition that actually exists in
-  // the document. Two identical ids would satisfy the uniqueness check above
-  // while both glyphs clip against the first row's element.
-  const defined = await page.evaluate(() =>
-    [...document.querySelectorAll("clipPath")].map((node) => node.id),
-  );
-  for (const id of ids) {
-    expect(defined, `no clipPath defines ${id}`).toContain(id);
-  }
+  const glyphs = page.locator('.webui-rail-action svg[class*="tabler-icon-pin"]');
+  await expect(glyphs).toHaveCount(2);
+  // Two separate elements, not one element counted twice.
+  expect(await glyphs.evaluateAll((nodes) => new Set(nodes).size)).toBe(2);
 });
 
 test("a pinned project row keeps the folder icon without an extra pin glyph", async ({ page }) => {
@@ -340,8 +330,12 @@ test("left rail expanders share the pinned animation and parent rows keep their 
     return [style.transitionProperty, style.transitionDuration, style.transitionTimingFunction];
   })).toEqual(pinnedTransition);
 
-  const disclosurePath = await childDisclosure.locator("path").getAttribute("d");
-  expect(disclosurePath).toBe("M4.25 2.75 8 6l-3.75 3.25v-6.5Z");
+  // The parent row's disclosure is the filled caret; the project row's is the
+  // outline chevron. The hand-drawn glyph said so through the path it drew,
+  // and the tabler glyph says it through its class and its fill.
+  const disclosure = childDisclosure.locator("svg").first();
+  expect(await disclosure.getAttribute("class")).toContain("tabler-icon-caret-right-filled");
+  expect(await disclosure.getAttribute("fill")).toBe("currentColor");
 
   await childDisclosure.click();
   await expect(childContent).toHaveAttribute("aria-hidden", "false");

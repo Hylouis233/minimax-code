@@ -74,7 +74,10 @@ test("steps forward and back, gating every required step", async ({ page }) => {
   await openApp(page, "#session=A");
 
   await expect(card(page)).toBeVisible();
-  await expect(page.locator('[data-testid="questionnaire-progress"]')).toHaveText("‹1/3›");
+  // The progress reads 1/3 between the two step affordances. The next one is
+  // an icon now, so it contributes no text to the indicator.
+  await expect(page.locator('[data-testid="questionnaire-progress"]')).toContainText("1/3");
+  await expect(page.locator('[data-testid="questionnaire-progress-next"] svg')).toBeVisible();
 
   // Required, unanswered: both ways forward are locked. This is the gate the
   // roadmap's 必填校验 row claimed — asserted on the real buttons.
@@ -86,7 +89,7 @@ test("steps forward and back, gating every required step", async ({ page }) => {
   await page.locator('[data-webui-questionnaire-option="o1a"]').click();
   await expect(next).toBeEnabled();
   await next.click();
-  await expect(page.locator('[data-testid="questionnaire-progress"]')).toHaveText("‹2/3›");
+  await expect(page.locator('[data-testid="questionnaire-progress"]')).toContainText("2/3");
 
   // Multi-select: the hint is the only signal the row offers that Space-like
   // toggling, not replacement, is the semantics.
@@ -98,7 +101,7 @@ test("steps forward and back, gating every required step", async ({ page }) => {
 
   // Back: the first step's answer survives the round trip.
   await page.locator('[data-testid="questionnaire-progress-prev"]').click();
-  await expect(page.locator('[data-testid="questionnaire-progress"]')).toHaveText("‹1/3›");
+  await expect(page.locator('[data-testid="questionnaire-progress"]')).toContainText("1/3");
   await expect(page.locator('[data-webui-questionnaire-option="o1a"]')).toHaveAttribute("data-selected", "true");
   await page.locator('[data-testid="questionnaire-next"]').click();
 
@@ -216,5 +219,5 @@ test("a multi-step request with no presentation block renders instead of throwin
   // DEFAULT_PRESENTATION: progress shown, back navigation allowed.
   await expect(page.locator('[data-testid="webui-error-boundary"]')).toHaveCount(0);
   await expect(card(page)).toBeVisible();
-  await expect(page.locator('[data-testid="questionnaire-progress"]')).toHaveText("‹1/2›");
+  await expect(page.locator('[data-testid="questionnaire-progress"]')).toContainText("1/2");
 });
