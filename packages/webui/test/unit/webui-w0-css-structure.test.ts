@@ -777,13 +777,12 @@ describe("W0 · at-rules and animations W5/W6 must not remove", () => {
       rule.context.some((entry) => entry.includes("prefers-reduced-motion")),
     );
 
-    // Eight blocks in shell.css, nine rules inside them (the settings block
-    // disables two selectors). Deleting one of these is the failure mode this
-    // assertion exists for: the base rule would keep animating for a user who
-    // asked for reduced motion. The exact list is the point -- adding an
-    // animated rule without registering its override here is the same defect,
-    // in the other direction.
-    expect(reducedMotion).toHaveLength(15);
+    // Sixteen rules across the stylesheets the shell imports. Deleting one of
+    // these is the failure mode this assertion exists for: the base rule would
+    // keep animating for a user who asked for reduced motion. The exact list
+    // is the point -- adding an animated rule without registering its override
+    // here is the same defect, in the other direction.
+    expect(reducedMotion).toHaveLength(16);
     for (const rule of reducedMotion)
       expect(rule.body).toMatch(/(?:animation|transition):\s*none/u);
 
@@ -813,6 +812,10 @@ describe("W0 · at-rules and animations W5/W6 must not remove", () => {
       // sessions opens and closes by transitioning its height, so a reader who
       // asked for reduced motion would otherwise watch the section slide.
       ".webui-progress-content-enter",
+      // Added with the progress section: it and its chevron transition their
+      // own state, so a reader who asked for reduced motion would otherwise
+      // watch both move.
+      ".webui-progress-section, .webui-progress-section-chevron",
       ".webui-project-section-content",
       // Added with the rail activity spinner. It spins forever by design, so a
       // reader who asked for reduced motion would otherwise get an animation

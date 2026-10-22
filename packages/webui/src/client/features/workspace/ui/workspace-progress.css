@@ -65,5 +65,5 @@
   .webui-subagent-status--error { color: var(--text_label_danger_secondary_default); }
   .webui-expandable-motion > .webui-progress-scroll { overflow-y: auto; overflow-x: hidden; }
   .webui-expandable-motion > .webui-subagents-scroll { overflow-y: auto; overflow-x: hidden; }
-  @media (prefers-reduced-motion: reduce) { .webui-progress-section, .webui-progress-section-chevron { transition-duration: 0ms; } }
+  @media (prefers-reduced-motion: reduce) { .webui-progress-section, .webui-progress-section-chevron { transition: none; } }
 }
