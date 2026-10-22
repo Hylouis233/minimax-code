@@ -38,9 +38,14 @@ import {
 import {
   WEBUI_BROWSER_TOOLBAR_COMMANDS,
   BrowserPanelHost,
+  webuiBrowserAgentPage,
   webuiBrowserToolbarRequest,
   webuiBrowserToolbarRun,
 } from "../../src/client/features/browser/ui/BrowserPanelHost.public.js";
+import {
+  initialWebuiBrowserPanelState,
+  reduceWebuiBrowserPanelState,
+} from "../../src/client/features/browser/projection/browser-state.js";
 
 const WORKSPACE_PANELS_SOURCE = readFileSync(
   new URL("../../src/client/features/workspace/ui/WorkspacePanels.tsx", import.meta.url),
@@ -96,6 +101,29 @@ describe("a web tab's toolbar", () => {
     expect(toolbarMarkup).not.toContain("<textarea");
     expect(toolbarMarkup).not.toContain("contenteditable");
     expect(toolbarMarkup).not.toContain("data-testid=\"webui-workspace-launcher-url\"");
+  });
+
+  it("names the page the Agent is on, and says nothing when it is the one in front", () => {
+    // Two actors, two pages: the one in front and the one the Agent is on. The
+    // row says which is which, and it is a report — the strip owns the choice
+    // of tab, and nothing here moves the Agent's page.
+    const agent: WebuiBrowserTargetId = { ...PAGE, targetId: "target-2" };
+    const state = reduceWebuiBrowserPanelState(initialWebuiBrowserPanelState, {
+      type: "targets-loaded",
+      list: {
+        surface: "isolated-chromium",
+        targets: [
+          { id: PAGE, title: "In front", url: "https://example.com/one", status: "open", selected: false },
+          { id: agent, title: "Agent page", url: "https://example.com/two", status: "open", selected: true },
+        ],
+      },
+      selected: agent,
+    });
+
+    expect(webuiBrowserAgentPage(state)).toBe("Agent page");
+
+    // A run that has selected nothing has no page to name.
+    expect(webuiBrowserAgentPage(initialWebuiBrowserPanelState)).toBeUndefined();
   });
 
   it("is carried by the browser business's host, over the tab's target", () => {

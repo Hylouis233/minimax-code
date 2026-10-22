@@ -276,17 +276,26 @@
   /* The new tab page: the tiles it opens a view from, and the URL box that
    * opens a page. It is a tab's content, so it fills the body of the panel
    * rather than sitting in the strip. */
-  .webui-workspace-launcher { display: flex; min-width: 0; min-height: 0; flex: 1 1 auto; flex-direction: column; align-items: center; justify-content: center; gap: var(--spacing_16); padding: var(--spacing_24); color: var(--text_default_primary); }
-  .webui-workspace-launcher-tiles { display: grid; width: 100%; max-width: 520px; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--spacing_12); }
-  .webui-workspace-launcher-tile { display: flex; min-height: 88px; flex-direction: column; align-items: center; justify-content: center; gap: var(--spacing_8); border: 1px solid var(--border_default); border-radius: 12px; background: var(--bg_default_secondary); padding: var(--spacing_12); color: var(--text_default_secondary); }
-  .webui-workspace-launcher-tile:hover { background: var(--bg_interaction_tertiary_hover); color: var(--text_default_primary); }
-  .webui-workspace-launcher-tile-glyph { font-size: 20px; line-height: 1; }
-  .webui-workspace-launcher-tile-label { font-size: var(--size_14); white-space: nowrap; }
-  .webui-workspace-launcher-url { display: flex; width: 100%; max-width: 520px; gap: var(--spacing_8); }
-  .webui-workspace-launcher-url-input { min-width: 0; flex: 1 1 auto; height: 36px; border: 1px solid var(--border_default); border-radius: 8px; background: var(--bg_default_secondary); padding: 0 var(--spacing_12); color: var(--text_default_primary); font-size: var(--size_14); }
-  .webui-workspace-launcher-url-input:focus { border-color: var(--border_accent); }
-  .webui-workspace-launcher-url-submit { height: 36px; flex: 0 0 auto; border: 0; border-radius: 8px; background: var(--bg_interaction_primary_default); padding: 0 var(--spacing_16); color: var(--text_default_inverted); font-size: var(--size_14); }
-  .webui-workspace-launcher-url-submit:disabled { opacity: 0.5; }
+  .webui-workspace-launcher { display: flex; min-width: 0; min-height: 0; flex: 1 1 auto; flex-direction: column; align-items: center; justify-content: center; gap: var(--spacing_32); padding: var(--spacing_24); background: var(--bg_default_primary); color: var(--text_default_primary); }
+  /* The address box, in the middle of the page, the way a browser's new tab
+   * page is built: a wide rounded field with the url in it, and the mark that
+   * says what the field is for at its left. */
+  .webui-workspace-launcher-omnibox { display: flex; width: 100%; max-width: 560px; align-items: center; gap: var(--spacing_8); height: 44px; padding: 0 var(--spacing_8) 0 var(--spacing_12); border: 1px solid var(--border_default); border-radius: 22px; background: var(--bg_default_secondary); }
+  .webui-workspace-launcher-omnibox:focus-within { border-color: var(--border_accent); }
+  .webui-workspace-launcher-omnibox-glyph { color: var(--icon_default_secondary, #5b6473); }
+  .webui-workspace-launcher-omnibox-input { min-width: 0; flex: 1 1 auto; height: 100%; border: 0; outline: 0; background: transparent; padding: 0; color: var(--text_default_primary); font-size: var(--size_14); }
+  .webui-workspace-launcher-omnibox-input::placeholder { color: var(--text_default_tertiary); }
+  .webui-workspace-launcher-omnibox-submit { display: inline-flex; width: 28px; height: 28px; flex: 0 0 28px; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: transparent; color: var(--icon_default_secondary, #5b6473); font-size: var(--size_12); }
+  .webui-workspace-launcher-omnibox-submit:hover { background: var(--bg_interaction_tertiary_hover); color: var(--text_default_primary); }
+  .webui-workspace-launcher-omnibox-submit:disabled { opacity: 0.5; }
+  /* The shortcuts, under the address box and in a row: a mark in a round
+   * plate with its name under it, which is the shape a browser's own
+   * shortcuts have. */
+  .webui-workspace-launcher-tiles { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--spacing_20); }
+  .webui-workspace-launcher-tile { display: flex; width: 88px; flex-direction: column; align-items: center; gap: var(--spacing_8); border: 0; background: transparent; padding: 0; color: var(--text_default_secondary); }
+  .webui-workspace-launcher-tile-icon { display: inline-flex; width: 44px; height: 44px; align-items: center; justify-content: center; border: 1px solid var(--border_default); border-radius: 50%; background: var(--bg_default_secondary); }
+  .webui-workspace-launcher-tile:hover .webui-workspace-launcher-tile-icon { background: var(--bg_interaction_tertiary_hover); color: var(--text_default_primary); }
+  .webui-workspace-launcher-tile-label { font-size: var(--size_12); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   .webui-workspace-launcher-unavailable, .webui-workspace-launcher-error { max-width: 520px; color: var(--text_default_secondary); font-size: var(--size_12); text-align: center; }
 
   .webui-turn-review { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; overflow: auto; }

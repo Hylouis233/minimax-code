@@ -32,6 +32,27 @@ export function WebuiIconClose({ className }: WebuiIconProps): ReactElement {
   return <svg viewBox="0 0 16 16" aria-hidden="true" className={className}><path d="m4 4 8 8m0-8-8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>;
 }
 
+/** The browser toolbar's reload — an almost-closed circle with the arrow that starts it. */
+export function WebuiIconReload({ className }: WebuiIconProps): ReactElement {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" className={className}>
+      <path d="M12.8 6.4A5 5 0 1 1 8 3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M9.8 1.5 8 3l1.8 1.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** The address bar's origin mark — the globe every browser puts before a url. */
+export function WebuiIconGlobe({ className }: WebuiIconProps): ReactElement {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" className={className}>
+      <circle cx="8" cy="8" r="5.2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M8 2.8a5.2 5.2 0 0 0 0 10.4 5.2 5.2 0 0 0 0-10.4Z" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M2.8 8h10.4" fill="none" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
 /** The product mark — the hero avatar and identity glyph. */
 export function WebuiIconBrand({ className }: WebuiIconProps): ReactElement {
   const clipId = `webui-brand-logo-${useId().replace(/:/gu, "")}`;

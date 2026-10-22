@@ -45,7 +45,6 @@ import {
   useMemo,
   useReducer,
   useRef,
-  useState,
   type ReactElement,
 } from "react";
 
@@ -65,10 +64,18 @@ import {
   useWebuiBrowserAuthorizationState,
 } from "../bindings/use-browser-authorization.public.js";
 import { prepareWebuiBrowserInputCommand } from "../application/browser-commands.js";
+import { isSameWebuiBrowserTarget } from "../../../../shared/contracts/browser.js";
+import {
+  WebuiIconChevronLeft,
+  WebuiIconChevronRight,
+  WebuiIconGlobe,
+  WebuiIconReload,
+} from "../../../shell/icons.js";
 import type { BrowserPort } from "../contracts/browser-port.js";
 import {
   isUsableWebuiBrowserTargetId,
   type WebuiBrowserInputIntent,
+  type WebuiBrowserPanelState,
 } from "../contracts/browser-panel.js";
 import {
   initialWebuiBrowserPanelState,
@@ -94,12 +101,26 @@ export type WebuiBrowserToolbarCommand = (typeof WEBUI_BROWSER_TOOLBAR_COMMANDS)
 const TOOLBAR_COPY = {
   label: "网页工具栏",
   urlLabel: "当前网址",
+  agentPage: "Agent 正在此标签页操作",
   commands: {
     back: "后退",
     forward: "前进",
     reload: "刷新",
   },
 } as const;
+
+/**
+ * The glyph a command wears.
+ *
+ * A browser's three buttons are marks, not words: the row is a chrome bar, and
+ * chrome drawn as text reads as a toolbar of a different kind. The name stays
+ * on the button for anyone who cannot see the mark.
+ */
+const TOOLBAR_GLYPHS: Readonly<Record<WebuiBrowserToolbarCommand, ReactElement>> = {
+  back: <WebuiIconChevronLeft className="size-3" />,
+  forward: <WebuiIconChevronRight className="size-3" />,
+  reload: <WebuiIconReload className="size-3" />,
+};
 
 export interface BrowserPanelHostProps {
   /**
@@ -177,13 +198,6 @@ export function BrowserPanelHost({
   const settingsState = useWebuiSettingsWorkflowsState();
   const capabilityManifest = settingsState.runtimeVersion.value?.capabilities;
 
-  // The session's web tabs, as the runtime published them. The panel's list
-  // shows these: a browser holds pages that are not tabs — the page it opens at
-  // startup, the one the provider drives for itself — and listing those beside
-  // the tabs is what makes a browser with one tab read as three.
-  const [webTabs, setWebTabs] = useState<WebuiBrowserWebTabSnapshot | undefined>(undefined);
-  const watchBrowserWebTabs = port?.watchBrowserWebTabs;
-
   // The authorization is the browser family's, and it is read from the owner
   // the Settings page also reads: the switches moved to the settings page, and
   // a panel that kept a second copy would go on showing the answer it had when
@@ -233,21 +247,6 @@ export function BrowserPanelHost({
   useEffect(() => {
     void authorizationOwner?.load();
   }, [authorizationOwner]);
-
-  // The session's web tabs, subscribed once for the surface the panel is on.
-  // When the slice's `watchBrowserWebTabs` changes identity the previous
-  // subscription is closed and a new one is opened, the same way the strip's
-  // own subscription is managed.
-  const watchTabsKey = watchBrowserWebTabs ?? null;
-  useEffect(() => {
-    if (!watchBrowserWebTabs) return;
-    const stop = watchBrowserWebTabs({ surface, ...runScope }, (snapshot) => {
-      setWebTabs(snapshot);
-    });
-    return () => {
-      stop();
-    };
-  }, [watchTabsKey, surface, runScope]);
 
   // The panel's own state follows the owner's answer.
   useEffect(() => {
@@ -388,16 +387,21 @@ export function BrowserPanelHost({
     [state],
   );
 
+  const agentPage = webuiBrowserAgentPage(state);
+
   return (
     <div className="webui-browser-host" data-testid="browser-panel-host">
       {targetProp ? (
-        <WebuiBrowserToolbar url={urlProp} onCommand={onToolbarCommand} />
+        <WebuiBrowserToolbar
+          url={urlProp}
+          agentPage={agentPage}
+          onCommand={onToolbarCommand}
+        />
       ) : null}
       <BrowserPanel
         port={port}
         state={state}
         capabilities={capabilityManifest}
-        webTabs={webTabs}
         onSendInput={onSendInput}
         onRejected={onRejected}
       />
@@ -453,9 +457,12 @@ export async function webuiBrowserToolbarRun(input: {
  */
 function WebuiBrowserToolbar({
   url,
+  agentPage,
   onCommand,
 }: {
   readonly url?: string;
+  /** The page the Agent is driving, when it is not the page in front. */
+  readonly agentPage?: string;
   readonly onCommand: (command: WebuiBrowserToolbarCommand) => void;
 }): ReactElement {
   return (
@@ -471,21 +478,62 @@ function WebuiBrowserToolbar({
           type="button"
           className="webui-browser-toolbar-command"
           aria-label={TOOLBAR_COPY.commands[command]}
+          title={TOOLBAR_COPY.commands[command]}
           data-testid={`browser-toolbar-${command}`}
           onClick={() => onCommand(command)}
         >
-          {TOOLBAR_COPY.commands[command]}
+          {TOOLBAR_GLYPHS[command]}
         </button>
       ))}
-      <span
-        className="webui-browser-toolbar-url"
-        aria-label={TOOLBAR_COPY.urlLabel}
-        data-testid="browser-toolbar-url"
-      >
-        {url ?? ""}
+      {/*
+        The address bar. It is a display, not a field — the only place a url is
+        typed is the new tab page's — so it is a rounded, quiet field with the
+        url in it, the way every browser draws one.
+      */}
+      <span className="webui-browser-omnibox" data-testid="browser-toolbar-omnibox">
+        <WebuiIconGlobe className="webui-browser-omnibox-glyph size-3 shrink-0" />
+        <span
+          className="webui-browser-omnibox-url"
+          aria-label={TOOLBAR_COPY.urlLabel}
+          data-testid="browser-toolbar-url"
+        >
+          {url ?? ""}
+        </span>
       </span>
+      {/*
+        Which page the Agent is on. A real browser has one person and one
+        page, so it has no such mark; this one has two, and the difference is
+        the whole point of the tab model. It is a report, at the quiet end of
+        the row, and it is never a control: the strip owns the tab in front.
+      */}
+      {agentPage ? (
+        <span
+          className="webui-browser-toolbar-agent"
+          data-testid="browser-toolbar-agent"
+          title={TOOLBAR_COPY.agentPage}
+          aria-label={`${TOOLBAR_COPY.agentPage}：${agentPage}`}
+        >
+          <span className="webui-browser-toolbar-agent-dot" aria-hidden="true" />
+          <span className="webui-browser-toolbar-agent-label">Agent</span>
+          <span className="webui-browser-toolbar-agent-title">{agentPage}</span>
+        </span>
+      ) : null}
     </div>
   );
+}
+
+/**
+ * The page the Agent is on, named the way the runtime named it.
+ *
+ * The run's selection is the runtime's cell and the client only reads it; the
+ * title comes from the same list the selection is read out of. `undefined` when
+ * the run has selected nothing, or when the runtime has not published a title
+ * for the page it did select.
+ */
+export function webuiBrowserAgentPage(state: WebuiBrowserPanelState): string | undefined {
+  const selection = state.runSelection;
+  if (!selection) return undefined;
+  return state.targets.find((target) => isSameWebuiBrowserTarget(target.id, selection))?.title;
 }
 
 /**

@@ -18,8 +18,8 @@ owns the per-target browser state — a page, its title and URL, and the run's s
 the service, not to the business — see *Surface facts worth knowing* below. `turn` is a business even
 without a screen, because its attach-to-settle lifecycle and generation-fenced identity outlive any
 surface. Both cells exist: the run's selection is the runtime's
-(`runtime/browser/browser-service.ts`), and the client reads it rather than writing it — the panel's
-target list reports the runtime's mark and offers no way to change it.
+(`runtime/browser/browser-service.ts`), and the client reads it rather than writing it — the toolbar
+reports the runtime's mark and offers no way to change it.
 
 Each business directory holds up to five roles, and the role decides what the file may do — not the
 directory it happens to sit in:

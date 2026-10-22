@@ -44,8 +44,6 @@ import {
   isWebuiBrowserSurfaceAuthorized,
   type WebuiBrowserError,
   type WebuiBrowserInputCommand,
-  type WebuiBrowserSurface,
-  type WebuiBrowserWebTabSnapshot,
 } from "../../../../shared/contracts/browser.js";
 import { readWebuiCapability, type WebuiCapabilityView } from "../../../../shared/capability-manifest.js";
 import type { BrowserPort } from "../contracts/browser-port.js";
@@ -61,20 +59,12 @@ import {
 } from "../application/browser-commands.js";
 import {
   selectWebuiBrowserFrame,
-  selectWebuiBrowserPanelRows,
   selectWebuiBrowserViewedTarget,
   webuiBrowserFrameDataUrl,
 } from "../projection/browser-state.js";
 
-const SURFACE_LABELS: Readonly<Record<WebuiBrowserSurface, string>> = {
-  "isolated-chromium": "隔离浏览器",
-  edge: "Microsoft Edge",
-  chrome: "Google Chrome",
-};
-
 const PANEL_COPY = {
   title: "浏览器",
-  targetListLabel: "浏览器标签页",
   frameLabel: "浏览器画面",
   frameEmpty: "还没有画面。选择一个标签页，或等待浏览器推送第一帧。",
   frameNoTarget: "没有选中的标签页。",
@@ -82,7 +72,6 @@ const PANEL_COPY = {
   inputLabel: "浏览器输入区",
   inputHint: "点击画面后可在此输入文字。",
   textInputLabel: "发送到浏览器的文字",
-  noTargets: "当前浏览器没有可显示的标签页。",
   unauthorized: "隔离浏览器未授权。请在设置的「浏览器」页中打开对应的浏览器开关。",
   absent: "当前运行时没有浏览器能力，浏览器面板不可用。",
   notReady: "浏览器能力尚未就绪（例如扩展未连接），面板暂时无法显示页面。",
@@ -103,15 +92,6 @@ export interface BrowserPanelProps {
   readonly state?: WebuiBrowserPanelState;
   /** The handshake manifest, so the panel can say *why* a family is unusable. */
   readonly capabilities?: WebuiCapabilityView;
-  /**
-   * The session's web tabs, as the runtime published them.
-   *
-   * The list shows these and not the browser's own page list: a browser holds
-   * pages that are not tabs — the page it opens at startup, the one the provider
-   * drives for itself — and a list that names them reads as more tabs than the
-   * person opened.
-   */
-  readonly webTabs?: WebuiBrowserWebTabSnapshot;
   /** Receives only commands that passed validation and the generation binding. */
   readonly onSendInput?: (command: WebuiBrowserInputCommand) => void;
   /** Receives every refusal, so a gesture that went nowhere is visible. */
@@ -122,7 +102,6 @@ export function BrowserPanel({
   port,
   state,
   capabilities,
-  webTabs,
   onSendInput,
   onRejected,
 }: BrowserPanelProps): ReactElement {
@@ -205,16 +184,8 @@ export function BrowserPanel({
     [submit],
   );
 
-  // The rows are the session's web tabs when the runtime publishes them, and the
-  // browser's own page list otherwise.
-  const rows = selectWebuiBrowserPanelRows(state, webTabs);
-
   return (
     <section className="webui-browser-panel" data-testid="browser-panel" role="region" aria-label={PANEL_COPY.title}>
-      <header className="webui-browser-panel-header">
-        <h3 className="webui-browser-panel-title">{PANEL_COPY.title}</h3>
-      </header>
-
       {capability === "absent" ? (
         <p className="webui-browser-notice" role="status" data-testid="browser-panel-absent">
           {PANEL_COPY.absent}
@@ -263,49 +234,8 @@ export function BrowserPanel({
         </p>
       ) : null}
 
-      <div className="webui-browser-body">
-        {/*
-          The session's pages, marked with the one the Agent is working on. It is a
-          report, not a control: the run's selection is the runtime's cell and the
-          person cannot write it from here (ADR 0022) — the strip owns which tab is
-          in front, and the one bootstrap in the runtime's hands. Which tab to look
-          at is chosen above, not here.
-        */}
-        <div
-          className="webui-browser-targets"
-          role="group"
-          aria-label={PANEL_COPY.targetListLabel}
-          data-testid="browser-target-list"
-        >
-          {rows.length === 0 ? (
-            <p className="webui-browser-empty" role="status" data-testid="browser-panel-no-targets">
-              {PANEL_COPY.noTargets}
-            </p>
-          ) : (
-            <ul className="webui-browser-target-list" data-testid="browser-target-items">
-              {rows.map((row) => (
-                <li key={`${row.key}:${row.generation}`}>
-                  <span
-                    aria-current={row.selected ? "true" : undefined}
-                    data-testid={`browser-target-${row.browserId}-${row.targetId}`}
-                    data-target-generation={row.generation}
-                    data-target-status={row.status}
-                    className={row.selected ? "webui-browser-target is-active" : "webui-browser-target"}
-                  >
-                    <strong>{row.title || row.url}</strong>
-                    <span className="webui-browser-target-url">{row.url}</span>
-                    <span className="webui-browser-target-meta">
-                      {`${SURFACE_LABELS[row.surface]} · 第 ${row.generation} 代 · ${row.status === "open" ? "已打开" : "已关闭"}`}
-                    </span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div className="webui-browser-stage">
-          {frameSrc ? (
+      <div className="webui-browser-stage">
+        {frameSrc ? (
             <img
               className="webui-browser-frame"
               data-testid="browser-panel-frame"
@@ -315,38 +245,37 @@ export function BrowserPanel({
               src={frameSrc}
               alt={viewed ? `${viewed.title || viewed.url} 的浏览器画面` : PANEL_COPY.frameLabel}
               draggable={false}
-            />
-          ) : (
-            <p className="webui-browser-empty" role="status" data-testid="browser-panel-frame-empty">
-              {frame ? PANEL_COPY.frameUnrenderable : viewed ? PANEL_COPY.frameEmpty : PANEL_COPY.frameNoTarget}
-            </p>
-          )}
-          {/* The input surface covers the picture rather than sitting beside it:
-              the coordinates it sends are measured against this element, so a
-              target drawn next to the frame would aim at the wrong place. */}
-          <div
-            className="webui-browser-input"
-            data-testid="browser-panel-input"
-            role="application"
-            aria-label={PANEL_COPY.inputLabel}
-            aria-describedby="browser-panel-input-hint"
-            tabIndex={inputEnabled ? 0 : -1}
-            onPointerDown={onPointerDown}
-            onKeyDown={onKeyDown}
-          >
-            <span id="browser-panel-input-hint" className="webui-browser-input-hint">
-              {PANEL_COPY.inputHint}
-            </span>
-            <input
-              type="text"
-              className="webui-browser-text"
-              data-testid="browser-panel-text-input"
-              aria-label={PANEL_COPY.textInputLabel}
-              disabled={!inputEnabled}
-              onChange={onTextChange}
-            />
-          </div>
-        </div>
+        />
+      ) : (
+        <p className="webui-browser-empty" role="status" data-testid="browser-panel-frame-empty">
+          {frame ? PANEL_COPY.frameUnrenderable : viewed ? PANEL_COPY.frameEmpty : PANEL_COPY.frameNoTarget}
+        </p>
+      )}
+      {/* The input surface covers the picture rather than sitting beside it:
+          the coordinates it sends are measured against this element, so a
+          target drawn next to the frame would aim at the wrong place. */}
+      <div
+        className="webui-browser-input"
+        data-testid="browser-panel-input"
+        role="application"
+        aria-label={PANEL_COPY.inputLabel}
+        aria-describedby="browser-panel-input-hint"
+        tabIndex={inputEnabled ? 0 : -1}
+        onPointerDown={onPointerDown}
+        onKeyDown={onKeyDown}
+      >
+        <span id="browser-panel-input-hint" className="webui-browser-input-hint">
+          {PANEL_COPY.inputHint}
+        </span>
+        <input
+          type="text"
+          className="webui-browser-text"
+          data-testid="browser-panel-text-input"
+          aria-label={PANEL_COPY.textInputLabel}
+          disabled={!inputEnabled}
+          onChange={onTextChange}
+        />
+      </div>
       </div>
     </section>
   );

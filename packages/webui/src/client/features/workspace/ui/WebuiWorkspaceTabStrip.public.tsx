@@ -50,6 +50,9 @@ import {
   WebuiIconClose,
   WebuiIconDiffFile,
   WebuiIconFile,
+  WebuiIconGlobe,
+  WebuiIconSearch,
+  WebuiIconSend,
   WebuiIconWorkspaceCanvas,
   WebuiIconWorkspaceReview,
   WebuiIconWorkspaceTerminal,
@@ -277,9 +280,12 @@ export function WebuiWorkspaceTabStrip({
             {item.content.kind === "launcher" ? (
               <span className="webui-workspace-tab-glyph webui-workspace-launcher-glyph" aria-hidden="true">+</span>
             ) : item.content.kind === "web" ? (
-              // A web tab's glyph is a default one. Fetching a site's icon is
-              // a separate piece of work and is not part of this.
-              <span className="webui-workspace-tab-glyph webui-workspace-web-glyph" aria-hidden="true">●</span>
+              // A web tab's glyph is the globe every browser puts on a page
+              // that has no icon of its own. Fetching a site's icon is a
+              // separate piece of work and is not part of this.
+              <span className="webui-workspace-tab-glyph webui-workspace-web-glyph" aria-hidden="true">
+                <WebuiIconGlobe className="size-3" />
+              </span>
             ) : (
               fileTabGlyph(item)
             )}
@@ -369,25 +375,15 @@ export function WebuiWorkspaceLauncher({
 
   return (
     <div className="webui-workspace-launcher" data-testid="workspace-launcher">
-      <div className="webui-workspace-launcher-tiles">
-        {tiles.map(({ tile, command }) => (
-          <button
-            key={tile.kind}
-            type="button"
-            className="webui-workspace-launcher-tile"
-            data-testid={`workspace-launcher-tile-${tile.kind}`}
-            onClick={() => command && dispatch(command)}
-          >
-            <span className="webui-workspace-launcher-tile-glyph" aria-hidden="true">
-              {launcherTileGlyph(tile.kind)}
-            </span>
-            <span className="webui-workspace-launcher-tile-label">{tile.label}</span>
-          </button>
-        ))}
-      </div>
-      <form className="webui-workspace-launcher-url" onSubmit={submit}>
+      {/*
+        The address box comes first and sits in the middle of the page, the way
+        a browser's new tab page is built: the one thing a person came here to
+        do is the first thing in front of them, and the shortcuts follow it.
+      */}
+      <form className="webui-workspace-launcher-omnibox" onSubmit={submit}>
+        <WebuiIconSearch className="webui-workspace-launcher-omnibox-glyph size-4 shrink-0" />
         <input
-          className="webui-workspace-launcher-url-input"
+          className="webui-workspace-launcher-omnibox-input"
           type="text"
           value={typed}
           aria-label={STRIP_COPY.launcherUrlLabel}
@@ -397,13 +393,34 @@ export function WebuiWorkspaceLauncher({
         />
         <button
           type="submit"
-          className="webui-workspace-launcher-url-submit"
+          className="webui-workspace-launcher-omnibox-submit"
           data-testid="workspace-launcher-url-submit"
+          aria-label={request && !request.error ? STRIP_COPY.launcherPending : STRIP_COPY.launcherUrlSubmit}
           disabled={!openBrowserWebTab}
         >
-          {request && !request.error ? STRIP_COPY.launcherPending : STRIP_COPY.launcherUrlSubmit}
+          {request && !request.error ? (
+            STRIP_COPY.launcherPending
+          ) : (
+            <WebuiIconSend className="size-3" />
+          )}
         </button>
       </form>
+      <div className="webui-workspace-launcher-tiles">
+        {tiles.map(({ tile, command }) => (
+          <button
+            key={tile.kind}
+            type="button"
+            className="webui-workspace-launcher-tile"
+            data-testid={`workspace-launcher-tile-${tile.kind}`}
+            onClick={() => command && dispatch(command)}
+          >
+            <span className="webui-workspace-launcher-tile-icon" aria-hidden="true">
+              {launcherTileGlyph(tile.kind)}
+            </span>
+            <span className="webui-workspace-launcher-tile-label">{tile.label}</span>
+          </button>
+        ))}
+      </div>
       {openBrowserWebTab ? null : (
         <p className="webui-workspace-launcher-unavailable">{STRIP_COPY.launcherUnavailable}</p>
       )}

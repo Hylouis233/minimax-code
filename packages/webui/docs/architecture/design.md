@@ -337,7 +337,7 @@ A change that breaks one of these is a design change, not a refactor:
 11. **One writer per browser cell, and the two cells are separate.** The run's selection is written by
     the Agent through the runtime; the tab the person is looking at is written by the person through
     the strip; neither party writes the other's cell. The panel shows, streams and binds input to the
-    viewed page, and its target list reports the runtime's mark without offering to change it. There is
+    viewed page, and the toolbar reports the runtime's mark without offering to change it. There is
     one bootstrap: a person who opens a web tab while the run has no selection gives the run that page,
     because a run with no selection cannot act at all — and the runtime decides it, from the selection
     it owns at the moment the page appears (`runtime/browser/browser-service.ts` — `openWebTab`).

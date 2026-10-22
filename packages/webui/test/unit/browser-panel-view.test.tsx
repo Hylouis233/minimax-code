@@ -118,59 +118,19 @@ describe("the Browser panel", () => {
     expect(source).not.toContain("dangerouslySetInnerHTML");
   });
 
-  it("lists every target with its browser, generation and status", () => {
+  it("is the window's page and nothing beside it", () => {
+    // A browser window is a page. A list of the browser's pages beside it is
+    // what made this read as a media panel with a sidebar, and the strip is
+    // where the tabs are (ADR 0022).
     const markup = renderToStaticMarkup(
       <BrowserPanel port={wiredPort} state={loadedState()} capabilities={{ browser: "supported" }} />,
     );
 
-    expect(markup).toContain('data-testid="browser-target-list"');
-    expect(markup).toContain('data-testid="browser-target-chromium-1-tab-1"');
-    expect(markup).toContain("Example Domain");
-    expect(markup).toContain("https://example.test/");
-    expect(markup).toContain("第 4 代");
-    expect(markup).toContain('aria-current="true"');
-  });
-
-  it("lists the session's web tabs and not the browser's other pages", () => {
-    // A browser holds more pages than it has tabs: the page it opens for itself
-    // at startup, and the one the provider drives before anyone asks for a page.
-    // The list is the session's tabs, so a browser with one tab reads as one tab.
-    const state = loadedState();
-    const internal = targetState({
-      id: { surface: "isolated-chromium", browserId: "chromium-1", targetId: "tab-launch", generation: 1 },
-      title: "about:blank",
-      url: "about:blank",
-      selected: false,
-    });
-    const webTabs: WebuiBrowserWebTabSnapshot = {
-      surface: "isolated-chromium",
-      tabs: [
-        {
-          id: "web-tab-1",
-          target: { surface: "isolated-chromium", browserId: "chromium-1", targetId: "tab-1", generation: 2 },
-          title: "Example Domain",
-          url: "https://example.test/",
-          selected: true,
-        },
-      ],
-    };
-
-    const markup = renderToStaticMarkup(
-      <BrowserPanel
-        port={wiredPort}
-        state={{ ...state, targets: [internal, ...state.targets] }}
-        capabilities={{ browser: "supported" }}
-        webTabs={webTabs}
-      />,
-    );
-
-    expect(markup).toContain("Example Domain");
-    expect(markup).toContain("https://example.test/");
-    // The generation comes from the published tab, not from a list read before
-    // the page moved.
-    expect(markup).toContain("第 2 代");
-    // The browser's own pages are not tabs, and the list does not name them.
-    expect(markup).not.toContain("about:blank");
+    expect(markup).toContain('data-testid="browser-panel-frame"');
+    expect(markup).not.toContain('data-testid="browser-target-list"');
+    expect(markup).not.toContain("webui-browser-targets");
+    // No heading above the page either: a browser window has no title bar.
+    expect(markup).not.toContain("webui-browser-panel-header");
   });
 
   it("says the runtime has no browser capability only when the manifest says so", () => {
@@ -188,31 +148,26 @@ describe("the Browser panel", () => {
     expect(withManifest).not.toContain("当前运行时没有报告浏览器能力");
   });
 
-  it("is handed the manifest and the session's web tabs by its host", () => {
-    // Two wirings the panel cannot do for itself. The manifest is the
-    // handshake's: without it the panel says the runtime has no browser while
-    // it is drawing one. The web tabs are the session's: without them the list
-    // is the browser's own page list, and a browser with one tab reads as three.
+  it("is handed the handshake's manifest by its host", () => {
+    // Without the manifest the panel cannot tell "this host has no browser"
+    // from "nobody told me", and says the wrong one for ever.
     const source = readFileSync(
       new URL("../../src/client/features/browser/ui/BrowserPanelHost.public.tsx", import.meta.url),
       "utf8",
     );
 
     expect(source).toContain("capabilities={capabilityManifest}");
-    expect(source).toContain("webTabs={webTabs}");
-    expect(source).toContain("watchBrowserWebTabs");
   });
 
-  it("reports the run's selection without offering to change it", () => {
-    // The list is what tells the person which page the Agent is working on. It is
-    // a report and not a control: the run's selection is the runtime's cell, and
-    // the strip — not this list — is what chooses the tab in front.
+  it("offers no control over the run's selection", () => {
+    // The run's selection is the runtime's cell, and the client only reads it:
+    // the strip chooses the tab in front and the Agent chooses its page. The
+    // panel draws the page and nothing else.
     const markup = renderToStaticMarkup(
       <BrowserPanel port={wiredPort} state={loadedState()} capabilities={{ browser: "supported" }} />,
     );
 
     expect(markup).not.toContain("<button");
-    expect(markup).toContain('aria-current="true"');
   });
 
   it("shows and binds input to the tab in front, not to the run's selection", () => {
@@ -247,21 +202,6 @@ describe("the Browser panel", () => {
     expect(markup).toContain('tabindex="0"');
     expect(markup).toContain('data-testid="browser-panel-text-input"');
     expect(markup).not.toContain("disabled");
-  });
-
-  it("renders a closed target rather than hiding it", () => {
-    // A closed target stays in the list so a stale reference is explainable.
-    const state = reduceWebuiBrowserPanelState(loadedState(), {
-      type: "targets-loaded",
-      list: {
-        surface: "isolated-chromium",
-        targets: [targetState({ status: "closed" })],
-      },
-    });
-    const markup = renderToStaticMarkup(<BrowserPanel port={wiredPort} state={state} />);
-
-    expect(markup).toContain('data-target-status="closed"');
-    expect(markup).toContain("已关闭");
   });
 
   it("says the browser is switched off instead of showing a dead frame", () => {

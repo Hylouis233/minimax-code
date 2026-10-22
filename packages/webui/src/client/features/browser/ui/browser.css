@@ -34,62 +34,119 @@
   .webui-browser-toolbar {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 2px;
     min-width: 0;
-    padding: 6px 12px;
+    padding: 6px 10px;
     background: var(--bg_grouped_secondary);
     border-bottom: 1px solid var(--border_default);
   }
 
+  /* The three commands are marks, not words: a row of bordered text buttons
+   * reads as a toolbar of some other kind. The name stays on the button for
+   * anyone who cannot see the mark. */
   .webui-browser-toolbar-command {
-    flex: 0 0 auto;
-    padding: 2px 10px;
-    font-size: var(--font-size_13, 13px);
-    color: var(--text_default_primary);
-    background: var(--bg_interaction_tertiary_hover, transparent);
-    border: 1px solid var(--border_default);
+    display: inline-flex;
+    width: 28px;
+    height: 28px;
+    flex: 0 0 28px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
     border-radius: 6px;
+    background: transparent;
+    color: var(--icon_default_secondary, #5b6473);
     cursor: pointer;
   }
 
   .webui-browser-toolbar-command:hover {
     background: var(--bg_interaction_tertiary_hover);
+    color: var(--text_default_primary);
   }
 
-  .webui-browser-toolbar-url {
+  .webui-browser-toolbar-command:focus-visible {
+    outline: 2px solid var(--icon_default_accent);
+    outline-offset: -2px;
+  }
+
+  /* The address bar. A rounded, quiet field with the url in it — the shape
+   * every browser draws, and the shape that says "this is where the page
+   * lives" without a label. */
+  .webui-browser-omnibox {
+    display: flex;
+    min-width: 0;
     flex: 1 1 auto;
+    align-items: center;
+    gap: 8px;
+    height: 28px;
+    margin: 0 6px;
+    padding: 0 10px;
+    border-radius: 14px;
+    background: var(--bg_default_primary);
+    box-shadow: inset 0 0 0 1px var(--border_default);
+  }
+
+  .webui-browser-omnibox-glyph {
+    color: var(--icon_default_tertiary, #a0a6b0);
+  }
+
+  .webui-browser-omnibox-url {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: var(--font-size_13, 13px);
+    font-size: var(--font-size_12, 12px);
     color: var(--text_default_secondary);
   }
 
+  /* The page the Agent is on. A real browser has one person and one page, so
+   * it has no such mark; this one has two, and the difference is the point of
+   * the tab model. It is a report at the quiet end of the row, never a
+   * control. */
+  .webui-browser-toolbar-agent {
+    display: inline-flex;
+    max-width: 38%;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 6px;
+    padding: 0 8px;
+    color: var(--text_default_tertiary);
+    font-size: var(--font-size_11, 11px);
+  }
+
+  .webui-browser-toolbar-agent-dot {
+    width: 6px;
+    height: 6px;
+    flex: 0 0 6px;
+    border-radius: 50%;
+    background: var(--icon_default_accent);
+  }
+
+  .webui-browser-toolbar-agent-label {
+    flex: 0 0 auto;
+    color: var(--text_default_tertiary);
+  }
+
+  .webui-browser-toolbar-agent-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text_default_secondary);
+  }
+
+  /* A browser window has no heading above its page, and the page reaches the
+   * edges of the window. The notices below the toolbar are states, not chrome,
+   * and they keep their own padding. */
   .webui-browser-panel {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 8px;
     min-width: 0;
     min-height: 0;
     height: 100%;
-    padding: 12px;
-    background: var(--bg_grouped_secondary);
-  }
-
-  .webui-browser-panel-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-
-  .webui-browser-panel-title {
-    margin: 0;
-    font-size: var(--font-size_14, 14px);
-    font-weight: 600;
-    color: var(--text_default_primary);
+    background: var(--bg_default_primary);
   }
 
   .webui-browser-surfaces {
@@ -120,13 +177,23 @@
     opacity: 0.55;
   }
 
+  /* The states a page can be in, drawn as a bubble over the page's own corner
+   * — the way a browser says "this page changed" without taking the page's
+   * space away. A bar between the toolbar and the page would cut the window
+   * in two, and the page is the thing the person came for. */
   .webui-browser-notice {
+    position: absolute;
+    z-index: 3;
+    top: 8px;
+    left: 8px;
+    max-width: calc(100% - 16px);
     margin: 0;
     padding: 6px 10px;
     border-radius: var(--border-radius_8, 8px);
     background: var(--bg_interaction_secondary_default);
     color: var(--text_default_secondary);
     font-size: var(--font-size_12, 12px);
+    box-shadow: 0 2px 8px rgb(0 0 0 / 12%);
   }
 
   .webui-browser-notice.is-error {
@@ -134,66 +201,10 @@
     border: 1px solid var(--border_light);
   }
 
-  .webui-browser-body {
-    display: flex;
-    gap: 12px;
-    flex: 1 1 auto;
-    min-height: 0;
-    min-width: 0;
-  }
-
-  .webui-browser-targets {
-    flex: 0 0 220px;
-    min-width: 0;
-    overflow-y: auto;
-  }
-
-  .webui-browser-target-list {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .webui-browser-target {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    width: 100%;
-    padding: 6px 8px;
-    border: 1px solid transparent;
-    border-radius: var(--border-radius_8, 8px);
-    background: transparent;
-    color: var(--text_default_primary);
-    text-align: left;
-  }
-
-  .webui-browser-target.is-active {
-    border-color: var(--icon_default_accent);
-    background: var(--bg_interaction_secondary_default);
-  }
-
-  .webui-browser-target strong,
-  .webui-browser-target-url,
-  .webui-browser-target-meta {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .webui-browser-target strong {
-    font-size: var(--font-size_12, 12px);
-    font-weight: 600;
-  }
-
-  .webui-browser-target-url,
-  .webui-browser-target-meta {
-    color: var(--text_default_secondary);
-    font-size: var(--font-size_11, 11px);
-  }
-
+  /* The page area. No border and no rounded frame: a page is not a picture in
+   * a box, and the frame around it was the first thing that made this read as
+   * a media panel rather than a window. The frame keeps its own aspect — the
+   * page's — and the area around it is the window's own surface. */
   .webui-browser-stage {
     position: relative;
     display: flex;
@@ -203,9 +214,7 @@
     min-width: 0;
     min-height: 240px;
     overflow: hidden;
-    border: 1px solid var(--border_light);
-    border-radius: var(--border-radius_8, 8px);
-    background: var(--bg_grouped_tertiary);
+    background: var(--bg_default_primary);
   }
 
   .webui-browser-frame {
