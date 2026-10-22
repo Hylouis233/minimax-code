@@ -460,17 +460,25 @@ describe.skipIf(!available)("the acceptance of the workspace browser tab model",
         // The person's input: the client's own binding, aimed at the page the
         // person is looking at. The field is clicked first, the way a person's
         // click is, and the text follows into the focused field.
+        //
+        // The binding carries the page's generation, and the generation moves
+        // when the page behind it is replaced — a page that is still loading
+        // is observed as a replaced page. The reads above already read through
+        // the page's current identity for that reason; the input is bound the
+        // same way, or the runtime refuses it as a target that was replaced
+        // before the input arrived.
+        const aimed = await currentIdentity(personPage.targetId);
         const centre = (await sendCommand({
-          surface: personPage.surface,
+          surface: aimed.surface,
           command: "Runtime.evaluate",
           params: {
             expression:
               "(() => { const r = document.getElementById('field').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()",
             returnByValue: true,
           },
-          target: personPage,
+          target: aimed,
         })) as { result?: { value?: { x?: number; y?: number } } } | undefined;
-        const click = prepareWebuiBrowserInputCommand(personPage, {
+        const click = prepareWebuiBrowserInputCommand(aimed, {
           kind: "pointer",
           x: centre?.result?.value?.x ?? 0,
           y: centre?.result?.value?.y ?? 0,
@@ -481,7 +489,9 @@ describe.skipIf(!available)("the acceptance of the workspace browser tab model",
         if (!click.ok) throw new Error(click.error.message);
         await sendInput(click.command as unknown as Record<string, unknown>);
 
-        const bound = prepareWebuiBrowserInputCommand(personPage, {
+        // The click may have moved the page on, so the text is bound to the
+        // identity the page carries now.
+        const bound = prepareWebuiBrowserInputCommand(await currentIdentity(personPage.targetId), {
           kind: "text",
           text: "person typed",
         });
