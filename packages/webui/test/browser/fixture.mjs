@@ -116,6 +116,110 @@ export function installFixtureTransport() {
     files: [{ fileId: "a.ts", path: "a.ts", additions: 2, deletions: 1 }],
     totals: { files: 1, additions: 2, deletions: 1 },
   };
+  // The browser family.
+  //
+  // The workspace's browser half -- the strip's web tabs, the toolbar, the
+  // page -- is driven entirely by the runtime's answers. A fixture that cannot
+  // answer the browser's operations leaves that half untested: the launcher
+  // cannot open a tab, the toolbar never renders, and the page never arrives.
+  //
+  // So the fixture answers them with a synthetic browser: pages it paints
+  // itself, tabs a test stages, and a run's selection it marks. What the
+  // fixture does NOT do is prove the runtime's behaviour -- the real browser
+  // is the isolated Chromium, and `browser-bridge-real-*.spec.ts` and the
+  // runtime's own integration tests are where that is proven. What the
+  // fixture proves is the client's half: that the panel draws a window, that
+  // the strip and the toolbar follow what the runtime published, and that a
+  // gesture lands on the page in front.
+  const browserSurface = "isolated-chromium";
+  const browserBrowserId = "browser-fixture";
+  let browserAuthorization = {
+    isolatedChromium: true,
+    edge: false,
+    chrome: false,
+    fullCdp: false,
+  };
+  /** The session's web tabs, as the runtime publishes them. */
+  let browserTabs = [];
+  let browserTabSequence = 0;
+  let browserFrameSequence = 0;
+
+  const browserTargetId = (targetId, generation = 1) => ({
+    surface: browserSurface,
+    browserId: browserBrowserId,
+    targetId,
+    generation,
+  });
+
+  /** A web tab in the runtime's shape, from the short form a test writes. */
+  const toBrowserTab = (entry) => ({
+    id: String(entry.id ?? `tab-${(browserTabSequence += 1)}`),
+    target: browserTargetId(String(entry.id ?? `tab-${browserTabSequence}`), entry.generation ?? 1),
+    title: entry.title ?? "",
+    url: entry.url ?? "",
+    selected: entry.selected === true,
+  });
+
+  const browserSnapshot = () => ({
+    surface: browserSurface,
+    tabs: browserTabs.map((tab) => clone(tab)),
+  });
+
+  const browserTargetList = () => ({
+    surface: browserSurface,
+    targets: browserTabs.map((tab) => ({
+      id: clone(tab.target),
+      title: tab.title,
+      url: tab.url,
+      status: "open",
+      selected: tab.selected,
+    })),
+  });
+
+  /**
+   * A page the fixture paints itself.
+   *
+   * The panel draws a page as an image, so the fixture has to hand it one. A
+   * one-pixel image would prove that the image path works and nothing else: a
+   * screenshot of the panel would show a grey box. So the page is drawn -- the
+   * tab's title and url on a white sheet -- and a test that looks at the
+   * panel sees the page it asked for.
+   */
+  const paintBrowserPage = (title, url) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 640;
+    canvas.height = 400;
+    const context = canvas.getContext("2d");
+    if (!context) return "";
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = "#eef0f2";
+    context.fillRect(0, 0, canvas.width, 36);
+    context.fillStyle = "#5b6473";
+    context.font = "13px sans-serif";
+    context.fillText(url || "about:blank", 12, 23);
+    context.fillStyle = "#1f2328";
+    context.font = "26px sans-serif";
+    context.fillText(title || "about:blank", 24, 110);
+    return canvas.toDataURL("image/png").split(",")[1] ?? "";
+  };
+
+  /**
+   * Pushes the tab snapshot to every watcher of the surface.
+   *
+   * The strip and the panel read the same publication, so a fixture that
+   * answered one and not the other would show a browser whose tabs disagree
+   * with themselves.
+   */
+  const publishBrowserTabs = () => {
+    const snapshot = browserSnapshot();
+    for (const socket of sockets) {
+      if (!socket.isBrowserTabWatch || socket.closed) continue;
+      if (socket.request?.body?.surface !== snapshot.surface) continue;
+      socket.streamFrame(snapshot);
+    }
+  };
+
   const requests = [];
   const replies = [];
   const sockets = new Set();
@@ -180,6 +284,82 @@ export function installFixtureTransport() {
       return { ...clone(turnDiff), success: true };
     }
     if (operation === "getWorkspaceReviewSummary") return clone(workspaceReviewSummary);
+    // ---- the browser family
+    if (operation === "getBrowserAuthorization") return clone(browserAuthorization);
+    if (operation === "setBrowserAuthorization") {
+      const next = body?.authorization ?? body ?? {};
+      browserAuthorization = { ...browserAuthorization, ...clone(next) };
+      return clone(browserAuthorization);
+    }
+    if (operation === "listBrowserCapabilities") {
+      return {
+        entries: [
+          {
+            surface: "isolated-chromium",
+            bridged: false,
+            liveImages: browserAuthorization.isolatedChromium,
+            input: browserAuthorization.isolatedChromium,
+            agentTools: browserAuthorization.isolatedChromium,
+            fullCdpApplies: true,
+          },
+          {
+            surface: "edge",
+            bridged: true,
+            liveImages: browserAuthorization.edge,
+            input: browserAuthorization.edge,
+            agentTools: browserAuthorization.edge,
+            fullCdpApplies: true,
+          },
+          {
+            surface: "chrome",
+            bridged: true,
+            liveImages: browserAuthorization.chrome,
+            input: browserAuthorization.chrome,
+            agentTools: browserAuthorization.chrome,
+            fullCdpApplies: true,
+          },
+        ],
+      };
+    }
+    if (operation === "listBrowserTargets") return browserTargetList();
+    if (operation === "selectBrowserTarget") {
+      // The run's selection is the runtime's cell. The fixture marks it, and
+      // the client's read of it is what the panel reports.
+      const wanted = body?.target?.targetId;
+      for (const tab of browserTabs) tab.selected = tab.target.targetId === wanted;
+      publishBrowserTabs();
+      return { ok: true };
+    }
+    if (operation === "openBrowserWebTab") {
+      // The person opening a page from the launcher. A surface that is
+      // switched off is refused before the page is created; that refusal is
+      // sent as a frame in `send`, where a refusal belongs.
+      const url = typeof body?.url === "string" ? body.url : "";
+      const tab = toBrowserTab({
+        id: `tab-${(browserTabSequence += 1)}`,
+        title: url,
+        url,
+        selected: false,
+      });
+      browserTabs = [...browserTabs, tab];
+      publishBrowserTabs();
+      return { accepted: true, target: clone(tab.target) };
+    }
+    if (operation === "closeBrowserWebTab") {
+      const targetId = body?.target?.targetId ?? body?.targetId;
+      browserTabs = browserTabs.filter((tab) => tab.target.targetId !== targetId);
+      publishBrowserTabs();
+      return { accepted: true, targetId: String(targetId) };
+    }
+    if (operation === "sendBrowserInput" || operation === "sendBrowserCommand") {
+      // The fixture does not drive a page, so a gesture has nothing to land on.
+      // It records the request, which is what a test asserts: that the
+      // gesture named the page in front rather than the Agent's page.
+      return { ok: true };
+    }
+    if (operation === "getBrowserInstallationKey") {
+      return { present: false, surface: browserSurface };
+    }
     // The synthetic terminal bridge stores process records in same-origin local
     // storage, NOT in the socket that created them: `listTerminals` answers from this
     // catalogue long after the creating page's socket is gone, which is the
@@ -353,6 +533,45 @@ export function installFixtureTransport() {
         );
         return;
       }
+      if (frame.operation === "openBrowserWebTab" && !browserAuthorization.isolatedChromium) {
+        // The switch is off: the runtime refuses the surface before it opens
+        // a page, and the refusal names the switch rather than the selection.
+        queueMicrotask(() =>
+          this.emit("message", {
+            data: JSON.stringify({
+              protocolVersion: 1,
+              kind: "error",
+              requestId: frame.requestId,
+              code: "browser_capability_denied",
+              message: 'Browser surface "isolated-chromium" is not authorized.',
+            }),
+          }),
+        );
+        return;
+      }
+      if (frame.operation === "watchBrowserWebTabs") {
+        // The web-tab snapshot. The strip and the panel read the same
+        // publication, so it goes to every watcher of the surface.
+        this.isBrowserTabWatch = true;
+        this.respond(frame, { stream: true });
+        this.streamFrame(browserSnapshot());
+        return;
+      }
+      if (frame.operation === "watchBrowserFrames") {
+        // The page, as an image. The panel draws what it is given, so the
+        // fixture paints a page for the target that was asked for.
+        this.isBrowserFrameWatch = true;
+        this.respond(frame, { stream: true });
+        const targetId = frame.body?.target?.targetId;
+        const tab = browserTabs.find((entry) => entry.target.targetId === targetId);
+        this.streamFrame({
+          target: clone(tab?.target ?? frame.body?.target),
+          data: paintBrowserPage(tab?.title, tab?.url),
+          format: "png",
+          sequence: (browserFrameSequence += 1),
+        });
+        return;
+      }
       if (frame.operation === "watchTerminal") {
         // The terminal watch is a stream of `WebuiTerminalFrame`s, and unlike a
         // turn stream it stays open for the life of the process. It is marked
@@ -467,6 +686,31 @@ export function installFixtureTransport() {
     delayEvery(operation, condition) { held.push({ operation, condition }); },
     setPage(sessionId, page) { pages[sessionId] = clone(page); },
     setModels(next) { models = clone(next); },
+    /**
+     * The session's web tabs, as the runtime publishes them.
+     *
+     * A test writes the short form -- an id, a title, a url, and whether the
+     * Agent is on that page -- and the fixture fills in the target the
+     * runtime would have published. The tabs are published to the watchers
+     * at once, so the strip and the panel see the same browser.
+     */
+    setBrowserTabs(next) {
+      browserTabs = (next ?? []).map((entry) => toBrowserTab(entry));
+      publishBrowserTabs();
+    },
+    /** The browser's switches, so a test can turn the surface off. */
+    setBrowserAuthorization(next) {
+      browserAuthorization = { ...browserAuthorization, ...clone(next ?? {}) };
+    },
+    /** The page the Agent is on: the tab the runtime marks as the selection. */
+    setBrowserSelection(targetId) {
+      for (const tab of browserTabs) tab.selected = tab.target.targetId === targetId;
+      publishBrowserTabs();
+    },
+    /** What the fixture's browser currently holds. */
+    browserTabs() {
+      return browserTabs.map((tab) => clone(tab));
+    },
     /** Which sessions the fixture currently holds as archived. */
     setArchived(ids) { archivedIds = [...ids]; },
     archived() { return [...archivedIds]; },

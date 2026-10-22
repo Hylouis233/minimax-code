@@ -23,6 +23,28 @@ and runs in the browser gate, after the client build and Chromium installation.
 Live and completed turn visibility is asserted from controlled stream frames while the indicator
 remains unmodified.
 
+## The browser family in the fixture
+
+The fixture answers the **browser** operations too, with a synthetic browser: the switches
+(`getBrowserAuthorization`, `setBrowserAuthorization`), the surfaces (`listBrowserCapabilities`), the
+session's web tabs (`watchBrowserWebTabs`, `openBrowserWebTab`, `closeBrowserWebTab`), the page
+(`watchBrowserFrames`), and the gestures and commands aimed at a page (`sendBrowserInput`,
+`sendBrowserCommand`, `listBrowserTargets`, `selectBrowserTarget`). A test stages what the browser
+holds with `window.__fixture.setBrowserTabs(...)`, marks the Agent's page with
+`window.__fixture.setBrowserSelection(targetId)`, and turns a surface off with
+`window.__fixture.setBrowserAuthorization(...)`.
+
+The page the fixture paints is drawn by the fixture itself: a white sheet with the tab's title and
+url on it. A one-pixel image would prove that the image path works and nothing else — a screenshot
+of the panel would show a grey box — so the panel shows the page the test asked for.
+
+What this proves is the **client's** half: that the panel draws a window, that the strip and the
+toolbar follow what the runtime published, that the page the Agent is on is named where a browser
+has no such mark, and that a gesture lands on the page in front. It does **not** prove the
+runtime's browser behaviour. The isolated Chromium, the extension and the bridge are proven by the
+runtime's own integration suites and by `browser-bridge-real-*.spec.mjs`, which launch a real
+browser instead of answering from a page.
+
 ## Determinism
 
 Playwright uses one pinned Linux viewport (1440×900, DPR 1, `zh-CN`, `Asia/Shanghai`, light colour
