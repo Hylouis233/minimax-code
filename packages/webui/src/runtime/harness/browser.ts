@@ -25,9 +25,12 @@ import type {
   WebuiBrowserImageFrame,
   WebuiBrowserInputCommand,
   WebuiBrowserSurface,
+  WebuiBrowserTabOpener,
   WebuiBrowserTargetId,
   WebuiBrowserTargetList,
   WebuiBrowserTargetState,
+  WebuiBrowserWebTabClose,
+  WebuiBrowserWebTabSnapshot,
 } from "../../shared/contracts/browser.js";
 import {
   WebuiBrowserService,
@@ -133,8 +136,19 @@ export interface WebuiBrowserAdapterBinding {
    * not know which switches are on.
    */
   initialize(): Promise<void>;
-  /** Releases every provider the browser service started. */
+  /**
+   * Releases every provider the browser service started.
+   */
   close(): Promise<void>;
+  /**
+   * Releases one session's pages.
+   *
+   * A session's pages are released when the session ends — deleted, archived
+   * or transferred away. The composition root wires this to the port's
+   * session-ending operations, so the release is keyed on the session rather
+   * than on whichever operation happened to end it.
+   */
+  releaseSession(sessionId: string): Promise<void>;
 }
 
 /** What the adapter needs before it has a host. */
@@ -200,6 +214,7 @@ export function createBrowserAdapter(
     },
     initialize: () => service.initialize(),
     close: () => service.close(),
+    releaseSession: (sessionId: string) => service.releaseSession(sessionId),
   };
 }
 
@@ -225,8 +240,26 @@ function createBrowserPort(service: WebuiBrowserService): WebuiBrowserPort {
       command: string,
       params?: Record<string, unknown>,
     ) => service.sendCommandToSelection(surface, runId, command, params ?? {}),
-    watchFrames: (surface: WebuiBrowserSurface, runId?: string, signal?: AbortSignal) =>
-      service.watchFrames(surface, runId, signal),
+    sendCommandToTarget: (
+      surface: WebuiBrowserSurface,
+      target: WebuiBrowserTargetId,
+      command: string,
+      params?: Record<string, unknown>,
+      signal?: AbortSignal,
+    ) => service.sendCommandToTarget(surface, target, command, params ?? {}, signal),
+    watchFrames: (surface: WebuiBrowserSurface, target: WebuiBrowserTargetId, signal?: AbortSignal) =>
+      service.watchFrames(surface, target, signal),
+    closeWebTab: (target: WebuiBrowserTargetId) => service.closeWebTab(target),
+    // `runId` is optional on the port because the person is not a run: the
+    // service reads an absent run as the panel's own cell.
+    openWebTab: (
+      runId?: string,
+      params?: Record<string, unknown>,
+      signal?: AbortSignal,
+      opener?: WebuiBrowserTabOpener,
+    ) => service.openWebTab(runId, params ?? {}, signal, opener),
+    watchWebTabs: (surface: WebuiBrowserSurface, runId?: string, signal?: AbortSignal) =>
+      service.watchWebTabs(surface, runId, signal),
     listCapabilities: () => service.listCapabilities(),
   };
 }

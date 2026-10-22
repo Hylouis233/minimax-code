@@ -34,8 +34,17 @@ export interface WebuiWorkspaceFilesCommands {
   readonly selectWorkspace: (workspaceDir: string | undefined) => void;
   readonly loadFileTree: (workspaceDir: string) => void;
   readonly loadDirectory: (workspaceDir: string, path: string) => Promise<WebuiWorkspaceDirLoad>;
-  readonly readFile: (tabId: string, workspaceDir: string, path: string) => void;
-  readonly setInlineFile: (tabId: string, content: string, resolvedPath: string) => void;
+  /**
+   * Reads a file into the cache.
+   *
+   * The first argument is the **cache key** — what the tab is showing — not a
+   * tab id. The cache is keyed that way because a tab's id is stable and its
+   * content is not: a tab that changed from one file to another has to read
+   * the new one rather than keep the old one's result.
+   */
+  readonly readFile: (cacheKey: string, workspaceDir: string, path: string) => void;
+  /** Files an inline text under the same cache key a read would use. */
+  readonly setInlineFile: (cacheKey: string, content: string, resolvedPath: string) => void;
   /** Release a closed tab's file slot and its read commit rights. */
   readonly discardFileTab: (tabId: string) => void;
   /** List one directory for the workspace picker (superseded browses dropped). */

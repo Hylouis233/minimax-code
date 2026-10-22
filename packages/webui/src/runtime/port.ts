@@ -9,9 +9,13 @@ import type {
   WebuiBrowserImageFrame,
   WebuiBrowserInputCommand,
   WebuiBrowserSurface,
+  WebuiBrowserTabOpener,
   WebuiBrowserTargetId,
   WebuiBrowserTargetList,
   WebuiBrowserTargetState,
+  WebuiBrowserWebTabOpen,
+  WebuiBrowserWebTabClose,
+  WebuiBrowserWebTabSnapshot,
 } from "../shared/contracts/browser.js";
 import type {
   WebuiActiveTurnResult,
@@ -691,12 +695,75 @@ export interface WebuiBrowserPort {
     command: string,
     params?: Record<string, unknown>,
   ): Promise<{ readonly accepted: true; readonly result?: unknown }>;
-  /** The live image stream of one surface, fenced to one run's selection. */
+  /**
+   * Runs one browser command against a **named page**.
+   *
+   * This is what a web tab's toolbar sends. A web tab holds exactly one page,
+   * so the tab is addressable and the person pressing back means the page they
+   * are looking at — not a run's selection, and not the panel's own cell. The
+   * target carries a generation, so a reference recorded before a navigation is
+   * refused rather than answered against the page that moved.
+   */
+  sendCommandToTarget(
+    surface: WebuiBrowserSurface,
+    target: WebuiBrowserTargetId,
+    command: string,
+    params?: Record<string, unknown>,
+    signal?: AbortSignal,
+  ): Promise<{ readonly accepted: true; readonly result?: unknown }>;
+  /**
+   * Opens a page and answers with its identity.
+   *
+   * This is `open_tab` — the same call, the same switch and the same refusal
+   * codes as the one a run's browser tools make, which is the whole point:
+   * every web tab, the person's and the Agent's alike, is opened through one
+   * gate.
+   *
+   * `opener` says which side asked, because the two sides have different cells:
+   * an `agent` opener makes the page the run's selection, and a `person` opener
+   * makes it the run's selection only when the run had none — the one bootstrap.
+   * The run is optional because the person may have no run in view; absent means
+   * the panel's own cell, and the bootstrap applies to it as it does to a run.
+   */
+  openWebTab(
+    runId?: string,
+    params?: Record<string, unknown>,
+    signal?: AbortSignal,
+    opener?: WebuiBrowserTabOpener,
+  ): Promise<WebuiBrowserWebTabOpen>;
+  /**
+   * The live image stream of one **target**.
+   *
+   * The stream is keyed by the target rather than by the run: the client asks
+   * for the page it is showing, so two tabs get their own pictures. The run's
+   * selection still decides what the **Agent's** commands act on — the two are
+   * different cells and this one does not move the other.
+   */
   watchFrames(
+    surface: WebuiBrowserSurface,
+    target: WebuiBrowserTargetId,
+    signal?: AbortSignal,
+  ): AsyncIterable<WebuiBrowserImageFrame>;
+  /**
+   * Closes the page a web tab is bound to.
+   *
+   * A tab the person closes does not leave a page behind in the browser, and
+   * the runtime's page set follows the strip.
+   */
+  closeWebTab(target: WebuiBrowserTargetId): Promise<WebuiBrowserWebTabClose>;
+  /**
+   * The session's web tabs, as a snapshot, on a stream.
+   *
+   * The runtime owns the record of what the session has open: the strip
+   * renders what this publishes rather than keeping a copy of its own, and a
+   * snapshot is idempotent, so a client that reconnects reconciles against
+   * it instead of drifting.
+   */
+  watchWebTabs(
     surface: WebuiBrowserSurface,
     runId?: string,
     signal?: AbortSignal,
-  ): AsyncIterable<WebuiBrowserImageFrame>;
+  ): AsyncIterable<WebuiBrowserWebTabSnapshot>;
   /** What each surface can offer right now. */
   listCapabilities(): Promise<{
     readonly entries: readonly WebuiBrowserCapabilityEntry[];

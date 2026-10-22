@@ -100,6 +100,41 @@ function extensionIdOf(worker: Worker): string {
 }
 
 /**
+ * A wait that must not be able to outlive its case.
+ *
+ * The harness talks to a browser extension, and several of those interactions
+ * have no deadline of their own: a service worker that Chrome has reclaimed
+ * does not answer, and a message nobody replies to does not settle. A wait
+ * that hangs there does not fail the case — it runs into Playwright's own
+ * timeout, and the report says only that the test timed out, with nothing
+ * about which step stopped.
+ *
+ * So every wait in this file that can outlive its case is bounded here, and
+ * the message names the step that stopped. The bound is generous enough for a
+ * slow machine: the Edge handshake takes 22.6 s on a CI runner.
+ */
+async function bounded<T>(what: string, ms: number, work: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  // The losing promise is still pending when the race is decided, and it may
+  // reject later; nothing is waiting for it, so its rejection is absorbed
+  // here rather than surfacing as an unhandled rejection.
+  work.catch(() => undefined);
+  try {
+    return await Promise.race([
+      work,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`${what} did not finish within ${ms}ms`)),
+          ms,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/**
  * Launches a browser with the built extension loaded.
  *
  * The id of an unpacked extension is derived from its load path, so it is
@@ -121,22 +156,43 @@ export async function launchWithExtension(
 }> {
   const profileDir = await mkdtemp(join(tmpdir(), "webui-bridge-real-"));
   const dist = options.dist ?? extensionDist;
-  const context = await chromium.launchPersistentContext(profileDir, {
-    headless: true,
-    // "chromium" is the bundled browser and "msedge" is the installed Edge.
-    // The extension is one package for both, and the only thing that differs
-    // is the browser it runs in.
-    channel,
-    args: [
-      `--disable-extensions-except=${dist}`,
-      `--load-extension=${dist}`,
-      "--no-first-run",
-      "--no-default-browser-check",
-    ],
-  });
+  const context = await bounded(
+    `the ${channel} browser did not start`,
+    60_000,
+    chromium.launchPersistentContext(profileDir, {
+      headless: true,
+      // "chromium" is the bundled browser and "msedge" is the installed Edge.
+      // The extension is one package for both, and the only thing that differs
+      // is the browser it runs in.
+      channel,
+      args: [
+        `--disable-extensions-except=${dist}`,
+        `--load-extension=${dist}`,
+        "--no-first-run",
+        "--no-default-browser-check",
+      ],
+    }),
+  );
   let worker = context.serviceWorkers()[0];
-  if (!worker) worker = await context.waitForEvent("serviceworker", { timeout: 30_000 });
+  if (!worker) {
+    worker = await bounded(
+      `the ${channel} browser did not start the extension's service worker`,
+      60_000,
+      context.waitForEvent("serviceworker", { timeout: 30_000 }),
+    );
+  }
   return { context, worker, extensionId: extensionIdOf(worker), profileDir };
+}
+
+/**
+ * Closes the browser, with a bound.
+ *
+ * A browser that will not close is a browser that has stopped answering, and
+ * the cleanup must not be the thing that hangs the case: a case that fails in
+ * its cleanup reports the cleanup, not the step that broke.
+ */
+export async function closeBrowser(context: BrowserContext): Promise<void> {
+  await bounded("the browser did not close", 30_000, context.close());
 }
 
 /**
@@ -223,33 +279,41 @@ export async function provision(
   origin: string,
   installationKey: string | undefined,
 ): Promise<void> {
-  await worker.evaluate(
-    async ({ originKey, keyKey, secret, host }) => {
-      // The host is passed in by name. A bare `origin` here would resolve to
-      // the *extension's* origin — a service worker has one — and the
-      // extension would then try to connect to itself.
-      await chrome.storage.local.set({ [originKey]: host });
-      if (secret) {
-        await chrome.storage.local.set({ [keyKey]: { secret } });
-      } else {
-        await chrome.storage.local.remove(keyKey);
-      }
-    },
-    {
-      originKey: ORIGIN_STORAGE_KEY,
-      keyKey: INSTALLATION_KEY_STORAGE_KEY,
-      secret: installationKey,
-      host: origin,
-    },
+  await bounded(
+    "the extension's service worker did not accept the host's address",
+    30_000,
+    worker.evaluate(
+      async ({ originKey, keyKey, secret, host }) => {
+        // The host is passed in by name. A bare `origin` here would resolve to
+        // the *extension's* origin — a service worker has one — and the
+        // extension would then try to connect to itself.
+        await chrome.storage.local.set({ [originKey]: host });
+        if (secret) {
+          await chrome.storage.local.set({ [keyKey]: { secret } });
+        } else {
+          await chrome.storage.local.remove(keyKey);
+        }
+      },
+      {
+        originKey: ORIGIN_STORAGE_KEY,
+        keyKey: INSTALLATION_KEY_STORAGE_KEY,
+        secret: installationKey,
+        host: origin,
+      },
+    ),
   );
   // The message has to come from a *page* — a message sent by the worker is not
   // delivered to the worker's own listener.
   const page = await context.newPage();
   try {
     await page.goto(`chrome-extension://${extensionId}/options.html`);
-    await page.evaluate(
-      (type) => chrome.runtime.sendMessage({ type }),
-      "webui-bridge-reconnect",
+    await bounded(
+      "the extension did not answer the reconnect message",
+      60_000,
+      page.evaluate(
+        (type) => chrome.runtime.sendMessage({ type }),
+        "webui-bridge-reconnect",
+      ),
     );
   } finally {
     await page.close();
@@ -354,8 +418,18 @@ export async function startBridge(
     // A real http page the extension will report as a target.
     pageUrl: `http://127.0.0.1:${port}/test-page`,
     close: async () => {
-      await bridge.close();
-      await new Promise<void>((resolve) => http.close(() => resolve()));
+      await bounded("the bridge did not close", 30_000, bridge.close());
+      // The browser is still running while the harness closes its server, so
+      // the browser may still be holding a connection: the extension's socket,
+      // or the keep-alive connection the test page was fetched over. A server
+      // that waits for a client to go away first cannot close while that
+      // client is still running — so the connections are cut here instead.
+      http.closeAllConnections();
+      await bounded(
+        "the bridge's http server did not close",
+        30_000,
+        new Promise<void>((resolve) => http.close(() => resolve())),
+      );
     },
   };
 }
@@ -374,9 +448,13 @@ export async function waitForConnected(
   // Both sides record what they thought happened; without them a failure here
   // says only "not connected", which is not a diagnosis.
   const snapshot = bridge.snapshot().surfaces[surface];
-  const lastError = await worker
-    ?.evaluate(() => chrome.storage.session.get("webui.browserBridge.lastError"))
-    .catch(() => undefined);
+  const lastError = worker
+    ? await bounded(
+        "the extension's last error could not be read",
+        10_000,
+        worker.evaluate(() => chrome.storage.session.get("webui.browserBridge.lastError")),
+      ).catch(() => undefined)
+    : undefined;
   throw new Error(
     `the surface did not reach connected=${connected}: host=${JSON.stringify(snapshot)} extension=${JSON.stringify(lastError)}`,
   );

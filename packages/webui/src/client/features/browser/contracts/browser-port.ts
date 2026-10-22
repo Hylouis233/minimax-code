@@ -30,6 +30,9 @@ import type {
   WebuiBrowserTargetId,
   WebuiBrowserTargetList,
   WebuiBrowserTargetState,
+  WebuiBrowserWebTabClose,
+  WebuiBrowserWebTabOpen,
+  WebuiBrowserWebTabSnapshot,
   WebuiBridgeBrowserSurface,
 } from "../../../../shared/contracts/browser.js";
 
@@ -199,18 +202,65 @@ export interface BrowserPort {
   ) => Promise<{ readonly accepted: true; readonly result?: unknown }>;
 
   /**
-   * The live image stream for one surface, carrying the named run's own target.
+   * The live image stream for one **target**.
+   *
+   * The stream is keyed by the target rather than by the run: the client asks
+   * for the page it is showing, so two tabs get their own pictures and the
+   * person and the Agent can work on different pages at the same time.
    *
    * Returns the disposer, matching `TerminalPort.watchTerminal`, because the
    * subscription outlives the render that opened it and something has to close
-   * it when the panel goes away. Switching runs closes this one and opens the
-   * active run's: a frame belonging to another run's target is not this
-   * stream's to show.
+   * it when the panel goes away.
    */
   readonly watchBrowserFrames?: (
-    request: WebuiBrowserRunScope & { readonly surface: WebuiBrowserSurface },
+    request: { readonly surface: WebuiBrowserSurface; readonly target: WebuiBrowserTargetId },
     onFrame: (frame: WebuiBrowserImageFrame) => void,
   ) => () => void;
+  /**
+   * The session's web tabs, as a snapshot, on a stream.
+   *
+   * The runtime owns the record of what the session has open, and this is how
+   * the client learns it: the strip renders what arrives here rather than
+   * keeping a copy of its own, because two copies of "what is open" disagree
+   * exactly when a tab is closed.
+   *
+   * Returns the disposer, like `watchBrowserFrames`: the subscription outlives
+   * the render that opened it.
+   */
+  readonly watchBrowserWebTabs?: (
+    request: WebuiBrowserRunScope & { readonly surface: WebuiBrowserSurface },
+    onSnapshot: (snapshot: WebuiBrowserWebTabSnapshot) => void,
+  ) => () => void;
+  /**
+   * Opens a page and answers with the page's identity.
+   *
+   * The person's half of the tab model: the new tab page's URL box calls this,
+   * and the answer is what the tab binds to. It is the same `open_tab` the
+   * Agent's tools perform, so a page typed by hand and a page opened by the
+   * Agent go through the same surface switch and the same refusals — the panel
+   * does not get a browser of its own by typing into its own launcher.
+   *
+   * `runId` is sent when the workspace knows its session, and that is what lets the
+   * runtime apply the one bootstrap: the page joins the run's selection when the run
+   * has none at that moment, and a run already working on a page keeps it. The
+   * launcher does not decide that — it cannot see the run's selection, and deciding
+   * it on the client would make the person a standing writer of the Agent's cell.
+   * Without a `runId` the page is recorded in the panel's own cell, which is the
+   * whole answer when there is no run behind the workspace at all.
+   */
+  readonly openBrowserWebTab?: (
+    request: WebuiBrowserRunScope & { readonly url: string },
+  ) => Promise<WebuiBrowserWebTabOpen>;
+  /**
+   * Closes the page a web tab is bound to.
+   *
+   * The tab names the target it holds, so the runtime closes the page that
+   * tab holds. The tab leaves the strip either way — a tab that is still
+   * published after it was closed would be a tab the strip cannot get rid of.
+   */
+  readonly closeBrowserWebTab?: (
+    request: { readonly target: WebuiBrowserTargetId },
+  ) => Promise<WebuiBrowserWebTabClose>;
   readonly listBrowserCapabilities?: () => Promise<WebuiBrowserCapabilityList>;
   /**
    * Reads one extension-reached surface's installation key so the person can

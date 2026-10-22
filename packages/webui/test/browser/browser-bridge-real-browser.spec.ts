@@ -110,7 +110,7 @@ test.describe("the browser bridge, against a real browser", () => {
       } finally {
         await started.close();
         await context.close();
-        await rm(profileDir, { recursive: true, force: true });
+        await rm(profileDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
       }
     });
 
@@ -155,7 +155,7 @@ test.describe("the browser bridge, against a real browser", () => {
       } finally {
         await started.close();
         await context.close();
-        await rm(profileDir, { recursive: true, force: true });
+        await rm(profileDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
       }
     });
   }
@@ -258,7 +258,7 @@ test.describe("the browser bridge, against a real browser", () => {
       await started.close();
       for (const browser of browsers) {
         await browser.context.close();
-        await rm(browser.profileDir, { recursive: true, force: true });
+        await rm(browser.profileDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
       }
     }
   });

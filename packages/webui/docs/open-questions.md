@@ -68,8 +68,10 @@ not silently change title generation (`packages/local-runtime/src/runtime/runtim
   refuses it as stale); the stage behind it falls back to its empty-picture notice, because a closed
   page pushes no frames. There is no tab to lose either way: the browser tab is the panel's own
   `browser` kind, not a slot holding a page.
-- **Alternative:** the tab falls back to the new tab page, so the slot stays usable and the URL box
-  comes back with it; or the tab closes with its page, so a tab always names a live page.
+- **Answered.** [ADR 0022](adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md) decides it and
+  the tree carries it: **a closed web tab closes its page**, and the runtime's page set follows the
+  strip (`runtime/browser/browser-service.ts` — `closeWebTab` closes the page and forgets the
+  target). A tab always names a live page, and closing a page and closing a tab are one command.
 - **What a decision would change:** whether the strip may hold a tab whose content is absent, and
   whether closing the last page closes the tab — which decides whether closing a page and closing a
   tab are one command or two.

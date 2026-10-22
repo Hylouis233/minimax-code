@@ -320,32 +320,39 @@ export function createWebuiWorkspaceFilesOwner(deps: {
     }
   };
 
-  const readFile = (tabId: string, workspaceDir: string, path: string): void => {
-    if (state.files.get(tabId)?.content) return;
-    const key = `file:${tabId}`;
+  /**
+   * Reads a file into the cache.
+   *
+   * The first argument is the **cache key**, not a tab id: the cache is keyed
+   * by what the tab is showing, so a tab that changed from one file to another
+   * reads the new one instead of keeping the old one's result.
+   */
+  const readFile = (cacheKey: string, workspaceDir: string, path: string): void => {
+    if (state.files.get(cacheKey)?.content) return;
+    const key = `file:${cacheKey}`;
     const version = bump(key);
     if (!port.readWorkspaceFile) {
-      setFile(tabId, { loading: false, error: "文件读取能力暂不可用。" });
+      setFile(cacheKey, { loading: false, error: "文件读取能力暂不可用。" });
       return;
     }
     const read = port.readWorkspaceFile;
-    setFile(tabId, { loading: true });
+    setFile(cacheKey, { loading: true });
     void read({ workspaceDir, path })
       .then((content) => {
         if (!isCurrent(key, version)) return;
-        setFile(tabId, { loading: false, content });
+        setFile(cacheKey, { loading: false, content });
       })
       .catch((reason: unknown) => {
         if (!isCurrent(key, version)) return;
-        setFile(tabId, { loading: false, error: message(reason) });
+        setFile(cacheKey, { loading: false, error: message(reason) });
       });
   };
 
-  const setInlineFile = (tabId: string, content: string, resolvedPath: string): void => {
+  const setInlineFile = (cacheKey: string, content: string, resolvedPath: string): void => {
     // Supersede any in-flight read for this tab so a late read does not
     // overwrite the inline content the tab already carries.
-    bump(`file:${tabId}`);
-    setFile(tabId, {
+    bump(`file:${cacheKey}`);
+    setFile(cacheKey, {
       loading: false,
       content: { type: "text", content, resolvedPath },
     });

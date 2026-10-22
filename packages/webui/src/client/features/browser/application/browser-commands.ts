@@ -17,11 +17,12 @@
 //      identity it was aimed at, so the receiving side can tell a command meant
 //      for the current page from one meant for the page that was there a moment
 //      ago.
-//   3. **The command is refused unless it names the page the panel is showing.**
-//      A pointer press queued while the tab navigated would otherwise land on
-//      whatever replaced it. Binding is checked here, at send time, against the
-//      state rather than at construction time, because that is the only moment
-//      the two can be compared.
+//   3. **The command is refused unless it names the page the person is looking
+//      at.** A pointer press queued while the tab navigated would otherwise land on
+//      whatever replaced it. The page in front is the *client's* cell — the tab the
+//      person chose, not the run's selection — so a gesture can never be aimed at
+//      the Agent's page by accident, and binding is checked here, at send time,
+//      because that is the only moment the command and the cell can be compared.
 
 import type {
   WebuiBrowserAuthorization,
@@ -36,7 +37,7 @@ import {
   type WebuiBrowserCommandRejectionReason,
   type WebuiBrowserCommandResult,
   type WebuiBrowserInputIntent,
-  type WebuiBrowserPanelState,
+  type WebuiBrowserViewedPage,
 } from "../contracts/browser-panel.js";
 
 /**
@@ -230,66 +231,72 @@ export function buildWebuiBrowserInputCommand(
 }
 
 /**
- * Whether `target` still names the page the panel is showing.
+ * Whether `target` still names the page the person is looking at.
  *
  * Both directions of a generation mismatch are refused. A command bound to an
  * older generation was aimed at a page that has been replaced; one bound to a
  * newer generation was aimed at a page the panel has not adopted yet, so sending
- * it would act on something the user cannot see.
+ * it would act on something the person cannot see.
  */
 export function checkWebuiBrowserInputTarget(
-  selected: WebuiBrowserPanelState["selectedTarget"],
+  viewed: WebuiBrowserViewedPage | undefined,
   target: WebuiBrowserInputCommand["target"],
 ): WebuiBrowserCommandResult | undefined {
   if (!isUsableWebuiBrowserTargetId(target)) {
     return rejection("target_identity", "browser_command_invalid", "命令缺少可用的目标标识。");
   }
-  if (!selected) {
-    return rejection("target_unknown", "browser_target_unknown", "面板当前没有选中的浏览器目标。");
+  if (!viewed) {
+    return rejection("target_unknown", "browser_target_unknown", "面板当前没有正在查看的浏览器页面。");
   }
   if (
-    selected.surface !== target.surface ||
-    selected.browserId !== target.browserId ||
-    selected.targetId !== target.targetId
+    viewed.surface !== target.surface ||
+    viewed.browserId !== target.browserId ||
+    viewed.targetId !== target.targetId
   ) {
-    return rejection("target_generation_ahead", "browser_target_stale", "命令指向的目标不是面板当前显示的目标。");
+    return rejection("target_generation_ahead", "browser_target_stale", "命令指向的页面不是面板当前显示的页面。");
   }
-  if (target.generation < selected.generation) {
+  if (target.generation < viewed.generation) {
     return rejection(
       "target_generation_behind",
       "browser_target_stale",
-      `目标已更新到第 ${selected.generation} 代，命令仍绑定第 ${target.generation} 代。`,
+      `目标已更新到第 ${viewed.generation} 代，命令仍绑定第 ${target.generation} 代。`,
     );
   }
-  if (target.generation > selected.generation) {
+  if (target.generation > viewed.generation) {
     return rejection(
       "target_generation_ahead",
       "browser_target_stale",
-      `命令绑定第 ${target.generation} 代，面板显示的是第 ${selected.generation} 代。`,
+      `命令绑定第 ${target.generation} 代，面板显示的是第 ${viewed.generation} 代。`,
     );
   }
   return undefined;
 }
 
 /**
- * The one call the panel makes: build the command, then refuse it unless it names
- * the page currently on screen.
+ * The one call the panel makes: build the command against the page the person is
+ * looking at, then refuse it unless it names that same page.
+ *
+ * The cell is the client's — the tab the person chose — and passing it as its own
+ * argument rather than reading it out of the whole state is what keeps the two
+ * cells from merging here again: there is no field of the run's selection left in
+ * this signature for a gesture to be aimed at. The run's selection decides what the
+ * *Agent's* commands act on, which happens in the runtime and nowhere near this
+ * path.
  *
  * Both halves are here rather than left to the caller so the order cannot be
- * wrong — a command validated against a target and then sent to a different one
- * would pass both checks and still mis-aim.
+ * wrong — a command validated against one page and then sent to another would pass
+ * both checks and still mis-aim.
  */
 export function prepareWebuiBrowserInputCommand(
-  state: WebuiBrowserPanelState,
+  viewed: WebuiBrowserViewedPage | undefined,
   intent: WebuiBrowserInputIntent,
 ): WebuiBrowserCommandResult {
-  const selected = state.selectedTarget;
-  if (!selected) {
-    return rejection("target_unknown", "browser_target_unknown", "面板当前没有选中的浏览器目标。");
+  if (!viewed) {
+    return rejection("target_unknown", "browser_target_unknown", "面板当前没有正在查看的浏览器页面。");
   }
-  const built = buildWebuiBrowserInputCommand(intent, selected);
+  const built = buildWebuiBrowserInputCommand(intent, viewed);
   if (!built.ok) return built;
-  const unbound = checkWebuiBrowserInputTarget(selected, built.command.target);
+  const unbound = checkWebuiBrowserInputTarget(viewed, built.command.target);
   return unbound ?? built;
 }
 

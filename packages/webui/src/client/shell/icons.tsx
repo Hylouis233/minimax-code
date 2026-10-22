@@ -363,17 +363,17 @@ export function WebuiIconSearch({ className }: WebuiIconProps): ReactElement {
   );
 }
 
-/** workspace add-menu glyph — the review/search icon. */
+/** workspace launcher tile glyph — the review/search icon. */
 export function WebuiIconWorkspaceReview({ className }: WebuiIconProps): ReactElement {
   return <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}><circle cx="8.5" cy="8.5" r="6.1" stroke="currentColor" strokeWidth="1.2" /><path d="m13 13 4.1 4.1M8.5 5.8v5.4M5.8 8.5h5.4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg>;
 }
 
-/** workspace add-menu glyph — the terminal prompt icon. */
+/** workspace launcher tile glyph — the terminal prompt icon. */
 export function WebuiIconWorkspaceTerminal({ className }: WebuiIconProps): ReactElement {
   return <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}><rect x="2.4" y="3.2" width="15.2" height="13.6" rx="2" stroke="currentColor" strokeWidth="1.2" /><path d="m5.5 7.2 2.6 2.3-2.6 2.3M9.8 12h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }
 
-/** workspace add-menu glyph — connected canvas nodes. */
+/** workspace launcher tile glyph — connected canvas nodes. */
 export function WebuiIconWorkspaceCanvas({ className }: WebuiIconProps): ReactElement {
   return <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}><rect x="2.3" y="2.5" width="4.2" height="4.2" rx=".7" stroke="currentColor" strokeWidth="1.1" /><rect x="13.5" y="2.5" width="4.2" height="4.2" rx=".7" stroke="currentColor" strokeWidth="1.1" /><rect x="7.9" y="13.3" width="4.2" height="4.2" rx=".7" stroke="currentColor" strokeWidth="1.1" /><path d="M6.5 4.6h7M4.4 6.8v3.2l5.6 3.3m5.6-6.5v3.2L10 13.3" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }

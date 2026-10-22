@@ -1,6 +1,6 @@
 # The workspace panel is a browser tab strip
 
-**Status:** Accepted.
+**Status:** Accepted and implemented.
 **Date:** 2026-10-21.
 
 The right-hand workspace panel becomes a browser. Its strip holds **tabs**; a tab is a stable slot

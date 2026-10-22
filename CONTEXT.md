@@ -439,6 +439,13 @@ The row of tabs in the workspace panel. It follows a browser's rules: a new tab 
 new tab page, a tab can be closed, and one tab is active at a time.
 _Avoid_: browser (the driven browser is a surface, not this), toolbar, menu bar
 
+**Viewed page**:
+The page the person is looking at. It is the client's cell, and it is not the run's selection:
+the person may be on a different page from the one the Agent is working on. One writer each
+— the person writes the viewed page, the Agent writes the run's selection — with one bootstrap,
+where a person who opens a web tab while the run has no selection gives the run that page.
+_Avoid_: selection (the run's selection is the runtime's), active target
+
 **Tool tab**:
 A tab whose content is a workspace tool view — files, terminal, canvas or changes. It holds no
 browser page.

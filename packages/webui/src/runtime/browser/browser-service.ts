@@ -41,9 +41,13 @@ import {
   type WebuiBrowserImageFrame,
   type WebuiBrowserInputCommand,
   type WebuiBrowserSurface,
+  type WebuiBrowserTabOpener,
   type WebuiBrowserTargetId,
   type WebuiBrowserTargetList,
   type WebuiBrowserTargetState,
+  type WebuiBrowserWebTab,
+  type WebuiBrowserWebTabClose,
+  type WebuiBrowserWebTabSnapshot,
 } from "../../shared/contracts/browser.js";
 import {
   browserOperationError,
@@ -176,10 +180,40 @@ export class WebuiBrowserService {
   #selectionOrder = 0;
   /** Which external surfaces the service has turned on, per surface. */
   readonly #bridgeSurfaces = new Map<"edge" | "chrome", boolean>();
-  /** The frame subscribers, per surface and then per run. */
+  /** The frame subscribers, per surface and then per target. */
   readonly #frameSubscribers = new Map<
     WebuiBrowserSurface,
     Map<string, Set<(frame: WebuiBrowserImageFrame) => void>>
+  >();
+  /**
+   * The provider-side frame handler, per surface and then per target.
+   *
+   * One screencast per page, shared by that page's subscribers: the provider
+   * holds one frame handler per page, so two subscriptions for the same page
+   * would otherwise take each other's frames away.
+   */
+  readonly #frameHandlers = new Map<
+    WebuiBrowserSurface,
+    Map<string, (frame: WebuiBrowserImageFrame) => void>
+  >();
+  /** How many frames each surface dropped, per surface. */
+  readonly #droppedFrames = new Map<WebuiBrowserSurface, number>();
+  /**
+   * The web tabs each session has open, per surface and then per run.
+   *
+   * The runtime owns this record. The strip renders what the runtime
+   * publishes, so a client that kept its own copy of the open tabs would be a
+   * second authority about what is open — and two authorities disagree at
+   * exactly the moment a tab is closed.
+   */
+  readonly #webTabs = new Map<
+    WebuiBrowserSurface,
+    Map<string, Map<string, WebuiBrowserTargetId>>
+  >();
+  /** The web-tab snapshot subscribers, per surface and then per run. */
+  readonly #webTabSubscribers = new Map<
+    WebuiBrowserSurface,
+    Map<string, Set<() => void>>
   >();
 
   constructor(options: WebuiBrowserServiceOptions) {
@@ -197,12 +231,225 @@ export class WebuiBrowserService {
     return created;
   }
 
+  /**
+   * Moves a selection onto the page the runtime currently holds.
+   *
+   * The generation moves when the page behind a target is replaced, and the
+   * selection follows it: the selection names a page, and a page that
+   * navigated is still the same page. A selection left behind would make the
+   * Agent's next action refuse against a page the runtime knows is there.
+   */
+  #followGeneration(identity: WebuiBrowserTargetState): void {
+    for (const selections of this.#selected.values()) {
+      for (const [runId, selection] of [...selections]) {
+        if (selection.target.targetId !== identity.id.targetId) continue;
+        if (selection.target.generation === identity.id.generation) continue;
+        selections.set(runId, { ...selection, target: identity.id });
+      }
+    }
+  }
+
   /** What one run has selected on one surface, if it has selected anything. */
   #selectionOf(
     surface: WebuiBrowserSurface,
     runId: string,
   ): WebuiBrowserTargetId | undefined {
     return this.#selected.get(surface)?.get(runId)?.target;
+  }
+
+  /** The web tabs one session has open on one surface. */
+  #webTabsOf(
+    surface: WebuiBrowserSurface,
+    runId: string,
+  ): Map<string, WebuiBrowserTargetId> | undefined {
+    return this.#webTabs.get(surface)?.get(runId);
+  }
+
+  /**
+   * Records a page a session opened as one of its web tabs.
+   *
+   * The identity is the one the provider answered `open_tab` with, so the
+   * runtime's record names the page that was actually created rather than one
+   * it inferred afterwards.
+   */
+  #recordWebTab(
+    surface: WebuiBrowserSurface,
+    runId: string,
+    target: WebuiBrowserTargetId,
+  ): void {
+    const runs = this.#webTabs.get(surface) ?? new Map<string, Map<string, WebuiBrowserTargetId>>();
+    const tabs = runs.get(runId) ?? new Map<string, WebuiBrowserTargetId>();
+    tabs.set(target.targetId, target);
+    runs.set(runId, tabs);
+    this.#webTabs.set(surface, runs);
+    this.#publishWebTabs(surface, runId);
+  }
+
+  /** Wakes the snapshot subscribers of one session. */
+  #publishWebTabs(surface: WebuiBrowserSurface, runId: string): void {
+    const subscribers = this.#webTabSubscribers.get(surface)?.get(runId);
+    if (!subscribers) return;
+    for (const wake of [...subscribers]) wake();
+  }
+
+  /**
+   * The session's web tabs, as a snapshot.
+   *
+   * The target identities come from the runtime's own record; the titles and
+   * urls come from the provider, which is the only party that knows what a
+   * page is showing. A tab the provider no longer lists is still published,
+   * with the title and url it last had — the runtime's record of what is open
+   * is not the provider's to decide.
+   */
+  async #webTabSnapshot(
+    surface: WebuiBrowserSurface,
+    runId: string,
+  ): Promise<WebuiBrowserWebTabSnapshot> {
+    const tabs = this.#webTabsOf(surface, runId);
+    const selected = this.#selectionOf(surface, runId);
+    const provider = this.#providers.get(surface);
+    const listed = provider ? await provider.listTargets() : [];
+    const byTargetId = new Map(listed.map((entry) => [entry.id.targetId, entry]));
+    const published = [...(tabs?.values() ?? [])].map((target) => {
+      const state = byTargetId.get(target.targetId);
+      return {
+        id: target.targetId,
+        // The generation is the page's own, so a page that navigated is
+        // published with its new generation while the web tab stays the same
+        // web tab.
+        target: { ...target, generation: state?.id.generation ?? target.generation },
+        title: state?.title ?? "",
+        url: state?.url ?? "",
+        selected: selected
+          ? selected.surface === target.surface &&
+            selected.browserId === target.browserId &&
+            selected.targetId === target.targetId
+          : false,
+      } satisfies WebuiBrowserWebTab;
+    });
+    return { surface, tabs: published };
+  }
+
+  /**
+   * The session's web tabs, on a stream.
+   *
+   * A snapshot rather than a delta: the list is small, and a snapshot is
+   * idempotent, so a client that reconnects receives the same snapshot and
+   * applying it twice changes nothing. The stream publishes only when the
+   * snapshot actually differs, so a client is not woken for a change that did
+   * not happen.
+   */
+  async *watchWebTabs(
+    surface: WebuiBrowserSurface,
+    runId: string = WEBUI_BROWSER_NO_RUN_ID,
+    signal?: AbortSignal,
+  ): AsyncIterable<WebuiBrowserWebTabSnapshot> {
+    const authorization = await this.readAuthorization();
+    if (!isBrowserSurfaceUsable(authorization, surface)) {
+      throw browserOperationError(
+        "browser_surface_not_authorized",
+        `Browser surface "${surface}" is not authorized.`,
+      );
+    }
+    await this.#ensureProvider(surface);
+
+    let notify: (() => void) | undefined;
+    const wake = (): void => notify?.();
+    const runs = this.#webTabSubscribers.get(surface) ?? new Map<string, Set<() => void>>();
+    const subscribers = runs.get(runId) ?? new Set<() => void>();
+    subscribers.add(wake);
+    runs.set(runId, subscribers);
+    this.#webTabSubscribers.set(surface, runs);
+
+    try {
+      let published: string | undefined;
+      while (!signal?.aborted) {
+        const snapshot = await this.#webTabSnapshot(surface, runId);
+        const encoded = JSON.stringify(snapshot);
+        if (encoded !== published) {
+          published = encoded;
+          yield snapshot;
+        }
+        await Promise.race([
+          new Promise<void>((resolve) => {
+            notify = resolve;
+          }),
+          new Promise<void>((resolve) => setTimeout(resolve, 250)),
+        ]);
+        notify = undefined;
+      }
+    } finally {
+      subscribers.delete(wake);
+      if (subscribers.size === 0) runs.delete(runId);
+    }
+  }
+
+  /**
+   * Closes a web tab's page and forgets the tab.
+   *
+   * Closing a web tab closes its page: a tab the person closes does not leave
+   * a page behind in the Chromium, and the runtime's page set follows the
+   * strip. The tab leaves the next snapshot either way — a tab that is still
+   * published after it was closed would be a tab the strip cannot get rid of.
+   */
+  async closeWebTabInSession(
+    surface: WebuiBrowserSurface,
+    runId: string,
+    targetId: string,
+  ): Promise<void> {
+    const tabs = this.#webTabsOf(surface, runId);
+    const target = tabs?.get(targetId);
+    if (!target) return;
+    tabs?.delete(targetId);
+    this.#publishWebTabs(surface, runId);
+    await this.#closeTarget(surface, target);
+  }
+
+  /**
+   * Closes the page a web tab is bound to.
+   *
+   * The tab names the target it holds, and the target names the page: a tab
+   * does not have to know which session opened the page it shows, and the
+   * page is closed wherever it is. The page leaves every session's tabs and
+   * every session's selection, because a page that is gone cannot be the page
+   * anybody is looking at or acting on.
+   */
+  async closeWebTab(target: WebuiBrowserTargetId): Promise<WebuiBrowserWebTabClose> {
+    const surface = target.surface;
+    for (const [runId, tabs] of [...this.#webTabs.get(surface) ?? new Map()]) {
+      if (!tabs.has(target.targetId)) continue;
+      tabs.delete(target.targetId);
+      this.#publishWebTabs(surface, runId);
+    }
+    for (const selections of this.#selected.values()) {
+      for (const [runId, selection] of [...selections]) {
+        if (selection.target.targetId !== target.targetId) continue;
+        selections.delete(runId);
+        this.#publishWebTabs(surface, runId);
+      }
+    }
+    await this.#closeTarget(surface, target);
+    return { accepted: true, targetId: target.targetId };
+  }
+
+  /** Closes one page and forgets the target behind it. */
+  async #closeTarget(
+    surface: WebuiBrowserSurface,
+    target: WebuiBrowserTargetId,
+  ): Promise<void> {
+    const provider = this.#providers.get(surface);
+    if (!provider) return;
+    // The stream stops first: a screencast left running for a page that is
+    // gone is a resource the browser holds for nobody.
+    await provider.stopImageStream(target.targetId).catch(() => undefined);
+    try {
+      await provider.sendCommand(target, "Target.closeTarget", {
+        targetId: target.targetId,
+      });
+    } catch {
+      // A page that is already gone needs no closing, and a provider that
+      // refuses the command has already done what was asked.
+    }
   }
 
   /**
@@ -400,13 +647,15 @@ export class WebuiBrowserService {
       // previous page would still look current to that run's stream. The order
       // is carried over because a navigation is not the run choosing a
       // different surface.
-      const selections = this.#selected.get(surface);
-      if (selections && raised) {
-        for (const [runId, selection] of [...selections]) {
-          if (selection.target.targetId === change.targetId) {
-            selections.set(runId, { ...selection, target: raised.id });
-          }
-        }
+      if (raised) this.#followGeneration(raised);
+      // The page behind a web tab was replaced, so the tab's generation moved
+      // and the snapshot that publishes it is no longer the one the client
+      // holds. Every session that has the tab open has to hear about it.
+      for (const [runId, tabs] of [...(this.#webTabs.get(surface) ?? new Map())]) {
+        if (!tabs.has(change.targetId)) continue;
+        const tab = tabs.get(change.targetId);
+        if (tab && raised) tabs.set(change.targetId, raised.id);
+        this.#publishWebTabs(surface, runId);
       }
     });
     return provider;
@@ -419,6 +668,8 @@ export class WebuiBrowserService {
     this.#providers.delete(surface);
     this.#selected.delete(surface);
     this.#frameSubscribers.delete(surface);
+    this.#webTabs.delete(surface);
+    this.#webTabSubscribers.delete(surface);
     for (const target of this.#registry.list(surface)) {
       this.#registry.close({
         surface,
@@ -469,7 +720,6 @@ export class WebuiBrowserService {
     // This run's own selection, and only that one: marking the flag from a
     // different run's selection is how the panel ends up showing one page while
     // the Agent drives another.
-    const selected = this.#selectionOf(surface, runId);
     const states: WebuiBrowserTargetState[] = [];
     for (const target of await provider.listTargets()) {
       const identity = this.#registry.observe({
@@ -481,6 +731,16 @@ export class WebuiBrowserService {
         status: target.status,
         generation: target.id.generation,
       });
+      // The provider's generation is the authority on which page is there
+      // now, and a selection follows the page it names.
+      this.#followGeneration(identity);
+      // The selection is read here, per target, rather than once before the
+      // listing. The generation can move while the listing is in flight — a
+      // page that is still loading is observed as a replaced page — and a
+      // selection read before the listing would be compared against a
+      // generation that has already moved on, and the tab would be reported
+      // as not selected.
+      const selected = this.#selectionOf(surface, runId);
       states.push({
         ...identity,
         selected: selected ? isSameWebuiBrowserTarget(selected, identity.id) : false,
@@ -514,10 +774,18 @@ export class WebuiBrowserService {
         "The browser target has been replaced; select it again.",
       );
     }
+    // The registry's generation is the current one, and it is the one the
+    // selection is written with. A page that is still loading is observed as
+    // a replaced page when its first load lands, and that observation may have
+    // arrived before this call did — a selection written from the caller's
+    // identity alone would be born stale.
     this.#runSelections(target.surface).set(runId, {
-      target,
+      target: known.id,
       order: (this.#selectionOrder += 1),
     });
+    // The snapshot says which web tab is the run's selection, so a selection
+    // that moved is a change the subscribers have to hear about.
+    this.#publishWebTabs(target.surface, runId);
     return { ...known, selected: true };
   }
 
@@ -587,7 +855,7 @@ export class WebuiBrowserService {
    */
   async *watchFrames(
     surface: WebuiBrowserSurface,
-    runId: string = WEBUI_BROWSER_NO_RUN_ID,
+    target: WebuiBrowserTargetId,
     signal?: AbortSignal,
   ): AsyncIterable<WebuiBrowserImageFrame> {
     const authorization = await this.readAuthorization();
@@ -605,15 +873,19 @@ export class WebuiBrowserService {
         true,
       );
     }
-    const selected = this.#selectionOf(surface, runId);
-    if (!selected) {
-      // Streaming nothing would leave the panel showing a browser it cannot
-      // watch, so a run that has not selected anything is refused here and the
-      // caller is told to select first. The stream below follows the selection
-      // once it exists; this is only about the starting point.
+    // The target has to be a page this service knows. A stream for a target
+    // that does not exist would deliver nothing at all, and a panel waiting
+    // for a picture that cannot arrive looks like a panel that is broken.
+    if (!this.#registry.resolve(target)) {
       throw browserOperationError(
         "browser_target_unknown",
-        "No browser target is selected for this surface.",
+        "The browser target does not exist.",
+      );
+    }
+    if (!this.#registry.isCurrent(target)) {
+      throw browserOperationError(
+        "browser_target_stale",
+        "The browser target has been replaced; select it again.",
       );
     }
     // The queue keeps the newest frame per target and nothing else.
@@ -626,6 +898,15 @@ export class WebuiBrowserService {
     const queue: WebuiBrowserImageFrame[] = [];
     let notify: (() => void) | undefined;
     const deliver = (frame: WebuiBrowserImageFrame) => {
+      // The fence. A frame belongs to the page behind the target the
+      // subscriber asked for, and all four identity fields decide it. A frame
+      // that names another page — another tab's, or a previous generation of
+      // this one — is dropped here rather than queued, so a subscriber never
+      // sees a picture of a page it did not ask for, not even briefly.
+      if (!this.#frameMatchesTarget(target, frame)) {
+        this.#droppedFrames.set(surface, (this.#droppedFrames.get(surface) ?? 0) + 1);
+        return;
+      }
       const index = queue.findIndex(
         (queued) =>
           queued.target.targetId === frame.target.targetId &&
@@ -636,32 +917,42 @@ export class WebuiBrowserService {
       else queue[queue.length - 1] = frame;
       notify?.();
     };
-    const runs = this.#frameSubscribers.get(surface) ?? new Map<
-      string,
-      Set<(frame: WebuiBrowserImageFrame) => void>
-    >();
-    const subscribers = runs.get(runId) ?? new Set<(frame: WebuiBrowserImageFrame) => void>();
-    subscribers.add(deliver);
-    runs.set(runId, subscribers);
-    this.#frameSubscribers.set(surface, runs);
 
-    // The target the provider-side stream is attached to right now. It moves
-    // with the run's selection, so `finally` releases whichever target the
-    // stream ended up on rather than the one it opened with.
-    let streaming: string | undefined = selected.targetId;
-    await provider.startImageStream(streaming, deliver);
+    // One provider-side screencast per page, shared by that page's
+    // subscribers: the provider holds one frame handler per page, so two
+    // subscriptions for the same page would otherwise take each other's
+    // frames away.
+    const targetKey = target.targetId;
+    const surfaceSubscribers =
+      this.#frameSubscribers.get(surface) ??
+      new Map<string, Set<(frame: WebuiBrowserImageFrame) => void>>();
+    const subscribers =
+      surfaceSubscribers.get(targetKey) ??
+      new Set<(frame: WebuiBrowserImageFrame) => void>();
+    const first = subscribers.size === 0;
+    subscribers.add(deliver);
+    surfaceSubscribers.set(targetKey, subscribers);
+    this.#frameSubscribers.set(surface, surfaceSubscribers);
+
+    const surfaceHandlers =
+      this.#frameHandlers.get(surface) ??
+      new Map<string, (frame: WebuiBrowserImageFrame) => void>();
+    const handler =
+      surfaceHandlers.get(targetKey) ??
+      ((frame: WebuiBrowserImageFrame) => {
+        const current = this.#frameSubscribers.get(surface)?.get(targetKey);
+        if (!current) return;
+        for (const subscriber of [...current]) subscriber(frame);
+      });
+    surfaceHandlers.set(targetKey, handler);
+    this.#frameHandlers.set(surface, surfaceHandlers);
+
+    if (first) await provider.startImageStream(targetKey, handler);
     try {
       while (!signal?.aborted) {
-        streaming = await this.#followSelection(surface, runId, provider, deliver, streaming);
         while (queue.length > 0) {
           const frame = queue.shift();
           if (!frame) continue;
-          // A frame belongs to the panel only while it names the page this
-          // run's panel is showing. A frame that arrives after that selection
-          // moved, after the page behind the target was replaced, or that
-          // belongs to another run's target would put a different page on
-          // screen than the one the person chose.
-          if (!this.#frameMatchesSelection(surface, runId, frame)) continue;
           yield frame;
         }
         await Promise.race([
@@ -674,76 +965,102 @@ export class WebuiBrowserService {
       }
     } finally {
       subscribers.delete(deliver);
-      if (subscribers.size === 0) runs.delete(runId);
-      // Cancelling the stream releases the provider-side resources it held:
-      // the screencast is stopped, not merely ignored.
-      if (streaming) await provider.stopImageStream(streaming).catch(() => undefined);
+      if (subscribers.size === 0) {
+        // Cancelling the stream releases the provider-side resources it held:
+        // the screencast is stopped, not merely ignored.
+        await provider.stopImageStream(targetKey).catch(() => undefined);
+        surfaceSubscribers.delete(targetKey);
+        surfaceHandlers.delete(targetKey);
+      }
     }
   }
 
   /**
-   * Moves one stream onto the target its run has selected now, and reports the
-   * target it is attached to afterwards.
+   * Releases a session's pages.
    *
-   * A run selects a target again and again while a stream runs, and the stream
-   * has to follow: the person pointed at another tab, so the panel has to show
-   * that tab. Re-reading the selection on every pass is what makes the stream
-   * follow it, and the provider-side stream is restarted rather than reused —
-   * the screencast is per target, so a stream left attached to the old one
-   * would show a page nobody is looking at and never show the new one.
+   * A session's pages are released when the session ends — deleted, archived,
+   * or transferred away. The release closes the page, drops the target from
+   * the registry, and takes the run's selection with it: a page in the
+   * isolated Chromium is a live process with a live target, and a target the
+   * registry still offers is a target a command could still be aimed at.
    *
-   * The old target's resources are released by stopping its stream before the
-   * new one starts: a screencast left running for a tab the person moved away
-   * from is a leak, and the provider holds it until it is told to let go.
-   *
-   * A new *generation* of the same target is not a retarget. The page behind the
-   * tab was replaced while the tab stayed the one the run selected, so the
-   * screencast follows it on its own and only the fence below has anything to
-   * say about it.
-   *
-   * A selection that disappeared while the stream ran — the surface's provider
-   * was stopped, which forgets the surface's selections — stops the stream and
-   * starts nothing. There is no longer a target this stream may carry.
+   * The release is keyed on the **session**, not on the operation that ended
+   * it, so a session that goes away in any of the three ways leaves the same
+   * nothing behind.
    */
-  async #followSelection(
-    surface: WebuiBrowserSurface,
-    runId: string,
-    provider: WebuiBrowserSurfaceProvider,
-    deliver: (frame: WebuiBrowserImageFrame) => void,
-    streaming: string | undefined,
-  ): Promise<string | undefined> {
-    const wanted = this.#selectionOf(surface, runId)?.targetId;
-    if (wanted === streaming) return streaming;
-    if (streaming !== undefined) {
-      await provider.stopImageStream(streaming).catch(() => undefined);
+  async releaseSession(sessionId: string): Promise<void> {
+    for (const [surface, runs] of [...this.#webTabs]) {
+      const tabs = runs.get(sessionId);
+      if (!tabs) continue;
+      for (const target of [...tabs.values()]) {
+        await this.#releaseTarget(surface, target);
+      }
+      runs.delete(sessionId);
     }
-    if (wanted === undefined) return undefined;
-    await provider.startImageStream(wanted, deliver);
-    return wanted;
+    // The run's selection goes with the session: a selection that names a page
+    // of a session that no longer exists is a selection nothing can act on.
+    for (const selections of this.#selected.values()) {
+      selections.delete(sessionId);
+    }
+  }
+
+  /** Closes one page and forgets its target. */
+  async #releaseTarget(
+    surface: WebuiBrowserSurface,
+    target: WebuiBrowserTargetId,
+  ): Promise<void> {
+    const provider = this.#providers.get(surface);
+    // The stream stops first: a screencast left running for a page that is
+    // gone is a resource the browser holds for nobody.
+    await provider?.stopImageStream(target.targetId).catch(() => undefined);
+    if (provider) {
+      try {
+        await provider.sendCommand(target, "Target.closeTarget", {
+          targetId: target.targetId,
+        });
+      } catch {
+        // A page that is already gone needs no closing.
+      }
+    }
+    this.#registry.forget({
+      surface: target.surface,
+      browserId: target.browserId,
+      targetId: target.targetId,
+    });
   }
 
   /**
-   * Whether a frame still describes the page one run is showing.
+   * How many frames this service has dropped on a surface.
    *
-   * The comparison is against *that run's* current selection, not the one the
-   * stream started with and not another run's: a run can select another tab
-   * while the stream is running, another run can select a different tab on the
-   * same surface, and a frame from either must not appear.
+   * A frame that names another page is dropped rather than put on screen, and
+   * the drop is counted rather than silent: a stream that quietly stops
+   * updating and a stream that is dropping frames look identical from the
+   * outside.
    */
-  #frameMatchesSelection(
-    surface: WebuiBrowserSurface,
-    runId: string,
+  droppedFrameCount(surface: WebuiBrowserSurface): number {
+    return this.#droppedFrames.get(surface) ?? 0;
+  }
+
+  /**
+   * Whether a frame still describes the page behind the target.
+   *
+   * Two things have to hold. The frame has to name the very target the
+   * subscriber asked for — all four identity fields, so another tab's frame
+   * and a previous generation of this one are both refused. And the page
+   * behind that target has to still be the one the frame is a picture of: the
+   * registry knows the current generation, and a frame of a page that has
+   * been replaced is a picture of something the person has already moved away
+   * from.
+   */
+  #frameMatchesTarget(
+    target: WebuiBrowserTargetId,
     frame: WebuiBrowserImageFrame,
   ): boolean {
-    const selected = this.#selectionOf(surface, runId);
-    if (!selected) return false;
-    return (
-      selected.surface === frame.target.surface &&
-      selected.browserId === frame.target.browserId &&
-      selected.targetId === frame.target.targetId &&
-      selected.generation === frame.target.generation
-    );
+    if (!isSameWebuiBrowserTarget(target, frame.target)) return false;
+    const current = this.#registry.resolve(target);
+    return current !== undefined && current.id.generation === frame.target.generation;
   }
+
 
   /**
    * Runs one browser command.
@@ -770,7 +1087,9 @@ export class WebuiBrowserService {
         `No browser target is selected for the "${surface}" surface.`,
       );
     }
-    return { accepted: true, result: await provider.sendCommand(target, command, params) };
+    const result = await provider.sendCommand(target, command, params);
+    this.#observeOpenedTarget(command, result, surface, WEBUI_BROWSER_NO_RUN_ID);
+    return { accepted: true, result };
   }
 
   /**
@@ -790,6 +1109,110 @@ export class WebuiBrowserService {
    * page it acted on; it is the registry's current view of that target, not a
    * second identity the service keeps.
    */
+  /**
+   * Opens a page, and says what the new page does to the run's selection.
+   *
+   * The page is opened the same way whoever opened it: one `open_tab`, one surface
+   * switch, one provider. What differs is which cell the new page joins, because
+   * the run's selection and the tab the person is looking at are two cells with one
+   * writer each (ADR 0022):
+   *
+   * - `agent` — the page becomes the run's selection. The run asked for it, and a
+   *   second `open_tab` moves it to the second page without losing the first. It is
+   *   also the bootstrap the tool gate allows: `open_tab` is the one action a run
+   *   with no selection may perform, because it is the action that would create the
+   *   selection the gate wants. Every other action of a run with no selection is
+   *   still refused with `browser_target_unknown`: a run that has selected nothing
+   *   is refused rather than handed a page nobody chose.
+   * - `person` — the page is recorded as the session's web tab, and joins the run's
+   *   selection **only if the run had none at this moment**. That is the one
+   *   bootstrap, and it is decided here rather than by the caller: the runtime owns
+   *   the selection, so the runtime is the only place that can read it at the moment
+   *   the page appears. A run that already has a page keeps it — the person opened a
+   *   tab, not the Agent's page.
+   *
+   * The surface is a fact rather than a choice either party made. The **Agent's**
+   * page follows the surface its run selected on, and a run without a selection
+   * opens a page in the isolated Chromium. The **person's** page is always in the
+   * isolated Chromium: the panel is the isolated browser's view, and the external
+   * browsers are driven in the person's own windows — so a person typing a url
+   * must not be refused because the Agent happens to be working in Edge.
+   *
+   * The run is optional because the person may have no run in view: an absent run
+   * is the panel's own cell, and the bootstrap applies to it exactly as it applies
+   * to a run.
+   */
+  async openWebTab(
+    runId: string = WEBUI_BROWSER_NO_RUN_ID,
+    params: Record<string, unknown> = {},
+    signal?: AbortSignal,
+    opener: WebuiBrowserTabOpener = "agent",
+  ): Promise<{
+    readonly accepted: true;
+    readonly target: WebuiBrowserTargetId;
+    readonly result?: unknown;
+  }> {
+    const surface =
+      opener === "person"
+        ? "isolated-chromium"
+        : (this.selectionSurfaceOf(runId) ?? "isolated-chromium");
+    // The switch comes first: a surface that is switched off is refused
+    // before anything is attempted, so the refusal names the switch rather
+    // than the selection.
+    await this.#authorizeCommand(surface, "open_tab");
+    const provider = await this.#commandProvider(surface);
+    if (!provider.openTab) {
+      throw browserOperationError(
+        "browser_capability_denied",
+        `Browser surface "${surface}" cannot open a tab.`,
+      );
+    }
+    // Whether the run has a selection is read **before** the page is created,
+    // and it is read across every surface: the Agent acts on one page, so the
+    // bootstrap is about the run and not about a surface. A run working in
+    // Edge still has a selection, and a person opening a tab must not take it.
+    //
+    // The bootstrap is decided at the moment the page is opened, and the page
+    // takes a moment to open: a run that selected a page while the person's
+    // page was opening must not have its selection taken away by the
+    // bootstrap afterwards.
+    const runHadNoSelection = this.selectionSurfaceOf(runId) === undefined;
+    const identity = (await awaitAbortableCommand(
+      provider.openTab(params),
+      signal,
+    )) as WebuiBrowserTargetId;
+    // The new page is known to the registry, and it is the session's web tab.
+    this.#registry.observe({
+      surface: identity.surface,
+      browserId: identity.browserId,
+      targetId: identity.targetId,
+      title: "",
+      url: "",
+      status: "open",
+      generation: identity.generation,
+    });
+    this.#recordWebTab(surface, runId, identity);
+    // The one bootstrap. A run that opened the page writes its own cell. A
+    // person does not: their page joins the run's selection only while the run
+    // has none, so a person who opens a tab in a running session never moves the
+    // Agent off the page it is working on, and a run with nothing to act on is
+    // not a dead end.
+    if (opener === "agent" || runHadNoSelection) {
+      // The registry's generation is the current one. A page that is still
+      // loading is observed as a replaced page when its first load lands, and
+      // that observation may have arrived before this answer did — a selection
+      // written from the answer alone would be born stale, and the Agent's
+      // next action would be refused against a page it had just opened.
+      const known = this.#registry.resolve(identity);
+      this.#runSelections(surface).set(runId, {
+        target: known?.id ?? identity,
+        order: (this.#selectionOrder += 1),
+      });
+    }
+    this.#publishWebTabs(surface, runId);
+    return { accepted: true, target: identity, result: identity };
+  }
+
   async sendCommandToSelection(
     surface: WebuiBrowserSurface,
     runId: string,
@@ -819,14 +1242,105 @@ export class WebuiBrowserService {
       );
     }
     const provider = await this.#commandProvider(surface);
+    const result = await awaitAbortableCommand(
+      provider.sendCommand(selected, command, params),
+      signal,
+    );
+    this.#observeOpenedTarget(command, result, surface, runId);
     return {
       accepted: true,
       target: selected,
-      result: await awaitAbortableCommand(
-        provider.sendCommand(selected, command, params),
-        signal,
-      ),
+      result,
     };
+  }
+
+  /**
+   * Runs one browser command against the page the caller names.
+   *
+   * This is the path a web tab's toolbar takes. The tab holds exactly one page,
+   * so the person pressing back means the page in front of them: resolving a
+   * selection instead would answer with whichever page the run or the panel
+   * happened to have selected, and a toolbar that reloads a page nobody is
+   * looking at is worse than no toolbar.
+   *
+   * The fences are the ones every command path makes, in the same order: the
+   * surface's switch and the command gate first, so a refusal names the switch
+   * rather than the page; then the generation, so a reference recorded before a
+   * navigation is refused instead of being applied to the page that moved.
+   *
+   * What it deliberately does **not** do is move a selection. A command that
+   * names a page acts on that page and answers; which cell the answer belongs to
+   * is the opener's answer to give, and the toolbar's three commands open
+   * nothing.
+   */
+  async sendCommandToTarget(
+    surface: WebuiBrowserSurface,
+    target: WebuiBrowserTargetId,
+    command: string,
+    params: Record<string, unknown> = {},
+    signal?: AbortSignal,
+  ): Promise<{
+    readonly accepted: true;
+    readonly target: WebuiBrowserTargetId;
+    readonly result?: unknown;
+  }> {
+    await this.#authorizeCommand(surface, command);
+    if (!this.#registry.isCurrent(target)) {
+      throw browserOperationError(
+        "browser_target_stale",
+        "The browser page has been replaced; open the tab again.",
+      );
+    }
+    const provider = await this.#commandProvider(surface);
+    const result = await awaitAbortableCommand(
+      provider.sendCommand(target, command, params),
+      signal,
+    );
+    return {
+      accepted: true,
+      target,
+      result,
+    };
+  }
+
+  /**
+   * Observes a page that a command opened.
+   *
+   * A command that opened a page answers with that page's identity, and the
+   * registry learns about the page from the answer alone. The new target is
+   * therefore known before anything asks the provider for its list again, and
+   * with the generation the provider gave it rather than a guess.
+   *
+   * The page also joins the session's web tabs: the runtime owns the record of
+   * what the session has open, and the strip renders what the runtime
+   * publishes.
+   *
+   * A command that did not open a page — or a provider whose answer is not an
+   * identity — is left alone. The registry is the service's record of what the
+   * browser has, and a command that opened nothing has nothing to add to it.
+   */
+  #observeOpenedTarget(
+    command: string,
+    result: unknown,
+    surface: WebuiBrowserSurface,
+    runId: string,
+  ): void {
+    if (command !== "open_tab") return;
+    const identity = readOpenedTargetIdentity(result);
+    if (!identity) return;
+    this.#registry.observe({
+      surface: identity.surface,
+      browserId: identity.browserId,
+      targetId: identity.targetId,
+      // The title and the url are the provider's to report, and it reports
+      // them the next time it is asked. What the answer carries is the
+      // identity, and that is what the registry needs to know a page exists.
+      title: "",
+      url: "",
+      status: "open",
+      generation: identity.generation,
+    });
+    this.#recordWebTab(surface, runId, identity);
   }
 
   /**
@@ -961,4 +1475,27 @@ async function awaitAbortableCommand(
  */
 export function browserErrorCode(error: unknown): string | undefined {
   return error instanceof WebuiBrowserOperationError ? error.code : undefined;
+}
+
+/**
+ * The identity a command that opened a page answered with.
+ *
+ * The answer is read rather than assumed. A provider that did not open a page
+ * — or a surface that cannot open one at all — answers with something else,
+ * and the service must not invent a target out of it.
+ */
+function readOpenedTargetIdentity(result: unknown): WebuiBrowserTargetId | undefined {
+  if (typeof result !== "object" || result === null) return undefined;
+  const candidate = result as Record<string, unknown>;
+  const { surface, browserId, targetId, generation } = candidate;
+  if (
+    typeof surface !== "string" ||
+    typeof browserId !== "string" ||
+    typeof targetId !== "string" ||
+    typeof generation !== "number" ||
+    !Number.isInteger(generation)
+  ) {
+    return undefined;
+  }
+  return { surface: surface as WebuiBrowserSurface, browserId, targetId, generation };
 }

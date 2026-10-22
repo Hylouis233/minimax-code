@@ -1,8 +1,8 @@
 // The browser operations.
 //
-// Seven operations: four that answer a question, one that changes the
-// authorization, one that forwards an input, and one that streams the live
-// images.
+// Ten operations: the ones that answer a question, the one that changes the
+// authorization, the ones that forward an input and a command, and the two
+// that stream — the live images, and the web tabs the session has open.
 //
 // The validators here are deliberately thin. The *shape* of a request is the
 // wire's business and belongs in this layer; whether an input command is
@@ -18,11 +18,14 @@ import {
   GET_BROWSER_INSTALLATION_KEY_OPERATION_NAME,
   LIST_BROWSER_CAPABILITIES_OPERATION_NAME,
   LIST_BROWSER_TARGETS_OPERATION_NAME,
+  CLOSE_BROWSER_WEB_TAB_OPERATION_NAME,
+  OPEN_BROWSER_WEB_TAB_OPERATION_NAME,
   SELECT_BROWSER_TARGET_OPERATION_NAME,
   SEND_BROWSER_INPUT_OPERATION_NAME,
   SEND_BROWSER_COMMAND_OPERATION_NAME,
   SET_BROWSER_AUTHORIZATION_OPERATION_NAME,
   WATCH_BROWSER_FRAMES_OPERATION_NAME,
+  WATCH_BROWSER_WEB_TABS_OPERATION_NAME,
 } from "../../shared/operation-names.js";
 import {
   WEBUI_BROWSER_SURFACES,
@@ -85,10 +88,10 @@ export const sendBrowserInputOperation: WebuiOperation<Record<string, unknown>> 
 /**
  * The browser command operation.
  *
- * The validator checks only that the request *names* a surface and a command.
- * Whether the command is allowed — a restricted action, or a raw DevTools
- * method under the Full CDP switch — is the runtime's decision, because only
- * the runtime knows the live authorization.
+ * The validator checks only that the request *names* a surface, a command, and
+ * — when it names one — the page it acts on. Whether the command is allowed — a
+ * restricted action, or a raw DevTools method under the Full CDP switch — is the
+ * runtime's decision, because only the runtime knows the live authorization.
  */
 export const sendBrowserCommandOperation: WebuiOperation<Record<string, unknown>> = {
   name: SEND_BROWSER_COMMAND_OPERATION_NAME,
@@ -97,7 +100,46 @@ export const sendBrowserCommandOperation: WebuiOperation<Record<string, unknown>
 
 export const watchBrowserFramesOperation: WebuiOperation<Record<string, unknown>> = {
   name: WATCH_BROWSER_FRAMES_OPERATION_NAME,
-  validate: (body) => validateSurface(WATCH_BROWSER_FRAMES_OPERATION_NAME, body),
+  validate: (body) => validateFrameStream(WATCH_BROWSER_FRAMES_OPERATION_NAME, body),
+};
+
+/**
+ * The web-tab snapshot stream.
+ *
+ * The request names a surface and, optionally, the run whose tabs it wants.
+ * The snapshot itself is the runtime's record of the session's web tabs, so
+ * there is nothing for the client to ask for beyond which session it is
+ * asking about.
+ */
+export const watchBrowserWebTabsOperation: WebuiOperation<Record<string, unknown>> = {
+  name: WATCH_BROWSER_WEB_TABS_OPERATION_NAME,
+  validate: (body) => validateSurface(WATCH_BROWSER_WEB_TABS_OPERATION_NAME, body),
+};
+
+/**
+ * The person's way of opening a page.
+ *
+ * The request names a url, and a run when there is one. It names no surface:
+ * which surface the page belongs to is the runtime's answer, exactly as it is
+ * for the Agent's `open_tab`, so the two paths cannot disagree about where a
+ * page is opened. Whether the page may be opened at all — the surface's switch,
+ * and the provider behind it — is the runtime's decision and keeps its own
+ * refusal codes.
+ */
+export const openBrowserWebTabOperation: WebuiOperation<Record<string, unknown>> = {
+  name: OPEN_BROWSER_WEB_TAB_OPERATION_NAME,
+  validate: (body) => validateWebTabUrl(OPEN_BROWSER_WEB_TAB_OPERATION_NAME, body),
+};
+
+/**
+ * The request that closes a web tab.
+ *
+ * The request names the target the tab is bound to, not a session: the tab
+ * knows the page it holds, and the runtime closes the page that tab holds.
+ */
+export const closeBrowserWebTabOperation: WebuiOperation<Record<string, unknown>> = {
+  name: CLOSE_BROWSER_WEB_TAB_OPERATION_NAME,
+  validate: (body) => validateWebTabTarget(CLOSE_BROWSER_WEB_TAB_OPERATION_NAME, body),
 };
 
 const AUTHORIZATION_SWITCHES = [
@@ -216,21 +258,66 @@ function validateTarget(
   if (!isRecord(target)) {
     return invalidBody(`${operation} body requires a target`);
   }
-  if (
-    typeof target.surface !== "string" ||
-    !WEBUI_BROWSER_SURFACES.includes(target.surface as WebuiBrowserSurface) ||
-    typeof target.browserId !== "string" ||
-    target.browserId.length === 0 ||
-    typeof target.targetId !== "string" ||
-    target.targetId.length === 0 ||
-    typeof target.generation !== "number" ||
-    !Number.isInteger(target.generation)
-  ) {
+  if (!isCompleteTargetIdentity(target)) {
     return invalidBody(`${operation} body requires a complete target identity`);
   }
   return validateRunId(operation, result.body);
 }
 
+/**
+ * Validates a frame-stream request.
+ *
+ * The request names the **target** the client is showing, not a run: the
+ * stream is per target, so two tabs get their own pictures and the person and
+ * the Agent can work on different pages at the same time.
+ *
+ * A request that still carries a run id is refused with an explicit error
+ * rather than being answered with the run's selection. A client asking for
+ * the old shape would otherwise be shown a page it did not ask for, and a
+ * stream that silently answers with the wrong page is worse than one that
+ * says the request is out of date.
+ */
+function validateFrameStream(
+  operation: string,
+  body: unknown,
+): WebuiOperationValidation<Record<string, unknown>> {
+  const result = requireRecord(operation, body);
+  if (!result.ok) return result;
+  if (result.body.runId !== undefined) {
+    return invalidBody(
+      `${operation} is keyed by a target, not by a run; send the target the client is showing`,
+    );
+  }
+  const surface = result.body.surface;
+  if (
+    typeof surface !== "string" ||
+    !WEBUI_BROWSER_SURFACES.includes(surface as WebuiBrowserSurface)
+  ) {
+    return invalidBody(`${operation} body requires a known browser surface`);
+  }
+  const target = result.body.target;
+  if (!isRecord(target)) {
+    return invalidBody(`${operation} body requires a target`);
+  }
+  if (!isCompleteTargetIdentity(target)) {
+    return invalidBody(`${operation} body requires a complete target identity`);
+  }
+  return { ok: true, body: result.body };
+}
+
+/** Whether a body carries a target identity with all four of its fields. */
+function isCompleteTargetIdentity(target: Record<string, unknown>): boolean {
+  return (
+    typeof target.surface === "string" &&
+    WEBUI_BROWSER_SURFACES.includes(target.surface as WebuiBrowserSurface) &&
+    typeof target.browserId === "string" &&
+    target.browserId.length > 0 &&
+    typeof target.targetId === "string" &&
+    target.targetId.length > 0 &&
+    typeof target.generation === "number" &&
+    Number.isInteger(target.generation)
+  );
+}
 /**
  * Validates the *envelope* of an input command.
  *
@@ -258,6 +345,12 @@ function validateInputCommand(
  *
  * A command with an empty name is malformed and is refused here rather than
  * being forwarded for the runtime to reject.
+ *
+ * A command may also name the **target** it acts on. That is what a web tab's
+ * toolbar sends: the tab holds exactly one page, and the person pressing back
+ * means the page they are looking at, not whichever page the surface currently
+ * has selected. An absent target is still the selection, so every existing
+ * caller keeps its meaning.
  */
 function validateCommand(
   operation: string,
@@ -280,9 +373,65 @@ function validateCommand(
   if (params !== undefined && !isRecord(params)) {
     return invalidBody(`${operation} body requires params to be an object`);
   }
+  const target = result.body.target;
+  if (target !== undefined && (!isRecord(target) || !isCompleteTargetIdentity(target))) {
+    return invalidBody(`${operation} body requires a complete target identity`);
+  }
   const runId = result.body.runId;
   if (runId !== undefined && (typeof runId !== "string" || runId.length === 0)) {
     return invalidBody(`${operation} body requires a runId to be a non-empty string`);
+  }
+  return { ok: true, body: result.body };
+}
+
+/**
+ * Validates a request to open a page.
+ *
+ * A page needs a url, and an empty one would open a blank page while answering
+ * that the request was honoured — so an empty url is malformed rather than a
+ * default. Whether the url is reachable is not this layer's business.
+ */
+function validateWebTabUrl(
+  operation: string,
+  body: unknown,
+): WebuiOperationValidation<Record<string, unknown>> {
+  const result = requireRecord(operation, body);
+  if (!result.ok) return result;
+  const url = result.body.url;
+  if (typeof url !== "string" || url.trim().length === 0) {
+    return invalidBody(`${operation} body requires a url`);
+  }
+  return validateRunId(operation, result.body);
+}
+
+/**
+ * The request that closes a web tab.
+ *
+ * The request names the target the tab is bound to. The generation is not
+ * required to be current: a tab whose page was replaced is still a tab the
+ * person can close, and the page it holds is the one the close reaches.
+ */
+function validateWebTabTarget(
+  operation: string,
+  body: unknown,
+): WebuiOperationValidation<Record<string, unknown>> {
+  const result = requireRecord(operation, body);
+  if (!result.ok) return result;
+  const target = result.body.target;
+  if (!isRecord(target)) {
+    return invalidBody(`${operation} body requires a target`);
+  }
+  if (
+    typeof target.surface !== "string" ||
+    !WEBUI_BROWSER_SURFACES.includes(target.surface as WebuiBrowserSurface) ||
+    typeof target.browserId !== "string" ||
+    target.browserId.length === 0 ||
+    typeof target.targetId !== "string" ||
+    target.targetId.length === 0 ||
+    typeof target.generation !== "number" ||
+    !Number.isInteger(target.generation)
+  ) {
+    return invalidBody(`${operation} body requires a complete target identity`);
   }
   return { ok: true, body: result.body };
 }
@@ -319,18 +468,34 @@ export function readBrowserTarget(body: Record<string, unknown>): WebuiBrowserTa
   return body.target as unknown as WebuiBrowserTargetId;
 }
 
-/** The command a validated body carries, as the runtime expects it. */
+/** The url a validated body carries, as the runtime expects it. */
+export function readBrowserWebTabUrl(body: Record<string, unknown>): string {
+  return String(body.url);
+}
+
+/**
+ * The command a validated body carries, as the runtime expects it.
+ *
+ * A `target` is read as part of the command rather than left on the body, the
+ * same way `readBrowserInputCommand` folds its target into the command: the
+ * runtime's command contract says which page it acts on, and leaving a wire
+ * field loose on the object would let a caller believe it acted on one page
+ * while the service drove another.
+ */
 export function readBrowserCommand(body: Record<string, unknown>): {
   readonly surface: WebuiBrowserSurface;
   readonly command: string;
   readonly params: Record<string, unknown>;
+  readonly target?: WebuiBrowserTargetId;
   readonly runId?: string;
 } {
   const params = body.params;
+  const target = body.target;
   return {
     surface: body.surface as WebuiBrowserSurface,
     command: String(body.command),
     params: isRecord(params) ? params : {},
+    ...(isRecord(target) ? { target: target as unknown as WebuiBrowserTargetId } : {}),
     ...(typeof body.runId === "string" && body.runId.length > 0
       ? { runId: body.runId }
       : {}),

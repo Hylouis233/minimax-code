@@ -11,6 +11,7 @@ import type {
   WebuiBrowserImageFrame,
   WebuiBrowserInputCommand,
   WebuiBrowserTargetId,
+  WebuiBrowserWebTabSnapshot,
   WebuiBrowserTargetState,
 } from "../../src/shared/contracts/browser.js";
 
@@ -39,6 +40,10 @@ class RecordingProvider implements WebuiBrowserSurfaceProvider {
   >();
   /** The tabs this browser has, in listing order. */
   readonly tabIds: readonly string[];
+  /** The tabs a command opened, in the order they were opened. */
+  readonly openedTabs: string[] = [];
+  /** The generation each target has, as the provider's own accounting has it. */
+  readonly generations = new Map<string, number>();
   /** One frame handler per open stream, keyed by the tab it watches. */
   readonly frameHandlers = new Map<string, (frame: WebuiBrowserImageFrame) => void>();
   /** The most recently opened stream's handler. */
@@ -60,29 +65,65 @@ class RecordingProvider implements WebuiBrowserSurfaceProvider {
 
   /** Announces that the page behind the target was replaced. */
   announceTargetChange(generation: number, targetId = "tab-1"): void {
+    // The provider owns the generation, so the listing reports the new one
+    // too — the same way the isolated provider's own accounting moves.
+    this.generations.set(targetId, generation);
     for (const listener of this.targetChangeListeners) {
       listener({ targetId, generation });
     }
+  }
+
+  /**
+   * Reports a generation the provider holds without announcing it.
+   *
+   * The announcement can be lost: a page that is still loading is observed as
+   * a replaced page while it is being attached to, and the announcement
+   * arrives before the service has observed the target at all.
+   */
+  reportGeneration(targetId: string, generation: number): void {
+    this.generations.set(targetId, generation);
   }
 
   async sendCommand(
     _target: unknown,
     command: string,
     params: Record<string, unknown>,
-  ): Promise<void> {
+  ): Promise<unknown> {
     this.commands.push({ command, params });
+    // The restricted command set reaches `open_tab` as a command; the dedicated
+    // `openWebTab` path reaches it as `openTab`. Both are the same page-opening,
+    // so both go through the one place that accounts for it.
+    if (command === "open_tab") return this.openTab(params);
+    return undefined;
+  }
+
+  /**
+   * Opens a page and answers with its identity.
+   *
+   * The same answer the isolated provider gives: the surface, the browser, the
+   * target and the generation the provider's own accounting has for it.
+   */
+  async openTab(_params: Record<string, unknown> = {}): Promise<WebuiBrowserTargetId> {
+    const targetId = `tab-${this.tabIds.length + this.openedTabs.length + 1}`;
+    this.openedTabs.push(targetId);
+    return {
+      surface: this.surface,
+      browserId: this.browserId,
+      targetId,
+      generation: 1,
+    } satisfies WebuiBrowserTargetId;
   }
 
   async listTargets(): Promise<readonly WebuiBrowserTargetState[]> {
-    return this.tabIds.map((targetId) => ({
+    return [...this.tabIds, ...this.openedTabs].map((targetId) => ({
       id: {
         surface: this.surface,
         browserId: this.browserId,
         targetId,
-        generation: 1,
+        generation: this.generations.get(targetId) ?? 1,
       },
-      title: "Example",
-      url: "https://example.test",
+      title: `Tab ${targetId}`,
+      url: `https://example.test/${targetId}`,
       status: "open" as const,
       selected: true,
     }));
@@ -136,6 +177,7 @@ class RecordingProvider implements WebuiBrowserSurfaceProvider {
 function createService(
   initial: WebuiBrowserAuthorization,
   tabIds: readonly string[] = ["tab-1"],
+  edgeProvider?: WebuiBrowserSurfaceProvider,
 ): {
   service: WebuiBrowserService;
   provider: RecordingProvider;
@@ -153,6 +195,9 @@ function createService(
     },
     dataDir: "/tmp/webui-browser-use-test",
     createIsolatedProvider: async () => provider,
+    ...(edgeProvider
+      ? { createBridgeProvider: async (surface: string) => (surface === "edge" ? edgeProvider : undefined) }
+      : {}),
   };
   return { service: new WebuiBrowserService(options), provider, state };
 }
@@ -174,6 +219,23 @@ async function selectedTargetOf(
 ): Promise<string | undefined> {
   const list = await service.listTargets("isolated-chromium", runId);
   return list.targets.find((target) => target.selected)?.id.targetId;
+}
+
+/**
+ * The first snapshot the service publishes for one session.
+ *
+ * Reading the first snapshot is what a client does when it connects: the
+ * stream opens with the runtime's current record, so a client that reconnects
+ * sees the same thing the first one saw.
+ */
+async function firstSnapshot(
+  service: WebuiBrowserService,
+  runId = "run-1",
+): Promise<WebuiBrowserWebTabSnapshot> {
+  for await (const snapshot of service.watchWebTabs("isolated-chromium", runId)) {
+    return snapshot;
+  }
+  throw new Error("the snapshot stream ended without publishing anything");
 }
 
 const ALL_OFF: WebuiBrowserAuthorization = {
@@ -473,6 +535,169 @@ describe("browser service", () => {
     await service.close();
   });
 
+  it("answers a command that opened a page with that page's identity", async () => {
+    const { service, provider } = createService({
+      ...ALL_OFF,
+      isolatedChromium: true,
+    });
+    await service.listTargets("isolated-chromium");
+    await service.selectTarget(tab("tab-1"));
+
+    const opened = await service.sendCommand("isolated-chromium", "open_tab", {
+      url: "https://example.test/",
+    });
+
+    // The answer names the page that was created: the surface, the browser,
+    // the target and the generation.
+    expect(opened.result).toEqual({
+      surface: "isolated-chromium",
+      browserId: "browser-1",
+      targetId: "tab-2",
+      generation: 1,
+    });
+    await service.close();
+  });
+
+  it("knows a page that open_tab opened from the identity alone", async () => {
+    const { service, provider } = createService({
+      ...ALL_OFF,
+      isolatedChromium: true,
+    });
+    await service.listTargets("isolated-chromium");
+    await service.selectTarget(tab("tab-1"));
+
+    const opened = await service.sendCommand("isolated-chromium", "open_tab", {
+      url: "https://example.test/",
+    });
+    const identity = opened.result as WebuiBrowserTargetId;
+
+    // The service learned about the page from the answer, so the identity is
+    // usable at once — it does not have to wait for the provider to be asked
+    // for its list again.
+    await service.selectTarget(identity);
+    expect(await selectedTargetOf(service)).toBe("tab-2");
+
+    await service.sendInput({ kind: "text", target: identity, text: "hello" });
+    expect(provider.inputs).toHaveLength(1);
+    expect(provider.inputs[0]?.target.targetId).toBe("tab-2");
+    await service.close();
+  });
+
+  it("leaves the registry alone for a command that opened no page", async () => {
+    const { service, provider } = createService({
+      ...ALL_OFF,
+      isolatedChromium: true,
+    });
+    await service.listTargets("isolated-chromium");
+    await service.selectTarget(tab("tab-1"));
+
+    // A command whose answer is not an identity must not be turned into one.
+    await service.sendCommand("isolated-chromium", "reload");
+    await expect(service.selectTarget(tab("tab-9"))).rejects.toMatchObject({
+      code: "browser_target_unknown",
+    });
+    expect(provider.openedTabs).toHaveLength(0);
+    await service.close();
+  });
+
+  it("publishes the session's web tabs as a snapshot", async () => {
+    const { service } = createService({ ...ALL_OFF, isolatedChromium: true });
+    await service.listTargets("isolated-chromium");
+    await service.selectTarget(tab("tab-1"), "run-1");
+    await service.sendCommandToSelection("isolated-chromium", "run-1", "open_tab", {
+      url: "https://example.test/second",
+    });
+
+    const snapshot = await firstSnapshot(service);
+    expect(snapshot.surface).toBe("isolated-chromium");
+    expect(snapshot.tabs).toHaveLength(1);
+    const [webTab] = snapshot.tabs;
+    // Each tab carries its id, its target identity, its title and its url.
+    expect(webTab?.id).toBe("tab-2");
+    expect(webTab?.target).toEqual({
+      surface: "isolated-chromium",
+      browserId: "browser-1",
+      targetId: "tab-2",
+      generation: 1,
+    });
+    expect(webTab?.title).toBe("Tab tab-2");
+    expect(webTab?.url).toBe("https://example.test/tab-2");
+    await service.close();
+  });
+
+  it("marks the run's selection in the snapshot", async () => {
+    const { service } = createService({ ...ALL_OFF, isolatedChromium: true });
+    await service.listTargets("isolated-chromium");
+    // A run acts on a page it has selected. The bootstrap — a run with no
+    // selection opening the first tab — is the Agent's side of this and lands
+    // with it; here the run selects first and then opens another tab.
+    await service.selectTarget(tab("tab-1"), "run-1");
+    await service.sendCommandToSelection("isolated-chromium", "run-1", "open_tab", {
+      url: "https://example.test/second",
+    });
+    const opened = await service.selectTarget(tab("tab-2"), "run-1");
+
+    const snapshot = await firstSnapshot(service, "run-1");
+    expect(snapshot.tabs[0]?.selected).toBe(true);
+    expect(opened.selected).toBe(true);
+    await service.close();
+  });
+
+  it("gives a client that reconnects the same snapshot", async () => {
+    const { service } = createService({ ...ALL_OFF, isolatedChromium: true });
+    await service.listTargets("isolated-chromium");
+    // A run acts on a page it has selected. The bootstrap — a run with no
+    // selection opening the first tab — is the Agent's side of this and lands
+    // with it; here the run selects first and then opens another tab.
+    await service.selectTarget(tab("tab-1"), "run-1");
+    await service.sendCommandToSelection("isolated-chromium", "run-1", "open_tab", {
+      url: "https://example.test/second",
+    });
+
+    const first = await firstSnapshot(service, "run-1");
+    const second = await firstSnapshot(service, "run-1");
+    // A snapshot rather than a delta: applying it twice changes nothing.
+    expect(second).toEqual(first);
+    await service.close();
+  });
+
+  it("drops a closed tab from the next snapshot", async () => {
+    const { service } = createService({ ...ALL_OFF, isolatedChromium: true });
+    await service.listTargets("isolated-chromium");
+    // A run acts on a page it has selected. The bootstrap — a run with no
+    // selection opening the first tab — is the Agent's side of this and lands
+    // with it; here the run selects first and then opens another tab.
+    await service.selectTarget(tab("tab-1"), "run-1");
+    await service.sendCommandToSelection("isolated-chromium", "run-1", "open_tab", {
+      url: "https://example.test/second",
+    });
+    expect((await firstSnapshot(service, "run-1")).tabs).toHaveLength(1);
+
+    await service.closeWebTabInSession("isolated-chromium", "run-1", "tab-2");
+    expect((await firstSnapshot(service, "run-1")).tabs).toHaveLength(0);
+    await service.close();
+  });
+
+  it("publishes a new generation when the page behind a web tab is replaced", async () => {
+    const { service, provider } = createService({ ...ALL_OFF, isolatedChromium: true });
+    await service.listTargets("isolated-chromium");
+    // A run acts on a page it has selected. The bootstrap — a run with no
+    // selection opening the first tab — is the Agent's side of this and lands
+    // with it; here the run selects first and then opens another tab.
+    await service.selectTarget(tab("tab-1"), "run-1");
+    await service.sendCommandToSelection("isolated-chromium", "run-1", "open_tab", {
+      url: "https://example.test/second",
+    });
+    expect((await firstSnapshot(service, "run-1")).tabs[0]?.target.generation).toBe(1);
+
+    provider.announceTargetChange(2, "tab-2");
+    // The web tab is still the same web tab; the page behind it is not.
+    const snapshot = await firstSnapshot(service, "run-1");
+    expect(snapshot.tabs[0]?.id).toBe("tab-2");
+    expect(snapshot.tabs[0]?.target.generation).toBe(2);
+    await service.close();
+  });
+
   /** Waits until the stream has subscribed, then pushes one frame. */
   async function pushWhenSubscribed(
     provider: RecordingProvider,
@@ -495,7 +720,7 @@ describe("browser service", () => {
 
     const controller = new AbortController();
     const received: WebuiBrowserImageFrame[] = [];
-    const stream = service.watchFrames("isolated-chromium", "run-panel", controller.signal);
+    const stream = service.watchFrames("isolated-chromium", tab("tab-1"), controller.signal);
     const consumer = (async () => {
       for await (const frame of stream) {
         received.push(frame);
@@ -523,7 +748,7 @@ describe("browser service", () => {
 
     const controller = new AbortController();
     const received: WebuiBrowserImageFrame[] = [];
-    const stream = service.watchFrames("isolated-chromium", "run-panel", controller.signal);
+    const stream = service.watchFrames("isolated-chromium", tab("tab-1"), controller.signal);
     const consumer = (async () => {
       for await (const frame of stream) {
         received.push(frame);
@@ -531,16 +756,23 @@ describe("browser service", () => {
       }
     })();
 
+    // The stream is established before the page is replaced: a stream opened
+    // for a page that has already been replaced is refused outright, because
+    // the picture it would carry is of a page that is gone.
+    await waitForStreams(provider, 1);
+
     // The provider announces that the page behind the tab was replaced. A frame
     // that arrives afterwards still names the previous page, and the panel has
     // already moved past it, so it must not reach the screen.
     provider.announceTargetChange(2);
-    await pushWhenSubscribed(provider, 1);
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    provider.pushFrame(1, "tab-1");
+    await settleFrames();
+
     controller.abort();
     await consumer.catch(() => undefined);
 
     expect(received).toHaveLength(0);
+    expect(service.droppedFrameCount("isolated-chromium")).toBe(1);
     await service.close();
   });
 });
@@ -584,6 +816,39 @@ describe("run-scoped selection", () => {
     await service.close();
   });
 
+  it("opens a person's page in the isolated Chromium, whatever the Agent is working on", async () => {
+    // The extension bridge drives the person's own browser through
+    // `chrome.debugger` and cannot open a page in it. The panel is the
+    // isolated browser's view, so the person typing a url must not be refused
+    // because the Agent happens to be working in Edge.
+    const edge = new RecordingProvider(["edge-tab"]);
+    const { service, provider } = createService(
+      { ...ALL_OFF, isolatedChromium: true, edge: true },
+      ["tab-1"],
+      edge,
+    );
+    // The Agent is working on Edge.
+    const edgeList = await service.listTargets("edge", "run-1");
+    const edgeTarget = edgeList.targets.find((entry) => entry.id.targetId === "edge-tab")?.id;
+    expect(edgeTarget).toBeDefined();
+    await service.selectTarget(edgeTarget!, "run-1");
+
+    const opened = await service.openWebTab(
+      "run-1",
+      { url: "https://example.test/" },
+      undefined,
+      "person",
+    );
+
+    // The page was opened in the isolated Chromium, not in the browser the
+    // Agent is working in.
+    expect(opened.target.surface).toBe("isolated-chromium");
+    expect(opened.target.browserId).toBe("browser-1");
+    // And the run keeps the page it was working on: a person who opens a tab
+    // while the run has a selection does not move it.
+    await service.close();
+  });
+
   it("keeps the no-run selection separate from every run's", async () => {
     const { service } = createService(TWO_TABS, ["tab-1", "tab-2"]);
     await service.listTargets("isolated-chromium");
@@ -614,15 +879,69 @@ describe("run-scoped selection", () => {
     await service.close();
   });
 
-  it("gives each run's stream only that run's target's frames", async () => {
+  it("gives a run the page a person opened while it had no selection", async () => {
+    // The bootstrap, and only that. A run with nothing selected cannot act at
+    // all, so the page the person opened becomes its selection — and the run can
+    // act on it immediately, which is what the bootstrap is for.
+    const { service } = createService(TWO_TABS, ["tab-1", "tab-2"]);
+    await service.listTargets("isolated-chromium", "run-a");
+
+    const { target } = await service.openWebTab(
+      "run-a",
+      { url: "https://example.test" },
+      undefined,
+      "person",
+    );
+
+    expect(await selectedTargetOf(service, "run-a")).toBe(target.targetId);
+    await service.close();
+  });
+
+  it("leaves a run's selection alone when a person opens a tab and it has one", async () => {
+    // The other half of the bootstrap: a person opening a tab is not a way to
+    // move the Agent. The page is still the session's web tab and appears in the
+    // snapshot — only the selection is left where the run put it.
+    const { service } = createService(TWO_TABS, ["tab-1", "tab-2"]);
+    await service.listTargets("isolated-chromium", "run-a");
+    await service.selectTarget(tab("tab-1"), "run-a");
+
+    const { target } = await service.openWebTab(
+      "run-a",
+      { url: "https://example.test" },
+      undefined,
+      "person",
+    );
+
+    expect(await selectedTargetOf(service, "run-a")).toBe("tab-1");
+    expect((await firstSnapshot(service, "run-a")).tabs.map((entry) => entry.id)).toContain(
+      target.targetId,
+    );
+    await service.close();
+  });
+
+  it("moves a run's selection when the Agent itself opens the second page", async () => {
+    // The Agent writing its own cell is not the bootstrap and is not conditional:
+    // a second `open_tab` has to move the run to the second page or the run
+    // could never move on.
+    const { service } = createService(TWO_TABS, ["tab-1", "tab-2"]);
+    await service.listTargets("isolated-chromium", "run-a");
+    await service.openWebTab("run-a", { url: "https://first.test/" });
+
+    const { target } = await service.openWebTab("run-a", { url: "https://second.test/" });
+
+    expect(await selectedTargetOf(service, "run-a")).toBe(target.targetId);
+    await service.close();
+  });
+
+  it("gives each target's stream only that target's frames", async () => {
     const { service, provider } = createService(TWO_TABS, ["tab-1", "tab-2"]);
     await service.listTargets("isolated-chromium", "run-a");
     await service.listTargets("isolated-chromium", "run-b");
     await service.selectTarget(tab("tab-1"), "run-a");
     await service.selectTarget(tab("tab-2"), "run-b");
 
-    const first = collectFrames(service, "run-a");
-    const second = collectFrames(service, "run-b");
+    const first = collectFrames(service, tab("tab-1"));
+    const second = collectFrames(service, tab("tab-2"));
     await waitForStreams(provider, 2);
 
     provider.pushFrame(1, "tab-1");
@@ -634,20 +953,21 @@ describe("run-scoped selection", () => {
     await stop(service, [first, second]);
   });
 
-  it("drops a frame that belongs to another run's target", async () => {
+  it("drops a frame that belongs to another target", async () => {
     const { service, provider } = createService(TWO_TABS, ["tab-1", "tab-2"]);
     await service.listTargets("isolated-chromium", "run-a");
     await service.listTargets("isolated-chromium", "run-b");
     await service.selectTarget(tab("tab-1"), "run-a");
     await service.selectTarget(tab("tab-2"), "run-b");
 
-    const first = collectFrames(service, "run-a");
-    const second = collectFrames(service, "run-b");
+    const first = collectFrames(service, tab("tab-1"));
+    const second = collectFrames(service, tab("tab-2"));
     await waitForStreams(provider, 2);
 
-    // The provider hands run A's stream a frame of run B's tab. Keeping the
-    // streams apart is the service's job, not the provider's, so the fence is
-    // against this run's own selection and the foreign frame is dropped.
+    // The provider hands the first tab's stream a frame of the second tab.
+    // Keeping the streams apart is the service's job as well as the
+    // provider's, so the fence is against the target the subscriber asked for
+    // and the foreign frame is dropped.
     provider.frameHandlers.get("tab-1")?.({
       target: {
         surface: "isolated-chromium",
@@ -697,20 +1017,19 @@ describe("run-scoped selection", () => {
  * the person left is a panel that never shows the tab they moved to), and one
  * run's retarget is one run's business.
  */
-describe("stream retargeting", () => {
+describe("the stream of one target", () => {
   const TWO_TABS: WebuiBrowserAuthorization = {
     ...ALL_OFF,
     isolatedChromium: true,
   };
 
-  it("refuses a stream for a run that has selected nothing", async () => {
+  it("refuses a stream for a target that does not exist", async () => {
     const { service, provider } = createService(TWO_TABS, ["tab-1", "tab-2"]);
     await service.listTargets("isolated-chromium", "run-a");
-    // Another run's selection is not this one's to stream, and streaming
-    // nothing would leave the panel watching a page it cannot see.
-    await service.selectTarget(tab("tab-1"), "run-b");
 
-    await expect(drainStream(service, "run-a")).rejects.toMatchObject({
+    // A stream for a target nobody has is a stream that can never deliver a
+    // frame, and a panel waiting for one looks like a panel that is broken.
+    await expect(drainStream(service, tab("tab-9"))).rejects.toMatchObject({
       code: "browser_target_unknown",
     });
     // The refusal is the whole outcome: nothing was started on the provider.
@@ -718,105 +1037,107 @@ describe("stream retargeting", () => {
     await service.close();
   });
 
-  it("starts the stream for the target the run selected at the time", async () => {
+  it("refuses a stream for a target whose page was replaced", async () => {
     const { service, provider } = createService(TWO_TABS, ["tab-1", "tab-2"]);
     await service.listTargets("isolated-chromium", "run-a");
-    await service.selectTarget(tab("tab-2"), "run-a");
+    provider.announceTargetChange(2, "tab-1");
 
-    const stream = collectFrames(service, "run-a");
+    await expect(drainStream(service, tab("tab-1"))).rejects.toMatchObject({
+      code: "browser_target_stale",
+    });
+    expect(provider.startedStreams).toHaveLength(0);
+    await service.close();
+  });
+
+  it("starts the stream for the target the request names", async () => {
+    const { service, provider } = createService(TWO_TABS, ["tab-1", "tab-2"]);
+    await service.listTargets("isolated-chromium", "run-a");
+
+    const stream = collectFrames(service, tab("tab-2"));
     await waitUntil(() => provider.startedStreams.includes("tab-2"));
     await stop(service, [stream]);
 
     expect(provider.startedStreams).toEqual(["tab-2"]);
   });
 
-  it("moves the stream onto the target the run selected next and stops the old one", async () => {
+  it("gives two tabs their own pictures, and neither receives the other's frames", async () => {
     const { service, provider } = createService(TWO_TABS, ["tab-1", "tab-2"]);
     await service.listTargets("isolated-chromium", "run-a");
-    await service.selectTarget(tab("tab-1"), "run-a");
 
-    const stream = collectFrames(service, "run-a");
-    await waitUntil(() => provider.startedStreams.includes("tab-1"));
-    const oldHandler = provider.frameHandlers.get("tab-1");
-
-    // The person points at another tab while the panel is watching this one.
-    await service.selectTarget(tab("tab-2"), "run-a");
-    await waitUntil(() => provider.startedStreams.includes("tab-2"));
-
-    // The screencast for the tab they moved away from is released rather than
-    // left running: a stream left attached to it would hold the browser's
-    // resources for a page nobody is looking at.
-    expect(provider.stoppedStreams).toEqual(["tab-1"]);
-
-    // A frame of the tab the run is on now arrives on the same stream.
-    provider.pushFrame(1, "tab-2");
-    // A frame that arrives from the old tab afterwards is dropped by the fence:
-    // it names a page this run is no longer showing. The handler is the one
-    // captured before the retarget, so the drop is the fence's doing and not
-    // the provider's.
-    oldHandler?.({
-      target: tab("tab-1"),
-      data: "QlRSQVk=",
-      format: "jpeg",
-      sequence: 2,
-    });
-    await settleFrames();
-
-    expect(stream.frames.map((frame) => frame.target.targetId)).toEqual(["tab-2"]);
-    await stop(service, [stream]);
-  });
-
-  it("keeps another run's stream when one run retargets", async () => {
-    const { service, provider } = createService(TWO_TABS, ["tab-1", "tab-2", "tab-3"]);
-    await service.listTargets("isolated-chromium", "run-a");
-    await service.listTargets("isolated-chromium", "run-b");
-    await service.selectTarget(tab("tab-1"), "run-a");
-    await service.selectTarget(tab("tab-2"), "run-b");
-
-    const first = collectFrames(service, "run-a");
-    const second = collectFrames(service, "run-b");
+    const first = collectFrames(service, tab("tab-1"));
+    const second = collectFrames(service, tab("tab-2"));
     await waitUntil(() => provider.startedStreams.length >= 2);
     expect(new Set(provider.startedStreams)).toEqual(new Set(["tab-1", "tab-2"]));
 
-    await service.selectTarget(tab("tab-3"), "run-a");
-    await waitUntil(() => provider.startedStreams.includes("tab-3"));
-
-    // Run B's screencast belongs to run B. Stopping it because run A moved
-    // would leave another run's panel without a stream at all.
-    expect(provider.stoppedStreams).toEqual(["tab-1"]);
-
-    provider.pushFrame(1, "tab-3");
+    provider.pushFrame(1, "tab-1");
     provider.pushFrame(1, "tab-2");
     await settleFrames();
 
-    expect(first.frames.map((frame) => frame.target.targetId)).toEqual(["tab-3"]);
+    expect(first.frames.map((frame) => frame.target.targetId)).toEqual(["tab-1"]);
     expect(second.frames.map((frame) => frame.target.targetId)).toEqual(["tab-2"]);
     await stop(service, [first, second]);
   });
 
-  it("keeps the stream on the tab whose page navigated", async () => {
+  it("drops a frame that names a target the subscriber did not ask for, and counts the drop", async () => {
     const { service, provider } = createService(TWO_TABS, ["tab-1", "tab-2"]);
     await service.listTargets("isolated-chromium", "run-a");
-    await service.selectTarget(tab("tab-1"), "run-a");
 
-    const stream = collectFrames(service, "run-a");
+    const stream = collectFrames(service, tab("tab-1"));
     await waitUntil(() => provider.startedStreams.includes("tab-1"));
 
-    // The tab is still the one the run selected; only the page behind it was
-    // replaced. The screencast follows the tab on its own, so nothing is
-    // restarted — and the new page's frame is what the panel then shows.
-    provider.announceTargetChange(2);
-    // The stream loop re-reads the selection once per pass, so this covers a
-    // whole pass before the restart counters are read.
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(provider.startedStreams).toEqual(["tab-1"]);
-    expect(provider.stoppedStreams).toEqual([]);
+    // The provider hands a frame to the page that asked for it, so the frame
+    // is delivered to this subscriber's own handler directly: the fence is
+    // what decides, and it has to be shown deciding on a frame that names
+    // another page. The drop is counted, because a stream that quietly stops
+    // updating and one that is dropping frames look the same from outside.
+    const handler = provider.frameHandlers.get("tab-1");
+    handler?.({
+      target: tab("tab-2"),
+      data: "QlRSQVk=",
+      format: "jpeg",
+      sequence: 1,
+    });
+    await settleFrames();
 
+    expect(stream.frames).toHaveLength(0);
+    expect(service.droppedFrameCount("isolated-chromium")).toBe(1);
+    await stop(service, [stream]);
+  });
+
+  it("refuses a frame from a superseded generation", async () => {
+    const { service, provider } = createService(TWO_TABS, ["tab-1", "tab-2"]);
+    await service.listTargets("isolated-chromium", "run-a");
+
+    const stream = collectFrames(service, tab("tab-1"));
+    await waitUntil(() => provider.startedStreams.includes("tab-1"));
+
+    // The page behind the tab was replaced, so the generation moved. The
+    // frame that arrives now carries the new generation, and the subscriber
+    // asked for the old one: a picture of a page that is gone.
+    provider.announceTargetChange(2, "tab-1");
     provider.pushFrame(2, "tab-1");
     await settleFrames();
 
-    expect(stream.frames.map((frame) => frame.target.generation)).toEqual([2]);
+    expect(stream.frames).toHaveLength(0);
+    expect(service.droppedFrameCount("isolated-chromium")).toBe(1);
     await stop(service, [stream]);
+  });
+
+  it("leaves the run's selection deciding what the Agent's commands act on", async () => {
+    const { service, provider } = createService(TWO_TABS, ["tab-1", "tab-2"]);
+    await service.listTargets("isolated-chromium", "run-a");
+    await service.selectTarget(tab("tab-2"), "run-a");
+
+    // The stream is keyed by the target the client asked for, and the command
+    // path is keyed by the run. They are different cells: the panel shows
+    // tab-1, and the Agent still acts on tab-2.
+    const stream = collectFrames(service, tab("tab-1"));
+    await waitUntil(() => provider.startedStreams.includes("tab-1"));
+
+    await service.sendCommandToSelection("isolated-chromium", "run-a", "reload", {});
+    expect(provider.commands.map((entry) => entry.command)).toEqual(["reload"]);
+    await stop(service, [stream]);
+    await service.close();
   });
 });
 
@@ -859,6 +1180,28 @@ describe("the surface a run is working on", () => {
     expect(service.selectionSurfaceOf("run-a")).toBeUndefined();
     await service.close();
   });
+
+  it("moves a selection onto the page the provider now holds", async () => {
+    const { service, provider } = createService({
+      ...ALL_OFF,
+      isolatedChromium: true,
+    });
+    await service.listTargets("isolated-chromium", "run-1");
+    await service.selectTarget(tab("tab-1"), "run-1");
+
+    // The page behind the tab was replaced, and the announcement that says so
+    // was lost — it arrived before the service had observed the target. The
+    // provider's listing is then the only thing that knows, and the selection
+    // has to follow it: a selection left behind would make the Agent's next
+    // action refuse against a page the runtime knows is there.
+    provider.reportGeneration("tab-1", 2);
+    const list = await service.listTargets("isolated-chromium", "run-1");
+    const selected = list.targets.find((entry) => entry.selected);
+    expect(selected?.id.targetId).toBe("tab-1");
+    expect(selected?.id.generation).toBe(2);
+    await service.close();
+  });
+
 });
 
 /** One open stream, plus what it has delivered so far. */
@@ -867,14 +1210,17 @@ interface OpenStream {
   readonly frames: WebuiBrowserImageFrame[];
 }
 
-/** Starts one run's stream and drains it in the background. */
-function collectFrames(service: WebuiBrowserService, runId: string): OpenStream {
+/** Starts one target's stream and drains it in the background. */
+function collectFrames(
+  service: WebuiBrowserService,
+  target: WebuiBrowserTargetId = tab("tab-1"),
+): OpenStream {
   const controller = new AbortController();
   const stream: OpenStream = { controller, frames: [] };
   void (async () => {
     for await (const frame of service.watchFrames(
       "isolated-chromium",
-      runId,
+      target,
       controller.signal,
     )) {
       stream.frames.push(frame);
@@ -913,13 +1259,16 @@ async function waitUntil(condition: () => boolean): Promise<void> {
  * Reads one run's stream, so a refusal on the way in is a rejection the caller
  * can read: an async generator that is never iterated never runs at all.
  */
-function drainStream(service: WebuiBrowserService, runId: string): Promise<void> {
+function drainStream(
+  service: WebuiBrowserService,
+  target: WebuiBrowserTargetId = tab("tab-1"),
+): Promise<void> {
   const controller = new AbortController();
   return (async () => {
     try {
       for await (const _frame of service.watchFrames(
         "isolated-chromium",
-        runId,
+        target,
         controller.signal,
       )) {
         return;

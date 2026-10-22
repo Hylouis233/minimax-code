@@ -203,6 +203,100 @@ export interface WebuiBrowserTargetList {
 }
 
 /**
+ * One web tab the runtime publishes.
+ *
+ * A web tab is a page of the isolated Chromium. The `id` is the runtime's
+ * handle for it, and it is the target's id: a page that navigates keeps its
+ * target id and gains a generation, so the web tab is still the same web tab.
+ *
+ * The `target` is the **binding** the client holds. The tab's own id belongs
+ * to the client and is assigned when the tab is opened; the runtime's target
+ * identity is what the client binds the tab to, and it is the thing that
+ * identifies the page uniquely — a target id alone names a page in one
+ * browser only.
+ */
+export interface WebuiBrowserWebTab {
+  /** The runtime's id for the web tab. It is the target's id. */
+  readonly id: string;
+  /** The target the web tab is bound to. The generation moves with the page. */
+  readonly target: WebuiBrowserTargetId;
+  /** The page's title, as the provider reports it. */
+  readonly title: string;
+  /** The page's url, as the provider reports it. */
+  readonly url: string;
+  /** Whether this web tab is the run's selection. */
+  readonly selected: boolean;
+}
+
+/**
+ * The session's web tabs, as a snapshot.
+ *
+ * A snapshot rather than a delta: the list is small, and a snapshot is
+ * idempotent, so a client that reconnects reconciles against it instead of
+ * drifting away from the runtime's record of what is open.
+ */
+export interface WebuiBrowserWebTabSnapshot {
+  readonly surface: WebuiBrowserSurface;
+  readonly tabs: readonly WebuiBrowserWebTab[];
+}
+
+/**
+ * The page a request to open one produced.
+ *
+ * `open_tab` answers with the identity of the page it created rather than with
+ * the page's picture, and both callers — the Agent's browser tools and the
+ * person's new tab page — get this answer. `accepted` says the request was
+ * allowed to try, and the identity is what the caller binds a tab to: the
+ * title and the URL arrive later, on the runtime's own snapshot.
+ */
+export interface WebuiBrowserWebTabOpen {
+  readonly accepted: true;
+  /** The identity of the page that was created. */
+  readonly target: WebuiBrowserTargetId;
+  readonly result?: unknown;
+}
+
+/**
+ * Who opened a web tab, and therefore what the new page does to the run's selection.
+ *
+ * The two cells are separate (ADR 0022): the run's selection is the runtime's and
+ * the Agent writes it, the tab the person is looking at is the client's and the
+ * person writes it. Opening a page is the one request that can reach across, so it
+ * says which side asked:
+ *
+ * - `agent` — the run's own `open_tab`. The page becomes the run's selection, and a
+ *   second `open_tab` moves it to the second page. The run is writing its own cell.
+ * - `person` — the new tab page's url box. The page is recorded as the session's web
+ *   tab either way, and becomes the run's selection **only when the run has none at
+ *   that moment**. That is the bootstrap, and it is a bootstrap rather than a
+ *   co-write: it is decided from the run's selection at the moment the page is
+ *   opened, and after it the two cells are independent again.
+ */
+export type WebuiBrowserTabOpener = "agent" | "person";
+
+/**
+ * The key a client reconciles a web tab by.
+ *
+ * The runtime's id is the target's id, and a target id names a page in one
+ * browser only — two surfaces can hold the same one. The binding is the whole
+ * identity, so the binding is the key.
+ */
+/**
+ * The answer to a request that closes a web tab.
+ *
+ * The page is gone, so there is nothing to name: the answer says which page was
+ * closed and that the close was accepted.
+ */
+export interface WebuiBrowserWebTabClose {
+  readonly accepted: true;
+  readonly targetId: string;
+}
+
+export function webuiBrowserWebTabKey(target: WebuiBrowserTargetId): string {
+  return `${target.surface}:${target.browserId}:${target.targetId}`;
+}
+
+/**
  * A validated input command aimed at one target.
  *
  * The panel does not forward raw DOM events. It converts them into this
@@ -352,6 +446,17 @@ export interface WebuiBrowserCommandRequest {
   readonly surface: WebuiBrowserSurface;
   readonly command: string;
   readonly params?: Readonly<Record<string, unknown>>;
+  /**
+   * The page the command acts on.
+   *
+   * A web tab's toolbar names the page its tab holds, because a tab is what the
+   * person is looking at: it is neither a run's selection nor the panel's own
+   * cell, so a command that resolved either would drive a page nobody is
+   * watching. A request that names no target keeps the old answer — a run's
+   * selection when it names a run, the panel's own cell otherwise — so the
+   * Agent's tools are unaffected.
+   */
+  readonly target?: WebuiBrowserTargetId;
 }
 
 /**

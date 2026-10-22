@@ -16,6 +16,8 @@ import {
   reduceWorkspacePanelSessionState,
   reduceWorkspacePanelState,
   setWorkspaceSessionProgressPanelOpen,
+  webuiWorkspaceTabContentKey,
+  webuiWorkspaceTabLabel,
   type WorkspacePanelSessionStates,
 } from "../../src/client/features/workspace/projection/workspace-panel-state.js";
 import { focusWebuiFileLine, webuiFileLineTargetId } from "../../src/client/bindings/browser-effects.js";
@@ -46,7 +48,7 @@ describe("right workspace panel navigation", () => {
       workspacePanel: { open: true },
       progressPanelOpen: false,
     });
-    expect(getWorkspacePanelSessionState(states, "session-a").workspacePanel.tabs[0]).toMatchObject({
+    expect(getWorkspacePanelSessionState(states, "session-a").workspacePanel.tabs[0]?.content).toMatchObject({
       kind: "files",
       workspaceDir: "/repo-a",
     });
@@ -124,7 +126,7 @@ describe("right workspace panel navigation", () => {
     });
     expect(state.open).toBe(true);
     const tab = state.tabs.find((candidate) => candidate.id === state.activeTabId);
-    expect(tab).toMatchObject({ kind: "file-preview", path: "/artifacts/plan.md", content: "# Plan\n\nbody" });
+    expect(tab?.content).toMatchObject({ kind: "file-preview", path: "/artifacts/plan.md", content: "# Plan\n\nbody" });
   });
 
   it("keeps one active view while opening, switching and closing tabs", () => {
@@ -137,7 +139,7 @@ describe("right workspace panel navigation", () => {
     const secondFileTab = state.activeTabId;
     expect(state.open).toBe(true);
     expect(state.tabs).toHaveLength(3);
-    expect(state.tabs.find((tab) => tab.id === fileTab)).toMatchObject({ kind: "file-preview", path: "src/index.ts", lineStart: 42 });
+    expect(state.tabs.find((tab) => tab.id === fileTab)?.content).toMatchObject({ kind: "file-preview", path: "src/index.ts", lineStart: 42 });
     state = reduceWorkspacePanelState(state, { type: "select-tab", tabId: filesTab! });
     expect(state.activeTabId).toBe(filesTab);
     state = reduceWorkspacePanelState(state, { type: "select-tab", tabId: secondFileTab! });
@@ -149,6 +151,135 @@ describe("right workspace panel navigation", () => {
     state = reduceWorkspacePanelState(state, { type: "close-tab", tabId: fileTab! });
     expect(state.open).toBe(false);
     expect(state.tabs).toEqual([]);
+  });
+
+  it("gives two web tabs in one session two ids", () => {
+    let state = initialWorkspacePanelState;
+    state = reduceWorkspacePanelState(state, {
+      type: "open-web-tab",
+      target: { surface: "isolated-chromium", browserId: "b", targetId: "t1", generation: 1 },
+      title: "First",
+      url: "https://example.test/one",
+    });
+    state = reduceWorkspacePanelState(state, {
+      type: "open-web-tab",
+      target: { surface: "isolated-chromium", browserId: "b", targetId: "t2", generation: 1 },
+      title: "Second",
+      url: "https://example.test/two",
+    });
+    // The id is the client's and says nothing about what the tab is showing,
+    // so two web tabs in one session are two tabs.
+    expect(state.tabs).toHaveLength(2);
+    expect(new Set(state.tabs.map((tab) => tab.id)).size).toBe(2);
+    expect(state.tabs.map((tab) => webuiWorkspaceTabLabel(tab))).toEqual(["First", "Second"]);
+  });
+
+  it("keeps one tab for a web tab that is already open", () => {
+    let state = initialWorkspacePanelState;
+    const target = { surface: "isolated-chromium", browserId: "b", targetId: "t1", generation: 1 } as const;
+    state = reduceWorkspacePanelState(state, { type: "open-web-tab", target, title: "First", url: "https://example.test/one" });
+    const firstId = state.activeTabId;
+    // The runtime publishes a snapshot, and applying a snapshot twice changes
+    // nothing: the same target is the same tab.
+    state = reduceWorkspacePanelState(state, { type: "open-web-tab", target, title: "First", url: "https://example.test/one" });
+    expect(state.tabs).toHaveLength(1);
+    expect(state.activeTabId).toBe(firstId);
+  });
+
+  it("opens the new tab page when the strip asks for one", () => {
+    let state = initialWorkspacePanelState;
+    state = reduceWorkspacePanelState(state, { type: "open-new-tab" });
+    expect(state.open).toBe(true);
+    expect(state.tabs).toHaveLength(1);
+    expect(state.tabs[0]?.content.kind).toBe("launcher");
+    // An idle launcher carries no request: `request` is what it holds once it
+    // has asked the runtime for a page.
+    expect(state.tabs[0]?.content).toEqual({ kind: "launcher" });
+    expect(state.activeTabId).toBe(state.tabs[0]?.id);
+  });
+
+  it("opens a fresh new tab page every time the strip asks, rather than reusing one", () => {
+    // The launcher is a tab's content, not a singleton the panel keeps. A person
+    // who typed a url into the last one wants another, and the page they opened
+    // must still be there beside it.
+    let state = initialWorkspacePanelState;
+    state = reduceWorkspacePanelState(state, { type: "open-new-tab" });
+    state = reduceWorkspacePanelState(state, { type: "open-new-tab" });
+    state = reduceWorkspacePanelState(state, { type: "open-new-tab" });
+    expect(state.tabs.filter((tab) => tab.content.kind === "launcher")).toHaveLength(3);
+    expect(new Set(state.tabs.map((tab) => tab.id)).size).toBe(3);
+  });
+
+  it("leaves an idle launcher alone when a published page arrives for another tab", () => {
+    // A page nothing asked for opens a tab of its own — the Agent's page — and
+    // an untouched launcher is not a slot waiting for it.
+    let state = initialWorkspacePanelState;
+    state = reduceWorkspacePanelState(state, { type: "open-new-tab" });
+    const target = { surface: "isolated-chromium", browserId: "b", targetId: "t1", generation: 1 } as const;
+    state = reduceWorkspacePanelState(state, { type: "open-web-tab", target, title: "Example", url: "https://example.test/" });
+    expect(state.tabs.filter((tab) => tab.content.kind === "launcher")).toHaveLength(1);
+    expect(state.tabs.filter((tab) => tab.content.kind === "web")).toHaveLength(1);
+  });
+
+  it("updates a web tab's content without moving the person off the tab they are on", () => {
+    let state = initialWorkspacePanelState;
+    const target = { surface: "isolated-chromium", browserId: "b", targetId: "t1", generation: 1 } as const;
+    state = reduceWorkspacePanelState(state, { type: "open-web-tab", target, title: "First", url: "https://example.test/one" });
+    const webTabId = state.activeTabId;
+    // A tool tab the person is looking at.
+    state = reduceWorkspacePanelState(state, { type: "open-tab", kind: "files", sessionId: "s1", workspaceDir: "/repo" });
+    const filesTabId = state.activeTabId;
+
+    // The page behind the web tab navigated: the title moved and the page got
+    // a new generation. The web tab's content updates — and the person keeps
+    // looking at the tab they were looking at.
+    state = reduceWorkspacePanelState(state, {
+      type: "open-web-tab",
+      target: { ...target, generation: 2 },
+      title: "Second",
+      url: "https://example.test/two",
+    });
+
+    expect(state.activeTabId).toBe(filesTabId);
+    const web = state.tabs.find((tab) => tab.id === webTabId);
+    expect(web?.content).toMatchObject({ kind: "web", title: "Second", url: "https://example.test/two" });
+    expect(web?.content.kind === "web" && web.content.target.generation).toBe(2);
+  });
+
+  it("labels a tab by its content, and a changed content changes the label", () => {
+    let state = initialWorkspacePanelState;
+    state = reduceWorkspacePanelState(state, { type: "open-file", sessionId: "s1", workspaceDir: "/repo", path: "src/index.ts" });
+    expect(webuiWorkspaceTabLabel(state.tabs[0]!)).toBe("index.ts");
+    // The content is mutable under a stable id, and the label follows it.
+    state = reduceWorkspacePanelState(state, { type: "open-file", sessionId: "s1", workspaceDir: "/repo", path: "README.md" });
+    expect(state.tabs).toHaveLength(2);
+    expect(webuiWorkspaceTabLabel(state.tabs[1]!)).toBe("README.md");
+  });
+
+  it("keys what a tab shows by its content, not by its slot", () => {
+    const file = webuiWorkspaceTabContentKey({
+      kind: "file-preview",
+      sessionId: "s1",
+      workspaceDir: "/repo",
+      path: "src/index.ts",
+    });
+    const sameFile = webuiWorkspaceTabContentKey({
+      kind: "file-preview",
+      sessionId: "s1",
+      workspaceDir: "/repo",
+      path: "src/index.ts",
+    });
+    const otherFile = webuiWorkspaceTabContentKey({
+      kind: "file-preview",
+      sessionId: "s1",
+      workspaceDir: "/repo",
+      path: "README.md",
+    });
+    // The same file is the same thing, and a different file is a different
+    // thing — which is what the cache needs, because a tab's id is stable and
+    // its content is not.
+    expect(file).toBe(sameFile);
+    expect(file).not.toBe(otherFile);
   });
 
   it("keeps the add-menu file view and opened files in the same tab strip", () => {
@@ -166,7 +297,7 @@ describe("right workspace panel navigation", () => {
 
   it("renders source files with syntax highlighting and preserves source text safely", () => {
     const tab = { id: "file:src/index.ts", kind: "file-preview" as const, sessionId: "s1", workspaceDir: "/repo", path: "src/index.ts" };
-    const markup = renderToStaticMarkup(createElement(WebuiFilePreview, { tab, codeMode: true, result: { loading: false, content: { type: "text", content: "const value = '<script>';\nreturn value;" } } }));
+    const markup = renderToStaticMarkup(createElement(WebuiFilePreview, { tabId: tab.id, content: tab, codeMode: true, result: { loading: false, content: { type: "text", content: "const value = '<script>';\nreturn value;" } } }));
     expect(webuiFileLanguage(tab.path)).toBe("typescript");
     expect(markup).toContain("hljs-keyword");
     expect(markup).toContain("hljs-string");
@@ -176,8 +307,8 @@ describe("right workspace panel navigation", () => {
 
   it("renders Markdown files as a document preview and keeps a source toggle", () => {
     const tab = { id: "file:README.md", kind: "file-preview" as const, sessionId: "s1", workspaceDir: "/repo", path: "README.md" };
-    const preview = renderToStaticMarkup(createElement(WebuiFilePreview, { tab, codeMode: false, result: { loading: false, content: { type: "text", content: "# Project guide" } } }));
-    const source = renderToStaticMarkup(createElement(WebuiFilePreview, { tab, codeMode: true, result: { loading: false, content: { type: "text", content: "# Project guide" } } }));
+    const preview = renderToStaticMarkup(createElement(WebuiFilePreview, { tabId: tab.id, content: tab, codeMode: false, result: { loading: false, content: { type: "text", content: "# Project guide" } } }));
+    const source = renderToStaticMarkup(createElement(WebuiFilePreview, { tabId: tab.id, content: tab, codeMode: true, result: { loading: false, content: { type: "text", content: "# Project guide" } } }));
     expect(preview).toContain('data-webui-markdown="true"');
     expect(source).toContain('class="webui-file-code"');
   });
@@ -192,12 +323,14 @@ describe("right workspace panel navigation", () => {
     expect(state).toBe(before);
   });
 
-  it("routes workspace and turn review through the same CHANGES tab identity", () => {
+  it("keeps the workspace review and the turn review in two tabs", () => {
     let state = initialWorkspacePanelState;
     state = reduceWorkspacePanelState(state, { type: "open-workspace-review", sessionId: "s1", workspaceDir: "/repo" });
     state = reduceWorkspacePanelState(state, { type: "open-turn-review", sessionId: "s1", workspaceDir: "/repo", messageId: "group-1", assistantMessageId: "assistant-9", turnId: "turn-3", changeSetId: "change-7", files: [{ file: "a.ts", additions: 1, deletions: 0, diff: "+a" }] });
-    expect(state.tabs.map((tab) => tab.kind)).toEqual(["review"]);
-    expect(state.tabs[0]).toMatchObject({ source: "turn", messageId: "group-1", assistantMessageId: "assistant-9", turnId: "turn-3", changeSetId: "change-7" });
+    // The two used to derive the same id, so opening one replaced the other.
+    expect(state.tabs.map((tab) => tab.content.kind)).toEqual(["review", "review"]);
+    expect(state.tabs.map((tab) => (tab.content.kind === "review" ? tab.content.source : undefined))).toEqual(["workspace", "turn"]);
+    expect(state.tabs[1]?.content).toMatchObject({ source: "turn", messageId: "group-1", assistantMessageId: "assistant-9", turnId: "turn-3", changeSetId: "change-7" });
   });
 
   it("parses only safe workspace file references and preserves line ranges", () => {

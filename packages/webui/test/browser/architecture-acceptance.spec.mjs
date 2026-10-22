@@ -10,8 +10,9 @@ const sessionModels = (page) => page.evaluate(() => window.__fixture.requests.fi
 
 async function openTerminal(page) {
   await page.getByTestId("workspace-panel-controls").getByRole("button", { name: "工作区文件侧栏" }).click();
-  await page.getByRole("button", { name: "添加标签" }).click();
-  await page.getByRole("menuitem", { name: "终端", exact: true }).click();
+  await page.getByRole("button", { name: "新建标签页" }).click();
+  await page.getByTestId("workspace-add-tab").click();
+  await page.getByTestId("workspace-launcher-tile-terminal").click();
 }
 
 for (const state of ["absent", "not-ready"]) {

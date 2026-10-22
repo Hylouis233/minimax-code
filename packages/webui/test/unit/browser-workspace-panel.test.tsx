@@ -1,28 +1,31 @@
-// The browser tab in the workspace panel's registry.
+// The web tab kind in the workspace panel's registry.
 //
-// The Browser panel is implemented and gated, and the panel that should mount it
-// (`features/workspace/ui/WorkspacePanels.tsx`) cannot: a browser tab's `addMenu`
-// entry carries a `WorkspacePanelCommand`, and the published command's `open-tab`
-// names only `files | canvas | terminal`
-// (`features/workspace/contracts/panel-command.ts:43`). Nothing can open the tab
-// until that union names `browser`, so what is pinned here is the half of the work
-// that is real — the kind is declared, labelled and placed in the menu order — plus
-// the two properties that must survive that change rather than be rewritten by it.
+// The browser tool tab is gone: the panel's tabs are web tabs, and a web tab
+// is opened by typing a URL in the new tab page or by the Agent — not by a tile
+// on it. What is pinned here is the kind, its label, the fact that it has no
+// tile of its own, and the property that must survive that change rather than be
+// rewritten by it: the launcher's tiles are the registry's rows that have one,
+// so the tiles never become a second list.
 //
-// The second group is the reason the panel is not mounted yet, stated as a test
-// because it is the rule that would otherwise be rediscovered by running the
-// dependency gate: the workspace panel is presentation, so it may read the browser
-// business's contracts and its `.public` components, and nothing else. The browser
-// state machine lives in that business's private projection, so the panel cannot
-// drive it from here — the owner has to be published by the business that owns it.
+// The second group is stated as a test because it is the rule that would
+// otherwise be rediscovered by running the dependency gate: the workspace
+// panel is presentation, so it may read the browser business's contracts and
+// its `.public` components, and nothing else. The browser state machine lives
+// in that business's private projection, so the panel cannot drive it from
+// here — the owner has to be published by the business that owns it.
+//
+// The third group is the new equilibrium: the panel mounts the published host
+// for an active web tab, using the browser business's `BrowserPanelHost` to
+// show that tab's page, and the host is what keys the image stream on the
+// tab's target. The panel itself never reaches into the host's reducer.
 
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
 import {
-  WEBUI_WORKSPACE_ADD_MENU_ORDER,
+  WEBUI_WORKSPACE_LAUNCHER_TILE_ORDER,
   WEBUI_WORKSPACE_TAB_KINDS,
-  webuiWorkspaceAddMenu,
+  webuiWorkspaceLauncherTiles,
   webuiWorkspaceTabLabel,
   type WorkspacePanelTab,
 } from "../../src/client/features/workspace/projection/workspace-panel-state.js";
@@ -32,35 +35,57 @@ const PANEL_SOURCE = new URL(
   import.meta.url,
 );
 
-describe("the browser tab kind", () => {
-  it("is a declared kind with its own word", () => {
-    expect(WEBUI_WORKSPACE_TAB_KINDS.browser.label).toBe("浏览器");
-    // Built the way `open-tab` builds one: no path, no workspace directory, and
-    // the optional instance fields the add menu sends with every such command.
-    const tab: WorkspacePanelTab = { id: "browser:::", kind: "browser" };
-    expect(webuiWorkspaceTabLabel(tab)).toBe("浏览器");
+describe("the web tab kind", () => {
+  it("is a declared kind, and a web tab is titled by its page", () => {
+    expect(WEBUI_WORKSPACE_TAB_KINDS.web).toBeDefined();
+    const tab: WorkspacePanelTab = {
+      id: "tab-1",
+      content: {
+        kind: "web",
+        target: {
+          surface: "isolated-chromium",
+          browserId: "browser-1",
+          targetId: "tab-9",
+          generation: 1,
+        },
+        title: "Example",
+        url: "https://example.test/",
+      },
+    };
+    expect(webuiWorkspaceTabLabel(tab)).toBe("Example");
   });
 
-  it("leads the file views in the add-menu order", () => {
-    const order = WEBUI_WORKSPACE_ADD_MENU_ORDER;
-    expect(order.indexOf("browser")).toBeGreaterThan(order.indexOf("terminal"));
-    expect(order.indexOf("browser")).toBeLessThan(order.indexOf("files"));
-    // Every kind is named once, and every name is a declared kind.
-    expect(new Set(order).size).toBe(order.length);
-    for (const kind of order) expect(WEBUI_WORKSPACE_TAB_KINDS[kind]).toBeDefined();
+  it("has no tile of its own", () => {
+    // A web tab is opened by typing a URL or by the Agent, so the launcher
+    // offers no tile for it — and the browser tool tab it replaced is gone.
+    expect(WEBUI_WORKSPACE_TAB_KINDS.web.tile).toBeNull();
+    expect(WEBUI_WORKSPACE_LAUNCHER_TILE_ORDER).not.toContain("web");
+    expect(WEBUI_WORKSPACE_TAB_KINDS).not.toHaveProperty("browser");
+    expect(webuiWorkspaceLauncherTiles().some((tile) => tile.kind === "web")).toBe(false);
   });
 
-  it("reaches the menu through the registry rather than a second list", () => {
-    // Whatever a row's `addMenu` says, the menu is the rows that have one, in the
-    // order list — so widening the command's `open-tab` union adds the entry
-    // without this file or the component naming it.
-    const expected = WEBUI_WORKSPACE_ADD_MENU_ORDER.filter(
-      (kind) => WEBUI_WORKSPACE_TAB_KINDS[kind].addMenu !== null,
+  it("reaches the launcher's tiles through the registry rather than a second list", () => {
+    // Whatever a row's `tile` says, the launcher's tiles are the rows that have
+    // one, in the order list — so widening the command's `open-tab` union adds a
+    // tile without this file or the component naming it.
+    const expected = WEBUI_WORKSPACE_LAUNCHER_TILE_ORDER.filter(
+      (kind) => WEBUI_WORKSPACE_TAB_KINDS[kind].tile !== null,
     );
-    expect(webuiWorkspaceAddMenu().map((entry) => entry.kind)).toEqual(expected);
-    for (const entry of webuiWorkspaceAddMenu()) {
-      expect(entry.label).toBe(WEBUI_WORKSPACE_TAB_KINDS[entry.kind].label);
+    expect(webuiWorkspaceLauncherTiles().map((tile) => tile.kind)).toEqual(expected);
+    for (const tile of webuiWorkspaceLauncherTiles()) {
+      expect(tile.label).toBe(WEBUI_WORKSPACE_TAB_KINDS[tile.kind].label);
     }
+  });
+
+  it("is exactly the four tool views, in the ADR's order", () => {
+    // The new tab page is a launcher over the tool views, and the browser tool
+    // view is not one of them: the tiles are 变更, 终端, 画布 and 查看文件.
+    expect(webuiWorkspaceLauncherTiles().map((tile) => tile.kind)).toEqual([
+      "review",
+      "terminal",
+      "canvas",
+      "files",
+    ]);
   });
 });
 
@@ -74,5 +99,16 @@ describe("the workspace panel reaches the browser business only through its publ
     expect(source).not.toContain("browser/projection/");
     expect(source).not.toContain("browser/application/");
     expect(source).not.toContain("application/port-slices");
+  });
+
+  it("mounts the published host, never a private component, for an active web tab", () => {
+    // The browser tool tab is gone, but a web tab is still rendered by the
+    // browser business — it just goes through the published host now. The host
+    // owns its own state; the panel only knows the target.
+    const source = readFileSync(PANEL_SOURCE, "utf8");
+    expect(source).toContain("BrowserPanelHost");
+    // The panel never reaches for one of the business's private `.tsx` files.
+    expect(source).not.toContain("browser/projection/browser-state");
+    expect(source).not.toContain("browser/application/browser-commands");
   });
 });

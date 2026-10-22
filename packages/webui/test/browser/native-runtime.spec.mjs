@@ -53,8 +53,9 @@ async function rpc(page, operation, body = operation === "listTerminals" ? {} : 
 }
 async function openTerminal(page) {
   await page.getByTestId("workspace-panel-controls").getByRole("button", { name: "工作区文件侧栏" }).click();
-  await page.getByRole("button", { name: "添加标签" }).click();
-  await page.getByRole("menuitem", { name: "终端" }).click();
+  await page.getByRole("button", { name: "新建标签页" }).click();
+  await page.getByTestId("workspace-add-tab").click();
+  await page.getByTestId("workspace-launcher-tile-terminal").click();
 }
 
 test("V04/V06: native PTYs survive another page, reload and a full five-slot roster", async ({ page, context }) => {

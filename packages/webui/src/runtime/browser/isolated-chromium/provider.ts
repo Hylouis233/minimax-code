@@ -10,7 +10,7 @@
 // client in the dependency set, and the commands Browser Use needs are a
 // small, well-understood set.
 //
-// Three behaviours here are not obvious and are the reason this file exists
+// Four behaviours here are not obvious and are the reason this file exists
 // rather than a call into an existing provider:
 //
 //   * **The attachment race.** A capture issued immediately after a navigation
@@ -19,9 +19,17 @@
 //     capture issued a moment later succeeds. The provider therefore waits for
 //     the page to be attached rather than assuming a command that failed once
 //     will keep failing.
-//   * **The generation follows the main frame.** A navigation replaces the page
-//     behind the tab, so the target's generation is raised then — that is what
-//     makes an element reference recorded before the navigation stale.
+//   * **One page per web tab.** A web tab is a page of this browser, and the
+//     provider holds one entry per tab: the CDP session it is addressed with,
+//     the generation of the page behind it, and the frame handler that asked
+//     for its picture. A command, an input and a frame all name a **target**,
+//     and the provider resolves the target to the page that carries it.
+//   * **The generation follows the main frame, and it follows it per page.** A
+//     navigation replaces the page behind one tab, so that tab's generation is
+//     raised then — that is what makes an element reference recorded before the
+//     navigation stale. The other tabs' pages are untouched, so their
+//     generations do not move: a generation is a fact about a page, not about
+//     the browser.
 //   * **The image stream is a screencast.** `Page.startScreencast` pushes
 //     frames as the page changes, which is what the panel needs; polling
 //     `Page.captureScreenshot` would be a screenshot, not a live stream.
@@ -129,8 +137,43 @@ export interface WebuiBrowserSurfaceProvider {
     command: string,
     params: Record<string, unknown>,
   ): Promise<unknown>;
+  /**
+   * Opens a page and returns its identity.
+   *
+   * `open_tab` is not aimed at a page — it creates one — so it needs no target
+   * to be sent to. That is what makes it the bootstrap: a run with no
+   * selection has no page to aim at, and the page it is about to open does not
+   * exist yet.
+   *
+   * A surface that cannot open a page has no such method, and the service
+   * refuses with `browser_capability_denied`.
+   */
+  openTab?(params: Record<string, unknown>): Promise<WebuiBrowserTargetId>;
   /** Releases everything the provider holds. */
   close(): Promise<void>;
+}
+
+/**
+ * One page the provider drives.
+ *
+ * A web tab is a page of this browser, so the session and the generation
+ * belong to the page rather than to the browser. The generation is raised when
+ * the page behind the tab is replaced, and it moves on its own: one tab
+ * navigating leaves every other tab's generation where it was.
+ */
+interface WebuiIsolatedChromiumPage {
+  /** The target this page is addressed by. */
+  readonly targetId: string;
+  /** The CDP session the connection addresses this page with. */
+  readonly sessionId: string;
+  /** The generation of the page behind the tab. */
+  generation: number;
+  /** The sequence number of the last frame this page delivered. */
+  frameSequence: number;
+  /** Whether a subscriber is currently asking for this page's pictures. */
+  streaming: boolean;
+  /** The subscriber that asked for this page's pictures. */
+  frameHandler?: (frame: WebuiBrowserImageFrame) => void;
 }
 
 /**
@@ -147,12 +190,22 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
   readonly #userDataDir: string;
   #child: ChildProcess | undefined;
   #connection: WebuiBrowserCdpConnection | undefined;
-  /** The CDP session of the page the panel is showing. */
-  #pageSessionId: string | undefined;
-  #pageTargetId: string | undefined;
-  #generation = 0;
-  #frameSequence = 0;
-  #streaming = false;
+  /**
+   * The pages this provider drives, by target id.
+   *
+   * One entry per web tab. A target that is not in here is a page this
+   * provider has never attached to, so it cannot be driven.
+   */
+  readonly #pages = new Map<string, WebuiIsolatedChromiumPage>();
+  /**
+   * The same pages, by the CDP session that addresses them.
+   *
+   * A CDP event carries the session it belongs to in its envelope, and that
+   * session is how an event is matched to the page it is about.
+   */
+  readonly #pagesBySession = new Map<string, WebuiIsolatedChromiumPage>();
+  /** The page the browser was launched with. */
+  #launchTargetId: string | undefined;
   #unsubscribe: (() => void) | undefined;
 
   private constructor(options: WebuiIsolatedChromiumProviderOptions) {
@@ -218,15 +271,99 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
     const created = await connection.send<{ targetId: string }>("Target.createTarget", {
       url: "about:blank",
     });
+    this.#launchTargetId = created.targetId;
+    await this.#attachPage(created.targetId);
+  }
+
+  /**
+   * Attaches to a page and registers it in the per-target map.
+   *
+   * Every page the provider drives is attached to, and `Page.enable` is sent to
+   * every one of them. A page that was never enabled never receives the
+   * navigation events that raise its generation, and a generation that never
+   * moves is a fence that never fires.
+   */
+  async #attachPage(targetId: string): Promise<WebuiIsolatedChromiumPage> {
+    const connection = this.#connection;
+    if (!connection) {
+      throw browserOperationError(
+        "browser_provider_unavailable",
+        "The isolated Chromium is not running.",
+        true,
+      );
+    }
     const attached = await connection.send<{ sessionId: string }>("Target.attachToTarget", {
-      targetId: created.targetId,
+      targetId,
       flatten: true,
     });
-    this.#pageTargetId = created.targetId;
-    this.#pageSessionId = attached.sessionId;
-    this.#generation = 1;
+    const page: WebuiIsolatedChromiumPage = {
+      targetId,
+      sessionId: attached.sessionId,
+      generation: 1,
+      frameSequence: 0,
+      streaming: false,
+    };
+    this.#pages.set(targetId, page);
+    this.#pagesBySession.set(page.sessionId, page);
+    await this.#withAttachmentRetry(() =>
+      connection.send("Page.enable", {}, page.sessionId),
+    );
+    return page;
+  }
 
-    await connection.send("Page.enable", {}, this.#pageSessionId);
+  /** The page a target names, when this provider drives it. */
+  #pageOf(targetId: string): WebuiIsolatedChromiumPage | undefined {
+    return this.#pages.get(targetId);
+  }
+
+  /** The page a CDP session addresses. */
+  #pageBySession(sessionId: string | undefined): WebuiIsolatedChromiumPage | undefined {
+    if (!sessionId) return undefined;
+    return this.#pagesBySession.get(sessionId);
+  }
+
+  /**
+   * Forgets a page the browser has destroyed.
+   *
+   * A closed tab does not leave a page behind in the provider's map: the page
+   * is gone, and a target that still resolved would let a command be aimed at
+   * a page that no longer exists.
+   */
+  #forgetPage(targetId: string): void {
+    const page = this.#pages.get(targetId);
+    if (!page) return;
+    this.#pages.delete(targetId);
+    this.#pagesBySession.delete(page.sessionId);
+    if (this.#launchTargetId === targetId) this.#launchTargetId = undefined;
+  }
+
+  /**
+   * Opens a page, attaches to it and registers it.
+   *
+   * The new page is a web tab this provider drives: it is commanded, streamed
+   * and input into like any other page, and it carries its own generation.
+   * The answer names the page that was created — the surface, the browser, the
+   * target and the generation the provider's own accounting gives it — so a
+   * caller can address the page from it alone.
+   */
+  async openTab(params: Record<string, unknown> = {}): Promise<WebuiBrowserTargetId> {
+    const connection = this.#connection;
+    if (!connection) {
+      throw browserOperationError(
+        "browser_provider_unavailable",
+        "The isolated Chromium is not running.",
+        true,
+      );
+    }
+    const url = typeof params.url === "string" ? params.url : "about:blank";
+    const created = await connection.send<{ targetId: string }>("Target.createTarget", { url });
+    const page = await this.#attachPage(created.targetId);
+    return {
+      surface: this.surface,
+      browserId: this.browserId,
+      targetId: page.targetId,
+      generation: page.generation,
+    };
   }
 
   async listTargets(): Promise<readonly WebuiBrowserTargetState[]> {
@@ -243,17 +380,22 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
     const states: WebuiBrowserTargetState[] = [];
     for (const info of targets.targetInfos ?? []) {
       if (info.type !== "page") continue;
+      // The generation is the page's own. A page this provider drives reports
+      // the generation it has raised; a page it never attached to has no
+      // generation here — and cannot be driven either, so the number is only
+      // ever read as the first one.
+      const page = this.#pageOf(info.targetId);
       states.push({
         id: {
           surface: this.surface,
           browserId: this.browserId,
           targetId: info.targetId,
-          generation: info.targetId === this.#pageTargetId ? this.#generation : 1,
+          generation: page?.generation ?? 1,
         },
         title: info.title,
         url: info.url,
         status: "open",
-        selected: info.targetId === this.#pageTargetId,
+        selected: info.targetId === this.#launchTargetId,
       });
     }
     return states;
@@ -263,41 +405,48 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
     targetId: string,
     onFrame: (frame: WebuiBrowserImageFrame) => void,
   ): Promise<void> {
-    if (targetId !== this.#pageTargetId) {
+    const page = this.#pageOf(targetId);
+    if (!page) {
       throw browserOperationError(
         "browser_target_unknown",
         "The isolated Chromium has no such target.",
       );
     }
     const connection = this.#connection;
-    const sessionId = this.#pageSessionId;
-    if (!connection || !sessionId) {
+    if (!connection) {
       throw browserOperationError(
         "browser_provider_unavailable",
         "The isolated Chromium is not running.",
         true,
       );
     }
-    this.#frameHandler = onFrame;
-    this.#streaming = true;
+    page.frameHandler = onFrame;
+    page.streaming = true;
+    // Chrome renders the foregrounded tab and throttles the others, so a
+    // background page's screencast produces no new frames. The page that is
+    // being streamed is therefore the page that is brought to the front — the
+    // same thing a browser does when a person switches to a tab.
+    await this.#withAttachmentRetry(() =>
+      connection.send("Page.bringToFront", {}, page.sessionId),
+    );
     await this.#withAttachmentRetry(() =>
       connection.send(
         "Page.startScreencast",
         { format: "jpeg", quality: 70, everyNthFrame: 1 },
-        sessionId,
+        page.sessionId,
       ),
     );
   }
 
   async stopImageStream(targetId: string): Promise<void> {
-    if (targetId !== this.#pageTargetId) return;
-    this.#streaming = false;
-    this.#frameHandler = undefined;
+    const page = this.#pageOf(targetId);
+    if (!page) return;
+    page.streaming = false;
+    page.frameHandler = undefined;
     const connection = this.#connection;
-    const sessionId = this.#pageSessionId;
-    if (!connection || !sessionId) return;
+    if (!connection) return;
     try {
-      await connection.send("Page.stopScreencast", {}, sessionId);
+      await connection.send("Page.stopScreencast", {}, page.sessionId);
     } catch {
       // A browser that has already gone cannot be asked to stop; the resources
       // it held are gone with it.
@@ -306,26 +455,37 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
 
   async sendInput(command: WebuiBrowserInputCommand): Promise<void> {
     const connection = this.#connection;
-    const sessionId = this.#pageSessionId;
-    if (!connection || !sessionId) {
+    if (!connection) {
       throw browserOperationError(
         "browser_provider_unavailable",
         "The isolated Chromium is not running.",
         true,
       );
     }
-    if (command.target.browserId !== this.browserId || command.target.targetId !== this.#pageTargetId) {
+    if (command.target.browserId !== this.browserId) {
       throw browserOperationError(
         "browser_target_unknown",
         "The isolated Chromium has no such target.",
       );
     }
+    // The page is resolved by the target, so an input reaches the tab it names
+    // and no other.
+    const page = this.#pageOf(command.target.targetId);
+    if (!page) {
+      throw browserOperationError(
+        "browser_target_unknown",
+        "The isolated Chromium has no such target.",
+      );
+    }
+    const sessionId = page.sessionId;
     // The provider is the party that knows when the page behind the tab was
     // replaced, so it is the party that refuses an input recorded against the
     // previous page. The registry refuses the same input too, but the registry
     // learns about the replacement from this provider — so the check that
-    // actually protects the page has to live here as well.
-    if (command.target.generation !== this.#generation) {
+    // actually protects the page has to live here as well. The generation is
+    // the page's own, so the fence holds on every page and not only on the
+    // one the browser was launched with.
+    if (command.target.generation !== page.generation) {
       throw browserOperationError(
         "browser_target_stale",
         "The browser page was replaced; the input was not delivered.",
@@ -407,24 +567,25 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
     command: string,
     params: Record<string, unknown>,
   ): Promise<unknown> {
-    // The isolated Chromium drives one page, so the target is checked rather
-    // than used: a command aimed at another tab is refused rather than sent
-    // to the wrong page.
-    if (target.targetId !== this.#pageTargetId) {
+    // The command is addressed to a target, and the target is resolved to the
+    // page that carries it. A target this provider does not drive is refused
+    // rather than sent to the wrong page.
+    const page = this.#pageOf(target.targetId);
+    if (!page) {
       throw browserOperationError(
         "browser_target_unknown",
         "The isolated Chromium has no such target.",
       );
     }
     const connection = this.#connection;
-    const sessionId = this.#pageSessionId;
-    if (!connection || !sessionId) {
+    if (!connection) {
       throw browserOperationError(
         "browser_provider_unavailable",
         "The isolated Chromium is not running.",
         true,
       );
     }
+    const sessionId = page.sessionId;
     switch (command) {
       case "navigate": {
         const url = params.url;
@@ -471,8 +632,10 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
         return await connection.send("DOM.getDocument", { depth: -1 }, sessionId);
       }
       case "open_tab": {
-        const url = typeof params.url === "string" ? params.url : "about:blank";
-        return await connection.send("Target.createTarget", { url });
+        // The answer names the page that was created: the surface, the
+        // browser, the target and the generation the provider's own accounting
+        // gives it. A caller can address the page from this answer alone.
+        return await this.openTab(params);
       }
       default:
         break;
@@ -495,18 +658,27 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
   }
 
   async close(): Promise<void> {
-    this.#streaming = false;
-    this.#frameHandler = undefined;
+    this.#pages.clear();
+    this.#pagesBySession.clear();
+    this.#launchTargetId = undefined;
     this.#unsubscribe?.();
     this.#unsubscribe = undefined;
     this.#connection?.close();
     this.#connection = undefined;
     this.#child?.kill("SIGKILL");
     this.#child = undefined;
-    await rm(this.#userDataDir, { recursive: true, force: true }).catch(() => undefined);
+    // The browser was killed a moment ago, and it may still be writing its
+    // profile. A removal that races with those writes fails with ENOTEMPTY, so
+    // it is retried rather than reported as a failure: the profile is a
+    // directory of files the browser owned, and the browser is gone.
+    await rm(this.#userDataDir, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 100,
+    }).catch(() => undefined);
   }
 
-  #frameHandler: ((frame: WebuiBrowserImageFrame) => void) | undefined;
   readonly #targetChangeListeners = new Set<
     (change: WebuiBrowserTargetChange) => void
   >();
@@ -527,36 +699,57 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
    * Only two matter here: the main frame navigating, which replaces the page
    * behind the target and raises its generation, and a screencast frame, which
    * is the panel's live image.
+   *
+   * Both are matched to their page by the **envelope's** session id — the
+   * flattened target session the connection puts on the event. The
+   * `event.params.sessionId` a screencast frame carries is the numeric
+   * acknowledgement id, and it names no page: two pages' frames carry the same
+   * one.
    */
   #onEvent(event: WebuiBrowserCdpEvent): void {
-    if (event.method === "Page.frameNavigated" && event.sessionId === this.#pageSessionId) {
+    // A page that is gone is not a page the provider drives any more. The
+    // event carries the target's id rather than a session — it is a
+    // browser-level event — so the page is found by its id.
+    if (
+      event.method === "Target.detachedFromTarget" ||
+      event.method === "Target.targetDestroyed"
+    ) {
+      const destroyed = event.params.targetId;
+      if (typeof destroyed === "string") this.#forgetPage(destroyed);
+      return;
+    }
+    const page = this.#pageBySession(event.sessionId);
+    if (!page) return;
+    if (event.method === "Page.frameNavigated") {
       const frame = event.params.frame as { parentId?: string } | undefined;
       // Only the main frame's navigation replaces the page. A subframe's
       // navigation leaves the page — and every reference recorded against it —
       // intact.
       if (frame && frame.parentId === undefined) {
-        this.#generation += 1;
-        this.#announceTargetChange();
+        // The generation is the page's own, so one page navigating does not
+        // move any other page's generation.
+        page.generation += 1;
+        this.#announceTargetChange(page);
       }
       return;
     }
-    if (event.method === "Page.screencastFrame" && this.#streaming) {
+    if (event.method === "Page.screencastFrame" && page.streaming) {
       const data = event.params.data;
       const metadata = event.params.metadata as { deviceWidth?: number } | undefined;
       if (typeof data !== "string") return;
       const sessionId = event.params.sessionId;
       void this.#ackScreencastFrame(sessionId);
-      this.#frameSequence += 1;
-      this.#frameHandler?.({
+      page.frameSequence += 1;
+      page.frameHandler?.({
         target: {
           surface: this.surface,
           browserId: this.browserId,
-          targetId: this.#pageTargetId ?? "",
-          generation: this.#generation,
+          targetId: page.targetId,
+          generation: page.generation,
         },
         data,
         format: "jpeg",
-        sequence: this.#frameSequence,
+        sequence: page.frameSequence,
       });
       void metadata;
       return;
@@ -568,14 +761,14 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
    *
    * The target registry that lives above this provider cannot know about a
    * navigation on its own, so without this announcement an input recorded
-   * against the previous page would still look current to it.
+   * against the previous page would still look current to it. The
+   * announcement names the target, because the replacement happened behind
+   * that tab and no other.
    */
-  #announceTargetChange(): void {
-    const targetId = this.#pageTargetId;
-    if (!targetId) return;
+  #announceTargetChange(page: WebuiIsolatedChromiumPage): void {
     for (const listener of this.#targetChangeListeners) {
       try {
-        listener({ targetId, generation: this.#generation });
+        listener({ targetId: page.targetId, generation: page.generation });
       } catch {
         // A listener that throws must not take the browser down with it.
       }

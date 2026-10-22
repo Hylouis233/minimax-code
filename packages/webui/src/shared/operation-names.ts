@@ -55,6 +55,33 @@ export const SELECT_BROWSER_TARGET_OPERATION_NAME = "selectBrowserTarget" as con
 export const SEND_BROWSER_INPUT_OPERATION_NAME = "sendBrowserInput" as const;
 export const SEND_BROWSER_COMMAND_OPERATION_NAME = "sendBrowserCommand" as const;
 export const WATCH_BROWSER_FRAMES_OPERATION_NAME = "watchBrowserFrames" as const;
+/**
+ * The stream that publishes the session's web tabs.
+ *
+ * A snapshot rather than a delta, on a stream of its own: the strip renders
+ * what the runtime publishes, and the runtime's record of what is open is the
+ * authority — a client that kept its own copy would be a second authority.
+ */
+export const WATCH_BROWSER_WEB_TABS_OPERATION_NAME = "watchBrowserWebTabs" as const;
+/**
+ * The unary call that opens a page, the person's way of asking for one.
+ *
+ * The Agent reaches `open_tab` through its browser tools rather than through
+ * this wire, so this operation exists for the new tab page's URL box: a person
+ * who types a url asks the runtime for the page exactly as the Agent does, and
+ * the answer names the page that was created. The `runId` is optional because
+ * the panel is not acting for a run: absent means the panel's own cell.
+ */
+export const OPEN_BROWSER_WEB_TAB_OPERATION_NAME = "openBrowserWebTab" as const;
+/**
+ * The operation that closes a web tab.
+ *
+ * A tab the person closes does not leave a page behind in the browser, and the
+ * runtime's page set follows the strip. The request names the **target** the
+ * tab is bound to, so the runtime closes the page that tab holds — the client
+ * does not have to know which session opened it.
+ */
+export const CLOSE_BROWSER_WEB_TAB_OPERATION_NAME = "closeBrowserWebTab" as const;
 export const LIST_BROWSER_CAPABILITIES_OPERATION_NAME = "listBrowserCapabilities" as const;
 /**
  * Reads one browser surface's installation key so the person can copy it.
@@ -238,6 +265,9 @@ import type {
   WebuiBrowserTargetId,
   WebuiBrowserTargetList,
   WebuiBrowserTargetState,
+  WebuiBrowserWebTabOpen,
+  WebuiBrowserWebTabClose,
+  WebuiBrowserWebTabSnapshot,
 } from "./contracts/browser.js";
 import { type WebuiBridgeBrowserSurface } from "./contracts/browser.js";
 import type { WebuiUsageQuotaResult } from "./contracts/usage-quota.js";
@@ -456,8 +486,28 @@ export interface OperationSpec {
     response: { readonly accepted: true; readonly result?: unknown };
   };
   watchBrowserFrames: {
-    request: { readonly surface: WebuiBrowserSurface; readonly runId?: string };
+    request: {
+      readonly surface: WebuiBrowserSurface;
+      readonly target: WebuiBrowserTargetId;
+    };
     response: WebuiBrowserFrameStreamEnvelope;
+  };
+  watchBrowserWebTabs: {
+    request: { readonly surface: WebuiBrowserSurface; readonly runId?: string };
+    response: WebuiBrowserWebTabStreamEnvelope;
+  };
+  /**
+   * A url, and optionally the run the page is opened for. There is no surface:
+   * the embedded panel is the isolated Chromium's view, and `open_tab` reads
+   * the surface off the run the same way the Agent's path does.
+   */
+  openBrowserWebTab: {
+    request: { readonly url: string; readonly runId?: string };
+    response: WebuiBrowserWebTabOpen;
+  };
+  closeBrowserWebTab: {
+    request: { readonly target: WebuiBrowserTargetId };
+    response: WebuiBrowserWebTabClose;
   };
   listBrowserCapabilities: {
     request: Record<string, never>;
@@ -724,6 +774,7 @@ export const WEBUI_STREAM_OPERATION_NAMES = [
   WATCH_EVENTS_OPERATION_NAME,
   WATCH_TERMINAL_OPERATION_NAME,
   WATCH_BROWSER_FRAMES_OPERATION_NAME,
+  WATCH_BROWSER_WEB_TABS_OPERATION_NAME,
 ] as const;
 
 export type WebuiStreamOperationName = (typeof WEBUI_STREAM_OPERATION_NAMES)[number];
@@ -755,6 +806,14 @@ export interface WebuiBrowserFrameStreamEnvelope {
   readonly stream: {
     readonly ok: true;
     readonly source: AsyncIterable<WebuiBrowserImageFrame>;
+  };
+}
+
+/** The `{ stream }` envelope for the browser web-tab snapshot stream. */
+export interface WebuiBrowserWebTabStreamEnvelope {
+  readonly stream: {
+    readonly ok: true;
+    readonly source: AsyncIterable<WebuiBrowserWebTabSnapshot>;
   };
 }
 

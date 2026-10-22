@@ -177,13 +177,59 @@ reason.
   carries the DevTools command and the extension's allowlist refuses what is not in it — that is
   what the `real-external` rows measured. The switch that gates it is enforced in the runtime
   browser service and is covered by the unit suite.
-- **The Agent's browser tools were not driven against a real browser in this pass.** The tool adapter
-  forwards to the same browser service as the panel, and a run that has selected nothing is refused
-  rather than being sent somewhere the person is not looking. Since round 11 of the review findings
-  that refusal reaches `open_tab` as well, so the Agent could not drive a browser at all: it could not
-  acquire a selection, the isolated provider drove one page, and the image stream was per run. The tab
-  model that fixes all three is decided ([ADR 0022](../adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md))
-  and is not in this tree, so nothing in this record speaks for it.
+- **The Agent's browser tools were not driven against a real browser in *this* pass.** The run above
+  is the previous programme's, and it does not speak for the tab model. The tab model's own run
+  does: see [the workspace browser tab model's acceptance](#the-workspace-browser-tab-models-acceptance)
+  below, where the Agent's `open_tab` opens a page in a real Chrome and the run's selection points at
+  it.
+
+## The workspace browser tab model's acceptance
+
+The tab model ([ADR 0022](../adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md)) is a second
+programme, and its acceptance is a second run: the same machine, the same installed Google Chrome, a
+different suite. Its records are written to **its own** completion directory —
+`.plan/workspace-browser-tab/complete/workspace-browser-tab.acceptance.json` — so a case from one
+programme can never be read as a case from the other.
+
+**The run.** `linux 7.0.0-38-generic`, Google Chrome 152.0.7977.82 (installed,
+`/usr/bin/google-chrome`), the `isolatedChromium` switch on, the Full CDP switch on, 2026-10-21. The
+suite is `packages/webui/test/integration/workspace-browser-tab-acceptance.test.ts`, and it drives the
+shipped paths: the Agent's tool path through the browser tool adapter, the person's launcher path
+through the server's own handler, the input path through the client's own binding, and the isolated
+provider itself.
+
+| Surface | Entry | Browser | Case | Settings | Result |
+| --- | --- | --- | --- | --- | --- |
+| `isolated-chromium` | development | Google Chrome 152.0.7977.82 (installed) | the Agent opens a tab | `isolatedChromium` on; the run's selection points at the page the Agent opened, and the client's strip shows it and makes it the active tab | `measured` — pass |
+| `isolated-chromium` | development | Google Chrome 152.0.7977.82 (installed) | the Agent navigates after opening | `isolatedChromium` on; the page is at the requested url and the frame stream follows the page it opened | `measured` — pass |
+| `isolated-chromium` | development | Google Chrome 152.0.7977.82 (installed) | the Agent acts on a page it did not open | `isolatedChromium` on; the action runs on the run's selection, and a reference recorded before the page moved is refused | `measured` — pass |
+| `isolated-chromium` | development | Google Chrome 152.0.7977.82 (installed) | a person opens a tab while the Agent works | `isolatedChromium` on; the Agent's page and the person's page are different, and each shows its own picture | `measured` — pass |
+| `isolated-chromium` | development | Google Chrome 152.0.7977.82 (installed) | a person opens a tab while the run has no selection | `isolatedChromium` on; the run's selection becomes the person's page, so the Agent can act on it | `measured` — pass |
+| `isolated-chromium` | development | Google Chrome 152.0.7977.82 (installed) | a person types into their own tab while the Agent works | `isolatedChromium` on; the input reaches the person's page, not the Agent's | `measured` — pass |
+| `isolated-chromium` | development | Google Chrome 152.0.7977.82 (installed) | a person types a url in the launcher | `isolatedChromium` on; the tab becomes that page, and the url is shown read-only in the toolbar | `measured` — pass |
+| `isolated-chromium` | development | Google Chrome 152.0.7977.82 (installed) | a person closes a web tab | `isolatedChromium` on; the page is released, and the runtime's page set follows the strip | `measured` — pass |
+| `isolated-chromium` | development | Google Chrome 152.0.7977.82 (installed) | back and forward | `isolatedChromium` on; the page moves through its own history, and the generation follows | `measured` — pass |
+| `isolated-chromium` | development | Google Chrome 152.0.7977.82 (installed) | the surface's switch is off | `isolatedChromium` on; the Agent's open_tab and the person's launcher path are both refused with browser_surface_not_authorized | `measured` — pass |
+| `isolated-chromium` | development | Google Chrome 152.0.7977.82 (installed) | a run with no selection acts | `isolatedChromium` on; every action except open_tab is refused with browser_target_unknown | `measured` — pass |
+| `isolated-chromium` | development | Google Chrome 152.0.7977.82 (installed) | a session ends | `isolatedChromium` on; its pages are released and no page is left behind | `measured` — pass |
+| `isolated-chromium` | development | Google Chrome 152.0.7977.82 (installed) | a second web tab in one session | `isolatedChromium` on; both are addressable, and the strip shows both | `measured` — pass |
+| `isolated-chromium` | development | Google Chrome 152.0.7977.82 (installed) | a page navigates | `isolatedChromium` on; its generation advances, and a reference recorded against the old generation is refused — on every tab, not only the first | `measured` — pass |
+
+**14 cases, 14 passes.** The three rows this
+programme exists for are here: the Agent opening a tab, the person browsing alongside it, and the
+generation fence on a page that is **not** the launch page.
+
+### What this run closes
+
+- **The Agent's browser tools were driven against a real browser.** The `open_tab` row is the tool
+  adapter's own path — the same adapter the Agent's tools use — opening a page in a real Chrome, and
+  the run's selection pointing at it. The "two cells" rows are the person typing in one page while the
+  Agent acts in another, in the same browser.
+- **The isolated provider drives more than one page.** The "second web tab" row opens two pages in
+  one session and drives each on its own.
+- **The image stream is per target.** The "navigates" and "back and forward" rows are the page's own
+  generation moving, and a reference recorded before the move being refused — on a page that is not
+  the launch page.
 
 ## Reproducing this
 

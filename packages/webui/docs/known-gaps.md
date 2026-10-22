@@ -89,33 +89,22 @@ in-process tick loop and its `<dataDir>/webui/scheduled-tasks.sqlite` store are 
 `cronService` for this client, but nothing in the browser surfaces them, and no plan exists to
 restore the removed surface (the retirement decision is in the branch history).
 
-## 8. Browser Use reaches one page, and the Agent cannot open it
+## 8. A web tab can name only the isolated Chromium
 
-More of Browser Use exists than this entry used to claim. The client has a browser business
-(`client/features/browser/`), mounted as the workspace's browser tab
-(`client/features/workspace/ui/WorkspacePanels.tsx` mounts `BrowserPanelHost`), and Settings carries
-an enabled `browser` page with the authorization switches (`BrowserSettingsPage.public.tsx`). The
-runtime has the isolated Chromium provider
-(`src/runtime/browser/isolated-chromium/provider.ts`), the target registry and its generation, and a
-browser service composed in `runtime/harness/browser.ts` that launches that provider itself. What is
-missing is what
-[ADR 0022](adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md) decides on top of them:
+The tab model ([ADR 0022](adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md)) is in the tree.
+The workspace panel's tab strip holds tool tabs and web tabs, the isolated Chromium holds one page per
+web tab, and the Agent's `open_tab` opens a page and makes it the run's selection. The four gaps this
+entry used to list are closed: the Agent can acquire a selection, the provider drives a page per web
+tab, the frame stream is per target, and a tab is a stable id with a mutable content.
 
-- **The Agent cannot acquire a selection.** `runtime/browser/tool-adapter.ts` refuses every action of
-  a run whose `selectionSurfaceOf(runId)` is empty, with `browser_target_unknown` — including
-  `open_tab`, the action that would have given it one. The panel's target list is the only writer
-  (`BrowserPanelHost.public.tsx` calls `selectBrowserTarget`).
-- **The isolated provider drives one page.** `#pageTargetId` names a single target and every command
-  refuses another; the provider's `open_tab` calls `Target.createTarget`, so it creates a page
-  nothing can then drive.
-- **The frame stream is per run.** Subscribers are keyed by `runId` and `#frameMatchesSelection`
-  drops every frame that is not that run's target, so two tabs cannot each have their own picture.
-- **The tab model is decided and not built.** A tab is still keyed by kind and opened from the add
-  menu (`workspace-panel-state.ts`), so there is no new tab page, no URL box, no in-place content
-  change and no per-target stream.
+What remains is a boundary rather than a gap:
 
-A web tab can name only the isolated Chromium: the extension bridge implements no `open_tab`, so Edge
-and Chrome keep the panel's target list as their entry point.
+- **The extension bridge implements no `open_tab`.** Edge and Chrome are reached through the
+  extension, which drives the person's own browser through `chrome.debugger` and cannot open a page
+  in it, so a web tab can name only the isolated Chromium. A person who wants a page in their own
+  browser uses the browser itself; the panel's web tabs are the embedded browser's.
+- **The bridged surfaces have no tab model.** The strip's web tabs come from the isolated
+  Chromium's snapshot, and the bridge's pages are not published as tabs.
 
 ## 9. The Mini App capability is not reachable from this client
 

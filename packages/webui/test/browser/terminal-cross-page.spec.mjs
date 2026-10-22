@@ -30,8 +30,9 @@ const openTerminalTab = async (page) => {
     await existing.click();
     return;
   }
-  await page.getByRole("button", { name: "添加标签" }).click();
-  await page.getByRole("menuitem", { name: "终端" }).click();
+  await page.getByRole("button", { name: "新建标签页" }).click();
+  await page.getByTestId("workspace-add-tab").click();
+  await page.getByTestId("workspace-launcher-tile-terminal").click();
   await expect(page.getByTestId("workspace-panel")).toHaveAttribute("data-active-tab", "terminal");
 };
 

@@ -27,7 +27,7 @@ import {
 import type { WebuiOperationPort } from "../../src/server/operation/bind-handlers.js";
 import { createStreamHandlerEntries } from "../../src/server/operation/handlers/stream.js";
 import { watchTerminalOperation } from "../../src/server/operation/workspace.js";
-import { watchBrowserFramesOperation } from "../../src/server/operation/browser.js";
+import { watchBrowserFramesOperation, watchBrowserWebTabsOperation } from "../../src/server/operation/browser.js";
 import {
   WEBUI_STREAM_OPERATION_NAMES,
   type OperationSpec,
@@ -116,7 +116,7 @@ describe("the unary request interface over OperationSpec", () => {
         `${name} is a stream and must not be unary`,
       );
     }
-    assert.equal(streams.length, 5);
+    assert.equal(streams.length, 6);
   });
 
   it("matches the server's registered stream descriptors exactly", () => {
@@ -124,6 +124,7 @@ describe("the unary request interface over OperationSpec", () => {
       ...createStreamHandlerEntries(inertPort).keys(),
       watchTerminalOperation.name,
       watchBrowserFramesOperation.name,
+      watchBrowserWebTabsOperation.name,
     ].sort();
     assert.deepEqual(registered, [...WEBUI_STREAM_OPERATION_NAMES].sort());
   });

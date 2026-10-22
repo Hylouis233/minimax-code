@@ -16,20 +16,24 @@ import type { WebuiBrowserPort } from "../../../runtime/port.js";
 import type { WebuiBridgeBrowserSurface } from "../../../shared/contracts/browser.js";
 import type { WebuiBrowserBridgeInstallationKeyView } from "../../../shared/contracts/browser-bridge.js";
 import {
+  closeBrowserWebTabOperation,
   getBrowserAuthorizationOperation,
   getBrowserInstallationKeyOperation,
   listBrowserCapabilitiesOperation,
   listBrowserTargetsOperation,
+  openBrowserWebTabOperation,
   readBrowserCommand,
   readBrowserInputCommand,
   readBrowserRunId,
   readBrowserSurface,
   readBrowserTarget,
+  readBrowserWebTabUrl,
   selectBrowserTargetOperation,
   sendBrowserCommandOperation,
   sendBrowserInputOperation,
   setBrowserAuthorizationOperation,
   watchBrowserFramesOperation,
+  watchBrowserWebTabsOperation,
 } from "../browser.js";
 import type {
   WebuiOperationHandler,
@@ -109,6 +113,19 @@ export function createBrowserHandlerEntries(
     body,
   ) => {
     const command = readBrowserCommand(body as Record<string, unknown>);
+    // A command that names a target acts on that page — this is what a web
+    // tab's toolbar sends, because the tab holds exactly one page and the
+    // person pressing back means the page they are looking at.
+    if (command.target) {
+      return {
+        body: await browser.sendCommandToTarget(
+          command.surface,
+          command.target,
+          command.command,
+          command.params,
+        ),
+      };
+    }
     // A command that names a run acts on that run's page. One that does not
     // acts on the no-run selection — the one the panel makes when no Agent run
     // is active.
@@ -135,6 +152,22 @@ export function createBrowserHandlerEntries(
       // cast is the same one the terminal watcher makes.
       source: browser.watchFrames(
         readBrowserSurface(body as Record<string, unknown>),
+        readBrowserTarget(body as Record<string, unknown>),
+        context.signal,
+      ) as unknown as AsyncIterable<Record<string, unknown>>,
+    },
+  });
+
+  const watchBrowserWebTabs: DedicatedHandler<typeof watchBrowserWebTabsOperation> = (
+    context,
+    body,
+  ) => ({
+    stream: {
+      ok: true,
+      // The same envelope as the frame stream: a snapshot is a third kind of
+      // payload with the same shape.
+      source: browser.watchWebTabs(
+        readBrowserSurface(body as Record<string, unknown>),
         readBrowserRunId(body as Record<string, unknown>),
         context.signal,
       ) as unknown as AsyncIterable<Record<string, unknown>>,
@@ -145,6 +178,48 @@ export function createBrowserHandlerEntries(
     async () => ({
       body: await browser.listCapabilities(),
     });
+
+  /**
+   * Opens a page for the person, the same call the Agent's `open_tab` makes.
+   *
+   * The port member is the same one the tool adapter reaches, so the two paths
+   * share the surface's switch, the provider's own refusal codes and the
+   * session's web-tab record. A body that names no run is the panel's own cell
+   * rather than a run's, exactly as every other browser operation reads it.
+   *
+   * `opener` is what separates the two cells here, and this operation is the
+   * person's side of it: the page joins the run's selection only when the run has
+   * none at this moment, which is the one bootstrap. A body naming a run that is
+   * already working on a page leaves that run's selection alone.
+   */
+  const openBrowserWebTab: DedicatedHandler<typeof openBrowserWebTabOperation> = async (
+    _context,
+    body,
+  ) => ({
+    body: await browser.openWebTab(
+      readBrowserRunId(body as Record<string, unknown>),
+      { url: readBrowserWebTabUrl(body as Record<string, unknown>) },
+      undefined,
+      "person",
+    ),
+  });
+
+  /**
+   * Closes a web tab's page.
+   *
+   * The tab names the target it is bound to, so the runtime closes the page
+   * that tab holds and drops it from the session's tabs. The tab leaves the
+   * next snapshot either way: a tab that is still published after it was
+   * closed would be a tab the strip cannot get rid of.
+   */
+  const closeBrowserWebTab: DedicatedHandler<typeof closeBrowserWebTabOperation> = async (
+    _context,
+    body,
+  ) => ({
+    body: await browser.closeWebTab(
+      readBrowserTarget(body as Record<string, unknown>),
+    ),
+  });
 
   /**
    * Hands the person their surface's installation key so they can paste it
@@ -225,6 +300,27 @@ export function createBrowserHandlerEntries(
       {
         operation: watchBrowserFramesOperation,
         handle: watchBrowserFrames as WebuiOperationHandler<unknown>,
+      },
+    ],
+    [
+      watchBrowserWebTabsOperation.name,
+      {
+        operation: watchBrowserWebTabsOperation,
+        handle: watchBrowserWebTabs as WebuiOperationHandler<unknown>,
+      },
+    ],
+    [
+      openBrowserWebTabOperation.name,
+      {
+        operation: openBrowserWebTabOperation,
+        handle: openBrowserWebTab as WebuiOperationHandler<unknown>,
+      },
+    ],
+    [
+      closeBrowserWebTabOperation.name,
+      {
+        operation: closeBrowserWebTabOperation,
+        handle: closeBrowserWebTab as WebuiOperationHandler<unknown>,
       },
     ],
     [

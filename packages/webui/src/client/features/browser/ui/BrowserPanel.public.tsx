@@ -23,6 +23,12 @@
 // on screen and the page the Agent drives are the same page — in the state,
 // where it can be asserted without a browser.
 //
+// The panel used to carry a surface switcher at the top of the body: three
+// radios, one for each of the surfaces the service knows about. That switcher
+// is gone now — Edge and Chrome are reached in the person's own windows, and
+// the only surface the panel sees is the isolated Chromium. The tab strip
+// decides what target is on screen, and this panel is that target's picture.
+//
 // `.public` because the workspace panel mounts it: the Browser business publishes
 // the panel and the workspace business renders it. Nothing else in this directory
 // is mounted from outside.
@@ -35,12 +41,10 @@ import {
   type ReactElement,
 } from "react";
 import {
-  WEBUI_BROWSER_SURFACES,
   isWebuiBrowserSurfaceAuthorized,
   type WebuiBrowserError,
   type WebuiBrowserInputCommand,
   type WebuiBrowserSurface,
-  type WebuiBrowserTargetId,
 } from "../../../../shared/contracts/browser.js";
 import { readWebuiCapability, type WebuiCapabilityView } from "../../../../shared/capability-manifest.js";
 import type { BrowserPort } from "../contracts/browser-port.js";
@@ -56,7 +60,7 @@ import {
 } from "../application/browser-commands.js";
 import {
   selectWebuiBrowserFrame,
-  selectWebuiBrowserSelectedTarget,
+  selectWebuiBrowserViewedTarget,
   webuiBrowserFrameDataUrl,
 } from "../projection/browser-state.js";
 
@@ -77,7 +81,7 @@ const PANEL_COPY = {
   inputHint: "点击画面后可在此输入文字。",
   textInputLabel: "发送到浏览器的文字",
   noTargets: "当前浏览器没有可显示的标签页。",
-  unauthorized: "该浏览器未授权。请在设置的「浏览器」页中打开对应的浏览器开关。",
+  unauthorized: "隔离浏览器未授权。请在设置的「浏览器」页中打开对应的浏览器开关。",
   absent: "当前运行时没有浏览器能力，浏览器面板不可用。",
   notReady: "浏览器能力尚未就绪（例如扩展未连接），面板暂时无法显示页面。",
   unknown: "当前运行时没有报告浏览器能力，面板按未授权处理。",
@@ -97,8 +101,6 @@ export interface BrowserPanelProps {
   readonly state?: WebuiBrowserPanelState;
   /** The handshake manifest, so the panel can say *why* a family is unusable. */
   readonly capabilities?: WebuiCapabilityView;
-  readonly onSelectTarget?: (target: WebuiBrowserTargetId) => void;
-  readonly onSurfaceChange?: (surface: WebuiBrowserSurface) => void;
   /** Receives only commands that passed validation and the generation binding. */
   readonly onSendInput?: (command: WebuiBrowserInputCommand) => void;
   /** Receives every refusal, so a gesture that went nowhere is visible. */
@@ -109,8 +111,6 @@ export function BrowserPanel({
   port,
   state,
   capabilities,
-  onSelectTarget,
-  onSurfaceChange,
   onSendInput,
   onRejected,
 }: BrowserPanelProps): ReactElement {
@@ -120,15 +120,20 @@ export function BrowserPanel({
   // unrecognised format or a payload outside the base64 alphabet gets no
   // element, rather than an element whose `src` guesses what it was given.
   const frameSrc = webuiBrowserFrameDataUrl(frame);
-  const selected = state ? selectWebuiBrowserSelectedTarget(state) : undefined;
+  // The client's cell: the page this tab holds. Everything below — the picture, the
+  // alt text, the input binding — follows it, and none of it reads the run's
+  // selection, which is a different page and belongs to the Agent.
+  const viewed = state ? selectWebuiBrowserViewedTarget(state) : undefined;
   const authorized = state ? isWebuiBrowserSurfaceAuthorized(state.authorization, surface) : false;
   const capability = readWebuiCapability(capabilities, WEBUI_BROWSER_CAPABILITY_NAME);
-  const inputEnabled = Boolean(selected) && authorized && Boolean(port?.sendBrowserInput);
+  const inputEnabled = Boolean(viewed) && authorized && Boolean(port?.sendBrowserInput);
 
   const submit = useCallback(
     (intent: WebuiBrowserInputIntent) => {
-      if (!state) return;
-      const result = prepareWebuiBrowserInputCommand(state, intent);
+      // Bound to the page in front, at send time: a gesture typed while the strip
+      // moved to another tab lands on the tab the person is looking at, or is
+      // refused — it is never re-aimed at whatever the Agent is doing.
+      const result = prepareWebuiBrowserInputCommand(state?.viewedPage, intent);
       // The refusal path is the one that matters: a gesture that could not be
       // aimed has to be visible, because the alternative is a click that appears
       // to do nothing.
@@ -194,26 +199,6 @@ export function BrowserPanel({
     <section className="webui-browser-panel" data-testid="browser-panel" role="region" aria-label={PANEL_COPY.title}>
       <header className="webui-browser-panel-header">
         <h3 className="webui-browser-panel-title">{PANEL_COPY.title}</h3>
-        <div className="webui-browser-surfaces" role="group" aria-label={PANEL_COPY.title}>
-          {WEBUI_BROWSER_SURFACES.map((candidate) => {
-            const allowed = state ? isWebuiBrowserSurfaceAuthorized(state.authorization, candidate) : false;
-            return (
-              <button
-                key={candidate}
-                type="button"
-                role="radio"
-                aria-checked={candidate === surface}
-                aria-label={SURFACE_LABELS[candidate]}
-                data-testid={`browser-surface-${candidate}`}
-                data-authorized={allowed ? "true" : "false"}
-                className={candidate === surface ? "webui-browser-surface is-active" : "webui-browser-surface"}
-                onClick={() => onSurfaceChange?.(candidate)}
-              >
-                {SURFACE_LABELS[candidate]}
-              </button>
-            );
-          })}
-        </div>
       </header>
 
       {capability === "absent" ? (
@@ -265,6 +250,13 @@ export function BrowserPanel({
       ) : null}
 
       <div className="webui-browser-body">
+        {/*
+          The session's pages, marked with the one the Agent is working on. It is a
+          report, not a control: the run's selection is the runtime's cell and the
+          person cannot write it from here (ADR 0022) — the strip owns which tab is
+          in front, and the one bootstrap in the runtime's hands. Which tab to look
+          at is chosen above, not here.
+        */}
         <div
           className="webui-browser-targets"
           role="group"
@@ -279,21 +271,19 @@ export function BrowserPanel({
             <ul className="webui-browser-target-list" data-testid="browser-target-items">
               {targets.map((target) => (
                 <li key={`${target.id.browserId}:${target.id.targetId}:${target.id.generation}`}>
-                  <button
-                    type="button"
+                  <span
                     aria-current={target.selected ? "true" : undefined}
                     data-testid={`browser-target-${target.id.browserId}-${target.id.targetId}`}
                     data-target-generation={target.id.generation}
                     data-target-status={target.status}
                     className={target.selected ? "webui-browser-target is-active" : "webui-browser-target"}
-                    onClick={() => onSelectTarget?.(target.id)}
                   >
                     <strong>{target.title || target.url}</strong>
                     <span className="webui-browser-target-url">{target.url}</span>
                     <span className="webui-browser-target-meta">
                       {`${SURFACE_LABELS[target.id.surface]} · 第 ${target.id.generation} 代 · ${target.status === "open" ? "已打开" : "已关闭"}`}
                     </span>
-                  </button>
+                  </span>
                 </li>
               ))}
             </ul>
@@ -309,12 +299,12 @@ export function BrowserPanel({
               data-frame-sequence={frame?.sequence}
               data-target-generation={frame?.target.generation}
               src={frameSrc}
-              alt={selected ? `${selected.title || selected.url} 的浏览器画面` : PANEL_COPY.frameLabel}
+              alt={viewed ? `${viewed.title || viewed.url} 的浏览器画面` : PANEL_COPY.frameLabel}
               draggable={false}
             />
           ) : (
             <p className="webui-browser-empty" role="status" data-testid="browser-panel-frame-empty">
-              {frame ? PANEL_COPY.frameUnrenderable : selected ? PANEL_COPY.frameEmpty : PANEL_COPY.frameNoTarget}
+              {frame ? PANEL_COPY.frameUnrenderable : viewed ? PANEL_COPY.frameEmpty : PANEL_COPY.frameNoTarget}
             </p>
           )}
           {/* The input surface covers the picture rather than sitting beside it:

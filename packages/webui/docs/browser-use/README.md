@@ -31,9 +31,9 @@ strip, the Agent's browser tools and the extension must agree on.
 Nothing here describes shipped, released behavior. The isolated-Chromium surface has a provider, a
 service and a panel path in this branch, and the extension bridge is wired into the server's upgrade
 path; the external handshake completes against a real Chrome and a real Edge, and the acceptance
-matrix records what each run observed. The tab model that ADR 0022 decides is **not in this tree**:
-its rules appear below as `required`. Where a document states a rule that has no implementing code,
-it says so in place rather than in a footnote.
+matrix records what each run observed. The tab model that ADR 0022 decides is **in this tree** except for
+its acceptance record: the rows that have code behind them say `implemented` and name the file. Where a
+document states a rule that has no implementing code, it says so in place rather than in a footnote.
 
 ## Implementation status was re-checked against the tree
 
@@ -52,7 +52,7 @@ still says something is not implemented, that is because it is not — the per-r
 | `packages/webui/src/server/browser-bridge/admission.ts`, `pairing.ts`, `session.ts`, `registry.ts`, `reconnect.ts` | `implemented` and **wired** into the server's upgrade path and the browser service; target-ownership routing fixed (F4) | `02`, `03` |
 | `packages/webui/src/shared/operation-names.ts` | `implemented` — eight browser operations registered, including `sendBrowserCommand` (F5) | `06` |
 | `packages/browser-extension/` | `implemented` — MV3 service worker, `chrome.storage.local` credential, Web Crypto signing | `02`, `04` |
-| The tab model of ADR 0022 | `required` — decided, not in the tree: the Agent cannot acquire a selection, the provider drives one page, and the frame stream is per run | `05`, `07` |
+| The tab model of ADR 0022 | `implemented` for the strip, the surface-switcher deletion, the launcher content kind, the tab's toolbar, the tile launcher and the run-vs-tab split — the workspace's reducer carries a `launcher` content, the strip renders tool tabs and web tabs in one row, `BrowserPanelHost` is keyed by a target rather than a switchable surface, and the run's selection and the tab the person is looking at are two cells with one writer each plus one runtime-decided bootstrap; what remains is the acceptance record | `01`, `05`, `07` |
 
 The *measurements* in these documents were never affected by the tree moving. They come from the probe
 artifacts, not from the source. What moved was the implementation status, and that is what this pass
@@ -149,7 +149,9 @@ directory:
 | **Full CDP** | The separate authorization to send arbitrary DevTools commands to an already-authorized surface. It never authorizes a surface on its own. |
 | **Generation** | The monotonic counter that makes a recorded page reference detectably stale rather than silently mis-aimed. See [`05-target-identity.md`](05-target-identity.md). |
 | **Run** | The Agent's browser working context, keyed by the WebUI Agent session. One session drives one browser selection. |
-| **Run selection** | The page the Agent acts on. The tree has no path by which the Agent creates one, which is what the eleventh review round found and what ADR 0022 decides. |
+| **Run selection** | The page the Agent acts on. The runtime's cell: the Agent writes it, the client reads it. There are two paths into it — the run's own `open_tab`, and the bootstrap below. |
+| **Tab in front** | The page the person is looking at. The client's cell: the person writes it by choosing a tab, and the picture and the input binding follow it. |
+| **Bootstrap** | The one write that crosses the two cells: a page a person opened while the run had no selection becomes that run's selection, decided by the runtime at the moment the page appears. |
 | **Tab** | A slot in the workspace panel's strip. It holds one piece of content at a time, and its content can be replaced without the tab being closed. |
 | **New tab page** | The launcher a newly opened tab shows: the tool views and a URL box. Choosing either replaces that tab's content. The URL box exists nowhere else. |
 

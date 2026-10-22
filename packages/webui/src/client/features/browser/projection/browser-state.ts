@@ -6,6 +6,14 @@
 //
 // Two decisions carry most of the weight.
 //
+// **Two cells, one writer each.** `viewedPage` is the client's: the person writes
+// it by choosing a tab, and everything this panel *shows* or *forwards input to*
+// reads it. `runSelection` is the runtime's: the Agent writes it, the client only
+// mirrors the mark the runtime puts on the target list, and it decides which page
+// the panel reports as the Agent's. No branch below writes one from the other's
+// facts — the bootstrap that hands a run the page a person opened is decided by the
+// runtime at the moment the page appears, not here.
+//
 // **The frame buffer is a record, keyed by tab.** A live stream pushes a frame
 // per visual change; an append-only list would grow for as long as the session
 // ran. Keeping one entry per key makes the bound structural rather than a
@@ -14,7 +22,7 @@
 // **A frame that is older than what the panel is showing is dropped.** The frame
 // carries its target's generation, and a page that navigated keeps its tab id but
 // gets a new generation — so a frame from the previous page is a picture of
-// something the user has already moved away from. Displaying it would show one
+// something the person has already moved away from. Displaying it would show one
 // page while the Agent drives another, which is the failure this whole business
 // exists to prevent (ADR 0019). Dropping is counted rather than silent, because a
 // panel that quietly stops updating and a panel that is dropping frames look
@@ -37,6 +45,7 @@ import {
   type WebuiBrowserPanelEvent,
   type WebuiBrowserPanelState,
   type WebuiBrowserPanelStatus,
+  type WebuiBrowserTargetChange,
 } from "../contracts/browser-panel.js";
 
 export const initialWebuiBrowserPanelState: WebuiBrowserPanelState = {
@@ -72,18 +81,20 @@ function withoutFrame(
 /**
  * The status the state implies.
  *
- * Derived rather than stored on each branch so "ready" means one thing: the
- * selected target currently has a frame that belongs to the generation being
- * shown. Anything else that claims `ready` is a panel displaying a stale page.
+ * Derived rather than stored on each branch so "ready" means one thing: the page
+ * the person is looking at currently has a frame that belongs to the generation
+ * being shown. Anything else that claims `ready` is a panel displaying a stale
+ * page. The run's selection does not enter into it — it says which page the Agent
+ * is on, and the Agent's page is not what this panel is showing.
  */
 function deriveStatus(state: WebuiBrowserPanelState): WebuiBrowserPanelStatus {
   if (state.error) return "error";
-  const selected = state.selectedTarget;
-  if (!selected) {
+  const viewed = state.viewedPage;
+  if (!viewed) {
     if (state.status === "loading") return "loading";
     return state.targets.length === 0 ? state.status : "empty";
   }
-  return frameHeld(state, webuiBrowserFrameKey(selected)) ? "ready" : "loading";
+  return frameHeld(state, webuiBrowserFrameKey(viewed)) ? "ready" : "loading";
 }
 
 function markSelection(
@@ -94,6 +105,43 @@ function markSelection(
     ...target,
     selected: selected ? isSameWebuiBrowserTarget(target.id, selected) : false,
   }));
+}
+
+/**
+ * Adopts the newer generation the list reports for the page in front.
+ *
+ * The list is where a page that navigated shows up first: the tab keeps its id and
+ * gains a generation, so a buffered picture of the previous page is a picture of
+ * something the person has already moved away from. The move is reported rather
+ * than applied quietly, because a panel that silently keeps showing the old page
+ * and a panel that is waiting for the new one look identical from the outside.
+ */
+function adoptNewerGeneration(
+  state: WebuiBrowserPanelState,
+  page: WebuiBrowserTargetId | undefined,
+): {
+  readonly page?: WebuiBrowserTargetId;
+  readonly frames: WebuiBrowserPanelState["frames"];
+  readonly targetChange?: WebuiBrowserTargetChange;
+} {
+  if (!page) return { page, frames: state.frames };
+  const listed = state.targets.find(
+    (candidate) => webuiBrowserFrameKey(candidate.id) === webuiBrowserFrameKey(page),
+  );
+  if (!listed) {
+    // The page is no longer in the list. It is cleared rather than moved: a
+    // fallback to another page is exactly the substitution the ADR forbids, and an
+    // empty panel says what happened where a different page would not.
+    return { frames: withoutFrame(state, page), targetChange: undefined };
+  }
+  if (listed.id.generation > page.generation) {
+    return {
+      page: listed.id,
+      frames: withoutFrame(state, listed.id),
+      targetChange: { target: listed.id, previousGeneration: page.generation },
+    };
+  }
+  return { page, frames: state.frames };
 }
 
 export function reduceWebuiBrowserPanelState(
@@ -110,106 +158,97 @@ export function reduceWebuiBrowserPanelState(
     case "surface-changed":
       return state.surface === event.surface
         ? state
-        : { ...state, surface: event.surface, targets: [], selectedTarget: undefined, frames: {}, status: "idle" };
+        : { ...state, surface: event.surface, targets: [], runSelection: undefined, viewedPage: undefined, frames: {}, status: "idle" };
 
     case "targets-requested":
       return { ...state, status: "loading", error: undefined };
 
     case "targets-loaded": {
       const surfaceChanged = event.list.surface !== state.surface;
-      // A new list for the same surface keeps the selection across refreshes; a
-      // list for a different surface starts over, because a target id from one
-      // surface means nothing in another.
-      let selected = surfaceChanged ? event.selected : (event.selected ?? state.selectedTarget);
-      let frames = surfaceChanged ? {} : state.frames;
-      let targetChange = surfaceChanged ? undefined : state.targetChange;
-
-      const listed = selected
-        ? event.list.targets.find(
-            (candidate) => webuiBrowserFrameKey(candidate.id) === webuiBrowserFrameKey(selected as WebuiBrowserTargetId),
-          )
-        : undefined;
-
-      if (selected && listed && listed.id.generation > selected.generation) {
-        // The tab is the same one, on a newer page. The buffered picture is of
-        // the page that is gone, so it goes with it, and the panel says so
-        // instead of pretending the old page is still there.
-        targetChange = { target: listed.id, previousGeneration: selected.generation };
-        frames = withoutFrame({ ...state, frames }, listed.id);
-        selected = listed.id;
-      } else if (selected && !listed && !surfaceChanged) {
-        // The selected tab is no longer in the list. The selection is cleared
-        // rather than moved: silently promoting another tab is exactly the
-        // fallback the ADR forbids, and an empty panel says what happened where
-        // a different page would not.
-        frames = withoutFrame({ ...state, frames }, selected);
-        selected = undefined;
-        targetChange = undefined;
-      }
-
+      // The runtime's cell, mirrored. A new list for the same surface keeps the
+      // run's selection across refreshes; a list for a different surface starts
+      // over, because a target id from one surface means nothing in another.
+      const runSelection = surfaceChanged ? event.selected : (event.selected ?? state.runSelection);
+      // The client's cell only survives a list for the same surface, and the
+      // comparison is made against the list that just arrived rather than the one
+      // held before: that list is where a replaced page first shows up.
+      const base: WebuiBrowserPanelState = surfaceChanged
+        ? { ...state, targets: event.list.targets, viewedPage: undefined, frames: {} }
+        : { ...state, targets: event.list.targets };
+      const viewed = adoptNewerGeneration(base, base.viewedPage);
       const next: WebuiBrowserPanelState = {
         ...state,
         surface: event.list.surface,
-        targets: markSelection(event.list.targets, selected),
-        selectedTarget: selected,
-        frames,
+        // The marked list is the runtime's answer about its own cell, so it is
+        // taken as it arrives rather than recomputed here.
+        targets: markSelection(event.list.targets, runSelection),
+        runSelection,
+        viewedPage: viewed.page,
+        frames: viewed.frames,
         status: event.list.targets.length === 0 ? "empty" : state.status,
         error: undefined,
-        ...(targetChange ? { targetChange } : {}),
+        targetChange: viewed.targetChange,
       };
       return { ...next, status: deriveStatus(next) };
     }
 
-    case "target-selected": {
+    case "page-viewed": {
+      // The client's cell, written by the person choosing a tab. It moves
+      // nothing else: the run's selection is the runtime's, and the picture and
+      // the input both follow this page instead.
       if (!isUsableWebuiBrowserTargetId(event.target)) return state;
+      const previous = state.viewedPage;
+      if (previous && isSameWebuiBrowserTarget(previous, event.target)) return state;
+      const moved = previous
+        ? {
+            targetChange: {
+              target: event.target,
+              previousGeneration: previous.generation,
+            },
+            // A different tab keeps its own buffered frame — the buffer is one
+            // frame per tab. The same tab on a newer generation does not: that
+            // picture is of the page that is gone.
+            frames: isSameWebuiBrowserTargetSlot(previous, event.target)
+              ? withoutFrame(state, event.target)
+              : state.frames,
+          }
+        : {};
       const next: WebuiBrowserPanelState = {
         ...state,
-        selectedTarget: event.target,
-        targetChange: undefined,
+        surface: event.target.surface,
+        viewedPage: event.target,
         error: undefined,
-        targets: markSelection(state.targets, event.target),
+        ...(previous ? moved : { targetChange: undefined }),
       };
-      // Derived rather than set, so selecting a tab the panel has no frame for
-      // reads as "waiting for the first frame" rather than as "ready".
+      // Derived rather than set, so a tab the panel has no frame for yet reads as
+      // "waiting for the first frame" rather than as "ready".
       return { ...next, status: deriveStatus(next) };
     }
 
     case "target-changed": {
-      // The active Agent run moved its own target (ADR decision 4). The panel
-      // follows it; it does not negotiate.
+      // The runtime's cell: the run's own page moved on. It moves the run's
+      // selection and nothing else — the page the person is looking at is not the
+      // run's, so a move here must not disturb the picture or the input binding.
+      // A different tab is not "this page moved on" and is ignored rather than
+      // adopted: the run's selection is the runtime's to report, and the list it
+      // publishes on the next read is the authoritative answer anyway.
       const target = event.target;
       if (!isUsableWebuiBrowserTargetId(target)) return state;
-      const previous = state.selectedTarget;
-      const next: WebuiBrowserPanelState = {
-        ...state,
-        surface: target.surface,
-        selectedTarget: target,
-        error: undefined,
-        ...(previous
-          ? {
-              targetChange: { target, previousGeneration: previous.generation },
-              frames: isSameWebuiBrowserTargetSlot(previous, target)
-                ? previous.generation === target.generation
-                  ? state.frames
-                  : withoutFrame(state, target)
-                : withoutFrame(state, previous),
-            }
-          : {}),
-      };
-      return { ...next, status: deriveStatus(next) };
+      const previous = state.runSelection;
+      if (!previous || !isSameWebuiBrowserTargetSlot(previous, target)) return state;
+      return { ...state, surface: target.surface, runSelection: target, error: undefined };
     }
 
     case "run-changed": {
       // A run's selection is that run's. When the active run changes, the panel
-      // stops claiming to show the previous run's target: the frames stay
-      // buffered per tab (so a new run that picks the same tab shows it at
-      // once), but the selection, the marked tabs and the "what moved on" note
-      // are cleared and wait for the new run's own answer.
-      if (state.selectedTarget === undefined && state.targetChange === undefined) return state;
+      // stops reporting the previous run's selection: the marked tabs are cleared
+      // and wait for the new run's own answer. What is *not* cleared is the
+      // page the person is looking at and the frames buffered for it — neither
+      // belongs to the run that just left.
+      if (state.runSelection === undefined) return state;
       const next: WebuiBrowserPanelState = {
         ...state,
-        selectedTarget: undefined,
-        targetChange: undefined,
+        runSelection: undefined,
         targets: markSelection(state.targets, undefined),
       };
       return { ...next, status: deriveStatus(next) };
@@ -219,7 +258,7 @@ export function reduceWebuiBrowserPanelState(
       const frame = event.frame;
       if (!isUsableWebuiBrowserTargetId(frame.target)) return dropped(state);
       const key = webuiBrowserFrameKey(frame.target);
-      const shown = state.selectedTarget;
+      const shown = state.viewedPage;
       // The panel is showing a newer generation of this very tab: the frame is a
       // picture of a page that no longer exists.
       if (shown && webuiBrowserFrameKey(shown) === key && frame.target.generation < shown.generation) {
@@ -259,20 +298,20 @@ function dropped(state: WebuiBrowserPanelState): WebuiBrowserPanelState {
 export function selectWebuiBrowserFrame(
   state: WebuiBrowserPanelState,
 ): WebuiBrowserPanelState["frames"][string] | undefined {
-  const selected = state.selectedTarget;
-  if (!selected) return undefined;
-  const key = webuiBrowserFrameKey(selected);
+  const viewed = state.viewedPage;
+  if (!viewed) return undefined;
+  const key = webuiBrowserFrameKey(viewed);
   return frameHeld(state, key) ? state.frames[key] : undefined;
 }
 
 /**
  * The target the live image stream should be open for.
  *
- * It is the run's selected target, and nothing else. A run that has selected
- * nothing has no page to stream, so the answer is `undefined` and the panel
- * opens no subscription — the server would refuse one anyway, and a
- * subscription that can never deliver a frame is a subscription that leaves
- * the panel blank.
+ * It is the page the person is looking at and nothing else — the client's cell, not
+ * the run's selection. A tab with no page in front has nothing to stream, so the
+ * answer is `undefined` and the panel opens no subscription: a subscription for a
+ * page the person is not looking at delivers a picture of somebody else's work,
+ * and one that can never deliver a frame leaves the panel blank anyway.
  *
  * The decision is a pure function so it can be tested without a DOM renderer;
  * the client test environment has none.
@@ -280,7 +319,7 @@ export function selectWebuiBrowserFrame(
 export function selectWebuiBrowserStreamTarget(
   state: WebuiBrowserPanelState,
 ): WebuiBrowserTargetId | undefined {
-  return state.selectedTarget;
+  return state.viewedPage;
 }
 
 /**
@@ -297,23 +336,29 @@ export function webuiBrowserStreamTargetKey(
   return `${target.browserId}:${target.targetId}:${target.generation}`;
 }
 
-export function selectWebuiBrowserSelectedTarget(
+/**
+ * The page the person is looking at, as the target list knows it.
+ *
+ * The list is where the title and url come from, so this is what the view reads to
+ * name the page it is showing and whether input may be forwarded to it.
+ */
+export function selectWebuiBrowserViewedTarget(
   state: WebuiBrowserPanelState,
 ): WebuiBrowserTargetState | undefined {
-  const selected = state.selectedTarget;
-  if (!selected) return undefined;
-  return state.targets.find((candidate) => isSameWebuiBrowserTarget(candidate.id, selected));
+  const viewed = state.viewedPage;
+  if (!viewed) return undefined;
+  return state.targets.find((candidate) => isSameWebuiBrowserTarget(candidate.id, viewed));
 }
 
 /**
- * The target a run has selected, as the host's target list reports it.
+ * The run's selection, as the target list reports it.
  *
- * The service marks exactly one target per run, so this is how the panel learns
+ * The service marks exactly one target per run, so this is how the client learns
  * which page the *active run* is driving without the run having to announce it —
  * and `undefined` when that run has selected nothing, which is the answer for a
- * panel that is showing a browser with no run behind it. Reading the flag
- * instead of the panel's own selection is what makes the panel follow the run
- * rather than keep showing whatever it happened to be showing.
+ * panel that is showing a browser with no run behind it. It is the runtime's cell
+ * being read, never written: the person cannot hand the Agent a page by clicking
+ * one here, and the strip's tab choice does not move it either.
  */
 export function selectedWebuiBrowserRunTarget(
   list: WebuiBrowserTargetList,

@@ -19,6 +19,8 @@ import type { WebuiTerminalFrame } from "../../shared/contracts/terminal.js";
 import type {
   WebuiBrowserImageFrame,
   WebuiBrowserSurface,
+  WebuiBrowserTargetId,
+  WebuiBrowserWebTabSnapshot,
 } from "../../shared/contracts/browser.js";
 import type {
   OperationSpec,
@@ -143,8 +145,20 @@ export interface WebuiWire {
    */
   watchBrowserFrames(
     operation: string,
-    requestBody: { readonly surface: WebuiBrowserSurface },
+    requestBody: { readonly surface: WebuiBrowserSurface; readonly target: WebuiBrowserTargetId },
     onFrame: (frame: WebuiBrowserImageFrame) => void,
+  ): () => void;
+  /**
+   * The web-tab snapshot stream.
+   *
+   * A watch rather than a stream, for the same reason the frame stream is one:
+   * the subscription outlives the render that opened it, and detaching has to
+   * release the runtime-side resources the stream held.
+   */
+  watchBrowserWebTabs(
+    operation: string,
+    requestBody: { readonly surface: WebuiBrowserSurface },
+    onSnapshot: (snapshot: WebuiBrowserWebTabSnapshot) => void,
   ): () => void;
   /** The one HTTP route, built from the same base and token as the socket. */
   workspaceFileUrl(input: { readonly workspaceDir: string; readonly path: string }): string;
@@ -372,7 +386,7 @@ export function createWebuiWire({
 
   function watchBrowserFrames(
     operation: string,
-    requestBody: { readonly surface: WebuiBrowserSurface },
+    requestBody: { readonly surface: WebuiBrowserSurface; readonly target: WebuiBrowserTargetId },
     onFrame: (frame: WebuiBrowserImageFrame) => void,
   ): () => void {
     let stopped = false;
@@ -383,6 +397,27 @@ export function createWebuiWire({
         if (stopped) return;
         if (frame.kind !== "event" || !frame.body || typeof frame.body !== "object") return;
         onFrame(frame.body as WebuiBrowserImageFrame);
+      },
+    });
+    return () => {
+      stopped = true;
+      session.close();
+    };
+  }
+
+  function watchBrowserWebTabs(
+    operation: string,
+    requestBody: { readonly surface: WebuiBrowserSurface },
+    onSnapshot: (snapshot: WebuiBrowserWebTabSnapshot) => void,
+  ): () => void {
+    let stopped = false;
+    const session = openWireSession(operation, requestBody, {
+      frame: (_session, frame) => {
+        // A stopped watch must not deliver, and `close()` is not a promise that
+        // the socket stops emitting: the caller's flag is what guarantees it.
+        if (stopped) return;
+        if (frame.kind !== "event" || !frame.body || typeof frame.body !== "object") return;
+        onSnapshot(frame.body as WebuiBrowserWebTabSnapshot);
       },
     });
     return () => {
@@ -411,6 +446,7 @@ export function createWebuiWire({
     stream,
     watchTerminal,
     watchBrowserFrames,
+    watchBrowserWebTabs,
     workspaceFileUrl,
     watchEvents: createWebuiEventChannel({ websocketUrl, webSocket }),
   };
