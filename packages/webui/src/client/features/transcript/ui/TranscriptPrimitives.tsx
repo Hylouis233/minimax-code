@@ -8,6 +8,7 @@
 // `WebuiToolResults`.
 
 import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
+import { IconBrowser, IconBrain, IconCode, IconFile, IconHammer, IconHexagon, IconListCheck, IconMusic, IconPhoto, IconRobot, IconSearch, IconSparkles, IconSquares, IconTarget, IconTerminal2, IconVideo, IconWorld } from "@tabler/icons-react";
 import { ActivityIndicator } from "./ActivityIndicator.js";
 import {
   WebuiIconChevronDown,
@@ -128,26 +129,15 @@ function WebuiToolDetailSection({
 }
 
 function WebuiToolIcon({ category }: { readonly category: ReturnType<typeof toolCallIconCategory> | "combine" }): ReactElement {
-  const paths: Readonly<Record<typeof category, ReactElement>> = {
-    command: <><rect x="2.25" y="3" width="15.5" height="14" rx="2.5" /><path d="m6 7 2.5 2.5L6 12M10.5 12H14" /></>,
-    file: <><path d="M5 2.75h6l4 4v10.5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3.75a1 1 0 0 1 1-1Z" /><path d="M11 3v4h4M7 11h6M7 14h6" /></>,
-    code: <><path d="m7 7-3 3 3 3M13 7l3 3-3 3M11.5 5.5l-3 9" /></>,
-    search: <><circle cx="8.5" cy="8.5" r="5.5" /><path d="m12.5 12.5 4 4" /></>,
-    web: <><circle cx="10" cy="10" r="7.25" /><path d="M2.9 10h14.2M10 2.75c2.1 2.05 3.2 4.47 3.2 7.25s-1.1 5.2-3.2 7.25C7.9 15.2 6.8 12.78 6.8 10s1.1-5.2 3.2-7.25Z" /></>,
-    browser: <><rect x="2.5" y="3.5" width="15" height="13" rx="2" /><path d="M2.5 7.5h15M5 5.5h.01M7.5 5.5h.01" /></>,
-    logo: <><path d="M10 2 17.25 6v8L10 18l-7.25-4V6L10 2Z" /><path d="m6.75 10 2.1 2.1 4.4-4.4" /></>,
-    memory: <><path d="M10 3.5a3.1 3.1 0 0 0-5.9 1.2 3.5 3.5 0 0 0-.7 6.3A3.2 3.2 0 0 0 10 14.5M10 3.5a3.1 3.1 0 0 1 5.9 1.2 3.5 3.5 0 0 1 .7 6.3 3.2 3.2 0 0 1-6.6 3.5M10 3.5v12" /><path d="M6.5 7.5h1M6 11h1.5M12.5 7.5h1M12.5 11H14" /></>,
-    image: <><rect x="2.5" y="3" width="15" height="14" rx="2" /><circle cx="7" cy="7.5" r="1.25" /><path d="m3.5 14 4-4 3 3 2.5-2.5 3.5 3.5" /></>,
-    video: <><rect x="2.5" y="3.5" width="10" height="13" rx="2" /><path d="m12.5 8 5-3v10l-5-3M6.5 8.25l3.25 1.75-3.25 1.75z" /></>,
-    music: <><path d="M11 14V4l6-1v9" /><circle cx="7.5" cy="14.5" r="2.5" /><circle cx="14.5" cy="12.5" r="2.5" /></>,
-    tool: <><path d="M14.3 5.7a4.5 4.5 0 0 0-5.9 5.9l-4.8 4.8a1.6 1.6 0 0 1-2.3-2.3l4.8-4.8a4.5 4.5 0 0 1 5.9-5.9l-2.6 2.6 2.6 2.6 2.6-2.9Z" /></>,
-    task: <><rect x="3" y="3" width="14" height="14" rx="2" /><path d="m5.75 7.5 1.25 1.25 2-2M11.5 7.75h3M5.75 12.5 7 13.75l2-2M11.5 12.75h3" /></>,
-    bot: <><rect x="3" y="5" width="14" height="11" rx="3" /><path d="M10 2v3M2 9h1M17 9h1M7 10h.01M13 10h.01M7 13h6" /></>,
-    goal: <><circle cx="10" cy="10" r="7.25" /><circle cx="10" cy="10" r="4.25" /><circle cx="10" cy="10" r="1.25" /></>,
-    thinking: <><path d="m10 2.75 1.75 5.5 5.5 1.75-5.5 1.75-1.75 5.5-1.75-5.5-5.5-1.75 5.5-1.75L10 2.75Z" /><path d="m16 2 .55 1.45L18 4l-1.45.55L16 6l-.55-1.45L14 4l1.45-.55L16 2Z" /></>,
-    combine: <><rect x="2.75" y="2.75" width="6" height="6" rx="1.5" /><rect x="11.25" y="2.75" width="6" height="6" rx="1.5" /><rect x="2.75" y="11.25" width="6" height="6" rx="1.5" /><rect x="11.25" y="11.25" width="6" height="6" rx="1.5" /></>,
-  };
-  return <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.55" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[category]}</svg>;
+  const icons = {
+    command: IconTerminal2, file: IconFile, code: IconCode, search: IconSearch,
+    web: IconWorld, browser: IconBrowser, logo: IconHexagon, memory: IconBrain,
+    image: IconPhoto, video: IconVideo, music: IconMusic, tool: IconHammer,
+    task: IconListCheck, bot: IconRobot, goal: IconTarget, thinking: IconSparkles,
+    combine: IconSquares,
+  } as const;
+  const Glyph = icons[category];
+  return <Glyph aria-hidden="true" size={20} stroke={1.55} />;
 }
 
 /** Tool rows remain the fallback only when the runtime diff facade is absent. */

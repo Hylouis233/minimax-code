@@ -26,7 +26,7 @@ import {
 
 test.beforeEach(async ({ page }) => {
   page.on("pageerror", (error) => console.error("BROWSER_PAGE_ERROR", error.stack ?? error.message));
-  page.on("console", (message) => { if (message.type() === "error") console.error("BROWSER_CONSOLE_ERROR", message.text()); });
+  page.on("console", (message) => console.log("BROWSER_CONSOLE", message.type(), message.text()));
 });
 
 test("an agent turn streams thinking and answer, then settles on DONE", async ({ page }) => {
@@ -42,6 +42,17 @@ test("an agent turn streams thinking and answer, then settles on DONE", async ({
   const body = assistantBody(page, "a-turn-1");
   await expect(body).toBeVisible();
   await expect(body.getByText("Synthetic answer one")).toBeVisible();
+  await expect(body.getByText("Synthetic reasoning")).toBeVisible();
+
+  // Thinking deltas append to the existing message and remain visible even
+  // when a later whole-message frame only carries a tool update.
+  await emitStream(page, "A", {
+    dataJson: JSON.stringify({
+      type: "agent_message_chunk",
+      agent_message_chunk: { msg_id: "a-turn-1", thinking_content: " plus" },
+    }),
+  });
+  await expect(body.getByText("Synthetic reasoning plus")).toBeVisible();
 
   // A tool call landing on the same message must not displace the answer.
   await emitAgentMessage(page, "A", {
@@ -49,6 +60,7 @@ test("an agent turn streams thinking and answer, then settles on DONE", async ({
     tool_calls: [{ id: "call-1", function: { name: "bash", arguments: JSON.stringify({ command: "ls -la" }) } }],
   });
   await expect(body.getByText("Synthetic answer one")).toBeVisible();
+  await expect(body.getByText("Synthetic reasoning plus")).toBeVisible();
 
   // The per-turn pulse is the element the stranded-animation bug lived on:
   // while the turn streams it is present exactly once, and `[DONE]` must
@@ -179,23 +191,115 @@ test("a page reload restores history and never revives a finished turn", async (
     window.__fixture.setPage("A", {
       messages: [
         { msgId: "history-user", role: "user", msgContent: "Persisted question", timestamp: 1_700_000_000_060 },
-        { msgId: "history-assistant", role: "assistant", msgContent: "Persisted answer", timestamp: 1_700_000_000_061 },
+        { msgId: "history-assistant", role: "assistant", msgContent: "Persisted answer", thinkingContent: "Persisted reasoning", timestamp: 1_700_000_000_061 },
       ],
       hasMore: false,
     });
   });
   await openApp(page, "#session=A");
   await expect(page.getByText("Persisted answer")).toBeVisible();
+  await expect(page.getByText("Persisted reasoning")).toBeVisible();
   await expect(liveIndicator(page)).toHaveCount(0);
 
   await page.reload();
   await expect(page.locator("#webui-root")).toBeVisible();
   await expect(page.getByText("Persisted question")).toHaveCount(1);
   await expect(page.getByText("Persisted answer")).toHaveCount(1);
+  await expect(page.getByText("Persisted reasoning")).toHaveCount(1);
   // A reloaded client has no live turn: neither the bottom indicator nor the
   // per-turn pulse may reappear from reloaded history alone.
   await expect(liveIndicator(page)).toHaveCount(0);
   await expect(livePulse(page)).toHaveCount(0);
+});
+
+test("an active turn reload restores thinking, resumes, and preserves message order", async ({ page }) => {
+  await configureFixture(page, () => {
+    window.__fixture.setPage("A", {
+      messages: [
+        { msgId: "reload-user", role: "user", msgContent: "Question before reload", timestamp: 1_700_000_000_070 },
+      ],
+      hasMore: false,
+    });
+    window.__fixture.setActiveTurn({ turnId: "reload-active-turn", busyReason: "turn", locallyOwned: false });
+  });
+  await openApp(page, "#session=A");
+  await expect.poll(() => page.evaluate(() => window.__fixture.requests.some(
+    (request) => request.operation === "resumeSession" && request.body.id === "A",
+  ))).toBe(true);
+  await emitStream(page, "A", {
+    dataJson: JSON.stringify({
+      type: "agent_message_chunk",
+      agent_message_chunk: {
+        msg_id: "reload-assistant",
+        thinking_content: "Reasoning before reload",
+        msg_content: "Answer before reload",
+      },
+    }),
+  });
+  await expect(page.getByText("Reasoning before reload")).toBeVisible();
+  await expect(page.getByText("Answer before reload")).toBeVisible();
+
+  await page.reload();
+  await expect(page.locator("#webui-root")).toBeVisible();
+  await expect(liveIndicator(page)).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.__fixture.requests.some(
+    (request) => request.operation === "resumeSession" && request.body.id === "A",
+  ))).toBe(true);
+  await expect.poll(() => page.evaluate(() => window.__fixture.requests.filter(
+    (request) => request.operation === "resumeSession" && request.body.id === "A",
+  ).at(-1)?.body.afterMsgId)).toBe("reload-user");
+
+  await emitStream(page, "A", {
+    dataJson: JSON.stringify({
+      type: "agent_message_chunk",
+      agent_message_chunk: {
+        msg_id: "reload-assistant",
+        thinking_content: "Reasoning before reload",
+        msg_content: "Answer before reload",
+      },
+    }),
+  });
+  await expect(page.getByText("Reasoning before reload")).toBeVisible();
+  await expect(page.getByText("Answer before reload")).toBeVisible();
+  await expect(page.getByText("Reasoning before reload")).toBeVisible();
+  await expect(page.getByText("Answer before reload")).toBeVisible();
+
+  await emitStream(page, "A", {
+    dataJson: JSON.stringify({
+      type: "agent_message_chunk",
+      agent_message_chunk: {
+        msg_id: "reload-assistant",
+        thinking_content: " and resumed reasoning",
+        msg_content: " and resumed answer",
+      },
+    }),
+  });
+  await expect(page.getByText("Reasoning before reload and resumed reasoning")).toBeVisible();
+  await expect(page.getByText("Answer before reload and resumed answer")).toBeVisible();
+
+  await emitAgentMessage(page, "A", {
+    msg_id: "reload-final-assistant",
+    thinking_content: "Final reasoning",
+    msg_content: "Final answer",
+  });
+  await expect(page.getByText("Final reasoning")).toBeVisible();
+  await expect(page.getByText("Final answer")).toBeVisible();
+
+  const transcriptText = await page.locator('[data-webui-transcript="A"]').innerText();
+  const orderedContent = [
+    "Question before reload",
+    "Reasoning before reload and resumed reasoning",
+    "Answer before reload and resumed answer",
+    "Final reasoning",
+    "Final answer",
+  ].map((content) => transcriptText.indexOf(content));
+  expect(orderedContent.every((index) => index >= 0)).toBe(true);
+  expect(orderedContent).toEqual([...orderedContent].sort((left, right) => left - right));
+
+  await emitStream(page, "A", { dataJson: "[DONE]" });
+  await expect(page.getByText("Reasoning before reload and resumed reasoning")).toHaveCount(1);
+  await expect(page.getByText("Final answer")).toHaveCount(1);
+  await expect(liveIndicator(page)).toHaveCount(0);
 });
 
 test("switching away and back keeps a live turn attached to its own session", async ({ page }) => {

@@ -19,6 +19,7 @@
 // region they belong to instead.
 
 import { Fragment, type RefObject } from "react";
+import { IconX } from "@tabler/icons-react";
 
 import { WebuiDropdown, type WebuiDropdownPlacementArgs } from "../../../ui/Dropdown.js";
 import type { WebuiClientSession } from "../../sessions/contracts/session-view.js";
@@ -160,7 +161,7 @@ export function WebuiComposerEditorStaging({
           value={reference.url}
           onChange={(event) => onChangeReference(reference.id, event.target.value)}
         />
-        <button type="button" aria-label="移除 URL 引用" onClick={() => onRemoveReference(reference.id)}>×</button>
+        <button type="button" aria-label="移除 URL 引用" onClick={() => onRemoveReference(reference.id)}><IconX aria-hidden="true" size={14} stroke={1.7} /></button>
       </div>
     ));
   return (
@@ -171,7 +172,7 @@ export function WebuiComposerEditorStaging({
             <div key={attachment.id} className={`webui-composer-attachment${attachment.kind === "image" ? " is-image" : ""}`}>
               {attachment.kind === "image" ? <img src={attachment.dataUrl} alt={attachment.fileName} /> : <span className="webui-composer-attachment-type">{attachment.fileName.split(".").pop()?.toUpperCase() ?? "FILE"}</span>}
               <span className="webui-composer-attachment-name" title={attachment.fileName}>{attachment.fileName}</span>
-              <button type="button" aria-label={`移除 ${attachment.fileName}`} onClick={() => onRemoveAttachment(attachment.id)}>×</button>
+              <button type="button" aria-label={`移除 ${attachment.fileName}`} onClick={() => onRemoveAttachment(attachment.id)}><IconX aria-hidden="true" size={14} stroke={1.7} /></button>
             </div>
           ))}
           {references("attached")}

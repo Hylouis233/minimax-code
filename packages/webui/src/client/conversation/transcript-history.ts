@@ -26,7 +26,10 @@ import {
   createWebuiSelectedSlot,
   type WebuiCommitToken,
 } from "./request-freshness.js";
-import { mergeOlderTranscriptPage } from "./transcript-request-ownership.js";
+import {
+  mergeOlderTranscriptPage,
+  mergeRefreshedTranscriptHead,
+} from "./transcript-request-ownership.js";
 
 /**
  * The slice this owner writes, as a contract the assembly satisfies.
@@ -120,6 +123,7 @@ export function createWebuiTranscriptHistoryOwner(deps: {
   const incarnation = pages.capture({ sessionId: "", anchor: "head" }).incarnation;
   pages.release({ sessionId: "", anchor: "head" });
   const asked = new Map<string, Map<string, { sessionId: string; anchor: string }>>();
+  const headPages = new Map<string, WebuiClientMessagePage>();
   const releasedSessions = new Set<string>();
 
   const keyOf = (sessionId: string, cursor: string | undefined) => ({
@@ -146,9 +150,13 @@ export function createWebuiTranscriptHistoryOwner(deps: {
   };
 
   const seed = (sessionId: string, page: WebuiClientMessagePage): void => {
-    deps.transcript.updateTranscript(sessionId, (current) =>
-      current.page.messages ? current : { ...current, page, loading: false },
-    );
+    let seeded = false;
+    deps.transcript.updateTranscript(sessionId, (current) => {
+      if (current.page.messages) return current;
+      seeded = true;
+      return { ...current, page, loading: false };
+    });
+    if (seeded) headPages.set(sessionId, page);
   };
 
   /**
@@ -210,27 +218,38 @@ export function createWebuiTranscriptHistoryOwner(deps: {
     ) {
       return { status: "stale" };
     }
+    let updatedHead = false;
     deps.transcript.updateTranscript(sessionId, (state) => {
-      const current = state;
-      const olderResult = cursor
-        ? mergeOlderTranscriptPage(
-            {
-              ownerSessionId: sessionId,
-              generation: current.generation,
-              page: current.page,
-              loading: false,
-            },
+      if (!cursor) {
+        updatedHead = true;
+        return {
+          ...state,
+          page: mergeRefreshedTranscriptHead(
+            state.page,
+            headPages.get(sessionId),
             page,
-            cursor,
-          )
-        : undefined;
+          ),
+          loading: false,
+        };
+      }
+      const olderResult = mergeOlderTranscriptPage(
+        {
+          ownerSessionId: sessionId,
+          generation: state.generation,
+          page: state.page,
+          loading: false,
+        },
+        page,
+        cursor,
+      );
       return {
         ...state,
-        page: olderResult?.state.page ?? page,
+        page: olderResult.state.page,
         loading: false,
-        ...(olderResult?.error ? { error: olderResult.error } : {}),
+        ...(olderResult.error ? { error: olderResult.error } : {}),
       };
     });
+    if (updatedHead) headPages.set(sessionId, page);
     return {
       status: "applied",
       // The token the resource returned with its own answer: the identity that
@@ -266,6 +285,7 @@ export function createWebuiTranscriptHistoryOwner(deps: {
     releaseSession: (sessionId) => {
       for (const key of asked.get(sessionId)?.values() ?? []) pages.release(key);
       asked.delete(sessionId);
+      headPages.delete(sessionId);
       // Authoritative deletions are replay-unsafe; retain only this compact
       // fence until application disposal, never the session's cached pages.
       releasedSessions.add(sessionId);
@@ -283,6 +303,7 @@ export function createWebuiTranscriptHistoryOwner(deps: {
       pages.dispose();
       presentation.dispose();
       asked.clear();
+      headPages.clear();
       releasedSessions.clear();
     },
   };

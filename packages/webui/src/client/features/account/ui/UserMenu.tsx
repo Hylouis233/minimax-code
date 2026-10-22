@@ -17,6 +17,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
+import { IconCalendarEvent, IconChevronRight, IconSettings, IconUserCircle } from "@tabler/icons-react";
 import { WebuiIconBell, WebuiIconBrand, WebuiIconCommandUsage } from "../../../shell/icons.js";
 import { SigninClaimResult } from "@mavis/shared/daily-signin";
 import { SettingsModal } from "../../settings/ui/SettingsModal.public.js";
@@ -64,26 +65,16 @@ function accountString(account: AccountStatus | undefined, key: string): string 
   return candidates.find((value): value is string => typeof value === "string" && value.length > 0);
 }
 
-function UsageGlyph({ kind }: { readonly kind: "settings" | "signin" }): ReactElement {
-  const path = kind === "settings"
-    ? "M10 2.5 11.2 4.1 13.1 3.8 13.8 5.6 15.6 6.3 15.3 8.2 16.9 9.4 15.8 11 16.2 12.9 14.4 13.6 13.7 15.4 11.8 15.1 10.6 16.7 9 15.6 7.1 16 6.4 14.2 4.6 13.5 4.9 11.6 3.3 10.4 4.4 8.8 4 6.9 5.8 6.2 6.5 4.4 8.4 4.7 9.6 3.1Z M10.1 8.1A1.9 1.9 0 1 0 10.1 11.9A1.9 1.9 0 0 0 10.1 8.1Z"
-    : "M10 2.8 11.1 5.6 14 6.7 11.1 7.8 10 10.6 8.9 7.8 6 6.7 8.9 5.6 10 2.8ZM15.1 10.7 15.8 12.4 17.5 13.1 15.8 13.8 15.1 15.5 14.4 13.8 12.7 13.1 14.4 12.4 15.1 10.7ZM5 11.2 5.7 12.9 7.4 13.6 5.7 14.3 5 16 4.3 14.3 2.6 13.6 4.3 12.9 5 11.2Z";
-  return <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d={path} fill="currentColor" fillRule="evenodd" clipRule="evenodd" /></svg>;
-}
-
 function SigninGlyph(): ReactElement {
-  return <UsageGlyph kind="signin" />;
+  return <IconCalendarEvent aria-hidden="true" size={18} stroke={1.7} />;
 }
 
 function AccountGlyph(): ReactElement {
-  return <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-    <circle cx="10" cy="6.5" r="2.75" stroke="currentColor" strokeWidth="1.5" />
-    <path d="M4.5 16.5c.55-2.55 2.55-4 5.5-4s4.95 1.45 5.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-  </svg>;
+  return <IconUserCircle aria-hidden="true" size={18} stroke={1.7} />;
 }
 
 function Chevron(): ReactElement {
-  return <svg className="webui-user-menu-chevron" width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m7.5 4.75 5.25 5.25-5.25 5.25" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+  return <IconChevronRight className="webui-user-menu-chevron" size={16} stroke={1.7} aria-hidden="true" />;
 }
 
 function MenuDivider(): ReactElement {
@@ -245,7 +236,7 @@ export function UserMenu({
       >
         <div className="webui-user-menu-uid" aria-label="用户 ID">UID : {uid ?? "—"}</div>
         <div className="webui-user-menu-list">
-          <button type="button" className="webui-user-menu-item" role="menuitem" data-testid="user-menu-settings" onClick={() => { setOpen(false); setSettingsOpen(true); }}><UsageGlyph kind="settings" /><span>设置</span><span className="webui-user-menu-shortcut">Ctrl+,</span></button>
+          <button type="button" className="webui-user-menu-item" role="menuitem" data-testid="user-menu-settings" onClick={() => { setOpen(false); setSettingsOpen(true); }}><IconSettings aria-hidden="true" size={18} stroke={1.7} /><span>设置</span><span className="webui-user-menu-shortcut">Ctrl+,</span></button>
           <button type="button" className="webui-user-menu-item" role="menuitem" data-testid="user-menu-account-login" onClick={() => { setOpen(false); setLoginOpen(true); }}><AccountGlyph /><span>账号与登录</span></button>
           <MenuDivider />
           <div className="webui-user-menu-signin-anchor" onMouseEnter={() => { cancelPanelClose(); loadSignin(); }} onMouseLeave={schedulePanelClose} onFocus={() => { cancelPanelClose(); loadSignin(); }} onClick={(event) => { event.stopPropagation(); if (!signinOpen) loadSignin(); }}>

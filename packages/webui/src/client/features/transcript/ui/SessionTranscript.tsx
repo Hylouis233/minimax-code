@@ -3,6 +3,7 @@
 // WebuiQuestionnaireResponse renderer for historical questionnaire answers.
 
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, type ReactElement } from "react";
+import { IconChevronUp } from "@tabler/icons-react";
 import { ChatSkeleton } from "./TranscriptSkeletons.js";
 import { ActivityIndicator, MessageAfterQueryStreamingPlaceholder, MessagePassiveLoadingPlaceholder } from "./ActivityIndicator.js";
 import { TurnNavigator, type TurnSummary } from "./TurnNavigator.js";
@@ -221,20 +222,7 @@ export function WebuiSessionTranscript({
               className="webui-button-secondary text-size_14 leading-line_height_20"
               aria-label={loading ? "正在加载更早消息" : "加载更早消息"}
             >
-              <svg
-                viewBox="0 0 16 16"
-                aria-hidden="true"
-                className="size-4 flex-none"
-              >
-                <path
-                  d="m4 10 4-4 4 4"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              <IconChevronUp aria-hidden="true" className="size-4 flex-none" size={16} stroke={1.7} />
               <span>{loading ? "正在加载…" : "加载更早消息"}</span>
             </button>
           </div>

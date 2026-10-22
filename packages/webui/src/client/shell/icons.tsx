@@ -1,657 +1,102 @@
-// WebUI shell icon set.
-//
-// Every path below is recorded in
-// `minimax-code-webui-work/webui-visual-align-icons.md`; the values are design
-// facts, and the file is authored here rather than copied wholesale.
-//
-// `viewBox` and the declared `width`/`height` are the glyph's own, so a glyph keeps the
-// optical size it was drawn for even when the surrounding row is a different height. The
-// brand mark declares no size of its own — it stretches to its container — so
-// it takes its size from `className` too.
+// Shared WebUI icon vocabulary. Keep product marks as assets and use Tabler for interface glyphs.
 
-import { useId, type ReactElement } from "react";
-import { IconWorld } from "@tabler/icons-react";
+import type { ReactElement } from "react";
+import {
+  IconArchive, IconArrowBackUp, IconArrowUp, IconBell, IconBug, IconCirclePlus,
+  IconCalendarEvent, IconChartBar, IconCheck, IconChevronDown, IconChevronLeft,
+  IconChevronRight, IconClipboard, IconCode, IconCopy, IconDeviceMobile, IconDots,
+  IconDownload, IconEdit, IconFile, IconFileCode, IconFolder, IconFolderPlus,
+  IconGitBranch, IconGitCompare, IconGitFork, IconHierarchy, IconLayoutDashboard,
+  IconLayoutSidebar, IconMapPin, IconMessage, IconMessageCircle, IconMessageQuestion,
+  IconMinimize, IconPaperclip, IconPin, IconPuzzle, IconRefresh, IconSearch,
+  IconShieldCheck, IconShieldLock, IconShieldX, IconSparkles,
+  IconTarget, IconTerminal2, IconThumbDown, IconThumbUp, IconTrash, IconWorld,
+  IconX,
+} from "@tabler/icons-react";
 
 export interface WebuiIconProps {
-  /** Extra classes applied to the root `svg`, e.g. a colour or shrink utility. */
   readonly className?: string;
 }
 
-export function WebuiIconCheck({ className }: WebuiIconProps): ReactElement {
-  return <svg viewBox="0 0 16 16" aria-hidden="true" className={className}><path d="M4 8.2 6.8 11 12 5.4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>;
-}
-
-export function WebuiIconChevronLeft({ className }: WebuiIconProps): ReactElement {
-  return <svg viewBox="0 0 16 16" aria-hidden="true" className={className}><path d="m10 3-5 5 5 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>;
-}
-
-export function WebuiIconChevronRight({ className }: WebuiIconProps): ReactElement {
-  return <svg viewBox="0 0 16 16" aria-hidden="true" className={className}><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>;
-}
-
-export function WebuiIconClose({ className }: WebuiIconProps): ReactElement {
-  return <svg viewBox="0 0 16 16" aria-hidden="true" className={className}><path d="m4 4 8 8m0-8-8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>;
-}
-
-/** The browser toolbar's reload — an almost-closed circle with the arrow that starts it. */
-export function WebuiIconReload({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true" className={className}>
-      <path d="M12.8 6.4A5 5 0 1 1 8 3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M9.8 1.5 8 3l1.8 1.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-/** The address bar's origin mark — the globe every browser puts before a url. */
-export function WebuiIconGlobe({ className }: WebuiIconProps): ReactElement {
-  return <IconWorld aria-hidden="true" className={className} size={16} stroke={1.5} />;
-}
-
-/** The product mark — the hero avatar and identity glyph. */
-export function WebuiIconBrand({ className }: WebuiIconProps): ReactElement {
-  const clipId = `webui-brand-logo-${useId().replace(/:/gu, "")}`;
-  return (
-    <svg viewBox="0 0 64 64" fill="none" aria-hidden="true" className={className}>
-      <path d="M0 32C0 14.3269 14.3269 0 32 0V0C49.6731 0 64 14.3269 64 32V32C64 49.6731 49.6731 64 32 64V64C14.3269 64 0 49.6731 0 32V32Z" style={{ "fill": "var(--bg_grouped_secondary)" }}></path>
-      <g clipPath={`url(#${clipId})`}>
-      <path d="M52.966 39.9246C52.966 40.7649 52.5884 41.5607 51.9375 42.0921L44.2067 48.4045C43.707 48.8125 43.0818 49.0353 42.4368 49.0353H13.0895C11.6406 49.0353 10.466 47.8607 10.466 46.4118V24.2861C10.466 23.4439 10.8454 22.6464 11.4989 22.115L20.1011 15.1203C20.6 14.7146 21.2235 14.4931 21.8665 14.4931H50.3426C51.7915 14.4931 52.966 15.6677 52.966 17.1166V39.9246Z" style={{ "fill": "var(--icon_default_primary)" }}></path>
-      <path d="M47.7187 38.0947C47.7187 38.5157 47.5292 38.9143 47.2026 39.18L41.9393 43.4628C41.6898 43.6659 41.3779 43.7767 41.0562 43.7767H16.628C16.145 43.7767 15.7535 43.3852 15.7535 42.9022V26.0081C15.7535 25.5856 15.9444 25.1858 16.2729 24.9201L22.3078 20.0398C22.557 19.8383 22.8678 19.7285 23.1882 19.7286L46.8446 19.7396C47.3274 19.7398 47.7187 20.1313 47.7187 20.6141V38.0947Z" style={{ "fill": "var(--bg_grouped_secondary)" }}></path>
-      <path d="M21.2438 34.9295C21.2438 34.1568 21.8702 33.5303 22.643 33.5303H25.966C26.7387 33.5303 27.3652 34.1568 27.3652 34.9295V44.9861H21.2438V34.9295Z" style={{ "fill": "var(--icon_default_primary)" }}></path>
-      <path d="M30.5134 34.9295C30.5134 34.1568 31.1398 33.5303 31.9126 33.5303H35.2356C36.0084 33.5303 36.6348 34.1568 36.6348 34.9295V44.9861H30.5134V34.9295Z" style={{ "fill": "var(--icon_default_primary)" }}></path></g>
-      <defs>
-      <clipPath id={clipId}>
-      <path d="M0 32C0 14.3269 14.3269 0 32 0V0C49.6731 0 64 14.3269 64 32V32C64 49.6731 49.6731 64 32 64V64C14.3269 64 0 49.6731 0 32V32Z"></path></clipPath></defs>
-    </svg>
-  );
-}
-
-/** Browser-tab product mark used as the default agent/subagent avatar. */
-export function WebuiIconAgent({ className }: WebuiIconProps): ReactElement {
-  return <img src="/assets/img/minimax-code-agent-icon.png" alt="" aria-hidden="true" className={className} />;
-}
-
-/** circle-plus, the rail's fixed new-task row — the `新建任务` glyph. */
-export function WebuiIconNewTask({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path d="M10.0005 1.90039C14.4737 1.90065 18.1 5.52675 18.1001 10C18.1001 14.4733 14.4738 18.0993 10.0005 18.0996C5.52698 18.0996 1.90088 14.4735 1.90088 10C1.90099 5.52659 5.52705 1.90039 10.0005 1.90039ZM10.0005 3.09961C6.18979 3.09961 3.10021 6.18933 3.1001 10C3.1001 13.8108 6.18972 16.9004 10.0005 16.9004C13.811 16.9001 16.9009 13.8106 16.9009 10C16.9008 6.18949 13.811 3.09987 10.0005 3.09961ZM9.99951 6.15039C10.3309 6.15039 10.5991 6.41863 10.5991 6.75V9.40039H13.2495C13.5809 9.40039 13.8491 9.66863 13.8491 10C13.849 10.3313 13.5808 10.5996 13.2495 10.5996H10.6001V13.25C10.5999 13.5811 10.3315 13.8493 10.0005 13.8496C9.66921 13.8496 9.40104 13.5812 9.40088 13.25V10.5996H6.74951C6.41823 10.5996 6.15004 10.3313 6.1499 10C6.1499 9.66863 6.41814 9.40039 6.74951 9.40039H9.3999V6.75C9.3999 6.41879 9.66837 6.15065 9.99951 6.15039Z" fill="currentColor"></path>
-    </svg>
-  );
-}
-
-/** rail nav row — the `插件` glyph. */
-export function WebuiIconPlugins({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path d="M7.65967 4.72168C8.02549 4.7217 8.37652 4.86639 8.63525 5.125C8.89401 5.38377 9.03955 5.73561 9.03955 6.10156V10.96H13.8979C14.2639 10.96 14.6157 11.1055 14.8745 11.3643C15.1331 11.623 15.2778 11.974 15.2778 12.3398V16.2393C15.2777 16.8119 15.0509 17.3617 14.646 17.7666C14.241 18.1714 13.6912 18.3984 13.1187 18.3984H3.76025C3.18764 18.3983 2.63782 18.1715 2.23291 17.7666C1.82801 17.3617 1.60121 16.8119 1.60107 16.2393V6.88086C1.60111 6.30828 1.82813 5.75848 2.23291 5.35352C2.63783 4.9486 3.18763 4.72179 3.76025 4.72168H7.65967ZM2.80029 16.2393C2.80043 16.4936 2.90168 16.7381 3.08154 16.918C3.26141 17.0978 3.5059 17.1991 3.76025 17.1992H7.83936V12.1602H2.80029V16.2393ZM9.03955 17.1992H13.1187C13.373 17.1992 13.6175 17.0977 13.7974 16.918C13.9772 16.7381 14.0785 16.4936 14.0786 16.2393V12.3398C14.0786 12.2923 14.0594 12.2466 14.0259 12.2129C13.9922 12.1792 13.9456 12.1602 13.8979 12.1602H9.03955V17.1992ZM3.76025 5.9209C3.50589 5.92101 3.26142 6.02227 3.08154 6.20215C2.9018 6.38207 2.80032 6.62653 2.80029 6.88086V10.96H7.83936V6.10156C7.83936 6.05387 7.82034 6.00736 7.78662 5.97363C7.75293 5.94007 7.70723 5.92092 7.65967 5.9209H3.76025ZM17.0181 1.60156C17.78 1.6016 18.3977 2.21959 18.3979 2.98145V7.66016C18.3979 8.42217 17.7801 9.04 17.0181 9.04004H12.3394C11.5773 9.04001 10.9595 8.42217 10.9595 7.66016V2.98145C10.9597 2.21958 11.5774 1.60159 12.3394 1.60156H17.0181ZM12.3394 2.80078C12.2402 2.80081 12.1589 2.88232 12.1587 2.98145V7.66016C12.1587 7.75943 12.2401 7.83982 12.3394 7.83984H17.0181C17.1173 7.8398 17.1977 7.75942 17.1978 7.66016V2.98145C17.1975 2.88233 17.1172 2.80082 17.0181 2.80078H12.3394Z" fill="currentColor"></path>
-    </svg>
-  );
-}
-
-/** rail nav row — the `网站` glyph. */
-export function WebuiIconSites({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path d="M14.3118 8.59906C15.0147 9.302 16.1537 9.302 16.8567 8.59906L18.342 7.11469C19.0445 6.41183 19.0445 5.27262 18.342 4.56976L16.8567 3.08539C16.1537 2.38244 15.0147 2.38244 14.3118 3.08539L12.8274 4.56976C12.1244 5.27271 12.1244 6.41174 12.8274 7.11469L14.3118 8.59906ZM9.03052 8.94183C10.0246 8.94183 10.8303 8.13614 10.8303 7.14203V4.54242C10.8303 3.54831 10.0246 2.74261 9.03052 2.74261H2.93091C1.9368 2.74261 1.1311 3.54831 1.1311 4.54242V7.14203C1.1311 8.13614 1.9368 8.94183 2.93091 8.94183H9.03052ZM16.009 7.7514C15.7747 7.98572 15.3937 7.98572 15.1594 7.7514L13.675 6.26703C13.4407 6.03271 13.4407 5.65173 13.675 5.41742L15.1594 3.93304C15.3937 3.69873 15.7747 3.69873 16.009 3.93304L17.4934 5.41742C17.7277 5.65173 17.7277 6.03271 17.4934 6.26703L16.009 7.7514ZM2.93091 7.74261C2.59954 7.74261 2.33032 7.4734 2.33032 7.14203V4.54242C2.33032 4.21105 2.59954 3.94183 2.93091 3.94183H9.03052C9.36189 3.94183 9.6311 4.21105 9.6311 4.54242V7.14203C9.6311 7.4734 9.36189 7.74261 9.03052 7.74261H2.93091ZM4.23071 17.4418C5.9428 17.4418 7.33032 16.0543 7.33032 14.3422C7.33032 12.6301 5.9428 11.2426 4.23071 11.2426C2.51863 11.2426 1.1311 12.6301 1.1311 14.3422C1.1311 16.0543 2.51863 17.4418 4.23071 17.4418ZM16.5305 17.4418C17.5246 17.4418 18.3303 16.6361 18.3303 15.642V13.0424C18.3303 12.0483 17.5246 11.2426 16.5305 11.2426H10.4309C9.4368 11.2426 8.6311 12.0483 8.6311 13.0424V15.642C8.6311 16.6361 9.4368 17.4418 10.4309 17.4418H16.5305ZM4.23071 16.2426C3.18137 16.2426 2.33032 15.3916 2.33032 14.3422C2.33032 13.2929 3.18137 12.4418 4.23071 12.4418C5.28005 12.4418 6.1311 13.2929 6.1311 14.3422C6.1311 15.3916 5.28005 16.2426 4.23071 16.2426ZM10.4309 16.2426C10.0995 16.2426 9.83032 15.9734 9.83032 15.642V13.0424C9.83032 12.711 10.0995 12.4418 10.4309 12.4418H16.5305C16.8619 12.4418 17.1311 12.711 17.1311 13.0424V15.642C17.1311 15.9734 16.8619 16.2426 16.5305 16.2426H10.4309Z" fill="currentColor"></path>
-    </svg>
-  );
-}
-
-/** rail nav row — the `远程` glyph. */
-export function WebuiIconRemote({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path d="M13.9692 1.46066C15.5901 1.46066 16.9045 2.77441 16.9047 4.39523V15.6042C16.9046 17.2252 15.5902 18.5388 13.9692 18.5388H6.02972C4.40905 18.5384 3.09524 17.225 3.09515 15.6042V4.39523C3.0954 2.77463 4.40915 1.46102 6.02972 1.46066H13.9692ZM6.02972 2.65988C5.07189 2.66024 4.29461 3.43737 4.29437 4.39523V15.6042C4.29446 16.5622 5.07179 17.3392 6.02972 17.3396H13.9692C14.9274 17.3396 15.7044 16.5624 15.7045 15.6042V4.39523C15.7043 3.43715 14.9273 2.65988 13.9692 2.65988H6.02972ZM9.52484 8.82687C9.71448 8.55567 10.0882 8.48927 10.3598 8.67844C10.6316 8.86806 10.6979 9.24262 10.5082 9.51437L9.29926 11.2468H11.726C12.3082 11.247 12.6475 11.9051 12.31 12.3796L10.5053 14.9167C10.3132 15.1864 9.93828 15.2493 9.6684 15.0573C9.3989 14.8652 9.33596 14.4903 9.52777 14.2204L10.7885 12.447H8.3725C7.79358 12.4465 7.45336 11.795 7.78461 11.32L9.52484 8.82687ZM11.8686 4.78C12.1999 4.7801 12.4682 5.0483 12.4682 5.37961C12.4681 5.71081 12.1998 5.97911 11.8686 5.97922H8.13226C7.80096 5.97922 7.53277 5.71088 7.53265 5.37961C7.53265 5.04824 7.80089 4.78 8.13226 4.78H11.8686Z" fill="currentColor"></path>
-    </svg>
-  );
-}
-
-/** identity row trailing action — the `站内信，无未读消息` glyph. */
-export function WebuiIconBell({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path d="M10.7783 16.4507C10.944 16.1638 11.3117 16.0653 11.5986 16.231C11.8854 16.3967 11.983 16.7634 11.8174 17.0503C11.6331 17.3694 11.368 17.6346 11.0488 17.8188C10.7297 18.003 10.3675 18.1001 9.99902 18.1001C9.63057 18.1 9.26832 18.0031 8.94922 17.8188C8.63011 17.6346 8.36494 17.3694 8.18066 17.0503C8.01513 16.7634 8.1137 16.3967 8.40039 16.231C8.68734 16.0654 9.05405 16.1638 9.21973 16.4507C9.29863 16.5873 9.41227 16.7008 9.54883 16.7798C9.68551 16.8587 9.8412 16.9008 9.99902 16.9009C10.1569 16.9009 10.3125 16.8587 10.4492 16.7798C10.5858 16.7009 10.6993 16.5872 10.7783 16.4507ZM10 1.8999C11.3522 1.90003 12.6492 2.43705 13.6055 3.39307C14.5618 4.34939 15.0995 5.64708 15.0996 6.99951C15.0996 8.62344 15.3539 9.64774 15.6953 10.3706C15.9519 10.9137 16.2684 11.3133 16.6211 11.6958L16.9854 12.0776L16.999 12.0913C17.1749 12.2847 17.2911 12.5257 17.333 12.7837C17.3748 13.0416 17.3399 13.3064 17.2344 13.5454C17.1286 13.7846 16.9555 13.9886 16.7363 14.1313C16.5172 14.2739 16.2614 14.3501 16 14.3501H3.99902C3.73748 14.3499 3.48176 14.2732 3.2627 14.1304C3.04364 13.9874 2.87018 13.7838 2.76465 13.5444C2.65921 13.3051 2.62573 13.0398 2.66797 12.7817C2.71028 12.5238 2.82676 12.2835 3.00293 12.0903L3.01465 12.0767C3.5128 11.5624 3.96163 11.0948 4.30371 10.3706C4.64505 9.64777 4.89941 8.62339 4.89941 6.99951C4.89956 5.64708 5.43723 4.34939 6.39355 3.39307C7.34996 2.43693 8.64761 1.8999 10 1.8999ZM10 3.09912C8.96587 3.09912 7.97355 3.51061 7.24219 4.2417C6.5109 4.97298 6.09975 5.96534 6.09961 6.99951C6.09961 8.74925 5.82503 9.95937 5.38867 10.8833C4.9566 11.798 4.3828 12.3879 3.88867 12.8979C3.86926 12.9192 3.85637 12.9467 3.85156 12.9751C3.84691 13.0035 3.85081 13.0336 3.8623 13.0601C3.87401 13.0866 3.89368 13.1096 3.91797 13.1255C3.94232 13.1414 3.97092 13.1499 4 13.1499H16C16.029 13.1499 16.0577 13.1413 16.082 13.1255C16.1062 13.1096 16.126 13.0865 16.1377 13.0601C16.1491 13.0338 16.1529 13.0043 16.1484 12.9761C16.1437 12.9476 16.1307 12.9203 16.1113 12.8989H16.1104C15.6152 12.3885 15.0423 11.7976 14.6104 10.8833C14.1739 9.95923 13.8994 8.74914 13.8994 6.99951C13.8993 5.9654 13.489 4.97297 12.7578 4.2417C12.0265 3.51051 11.0341 3.09925 10 3.09912Z" fill="currentColor"></path>
-    </svg>
-  );
-}
-
-/** composer toolbar left — the `attach-button` glyph. */
-export function WebuiIconAttach({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path d="M10 2.5C10.3312 2.5 10.5994 2.76842 10.5996 3.09961V9.40039H16.9004C17.2316 9.4006 17.5 9.66876 17.5 10C17.5 10.3312 17.2316 10.5994 16.9004 10.5996H10.5996V16.9004C10.5994 17.2316 10.3312 17.5 10 17.5C9.66876 17.5 9.4006 17.2316 9.40039 16.9004V10.5996H3.09961C2.76842 10.5994 2.5 10.3312 2.5 10C2.5 9.66876 2.76842 9.4006 3.09961 9.40039H9.40039V3.09961C9.4006 2.76842 9.66876 2.5 10 2.5Z" fill="currentColor"></path>
-    </svg>
-  );
-}
-
-/** model selector / dropdown affordance — the `model-selector-trigger` glyph. */
-export function WebuiIconChevronDown({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}>
-      <path d="M12 6L8 10L4 6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"></path>
-    </svg>
-  );
-}
-
-/** Outline disclosure chevron used by pinned and project section headers. */
-export function WebuiIconSessionDisclosure({ className }: WebuiIconProps): ReactElement {
-  return <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true" className={className}><path d="m4.25 2.5 3.5 3.5-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>;
-}
-
-/** Filled disclosure arrow retained for expandable parent-session rows. */
-export function WebuiIconSessionTreeDisclosure({ className }: WebuiIconProps): ReactElement {
-  return <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true" className={className}><path d="M4.25 2.75 8 6l-3.75 3.25v-6.5Z" fill="currentColor" /></svg>;
-}
-
-/** approval mode `请求批准` — a raised open hand, drawn on the 20-unit grid the
- *  rest of the composer toolbar uses. */
-export function WebuiIconPermissionRequest({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path
-        d="M8 17.6V15.6C6.8 15.2 6 14 5.6 12.6L4.4 10A1.1 1.1 0 0 1 6.6 10L7 10.6V4.6A1.05 1.05 0 0 1 9.1 4.6V8.4V3.2A1.05 1.05 0 0 1 11.2 3.2V8.4V4.2A1.05 1.05 0 0 1 13.3 4.2V8.4V6.6A0.85 0.85 0 0 1 15 6.6V11.6C15 14.2 13 16 10.4 16H9.2C8.8 16 8.4 15.8 8 15.6Z"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-/** approval mode `帮我批准` — a command box carrying a `>` prompt. */
-export function WebuiIconPermissionAuto({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <rect x="2.9" y="3.9" width="14.2" height="12.2" rx="3" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M6.9 7.9 9.5 10l-2.6 2.1M11.4 12.6h2.6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-/** approval mode `完全访问权限` — a shield carrying an exclamation mark. */
-export function WebuiIconPermissionFull({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path
-        d="M10 2.6 16.4 4.7v4.7c0 3.7-2.7 6.6-6.4 8.1-3.7-1.5-6.4-4.4-6.4-8.1V4.7L10 2.6Z"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinejoin="round"
-      />
-      <path d="M10 7.4v3.8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-      <circle cx="10" cy="13.6" r="0.95" fill="currentColor" />
-    </svg>
-  );
-}
-
-/** composer send — the `send-button` glyph. */
-export function WebuiIconFile({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M4 1.75h5l3 3v9.5H4z" />
-      <path d="M9 1.75V5h3" />
-    </svg>
-  );
-}
-
-/** Edited-files summary glyph — the `ap` icon. */
-export function WebuiIconDiffSummary({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path
-        d="M10 1.40039C14.7496 1.40039 18.5996 5.25035 18.5996 10C18.5996 14.7496 14.7496 18.5996 10 18.5996C5.25035 18.5996 1.40039 14.7496 1.40039 10C1.40039 5.25035 5.25035 1.40039 10 1.40039ZM10 2.59961C5.91309 2.59961 2.59961 5.91309 2.59961 10C2.59961 14.0869 5.91309 17.4004 10 17.4004C14.0869 17.4004 17.4004 14.0869 17.4004 10C17.4004 5.91309 14.0869 2.59961 10 2.59961ZM12.5 13.4014C12.8314 13.4014 13.0996 13.6696 13.0996 14.001C13.0994 14.3321 12.8312 14.6006 12.5 14.6006H7.5C7.16877 14.6006 6.90062 14.3321 6.90039 14.001C6.90039 13.6696 7.16863 13.4014 7.5 13.4014H12.5ZM10 5.21777C10.3314 5.21777 10.5996 5.48601 10.5996 5.81738V7.71777H12.5C12.8314 7.71777 13.0996 7.98601 13.0996 8.31738C13.0996 8.64872 12.8313 8.91699 12.5 8.91699H10.5996V10.8174C10.5996 11.1487 10.3313 11.417 10 11.417C9.66865 11.417 9.40043 11.1487 9.40039 10.8174V8.91699H7.5C7.16865 8.91699 6.90043 8.64872 6.90039 8.31738C6.90039 7.98601 7.16863 7.71777 7.5 7.71777H9.40039V5.81738C9.40039 5.48601 9.66863 5.21777 10 5.21777Z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-
-/** File-type glyph projection used by diff rows. */
-export function WebuiIconDiffFile({ fileName, className }: WebuiIconProps & { readonly fileName?: string }): ReactElement {
-  const extension = fileName?.split(/[./\\]/u).pop()?.toLowerCase();
-  const glyphs: Readonly<Record<string, readonly [string, string]>> = {
-    c: ["C", "is-code"], cjs: ["JS", "is-javascript"], css: ["CSS", "is-css"], go: ["Go", "is-go"], h: ["C", "is-code"], htm: ["5", "is-html"], html: ["5", "is-html"],
-    java: ["J", "is-java"], js: ["JS", "is-javascript"], jsx: ["JS", "is-javascript"], json: ["{}", "is-json"], md: ["M↓", "is-markdown"], mjs: ["JS", "is-javascript"], mts: ["TS", "is-typescript"],
-    py: ["Py", "is-python"], rs: ["Rs", "is-rust"], sh: ["$", "is-shell"], sql: ["DB", "is-sql"], ts: ["TS", "is-typescript"], tsx: ["TS", "is-typescript"], xml: ["<>", "is-xml"], yaml: ["Y", "is-yaml"], yml: ["Y", "is-yaml"],
-  };
-  const glyph = extension ? glyphs[extension] : undefined;
-  if (glyph) return <span aria-hidden="true" className={`webui-workspace-filetype-badge ${glyph[1]} ${className ?? ""}`}>{glyph[0]}</span>;
-  return <WebuiIconFile className={className} />;
-}
-
-/** The send glyph is the only consumer of this icon, and its rendered
- * footprint is fixed by the 36px disc around it: the path's ink spans 12.16 of
- * the 20-unit viewBox, so 20px renders a 12.2px arrow inside the disc, which
- * is the proportion the composer send button is drawn to. */
-export function WebuiIconSend({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path d="M10.0795 16V4M16.159 9.47515L10.0795 4L4 9.47515" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"></path>
-    </svg>
-  );
-}
-
-/** workspace pill leading icon — the `project-selector-leading-icon` glyph. */
-export function WebuiIconFolder({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path d="M7.50586 2.5C7.95942 2.50007 8.39502 2.68035 8.71582 3.00098L10.0439 4.3291C10.1397 4.42465 10.27 4.4784 10.4053 4.47852H15.3574C16.793 4.47875 17.9567 5.64261 17.957 7.07812V14.71C17.957 16.1458 16.7932 17.3103 15.3574 17.3105H4.59961C3.16387 17.3103 2 16.1458 2 14.71V5.09961C2.00011 3.66391 3.16394 2.50023 4.59961 2.5H7.50586ZM3.19922 9.36328V14.71C3.19922 15.483 3.82661 16.1101 4.59961 16.1104H15.3574C16.1304 16.1101 16.7568 15.483 16.7568 14.71V9.36328H3.19922ZM4.59961 3.69922C3.82668 3.69945 3.19933 4.32665 3.19922 5.09961V8.16406H16.7568V7.07812C16.7565 6.30535 16.1302 5.67894 15.3574 5.67871H10.4053C9.95176 5.6786 9.51608 5.49833 9.19531 5.17773L7.86719 3.84961C7.77143 3.75402 7.64116 3.69929 7.50586 3.69922H4.59961Z" fill="currentColor"></path>
-    </svg>
-  );
-}
-
-/** Sidebar conversation glyph used by individually pinned sessions. */
-export function WebuiIconSession({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path d="M10 2.2c-4.31 0-7.8 3.12-7.8 6.97 0 1.53.56 2.94 1.51 4.08L3.1 17.6l4.49-1.57c.76.25 1.57.39 2.41.39 4.31 0 7.8-3.12 7.8-6.97S14.31 2.2 10 2.2Z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-/** Project/session row action — the horizontal more-actions glyph. */
-export function WebuiIconMore({ className }: WebuiIconProps): ReactElement {
-  return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}><path d="M2.90039 6.75C3.53534 6.75021 4.0498 7.26539 4.0498 7.90039C4.04959 8.53521 3.53521 9.04959 2.90039 9.0498C2.26539 9.0498 1.75021 8.53534 1.75 7.90039C1.75 7.26526 2.26526 6.75 2.90039 6.75ZM7.90039 6.75C8.53534 6.75021 9.0498 7.26539 9.0498 7.90039C9.04959 8.53521 8.53521 9.04959 7.90039 9.0498C7.26539 9.0498 6.75021 8.53534 6.75 7.90039C6.75 7.26526 7.26526 6.75 7.90039 6.75ZM12.9004 6.75C13.5353 6.75021 14.0498 7.26539 14.0498 7.90039C14.0496 8.53521 13.5352 9.04959 12.9004 9.0498C12.2654 9.0498 11.7502 8.53534 11.75 7.90039C11.75 7.26526 12.2653 6.75 12.9004 6.75Z" fill="currentColor" /></svg>;
-}
-
-/** Project row action — the create-task plus glyph. */
-export function WebuiIconProjectAdd({ className }: WebuiIconProps): ReactElement {
-  return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}><path d="M8 3C8.27614 3 8.5 3.22386 8.5 3.5V7.5H12.5C12.7761 7.5 13 7.72386 13 8C13 8.27614 12.7761 8.5 12.5 8.5H8.5V12.5C8.5 12.7761 8.27614 13 8 13C7.72386 13 7.5 12.7761 7.5 12.5V8.5H3.5C3.22386 8.5 3 8.27614 3 8C3 7.72386 3.22386 7.5 3.5 7.5H7.5V3.5C7.5 3.22386 7.72386 3 8 3Z" fill="currentColor" /></svg>;
-}
-
-/**
- * The persistent "this row is pinned" mark.
- *
- * Solid on purpose, where the action button's glyph is an outline: the two
- * answer different questions. The button says what a click will do, the mark
- * says what already is. A 12px outline sitting next to an 11px age label was
- * rendered side by side with the solid form and read as a smudge at both 12px
- * and 14px -- the pin's counter is what makes it a pin, and at that size the
- * stroke eats it.
- *
- * 14px rather than 12 because the solid silhouette closes up below that, and
- * rather than 16 because 16 is the action button's glyph and two pins the same
- * size on one row reads as a mistake.
- */
-export function WebuiIconSessionPinMark({ className }: WebuiIconProps): ReactElement {
-  return <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}><path d="M13.9828 5.56887C14.308 5.89408 14.4908 6.33537 14.491 6.79526C14.491 7.25536 14.3081 7.69767 13.9828 8.02303C13.6574 8.34821 13.2157 8.53057 12.7557 8.53057C12.2957 8.53046 11.8546 8.34761 11.5293 8.02234C11.5073 8.00047 11.4774 7.98787 11.4464 7.98781C11.4155 7.98781 11.3856 8.00055 11.3636 8.02234L9.72147 9.66443C9.62503 9.76108 9.55725 9.88298 9.52605 10.0159C9.50274 10.1155 9.50053 10.2186 9.51914 10.3184L9.54538 10.4178L9.54607 10.4213L9.92863 11.5869L9.92932 11.5876C10.0321 11.8935 10.0471 12.2222 9.97351 12.5364C9.89986 12.8505 9.74022 13.1381 9.51224 13.3664L9.18009 13.6985C8.97058 13.908 8.68641 14.0258 8.39012 14.0258C8.09383 14.0258 7.8097 13.908 7.60015 13.6985L5.33382 11.4322L3.50459 13.2614C3.30933 13.4567 2.99275 13.4567 2.79749 13.2614C2.60231 13.0662 2.60225 12.7495 2.79749 12.5543L4.62671 10.7251L2.36038 8.45876C2.15098 8.24922 2.03306 7.96503 2.03307 7.66879C2.03316 7.37255 2.1509 7.08829 2.36038 6.87882L2.69252 6.54667L2.78022 6.4645C2.99256 6.27998 3.2475 6.14989 3.52255 6.08539C3.83675 6.01174 4.16543 6.02678 4.47134 6.12959L5.63765 6.51283L5.6411 6.51352C5.77063 6.55705 5.90995 6.56401 6.043 6.53286C6.17596 6.50167 6.2978 6.4339 6.39448 6.33744L8.03657 4.69535C8.05836 4.67336 8.07109 4.64346 8.07109 4.61248C8.071 4.5815 8.05845 4.55156 8.03657 4.52962C7.71133 4.20435 7.52844 3.7632 7.52833 3.30323C7.52837 2.84329 7.71073 2.40145 8.03588 2.07615C8.36123 1.75084 8.80355 1.56792 9.26365 1.56792C9.72357 1.56805 10.1648 1.75095 10.49 2.07615L13.9828 5.56887Z" fill="currentColor" /></svg>;
-}
-
-/** Small project-rail pin glyph, matching the sidebar icon. */
-export function WebuiIconSessionPin({ className }: WebuiIconProps): ReactElement {
-  return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}><path d="M13.9828 5.56887C14.308 5.89408 14.4908 6.33537 14.491 6.79526C14.491 7.25536 14.3081 7.69767 13.9828 8.02303C13.6574 8.34821 13.2157 8.53057 12.7557 8.53057C12.2957 8.53046 11.8546 8.34761 11.5293 8.02234C11.5073 8.00047 11.4774 7.98787 11.4464 7.98781C11.4155 7.98781 11.3856 8.00055 11.3636 8.02234L9.72147 9.66443C9.62503 9.76108 9.55725 9.88298 9.52605 10.0159C9.50274 10.1155 9.50053 10.2186 9.51914 10.3184L9.54538 10.4178L9.54607 10.4213L9.92863 11.5869L9.92932 11.5876C10.0321 11.8935 10.0471 12.2222 9.97351 12.5364C9.89986 12.8505 9.74022 13.1381 9.51224 13.3664L9.18009 13.6985C8.97058 13.908 8.68641 14.0258 8.39012 14.0258C8.09383 14.0258 7.8097 13.908 7.60015 13.6985L5.33382 11.4322L3.50459 13.2614C3.30933 13.4567 2.99275 13.4567 2.79749 13.2614C2.60231 13.0662 2.60225 12.7495 2.79749 12.5543L4.62671 10.7251L2.36038 8.45876C2.15098 8.24922 2.03306 7.96503 2.03307 7.66879C2.03316 7.37255 2.1509 7.08829 2.36038 6.87882L2.69252 6.54667L2.78022 6.4645C2.99256 6.27998 3.2475 6.14989 3.52255 6.08539C3.83675 6.01174 4.16543 6.02678 4.47134 6.12959L5.63765 6.51283L5.6411 6.51352C5.77063 6.55705 5.90995 6.56401 6.043 6.53286C6.17596 6.50167 6.2978 6.4339 6.39448 6.33744L8.03657 4.69535C8.05836 4.67336 8.07109 4.64346 8.07109 4.61248C8.071 4.5815 8.05845 4.55156 8.03657 4.52962C7.71133 4.20435 7.52844 3.7632 7.52833 3.30323C7.52837 2.84329 7.71073 2.40145 8.03588 2.07615C8.36123 1.75084 8.80355 1.56792 9.26365 1.56792C9.72357 1.56805 10.1648 1.75095 10.49 2.07615L13.9828 5.56887ZM9.78293 2.78326C9.64523 2.64559 9.45835 2.56795 9.26365 2.56781C9.06877 2.56781 8.8808 2.64548 8.74298 2.78326C8.60537 2.92102 8.52827 3.1085 8.52823 3.30323C8.52833 3.49798 8.60598 3.68478 8.74367 3.82251C8.9531 4.03199 9.07089 4.31629 9.07099 4.61248C9.07099 4.90867 8.953 5.19292 8.74367 5.40245L7.10158 7.04454L7.0132 7.12741C6.80099 7.31169 6.54636 7.44135 6.27156 7.50582C5.95814 7.57931 5.6308 7.56372 5.32553 7.46163V7.46301L4.15577 7.07907L4.153 7.07769C4.02342 7.03415 3.88352 7.02785 3.75042 7.05905C3.61748 7.09029 3.49558 7.15797 3.39894 7.25447L3.06748 7.58592C3.04554 7.60787 3.03306 7.63777 3.03296 7.66879C3.03296 7.69982 3.04562 7.72965 3.06748 7.75165L8.30726 12.9914C8.32927 13.0133 8.35905 13.0259 8.39012 13.0259C8.42119 13.0259 8.451 13.0134 8.47298 12.9914L8.80444 12.66L8.87142 12.5833C8.93275 12.502 8.9764 12.4083 8.99986 12.3085C9.03104 12.1754 9.02476 12.0355 8.98122 11.9059L8.97984 11.9031L8.5959 10.7334L8.59659 10.7327C8.49479 10.4277 8.47967 10.1004 8.55309 9.78734C8.61756 9.51259 8.74724 9.25788 8.9315 9.04571L9.01436 8.95732L10.6565 7.31523C10.866 7.10591 11.1502 6.98792 11.4464 6.98792C11.7426 6.98797 12.0269 7.10583 12.2364 7.31523C12.3741 7.45296 12.5609 7.53057 12.7557 7.53068C12.9504 7.53067 13.1379 7.45356 13.2756 7.31592C13.4134 7.1781 13.4911 6.99014 13.4911 6.79526C13.4909 6.60058 13.4133 6.41365 13.2756 6.27598L9.78293 2.78326Z" fill="currentColor" /></svg>;
-}
-
-/** Context-menu glyphs, as used by the sidebar action menu. */
-export function WebuiIconContextPin({ className, pinned = false }: WebuiIconProps & { pinned?: boolean }): ReactElement {
-  // The slashed glyph is clipped to the viewBox, so it needs a clipPath, and a
-  // shared id would make the second pinned row on screen resolve its clip
-  // against the first row's element. Safe only while at most one pinned row is
-  // ever mounted, which was true when this lived in a context menu that opens
-  // one item at a time and stopped being true the moment the rail drew it on
-  // every row.
-  const clipId = `webui-context-pin-${pinned ? "pinned" : "unpinned"}-${useId().replace(/:/gu, "")}`;
-  return pinned
-    ? <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className={className}><g clipPath={`url(#${clipId})`}><path d="M17.1179 14.9087C17.3519 15.143 17.352 15.5224 17.1179 15.7567C16.8837 15.9909 16.5036 15.9914 16.2693 15.7574L12.3201 11.8068C12.2943 11.9071 12.2452 12.0031 12.1668 12.0816C12.0408 12.2079 11.952 12.3665 11.9113 12.5402C11.8808 12.6703 11.8779 12.8054 11.9023 12.9358L11.9362 13.065L11.9375 13.0691L12.4209 14.5427L12.4644 14.687C12.5524 15.0256 12.557 15.3822 12.4768 15.7242C12.385 16.1151 12.1861 16.4732 11.9023 16.7572L11.4832 17.1764C11.2245 17.435 10.8731 17.5802 10.5074 17.5804C10.1417 17.5804 9.79043 17.4349 9.53171 17.1764L6.64666 14.2913L4.31335 16.6247C4.07899 16.8584 3.6995 16.8588 3.46537 16.6247C3.23138 16.3905 3.23166 16.011 3.46537 15.7767L5.79869 13.4434L2.91502 10.5597C2.65636 10.301 2.51048 9.94909 2.51036 9.58329C2.5105 9.21759 2.65645 8.86688 2.91502 8.60825L3.33417 8.1891C3.61842 7.90517 3.97606 7.70629 4.36721 7.61458C4.75834 7.52288 5.16722 7.54184 5.54802 7.66982L7.02162 8.15319L7.02577 8.15457C7.19489 8.21135 7.37687 8.22015 7.55057 8.17943C7.7242 8.1387 7.88355 8.0506 8.00978 7.92463C8.08819 7.8463 8.18321 7.79587 8.28323 7.76995L4.57299 4.05971C4.33867 3.82539 4.33867 3.44605 4.57299 3.21173C4.80731 2.97753 5.18669 2.97746 5.42097 3.21173L17.1179 14.9087ZM9.01105 8.49777C8.98519 8.598 8.93628 8.69407 8.85775 8.7726C8.57354 9.05647 8.2151 9.2561 7.82402 9.34782C7.4343 9.4391 7.02696 9.41938 6.64735 9.29257L5.1703 8.80851L5.16616 8.80713C4.99707 8.7503 4.81504 8.74162 4.64135 8.78227C4.46754 8.82303 4.30776 8.9116 4.18146 9.03777L3.76299 9.45623C3.72947 9.48981 3.71065 9.53585 3.71051 9.58329C3.71063 9.63082 3.73006 9.67742 3.76368 9.71104L10.3804 16.3277C10.4141 16.3612 10.46 16.3802 10.5074 16.3802C10.5549 16.3801 10.6009 16.3613 10.6345 16.3277L11.053 15.9093L11.14 15.8085C11.22 15.7023 11.2778 15.5797 11.3085 15.4494C11.3491 15.2758 11.3403 15.0935 11.2836 14.9246L11.2829 14.9211L10.7968 13.4434L10.7975 13.4427C10.6709 13.0634 10.6518 12.6561 10.7429 12.2667C10.8346 11.8756 11.0342 11.5172 11.3181 11.233C11.3964 11.1547 11.491 11.1036 11.5909 11.0776L9.01105 8.49777ZM17.5481 6.95443C17.9527 7.35926 18.1805 7.90817 18.1807 8.48051C18.1805 9.0531 17.953 9.60306 17.5481 10.008C17.1432 10.4129 16.5933 10.6404 16.0207 10.6405C15.4483 10.6404 14.8994 10.4125 14.4946 10.008C14.2603 9.77369 14.2597 9.39363 14.4939 9.1593C14.7282 8.92504 15.1083 8.92569 15.3426 9.15999C15.5225 9.33963 15.7671 9.44104 16.0214 9.44104C16.2756 9.44093 16.5196 9.33909 16.6995 9.1593C16.8793 8.97949 16.981 8.73547 16.9812 8.4812C16.9812 8.22694 16.8798 7.98231 16.7001 7.8024L12.289 3.39127C12.1092 3.21143 11.8645 3.11036 11.6102 3.11022C11.3557 3.11022 11.1114 3.21133 10.9314 3.39127C10.7515 3.57122 10.6504 3.81562 10.6504 4.07007C10.6506 4.32431 10.7516 4.56907 10.9314 4.74886C11.1651 4.98321 11.1655 5.36272 10.9314 5.59684C10.6973 5.83083 10.3178 5.8305 10.0835 5.59684C9.67861 5.192 9.45042 4.64257 9.45023 4.07007C9.45023 3.49736 9.67783 2.9476 10.0828 2.5426C10.4878 2.13762 11.0375 1.91008 11.6102 1.91008C12.1828 1.91021 12.7321 2.13841 13.137 2.5433L17.5481 6.95443Z" fill="currentColor" /></g><defs><clipPath id={clipId}><rect width="20" height="20" fill="white" /></clipPath></defs></svg>
-    : <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className={className}><g clipPath={`url(#${clipId})`}><path d="M17.4607 6.97887C17.8626 7.38076 18.0882 7.92626 18.0884 8.4946C18.0883 9.06292 17.8625 9.60838 17.4607 10.0103C17.0587 10.4122 16.5134 10.638 15.945 10.638C15.3765 10.638 14.8312 10.4123 14.4292 10.0103C14.3972 9.97839 14.3536 9.96007 14.3084 9.95991C14.263 9.95991 14.2184 9.97826 14.1862 10.0103L12.1346 12.0619C12.0107 12.186 11.9234 12.3428 11.8833 12.5135C11.8432 12.6842 11.8517 12.8631 11.9074 13.0293L11.9088 13.0335L12.388 14.4919C12.515 14.8697 12.5341 15.2763 12.4433 15.6644C12.3523 16.0525 12.1539 16.4077 11.8722 16.6899L11.4572 17.1049C11.2 17.3621 10.8514 17.5067 10.4877 17.5068C10.1239 17.5068 9.77473 17.3627 9.51748 17.1056L6.66696 14.255L4.36195 16.56C4.12764 16.7941 3.74821 16.7942 3.51398 16.56C3.27975 16.3258 3.27992 15.9464 3.51398 15.7121L5.81898 13.4071L2.96777 10.5558C2.71081 10.2986 2.56657 9.94924 2.56657 9.58564C2.56678 9.2221 2.71138 8.87321 2.96846 8.61613L3.38347 8.20112C3.66557 7.91943 4.02077 7.72106 4.40891 7.63005C4.79704 7.53911 5.20355 7.55832 5.58144 7.68529L7.03985 8.16452L7.04399 8.1659C7.21033 8.22175 7.38898 8.23013 7.55982 8.19007C7.73045 8.15003 7.88665 8.06316 8.01074 7.93941L10.063 5.88714C10.095 5.85496 10.1141 5.81102 10.1141 5.7656C10.114 5.72022 10.0951 5.67617 10.063 5.64407C9.66121 5.24212 9.43534 4.69669 9.43531 4.12835C9.43545 3.56009 9.66123 3.0145 10.063 2.61263C10.4649 2.21084 11.0104 1.985 11.5787 1.98493C12.1471 1.98494 12.6925 2.21081 13.0944 2.61263L17.4607 6.97887ZM12.2465 3.4606C12.0696 3.28393 11.8294 3.18451 11.5794 3.18439C11.3293 3.18439 11.0886 3.28449 10.9117 3.46129C10.7349 3.63812 10.6356 3.87835 10.6355 4.12835C10.6355 4.37843 10.7349 4.61849 10.9117 4.7954C11.1687 5.05241 11.3133 5.40149 11.3136 5.76491C11.3136 6.12862 11.1688 6.47856 10.9117 6.73581L8.8594 8.78807C8.5773 9.06985 8.22146 9.2674 7.83327 9.35845C7.44519 9.44936 7.03926 9.43085 6.66143 9.3039V9.30252L5.20302 8.82467L5.19888 8.82329C5.03255 8.76742 4.8532 8.7584 4.68236 8.79843C4.51167 8.83851 4.35485 8.92592 4.23075 9.04978L3.81643 9.4641C3.7844 9.49614 3.76692 9.54036 3.76671 9.58564C3.76671 9.63097 3.78452 9.67499 3.81643 9.70717L10.3661 16.2569C10.3984 16.289 10.4422 16.3066 10.4877 16.3066C10.5332 16.3065 10.5771 16.289 10.6092 16.2569L11.0235 15.8426L11.1092 15.7431C11.1877 15.6389 11.2448 15.5189 11.2749 15.391C11.3148 15.2202 11.3059 15.0407 11.25 14.8744L11.2493 14.871L10.7701 13.4112C10.6434 13.0336 10.624 12.6278 10.7149 12.2401C10.806 11.852 11.0036 11.4959 11.2852 11.2139L13.3375 9.16165C13.5948 8.90455 13.9447 8.75976 14.3084 8.75976C14.6719 8.75992 15.0208 8.90468 15.2779 9.16165C15.4548 9.33857 15.6948 9.43782 15.945 9.43786C16.1952 9.43786 16.4351 9.3385 16.612 9.16165C16.7888 8.9847 16.8889 8.74405 16.8889 8.4939C16.8887 8.244 16.7894 8.00358 16.6127 7.82685L12.2465 3.4606Z" fill="currentColor" /></g><defs><clipPath id={clipId}><rect width="20" height="20" fill="white" /></clipPath></defs></svg>;
-}
-
-export function WebuiIconContextRename({ className }: WebuiIconProps): ReactElement {
-  return <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className={className}><path d="M12.1505 3.05667C13.4737 1.73366 15.6194 1.73361 16.9425 3.05667C18.2655 4.3798 18.2655 6.52554 16.9425 7.84866L8.17981 16.6114C7.66148 17.1296 6.98841 17.4657 6.26282 17.5694L3.80969 17.92C2.80044 18.0641 1.93516 17.1987 2.07922 16.1895L2.42981 13.7364C2.53347 13.0107 2.86956 12.3377 3.38782 11.8194L12.1505 3.05667ZM4.23645 12.668C3.90179 13.0028 3.68523 13.4377 3.61829 13.9063L3.2677 16.3594C3.23686 16.5766 3.42257 16.7624 3.63977 16.7315L6.09387 16.3819C6.56232 16.3149 6.99651 16.0973 7.33118 15.7627L14.3566 8.73636L11.2618 5.64163L4.23645 12.668ZM16.0939 3.9053C15.2394 3.05088 13.8537 3.05092 12.9991 3.9053L12.1105 4.793L15.2052 7.88773L16.0939 7.00003C16.9482 6.14554 16.9482 4.75981 16.0939 3.9053Z" fill="currentColor" /></svg>;
-}
-
-export function WebuiIconContextArchive({ className }: WebuiIconProps): ReactElement {
-  return <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className={className}><path d="M16.0669 3.6062C17.078 3.60662 17.8976 4.42616 17.8979 5.43726V6.05347C17.8979 7.06489 17.0782 7.88508 16.0669 7.8855H15.8452V14.7683C15.8452 16.2334 14.657 17.4216 13.1919 17.4216H6.00635C4.54129 17.4215 3.35405 16.2334 3.354 14.7683V7.8855H3.13232C2.12081 7.8853 1.30127 7.06502 1.30127 6.05347V5.43726C1.30165 4.42602 2.12105 3.60639 3.13232 3.6062H16.0669ZM4.55322 7.8855V14.7683C4.55327 15.5706 5.20403 16.2213 6.00635 16.2214H13.1919C13.9943 16.2214 14.645 15.5707 14.645 14.7683V7.8855H4.55322ZM11.6528 11.5632C11.9838 11.5637 12.2524 11.8318 12.2524 12.1628C12.2524 12.4938 11.9837 12.762 11.6528 12.7625H7.54639C7.21506 12.7625 6.94686 12.4941 6.94678 12.1628C6.94678 11.8315 7.21502 11.5632 7.54639 11.5632H11.6528ZM3.13232 4.80542C2.78379 4.80561 2.50087 5.08876 2.50049 5.43726V6.05347C2.50049 6.40228 2.78355 6.68511 3.13232 6.6853H16.0669C16.4155 6.68489 16.6987 6.40214 16.6987 6.05347V5.43726C16.6984 5.0889 16.4152 4.80584 16.0669 4.80542H3.13232Z" fill="currentColor" /></svg>;
-}
-
-export function WebuiIconContextFork({ className }: WebuiIconProps): ReactElement {
-  return <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className={className}><path d="M17.6123 6.8125C17.6123 7.14385 17.344 7.41305 17.0127 7.41309C16.6813 7.41309 16.4131 7.14387 16.4131 6.8125V4.36426L11.3379 9.44043C10.9881 9.79041 10.5714 10.0669 10.1133 10.2539C9.65713 10.4401 9.16839 10.5337 8.67578 10.5293H2.20801C1.87677 10.5292 1.60843 10.2609 1.6084 9.92969C1.60843 9.59843 1.87677 9.33021 2.20801 9.33008H8.68164C9.01674 9.33367 9.34987 9.27017 9.66016 9.14355C9.97034 9.01693 10.2524 8.82876 10.4893 8.5918L15.5654 3.5166H13.1172C12.7858 3.5166 12.5166 3.24836 12.5166 2.91699C12.5166 2.58565 12.7858 2.31738 13.1172 2.31738H17.0127C17.0904 2.31739 17.1682 2.33222 17.2412 2.3623C17.2596 2.36989 17.2765 2.38034 17.2939 2.38965C17.3448 2.41685 17.3936 2.45022 17.4365 2.49316C17.4795 2.53611 17.5128 2.58486 17.54 2.63574C17.5493 2.65317 17.5598 2.67007 17.5674 2.68848C17.5975 2.76146 17.6123 2.8393 17.6123 2.91699V6.8125ZM17.6123 16.9424C17.6123 17.0198 17.5971 17.0972 17.5674 17.1699C17.5598 17.1883 17.5493 17.2052 17.54 17.2227C17.5127 17.2741 17.4798 17.3239 17.4365 17.3672C17.3938 17.4098 17.3446 17.4417 17.2939 17.4688C17.2097 17.514 17.115 17.543 17.0127 17.543H13.1172C12.786 17.543 12.5168 17.2736 12.5166 16.9424C12.5168 16.6112 12.7859 16.3428 13.1172 16.3428H15.5645L11.9131 12.6914C11.6793 12.4572 11.6794 12.078 11.9131 11.8438C12.1474 11.6094 12.5274 11.6094 12.7617 11.8438L16.4131 15.4951V13.0469C16.4131 12.7155 16.6813 12.4473 17.0127 12.4473C17.344 12.4473 17.6123 12.7155 17.6123 13.0469V16.9424Z" fill="currentColor" /></svg>;
-}
-
-export function WebuiIconContextCopy({ className }: WebuiIconProps): ReactElement {
-  return <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className={className}><path fillRule="evenodd" clipRule="evenodd" d="M14.4819 2.43701C16.1841 2.43701 17.564 3.8169 17.564 5.51904V10.896C17.5639 12.5981 16.1841 13.978 14.4819 13.978H13.98V14.4819C13.9798 16.1838 12.5999 17.5639 10.8979 17.564H5.52002C3.81838 17.564 2.43875 16.1845 2.43799 14.4829L2.43604 9.1001C2.4357 7.40007 3.81221 6.02043 5.51221 6.01709L6.02295 6.01611V5.51904C6.02295 3.81696 7.40292 2.43712 9.10498 2.43701H14.4819ZM5.51514 7.21729C4.4769 7.21919 3.63597 8.06186 3.63623 9.1001L3.63721 14.4819C3.63758 15.5211 4.48087 16.3638 5.52002 16.3638H10.8979C11.9371 16.3637 12.7796 15.5211 12.7798 14.4819V9.08936C12.7797 8.04877 11.9346 7.2057 10.894 7.20752L5.51514 7.21729ZM9.10498 3.63623C8.06566 3.63634 7.22217 4.4797 7.22217 5.51904V6.01318L10.8921 6.00732C12.5963 6.00429 13.9798 7.38517 13.98 9.08936V12.7788H14.4819C15.5213 12.7788 16.3647 11.9354 16.3647 10.896V5.51904C16.3647 4.47964 15.5213 3.63623 14.4819 3.63623H9.10498Z" fill="currentColor" /><path fillRule="evenodd" clipRule="evenodd" d="M14.4819 2.43701C16.1841 2.43701 17.564 3.8169 17.564 5.51904V10.896C17.5639 12.5981 16.1841 13.978 14.4819 13.978H13.98V14.4819C13.9798 16.1838 12.5999 17.5639 10.8979 17.564H5.52002C3.81838 17.564 2.43875 16.1845 2.43799 14.4829L2.43604 9.1001C2.4357 7.40007 3.81221 6.02043 5.51221 6.01709L6.02295 6.01611V5.51904C6.02295 3.81696 7.40292 2.43712 9.10498 2.43701H14.4819ZM5.51514 7.21729C4.4769 7.21919 3.63597 8.06186 3.63623 9.1001L3.63721 14.4819C3.63758 15.5211 4.48087 16.3638 5.52002 16.3638H10.8979C11.9371 16.3637 12.7796 15.5211 12.7798 14.4819V9.08936C12.7797 8.04877 11.9346 7.2057 10.894 7.20752L5.51514 7.21729ZM9.10498 3.63623C8.06566 3.63634 7.22217 4.4797 7.22217 5.51904V6.01318L10.8921 6.00732C12.5963 6.00429 13.9798 7.38517 13.98 9.08936V12.7788H14.4819C15.5213 12.7788 16.3647 11.9354 16.3647 10.896V5.51904C16.3647 4.47964 15.5213 3.63623 14.4819 3.63623H9.10498Z" fill="currentColor" /></svg>;
-}
-
-export function WebuiIconContextFeedback({ className }: WebuiIconProps): ReactElement {
-  return <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className={className}><path d="M10.0006 2.22754C14.6698 2.22754 18.5648 5.65006 18.5651 10C18.5648 14.3499 14.6698 17.7715 10.0006 17.7715C8.60994 17.7715 7.29336 17.471 6.12854 16.9346C6.18228 16.9593 6.17429 16.9396 6.0221 16.9414C5.89615 16.9429 5.72698 16.958 5.52112 16.9863C5.1108 17.0428 4.60686 17.1447 4.10901 17.2588C3.61373 17.3723 3.13569 17.4953 2.78089 17.5898C2.60405 17.6369 2.45834 17.677 2.35706 17.7051C2.30648 17.7191 2.26654 17.7298 2.23987 17.7373C2.22658 17.7411 2.2163 17.7442 2.2096 17.7461C2.20633 17.747 2.2034 17.7476 2.20178 17.748L2.20081 17.749C1.9619 17.8175 1.70471 17.7308 1.5553 17.5322C1.4064 17.3338 1.39436 17.0638 1.526 16.8535L1.52698 16.8525C1.52761 16.8514 1.5286 16.8488 1.52991 16.8467C1.53281 16.8421 1.53795 16.8353 1.54358 16.8262C1.55519 16.8074 1.57252 16.7791 1.59436 16.7432C1.63849 16.6706 1.70149 16.5648 1.776 16.4375C1.92566 16.1818 2.11995 15.8384 2.30139 15.4824C2.48523 15.1217 2.64596 14.7682 2.73792 14.4873C2.77778 14.3654 2.79712 14.275 2.8053 14.2158C1.94255 13.005 1.43625 11.5575 1.43616 10C1.43642 5.65013 5.33156 2.22765 10.0006 2.22754ZM10.0006 3.42676C5.873 3.42687 2.63662 6.42798 2.63635 10C2.63645 11.3256 3.07675 12.5626 3.84046 13.6006C4.01923 13.8435 4.01971 14.1265 4.0055 14.292C3.98928 14.4798 3.93836 14.6775 3.87854 14.8604C3.75766 15.2297 3.56395 15.6482 3.37073 16.0273C3.33614 16.0952 3.29824 16.1613 3.26331 16.2275C3.44871 16.1818 3.64357 16.1342 3.84143 16.0889C4.35219 15.9718 4.89584 15.8604 5.35803 15.7969C5.58824 15.7652 5.81222 15.7435 6.00843 15.7412C6.17836 15.7392 6.42218 15.7489 6.6305 15.8447C7.63826 16.3088 8.78362 16.5722 10.0006 16.5723C14.1283 16.5723 17.3646 13.5721 17.3649 10C17.3646 6.42792 14.1283 3.42676 10.0006 3.42676Z" fill="currentColor" /><path d="M7.57501 7.41698C7.77093 6.86004 8.15764 6.3904 8.66664 6.09126C9.17564 5.79211 9.77409 5.68276 10.356 5.78257C10.9379 5.88238 11.4657 6.18492 11.8459 6.63659C12.2261 7.08825 12.4342 7.65991 12.4333 8.25031C12.4333 9.91698 9.93335 10.7503 9.93335 10.7503" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /><path d="M10 14.0837H10.0083" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
-}
-
-export function WebuiIconContextExport({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path d="M10 12.25V3.5m0 0-3 3m3-3 3 3M3.5 12.75v2.5c0 .83.67 1.5 1.5 1.5h10c.83 0 1.5-.67 1.5-1.5v-2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-/** Down arrow into a tray — import a conversation file into the local session list. */
-export function WebuiIconSessionImport({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path d="M10 2.75v8m0 0-3-3m3 3 3-3M3.5 12.25v2.5c0 .83.67 1.5 1.5 1.5h10c.83 0 1.5-.67 1.5-1.5v-2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-export function WebuiIconContextTrash({ className }: WebuiIconProps): ReactElement {
-  return <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className={className}><path d="M12.2524 2.28223C13.2415 2.28223 14.0435 3.08414 14.0435 4.07324V5.46973H18.3335C18.6647 5.46984 18.933 5.73812 18.9331 6.06934C18.9331 6.40064 18.6648 6.66883 18.3335 6.66895H15.9595V14.7363C15.9595 16.383 14.6246 17.7175 12.978 17.7178H7.02295C5.37613 17.7178 4.04151 16.3832 4.0415 14.7363V6.66895H1.6665C1.33519 6.66888 1.06689 6.40066 1.06689 6.06934C1.067 5.7381 1.33526 5.4698 1.6665 5.46973H5.95654V4.07324C5.95654 3.08422 6.75856 2.28236 7.74756 2.28223H12.2524ZM5.24072 14.7363C5.24073 15.7204 6.03887 16.5185 7.02295 16.5186H12.978C13.9619 16.5183 14.7593 15.7202 14.7593 14.7363V6.66895H5.24072V14.7363ZM8.37549 9.52637C8.70671 9.52648 8.97502 9.79474 8.9751 10.126V13.6992C8.97486 14.0303 8.70661 14.2987 8.37549 14.2988C8.04426 14.2988 7.77611 14.0304 7.77588 13.6992V10.126C7.77596 9.79467 8.04417 9.52637 8.37549 9.52637ZM11.7192 9.52637C12.0505 9.52649 12.3188 9.79475 12.3188 10.126V13.6992C12.3186 14.0303 12.0504 14.2987 11.7192 14.2988C11.388 14.2988 11.1199 14.0304 11.1196 13.6992V10.126C11.1197 9.79467 11.3879 9.52637 11.7192 9.52637ZM7.74756 3.48145C7.4213 3.48158 7.15576 3.74696 7.15576 4.07324V5.46973H12.8442V4.07324C12.8442 3.74688 12.5788 3.48145 12.2524 3.48145H7.74756Z" fill="currentColor" /></svg>;
-}
-
-export function WebuiIconContextChevron({ className }: WebuiIconProps): ReactElement {
-  return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className={className}><path d="M6 4L10 8L6 12" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" /></svg>;
-}
-
-/** run-location pill leading icon — the `run-location-pill` glyph. */
-export function WebuiIconRunLocation({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}>
-      <path d="M11.9994 2.7832C12.4987 2.7832 12.9782 2.98201 13.3314 3.33496C13.6843 3.68798 13.883 4.16687 13.8831 4.66602V10.3506C13.8831 10.4722 13.9118 10.5924 13.9662 10.7012L14.6781 12.1191H14.6771C14.7708 12.3052 14.8152 12.5126 14.806 12.7207C14.7967 12.9287 14.7341 13.1307 14.6244 13.3076C14.5145 13.4846 14.3614 13.6308 14.179 13.7314C13.9977 13.8314 13.7933 13.8826 13.5863 13.8818V13.8828H2.41245V13.8818C2.20565 13.8825 2.00176 13.8314 1.82065 13.7314C1.63836 13.6308 1.48418 13.4846 1.37436 13.3076C1.2648 13.1308 1.20201 12.9285 1.19272 12.7207C1.18355 12.5127 1.22797 12.3051 1.32162 12.1191L2.03354 10.7012C2.08793 10.5923 2.1166 10.4723 2.11655 10.3506V4.66602C2.11672 4.16679 2.31531 3.68799 2.6683 3.33496C3.02134 2.98196 3.50013 2.78337 3.99936 2.7832H11.9994ZM3.00912 11.208L2.30405 12.6133V12.6143C2.29521 12.6319 2.29054 12.6521 2.29135 12.6719C2.29227 12.6914 2.29873 12.7108 2.30893 12.7275C2.31937 12.7444 2.33461 12.7589 2.3519 12.7686C2.36925 12.7781 2.3897 12.7833 2.40952 12.7832H13.5902C13.6099 12.7833 13.6295 12.778 13.6468 12.7686C13.6643 12.7589 13.6792 12.7445 13.6898 12.7275C13.7002 12.7107 13.7064 12.6916 13.7074 12.6719C13.7082 12.6521 13.7036 12.632 13.6947 12.6143V12.6133L12.9896 11.208H3.00912ZM3.99936 3.88281C3.79187 3.88298 3.5924 3.9656 3.44565 4.1123C3.29894 4.25905 3.21633 4.45853 3.21616 4.66602V10.1084H12.7826V4.66602C12.7824 4.4585 12.6998 4.25906 12.5531 4.1123C12.4062 3.9658 12.2068 3.88281 11.9994 3.88281H3.99936Z" fill="currentColor"></path>
-    </svg>
-  );
-}
-
-/** floating rail toggle — the `mavis-sidebar-toggle` glyph. */
-export function WebuiIconSidebarToggle({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path d="M7.63158 3.33331V16.6666M5 16.6666H15C16.3807 16.6666 17.5 15.5474 17.5 14.1666V5.83331C17.5 4.4526 16.3807 3.33331 15 3.33331H5C3.61929 3.33331 2.5 4.4526 2.5 5.83331V14.1666C2.5 15.5474 3.61929 16.6666 5 16.6666Z" stroke="currentColor" strokeWidth="1.2"></path>
-    </svg>
-  );
-}
-
-/** floating search — the `mavis-search` glyph. */
-export function WebuiIconSearch({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path d="M9.18219 2.5289C12.8271 2.5291 15.7818 5.48355 15.7818 9.12851C15.7818 10.799 15.1585 12.3224 14.1353 13.485L17.2769 16.6266C17.5112 16.8609 17.5112 17.2399 17.2769 17.4742C17.0426 17.7081 16.6634 17.7083 16.4293 17.4742L13.2652 14.3102C12.1417 15.1967 10.7246 15.728 9.18219 15.7281C5.53711 15.7281 2.58258 12.7736 2.58258 9.12851C2.58258 5.48343 5.53711 2.5289 9.18219 2.5289ZM9.18219 3.72812C6.19985 3.72812 3.7818 6.14617 3.7818 9.12851C3.7818 12.1108 6.19985 14.5289 9.18219 14.5289C12.1644 14.5287 14.5826 12.1107 14.5826 9.12851C14.5826 6.14629 12.1644 3.72832 9.18219 3.72812Z" fill="currentColor"></path>
-    </svg>
-  );
-}
-
-/** workspace launcher tile glyph — the review/search icon. */
-export function WebuiIconWorkspaceReview({ className }: WebuiIconProps): ReactElement {
-  return <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}><circle cx="8.5" cy="8.5" r="6.1" stroke="currentColor" strokeWidth="1.2" /><path d="m13 13 4.1 4.1M8.5 5.8v5.4M5.8 8.5h5.4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg>;
-}
-
-/** workspace launcher tile glyph — the terminal prompt icon. */
-export function WebuiIconWorkspaceTerminal({ className }: WebuiIconProps): ReactElement {
-  return <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}><rect x="2.4" y="3.2" width="15.2" height="13.6" rx="2" stroke="currentColor" strokeWidth="1.2" /><path d="m5.5 7.2 2.6 2.3-2.6 2.3M9.8 12h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
-}
-
-/** workspace launcher tile glyph — connected canvas nodes. */
-export function WebuiIconWorkspaceCanvas({ className }: WebuiIconProps): ReactElement {
-  return <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}><rect x="2.3" y="2.5" width="4.2" height="4.2" rx=".7" stroke="currentColor" strokeWidth="1.1" /><rect x="13.5" y="2.5" width="4.2" height="4.2" rx=".7" stroke="currentColor" strokeWidth="1.1" /><rect x="7.9" y="13.3" width="4.2" height="4.2" rx=".7" stroke="currentColor" strokeWidth="1.1" /><path d="M6.5 4.6h7M4.4 6.8v3.2l5.6 3.3m5.6-6.5v3.2L10 13.3" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" /></svg>;
-}
-
-/** workspace panel maximize/restore glyph — diagonal expand arrows. */
-export function WebuiIconWorkspaceExpand({ className }: WebuiIconProps): ReactElement {
-  return <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}><path d="M11.5 3.5h5v5M16.3 3.7l-5.1 5.1M8.5 16.5h-5v-5M3.7 16.3l5.1-5.1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
-}
-
-// Slash palette row leading glyphs.
-//
-// The WebUI keeps the slash-palette visual language (icon + bold title + dim
-// description, sized at 18 with text-icon_default_secondary). The five new glyphs below
-// cover the commands that have no direct rail equivalent: help, compact, status, usage,
-// model. `new` reuses the rail's `WebuiIconNewTask` so the popover and the rail stay in
-// sync when the glyph shifts.
-
-/** slash palette — `compact` row leading glyph. */
-export function WebuiIconCommandCompact({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path d="M9.125 2.375C9.40195 2.375 9.625 2.59805 9.625 2.875V3.875H10.375V2.875C10.375 2.59805 10.598 2.375 10.875 2.375C11.152 2.375 11.375 2.59805 11.375 2.875V3.875H12.375C12.9299 3.875 13.375 4.32011 13.375 4.875V7.375C13.375 7.92989 12.9299 8.375 12.375 8.375H7.625C7.07011 8.375 6.625 7.92989 6.625 7.375V4.875C6.625 4.32011 7.07011 3.875 7.625 3.875H8.625V2.875C8.625 2.59805 8.848 2.375 9.125 2.375ZM7.625 5.125V5.875H12.375V5.125H7.625Z M7.625 11.625H12.375C12.9299 11.625 13.375 12.0701 13.375 12.625V15.125C13.375 15.6799 12.9299 16.125 12.375 16.125H11.375V17.125C11.375 17.402 11.152 17.625 10.875 17.625C10.598 17.625 10.375 17.402 10.375 17.125V16.125H9.625V17.125C9.625 17.402 9.40195 17.625 9.125 17.625C8.848 17.625 8.625 17.402 8.625 17.125V16.125H7.625C7.07011 16.125 6.625 15.6799 6.625 15.125V12.625C6.625 12.0701 7.07011 11.625 7.625 11.625ZM7.625 14.125H12.375V12.875H7.625V14.125Z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-
-/** slash palette — `usage` row leading glyph. */
-export function WebuiIconCommandUsage({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path d="M3 16.25H17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M5.5 13.75V9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M9.75 13.75V6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M14 13.75V3.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-// Palette command glyphs.
-//
-// The slash palette uses these glyphs for its built-in commands:
-// goal (target), plan (cycle), fork (Y-fork), and memory (brain). They share
-// the 18x18 / currentColor rule and are inert in WebUI when the
-// underlying harness feature is not wired, so they render with the same row
-// height and weight as the supported entries next to them.
-
-/** slash palette — `goal` row leading glyph. */
-export function WebuiIconCommandGoal({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <circle cx="10" cy="10" r="7.5" stroke="currentColor" strokeWidth="1.5" />
-      <circle cx="10" cy="10" r="4.5" stroke="currentColor" strokeWidth="1.5" />
-      <circle cx="10" cy="10" r="1.5" fill="currentColor" />
-    </svg>
-  );
-}
-
-/** slash palette — `plan` row leading glyph. */
-export function WebuiIconCommandPlan({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path
-        d="M3 4.5C3 4.22386 3.22386 4 3.5 4H7.5C7.77614 4 8 4.22386 8 4.5V9.5C8 9.77614 7.77614 10 7.5 10H3.5C3.22386 10 3 9.77614 3 9.5V4.5Z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      />
-      <path
-        d="M12 4.5C12 4.22386 12.2239 4 12.5 4H16.5C16.7761 4 17 4.22386 17 4.5V9.5C17 9.77614 16.7761 10 16.5 10H12.5C12.2239 10 12 9.77614 12 9.5V4.5Z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      />
-      <path
-        d="M3.5 10H7.5C7.77614 10 8 10.2239 8 10.5V15.5C8 15.7761 7.77614 16 7.5 16H3.5C3.22386 16 3 15.7761 3 15.5V10.5C3 10.2239 3.22386 10 3.5 10Z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      />
-      <path
-        d="M12 13.5C12 13.2239 12.2239 13 12.5 13H16.5C16.7761 13 17 13.2239 17 13.5V15.5C17 15.7761 16.7761 16 16.5 16H12.5C12.2239 16 12 15.7761 12 15.5V13.5Z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      />
-    </svg>
-  );
-}
-
-// Skills section row leading glyphs. The WebUI ships these as fixtures that
-// mirror the slash-palette skill rows (mavis/ask-matt,
-// code-review, codebase-design, diagnosing-bugs). Each is inert today.
-
-/** slash palette — skill row glyph (an N-style mark). */
-export function WebuiIconSkillAskMatt({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <rect x="3" y="2.5" width="14" height="15" rx="2" stroke="currentColor" strokeWidth="1.5" />
-      <path
-        d="M7 6.5L13 13.5M13 6.5L7 13.5"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-/** slash palette — skill row glyph for code-review. */
-export function WebuiIconSkillCodeReview({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <rect x="3" y="3.5" width="14" height="13" rx="2" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M6 7.5H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M6 10.5H11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M6 13.5H9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <circle cx="14" cy="13.5" r="1.25" fill="currentColor" />
-    </svg>
-  );
-}
-
-/** slash palette — skill row glyph for codebase-design. */
-export function WebuiIconSkillCodebaseDesign({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path d="M3.5 16.5H16.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <rect x="4.5" y="4.5" width="11" height="3.5" rx="1" stroke="currentColor" strokeWidth="1.5" />
-      <rect x="4.5" y="9.5" width="11" height="3.5" rx="1" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M6.5 6.25H6.51" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M6.5 11.25H6.51" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M9 6.25H13.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M9 11.25H13.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-/** slash palette — skill row glyph for diagnosing-bugs. */
-export function WebuiIconSkillDiagnosingBugs({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path
-        d="M8 4.5C5.8575 4.5 4.5 6.153 4.5 8.25C4.5 9.25 4.5 11 4.5 11.25C3.5 11.5 3 12.5 3 13.5C3 15.1569 4.3431 16.5 6 16.5H10C11.6569 16.5 13 15.1569 13 13.5C13 12.5 12.5 11.5 11.5 11.25C11.5 11 11.5 9.25 11.5 8.25C11.5 6.153 10.1425 4.5 8 4.5Z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-      <path d="M6 7L5 6M10 7L11 6M6 9L5 10M10 9L11 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M15.5 5L17 3.5M15.5 5L14 3.5M15.5 5V3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M16.5 11L18 9.5M16.5 11L15 9.5M16.5 11V9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-/** slash palette — generic skill row glyph used when the registry returns a
- * skill name we don't have a dedicated icon for. Spells the same look as the
- * `skill-default` glyph (a four-point sparkle) so the popover
- * stays in 1:1 with the reference. */
-export function WebuiIconSkillGeneric({ className }: WebuiIconProps): ReactElement {
-  return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path
-        d="M10 2.5L11.45 7.05C11.69 7.7 12.3 8.31 12.95 8.55L17.5 10L12.95 11.45C12.3 11.69 11.69 12.3 11.45 12.95L10 17.5L8.55 12.95C8.31 12.3 7.7 11.69 7.05 11.45L2.5 10L7.05 8.55C7.7 8.31 8.31 7.7 8.55 7.05L10 2.5Z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-/** Icon props for the message-action glyphs: an explicit
- * pixel size per call site (16 or 18), so these keep the same knob. */
-export interface WebuiSizedIconProps {
-  readonly className?: string;
-  /** Rendered width/height in px. */
+export interface WebuiSizedIconProps extends WebuiIconProps {
   readonly size?: number;
 }
 
-/** message copy — `message-copy-button` / `user-message-copy-button` idle glyph. */
-export function WebuiIconMessageCopy({ className, size = 20 }: WebuiSizedIconProps): ReactElement {
-  return (
-    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path fillRule="evenodd" clipRule="evenodd" fill="currentColor" d="M14.4819 2.43701C16.1841 2.43701 17.564 3.8169 17.564 5.51904V10.896C17.5639 12.5981 16.1841 13.978 14.4819 13.978H13.98V14.4819C13.9798 16.1838 12.5999 17.5639 10.8979 17.564H5.52002C3.81838 17.564 2.43875 16.1845 2.43799 14.4829L2.43604 9.1001C2.4357 7.40007 3.81221 6.02043 5.51221 6.01709L6.02295 6.01611V5.51904C6.02295 3.81696 7.40292 2.43712 9.10498 2.43701H14.4819ZM5.51514 7.21729C4.4769 7.21919 3.63597 8.06186 3.63623 9.1001L3.63721 14.4819C3.63758 15.5211 4.48087 16.3638 5.52002 16.3638H10.8979C11.9371 16.3637 12.7796 15.5211 12.7798 14.4819V9.08936C12.7797 8.04877 11.9346 7.2057 10.894 7.20752L5.51514 7.21729ZM9.10498 3.63623C8.06566 3.63634 7.22217 4.4797 7.22217 5.51904V6.01318L10.8921 6.00732C12.5963 6.00429 13.9798 7.38517 13.98 9.08936V12.7788H14.4819C15.5213 12.7788 16.3647 11.9354 16.3647 10.896V5.51904C16.3647 4.47964 15.5213 3.63623 14.4819 3.63623H9.10498Z" />
-    </svg>
-  );
+type IconComponent = typeof IconCheck;
+
+function glyph(Icon: IconComponent, className?: string, size = 18): ReactElement {
+  return <Icon aria-hidden="true" className={className} size={size} stroke={1.7} />;
 }
 
-/** message copied — the confirmation glyph both copy buttons swap to. */
-export function WebuiIconMessageCopied({ className, size = 20 }: WebuiSizedIconProps): ReactElement {
-  return (
-    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path d="M3.125 9.11857L8.0609 16.1699L16.875 3.83011" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
+export function WebuiIconCheck({ className }: WebuiIconProps): ReactElement { return glyph(IconCheck, className, 16); }
+export function WebuiIconChevronLeft({ className }: WebuiIconProps): ReactElement { return glyph(IconChevronLeft, className, 16); }
+export function WebuiIconChevronRight({ className }: WebuiIconProps): ReactElement { return glyph(IconChevronRight, className, 16); }
+export function WebuiIconClose({ className }: WebuiIconProps): ReactElement { return glyph(IconX, className, 16); }
+export function WebuiIconReload({ className }: WebuiIconProps): ReactElement { return glyph(IconRefresh, className, 16); }
+export function WebuiIconGlobe({ className }: WebuiIconProps): ReactElement { return glyph(IconWorld, className, 16); }
 
-/** rewind — `message-rewind-button` / `user-message-rewind-button` glyph. */
-export function WebuiIconMessageRewind({ className, size = 20 }: WebuiSizedIconProps): ReactElement {
-  return (
-    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path fill="currentColor" d="M6.44862 3.20065C6.70012 2.98507 7.0796 3.01376 7.2953 3.26511C7.51076 3.51661 7.48117 3.89515 7.22987 4.11081L5.73573 5.39108H12.0717C14.9759 5.39113 17.5336 7.53673 17.6527 10.2915C17.7784 13.2093 15.1372 15.5903 12.0717 15.5903H5.55702C5.22601 15.5901 4.95767 15.3217 4.95741 14.9907C4.95741 14.6595 5.22585 14.3913 5.55702 14.3911H12.0717C14.5816 14.391 16.5445 12.4577 16.4535 10.3432C16.3666 8.33548 14.4438 6.59035 12.0717 6.5903H5.69276L7.26405 8.16159C7.49777 8.39579 7.49776 8.77504 7.26405 9.00925C7.02972 9.24339 6.64967 9.24351 6.41542 9.00925L3.76112 6.35495C3.64312 6.2368 3.57893 6.07456 3.58534 5.90769C3.59184 5.7409 3.66764 5.58375 3.79432 5.47507L6.44862 3.20065Z" />
-    </svg>
-  );
+/** Product mark. This custom MiniMax glyph is branding, not a UI icon. */
+export function WebuiIconBrand({ className }: WebuiIconProps): ReactElement {
+  return <img src="/assets/img/minimax-code-agent-icon.png" alt="" aria-hidden="true" className={className} />;
 }
-
-/** edit — `message-edit-button` glyph, drawn on a 16px grid. */
-export function WebuiIconMessageEdit({ className, size = 16 }: WebuiSizedIconProps): ReactElement {
-  return (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}>
-      <path fill="currentColor" d="M9.47052 2.9037C10.4714 1.9029 12.0945 1.90312 13.0955 2.9037C14.0963 3.9047 14.0964 5.52775 13.0955 6.5287L6.76935 12.8559C6.37727 13.2479 5.86805 13.5029 5.31915 13.5814L3.54767 13.8344C2.74184 13.9495 2.05079 13.2583 2.16583 12.4525L2.41876 10.681C2.49721 10.132 2.7522 9.623 3.14435 9.23085L9.47052 2.9037ZM3.92169 10.0092C3.69798 10.2329 3.55245 10.5231 3.50763 10.8363L3.2547 12.6078C3.24339 12.6875 3.31173 12.7566 3.39142 12.7455L5.1629 12.4926C5.47619 12.4478 5.76722 12.3023 5.99103 12.0785L10.9813 7.0873L8.91193 5.01796L3.92169 10.0092ZM12.3182 3.68202C11.7468 3.11062 10.8203 3.11066 10.2488 3.68202L9.68927 4.24062L11.7586 6.30995L12.3182 5.75136C12.8895 5.18001 12.8893 4.25345 12.3182 3.68202Z" />
-    </svg>
-  );
+export function WebuiIconAgent({ className }: WebuiIconProps): ReactElement {
+  return <img src="/assets/img/minimax-code-agent-icon.png" alt="" aria-hidden="true" className={className} />;
 }
-
-/** edit — `user-message-edit-button` glyph, drawn on a 20px grid. */
-export function WebuiIconMessageEditUser({ className, size = 20 }: WebuiSizedIconProps): ReactElement {
-  return (
-    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path fill="currentColor" d="M12.1505 3.05667C13.4737 1.73366 15.6194 1.73361 16.9425 3.05667C18.2655 4.3798 18.2655 6.52554 16.9425 7.84866L8.17981 16.6114C7.66148 17.1296 6.98841 17.4657 6.26282 17.5694L3.80969 17.92C2.80044 18.0641 1.93516 17.1987 2.07922 16.1895L2.42981 13.7364C2.53347 13.0107 2.86956 12.3377 3.38782 11.8194L12.1505 3.05667ZM4.23645 12.668C3.90179 13.0028 3.68523 13.4377 3.61829 13.9063L3.2677 16.3594C3.23686 16.5766 3.42257 16.7624 3.63977 16.7315L6.09387 16.3819C6.56232 16.3149 6.99651 16.0973 7.33118 15.7627L14.3566 8.73636L11.2618 5.64163L4.23645 12.668ZM16.0939 3.9053C15.2394 3.05088 13.8537 3.05092 12.9991 3.9053L12.1105 4.793L15.2052 7.88773L16.0939 7.00003C16.9482 6.14554 16.9482 4.75981 16.0939 3.9053Z" />
-    </svg>
-  );
-}
-
-/** like, unselected — `message-feedback-like-action` idle glyph. */
-export function WebuiIconMessageLikeOff({ className, size = 20 }: WebuiSizedIconProps): ReactElement {
-  return (
-    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path d="M6.34943 8.54331V17.2833M12.1761 5.54258L11.8148 7.0311C11.6279 7.80131 12.2113 8.54331 13.0039 8.54331H15.6939C15.9201 8.54331 16.1431 8.59596 16.3454 8.69709C16.5477 8.79823 16.7236 8.94507 16.8593 9.12598C16.995 9.30689 17.0867 9.51691 17.1271 9.7394C17.1676 9.96189 17.1557 10.1907 17.0923 10.4078L15.3598 15.7701C15.0684 16.6721 14.2286 17.2833 13.2807 17.2833H4.71796C3.60776 17.2833 2.70776 16.3833 2.70776 15.2731V10.5535C2.70776 9.44331 3.60776 8.54331 4.71796 8.54331H6.17463C6.44563 8.54317 6.71122 8.46743 6.94153 8.32461C7.17185 8.18179 7.35775 7.97755 7.47835 7.73486L9.53167 3.63416C9.81268 3.07296 10.4183 2.67594 10.98 2.95597C11.2874 3.10923 11.5562 3.32998 11.7663 3.60172C11.9764 3.87346 12.1224 4.18916 12.1934 4.52524C12.2643 4.86133 12.2584 5.2091 12.1761 5.54258Z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-/** like, selected — the same outline, filled, with a thickened stroke. */
-export function WebuiIconMessageLikeOn({ className, size = 20 }: WebuiSizedIconProps): ReactElement {
-  return (
-    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path d="M6.34937 8.54334V17.2833M12.176 5.54261L11.8147 7.03113C11.6278 7.80134 12.2112 8.54334 13.0038 8.54334H15.6939C15.92 8.54334 16.1431 8.59599 16.3453 8.69713C16.5476 8.79826 16.7235 8.9451 16.8592 9.12601C16.9949 9.30692 17.0866 9.51694 17.1271 9.73943C17.1675 9.96192 17.1556 10.1908 17.0923 10.4079L15.3598 15.7701C15.0683 16.6721 14.2285 17.2833 13.2806 17.2833H4.7179C3.6077 17.2833 2.7077 16.3833 2.7077 15.2731V10.5535C2.7077 9.44334 3.6077 8.54334 4.7179 8.54334H6.17457C6.44557 8.5432 6.71116 8.46746 6.94147 8.32464C7.17179 8.18182 7.35769 7.97758 7.47829 7.73489L9.53161 3.63419C9.81262 3.07299 10.4183 2.67597 10.98 2.956C11.2874 3.10926 11.5562 3.33001 11.7663 3.60175C11.9764 3.87349 12.1224 4.18919 12.1933 4.52527C12.2643 4.86136 12.2584 5.20913 12.176 5.54261Z" fill="currentColor" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-/** dislike, unselected — `message-feedback-dislike-action` idle glyph. */
-export function WebuiIconMessageDislikeOff({ className, size = 20 }: WebuiSizedIconProps): ReactElement {
-  return (
-    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path d="M13.6507 11.4566V2.71664M7.824 14.4574L8.55234 11.4566H4.30615C4.08001 11.4566 3.85698 11.404 3.65471 11.3029C3.45245 11.2017 3.2765 11.0549 3.14082 10.874C3.00514 10.6931 2.91344 10.483 2.87298 10.2606C2.83253 10.0381 2.84443 9.80921 2.90775 9.59211L4.60477 3.76544C4.69302 3.46287 4.87703 3.19709 5.12917 3.00798C5.38131 2.81887 5.68799 2.71664 6.00317 2.71664H15.8357C16.222 2.71664 16.5925 2.87011 16.8657 3.14329C17.1389 3.41647 17.2923 3.78698 17.2923 4.17331V9.99998C17.2923 10.3863 17.1389 10.7568 16.8657 11.03C16.5925 11.3032 16.222 11.4566 15.8357 11.4566H13.8255C13.5545 11.4568 13.2889 11.5325 13.0586 11.6753C12.8283 11.8182 12.6423 12.0224 12.5218 12.2651L10.009 17.2833C9.66554 17.2791 9.32747 17.1972 9.02007 17.044C8.71267 16.8907 8.44387 16.67 8.23376 16.3982C8.02365 16.1265 7.87767 15.8108 7.80672 15.4747C7.73576 15.1386 7.74167 14.7909 7.824 14.4574Z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-/** dislike, selected — filled outline, thickened stroke. */
-export function WebuiIconMessageDislikeOn({ className, size = 20 }: WebuiSizedIconProps): ReactElement {
-  return (
-    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path d="M13.6506 11.4567V2.71667M7.82394 14.4574L8.55228 11.4567H4.30609C4.07995 11.4567 3.85692 11.404 3.65465 11.3029C3.45239 11.2018 3.27644 11.0549 3.14076 10.874C3.00508 10.6931 2.91338 10.4831 2.87292 10.2606C2.83247 10.0381 2.84437 9.80924 2.90769 9.59214L4.60471 3.76547C4.69296 3.4629 4.87697 3.19712 5.12911 3.00801C5.38125 2.8189 5.68793 2.71667 6.00311 2.71667H15.8356C16.2219 2.71667 16.5925 2.87014 16.8656 3.14332C17.1388 3.4165 17.2923 3.78701 17.2923 4.17334V10C17.2923 10.3863 17.1388 10.7568 16.8656 11.03C16.5925 11.3032 16.2219 11.4567 15.8356 11.4567H13.8254C13.5544 11.4568 13.2888 11.5326 13.0585 11.6754C12.8282 11.8182 12.6423 12.0224 12.5217 12.2651L10.0089 17.2833C9.66548 17.2791 9.32741 17.1973 9.02001 17.044C8.7126 16.8908 8.44381 16.67 8.2337 16.3983C8.02359 16.1265 7.87761 15.8108 7.80665 15.4747C7.7357 15.1387 7.74161 14.7909 7.82394 14.4574Z" fill="currentColor" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-/** fork — `message-fork-button` glyph (expand toward a new session). */
-export function WebuiIconMessageFork({ className, size = 20 }: WebuiSizedIconProps): ReactElement {
-  return (
-    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
-      <path fill="currentColor" d="M17.6123 6.8125C17.6123 7.14385 17.344 7.41305 17.0127 7.41309C16.6813 7.41309 16.4131 7.14387 16.4131 6.8125V4.36426L11.3379 9.44043C10.9881 9.79041 10.5714 10.0669 10.1133 10.2539C9.65713 10.4401 9.16839 10.5337 8.67578 10.5293H2.20801C1.87677 10.5292 1.60843 10.2609 1.6084 9.92969C1.60843 9.59843 1.87677 9.33021 2.20801 9.33008H8.68164C9.01674 9.33367 9.34987 9.27017 9.66016 9.14355C9.97034 9.01693 10.2524 8.82876 10.4893 8.5918L15.5654 3.5166H13.1172C12.7858 3.5166 12.5166 3.24836 12.5166 2.91699C12.5166 2.58565 12.7858 2.31738 13.1172 2.31738H17.0127C17.0904 2.31739 17.1682 2.33222 17.2412 2.3623C17.2596 2.36989 17.2765 2.38034 17.2939 2.38965C17.3448 2.41685 17.3936 2.45022 17.4365 2.49316C17.4795 2.53611 17.5128 2.58486 17.54 2.63574C17.5493 2.65317 17.5598 2.67007 17.5674 2.68848C17.5975 2.76146 17.6123 2.8393 17.6123 2.91699V6.8125ZM17.6123 16.9424C17.6123 17.0198 17.5971 17.0972 17.5674 17.1699C17.5598 17.1883 17.5493 17.2052 17.54 17.2227C17.5127 17.2741 17.4798 17.3239 17.4365 17.3672C17.3938 17.4098 17.3446 17.4417 17.2939 17.4688C17.2097 17.514 17.115 17.543 17.0127 17.543H13.1172C12.786 17.543 12.5168 17.2736 12.5166 16.9424C12.5168 16.6112 12.7859 16.3428 13.1172 16.3428H15.5645L11.9131 12.6914C11.6793 12.4572 11.6794 12.078 11.9131 11.8438C12.1474 11.6094 12.5274 11.6094 12.7617 11.8438L16.4131 15.4951V13.0469C16.4131 12.7155 16.6813 12.4473 17.0127 12.4473C17.344 12.4473 17.6123 12.7155 17.6123 13.0469V16.9424Z" />
-    </svg>
-  );
-}
+export function WebuiIconNewTask({ className }: WebuiIconProps): ReactElement { return glyph(IconCirclePlus, className); }
+export function WebuiIconPlugins({ className }: WebuiIconProps): ReactElement { return glyph(IconPuzzle, className); }
+export function WebuiIconSites({ className }: WebuiIconProps): ReactElement { return glyph(IconLayoutDashboard, className); }
+export function WebuiIconRemote({ className }: WebuiIconProps): ReactElement { return glyph(IconDeviceMobile, className); }
+export function WebuiIconBell({ className }: WebuiIconProps): ReactElement { return glyph(IconBell, className, 20); }
+export function WebuiIconAttach({ className }: WebuiIconProps): ReactElement { return glyph(IconPaperclip, className); }
+export function WebuiIconChevronDown({ className }: WebuiIconProps): ReactElement { return glyph(IconChevronDown, className, 16); }
+export function WebuiIconSessionDisclosure({ className }: WebuiIconProps): ReactElement { return glyph(IconChevronRight, className, 14); }
+export function WebuiIconSessionTreeDisclosure({ className }: WebuiIconProps): ReactElement { return glyph(IconChevronRight, className, 14); }
+export function WebuiIconPermissionRequest({ className }: WebuiIconProps): ReactElement { return glyph(IconShieldLock, className); }
+export function WebuiIconPermissionAuto({ className }: WebuiIconProps): ReactElement { return glyph(IconShieldCheck, className); }
+export function WebuiIconPermissionFull({ className }: WebuiIconProps): ReactElement { return glyph(IconShieldX, className); }
+export function WebuiIconFile({ className }: WebuiIconProps): ReactElement { return glyph(IconFile, className); }
+export function WebuiIconDiffSummary({ className }: WebuiIconProps): ReactElement { return glyph(IconGitCompare, className); }
+export function WebuiIconDiffFile({ className }: WebuiIconProps & { readonly fileName?: string }): ReactElement { return glyph(IconFileCode, className); }
+export function WebuiIconSend({ className }: WebuiIconProps): ReactElement { return glyph(IconArrowUp, className); }
+export function WebuiIconFolder({ className }: WebuiIconProps): ReactElement { return glyph(IconFolder, className); }
+export function WebuiIconSession({ className }: WebuiIconProps): ReactElement { return glyph(IconMessage, className); }
+export function WebuiIconMore({ className }: WebuiIconProps): ReactElement { return glyph(IconDots, className); }
+export function WebuiIconProjectAdd({ className }: WebuiIconProps): ReactElement { return glyph(IconFolderPlus, className); }
+export function WebuiIconSessionPinMark({ className }: WebuiIconProps): ReactElement { return glyph(IconPin, className, 14); }
+export function WebuiIconSessionPin({ className }: WebuiIconProps): ReactElement { return glyph(IconPin, className); }
+export function WebuiIconContextPin({ className, pinned = false }: WebuiIconProps & { pinned?: boolean }): ReactElement { return glyph(IconPin, className); }
+export function WebuiIconContextRename({ className }: WebuiIconProps): ReactElement { return glyph(IconEdit, className); }
+export function WebuiIconContextArchive({ className }: WebuiIconProps): ReactElement { return glyph(IconArchive, className); }
+export function WebuiIconContextFork({ className }: WebuiIconProps): ReactElement { return glyph(IconGitFork, className); }
+export function WebuiIconContextCopy({ className }: WebuiIconProps): ReactElement { return glyph(IconCopy, className); }
+export function WebuiIconContextFeedback({ className }: WebuiIconProps): ReactElement { return glyph(IconMessageCircle, className); }
+export function WebuiIconContextExport({ className }: WebuiIconProps): ReactElement { return glyph(IconDownload, className); }
+export function WebuiIconSessionImport({ className }: WebuiIconProps): ReactElement { return glyph(IconArrowBackUp, className); }
+export function WebuiIconContextTrash({ className }: WebuiIconProps): ReactElement { return glyph(IconTrash, className); }
+export function WebuiIconContextChevron({ className }: WebuiIconProps): ReactElement { return glyph(IconChevronRight, className); }
+export function WebuiIconRunLocation({ className }: WebuiIconProps): ReactElement { return glyph(IconMapPin, className); }
+export function WebuiIconSidebarToggle({ className }: WebuiIconProps): ReactElement { return glyph(IconLayoutSidebar, className); }
+export function WebuiIconSearch({ className }: WebuiIconProps): ReactElement { return glyph(IconSearch, className); }
+export function WebuiIconWorkspaceReview({ className }: WebuiIconProps): ReactElement { return glyph(IconGitBranch, className); }
+export function WebuiIconWorkspaceTerminal({ className }: WebuiIconProps): ReactElement { return glyph(IconTerminal2, className); }
+export function WebuiIconWorkspaceCanvas({ className }: WebuiIconProps): ReactElement { return glyph(IconHierarchy, className); }
+export function WebuiIconWorkspaceExpand({ className }: WebuiIconProps): ReactElement { return glyph(IconLayoutDashboard, className); }
+export function WebuiIconCommandCompact({ className }: WebuiIconProps): ReactElement { return glyph(IconMinimize, className); }
+export function WebuiIconCommandUsage({ className }: WebuiIconProps): ReactElement { return glyph(IconChartBar, className); }
+export function WebuiIconCommandGoal({ className }: WebuiIconProps): ReactElement { return glyph(IconTarget, className); }
+export function WebuiIconCommandPlan({ className }: WebuiIconProps): ReactElement { return glyph(IconCalendarEvent, className); }
+export function WebuiIconSkillAskMatt({ className }: WebuiIconProps): ReactElement { return glyph(IconMessageQuestion, className); }
+export function WebuiIconSkillCodeReview({ className }: WebuiIconProps): ReactElement { return glyph(IconCode, className); }
+export function WebuiIconSkillCodebaseDesign({ className }: WebuiIconProps): ReactElement { return glyph(IconHierarchy, className); }
+export function WebuiIconSkillDiagnosingBugs({ className }: WebuiIconProps): ReactElement { return glyph(IconBug, className); }
+export function WebuiIconSkillGeneric({ className }: WebuiIconProps): ReactElement { return glyph(IconPuzzle, className); }
+export function WebuiIconMessageCopy({ className, size = 20 }: WebuiSizedIconProps): ReactElement { return glyph(IconClipboard, className, size); }
+export function WebuiIconMessageCopied({ className, size = 20 }: WebuiSizedIconProps): ReactElement { return glyph(IconCheck, className, size); }
+export function WebuiIconMessageRewind({ className, size = 20 }: WebuiSizedIconProps): ReactElement { return glyph(IconRefresh, className, size); }
+export function WebuiIconMessageEdit({ className, size = 16 }: WebuiSizedIconProps): ReactElement { return glyph(IconEdit, className, size); }
+export function WebuiIconMessageEditUser({ className, size = 20 }: WebuiSizedIconProps): ReactElement { return glyph(IconEdit, className, size); }
+export function WebuiIconMessageLikeOff({ className, size = 20 }: WebuiSizedIconProps): ReactElement { return glyph(IconThumbUp, className, size); }
+export function WebuiIconMessageLikeOn({ className, size = 20 }: WebuiSizedIconProps): ReactElement { return glyph(IconThumbUp, className, size); }
+export function WebuiIconMessageDislikeOff({ className, size = 20 }: WebuiSizedIconProps): ReactElement { return glyph(IconThumbDown, className, size); }
+export function WebuiIconMessageDislikeOn({ className, size = 20 }: WebuiSizedIconProps): ReactElement { return glyph(IconThumbDown, className, size); }
+export function WebuiIconMessageFork({ className, size = 20 }: WebuiSizedIconProps): ReactElement { return glyph(IconGitFork, className, size); }

@@ -18,6 +18,7 @@
 // between a submenu and its trigger — belongs to this surface and moved with it.
 
 import { WebuiIconAttach, WebuiIconCommandGoal, WebuiIconCommandPlan, WebuiIconPlugins, WebuiIconSkillGeneric } from "../../../shell/icons.js";
+import { IconChevronRight } from "@tabler/icons-react";
 import type { WebuiComposerPluginSummary } from "../../../features/plugins/application/composer-catalogue.public.js";
 import type { WebuiSlashSkillSummary } from "./slash-palette.js";
 
@@ -116,8 +117,8 @@ export function WebuiComposerMenus({
     >
       <div className="webui-composer-menu" role="menu" aria-label="添加附件或技能" data-webui-composer-menu="root">
         <button type="button" role="menuitem" onMouseEnter={() => { if (menu && menu !== "root") onMenuChange("root"); }} onFocus={() => { if (menu && menu !== "root") onMenuChange("root"); }} onClick={() => { onMenuChange(undefined); onAttach(); }}><WebuiIconAttach className="webui-composer-menu-icon" />添加文件或图片</button>
-        <button type="button" role="menuitem" aria-haspopup="menu" aria-expanded={menu === "skills"} data-webui-composer-submenu-trigger="skills" onMouseEnter={() => onMenuChange("skills")} onFocus={() => onMenuChange("skills")} onClick={() => onMenuChange("skills")}><WebuiIconSkillGeneric className="webui-composer-menu-icon" />技能 <span aria-hidden="true">›</span></button>
-        <button type="button" role="menuitem" aria-haspopup="menu" aria-expanded={menu === "plugins"} data-webui-composer-submenu-trigger="plugins" onMouseEnter={() => onMenuChange("plugins")} onFocus={() => onMenuChange("plugins")} onClick={() => onMenuChange("plugins")}><WebuiIconPlugins className="webui-composer-menu-icon" />插件 <span aria-hidden="true">›</span></button>
+        <button type="button" role="menuitem" aria-haspopup="menu" aria-expanded={menu === "skills"} data-webui-composer-submenu-trigger="skills" onMouseEnter={() => onMenuChange("skills")} onFocus={() => onMenuChange("skills")} onClick={() => onMenuChange("skills")}><WebuiIconSkillGeneric className="webui-composer-menu-icon" />技能 <IconChevronRight aria-hidden="true" size={16} stroke={1.7} /></button>
+        <button type="button" role="menuitem" aria-haspopup="menu" aria-expanded={menu === "plugins"} data-webui-composer-submenu-trigger="plugins" onMouseEnter={() => onMenuChange("plugins")} onFocus={() => onMenuChange("plugins")} onClick={() => onMenuChange("plugins")}><WebuiIconPlugins className="webui-composer-menu-icon" />插件 <IconChevronRight aria-hidden="true" size={16} stroke={1.7} /></button>
         <div role="separator" />
         <button type="button" role="menuitem" onMouseEnter={() => { if (menu && menu !== "root") onMenuChange("root"); }} onFocus={() => { if (menu && menu !== "root") onMenuChange("root"); }} onClick={() => { onMenuChange(undefined); onGoal(); }}><WebuiIconCommandGoal className="webui-composer-menu-icon" />目标</button>
         <button type="button" role="menuitem" onMouseEnter={() => { if (menu && menu !== "root") onMenuChange("root"); }} onFocus={() => { if (menu && menu !== "root") onMenuChange("root"); }} onClick={() => { onMenuChange(undefined); onPlan(); }}><WebuiIconCommandPlan className="webui-composer-menu-icon" />计划</button>

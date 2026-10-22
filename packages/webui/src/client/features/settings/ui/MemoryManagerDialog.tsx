@@ -13,6 +13,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { IconDots, IconMessageCirclePlus, IconTrash, IconX } from "@tabler/icons-react";
 import { basenamePath } from "../../../projection/common/paths.js";
 import type { WebuiAgentMemoryView, WebuiMemorySettingsView } from "../../../../shared/contracts/personalization.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
@@ -322,19 +323,13 @@ export function MemoryManagerDialog({
                   data-testid="agent-memory-menu"
                   className="webui-settings-icon-button"
                 >
-                  <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                    <circle cx="3" cy="8" r="1.4" />
-                    <circle cx="8" cy="8" r="1.4" />
-                    <circle cx="13" cy="8" r="1.4" />
-                  </svg>
+                  <IconDots aria-hidden="true" size={16} stroke={1.7} />
                 </button>
               ); }}
             >
               {onCreateInSession ? (
                 <button type="button" role="menuitem" data-testid="agent-memory-create-in-session" onClick={handoff}>
-                  <svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" className="webui-memory-manager-menu-icon">
-                    <path d="M14 10.5a2 2 0 0 1-2 2H6l-3.5 2.5V4.5a2 2 0 0 1 2-2h7.5a2 2 0 0 1 2 2v6Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-                  </svg>
+                  <IconMessageCirclePlus aria-hidden="true" size={14} stroke={1.7} className="webui-memory-manager-menu-icon" />
                   在会话中创建
                 </button>
               ) : null}
@@ -352,9 +347,7 @@ export function MemoryManagerDialog({
                   setConfirmingDelete(true);
                 }}
               >
-                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" className="webui-memory-manager-menu-icon">
-                  <path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8a1 1 0 0 0 1 .9h3.8a1 1 0 0 0 1-.9l.6-8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                <IconTrash aria-hidden="true" size={14} stroke={1.7} className="webui-memory-manager-menu-icon" />
                 删除记忆
               </button>
             </WebuiDropdown>
@@ -365,9 +358,7 @@ export function MemoryManagerDialog({
               className="webui-settings-icon-button"
               onClick={onClose}
             >
-              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="m4 4 8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
-              </svg>
+              <IconX aria-hidden="true" size={16} stroke={1.7} />
             </button>
           </div>
         </div>
@@ -489,9 +480,7 @@ export function MemoryManagerDialog({
           className="webui-memory-confirm-close"
           onClick={() => setConfirmingDelete(false)}
         >
-          <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="m4 4 8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
-          </svg>
+          <IconX aria-hidden="true" size={16} stroke={1.7} />
         </button>
         <p className="webui-memory-confirm-body">{MEMORY_DELETE_CONFIRM.body}</p>
         <div className="webui-memory-confirm-actions">

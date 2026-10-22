@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import { IconPlus, IconSettings } from "@tabler/icons-react";
 import { InstalledPluginSource } from "@mavis/protocol/local";
 import {
   useWebuiPluginWorkflows,
@@ -392,10 +393,7 @@ export function PluginCatalogue({
                     setView("personal");
                   }}
                 >
-                  <svg viewBox="0 0 20 20" aria-hidden="true">
-                    <path d="M7.1 2.8h5.8l4.3 4.3v5.8l-4.3 4.3H7.1l-4.3-4.3V7.1z" />
-                    <circle cx="10" cy="10" r="2.2" />
-                  </svg>
+                  <IconSettings aria-hidden="true" size={18} stroke={1.7} />
                   管理
                 </button>
               </div>
@@ -476,7 +474,7 @@ export function PluginCatalogue({
                 setDialog("agent");
               }}
             >
-              <span aria-hidden="true">＋</span> 创建 Agent
+              <IconPlus aria-hidden="true" size={16} stroke={1.7} /> 创建 Agent
             </button>
           </div>
           {/*

@@ -22,7 +22,7 @@ For business-code changes, follow [Business maintenance](references/business-mai
 | Find code, choose an owner, judge imports, structural refactor | [Architecture and source map](references/architecture.md) |
 | Session creation, send/queue/retry, streaming, async reads, disposal | [Ownership and lifecycle](references/ownership.md) |
 | Wire operations, runtime assembly, capabilities, process resources | [Loopback and runtime](references/runtime.md) |
-| Add a component or modify component styles | Read [Component design system](references/component-design-system.md) first: token selection, scales, component recipes and state rules |
+| Add a component or modify component styles/icons | Read [Component design system](references/component-design-system.md) first: token selection, scales, component recipes, Tabler icon usage and state rules |
 | Theme, assets, layout, CSS compilation or visual verification | [Visual development](references/visual-design.md); screenshots there are optional context, not the design specification |
 | Tests, build, packaging, verification claims or delivery | [Verification and delivery](references/verification.md) |
 | Refresh the skill or check the investigation's limits | [Source evidence and refresh](references/source-evidence.md) |
@@ -34,7 +34,7 @@ Load the branches the task needs. Repository documents linked there provide deta
 - Keep business state and submitted operations with their application owner. Inject capability contracts; bindings subscribe and adapt browser effects; UI renders snapshots and invokes named commands. Local uncommitted forms and ephemeral presentation state can remain local when that is their established lifetime.
 - Publish a narrow owner-role module or contract for a real peer consumer. A `.public` suffix grants reachability, not authority to expose writers, teardown or another business's implementation.
 - Reuse request/freshness and session-interest mechanisms when results outlive selection or mounting. Capture operation identity before awaiting; preserve navigation, deletion, incarnation and newer-input fences.
-- For UI work, apply the component design system: semantic color roles, shared type/spacing/radius scales, existing control recipes and complete interaction states. Reuse an existing primitive when available; keep business-private styles with their business. Inspect the result in both themes; screenshots assist verification, while source tokens and component contracts define the design.
+- For UI work, apply the component design system: semantic color roles, shared type/spacing/radius scales, existing control recipes, the Tabler icon library and complete interaction states. Reuse an existing primitive when available; do not draw interface icons yourself. Keep business-private styles with their business. Inspect the result in both themes; screenshots assist verification, while source tokens and component contracts define the design.
 - Keep file movement deliberate: this is a public source projection with an explicit inventory and upstream synchronization costs. Prefer a cohesive change in its current home over layout churn.
 
 Run verification proportional to the change and applicable repository requirements. Report behavior and seam tested, results, and remaining boundaries. Activation never authorizes publication, Git pushes, production changes or paid/live-provider calls by itself.

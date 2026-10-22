@@ -22,6 +22,59 @@ function mergeQueryCollapseViews(
   return [...byQueryKey.values()];
 }
 
+function mergeHeadMessages(
+  olderMessages: readonly NonNullable<WebuiClientMessagePage["messages"]>[number][],
+  headMessages: readonly NonNullable<WebuiClientMessagePage["messages"]>[number][],
+) {
+  const merged = [...olderMessages];
+  for (const message of headMessages) {
+    const existing = merged.findIndex((candidate) => candidate.msgId === message.msgId);
+    if (existing < 0) merged.push(message);
+    else merged[existing] = message;
+  }
+  return merged;
+}
+
+function mergeQueryViews(
+  older: NonNullable<WebuiClientMessagePage["queryCollapseViews"]>,
+  head: NonNullable<WebuiClientMessagePage["queryCollapseViews"]>,
+) {
+  const byQueryKey = new Map(older.map((view) => [view.queryKey, view]));
+  for (const view of head) byQueryKey.set(view.queryKey, view);
+  return [...byQueryKey.values()];
+}
+
+/** Keep loaded older pages while replacing the authoritative head page. */
+export function mergeRefreshedTranscriptHead(
+  current: WebuiClientMessagePage,
+  previousHead: WebuiClientMessagePage | undefined,
+  refreshedHead: WebuiClientMessagePage,
+): WebuiClientMessagePage {
+  if (!previousHead) return refreshedHead;
+  const previousHeadIds = new Set((previousHead.messages ?? []).map(({ msgId }) => msgId));
+  const olderMessages = (current.messages ?? []).filter(({ msgId }) => !previousHeadIds.has(msgId));
+  const hasLoadedOlderMessages = olderMessages.length > 0;
+  return {
+    ...refreshedHead,
+    messages: mergeHeadMessages(olderMessages, refreshedHead.messages ?? []),
+    queryCollapseViews: mergeQueryViews(
+      current.queryCollapseViews ?? [],
+      refreshedHead.queryCollapseViews ?? [],
+    ),
+    ...(refreshedHead.contextSnapshot
+      ? { contextSnapshot: refreshedHead.contextSnapshot }
+      : current.contextSnapshot
+        ? { contextSnapshot: current.contextSnapshot }
+        : {}),
+    ...(hasLoadedOlderMessages
+      ? {
+          nextCursor: current.nextCursor,
+          hasMore: current.hasMore,
+        }
+      : {}),
+  };
+}
+
 export interface WebuiOwnedTranscriptState {
   readonly ownerSessionId: string;
   readonly generation: number;

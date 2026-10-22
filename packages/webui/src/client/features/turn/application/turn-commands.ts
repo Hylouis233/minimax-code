@@ -471,7 +471,7 @@ export function createWebuiConversationTurnCommands(
       sessionId,
       turnId,
       ...(capabilities?.resume ? { resumeSession: capabilities.resume } : {}),
-      ...(capabilities?.load ? { loadHistory: capabilities.load } : {}),
+      ...(capabilities?.load ? { loadMessages: capabilities.load } : {}),
       readStream,
       setSending: writer.setTurnSending,
       sink: writer.createSink(),

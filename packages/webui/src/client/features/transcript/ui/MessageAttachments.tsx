@@ -17,6 +17,7 @@
 // "broken-image placeholder" so callers never see a half-rendered tile.
 
 import { useEffect, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { IconEye, IconFileText, IconPhoto } from "@tabler/icons-react";
 
 // The attachment shape lives in contracts.ts (so projection/message-projection.ts
 // can return it without importing the React component). Re-export it under the
@@ -70,18 +71,7 @@ function AttachmentImage(props: {
         data-testid="message-attachment-image-placeholder"
       >
         <div className="flex flex-col items-center gap-1">
-          <svg
-            className="text-text_default_quaternary"
-            width="20"
-            height="20"
-            viewBox="0 0 20 20"
-            aria-hidden="true"
-            focusable="false"
-          >
-            <rect x="2" y="3" width="16" height="14" rx="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
-            <circle cx="7" cy="8" r="1.5" fill="currentColor" />
-            <path d="M4 14l4-4 3 3 2-2 3 3" fill="none" stroke="currentColor" strokeWidth="1.5" />
-          </svg>
+          <IconPhoto className="text-text_default_quaternary" width={20} height={20} aria-hidden="true" focusable="false" stroke={1.6} />
           <span
             className="max-w-[100px] truncate text-[10px] text-text_default_quaternary"
             title={attachment.file_name}
@@ -132,23 +122,7 @@ function AttachmentFile(props: {
     >
       <div className="flex items-start gap-2">
         <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-bg_grouped_primary_elevated">
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 18 18"
-            aria-hidden="true"
-            focusable="false"
-            className="text-icon_default_secondary"
-          >
-            <path
-              d="M4 2h7l3 3v11H4z"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinejoin="round"
-            />
-            <path d="M11 2v3h3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-          </svg>
+          <IconFileText width={18} height={18} aria-hidden="true" focusable="false" className="text-icon_default_secondary" stroke={1.6} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-medium leading-5 text-text_default_primary">
@@ -171,10 +145,7 @@ function AttachmentFile(props: {
             data-testid="message-attachment-file-preview"
             aria-label={`Preview ${attachment.file_name}`}
           >
-            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" focusable="false">
-              <path d="M1 7s2.5-5 6-5 6 5 6 5-2.5 5-6 5-6-5-6-5z" fill="none" stroke="currentColor" strokeWidth="1.4" />
-              <circle cx="7" cy="7" r="2" fill="none" stroke="currentColor" strokeWidth="1.4" />
-            </svg>
+            <IconEye width={14} height={14} aria-hidden="true" focusable="false" stroke={1.6} />
           </button>
         ) : null}
       </div>

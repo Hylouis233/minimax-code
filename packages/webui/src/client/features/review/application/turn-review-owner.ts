@@ -88,11 +88,20 @@ function resourceKey(key: WebuiTurnReviewKey) {
 
 /** The query request the port takes, rebuilt from the key. */
 function queryRequest(key: WebuiTurnReviewKey) {
+  // These selectors are alternatives, not cumulative filters. The runtime
+  // resolves changeSetId first, then assistantMessageId, then turnId; sending
+  // the transcript group's first assistant message alongside its turnId can
+  // therefore select a different (often empty) diff. Keep the most specific
+  // available identity and only fall back when it is absent.
   return {
     id: key.sessionId,
-    ...(key.turnId ? { turnId: key.turnId } : {}),
-    ...(key.assistantMessageId ? { assistantMessageId: key.assistantMessageId } : {}),
-    ...(key.changeSetId ? { changeSetId: key.changeSetId } : {}),
+    ...(key.changeSetId
+      ? { changeSetId: key.changeSetId }
+      : key.turnId
+        ? { turnId: key.turnId }
+        : key.assistantMessageId
+          ? { assistantMessageId: key.assistantMessageId }
+          : {}),
   };
 }
 

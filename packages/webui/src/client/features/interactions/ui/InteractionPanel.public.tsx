@@ -1,6 +1,7 @@
 // WebuiInteractionPanel — the per-session permission and questionnaire UI.
 
 import { useEffect, useState, type ReactElement } from "react";
+import { IconChevronRight } from "@tabler/icons-react";
 import {
   buildWebuiQuestionnaireAnswers,
   canAdvanceWebuiQuestionnaireStep,
@@ -228,7 +229,7 @@ export function WebuiInteractionPanel({
               <span className="webui-questionnaire-progress" data-testid="questionnaire-progress" aria-label={`${currentStep + 1}/${questionnaire.steps.length}`}>
                 <button type="button" data-testid="questionnaire-progress-prev" aria-label="上一步" onClick={() => setCurrentStep((value) => Math.max(0, value - 1))} disabled={submitting || !(questionnaire.presentation?.allowBackNavigation ?? true) || currentStep === 0}>‹</button>
                 <span>{currentStep + 1}/{questionnaire.steps.length}</span>
-                <button type="button" data-testid="questionnaire-progress-next" aria-label="下一步" onClick={() => setCurrentStep((value) => Math.min(questionnaire.steps.length - 1, value + 1))} disabled={submitting || currentStep >= questionnaire.steps.length - 1}>›</button>
+                <button type="button" data-testid="questionnaire-progress-next" aria-label="下一步" onClick={() => setCurrentStep((value) => Math.min(questionnaire.steps.length - 1, value + 1))} disabled={submitting || currentStep >= questionnaire.steps.length - 1}><IconChevronRight aria-hidden="true" size={16} stroke={1.7} /></button>
               </span>
             ) : null}
           </header>

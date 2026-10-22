@@ -44,6 +44,23 @@ describe("the turn-review owner", () => {
     expect(owner.read(key).view?.changeSetId).toBe("c1");
   });
 
+  it("queries by turn instead of the group's fallback message id", async () => {
+    const getTurnDiff = vi.fn(async () => view("c1"));
+    const owner = createWebuiTurnReviewOwner({ port: { getTurnDiff } });
+
+    // A transcript group can start with a different assistant message from the
+    // final message that owns the recorded diff. The runtime checks
+    // assistantMessageId before turnId, so sending both makes that fallback
+    // message id win and returns an empty fileChanges list.
+    await owner.load({
+      sessionId: "S",
+      turnId: "T1",
+      assistantMessageId: "first-message-in-group",
+    });
+
+    expect(getTurnDiff).toHaveBeenCalledWith({ id: "S", turnId: "T1" });
+  });
+
   it("does not let a superseded read claim the answer that replaced it", async () => {
     const pending: Array<(value: WebuiTurnDiffView) => void> = [];
     const owner = createWebuiTurnReviewOwner({

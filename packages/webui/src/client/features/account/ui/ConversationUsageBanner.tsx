@@ -24,6 +24,7 @@
 // form land on the same element.
 
 import type { MouseEvent, ReactNode } from "react";
+import { IconAlertCircle, IconX } from "@tabler/icons-react";
 
 export type ConversationUsageActionKind =
   | "buy_credits"
@@ -100,34 +101,11 @@ function DefaultActionButton(props: {
 }
 
 function CloseIcon(): React.JSX.Element {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" focusable="false">
-      <path
-        d="M4 4l10 10M14 4L4 14"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
+  return <IconX width={18} height={18} aria-hidden="true" focusable="false" stroke={1.7} />;
 }
 
 function NoticeIcon(): React.JSX.Element {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 20 20"
-      aria-hidden="true"
-      focusable="false"
-      className="flex-none text-icon_default_secondary"
-    >
-      <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M10 6v5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <circle cx="10" cy="13.5" r="0.9" fill="currentColor" />
-    </svg>
-  );
+  return <IconAlertCircle width={20} height={20} aria-hidden="true" focusable="false" className="flex-none text-icon_default_secondary" stroke={1.7} />;
 }
 
 export function ConversationUsageBanner(props: ConversationUsageBannerProps): React.JSX.Element {

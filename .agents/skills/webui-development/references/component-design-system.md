@@ -4,7 +4,7 @@ Read this before adding a WebUI component or changing its appearance. It supplie
 
 ## Design direction
 
-Use restrained neutral surfaces, quiet separators, compact readable text, rounded controls and sparse blue accents. Communicate hierarchy through surface, spacing and text roles. Primary actions use the existing neutral high-contrast treatment; links, selected indicators and switches use accent where their existing recipe does. Adding a component is not an invitation to add a new palette, font, gradient, shadow or icon family.
+Use restrained neutral surfaces, quiet separators, compact readable text, rounded controls and sparse blue accents. Communicate hierarchy through surface, spacing and text roles. Primary actions use the existing neutral high-contrast treatment; links, selected indicators and switches use accent where their existing recipe does. Adding a component is not an invitation to add a new palette, font, gradient, shadow or icon family. Use the existing Tabler icon library for interface glyphs; do not draw new icons yourself.
 
 For a style modification, retain the component's established size and interaction contract unless the request changes it. For a new component, choose the matching recipe below, then fill its content and behavior. The rules and recipes are the design reference; full-page screenshots are optional context.
 
@@ -47,7 +47,13 @@ Choose a background/foreground pair together. Inverted/static text is for the ma
 | Radius tokens | `--radius_4/8/12/16/20/24/32/full` |
 | Radius use | 8px compact controls/inputs; 12px menus/small surfaces; 16–20px larger cards/composer; full for pills/circles. Preserve a reused component's exact recipe |
 | Weight | Use existing `font-normal`/`font-medium` utilities (400/500). Baseline `--weight_regular`/`--weight_medium` values contain `px`; do not copy that unit into new `font-weight` rules |
-| Icons | Existing SVG glyphs, typically 16px inside compact controls; size via the reused glyph's viewBox and recipe, not arbitrary path replacement |
+| Icons | Tabler React components from `@tabler/icons-react`; typically 16px inside compact controls. Reuse a matching `WebuiIcon*` wrapper from `src/client/shell/icons.tsx` when available; otherwise import the Tabler glyph directly and size it to the component recipe |
+
+### Interface icons
+
+- Use `@tabler/icons-react`, already included by `packages/webui`. Prefer an existing semantic wrapper from `src/client/shell/icons.tsx` when one matches; otherwise import the appropriate named `Icon*` component directly.
+- Do not hand-draw interface glyphs as inline SVG paths, CSS shapes/pseudo-elements, or text characters such as arrows, checks, plus signs and crosses. Replace such glyphs with Tabler components and retain the surrounding accessible name, layout and interaction.
+- Keep approved brand marks as their supplied assets. Purpose-built illustrations, data visualizations, progress geometry and animations are not interface glyphs; keep their domain-specific rendering when needed instead of forcing them into an icon component.
 
 Prefer `gap-spacing_8`, `p-spacing_12`, `rounded-radius_8`, `text-body-base` and semantic colors. Stock classes such as `gap-2` and `size-7` are supported too; preserve them in existing recipes. Literal geometry is appropriate when the scale does not describe the required shape. Distinguish documented existing sizes from recommended composition defaults; there is no universal 36px height for every button or 20px radius for every card.
 
@@ -56,7 +62,7 @@ Prefer `gap-spacing_8`, `p-spacing_12`, `rounded-radius_8`, `text-body-base` and
 | Component | Reuse or inspect | Existing recipe / instruction |
 | --- | --- | --- |
 | Binary switch | `src/client/ui/ToggleSwitch.tsx`; `.webui-toggle-switch` in settings CSS | Reuse component and its `checked`, `label`, `onChange`, `disabled` contract. Existing track is 40×20px with a sliding thumb; keep `role=switch`, `aria-checked`, accent checked state and visible focus |
-| Compact icon action | `src/client/ui/form-atoms.tsx` `IconButton` | 28px hit area, 16px glyph, tertiary→secondary icon hover and disabled opacity. It creates the SVG wrapper: supply a path glyph such as `RefreshIcon`, not a nested full SVG |
+| Compact icon action | `src/client/ui/form-atoms.tsx` `IconButton` | 28px hit area, 16px glyph, tertiary→secondary icon hover and disabled opacity. Supply a Tabler React icon component as its child; `IconButton` renders the child directly |
 | General settings row | `features/settings/ui/SettingsModal.public.tsx`: `SettingRow`, `Section`, `Divider`, `Button` | Reuse inside its owning module: left title/description, right control, grouped card, inset separators. These helpers are private, not a shared package API |
 | Settings action button | `.webui-mavis-button` in `features/settings/ui/settings.css` | Existing 36px height, 80px min-width, radius 8, horizontal padding 12, text 14; neutral gray/primary/danger variants. Inspect effective declarations and state rules |
 | Form field | `features/models/ui/ProviderFormPanel.public.tsx` and `.webui-provider-form-field` in `models.css` | Existing input 40px high, radius 8, border-default, canvas fill, horizontal padding 12; label 14/20, gap 8; focus border-accent. Textareas preserve multiline behavior |

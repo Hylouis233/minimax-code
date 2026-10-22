@@ -95,6 +95,52 @@ describe("fence 1 — the stream lease is claimed before the turn opens", () => 
     expect(shell.stream().phase).toBe("streaming");
   });
 
+  it("anchors persisted thinking before applying a resumed thinking chunk", async () => {
+    const shell = harness();
+    const history = {
+      messages: [
+        { msgId: "msg-user-1", role: "user", msgContent: "Question" },
+        {
+          msgId: "assistant-1",
+          role: "assistant",
+          msgContent: "Answer so far",
+          thinkingContent: "Reasoning so far",
+        },
+      ],
+    };
+    const resumeSession: WebuiClientSessionResumer = vi.fn(async (_request, onFrame) => {
+      onFrame({
+        dataJson: JSON.stringify({
+          type: "agent_message_chunk",
+          agent_message_chunk: {
+            msg_id: "assistant-1",
+            msg_content: " and continued",
+            thinking_content: " and continued reasoning",
+          },
+        }),
+      });
+      onFrame({ dataJson: "[DONE]" });
+    });
+
+    await runWebuiStreamLoop(
+      loopDeps({
+        resumeSession,
+        loadHistory: async () => history,
+      }),
+      { sessionId: SESSION_ID, attachId: "turn-1" },
+      shell.newSink(),
+    );
+
+    expect(shell.stream().messages).toMatchObject([
+      { id: "msg-user-1", answer: "Question", thinking: "" },
+      {
+        id: "assistant-1",
+        answer: "Answer so far and continued",
+        thinking: "Reasoning so far and continued reasoning",
+      },
+    ]);
+  });
+
   it("claims as `local-send` with no turn id, because the runtime names the turn later", async () => {
     const shell = harness();
     void runWebuiStreamLoop(

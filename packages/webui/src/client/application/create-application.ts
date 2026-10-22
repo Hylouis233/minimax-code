@@ -514,8 +514,8 @@ export function createWebuiApplication(
    * application's one construction, a binding reads it instead of building a
    * second one.
    */
-  const turnCommandsFor = (sessionId: string | undefined): WebuiConversationTurnCommands =>
-    createWebuiConversationTurnCommands({
+  const turnCommandsFor = (sessionId: string | undefined): WebuiConversationTurnCommands => {
+    return createWebuiConversationTurnCommands({
       store,
       sessionId,
       ...(deps.turnCapabilities ? { capabilities: turnCapabilities } : {}),
@@ -530,6 +530,7 @@ export function createWebuiApplication(
       // would clear a slot without knowing whether it was still the submitted
       // revision — which is how newer typing in that slot was erased.
     });
+  };
   /**
    * The one reconciliation entry point: the same owner routes the event path
    * uses, so selection and reconnect do not run a second one.

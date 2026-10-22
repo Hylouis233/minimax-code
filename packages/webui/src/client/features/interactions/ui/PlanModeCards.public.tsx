@@ -12,6 +12,7 @@
 // rest of the plan surface stays in the private sibling `PlanModeCards.tsx`.
 
 import { useLayoutEffect, useRef, useState, type ReactElement } from "react";
+import { IconEye } from "@tabler/icons-react";
 
 import {
   WEBUI_PLAN_COPY,
@@ -160,15 +161,5 @@ export function WebuiPlanDeliveryCard({
 
 /** Eye glyph for 预览: an outline eye in an 18px box. */
 function PlanEyeIcon({ className }: { readonly className?: string }): ReactElement {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true" className={className}>
-      <path
-        d="M2.25 9s2.5-4.25 6.75-4.25S15.75 9 15.75 9s-2.5 4.25-6.75 4.25S2.25 9 2.25 9Z"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinejoin="round"
-      />
-      <circle cx="9" cy="9" r="1.9" stroke="currentColor" strokeWidth="1.3" />
-    </svg>
-  );
+  return <IconEye aria-hidden="true" className={className} size={18} stroke={1.7} />;
 }

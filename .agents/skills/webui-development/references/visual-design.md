@@ -29,7 +29,7 @@ Source anchors below are under `packages/webui/`.
 | Settings rows and controls | `features/settings/ui/settings.css`, `SettingsModal.public.tsx`, `settings-atoms.tsx` | Full settings surface has its own navigation; retain selected/disabled states |
 | Messages/code/diffs | `features/transcript/ui/transcript.css`, `transcript-widgets.css`, `markdown.public.tsx` | Preserve readable column, line numbers, copy/actions, file refs and math |
 | Domain surfaces | `features/{sessions,models,plugins,interactions,workspace,account,goal}/ui/*.css` | Place business styles with that business; use shared primitives for shared behavior |
-| Form primitives and icons | `src/client/ui/form-atoms.tsx`, `ToggleSwitch.tsx`, `ContextMenu.tsx`, `shell/icons.tsx` | Reuse the existing vector and control language before adding another library |
+| Form primitives and icons | `src/client/ui/form-atoms.tsx`, `ToggleSwitch.tsx`, `ContextMenu.tsx`, `shell/icons.tsx`, `@tabler/icons-react` | Reuse the existing Tabler icon vocabulary and control primitives; do not hand-draw interface glyphs or add another icon library |
 
 In rows using abbreviated `features/…`, the full prefix is `src/client/`.
 

@@ -2,6 +2,7 @@
 // at its end.
 
 import { useState, type ReactElement } from "react";
+import { IconChevronDown } from "@tabler/icons-react";
 import { WebuiMarkdown } from "./markdown.public.js";
 import { basenamePath } from "../../../projection/common/paths.js";
 import { parseWebuiMessageFileReference, type WebuiMessageFileReference } from "../projection/message-file-reference.js";
@@ -142,7 +143,7 @@ function WebuiAgentJoinedGroup({
         onClick={() => setExpanded((value) => !value)}
       >
         <span>分配任务</span>
-        <span className={`webui-agent-joined-chevron${expanded ? "" : " is-collapsed"}`} aria-hidden="true">⌄</span>
+        <IconChevronDown className={`webui-agent-joined-chevron${expanded ? "" : " is-collapsed"}`} aria-hidden="true" size={16} stroke={1.7} />
       </button>
       <div className="webui-agent-joined-list" data-testid="agent-task-list" hidden={!expanded}>
         {agents.map((agent, index) => {

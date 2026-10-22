@@ -13,6 +13,7 @@
 // variants as plain string literals to keep this file dependency-free.
 
 import { useEffect, useState, type ReactNode } from "react";
+import { IconAlertCircle } from "@tabler/icons-react";
 
 export type OutputErrorVariant = "output_retrying" | "output_rate_limited" | "output_error";
 
@@ -72,25 +73,7 @@ function DefaultIcon({ tooltip, renderIconTooltip }: {
   tooltip?: string;
   renderIconTooltip?: (icon: ReactNode, tooltip?: string) => ReactNode;
 }): React.JSX.Element {
-  const icon = (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" strokeWidth="1.5" />
-      <path
-        d="M8 4v5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-      <circle cx="8" cy="11.5" r="0.9" fill="currentColor" />
-    </svg>
-  );
+  const icon = <IconAlertCircle width={16} height={16} aria-hidden="true" focusable="false" stroke={1.7} />;
   if (renderIconTooltip) {
     return <>{renderIconTooltip(icon, tooltip)}</>;
   }

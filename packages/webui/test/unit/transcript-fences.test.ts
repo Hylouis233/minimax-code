@@ -23,6 +23,53 @@ const page = (...msgIds: string[]): WebuiClientMessagePage => ({
 });
 
 describe("a late page after a session switch is discarded", () => {
+  it("reproduces a head refresh dropping messages from an already loaded older page", async () => {
+    const store = createWebuiSessionStore();
+    const owner = createWebuiTranscriptHistoryOwner({
+      transcript: createWebuiTranscriptHistoryWriter(store),
+      loadMessages: ({ before }) =>
+        Promise.resolve(
+          before
+            ? {
+                messages: [
+                  { msgId: "old-1", role: "user", msgContent: "刷新前的较早消息" },
+                  { msgId: "old-2", role: "assistant", msgContent: "较早消息的回复" },
+                ],
+                hasMore: false,
+              }
+            : {
+                messages: [
+                  { msgId: "recent-1", role: "user", msgContent: "最近的提问" },
+                  { msgId: "recent-2", role: "assistant", msgContent: "最近的回答" },
+                ],
+                nextCursor: "older-page",
+                hasMore: true,
+              },
+        ),
+    });
+
+    await owner.loadPage("S");
+    await owner.loadOlder("S", "older-page");
+    const beforeRefresh = store.readSession("S").transcript.page.messages ?? [];
+
+    await owner.refreshPage("S");
+    const afterRefresh = store.readSession("S").transcript.page.messages ?? [];
+
+    expect(beforeRefresh.map((message) => [message.msgId, message.msgContent])).toEqual([
+      ["old-1", "刷新前的较早消息"],
+      ["old-2", "较早消息的回复"],
+      ["recent-1", "最近的提问"],
+      ["recent-2", "最近的回答"],
+    ]);
+    expect(afterRefresh.map((message) => [message.msgId, message.msgContent])).toEqual([
+      ["old-1", "刷新前的较早消息"],
+      ["old-2", "较早消息的回复"],
+      ["recent-1", "最近的提问"],
+      ["recent-2", "最近的回答"],
+    ]);
+    owner.dispose();
+  });
+
   it("V15/V16 releases a deleted session's cached pages and fences late reads", async () => {
     const store = createWebuiSessionStore();
     let resolve!: (value: WebuiClientMessagePage) => void;

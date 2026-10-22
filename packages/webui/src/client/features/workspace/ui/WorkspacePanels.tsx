@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactElement } from "react";
 import { Terminal } from "@xterm/xterm";
+import { IconEdit } from "@tabler/icons-react";
 import { FitAddon } from "@xterm/addon-fit";
 import { basenamePath } from "../../../projection/common/paths.js";
 import hljs from "highlight.js/lib/core";
@@ -55,7 +56,7 @@ import {
 } from "../../terminal/projection/terminal-size.public.js";
 import type { WebuiTerminalSize } from "../../terminal/contracts/terminal-port.js";
 import type { WebuiTerminalOwner } from "../../terminal/contracts/terminal-owner.js";
-import { WebuiIconClose, WebuiIconDiffFile, WebuiIconFolder, WebuiIconSearch, WebuiIconSidebarToggle, WebuiIconWorkspaceExpand } from "../../../shell/icons.js";
+import { WebuiIconChevronRight, WebuiIconClose, WebuiIconDiffFile, WebuiIconFolder, WebuiIconSearch, WebuiIconSidebarToggle, WebuiIconWorkspaceExpand } from "../../../shell/icons.js";
 import { FileTree, filterWorkspaceFiles, findWorkspaceFile, getWorkspaceFileParentPaths, mergeWorkspaceFileChildren } from "./WorkspaceFileTree.js";
 import { WorkspaceMediaPreview } from "./WorkspaceMediaPreview.js";
 import { isMediaContent } from "../projection/media-preview.js";
@@ -129,6 +130,7 @@ export function WebuiDiffFileSection({ file, selected, loading = false, error, o
   const language = webuiFileLanguage(file.file);
   return <details className="webui-turn-review-file" open data-testid="turn-review-diff-file">
     <summary className="webui-turn-review-file-heading" aria-current={selected ? "true" : undefined} onClick={onSelect}>
+      <WebuiIconChevronRight className="webui-turn-review-chevron" />
       <span className="webui-diff-file-icon"><WebuiIconDiffFile fileName={file.file} /></span>
       <span className="webui-turn-review-file-path" title={file.file}>{file.file}</span>
       <span className="webui-diff-add">+{file.additions}</span>
@@ -552,13 +554,13 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     </div>
     {hasFileWorkspace ? <div className="webui-workspace-file-toolbar">
       <div className="webui-workspace-file-breadcrumb" aria-label="文件路径">
-        {activeFilePath ? activeFilePath.split("/").map((part, index) => <span key={`${part}-${index}`} className={index === activeFilePath.split("/").length - 1 ? "is-current" : ""}>{index ? <span aria-hidden="true">›</span> : null}{part}</span>) : <span className="is-current">{basenamePath(workspaceDir ?? "") || "工作区"}</span>}
+        {activeFilePath ? activeFilePath.split("/").map((part, index) => <span key={`${part}-${index}`} className={index === activeFilePath.split("/").length - 1 ? "is-current" : ""}>{index ? <WebuiIconChevronRight className="size-3" /> : null}{part}</span>) : <span className="is-current">{basenamePath(workspaceDir ?? "") || "工作区"}</span>}
       </div>
       {activeTab?.content.kind === "file-preview" && /\.md$/iu.test(activeTab.content.path) ? <div className="webui-workspace-file-mode" role="group" aria-label="文件显示模式">
         <button type="button" aria-pressed={!fileCodeMode} onClick={() => setFileCodeMode(false)}>预览</button>
         <button type="button" aria-pressed={fileCodeMode} onClick={() => setFileCodeMode(true)}>代码</button>
       </div> : null}
-      {activeTab?.content.kind === "file-preview" ? <button type="button" className="webui-workspace-edit-action" aria-label="编辑文件（暂未支持）" title="编辑文件（暂未支持）" disabled><svg className="size-[18px]" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m12.7 3.3 4 4M3.5 16.5l3.1-.6L16 6.5a1.4 1.4 0 0 0-2-2l-9.4 9.4-.6 2.6Z" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" /></svg></button> : null}
+      {activeTab?.content.kind === "file-preview" ? <button type="button" className="webui-workspace-edit-action" aria-label="编辑文件（暂未支持）" title="编辑文件（暂未支持）" disabled><IconEdit aria-hidden="true" className="size-[18px]" size={18} stroke={1.7} /></button> : null}
       <button type="button" className="webui-workspace-tree-toggle" aria-label={fileTreeOpen ? "隐藏文件树" : "显示文件树"} aria-pressed={fileTreeOpen} onClick={() => setFileTreeOpen((open) => !open)}><WebuiIconSidebarToggle className="size-5" /></button>
     </div> : null}
     <div className="webui-workspace-panel-body">

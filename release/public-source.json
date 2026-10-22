@@ -4229,6 +4229,7 @@
     "packages/webui/test/gates/webui-boundary-check.test.ts",
     "packages/webui/test/gates/webui-dependency-check.test.ts",
     "packages/webui/test/integration/adapter-conversions.test.ts",
+    "packages/webui/test/integration/agent-transcript.test.ts",
     "packages/webui/test/integration/browser-panel-live-navigation.test.ts",
     "packages/webui/test/integration/browser-use-real-input.test.ts",
     "packages/webui/test/integration/isolated-chromium-screencast.test.ts",

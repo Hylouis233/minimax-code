@@ -12,6 +12,7 @@
 // live here; the composer passes the usage it read, the quota, and the selected model in.
 
 import type { WebuiModelEntry } from "../../../../shared/contracts/models.js";
+import { IconChevronDown } from "@tabler/icons-react";
 import type { WebuiUsageQuotaResult } from "../../../../shared/contracts/usage-quota.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { breakdownSegmentPercent, breakdownShareLabel, breakdownSwatchStyle, contextBreakdownRows, drawableBreakdownRows } from "../projection/context-breakdown.js";
@@ -200,9 +201,7 @@ export function ContextUsageIndicator({ usage, usageQuota, planModel }: {
                 aria-hidden="true"
                 className={`webui-context-usage-chevron${breakdownOpen ? " is-open" : ""}`}
               >
-                <svg viewBox="0 0 16 16">
-                  <path d="M4 6.5 8 10.5 12 6.5" />
-                </svg>
+                <IconChevronDown aria-hidden="true" size={16} stroke={1.7} />
               </span>
             </span>
           </button>

@@ -6,6 +6,7 @@
 // mutually exclusive and dismissed together, and that bookkeeping is the menu's.
 
 import { Fragment, useState, type ReactElement } from "react";
+import { IconCheck, IconCoin, IconInfoCircle } from "@tabler/icons-react";
 import {
   SigninDayStatus,
   getCurrentSigninStreak,
@@ -61,29 +62,17 @@ export function formatSigninError(error: unknown): string {
 }
 
 function SigninInfoIcon(): ReactElement {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <path d="M8 1.5C11.5899 1.5 14.5 4.41015 14.5 8C14.5 11.5899 11.5899 14.5 8 14.5C4.41016 14.5 1.5 11.5898 1.5 8C1.5 4.41016 4.41016 1.50002 8 1.5ZM8 2.5C4.96245 2.50002 2.5 4.96244 2.5 8C2.5 11.0376 4.96245 13.5 8 13.5C11.0376 13.5 13.5 11.0376 13.5 8C13.5 4.96243 11.0376 2.5 8 2.5ZM8 7.5C8.27614 7.5 8.5 7.72386 8.5 8V10.667C8.49982 10.943 8.27603 11.167 8 11.167C7.72397 11.167 7.50018 10.943 7.5 10.667V8C7.5 7.72386 7.72386 7.5 8 7.5ZM8.00684 4.83301C8.28279 4.8331 8.50666 5.05707 8.50684 5.33301C8.50684 5.60909 8.2829 5.83292 8.00684 5.83301H8C7.72386 5.83301 7.5 5.60915 7.5 5.33301C7.50018 5.05702 7.72397 4.83301 8 4.83301H8.00684Z" fill="currentColor" />
-    </svg>
-  );
+  return <IconInfoCircle aria-hidden="true" size={14} stroke={1.7} />;
 }
 
 /** Check mark inside a day dot, size 14. */
 function SigninCheckIcon(): ReactElement {
-  return (
-    <svg width="14" height="14" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className="signin-day-check" aria-hidden="true">
-      <path d="M3.125 9.11857L8.0609 16.1699L16.875 3.83011" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+  return <IconCheck aria-hidden="true" className="signin-day-check" size={14} stroke={1.7} />;
 }
 
 /** Credits glyph in the claim button / bonus tag. */
 function SigninCreditsIcon({ size }: { readonly size: number }): ReactElement {
-  return (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <path d="M7.96545 1.35282C11.5553 1.35282 14.4654 4.26303 14.4655 7.85282C14.4655 11.4427 11.5553 14.3528 7.96545 14.3528C4.37566 14.3528 1.46545 11.4426 1.46545 7.85282C1.46553 4.26307 4.3757 1.35288 7.96545 1.35282ZM7.96545 2.35282C4.92799 2.35288 2.46553 4.81535 2.46545 7.85282C2.46545 10.8903 4.92794 13.3528 7.96545 13.3528C11.003 13.3528 13.4655 10.8904 13.4655 7.85282C13.4654 4.81531 11.003 2.35282 7.96545 2.35282ZM7.30042 4.30497C7.61361 3.7846 8.38548 3.7848 8.69885 4.30497L8.75842 4.42508L9.54163 6.34501L11.4625 7.12918C12.1426 7.40684 12.1426 8.36911 11.4625 8.64676L9.54163 9.42997L8.75842 11.3509C8.48077 12.0309 7.5185 12.0309 7.24084 11.3509L6.45667 9.42997L4.53674 8.64676C3.85714 8.36894 3.85705 7.40692 4.53674 7.12918L6.45667 6.34501L7.24084 4.42508L7.30042 4.30497ZM7.35413 6.79325C7.27083 6.9971 7.10875 7.15917 6.90491 7.24247L5.32288 7.88797L6.90491 8.53348C7.08319 8.60633 7.22941 8.73993 7.31897 8.90848L7.35413 8.9827L7.99963 10.5638L8.64514 8.9827C8.7284 8.77895 8.89064 8.6168 9.09436 8.53348L10.6754 7.88797L9.09436 7.24247C8.89069 7.15913 8.72838 6.99697 8.64514 6.79325L7.99963 5.21122L7.35413 6.79325Z" fill="currentColor" />
-    </svg>
-  );
+  return <IconCoin aria-hidden="true" size={size} stroke={1.7} />;
 }
 
 /** Dotted connector between day dots. */

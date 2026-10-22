@@ -307,8 +307,8 @@
   .webui-turn-review-file { min-width: 0; border-bottom: 1px solid var(--border_default); }
   .webui-turn-review-file-heading { position: sticky; top: 0; display: flex; min-width: 0; min-height: 40px; align-items: center; gap: var(--spacing_8); border: 0; background: var(--bg_default_primary); padding: 0 var(--spacing_12); color: var(--text_default_primary); cursor: pointer; list-style: none; }
   .webui-turn-review-file-heading::-webkit-details-marker { display: none; }
-  .webui-turn-review-file-heading::before { width: 12px; flex: 0 0 12px; color: var(--icon_default_tertiary); content: "›"; font-size: 18px; text-align: center; }
-  .webui-turn-review-file[open] > .webui-turn-review-file-heading::before { content: "⌄"; }
+  .webui-turn-review-chevron { width: 12px; height: 12px; flex: 0 0 12px; color: var(--icon_default_tertiary); transition: transform 120ms ease; }
+  .webui-turn-review-file[open] > .webui-turn-review-file-heading > .webui-turn-review-chevron { transform: rotate(90deg); }
   .webui-turn-review-file-heading:hover { background: var(--bg_interaction_secondary_default); }
   .webui-turn-review-file-heading .webui-diff-file-icon { width: 18px; height: 18px; }
   .webui-turn-review-file-heading .webui-diff-file-icon .webui-workspace-filetype-badge { width: 18px; height: 18px; }
