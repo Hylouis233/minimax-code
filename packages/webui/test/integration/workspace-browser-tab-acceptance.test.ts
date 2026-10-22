@@ -41,7 +41,7 @@ import {
   SEND_BROWSER_COMMAND_OPERATION_NAME,
   SEND_BROWSER_INPUT_OPERATION_NAME,
 } from "../../src/shared/operation-names.js";
-import { acceptanceRecordsFor } from "../browser/acceptance-record.js";
+import { acceptanceRecordsFor, restoreAcceptanceRecords } from "../browser/acceptance-record.js";
 import type {
   WebuiBrowserAuthorization,
   WebuiBrowserTargetId,
@@ -53,6 +53,18 @@ const SUITE = "workspace-browser-tab";
 
 /** How long a page is given to settle after a move. */
 const SETTLE_MS = 750;
+
+/**
+ * How long a case may take.
+ *
+ * A case drives a real browser: the first one launches it, opens a tab and
+ * waits for the strip to gain it. The default budget (5s) is smaller than a
+ * cold browser start on a loaded runner, and a case that runs out of time
+ * leaves the browser half launched — the next case then finds a browser that
+ * exited during startup and fails too. The sibling suite
+ * (`browser-panel-live-navigation.test.ts`) has always given its cases 30s.
+ */
+const TIMEOUT_MS = 30_000;
 
 async function chromeIsAvailable(): Promise<boolean> {
   for (const candidate of ["/usr/bin/google-chrome", "/usr/bin/chromium"]) {
@@ -123,6 +135,9 @@ describe.skipIf(!available)("the acceptance of the workspace browser tab model",
   afterAll(async () => {
     await service?.close();
     if (dataDir) await rm(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    // On CI the record file is tracked and the run's own timestamps are not a
+    // source change, so the file goes back the way the checkout had it.
+    restoreAcceptanceRecords();
   });
 
   // -- the paths the cases drive ------------------------------------------
@@ -300,7 +315,7 @@ describe.skipIf(!available)("the acceptance of the workspace browser tab model",
         expect(state.tabs[0]?.content.kind).toBe("web");
       },
     );
-  });
+  }, TIMEOUT_MS);
 
   it("the Agent navigates after opening, and the picture follows", async () => {
     await record(
@@ -340,7 +355,7 @@ describe.skipIf(!available)("the acceptance of the workspace browser tab model",
         expect(frames.length).toBeGreaterThan(0);
       },
     );
-  });
+  }, TIMEOUT_MS);
 
   it("the Agent acts on a page it did not open, and a stale reference is refused", async () => {
     await record(
@@ -377,7 +392,7 @@ describe.skipIf(!available)("the acceptance of the workspace browser tab model",
         ).rejects.toMatchObject({ code: "browser_target_stale" });
       },
     );
-  });
+  }, TIMEOUT_MS);
 
   it("a person opens a tab while the Agent works, and the two pages differ", async () => {
     await record(
@@ -408,7 +423,7 @@ describe.skipIf(!available)("the acceptance of the workspace browser tab model",
         expect(await readTitle(personPage!)).toContain("person");
       },
     );
-  });
+  }, TIMEOUT_MS);
 
   it("a person opens a tab while the run has no selection, and the run gets it", async () => {
     await record(
@@ -437,7 +452,7 @@ describe.skipIf(!available)("the acceptance of the workspace browser tab model",
         expect(await readTitle(page!)).toContain("acted on");
       },
     );
-  });
+  }, TIMEOUT_MS);
 
   it("a person types into their own tab while the Agent works", async () => {
     await record(
@@ -505,7 +520,7 @@ describe.skipIf(!available)("the acceptance of the workspace browser tab model",
         expect(await readField(agentPage)).toBe("");
       },
     );
-  });
+  }, TIMEOUT_MS);
 
   it("a person types a url in the launcher, and the tab becomes that page", async () => {
     await record(
@@ -537,7 +552,7 @@ describe.skipIf(!available)("the acceptance of the workspace browser tab model",
         expect((commands[1] as { readonly type: string }).type).toBe("open-web-tab");
       },
     );
-  });
+  }, TIMEOUT_MS);
 
   it("a person closes a web tab, and the page is released", async () => {
     await record(
@@ -577,7 +592,7 @@ describe.skipIf(!available)("the acceptance of the workspace browser tab model",
         expect(await runSelection("run-6")).toBeUndefined();
       },
     );
-  });
+  }, TIMEOUT_MS);
 
   it("back and forward move through the page's own history", async () => {
     await record(
@@ -625,7 +640,7 @@ describe.skipIf(!available)("the acceptance of the workspace browser tab model",
         expect(await readTitle(back)).toContain("history two");
       },
     );
-  });
+  }, TIMEOUT_MS);
 
   it("the surface's switch is off, and both paths are refused", async () => {
     await record(
@@ -671,7 +686,7 @@ describe.skipIf(!available)("the acceptance of the workspace browser tab model",
         }
       },
     );
-  });
+  }, TIMEOUT_MS);
 
   it("a run with no selection is refused every action but open_tab", async () => {
     await record(
@@ -695,7 +710,7 @@ describe.skipIf(!available)("the acceptance of the workspace browser tab model",
         expect(opened).toBeDefined();
       },
     );
-  });
+  }, TIMEOUT_MS);
 
   it("a session ends, and its pages are released", async () => {
     await record(
@@ -719,7 +734,7 @@ describe.skipIf(!available)("the acceptance of the workspace browser tab model",
         expect(await runSelection("run-8")).toBeUndefined();
       },
     );
-  });
+  }, TIMEOUT_MS);
 
   it("a second web tab in one session is addressable, and the strip shows both", async () => {
     await record(
@@ -759,7 +774,7 @@ describe.skipIf(!available)("the acceptance of the workspace browser tab model",
         expect(webuiWorkspaceTabStripReconcile([], published)).toHaveLength(2);
       },
     );
-  });
+  }, TIMEOUT_MS);
 
   it("a page navigates, and a stale reference is refused on every tab", async () => {
     await record(
@@ -798,5 +813,5 @@ describe.skipIf(!available)("the acceptance of the workspace browser tab model",
         ).resolves.toMatchObject({ accepted: true });
       },
     );
-  });
+  }, TIMEOUT_MS);
 });
