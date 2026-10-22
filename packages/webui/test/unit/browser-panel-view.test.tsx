@@ -198,10 +198,12 @@ describe("the Browser panel", () => {
 
     expect(markup).toContain('alt="Example Domain 的浏览器画面"');
     expect(markup).not.toContain("Agent page 的浏览器画面");
-    // The input surface is only reachable when there is a page in front.
+    // The input surface is only reachable when there is a page in front, and it
+    // is the way in: the picture itself takes the pointer and the keys, and
+    // there is no field of the panel's own.
     expect(markup).toContain('tabindex="0"');
-    expect(markup).toContain('data-testid="browser-panel-text-input"');
-    expect(markup).not.toContain("disabled");
+    expect(markup).toContain('data-testid="browser-panel-input"');
+    expect(markup).not.toContain('data-testid="browser-panel-text-input"');
   });
 
   it("says the browser is switched off instead of showing a dead frame", () => {
@@ -290,7 +292,7 @@ describe("the Browser panel", () => {
       );
       expect(markup).toContain('data-testid="browser-panel-input"');
       expect(markup).toContain('role="application"');
-      expect(markup).toContain('data-testid="browser-panel-text-input"');
+      expect(markup).not.toContain('data-testid="browser-panel-text-input"');
     });
   });
 });

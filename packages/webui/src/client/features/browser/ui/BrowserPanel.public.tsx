@@ -37,7 +37,6 @@ import {
   useCallback,
   useEffect,
   useRef,
-  type ChangeEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactElement,
@@ -73,8 +72,6 @@ const PANEL_COPY = {
   frameNoTarget: "没有选中的标签页。",
   frameUnrenderable: "收到了一帧无法显示的画面数据，已忽略。",
   inputLabel: "浏览器输入区",
-  inputHint: "点击画面后可在此输入文字。",
-  textInputLabel: "发送到浏览器的文字",
   unauthorized: "隔离浏览器未授权。请在设置的「浏览器」页中打开对应的浏览器开关。",
   absent: "当前运行时没有浏览器能力，浏览器面板不可用。",
   notReady: "浏览器能力尚未就绪（例如扩展未连接），面板暂时无法显示页面。",
@@ -204,6 +201,14 @@ export function BrowserPanel({
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
       if (!inputEnabled) return;
       event.preventDefault();
+      // A composition is not a key. The browser is given the text the input
+      // method made, or a Chinese word never reaches the page -- and the panel
+      // has no field of its own to type it into.
+      const composed = webuiBrowserComposedText(event);
+      if (composed) {
+        submit({ kind: "text", text: composed });
+        return;
+      }
       submit({
         kind: "key",
         key: event.key,
@@ -214,18 +219,6 @@ export function BrowserPanel({
       });
     },
     [inputEnabled, submit],
-  );
-
-  const onTextChange = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
-      const field = event.target;
-      if (field.value.length === 0) return;
-      submit({ kind: "text", text: field.value });
-      // Cleared after sending, so the next insertion is a new one rather than an
-      // append onto what the page already received.
-      field.value = "";
-    },
-    [submit],
   );
 
   return (
@@ -304,24 +297,28 @@ export function BrowserPanel({
         data-testid="browser-panel-input"
         role="application"
         aria-label={PANEL_COPY.inputLabel}
-        aria-describedby="browser-panel-input-hint"
         tabIndex={inputEnabled ? 0 : -1}
         onPointerDown={onPointerDown}
         onKeyDown={onKeyDown}
-      >
-        <span id="browser-panel-input-hint" className="webui-browser-input-hint">
-          {PANEL_COPY.inputHint}
-        </span>
-        <input
-          type="text"
-          className="webui-browser-text"
-          data-testid="browser-panel-text-input"
-          aria-label={PANEL_COPY.textInputLabel}
-          disabled={!inputEnabled}
-          onChange={onTextChange}
-        />
-      </div>
+      />
       </div>
     </section>
   );
+}
+
+/**
+ * The text an input method made, when the key event carries one.
+ *
+ * A composed word is not a key: it has no `code` of its own, it is longer
+ * than a character, and the browser is given the text rather than a
+ * keystroke. The two placeholders an input method reports instead of a word
+ * are not text and are left to the key path.
+ */
+function webuiBrowserComposedText(event: ReactKeyboardEvent<HTMLDivElement>): string {
+  const key = event.key;
+  if (!key || key === "Process" || key === "Unidentified") return "";
+  if (key.length < 2) return "";
+  // A named key has a code of its own; a composed word does not.
+  if (event.code) return "";
+  return key;
 }

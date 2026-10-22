@@ -235,37 +235,16 @@
   }
 
   /* Transparent and stretched over the stage: the pointer lands here so the
-   * measured coordinate is the point on the picture the person chose. */
+   * measured coordinate is the point on the picture the person chose, and the
+   * keys land here so the text lands in the page's focused element. */
   .webui-browser-input {
     position: absolute;
     inset: 0;
-    display: flex;
-    align-items: flex-end;
-    justify-content: flex-end;
-    gap: 8px;
-    padding: 8px;
   }
 
   .webui-browser-input:focus-visible {
     outline: 2px solid var(--icon_default_accent);
     outline-offset: -2px;
-  }
-
-  .webui-browser-input-hint {
-    margin: 0 auto 0 0;
-    color: var(--text_default_secondary);
-    font-size: var(--font-size_11, 11px);
-    pointer-events: none;
-  }
-
-  .webui-browser-text {
-    max-width: 60%;
-    padding: 4px 8px;
-    border: 1px solid var(--border_light);
-    border-radius: var(--border-radius_8, 8px);
-    background: var(--bg_grouped_secondary);
-    color: var(--text_default_primary);
-    font-size: var(--font-size_12, 12px);
   }
 
   .webui-browser-empty {
