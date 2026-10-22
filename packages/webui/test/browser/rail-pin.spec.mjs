@@ -58,6 +58,21 @@ function rowOf(page, sessionId) {
 }
 
 /**
+ * The right inset of a computed `inset()` clip, in pixels.
+ *
+ * A clip of `inset(0px 88px 0px 0px)` hides the rightmost 88px of the
+ * element, so the element's visible right edge sits that far in from its
+ * layout box. Zero when the element is not clipped.
+ */
+function clipRightInset(clipPath) {
+  const match = /^inset\((.*)\)$/u.exec(String(clipPath).trim());
+  if (!match) return 0;
+  const parts = match[1].split(/\s+/u);
+  if (parts.length < 2) return 0;
+  return Number.parseFloat(parts[1]) || 0;
+}
+
+/**
  * The state of the pin glyph in a row's action button, read from the clip path
  * the glyph actually references.
  *
@@ -109,10 +124,7 @@ test("a running session title keeps its space before hover actions", async ({ pa
   const labelBeforeHover = await label.evaluate((element) => {
     const style = getComputedStyle(element);
     const bounds = element.getBoundingClientRect();
-    return {
-      paddingRight: style.paddingRight,
-      contentRight: bounds.right - Number.parseFloat(style.paddingRight),
-    };
+    return { clipPath: style.clipPath, boundsRight: bounds.right };
   });
   const metadataBeforeHover = await metadata.boundingBox();
   await row.hover();
@@ -122,10 +134,10 @@ test("a running session title keeps its space before hover actions", async ({ pa
     const style = getComputedStyle(element);
     const bounds = element.getBoundingClientRect();
     return {
-      paddingRight: style.paddingRight,
+      clipPath: style.clipPath,
+      boundsRight: bounds.right,
       transitionProperty: style.transitionProperty,
       transitionDuration: style.transitionDuration,
-      contentRight: bounds.right - Number.parseFloat(style.paddingRight),
     };
   });
   const actionsBounds = await actions.boundingBox();
@@ -137,12 +149,20 @@ test("a running session title keeps its space before hover actions", async ({ pa
 
   expect(before).not.toBeNull();
   expect(after).toBeNull();
-  expect(labelBeforeHover.paddingRight).toBe("0px");
-  expect(labelBeforeHover.contentRight).toBeLessThanOrEqual(metadataBeforeHover.x);
-  expect(labelLayout.paddingRight).toBe("88px");
-  expect(labelLayout.contentRight).toBeLessThanOrEqual(actionsBounds.x);
-  expect(actionsBounds.x - labelLayout.contentRight).toBeLessThanOrEqual(8);
-  expect(labelLayout.transitionProperty).toContain("padding-right");
+  // The space for the hover actions is kept by clipping the title's first
+  // span, not by padding it: the span is clipped from the right on hover, so
+  // the title's visible edge stops short of the actions. Clipping rather than
+  // padding keeps the row's own layout from moving while it answers a hover.
+  const clipBefore = clipRightInset(labelBeforeHover.clipPath);
+  const clipAfter = clipRightInset(labelLayout.clipPath);
+  const contentRightBefore = labelBeforeHover.boundsRight - clipBefore;
+  const contentRightAfter = labelLayout.boundsRight - clipAfter;
+  expect(clipBefore).toBe(0);
+  expect(contentRightBefore).toBeLessThanOrEqual(metadataBeforeHover.x);
+  expect(clipAfter).toBe(88);
+  expect(contentRightAfter).toBeLessThanOrEqual(actionsBounds.x);
+  expect(actionsBounds.x - contentRightAfter).toBeLessThanOrEqual(8);
+  expect(labelLayout.transitionProperty).toContain("clip-path");
   expect(metaDisplay).toBe("none");
   expect(actionStyle.opacity).toBe("1");
   expect(actionStyle.transitionProperty).toContain("opacity");
