@@ -1425,6 +1425,7 @@
     "packages/local-runtime-v2/src/service/session-system/stream/index.ts",
     "packages/local-runtime-v2/src/service/session-system/stream/session-frame-retention.ts",
     "packages/local-runtime-v2/src/service/session-system/stream/session-frame.ts",
+    "packages/local-runtime-v2/src/service/session-system/stream/session-stream-service.test.ts",
     "packages/local-runtime-v2/src/service/session-system/stream/session-stream-service.ts",
     "packages/local-runtime-v2/src/service/session-system/usage/commit-signal.ts",
     "packages/local-runtime-v2/src/service/session-system/usage/index.ts",
