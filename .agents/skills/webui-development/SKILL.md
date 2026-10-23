@@ -38,3 +38,37 @@ Load the branches the task needs. Repository documents linked there provide deta
 - Keep file movement deliberate: this is a public source projection with an explicit inventory and upstream synchronization costs. Prefer a cohesive change in its current home over layout churn.
 
 Run verification proportional to the change and applicable repository requirements. Report behavior and seam tested, results, and remaining boundaries. Activation never authorizes publication, Git pushes, production changes or paid/live-provider calls by itself.
+
+## Verify complete business flows and usability
+
+For a user-visible WebUI flow, build a source-grounded scenario matrix before writing tests. Trace
+each user-reachable entry point and primary control through its real owner, command, service or
+transport, runtime consumer, persisted state, and final rendered result where those layers apply.
+Include material state combinations such as empty/populated, valid/invalid, loading/error, cancel/
+retry/recovery, selection changes, refresh/resume, and concurrent activity. Cover every flow in the
+approved plan or request; do not stop at the named examples if the current UI exposes more actions.
+
+Prefer tests that prove a user outcome over tests that mirror implementation details. Exercise the
+actual browser control for interaction claims: click the button, submit the form, change the tab,
+select the option, or use the keyboard path the user uses. An injected demo object, direct service
+call, reducer assertion or helper invocation cannot stand in for that interaction. Keep useful unit
+tests for local contracts, but label their evidence boundary accurately.
+
+For end-to-end or integration claims, preserve the real WebUI client/input and production service /
+transport / runtime adapter / persistence path through an observable rendered or persisted outcome.
+Use isolated temporary workspaces and stores, synthetic files and local origins. Deterministic local
+model stubs may control output and timing; they must not replace the path under test. Explicitly
+identify mocks, stubs, skips, environment gates, and any live/native boundary that remains untested.
+
+For layout and usability claims, run the built Chromium client and inspect the actual rendered DOM,
+computed geometry, responsive or constrained viewport behavior, overlay placement/stacking, focus
+and keyboard operation, scrolling, and representative screenshots for the states affected. A passing
+build, selector count or screenshot alone does not prove usability. Assert that dialogs remain
+overlays, controls stay visible and reachable, labels align with fields, and actions produce the
+expected user-visible result. Review screenshot diffs before accepting Linux CI baselines.
+
+For critical cross-layer paths, add a narrow break-link or mutation negative control when practical:
+the target flow should fail if input is dropped, a stream is not projected, persisted state is not
+restored, a runtime update is not rendered, or a browser control does not reach its service. Restore
+only the mutation introduced for that check and rerun the target flow. Preserve valid existing tests;
+remove one only when behavior is retired or replacement evidence is demonstrated and recorded.

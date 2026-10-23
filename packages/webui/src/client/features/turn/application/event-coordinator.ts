@@ -87,6 +87,7 @@ export type WebuiSessionStatePatch =
 
 export interface WebuiEffectHandlers {
   readonly refreshPending: () => void | Promise<unknown>;
+  readonly refreshQueue?: () => void;
   /**
    * Commit every patch one event produced, in the order the event produced them.
    *
@@ -142,6 +143,9 @@ export function applyWebuiEffectCommands(
     switch (cmd.type) {
       case "refresh-pending":
         Promise.resolve(handlers.refreshPending()).catch(() => undefined);
+        break;
+      case "refresh-queue":
+        handlers.refreshQueue?.();
         break;
       case "refresh-goal":
         Promise.resolve(handlers.refreshGoal()).catch(() => undefined);
@@ -251,6 +255,7 @@ export interface WebuiDomainEventRoutes {
   readonly invalidatePending: (sessionId: string) => void;
   /** The authoritative permission/questionnaire re-read for one session. */
   readonly refreshPending: (sessionId: string) => void | Promise<unknown>;
+  readonly refreshQueue?: (sessionId: string) => void;
   /** Attach to, or recheck, the turn a `session.start` names. */
   readonly attachStream: (
     sessionId: string,
@@ -320,6 +325,7 @@ export function createWebuiEventCoordinator(
 
   const handlersFor = (sessionId: string): WebuiEffectHandlers => ({
     refreshPending: () => deps.routes.refreshPending(sessionId),
+    refreshQueue: () => deps.routes.refreshQueue?.(sessionId),
     // The route, never the replaceable set: a mounted view cannot take the goal
     // read away from the owner that fences it.
     refreshGoal: () => deps.routes.refreshGoal(sessionId),

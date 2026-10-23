@@ -561,6 +561,7 @@ export function createWebuiApplication(
         dirtyResources.delete(sessionId);
         return interactions.owner(sessionId).refresh();
       },
+      refreshQueue: (sessionId) => composerController?.refreshQueue(sessionId),
       attachStream: (sessionId, turnId, mode) => {
         const commands = turnCommandsFor(sessionId);
         if (mode === "recheck") commands.recheck(turnId);

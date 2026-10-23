@@ -16,16 +16,13 @@ mode. It verifies process ownership and shutdown, not credential or provider aut
 The workspace progress cases include a fixture-backed `workspace.git.changed` update: they change
 the environment response, emit the runtime event shape, then assert that the built client re-reads
 and renders the new branch and line counts without a page reload. This verifies client invalidation
-and rendering only. The local-runtime transcript integration separately verifies the real
-environment query through the production service and adapter. It also changes a tracked workspace
-file through the Agent's runtime `write` tool, then checks that the client issues a fresh environment
-query and renders the new line count. While the integration model response is held after a runtime
-todo update, it drives the built client through the local-origin embedded browser and checks both
-panel states before allowing the Agent response to continue. This combined journey is Vitest
-integration evidence; it also closes the active `sendMessage` WebSocket during a held response,
-observes cursor-based `resumeSession` on the production service, and verifies the rendered and
-persisted completion. A separate page reload verifies refresh restoration with a message anchor. The
-fixture event test remains browser-client evidence only.
+and rendering only. The current local-runtime transcript integration covers a real composer send,
+streamed reasoning and answer, page reload, cursor-based `resumeSession`, queueing during the active
+turn, runtime queue drain, a production `todowrite` model tool call reflected in the progress card,
+rendered ordering and persisted history. It does not currently exercise a runtime environment change,
+tool-driven file write, embedded-browser operation during an active turn, `/plan`, `/goal`, Ask User,
+fork isolation, cancellation or retry. Those are outstanding integration journeys in the active
+strategy plan; the fixture-backed cases remain client evidence only.
 
 The fixture replaces the browser's `WebSocket` constructor before the built client script executes.
 The client's normal `createWebuiTransport` path then sends real WebUI wire envelopes to the
@@ -40,15 +37,15 @@ Live and completed turn visibility is asserted from controlled stream frames whi
 remains unmodified.
 
 The composer spec selects `/compact` from the slash palette, adds an instruction, and asserts the
-`runCommand` request body at the fixture transport. This checks built-client behavior only; the
-production request, command runner and rendered result are covered by `agent-transcript.test.ts` in
-the Vitest integration gate.
+`runCommand` request body at the fixture transport. This checks built-client behavior only; a
+production command-runner journey is not currently covered by `agent-transcript.test.ts` or another
+WebUI integration test.
 
 The transcript spec exercises assistant copy, feedback toggles and message-level fork through the
 built client. Copy uses Chromium's clipboard API; the fork case checks the selected assistant
 message and title in the fixture request, then verifies navigation to the returned session. These
-fixture-backed interactions do not establish runtime fork isolation; that remains covered by the
-production transcript integration.
+fixture-backed interactions do not establish runtime fork isolation; that integration journey
+remains to be added.
 
 ## The browser family in the fixture
 

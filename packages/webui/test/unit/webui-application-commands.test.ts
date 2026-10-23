@@ -787,4 +787,39 @@ describe("attach, recheck and gap recovery", () => {
     expect(releaseSubscription).not.toHaveBeenCalled();
     expect(attach).not.toHaveBeenCalled();
   });
+
+  it("recheck attaches to a queued turn after the previous lease was released", async () => {
+    const attach = vi.fn();
+    recheckWebuiSubscription({
+      sessionId: "s1",
+      getActiveTurn: async () => busy,
+      readStream: () => initialWebuiStreamState,
+      releaseSubscription: vi.fn(),
+      attach,
+    });
+    await flush();
+    expect(attach).toHaveBeenCalledTimes(1);
+    expect(attach).toHaveBeenCalledWith("t-new");
+  });
+
+  it("does not attach from a no-lease recheck if a newer lease claims during the probe", async () => {
+    let resolveProbe!: (active: typeof busy) => void;
+    const probe = { probe: () => new Promise<typeof busy>((resolve) => { resolveProbe = resolve; }) };
+    let stream: WebuiStreamState = initialWebuiStreamState;
+    const attach = vi.fn();
+    recheckWebuiSubscription({
+      sessionId: "s1",
+      probe,
+      readStream: () => stream,
+      releaseSubscription: vi.fn(),
+      attach,
+    });
+    stream = {
+      ...initialWebuiStreamState,
+      subscription: { owner: "local-send", generation: 8 },
+    };
+    resolveProbe(busy);
+    await flush();
+    expect(attach).not.toHaveBeenCalled();
+  });
 });

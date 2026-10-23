@@ -604,12 +604,16 @@ describe("W2 · trace 2 · session.finish/abort/error map to status + refusal", 
       event({ type: "session.finish", payload: { sessionId: SESSION } }),
       SESSION,
     );
-    // progress write + sending(false) + status patch.
+    // progress write + sending(false) + status patch + active-turn recheck.
     expect(commandTypes(result.commands)).toEqual([
       "set-stream",
       "set-sending",
       "set-stream",
+      "attach-stream",
     ]);
+    const recheck = findCommand(result.commands, "attach-stream");
+    expect(recheck?.mode).toBe("recheck");
+    expect(recheck?.turnId).toBeUndefined();
     expect(findCommand(result.commands, "set-sending")?.sending).toBe(false);
     const finalStream = result.state.stream;
     expect(finalStream.phase).toBe("done");
@@ -653,8 +657,8 @@ describe("W2 · trace 2 · session.finish/abort/error map to status + refusal", 
   });
 });
 
-describe("W2 · trace 3 · session.queue.updated → refresh-pending", () => {
-  it("emits progress write + refresh-pending", () => {
+describe("W2 · trace 3 · session.queue.updated → refresh-queue", () => {
+  it("emits progress write + refresh-queue", () => {
     const before = makeState({
       stream: { ...initialWebuiStreamState, phase: "waiting" },
     });
@@ -668,7 +672,7 @@ describe("W2 · trace 3 · session.queue.updated → refresh-pending", () => {
     );
     expect(commandTypes(result.commands)).toEqual([
       "set-stream",
-      "refresh-pending",
+      "refresh-queue",
     ]);
     expect(result.state.stream.phase).toBe("waiting");
   });
@@ -1172,6 +1176,7 @@ describe("W2.9 · executor · applyWebuiEffectCommands walks commands in order",
     return {
       calls,
       refreshPending: record("refreshPending"),
+      refreshQueue: record("refreshQueue"),
       refreshGoal: record("refreshGoal"),
       // One call per event, carrying the event's patches in order. The order the
       // executor used to prove by counting setter calls is now the order inside
@@ -1245,12 +1250,12 @@ describe("W2.9 · executor · applyWebuiEffectCommands walks commands in order",
     expect(handlers.calls.map((call) => call.type)).toEqual(["refreshGoal"]);
   });
 
-  it("refresh-pending is called even when it returns a rejecting promise", async () => {
+  it("session.queue.updated refreshes the queue projection", async () => {
     let calls = 0;
     const handlers: WebuiEffectHandlers = {
-      refreshPending: () => {
+      refreshPending: () => Promise.reject(new Error("pending should not refresh")),
+      refreshQueue: () => {
         calls += 1;
-        return Promise.reject(new Error("boom"));
       },
       refreshGoal: () => undefined,
       applyPatches: () => undefined,
@@ -1266,9 +1271,6 @@ describe("W2.9 · executor · applyWebuiEffectCommands walks commands in order",
     );
     applyWebuiEffectCommands(result.commands, handlers);
     expect(calls).toBe(1);
-    // Wait a tick to let the rejection settle; the executor must have
-    // attached a catch handler that swallows it.
-    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(calls).toBe(1);
   });
 

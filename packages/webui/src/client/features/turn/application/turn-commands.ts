@@ -147,11 +147,19 @@ export function recheckWebuiSubscription(deps: WebuiRecheckSubscriptionDeps): vo
   // only at resolution time would let this stale snapshot retarget the user's
   // own turn away from them.
   const probed = readStream().subscription;
-  if (!probed) return;
   void probe
     .probe(sessionId)
     .then((active) => {
       const owned = readStream().subscription;
+      // A terminal event can release the old lease after an earlier
+      // `session.start` recheck already resolved. In that case the terminal
+      // schedules another recheck with no lease captured; attach only if no
+      // newer local/recovered subscription claimed the session meanwhile.
+      if (!probed) {
+        if (owned || !active || active.busyReason !== "turn") return;
+        attach(active.turnId);
+        return;
+      }
       // The lease this probe was about is gone or has been replaced. The answer
       // describes a turn that is no longer ours to act on.
       if (!isWebuiSubscriptionProbeCurrent(probed, owned) || !owned) return;

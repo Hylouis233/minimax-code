@@ -45,35 +45,20 @@ never proves a higher one.
 Deterministic loopback tests replace the leaf host, and deterministic browser tests replace the
 server transport. Their levels do not imply native execution. `real-host-loopback.test.ts` and
 `real-host-model-turn.test.ts` additionally use the production host; the latter controls only its
-external HTTP model endpoint. `agent-transcript.test.ts` drives the built Chromium composer through
-the WebUI socket, service, production runtime adapter and a persisted temporary harness session.
-Its local deterministic model stub controls streamed reasoning, answers, tool calls and timing; the
-test observes an active `sendMessage` WebSocket being closed while the response is held, a new
-production `resumeSession` request carrying the last cursor, continued rendered output and persisted
-history. A later page reload separately verifies history anchoring through `afterMsgId`. It also
-observes an in-flight queued follow-up, runtime request delivery, rendered transcript order, persisted
-history and an emptied runtime queue. It selects `@reference.md` from the
-workspace mention list and verifies it in the actual send request. A synthetic text attachment is
-forwarded through that request, materialized by the runtime into its temporary asset store, and read
-back byte-for-byte from persisted attachment metadata. A synthetic runtime `write` executes before
-Plan Mode, and the test checks both the isolated workspace bytes and the rendered diff card's file
-path and change count. The same test initializes an isolated temporary Git repository and observes
-the branch rendered from the production `getWorkspaceEnvironment` service query. After the runtime
-write, it also requires another environment query and the rendered changed-file line count. A held
-response after a runtime `todowrite` lets the same browser session operate the embedded browser
-against a local HTTP page while the Agent is still active; the test checks the todo panel and browser
-state before releasing the response. A separate fixture-backed browser test covers a
-`workspace.git.changed` event refreshing branch and line counts; that is client evidence, not runtime
-integration evidence. `/plan <prompt>` checks request intent and the local model response, but does
-not claim a persisted plan-review or approval state. Ask User is emitted once by the stub, answered
-through the questionnaire UI, then checked as a rendered assistant continuation and persisted
-message in the same harness session. `/goal` is checked through its persisted objective and banner.
-The same production-path journey selects `/compact` in the slash palette, carries its custom
-instruction and forked-session identity through `runCommand` and the production command runner, and
-asserts the command result rendered by the composer. It exits Plan Mode first because that mode
-changes the meaning of subsequent composer submissions. The focused browser composer spec separately
-checks `/compact` selection and the exact request sent by the built client to its in-page fixture;
-that fixture case alone is not runtime evidence.
+external HTTP model endpoint. The current `agent-transcript.test.ts` is a built-Chromium real-path
+journey: a user sends a message through the WebUI socket, production service and runtime adapter into
+an isolated persisted session; a local model stub streams reasoning and holds its answer while the
+page reloads. The user queues a second message through the real composer during that turn. The test
+observes the queue across refresh, the `resumeSession` cursor, resumed transcript, runtime queue drain
+and ordered persisted messages. A third composer turn asks the stub model to call production
+`todowrite`; the test observes its tool label, resulting todo in the rendered progress card, and
+persisted runtime history. This proves refresh/resume, one queued-send path and one runtime
+todo-to-panel path. It does not currently cover `@` references, attachments, other tool calls/diff
+cards, `/plan`, `/goal`, Ask User continuation, fork isolation, runtime environment changes, browser
+interaction during a turn, cancellation or retry. Those remain required by the active strategy plan.
+The fixture-backed browser specs prove
+their named built-client interactions separately; they do not upgrade those flows to runtime
+integration evidence.
 
 Several Vitest integration suites launch a system Chromium and use `describe.skipIf` when none of
 their supported executable paths exists. In a skip, their real-browser assertions are untested even
@@ -81,23 +66,13 @@ though the rest of `test:webui` may pass. The Playwright bridge specs similarly 
 cases when the installed Edge executable is missing. Report those skips from the actual gate output;
 do not infer their execution from the suite or file being registered.
 
-The session row's “更多操作” menu creates a real runtime fork; a fork-only composer message is
-persisted under the new session, and loading the source and fork session hashes confirms the
-transcripts remain separate. Session restoration is checked through route reloads, not a
-pointer-driven selection between the two rail links. The stub emits a production `todowrite` call
-and holds the following model response open; the test observes the todo in the built-client
-progress panel and the rendered `todowrite` activity row while that runtime turn remains active,
-then opens a synthetic local origin through the same production browser adapter/service and checks
-the browser service target URL, toolbar URL and page frame before releasing the response. Finally,
-it stops a held Agent response through the composer, observes `abortSession` and runtime turn
-settlement, verifies no late answer persisted, then submits another message and observes a rendered
-and persisted recovery answer. A separate controlled `invalid_request_error` response exercises the
-assistant error surface: the test waits for the runtime turn to settle and the visible retry button,
-clicks it, observes a second `sendMessage` with the identical user text, then checks the rendered
-and persisted successful answer. The local model stub refuses until that click, so recovery cannot
-be explained by a hidden automatic retry. These cases establish neither live account/provider
-authorization nor cloud or other-platform behavior, and they do not cover every permission mode or
-diff format.
+Other current browser cases exercise their named UI interactions against deterministic fixtures.
+For example, the transcript spec covers message actions and fixture-backed fork navigation, while
+workspace-progress and embedded-browser specs render fixture events and route controls to the
+in-page transport. They do not prove a production runtime fork, an active Agent/browser overlap,
+cancellation recovery or model-error retry. The active strategy plan tracks
+these as integration and interaction coverage still to implement; do not infer them from fixture
+coverage.
 `native-runtime.spec.mjs` starts the production host/service in a separate process and verifies real
 native PTY ownership, output and exit events, providing level-5 evidence for that local terminal
 path on the executing platform. State the specific seam and platform instead of extending a green

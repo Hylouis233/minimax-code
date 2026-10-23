@@ -81,9 +81,10 @@ export interface WebuiEffectState {
 
 /** One side effect the host executor must perform in order. The host
  *  walks the list in order; each command is a 1-to-1 trace of a setter
- *  call (or, for `refresh-pending`, a `void` async kick). */
+ *  call or a `void` async kick). */
 export type WebuiEffectCommand =
   | { readonly type: "refresh-pending" }
+  | { readonly type: "refresh-queue" }
   | { readonly type: "refresh-goal" }
   | {
       readonly type: "set-sending";
@@ -252,10 +253,15 @@ export function reduceWebuiEffect(
           : released;
       };
       commands.push({ type: "set-stream", patch: refusalPatch });
+      // A queued turn may have started while this client still held the
+      // previous turn's lease. Its `session.start` recheck can resolve before
+      // this terminal releases that lease; probe again now so the new active
+      // turn is not left without a transcript stream.
+      commands.push({ type: "attach-stream", turnId: undefined, mode: "recheck" });
       break;
     }
     case "session.queue.updated": {
-      commands.push({ type: "refresh-pending" });
+      commands.push({ type: "refresh-queue" });
       break;
     }
     case "permission.ask": {
@@ -452,9 +458,7 @@ function applyAllCommands(
  *     to land on the same shape).
  *   - `set-sending` / `set-goal` are value commands; pass the value
  *     directly (`setGoal(undefined)` / `setSending(true)`).
- *   - `refresh-pending` is `void refreshPending().catch(() => undefined)`
- *     in the original closure. We swallow the rejection here too so
- *     `void` does not turn into an unhandled rejection.
+ *   - refresh commands are async kicks whose owners handle their own failures.
  *   - Commands are walked in array order, no reordering.
  * ------------------------------------------------------------------------ */
 

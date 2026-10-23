@@ -18,7 +18,7 @@
     },
     "observed": "the host noticed the terminated worker, the surface went down and came back, and a command against the live tab answered again",
     "result": "pass",
-    "at": "2026-10-22T09:57:44.153Z",
+    "at": "2026-10-23T01:58:19.029Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-external"
   },
@@ -41,7 +41,7 @@
     },
     "observed": "the text the host sent appeared in the page's field, and a non-empty image frame for that page arrived at the host",
     "result": "pass",
-    "at": "2026-10-22T09:57:44.705Z",
+    "at": "2026-10-23T01:58:19.603Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-external"
   },
@@ -64,7 +64,7 @@
     },
     "observed": "the command in the allowed subset answered with the page's title, and a command outside it was refused as unsupported",
     "result": "pass",
-    "at": "2026-10-22T09:57:45.027Z",
+    "at": "2026-10-23T01:58:19.962Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-external"
   },
@@ -87,7 +87,7 @@
     },
     "observed": "the host noticed the terminated worker, the surface went down and came back, and a command against the live tab answered again",
     "result": "pass",
-    "at": "2026-10-22T09:57:46.041Z",
+    "at": "2026-10-23T01:58:21.016Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-external"
   },
@@ -110,7 +110,7 @@
     },
     "observed": "the text the host sent appeared in the page's field, and a non-empty image frame for that page arrived at the host",
     "result": "pass",
-    "at": "2026-10-22T09:57:47.085Z",
+    "at": "2026-10-23T01:58:22.088Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-external"
   },
@@ -133,7 +133,7 @@
     },
     "observed": "the command in the allowed subset answered with the page's title, and a command outside it was refused as unsupported",
     "result": "pass",
-    "at": "2026-10-22T09:57:47.525Z",
+    "at": "2026-10-23T01:58:22.575Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-external"
   }

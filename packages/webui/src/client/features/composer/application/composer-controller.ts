@@ -384,6 +384,7 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
       }
     },
     removeQueued: ({ sessionId, itemId }) => queueCommands.remove({ sessionId, itemId, selectedSessionId: deps.readSelectedSessionId() }),
+    refreshQueue: (sessionId) => refreshQueue(sessionId),
     selectSession: (sessionId) => {
       if (sessionId !== lastSelectedSessionId) deps.store.setModes({ goal: false });
       lastSelectedSessionId = sessionId;
