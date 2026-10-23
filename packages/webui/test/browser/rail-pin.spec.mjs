@@ -177,7 +177,7 @@ test("the pin button offers the unpin glyph on a pinned row", async ({ page }) =
   // Wrong when: the label says 取消置顶 and the drawing does not change, which
   // is the state this whole change started from.
   expect(await pinGlyphState(page, "A")).toBe("pinned");
-  expect(await pinButtonLabel(page, "A")).toBe("取消置顶：绿川椒 Demo 订货小程序");
+  expect(await pinButtonLabel(page, "A")).toBe("取消置顶：Synthetic session A");
 });
 
 test("the pin button offers the pin glyph on a row that is not pinned", async ({ page }) => {
@@ -185,7 +185,7 @@ test("the pin button offers the pin glyph on a row that is not pinned", async ({
   await openApp(page, "#session=A");
 
   expect(await pinGlyphState(page, "B")).toBe("unpinned");
-  expect(await pinButtonLabel(page, "B")).toBe("置顶：灵动岛卡住问题");
+  expect(await pinButtonLabel(page, "B")).toBe("置顶：Synthetic session B");
 });
 
 test("two pinned rows each draw their own pin glyph", async ({ page }) => {
