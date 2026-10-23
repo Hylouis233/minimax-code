@@ -802,6 +802,20 @@ describe("attach, recheck and gap recovery", () => {
     expect(attach).toHaveBeenCalledWith("t-new");
   });
 
+  it("reconciles persisted history when a turn finishes before the recheck probe", async () => {
+    const attach = vi.fn();
+    recheckWebuiSubscription({
+      sessionId: "s1",
+      getActiveTurn: async () => undefined,
+      readStream: () => initialWebuiStreamState,
+      releaseSubscription: vi.fn(),
+      attach,
+    });
+    await flush();
+    expect(attach).toHaveBeenCalledTimes(1);
+    expect(attach).toHaveBeenCalledWith(undefined);
+  });
+
   it("does not attach from a no-lease recheck if a newer lease claims during the probe", async () => {
     let resolveProbe!: (active: typeof busy) => void;
     const probe = { probe: () => new Promise<typeof busy>((resolve) => { resolveProbe = resolve; }) };

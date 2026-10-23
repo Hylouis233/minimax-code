@@ -83,6 +83,12 @@ export interface WebuiTranscriptHistoryOwner {
    * held was written before the turn's messages were persisted.
    */
   readonly refreshPage: (sessionId: string) => Promise<WebuiTranscriptLoadOutcome>;
+  /**
+   * Discards every cached page for a session, then replaces its head page.
+   * History mutations that can remove messages (rewind/edit) must not merge
+   * rows from the old projection back into the authoritative result.
+   */
+  readonly replacePage: (sessionId: string) => Promise<WebuiTranscriptLoadOutcome>;
   readonly loadOlder: (
     sessionId: string,
     cursor: string,
@@ -293,6 +299,14 @@ export function createWebuiTranscriptHistoryOwner(deps: {
     },
     loadPage: (sessionId) => load(sessionId, undefined, "join"),
     refreshPage: (sessionId) => load(sessionId, undefined, "fresh"),
+    replacePage: (sessionId) => {
+      for (const key of asked.get(sessionId)?.values() ?? []) pages.invalidate(key);
+      asked.delete(sessionId);
+      headPages.delete(sessionId);
+      return presentation.identity() === sessionId
+        ? load(sessionId, undefined, "fresh")
+        : Promise.resolve({ status: "stale" });
+    },
     loadOlder: (sessionId, cursor) => load(sessionId, cursor, "fresh"),
     isCurrentPage: (handle) =>
       !pages.isDisposed() &&

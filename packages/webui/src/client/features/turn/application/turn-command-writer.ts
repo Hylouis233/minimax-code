@@ -32,7 +32,7 @@ export function createWebuiTurnCommands(writer: {
     kind: writer.kind,
     // The attempt's sink, built from this writer's own `setStream`: the fence
     // travels with the writer instead of being a convention the caller honours.
-    createSink: () => buildWebuiStreamLoopSink(writer.setStream),
+    createSink: (options) => buildWebuiStreamLoopSink(writer.setStream, undefined, options),
     resetStreamForTurn: lifecycle.resetStreamForTurn,
     setStreamRefusal: lifecycle.setStreamRefusal,
     setTurnSending: lifecycle.setTurnSending,

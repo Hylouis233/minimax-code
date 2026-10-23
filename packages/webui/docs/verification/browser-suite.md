@@ -21,10 +21,29 @@ and renders the new branch and line counts without a page reload. This verifies 
 and rendering only. The current local-runtime transcript integration covers a real composer send,
 streamed reasoning and answer, page reload, cursor-based `resumeSession`, queueing during the active
 turn, runtime queue drain, a production `todowrite` model tool call reflected in the progress card,
-rendered ordering and persisted history. It does not currently exercise a runtime environment change,
-tool-driven file write, embedded-browser operation during an active turn, `/plan`, `/goal`, Ask User,
-fork isolation, cancellation or retry. Those are outstanding integration journeys in the active
-strategy plan; the fixture-backed cases remain client evidence only.
+rendered ordering and persisted history. It also selects a real `@` suggestion and stages a synthetic
+file through the mounted composer, then verifies reference and bytes at the local deterministic model
+endpoint plus persisted/rendered response. The same integration also drives `/plan`, `/goal`, Ask User
+continuation, copy/fork followed by a fork-only composer turn, and assistant/user row actions. For
+rewind it confirms “仅回退对话” on a persisted user row without leaving the mounted session, then
+checks the operation response, persisted history and rendered transcript. It next opens the inline
+editor for a surviving user row without reloading, checking that message controls remain usable after
+the rewind. It also checks message edit, copy and feedback controls. `real-host-loopback.test.ts` additionally drives the mounted Plugins →
+Manage → MCP surface and Add MCP Server form against the production local runtime, saving a disabled
+synthetic server. These do not establish an external MCP handshake. The production-host transcript
+journey also clicks Stop during an active streamed turn, observes the `abortSession` wire
+request/runtime settlement and absence of late content in the transcript and persisted history,
+then sends a follow-up in the same session and observes recovery. It drives an actual Agent file write
+through the runtime, observes the workspace event, the new environment read and rendered diff count,
+deliberately disconnects `watchEvents`, waits for a fresh watch request and acknowledgement, and
+confirms subsequent environment updates still reach the UI. A separate local model failure returns an
+error through the runtime event socket; the mounted UI must show Retry, preserve the error only in its
+owning fork while switching sessions, then retry through the composer and persist the successful
+answer. The Agent/todo/browser overlap is a concurrency check, not a causal workflow: the integration
+separately asserts runtime `todowrite` → rendered progress item and mounted browser control/input →
+production browser service → local Chromium page result. While the model reply is held, it verifies
+the Agent turn remains active and the todo remains visible during the browser action. Neither feature
+triggers the other. The fixture-backed cases remain client evidence only.
 
 The fixture replaces the browser's `WebSocket` constructor before the built client script executes.
 The client's normal `createWebuiTransport` path then sends real WebUI wire envelopes to the
@@ -45,9 +64,10 @@ WebUI integration test.
 
 The transcript spec exercises assistant copy, feedback toggles and message-level fork through the
 built client. Copy uses Chromium's clipboard API; the fork case checks the selected assistant
-message and title in the fixture request, then verifies navigation to the returned session. These
-fixture-backed interactions do not establish runtime fork isolation; that integration journey
-remains to be added.
+message and title in the fixture request, then verifies navigation to the returned session. The
+separate `agent-transcript.test.ts` integration also checks one fork-only follow-up message against
+persisted source/fork histories and confirms the same-session rewind/edit result through the
+production local boundary. Neither case proves behavior in a user's already-open account session.
 
 ## The browser family in the fixture
 
@@ -141,8 +161,15 @@ backdrop cancellation, successful submission and visible validation failure. Age
 are checked against the request envelope; MCP switches stdio to HTTP and verifies invalid timeout
 refusal plus advanced headers/timeout in the successful request; Git preview uses a local synthetic
 fixture result and makes no external request. These browser cases exercise the mounted client to the
-in-page transport only. The separate real-host MCP list case is in `real-host-loopback.test.ts` and
-does not constitute a browser-to-runtime page test or a live server connection.
+in-page transport only. A separate Chromium integration case in `real-host-loopback.test.ts` serves
+the built client through the production `WebuiService` in explicit loopback development mode and uses
+the production runtime adapter and persisted local settings. It clicks Plugins → Manage → MCP,
+checks the returned list and visible error absence, opens the actual Add MCP Server dialog, measures
+the fixed overlay, centering and field/control alignment at 1440×900, and submits a disabled synthetic
+stdio entry that appears in the reloaded list. Development mode is needed because relative static
+asset requests do not carry the service token; the host, adapter, operation registry, WebSocket
+service and settings path remain real. It does not launch the disabled process or prove an MCP
+handshake or external server.
 
 The harness starts with a random server id, and every test asserts that both `/health` and the served
 page report **this run's** id. That assertion is registered on the `test` that `harness.mjs` exports,

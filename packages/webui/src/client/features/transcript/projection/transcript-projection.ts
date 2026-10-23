@@ -54,6 +54,10 @@ export function projectWebuiTranscriptMessages(
   for (let streamIndex = 0; streamIndex < streamMessages.length; streamIndex += 1) {
     const stream = streamMessages[streamIndex]!;
     const index = indexById.get(stream.id);
+    // Once a turn is settled, the refreshed persisted page is authoritative.
+    // A rewind can delete a message that is still present in stream state; do
+    // not resurrect that orphan into the transcript after replacing history.
+    if (index === undefined && !preferStreamUpdates) continue;
     const previous = index === undefined ? undefined : messages[index];
     if (previous && !preferStreamUpdates) continue;
     const next: WebuiClientMessage = {

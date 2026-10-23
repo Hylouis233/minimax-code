@@ -525,6 +525,9 @@ export function createWebuiApplication(
       // use case, which reserves the admission, transfers the home record under
       // its guards and answers whether the created session may be selected.
       taskSessions: taskSessionWorkflows,
+      refreshQueue: () => {
+        if (sessionId) composerController?.refreshQueue(sessionId);
+      },
       // No draft writer crosses into Turn: the composer consumes the input it
       // captured, on the admission the turn owner returns, and a link installed here
       // would clear a slot without knowing whether it was still the submitted
@@ -642,13 +645,37 @@ export function createWebuiApplication(
       ? { getSessionForkOptions: (request) => slices.sessions.getSessionForkOptions!(request) }
       : {}),
     ...(slices.sessions.forkSession
-      ? { forkSession: (request) => slices.sessions.forkSession!(request) }
+      ? {
+          forkSession: async (request) => {
+            const result = await slices.sessions.forkSession!(request);
+            // Message-row forks use the same wire operation as rail forks,
+            // but the row action cannot update the session catalog itself.
+            // Refresh the owning session workflow before the shell selects the
+            // returned session, so the rail can show which session is active.
+            try {
+              await sessionWorkflows.refresh();
+            } catch (error) {
+              sessionWorkflows.setError(error instanceof Error ? error.message : String(error));
+            }
+            return result;
+          },
+        }
       : {}),
     ...(slices.transcript.getSessionRewindPreview
       ? { getSessionRewindPreview: (request) => slices.transcript.getSessionRewindPreview!(request) }
       : {}),
     ...(slices.transcript.rewindSession
-      ? { rewindSession: (request) => slices.transcript.rewindSession!(request) }
+      ? {
+          rewindSession: async (request) => {
+            const result = await slices.transcript.rewindSession!(request);
+            // The runtime has committed a new transcript revision, but the
+            // mounted view still owns its prior page. Replace the selected
+            // session's cached pages before resolving the row action so
+            // removed messages do not remain rendered until a manual reload.
+            await transcriptHistory.replacePage(request.id);
+            return result;
+          },
+        }
       : {}),
     ...(slices.transcript.editSessionMessage
       ? { editSessionMessage: (request) => slices.transcript.editSessionMessage!(request) }

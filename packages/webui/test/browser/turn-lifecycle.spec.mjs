@@ -24,6 +24,13 @@ import {
   test,
 } from "./harness.mjs";
 
+async function stageHistory(page, messages) {
+  await page.evaluate((nextMessages) => window.__fixture.setPage("A", {
+    messages: nextMessages,
+    hasMore: false,
+  }), messages);
+}
+
 test.beforeEach(async ({ page }) => {
   page.on("pageerror", (error) => console.error("BROWSER_PAGE_ERROR", error.stack ?? error.message));
   page.on("console", (message) => console.log("BROWSER_CONSOLE", message.type(), message.text()));
@@ -66,6 +73,13 @@ test("an agent turn streams thinking and answer, then settles on DONE", async ({
   // while the turn streams it is present exactly once, and `[DONE]` must
   // clear it.
   await expect(livePulse(page)).toHaveCount(1);
+  await stageHistory(page, [{
+    msgId: "a-turn-1",
+    role: "assistant",
+    msgContent: "Synthetic answer one",
+    thinkingContent: "Synthetic reasoning plus",
+    timestamp: 1_700_000_000_100,
+  }]);
   await emitStream(page, "A", { dataJson: "[DONE]" });
   await expect(liveIndicator(page)).toHaveCount(0);
   await expect(livePulse(page)).toHaveCount(0);
@@ -117,6 +131,8 @@ test("a turn whose session.start was missed is recovered through the active-turn
 
   await emitAgentMessage(page, "A", { msg_id: "missed-1", msg_content: "Recovered answer" });
   await expect(page.getByText("Recovered answer")).toBeVisible();
+  await stageHistory(page, [{ msgId: "missed-1", role: "assistant", msgContent: "Recovered answer", timestamp: 1_700_000_000_110 }]);
+  await page.evaluate(() => window.__fixture.setActiveTurn(null));
   await emitStream(page, "A", { dataJson: "[DONE]" });
   await expect(liveIndicator(page)).toHaveCount(0);
 });
@@ -148,6 +164,10 @@ test("a mid-turn socket drop resumes from the last cursor and keeps the turn", a
   // The replacement subscription keeps delivering into the same turn.
   await emitAgentMessage(page, "A", { msg_id: "a-turn-2", msg_content: "After the drop" }, "cursor-2");
   await expect(page.getByText("After the drop")).toBeVisible();
+  await stageHistory(page, [
+    { msgId: "a-turn-1", role: "assistant", msgContent: "Before the drop", timestamp: 1_700_000_000_120 },
+    { msgId: "a-turn-2", role: "assistant", msgContent: "After the drop", timestamp: 1_700_000_000_121 },
+  ]);
   await emitStream(page, "A", { dataJson: "[DONE]" });
   await expect(liveIndicator(page)).toHaveCount(0);
   await expect(page.getByText("Before the drop")).toBeVisible();
@@ -296,6 +316,12 @@ test("an active turn reload restores thinking, resumes, and preserves message or
   expect(orderedContent.every((index) => index >= 0)).toBe(true);
   expect(orderedContent).toEqual([...orderedContent].sort((left, right) => left - right));
 
+  await stageHistory(page, [
+    { msgId: "reload-user", role: "user", msgContent: "Question before reload", timestamp: 1_700_000_000_070 },
+    { msgId: "reload-assistant", role: "assistant", thinkingContent: "Reasoning before reload and resumed reasoning", msgContent: "Answer before reload and resumed answer", timestamp: 1_700_000_000_071 },
+    { msgId: "reload-final-assistant", role: "assistant", thinkingContent: "Final reasoning", msgContent: "Final answer", timestamp: 1_700_000_000_072 },
+  ]);
+  await page.evaluate(() => window.__fixture.setActiveTurn(null));
   await emitStream(page, "A", { dataJson: "[DONE]" });
   await expect(page.getByText("Reasoning before reload and resumed reasoning")).toHaveCount(1);
   await expect(page.getByText("Final answer")).toHaveCount(1);
@@ -320,6 +346,10 @@ test("switching away and back keeps a live turn attached to its own session", as
   // The turn is still running, so coming back must restore the live state.
   await expect(liveIndicator(page)).toBeVisible();
 
+  await stageHistory(page, [
+    { msgId: "a-turn-1", role: "assistant", msgContent: "A first message", timestamp: 1_700_000_000_130 },
+    { msgId: "a-turn-2", role: "assistant", msgContent: "A late message", timestamp: 1_700_000_000_131 },
+  ]);
   await emitStream(page, "A", { dataJson: "[DONE]" });
   await expect(liveIndicator(page)).toHaveCount(0);
   await expect(page.getByText("A late message")).toBeVisible();
@@ -486,6 +516,10 @@ test("a reply delivered as its own text-only message still renders above the pul
   expect(order[order.length - 1]).toBe("PULSE");
   await expect(livePulse(page)).toHaveCount(1);
 
+  await stageHistory(page, [
+    { msgId: "a-split-1", role: "assistant", thinkingContent: "Let me check the goal first.", timestamp: 1_700_000_000_140 },
+    { msgId: "a-split-2", role: "assistant", msgContent: "Split reply", timestamp: 1_700_000_000_141 },
+  ]);
   await emitStream(page, "A", { dataJson: "[DONE]" });
   await expect(livePulse(page)).toHaveCount(0);
   await expect(page.getByText("Split reply")).toHaveCount(1);
@@ -506,6 +540,7 @@ test("a plain text-only turn keeps its reply free of any process disclosure", as
   await expect(body.locator("details")).toHaveCount(0);
   await expect(body.locator('[data-webui-message-kind="assistant"]')).toHaveCount(1);
 
+  await stageHistory(page, [{ msgId: "a-plain-1", role: "assistant", msgContent: "Plain reply", timestamp: 1_700_000_000_150 }]);
   await emitStream(page, "A", { dataJson: "[DONE]" });
   await expect(body.locator("summary")).toHaveCount(0);
   await expect(body.locator("details")).toHaveCount(0);

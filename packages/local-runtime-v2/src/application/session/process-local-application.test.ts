@@ -6,18 +6,23 @@ import { composeProcessLocalApplication } from "./process-local-composition.js";
 import { toSessionMessageView } from "./content-application.js";
 
 describe("composeProcessLocalApplication workspace ownership", () => {
-  it("forwards the V2 WorkspaceGitService through the CLI application seam", async () => {
+  it("routes environment reads and review through the V2 WorkspaceGitService", async () => {
     const workspaceGit = {
+      getMetadata: vi.fn(async () => ({ branch: "v2-main" })),
+      getChanges: vi.fn(async () => ({ changedFiles: 2 })),
       getReviewSummary: vi.fn(),
       listReviewFileDiffs: vi.fn(),
       getReviewFileContent: vi.fn(),
       searchReviewDiffs: vi.fn(),
     };
-    const legacyWorkspaceGit = { getMetadata: vi.fn() };
+    const legacyWorkspaceGit = {
+      getMetadata: vi.fn(async () => ({ branch: "legacy-main" })),
+      getChanges: vi.fn(async () => ({ changedFiles: 0 })),
+    };
     const application = composeProcessLocalApplication({
       eventBus: { subscribe: vi.fn(() => () => undefined) },
       usageCommits: undefined,
-      workspaceReview: workspaceGit as never,
+      workspaceGit: workspaceGit as never,
       compatibility: {
         skills: { listSkills: vi.fn(), listRuntimeSkills: vi.fn() },
         peripherals: { workspace: { git: legacyWorkspaceGit } },
@@ -37,7 +42,12 @@ describe("composeProcessLocalApplication workspace ownership", () => {
     });
 
     expect(application.workspace?.git.getReviewSummary).toBeDefined();
-    expect(application.workspace?.git.getMetadata).toBe(legacyWorkspaceGit.getMetadata);
+    await expect(application.workspace?.git.getMetadata("/repo")).resolves.toEqual({ branch: "v2-main" });
+    await expect(application.workspace?.git.getChanges?.("/repo", "full")).resolves.toEqual({ changedFiles: 2 });
+    expect(workspaceGit.getMetadata).toHaveBeenCalledWith("/repo");
+    expect(workspaceGit.getChanges).toHaveBeenCalledWith("/repo", "full");
+    expect(legacyWorkspaceGit.getMetadata).not.toHaveBeenCalled();
+    expect(legacyWorkspaceGit.getChanges).not.toHaveBeenCalled();
     await application.workspace?.git.getReviewSummary?.("/repo", { type: "workspace" });
     expect(workspaceGit.getReviewSummary).toHaveBeenCalledWith("/repo", { type: "workspace" });
   });

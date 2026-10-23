@@ -13,7 +13,15 @@ type ProcessLocalMiniAppArgs = Parameters<typeof createProcessLocalMiniAppApplic
 export function composeProcessLocalApplication(input: {
   readonly eventBus: ProcessLocalApplicationOptions['eventBus'];
   readonly usageCommits: ProcessLocalApplicationOptions['usageCommits'];
-  readonly workspaceReview: Pick<WorkspaceGitService, 'getReviewSummary' | 'listReviewFileDiffs' | 'getReviewFileContent' | 'searchReviewDiffs'>;
+  readonly workspaceGit: Pick<
+    WorkspaceGitService,
+    | 'getMetadata'
+    | 'getChanges'
+    | 'getReviewSummary'
+    | 'listReviewFileDiffs'
+    | 'getReviewFileContent'
+    | 'searchReviewDiffs'
+  >;
   readonly compatibility: Pick<V1ServiceCompatibility, 'skills' | 'peripherals'>;
   readonly listRuntimeSkills: ProcessLocalApplicationOptions['skills']['listRuntimeSkills'];
   readonly plugins: ProcessLocalApplicationOptions['plugins'];
@@ -44,10 +52,16 @@ export function composeProcessLocalApplication(input: {
       ...(input.compatibility.peripherals.workspace ?? {}),
       git: {
         ...(input.compatibility.peripherals.workspace?.git ?? {}),
-        getReviewSummary: input.workspaceReview.getReviewSummary.bind(input.workspaceReview),
-        listReviewFileDiffs: input.workspaceReview.listReviewFileDiffs.bind(input.workspaceReview),
-        getReviewFileContent: input.workspaceReview.getReviewFileContent.bind(input.workspaceReview),
-        searchReviewDiffs: input.workspaceReview.searchReviewDiffs.bind(input.workspaceReview),
+        getMetadata: async (workspaceDir) => ({
+          ...(await input.workspaceGit.getMetadata(workspaceDir)),
+        }),
+        getChanges: async (workspaceDir, mode) => ({
+          ...(await input.workspaceGit.getChanges(workspaceDir, mode)),
+        }),
+        getReviewSummary: input.workspaceGit.getReviewSummary.bind(input.workspaceGit),
+        listReviewFileDiffs: input.workspaceGit.listReviewFileDiffs.bind(input.workspaceGit),
+        getReviewFileContent: input.workspaceGit.getReviewFileContent.bind(input.workspaceGit),
+        searchReviewDiffs: input.workspaceGit.searchReviewDiffs.bind(input.workspaceGit),
       },
     },
     plan: { isEntryEnabled: input.planEntryEnabled },

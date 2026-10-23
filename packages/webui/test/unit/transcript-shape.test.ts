@@ -186,6 +186,19 @@ describe("live transcript timeline merge", () => {
     expect(messages).toHaveLength(1);
     expect(messages[0]?.msgContent).toBe("live");
   });
+
+  it("does not resurrect a deleted stream-only message after the turn settles", () => {
+    const messages = projectWebuiTranscriptMessages(
+      { messages: [{ msgId: "user-1", role: "user", msgContent: "kept" }] },
+      [
+        { id: "user-1", role: "user", answer: "kept", thinking: "" },
+        { id: "assistant-1", answer: "rewound", thinking: "" },
+      ],
+      false,
+    );
+
+    expect(messages.map((message) => message.msgId)).toEqual(["user-1"]);
+  });
 });
 
 describe("WEBUI_LIVE_FIELD_TABLE — every populated field on the live fixtures must appear", () => {

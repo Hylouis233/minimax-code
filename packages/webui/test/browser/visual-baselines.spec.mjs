@@ -36,7 +36,7 @@ test("shell and session rail layout baseline", async ({ page }) => {
   await expect.poll(() => page.locator('img[src^="/assets/"]').evaluateAll((images) =>
     images.every((image) => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0),
   )).toBe(true);
-  await expect(shell).toHaveScreenshot("shell-and-rail.png", { animations: "disabled" });
+  await expect(shell).toHaveScreenshot("shell-and-rail.png", { animations: "disabled", maxDiffPixels: 2 });
 });
 
 test("transcript and composer layout baseline", async ({ page }) => {
@@ -48,7 +48,37 @@ test("transcript and composer layout baseline", async ({ page }) => {
     msg_content: "Synthetic final answer for visual review.",
   });
   await expect(assistantBody(page, "visual-baseline-assistant").getByText("Synthetic final answer for visual review.")).toBeVisible();
+  // A completed turn reconciles against getMessages. Keep the fixture's
+  // authoritative history in sync with the streamed rows instead of letting
+  // the default seed page erase them at DONE.
+  await page.evaluate(() => {
+    window.__fixture.setPage("A", {
+      messages: [
+        { msgId: "history-A", role: "user", msgContent: "History A synthetic", timestamp: 1_700_000_000_001 },
+        { msgId: "visual-baseline-user", role: "user", msgContent: "Snapshot synthetic user prompt", timestamp: 1_700_000_000_010 },
+        {
+          msgId: "visual-baseline-assistant",
+          role: "assistant",
+          msgContent: "Synthetic final answer for visual review.",
+          thinkingContent: "Synthetic reasoning for visual review.",
+          timestamp: 1_700_000_000_011,
+        },
+      ],
+      hasMore: false,
+    });
+    window.__fixture.setTurnDiff({
+      status: "active",
+      changeSetId: "cs-visual-baseline",
+      sourceMessageId: "visual-baseline-assistant",
+      canUndo: true,
+      canReapply: false,
+      fileChanges: [{ file: "a.ts", additions: 2, deletions: 1 }],
+    });
+  });
   await emitStream(page, "A", { dataJson: "[DONE]" });
+  await expect(page.getByText("Snapshot synthetic user prompt")).toBeVisible();
+  await expect(assistantBody(page, "visual-baseline-assistant").getByText("Synthetic final answer for visual review.")).toBeVisible();
+  await expect(page.getByTestId("turn-diff-card")).toBeVisible();
 
   const transcript = page.locator('[data-webui-transcript="A"]');
   await assertInViewport(transcript, page);

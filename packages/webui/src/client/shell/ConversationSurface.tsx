@@ -41,7 +41,7 @@ export function ConversationSurface(props: {
           : "webui-session-layout relative flex h-full min-h-0 w-full flex-col items-center gap-2"}>
           {props.home ? (props.greetingPending ? <GreetingSkeleton /> : <div className="flex flex-col items-center gap-2 text-center [@media(max-height:300px)]:hidden">
             <div className="group/avatar relative size-16 flex-shrink-0"><div className="webui-hero-avatar relative h-full w-full overflow-visible rounded-full bg-bg_grouped_tertiary"><span className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-full"><WebuiIconBrand className="h-full w-full" /></span></div></div>
-            <h1 className="text-[28px] font-medium leading-tight text-text_default_primary">MiniMax Code，让工作更简单。</h1>
+            <h1 className="text-[28px] font-medium leading-tight text-text_default_primary">MiniMax Code Web，让工作更简单。</h1>
           </div>) : <div className="webui-session-title-row flex w-full items-center gap-2" data-webui-rail-collapsed={props.railCollapsed || undefined}><span className="webui-session-title" data-webui-session-title="true">{props.title ?? ""}</span></div>}
           {props.usageBanner}
           {props.connectionStatus}

@@ -156,8 +156,9 @@ export function recheckWebuiSubscription(deps: WebuiRecheckSubscriptionDeps): vo
       // schedules another recheck with no lease captured; attach only if no
       // newer local/recovered subscription claimed the session meanwhile.
       if (!probed) {
-        if (owned || !active || active.busyReason !== "turn") return;
-        attach(active.turnId);
+        if (owned) return;
+        if (active?.busyReason === "turn") attach(active.turnId);
+        else if (!active) attach(undefined);
         return;
       }
       // The lease this probe was about is gone or has been replaced. The answer
@@ -169,6 +170,7 @@ export function recheckWebuiSubscription(deps: WebuiRecheckSubscriptionDeps): vo
       // claimed while the probe was in flight, and that lease is the live one.
       releaseSubscription(owned.generation);
       if (decision === "retarget" && active) attach(active.turnId);
+      else if (decision === "release" && !active && !readStream().subscription) attach(undefined);
     })
     .catch(() => undefined);
 }
@@ -362,6 +364,8 @@ export interface WebuiTurnCommandContext {
   readonly scope?: WebuiSessionScopeManager;
   /** The task use case the substrate creates through. */
   readonly taskSessions?: WebuiTaskSessionSubmitter;
+  /** Refresh the mounted queue projection after an attached turn settles. */
+  readonly refreshQueue?: () => void;
 }
 
 /** What a surface supplies to send: intent and data, never a writer or a sink. */
@@ -383,7 +387,7 @@ export interface WebuiTurnCommandContext {
 export function createWebuiConversationTurnCommands(
   context: WebuiTurnCommandContext,
 ): WebuiConversationTurnCommands {
-  const { store, sessionId, capabilities, taskSessions } = context;
+  const { store, sessionId, capabilities, taskSessions, refreshQueue } = context;
 
   /**
    * The record writer for this turn: the session's, or the home slot's before a
@@ -474,6 +478,19 @@ export function createWebuiConversationTurnCommands(
 
   const attach = (turnId: string | undefined): Promise<void> => {
     const writer = writerFor();
+    if (turnId === undefined) {
+      // With no authoritative active turn, the recheck may be observing a
+      // turn that completed between its lifecycle event and this probe. Force
+      // the existing stream path to seed from persisted history instead of
+      // resuming after the old cursor and silently keeping a stale transcript.
+      let canReconcile = false;
+      storeWriterFor().setStream((current) => {
+        if (current.subscription) return current;
+        canReconcile = true;
+        return current.cursor === undefined ? current : { ...current, cursor: undefined };
+      });
+      if (!canReconcile) return Promise.resolve();
+    }
     const hold = holdDelivery();
     return attachWebuiTurn({
       sessionId,
@@ -482,8 +499,21 @@ export function createWebuiConversationTurnCommands(
       ...(capabilities?.load ? { loadMessages: capabilities.load } : {}),
       readStream,
       setSending: writer.setTurnSending,
-      sink: writer.createSink(),
-    }).finally(hold.release);
+      // A turn-id-less attach is a history reconciliation after the active-turn
+      // probe found no live work. It must replace stale transcript rows without
+      // erasing the terminal error that the user needs to retry.
+      sink: writer.createSink({ clearRefusalOnAnchor: turnId !== undefined }),
+    }).finally(hold.release).then(() => {
+      // A resumed stream can finish while the runtime is handing a queued
+      // message to the next turn. `watchEvents` is deliberately non-barrier:
+      // a `session.start` may be lost during reconnect or between acceptance
+      // and the event iterator's first read. Reconcile once the old stream has
+      // released its lease so an already-active follow-up turn is attached.
+      if (turnId !== undefined) {
+        refreshQueue?.();
+        recover();
+      }
+    });
   };
 
   const probeDeps = (): Pick<WebuiRecheckSubscriptionDeps, "probe"> &
@@ -491,6 +521,16 @@ export function createWebuiConversationTurnCommands(
     const probe = activeTurnProbe();
     return probe ? { probe } : {};
   };
+
+  const recover = (): void =>
+    recoverMissedWebuiTurn({
+      sessionId,
+      ...(capabilities?.activeTurn ? { getActiveTurn: capabilities.activeTurn } : {}),
+      ...probeDeps(),
+      readStream,
+      settleStaleSubscription,
+      attach,
+    });
 
   return {
     recheck: (turnId) =>
@@ -502,15 +542,7 @@ export function createWebuiConversationTurnCommands(
         releaseSubscription,
         attach,
       }),
-    recover: () =>
-      recoverMissedWebuiTurn({
-        sessionId,
-        ...(capabilities?.activeTurn ? { getActiveTurn: capabilities.activeTurn } : {}),
-        ...probeDeps(),
-        readStream,
-        settleStaleSubscription,
-        attach,
-      }),
+    recover,
     send: (intent) => {
       const writer = writerFor();
       const hold = holdDelivery();

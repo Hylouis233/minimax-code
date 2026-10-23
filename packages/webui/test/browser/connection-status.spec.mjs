@@ -97,6 +97,15 @@ test("an unresumable drop shows 连接失败 with its reason, and 重试连接 d
       agent_message: { msgId: "m-recovered", msgContent: "重试后恢复的回复" },
     }),
   });
+  await page.evaluate(() => window.__fixture.setPage("A", {
+    messages: [{
+      msgId: "m-recovered",
+      role: "assistant",
+      msgContent: "重试后恢复的回复",
+      timestamp: 1_700_000_000_200,
+    }],
+    hasMore: false,
+  }));
   await emitStream(page, "A", { dataJson: "[DONE]" });
   await expect(page.getByText("重试后恢复的回复")).toBeVisible();
 });

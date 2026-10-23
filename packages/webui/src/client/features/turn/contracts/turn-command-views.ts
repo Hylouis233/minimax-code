@@ -73,7 +73,7 @@ export interface WebuiTurnLifecycleCommands {
  */
 export interface WebuiTurnCommandWriter {
   readonly kind: "session" | "home";
-  readonly createSink: () => WebuiDeliverySink;
+  readonly createSink: (options?: { readonly clearRefusalOnAnchor?: boolean }) => WebuiDeliverySink;
   readonly resetStreamForTurn: () => void;
   readonly setStreamRefusal: (refusal: string | undefined) => void;
   readonly setTurnSending: (sending: boolean) => void;

@@ -90,7 +90,9 @@ export function buildWebuiStreamLoopSink(
       scope?: { readonly generation?: number },
     ) => WebuiStreamState;
   } = streamStateBundle,
+  options: { readonly clearRefusalOnAnchor?: boolean } = {},
 ): WebuiDeliverySink {
+  const clearRefusalOnAnchor = options.clearRefusalOnAnchor ?? true;
   // Set when this sink claims ownership. Everything a superseded attempt writes —
   // a late chunk, a late completion, a stray "streaming" that would resurrect the
   // thinking spinner — is dropped here rather than in the shared reducer, because
@@ -185,7 +187,7 @@ export function buildWebuiStreamLoopSink(
             processingStartedAtMs:
               typeof startedAt === "number" ? startedAt : Date.now(),
             resumeRequired: false,
-            refusal: undefined,
+            ...(clearRefusalOnAnchor ? { refusal: undefined } : {}),
           },
         );
       });

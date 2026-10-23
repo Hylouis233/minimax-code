@@ -53,9 +53,28 @@ observes the queue across refresh, the `resumeSession` cursor, resumed transcrip
 and ordered persisted messages. A third composer turn asks the stub model to call production
 `todowrite`; the test observes its tool label, resulting todo in the rendered progress card, and
 persisted runtime history. This proves refresh/resume, one queued-send path and one runtime
-todo-to-panel path. It does not currently cover `@` references, attachments, other tool calls/diff
-cards, `/plan`, `/goal`, Ask User continuation, fork isolation, runtime environment changes, browser
-interaction during a turn, cancellation or retry. Those remain required by the active strategy plan.
+todo-to-panel path. A later composer turn selects an actual `@` suggestion, stages a synthetic
+attachment through the mounted file input, verifies its exact bytes and reference at the local model
+request, then asserts the response in persisted history and transcript. Later turns cover runtime
+`/plan`, `/goal`, Ask User continuation, a fork-only follow-up and same-session row actions. A
+confirmed rewind refreshes the selected transcript from production history; the integration checks
+that the message disappears from the mounted transcript and persisted history without route change,
+then opens the inline editor for a surviving user row in the same mounted session without a reload.
+The real-path integration checks the Agent/todo/browser overlap as concurrency, with independent
+assertions for `todowrite` → progress panel and mounted browser input → production browser service →
+local Chromium page. While the deterministic model response is held, the Agent turn stays active, the
+todo remains visible and a user click/type reaches the synthetic page. The todo does not trigger the
+browser action and the browser action does not produce the todo. The same production client/runtime
+journey clicks Stop during an active turn, checks the `abortSession` request, runtime settlement and
+absence of late content from rendered/persisted history, then submits a successful follow-up in the
+same session. It also exercises an actual Agent file write → runtime workspace event → environment
+request invalidation → rendered diff count, a forced `watchEvents` disconnect/reconnect, and a local
+model failure → visible error → same-session Retry recovery. While the fork carries the error, the
+test switches to the source session to check error isolation, returns to the fork, retries and confirms
+the persisted answer. These are named local integration journeys; they do not establish every
+workspace mutation type, every reconnect race, packaged desktop behavior or an already-open user
+session. The fixture-backed browser specs prove their named built-client interactions separately;
+they do not upgrade those flows to runtime integration evidence.
 The fixture-backed browser specs prove
 their named built-client interactions separately; they do not upgrade those flows to runtime
 integration evidence.
@@ -67,12 +86,11 @@ cases when the installed Edge executable is missing. Report those skips from the
 do not infer their execution from the suite or file being registered.
 
 Other current browser cases exercise their named UI interactions against deterministic fixtures.
-For example, the transcript spec covers message actions and fixture-backed fork navigation, while
-workspace-progress and embedded-browser specs render fixture events and route controls to the
-in-page transport. They do not prove a production runtime fork, an active Agent/browser overlap,
-cancellation recovery or model-error retry. The active strategy plan tracks
-these as integration and interaction coverage still to implement; do not infer them from fixture
-coverage.
+For example, the transcript spec covers built-client message actions and fixture-backed fork
+navigation, while workspace-progress and embedded-browser specs render fixture events and route
+controls to the in-page transport. They do not prove runtime delivery. The separate local integration
+claims above are supported only by their production service/runtime/persisted-session paths; do not
+infer those boundaries from fixture coverage.
 `native-runtime.spec.mjs` starts the production host/service in a separate process and verifies real
 native PTY ownership, output and exit events, providing level-5 evidence for that local terminal
 path on the executing platform. State the specific seam and platform instead of extending a green
@@ -98,9 +116,14 @@ switches transport and checks advanced HTTP headers and timeout. Linux screensho
 dialog. These remain level-4 UI/request evidence because the browser transport uses the in-page
 fixture. `real-host-loopback.test.ts` separately exercises production MCP listing through the real
 runtime adapter, operation registry, WebuiService and loopback WebSocket, then decodes the response
-with the production client codec. It proves the local service/result shape, not the mounted page or
-a live MCP connection. Live marketplace, plugin installation and external MCP service behavior
-remain outside the default gates.
+with the production client codec. A separate Chromium case in the same file serves the built client
+through that production service in explicit loopback development mode, clicks Plugins → Manage → MCP,
+checks the actual empty list and absence of the result-shape error, opens Add MCP Server, asserts
+overlay/centering/field geometry at 1440×900, and submits a disabled synthetic stdio entry that
+reappears in the list. The development mode allows relative static assets that do not carry the
+service token; the host, operation registry, service, adapter and persisted local settings are real.
+The disabled MCP process is not started, so this does not prove a live MCP connection. Live
+marketplace, plugin installation and external MCP service behavior remain outside the default gates.
 
 Linux visual baselines include the plugin marketplace and Skill marketplace card grids, Skill
 management rows, and MCP management rows. The browser tests assert grid columns and visible/in-view

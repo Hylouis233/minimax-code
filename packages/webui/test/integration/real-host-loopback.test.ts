@@ -23,9 +23,10 @@
 import { once } from "node:events";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
+import { chromium, expect as browserExpect } from "@playwright/test";
 import { WebSocket } from "ws";
 import type { RawData } from "ws";
 
@@ -57,6 +58,7 @@ interface Booted {
   readonly tcpPort: number;
   readonly dataDir: string;
   readonly workspaceDir: string;
+  readonly port: ReturnType<typeof createHarnessPortFromHost>;
   close(): Promise<void>;
 }
 
@@ -76,7 +78,7 @@ afterEach(async () => {
  * host, not part of the request path under test, and leaving it real would try
  * to install and launch a broker.
  */
-async function bootRealHost(): Promise<Booted> {
+async function bootRealHost(options: { readonly dev?: boolean; readonly serveBuiltClient?: boolean } = {}): Promise<Booted> {
   const dataDir = await mkdtemp(join(tmpdir(), "webui-real-host-"));
   const workspaceDir = join(dataDir, "workspace");
   await mkdir(workspaceDir, { recursive: true });
@@ -117,6 +119,8 @@ async function bootRealHost(): Promise<Booted> {
     terminal,
     tcpPort: 0,
     credential: { token: CREDENTIAL_TOKEN },
+    ...(options.dev ? { dev: true } : {}),
+    ...(options.serveBuiltClient ? { clientDir: resolve("dist-webui/client") } : {}),
   });
   const info = await service.start();
   const entry: Booted = {
@@ -125,6 +129,7 @@ async function bootRealHost(): Promise<Booted> {
     tcpPort: info.tcpPort,
     dataDir,
     workspaceDir,
+    port,
     close: async () => {
       await service.close().catch(() => undefined);
       await assembled.host.apiHost.close().catch(() => undefined);
@@ -280,6 +285,118 @@ describe("real host over the loopback service", () => {
     ).toEqual({ servers: [] });
     client.close();
     await client.closed;
+  }, 120_000);
+
+  it("renders and submits MCP management through the built client and production runtime", async () => {
+    const host = await bootRealHost({ dev: true, serveBuiltClient: true });
+    const created = await host.port.createSession({ name: "main", workspaceDir: host.workspaceDir });
+    const sessionId = created.session?.sessionId;
+    expect(sessionId).toBeTruthy();
+
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const page = await browser.newPage({
+        locale: "zh-CN",
+        viewport: { width: 1440, height: 900 },
+      });
+      const requests: Record<string, unknown>[] = [];
+      const responses: Record<string, unknown>[] = [];
+      page.on("websocket", (socket) => {
+        socket.on("framesent", ({ payload }) => {
+          try {
+            const frame = JSON.parse(String(payload)) as Record<string, unknown>;
+            if (frame.kind === "request") requests.push(frame);
+          } catch { /* Non-JSON protocol frames are not operation requests. */ }
+        });
+        socket.on("framereceived", ({ payload }) => {
+          try {
+            responses.push(JSON.parse(String(payload)) as Record<string, unknown>);
+          } catch { /* Non-JSON protocol frames are not operation responses. */ }
+        });
+      });
+      await page.goto(`http://127.0.0.1:${host.tcpPort}/?token=${CREDENTIAL_TOKEN}#session=${sessionId}`);
+      const root = page.locator("#webui-root");
+      const startupFallback = page.getByTestId("webui-startup-fallback");
+      await browserExpect.poll(async () => await root.isVisible() || await startupFallback.isVisible())
+        .toBe(true);
+      if (await startupFallback.isVisible()) {
+        throw new Error(`Built WebUI startup failed: ${await startupFallback.innerText()}`);
+      }
+      await page.getByRole("button", { name: "插件" }).first().click();
+      await page.locator(".webui-plugin-manage-trigger").click();
+      await page.locator('.webui-plugin-category-filter button', { hasText: "MCP" }).click();
+      await browserExpect(page.getByPlaceholder("搜索MCP...")).toBeVisible();
+      await browserExpect(page.getByText("暂无内容")).toBeVisible();
+      await browserExpect(page.getByText(/pluginManagement returned a body/u)).toHaveCount(0);
+
+      const listRequest = requests.find((frame) =>
+        frame.operation === "pluginManagement" &&
+        (frame.body as { action?: string } | undefined)?.action === "listMcpServers",
+      );
+      expect(listRequest).toBeDefined();
+      await browserExpect.poll(() => responses.some((frame) =>
+        frame.requestId === listRequest?.requestId && frame.kind === "response" &&
+        JSON.stringify(frame.body).includes('"servers":[]'),
+      )).toBe(true);
+
+      await page.locator(".webui-plugin-create-trigger").click();
+      await page.getByRole("button", { name: "添加 MCP server" }).click();
+      const dialog = page.getByRole("dialog", { name: "MCP Server" });
+      await browserExpect(dialog).toBeVisible();
+      const geometry = await dialog.evaluate((node) => {
+        const backdrop = node.parentElement!;
+        const backdropRect = backdrop.getBoundingClientRect();
+        const rect = node.getBoundingClientRect();
+        const fields = node.querySelector(".webui-mcp-form-fields")!;
+        const controls = [...fields.querySelectorAll("input:not([type=checkbox]), select")];
+        return {
+          backdropFixed: getComputedStyle(backdrop).position === "fixed",
+          backdropCoversViewport: backdropRect.left <= 0 && backdropRect.top <= 0 &&
+            backdropRect.right >= innerWidth && backdropRect.bottom >= innerHeight,
+          centered: Math.abs(rect.left + rect.width / 2 - innerWidth / 2) < 3 &&
+            Math.abs(rect.top + rect.height / 2 - innerHeight / 2) < 3,
+          insideViewport: rect.left >= 0 && rect.top >= 0 &&
+            rect.right <= innerWidth && rect.bottom <= innerHeight,
+          fieldsGrid: getComputedStyle(fields).display === "grid",
+          controlsAligned: controls.length >= 3 && controls.every((control) => {
+            const input = control.getBoundingClientRect();
+            const label = control.closest("label")!.getBoundingClientRect();
+            return Math.abs(input.left - label.left) < 3 && Math.abs(input.width - label.width) < 3;
+          }),
+        };
+      });
+      expect(geometry).toEqual({
+        backdropFixed: true,
+        backdropCoversViewport: true,
+        centered: true,
+        insideViewport: true,
+        fieldsGrid: true,
+        controlsAligned: true,
+      });
+      await dialog.getByLabel("名称").fill("synthetic-disabled-mcp");
+      await dialog.getByLabel("命令").fill("synthetic-mcp-command");
+      await dialog.getByLabel("启用").uncheck();
+      await dialog.getByRole("button", { name: "添加服务器" }).click();
+      await browserExpect(dialog).toHaveCount(0);
+      await browserExpect(page.locator(".webui-plugin-row").filter({ hasText: "synthetic-disabled-mcp" }))
+        .toBeVisible();
+      await browserExpect(page.getByText(/pluginManagement returned a body/u)).toHaveCount(0);
+
+      const createRequest = requests.find((frame) =>
+        frame.operation === "pluginManagement" &&
+        (frame.body as { action?: string } | undefined)?.action === "createMcpServer",
+      );
+      expect(createRequest?.body).toMatchObject({
+        action: "createMcpServer",
+        input: {
+          name: "synthetic-disabled-mcp",
+          enabled: false,
+          config: { transport: "stdio", command: "synthetic-mcp-command" },
+        },
+      });
+    } finally {
+      await browser.close();
+    }
   }, 120_000);
 
   it("answers with the registry's own error frame for a body the validator rejects", async () => {

@@ -1255,7 +1255,7 @@ describe("WebUI shell — desktop anatomy", () => {
     const html = renderShell();
 
     expect(html).toMatch(/data-webui-home-content="true"/u);
-    expect(html).toContain("MiniMax Code，让工作更简单。");
+    expect(html).toContain("MiniMax Code Web，让工作更简单。");
     // The hero column keeps its 743px width below a 240px spacer.
     expect(html).toMatch(/max-w-\[743px\]/u);
     // The spacer is decorative, full-bleed, and holds its size in the flex
