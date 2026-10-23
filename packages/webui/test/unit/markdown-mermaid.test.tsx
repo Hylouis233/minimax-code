@@ -129,6 +129,31 @@ describe("renderWebuiMermaidSvg", () => {
     await expect(renderWebuiMermaidSvg("this is not a diagram @@")).rejects.toThrow(/Parse error/iu);
   });
 
+  it("rejects a body that references a remote image, without touching the library", async () => {
+    // `@{img: 'https://…'}` makes the real library fetch the image over the
+    // network mid-render (the request leaves the page before `render`
+    // settles), and `iconify:` does the same through its icon loader. A
+    // diagram body is model output, so the render must end before it starts
+    // — this path is the plain-fence fallback, same as any other refusal.
+    for (const body of [
+      "graph TD;\n  A@{img: 'https://evil.example/logo.png'} --> B;",
+      'graph TD;\n  A@{img: "iconify:mdi:account"} --> B;',
+    ]) {
+      await expect(renderWebuiMermaidSvg(body)).rejects.toThrow(/remote image/iu);
+    }
+    expect(renderMock).not.toHaveBeenCalled();
+  });
+
+  it("draws a self-contained data-URI image", async () => {
+    // `data:` URIs carry their bytes with them and draw offline — the guard
+    // above must not take the one image form that never touches the network.
+    renderMock.mockResolvedValue({ svg: '<svg id="webui-mermaid-2"><g></g></svg>' } as never);
+    await expect(
+      renderWebuiMermaidSvg("graph TD;\n  A@{img: 'data:image/svg+xml;base64,PHN2Zw=='} --> B;"),
+    ).resolves.toContain("<svg");
+    expect(renderMock).toHaveBeenCalled();
+  });
+
   it("rejects a render that outlives the timeout", async () => {
     // A real clock with an injected budget: faking timers here would put the
     // rejection inside a timer-advance window, which Vitest reports as an
@@ -270,6 +295,28 @@ describe("the SVG that reaches the DOM", () => {
     expect(clean).not.toContain("foreignObject");
     expect(clean).not.toContain("<script");
     expect(clean).toContain("<g/>");
+  });
+
+  it("neutralises CSS imports and off-page url() references, keeping fragment refs and data images", () => {
+    // The `<style>` element is kept (it carries the diagram's class CSS);
+    // these rules are its backstop. Fragment refs (`url(#…)` — the arrowhead
+    // markers) and data: images are drawing, not fetches, and must survive.
+    const styled = [
+      "<svg><style>",
+      ".edge { fill: red; }",
+      '@import url("https://evil.example/i.css");',
+      ".x { background: url(https://evil.example/b.png); }",
+      '.y { background: url("//evil.example/p.png"); }',
+      ".marker { fill: url(#arrow); }",
+      '.z { background: url("data:image/svg+xml;base64,PHN2Zw=="); }',
+      "</style></svg>",
+    ].join("");
+    const clean = sanitizeWebuiMermaidSvg(styled);
+    expect(clean).not.toContain("@import");
+    expect(clean).not.toContain("evil.example");
+    expect(clean).toContain(".edge { fill: red; }");
+    expect(clean).toContain("url(#arrow)");
+    expect(clean).toContain("data:image/svg+xml;base64,PHN2Zw==");
   });
 
   it("leaves an ordinary diagram untouched", () => {

@@ -26,8 +26,9 @@
 //      runs effects, so the block carries each state as a plain prop and the
 //      wrapper only wires the async render into it.
 //   4. The rendered SVG is sanitized before it is injected, and the diagram is
-//      drawn with the theme the app is actually showing. Both are load-bearing
-//      — see the two sections below.
+//      drawn with the theme the app is actually showing — and redrawn when
+//      that theme changes, because the palette is baked into the SVG. Both
+//      are load-bearing — see the two sections below.
 
 import { useEffect, useState, type ReactElement } from "react";
 
@@ -101,6 +102,27 @@ export function readWebuiDocumentTheme(
  * body, not assembled from user HTML, so the surface is small — but small is
  * not zero, and the filter is what makes "the SVG carries no script" a
  * property of this component rather than a property of the library version.
+ *
+ * What is deliberately kept: the `<style>` element the library emits. The
+ * diagram's class CSS lives there — every colour the theme rules assign — so
+ * removing it would unstyle the drawing. It is acceptable input because each
+ * way a diagram body can reach into it is validated by the library, checked
+ * against the pinned version under `securityLevel: "strict"`:
+ *
+ *   - `classDef` / `style` / `linkStyle` reject `url(…)` and stray `{`/`;` at
+ *     parse time (`classDef ex fill:red,stroke:url(https://…)` is a parse
+ *     error, not a rendered rule);
+ *   - the colours an `%%{init} …%%` directive can set go through a colour
+ *     parser that rejects anything that is not a colour — a breakout payload
+ *     like `#f00; } * { background-image: url(https://…)` dies as
+ *     "Unsupported color format";
+ *   - the directive cannot flip security-relevant keys at all (`securityLevel`
+ *     and `htmlLabels` stay as configured here), and `click … call` binds
+ *     nothing on the `render()` path.
+ *
+ * The `@import` and off-page `url()` rules below are the backstop: they cost
+ * nothing on a healthy diagram and they hold the line if a future diagram
+ * type grows a raw-CSS surface.
  */
 export function sanitizeWebuiMermaidSvg(svg: string): string {
   return svg
@@ -120,7 +142,13 @@ export function sanitizeWebuiMermaidSvg(svg: string): string {
     // Script-ish URLs in href / xlink:href / src.
     .replace(/\s(xlink:href|href|src)\s*=\s*"\s*javascript:[^"]*"/giu, "")
     .replace(/\s(xlink:href|href|src)\s*=\s*'\s*javascript:[^']*'/giu, "")
-    .replace(/\s(xlink:href|href|src)\s*=\s*javascript:[^\s>]*/giu, "");
+    .replace(/\s(xlink:href|href|src)\s*=\s*javascript:[^\s>]*/giu, "")
+    // CSS imports and off-page url() references. A <style> inside inline SVG
+    // applies to the whole page, not just the diagram, and an off-page url()
+    // turns a diagram into a network fetch. Fragment refs (`url(#…)` — the
+    // arrowhead markers) and data: images are drawing, not fetches, and stay.
+    .replace(/@import\b[^;{]*[;{]?/giu, "")
+    .replace(/url\(\s*(['"]?)\s*(?:https?:|\/\/|data:text\/html)[^)'"]*\1\s*\)/giu, "none");
 }
 
 /* Rendering -------------------------------------------------------------- */
@@ -147,7 +175,9 @@ async function loadMermaid(theme: WebuiMermaidTheme): Promise<MermaidModule> {
     // `theme` is the app's own theme, not the library's default: Mermaid
     // bakes its palette into the SVG it returns, so a diagram drawn with the
     // light palette is a light diagram even on a dark page. Re-initializing
-    // on a theme change is what lets the next diagram follow the switch.
+    // on a theme change is what lets the renderer follow the switch — the
+    // next diagram, and (through the subscription in `WebuiMermaid`) the
+    // ones already on screen.
     module.default.initialize({
       startOnLoad: false,
       securityLevel: "strict",
@@ -172,21 +202,43 @@ export interface WebuiMermaidRenderOptions {
    * callers never pass it.
    */
   readonly timeoutMs?: number;
-  /** The theme to draw with; defaults to the app's current theme. */
+  /**
+   * The theme to draw with. Defaults to `light`: this function is pure and
+   * has no document to ask, so an unspecified theme means the library's own
+   * default palette. The component passes the document's current theme
+   * explicitly — nothing on the production path relies on the default.
+   */
   readonly theme?: WebuiMermaidTheme;
 }
+
+/**
+ * A diagram body whose `@{img: '…'}` node image is not a `data:` URI.
+ *
+ * A remote value — an `https://` URL, the `iconify:` scheme — makes the
+ * library fetch the image over the network while it renders (verified: the
+ * request leaves the page before `render` settles). A diagram body is model
+ * output that can be steered by whatever the model read, and a render must
+ * not turn it into a request to an arbitrary host, so such a body is refused
+ * before the library is even imported. `data:` URIs are self-contained and
+ * draw offline; they pass.
+ */
+const REMOTE_IMAGE_IN_BODY = /@\{img\s*:\s*['"]\s*(?!data:)/u;
 
 /**
  * Render one Mermaid diagram body to an SVG string.
  *
  * Rejects — rather than returning a fallback — on every failure so the caller
- * decides what the user sees: an empty body, invalid syntax, a thrown render
- * and a render that outlives the timeout all end here. The empty-body check
- * runs before the dynamic import so an empty fence never pulls the library
- * down the wire.
+ * decides what the user sees: an empty body, a body that references a remote
+ * image, invalid syntax, a thrown render and a render that outlives the
+ * timeout all end here. The empty-body and remote-image checks run before the
+ * dynamic import so neither ever pulls the library down the wire, and the
+ * remote-image one also never lets it touch the network.
  */
 export async function renderWebuiMermaidSvg(text: string, options?: WebuiMermaidRenderOptions): Promise<string> {
   if (text.trim() === "") throw new Error("webui-mermaid: empty diagram body");
+  if (REMOTE_IMAGE_IN_BODY.test(text)) {
+    throw new Error("webui-mermaid: diagram body references a remote image");
+  }
   const theme = options?.theme ?? "light";
   const mermaid = (await loadMermaid(theme)).default;
   diagramSequence += 1;
@@ -269,16 +321,26 @@ export interface WebuiMermaidProps {
  * The effectful half: renders the diagram once per body and repaints the block
  * with the outcome. `cancelled` guards the state updates so a fence that
  * unmounts mid-render — a session switch, a trimmed transcript — writes
- * nothing. The dependency is the body alone: a re-render with the same text
- * must not re-run the library.
+ * nothing. The dependencies are the body and the theme: a re-render with the
+ * same text must not re-run the library, while a theme switch must — the
+ * palette is baked into the SVG, so the only way a drawn diagram follows the
+ * app's theme is to draw it again. The theme arrives as state from the DOM
+ * port's subscription (see `subscribeDocumentTheme`); until the document
+ * first changes theme after mount it is `undefined`, and the draw reads the
+ * document directly instead, so the first diagram does not wait for an event.
+ * While a theme switch redraws, the previous SVG stays on screen — a reader
+ * who changed the theme never sees the fence flash back to its source text.
  */
 export function WebuiMermaid({ text, lang }: WebuiMermaidProps): ReactElement {
   const [state, setState] = useState<WebuiMermaidState>({ status: "pending" });
   const { dom } = useWebuiBrowserCapabilities();
+  const [theme, setTheme] = useState<WebuiMermaidTheme | undefined>(undefined);
+  useEffect(() => dom.subscribeDocumentTheme(setTheme), [dom]);
   useEffect(() => {
     let cancelled = false;
-    const theme = readWebuiDocumentTheme(() => dom.readDocumentTheme());
-    renderWebuiMermaidSvg(text, { theme })
+    renderWebuiMermaidSvg(text, {
+      theme: theme ?? readWebuiDocumentTheme(() => dom.readDocumentTheme()),
+    })
       .then((svg) => {
         if (!cancelled) setState({ status: "rendered", svg });
       })
@@ -288,6 +350,6 @@ export function WebuiMermaid({ text, lang }: WebuiMermaidProps): ReactElement {
     return () => {
       cancelled = true;
     };
-  }, [dom, text]);
+  }, [dom, text, theme]);
   return <WebuiMermaidBlock state={state} text={text} lang={lang} />;
 }

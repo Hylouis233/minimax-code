@@ -313,6 +313,44 @@ test("a diagram follows the app's theme", async ({ page }) => {
   expect(await readPalette()).not.toBe(lightPalette);
 });
 
+test("a drawn diagram repaints when the theme switches, without a reload", async ({ page }) => {
+  await stageTranscript(page, [
+    { msgId: "m-6", role: "assistant", msgContent: "```mermaid\n" + MERMAID_DIAGRAM + "\n```", timestamp: 1_700_000_000_001 },
+  ]);
+  await openApp(page, "#session=A");
+  await expect(page.locator(".webui-mermaid svg")).toBeVisible({ timeout: 20_000 });
+  const readPalette = () =>
+    page.locator(".webui-mermaid svg").evaluate((node) => node.querySelector("style")?.textContent ?? "");
+  const lightPalette = await readPalette();
+
+  // No reload happens anywhere below this marker — a reload would wipe it, so
+  // reading it back at the end is the proof that the repaint came from the
+  // renderer hearing the theme change, not from the page coming back.
+  await page.evaluate(() => {
+    window.__webuiNoReloadWitness = true;
+  });
+
+  // The app's own control, driven the way a user drives it (the same flow
+  // `settings-theme.spec.mjs` uses): user menu, 设置, 深色模式. That click
+  // flips the `dark` class on `<html>`, and the diagram must redraw — the
+  // palette is baked into the SVG, so a theme switch that does not redraw
+  // leaves a light diagram sitting on a dark page until the next navigation.
+  // This is the path the reload-based case above cannot see.
+  await page.locator('[data-testid="sidebar-user-menu-trigger"]').click();
+  await page.locator('[data-testid="user-menu-settings"]').click();
+  await expect(page.locator('[role="dialog"][aria-label="设置"]')).toBeVisible();
+  await page.locator('[data-testid="mavis-settings-appearance-row"] .mavis-settings-theme-option', { hasText: "深色模式" }).click();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+
+  await expect
+    .poll(async () => readPalette(), { timeout: 20_000 })
+    .not.toBe(lightPalette);
+  expect(await page.evaluate(() => window.__webuiNoReloadWitness)).toBe(true);
+  // The repaint produced a rendered diagram again — not a fallback.
+  await expect(page.locator(".webui-mermaid svg")).toBeVisible();
+  await expect(page.locator(".webui-code-block")).toHaveCount(0);
+});
+
 test("a wide diagram fits its container", async ({ page }) => {
   // A wide diagram must not push the transcript sideways: the SVG scales with
   // the container (`max-width: 100%`, `height: auto`).
