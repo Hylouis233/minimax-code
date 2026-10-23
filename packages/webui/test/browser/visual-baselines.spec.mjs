@@ -64,6 +64,17 @@ test("settings dialog layout baseline", async ({ page }) => {
   const dialog = page.locator('[role="dialog"][aria-label="设置"]');
   await assertInViewport(dialog, page);
   await expect(dialog.getByRole("heading", { name: "通用", exact: true })).toBeVisible();
+  // The overlay fades in and the panel behind it slides in, so a frame taken
+  // while either is still moving is a frame the next run does not repeat. The
+  // same wait the browser panel case uses, over the whole subtree, so this
+  // records the settled frame rather than a lucky one.
+  await dialog.evaluate(async (element) => {
+    const finite = element.getAnimations({ subtree: true }).filter((animation) => {
+      const timing = animation.effect?.getComputedTiming();
+      return timing ? Number.isFinite(timing.endTime) : false;
+    });
+    await Promise.all(finite.map((animation) => animation.finished.catch(() => undefined)));
+  });
   await expect(dialog).toHaveScreenshot("settings-dialog.png", { animations: "disabled" });
 });
 
