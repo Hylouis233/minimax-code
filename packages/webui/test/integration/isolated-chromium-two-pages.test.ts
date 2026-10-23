@@ -69,8 +69,80 @@ function pageUrl(title: string): string {
   return `data:text/html,${encodeURIComponent(pageHtml(title))}`;
 }
 
-/** How long a page is given to settle after a navigation. */
-const SETTLE_MS = 750;
+/**
+ * The budget every case in this file is given.
+ *
+ * Every case here drives a real browser, so the budget is not a statement
+ * about what the case may take — it is room for a runner that is several
+ * times slower than the machine the numbers were measured on, so that a slow
+ * machine cannot report a red that says nothing about the product. What is
+ * correct and what is not is decided by `WAIT_MS`: a case whose page never
+ * reaches the state it asserts fails at that deadline, with the state it was
+ * waiting for named, and the budget is never what catches it.
+ *
+ * The budget therefore has to cover the case's waits *and* the work around
+ * them. The case that waits most often waits seven times, and every one of
+ * those waits ends at `WAIT_MS`, so the largest sum of wait deadlines in
+ * this file is 21s. The macOS CI run — the whole 213-file webui group at
+ * once — measured the slowest of these cases at 5015ms, so 21s of waits
+ * plus that work is about 26s, and 30s would leave 4s between a slow
+ * machine and a red that says nothing. 60s is the number the repository
+ * already gives a gate that drives a real process
+ * (`webui-dependency-check.test.ts`), and it leaves the round trips to a
+ * real browser about 8x the time the CI run measured them.
+ */
+const BROWSER_CASE_BUDGET_MS = 60_000;
+
+/** How often a page is asked whether it has reached the state a case waits for. */
+const POLL_MS = 50;
+
+/**
+ * How long a page is given to reach the state a case waits for.
+ *
+ * Every wait in this file is a condition rather than a pause, so this is a
+ * deadline on the condition and not a delay: a page that never gets there
+ * fails the case here, with the state it was waiting for named. It is an
+ * order of magnitude below the budget the case is given, and it is the
+ * budget's own rule that a failure is always the condition's and never the
+ * budget's.
+ *
+ * The longest wait a healthy page took here was about 200ms, so this is
+ * roughly fifteen times the time a page needs. A case may wait several
+ * times, so the budget covers the sum of those deadlines — not this one.
+ */
+const WAIT_MS = 3_000;
+
+/**
+ * Waits for a condition to hold.
+ *
+ * The condition is asked again every `POLL_MS` until it holds. A condition
+ * that throws is the page's own state rather than the flow's failure — a
+ * page that is loading answers a read with an error — so it is asked again,
+ * and the last of those errors is reported if the wait ends without the
+ * condition holding.
+ *
+ * The wait never passes a condition that did not hold: it ends in a failure,
+ * not in a quiet success.
+ */
+async function waitFor(
+  condition: () => boolean | Promise<boolean>,
+  description: string,
+): Promise<void> {
+  const deadline = Date.now() + WAIT_MS;
+  let lastError: unknown;
+  while (Date.now() < deadline) {
+    try {
+      if (await condition()) return;
+      lastError = undefined;
+    } catch (error) {
+      lastError = error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+  }
+  throw new Error(
+    `timed out waiting for ${description}${lastError === undefined ? "" : `: ${String(lastError)}`}`,
+  );
+}
 
 async function chromeIsAvailable(): Promise<boolean> {
   return (await resolveChromePath()) !== undefined;
@@ -78,12 +150,20 @@ async function chromeIsAvailable(): Promise<boolean> {
 
 async function resolveChromePath(): Promise<string | undefined> {
   const { access } = await import("node:fs/promises");
-  for (const candidate of [
-    "/usr/bin/google-chrome",
-    "/usr/bin/google-chrome-stable",
-    "/usr/bin/chromium",
-    "/usr/bin/chromium-browser",
-  ]) {
+  const candidates =
+    process.platform === "darwin"
+      ? [
+          "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+          "/Applications/Chromium.app/Contents/MacOS/Chromium",
+          "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
+        ]
+      : [
+          "/usr/bin/google-chrome",
+          "/usr/bin/google-chrome-stable",
+          "/usr/bin/chromium",
+          "/usr/bin/chromium-browser",
+        ];
+  for (const candidate of candidates) {
     try {
       await access(candidate);
       return candidate;
@@ -130,11 +210,30 @@ describe.skipIf(!available)("the isolated Chromium, one page per web tab", () =>
     const targetId = opened?.targetId;
     if (!targetId) throw new Error("open_tab returned no target");
     // The page is created by the browser before the provider has registered
-    // it, so the listing settles first.
-    await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+    // it, so the wait is for the page to be listed rather than for a fixed
+    // span of time: the listing is what says the provider drives it.
+    await waitFor(
+      async () =>
+        (await provider.listTargets()).some((entry) => entry.id.targetId === targetId),
+      "the new page to appear in the target list",
+    );
     const state = (await provider.listTargets()).find((entry) => entry.id.targetId === targetId);
     if (!state) throw new Error("the new page is not in the target list");
+    // The page is listed before its document has loaded, so the title is
+    // waited for as well: a title read too early is the empty one, and the
+    // case would read that as a page that is not the one it opened.
+    await waitFor(
+      async () => (await readTitle(state.id)) === title,
+      "the new page to load",
+    );
     return state.id;
+  }
+
+  /** The generation the provider currently holds for a page. */
+  async function generationOf(targetId: string): Promise<number> {
+    const found = (await provider.listTargets()).find((entry) => entry.id.targetId === targetId);
+    if (!found) throw new Error("the page is not in the target list");
+    return found.id.generation;
   }
 
   /** The title the page behind the target is showing. */
@@ -184,9 +283,18 @@ describe.skipIf(!available)("the isolated Chromium, one page per web tab", () =>
       clickCount: 1,
     });
     await provider.sendInput({ kind: "text", target, text });
+    // The text is waited for as the value it is, not as "the page changed":
+    // the browser delivers the keystrokes to the page on its own schedule, so
+    // a read taken right after the send can still see the field as it was —
+    // and a keystroke that is still on its way lands in the *next* case's
+    // text, which is how a field ends up holding two texts at once.
+    await waitFor(
+      async () => (await readField(target)) === text,
+      `the field to hold ${JSON.stringify(text)}`,
+    );
   }
 
-  it("drives, streams and inputs into two pages independently", async () => {
+  it("drives, streams and inputs into two pages independently", { timeout: BROWSER_CASE_BUDGET_MS }, async () => {
     const first = await launchTarget();
     const second = await openPage("second page");
 
@@ -196,7 +304,10 @@ describe.skipIf(!available)("the isolated Chromium, one page per web tab", () =>
     // the tab, so the identity is read again afterwards: the one read before
     // the navigation is stale by then, and that is the point.
     await provider.sendCommand(first, "Page.navigate", { url: pageUrl("first page") });
-    await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+    await waitFor(
+      async () => (await readTitle(first)) === "first page",
+      "the first page to load",
+    );
     const firstAfterNavigation = await launchTarget();
     expect(await readTitle(firstAfterNavigation)).toBe("first page");
     expect(await readTitle(second)).toBe("second page");
@@ -208,7 +319,7 @@ describe.skipIf(!available)("the isolated Chromium, one page per web tab", () =>
     expect(await readField(second)).toBe("bravo");
   });
 
-  it("advances one page's generation and leaves the other's alone", async () => {
+  it("advances one page's generation and leaves the other's alone", { timeout: BROWSER_CASE_BUDGET_MS }, async () => {
     const first = await launchTarget();
     const second = await openPage("generation page");
 
@@ -218,7 +329,10 @@ describe.skipIf(!available)("the isolated Chromium, one page per web tab", () =>
     }
 
     await provider.sendCommand(second, "Page.navigate", { url: pageUrl("navigated page") });
-    await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+    await waitFor(
+      async () => (await generationOf(second.targetId)) > (before.get(second.targetId) ?? 0),
+      "the navigated page to advance its generation",
+    );
 
     const after = new Map<string, number>();
     for (const target of await provider.listTargets()) {
@@ -231,13 +345,16 @@ describe.skipIf(!available)("the isolated Chromium, one page per web tab", () =>
     expect(after.get(first.targetId)).toBe(before.get(first.targetId));
   });
 
-  it("refuses a stale reference on every page, not only the launch page", async () => {
+  it("refuses a stale reference on every page, not only the launch page", { timeout: BROWSER_CASE_BUDGET_MS }, async () => {
     const first = await launchTarget();
     const second = await openPage("fenced page");
 
     const secondBefore = second.generation;
     await provider.sendCommand(second, "Page.navigate", { url: pageUrl("fenced page two") });
-    await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+    await waitFor(
+      async () => (await generationOf(second.targetId)) > secondBefore,
+      "the navigated page to advance its generation",
+    );
 
     // The stale identity of the page that was navigated.
     await expect(
@@ -250,7 +367,7 @@ describe.skipIf(!available)("the isolated Chromium, one page per web tab", () =>
     expect(await readField(first)).toBe("still works");
   });
 
-  it("answers open_tab with the identity of the page it created", async () => {
+  it("answers open_tab with the identity of the page it created", { timeout: BROWSER_CASE_BUDGET_MS }, async () => {
     const launch = await launchTarget();
 
     const opened = (await provider.sendCommand(launch, "open_tab", {
@@ -265,7 +382,11 @@ describe.skipIf(!available)("the isolated Chromium, one page per web tab", () =>
     expect(typeof opened.generation).toBe("number");
 
     // The page appears in the provider's target list under that identity.
-    await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+    await waitFor(
+      async () =>
+        (await provider.listTargets()).some((entry) => entry.id.targetId === opened.targetId),
+      "the new page to appear in the target list",
+    );
     const listed = (await provider.listTargets()).find(
       (entry) => entry.id.targetId === opened.targetId,
     );
@@ -279,11 +400,14 @@ describe.skipIf(!available)("the isolated Chromium, one page per web tab", () =>
     // that is the generation the provider holds afterwards.
     const current = listed!.id;
     await provider.sendCommand(current, "Page.navigate", { url: pageUrl("driven page") });
-    await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+    await waitFor(
+      async () => (await readTitle(current)) === "driven page",
+      "the driven page to load",
+    );
     expect(await readTitle(current)).toBe("driven page");
   });
 
-  it("delivers a frame to the page that asked for it and to no other", async () => {
+  it("delivers a frame to the page that asked for it and to no other", { timeout: BROWSER_CASE_BUDGET_MS }, async () => {
     const first = await launchTarget();
     const second = await openPage("streamed page");
 
@@ -296,11 +420,11 @@ describe.skipIf(!available)("the isolated Chromium, one page per web tab", () =>
     // frames are produced while that page is the one on screen.
     await provider.startImageStream(first.targetId, (frame) => firstFrames.push(frame));
     await typeInto(first, "one");
-    await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+    await waitFor(() => firstFrames.length > 0, "a frame of the first page");
 
     await provider.startImageStream(second.targetId, (frame) => secondFrames.push(frame));
     await typeInto(second, "two");
-    await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+    await waitFor(() => secondFrames.length > 0, "a frame of the second page");
 
     expect(firstFrames.length).toBeGreaterThan(0);
     expect(secondFrames.length).toBeGreaterThan(0);
@@ -361,15 +485,32 @@ describe.skipIf(!available)("the browser service, streaming two pages of one Chr
     if (dataDir) await rm(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
 
+  /** The value an expression has on the page the run has selected. */
+  async function readSelection(expression: string): Promise<unknown> {
+    const read = (await service.sendCommandToSelection(
+      "isolated-chromium",
+      "run-1",
+      "Runtime.evaluate",
+      { expression, returnByValue: true },
+    )) as { result?: { result?: { value?: unknown } } } | undefined;
+    return read?.result?.result?.value;
+  }
+
   /** Repaints the page the run is on, which is what makes the screencast push. */
   async function repaint(): Promise<void> {
     await service.sendCommandToSelection("isolated-chromium", "run-1", "Runtime.evaluate", {
       expression: "document.body.style.background = 'rgb(12, 34, 56)'",
     });
-    await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+    // The wait is for the paint to reach the page rather than for a fixed
+    // span of time: the screencast pushes when the page has changed, so a
+    // repaint that had not landed yet would produce no frame at all.
+    await waitFor(
+      async () => (await readSelection("document.body.style.background")) === "rgb(12, 34, 56)",
+      "the repaint to reach the page",
+    );
   }
 
-  it("gives two tabs their own pictures, and neither receives the other's frames", async () => {
+  it("gives two tabs their own pictures, and neither receives the other's frames", { timeout: BROWSER_CASE_BUDGET_MS }, async () => {
     const list = await service.listTargets("isolated-chromium", "run-1");
     // The service marks the *run's* selection, and the run has not selected
     // anything yet, so the page to start from is found by asking the provider
@@ -412,6 +553,18 @@ describe.skipIf(!available)("the browser service, streaming two pages of one Chr
         firstFrames.push(frame);
       }
     })();
+
+    // Chrome renders the page in front and throttles the ones behind it, and
+    // the provider brings the page it streams to the front. A page that is
+    // behind another one therefore produces no picture at all, so each page
+    // is watched while it is the one on screen: the first page's stream is
+    // opened and its picture waited for, and only then is the second page's
+    // stream opened. Both streams are open at once from that point on, which
+    // is what the crossing below is about — the first page's stream is open
+    // while the second page's pictures arrive.
+    await repaint();
+    await waitFor(() => firstFrames.length > 0, "a picture of the first page");
+
     const secondStream = (async () => {
       for await (const frame of service.watchFrames(
         "isolated-chromium",
@@ -421,14 +574,10 @@ describe.skipIf(!available)("the browser service, streaming two pages of one Chr
         secondFrames.push(frame);
       }
     })();
-
-    // Chrome renders the page in front, so each page is repainted while its
-    // own stream is the one watching.
-    await repaint();
     await service.selectTarget(second, "run-1");
     await repaint();
+    await waitFor(() => secondFrames.length > 0, "a picture of the second page");
 
-    await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
     controller.abort();
     await Promise.allSettled([firstStream, secondStream]);
 
@@ -476,7 +625,18 @@ describe.skipIf(!available)("the Agent opening a tab of a real isolated Chromium
     if (dataDir) await rm(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
 
-  it("opens a page the same run can then navigate", async () => {
+  /** The title the page the run has selected is showing. */
+  async function readSelectionTitle(): Promise<string> {
+    const read = (await service.sendCommandToSelection(
+      "isolated-chromium",
+      "run-1",
+      "Runtime.evaluate",
+      { expression: "document.title", returnByValue: true },
+    )) as { result?: { result?: { value?: string } } };
+    return read.result?.result?.value ?? "";
+  }
+
+  it("opens a page the same run can then navigate", { timeout: BROWSER_CASE_BUDGET_MS }, async () => {
     const adapter = createWebuiBrowserToolAdapter({ browser: service });
     const context = { sessionId: "run-1" } as never;
 
@@ -498,7 +658,12 @@ describe.skipIf(!available)("the Agent opening a tab of a real isolated Chromium
     );
 
     await adapter.execute(context, "navigate", { url: pageUrl("driven by the agent") });
-    await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+    // The wait is for the page to be the one the run navigated rather than
+    // for a fixed span of time after the navigation was asked for.
+    await waitFor(
+      async () => (await readSelectionTitle()) === "driven by the agent",
+      "the navigated page to load",
+    );
 
     // The page behind the tab is the one the run navigated.
     const read = (await service.sendCommandToSelection(
@@ -587,11 +752,6 @@ describe.skipIf(!available)("the web tab's toolbar, on a real page", () => {
     await webuiBrowserToolbarRun({ send: sendCommand, target, command });
   }
 
-  /** How long a page is given to settle after a move. */
-  async function settle(): Promise<void> {
-    await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
-  }
-
   /** The tab's current identity, as the runtime's web-tab snapshot publishes it. */
   async function currentTab(target: WebuiBrowserTargetId): Promise<WebuiBrowserTargetId> {
     const list = await service.listTargets("isolated-chromium");
@@ -611,7 +771,7 @@ describe.skipIf(!available)("the web tab's toolbar, on a real page", () => {
     return typeof read?.result?.value === "string" ? read.result.value : "";
   }
 
-  it("walks a real page's history and re-reads it", async () => {
+  it("walks a real page's history and re-reads it", { timeout: BROWSER_CASE_BUDGET_MS }, async () => {
     // The person's launcher opens the page, which gives the tab something to
     // show and something to go back to. No run is in view here, so the page is
     // recorded in the panel's own cell.
@@ -621,7 +781,13 @@ describe.skipIf(!available)("the web tab's toolbar, on a real page", () => {
       undefined,
       "person",
     );
-    await settle();
+    // Each wait below is for the page to be where this case says it is, so a
+    // navigation that did not happen fails the case at the wait and with the
+    // state it was waiting for named — not after a fixed pause.
+    await waitFor(
+      async () => (await readTitle(opened.target)) === "toolbar one",
+      "the first page to load",
+    );
     let tab = await currentTab(opened.target);
 
     // The page moves: the Agent's `navigate`, sent through the same operation
@@ -632,39 +798,65 @@ describe.skipIf(!available)("the web tab's toolbar, on a real page", () => {
       params: { url: pageUrl("toolbar two") },
       target: tab,
     });
-    await settle();
+    await waitFor(
+      async () => (await readTitle(tab)) === "toolbar two",
+      "the second page to load",
+    );
     tab = await currentTab(tab);
     expect(await readTitle(tab)).toBe("toolbar two");
 
     // Back lands on the page it came from.
     await pressToolbar(tab, "back");
-    await settle();
+    await waitFor(
+      async () => (await readTitle(tab)) === "toolbar one",
+      "the back navigation to land",
+    );
     const afterBack = await currentTab(tab);
     expect(await readTitle(afterBack)).toBe("toolbar one");
 
     // Forward lands on the one it left.
     await pressToolbar(afterBack, "forward");
-    await settle();
+    await waitFor(
+      async () => (await readTitle(tab)) === "toolbar two",
+      "the forward navigation to land",
+    );
     const afterForward = await currentTab(afterBack);
     expect(await readTitle(afterForward)).toBe("toolbar two");
 
     // Reload re-reads the page it is on, and the title follows the page rather
-    // than the press: it is still the page the tab holds.
+    // than the press: it is still the page the tab holds. The wait is for the
+    // page's generation to move, because that is what says the document was
+    // read again — the title alone cannot tell a reload from the page before
+    // it.
+    const beforeReload = afterForward.generation;
     await pressToolbar(afterForward, "reload");
-    await settle();
+    await waitFor(
+      async () => (await currentTab(afterForward)).generation > beforeReload,
+      "the reload to read the page again",
+    );
+    // The generation moves when the navigation starts, and the document is
+    // read again after it, so the title is waited for as well: read in
+    // between, it is the title of the document being replaced.
+    await waitFor(
+      async () => (await readTitle(afterForward)) === "toolbar two",
+      "the reloaded page to show its title",
+    );
     const afterReload = await currentTab(afterForward);
     expect(afterReload.targetId).toBe(afterForward.targetId);
     expect(await readTitle(afterReload)).toBe("toolbar two");
   });
 
-  it("follows the page's generation, so a reference recorded before a move is refused", async () => {
+  it("follows the page's generation, so a reference recorded before a move is refused", { timeout: BROWSER_CASE_BUDGET_MS }, async () => {
     const opened = await service.openWebTab(
       undefined,
       { url: pageUrl("generation one") },
       undefined,
       "person",
     );
-    await settle();
+    await waitFor(
+      async () => (await readTitle(opened.target)) === "generation one",
+      "the first page to load",
+    );
     const recorded = await currentTab(opened.target);
 
     await sendCommand({
@@ -673,7 +865,12 @@ describe.skipIf(!available)("the web tab's toolbar, on a real page", () => {
       params: { url: pageUrl("generation two") },
       target: recorded,
     });
-    await settle();
+    // The move has to have landed before the reference can be stale, so the
+    // wait is for the page's generation to advance rather than for a pause.
+    await waitFor(
+      async () => (await currentTab(recorded)).generation > recorded.generation,
+      "the navigation to replace the page",
+    );
 
     // The move advanced the page, so the reference the toolbar was holding is
     // stale and is refused rather than answered against the page that moved.
@@ -686,18 +883,31 @@ describe.skipIf(!available)("the web tab's toolbar, on a real page", () => {
     const current = await currentTab(recorded);
     expect(current.generation).toBeGreaterThan(recorded.generation);
     await pressToolbar(current, "reload");
-    await settle();
+    await waitFor(
+      async () => (await currentTab(current)).generation > current.generation,
+      "the reload to read the page again",
+    );
+    // The generation moves when the navigation starts, so the title is
+    // waited for as well: read in between, it is the title of the document
+    // being replaced.
+    await waitFor(
+      async () => (await readTitle(current)) === "generation two",
+      "the reloaded page to show its title",
+    );
     expect(await readTitle(current)).toBe("generation two");
   });
 
-  it("refuses a move the page's history cannot make, with the provider's own code", async () => {
+  it("refuses a move the page's history cannot make, with the provider's own code", { timeout: BROWSER_CASE_BUDGET_MS }, async () => {
     const opened = await service.openWebTab(
       undefined,
       { url: pageUrl("nowhere to go") },
       undefined,
       "person",
     );
-    await settle();
+    await waitFor(
+      async () => (await readTitle(opened.target)) === "nowhere to go",
+      "the page to load",
+    );
     const tab = await currentTab(opened.target);
     const before = await readTitle(tab);
 
@@ -761,10 +971,6 @@ describe.skipIf(!available)("the run's selection and the tab in front, on a real
     await service?.close();
     if (dataDir) await rm(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
-
-  async function settle(): Promise<void> {
-    await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
-  }
 
   /** The tab's current identity, as the runtime's target list publishes it. */
   async function currentTab(target: WebuiBrowserTargetId): Promise<WebuiBrowserTargetId> {
@@ -851,6 +1057,13 @@ describe.skipIf(!available)("the run's selection and the tab in front, on a real
       if (!validated.ok) throw new Error(validated.message);
       await entry.handle({ requestId: "person" }, validated.body);
     }
+    // The text is waited for as the value it is, not as "the page changed":
+    // the browser delivers the keystrokes to the page on its own schedule, so
+    // a read taken right after the send can still see the field as it was.
+    await waitFor(
+      async () => (await readField(page)) === text,
+      `the field to hold ${JSON.stringify(text)}`,
+    );
   }
 
   /** The Agent's own action on whatever page its run has selected. */
@@ -864,10 +1077,13 @@ describe.skipIf(!available)("the run's selection and the tab in front, on a real
     return (answered as { result?: { result?: { value?: unknown } } }).result?.result?.value;
   }
 
-  it("keeps the Agent's page and the person's page apart while both are in use", async () => {
+  it("keeps the Agent's page and the person's page apart while both are in use", { timeout: BROWSER_CASE_BUDGET_MS }, async () => {
     // The Agent opens its page: its run's selection is the page it opened.
     const opened = await service.openWebTab("run-1", { url: pageUrl("agent page") });
-    await settle();
+    await waitFor(
+      async () => (await evaluate(opened.target, "document.title")) === "agent page",
+      "the Agent's page to load",
+    );
     const agentPage = await currentTab(opened.target);
     expect(await runSelection()).toBe(agentPage.targetId);
 
@@ -879,7 +1095,10 @@ describe.skipIf(!available)("the run's selection and the tab in front, on a real
       undefined,
       "person",
     );
-    await settle();
+    await waitFor(
+      async () => (await evaluate(personOpened.target, "document.title")) === "person page",
+      "the person's page to load",
+    );
     const personPage = await currentTab(personOpened.target);
     expect(personPage.targetId).not.toBe(agentPage.targetId);
     expect(await runSelection()).toBe(agentPage.targetId);
@@ -887,8 +1106,18 @@ describe.skipIf(!available)("the run's selection and the tab in front, on a real
     // The Agent acts on its own page, and the person types on theirs. Neither
     // gesture is aimed at the other's page, and each page ends up with its own.
     await agentRuns("document.title = 'agent acted'");
+    await waitFor(
+      async () => (await evaluate(agentPage, "document.title")) === "agent acted",
+      "the Agent's title to land on the Agent's page",
+    );
     await personTypes(personPage, "person typed");
-    await settle();
+    // The page's own script rewrites its title from the text it received, so
+    // the title is the browser saying the input reached this page — which is
+    // what the wait is for.
+    await waitFor(
+      async () => (await evaluate(personPage, "document.title")) === "text:person typed",
+      "the typed text to reach the person's page",
+    );
 
     expect(await evaluate(agentPage, "document.title")).toBe("agent acted");
     expect(await readField(agentPage)).toBe("");
@@ -901,7 +1130,7 @@ describe.skipIf(!available)("the run's selection and the tab in front, on a real
     expect(await runSelection()).toBe(agentPage.targetId);
   });
 
-  it("delivers both on one page, and refuses a stale input rather than dropping it", async () => {
+  it("delivers both on one page, and refuses a stale input rather than dropping it", { timeout: BROWSER_CASE_BUDGET_MS }, async () => {
     // A second run, which has selected nothing. The page the person opens is
     // therefore bootstrapped into its selection — the one write that crosses from
     // the client's cell to the runtime's, and it is decided here by the runtime.
@@ -911,15 +1140,29 @@ describe.skipIf(!available)("the run's selection and the tab in front, on a real
       undefined,
       "person",
     );
-    await settle();
+    await waitFor(
+      async () => (await evaluate(opened.target, "document.title")) === "shared page",
+      "the shared page to load",
+    );
     const shared = await currentTab(opened.target);
     expect(await runSelection("run-2")).toBe(shared.targetId);
 
     // The person types on that page and the Agent acts on the same page. Neither
     // is a cancel of the other: both land, and both are visible in the page.
     await personTypes(shared, "both delivered", "run-2");
+    // The page's own script rewrites its title from the text it received, and
+    // that rewrite is the browser's own answer to the input. It is waited for
+    // before the Agent writes the title, so the two writes cannot land in the
+    // other order and leave the page showing the wrong title.
+    await waitFor(
+      async () => (await evaluate(shared, "document.title")) === "text:both delivered",
+      "the typed text to reach the shared page",
+    );
     await agentRuns("document.title = 'agent acted'", "run-2");
-    await settle();
+    await waitFor(
+      async () => (await evaluate(shared, "document.title")) === "agent acted",
+      "the Agent's title to land on the shared page",
+    );
     expect(await readField(shared)).toBe("both delivered");
     expect(await evaluate(shared, "document.title")).toBe("agent acted");
 
@@ -929,7 +1172,12 @@ describe.skipIf(!available)("the run's selection and the tab in front, on a real
     // fence and a lost character.
     const recorded = await currentTab(shared);
     await evaluate(recorded, "location.href = 'about:blank'");
-    await settle();
+    // The input below is stale only once the move has landed, so the wait is
+    // for the page's generation to advance rather than for a pause.
+    await waitFor(
+      async () => (await currentTab(recorded)).generation > recorded.generation,
+      "the page to move",
+    );
     const late = prepareWebuiBrowserInputCommand(recorded, { kind: "text", text: "too late" });
     expect(late).toMatchObject({ ok: true });
     if (!late.ok) return;
