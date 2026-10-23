@@ -2843,6 +2843,7 @@
     "packages/local-runtime/test/unit/content-safety-api-v2.test.ts",
     "packages/local-runtime/test/unit/content-safety-turn-v2.test.ts",
     "packages/local-runtime/test/unit/cron/once-time.test.ts",
+    "packages/local-runtime/test/unit/diff-capture-symlink-containment.test.ts",
     "packages/local-runtime/test/unit/diff-mutation-precheck.test.ts",
     "packages/local-runtime/test/unit/diff-mutation-symlink-containment.test.ts",
     "packages/local-runtime/test/unit/error-reporting-privacy.test.ts",

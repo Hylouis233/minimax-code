@@ -838,11 +838,53 @@ function normalizeCapturePath(workspaceDir: string, filePath: string): string | 
   return relative;
 }
 
+/**
+ * The absolute path the capture layer may read, or `undefined` when the path
+ * is not one the capture layer handles at all.
+ *
+ * The result is a *lexical* answer: the path is inside the workspace as a
+ * string. Whether it is inside the workspace as a file is decided by
+ * `isCapturedPathInsideWorkspace`, which the caller has to ask before it
+ * reads anything.
+ */
 function safeCapturedPath(workspaceDir: string, filePath: string): string | undefined {
   const normalized = normalizeCapturePath(workspaceDir, filePath);
   if (!normalized) return undefined;
   if (path.isAbsolute(normalized) || path.win32.isAbsolute(normalized)) return normalized;
   return path.resolve(workspaceDir, normalized);
+}
+
+/**
+ * Whether `absolute` really lives inside the workspace.
+ *
+ * Containment is decided on the *real* paths, not on the strings: a path
+ * inside the workspace whose final component — or one of its parent
+ * directories — is a symlink pointing outside it is inside the workspace as
+ * a string and outside it as a file, and `fs.stat`/`fs.open` follow the
+ * link. Reading such a path would put the content of a file outside the
+ * workspace into the turn-diff record, and from there into the database and
+ * into the WebUI review panel.
+ *
+ * The check is the read-side twin of the one the mutation does before it
+ * writes (`resolveMutationTargetPath`): the real path of the target is
+ * compared with the real path of the workspace root, so a workspace that is
+ * itself reached through a symlink still contains its own files, and a
+ * target that cannot be resolved at all is refused rather than guessed at.
+ *
+ * Known boundary (unchanged by this check): the real path is resolved
+ * before the read, so a symlink swapped between the check and the read is
+ * still a race. Closing that needs a read that cannot follow a link
+ * (`O_NOFOLLOW`), which is a larger change than this refusal.
+ */
+async function isCapturedPathInsideWorkspace(
+  workspaceDir: string,
+  absolute: string,
+): Promise<boolean> {
+  const realRoot = await resolveRealPath(path.resolve(workspaceDir));
+  if (!realRoot) return false;
+  const realTarget = await resolveRealPath(absolute);
+  if (!realTarget) return false;
+  return isInsideDirectory(realRoot, realTarget);
 }
 
 async function snapshotCapturedFile(
@@ -852,6 +894,13 @@ async function snapshotCapturedFile(
 ): Promise<LocalTurnDiffSnapshotEntry> {
   const normalized = normalizeCapturePath(workspaceDir, filePath);
   if (!normalized) return { file: filePath, exists: false };
+  /* An *absolute* normalized path is the capture layer's deliberate record
+   * of a write that landed outside the workspace: `normalizeCapturePath`
+   * hands the absolute path back for those, and they keep their existing
+   * behaviour. A workspace-relative path is the one that has to be
+   * re-checked by real path below — it only *looks* contained, and a
+   * symlink inside it can point anywhere. */
+  const outsideWorkspace = path.isAbsolute(normalized) || path.win32.isAbsolute(normalized);
   const absolute = safeCapturedPath(workspaceDir, normalized);
   if (!absolute) return { file: normalized, exists: false };
   try {
@@ -863,6 +912,15 @@ async function snapshotCapturedFile(
       hash: metadataSnapshotHash(stats),
       sizeBytes: stats.size,
     };
+    if (!outsideWorkspace && !(await isCapturedPathInsideWorkspace(workspaceDir, absolute))) {
+      /* The path is inside the workspace as a string and outside it as a
+       * file: a symlink. Record that something is there — the turn did
+       * touch it — but never its content. `oversized` is the marker the
+       * rest of this layer already reads as "no content was captured", so
+       * the snapshot is not restorable either, which is what we want: the
+       * mutation refuses such a target anyway. */
+      return { ...metadataEntry, oversized: true };
+    }
     if (stats.size > MAX_TEXT_SNAPSHOT_BYTES) return { ...metadataEntry, oversized: true };
     if (budget && stats.size > budget.remainingTextBytes) {
       return { ...metadataEntry, oversized: true };
