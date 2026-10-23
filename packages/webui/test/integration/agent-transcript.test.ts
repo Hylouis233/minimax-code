@@ -13,6 +13,33 @@ const MODEL_ID = "stub-model";
 const PROVIDER_NAME = "stub";
 const PROVIDER_ID = `custom_provider:${PROVIDER_NAME}`;
 
+/**
+ * The deadline for a wait whose completion depends on the browser client
+ * booting and rendering the page, not on the runtime's own work.
+ *
+ * The client boots by asking the host for its version and rendering the shell
+ * when the answer arrives, and that request carries the wire's own 30s
+ * deadline (`DEFAULT_REQUEST_TIMEOUT_MS` in `platform/wire.ts`): past it the
+ * client renders the startup fallback instead of the shell, so no shell can
+ * arrive later than this. The deadline is therefore the product's own
+ * tolerance — a case that waits to it and still sees no composer has learned
+ * that the client did not boot, which is the product's failure to report and
+ * not this gate's to paper over.
+ *
+ * The default 5s is shorter than that on a loaded runner. The macOS CI run of
+ * the whole 213-file webui group measured this file's case at 26.7s with the
+ * shell still not up when the default deadline expired, against 12.0s for the
+ * same case on ubuntu; the group itself measured 160.9s on macOS against
+ * 76.9s on ubuntu. 30s is also the budget the sibling real-browser gates in
+ * this directory already give (`browser-panel-live-navigation.test.ts`,
+ * `workspace-browser-tab-acceptance.test.ts`), and it leaves this case's own
+ * 120s budget enough for the rest of the case: about 21.6s of setup ran
+ * before this wait on that macOS run and the rest of the case needs about 25s
+ * at the same ratio, so a wait that runs to its deadline still ends the case
+ * around 77s — the budget is never the thing that catches the failure.
+ */
+const FIRST_SCREEN_TIMEOUT_MS = 30_000;
+
 function frame(delta: Record<string, unknown>, finishReason: string | null = null) {
   return `data: ${JSON.stringify({
     id: "chatcmpl-agent-transcript",
@@ -204,9 +231,13 @@ it("a real agent turn resumes after refresh and drains a queued message in order
     });
     const url = `http://127.0.0.1:${info.tcpPort}/?token=${info.credential.token}#session=${sessionId}`;
     await page.goto(url);
-    await browserExpect(page.locator("#webui-root")).toBeVisible();
+    // The first screen is the composer, not the mount node: `#webui-root` is an
+    // empty div until React commits, so waiting for it to be "visible" only
+    // proves the client has not finished booting. The deadline is the
+    // product's own handshake deadline — see `FIRST_SCREEN_TIMEOUT_MS`.
     const composer = page.getByPlaceholder("输入消息…（输入 / 唤起命令）");
-    await browserExpect(composer).toBeVisible();
+    await browserExpect(composer).toBeVisible({ timeout: FIRST_SCREEN_TIMEOUT_MS });
+    await browserExpect(page.locator("#webui-root")).toBeVisible();
     await composer.fill("Please reason, then answer.");
     await page.getByRole("button", { name: "发送" }).click();
 
@@ -219,8 +250,13 @@ it("a real agent turn resumes after refresh and drains a queued message in order
       request.body?.content === "Send this after the active answer.")).toBe(true);
     await browserExpect(page.locator("[data-webui-queue-item]")).toHaveCount(1);
     await page.reload();
+    // The reload is a second cold start of the same client, so it waits on the
+    // same condition and with the same deadline. The transcript's first user
+    // message is part of that condition: it can only be on screen once the
+    // reloaded client has resumed the session and rendered what it read back.
+    await browserExpect(composer).toBeVisible({ timeout: FIRST_SCREEN_TIMEOUT_MS });
     await browserExpect(page.locator("#webui-root")).toBeVisible();
-    await browserExpect(page.getByText("Please reason, then answer.")).toBeVisible();
+    await browserExpect(page.getByText("Please reason, then answer.")).toBeVisible({ timeout: FIRST_SCREEN_TIMEOUT_MS });
     await browserExpect.poll(() => requests.some((request) => request.operation === "resumeSession"))
       .toBe(true);
     const resumeRequest = requests.find((request) => request.operation === "resumeSession");
