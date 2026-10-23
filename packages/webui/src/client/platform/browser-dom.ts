@@ -77,6 +77,20 @@ export interface WebuiBrowserDom {
    * confine to the platform layer.
    */
   readonly readDocumentTheme: () => "dark" | "light";
+  /**
+   * The theme the document is showing changed.
+   *
+   * Every theme transition the app makes ends as the appearance effect above
+   * flipping the `dark` class on the document element — a click in the
+   * settings modal, a `system` preference following the OS — so the
+   * subscription observes that class rather than any one writer: whoever
+   * flips it, the listener hears. A component whose drawing bakes the theme
+   * in (the transcript's Mermaid renderer) repaints on this signal instead of
+   * showing a stale palette until the next navigation. A platform with no
+   * document, or no `MutationObserver`, answers with a no-op: the listener
+   * keeps the theme it last read.
+   */
+  readonly subscribeDocumentTheme: (listener: (theme: "dark" | "light") => void) => () => void;
   readonly dispatchContextWindowUsageChange: () => void;
   readonly copyTextFallback: (text: string) => void;
   /**
@@ -176,6 +190,17 @@ export function createWebuiBrowserDom(
     },
     readDocumentTheme: () =>
       documentObject?.documentElement.classList.contains("dark") ? "dark" : "light",
+    subscribeDocumentTheme: (listener) => {
+      if (!documentObject || typeof MutationObserver === "undefined") return () => undefined;
+      const read = () =>
+        documentObject.documentElement.classList.contains("dark") ? "dark" : "light";
+      const observer = new MutationObserver(() => listener(read()));
+      observer.observe(documentObject.documentElement, {
+        attributes: true,
+        attributeFilter: ["class"],
+      });
+      return () => observer.disconnect();
+    },
     dispatchContextWindowUsageChange: () => {
       if (windowObject) windowObject.dispatchEvent(new Event("webui-context-window-usage-change"));
     },
