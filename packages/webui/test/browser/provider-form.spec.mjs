@@ -102,6 +102,43 @@ async function fillNewProvider(page, dialog) {
   await dialog.getByLabel("模型名称").fill("draft-model");
 }
 
+/**
+ * Records what the provider picker's popup carried, in the page.
+ *
+ * The exit animation is a 120ms window: the popup starts leaving, the
+ * stylesheet fades it out, and the skeleton unmounts it when the fade is
+ * over. A reading taken across the wire can arrive after that unmount — and a
+ * popup that is no longer in the document has no computed style to read, so
+ * the reading comes back empty and the test fails on a state it never saw.
+ * It can also arrive before the popup has started leaving, which reads as
+ * the entrance animation.
+ *
+ * So the reading is taken where the state changes: the page watches the
+ * popup's own class and records the popup's computed animation-name at the
+ * moment that class changes. The record outlives the popup, so the test can
+ * read it whenever it gets there, and it cannot miss the window.
+ */
+async function recordProviderPickerMotion(page) {
+  await page.evaluate(() => {
+    const selector = '[role="listbox"][aria-label="提供商列表"]';
+    window.__webuiProviderPickerMotion = [];
+    new MutationObserver((records) => {
+      for (const record of records) {
+        const node = record.target;
+        if (!(node instanceof Element) || !node.matches(selector)) continue;
+        window.__webuiProviderPickerMotion.push({
+          leaving: node.classList.contains("is-leaving"),
+          animationName: getComputedStyle(node).animationName,
+        });
+      }
+    }).observe(document.documentElement, {
+      attributes: true,
+      subtree: true,
+      attributeFilter: ["class"],
+    });
+  });
+}
+
 test("the custom tab lists the saved provider and its model row", async ({ page }) => {
   await configureFixture(page, seedProviderSurface);
   await openCustomModels(page);
@@ -180,12 +217,18 @@ test.describe("with motion allowed", () => {
     // opens and closes the same way.
     expect(await listbox.evaluate((node) => getComputedStyle(node).animationName)).toBe("webui-dropdown-in");
 
+    // The recorder is in place before the press, so what it records is this
+    // press's leaving.
+    await recordProviderPickerMotion(page);
     await page.mouse.click(6, 6);
+
     // While it is fading out it is still mounted, and it carries the exit
-    // animation rather than the entrance one.
+    // animation rather than the entrance one. The reading is the one the page
+    // took at the moment the popup started leaving — not a sample of a popup
+    // that has already been unmounted.
     await expect
-      .poll(() => listbox.evaluate((node) => getComputedStyle(node).animationName).catch(() => "gone"))
-      .toBe("webui-dropdown-out");
+      .poll(() => page.evaluate(() => (window.__webuiProviderPickerMotion ?? []).find((entry) => entry.leaving) ?? null))
+      .toEqual({ leaving: true, animationName: "webui-dropdown-out" });
     await expect(listbox).toHaveCount(0);
   });
 });
