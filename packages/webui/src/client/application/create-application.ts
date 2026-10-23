@@ -579,7 +579,18 @@ export function createWebuiApplication(
           dirtyResources.delete(sessionId);
           reconcileSession(sessionId);
           turnCommandsFor(sessionId).recover();
+          // The queue is a projection of events this channel could have missed:
+          // an item that drained while the channel was down leaves a stale row
+          // behind, and the authoritative read is what clears it.
+          composerController?.refreshQueue(sessionId);
         }
+        // The transcript is the same story: the events that would have said a
+        // turn started were missed, and a turn that ran and settled in that
+        // window is in no probe's answer. The head page is the authoritative
+        // read of what the session holds, and the view that presents it is the
+        // one that reads it.
+        const presented = store.getSelectedSessionId();
+        if (presented) void transcriptHistory.refreshPage(presented);
         notify(channelReadyListeners, undefined);
       },
       // The one writer of the working tree tells the reader of it, and the link
