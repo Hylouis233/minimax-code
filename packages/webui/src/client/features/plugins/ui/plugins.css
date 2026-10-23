@@ -698,6 +698,7 @@
   }
   .webui-agent-form-actions {
     display: flex;
+    grid-column: 1 / -1;
     justify-content: flex-end;
     gap: 12px;
     margin-top: 22px;
@@ -728,9 +729,18 @@
     background: transparent;
     color: var(--text_label_danger_secondary_default);
   }
+  .webui-agent-form textarea {
+    min-height: 180px;
+  }
+  .webui-skill-form textarea {
+    min-height: 240px;
+  }
   .webui-plugin-backdrop {
+    box-sizing: border-box;
     position: fixed;
     inset: 0;
+    width: 100vw;
+    height: 100vh;
     z-index: 120;
     display: flex;
     align-items: center;
@@ -739,8 +749,11 @@
     padding: 24px;
   }
   .webui-plugin-dialog {
+    box-sizing: border-box;
     display: flex;
     width: min(800px, calc(100vw - 32px));
+    min-width: 0;
+    max-width: calc(100vw - 32px);
     max-height: min(690px, calc(100vh - 48px));
     flex-direction: column;
     overflow: hidden;
@@ -776,6 +789,9 @@
     gap: 16px 20px;
     overflow: auto;
     padding: 24px 30px;
+  }
+  .webui-plugin-form label.wide {
+    grid-column: 1 / -1;
   }
   .webui-plugin-form label {
     display: flex;
@@ -825,7 +841,10 @@
     opacity: 0.48;
   }
   .webui-mcp-dialog {
+    box-sizing: border-box;
     width: min(800px, calc(100vw - 32px));
+    min-width: 0;
+    max-width: calc(100vw - 32px);
     height: min(690px, calc(100vh - 32px));
     max-height: min(690px, calc(100vh - 32px));
     border-radius: 18px;
@@ -857,12 +876,80 @@
     padding: 0 10px;
     border-radius: 8px;
   }
+  .webui-mcp-mode {
+    display: inline-flex;
+    align-self: flex-start;
+    gap: 3px;
+    border-radius: 10px;
+    background: var(--bg_grouped_secondary);
+    padding: 3px;
+  }
+  .webui-mcp-mode button {
+    min-height: 36px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    padding: 0 12px;
+    color: var(--text_default_secondary);
+  }
+  .webui-mcp-mode button[aria-pressed="true"] {
+    background: var(--bg_default_primary);
+    color: var(--text_default_primary);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 12%);
+  }
   .webui-mcp-form {
+    display: flex;
     min-height: 0;
     flex: 1 1 auto;
+    flex-direction: column;
+    overflow: auto;
     gap: 16px 20px;
     scrollbar-gutter: stable;
     padding: 24px 30px;
+  }
+  .webui-mcp-form-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 16px 20px;
+  }
+  .webui-mcp-form label {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 7px;
+    color: var(--text_default_secondary);
+    font-size: 13px;
+  }
+  .webui-mcp-form label input:not([type="checkbox"]),
+  .webui-mcp-form label select,
+  .webui-mcp-form label textarea,
+  .webui-mcp-form > textarea {
+    box-sizing: border-box;
+    width: 100%;
+    border: 1px solid var(--border_default);
+    border-radius: 9px;
+    background: var(--bg_default_primary);
+    padding: 9px 12px;
+    color: var(--text_default_primary);
+    font: inherit;
+  }
+  .webui-mcp-form label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    align-self: flex-start;
+  }
+  .webui-mcp-form-fields > button {
+    min-height: 40px;
+    border: 1px solid var(--border_default);
+    border-radius: 9px;
+    justify-self: start;
+    background: var(--bg_grouped_secondary);
+    padding: 0 14px;
+    color: var(--text_default_primary);
+  }
+  .webui-mcp-form .webui-agent-form-actions {
+    margin-top: auto;
   }
   .webui-mcp-form > label {
     font-size: 13px;
@@ -930,6 +1017,9 @@
     }
     .webui-mcp-form {
       padding: 18px 20px;
+    }
+    .webui-mcp-form-fields {
+      grid-template-columns: 1fr;
     }
     .webui-mcp-dialog footer {
       padding: 14px 20px 18px;

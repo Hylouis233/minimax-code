@@ -153,7 +153,7 @@ export function PluginManagementList({
                   </span>
                   {row.mcpStatus.reason ? (
                     <small
-                      className="text-size_12 text-text_default_tertiary"
+                      className="text-size_12 text-text_default_secondary"
                       data-webui-mcp-status-reason={row.mcpStatus.key}
                       title={row.mcpStatus.reason}
                     >

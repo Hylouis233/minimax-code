@@ -10,7 +10,7 @@
 // session that ends and leaves a page behind leaves a browser nobody can
 // switch off.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { WebuiBrowserService } from "../../src/runtime/browser/browser-service.js";
 import { createHarnessPortFromHost } from "../../src/runtime/harness/adapter.js";
@@ -31,6 +31,7 @@ class RecordingProvider implements WebuiBrowserSurfaceProvider {
   readonly surface = "isolated-chromium" as const;
   readonly browserId = "browser-1";
   readonly commands: { command: string; params: Record<string, unknown> }[] = [];
+  readonly startedStreams: string[] = [];
   readonly stoppedStreams: string[] = [];
   /** The pages this browser has, in the order they were opened. */
   readonly openedTabs: string[] = [];
@@ -78,7 +79,12 @@ class RecordingProvider implements WebuiBrowserSurfaceProvider {
     targetId: string,
     onFrame: (frame: WebuiBrowserImageFrame) => void,
   ): Promise<void> {
+    this.startedStreams.push(targetId);
     this.frameHandlers.set(targetId, onFrame);
+  }
+
+  frameHandlerFor(targetId: string): ((frame: WebuiBrowserImageFrame) => void) | undefined {
+    return this.frameHandlers.get(targetId);
   }
 
   async stopImageStream(targetId: string): Promise<void> {
@@ -251,16 +257,18 @@ describe("a session's pages are released when the session ends", () => {
         frames.push(frame);
       }
     })();
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await vi.waitFor(() => expect(provider.startedStreams).toContain(opened.targetId));
+    const lateFrame = provider.frameHandlerFor(opened.targetId);
+    expect(lateFrame).toBeTypeOf("function");
 
     await port.deleteSession({ id: SESSION });
-    await new Promise((resolve) => setTimeout(resolve, 50));
 
     // The screencast for the released page is stopped rather than left
     // running for a page that no longer exists.
     expect(provider.stoppedStreams).toContain(opened.targetId);
-    // And a frame for a page that is gone is dropped rather than delivered.
-    provider.commands.push({ command: "noop", params: {} });
+    // A provider callback that was already in flight at release cannot
+    // reintroduce a frame for the target after the registry forgets it.
+    lateFrame?.({ target: opened, data: "AAAA", format: "png", sequence: 1 });
     expect(frames).toHaveLength(0);
     controller.abort();
     await stream.catch(() => undefined);

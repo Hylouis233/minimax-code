@@ -42,32 +42,40 @@ export function PluginItemDialog({
 }: PluginItemDialogProps): ReactElement {
   return (
     <div
-      className={`webui-plugin-dialog${dialog === "mcp" ? " webui-mcp-dialog" : ""}`}
-      role="dialog"
-      aria-label={TITLE[dialog]}
+      className="webui-plugin-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
     >
-      <header className="webui-plugin-dialog-header">
-        <strong>
-          {editing ? `编辑${TITLE[dialog]}` : `添加${TITLE[dialog]}`}
-        </strong>
-        <p>
-          {dialog === "mcp"
-            ? "配置 MiniMax Code 如何连接到这个 server"
-            : "配置 MiniMax Code 如何连接到该项"}
-        </p>
-      </header>
-      {dialog === "mcp" ? (
-        <McpServerForm editing={editing} onSubmit={onSubmit} onClose={onClose} />
-      ) : dialog === "agent" ? (
-        <AgentForm
-          editing={editing}
-          onSubmit={onSubmit}
-          {...(onChatWithAgent ? { onChatWithAgent } : {})}
-          onClose={onClose}
-        />
-      ) : (
-        <SkillForm onSubmit={onSubmit} onClose={onClose} />
-      )}
+      <div
+        className={`webui-plugin-dialog${dialog === "mcp" ? " webui-mcp-dialog" : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={TITLE[dialog]}
+      >
+        <header className="webui-plugin-dialog-header">
+          <strong>
+            {editing ? `编辑${TITLE[dialog]}` : `添加${TITLE[dialog]}`}
+          </strong>
+          <p>
+            {dialog === "mcp"
+              ? "配置 MiniMax Code 如何连接到这个 server"
+              : "配置 MiniMax Code 如何连接到该项"}
+          </p>
+        </header>
+        {dialog === "mcp" ? (
+          <McpServerForm editing={editing} onSubmit={onSubmit} onClose={onClose} />
+        ) : dialog === "agent" ? (
+          <AgentForm
+            editing={editing}
+            onSubmit={onSubmit}
+            {...(onChatWithAgent ? { onChatWithAgent } : {})}
+            onClose={onClose}
+          />
+        ) : (
+          <SkillForm onSubmit={onSubmit} onClose={onClose} />
+        )}
+      </div>
     </div>
   );
 }

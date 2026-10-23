@@ -11,7 +11,7 @@
 //
 // The composer's field contract is in packages/webui/docs/client.md.
 
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -67,6 +67,30 @@ test("typing / opens the slash palette; filtering and Escape behave", async ({ p
   await input.press("Escape");
   await expect(commandMenu(page)).toHaveCount(0);
   await expect(input).toHaveValue("");
+});
+
+test("/compact from the slash palette reaches the runtime with its instruction", async ({ page }) => {
+  await openApp(page, "#session=A");
+
+  const input = composer(page);
+  await input.fill("/comp");
+  const compact = commandMenu(page).getByRole("option", { name: /压缩/ });
+  await expect(compact).toBeVisible();
+  await compact.click();
+  await input.pressSequentially(" preserve code changes");
+  await input.press("Enter");
+
+  await expect.poll(() => page.evaluate(() => window.__fixture.requests.filter(
+    (request) => request.operation === "runCommand",
+  ))).toHaveLength(1);
+  const run = await page.evaluate(() => window.__fixture.requests.find(
+    (request) => request.operation === "runCommand",
+  ));
+  expect(run.body).toMatchObject({
+    command: "compact",
+    input: "preserve code changes",
+    sessionId: "A",
+  });
 });
 
 test("the composer's popups are placed by the shared layer, inside the viewport", async ({ page }) => {
@@ -229,6 +253,13 @@ test("history is per session — B's submissions do not leak into A", async ({ p
   await input.click();
   await input.press("ArrowUp");
   await expect(input).toHaveValue("");
+
+  // The negative result is meaningful only if the owning session still has
+  // its own entry to recall.
+  await switchSession(page, "B");
+  await input.click();
+  await input.press("ArrowUp");
+  await expect(input).toHaveValue("message in B");
 });
 
 test("attaching a file and an image renders chips that can be removed", async ({ page }) => {
@@ -260,18 +291,22 @@ test("the directory input accepts a folder selection and renders its chips", asy
   // in tmp. Chips are named by webkitRelativePath, which prefixes the chosen
   // directory's own name — hence substring assertions.
   const folder = mkdtempSync(path.join(tmpdir(), "webui-folder-"));
-  mkdirSync(path.join(folder, "src"));
-  writeFileSync(path.join(folder, "root.txt"), "root");
-  writeFileSync(path.join(folder, "src", "main.ts"), "export {};\n");
-  const folderInput = page.locator('input.webui-composer-hidden-file-input[aria-label="添加本地文件夹"]');
-  await folderInput.setInputFiles(folder);
-  const chips = page.locator('[data-webui-composer-attachments="true"]');
-  await expect(chips).toBeVisible();
-  await expect(chips.getByText("root.txt")).toBeVisible();
-  await expect(chips.getByText("main.ts")).toBeVisible();
-  await chips.getByRole("button", { name: /移除/ }).first().click();
-  await expect(chips.getByText("root.txt")).toHaveCount(0);
-  await expect(chips.getByText("main.ts")).toBeVisible();
+  try {
+    mkdirSync(path.join(folder, "src"));
+    writeFileSync(path.join(folder, "root.txt"), "root");
+    writeFileSync(path.join(folder, "src", "main.ts"), "export {};\n");
+    const folderInput = page.locator('input.webui-composer-hidden-file-input[aria-label="添加本地文件夹"]');
+    await folderInput.setInputFiles(folder);
+    const chips = page.locator('[data-webui-composer-attachments="true"]');
+    await expect(chips).toBeVisible();
+    await expect(chips.getByText("root.txt")).toBeVisible();
+    await expect(chips.getByText("main.ts")).toBeVisible();
+    await chips.getByRole("button", { name: /移除/ }).first().click();
+    await expect(chips.getByText("root.txt")).toHaveCount(0);
+    await expect(chips.getByText("main.ts")).toBeVisible();
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
 });
 
 test("@ opens the mention menu and the local-file picker entry drives the OS chooser", async ({ page }) => {
@@ -332,13 +367,10 @@ test("a submission carries the typed text to the transport", async ({ page }) =>
   await input.pressSequentially("input-to-owner-to-transport");
   await input.press("Enter");
 
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const request = window.__fixture.requests.find((entry) => entry.operation === "sendMessage");
-        return JSON.stringify(request?.body ?? {}).includes("input-to-owner-to-transport");
-      }),
-    )
-    .toBe(true);
+  await expect.poll(() =>
+    page.evaluate(() =>
+      window.__fixture.requests.find((entry) => entry.operation === "sendMessage")?.body,
+    ),
+  ).toEqual({ id: "A", content: "input-to-owner-to-transport" });
   await expect(input).toHaveValue("");
 });

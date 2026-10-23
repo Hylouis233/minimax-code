@@ -86,7 +86,7 @@ test("the rail orders sessions newest first", async ({ page }) => {
 
 test("a title substring narrows the rail to the one session", async ({ page }) => {
   await openApp(page, "#session=A");
-  await search(page, "绿川椒");
+  await search(page, "session A");
 
   // Wrong when: the rail keeps both rows, which is what a passed-but-ignored
   // query prop looks like from outside.
@@ -97,12 +97,12 @@ test("a title substring narrows the rail to the one session", async ({ page }) =
 
 test("the query ignores case", async ({ page }) => {
   await openApp(page, "#session=A");
-  // "Demo" is inside A's title; searching it upper-case exercises the
+  // "session A" is inside A's title; searching it upper-case exercises the
   // lower-casing on the *title* path. Searching the agent name instead would
   // not: `sessionLabel` prefers the title, so the agent name is only consulted
   // when there is no title, and the assertion would be wrong about what the
   // contract is.
-  await search(page, "DEMO");
+  await search(page, "SESSION A");
 
   await expect(sessionRow(page, "A")).toBeVisible();
   await expect(sessionRow(page, "B")).toHaveCount(0);
@@ -124,7 +124,7 @@ test("a query matching nothing leaves no rows behind", async ({ page }) => {
 
 test("clearing the query brings every row back", async ({ page }) => {
   await openApp(page, "#session=A");
-  await search(page, "绿川椒");
+  await search(page, "session A");
   await expect(sessionRow(page, "B")).toHaveCount(0);
 
   await searchBox(page).fill("");

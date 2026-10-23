@@ -194,7 +194,6 @@ export function WebuiClientFoundationApp(
   // provided to the screens below. The shell holds no capability to cut its own
   // and no transport to fall back to.
   const portSlices = application.portSlices;
-  const transcriptCommands = application.transcriptCommands;
   const workspacePort = portSlices.workspace;
   // The browser Terminal owner, built by the assembly for the same reason as the
   // rest: this component renders the provider that `useWebuiPortSlice` reads (see
@@ -324,6 +323,26 @@ export function WebuiClientFoundationApp(
   const selectSession = useCallback((sessionId: string | undefined) => {
     setSelectedSessionId(sessionId);
   }, []);
+  const transcriptCommandsWithForkNavigation = useMemo(() => {
+    const commands = application.transcriptCommands;
+    if (!commands.forkSession) return commands;
+    return {
+      ...commands,
+      forkSession: async (request: Parameters<NonNullable<typeof commands.forkSession>>[0]) => {
+        const result = await commands.forkSession!(request);
+        if (result.session?.sessionId) {
+          selectSession(result.session.sessionId);
+          if (typeof window !== "undefined")
+            window.history.replaceState(
+              null,
+              "",
+              `${window.location.pathname}${window.location.search}${sessionHash(result.session.sessionId)}`,
+            );
+        }
+        return result;
+      },
+    };
+  }, [application.transcriptCommands, selectSession]);
   useEffect(() => {
     application.select(selectedSessionId);
   }, [application, selectedSessionId]);
@@ -961,7 +980,7 @@ export function WebuiClientFoundationApp(
                   onOpenFile={({ sessionId, workspaceDir, reference }) => dispatchWorkspacePanel({ type: "open-file", sessionId, workspaceDir, path: reference.path, ...(reference.lineStart !== undefined ? { lineStart: reference.lineStart } : {}), ...(reference.lineEnd !== undefined ? { lineEnd: reference.lineEnd } : {}) })}
                   onOpenTurnReview={(command) => dispatchWorkspacePanel(command)}
                   {...(initialMessages ? { initialMessages } : {})}
-                  transcriptCommands={transcriptCommands}
+                  transcriptCommands={transcriptCommandsWithForkNavigation}
                   answerPlanBuild={planReviewWorkflow.answerPlanBuild}
                   onOpenPlanFile={({ sessionId: planSessionId, path, content }) => dispatchWorkspacePanel({ type: "open-plan-file", sessionId: planSessionId, workspaceDir: selectedSession?.workspaceDir ?? "", path, content })}
                 /></WebuiZoneBoundary></Transcript> : null}

@@ -35,7 +35,7 @@ export function AgentForm({
 
   const save = async () => {
     const trimmed = name.trim();
-    await onSubmit(
+    const saved = await onSubmit(
       editing
         ? {
             kind: "updateAgent",
@@ -64,10 +64,11 @@ export function AgentForm({
             },
           },
     );
+    if (saved) onClose();
   };
 
   return (
-    <div className="webui-agent-form">
+    <div className="webui-plugin-form webui-agent-form">
       <label>
         <span>名称</span>
         <input value={name} onChange={(event) => setName(event.currentTarget.value)} />
@@ -76,7 +77,7 @@ export function AgentForm({
         <span>描述</span>
         <input value={description} onChange={(event) => setDescription(event.currentTarget.value)} />
       </label>
-      <label>
+      <label className="wide">
         <span>系统提示词</span>
         <textarea value={prompt} onChange={(event) => setPrompt(event.currentTarget.value)} />
       </label>

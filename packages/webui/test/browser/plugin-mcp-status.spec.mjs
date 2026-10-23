@@ -65,14 +65,24 @@ test("a server that cannot connect is labelled 连接失败 with its own reason"
   const broken = rowOf(page, "broken-http").locator("[data-webui-mcp-status]");
   await expect(broken).toHaveText("连接失败");
   await expect(broken).toHaveAttribute("data-webui-mcp-status", "error");
-  await expect(rowOf(page, "broken-http").locator("[data-webui-mcp-status-reason]"))
-    .toHaveText("MCP_CONNECTION_TIMEOUT: 握手超时（10s）");
+  const brokenReason = rowOf(page, "broken-http").locator("[data-webui-mcp-status-reason]");
+  await expect(brokenReason).toHaveText("MCP_CONNECTION_TIMEOUT: 握手超时（10s）");
+  const secondaryText = await page.evaluate(() => {
+    const probe = document.createElement("span");
+    probe.style.color = "var(--text_default_secondary)";
+    document.body.append(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color;
+  });
+  expect(await brokenReason.evaluate((node) => getComputedStyle(node).color))
+    .toBe(secondaryText);
 
   const gone = rowOf(page, "gone-binary").locator("[data-webui-mcp-status]");
   await expect(gone).toHaveText("不可用");
   await expect(gone).toHaveAttribute("data-webui-mcp-status", "unavailable");
-  await expect(rowOf(page, "gone-binary").locator("[data-webui-mcp-status-reason]"))
-    .toHaveText("MCP_COMMAND_NOT_FOUND: ./missing-bin");
+  const goneReason = rowOf(page, "gone-binary").locator("[data-webui-mcp-status-reason]");
+  await expect(goneReason).toHaveText("MCP_COMMAND_NOT_FOUND: ./missing-bin");
 });
 
 test("the calm states are labelled too, so trouble has honest neighbours", async ({ page }) => {

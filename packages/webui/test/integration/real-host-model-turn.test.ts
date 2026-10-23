@@ -181,8 +181,8 @@ describe("real host, one turn against a controlled model service", () => {
       // dispatcher builds from a rejecting handler.
       const frame = await response;
       expect(frame.kind).toBe("error");
-      expect(typeof frame.code).toBe("string");
-      expect(String(frame.code).length).toBeGreaterThan(0);
+      expect(frame.code).toBe("local_session_not_found");
+      expect(frame.message).toBe("Session not found");
       ws.close();
     },
     120_000,

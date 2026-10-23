@@ -37,7 +37,7 @@ export function SkillForm({ onSubmit, onClose }: SkillFormProps): ReactElement {
   };
 
   return (
-    <div className="webui-skill-form">
+    <div className="webui-plugin-form webui-skill-form">
       <label>
         <span>名称</span>
         <input value={name} onChange={(event) => setName(event.currentTarget.value)} />
@@ -49,7 +49,7 @@ export function SkillForm({ onSubmit, onClose }: SkillFormProps): ReactElement {
           onChange={(event) => setDescription(event.currentTarget.value)}
         />
       </label>
-      <label>
+      <label className="wide">
         <span>内容</span>
         <textarea value={content} onChange={(event) => setContent(event.currentTarget.value)} />
       </label>

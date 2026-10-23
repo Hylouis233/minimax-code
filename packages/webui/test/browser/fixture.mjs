@@ -1,7 +1,7 @@
 export function installFixtureTransport() {
   const sessions = [
-    { id: "A", title: "绿川椒 Demo 订货小程序" },
-    { id: "B", title: "灵动岛卡住问题" },
+    { id: "A", title: "Synthetic session A" },
+    { id: "B", title: "Synthetic session B" },
   ].map(({ id, title }, index) => ({
     sessionId: id,
     agentName: `synthetic-${id}`,

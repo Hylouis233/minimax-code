@@ -7,7 +7,9 @@
 // dialog (`importPlugin` closes and clears only after `mutate` reports success).
 
 import type { ReactElement } from "react";
+import { createPortal } from "react-dom";
 
+import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { readWebuiPluginRow as read, type WebuiPluginRow as Row } from "../contracts/plugin-rows.js";
 
 export interface PluginImportDialogProps {
@@ -23,7 +25,9 @@ export interface PluginImportDialogProps {
 }
 
 export function PluginImportDialog({ url, onUrlChange, preview, error, busy, onPreview, onImport, onClose }: PluginImportDialogProps): ReactElement {
-  return (
+  const { dom } = useWebuiBrowserCapabilities();
+  const portalTarget = dom.portalTarget();
+  const dialog = (
     <div
       className="webui-plugin-backdrop"
       role="presentation"
@@ -133,4 +137,5 @@ export function PluginImportDialog({ url, onUrlChange, preview, error, busy, onP
       </section>
     </div>
   );
+  return portalTarget ? createPortal(dialog, portalTarget) : dialog;
 }

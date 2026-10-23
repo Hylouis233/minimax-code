@@ -7,6 +7,106 @@ test.beforeEach(async ({ page }) => {
   page.on("console", (message) => { if (message.type() === "error") console.error("BROWSER_CONSOLE_ERROR", message.text()); });
 });
 
+test("assistant copy and feedback controls update the selected message", async ({ page }) => {
+  await configureFixture(page, () => window.__fixture.setPage("A", {
+    messages: [{
+      msgId: "assistant-actions-synthetic",
+      role: "assistant",
+      msgContent: "Synthetic assistant copy payload",
+      timestamp: 1_700_000_000_003,
+    }],
+    hasMore: false,
+  }));
+  await page.goto("/#session=A");
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"], {
+    origin: new URL(page.url()).origin,
+  });
+
+  const actions = page.locator('[data-testid="message-actions"][data-message-id="assistant-actions-synthetic"]');
+  await expect(actions).toBeVisible();
+  await actions.getByRole("button", { name: "复制" }).click();
+  await expect(actions.getByRole("button", { name: "已复制" })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(
+    "Synthetic assistant copy payload",
+  );
+
+  const like = actions.getByRole("button", { name: "赞" });
+  const dislike = actions.getByRole("button", { name: "踩" });
+  await like.click();
+  await expect(like).toHaveAttribute("aria-pressed", "true");
+  await dislike.click();
+  await expect(like).toHaveAttribute("aria-pressed", "false");
+  await expect(dislike).toHaveAttribute("aria-pressed", "true");
+  await dislike.click();
+  await expect(dislike).toHaveAttribute("aria-pressed", "false");
+  await expect(like).toHaveAttribute("aria-pressed", "true");
+});
+
+test("assistant message fork requests the selected reply and enters the returned session", async ({ page }) => {
+  await configureFixture(page, () => {
+    window.__fixture.setPage("A", {
+      messages: [{
+        msgId: "assistant-fork-synthetic",
+        role: "assistant",
+        msgContent: "Synthetic fork source answer",
+        actions: { fork: true },
+        timestamp: 1_700_000_000_004,
+      }],
+      hasMore: false,
+    });
+    window.__fixture.setPage("synthetic-forked-session", {
+      messages: [{
+        msgId: "forked-assistant-restored",
+        role: "assistant",
+        msgContent: "Synthetic restored fork transcript",
+        timestamp: 1_700_000_000_005,
+      }],
+      hasMore: false,
+    });
+    window.__fixture.setResponse("getSessionForkOptions", {
+      canFork: true,
+      suggestedTitle: "Synthetic fork title",
+      nextForkOrdinal: 1,
+      sourceTitle: "Synthetic source",
+      worktreeVisible: false,
+      worktreeEligible: false,
+    });
+    window.__fixture.setResponse("forkSession", {
+      session: {
+        sessionId: "synthetic-forked-session",
+        agentName: "synthetic-A",
+        title: "Synthetic fork title",
+        workspaceDir: "/synthetic/workspace",
+      },
+    });
+  });
+  await page.goto("/#session=A");
+
+  const actions = page.locator('[data-testid="message-actions"][data-message-id="assistant-fork-synthetic"]');
+  await actions.getByRole("button", { name: "复制为新会话" }).click();
+  const dialog = page.getByTestId("fork-dialog");
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel("会话名称")).toHaveValue("Synthetic fork title");
+  await dialog.getByLabel("会话名称").fill("Forked from selected answer");
+  await dialog.getByRole("button", { name: "复制并进入" }).click();
+
+  await expect.poll(() => page.evaluate(() => window.__fixture.requests.filter((request) => request.operation === "forkSession"))).toHaveLength(1);
+  const request = await page.evaluate(() => window.__fixture.requests.find((item) => item.operation === "forkSession"));
+  const reply = await page.evaluate(() => window.__fixture.replies.find((item) => item.operation === "forkSession"));
+  expect(reply.body.session.sessionId).toBe("synthetic-forked-session");
+  expect(request.body).toMatchObject({
+    id: "A",
+    assistantMessageId: "assistant-fork-synthetic",
+    title: "Forked from selected answer",
+    useSuggestedTitle: false,
+    createIsolatedWorktree: false,
+  });
+  await expect(page).toHaveURL(/#session=synthetic-forked-session/);
+  const forkedTranscript = page.locator('[data-webui-transcript="synthetic-forked-session"]');
+  await expect(forkedTranscript).toBeVisible();
+  await expect(forkedTranscript.getByText("Synthetic restored fork transcript")).toBeVisible();
+});
+
 test("A history is never rendered during B's delayed first page", async ({ page }) => {
   // A session switch fans out into three concurrent `getMessages` for B
   // (transcript first page, context usage, workspace history progress).

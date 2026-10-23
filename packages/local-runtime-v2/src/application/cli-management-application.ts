@@ -342,9 +342,9 @@ async function pluginManagement(
           : {}),
       });
     case "listMcpServers":
-      return options.mcp.list(
-        typeof input.keyword === "string" ? input.keyword : undefined,
-      );
+      return options.mcp
+        .list(typeof input.keyword === "string" ? input.keyword : undefined)
+        .then((servers) => ({ servers }));
     case "getMcpServer":
       return options.mcp.get(required("name"));
     case "createMcpServer":

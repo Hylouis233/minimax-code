@@ -64,7 +64,7 @@ test("the rail's menu archives a session and the archived page takes it back", a
   await openSettings(page);
   await page.locator('[data-menu-key="archived"]').click();
   await expect(archivedPage(page)).toBeVisible();
-  await expect(archivedPage(page)).toContainText("灵动岛卡住问题");
+  await expect(archivedPage(page)).toContainText("Synthetic session B");
 
   // 3. Unarchive from that page: the same operation, the other direction.
   await archivedPage(page)
@@ -76,5 +76,5 @@ test("the rail's menu archives a session and the archived page takes it back", a
     id: "B",
     archived: false,
   });
-  await expect(archivedPage(page)).not.toContainText("灵动岛卡住问题");
+  await expect(archivedPage(page)).not.toContainText("Synthetic session B");
 });

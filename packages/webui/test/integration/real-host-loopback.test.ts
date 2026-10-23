@@ -37,6 +37,7 @@ import {
   createOperationRegistry,
 } from "../../src/server/index.js";
 import { WEBUI_PROTOCOL_VERSION } from "../../src/shared/envelope.js";
+import { decodeWebuiOperationResult } from "../../src/shared/operation-codecs.js";
 import { removeRealHostDataDir } from "./remove-real-host-data-dir.js";
 
 const CREDENTIAL_TOKEN = "real-host-loopback-token";
@@ -266,6 +267,17 @@ describe("real host over the loopback service", () => {
     expect(persistedCanvas.body).toMatchObject({
       nodes: [{ id: "webui-file" }],
     });
+
+    // Exercise the production MCP service through the host adapter, operation
+    // registry, WebuiService and a real loopback WebSocket. The client boundary
+    // decoder is the same production codec used by the mounted WebUI client.
+    const mcpList = await client.call("pluginManagement", {
+      action: "listMcpServers",
+    });
+    expect(mcpList.kind).toBe("response");
+    expect(
+      decodeWebuiOperationResult("pluginManagement", mcpList.body),
+    ).toEqual({ servers: [] });
     client.close();
     await client.closed;
   }, 120_000);
