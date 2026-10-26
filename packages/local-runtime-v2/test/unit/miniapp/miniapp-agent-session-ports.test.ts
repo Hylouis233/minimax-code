@@ -92,7 +92,7 @@ describe('createMiniAppAgentSessionPorts records', () => {
     );
   });
 
-  it('records the host chat session and works in its project directory without creating it', async () => {
+  it('works in the host chat project directory without creating it', async () => {
     const root = await mkdtemp(join(tmpdir(), 'miniapp-agent-ports-'));
     cleanup.push(root);
     const projectDir = join(root, 'deleted-project');
@@ -104,7 +104,6 @@ describe('createMiniAppAgentSessionPorts records', () => {
       agentName: 'mavis',
       workspaceDir: projectDir,
       createDir: false,
-      hostSessionId: 'chat-1',
       model: DEFAULT_MODEL,
     });
 

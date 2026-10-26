@@ -1,6 +1,15 @@
 /** Largest `agentConcurrency` a Mini App manifest may declare. */
 export const MINIAPP_AGENT_MAX_CONCURRENCY = 32;
 
+/**
+ * Session `purpose` label that marks a Mini App-owned session, followed by the plugin id.
+ *
+ * It lives here, with the rest of the Mini App policy constants, because the session boundary rejects
+ * client-supplied `purpose` values starting with it and the turn owner reads it for approval lineage.
+ */
+export const MINIAPP_AGENT_PURPOSE_PREFIX = 'miniapp:';
+
+
 /** Runs of one plugin at once when its manifest omits `agentConcurrency`. */
 export const MINIAPP_AGENT_DEFAULT_CONCURRENCY = 4;
 

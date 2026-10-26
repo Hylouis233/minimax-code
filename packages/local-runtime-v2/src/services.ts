@@ -205,6 +205,7 @@ import {
   requireAgentRuntime,
   requireTurnSystem,
   type AgentHostRuntimeLifecycle,
+  type LocalTurnMiniAppApprovalRouter,
   type ToolResultCompactionConfig,
   type TurnSystemOwner,
   type SystemPromptOverrides,
@@ -785,6 +786,7 @@ async function initializeRuntimeServiceOwners(
       disposeMcpSession: (sessionId) => mcpRuntime.disposeSession(sessionId),
       goalVerifierExtension: subagentVerification.extension,
       goalVerifierOutputTokenCap: subagentVerification.outputTokenCap,
+      ...(miniAppAgent ? { miniAppApprovals: miniAppAgent } : {}),
     });
     const sessionApplications = await initializeSessionApplications(
       input,
@@ -1004,6 +1006,8 @@ interface RuntimeTurnSystemInitializationDeps {
   readonly goalVerifierExtension: GoalSubagentVerifierRuntime["extension"];
   /** Host-clamped attempt cap the verifier child's provider requests must obey. */
   readonly goalVerifierOutputTokenCap: GoalSubagentVerifierRuntime["outputTokenCap"];
+  /** Mini App approval routing; absent when this runtime has no Mini App service. */
+  readonly miniAppApprovals?: LocalTurnMiniAppApprovalRouter;
 }
 
 async function initializeRuntimeTurnSystem(
@@ -1017,6 +1021,7 @@ async function initializeRuntimeTurnSystem(
     resumeSessionDeletion,
     goalVerifierExtension,
     goalVerifierOutputTokenCap,
+    miniAppApprovals,
   } = dependencies;
   const llmRetryObserver = createSessionLLMRetryEventObserver(
     input.writeGlobalEvent,
@@ -1068,6 +1073,7 @@ async function initializeRuntimeTurnSystem(
         turnFacts,
         pluginHookSessionOwnership,
         turnCapabilities: input.turnCapabilities,
+        ...(miniAppApprovals ? { miniAppApprovals } : {}),
         // `sessionTitle.enabled: false` disables title generation: wire a
         // no-op so no title model request is issued. Read from the injected
         // config source (same as beta/custom_provider above), default on.

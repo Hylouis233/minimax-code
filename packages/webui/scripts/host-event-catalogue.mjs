@@ -11,10 +11,15 @@ const eventName = /^(?:session|message|agent|rotation|content|turn|stream|permis
  * The Mini App agent module declares and emits its own run-event vocabulary
  * (`turn.started`, `message.committed`, `permission.requested`, ...). Those events are
  * projected to the Mini App page bridge, never written to the host event bus, so a name
- * shared with a host event does not make one. Excluded by directory rather than by
- * dropping names, so the catalogue keeps reporting real host producers only.
+ * shared with a host event does not make one. Excluded per file, not per directory: a
+ * genuine host producer added to the same folder must still be catalogued.
  */
-const excludedDirectories = [path.join("service", "miniapp", "agent")];
+const excludedSources = [
+  path.join("service", "miniapp", "agent", "contracts.ts"),
+  path.join("service", "miniapp", "agent", "gateway.ts"),
+  path.join("service", "miniapp", "agent", "session-ports.ts"),
+  path.join("service", "miniapp", "agent", "session-ports-projection.ts"),
+];
 
 
 /** Collect actual literal declarations with the TypeScript parser, including typed producers. */
@@ -25,12 +30,11 @@ export function collectHostEventTypes(root = hostRoot, read = readFileSync) {
     for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
       const filename = path.join(directory, entry.name);
       if (entry.isDirectory()) {
-        const relative = path.relative(root, filename);
-        if (excludedDirectories.some((suffix) => relative === suffix || relative.endsWith(path.sep + suffix))) continue;
         walk(filename);
         continue;
       }
       if (!entry.name.endsWith(".ts") || entry.name.endsWith(".test.ts")) continue;
+      if (excludedSources.includes(path.relative(root, filename))) continue;
       files.push(filename);
     }
   }

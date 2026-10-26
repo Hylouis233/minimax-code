@@ -55,10 +55,16 @@ describe("host-derived event types", () => {
         'declare function publish(value: object): void; publish({type: "message.miniapp_owned" as const});\n',
       );
 
+      // The exclusion is per file, so a host producer in the same folder is still catalogued.
+      writeFileSync(
+        path.join(agent, "surface-host-producer.ts"),
+        'declare function publish(value: object): void; publish({type: "session.from_agent_dir" as const});\n',
+      );
       execFileSync(process.execPath, [script, `--host-root=${directory}`, `--output=${output}`, "--write"]);
       const catalogue = readFileSync(output, "utf8");
       expect(catalogue).toContain('"session.published"');
       expect(catalogue).toContain('"message.miniapp_owned"');
+      expect(catalogue).toContain('"session.from_agent_dir"');
       for (const frame of [
         "turn.started",
         "turn.finished",

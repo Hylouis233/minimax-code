@@ -29,7 +29,7 @@ export {
 export const MINIAPP_AGENT_QUEUE_FACTOR = 4;
 
 /** Session purpose label only; Mini App sessions resolve their prompt surface like any other. */
-export const MINIAPP_AGENT_PURPOSE_PREFIX = 'miniapp:';
+export { MINIAPP_AGENT_PURPOSE_PREFIX } from '../contracts.js';
 
 /** Agent for new Mini App sessions without a host chat session (`PRIMARY_AGENT_NAME`). */
 export const MINIAPP_AGENT_NAME = 'mavis';
@@ -375,10 +375,8 @@ export interface MiniAppAgentSessionPorts {
     readonly pluginId: string;
     readonly agentName: string;
     readonly workspaceDir: string;
-    /** True for the plugin directory; a host chat's project directory is used as it is. */
+    /** The plugin directory when `createDir` is set; a host chat's project directory is used as it is. */
     readonly createDir: boolean;
-    /** Recorded in `miniAppOrigin.hostSessionId`; absent on the Node path. */
-    readonly hostSessionId?: string;
     /** Resolved at creation; the session record keeps it as its model. */
     readonly model: MiniAppAgentModelSelection;
     /** Only with the runtime default model (see `defaultSessionModel`); written as the record's limit. */

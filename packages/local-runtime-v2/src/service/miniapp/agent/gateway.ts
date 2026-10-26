@@ -885,7 +885,7 @@ async function bindNewSession(
   readonly agentName: string;
   readonly model: MiniAppAgentModelSelection;
 }> {
-  const { pluginId, hostSessionId } = caller;
+  const { pluginId } = caller;
   try {
     const context = await creationContext(state, bound, caller, request.agent);
     const { agentName, workspaceDir, createDir } = context;
@@ -899,7 +899,6 @@ async function bindNewSession(
       createDir,
       model,
       ...(contextWindow === undefined ? {} : { contextWindow }),
-      ...(hostSessionId ? { hostSessionId } : {}),
     });
     return { sessionId: created.sessionId, agentName, model };
   } catch (error) {

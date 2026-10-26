@@ -351,7 +351,6 @@ describe('createMiniAppAgentGateway session context', () => {
         agentName: 'custom-x',
         workspaceDir: projectDir,
         createDir: false,
-        hostSessionId: 'chat-1',
         model: HOST_MODEL,
       });
       expect(ports.defaultSessionModel).not.toHaveBeenCalled();
@@ -381,7 +380,6 @@ describe('createMiniAppAgentGateway session context', () => {
       agentName: 'custom-x',
       workspaceDir: pluginDir('custom-x'),
       createDir: true,
-      hostSessionId: 'chat-1',
       // The host chat record carries no model, so the runtime default is frozen instead.
       model: DEFAULT_MODEL,
     });
@@ -431,7 +429,6 @@ describe('createMiniAppAgentGateway session context', () => {
       agentName: 'mavis',
       workspaceDir: pluginDir('mavis'),
       createDir: true,
-      hostSessionId: 'gone',
       model: DEFAULT_MODEL,
     });
     expect(logger.info).toHaveBeenCalledWith(
@@ -507,7 +504,6 @@ describe('createMiniAppAgentGateway session context', () => {
           agentName: 'custom-x',
           workspaceDir: removeProject ? pluginDir('custom-x') : projectDir,
           createDir: removeProject,
-          hostSessionId: 'chat-1',
           model: DEFAULT_MODEL,
         });
         turns.finish(1);
@@ -1638,7 +1634,6 @@ describe('createMiniAppAgentGateway models / agents / create', () => {
       agentName: 'custom-x',
       workspaceDir: pluginDir('custom-x'),
       createDir: true,
-      hostSessionId: 'chat-1',
       model: HOST_MODEL,
     });
     expect(ports.runTurn).toHaveBeenCalledTimes(1);
@@ -1702,7 +1697,6 @@ describe('createMiniAppAgentGateway chosen agent and failing lookups', () => {
       agentName: 'writer',
       workspaceDir: pluginDir('writer'),
       createDir: true,
-      hostSessionId: 'chat-1',
       model: HOST_MODEL,
     });
   });
