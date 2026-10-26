@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,6 +26,47 @@ describe("host-derived event types", () => {
       expect(readFileSync(output, "utf8")).toContain('"session.future_fact"');
       expect(readFileSync(output, "utf8")).toContain('"session.union_a"');
       expect(readFileSync(output, "utf8")).toContain('"session.union_b"');
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
+
+  it("keeps Mini App agent run frames out of the catalogue while scanning the rest of the host", () => {
+    const directory = mkdtempSync(path.join(tmpdir(), "webui-event-types-"));
+    try {
+      const output = path.join(directory, "events.ts");
+      const agent = path.join(directory, "service/miniapp/agent");
+      const sibling = path.join(directory, "service/miniapp");
+      mkdirSync(agent, { recursive: true });
+      writeFileSync(
+        path.join(directory, "producer.ts"),
+        'declare function publish(value: object): void; publish({type: "session.published" as const});\n',
+      );
+      // Mini App Agent run frames: declared and emitted in the agent subtree, never host-bus facts.
+      writeFileSync(
+        path.join(agent, "contracts.ts"),
+        'export interface Frame { readonly type: "turn.started" | "turn.finished" | "message.committed"; }\n',
+      );
+      writeFileSync(
+        path.join(agent, "gateway.ts"),
+        'declare function emit(value: object): void; emit({type: "permission.requested" as const});\n',
+      );
+      // The exclusion is one subtree, not the whole Mini App service.
+      writeFileSync(
+        path.join(sibling, "contracts.ts"),
+        'declare function publish(value: object): void; publish({type: "message.miniapp_owned" as const});\n',
+      );
+
+      execFileSync(process.execPath, [script, `--host-root=${directory}`, `--output=${output}`, "--write"]);
+      const catalogue = readFileSync(output, "utf8");
+      expect(catalogue).toContain('"session.published"');
+      expect(catalogue).toContain('"message.miniapp_owned"');
+      for (const frame of [
+        "turn.started",
+        "turn.finished",
+        "message.committed",
+        "permission.requested",
+      ]) {
+        expect(catalogue).not.toContain(`"${frame}"`);
+      }
     } finally { rmSync(directory, { recursive: true, force: true }); }
   });
 
