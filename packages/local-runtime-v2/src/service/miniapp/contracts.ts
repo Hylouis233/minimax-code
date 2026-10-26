@@ -1,3 +1,6 @@
+/** Largest `agentConcurrency` a Mini App manifest may declare. */
+export const MINIAPP_AGENT_MAX_CONCURRENCY = 32;
+
 export type MiniAppHostConnectorPolicy =
   | { readonly kind: 'deny-all' }
   | { readonly kind: 'allowlist'; readonly providers: readonly string[] };

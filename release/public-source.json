@@ -1171,6 +1171,7 @@
     "packages/local-runtime-v2/src/service/plugin-system/plugin/package/hook/reader.ts",
     "packages/local-runtime-v2/src/service/plugin-system/plugin/package/miniapp/path.ts",
     "packages/local-runtime-v2/src/service/plugin-system/plugin/package/miniapp/reader.ts",
+    "packages/local-runtime-v2/src/service/plugin-system/plugin/package/miniapp/validation.test.ts",
     "packages/local-runtime-v2/src/service/plugin-system/plugin/package/miniapp/validation.ts",
     "packages/local-runtime-v2/src/service/plugin-system/plugin/package/minimax-reader.ts",
     "packages/local-runtime-v2/src/service/plugin-system/plugin/package/package-contract.ts",

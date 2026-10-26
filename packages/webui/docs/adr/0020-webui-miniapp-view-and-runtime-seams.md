@@ -85,7 +85,7 @@ hold two credentials instead of one.
 
 ## The contract baseline
 
-The Mini App contract in this repository is one generation behind the Mini App implementation
+The Mini App contract in this repository was one generation behind the Mini App implementation
 shipped in the desktop client: 54 lines here against 1267 there. This record takes the shipped
 generation, minus the window block.
 
@@ -93,12 +93,15 @@ The mechanics are cheap, and the borrow is auditable rather than a blanket impor
 The shipped file's only import is
 `./questionnaire.js`, and this repository's copy of that file is byte-identical, so the borrowing is a
 content edit to one existing file: no new path, no workspace dependency, no inventory regeneration.
-`diff` also shows that the first 54 lines of the shipped file reproduce this repository's file
-exactly, so the newer generation is a strict superset from line 7 onward, and the remainder arrives
-as one contiguous block rather than as scattered patches. Nothing here has a consumer for the
-response types whose shape changes — `MiniAppSurfaceTabSummary`, `MiniAppListResponse`,
-`MiniAppOpenResponse` and `MiniAppControlResponse` are declared and unused — so adding required
-fields and error codes breaks no call site.
+`diff` shows the newer generation to be a strict superset of this repository's file from line 7
+onward, and it is taken as one contiguous copy of the shipped leading part rather than as scattered
+patches — but that part is not line-for-line identical to today's 54 lines. The shipped file opens
+with a six-line type-only import, and it adds `detached` and `presentationRevision` to the tab
+summary and `detach_failed` and `attach_failed` to the error codes, which moves
+`MiniAppOpenResponse` and `MiniAppControlResponse` below the new start and page-open types. Nothing
+here has a consumer for the response types whose shape changes — `MiniAppSurfaceTabSummary`,
+`MiniAppListResponse`, `MiniAppOpenResponse` and `MiniAppControlResponse` are declared and unused —
+so adding required fields and error codes breaks no call site.
 
 What the borrowing brings:
 
@@ -119,7 +122,10 @@ What the borrowing brings:
 What the borrowing leaves behind is the window block: the argv surface id, the `surface.window`
 manifest whitelist, and the page's `getState`/`update`/`focus` handle. It is the last contiguous
 region of the file, so a future synchronization reads as one omitted tail rather than as a series of
-local divergences.
+local divergences. One private helper has to come out of that tail: `isPlainRecord` is declared
+inside the window block but used nine times by the agent parsers above it, so it is kept at the seam
+between the copied part and the omission, and it is the one local divergence to reconcile against a
+future copy.
 
 Two consequences follow for the layers around the contract. The manifest reader must accept the
 three keys the newer generation declares and this repository's reader does not know: `surface.window`,
