@@ -16,6 +16,7 @@
 
 @import "./tokens.css";
 @import "./shell.css";
+@import "@xterm/xterm/css/xterm.css";
 /* The shared dropdown surface: the look, the motion and the shape every
  * floating popup in the client shares. It comes before the feature rules, so a
  * feature that needs something specific about its own popup can still say so. */

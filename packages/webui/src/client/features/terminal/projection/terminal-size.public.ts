@@ -2,12 +2,10 @@
  * What the shell reports about a terminal's size, and when a report is worth
  * sending, published as a public module.
  *
- * The terminal is opened at a fixed 80x24 and then fitted to the element it was
- * mounted in. Fitting moves the browser's viewport and tells the runtime
- * nothing, so the pseudo-terminal behind the tab went on wrapping and answering
- * size queries as 80x24 for the whole session: full-screen programs drew
- * themselves into a grid the browser was not showing, and long lines broke at
- * the wrong column.
+ * A new terminal is measured before its PTY is created, so its first prompt is
+ * rendered at the visible grid size. Restored terminals and later pane resizes
+ * still need a report because the runtime may hold a different size than the
+ * browser viewport.
  *
  * Two rules keep the report from turning into chatter.
  *
@@ -17,10 +15,9 @@
  *     stops, so the caller waits out `TERMINAL_RESIZE_DEBOUNCE_MS` after the
  *     last measurement before sending.
  *   - Only a size the runtime does not already hold is worth a request. The
- *     cache is keyed by terminal, because changing the active tab re-mounts the
- *     terminal and a fresh pseudo-terminal starts back at 80x24: a cache that
- *     ignored the id would read the previous terminal's size as "already
- *     reported" and leave the new one at the default.
+ *     cache is keyed by terminal because changing the active tab re-mounts the
+ *     terminal, and a new PTY can have a different initial grid from an older
+ *     one.
  *
  * The observer and the timers that feed these rules live in
  * `components/workspace/WorkspacePanels.tsx`, in the same split the model

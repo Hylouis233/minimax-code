@@ -592,7 +592,7 @@ export interface WebuiHarnessPort {
  * operation handler drives it and the WebSocket server frames what it yields.
  */
 export interface WebuiTerminalProcessPort {
-  create(workspaceDir: string): {
+  create(workspaceDir: string, cols?: number, rows?: number): {
     readonly terminalId: string;
     readonly status: "running";
   };

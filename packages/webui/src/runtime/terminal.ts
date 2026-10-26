@@ -13,7 +13,7 @@ type Terminal = { readonly id: string; readonly pty: Pty; readonly output: strin
 export class WebuiTerminalManager implements WebuiTerminalProcessPort {
   private readonly terminals = new Map<string, Terminal>();
   constructor(private readonly loadPty: () => PtyModule = () => require("node-pty") as PtyModule) {}
-  create(workspaceDir: string) {
+  create(workspaceDir: string, cols = 80, rows = 24) {
     if (this.terminals.size >= 5) throw new Error("最多可以打开 5 个终端");
     const id = `terminal-${crypto.randomUUID()}`;
     let ptyModule: PtyModule;
@@ -24,7 +24,7 @@ export class WebuiTerminalManager implements WebuiTerminalProcessPort {
       throw new Error(`终端原生模块加载失败；请在 node_modules/node-pty 内执行 npx --yes node-gyp rebuild。${detail}`);
     }
     const shell = process.env.SHELL || (process.platform === "win32" ? "powershell.exe" : "/bin/sh");
-    const child = ptyModule.spawn(shell, process.platform === "win32" ? [] : ["-il"], { name: "xterm-256color", cols: 80, rows: 24, cwd: workspaceDir, env: { ...process.env, TERM: "xterm-256color" } });
+    const child = ptyModule.spawn(shell, process.platform === "win32" ? [] : ["-il"], { name: "xterm-256color", cols: Math.max(2, Math.min(500, Math.floor(cols))), rows: Math.max(1, Math.min(300, Math.floor(rows))), cwd: workspaceDir, env: { ...process.env, TERM: "xterm-256color" } });
     const terminal: Terminal = { id, pty: child, output: [], listeners: new Set(), exited: false };
     child.onData((data) => { terminal.output.push(data); if (terminal.output.length > 10000) terminal.output.shift(); for (const listener of terminal.listeners) listener(data); });
     child.onExit(() => { terminal.exited = true; for (const listener of terminal.listeners) listener(""); });

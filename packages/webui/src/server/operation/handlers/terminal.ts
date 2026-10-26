@@ -41,6 +41,8 @@ export function createTerminalHandlerEntries(
   ) => ({
     body: terminal.create(
       String((body as Record<string, unknown>).workspaceDir ?? process.cwd()),
+      Number((body as Record<string, unknown>).cols) || 80,
+      Number((body as Record<string, unknown>).rows) || 24,
     ),
   });
   const listTerminals: DedicatedHandler<typeof listTerminalsOperation> = async () => ({

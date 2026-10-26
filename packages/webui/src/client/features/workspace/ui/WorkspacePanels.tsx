@@ -90,14 +90,7 @@ export {
   chunkWebuiWorkspaceReviewFileIds,
   WEBUI_WORKSPACE_REVIEW_DIFF_BATCH_SIZE,
 };
-const DESKTOP_COPY = { newTerminal: "新建终端", terminalLimit: "最多可以打开 5 个终端", terminalLabel: "终端", terminalExited: "已退出", terminalEmptyTitle: "还没有终端", terminalEmptyDescription: "可直接在右侧面板中启动当前工作区的 Shell。", terminalLoading: "正在读取终端…", fileClose: "关闭" } as const;
-
-/**
- * How many PTYs the process half admits, per `runtime/terminal.ts`. The panel
- * checks it before asking, so a full set is stated rather than discovered by a
- * refused request.
- */
-const DESKTOP_TERMINAL_LIMIT = 5;
+const DESKTOP_COPY = { terminalExited: "已退出", terminalLoading: "正在读取终端…" } as const;
 
 const FILE_CODE_LANGUAGES = {
   bash,
@@ -269,38 +262,13 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
    * newer answer with the previous workspace's terminals.
    */
   const rosterRead = useRef(0);
-  const [activeTerminalId, setActiveTerminalId] = useState<string>();
+  const autoCreateTerminalFor = useRef<string>();
+  const [terminalInitialSize, setTerminalInitialSize] = useState<{ readonly cols: number; readonly rows: number }>();
   const [terminalError, setTerminalError] = useState<string>();
-  /**
-   * The process half's limit, as the panel needs it.
-   *
-   * The client could learn the count only by attempting a create and being
-   * refused, which reads to the user as a malfunction. The panel knows the rule
-   * (`runtime/terminal.ts`), so it says so before the request instead of after
-   * it — and it checks the count it already has, so the button explains itself
-   * rather than failing.
-   */
-  const terminalSlotsFull = terminals.length >= DESKTOP_TERMINAL_LIMIT;
   const terminalSupport = terminalOwner?.support().create ?? "absent";
   const terminalAvailability = terminalSupport === "absent" ? "当前服务未提供终端。"
     : terminalSupport === "not-ready" ? "终端服务尚未就绪。"
       : terminalSupport === "incompatible" ? "终端接口与当前页面不兼容，请检查服务版本。" : undefined;
-  const terminalCreateDisabled = terminalSlotsFull || !terminalOwner?.canCreate;
-  const terminalCreateReason = terminalAvailability ?? (terminalSlotsFull ? DESKTOP_COPY.terminalLimit : undefined);
-  const createTerminal = (): void => {
-    if (!activeWorkspace || !terminalOwner?.canCreate) return;
-    if (terminalSlotsFull) {
-      setTerminalError(DESKTOP_COPY.terminalLimit);
-      return;
-    }
-    void terminalOwner
-      .create(activeWorkspace)
-      .then((created) => {
-        if (created) setActiveTerminalId(created.terminalId);
-        syncTerminalsFromOwner(terminalOwner);
-      })
-      .catch((error: unknown) => setTerminalError(error instanceof Error ? error.message : String(error)));
-  };
   const terminalHost = useRef<HTMLDivElement>(null);
   const terminalInstance = useRef<Terminal>();
   const terminalStop = useRef<(() => void) | undefined>();
@@ -308,8 +276,8 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
    * The size this pane last told the runtime, so an unchanged measurement is
    * not sent twice. Deliberately NOT reset when the effect re-mounts the
    * terminal: the entry carries its terminal id, and a different terminal
-   * cannot match it, so a fresh 80x24 pseudo-terminal still hears about the
-   * grid it was fitted to.
+   * cannot match it, so a restored PTY still hears about the grid it was fitted
+   * to while a newly created PTY can start at its measured grid.
    */
   const reportedTerminalSize = useRef<WebuiTerminalSize>();
   const activeWorkspace = activeTab && "workspaceDir" in activeTab.content ? activeTab.content.workspaceDir : workspaceDir;
@@ -488,21 +456,57 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
       // Unmounting invalidates this read for the same reason switching does.
       if (rosterRead.current === read) rosterRead.current += 1;
     };
-  }, [terminalOwner, activeTab?.id, activeWorkspace]);
+  }, [terminalOwner, activeTab?.id, activeWorkspace, tab]);
+  useEffect(() => {
+    if (tab !== "terminal" || !terminalsReady || terminals.length > 0 || !activeWorkspace || !terminalOwner?.canCreate || !terminalInitialSize) return;
+    const autoCreateKey = `${activeTab?.id ?? ""}\0${activeWorkspace}`;
+    if (autoCreateTerminalFor.current === autoCreateKey) return;
+    autoCreateTerminalFor.current = autoCreateKey;
+    void terminalOwner.create(activeWorkspace, terminalInitialSize).then((created) => {
+      if (created) reportedTerminalSize.current = { terminalId: created.terminalId, ...terminalInitialSize };
+      syncTerminalsFromOwner(terminalOwner);
+    }).catch((error: unknown) => setTerminalError(error instanceof Error ? error.message : String(error)));
+  }, [tab, terminalsReady, terminals.length, activeWorkspace, terminalOwner, terminalInitialSize, activeTab?.id]);
   // A view going away releases its watch and its xterm; it never kills a PTY.
   // Process death is the panel's explicit dispose button or the application's
   // disposal.
   useEffect(() => () => { terminalStop.current?.(); terminalInstance.current?.dispose(); }, []);
-  const terminalTargetId = (terminals.find((candidate) => String(candidate.terminalId) === activeTerminalId) ?? terminals[0])?.terminalId;
+  const terminalTargetId = terminals[0]?.terminalId;
+  // Measure the real xterm grid before creating the PTY. This avoids starting
+  // the shell at 80x24 and immediately resizing it, which leaves wrapped prompt
+  // fragments behind in some interactive shells.
+  useEffect(() => {
+    if (tab !== "terminal" || terminalTargetId || !terminalHost.current) return;
+    const host = terminalHost.current;
+    const styles = getComputedStyle(host);
+    const terminal = new Terminal({ cols: terminalInitialSize?.cols ?? 80, rows: terminalInitialSize?.rows ?? 24, convertEol: true, theme: { background: styles.getPropertyValue("--bg_default_primary").trim(), foreground: styles.getPropertyValue("--terminal_foreground").trim(), cursor: styles.getPropertyValue("--terminal_cursor").trim() } });
+    const fit = new FitAddon();
+    terminal.loadAddon(fit);
+    terminal.open(host);
+    let disposed = false;
+    let initialFitFrame: number | undefined;
+    void document.fonts.ready.then(() => {
+      if (disposed) return;
+      initialFitFrame = requestAnimationFrame(() => {
+        if (disposed) return;
+        fit.fit();
+        setTerminalInitialSize({ cols: terminal.cols, rows: terminal.rows });
+      });
+    });
+    return () => {
+      disposed = true;
+      if (initialFitFrame !== undefined) cancelAnimationFrame(initialFitFrame);
+      terminal.dispose();
+    };
+  }, [tab, terminalTargetId]);
   useEffect(() => {
     if (!terminalTargetId || !terminalHost.current) return;
     const terminalId = String(terminalTargetId);
     const styles = getComputedStyle(terminalHost.current);
-    const terminal = new Terminal({ cols: 80, rows: 24, convertEol: true, theme: { background: styles.getPropertyValue("--bg_default_secondary").trim(), foreground: styles.getPropertyValue("--terminal_foreground").trim(), cursor: styles.getPropertyValue("--terminal_cursor").trim() } });
+    const terminal = new Terminal({ cols: terminalInitialSize?.cols ?? 80, rows: terminalInitialSize?.rows ?? 24, convertEol: true, theme: { background: styles.getPropertyValue("--bg_default_primary").trim(), foreground: styles.getPropertyValue("--terminal_foreground").trim(), cursor: styles.getPropertyValue("--terminal_cursor").trim() } });
     const fit = new FitAddon();
     terminal.loadAddon(fit);
     terminal.open(terminalHost.current);
-    fit.fit();
     terminalInstance.current = terminal;
     terminalStop.current = terminalOwner?.attach(terminalId, (frame) => { terminal.write(frame.data); if (frame.exited) terminal.options.disableStdin = true; });
     // The fit moves the browser's viewport; this is what tells the runtime. The
@@ -524,12 +528,24 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     const observer = new ResizeObserver(onResize);
     observer.observe(terminalHost.current);
     const input = terminal.onData((data) => { if (terminalOwner?.canWrite) void terminalOwner.write(terminalId, data); });
-    return () => { input.dispose(); observer.disconnect(); if (resizeTimer !== undefined) clearTimeout(resizeTimer); terminalStop.current?.(); terminalStop.current = undefined; terminal.dispose(); terminalInstance.current = undefined; };
+    let disposed = false;
+    let initialFitFrame: number | undefined;
+    void document.fonts.ready.then(() => {
+      if (disposed) return;
+      initialFitFrame = requestAnimationFrame(() => {
+        if (disposed) return;
+        fit.fit();
+        terminal.refresh(0, Math.max(0, terminal.rows - 1));
+        reportTerminalSize();
+        terminal.focus();
+      });
+    });
+    return () => { disposed = true; if (initialFitFrame !== undefined) cancelAnimationFrame(initialFitFrame); input.dispose(); observer.disconnect(); if (resizeTimer !== undefined) clearTimeout(resizeTimer); terminalStop.current?.(); terminalStop.current = undefined; terminal.dispose(); terminalInstance.current = undefined; };
     // `terminalOwner` takes its place beside its neighbours rather than being
     // read through a ref: the owner is created once per mount by the binding and
     // its commands are stable, so a panel drag cannot re-run this effect and
     // rebuild a shell that is running.
-  }, [terminalTargetId, terminalOwner, tab]);
+  }, [terminalTargetId, terminalOwner, tab, terminalInitialSize]);
   // The registry carries the kinds, their words and how each opens. Both the tab
   // glyphs the strip needs and the launcher's tiles live in the strip itself:
   // the new tab page took the place of this panel's add menu, which was the same
@@ -646,9 +662,11 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
       <BrowserPanelHost target={activeTab.content.target} url={activeTab.content.url} />
     </div> : null}
     {tab === "launcher" && activeTab?.content.kind === "launcher" ? <WebuiWorkspaceLauncher tab={activeTab} dispatch={panelDispatch} sessionId={sessionId} workspaceDir={workspaceDir} /> : null}
-    {tab === "terminal" && terminalAvailability ? <p role="status" data-webui-terminal-availability={terminalSupport}>{terminalAvailability}</p> : null}
-    {tab === "terminal" && terminalError && terminals.length === 0 ? <p role="alert">{terminalError}</p> : null}
-    {tab === "terminal" ? <div className="webui-terminal-empty">{!terminalsReady ? <><p>{DESKTOP_COPY.terminalLoading}</p></> : terminals.length === 0 ? <><strong>{DESKTOP_COPY.terminalEmptyTitle}</strong><p>{DESKTOP_COPY.terminalEmptyDescription}</p></> : <><div className="webui-terminal-tabs">{terminals.map((terminal, index) => <button type="button" key={String(terminal.terminalId)} className={`file-tab group/tab-close h-8 w-40 min-w-20 ${String(terminal.terminalId) === (activeTerminalId ?? String(terminals[0]?.terminalId)) ? "bg-bg_interaction_tertiary_selected" : ""}`} onClick={() => setActiveTerminalId(String(terminal.terminalId))}><span>#{index + 1}</span>{terminal.status === "exited" ? DESKTOP_COPY.terminalExited : DESKTOP_COPY.terminalLabel}<span className="file-tab-close opacity-0 group-hover/tab-close:opacity-100"><WebuiIconClose className="size-[14px]" /></span></button>)}</div><div ref={terminalHost} className="webui-xterm-host" />{terminalError ? <p role="alert">{terminalError}</p> : null}<div className="webui-terminal-actions"><button type="button" disabled={terminalCreateDisabled} title={terminalCreateReason} onClick={createTerminal}>{DESKTOP_COPY.newTerminal}</button><button type="button" onClick={() => { const active = terminals.find((candidate) => String(candidate.terminalId) === (activeTerminalId ?? String(terminals[0]?.terminalId))); if (active && terminalOwner?.canDispose) void terminalOwner.disposeProcess(String(active.terminalId)).then(() => syncTerminalsFromOwner(terminalOwner)); }}>{DESKTOP_COPY.fileClose}</button></div></> }{terminalsReady && terminals.length === 0 ? <button type="button" disabled={terminalCreateDisabled} title={terminalCreateReason} onClick={createTerminal}>{DESKTOP_COPY.newTerminal}</button> : null}</div> : null}
+    {tab === "terminal" ? <div className="webui-terminal-content">
+        <div ref={terminalHost} className="webui-xterm-host" />
+        {!terminalsReady || terminals.length === 0 && (terminalAvailability || terminalError) ? <p role={terminalError ? "alert" : "status"} data-webui-terminal-availability={terminalSupport}>{!terminalsReady ? DESKTOP_COPY.terminalLoading : terminalAvailability ?? terminalError}</p> : null}
+        {terminalError && terminals.length > 0 ? <p role="alert">{terminalError}</p> : null}
+    </div> : null}
       </div>
       {hasFileWorkspace && fileTreeOpen ? <aside className="webui-workspace-file-tree-panel" aria-label="工作区文件树">
         <label className="webui-workspace-file-search"><WebuiIconSearch className="size-4" /><input aria-label="搜索文件" placeholder="搜索" value={fileSearch} onChange={(event) => setFileSearch(event.currentTarget.value)} /></label>

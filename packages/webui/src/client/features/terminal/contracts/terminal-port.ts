@@ -23,6 +23,8 @@ export interface WebuiTerminalSize {
 export interface TerminalPort {
   readonly createTerminal?: (request: {
     readonly workspaceDir: string;
+    readonly cols?: number;
+    readonly rows?: number;
   }) => Promise<{ readonly terminalId: string; readonly status: string }>;
   readonly listTerminals?: () => Promise<readonly Record<string, unknown>[]>;
   readonly writeTerminal?: (request: {

@@ -194,11 +194,11 @@ export function createWebuiTerminalOwner(
     }
   };
 
-  const create = async (workspaceDir: string): Promise<WebuiTerminalRecord | undefined> => {
+  const create = async (workspaceDir: string, size?: { readonly cols: number; readonly rows: number }): Promise<WebuiTerminalRecord | undefined> => {
     if (disposed) return undefined;
     const createTerminal = port.createTerminal;
     if (!createTerminal) return undefined;
-    const created = await createTerminal({ workspaceDir }).catch((reason: unknown) => {
+    const created = await createTerminal({ workspaceDir, ...size }).catch((reason: unknown) => {
       markIncompatible("create", reason);
       throw reason;
     });

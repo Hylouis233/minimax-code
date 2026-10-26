@@ -379,16 +379,16 @@
   .file-tab { display: flex; align-items: center; gap: var(--spacing_4); overflow: hidden; padding: 0 var(--spacing_8); font-size: var(--size_12); white-space: nowrap; }
   .file-tab button { margin-left: auto; border: 0; background: transparent; color: inherit; }
 
-  .webui-canvas-content, .webui-terminal-empty { position: relative; display: flex; min-height: 300px; height: calc(100% - 180px); flex-direction: column; align-items: center; justify-content: center; gap: var(--spacing_8); padding: var(--spacing_16); color: var(--text_default_secondary); text-align: center; }
-  .webui-canvas-content p, .webui-terminal-empty p { margin: 0; color: var(--text_default_tertiary); font-size: var(--size_12); }
+  .webui-canvas-content { position: relative; display: flex; min-height: 300px; height: calc(100% - 180px); flex-direction: column; align-items: center; justify-content: center; gap: var(--spacing_8); padding: var(--spacing_16); color: var(--text_default_secondary); text-align: center; }
+  .webui-canvas-content p { margin: 0; color: var(--text_default_tertiary); font-size: var(--size_12); }
   .webui-canvas-stage { display: flex; min-width: 160px; min-height: 100px; align-items: center; justify-content: center; gap: var(--spacing_8); transform-origin: center; }
   .webui-canvas-node { border: 1px solid var(--border_default); border-radius: var(--radius_8); background: var(--bg_grouped_secondary); padding: var(--spacing_8); font-size: var(--size_12); }
   .webui-canvas-zoom { position: absolute; right: var(--spacing_8); bottom: var(--spacing_8); font-size: var(--size_12); }
-  .webui-terminal-empty button { border: 1px solid var(--border_default); border-radius: var(--radius_8); background: transparent; padding: var(--spacing_8) var(--spacing_12); color: var(--text_default_primary); }
-  .webui-xterm-host { width: 100%; min-height: 260px; overflow: hidden; background: var(--bg_default_secondary); padding: var(--spacing_8); text-align: left; }
+  .webui-terminal-content { position: relative; display: flex; min-width: 0; min-height: 0; flex: 1 1 auto; flex-direction: column; overflow: hidden; background: var(--bg_default_primary); padding: var(--spacing_16); }
+  .webui-terminal-content > p { position: absolute; z-index: 1; top: var(--spacing_16); left: var(--spacing_16); margin: 0; color: var(--text_default_secondary); font-size: var(--size_14); }
+  .webui-xterm-host { width: 100%; min-width: 0; min-height: 0; flex: 1 1 auto; overflow: hidden; background: var(--bg_default_primary); text-align: left; }
   .webui-xterm-host .xterm { height: 100%; }
-  .webui-xterm-host .xterm-viewport { background: var(--bg_default_secondary) !important; }
-  .webui-terminal-actions { display: flex; gap: var(--spacing_8); }
+  .webui-xterm-host .xterm-viewport { background: var(--bg_default_primary) !important; }
 
   /* Keep the existing surfaces fluid as the browser window narrows.
    * These rules change only available space and panel placement; typography,

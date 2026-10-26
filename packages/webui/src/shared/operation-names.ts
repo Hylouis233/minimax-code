@@ -446,7 +446,7 @@ export interface OperationSpec {
     response: WebuiWorkspaceArchiveExtractResult;
   };
   createTerminal: {
-    request: Record<string, unknown>;
+    request: { readonly workspaceDir?: string; readonly cols?: number; readonly rows?: number };
     response: { readonly terminalId: string; readonly status: "running" };
   };
   listTerminals: {
