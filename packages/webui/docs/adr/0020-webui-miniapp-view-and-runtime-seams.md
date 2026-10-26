@@ -435,13 +435,23 @@ above. The plugin catalogue's apps area rides with that change rather than after
 that shows what is installed and what is running, so without it the view has nothing to be opened from. The agent capability follows the view: it is the only part that can be reviewed against a
 working page, since a plugin's agent calls are only observable from a page this client can display.
 
+### The proxy makes the document framable
+
+The page is framed by this client, on a different origin, so a page must not be able to refuse. The proxy
+therefore drops `X-Frame-Options` from every response it forwards and removes the `frame-ancestors`
+directive from a page's own CSP while leaving its other directives alone — the Mini App's origin is a
+separate origin from the client's, so the rest of its policy governs a document that cannot reach the
+client anyway. Nothing is added: no header the page did not ask for, no CSP of the proxy's own.
+
+The document is the one response the proxy rewrites. The page bridge has to be in the document before the
+page's own scripts run, so the proxy injects a script tag for it before `</head>`, or after the opening
+`<body>` tag when a page has no head, or ahead of the document when it has neither, and restates the
+`Content-Length` because the body it sends is not the body it received. Everything else — paths, methods,
+status codes, the page's own headers — passes through unchanged.
+
 ## Open implementation questions
 
-1. **Framing the page through the proxy.** One listener per Mini App is decided above; what remains is
-   which response headers the proxy must add or drop for the document to be framable at all, and what
-   it does with a Mini App that sets framing or CSP headers of its own. The desktop client offers no
-   precedent: it never frames the page and writes no response headers of its own.
-2. **The bridge's method-level error mapping.** Which failure code each bridge call answers when the
+1. **The bridge's method-level error mapping.** Which failure code each bridge call answers when the
    host cannot serve it — an unsupported capability, a full queue, a runtime that stopped between two
    calls — and how a page's request identifier survives the `postMessage` boundary.
 

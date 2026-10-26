@@ -28,6 +28,20 @@ let proxy: MiniAppProxy;
 beforeAll(async () => {
   upstream = http.createServer((request, response) => {
     seen.push({ method: request.method, url: request.url, headers: { ...request.headers } });
+    if (request.url === '/page') {
+      response
+        .writeHead(200, {
+          'content-type': 'text/html; charset=utf-8',
+          'x-frame-options': 'DENY',
+          'content-security-policy': "default-src 'self'; frame-ancestors 'none'; script-src 'self'",
+        })
+        .end('<!doctype html><html><head><title>app</title></head><body>page</body></html>');
+      return;
+    }
+    if (request.url === '/bare') {
+      response.writeHead(200, { 'content-type': 'text/html' }).end('<p>no head here</p>');
+      return;
+    }
     if (request.url === '/echo') {
       response.writeHead(200, { 'content-type': 'text/plain' }).end('from-upstream');
       return;
@@ -52,6 +66,7 @@ beforeAll(async () => {
       credentialHeader: CREDENTIAL_HEADER,
     },
     port: 0,
+    bridge: { path: '/__miniapp/bridge.js', script: 'globalThis.__bridge = true;' },
   });
 });
 
@@ -140,5 +155,38 @@ describe('Mini App proxy', () => {
     expect(first).toBeGreaterThanOrEqual(49_152);
     expect(first).toBeLessThanOrEqual(65_535);
     expect(deriveMiniAppProxyPort('another.miniapp')).not.toBe(first);
+  });
+});
+
+describe('Mini App proxy document rewrite', () => {
+  it('injects the bridge before the document head ends', async () => {
+    const result = await get(proxy.port, '/page');
+
+    expect(result.status).toBe(200);
+    expect(result.body).toContain('<script src="/__miniapp/bridge.js"></script></head>');
+    expect(result.body).toContain('<title>app</title>');
+  });
+
+  it('makes the document framable: drops X-Frame-Options and the frame-ancestors directive', async () => {
+    const result = await get(proxy.port, '/page');
+
+    expect(result.headers).not.toHaveProperty('x-frame-options');
+    expect(result.headers['content-security-policy']).toBe("default-src 'self'; script-src 'self'");
+  });
+
+  it('injects before the body when the document has no head', async () => {
+    const result = await get(proxy.port, '/bare');
+
+    expect(result.body).toBe('<script src="/__miniapp/bridge.js"></script><p>no head here</p>');
+  });
+
+  it('serves the bridge itself and never forwards that path upstream', async () => {
+    const before = seen.length;
+    const result = await get(proxy.port, '/__miniapp/bridge.js');
+
+    expect(result.status).toBe(200);
+    expect(result.body).toBe('globalThis.__bridge = true;');
+    expect(result.headers['content-type']).toContain('text/javascript');
+    expect(seen.length).toBe(before);
   });
 });

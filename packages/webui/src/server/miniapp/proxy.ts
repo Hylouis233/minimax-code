@@ -37,11 +37,27 @@ export function deriveMiniAppProxyPort(pluginId: string): number {
   return PROXY_PORT_MIN + (digest.readUInt32BE(0) % PROXY_PORT_RANGE);
 }
 
+/**
+ * The page bridge the proxy injects into the Mini App's document.
+ *
+ * The proxy owns the seam — which document, where the tag goes, what headers survive — while the script
+ * itself belongs to the bridge, which knows what `window.mcode.miniapp` exposes.
+ */
+export interface MiniAppPageBridge {
+  /** Absolute path on the proxy origin that serves the script, e.g. `/__miniapp/bridge.js`. */
+  readonly path: string;
+  readonly script: string;
+}
+
 export interface StartMiniAppProxyInput {
   readonly target: MiniAppProxyTarget;
   /** Defaults to the derived port; a test or a retry may pass the next candidate. */
   readonly port?: number;
+  readonly bridge?: MiniAppPageBridge;
 }
+
+const FRAME_BLOCKING_HEADERS = ['x-frame-options'] as const;
+const CSP_HEADER = 'content-security-policy';
 
 /**
  * One loopback listener per running Mini App.
@@ -62,6 +78,12 @@ export async function startMiniAppProxy(input: StartMiniAppProxyInput): Promise<
   const sockets = new Set<{ destroy(): void }>();
 
   const server = http.createServer((request, response) => {
+    if (input.bridge && request.url === input.bridge.path) {
+      response
+        .writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' })
+        .end(input.bridge.script);
+      return;
+    }
     const forwarded = http.request(
       {
         host: upstream.hostname,
@@ -75,8 +97,28 @@ export async function startMiniAppProxy(input: StartMiniAppProxyInput): Promise<
         agent: false,
       },
       (upstreamResponse) => {
-        response.writeHead(upstreamResponse.statusCode ?? 502, upstreamResponse.headers);
-        upstreamResponse.pipe(response);
+        const headers = frameableHeaders(upstreamResponse.headers);
+        if (!isHtml(upstreamResponse.headers) || !input.bridge) {
+          response.writeHead(upstreamResponse.statusCode ?? 502, headers);
+          upstreamResponse.pipe(response);
+          return;
+        }
+        // The document is the one response this proxy rewrites: the page bridge has to be in it before
+        // the page's own scripts run, and a page cannot be allowed to decide it will not be framed.
+        const chunks: Buffer[] = [];
+        upstreamResponse.on('data', (chunk: Buffer) => chunks.push(chunk));
+        upstreamResponse.on('end', () => {
+          const body = Buffer.from(
+            injectBridge(Buffer.concat(chunks).toString('utf8'), input.bridge as MiniAppPageBridge),
+            'utf8',
+          );
+          // The body length changed, so the upstream framing no longer applies.
+          delete headers['transfer-encoding'];
+          headers['content-length'] = String(body.byteLength);
+          response.writeHead(upstreamResponse.statusCode ?? 502, headers);
+          response.end(body);
+        });
+        upstreamResponse.on('error', () => response.destroy());
       },
     );
     forwarded.on('error', () => {
@@ -146,4 +188,44 @@ export async function startMiniAppProxy(input: StartMiniAppProxyInput): Promise<
       await new Promise<void>((resolve) => server.close(() => resolve()));
     },
   };
+}
+
+function isHtml(headers: http.IncomingHttpHeaders): boolean {
+  const contentType = headers['content-type'];
+  return typeof contentType === 'string' && contentType.toLowerCase().includes('text/html');
+}
+
+/**
+ * The page is framed by the WebUI client, on a different origin, so a page that asks not to be framed
+ * must not be able to refuse: `X-Frame-Options` is dropped and a `frame-ancestors` directive is removed
+ * from the page's own CSP. Everything else the page declares is left alone — the Mini App's origin is a
+ * separate origin from the client's, so its CSP governs a document that cannot reach the client anyway.
+ */
+function frameableHeaders(headers: http.IncomingHttpHeaders): http.OutgoingHttpHeaders {
+  const result: http.OutgoingHttpHeaders = {};
+  for (const [name, value] of Object.entries(headers)) {
+    if (FRAME_BLOCKING_HEADERS.includes(name.toLowerCase() as 'x-frame-options')) continue;
+    if (name.toLowerCase() === CSP_HEADER && typeof value === 'string') {
+      const directives = value
+        .split(';')
+        .map((directive) => directive.trim())
+        .filter((directive) => directive.length > 0 && !directive.toLowerCase().startsWith('frame-ancestors'));
+      result[name] = directives.join('; ');
+      continue;
+    }
+    result[name] = value;
+  }
+  return result;
+}
+
+function injectBridge(document: string, bridge: MiniAppPageBridge): string {
+  const tag = `<script src="${bridge.path}"></script>`;
+  const headEnd = document.search(/<\/head\s*>/iu);
+  if (headEnd >= 0) return `${document.slice(0, headEnd)}${tag}${document.slice(headEnd)}`;
+  const bodyStart = document.search(/<body[^>]*>/iu);
+  if (bodyStart >= 0) {
+    const insertAt = document.indexOf('>', bodyStart) + 1;
+    return `${document.slice(0, insertAt)}${tag}${document.slice(insertAt)}`;
+  }
+  return `${tag}${document}`;
 }
