@@ -1,0 +1,230 @@
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { EventEmitter } from 'node:events';
+import type { ChildProcess } from 'node:child_process';
+
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+import type { MiniAppNodeRuntime, ProcessMiniAppCandidate } from '../../../src/service/miniapp/contracts.js';
+import { createMiniAppNodeRuntimeAdapter } from '../../../src/service/miniapp/process/node-runtime/node-runtime.js';
+import {
+  startMiniAppModule,
+  type MiniAppRunnerInitMessage,
+  type RunningMiniAppModule,
+} from '../../../src/service/miniapp/process/node-runtime/host-runner.js';
+
+/**
+ * A scripted child: it is the real runner running in this process, so the readiness probe meets the
+ * real guard. Everything else about the child process is scripted, which lets the test observe the
+ * credential the runtime mints and hands down without spawning a node process per case.
+ */
+class ScriptedChild extends EventEmitter {
+  pid = 4242;
+  exitCode: number | null = null;
+  signalCode: NodeJS.Signals | null = null;
+  connected = true;
+  readonly stdout = new EventEmitter();
+  readonly stderr = new EventEmitter();
+  readonly stdin = new EventEmitter() as unknown as ChildProcess['stdin'];
+
+  readonly received: MiniAppRunnerInitMessage[] = [];
+  private runner: RunningMiniAppModule | undefined;
+
+  constructor(
+    private readonly onExit: () => void,
+    /** A child that accepts the init message and never reports readiness. */
+    private readonly silent = false,
+  ) {
+    super();
+  }
+
+  async send(message: unknown, callback?: (error: Error | null) => void): Promise<boolean> {
+    const init = message as MiniAppRunnerInitMessage;
+    if (init?.type === 'miniapp:init') {
+      this.received.push(init);
+      if (this.silent) return true;
+      try {
+        this.runner = await startMiniAppModule(init, {
+          loadModule: async () => ({
+            start: async (context: { readonly listen: { host: string; port: number } }) => {
+              const { createServer } = await import('node:http');
+              const server = createServer((_request, response) => {
+                response.writeHead(200).end('plugin');
+              });
+              await new Promise<void>((resolve, reject) => {
+                server.once('error', reject);
+                server.listen(context.listen.port, context.listen.host, resolve);
+              });
+              return {
+                async dispose() {
+                  server.closeAllConnections();
+                  await new Promise<void>((resolve) => server.close(() => resolve()));
+                },
+              };
+            },
+          }),
+        });
+      } catch (error) {
+        callback?.(error as Error);
+        this.emit('message', { type: 'miniapp:error', code: 'RUNNER_START_FAILED', errorText: String(error) });
+        return false;
+      }
+      callback?.(null);
+      this.emit('message', {
+        type: 'miniapp:started',
+        pluginId: init.pluginId,
+        processGeneration: init.processGeneration,
+        readiness: init.readiness,
+      });
+      return true;
+    }
+    if (init?.type === 'miniapp:stop') {
+      await this.runner?.stop();
+      this.exit(0);
+    }
+    return true;
+  }
+
+  exit(code: number): void {
+    if (this.exitCode !== null) return;
+    this.exitCode = code;
+    this.connected = false;
+    this.onExit();
+    this.emit('exit', code, null);
+  }
+
+  kill(): boolean {
+    this.exit(0);
+    return true;
+  }
+}
+
+let packageRoot = '';
+
+const candidate = (): ProcessMiniAppCandidate => ({
+  pluginId: 'fixture.miniapp',
+  packageRoot,
+  packageDigest: 'package-digest',
+  clientDigest: 'client-digest',
+  nodeDigest: 'node-digest',
+  surfacePath: '/dashboard',
+  lifecycle: 'on-demand',
+  nodeEntry: 'miniapp/node/server.js',
+  mcpEndpoints: [],
+  hostConnectorPolicy: { kind: 'deny-all' },
+});
+
+beforeAll(async () => {
+  packageRoot = await mkdtemp(join(tmpdir(), 'miniapp runtime '));
+  const entry = join(packageRoot, 'miniapp', 'node', 'server.js');
+  await mkdir(dirname(entry), { recursive: true });
+  await writeFile(entry, 'export const start = async () => undefined;\n');
+});
+
+afterAll(async () => {
+  await rm(packageRoot, { recursive: true, force: true });
+});
+
+describe('Mini App loopback credential', () => {
+  it('mints one credential per preparation and hands that exact value down', async () => {
+    let minted = 0;
+    const child = new ScriptedChild(() => undefined);
+    const dataDir = await mkdtemp(join(tmpdir(), 'miniapp data '));
+    const adapter = createMiniAppNodeRuntimeAdapter({
+      resolvePluginDataDir: () => dataDir,
+      verifyCandidate: async () => true,
+      materializePackage: async ({ targetRoot }) => {
+        const target = join(targetRoot, 'miniapp', 'node', 'server.js');
+        await mkdir(dirname(target), { recursive: true });
+        await writeFile(target, 'export const start = async () => undefined;\n');
+      },
+      isPortReserved: () => false,
+      makeLoopbackToken: () => {
+        minted += 1;
+        return `credential-${minted}`;
+      },
+      spawn: () => child as unknown as ChildProcess,
+      createTerminator: () => ({ stop: async () => ({ proven: true }) }) as never,
+    });
+
+    let runtime: MiniAppNodeRuntime | undefined;
+    try {
+      runtime = await adapter.prepare({
+        candidate: candidate(),
+        processGeneration: 'generation-1',
+        signal: new AbortController().signal,
+        onLog: () => undefined,
+      });
+
+      expect(minted).toBe(1);
+      expect(child.received).toHaveLength(1);
+      expect(child.received[0]?.loopbackToken).toBe('credential-1');
+      // The handle carries the same value the guard was installed with, and readiness passed only
+      // because the guard answered 204 for it.
+      expect(runtime.loopbackToken).toBe('credential-1');
+    } finally {
+      await runtime?.stop();
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('Mini App process generations', () => {
+  it('gives a new process generation a different credential', async () => {
+    let minted = 0;
+    const tokens: string[] = [];
+    const token = () => {
+      minted += 1;
+      const value = `credential-${minted}`;
+      tokens.push(value);
+      return value;
+    };
+    const dataDir = await mkdtemp(join(tmpdir(), 'miniapp data '));
+    const build = (child: ScriptedChild) =>
+      createMiniAppNodeRuntimeAdapter({
+        resolvePluginDataDir: () => dataDir,
+        verifyCandidate: async () => true,
+        materializePackage: async ({ targetRoot }) => {
+          const target = join(targetRoot, 'miniapp', 'node', 'server.js');
+          await mkdir(dirname(target), { recursive: true });
+          await writeFile(target, 'export const start = async () => undefined;\n');
+        },
+        isPortReserved: () => false,
+        makeLoopbackToken: token,
+        spawn: () => child as unknown as ChildProcess,
+        createTerminator: () => ({ stop: async () => ({ proven: true }) }) as never,
+        // Fails fast: this case only needs the init message a new generation would receive.
+        runnerStartTimeoutMs: 40,
+        nowMs: Date.now,
+      });
+
+    try {
+      const first = new ScriptedChild(() => undefined);
+      const firstRuntime = await build(first).prepare({
+        candidate: { ...candidate(), pluginId: 'fixture.first' },
+        processGeneration: 'generation-1',
+        signal: new AbortController().signal,
+        onLog: () => undefined,
+      });
+      expect(first.received[0]?.loopbackToken).toBe(tokens[0]);
+      await firstRuntime.stop();
+
+      const second = new ScriptedChild(() => undefined, true);
+      await expect(
+        build(second).prepare({
+          candidate: { ...candidate(), pluginId: 'fixture.first' },
+          processGeneration: 'generation-2',
+          signal: new AbortController().signal,
+          onLog: () => undefined,
+        }),
+      ).rejects.toBeDefined();
+
+      expect(second.received).toHaveLength(1);
+      expect(second.received[0]?.loopbackToken).toBe(tokens[1]);
+      expect(new Set(tokens).size).toBe(2);
+    } finally {
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
+});
