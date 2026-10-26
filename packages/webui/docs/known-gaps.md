@@ -135,9 +135,9 @@ The Mini App contract in this repository is also one generation behind the imple
 in the desktop client: `packages/shared/src/miniapp-surface.ts` here is 54 lines against 1267
 there, and this repository's runtime has no credential guard on the Mini App's own HTTP server.
 The newer contract is in neither this repository nor the public upstream tree, so it does not
-arrive by synchronization. The accepted direction for this client is in
-[ADR 0020](adr/0020-webui-miniapp-view-and-runtime-seams.md), including the contract-baseline
-question it leaves open.
+arrive by synchronization. The accepted direction for this client — which generation of the contract
+is taken, what the bridge carries, where the view lives and how a standalone presentation is
+tracked — is in [ADR 0020](adr/0020-webui-miniapp-view-and-runtime-seams.md).
 
 The owner-kind gate is also decided in the wrong place. The runtime owner policy resolves once per
 host and drives the other owner-derived service gates — cron, channels, the scheduler — from its

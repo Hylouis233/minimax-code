@@ -156,12 +156,13 @@ export function createWebuiTerminalOwner(
 
   const asRecord = (value: unknown): WebuiTerminalRecord | undefined => {
     if (!value || typeof value !== "object") return undefined;
-    const record = value as { terminalId?: unknown; status?: unknown; output?: unknown };
+    const record = value as { terminalId?: unknown; status?: unknown; output?: unknown; workspaceTabId?: unknown };
     if (typeof record.terminalId !== "string") return undefined;
     return {
       terminalId: record.terminalId,
       status: typeof record.status === "string" ? record.status : "running",
       ...(typeof record.output === "string" ? { output: record.output } : {}),
+      ...(typeof record.workspaceTabId === "string" ? { workspaceTabId: record.workspaceTabId } : {}),
     };
   };
 
@@ -194,16 +195,16 @@ export function createWebuiTerminalOwner(
     }
   };
 
-  const create = async (workspaceDir: string, size?: { readonly cols: number; readonly rows: number }): Promise<WebuiTerminalRecord | undefined> => {
+  const create = async (workspaceDir: string, size?: { readonly cols: number; readonly rows: number }, workspaceTabId?: string): Promise<WebuiTerminalRecord | undefined> => {
     if (disposed) return undefined;
     const createTerminal = port.createTerminal;
     if (!createTerminal) return undefined;
-    const created = await createTerminal({ workspaceDir, ...size }).catch((reason: unknown) => {
+    const created = await createTerminal({ workspaceDir, ...size, ...(workspaceTabId ? { workspaceTabId } : {}) }).catch((reason: unknown) => {
       markIncompatible("create", reason);
       throw reason;
     });
     await refresh();
-    return { terminalId: created.terminalId, status: created.status };
+    return { terminalId: created.terminalId, status: created.status, ...(workspaceTabId ? { workspaceTabId } : {}) };
   };
 
   const write = async (terminalId: string, data: string): Promise<void> => {

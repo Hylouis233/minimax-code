@@ -43,6 +43,7 @@ export function createTerminalHandlerEntries(
       String((body as Record<string, unknown>).workspaceDir ?? process.cwd()),
       Number((body as Record<string, unknown>).cols) || 80,
       Number((body as Record<string, unknown>).rows) || 24,
+      typeof (body as Record<string, unknown>).workspaceTabId === "string" ? String((body as Record<string, unknown>).workspaceTabId) : undefined,
     ),
   });
   const listTerminals: DedicatedHandler<typeof listTerminalsOperation> = async () => ({
@@ -50,6 +51,7 @@ export function createTerminalHandlerEntries(
       readonly terminalId: string;
       readonly status: "running" | "exited";
       readonly output: string;
+      readonly workspaceTabId?: string;
     }[],
   });
   const writeTerminal: DedicatedHandler<typeof writeTerminalOperation> = async (

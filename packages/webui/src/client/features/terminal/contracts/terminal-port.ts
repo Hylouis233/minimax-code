@@ -25,6 +25,7 @@ export interface TerminalPort {
     readonly workspaceDir: string;
     readonly cols?: number;
     readonly rows?: number;
+    readonly workspaceTabId?: string;
   }) => Promise<{ readonly terminalId: string; readonly status: string }>;
   readonly listTerminals?: () => Promise<readonly Record<string, unknown>[]>;
   readonly writeTerminal?: (request: {
@@ -34,9 +35,8 @@ export interface TerminalPort {
   /**
    * Tell the runtime how large the attached terminal now is.
    *
-   * The pseudo-terminal behind the tab is created at 80x24 and this operation
-   * is the only thing that moves it, so a client that never sends one leaves
-   * full-screen programs drawing into a grid the browser is not showing.
+   * A new pseudo-terminal starts at its measured grid; this operation keeps it
+   * in step with later browser viewport changes and restored terminal sessions.
    */
   readonly resizeTerminal?: (request: WebuiTerminalSize) => Promise<unknown>;
   readonly disposeTerminal?: (request: {

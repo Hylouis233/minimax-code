@@ -457,21 +457,22 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
       if (rosterRead.current === read) rosterRead.current += 1;
     };
   }, [terminalOwner, activeTab?.id, activeWorkspace, tab]);
+  const activeTerminal = activeTab ? terminals.find((entry) => entry.workspaceTabId === activeTab.id) : undefined;
+  const terminalTargetId = activeTerminal?.terminalId;
   useEffect(() => {
-    if (tab !== "terminal" || !terminalsReady || terminals.length > 0 || !activeWorkspace || !terminalOwner?.canCreate || !terminalInitialSize) return;
+    if (tab !== "terminal" || !terminalsReady || terminalTargetId || !activeWorkspace || !activeTab?.id || !terminalOwner?.canCreate || !terminalInitialSize) return;
     const autoCreateKey = `${activeTab?.id ?? ""}\0${activeWorkspace}`;
     if (autoCreateTerminalFor.current === autoCreateKey) return;
     autoCreateTerminalFor.current = autoCreateKey;
-    void terminalOwner.create(activeWorkspace, terminalInitialSize).then((created) => {
+    void terminalOwner.create(activeWorkspace, terminalInitialSize, activeTab.id).then((created) => {
       if (created) reportedTerminalSize.current = { terminalId: created.terminalId, ...terminalInitialSize };
       syncTerminalsFromOwner(terminalOwner);
     }).catch((error: unknown) => setTerminalError(error instanceof Error ? error.message : String(error)));
-  }, [tab, terminalsReady, terminals.length, activeWorkspace, terminalOwner, terminalInitialSize, activeTab?.id]);
+  }, [tab, terminalsReady, terminalTargetId, activeWorkspace, terminalOwner, terminalInitialSize, activeTab?.id]);
   // A view going away releases its watch and its xterm; it never kills a PTY.
   // Process death is the panel's explicit dispose button or the application's
   // disposal.
   useEffect(() => () => { terminalStop.current?.(); terminalInstance.current?.dispose(); }, []);
-  const terminalTargetId = terminals[0]?.terminalId;
   // Measure the real xterm grid before creating the PTY. This avoids starting
   // the shell at 80x24 and immediately resizing it, which leaves wrapped prompt
   // fragments behind in some interactive shells.
@@ -664,8 +665,8 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     {tab === "launcher" && activeTab?.content.kind === "launcher" ? <WebuiWorkspaceLauncher tab={activeTab} dispatch={panelDispatch} sessionId={sessionId} workspaceDir={workspaceDir} /> : null}
     {tab === "terminal" ? <div className="webui-terminal-content">
         <div ref={terminalHost} className="webui-xterm-host" />
-        {!terminalsReady || terminals.length === 0 && (terminalAvailability || terminalError) ? <p role={terminalError ? "alert" : "status"} data-webui-terminal-availability={terminalSupport}>{!terminalsReady ? DESKTOP_COPY.terminalLoading : terminalAvailability ?? terminalError}</p> : null}
-        {terminalError && terminals.length > 0 ? <p role="alert">{terminalError}</p> : null}
+        {!terminalsReady || !terminalTargetId && (terminalAvailability || terminalError) ? <p role={terminalError ? "alert" : "status"} data-webui-terminal-availability={terminalSupport}>{!terminalsReady ? DESKTOP_COPY.terminalLoading : terminalAvailability ?? terminalError}</p> : null}
+        {terminalError && terminalTargetId ? <p role="alert">{terminalError}</p> : null}
     </div> : null}
       </div>
       {hasFileWorkspace && fileTreeOpen ? <aside className="webui-workspace-file-tree-panel" aria-label="工作区文件树">

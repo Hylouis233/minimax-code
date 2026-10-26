@@ -8,12 +8,12 @@ type Pty = { readonly pid: number; write(data: string): void; resize(cols: numbe
 type PtyModule = { spawn(shell: string, args: string[], options: Record<string, unknown>): Pty };
 const require = createRequire(import.meta.url);
 
-type Terminal = { readonly id: string; readonly pty: Pty; readonly output: string[]; readonly listeners: Set<(data: string) => void>; exited: boolean };
+type Terminal = { readonly id: string; readonly workspaceTabId?: string; readonly pty: Pty; readonly output: string[]; readonly listeners: Set<(data: string) => void>; exited: boolean };
 
 export class WebuiTerminalManager implements WebuiTerminalProcessPort {
   private readonly terminals = new Map<string, Terminal>();
   constructor(private readonly loadPty: () => PtyModule = () => require("node-pty") as PtyModule) {}
-  create(workspaceDir: string, cols = 80, rows = 24) {
+  create(workspaceDir: string, cols = 80, rows = 24, workspaceTabId?: string) {
     if (this.terminals.size >= 5) throw new Error("最多可以打开 5 个终端");
     const id = `terminal-${crypto.randomUUID()}`;
     let ptyModule: PtyModule;
@@ -25,7 +25,7 @@ export class WebuiTerminalManager implements WebuiTerminalProcessPort {
     }
     const shell = process.env.SHELL || (process.platform === "win32" ? "powershell.exe" : "/bin/sh");
     const child = ptyModule.spawn(shell, process.platform === "win32" ? [] : ["-il"], { name: "xterm-256color", cols: Math.max(2, Math.min(500, Math.floor(cols))), rows: Math.max(1, Math.min(300, Math.floor(rows))), cwd: workspaceDir, env: { ...process.env, TERM: "xterm-256color" } });
-    const terminal: Terminal = { id, pty: child, output: [], listeners: new Set(), exited: false };
+    const terminal: Terminal = { id, ...(workspaceTabId ? { workspaceTabId } : {}), pty: child, output: [], listeners: new Set(), exited: false };
     child.onData((data) => { terminal.output.push(data); if (terminal.output.length > 10000) terminal.output.shift(); for (const listener of terminal.listeners) listener(data); });
     child.onExit(() => { terminal.exited = true; for (const listener of terminal.listeners) listener(""); });
     this.terminals.set(id, terminal);
@@ -35,11 +35,13 @@ export class WebuiTerminalManager implements WebuiTerminalProcessPort {
     readonly terminalId: string;
     readonly status: "running" | "exited";
     readonly output: string;
+    readonly workspaceTabId?: string;
   }[] {
     return [...this.terminals.values()].map((terminal) => ({
       terminalId: terminal.id,
       status: terminal.exited ? ("exited" as const) : ("running" as const),
       output: terminal.output.join(""),
+      ...(terminal.workspaceTabId ? { workspaceTabId: terminal.workspaceTabId } : {}),
     }));
   }
   write(terminalId: string, data: string) { this.get(terminalId).pty.write(data); return { success: true as const }; }

@@ -49,6 +49,7 @@ export interface WebuiTerminalRecord {
   readonly terminalId: string;
   readonly status: string;
   readonly output?: string;
+  readonly workspaceTabId?: string;
 }
 
 export interface WebuiTerminalCatalogue {
@@ -105,7 +106,7 @@ export interface WebuiTerminalOwner {
   /** Read the catalogue; a failure is recorded in the snapshot, not thrown. */
   readonly refresh: () => Promise<void>;
   /** Create a terminal and adopt it into the catalogue. */
-  readonly create: (workspaceDir: string, size?: { readonly cols: number; readonly rows: number }) => Promise<WebuiTerminalRecord | undefined>;
+  readonly create: (workspaceDir: string, size?: { readonly cols: number; readonly rows: number }, workspaceTabId?: string) => Promise<WebuiTerminalRecord | undefined>;
   readonly write: (terminalId: string, data: string) => Promise<void>;
   readonly resize: (request: WebuiTerminalSizeRequest) => Promise<void>;
   /** Explicit process death. A view release never calls this. */
