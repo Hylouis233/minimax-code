@@ -716,6 +716,14 @@ export function installFixtureTransport() {
     pending,
     setResponse(operation, value) { responses.set(operation, clone(value)); },
     refuseOperation(operation, code, message) { refusals.set(operation, { code, message }); },
+    /**
+     * Answers an operation again after `refuseOperation`.
+     *
+     * A runtime refusal is a condition, not a latch: a capacity refusal ends
+     * when a slot is freed, and the next start then succeeds. A fixture that
+     * could only refuse forever would make "stop one, then retry" untestable.
+     */
+    allowOperation(operation) { refusals.delete(operation); },
     setSessions(next) { sessions.splice(0, sessions.length, ...clone(next)); },
     setProjects(next) { projects = clone(next); },
     delayNext(operation, condition) { delayed.push({ operation, condition }); },
