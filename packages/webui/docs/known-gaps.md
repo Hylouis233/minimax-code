@@ -4,7 +4,7 @@ Capabilities the WebUI does not have, verified against the tree. Each entry says
 how, and what remains unverified. "Not implemented" and "not decided" are different states and are
 kept apart here; the undecided ones are also in `open-questions.md`.
 
-Last verified: 2026-10-21, against `webui` at `ccc51961`. This list covers capabilities; open
+Last verified: 2026-10-26, against `webui` at `88c83655`. This list covers capabilities; open
 decisions are in [`open-questions.md`](open-questions.md).
 
 ## 1. Connector and App tools depend on a beta feature, and on the model finding them
@@ -105,6 +105,18 @@ What remains is a boundary rather than a gap:
   browser uses the browser itself; the panel's web tabs are the embedded browser's.
 - **The bridged surfaces have no tab model.** The strip's web tabs come from the isolated
   Chromium's snapshot, and the bridge's pages are not published as tabs.
+- **The bridge cannot `upload_files`.** The action needs `DOM.setFileInputFiles`, which is
+  deliberately absent from the extension's DevTools allowlist — the extension's debugger could run
+  it, but what it must not do is give the Agent a way to name an arbitrary local file in the user's
+  real browser. The action therefore cannot complete on the bridge: the extension refuses the
+  method as unsupported, and the bridge maps that refusal to `browser_capability_denied`. This is a
+  **capability difference, not a semantic one**: the isolated Chromium performs the same action
+  with the same semantics. **No test pins the refusal**, so a future change to the allowlist would
+  silently widen this surface.
+
+The bridge's **restricted action set is otherwise the same 28 actions** the isolated Chromium
+executes, and both are executed by Browser Core — one implementation over two transports. See
+[`browser-use/10-browser-core-integration.md`](browser-use/10-browser-core-integration.md).
 
 ## 9. The Mini App capability is not reachable from this client
 

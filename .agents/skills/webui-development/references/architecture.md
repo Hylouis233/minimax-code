@@ -13,6 +13,25 @@ Paths are repository-relative. Start structural work with `packages/webui/docs/a
 
 Browser → authenticated loopback service → `WebuiHarnessPort` → process-local harness. The port call is an in-process adapter seam, not another network hop. WebUI builds on `@mavis/local-runtime-v2`; it does not launch the CLI or import `packages/tui`. TUI may be read for behavior/event semantics. Local `src/shared/` and the workspace package `@mavis/shared` are different homes.
 
+## The browser's own boundary
+
+The browser runtime lives in `src/runtime/browser/` and the external bridge in `src/server/browser-bridge/`. Both reach a real browser through `@mavis/browser-core`, a **peer** workspace package (`packages/browser-core/`) rather than a WebUI layer.
+
+| Concern | Owner | Where |
+| --- | --- | --- |
+| What a browser action *means* — element references, retained snapshots, action deadlines, effect validation | `@mavis/browser-core` | `packages/browser-core/src/` |
+| How a command reaches one page or tab | a `BrowserTransport` adapter, one per surface | `src/runtime/browser/isolated-chromium/core-transport.ts`; `src/server/browser-bridge/core-transport.ts` |
+| Whether an action *may* run | the WebUI | `src/runtime/browser/authorization.ts`, `src/runtime/browser/browser-service.ts` |
+
+**The rule that keeps this honest:** Browser Core decides what an action means, the WebUI decides whether it may run, and a transport decides only how the command travels. A transport never judges an action's meaning, and the core reads no authorization switch.
+
+When changing a browser action, an element reference, or the bridge's command path, read `packages/webui/docs/browser-use/10-browser-core-integration.md` first. Two consequences are easy to miss:
+
+- **Do not re-implement an action's semantics in a provider.** A provider that translates a restricted action into raw DevTools calls itself is a second definition of what the action does, and the two will drift. Add the capability to the core, or extend the transport — not the provider's action switch.
+- **`src/client/` and `src/shared/` may not import `@mavis/browser-core`.** The dependency gate rejects it, and the reason is structural: the browser bundle must not carry a second, unreachable copy of the core's semantics. This is why the restricted command vocabulary is duplicated in `src/shared/contracts/browser.ts` rather than read from the core; `test/unit/browser-restricted-commands.test.ts` asserts the two lists cannot drift. If you add an action, update both and let the test tell you.
+
+The two surfaces are not interchangeable, and the differences are properties of the browsers rather than of the WebUI's knowledge: the bridge cannot `open_tab` (`chrome.debugger` cannot open a page in the person's browser) and cannot `upload_files` (`DOM.setFileInputFiles` is deliberately absent from the extension's allowlist). The bridge's screenshot comes from the extension's pushed visible-tab frame, so a tab that is not in front is refused rather than answered with another tab's picture.
+
 ## Client placement
 
 Paths here are under `packages/webui/src/client/`.

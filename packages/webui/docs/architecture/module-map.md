@@ -50,6 +50,8 @@ business is — and what it is not — is in `../client/ownership.md`.
 | `runtime/commands/` | The six WebUI slash commands: `descriptors.ts` (help, new, compact, status, usage, model) and `runner.ts`. |
 | `runtime/runtime-environment.ts` | Reflects the installed client's region/build scope into the process environment before the host is built. |
 | `runtime/browser-provider.ts` | The browser (Browser Use) provider and its adoption rule. |
+| `runtime/browser/` | The browser runtime: `browser-service.ts` (authorization, providers, the target registry, the per-run frame streams and the web-tab snapshot), `tool-adapter.ts` (the Agent's tool path over the service), `authorization.ts` (the four switches and the restricted-command gate), `target-registry.ts` (the target identity and its generation), `input.ts` (input-command validation), `errors.ts` (the stable browser error codes). |
+| `runtime/browser/isolated-chromium/` | The browser this process launches and owns: `provider.ts` (the pages, their generations and their image streams), `cdp-connection.ts` (the DevTools connection), `core-transport.ts` (the Browser Core transport over that connection). |
 
 ## Server
 
@@ -61,6 +63,14 @@ business is — and what it is not — is in `../client/ownership.md`.
 | `server/http/` | `router.ts`, `client-assets.ts`, `workspace-file.ts`, `session-transfer.ts`, `responses.ts`. |
 | `server/credentials.ts`, `server/envelope.ts` | The loopback credential and runtime envelope validation (`isWebuiFrame`). The frame shape, protocol version and error codes live in `shared/envelope.ts`. |
 | `server/projections/` | Server-side projections shared by handlers: `context-snapshot.ts`, `model-provider.ts`, `usage.ts`, `index.ts`. |
+
+## Server — browser bridge
+
+| Module | Role |
+| --- | --- |
+| `server/browser-bridge/server.ts` | The bridge itself: the WebSocket server, the per-tab state, the `cdp` command channel and the Browser Core sessions. |
+| `server/browser-bridge/core-transport.ts` | The Browser Core transport over the bridge's `cdp` frame, and the capability boundaries the extension's allowlist implies. |
+| `server/browser-bridge/admission.ts`, `pairing.ts`, `session.ts`, `registry.ts`, `reconnect.ts`, `credential-store.ts` | The dedicated admission path, the pairing proof, the session and target registry, the reconnect schedule and the OS credential store. |
 
 ## Server — operations
 
@@ -90,3 +100,9 @@ The binding roster and the compiler enforcement that keeps it in step with the p
 `@mavis/shared` is a **different** workspace package (`packages/shared`), not `src/shared/`. The
 server and the browser import its public subpaths, including `daily-signin`, protocol and runtime
 boundary contracts.
+
+`@mavis/browser-core` is a second such package (`packages/browser-core/`). It owns the **semantics**
+of a browser action and reaches a browser through a `BrowserTransport`; the WebUI supplies one
+adapter per surface. The TUI drives the same package, so the two clients share one definition of
+what an action means. See
+[`../browser-use/10-browser-core-integration.md`](../browser-use/10-browser-core-integration.md).

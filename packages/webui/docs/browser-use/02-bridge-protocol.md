@@ -116,6 +116,16 @@ attached debugger cannot produce an image frame at all; the extension captures t
   [`01-capability-matrix.md`](01-capability-matrix.md) applies to the isolated provider only. It has no
   analogue on this path.
 
+**The bridge's `screenshot` action is answered from that same source.** The extension is already
+streaming pictures of the tab in front, and a picture of that tab is exactly a screenshot of the
+page — so the bridge's core session takes its pictures there rather than from a DevTools command,
+through the core's `captureScreenshot` hook. A tab that is **not** in front therefore has no picture
+to give, and its screenshot is refused with `browser_capability_denied` rather than answered with
+somebody else's page. This is the boundary `Page.captureScreenshot` would have crossed: a DevTools
+screenshot can capture any tab on demand, including the ones the person is not looking at.
+
+See [`10-browser-core-integration.md`](10-browser-core-integration.md).
+
 ## Pairing: proof first, credential second
 
 The credential is **host-authored**. The extension does not mint one: two
@@ -363,10 +373,28 @@ permitted by the Full CDP switch.
 The extension decides the rest. `chrome.debugger` exposes only a **subset** of
 the DevTools domains, so the extension keeps an explicit list of the commands
 it will send (`WEBUI_BROWSER_BRIDGE_CDP_COMMANDS` in
-`packages/browser-extension/src/cdp.ts`) and refuses anything outside it —
-**before** it makes any browser call. A refusal carries `unsupported: true`, so
-the host can tell "the extension will never run this" apart from "this
-failed", which are different things to a caller.
+`packages/browser-extension/src/cdp.ts`, **45** commands) and refuses anything
+outside it — **before** it makes any browser call. A refusal carries
+`unsupported: true`, so the host can tell "the extension will never run this"
+apart from "this failed", which are different things to a caller.
+
+The list covers these domains: `DOM`, `DOMDebugger`, `DOMSnapshot`, `Runtime`,
+`Accessibility`, `Network`, `Input`, `Page`, `Emulation`, `Log`, `Console`,
+`Fetch`. Two of them are **deliberately absent**, and each absence is a
+boundary rather than a gap:
+
+| Absent | Why |
+| --- | --- |
+| `Page.captureScreenshot` | it could capture any tab on demand, including the ones the person is not looking at. The bridge takes its pictures from the extension's pushed visible-tab frame instead — see above |
+| `DOM.setFileInputFiles` | it would give the Agent a way to name an arbitrary local file in the user's real browser. `upload_files` therefore cannot complete on the bridge: the extension refuses the method as unsupported, and the bridge maps that refusal to `browser_capability_denied` |
+
+**A restricted browser-tool action is not one `cdp` frame.** It is a *sequence*
+of them. Browser Core owns the semantics of an action — the element map, the
+retained snapshot, the deadline — and it reaches the tab through the bridge's
+DevTools channel, so `click` on a named element is several commands (a DOM
+query, a box model, an input event) rather than one. Every one of those
+commands must be inside the list above, and one that is not makes the whole
+action fail with `unsupported`.
 
 A browser that refuses a command the list allows comes back as a plain
 refusal with the browser's own message. Chrome's answer is the authority; the

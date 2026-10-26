@@ -112,9 +112,17 @@ authorization. This table is `implemented` and transcribed from `admission.ts:81
 | 1 | Request path is exactly `/browser-bridge` (`WEBUI_BROWSER_BRIDGE_PATH`) | `admission.ts:95` | `400 Bad Request` |
 | 2 | `Host` header host part is loopback (`isLoopbackHost`) | `admission.ts:102` | `403 Forbidden Host` |
 | 3 | URL hostname is `127.0.0.1` or `localhost` | `admission.ts:107` | `403 Forbidden Host` |
-| 4 | `Origin` is a `chrome-extension://<id>/` URL **and** some pairing's allowlist admits that id | `admission.ts:114`, `admission.ts:122` | `403 Forbidden Origin` |
-| 5 | A challenge has been issued and the presented `proof` verifies: `keyId` matches, `nonce` matches, the algorithm is the issued one, and the signature compares equal | `pairing.ts`, via `verifyWebuiBrowserBridgeProof` (`contracts/browser-bridge.ts:218`) | closed with `reason` |
-| 6 | The switch for the browser named in `hello` is on, and a current credential exists for it | `pairing.ts:152` | closed with `reason` |
+| 4 | `Origin` is a `chrome-extension://<id>/` URL **and** some pairing's allowlist admits that id | `admission.ts:114`, `admission.ts:128` | `403 Forbidden Origin` |
+| 5 | A challenge has been issued and the presented `proof` verifies: `keyId` matches, `nonce` matches, the algorithm is the issued one, and the signature compares equal | `pairing.ts`, via `verifyWebuiBrowserBridgeProof` (`contracts/browser-bridge.ts:323`) | closed with `reason` |
+| 6 | The switch for the browser named in `hello` is on, and a current credential exists for it | `pairing.ts:175` | closed with `reason` |
+
+**Check 4 is a pre-filter, not the authentication decision.** The `Origin` header is
+writable by any local process, so it says which extension *claims* to be connecting — it does
+not say who is connecting. What authenticates the peer is the **proof**, and a peer that
+proves the surface's **installation key** is the only one the host will release the pairing
+credential to (`pairing.ts:270`, `verifyProof`; `session.ts:652`). A peer that proves only a
+pairing credential the host already issued is admitted without a further credential; a peer
+that proves neither is refused and receives no credential at all.
 
 Two corrections to the shape this document originally specified, both now taken from the source:
 

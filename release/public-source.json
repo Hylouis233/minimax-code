@@ -3587,6 +3587,7 @@
     "packages/webui/docs/browser-use/06-runtime-authorization-trace.md",
     "packages/webui/docs/browser-use/07-review-findings.md",
     "packages/webui/docs/browser-use/09-acceptance-record.md",
+    "packages/webui/docs/browser-use/10-browser-core-integration.md",
     "packages/webui/docs/browser-use/README.md",
     "packages/webui/docs/client/composer.md",
     "packages/webui/docs/client/floating-surfaces.md",

@@ -11,7 +11,7 @@
 **The registry exists and its generation is now fed.** `WebuiBrowserTargetRegistry` is implemented in
 `packages/webui/src/runtime/browser/target-registry.ts`, `isCurrent` compares the generation
 (`target-registry.ts`), and `WebuiBrowserService.#ensureProvider` subscribes to the provider's
-`onTargetChanged` and calls `raiseGeneration` (`browser-service.ts:176`), so the counter advances when
+`onTargetChanged` and calls `raiseGeneration` (`browser-service.ts:620`), so the counter advances when
 the page behind a target is replaced. Finding F2 in
 [`07-review-findings.md`](07-review-findings.md) records what this closes and what remains unmeasured.
 
@@ -80,12 +80,12 @@ than resolving to the nearest match.
 | Situation | Result | Pinned code | State |
 | --- | --- | --- | --- |
 | Identity matches surface, browser, tab **and** generation | proceed | — | `implemented` — `isCurrent`, `target-registry.ts` |
-| Generation is behind the registry's | refuse — the page moved on | `browser_target_stale` | `implemented` — `sendInput` calls `isCurrent` (`browser-service.ts:289`), and the registry's generation is raised from `provider.onTargetChanged` (`browser-service.ts:176`) |
-| Surface or browser does not match, or the target is absent | refuse — no such target here | `browser_target_unknown` | `implemented` — `selectTarget`, `browser-service.ts:256` |
+| Generation is behind the registry's | refuse — the page moved on | `browser_target_stale` | `implemented` — `sendInput` calls `isCurrent` (`browser-service.ts:848`), and the registry's generation is raised from `provider.onTargetChanged` (`browser-service.ts:620`) |
+| Surface or browser does not match, or the target is absent | refuse — no such target here | `browser_target_unknown` | `implemented` — `selectTarget`, `browser-service.ts:777` |
 
 **How the registry learns that the page moved.** The provider is the only party that knows when the page
 behind a target is replaced, so `#ensureProvider` subscribes to it and forwards the announcement
-(`browser-service.ts:176`):
+(`browser-service.ts:620`):
 
 | Counter | Owner | Behaviour |
 | --- | --- | --- |
@@ -135,14 +135,26 @@ identity the message arrives on. See [`02-bridge-protocol.md`](02-bridge-protoco
 | --- | --- | --- |
 | Each Agent run / TUN owns its own target selection | Two concurrent runs select independently | `implemented` — the service keys its selections by surface and then by run (`WebuiBrowserService.#selected`) |
 | One run's selection must not overwrite another's | Selecting a tab in run A does not move run B's target | `implemented` — the selection map is per run |
-| The Agent may choose a different authorized tab each turn | Selection is not pinned for the life of a run | `implemented` — the Agent's `open_tab` is the path: it creates a page and makes it the run's selection (`runtime/browser/tool-adapter.ts:178`, `runtime/browser/browser-service.ts:1082`), so a run's selection is not pinned for the life of the run |
-| **After switching tabs, the Agent must reacquire page elements** | References from the previous tab are dead. This is a caller obligation, enforced by the generation counter making it visible | `required` — a rule on the caller; the generation counter can only report the mismatch |
+| The Agent may choose a different authorized tab each turn | Selection is not pinned for the life of a run | `implemented` — the Agent's `open_tab` is the path: it creates a page and makes it the run's selection (`runtime/browser/tool-adapter.ts:178`, `runtime/browser/browser-service.ts:1188`), so a run's selection is not pinned for the life of the run |
+| **After switching tabs, the Agent must reacquire page elements** | References from the previous tab are dead | `implemented` — Browser Core holds the element map and the retained snapshot, and refuses a reference whose page has moved on with a stale-reference refusal (`STALE_ELEMENT_REF`, or `STALE_SNAPSHOT` when the snapshot itself is the stale part). A reference on a page that did **not** navigate stays usable. `packages/browser-core/src/browser-action-targets.ts`; `packages/webui/test/integration/browser-core-agent-actions.test.ts` |
 | Operations against the same tab are serialized | One writer per tab | `required` — the service and the CDP connection both answer commands without serializing them per target |
-| Operations against different tabs may proceed independently | Concurrency is per tab, not global | `implemented` — each page of the isolated Chromium has its own CDP session (`runtime/browser/isolated-chromium/provider.ts:199`), so a command against one tab does not wait for another |
+| Operations against different tabs may proceed independently | Concurrency is per tab, not global | `implemented` — each page of the isolated Chromium has its own CDP session (`runtime/browser/isolated-chromium/provider.ts:249`), so a command against one tab does not wait for another |
 
-The reacquire rule is stated as a requirement on the caller rather than as a mechanism, because the
-generation counter can only report the mismatch — it cannot re-resolve an element reference. A reference
-recorded against generation *N* has no meaning at *N+1*, and nothing on the host can reconstruct it.
+**Two fences, not one.** The reacquire rule used to be a rule on the caller, because the generation
+counter could only report a mismatch — it could not re-resolve an element reference. That is no
+longer the case, and the two paths now have their own fences:
+
+| Path | Fence | Code |
+| --- | --- | --- |
+| A **command** the Agent sends | `STALE_ELEMENT_REF` — the reference is refused when the snapshot it was recorded against no longer matches the live page | `packages/browser-core/src/browser-action-targets.ts` |
+| **Input** the person sends | `browser_target_stale` — the command is refused when the target's generation has moved on | `runtime/browser/browser-service.ts:848` |
+
+The command path's fence is the core's, and it is the core's because the core holds the element map
+and the retained snapshot that make a reference meaningful. A reference recorded against generation
+*N* is still refused at *N+1* — but the refusal is now a mechanism, not a convention, and a caller
+that ignores it gets a stale-reference refusal rather than a mis-aimed click.
+
+See [`10-browser-core-integration.md`](10-browser-core-integration.md).
 
 ## The panel follows the active run
 
@@ -156,7 +168,7 @@ The rules that decision pins are in [The tab model](#the-tab-model-adr-0022).
 | --- | --- | --- |
 | The panel reports the active run's selection | The person can see which page the Agent is working on, and it is a different page from the one in front | `implemented` — the panel reads the run's selection from the target list (`BrowserPanelHost` → `listBrowserTargets`) and mirrors it into `WebuiBrowserPanelState.runSelection`; the **toolbar** names that page at the quiet end of the row (`webuiBrowserAgentPage`). It **reports** rather than projects: the panel shows the page in front (below) |
 | Changing runs updates what the panel reports | The panel re-reads the newly active run's selection, and the page in front does not move with it | `implemented` — the panel re-reads the list when the run changes; `run-changed` clears `runSelection` and leaves `viewedPage` alone |
-| A frame for a target the panel is not showing is dropped | The frame carries its identity, so a stale or out-of-band frame is detectable and is not displayed as if it were the chosen page. | `implemented` — `WebuiBrowserService.#frameMatchesSelection` (`browser-service.ts:733`) compares all four identity fields and the stream drops non-matching frames (`browser-service.ts:664`); see finding F6 |
+| A frame for a target the panel is not showing is dropped | The frame carries its identity, so a stale or out-of-band frame is detectable and is not displayed as if it were the chosen page. | `implemented` — `WebuiBrowserService.#frameMatchesTarget` (`browser-service.ts:1098`) compares all four identity fields and the stream drops non-matching frames (`browser-service.ts:944`); see finding F6 |
 | The panel never writes the run's selection | Selection belongs to the Agent; the panel reflects it | `implemented` — the mark in the toolbar is a report of the runtime's mark, with no write behind it: `BrowserPanelProps` has no `onSelectTarget` and nothing in the panel calls `selectBrowserTarget`. The person writes the cell they own — the tab in front — by choosing a tab in the strip |
 
 That last row is the distinction that keeps the panel honest. The run's selection is the Agent's cell,
@@ -177,15 +189,15 @@ concurrency rule the tree does not enforce — are still `required`, and they sa
 
 | Rule | Consequence | State |
 | --- | --- | --- |
-| A tab is a slot whose content can be replaced in place | Choosing a launcher tile or typing a URL changes what the tab shows; the tab is not closed and the strip does not flicker | `implemented` — `replaceTabContent` (`client/features/workspace/projection/workspace-panel-state.ts:420`) replaces the content of the tab that is open, and the strip's own launcher does it (`client/features/workspace/ui/WebuiWorkspaceTabStrip.public.tsx:315`) |
-| The tab's id belongs to the client | Two web tabs in one session are two tabs, and the id does not change when the content does; the target identity is a binding the tab holds | `implemented` — `openNewTab` assigns the id from the client's own counter (`client/features/workspace/projection/workspace-panel-state.ts:353`, `:259`), and the content carries the binding (`WorkspacePanelTab`, `:120`) |
-| The URL box belongs to the new tab page | There is no persistent address bar; a web tab carries a toolbar (back, forward, reload, read-only URL) instead | `implemented` — the only field for a URL is the launcher's (`WebuiWorkspaceLauncher`, `client/features/workspace/ui/WebuiWorkspaceTabStrip.public.tsx:315`); a web tab's URL is a `span`, not an input (`client/features/browser/ui/BrowserPanelHost.public.tsx:442`) |
-| A web tab holds exactly one browser page | The isolated Chromium holds one page per web tab, so a page is addressable by the tab that shows it | `implemented` — the provider's per-target map holds one page per web tab (`runtime/browser/isolated-chromium/provider.ts:199`), and the command path resolves the session by target |
-| A web tab is titled by the page and glyphed by default | The title is the one the provider already reports; the icon is a default glyph, and fetching a site's icon is not part of this | `implemented` — the title is the one the runtime's snapshot publishes, and the strip renders it with a default glyph (`client/features/workspace/ui/WebuiWorkspaceTabStrip.public.tsx:183`); no icon is fetched |
-| The Agent opens web tabs | `open_tab` creates a page, makes it the run's selection and tells the client, so a tab appears in the strip and becomes the active one | `implemented` — the tool adapter lets `open_tab` through for a run with no selection (`runtime/browser/tool-adapter.ts:178`), the service opens the page and makes it the run's selection (`runtime/browser/browser-service.ts:1082`), and the strip turns the published tab into a panel tab (`client/features/workspace/ui/WebuiWorkspaceTabStrip.public.tsx:106`) |
+| A tab is a slot whose content can be replaced in place | Choosing a launcher tile or typing a URL changes what the tab shows; the tab is not closed and the strip does not flicker | `implemented` — `replaceTabContent` (`client/features/workspace/projection/workspace-panel-state.ts:422`) replaces the content of the tab that is open, and the strip's own launcher does it (`client/features/workspace/ui/WebuiWorkspaceTabStrip.public.tsx:428`) |
+| The tab's id belongs to the client | Two web tabs in one session are two tabs, and the id does not change when the content does; the target identity is a binding the tab holds | `implemented` — `openNewTab` assigns the id from the client's own counter (`client/features/workspace/projection/workspace-panel-state.ts:355`, `:258`), and the content carries the binding (`WorkspacePanelTab`, `client/features/workspace/projection/workspace-panel-state.ts:120`) |
+| The URL box belongs to the new tab page | There is no persistent address bar; a web tab carries a toolbar (back, forward, reload, read-only URL) instead | `implemented` — the only field for a URL is the launcher's (`WebuiWorkspaceLauncher`, `client/features/workspace/ui/WebuiWorkspaceTabStrip.public.tsx:428`); a web tab's URL is a `span`, not an input (`client/features/browser/ui/BrowserPanelHost.public.tsx:547`) |
+| A web tab holds exactly one browser page | The isolated Chromium holds one page per web tab, so a page is addressable by the tab that shows it | `implemented` — the provider's per-target map holds one page per web tab (`runtime/browser/isolated-chromium/provider.ts:249`), and the command path resolves the session by target |
+| A web tab is titled by the page and glyphed by default | The title is the one the provider already reports; the icon is a default glyph, and fetching a site's icon is not part of this | `implemented` — the title is the one the runtime's snapshot publishes, and the strip renders it with a default glyph (`client/features/workspace/ui/WebuiWorkspaceTabStrip.public.tsx:217`); no icon is fetched |
+| The Agent opens web tabs | `open_tab` creates a page, makes it the run's selection and tells the client, so a tab appears in the strip and becomes the active one | `implemented` — the tool adapter lets `open_tab` through for a run with no selection (`runtime/browser/tool-adapter.ts:178`), the service opens the page and makes it the run's selection (`runtime/browser/browser-service.ts:1188`), and the strip turns the published tab into a panel tab (`client/features/workspace/ui/WebuiWorkspaceTabStrip.public.tsx:140`) |
 | The run's selection and the person's active tab are separate cells | A person opening their own tab does not move the Agent off its page, and the Agent opening a tab does not yank the person away from theirs. The person's input follows their tab; the Agent's actions follow the run's selection | `implemented` — `WebuiBrowserPanelState.viewedPage` (the client's cell, written by `page-viewed`) and `runSelection` (the runtime's cell, written by `targets-loaded`). The picture, the alt text, the frame stream and the input binding all read `viewedPage`; `prepareWebuiBrowserInputCommand` takes it as its own argument, so no gesture can be aimed at the run's page |
 | One bootstrap: a person opening a web tab gives the run that page **only when the run has no selection** | A run with no selection cannot act at all, so the person's page becomes the run's selection; after that the two cells are independent | `implemented` — `openWebTab` takes a `WebuiBrowserTabOpener` (`"agent"` or `"person"`), and a person-opened page joins the run's selection only when `#selectionOf(surface, runId)` was undefined at the moment the page appeared. The runtime decides it, because the runtime is the only place that can read that selection; the workspace names its session and applies nothing itself |
-| Closing a web tab closes its page | The runtime's page set follows the strip, so a closed tab leaves no page behind in the Chromium | `implemented` — `closeWebTab` closes the page and forgets the target (`runtime/browser/browser-service.ts:376`) |
+| Closing a web tab closes its page | The runtime's page set follows the strip, so a closed tab leaves no page behind in the Chromium | `implemented` — `closeWebTab` closes the page and forgets the target (`runtime/browser/browser-service.ts:421`) |
 | The browser tool tab is deleted | The strip's kinds lose `browser` and with it the surface switcher: the panel is the isolated browser's view, and the external browsers are driven in the user's own windows | `implemented` — the registry has no `browser` kind (`client/features/workspace/projection/workspace-panel-state.ts:29`), and the published host is keyed by the web tab's target rather than by a switchable surface (`client/features/browser/ui/BrowserPanelHost.public.tsx`) |
 | Frames are per target | Each tab's picture is its own; a frame reaches only the tab that asked for it | `implemented` — the stream is keyed by the target (`runtime/browser/browser-service.ts`), and the provider routes a frame to its page by the envelope's session id (`runtime/browser/isolated-chromium/provider.ts`) |
 

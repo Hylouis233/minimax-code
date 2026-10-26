@@ -403,3 +403,46 @@ What is removed is the browser tool tab, with the panel it belonged to, and with
 switcher. That switcher was the panel's way of reaching Edge and Chrome, and the panel was never
 where those browsers are driven: they are driven in the user's own windows, where the person sees
 them. The panel is the isolated browser's view, and it stays that.
+
+### A9 — The browser's action semantics belong to a peer package
+
+The decision above says Browser Use owns "browser commands". That remains true of the
+**command path** — the WebUI decides which commands may run, on which surface, against which
+target, and it answers the client. It is no longer true of the **semantics** of those commands.
+
+The isolated-Chromium provider answered a restricted action by translating it into a raw
+DevTools method. That works for an action one CDP call wide and cannot work for an action
+that takes an element reference: turning a reference into a coordinate needs the element map,
+the retained snapshot and the generation check, and the provider had no element map. The
+honest response was to **refuse** 21 of the 28 restricted actions — including `inspect`, `query`,
+`click` and `type` — rather than guess where a click should land. The vocabulary said `click`; the
+surface could not do it.
+
+The semantics now live in `@mavis/browser-core` (`packages/browser-core/`), a peer package
+the TUI already drove:
+
+- **Browser Core owns what an action means** — element references, retained snapshots, action
+  deadlines, effect validation — and reaches a browser through a `BrowserTransport`.
+- **The WebUI owns whether an action may run.** The core reads no authorization switch, and
+  the surface's own fences (`return_to_previous_tab` on the isolated surface, `open_tab` and
+  an off-screen `screenshot` on the bridge) are facts about the browser rather than policy.
+- **A transport carries a command; it never judges one.** The WebUI supplies one adapter per
+  surface: `runtime/browser/isolated-chromium/core-transport.ts` and
+  `server/browser-bridge/core-transport.ts`.
+
+Three consequences follow, and they are the shape of the decision:
+
+- `src/client/` and `src/shared/` may not import the core. The browser bundle must not carry
+  a second, unreachable copy of the semantics, so the restricted vocabulary is stated in
+  `src/shared/contracts/browser.ts` as well, and a test asserts the two lists cannot drift.
+- **A capability difference is not a semantic difference.** The bridge cannot `upload_files`,
+  because `DOM.setFileInputFiles` is deliberately absent from the extension's allowlist: the
+  extension's debugger could run it, but what it must not do is give the Agent a way to name
+  an arbitrary local file in the user's real browser. The isolated Chromium performs the same
+  action with the same semantics.
+- **The bridge's screenshot comes from the extension's pushed visible-tab frame**, not from
+  `Page.captureScreenshot`, which could photograph a tab the person is not looking at. A tab
+  that is not in front is refused rather than answered with another tab's picture.
+
+The mechanism is described in
+[`../browser-use/10-browser-core-integration.md`](../browser-use/10-browser-core-integration.md).

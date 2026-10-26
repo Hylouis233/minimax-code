@@ -40,7 +40,23 @@ never proves a higher one.
 | 2 | Assembled application behaviour | `test/unit/*application*`, `*workflows*`, `*commands*`, creation/adoption and lifecycle suites, with injected capabilities, storage and channel |
 | 3 | Real boundary behaviour | `test/integration/loopback-harness-path.test.ts`: a real service, real loopback socket, real envelope, dispatcher and registry, a real `watchEvents` delivery, drop-and-reconnect, and a close that refuses further connections |
 | 4 | Built-browser behaviour | `pnpm test:webui-browser`: rendered built client, navigation, multi-page interaction and recoverable zone failures. Fixture-backed specs use a deterministic in-page transport and do not prove the production service/runtime path. |
-| 5 | Real local product boundary | `agent-transcript.test.ts`, `real-host-loopback.test.ts`, `real-host-model-turn.test.ts`, the real Chromium navigation integrations, explicit real-browser bridge specs, and `native-runtime.spec.mjs` on the executing host. These prove only the named local boundary and platform; they do not prove cloud accounts, live external providers or other platforms. |
+| 5 | Real local product boundary | `agent-transcript.test.ts`, `real-host-loopback.test.ts`, `real-host-model-turn.test.ts`, the real Chromium navigation integrations, `browser-core-agent-actions.test.ts`, explicit real-browser bridge specs, and `native-runtime.spec.mjs` on the executing host. These prove only the named local boundary and platform; they do not prove cloud accounts, live external providers or other platforms. |
+
+### The browser's own suites
+
+Three suites cover the Browser Core layer, and they are at **different** levels — the difference
+matters when a claim is written about them.
+
+| Suite | Level | What it proves |
+| --- | --- | --- |
+| `test/integration/browser-core-agent-actions.test.ts` | 5 — a **real** Chromium | the Agent's `inspect` → `click` → `type` run through the core against a real browser, and that a reference recorded before a navigation is refused while a current one is accepted. It **requires** a browser: unlike the other Chromium suites it does not use `describe.skipIf`, so on a machine with no Chrome it **fails** rather than skips |
+| `test/unit/browser-bridge-core-actions.test.ts` | 2 — assembled, with the extension as a **test double** | the bridge routes a restricted action through the core, the navigation fence holds, and a screenshot is answered with the frame the extension streams — and refused for a tab that is not in front. It proves the **wiring**, not a browser's behaviour |
+| `test/unit/browser-restricted-commands.test.ts` | 1 — pure behaviour | the 28-name restricted vocabulary cannot drift: it holds only actions the runtime's contract declares, holds every action the runtime's aggregate tool accepts, and lists each action once |
+
+**Not covered:** `upload_files` on the bridge path. The vocabulary test names the action and nothing
+asserts the bridge's refusal, so that capability difference is unpinned.
+
+See [`../browser-use/10-browser-core-integration.md`](../browser-use/10-browser-core-integration.md).
 
 Deterministic loopback tests replace the leaf host, and deterministic browser tests replace the
 server transport. Their levels do not imply native execution. `real-host-loopback.test.ts` and
@@ -84,6 +100,12 @@ their supported executable paths exists. In a skip, their real-browser assertion
 though the rest of `test:webui` may pass. The Playwright bridge specs similarly skip Edge-specific
 cases when the installed Edge executable is missing. Report those skips from the actual gate output;
 do not infer their execution from the suite or file being registered.
+
+**One suite does not skip, and that is the point.** `browser-core-agent-actions.test.ts` uses a plain
+`describe`, so on a machine with no Chrome it fails rather than skipping. Its file header says the
+suite skips when the browser is missing, and the header does not match the code. A green run of
+`test:webui` therefore *does* imply that a real Chromium was present for that suite — but only
+because it fails otherwise, not because it reports a skip.
 
 Other current browser cases exercise their named UI interactions against deterministic fixtures.
 For example, the transcript spec covers built-client message actions and fixture-backed fork

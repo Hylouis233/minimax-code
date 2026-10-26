@@ -24,10 +24,33 @@ Independent read-only forward-testing exercised file-preview refresh during sess
 | Loopback contract | `shared/operation-names.ts`, `server/operation/{operations,bind-handlers,binding-mechanism,operation-dispatch}.ts` |
 | Support/readiness | `shared/capability-manifest.ts`, `server/service.ts`, `runtime/harness/adapter.ts` |
 | Process close | `runtime/assembly.ts`, `runtime/lifecycle.ts`, `runtime/terminal.ts`, `server/service.ts` |
+| Browser action semantics | `packages/browser-core/src/browser-core.ts`, `browser-actions.ts`, `browser-action-targets.ts`, `browser-transport.ts`; the WebUI adapters `src/runtime/browser/isolated-chromium/core-transport.ts` and `src/server/browser-bridge/core-transport.ts`; the authoritative narrative `packages/webui/docs/browser-use/10-browser-core-integration.md` |
 | Visual baseline | `client/styles/{tokens,index,shell}.css`, `tailwind.config.cjs`, feature CSS, `ConversationSurface.tsx`, `WebuiClientFoundationApp.tsx`, Settings appearance source |
 | Verification | `scripts/verify.mjs`, root/package scripts, `test/vitest-suites.json`, `playwright.config.mjs`, browser harness/server/fixture, token tests |
 
 Unless explicitly prefixed, source rows refer to `packages/webui/src/`. Use symbol search for exact current locations rather than freezing line numbers that will drift.
+
+### Refresh of 2026-10-26 — the Browser Core layer
+
+A documentation synchronization pass brought the WebUI documents and this skill in line with the
+Browser Core integration (`eb6cd3e5`, `88c83655`). The facts it established, all read from the tree
+at `webui` / `88c83655`:
+
+| Claim | Evidence |
+| --- | --- |
+| The browser's action semantics belong to `@mavis/browser-core`, and both surfaces execute it over a `BrowserTransport` | `packages/browser-core/src/browser-transport.ts`; `src/runtime/browser/isolated-chromium/core-transport.ts`; `src/server/browser-bridge/core-transport.ts` |
+| `src/client/` and `src/shared/` may not import the core; the gate enforces it | `scripts/lib/webui-dependency-rules.mjs` — the workspace-host check for `client/` and `shared/` |
+| The restricted vocabulary is stated twice, and a test pins them together | `src/shared/contracts/browser.ts`; `packages/webui/test/unit/browser-restricted-commands.test.ts` |
+| The bridge's `open_tab` and `upload_files` are refused; the isolated surface refuses `return_to_previous_tab` | `src/server/browser-bridge/server.ts`; `src/runtime/browser/isolated-chromium/provider.ts`; `packages/browser-extension/src/cdp.ts` (the allowlist, 45 commands, without `Page.captureScreenshot` or `DOM.setFileInputFiles`) |
+| The bridge's screenshot comes from the extension's pushed visible-tab frame | `src/server/browser-bridge/server.ts` — `#captureVisibleFrame`; `packages/browser-extension/src/images.ts` |
+| The three new suites' evidence levels | `packages/webui/test/integration/browser-core-agent-actions.test.ts` (real browser), `packages/webui/test/unit/browser-bridge-core-actions.test.ts` (wiring, extension as a double), `packages/webui/test/unit/browser-restricted-commands.test.ts` (pure) |
+
+The line-number citations in `packages/webui/docs/browser-use/*.md` that this pass corrected were
+verified against the tree by reading the cited line, not by pattern-matching the file name. **New
+citations should be made the same way** — a citation that was not read at the cited line is not
+evidence.
+
+One capability difference is recorded but **not** pinned by a test: the bridge refuses `upload_files`.
 
 ## Refresh workflow
 

@@ -29,6 +29,10 @@ forbidden edge, including `import type` edges that the build erases.
 Identity is always legal, so each row reads "these targets, plus the same layer". Four consequences
 decide most arguments:
 
+- **A workspace package is a peer, not a layer.** `src/client/` and `src/shared/` may import only
+  `@mavis/shared` and `@mavis/protocol`; the dependency gate rejects any other workspace dependency
+  from them. `src/server/` and `src/runtime/` may import `@mavis/browser-core`, which owns the
+  semantics of a browser action. See `docs/browser-use/10-browser-core-integration.md`.
 - **A business publishes through a module it owns.** A peer imports its `contracts/` declarations, and
   additionally any `*.public.ts` / `*.public.tsx` module — an owner-role module whose marker publishes
   **every** explicit export to eligible peers, so a later export is a public-interface change that gets

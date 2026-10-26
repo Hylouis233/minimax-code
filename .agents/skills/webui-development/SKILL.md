@@ -9,7 +9,7 @@ Use the existing WebUI as the product and architecture reference. Deliver reques
 
 ## Establish the current contract
 
-Locate the repository from the working directory; the original checkout is `/home/fectivnfy/my_data/project/my_project/minimax-code`. Reference paths are repository-relative. Read root `AGENTS.md`, `packages/webui/AGENTS.md`, `packages/webui/docs/README.md`, and relevant terms in `CONTEXT.md`. Inspect HEAD and dirty files before editing. This skill is a source-grounded map dated 2026-10-19, not an authority over current instructions, source or tests.
+Locate the repository from the working directory; the original checkout is `/home/fectivnfy/my_data/project/my_project/minimax-code`. Reference paths are repository-relative. Read root `AGENTS.md`, `packages/webui/AGENTS.md`, `packages/webui/docs/README.md`, and relevant terms in `CONTEXT.md`. Inspect HEAD and dirty files before editing. This skill is a source-grounded map, refreshed 2026-10-26, not an authority over current instructions, source or tests.
 
 For the changed use case, identify its resource identity, state owner, command, binding, rendered surface and verification seam. Trace one real caller through implementation before choosing a home. Directory names and passing dependency gates alone do not prove ownership. If an explicitly approved design conflicts with the tree, surface that conflict before redesigning it.
 
@@ -20,6 +20,7 @@ For business-code changes, follow [Business maintenance](references/business-mai
 | Task | Read |
 | --- | --- |
 | Find code, choose an owner, judge imports, structural refactor | [Architecture and source map](references/architecture.md) |
+| Browser actions, element references, the external browser bridge | [Architecture and source map](references/architecture.md) and [Loopback and runtime](references/runtime.md) — the semantics live in `@mavis/browser-core`; start from `packages/webui/docs/browser-use/10-browser-core-integration.md` |
 | Session creation, send/queue/retry, streaming, async reads, disposal | [Ownership and lifecycle](references/ownership.md) |
 | Wire operations, runtime assembly, capabilities, process resources | [Loopback and runtime](references/runtime.md) |
 | Add a component or modify component styles/icons | Read [Component design system](references/component-design-system.md) first: token selection, scales, component recipes, Tabler icon usage and state rules |

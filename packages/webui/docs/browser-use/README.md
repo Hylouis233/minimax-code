@@ -11,14 +11,14 @@ status line of its own:
 
 Where a document mixes the three, they are separated inline rather than merged into one sentence.
 
-**Read [`07-review-findings.md`](07-review-findings.md) before anything else.** **Ten review rounds**
+**Read [`07-review-findings.md`](07-review-findings.md) before anything else.** **Twelve review rounds**
 have run against this change — nine by a `codex` `gpt-6-luna` reviewer reading the source rather
-than the description, and a final acceptance pass against the finished tree — and an eleventh was
-raised by the tab-model review. That document records every finding and states, for each, whether it
-is closed or still open. **The first ten rounds are closed**; the ones that changed a decision are
-recorded in the decision record's amendments, and the ones that could not be closed on this machine
-are marked `fixed, platform unverified` rather than rounded up. **The eleventh round's four findings
-are open**: they are what the tab model was written to close.
+than the description, a seventh that was the final acceptance pass against the finished tree, an
+eleventh raised by the tab-model review, and a twelfth raised by the Browser Core integration. That
+document records every finding and states, for each, whether it is closed or still open. **The first
+twelve rounds are closed**; the ones that changed a decision are recorded in the decision record's
+amendments, and the ones that could not be closed on this machine are marked `fixed, platform
+unverified` rather than rounded up.
 
 The decision record for this programme is
 [`../adr/0019-webui-browser-use-surfaces-and-external-browser-bridge.md`](../adr/0019-webui-browser-use-surfaces-and-external-browser-bridge.md),
@@ -47,7 +47,10 @@ still says something is not implemented, that is because it is not — the per-r
 | `packages/webui/src/runtime/browser/authorization.ts` | `implemented` — the surface gate is enforced by the browser service | `06` |
 | `packages/webui/src/runtime/browser/target-registry.ts` | `implemented`, and fed from `provider.onTargetChanged` (F2) | `05` |
 | `packages/webui/src/runtime/browser/browser-service.ts` | `implemented` — owns authorization, providers, the registry and the per-run frame streams | `06` |
-| `packages/webui/src/runtime/browser/isolated-chromium/provider.ts` | `implemented` — including the attachment retry; it drives exactly one page, and a second page cannot be addressed | `01` |
+| `packages/webui/src/runtime/browser/isolated-chromium/provider.ts` | `implemented` — including the attachment retry; it drives one page per web tab, and every page is addressable | `01` |
+| `packages/browser-core/` | `implemented` — the provider-neutral core that owns the **semantics** of a browser action. The WebUI consumes it on **both** surfaces over a `BrowserTransport` adapter each | `10` |
+| `packages/webui/src/runtime/browser/isolated-chromium/core-transport.ts` | `implemented` — the core's transport over the isolated Chromium's own CDP connection | `10` |
+| `packages/webui/src/server/browser-bridge/core-transport.ts` | `implemented` — the core's transport over the bridge's `cdp` frame, with the extension's pushed visible-tab frame as the screenshot source | `10` |
 | `packages/webui/src/server/browser-bridge/credential-store.ts` | `implemented`, rewritten mid-review; the three per-OS forms are in place, and the macOS and Windows forms are asserted through an injected runner rather than executed | `04` |
 | `packages/webui/src/server/browser-bridge/admission.ts`, `pairing.ts`, `session.ts`, `registry.ts`, `reconnect.ts` | `implemented` and **wired** into the server's upgrade path and the browser service; target-ownership routing fixed (F4) | `02`, `03` |
 | `packages/webui/src/shared/operation-names.ts` | `implemented` — eight browser operations registered, including `sendBrowserCommand` (F5) | `06` |
@@ -58,7 +61,7 @@ The *measurements* in these documents were never affected by the tree moving. Th
 artifacts, not from the source. What moved was the implementation status, and that is what this pass
 corrected.
 
-The tree moved through **three review waves** while this pass was running:
+The tree moved through **four review waves** while this pass was running:
 
 1. `packages/webui/src/server/browser-bridge/credential-store.ts` was rewritten from `cmdkey` to a DPAPI
    round trip, with the secret on stdin rather than in `argv`.
@@ -66,9 +69,12 @@ The tree moved through **three review waves** while this pass was running:
 3. The bridge stopped switching surfaces on by itself, the runtime started reaching it through the
    member it actually exposes, external frames stopped being relabelled, and a host restart started
    restoring its pairing credential instead of rotating it.
+4. The bridge gained the `cdp` / `cdp-result` frame pair and the extension gained its allowlist, so
+   Full CDP reached the external surfaces (F6 and N4); and the **Browser Core** integration landed,
+   moving the semantics of a restricted action out of the providers and into `@mavis/browser-core`.
 
-Every line number cited in these documents was re-verified after each wave. The findings that are still
-open are listed in [`07-review-findings.md`](07-review-findings.md).
+Every line number cited in these documents was re-verified against this branch. The findings that are
+still open are listed in [`07-review-findings.md`](07-review-findings.md).
 
 ## Documents
 
@@ -80,9 +86,10 @@ open are listed in [`07-review-findings.md`](07-review-findings.md).
 | [`04-pairing-credentials.md`](04-pairing-credentials.md) | Credential lifecycle, the per-OS secure store on each platform, and the explicit-failure rule when no store exists | You implement pairing, credential storage, revocation or re-enable |
 | [`05-target-identity.md`](05-target-identity.md) | The three-part target identity and its generation, what invalidates a generation, and how a stale reference is rejected | You work with targets, input forwarding, tab selection or run scoping |
 | [`06-runtime-authorization-trace.md`](06-runtime-authorization-trace.md) | Each of the four authorization switches traced to the place it must be enforced, with the current implementation status of each check | You implement an authorization check, or you are auditing whether one exists |
-| [`07-review-findings.md`](07-review-findings.md) | All the findings from the eleven review rounds, what was done about each, and what is still open | You want to know what is known to be broken, or what has been corrected |
+| [`07-review-findings.md`](07-review-findings.md) | All the findings from the twelve review rounds, what was done about each, and what is still open | You want to know what is known to be broken, or what has been corrected |
 | [`packages/browser-extension/STORE-DISCLOSURES.md`](../../../browser-extension/STORE-DISCLOSURES.md) | The store disclosures for the Chrome Web Store and the Edge Add-ons, and the differences between a packaged build and a development build | You are preparing a store submission, or you need to know what a packaged build is |
 | [`09-acceptance-record.md`](09-acceptance-record.md) | The acceptance matrix: every surface, every case, the browser version, the operating system, the settings and the observed result — written from the records the suites produce | You want to know what was actually run, and where the evidence is thin |
+| [`10-browser-core-integration.md`](10-browser-core-integration.md) | The Browser Core layer: who owns the semantics of a browser action, the `BrowserTransport` seam, the two adapters, and what each surface still cannot do | You change a browser action, an element reference, or the bridge's command path |
 
 ## How to read these documents
 
@@ -146,6 +153,8 @@ directory:
 | **Isolated Chromium** | The browser this process launches and owns, reached over CDP on loopback. |
 | **Bridged surface** | `edge` or `chrome` — the person's own browser, reached through the extension bridge rather than launched here. |
 | **Restricted command set** | The fixed browser action vocabulary the Agent's tools may use while Full CDP access is off. |
+| **Browser Core** | The provider-neutral package (`@mavis/browser-core`) that owns the **semantics** of a browser action — element references, retained snapshots, action deadlines, effect validation. It reaches a browser through a `BrowserTransport` and knows nothing about any particular browser or switch. See [`10-browser-core-integration.md`](10-browser-core-integration.md). |
+| **Transport** | The adapter that carries a Browser Core command to one page or tab. The WebUI has one per surface: `runtime/browser/isolated-chromium/core-transport.ts` and `server/browser-bridge/core-transport.ts`. |
 | **Full CDP** | The separate authorization to send arbitrary DevTools commands to an already-authorized surface. It never authorizes a surface on its own. |
 | **Generation** | The monotonic counter that makes a recorded page reference detectably stale rather than silently mis-aimed. See [`05-target-identity.md`](05-target-identity.md). |
 | **Run** | The Agent's browser working context, keyed by the WebUI Agent session. One session drives one browser selection. |
@@ -157,18 +166,17 @@ directory:
 
 ## Publication note
 
-These nine files are new, and every file in this repository is listed in the generated inventory
-`release/public-source.json`. Recording them requires running, in the repository root:
+Every file in this repository is listed in the generated inventory `release/public-source.json`.
+Recording a new or moved file requires running, in the repository root:
 
 ```sh
 node scripts/source-inventory.mjs --write
 pnpm check:source
 ```
 
-The inventory is generated and must not be hand-edited. Until it is regenerated these documents are
+The inventory is generated and must not be hand-edited. Until it is regenerated a new document is
 present in the working tree but not recorded as part of the published source projection, and
-`pnpm check:source` will report them as missing from it.
+`pnpm check:source` will report it as missing from it.
 
-The index at [`../README.md`](../README.md) does not yet list this directory; the documents there
-describe the package as a whole, so a one-line Browser Use entry belongs alongside the other nested
-subject groups.
+The index at [`../README.md`](../README.md) lists this directory, with a one-line Browser Use entry
+among the other nested subject groups.

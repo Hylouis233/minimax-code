@@ -46,6 +46,9 @@ Assert outcomes users/consumers observe. Existing validators' code-only tests do
 | Built-browser fixture | Rendering, navigation and interactions of built client | Actual service/host/cloud behavior |
 | Production host with controlled model HTTP endpoint | Real local host/turn path to that endpoint | Real provider authorization |
 | `native-runtime.spec.mjs` | Production host/service and native PTY on executing platform | Other OSes, real account/provider |
+| `test/integration/browser-core-agent-actions.test.ts` | The Agent's `inspect` → `click` → `type` against a **real** Chromium through Browser Core, and the stale-reference refusal. It **requires** a browser — it has no `describe.skipIf`, so on a machine with no Chrome it fails rather than skipping | The bridge path; any platform other than the one it ran on |
+| `test/unit/browser-bridge-core-actions.test.ts` | The bridge's **wiring** through Browser Core, the navigation fence, and the screenshot's source | That a real browser performed any of it — the extension is a test double |
+| `test/unit/browser-restricted-commands.test.ts` | That the restricted vocabulary cannot drift | That any action behaves correctly at runtime |
 
 Keep each claim at its actual seam. HTTP 200 or a listener is not browser readiness. A screenshot is not interaction coverage. One-page session switching is not independent-page ownership evidence. Native terminal coverage in one scenario does not turn every fixture scenario into native evidence.
 

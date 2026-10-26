@@ -43,6 +43,7 @@ nothing from `packages/tui` (ADR 0003) and does not drive the CLI binary (ADR 00
 | ADR 0014 — four internal boundaries | Capability and orchestration are split inside both the client and the runtime; see §3 |
 | ADR 0016, ADR 0017 — business-first ownership, temporal ownership | Businesses own resources; lifetimes, generations and freshness are the application's concern, not a component's; see §8 and §9 |
 | ADR 0018 — measured observation | State moves on evidence: the client reconciles its own stream state because the server alternative was measured and rejected (see §9) |
+| The browser's semantics live in a peer package | `@mavis/browser-core` owns what a browser action means and reaches a browser through a `BrowserTransport`. The WebUI supplies one adapter per surface and keeps the authorization decisions. `src/client/` and `src/shared/` never import it — see §3 |
 
 ## 3. The four execution boundaries
 
@@ -68,6 +69,33 @@ then combines their metafile inputs for `pnpm check:webui-boundary`. That bounda
 combined build graph's allowed inputs and required entries; it does not retain per-output input
 membership. `pnpm check:webui-dependency` enforces client/server import direction from source,
 including type-only imports, while `pnpm typecheck:webui` checks the package's TypeScript programs.
+
+### The browser's own boundary
+
+The browser reaches a real browser through `@mavis/browser-core`, a **peer** package rather than one
+of the four layers. The core owns the semantics of a browser action — element references, retained
+snapshots, action deadlines, effect validation — and reaches a browser through a `BrowserTransport`
+contract. The WebUI supplies one adapter per surface:
+
+```
+Agent tool or panel
+  → browser service                       runtime/browser/browser-service.ts
+  → provider                              runtime/browser/isolated-chromium/provider.ts
+                                          server/browser-bridge/server.ts
+  → Browser Core session                  @mavis/browser-core
+  → BrowserTransport adapter              core-transport.ts, one per surface
+  → the browser
+```
+
+The division is the one that keeps the layers honest. **The core decides what an action means; the
+WebUI decides whether it may run; the transport decides how the command travels.** The core reads no
+authorization switch, and a transport never judges an action's meaning.
+
+`src/client/` and `src/shared/` never import `@mavis/browser-core`, and the dependency gate enforces
+it. The consequence is that the restricted command vocabulary is stated twice — once in
+`src/shared/contracts/browser.ts`, where the shared layer can reach it, and once in the core — and a
+test asserts the two cannot drift. See
+[`../browser-use/10-browser-core-integration.md`](../browser-use/10-browser-core-integration.md).
 
 The request path, end to end:
 
@@ -312,6 +340,11 @@ Two ownership facts worth stating here because they are easy to get wrong:
 - **The page never closes the runtime.** A reconnect re-attaches to the same host; only the service's
   shutdown ends it.
 
+The **browser bridge** is a resource of the other kind: it is not created by the runtime assembly but
+supplied to the service (`server/service.ts`), and the service closes it (`server/service.ts:308`).
+It is a `server/` resource that drives a browser, which is why it may import `@mavis/browser-core`
+while `src/client/` and `src/shared/` may not.
+
 ## 12. Invariants
 
 A change that breaks one of these is a design change, not a refactor:
@@ -335,6 +368,13 @@ A change that breaks one of these is a design change, not a refactor:
 8. **Optional means unsupported.** An unwired operation stays `undefined` through the port, the slice and
    the component, which renders the affected area conditionally.
 9. **`shared/` reaches neither execution side**, and `packages/tui` is never imported.
+9a. **The browser's semantics live in one place.** The meaning of a browser action belongs to
+    `@mavis/browser-core`, and both surfaces execute it through a `BrowserTransport`. A provider that
+    re-implements an action's meaning is a second definition of what the action does, and the two
+    will drift. The WebUI keeps the **authorization** decision — the core reads no switch.
+9b. **A transport carries a command; it does not judge one.** A `BrowserTransport` adapter decides
+    *how* a command reaches a page or tab. It never decides what the command means, and it never
+    decides whether the command may run.
 10. **One writer per piece of state.** No two modules own the same map, and the writable session record
     has one owner.
 11. **One writer per browser cell, and the two cells are separate.** The run's selection is written by

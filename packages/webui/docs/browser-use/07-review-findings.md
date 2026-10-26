@@ -1,11 +1,9 @@
 # Review findings — WebUI Browser Use
 
-**Ten review rounds** have been run against this change, and a eleventh has been raised by the
-tab-model review. Nine of them were run
-by a `codex` `gpt-6-luna` reviewer reading the source rather than the
-description; the seventh was the final acceptance pass, run against the
-finished tree and against the acceptance criteria the tickets state. This
-document records what each round found and what was done about it.
+**Twelve review rounds** have been run against this change: nine by a `codex` `gpt-6-luna` reviewer
+reading the source rather than the description, a seventh that was the final acceptance pass run
+against the finished tree, an eleventh raised by the tab-model review, and a twelfth raised by the
+Browser Core integration. This document records what each round found and what was done about it.
 
 Two **probe rounds** — a real browser against the built extension, and the
 external path driven against it — are recorded here as well. They are numbered
@@ -95,12 +93,12 @@ rounded up.
 
 | # | Severity | Finding | Status |
 | --- | --- | --- | --- |
-| F1 | BLOCKER | The host and the extension mint **independent** pairing credentials, so the extension can never produce a proof the host accepts. | `open` |
+| F1 | BLOCKER | The host and the extension mint **independent** pairing credentials, so the extension can never produce a proof the host accepts. | `fixed` |
 | F2 | BLOCKER | Bridge startup enabled Edge and Chrome regardless of the authorization switches. | `fixed` |
 | F3 | MAJOR | The composition passed `createBridgeProvider` where the bridge exposes `createProvider`, so the service was handed an undefined factory. | `fixed` |
 | F4 | BLOCKER | An external frame was stamped with the latest announcement's generation, so a delayed frame from the old page passed the selection fence. | `fixed` |
 | F5 | MAJOR | External target generations never reached the runtime registry, so a target that navigated could become unusable. | `fixed` |
-| F6 | MAJOR | Full CDP was unavailable on Edge and Chrome: the bridge provider refused every raw command. | `open` |
+| F6 | MAJOR | Full CDP was unavailable on Edge and Chrome: the bridge provider refused every raw command. | `fixed` |
 | F7 | MAJOR | This document itself was stale about round 1. | `fixed` |
 
 ### What was done
@@ -127,7 +125,7 @@ rounded up.
   generation for a new entry without regressing a newer one.
 - **F7** — This document.
 
-### What is still open, and why
+### What was open then, and how it closed
 
 **F1 — the pairing exchange.** The host mints a credential and keeps it in the
 OS secure store; the extension currently mints a *different* credential and
@@ -148,6 +146,24 @@ rather than a patch:
    confirmation, not per-tab, but the wording should be reconciled with the
    mechanism rather than left to the reader.
 
+**F1 is now closed**, and the mechanism is **not** the one this finding
+proposed. There is no pairing code and no settings surface: the extension
+generates an ephemeral ECDH P-256 key pair when it connects, and the host
+seals its credential to that public key — ECDH P-256, then HKDF-SHA256, then
+AES-256-GCM — and sends it in a `pair` frame
+(`packages/webui/src/server/browser-bridge/pairing.ts:470`,
+`sealCredentialForExtension`; `packages/webui/src/server/browser-bridge/session.ts:695`).
+The extension validates the frame, decrypts it and stores it, and the host's
+credential is authoritative: the extension never mints one.
+
+That is a decision, and it is recorded as one — ADR 0019's amendment **A1**,
+" How the extension obtains the host's pairing credential", which states the
+seal, the reason a code is not needed, and the reason the host seals to the
+key *that peer supplied* rather than to a key it chose. The finding's two open
+questions are therefore answered by A1 rather than left open: the credential
+never travels through the person, and "automatically pairs" means the transfer
+happens during the handshake.
+
 Until this lands, the external surfaces cannot complete a handshake, and every
 external capability is blocked behind it.
 
@@ -156,10 +172,27 @@ the isolated Chromium forwards a raw DevTools method, but the bridge provider
 refuses every raw command, because `chrome.debugger` exposes only a subset of
 the DevTools domains. The honest fix is a bounded bridge command frame and an
 extension-side `chrome.debugger.sendCommand` dispatch restricted to that
-subset, with an unsupported method refused explicitly. It is not done here:
-it needs the same wire change as F1's exchange, and doing both at once without
-a real Edge or Chrome to test against would produce a protocol that has never
-spoken to a browser.
+subset, with an unsupported method refused explicitly. **At the time of this
+round it was not done**: it needed the same wire change as F1's exchange, and
+doing both at once without a real Edge or Chrome to test against would produce
+a protocol that had never spoken to a browser.
+
+**F6 is now closed**, and the way it was closed is the way the finding asked
+for. The host sends a raw DevTools command as a `cdp` frame and the extension
+answers with a `cdp-result`; the extension keeps an explicit list of the
+commands it will send and refuses anything outside it **before** it makes any
+browser call, and that refusal says `unsupported`, so the host can tell "the
+extension will never run this" from "this failed". The host's own gate is
+unchanged and still comes first: the surface must be authorized, and the
+command must be a restricted browser-tool action or permitted by the Full CDP
+switch. The provider does not keep a second opinion about that, which is why
+it no longer refuses a raw command on the surface's own authority.
+
+`packages/webui/test/unit/browser-bridge-server.test.ts` — "forwards a raw
+DevTools command rather than refusing it";
+`packages/browser-extension/test/cdp.test.ts` — "sends a command that is in the
+supported subset" and "refuses a command outside the subset without asking the
+browser".
 
 ## Round 3
 
@@ -174,7 +207,7 @@ spoken to a browser.
 | N1 | BLOCKER | Startup minted a **new** host credential instead of loading the persisted one, so a restarted host and the extension held different secrets. | `fixed` |
 | N2 | BLOCKER | The Agent's browser tools never reach the browser service. | `fixed` |
 | N3 | MAJOR | The target selection is per surface, not per Agent run. | `fixed` |
-| N4 | MAJOR | Full CDP is denied on the external surfaces. | `open` |
+| N4 | MAJOR | Full CDP is denied on the external surfaces. | `fixed` |
 | N5 | MAJOR | The frame queue was unbounded. | `fixed` |
 | N6 | MAJOR | This document set still said the bridge was not wired. | `fixed` |
 
@@ -247,7 +280,14 @@ the DevTools domains. The fix is a bounded bridge command frame and an
 extension-side dispatch restricted to that subset, with an unsupported method
 refused explicitly. It needs the same wire change as the pairing exchange, and
 without a real Edge or Chrome to speak to, doing both at once would produce a
-protocol that has never been exercised against a browser.
+protocol that has never been exercised against a browser. **At the time of this
+round it was not done.**
+
+**N4 is now closed**, in the way round 2's F6 describes: the `cdp` /
+`cdp-result` frame pair, and the extension's allowlist with an explicit
+`unsupported` refusal for anything outside it. The evidence is in
+[`10-browser-core-integration.md`](10-browser-core-integration.md) and in
+[`02-bridge-protocol.md`](02-bridge-protocol.md).
 
 ## Round 4
 
@@ -259,46 +299,47 @@ protocol that has never been exercised against a browser.
 
 | # | Severity | Finding | Status |
 | --- | --- | --- | --- |
-| N1 | BLOCKER | Admission trusts the `Origin` header to select an allowlisted extension id, and the host then encrypts its credential to the public key that peer supplies. A local process can spoof the allowlisted origin, supply its own key, decrypt the credential and answer the challenge. | `open` |
+| N1 | BLOCKER | Admission trusts the `Origin` header to select an allowlisted extension id, and the host then encrypts its credential to the public key that peer supplies. A local process can spoof the allowlisted origin, supply its own key, decrypt the credential and answer the challenge. | `fixed` |
 | N2 | MAJOR | Changing the selected target did not retarget the active image stream. | `fixed` |
 | N3 | MAJOR | The Agent tool path silently used the isolated Chromium even when the panel was showing Edge or Chrome. | `fixed` |
 | N4 | MAJOR | The published documents still said the tool adapter did not exist and that the host and the extension minted independent credentials. | `fixed` |
 
 ### N1 — the bridge is now authenticated by an installation key
 
-This is the one finding that is a **design** gap rather than a defect, and the
-ADR's amendment A1 already names the shape of the answer: the extension needs
-an **installation key** that a local process does not have, and the exchange
-must be bound to it.
+This finding was a **design** gap rather than a defect, and the ADR's amendment **A2**
+records the shape of the answer: the extension needs an **installation key** that a local
+process does not have, and the exchange must be bound to it.
 
-What the tree does today, stated plainly so nobody has to infer it:
+**What this round found.** The host selected the allowlisted extension id from the `Origin`
+header, and then sealed its pairing credential to the **public key that peer supplied**,
+and sent it. A local process can put any `Origin` on a loopback socket, so it could be
+admitted as the allowlisted extension, supply its own ephemeral key, decrypt the
+credential and answer the challenge. The exchange protected the credential **in transit**
+and nothing more; it was not an authentication of the peer. Until the installation key
+existed, the honest position was that the external surfaces were **not** safe against an
+attacker who can reach loopback, and the switch that enables them should be understood as
+enabling them for **the person's browser**, not as a boundary against a local process.
 
-- The host selects the allowlisted extension id from the `Origin` header.
-- The host then seals its pairing credential to the **public key that peer
-  supplied**, and sends it.
-- A local process can put any `Origin` on a loopback socket, so it can be
-  admitted as the allowlisted extension, supply its own ephemeral key, decrypt
-  the credential and answer the challenge.
+**What the tree does today.** The `Origin` header is now a **pre-filter**, not the
+authentication decision:
 
-The exchange therefore protects the credential **in transit** and nothing more.
-It is not an authentication of the peer. The bridge must be treated as
-**unauthenticated against a local process** until the installation key lands,
-and the credential must not be regarded as secret from anything that can
-reach loopback.
+- The host mints a 32-byte **installation key** per surface, keeps it in the OS secure
+  store, and shows it in the WebUI Settings surface
+  (`packages/webui/src/server/browser-bridge/server.ts:380`).
+- The extension stores it in `chrome.storage.local`
+  (`packages/browser-extension/src/pairing.ts:48`) and thereafter shows only a fingerprint.
+- The handshake is **proof-first**: `hello` → `challenge` → `proof`, and only then, for a
+  peer that proved the installation key, the sealed pairing credential
+  (`packages/webui/src/server/browser-bridge/pairing.ts:270`,
+  `verifyProof`; `packages/webui/src/server/browser-bridge/session.ts:652`).
+- A peer that proves **only** a pairing credential the host already issued is admitted
+  without a further credential. A peer that proves neither is refused and **receives no
+  credential at all** — the `pair` frame is sent only to a peer that has proved the
+  installation key.
 
-**What is needed.** A per-installation key that the extension holds and a
-local process does not, provisioned when the extension is installed and
-configured, and bound into the exchange so that only the holder of that key
-can complete it. The credential would then only ever be sealed to a key the
-host has already seen prove possession of the installation key. The native
-messaging route the ADR's research findings already list is the other
-candidate, and it has the same property: a registered host process, not a
-spoofable `Origin` header.
-
-Until that exists, the honest position is the one this document takes: the
-external surfaces are **not** safe against an attacker who can reach loopback,
-and the switch that enables them should be understood as enabling them for
-**the person's browser**, not as a boundary against a local process.
+Provisioning is explicit, and that is the deliberate cost: an unprovable peer identity
+cannot be automated away. The automatic pairing ADR 0019 describes is automatic with
+respect to **tabs**, not with respect to **peer identity**.
 
 ### A residual gap the N2 fix left behind — now closed
 
@@ -656,10 +697,10 @@ which is now in the tree.
 
 | # | Severity | Finding | Status |
 | --- | --- | --- | --- |
-| T1 | BLOCKER | **The Agent cannot create a selection, so it cannot act at all.** The tool adapter resolves the surface from the run's own selection and refuses with `browser_target_unknown` when the run has none, and the only writer of a selection is the panel. A person asking for a browser therefore got the same refusal for every action — `inspect`, `navigate` and `open_tab` alike — and `open_tab` was the one action that should have produced a selection. ADR 0019 required that both the user and the Agent can select a target; the tree carried half of it. | `closed` — `open_tab` is the one action a run with no selection may perform, because it is the action that would create the selection the gate wants (`packages/webui/src/runtime/browser/tool-adapter.ts:178`). The service opens the page and makes it the run's selection (`packages/webui/src/runtime/browser/browser-service.ts:1082`), and a person who opens a tab while the run has none gives the run that page as a documented bootstrap. Measured in a real Chrome — see [`09-acceptance-record.md`](09-acceptance-record.md), the rows "the Agent opens a tab" and "a person opens a tab while the run has no selection". |
-| T2 | MAJOR | **`open_tab` created a page that nothing could address.** The isolated provider drives exactly one page and refuses every other target, so `Target.createTarget` produced a second page that the provider would not drive, would not stream, and would not accept input for. It appeared in the target list as a tab that did nothing when chosen. | `closed` — the provider holds one page per web tab, each with its own CDP session (`packages/webui/src/runtime/browser/isolated-chromium/provider.ts:199`), and `open_tab` attaches the page it creates and registers it (`packages/webui/src/runtime/browser/isolated-chromium/provider.ts:349`). Measured in a real Chrome — the rows "the Agent opens a tab" and "a second web tab in one session". |
-| T3 | MAJOR | **The image stream was per run, so the person and the Agent could not be on different pages.** `watchFrames` resolved the run's selection and streamed that target, and the client dropped any frame that did not match it. A person opening another tab had no way to see it without moving the run's selection, which would have moved the Agent's work with it. | `closed` — the stream is keyed by the target (`packages/webui/src/runtime/browser/browser-service.ts:795`), and the run's selection and the tab the person is looking at are two cells with one writer each (`packages/webui/src/client/features/browser/contracts/browser-panel.ts`). Measured in a real Chrome — the rows "a person opens a tab while the Agent works" and "a person types into their own tab while the Agent works". |
-| T4 | MINOR | **A page had no identity in the interface.** The panel was a view of a run's selected target, and that selection was invisible: a person moved it by clicking a chip inside the browser panel, and the Agent could not move it at all. | `closed` — a page has a name: the tab strip (`packages/webui/src/client/features/workspace/ui/WebuiWorkspaceTabStrip.public.tsx:183`) shows a row of tabs, and the runtime publishes the session's web tabs as a snapshot (`packages/webui/src/runtime/browser/browser-service.ts`). The strip opens a tab and the Agent opens a tab, each on its own side. Measured in a real Chrome — the row "the Agent opens a tab, and the strip gains it as the active tab". |
+| T1 | BLOCKER | **The Agent cannot create a selection, so it cannot act at all.** The tool adapter resolves the surface from the run's own selection and refuses with `browser_target_unknown` when the run has none, and the only writer of a selection is the panel. A person asking for a browser therefore got the same refusal for every action — `inspect`, `navigate` and `open_tab` alike — and `open_tab` was the one action that should have produced a selection. ADR 0019 required that both the user and the Agent can select a target; the tree carried half of it. | `closed` — `open_tab` is the one action a run with no selection may perform, because it is the action that would create the selection the gate wants (`packages/webui/src/runtime/browser/tool-adapter.ts:178`). The service opens the page and makes it the run's selection (`packages/webui/src/runtime/browser/browser-service.ts:1188`), and a person who opens a tab while the run has none gives the run that page as a documented bootstrap. Measured in a real Chrome — see [`09-acceptance-record.md`](09-acceptance-record.md), the rows "the Agent opens a tab" and "a person opens a tab while the run has no selection". |
+| T2 | MAJOR | **`open_tab` created a page that nothing could address.** The isolated provider drives exactly one page and refuses every other target, so `Target.createTarget` produced a second page that the provider would not drive, would not stream, and would not accept input for. It appeared in the target list as a tab that did nothing when chosen. | `closed` — the provider holds one page per web tab, each with its own CDP session (`packages/webui/src/runtime/browser/isolated-chromium/provider.ts:249`), and `open_tab` attaches the page it creates and registers it (`packages/webui/src/runtime/browser/isolated-chromium/provider.ts:338`). Measured in a real Chrome — the rows "the Agent opens a tab" and "a second web tab in one session". |
+| T3 | MAJOR | **The image stream was per run, so the person and the Agent could not be on different pages.** `watchFrames` resolved the run's selection and streamed that target, and the client dropped any frame that did not match it. A person opening another tab had no way to see it without moving the run's selection, which would have moved the Agent's work with it. | `closed` — the stream is keyed by the target (`packages/webui/src/runtime/browser/browser-service.ts:893`), and the run's selection and the tab the person is looking at are two cells with one writer each (`packages/webui/src/client/features/browser/contracts/browser-panel.ts`). Measured in a real Chrome — the rows "a person opens a tab while the Agent works" and "a person types into their own tab while the Agent works". |
+| T4 | MINOR | **A page had no identity in the interface.** The panel was a view of a run's selected target, and that selection was invisible: a person moved it by clicking a chip inside the browser panel, and the Agent could not move it at all. | `closed` — a page has a name: the tab strip (`packages/webui/src/client/features/workspace/ui/WebuiWorkspaceTabStrip.public.tsx:231`) shows a row of tabs, and the runtime publishes the session's web tabs as a snapshot (`packages/webui/src/runtime/browser/browser-service.ts`). The strip opens a tab and the Agent opens a tab, each on its own side. Measured in a real Chrome — the row "the Agent opens a tab, and the strip gains it as the active tab". |
 
 ### What was done
 
@@ -669,6 +710,39 @@ records the change to the panel's role. The decisions are settled **and** the tr
 the rules ADR 0022 pins are `implemented` in [`05-target-identity.md`](05-target-identity.md), each with
 the file and the line that carries it, and the behaviour is measured in a real Chrome in
 [`09-acceptance-record.md`](09-acceptance-record.md).
+
+## Round 12 — the Browser Core integration, of the tree round 11 left behind
+
+This round was not run by an external reviewer either. It came from the decision to align the WebUI's
+browser semantics with the provider-neutral Browser Core that the TUI already drives, and from the
+review of the change that did it. Four findings came out of it, and all four are closed in the tree.
+
+| # | Severity | Finding | Status |
+| --- | --- | --- | --- |
+| C1 | MAJOR | **The restricted action set was not executable on the isolated surface.** The provider translated a restricted action into a raw DevTools method, which cannot work for an action that takes an element reference: turning one into a coordinate needs the element map, the retained snapshot and the generation check. The provider had no element map, so it **refused** 21 of the 28 actions — including `inspect`, `query`, `click` and `type` — rather than guessing where a click should land. | `closed` — the restricted actions are executed by Browser Core on both surfaces, over a `BrowserTransport` adapter per surface. `packages/webui/src/runtime/browser/isolated-chromium/core-transport.ts`; `packages/webui/src/runtime/browser/isolated-chromium/provider.ts:829`. Proved against a real browser — `packages/webui/test/integration/browser-core-agent-actions.test.ts` drives `inspect` → `click` → `type`. |
+| C2 | MAJOR | **The external surfaces could not execute the restricted action set at all.** The bridge provider had its own smaller action path — five of the 28 restricted actions (`navigate`, `reload`, `back`, `forward`, `get_dom`), each mapped to one DevTools command, with every other action refused rather than guessed at — and the actions it did have were implemented against the bridge's wire rather than against a shared definition of what the action means. | `closed` — the bridge runs the same restricted vocabulary through Browser Core, over the bridge's own transport. `packages/webui/src/server/browser-bridge/core-transport.ts`; `packages/webui/src/server/browser-bridge/server.ts:843`. `packages/webui/test/unit/browser-bridge-core-actions.test.ts`. |
+| C3 | MAJOR | **`back` and `forward` on the bridge did not navigate.** The bridge's path asked the tab for its navigation history and answered with it — the page never moved. The isolated surface's `back` and `forward` worked, so the same action meant two different things on two surfaces. | `closed` — both surfaces now use Browser Core's `history` semantics, so the action reads the history and goes to the entry. `packages/browser-core/src/browser-actions.ts:245`; `packages/webui/test/unit/browser-bridge-core-actions.test.ts` |
+| C4 | MAJOR | **The bridge could not take a screenshot of anything but the tab in front — and did not say so.** The extension's debugger exposes a restricted CDP subset that excludes `Page.captureScreenshot`, so a screenshot had no source on that path. | `closed` — the bridge takes its pictures from the extension's own pushed visible-tab frame, through the core's `captureScreenshot` hook, and refuses a screenshot of a tab that is not in front with `browser_capability_denied` rather than answering with another tab's picture. `packages/webui/src/server/browser-bridge/server.ts:939`; `packages/browser-extension/src/images.ts` |
+
+### What was done
+
+The layer itself is described in [`10-browser-core-integration.md`](10-browser-core-integration.md), and
+the surface-specific consequences are in [`01-capability-matrix.md`](01-capability-matrix.md). Three
+things are worth stating here because they are decisions rather than code:
+
+- **The core's errors are the Agent's errors.** A stale reference, a missing element and a timeout are
+  raised as they are, because the code they carry is what tells the Agent whether to inspect again,
+  to pick another element, or to try something else. Flattening them into one failure would leave the
+  Agent guessing.
+- **The extension's allowlist grew from 26 to 45 commands**, with 19 new commands added to the DOM,
+  Runtime, Accessibility, Network and Page domains, and with the **DOMSnapshot** domain introduced.
+  Two commands stay out on purpose: `Page.captureScreenshot` and `DOM.setFileInputFiles`. The first
+  would let the Agent photograph a tab the person is not looking at; the second would let it name an
+  arbitrary local file in the user's real browser. The bridge therefore cannot complete
+  `upload_files` — the action's method is refused as unsupported, which the bridge maps to
+  `browser_capability_denied`. That is a **capability difference**, not a semantic one.
+- **`upload_files` on the bridge is not pinned by a test.** The vocabulary test names the action, and
+  nothing asserts the refusal. A future change to the allowlist would silently widen this surface.
 
 ## What this document does not establish
 

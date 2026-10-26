@@ -25,7 +25,7 @@ Four boundaries are held apart, each with its own owner (ADR 0014, ADR 0016):
 | Boundary | Owns | Does not |
 | --- | --- | --- |
 | `src/client/` | Browser orchestration, business state, presentation, browser IO | Speak to the harness, hold Node resources |
-| `src/server/` | Network ingress: authentication, envelope validation, dispatch, wire projection, socket lifecycle, static assets | Hold browser state or import runtime implementations |
+| `src/server/` | Network ingress: authentication, envelope validation, dispatch, wire projection, socket lifecycle, static assets, and the external browser bridge | Hold browser state or import runtime implementations |
 | `src/runtime/` | Harness capability adaptation and every Node-side process resource | Know which session a browser has selected |
 | `src/shared/` | Cross-process wire contracts and shared constants | Import either execution side |
 
@@ -33,6 +33,29 @@ Four boundaries are held apart, each with its own owner (ADR 0014, ADR 0016):
 under `tsconfig.server.json`. The browser bundle has its own metafile (`dist-webui/metafile.json`),
 checked by `scripts/check-webui-boundary.mjs`. The dev launcher runs the Node side through the
 repository's `tsconfig.standalone.json` via `tsx`, not through either package config.
+
+## The browser's own boundary
+
+The browser runtime sits inside `src/runtime/` and the browser bridge inside `src/server/`, and both
+reach the browser through `@mavis/browser-core` — a workspace package, not a WebUI layer.
+
+```
+Agent tool or panel
+  → browser service                      (runtime/browser/browser-service.ts)
+  → provider: isolated Chromium or bridge (runtime/browser/isolated-chromium/, server/browser-bridge/)
+  → Browser Core session                 (@mavis/browser-core)
+  → BrowserTransport adapter             (core-transport.ts, one per surface)
+  → the browser
+```
+
+The split is the one that keeps the layers honest: **Browser Core decides what an action means, the
+WebUI decides whether it may run, and the transport decides how the command travels.** The core
+reads no authorization switch and the transport judges no action. `@mavis/browser-core` is a
+dependency of the `runtime/` and `server/` layers only; `src/client/` and `src/shared/` never import
+it, which is why the restricted command vocabulary is duplicated in
+`src/shared/contracts/browser.ts` rather than read from the core.
+
+See [`../browser-use/10-browser-core-integration.md`](../browser-use/10-browser-core-integration.md).
 
 ## How a request travels
 

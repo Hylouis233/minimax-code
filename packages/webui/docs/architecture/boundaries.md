@@ -19,6 +19,33 @@ cross-feature call through an approved public contract or command is not automat
 | `runtime/` | `runtime/port.ts`, `shared/` and runtime modules | Implement the process-local host adapter without depending on browser or server implementation. |
 | `shared/` | leaf dependencies only | Wire contracts and shared values import neither execution side. |
 
+### Workspace packages are not layers
+
+A workspace package is a **peer**, not one of the four layers. `@mavis/shared`, `@mavis/protocol`,
+`@mavis/browser-core` and `@mavis/local-runtime-v2` are separate packages with their own boundaries,
+and importing one is not an edge between two WebUI layers.
+
+| Package | May be imported by | Why |
+| --- | --- | --- |
+| `@mavis/shared` | `client/`, `server/`, `runtime/`, `shared/` | it holds the wire contracts and the runtime boundary contracts |
+| `@mavis/protocol` | `client/`, `server/`, `runtime/` | it holds the generated protocol |
+| `@mavis/browser-core` | `runtime/`, `server/` | it owns the semantics of a browser action and reaches a browser through a `BrowserTransport` |
+| `@mavis/local-runtime-v2` | `runtime/` | it is the harness host the adapter drives |
+| `@mavis/oauth-core`, `@mavis/mcode-tools-host` | `runtime/` | the account and the tools host are reached through the runtime adapter |
+
+`src/client/` and `src/shared/` may import **only** `@mavis/shared` and `@mavis/protocol`. The gate is
+`scripts/lib/webui-dependency-rules.mjs`, which reports any workspace dependency from `client/` or
+`shared/` that is not one of those two. The browser-core restriction is not a preference: the browser
+bundle must not carry the core, because the core reaches a browser through a transport, and a
+browser-side copy of the core would be a second, unreachable definition of what an action means.
+This is why the restricted command vocabulary is duplicated in `src/shared/contracts/browser.ts` rather
+than read from `@mavis/browser-core` — the shared layer cannot import the core, so it states the
+vocabulary itself, and a test asserts the two lists cannot drift.
+
+`packages/webui/src/server/browser-bridge/` is the one place where a `server/` module imports
+`@mavis/browser-core`. That is allowed: the bridge is a Node-side surface that drives a browser, not
+an inbound network endpoint.
+
 Within a layer, feature implementation is private by default. A feature may use another feature's
 public `contracts/`, or a module that feature published as its surface: a `.public.ts` for a
 derivation or interface, a `.public.tsx` for a component. Everything else in another feature is

@@ -37,7 +37,9 @@ declaration rather than a probe result. This document is the measurement half.
 | Pointer / keyboard / text input | **measured** — mouse press + release, `Input.insertText`, and `Input.dispatchKeyEvent` all succeeded against a real page | **measured** — the text the host sent appeared in the page's field, read back through the browser's own automation, in a real Edge | **measured** — the same, in a real Chrome |
 | Agent browser tools | **implemented** — the tool adapter forwards to the same browser service the panel uses, and the composition root hands it to the runtime host. Which *surface* a call acts on is resolved from the run's own selection, so a run that has selected nothing is refused rather than being sent somewhere the person is not looking — except for `open_tab`, which is the one action that would create the selection the gate wants, and which therefore may. [ADR 0022](../adr/0022-webui-workspace-panel-is-a-browser-tab-strip.md) gives `open_tab` that path (`implemented` — `runtime/browser/tool-adapter.ts:178`) | **implemented**, same adapter | **implemented**, same adapter |
 | Full CDP widening | `implemented` — gated in `WebuiBrowserService.sendCommand` | `implemented`, same gate | `implemented`, same gate |
-| Restricted command set | `implemented` — `WEBUI_BROWSER_RESTRICTED_COMMANDS`, 28 names, `packages/webui/src/shared/contracts/browser.ts:310` | same vocabulary over the bridge | same vocabulary over the bridge |
+| Restricted command set | `implemented` — `WEBUI_BROWSER_RESTRICTED_COMMANDS`, 28 names, `packages/webui/src/shared/contracts/browser.ts:428` | same vocabulary, **executed** by Browser Core | same vocabulary, **executed** by Browser Core |
+| Who executes a restricted action | `implemented` — Browser Core, over the provider's own CDP connection. [`10-browser-core-integration.md`](10-browser-core-integration.md) | `implemented` — Browser Core, over the bridge's `cdp` frame | `implemented` — Browser Core, over the bridge's `cdp` frame |
+| Actions the surface itself answers | `open_tab` is the provider's; `return_to_previous_tab` is **refused** with `browser_capability_denied` | `open_tab` is **refused** with `browser_capability_denied` | `open_tab` is **refused** with `browser_capability_denied` |
 | Extension permission gate | not applicable — no extension is involved | The extension's own browser permission, independent of the WebUI switch | The extension's own browser permission, independent of the WebUI switch |
 
 ## Measured on the validation machine — `.plan/browser-use/complete/cdp-evidence.json`
@@ -148,30 +150,37 @@ renderer has settled. Note the two different payload lengths (`screenshotBytes` 
 
 **`implemented` — the isolated-Chromium provider does handle this failure.**
 `packages/webui/src/runtime/browser/isolated-chromium/provider.ts` wraps the affected sends in
-`#withAttachmentRetry` (`provider.ts:588`), which re-issues an operation while it fails with an
+`#withAttachmentRetry` (`provider.ts:1086`), which re-issues an operation while it fails with an
 attachment error, up to a bounded window:
 
 | Element | Value | Source |
 | --- | --- | --- |
-| Mechanism | `#withAttachmentRetry(operation)` | `provider.ts:588` |
-| Retry window | `ATTACHMENT_RETRY_WINDOW_MS` = 3 000 ms | `provider.ts:50` |
-| Retry delay | `ATTACHMENT_RETRY_DELAY_MS` = 100 ms | `provider.ts:52` |
-| Failure test | `isAttachmentFailure` matches the message `Not attached to an active page` | `provider.ts:606` |
-| Non-attachment errors | rethrown immediately, never retried | `provider.ts:596` |
-| On window expiry | the original error is thrown, not a timeout | `provider.ts:600` |
+| Mechanism | `#withAttachmentRetry(operation)` | `provider.ts:1086` |
+| Retry window | `ATTACHMENT_RETRY_WINDOW_MS` = 3 000 ms | `provider.ts:70` |
+| Retry delay | `ATTACHMENT_RETRY_DELAY_MS` = 100 ms | `provider.ts:72` |
+| Failure test | `isAttachmentFailure` matches the message `Not attached to an active page` | `provider.ts:1104` |
+| Non-attachment errors | rethrown immediately, never retried | `provider.ts:1094` |
+| On window expiry | the original error is thrown, not a timeout | `provider.ts:1098` |
 
-The retry wraps eleven call sites, covering image capture and every navigation as well as input:
+The retry wraps **five** call sites:
 
 | Command | Source |
 | --- | --- |
-| `Page.startScreencast` | `provider.ts:272` |
-| `Page.navigate` | `provider.ts:416` |
-| `Page.reload` | `provider.ts:422` |
-| `Page.navigateToHistoryEntry` | `provider.ts:442` |
-| `Page.captureScreenshot` | `provider.ts:448` |
-| `Input.dispatchMouseEvent` | `provider.ts:325` |
-| `Input.dispatchKeyEvent` | `provider.ts:357` |
-| `Input.insertText` | `provider.ts:368` |
+| `Page.enable` | `provider.ts:409` |
+| `Emulation.setDeviceMetricsOverride` | `provider.ts:580` |
+| `Page.bringToFront` | `provider.ts:619` |
+| `Page.startScreencast` | `provider.ts:622` |
+| a raw DevTools method, when Full CDP is on | `provider.ts:847` |
+
+**The navigation and capture commands are no longer the provider's.** They were, when this table was
+first written; Browser Core issues them now — `Page.navigate` and `Page.reload` at
+`packages/browser-core/src/browser-actions.ts:203` and `:276`, `Page.navigateToHistoryEntry` at `:245`,
+and `Page.captureScreenshot` at `packages/browser-core/src/browser-action-artifacts.ts:65`. The
+provider reaches them through its core transport
+(`packages/webui/src/runtime/browser/isolated-chromium/core-transport.ts`), whose `send` is the
+provider's own CDP connection — so the retry's *scope* narrowed while the *failure* it covers did
+not: an attachment failure is still a failure of the same connection, and the core's own command
+path does not carry the provider's retry.
 
 Two limits of this fix are worth stating, because the measurement does not cover them:
 
@@ -193,11 +202,38 @@ lists in the tree and they are **not** the same, which is worth stating before e
 
 | List | Where | Count | Whose it is |
 | --- | --- | --- | --- |
-| `WEBUI_BROWSER_RESTRICTED_COMMANDS` | `packages/webui/src/shared/contracts/browser.ts:310` | **28** | the WebUI's own gate, read by `isBrowserCommandAllowed` and enforced in `WebuiBrowserService.sendCommand` |
+| `WEBUI_BROWSER_RESTRICTED_COMMANDS` | `packages/webui/src/shared/contracts/browser.ts:428` | **28** | the WebUI's own gate, read by `isBrowserCommandAllowed` and enforced in `WebuiBrowserService.sendCommand` |
 | `LOCAL_BROWSER_ACTION_NAMES` | `packages/agent-tools/src/desktop/builtin-browser-defs.ts:744` | **24** | the Agent tools' browser-action vocabulary |
 
 The 28-name WebUI list adds `wait_for`, `get_dom`, `verify_text` and `inspect_editable_targets` to the
 Agent list.
+
+**The list says what may be sent; it does not say who executes it.** Since Browser Core was
+integrated, the executor is Browser Core on **both** surfaces — one implementation, reached over a
+transport. The two surfaces differ in what the *browser* can do, not in what the WebUI knows how to
+express. [`10-browser-core-integration.md`](10-browser-core-integration.md) owns that layer.
+
+Three actions are answered by the surface rather than by the core, because they are about the run's
+pages rather than about one page:
+
+| Action | Isolated Chromium | Bridge | Reason |
+| --- | --- | --- | --- |
+| `open_tab` | the provider answers it | refused with `browser_capability_denied` | `chrome.debugger` cannot open a page in the person's browser |
+| `return_to_previous_tab` | refused with `browser_capability_denied` | refused | it moves between the pages a **run** has open, and the run's pages are the service's record, not the provider's |
+
+And one restricted action is a **capability difference** rather than a semantic one:
+
+| Action | Isolated Chromium | Bridge | Reason |
+| --- | --- | --- | --- |
+| `upload_files` | performed | **unavailable** | it needs `DOM.setFileInputFiles`, which is deliberately absent from the extension's allowlist — see below |
+
+`DOM.setFileInputFiles` is not on the extension's list (`packages/browser-extension/src/cdp.ts`) on
+purpose: the extension's debugger could run it, but what it must not do is give the Agent a way to
+name an arbitrary local file in the user's real browser. The bridge therefore refuses the action
+because its **method** is not available — the extension refuses `DOM.setFileInputFiles` as
+unsupported, and the bridge maps that refusal to `browser_capability_denied` — rather than
+approximating it. **No suite pins this refusal** — the vocabulary test names the action, and
+nothing asserts that the bridge refuses it.
 
 **The probe's `restrictedActionCount: 28` matches the WebUI list exactly** — the same 28 names, in the
 same set. That number is therefore not an arbitrary enumeration: it is the restricted vocabulary the
@@ -211,10 +247,10 @@ Full CDP access is a global, persistent authorization for the Agent to send any 
 provider supports. It widens an already-authorized surface and never authorizes one on its own.
 
 **`implemented`.** `WebuiBrowserService.sendCommand`
-(`packages/webui/src/runtime/browser/browser-service.ts:419`) is the command path: it checks the surface
+(`packages/webui/src/runtime/browser/browser-service.ts:1117`) is the command path: it checks the surface
 switch first, so a disabled surface is refused with `browser_surface_not_authorized` regardless of
 `fullCdp`, then calls `isBrowserCommandAllowed(authorization, command, WEBUI_BROWSER_RESTRICTED_COMMANDS)`
-(`browser-service.ts:431`). A command outside the restricted set with `fullCdp` off is refused with
+(`browser-service.ts:1406`). A command outside the restricted set with `fullCdp` off is refused with
 `browser_capability_denied` and is never forwarded. The path is exposed as the `sendBrowserCommand`
 operation, and the same operation answers three callers: a run's tools (`sendCommandToSelection`), the
 panel with no run (`sendCommand`), and a web tab's toolbar, which names the page its tab holds
@@ -387,10 +423,14 @@ that closes it. It is a gap, not a denial.
 | A session's pages are released when the session ends | **implemented** | the release is keyed on the **session**, not on one operation. The three ways a session goes away — deletion, archiving, and a transfer away — all reach it: the first two through the harness port's own `deleteSession` and `archiveSession`, the third through the transfer's rollback, which calls the same `deleteSession`. `packages/webui/src/runtime/harness/sessions.ts` — `releaseSessionIfItEnded`; `packages/webui/src/runtime/browser/browser-service.ts` — `releaseSession` |
 | The runtime publishes the session's web tabs as a snapshot | **implemented** | the service keeps the session's web tabs beside the run's selection and publishes them on the `watchBrowserWebTabs` stream — each tab's id, its target identity, its title, its URL, and whether it is the run's selection. `packages/webui/src/runtime/browser/browser-service.ts` — `watchWebTabs` |
 | The client subscribes to the published snapshot | **implemented** | the browser port carries `watchBrowserWebTabs`, the transport's request table has it, and the wire opens the stream, and the strip subscribes **under the session's run id**: the pages of a session are recorded in that cell whether the Agent opened them or the person did, so one subscription carries both. `packages/webui/src/client/features/browser/contracts/browser-port.ts`; `packages/webui/src/client/features/workspace/ui/WebuiWorkspaceTabStrip.public.tsx` |
-| The Agent opens tabs and gives a run its first selection | **implemented** | `open_tab` is the one action a run with no selection may perform, because it is the action that would create the selection the gate wants. Every other action of a cold run is still refused with `browser_target_unknown`. `packages/webui/src/runtime/browser/tool-adapter.ts` — the `open_tab` branch; `packages/webui/src/runtime/browser/browser-service.ts` — `openWebTab` | `tool-adapter.ts:163` refuses a run that has selected nothing, so the Agent cannot acquire a selection of its own and `open_tab` is refused with it. The provider's side is done; the tool's side is not. #206 |
+| The Agent opens tabs and gives a run its first selection | **implemented** | `open_tab` is the one action a run with no selection may perform, because it is the action that would create the selection the gate wants. Every other action of a cold run is still refused with `browser_target_unknown`. `packages/webui/src/runtime/browser/tool-adapter.ts:178` — the `open_tab` branch, which calls `openWebTab`; `packages/webui/src/runtime/browser/browser-service.ts:1188` — `openWebTab` |
 | The client's tab is a stable id with a mutable content | **implemented** | the id is assigned by the client when the tab is opened and does not change when the content does, so two web tabs in one session are two tabs. The rules that used to fall out of the id — the same file opens one tab, the workspace review and the turn review are two tabs — are content checks now. `packages/webui/src/client/features/workspace/projection/workspace-panel-state.ts` |
 | The frame operation's request names a target | **implemented** | `watchBrowserFrames` takes `{ surface, target }`. A request that still carries a run id is refused with an explicit error rather than answered with the run's selection. `packages/webui/src/server/operation/browser.ts` — `validateFrameStream` |
 | The provider's attachment retry | **implemented** | `provider.ts` — the mechanism is cited in full above |
+| A restricted action is executed by one implementation on both surfaces | **implemented** | Browser Core owns the semantics — element references, retained snapshots, action deadlines, effect validation — and reaches each browser through a `BrowserTransport`. The isolated Chromium's adapter is `packages/webui/src/runtime/browser/isolated-chromium/core-transport.ts`; the bridge's is `packages/webui/src/server/browser-bridge/core-transport.ts`. [`10-browser-core-integration.md`](10-browser-core-integration.md) |
+| A reference names an element the Agent can act on | **implemented** | `inspect` returns an opaque `browser-element:<generation>-<uuid>`. The core holds the element map and the retained snapshot, and refuses a reference whose page has moved on with a stale-reference refusal (`STALE_ELEMENT_REF` or `STALE_SNAPSHOT`) — while a reference on a page that did **not** navigate stays usable. `packages/browser-core/src/browser-action-targets.ts`; `packages/webui/test/integration/browser-core-agent-actions.test.ts` |
+| The bridge's `back` and `forward` actually navigate | **implemented** | they are Browser Core's `history` semantics, so they read the tab's history and go to the entry. The bridge's earlier path only asked for the history and never moved. `packages/browser-core/src/browser-actions.ts:245`; `packages/webui/test/unit/browser-bridge-core-actions.test.ts` |
+| The bridge's screenshot is the tab the person is looking at | **implemented** | it comes from the extension's own pushed visible-tab frame, through the core's `captureScreenshot` hook. A tab that is not in front has no frame to give and is refused with `browser_capability_denied` rather than answered with another tab's picture. `packages/webui/src/server/browser-bridge/server.ts` — `#captureVisibleFrame`; `packages/webui/src/client/features/browser/ui/BrowserPanelHost.public.tsx` |
 | The files tab is a singleton | **implemented** | an explicit content check now: one files tab per session and directory. The id no longer implies it, because the id says nothing about what the tab is showing |
 | The two review tabs are two tabs | **implemented** | the workspace's change set and a turn's review are told apart by the content's `source`, so opening one no longer replaces the other |
 | A tab's label follows its content | **implemented** | the content carries the kind, and a web tab is titled by the page the runtime publishes |

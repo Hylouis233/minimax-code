@@ -49,11 +49,19 @@
 // The surface is not the isolated Chromium, and it cannot do everything the
 // isolated Chromium can. One action is outside it:
 //
-//   - `upload_files` needs a file chooser the extension does not intercept.
+//   - `upload_files` needs `DOM.setFileInputFiles`, and that method is
+//     deliberately absent from the extension's DevTools allowlist.
 //
-// It is refused by name when it is asked for rather than approximated: a file
-// that went somewhere else would be worse than a refusal that says which
-// capability is missing.
+// It is refused because its **method** is not available, not because the
+// action's name is special-cased: nothing here branches on `upload_files`.
+// The action reaches the core, the core asks for `DOM.setFileInputFiles`, and
+// the extension refuses the method as unsupported before it makes any browser
+// call; the bridge maps that refusal to `browser_capability_denied`.
+//
+// The extension's debugger could run the method. What it must not do is give
+// the Agent a way to name an arbitrary local file in the user's real browser,
+// so the method is not on the list. A file that went somewhere else would be
+// worse than a refusal that says which capability is missing.
 //
 // The screenshot is a different case, and it works. The extension streams
 // pictures of the tab the person is looking at, and a picture of that tab is

@@ -231,6 +231,52 @@ generation fence on a page that is **not** the launch page.
   generation moving, and a reference recorded before the move being refused — on a page that is not
   the launch page.
 
+## The Browser Core layer's own acceptance
+
+The Browser Core integration is a third wave, and it has its own suites. The isolated surface's
+cases run against a **real** browser; the bridge's cases run against the bridge's wiring with the
+extension as a **test double**, so they prove the wiring rather than a browser.
+
+**The isolated surface — a real browser.**
+`packages/webui/test/integration/browser-core-agent-actions.test.ts` drives the Agent's tools through
+Browser Core against a real Chromium.
+
+**It requires one.** Unlike the other Chromium suites in this package, it does **not** use
+`describe.skipIf`: on a machine with no Chrome the provider's executable discovery throws
+`browser_provider_unavailable` and the cases fail rather than skip. A green run of this suite is
+therefore evidence that a real browser was present, and its absence from a run is **not** evidence
+that the behaviour was checked.
+
+| Case | Result | Evidence |
+| --- | --- | --- |
+| the Agent inspects the page and gets a reference it can act on | `measured` — pass | the reference is an opaque `browser-element:<generation>-<uuid>` |
+| the Agent clicks the element the inspection named | `measured` — pass | the click lands on that element |
+| the Agent types into the field the inspection named | `measured` — pass | the text reaches that field |
+| a reference recorded before the page navigated is refused | `measured` — pass | refused with a stale-reference refusal — `STALE_ELEMENT_REF` or `STALE_SNAPSHOT` |
+| a reference that is still current is accepted | `measured` — pass | the action runs |
+
+**The bridge — the wiring, with a double.**
+`packages/webui/test/unit/browser-bridge-core-actions.test.ts` drives the same core action path over
+the bridge. The extension is a **test double**, so these cases establish that the bridge routes an
+action through the core and answers it, and **not** that a real browser performed them.
+
+| Case | Result | Evidence |
+| --- | --- | --- |
+| the core's action path runs over the bridge | `measured` — pass | the bridge's `cdp` frames carry the commands |
+| a reference recorded before the tab navigated is refused | `measured` — pass | refused with a stale-reference refusal — `STALE_ELEMENT_REF` or `STALE_SNAPSHOT` |
+| a reference stays usable while the tab has not navigated | `measured` — pass | the action runs |
+| a screenshot is answered with the picture the extension streams | `measured` — pass | the frame the extension pushed is the answer |
+| a screenshot of a tab that is not the one in front is refused | `measured` — pass | refused with `browser_capability_denied`, and not answered with another tab's picture |
+
+**The vocabulary cannot drift.**
+`packages/webui/test/unit/browser-restricted-commands.test.ts` holds only actions the runtime's
+contract declares, holds every action the runtime's aggregate tool accepts, and lists each action
+once. It is a pure-behaviour guard over the 28-name vocabulary.
+
+**Not covered by any of these:** `upload_files` on the bridge. The vocabulary test names the action
+and nothing asserts the refusal, so the bridge's `upload_files` gap is a **capability difference
+without a test pinning it**.
+
 ## Reproducing this
 
 ```sh
