@@ -82,6 +82,13 @@ export function createProcessLocalMiniAppApplication(
         miniApps: definitions.map((miniApp) => summary(miniApp, statuses.get(miniApp.pluginId))),
       };
     },
+    listInstalled: async () => {
+      const definitions = await plugins.listInstalledMiniApps();
+      const statuses = new Map(supervisor.inspect().map((status) => [status.pluginId, status]));
+      return {
+        miniApps: definitions.map((miniApp) => summary(miniApp, statuses.get(miniApp.pluginId))),
+      };
+    },
     open: ({ pluginId, signal }) => open(pluginId, signal),
     stop: async ({ pluginId, signal }) => {
       await requireDefinition(pluginId);
@@ -97,6 +104,7 @@ function summary(
   const runtimeStatus = mapRuntimeStatus(status?.phase);
   return {
     pluginId: miniApp.pluginId,
+    ...(miniApp.enabled !== undefined ? { enabled: miniApp.enabled } : {}),
     ...(miniApp.displayName ? { displayName: miniApp.displayName } : {}),
     ...(miniApp.description ? { description: miniApp.description } : {}),
     ...(miniApp.iconPath ? { iconUrl: localIconUrl(miniApp.iconPath) } : {}),

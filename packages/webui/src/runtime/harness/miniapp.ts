@@ -55,15 +55,18 @@ interface RuntimeMiniAppLaunch {
  */
 function requireMiniApps(host: WebuiRuntimeHostHandle): Required<
   Pick<WebuiRuntimeCliService, "listMiniApps" | "openMiniApp" | "stopMiniApp">
-> {
+> & { readonly listInstalledMiniApps?: WebuiRuntimeCliService["listInstalledMiniApps"] } {
   const cliService = requireCliService(host);
-  const { listMiniApps, openMiniApp, stopMiniApp } = cliService;
+  const { listMiniApps, openMiniApp, stopMiniApp, listInstalledMiniApps } = cliService;
   if (!listMiniApps || !openMiniApp || !stopMiniApp)
     throw new WebuiCapabilityUnavailableError(MINIAPP_CAPABILITY_ABSENT);
   // The runtime's members read `this.options`, so the receiver has to be the
   // service they were destructured from — not this wrapper.
   return {
     listMiniApps: () => listMiniApps.call(cliService),
+    ...(listInstalledMiniApps
+      ? { listInstalledMiniApps: () => listInstalledMiniApps.call(cliService) }
+      : {}),
     openMiniApp: (request) => openMiniApp.call(cliService, request),
     stopMiniApp: (request) => stopMiniApp.call(cliService, request),
   };
@@ -81,6 +84,7 @@ export function toWebuiMiniAppSummary(
 ): WebuiMiniAppSummary {
   return {
     pluginId: summary.pluginId,
+    ...(summary.enabled !== undefined ? { enabled: summary.enabled } : {}),
     ...(summary.displayName !== undefined ? { displayName: summary.displayName } : {}),
     ...(summary.description !== undefined ? { description: summary.description } : {}),
     ...(summary.iconUrl !== undefined ? { iconUrl: summary.iconUrl } : {}),
@@ -121,7 +125,13 @@ export function createMiniAppAdapter(
 ): Pick<WebuiHarnessPort, "listMiniApps" | "openMiniApp" | "stopMiniApp"> {
   return {
     async listMiniApps() {
-      const { miniApps } = await requireMiniApps(host).listMiniApps();
+      // The installed read when the host has one: it also answers for a Mini App
+      // the person disabled, which is the row the catalogue offers to enable. A
+      // host that predates it answers with the startable set alone.
+      const capabilities = requireMiniApps(host);
+      const { miniApps } = capabilities.listInstalledMiniApps
+        ? await capabilities.listInstalledMiniApps()
+        : await capabilities.listMiniApps();
       return { miniApps: miniApps.map(toWebuiMiniAppSummary) };
     },
 

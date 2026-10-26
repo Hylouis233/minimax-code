@@ -137,6 +137,15 @@ export interface LocalRuntimeApplication {
   };
   readonly miniApps?: {
     list(): Promise<{ readonly miniApps: readonly MiniAppSurfaceSummary[] }>;
+    /**
+     * The same rows, including a package that is installed but disabled.
+     *
+     * `list` answers what the runtime can start; this answers what is installed,
+     * with `enabled` on each row, so a management surface can offer to turn a
+     * disabled Mini App back on. Kept apart rather than folded into `list` so no
+     * existing consumer starts seeing packages it cannot start.
+     */
+    listInstalled(): Promise<{ readonly miniApps: readonly MiniAppSurfaceSummary[] }>;
     open(input: {
       readonly pluginId: string;
       readonly signal?: AbortSignal;

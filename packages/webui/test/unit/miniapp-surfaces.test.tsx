@@ -15,7 +15,7 @@
 import http from "node:http";
 
 import { describe, expect, it } from "vitest";
-import { createElement } from "react";
+import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { WebuiMiniAppWorkflowsProvider } from "../../src/client/features/miniapp/bindings/use-miniapp-workflows.js";
@@ -59,9 +59,9 @@ function port(input: {
   };
 }
 
-function render(element: ReturnType<typeof MiniAppAppsList> | ReturnType<typeof MiniAppPicker> | ReturnType<typeof MiniAppView>, workflows: ReturnType<typeof createWebuiMiniAppWorkflows>): string {
+function render(element: ReactElement, workflows: ReturnType<typeof createWebuiMiniAppWorkflows>): string {
   return renderToStaticMarkup(
-    createElement(WebuiMiniAppWorkflowsProvider, { workflows }, element),
+    createElement(WebuiMiniAppWorkflowsProvider, { workflows, children: element }),
   );
 }
 
@@ -80,10 +80,10 @@ describe("the plugin catalogue's apps area", () => {
     expect(markup).toContain("dashboard 应用");
     expect(markup).toContain("运行中");
     expect(markup).toContain("启动失败（RUNNER_START_FAILED）");
-    // stop, uninstall and the enable switch are all reachable from the row.
+    // stop, uninstall and disable are all reachable from the row.
     expect(markup).toContain("停止");
     expect(markup).toContain("卸载");
-    expect(markup).toContain("启用 dashboard 应用");
+    expect(markup).toContain("停用");
   });
 
   it("reports an app another client owns, naming that client and its pid", async () => {
@@ -104,6 +104,27 @@ describe("the plugin catalogue's apps area", () => {
     expect(markup).toContain("electron");
     expect(markup).toContain("4242");
     expect(markup).toContain("已在其他客户端运行");
+  });
+
+  it("offers 启用 for a disabled Mini App instead of a start it cannot do", async () => {
+    const workflows = createWebuiMiniAppWorkflows({
+      port: port({
+        miniApps: [
+          { ...summary("disabled-one", "stopped"), enabled: false },
+          summary("enabled-one", "stopped"),
+        ],
+      }),
+    });
+    await workflows.loadListing();
+    const markup = render(createElement(MiniAppAppsList, {}), workflows);
+    // The disabled row is listed — that is what makes enabling it possible — and
+    // says so rather than showing a runtime state it does not have.
+    expect(markup).toContain("disabled-one 应用");
+    expect(markup).toContain("已停用");
+    expect(markup).toContain("启用");
+    // The enabled row keeps its start and stop actions.
+    expect(markup).toContain("enabled-one 应用");
+    expect(markup).toContain("打开");
   });
 
   it("says the capability is absent rather than showing an empty list", () => {

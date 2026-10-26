@@ -174,6 +174,17 @@ export class CliService {
   }
 
   /**
+   * Every installed Mini App, enabled or not.
+   *
+   * The management read: `listMiniApps` answers what this host can start, and a
+   * disabled package is installed but not startable. A surface that shows the
+   * installed set — and offers to enable one of them — needs this one.
+   */
+  listInstalledMiniApps() {
+    return this.requireCapability("miniApps", "Mini App").listInstalled();
+  }
+
+  /**
    * Starts a Mini App and, when this host has a presenter, shows it. A forwarding call only: the
    * application owns the lifecycle, and `launch` is server-only coordinates the caller must not forward
    * to a renderer.

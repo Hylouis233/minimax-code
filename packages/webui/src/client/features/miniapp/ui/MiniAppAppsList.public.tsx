@@ -14,7 +14,6 @@
 
 import { useEffect, type ReactElement } from "react";
 
-import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
 import {
   useWebuiMiniAppWorkflows,
   useWebuiMiniAppWorkflowsState,
@@ -89,6 +88,7 @@ export function MiniAppAppsList({ onInstallRequest }: MiniAppAppsListProps): Rea
                 {row.errorCode ? `（${row.errorCode}）` : ""}
               </span>
               <div className="webui-plugin-actions">
+                {row.enabled ? (<>
                 <button
                   type="button"
                   disabled={state.opening === row.pluginId}
@@ -128,14 +128,16 @@ export function MiniAppAppsList({ onInstallRequest }: MiniAppAppsListProps): Rea
                 >
                   卸载
                 </button>
-                {/* The list is the runtime's *available* Mini Apps, so every row
-                    is enabled; turning the switch off disables the plugin, and the
-                    row leaves the list on the reload that follows. */}
-                <ToggleSwitch
-                  checked
-                  label={`启用 ${row.name}`}
-                  onChange={() => void workflows?.setPluginEnabled(row.pluginId, false)}
-                />
+                <button type="button" onClick={() => void workflows?.setPluginEnabled(row.pluginId, false)}>
+                  停用
+                </button>
+                </>) : (
+                  // A disabled package has nothing to start or stop; the one
+                  // action it has is the one that makes it startable again.
+                  <button type="button" onClick={() => void workflows?.setPluginEnabled(row.pluginId, true)}>
+                    启用
+                  </button>
+                )}
               </div>
             </article>
           );

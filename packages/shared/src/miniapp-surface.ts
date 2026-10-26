@@ -12,6 +12,15 @@ export interface MiniAppSurfaceSummary {
   readonly displayName?: string;
   readonly description?: string;
   readonly iconUrl?: string;
+  /**
+   * Whether the runtime may start this package.
+   *
+   * Absent for a producer that lists only startable packages — which is what the
+   * launch path and the desktop client's catalogue do — and `false` for a row a
+   * management surface read through the installed listing, so that surface can
+   * offer to enable it instead of a start the runtime would refuse.
+   */
+  readonly enabled?: boolean;
   readonly runtime: {
     readonly kind: 'process';
     readonly status: MiniAppRuntimeStatus;

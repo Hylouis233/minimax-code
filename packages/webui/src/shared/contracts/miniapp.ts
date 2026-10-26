@@ -35,6 +35,15 @@ export interface WebuiMiniAppSummary {
   readonly displayName?: string;
   readonly description?: string;
   readonly iconUrl?: string;
+  /**
+   * Whether the runtime may start this package.
+   *
+   * Absent means "the runtime lists only startable packages", which is what the
+   * older read answered. `false` marks a row from the installed listing — a Mini
+   * App the person disabled, which the catalogue offers to enable rather than to
+   * open.
+   */
+  readonly enabled?: boolean;
   readonly runtime: {
     readonly kind: "process";
     readonly status: WebuiMiniAppRuntimeStatus;

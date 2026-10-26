@@ -587,6 +587,14 @@ export interface WebuiRuntimeCliService {
    * makes of one.
    */
   listMiniApps?(): Promise<HostResult<"listMiniApps">>;
+  /**
+   * The installed set, including a Mini App the person disabled.
+   *
+   * Optional: a host whose runtime predates the installed read answers only
+   * `listMiniApps`, and the adapter falls back to it. `enabled: false` on a row is
+   * what tells the catalogue to offer "enable" rather than "open".
+   */
+  listInstalledMiniApps?(): Promise<HostResult<"listMiniApps">>;
   openMiniApp?(
     request: WebuiHostRequest<"openMiniApp">,
   ): Promise<HostResult<"openMiniApp">>;

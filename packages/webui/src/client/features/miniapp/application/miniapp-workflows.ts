@@ -187,7 +187,10 @@ export function createWebuiMiniAppWorkflows(deps: {
   const readCatalogue = async (): Promise<WebuiMiniAppList | undefined> => {
     if (!port.listMiniApps) return undefined;
     const list = await port.listMiniApps();
-    const rows = webuiMiniAppRows(list.miniApps);
+    // A host that answers nothing, or something else, is an empty catalogue rather
+    // than a thrown render: a panel that cannot read "no rows" takes the whole
+    // workspace down with it.
+    const rows = webuiMiniAppRows(Array.isArray(list?.miniApps) ? list.miniApps : []);
     set((current) => ({ ...current, listing: { rows, loading: false } }));
     return list;
   };

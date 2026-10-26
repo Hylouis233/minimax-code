@@ -32,7 +32,11 @@ export interface MiniAppPickerProps {
 export function MiniAppPicker({ sessionId, onOpened, onClose }: MiniAppPickerProps): ReactElement {
   const workflows = useWebuiMiniAppWorkflows();
   const state = useWebuiMiniAppWorkflowsState();
-  const { rows, loading } = state.listing;
+  const { loading } = state.listing;
+  // Only a startable package belongs here: the picker exists to open one, and a
+  // disabled Mini App cannot be opened — the catalogue's apps area is where it is
+  // enabled, and this surface would otherwise offer an action that always fails.
+  const rows = state.listing.rows.filter((row) => row.enabled);
   const running = webuiMiniAppRunningRows(rows);
   const refused = Object.values(state.refusals);
   const capacityRefused = refused.some((refusal) => refusal.code === "BUSY");

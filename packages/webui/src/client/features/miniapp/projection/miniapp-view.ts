@@ -35,6 +35,14 @@ export interface WebuiMiniAppRow {
   readonly statusLabel: string;
   /** True while the runtime is up, which is when the row offers "stop". */
   readonly running: boolean;
+  /**
+   * False for a package that is installed but disabled.
+   *
+   * Such a row can be enabled but not started: the runtime refuses to launch a
+   * disabled package, so offering "open" on it would be an action that always
+   * fails.
+   */
+  readonly enabled: boolean;
 }
 
 /** The state in words. A closed union in, a label out — never "unknown". */
@@ -57,16 +65,22 @@ export function webuiMiniAppStatusLabel(status: WebuiMiniAppRuntimeStatus): stri
 export function webuiMiniAppRows(
   miniApps: readonly WebuiMiniAppSummary[],
 ): readonly WebuiMiniAppRow[] {
-  return miniApps.map((miniApp) => ({
-    pluginId: miniApp.pluginId,
-    name: miniApp.displayName || miniApp.pluginId,
-    description: miniApp.description ?? "",
-    ...(miniApp.iconUrl !== undefined ? { iconUrl: miniApp.iconUrl } : {}),
-    status: miniApp.runtime.status,
-    ...(miniApp.runtime.errorCode !== undefined ? { errorCode: miniApp.runtime.errorCode } : {}),
-    statusLabel: webuiMiniAppStatusLabel(miniApp.runtime.status),
-    running: miniApp.runtime.status === "running",
-  }));
+  return miniApps.map((miniApp) => {
+    // A disabled package has no runtime state to report: it is installed and not
+    // startable, which is a fact about the package rather than about a process.
+    const enabled = miniApp.enabled !== false;
+    return {
+      pluginId: miniApp.pluginId,
+      name: miniApp.displayName || miniApp.pluginId,
+      description: miniApp.description ?? "",
+      ...(miniApp.iconUrl !== undefined ? { iconUrl: miniApp.iconUrl } : {}),
+      status: miniApp.runtime.status,
+      ...(miniApp.runtime.errorCode !== undefined ? { errorCode: miniApp.runtime.errorCode } : {}),
+      statusLabel: enabled ? webuiMiniAppStatusLabel(miniApp.runtime.status) : "已停用",
+      running: enabled && miniApp.runtime.status === "running",
+      enabled,
+    };
+  });
 }
 
 /** The rows that are up, in catalogue order. */

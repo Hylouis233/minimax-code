@@ -36,18 +36,35 @@ export function sameMiniAppCandidate(
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-/** Enabled and valid authored definitions, independent from Host runtime acceptance. */
-export function listEnabledMiniAppDefinitions(
+/**
+ * Every installed Mini App, enabled or not.
+ *
+ * The enabled-only projection below is what activation, publication and the
+ * runtime's own projection must keep using. This one exists because a management
+ * surface has to be able to show a Mini App it disabled and offer to turn it back
+ * on: a listing that drops the package answers "nothing is installed", which is
+ * the one answer that leaves the person with no action.
+ *
+ * The two share this walk, so a package cannot be a Mini App for one and not for
+ * the other. Official packages carry no per-package switch in this snapshot, so
+ * they are enabled whenever the package is present — which is what the enabled
+ * projection has always assumed for them. A local package's `enabled` is the
+ * projection's own flag, the same one the rest of the plugin system reads.
+ */
+export function listInstalledMiniAppDefinitions(
   snapshot: PluginSnapshot,
-): readonly MiniAppDefinition[] {
+): readonly (MiniAppDefinition & { readonly enabled: boolean })[] {
   const packages = [
-    ...snapshot.officialPackages.flatMap(({ plugin }) => (plugin?.miniapp ? [plugin] : [])),
+    ...snapshot.officialPackages.flatMap(({ plugin }) =>
+      plugin?.miniapp ? [{ plugin, enabled: true }] : [],
+    ),
     ...snapshot.localPlugins
-      .filter((projection) => projection.enabled && projection.plugin.miniapp !== undefined)
-      .map(({ plugin }) => plugin),
+      .filter((projection) => projection.plugin.miniapp !== undefined)
+      .map((projection) => ({ plugin: projection.plugin, enabled: projection.enabled })),
   ];
   return packages
-    .map<MiniAppDefinition>((plugin) => ({
+    .map<MiniAppDefinition & { readonly enabled: boolean }>(({ plugin, enabled }) => ({
+      enabled,
       source: plugin.source === 'OFFICIAL' ? 'official' : 'local',
       ...(plugin.displayName ? { displayName: plugin.displayName } : {}),
       ...(plugin.description ? { description: plugin.description } : {}),
@@ -55,6 +72,13 @@ export function listEnabledMiniAppDefinitions(
       candidate: miniAppCandidateFromPackage({ plugin }),
     }))
     .sort((left, right) => left.candidate.pluginId.localeCompare(right.candidate.pluginId));
+}
+
+/** Enabled and valid authored definitions, independent from Host runtime acceptance. */
+export function listEnabledMiniAppDefinitions(
+  snapshot: PluginSnapshot,
+): readonly MiniAppDefinition[] {
+  return listInstalledMiniAppDefinitions(snapshot).filter((definition) => definition.enabled);
 }
 
 /** Runtime-only projection after a publication snapshot has been admission-filtered. */

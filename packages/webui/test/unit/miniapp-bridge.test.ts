@@ -99,7 +99,7 @@ describe("a confirmed append", () => {
   });
 
   it("detects the plugin name in the question it asks, so the confirmation names the page", async () => {
-    const confirm = vi.fn(() => false);
+    const confirm = vi.fn((_question: string) => false);
     await webuiMiniAppBridgeAppend({
       request,
       sessionId: "session-1",
