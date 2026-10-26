@@ -10,6 +10,7 @@ export { sendMessageOperation, enqueueMessageOperation, resumeSessionOperation }
 export { watchEventsOperation, listPendingPermissionsOperation, getPendingQuestionnaireOperation, replyPermissionOperation, replyQuestionnaireOperation, dismissQuestionnaireOperation } from "./questionnaire.js";
 export { abortSessionOperation, listQueueMessagesOperation, deleteQueueItemOperation, listModelsOperation, listSkillsOperation, selectModelOperation, getSessionUsageOperation } from "./queue.js";
 export { pluginManagementOperation } from "./plugin-management.js";
+export { listMiniAppsOperation, openMiniAppOperation, stopMiniAppOperation } from "./miniapp.js";
 export { getPermissionModeOperation, setPermissionModeOperation } from "./permission-mode.js";
 export { getGlobalInstructionsOperation, setGlobalInstructionsOperation } from "./personalization.js";
 export { getAgentMemoryOperation, setAgentMemoryOperation } from "./agent-memory.js";
@@ -21,6 +22,7 @@ import {
   type WebuiOperationPort,
 } from "./bind-handlers.js";
 import { createWorkspaceHandlerEntries } from "./handlers/workspace.js";
+import { createMiniAppHandlerEntries } from "./handlers/miniapp.js";
 import { createTerminalHandlerEntries } from "./handlers/terminal.js";
 import {
   createBrowserHandlerEntries,
@@ -63,7 +65,7 @@ export type {
 } from "./operation-contract.js";
 
 /**
- * Builds the operation registry: 86 statically declared bindings plus the 13
+ * Builds the operation registry: 93 statically declared bindings plus the 16
  * operations that keep dedicated handlers.
  *
  * The registration order below is observable on the wire and must not change;
@@ -91,6 +93,7 @@ export function createOperationRegistry(
     ...createAccountHandlerEntries(port),
     ...createStreamHandlerEntries(port),
     ...createMessageHandlerEntries(port),
+    ...createMiniAppHandlerEntries(port),
     ...(terminal ? createTerminalHandlerEntries(terminal) : []),
     ...(browser ? createBrowserHandlerEntries(browser, browserInstallationKeys) : []),
   ]);
@@ -265,6 +268,13 @@ export function createOperationRegistry(
   registerOperation(registry, entry("sendMessage"));
   registerOperation(registry, entry("enqueueMessage"));
   registerOperation(registry, entry("resumeSession"));
+  // The Mini App surface is registered unconditionally, like every capability
+  // since batch C: a host without the Mini App cell answers
+  // `capability_unavailable` from the handler, which is a different statement
+  // from "this operation does not exist here" and one the client can branch on.
+  registerOperation(registry, entry("listMiniApps"));
+  registerOperation(registry, entry("openMiniApp"));
+  registerOperation(registry, entry("stopMiniApp"));
   return registry;
 }
 

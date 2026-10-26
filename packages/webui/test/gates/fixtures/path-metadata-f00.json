@@ -3658,6 +3658,15 @@
       "home": "outside"
     },
     {
+      "path": "runtime/harness/miniapp.ts",
+      "layers": [
+        "runtime"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
       "path": "runtime/harness/models-plugins.ts",
       "layers": [
         "runtime"
@@ -4108,6 +4117,24 @@
       "home": "outside"
     },
     {
+      "path": "server/miniapp/presenter.ts",
+      "layers": [
+        "server"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
+      "path": "server/miniapp/proxy.ts",
+      "layers": [
+        "server"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
       "path": "server/operation/account.ts",
       "layers": [
         "server"
@@ -4216,6 +4243,15 @@
       "home": "outside"
     },
     {
+      "path": "server/operation/handlers/miniapp.ts",
+      "layers": [
+        "server"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
       "path": "server/operation/handlers/stream.ts",
       "layers": [
         "server"
@@ -4262,6 +4298,15 @@
     },
     {
       "path": "server/operation/messages.ts",
+      "layers": [
+        "server"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
+      "path": "server/operation/miniapp.ts",
       "layers": [
         "server"
       ],
@@ -4550,6 +4595,15 @@
     },
     {
       "path": "shared/contracts/messages.ts",
+      "layers": [
+        "shared"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
+      "path": "shared/contracts/miniapp.ts",
       "layers": [
         "shared"
       ],

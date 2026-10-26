@@ -575,6 +575,24 @@ export interface WebuiRuntimeCliService {
     readonly reason: "ui_request";
     readonly customInstructions?: string;
   }): Promise<HostResult<"requestCompaction">>;
+  /**
+   * The Mini App cell of the runtime's owner policy.
+   *
+   * Optional on the same terms as the memory pair: a host composed without the
+   * Mini App capability still has to satisfy this shape, and the adapter's guard
+   * turns the absent member into one `capability_unavailable` refusal instead of
+   * an empty catalogue. Results are the runtime's own (`HostResult`), because the
+   * publishable summary and the server-only launch are converted at the adapter —
+   * a `WebuiMiniAppLaunch` is not a shape the runtime has, it is what the WebUI
+   * makes of one.
+   */
+  listMiniApps?(): Promise<HostResult<"listMiniApps">>;
+  openMiniApp?(
+    request: WebuiHostRequest<"openMiniApp">,
+  ): Promise<HostResult<"openMiniApp">>;
+  stopMiniApp?(
+    request: WebuiHostRequest<"stopMiniApp">,
+  ): Promise<HostResult<"stopMiniApp">>;
 }
 
 export interface WebuiRuntimeHostHandle {

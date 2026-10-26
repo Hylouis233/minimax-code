@@ -13,7 +13,7 @@
 // Binding declarations contain no `any`, no type assertions and no non-null
 // assertions; the only registry-type erasure lives in `executeBinding`.
 //
-// The 13 operations that shape a response, degrade when a capability is absent
+// The 16 operations that shape a response, degrade when a capability is absent
 // or carry a stream/terminal/command shape keep dedicated handlers in
 // `./handlers/`; they are not bindings.
 import type { OperationSpec } from "../../shared/operation-names.js";
@@ -141,7 +141,7 @@ export type {
 } from "./binding-mechanism.js";
 
 // ---------------------------------------------------------------------------
-// Binding declarations — 86 operations (the other 13 keep dedicated handlers)
+// Binding declarations — 93 operations (the other 16 keep dedicated handlers)
 // ---------------------------------------------------------------------------
 
 const identity = <T>(value: T): T => value;
@@ -762,6 +762,9 @@ export const DEDICATED_OPERATION_NAMES = [
   "getMessages",
   "sendMessage",
   "resumeSession",
+  "listMiniApps",
+  "openMiniApp",
+  "stopMiniApp",
 ] as const;
 
 type AnyBinding = WebuiOperationBinding<

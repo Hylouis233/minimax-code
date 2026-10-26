@@ -4,7 +4,7 @@
 // Split out of `bind-handlers.ts` because the two halves change for
 // different reasons and are verified differently: this half is generic — it
 // holds no operation name and no runtime method name of its own — while the
-// roster next door is a 86-row table of concrete declarations that changes with
+// roster next door is a 93-row table of concrete declarations that changes with
 // the wire surface. A reviewer reading a table row should not have to hold the
 // executor's erasure in mind, and a change to the executor should not touch a
 // file whose diff is otherwise a list of operations.
@@ -134,6 +134,9 @@ export type WebuiOperationPort = Pick<
   | "setUserProfile"
   | "getMemorySettings"
   | "setMemorySettings"
+  | "listMiniApps"
+  | "openMiniApp"
+  | "stopMiniApp"
   | "runCommand"
 >;
 

@@ -108,6 +108,10 @@ import type {
   WebuiTestUserModelCandidateRequest,
 } from "../shared/contracts/models.js";
 import type { WebuiHostPrerequisiteFacts } from "../shared/capability-manifest.js";
+import type {
+  WebuiMiniAppList,
+  WebuiMiniAppSummary,
+} from "../shared/contracts/miniapp.js";
 import type { WebuiVersionInfo } from "../shared/contracts/version.js";
 import type { WebuiUsageQuotaResult } from "../shared/contracts/usage-quota.js";
 import type {
@@ -572,11 +576,78 @@ export interface WebuiHarnessPort {
    */
   runCommand(request: WebuiRunCommandRequest): Promise<WebuiRunCommandResult>;
   /**
+   * The Mini App catalogue.
+   *
+   * Optional because the Mini App capability is a cell of the runtime's owner
+   * policy: a host whose application was composed without it has no Mini Apps at
+   * all, which is a different answer from an empty catalogue. The operations
+   * refuse with `capability_unavailable` when these members are absent, rather
+   * than reporting "no Mini Apps installed".
+   */
+  listMiniApps?(): Promise<WebuiMiniAppList>;
+  /**
+   * Starts one Mini App and hands back its launch coordinates.
+   *
+   * The result is **server-only**: `launch` carries the Mini App's real origin,
+   * the credential its own loopback guard demands and the header that credential
+   * is read from. `server/operation/handlers/miniapp.ts` turns it into a proxy
+   * and answers the browser with that proxy's URL; nothing in `launch` may be
+   * copied into a response. The `signal` is the requesting frame's, so a client
+   * that goes away stops waiting on a start.
+   */
+  openMiniApp?(request: {
+    readonly pluginId: string;
+    readonly signal?: AbortSignal;
+  }): Promise<WebuiMiniAppLaunch>;
+  /** Stops one Mini App. The caller closes its proxy. */
+  stopMiniApp?(request: {
+    readonly pluginId: string;
+    readonly signal?: AbortSignal;
+  }): Promise<void>;
+  /**
    * Release anything the port owns. The service calls this after closing
    * every transport-side resource so the harness can tear itself down in
    * the required order.
    */
   close(): Promise<void>;
+}
+
+/**
+ * The refusal a host without the Mini App cell gives, everywhere it is given.
+ *
+ * Declared beside the capability itself because two layers answer it — the
+ * adapter when the runtime's facade has no Mini App application, and the
+ * dedicated handlers when the port has no member at all — and one message is
+ * what keeps "this host has no Mini Apps" recognisable to a client regardless of
+ * which of the two noticed it.
+ */
+export const MINIAPP_CAPABILITY_ABSENT =
+  "runtime host does not expose the Mini App capability";
+
+/**
+ * One Mini App launch, as the runtime hands it over.
+ *
+ * Declared here rather than in `shared/contracts/` on purpose: `credential` is a
+ * live capability, and a shared contract is importable by the browser. Only the
+ * server and the runtime may name this type; the wire carries
+ * `WebuiMiniAppView`, which cannot express any of it.
+ */
+export interface WebuiMiniAppLaunch {
+  readonly miniApp: WebuiMiniAppSummary;
+  readonly launch: {
+    /** The Mini App's own loopback origin. Never forwarded to a renderer. */
+    readonly origin: string;
+    readonly surfacePath: string;
+    readonly runId: string;
+    /** The credential the Mini App's guard demands. Injected by the proxy. */
+    readonly credential: string;
+    /**
+     * Request header the guard reads it from. Carried with the credential so the
+     * server never spells the header name twice, and never spells it differently
+     * from the runtime that installed it.
+     */
+    readonly credentialHeader: string;
+  };
 }
 
 /**

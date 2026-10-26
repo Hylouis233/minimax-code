@@ -549,6 +549,13 @@ The local process that serves one Mini App's page on a loopback port. The client
 and does not own its state.
 _Avoid_: runtime (that names the harness side), server, container
 
+**Mini App proxy**:
+The loopback listener the service puts between a Mini App's process and the client's view. The
+Mini App serves its own page under a credential its own guard demands; the client frames the proxy's
+URL instead, and the proxy injects that credential on the way out. The process's origin and the
+credential are server-only, so an operation answers with the proxy and never with the process.
+_Avoid_: gateway, tunnel, port forward
+
 **Mini App presentation lease**:
 The record of which client document is currently showing one Mini App, held by the service because
 two presentations of the same Mini App are two documents that share nothing but that service. It is

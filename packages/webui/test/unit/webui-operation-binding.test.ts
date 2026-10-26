@@ -1,7 +1,7 @@
 // Unit tests for the typed operation bindings and their executor.
 //
 // These pin the *declaration* surface: every operation is either a binding or
-// one of the thirteen dedicated handlers, a binding calls exactly the runtime
+// one of the sixteen dedicated handlers, a binding calls exactly the runtime
 // method it names with exactly the arguments its declaration computes, the
 // receiver is preserved, a missing capability fails at invocation (never at
 // assembly) with the historical error class and message, a capability
@@ -45,9 +45,9 @@ describe("WebUI operation bindings", () => {
   it("covers every operation exactly once as a binding or a dedicated handler", () => {
     const bindingNames = Object.keys(WEBUI_OPERATION_BINDINGS);
     expect(bindingNames).toHaveLength(93);
-    expect(DEDICATED_OPERATION_NAMES).toHaveLength(13);
+    expect(DEDICATED_OPERATION_NAMES).toHaveLength(16);
     const all = new Set<string>([...bindingNames, ...DEDICATED_OPERATION_NAMES]);
-    expect(all.size).toBe(106);
+    expect(all.size).toBe(109);
     for (const dedicated of DEDICATED_OPERATION_NAMES)
       expect(bindingNames).not.toContain(dedicated);
   });

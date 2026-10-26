@@ -21,6 +21,7 @@ import { createInteractionsAdapter } from "./interactions.js";
 import { createWorkspaceAdapter } from "./workspace.js";
 import { createSettingsAdapter } from "./settings.js";
 import { createModelsPluginsAdapter } from "./models-plugins.js";
+import { createMiniAppAdapter } from "./miniapp.js";
 import { createAccountAdapter } from "./account.js";
 import { runWebuiCommand } from "../commands/runner.js";
 import { importWebuiSessionTransfer } from "../session-transfer.js";
@@ -70,6 +71,7 @@ export function createHarnessPortFromHost(
     ...createWorkspaceAdapter(host),
     ...createSettingsAdapter(host),
     ...createModelsPluginsAdapter(host),
+    ...createMiniAppAdapter(host),
     ...createAccountAdapter(host),
     async close() {
       if (closed) return;

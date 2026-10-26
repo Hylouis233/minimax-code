@@ -165,6 +165,13 @@ export const GET_USER_PROFILE_OPERATION_NAME = "getUserProfile" as const;
 export const SET_USER_PROFILE_OPERATION_NAME = "setUserProfile" as const;
 export const GET_MEMORY_SETTINGS_OPERATION_NAME = "getMemorySettings" as const;
 export const SET_MEMORY_SETTINGS_OPERATION_NAME = "setMemorySettings" as const;
+// The Mini App surface. Three operations over one runtime capability: the
+// catalogue, the launch, and the stop. `openMiniApp` answers with a loopback
+// view URL rather than the Mini App's own coordinates, so the credential the
+// Mini App's guard demands never leaves the server.
+export const LIST_MINI_APPS_OPERATION_NAME = "listMiniApps" as const;
+export const OPEN_MINI_APP_OPERATION_NAME = "openMiniApp" as const;
+export const STOP_MINI_APP_OPERATION_NAME = "stopMiniApp" as const;
 
 import type {
   WebuiActiveTurnResult,
@@ -297,6 +304,10 @@ import type {
   WebuiRunCommandResult,
 } from "./contracts/terminal.js";
 import type { WebuiPluginManagementRequest } from "./plugin-management.js";
+import type {
+  WebuiMiniAppList,
+  WebuiMiniAppView,
+} from "./contracts/miniapp.js";
 
 /**
  * The complete operation table: every wire operation name mapped to the
@@ -754,6 +765,28 @@ export interface OperationSpec {
   setMemorySettings: {
     request: { readonly enabled?: boolean; readonly proactive?: boolean };
     response: WebuiMemorySettingsView;
+  };
+  /**
+   * The Mini App catalogue. A row's `runtime.status` is why this is not just a
+   * plugin list: the picker offers "open" or "stop" from it.
+   */
+  listMiniApps: { request: undefined; response: WebuiMiniAppList };
+  /**
+   * Starts one Mini App and names where to frame it.
+   *
+   * The response is the loopback proxy's `viewUrl` and the plugin it belongs to.
+   * The Mini App's own origin, surface path and launch credential stay on the
+   * server: the proxy is the only thing that sees them, and it injects the
+   * credential on the way out.
+   */
+  openMiniApp: {
+    request: { readonly pluginId: string };
+    response: WebuiMiniAppView;
+  };
+  /** Stops one Mini App and closes the proxy that was serving it. */
+  stopMiniApp: {
+    request: { readonly pluginId: string };
+    response: { readonly success: true };
   };
 }
 
