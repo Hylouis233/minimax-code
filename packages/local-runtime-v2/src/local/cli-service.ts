@@ -168,6 +168,24 @@ export class CliService {
     return { sessionId, workspaceRoot };
   }
 
+  /** The Mini App listing the catalogue and the picker both read. */
+  listMiniApps() {
+    return this.requireCapability("miniApps", "Mini App").list();
+  }
+
+  /**
+   * Starts a Mini App and, when this host has a presenter, shows it. A forwarding call only: the
+   * application owns the lifecycle, and `launch` is server-only coordinates the caller must not forward
+   * to a renderer.
+   */
+  openMiniApp(input: { readonly pluginId: string; readonly signal?: AbortSignal }) {
+    return this.requireCapability("miniApps", "Mini App").open(input);
+  }
+
+  stopMiniApp(input: { readonly pluginId: string; readonly signal?: AbortSignal }) {
+    return this.requireCapability("miniApps", "Mini App").stop(input);
+  }
+
   clearSessionMcpServers(sessionId: string): Promise<void> {
     return this.requireCapability("mcp", "MCP").clearSessionServers(sessionId);
   }

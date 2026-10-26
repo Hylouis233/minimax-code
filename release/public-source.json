@@ -1664,6 +1664,7 @@
     "packages/local-runtime-v2/test/unit/agent/storage/agent.repository.test.ts",
     "packages/local-runtime-v2/test/unit/agent/storage/canonical-agent-config.test.ts",
     "packages/local-runtime-v2/test/unit/compat/v1/runtime.test.ts",
+    "packages/local-runtime-v2/test/unit/miniapp/cli-service-miniapp.test.ts",
     "packages/local-runtime-v2/test/unit/miniapp/loopback-guard.test.ts",
     "packages/local-runtime-v2/test/unit/miniapp/node-runtime-credential.test.ts",
     "packages/local-runtime-v2/test/unit/miniapp/owner-lease.test.ts",

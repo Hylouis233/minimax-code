@@ -47,6 +47,7 @@
       "packages/local-runtime-v2/test/unit/miniapp/node-runtime-credential.test.ts",
       "packages/local-runtime-v2/test/unit/miniapp/owner-lease.test.ts",
       "packages/local-runtime-v2/test/unit/miniapp/runtime-miniapp-options.test.ts",
+      "packages/local-runtime-v2/test/unit/miniapp/cli-service-miniapp.test.ts",
       "packages/local-runtime-v2/src/service/mcp/runtime/builtin-matrix.test.ts",
       "packages/local-runtime-v2/src/service/workspace/snapshot/watcher.test.ts",
       "packages/tui/test/unit/tui-codex-login.test.ts",
