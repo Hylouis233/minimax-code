@@ -11,6 +11,7 @@ import {
   MINIAPP_LOOPBACK_HEALTH_PATH,
   MINIAPP_LOOPBACK_TOKEN_HEADER,
 } from '../../../src/service/miniapp/contracts.js';
+import { probeMiniAppPortOwnership } from '../../../src/service/miniapp/process/node-runtime/loopback-ownership.js';
 import { waitForLoopbackReadiness } from '../../../src/service/miniapp/process/node-runtime/loopback-readiness.js';
 import {
   isMiniAppRunnerInitMessage,
@@ -317,5 +318,39 @@ describe('Mini App loopback readiness', () => {
     await expect(readiness(closedPort, TOKEN, 150)).rejects.toMatchObject({
       code: 'READINESS_TIMEOUT',
     });
+  });
+});
+
+describe('Mini App port ownership', () => {
+  const probe = (target: number) =>
+    probeMiniAppPortOwnership({
+      port: target,
+      timeoutMs: 500,
+      signal: new AbortController().signal,
+    });
+
+  it('reports a closed port as free', async () => {
+    expect(await probe(await freePort())).toBe('free');
+  });
+
+  it('reports a port whose guard rejects an anonymous request as guarded', async () => {
+    expect(await probe(port)).toBe('guarded');
+  });
+
+  it('reports a port held by something that does not answer like the guard as foreign', async () => {
+    const plainPort = await freePort();
+    const script = [
+      "const http = require('node:http');",
+      'http',
+      '  .createServer((_request, response) => response.writeHead(200).end())',
+      `  .listen(${plainPort}, '127.0.0.1');`,
+    ].join('\n');
+    const child = spawn(process.execPath, ['-e', script], { stdio: 'ignore' });
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(await probe(plainPort)).toBe('foreign');
+    } finally {
+      child.kill('SIGKILL');
+    }
   });
 });
